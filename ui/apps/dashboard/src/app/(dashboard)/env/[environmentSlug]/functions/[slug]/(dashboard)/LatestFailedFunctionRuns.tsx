@@ -4,9 +4,9 @@ import { useMemo } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { XCircleIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 import { useQuery } from 'urql';
 
-import Button from '@/components/Button';
 import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import { useEnvironment } from '@/queries';
@@ -90,13 +90,12 @@ export default function LatestFailedFunctionRuns({
         </div>
         <Button
           className="ml-auto"
-          variant="secondary"
+          appearance="outlined"
           href={
             `/env/${environmentSlug}/functions/${encodeURIComponent(functionSlug)}/logs` as Route
           }
-        >
-          View All Logs
-        </Button>
+          label="View All Logs"
+        />
       </header>
       <div className="rounded-md border border-slate-200 text-sm text-slate-500">
         <table className="w-full table-fixed divide-y divide-slate-200 rounded-lg bg-white">

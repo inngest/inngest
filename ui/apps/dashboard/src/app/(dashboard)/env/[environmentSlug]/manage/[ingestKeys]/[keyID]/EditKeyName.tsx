@@ -3,9 +3,9 @@
 import { useContext, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RocketLaunchIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 
-import Button from '@/components/Button';
 import Input from '@/components/Forms/Input';
 import useManagePageTerminology from './../useManagePageTerminology';
 import { Context } from './Context';
@@ -55,12 +55,11 @@ export default function EditKeyButton({ keyID, keyName }: EditKeyNameProps) {
       />
       <Button
         type="submit"
-        icon={<RocketLaunchIcon className="h-4" />}
-        variant="primary"
+        icon={<RocketLaunchIcon />}
+        kind="primary"
         disabled={isDisabled}
-      >
-        Save Name
-      </Button>
+        label="Save Name"
+      />
     </form>
   );
 }

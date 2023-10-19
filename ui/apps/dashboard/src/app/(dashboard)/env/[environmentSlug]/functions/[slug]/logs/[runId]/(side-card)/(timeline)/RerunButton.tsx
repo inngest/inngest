@@ -3,10 +3,10 @@
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { ArrowPathIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
-import Button from '@/components/Button';
 import { getFragmentData, graphql, type FragmentType } from '@/gql';
 import cn from '@/utils/cn';
 
@@ -67,15 +67,12 @@ export default function RerunButton({
 
   return (
     <Button
-      size="sm"
-      context="dark"
+      size="small"
       iconSide="right"
-      variant="secondary"
       disabled={isMutating}
-      onClick={() => rerunFunction()}
-      icon={<ArrowPathIcon className={cn('h-3 w-3 text-sky-500', isMutating && 'animate-spin')} />}
-    >
-      Rerun
-    </Button>
+      btnAction={() => rerunFunction()}
+      icon={<ArrowPathIcon className={cn(' text-sky-500', isMutating && 'animate-spin')} />}
+      label="Rerun"
+    />
   );
 }

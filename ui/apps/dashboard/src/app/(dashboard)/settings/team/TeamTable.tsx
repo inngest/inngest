@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@inngest/components/Button';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
-import Button from '@/components/Button';
 import Modal from '@/components/Modal';
 import Table from '@/components/Table';
 import { graphql } from '@/gql';
@@ -70,10 +70,8 @@ export default function TeamTable({ loggedInUserID, users }: Props) {
           <p>Are you sure you want to delete {pendingUser.email}?</p>
 
           <div className="flex flex-row justify-end gap-4">
-            <Button onClick={cancelDeletion} variant="secondary">
-              No
-            </Button>
-            <Button onClick={() => deleteUser(pendingUser.id)}>Yes</Button>
+            <Button btnAction={cancelDeletion} appearance="outlined" label="No" />
+            <Button kind="danger" btnAction={() => deleteUser(pendingUser.id)} label="Yes" />
           </div>
         </Modal>
       )}
@@ -118,9 +116,13 @@ function createColumns({
         const isDisabled = isDeletionPending || user.id === loggedInUserID;
 
         return (
-          <Button disabled={isDisabled} onClick={() => onClickDelete(user)} variant="danger">
-            Delete user
-          </Button>
+          <Button
+            disabled={isDisabled}
+            btnAction={() => onClickDelete(user)}
+            kind="danger"
+            appearance="outlined"
+            label="Delete user"
+          />
         );
       },
     },

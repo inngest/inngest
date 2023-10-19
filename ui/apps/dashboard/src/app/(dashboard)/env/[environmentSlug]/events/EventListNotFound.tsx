@@ -3,10 +3,10 @@
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 import { useCopyToClipboard } from 'react-use';
 import { useQuery } from 'urql';
 
-import Button from '@/components/Button';
 import SecretKey from '@/components/Secrets/SecretKey';
 import { graphql } from '@/gql';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
@@ -104,9 +104,11 @@ export default function EventListNotFound({ environmentSlug }: { environmentSlug
           </div>
 
           <div className="mt-6 flex items-center gap-2 border-t border-slate-800/50 py-4">
-            <Button variant="primary" href={`/env/${environmentSlug}/deploys` as Route}>
-              Deploy Your Functions
-            </Button>
+            <Button
+              kind="primary"
+              href={`/env/${environmentSlug}/deploys` as Route}
+              label="Deploy Your Functions"
+            />
             <div className="flex gap-2 border-l border-slate-800/50 pl-2">
               <Button
                 href={
@@ -114,20 +116,14 @@ export default function EventListNotFound({ environmentSlug }: { environmentSlug
                 }
                 target="_blank"
                 rel="noreferrer"
-                variant="secondary"
-                context="dark"
-              >
-                <VercelLogomark className="-ml-0.5 h-4 w-4" />
-                Vercel Integration
-              </Button>
+                icon={<VercelLogomark className="-ml-0.5" />}
+                label="Vercel Integration"
+              />
               <Button
-                variant="secondary"
-                context="dark"
                 target="_blank"
                 href={'https://www.inngest.com/docs/events?ref=app-onboarding-events' as Route}
-              >
-                Read The Docs
-              </Button>
+                label="Read The Docs"
+              />
             </div>
           </div>
         </div>
@@ -144,9 +140,12 @@ export default function EventListNotFound({ environmentSlug }: { environmentSlug
             environment. Your events will show up on this page when they are received.
           </p>
           <div className="mt-6 flex items-center gap-2 border-t border-slate-100 py-4">
-            <Button variant="secondary" target="_blank" onClick={() => router.refresh()}>
-              Refresh page to check for events
-            </Button>
+            <Button
+              appearance="outlined"
+              target="_blank"
+              btnAction={() => router.refresh()}
+              label="Refresh page to check for events"
+            />
           </div>
         </div>
       </div>

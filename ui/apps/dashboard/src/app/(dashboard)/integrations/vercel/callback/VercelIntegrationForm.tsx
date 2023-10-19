@@ -4,10 +4,10 @@ import { useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@headlessui/react';
+import { Button } from '@inngest/components/Button';
 
 import type VercelIntegration from '@/app/(dashboard)/settings/integrations/vercel/VercelIntegration';
 import useUpdateVercelIntegration from '@/app/(dashboard)/settings/integrations/vercel/useUpdateVercelIntegration';
-import Button from '@/components/Button';
 import Input from '@/components/Forms/Input';
 import cn from '@/utils/cn';
 
@@ -85,12 +85,11 @@ export default function VercelIntegrationForm({
         {hasPages && (
           <nav className="space-x-2 text-right" aria-label="Pagination">
             <Button
-              onClick={() => setCurrentPage(currentPage - 1)}
-              variant="secondary"
+              btnAction={() => setCurrentPage(currentPage - 1)}
+              appearance="outlined"
               disabled={!hasPreviousPage}
-            >
-              Prev
-            </Button>
+              label="Prev"
+            />
             <span className="isolate inline-flex rounded-md shadow-sm">
               {Array.from({ length: totalPages }, (_, index) => {
                 const isCurrentPage = index === currentPage - 1;
@@ -98,9 +97,9 @@ export default function VercelIntegrationForm({
                 const isLastPage = index === totalPages - 1;
                 return (
                   <Button
-                    onClick={() => setCurrentPage(index + 1)}
+                    btnAction={() => setCurrentPage(index + 1)}
                     key={index}
-                    variant="secondary"
+                    appearance="outlined"
                     aria-current={isCurrentPage ? 'page' : undefined}
                     className={cn(
                       'relative z-10 rounded-none rounded-l-md focus:z-20 focus:outline-offset-0',
@@ -110,19 +109,17 @@ export default function VercelIntegrationForm({
                         ? 'hover:bg-white focus-visible:outline  focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500'
                         : 'bg-slate-100'
                     )}
-                  >
-                    {index + 1}
-                  </Button>
+                    label={index + 1}
+                  />
                 );
               })}
             </span>
             <Button
-              variant="secondary"
+              appearance="outlined"
               disabled={!hasNextPage}
-              onClick={() => setCurrentPage(currentPage + 1)}
-            >
-              Next
-            </Button>
+              btnAction={() => setCurrentPage(currentPage + 1)}
+              label="Next"
+            />
           </nav>
         )}
       </div>
@@ -139,7 +136,7 @@ export default function VercelIntegrationForm({
           </a>{' '}
           about the Vercel integration.
         </p>
-        <Button type="submit">Save Configuration</Button>
+        <Button type="submit" label="Save Configuration" />
       </div>
     </form>
   );

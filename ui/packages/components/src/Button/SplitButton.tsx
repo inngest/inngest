@@ -1,3 +1,5 @@
+'use client';
+
 import { useState } from 'react';
 import {
   Button,
@@ -19,7 +21,7 @@ type ButtonCopyProps = {
   }[];
 };
 
-export default function SplitButton({ kind = 'default', size = 'small', items }: ButtonCopyProps) {
+export function SplitButton({ kind = 'default', size = 'small', items }: ButtonCopyProps) {
   const [value, setValue] = useState(items.length > 0 ? items[0]?.label : '');
   const selectedItem = items.find((item) => item.label === value);
   const { onClick: btnAction, label, icon } = selectedItem || {};
@@ -27,7 +29,7 @@ export default function SplitButton({ kind = 'default', size = 'small', items }:
   const buttonColors = getButtonColors({ kind, appearance: 'solid' });
   const buttonSizes = getButtonSizeStyles({ size, icon: true });
   const dropdownSizes = getButtonSizeStyles({ size, label: '' });
-  const disabledStyles = getDisabledStyles();
+  const disabledStyles = getDisabledStyles({ kind, appearance: 'solid' });
   const verticalDivider =
     'before:absolute before:h-3/4 before:border-l before:border-slate-800/50 before:top-2/4 before:left-0 before:-translate-x-2/4 before:-translate-y-2/4';
 

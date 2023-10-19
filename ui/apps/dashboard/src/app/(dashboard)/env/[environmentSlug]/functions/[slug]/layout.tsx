@@ -8,7 +8,6 @@ import {
   FolderIcon,
 } from '@heroicons/react/20/solid';
 
-import Button from '@/components/Button';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { Tag } from '@/components/Tag/Tag';
 import { useFunction } from '@/queries';

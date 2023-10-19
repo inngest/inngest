@@ -9,7 +9,7 @@
     ]
   },
   "scripts": {
-    "storybook": "storybook dev -p 6006",
+    "storybook": "storybook dev -p 6007",
     "build-storybook": "storybook build",
     "test": "vitest"
   },
@@ -17,6 +17,7 @@
     "@headlessui/tailwindcss": "0.1.2",
     "@monaco-editor/react": "4.5.2",
     "@radix-ui/react-accordion": "1.1.2",
+    "@radix-ui/react-select": "1.2.2",
     "@radix-ui/react-tooltip": "1.0.6",
     "@tanstack/react-table": "8.9.3",
     "framer-motion": "10.16.4",
