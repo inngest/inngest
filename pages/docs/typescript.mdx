@@ -225,3 +225,48 @@ export default inngest.createFunction(
 );
 ```
 </CodeGroup>
+
+## Helpers
+
+The TS SDK exports some helper types to allow you to access the type of particular Inngest internals outside of an Inngest function.
+
+### GetEvents <VersionBadge version="v2.0.0+" />
+
+Get a record of all available events given an Inngest client.
+
+It's recommended to use this instead of directly reusing your own event types, as Inngest will add extra properties and internal events such as `ts` and `inngest/function.failed`.
+
+```ts
+import { type GetEvents } from "inngest";
+import { inngest } from "@/inngest";
+
+type Events = GetEvents<typeof inngest>;
+```
+
+### GetFunctionInput <VersionBadge version="v3.3.0+" />
+
+Get the argument passed to Inngest functions given an Inngest client and, optionally, an event trigger.
+
+Useful for building function factories or other such abstractions.
+
+```ts
+import { type GetFunctionInput } from "inngest";
+import { inngest } from "@/inngest";
+
+type InputArg = GetFunctionInput<typeof inngest>;
+type InputArgWithTrigger = GetFunctionInput<typeof inngest, "app/user.created">;
+```
+
+### GetStepTools <VersionBadge version="v3.3.0+" />
+
+Get the `step` object passed to an Inngest function given an Inngest client and, optionally, an event trigger.
+
+Is a small shim over the top of `GetFunctionInput<...>["step"]`.
+
+```ts
+import { type GetStepTools } from "inngest";
+import { inngest } from "@/inngest";
+
+type StepTools = GetStepTools<typeof inngest>;
+type StepToolsWithTrigger = GetStepTools<typeof inngest, "app/user.created">;
+```
