@@ -8,6 +8,7 @@ import type { Environment } from '@inngest/components/types/environment';
 import type { Event } from '@inngest/components/types/event';
 import type { Function } from '@inngest/components/types/function';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
+import type { FunctionVersion } from '@inngest/components/types/functionVersion';
 import { classNames } from '@inngest/components/utils/classNames';
 import { type RawHistoryItem } from '@inngest/components/utils/historyParser';
 import { Client, useClient } from 'urql';
@@ -19,11 +20,19 @@ type Props = {
   environment: Pick<Environment, 'id' | 'slug'>;
   event?: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>;
   func: Pick<Function, 'id' | 'name' | 'slug' | 'triggers'>;
+  functionVersion?: Pick<FunctionVersion, 'url' | 'version'>;
   rawHistory: RawHistoryItem[];
   run: Pick<FunctionRun, 'canRerun' | 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'>;
 };
 
-export function StreamDetails({ environment, event, func, rawHistory, run }: Props) {
+export function StreamDetails({
+  environment,
+  event,
+  func,
+  functionVersion,
+  rawHistory,
+  run,
+}: Props) {
   const client = useClient();
 
   const getOutput = useMemo(() => {
@@ -46,6 +55,7 @@ export function StreamDetails({ environment, event, func, rawHistory, run }: Pro
 
       <RunDetails
         func={func}
+        functionVersion={functionVersion}
         getHistoryItemOutput={getOutput}
         history={history}
         rerunButton={<RerunButton environment={environment} func={func} functionRunID={run.id} />}

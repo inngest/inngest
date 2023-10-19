@@ -9,6 +9,7 @@ import { Timeline } from '@inngest/components/Timeline';
 import { IconClock } from '@inngest/components/icons/Clock';
 import type { Function } from '@inngest/components/types/function';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
+import type { FunctionVersion } from '@inngest/components/types/functionVersion';
 import type { HistoryParser } from '@inngest/components/utils/historyParser';
 import { type OutputType } from '@inngest/components/utils/outputRenderer';
 
@@ -18,6 +19,7 @@ import { renderRunMetadata } from './runMetadataRenderer';
 
 interface Props {
   func: Pick<Function, 'name' | 'triggers'>;
+  functionVersion?: Pick<FunctionVersion, 'url' | 'version'>;
   getHistoryItemOutput: (historyItemID: string) => Promise<string | undefined>;
   history: HistoryParser;
 
@@ -27,11 +29,22 @@ interface Props {
   run: Pick<FunctionRun, 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'>;
 }
 
-export function RunDetails({ func, getHistoryItemOutput, history, rerunButton, run }: Props) {
+export function RunDetails({
+  func,
+  functionVersion,
+  getHistoryItemOutput,
+  history,
+  rerunButton,
+  run,
+}: Props) {
   const firstTrigger = func.triggers[0] ?? null;
   const cron = firstTrigger && firstTrigger.type === 'CRON';
 
-  const metadataItems = renderRunMetadata(run, history);
+  const metadataItems = renderRunMetadata({
+    functionRun: run,
+    functionVersion,
+    history,
+  });
   let type: OutputType | undefined;
   if (run.status === 'COMPLETED') {
     type = 'completed';
