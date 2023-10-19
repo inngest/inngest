@@ -10,6 +10,18 @@ type Props = PropsWithChildren<{
 
 // Conditionally renders children based on a feature flag.
 export async function ServerFeatureFlag({ children, defaultValue = false, flag }: Props) {
+  const isEnabled = await getBooleanFlag(flag, { defaultValue });
+  if (isEnabled) {
+    return <>{children}</>;
+  }
+
+  return null;
+}
+
+export async function getBooleanFlag(
+  flag: string,
+  { defaultValue = false }: { defaultValue?: boolean } = {}
+): Promise<boolean> {
   const user = await currentUser();
   const client = await getLaunchDarklyClient();
 
@@ -31,10 +43,5 @@ export async function ServerFeatureFlag({ children, defaultValue = false, flag }
     },
   } as const;
 
-  const isEnabled = await client.variation(flag, context, defaultValue);
-  if (isEnabled) {
-    return <>{children}</>;
-  }
-
-  return null;
+  return client.variation(flag, context, defaultValue);
 }
