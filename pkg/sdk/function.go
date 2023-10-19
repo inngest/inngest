@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
@@ -71,20 +72,23 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 	case float64:
 		// JSON is always unmarshalled as a float.
 		c := int(v)
-		f.Concurrency = &inngest.Concurrency{
-			Limit: c,
+		f.Concurrency = &inngest.ConcurrencyLimits{
+			Limits: []inngest.Concurrency{
+				{
+					Limit: c,
+				},
+			},
 		}
 	case map[string]any:
-		// Handle maps.
-		limit, ok := v["limit"].(float64)
-		key, _ := v["key"].(string)
-		if ok {
-			f.Concurrency = &inngest.Concurrency{
-				Limit: int(limit),
-			}
+		f.Concurrency = &inngest.ConcurrencyLimits{
+			Limits: []inngest.Concurrency{parseConcurrency(v)},
 		}
-		if key != "" {
-			f.Concurrency.Key = &key
+	case []map[string]any:
+		f.Concurrency = &inngest.ConcurrencyLimits{
+			Limits: []inngest.Concurrency{},
+		}
+		for _, item := range v {
+			f.Concurrency.Limits = append(f.Concurrency.Limits, parseConcurrency(item))
 		}
 	}
 
@@ -93,7 +97,6 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 		return nil, err
 	}
 	f.EventBatch = eventbatch
-
 	if s.Idempotency != nil {
 		f.RateLimit = &inngest.RateLimit{
 			Limit:  1,
@@ -134,6 +137,23 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 	}
 
 	return &f, nil
+}
+
+func parseConcurrency(v map[string]any) inngest.Concurrency {
+	c := inngest.Concurrency{}
+	// Handle maps.
+	limit, ok := v["limit"].(float64)
+	if ok {
+		c.Limit = int(limit)
+	}
+	key, _ := v["key"].(string)
+	if key != "" {
+		c.Key = &key
+	}
+	if scope, _ := v["scope"].(string); scope != "" {
+		c.Scope, _ = enums.ConcurrencyScopeString(scope)
+	}
+	return c
 }
 
 // SDKStep represents the SDK's definition of a step;  a step is a node in a DAG of steps

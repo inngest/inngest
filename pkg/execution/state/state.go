@@ -71,6 +71,27 @@ type Identifier struct {
 	// this run has.  All next steps will use this as the factor when scheduling
 	// future edge jobs (on their first attempt).
 	PriorityFactor *int64 `json:"pf,omitempty"`
+	// CustomConcurrencyKeys stores custom concurrency keys for this function run.  This
+	// allows us to use custom concurrency keys for each job when processing steps for
+	// the function, with cached expression results.
+	CustomConcurrencyKeys []CustomConcurrency `json:"cck,omitempty"`
+}
+
+type CustomConcurrency struct {
+	// Key represents the actual evaluated concurrency key.
+	Key string `json:"k"`
+	// Hash represents the hash of the concurrency expression - unevaluated -
+	// as defined in the function.  This lets us look up the latest concurrency
+	// values as defined in the most recent version of the function and use
+	// these concurrency values.  Without this, it's impossible to adjust concurrency
+	// for in-progress functions.
+	Hash string `json:"h"`
+	// Limit represents the limit at the time the function started.  If the concurrency
+	// key is removed from the fn definition, this pre-computed value will be used instead.
+	//
+	// NOTE: If the value is removed from the last deployed function we could also disregard
+	// this concurrency key.
+	Limit int `json:"l"`
 }
 
 // IdempotencyKey returns the unique key used to represent this single

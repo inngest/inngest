@@ -629,8 +629,13 @@ func TestQueueLease(t *testing.T) {
 			return p.Queue(), 100
 		}
 		q.accountConcurrencyGen = nil
-		q.customConcurrencyGen = func(ctx context.Context, i QueueItem) (string, int) {
-			return "custom-level-key", 1
+		q.customConcurrencyGen = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
+			return []state.CustomConcurrency{
+				{
+					Key:   "custom-level-key",
+					Limit: 1,
+				},
+			}
 		}
 
 		// Create a new item
