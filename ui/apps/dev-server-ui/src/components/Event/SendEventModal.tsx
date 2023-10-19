@@ -8,11 +8,11 @@ import {
   type SyntheticEvent,
 } from 'react';
 import { Button } from '@inngest/components/Button';
+import { Modal } from '@inngest/components/Modal';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
-import Modal from '@/components/Modal';
 import useModifierKey from '@/hooks/useModifierKey';
 import { usePortal } from '../../hooks/usePortal';
 import { useSendEventMutation } from '../../store/devApi';

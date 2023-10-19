@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
+import { Modal } from '@inngest/components/Modal';
 import { toast } from 'sonner';
 
 import Input from '@/components/Form/Input';
-import Modal from '@/components/Modal';
 import useDebounce from '@/hooks/useDebounce';
 import { IconExclamationTriangle } from '@/icons';
 import { useCreateAppMutation } from '@/store/generated';
