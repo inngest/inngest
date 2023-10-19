@@ -8,11 +8,11 @@ import {
   type SyntheticEvent,
 } from 'react';
 import { Button } from '@inngest/components/Button';
+import { Modal } from '@inngest/components/Modal';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
-import Modal from '@/components/Modal';
 import useModifierKey from '@/hooks/useModifierKey';
 import { usePortal } from '../../hooks/usePortal';
 import { useSendEventMutation } from '../../store/devApi';
@@ -199,8 +199,19 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
       title="Send Event"
       description="Send an event manually by filling or pasting a payload"
       className="w-full max-w-5xl"
+      footer={
+        <div className="flex items-center justify-between">
+          <Button label="Cancel" appearance="outlined" btnAction={onClose} />
+          <Button
+            disabled={sendEventState.isLoading}
+            label="Send Event"
+            btnAction={() => sendEvent()}
+            keys={[useModifierKey(), '↵']}
+          />
+        </div>
+      }
     >
-      <div className="m-6">
+      <div className="p-6">
         <div className="relative flex h-[20rem] w-full flex-col overflow-hidden rounded-lg">
           <div className="flex items-center justify-between border-b border-slate-700/20 bg-slate-800/40 shadow">
             <p className=" px-5 py-4 text-xs text-slate-400">Payload</p>
@@ -246,15 +257,6 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
             />
           ) : null}
         </div>
-      </div>
-      <div className="flex items-center justify-between border-t border-slate-800 p-6">
-        <Button label="Cancel" appearance="outlined" btnAction={onClose} />
-        <Button
-          disabled={sendEventState.isLoading}
-          label="Send Event"
-          btnAction={() => sendEvent()}
-          keys={[useModifierKey(), '↵']}
-        />
       </div>
     </Modal>
   );
