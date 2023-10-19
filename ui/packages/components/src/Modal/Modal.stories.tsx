@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import type { Meta, StoryObj } from '@storybook/react';
 
-import Modal from './Modal';
+import { Modal } from './Modal';
 
 const meta = {
   title: 'Components/Modal',
