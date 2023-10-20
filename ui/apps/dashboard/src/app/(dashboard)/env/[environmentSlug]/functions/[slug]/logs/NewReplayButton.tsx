@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react';
 import { Button } from '@inngest/components/Button';
+import { IconReplay } from '@inngest/components/icons/Replay';
 
 import NewReplayModal from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/NewReplayModal';
-import ReplayIcon from '@/icons/replay.svg';
 
 type NewReplayButtonProps = {
   environmentSlug: string;
@@ -20,7 +20,7 @@ export default function NewReplayButton({ environmentSlug, functionSlug }: NewRe
         label="New Replay"
         kind="primary"
         btnAction={() => setIsModalVisible(true)}
-        icon={<ReplayIcon className="h-5 w-5 text-white" />}
+        icon={<IconReplay className="h-5 w-5 text-white" />}
       />
       <NewReplayModal
         isOpen={isModalVisible}

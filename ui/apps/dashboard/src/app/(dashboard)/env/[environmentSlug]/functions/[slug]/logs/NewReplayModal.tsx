@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { Modal } from '@inngest/components/Modal';
+import { IconReplay } from '@inngest/components/icons/Replay';
 import * as Popover from '@radix-ui/react-popover';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import * as chrono from 'chrono-node';
@@ -12,7 +13,6 @@ import { toast } from 'sonner';
 import { type TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import Input from '@/components/Forms/Input';
 import { FunctionRunStatus } from '@/gql/graphql';
-import ReplayIcon from '@/icons/replay.svg';
 
 type NewReplayModalProps = {
   environmentSlug: string;
@@ -67,7 +67,7 @@ export default function NewReplayModal({
       className="max-w-6xl p-0"
       title={
         <span className="inline-flex items-center gap-1">
-          <ReplayIcon className="h-6 w-6" />
+          <IconReplay className="h-6 w-6" />
           Replay Function
         </span>
       }
@@ -139,7 +139,7 @@ export default function NewReplayModal({
           <Button
             label="Replay Function"
             kind="primary"
-            icon={<ReplayIcon className="h-5 w-5 text-white" />}
+            icon={<IconReplay className="h-5 w-5 text-white" />}
           />
         </div>
       </form>
