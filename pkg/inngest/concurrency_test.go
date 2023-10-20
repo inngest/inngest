@@ -105,10 +105,12 @@ func TestConcurrencyLimits_Unmarshal(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual := &ConcurrencyLimits{}
-		err := json.Unmarshal(test.input, actual)
-		require.NoError(t, err, test)
-		require.EqualValues(t, test.expected, *actual)
+		t.Run(string(test.input), func(t *testing.T) {
+			actual := &ConcurrencyLimits{}
+			err := json.Unmarshal(test.input, actual)
+			require.NoError(t, err, test)
+			require.EqualValues(t, test.expected, *actual)
+		})
 	}
 }
 
@@ -184,7 +186,9 @@ func TestConcurrencyEvaluate(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual := test.limit.Evaluate(context.Background(), test.scopeID, test.input)
-		require.EqualValues(t, test.expected, actual, test)
+		t.Run(fmt.Sprintf("%#v", test), func(t *testing.T) {
+			actual := test.limit.Evaluate(context.Background(), test.scopeID, test.input)
+			require.EqualValues(t, test.expected, actual, test)
+		})
 	}
 }
