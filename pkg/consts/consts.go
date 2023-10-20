@@ -48,6 +48,12 @@ const (
 	// MaxCancellations represents the max automatic cancellation signals per function
 	MaxCancellations = 5
 
+	// MaxConcurrencyLimits limits the max concurrency constraints for a specific function.
+	MaxConcurrencyLimits = 2
+
+	// DefaultConcurrencyLimit is the default concurrency limit applied when not specified
+	DefaultConcurrencyLimit = 1_000
+
 	// FunctionIdempotencyPeriod determines how long a specific function remains idempotent
 	// when using idempotency keys.
 	FunctionIdempotencyPeriod = 24 * time.Hour

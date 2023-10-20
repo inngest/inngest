@@ -53,9 +53,11 @@ type Function struct {
 
 	Priority *Priority `json:"priority,omitempty"`
 
-	// Concurrency allows limiting the concurrency of running functions, optionally constrained
-	// by an individual concurrency key.
-	Concurrency *Concurrency `json:"concurrency,omitempty"`
+	// ConcurrencyLimits allows limiting the concurrency of running functions, optionally constrained
+	// by individual concurrency keys.
+	//
+	// Users may specify up to 2 concurrency keys.
+	Concurrency *ConcurrencyLimits `json:"concurrency,omitempty"`
 
 	Debounce *Debounce `json:"debounce,omitempty"`
 
@@ -79,13 +81,6 @@ type Function struct {
 	Edges []Edge `json:"edges,omitempty"`
 }
 
-func (f Function) ConcurrencyLimit() int {
-	if f.Concurrency == nil {
-		return 0
-	}
-	return f.Concurrency.Limit
-}
-
 type Priority struct {
 	Run *string `json:"run"`
 }
@@ -93,11 +88,6 @@ type Priority struct {
 type Debounce struct {
 	Key    *string `json:"key"`
 	Period string  `json:"period"`
-}
-
-type Concurrency struct {
-	Limit int     `json:"limit"`
-	Key   *string `json:"key,omitempty"`
 }
 
 // Cancel represents a cancellation signal for a function.  When specified, this
@@ -134,6 +124,12 @@ func (f Function) Validate(ctx context.Context) error {
 	}
 	if len(f.Triggers) == 0 {
 		err = multierror.Append(err, fmt.Errorf("At least one trigger is required"))
+	}
+
+	if f.Concurrency != nil {
+		if cerr := f.Concurrency.Validate(ctx); cerr != nil {
+			err = multierror.Append(err, cerr)
+		}
 	}
 
 	for _, t := range f.Triggers {

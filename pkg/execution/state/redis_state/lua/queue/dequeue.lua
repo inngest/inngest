@@ -13,9 +13,10 @@ local idempotencyKey = KEYS[4]
 -- We must dequeue our queue item ID from each concurrency queue
 local accountConcurrencyKey   = KEYS[5] -- Account concurrency level
 local partitionConcurrencyKey = KEYS[6] -- Partition (function) concurrency level
-local customConcurrencyKey    = KEYS[7] -- Optional for eg. for concurrency amongst steps 
+local customConcurrencyKeyA   = KEYS[7] -- Optional for eg. for concurrency amongst steps 
+local customConcurrencyKeyB   = KEYS[8] -- Optional for eg. for concurrency amongst steps 
 -- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer      = KEYS[8]
+local concurrencyPointer      = KEYS[9]
 
 local queueID        = ARGV[1]
 local idempotencyTTL = tonumber(ARGV[2])
@@ -45,8 +46,11 @@ redis.call("ZREM", partitionConcurrencyKey, item.id)
 if accountConcurrencyKey ~= nil and accountConcurrencyKey ~= "" then
 	redis.call("ZREM", accountConcurrencyKey, item.id)
 end
-if customConcurrencyKey ~= nil and customConcurrencyKey ~= "" then
-	redis.call("ZREM", customConcurrencyKey, item.id)
+if customConcurrencyKeyA ~= nil and customConcurrencyKeyA ~= "" then
+	redis.call("ZREM", customConcurrencyKeyA, item.id)
+end
+if customConcurrencyKeyB ~= nil and customConcurrencyKeyB ~= "" then
+	redis.call("ZREM", customConcurrencyKeyB, item.id)
 end
 
 -- Get the earliest item in the partition concurrency set.  We may be requeueing

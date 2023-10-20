@@ -30,12 +30,17 @@ func MakeFunction(f *cqrs.Function) (*Function, error) {
 		}
 	}
 
+	concurrency := 0
+	if fn.Concurrency != nil {
+		concurrency = fn.Concurrency.PartitionConcurrency()
+	}
+
 	return &Function{
 		ID:          f.ID.String(),
 		Name:        f.Name,
 		Slug:        f.Slug,
 		Config:      f.Config,
-		Concurrency: fn.ConcurrencyLimit(),
+		Concurrency: concurrency,
 		Triggers:    triggers,
 		URL:         fn.Steps[0].URI,
 	}, nil
