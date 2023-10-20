@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
@@ -22,7 +21,7 @@ type SDKFunction struct {
 	// by an individual concurrency key.
 	//
 	// This may be an int OR a struct, for backwards compatibility.
-	Concurrency any `json:"concurrency,omitempty"`
+	Concurrency *inngest.ConcurrencyLimits `json:"concurrency,omitempty"`
 
 	// Priority represents the priority information for this function.
 	Priority *inngest.Priority `json:"priority,omitempty"`
@@ -56,41 +55,18 @@ type SDKFunction struct {
 
 func (s SDKFunction) Function() (*inngest.Function, error) {
 	f := inngest.Function{
-		Name:      s.Name,
-		Slug:      s.Slug,
-		Triggers:  s.Triggers,
-		Priority:  s.Priority,
-		RateLimit: s.RateLimit,
-		Cancel:    s.Cancel,
-		Debounce:  s.Debounce,
+		Name:        s.Name,
+		Slug:        s.Slug,
+		Concurrency: s.Concurrency,
+		Triggers:    s.Triggers,
+		Priority:    s.Priority,
+		RateLimit:   s.RateLimit,
+		Cancel:      s.Cancel,
+		Debounce:    s.Debounce,
 	}
 	// Ensure we set the slug here if s.ID is nil.  This defaults to using
 	// the slugged version of the function name.
 	f.Slug = f.GetSlug()
-
-	switch v := s.Concurrency.(type) {
-	case float64:
-		// JSON is always unmarshalled as a float.
-		c := int(v)
-		f.Concurrency = &inngest.ConcurrencyLimits{
-			Limits: []inngest.Concurrency{
-				{
-					Limit: c,
-				},
-			},
-		}
-	case map[string]any:
-		f.Concurrency = &inngest.ConcurrencyLimits{
-			Limits: []inngest.Concurrency{parseConcurrency(v)},
-		}
-	case []map[string]any:
-		f.Concurrency = &inngest.ConcurrencyLimits{
-			Limits: []inngest.Concurrency{},
-		}
-		for _, item := range v {
-			f.Concurrency.Limits = append(f.Concurrency.Limits, parseConcurrency(item))
-		}
-	}
 
 	eventbatch, err := inngest.NewEventBatchConfig(s.EventBatch)
 	if err != nil {
@@ -137,23 +113,6 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 	}
 
 	return &f, nil
-}
-
-func parseConcurrency(v map[string]any) inngest.Concurrency {
-	c := inngest.Concurrency{}
-	// Handle maps.
-	limit, ok := v["limit"].(float64)
-	if ok {
-		c.Limit = int(limit)
-	}
-	key, _ := v["key"].(string)
-	if key != "" {
-		c.Key = &key
-	}
-	if scope, _ := v["scope"].(string); scope != "" {
-		c.Scope, _ = enums.ConcurrencyScopeString(scope)
-	}
-	return c
 }
 
 // SDKStep represents the SDK's definition of a step;  a step is a node in a DAG of steps

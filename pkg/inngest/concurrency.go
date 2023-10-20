@@ -38,6 +38,11 @@ func (c ConcurrencyLimits) Validate(ctx context.Context) error {
 	if len(c.Limits) > consts.MaxConcurrencyLimits {
 		return fmt.Errorf("There are more concurrency limits specified than the allowed max of: %d", consts.MaxConcurrencyLimits)
 	}
+	for _, l := range c.Limits {
+		if err := l.Validate(ctx); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -63,6 +68,17 @@ func (c *ConcurrencyLimits) UnmarshalJSON(b []byte) error {
 		}
 		c.Limits = items
 	default:
+		// Attempt to parse this as a number.
+		int, err := strconv.Atoi(string(b))
+		if err != nil {
+			return nil
+		}
+		c.Limits = []Concurrency{
+			{
+				Scope: enums.ConcurrencyScopeFn,
+				Limit: int,
+			},
+		}
 		return nil
 	}
 
@@ -98,6 +114,13 @@ type Concurrency struct {
 	Key   *string                `json:"key,omitempty"`
 	Scope enums.ConcurrencyScope `json:"scope"`
 	Hash  string                 `json:"hash"`
+}
+
+func (c Concurrency) Validate(ctx context.Context) error {
+	if c.Scope != enums.ConcurrencyScopeFn && c.Key == nil {
+		return fmt.Errorf("A concurrency key must be specified for %s scoped limits", c.Scope)
+	}
+	return nil
 }
 
 // Key returns the concurrency key
