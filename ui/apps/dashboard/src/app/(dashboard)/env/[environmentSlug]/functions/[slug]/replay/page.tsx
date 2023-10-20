@@ -1,6 +1,10 @@
+'use client';
+
+import { useRef } from 'react';
+import { Table } from '@inngest/components/Table';
+import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 
-import Table from '@/components/Table';
 import { defaultTime, duration } from '@/utils/date';
 
 const replays = [
@@ -24,6 +28,49 @@ const replays = [
   },
 ];
 
+type ReplayItem = {
+  status: string;
+  name: string;
+  startedAt: string;
+  elapsed: string;
+  runsCount: number;
+};
+
+const columnHelper = createColumnHelper<ReplayItem>();
+
+const columns = [
+  columnHelper.accessor('status', {
+    header: () => <span>Status</span>,
+    cell: (props) => props.getValue(),
+    size: 250,
+    minSize: 250,
+  }),
+  columnHelper.accessor('name', {
+    header: () => <span>Replay Name</span>,
+    cell: (props) => props.getValue(),
+    size: 250,
+    minSize: 250,
+  }),
+  columnHelper.accessor('startedAt', {
+    header: () => <span>Started At</span>,
+    cell: (props) => props.getValue(),
+    size: 250,
+    minSize: 250,
+  }),
+  columnHelper.accessor('elapsed', {
+    header: () => <span>Elapsed</span>,
+    cell: (props) => props.getValue(),
+    size: 250,
+    minSize: 250,
+  }),
+  columnHelper.accessor('runsCount', {
+    header: () => <span>Total Runs</span>,
+    cell: (props) => props.getValue(),
+    size: 250,
+    minSize: 250,
+  }),
+];
+
 type FunctionReplayPageProps = {
   params: {
     environmentSlug: string;
@@ -31,6 +78,7 @@ type FunctionReplayPageProps = {
   };
 };
 export default function FunctionReplayPage({ params }: FunctionReplayPageProps) {
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   const replaysInTableFormat = replays.map((replay) => {
     return {
       ...replay,
@@ -41,15 +89,13 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
 
   return (
     <Table
-      columns={[
-        { key: 'status', className: 'w-14' },
-        { key: 'name', label: 'Replay Name' },
-        { key: 'startedAt', label: 'Started At' },
-        { key: 'elapsed', label: 'Elapsed' },
-        { key: 'runsCount', label: 'Total Runs' },
-      ]}
-      empty="You have no replays for this function."
-      data={replaysInTableFormat}
+      tableContainerRef={tableContainerRef}
+      options={{
+        data: replaysInTableFormat,
+        columns,
+        getCoreRowModel: getCoreRowModel(),
+      }}
+      blankState={<p>You have no replays for this function.</p>}
     />
   );
 }
