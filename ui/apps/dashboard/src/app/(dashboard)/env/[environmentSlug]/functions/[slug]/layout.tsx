@@ -6,6 +6,7 @@ import {
   CommandLineIcon,
   FolderIcon,
 } from '@heroicons/react/20/solid';
+import { Badge } from '@inngest/components/Badge';
 import { IconReplay } from '@inngest/components/icons/Replay';
 
 import Header, { type HeaderLink } from '@/components/Header/Header';
@@ -51,9 +52,9 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
       text: 'Replay',
       icon: <IconReplay className="h-3.5 w-3.5" />,
       badge: (
-        <Tag size="sm" className="h-3.5 bg-indigo-500 px-1 py-0 text-white">
+        <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
           New
-        </Tag>
+        </Badge>
       ),
     },
   ];
