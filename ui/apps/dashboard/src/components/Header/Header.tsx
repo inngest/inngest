@@ -31,7 +31,7 @@ export default function Header({
   className = '',
 }: HeaderTypes) {
   return (
-    <div className={cn('left-0 right-0 top-0 z-10 bg-slate-900', className)}>
+    <div className={cn('dark left-0 right-0 top-0 z-10 bg-slate-900', className)}>
       <div className="flex items-center justify-between px-6">
         <div>
           <div className="flex items-center">

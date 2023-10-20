@@ -50,7 +50,9 @@ export function StreamDetails({
   const history = useParsedHistory(rawHistory);
 
   return (
-    <div className={classNames('grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}>
+    <div
+      className={classNames('dark grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}
+    >
       {event && <EventDetails event={event} />}
 
       <RunDetails
