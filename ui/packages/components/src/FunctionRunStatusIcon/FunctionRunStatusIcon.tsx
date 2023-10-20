@@ -6,10 +6,10 @@ import { IconStatusCircleMinus } from '@inngest/components/icons/StatusCircleMin
 import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 
 const icons = {
-  CANCELLED: IconStatusCircleArrowPath,
+  CANCELLED: IconStatusCircleMinus,
   COMPLETED: IconStatusCircleCheck,
   FAILED: IconStatusCircleCross,
-  RUNNING: IconStatusCircleMinus,
+  RUNNING: IconStatusCircleArrowPath,
 } as const satisfies { [key in FunctionRunStatus]: React.ComponentType };
 
 type Props = {
