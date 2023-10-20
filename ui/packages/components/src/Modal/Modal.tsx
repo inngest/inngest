@@ -58,7 +58,7 @@ export function Modal({
                     <Dialog.Title className="text-xl font-semibold text-white">
                       {title}
                     </Dialog.Title>
-                    <Dialog.Description className="text-sm font-medium text-white dark:text-slate-400">
+                    <Dialog.Description className="text-sm text-indigo-100 dark:font-medium dark:text-slate-400">
                       {description}
                     </Dialog.Description>
                   </div>
