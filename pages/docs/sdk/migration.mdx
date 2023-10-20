@@ -146,6 +146,8 @@ This is only needed to ensure function runs started on v2 will transition to v3;
      </Col>
 </Row>
 
+If during migration your function ID is not the same, you'll see duplicated functions in your function list. In that case, the recommended approach is to archive the old function using the dashboard.
+
 ## Clients and functions require IDs
 
 When instantiating a client using `new Inngest()` or creating a function via `inngest.createFunction()`, it's now required to pass an `id` instead of a `name`. We recommend changing the property name and wrapping the value in `slugify()` to ensure you don't redeploy any functions.
