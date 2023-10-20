@@ -95,15 +95,17 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
   });
 
   return (
-    <Table
-      tableContainerRef={tableContainerRef}
-      options={{
-        data: replaysInTableFormat,
-        columns,
-        getCoreRowModel: getCoreRowModel(),
-        enableSorting: false,
-      }}
-      blankState={<p>You have no replays for this function.</p>}
-    />
+    <div className="overflow-y-auto">
+      <Table
+        tableContainerRef={tableContainerRef}
+        options={{
+          data: replaysInTableFormat,
+          columns,
+          getCoreRowModel: getCoreRowModel(),
+          enableSorting: false,
+        }}
+        blankState={<p>You have no replays for this function.</p>}
+      />
+    </div>
   );
 }
