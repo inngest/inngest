@@ -1,12 +1,12 @@
 'use client';
 
 import {
-  ArchiveBoxIcon,
   ChartBarSquareIcon,
   CodeBracketSquareIcon,
   CommandLineIcon,
   FolderIcon,
 } from '@heroicons/react/20/solid';
+import { IconReplay } from '@inngest/components/icons/Replay';
 
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { Tag } from '@/components/Tag/Tag';
@@ -45,6 +45,11 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
       href: `/env/${params.environmentSlug}/functions/${params.slug}/logs`,
       text: 'Logs',
       icon: <CommandLineIcon className="w-3.5" />,
+    },
+    {
+      href: `/env/${params.environmentSlug}/functions/${params.slug}/replay`,
+      text: 'Replay',
+      icon: <IconReplay className="h-3.5 w-3.5" />,
     },
   ];
   return (
