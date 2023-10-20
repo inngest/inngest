@@ -7,7 +7,7 @@ import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 
-import { defaultTime, duration } from '@/utils/date';
+import { duration } from '@/utils/date';
 
 const replays = [
   {
@@ -101,6 +101,7 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
         data: replaysInTableFormat,
         columns,
         getCoreRowModel: getCoreRowModel(),
+        enableSorting: false,
       }}
       blankState={<p>You have no replays for this function.</p>}
     />
