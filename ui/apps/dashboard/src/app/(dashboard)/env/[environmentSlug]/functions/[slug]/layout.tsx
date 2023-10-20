@@ -50,6 +50,11 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
       href: `/env/${params.environmentSlug}/functions/${params.slug}/replay`,
       text: 'Replay',
       icon: <IconReplay className="h-3.5 w-3.5" />,
+      badge: (
+        <Tag size="sm" className="h-3.5 bg-indigo-500 px-1 py-0 text-white">
+          New
+        </Tag>
+      ),
     },
   ];
   return (
