@@ -92,7 +92,9 @@ export default async function Keys({
               keyID={keyID}
             />
           </div>
-          <KeyBox value={value} maskedValue={maskedValue} label={keyLabel} />
+          <div className="w-3/5">
+            <KeyBox value={value} maskedValue={maskedValue} label={keyLabel} />
+          </div>
         </div>
         <TransformEvent keyID={keyID} metadata={key.metadata} keyName={key.name} />
         <FilterEvents
