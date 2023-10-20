@@ -225,6 +225,7 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 			}
 			_, err := s.cronmanager.AddFunc(t.Cron, func() {
 				err := s.initialize(context.Background(), fn, event.NewOSSTrackedEvent(event.Event{
+					Cron: &t.CronTrigger.Cron,
 					ID:   time.Now().UTC().Format(time.RFC3339),
 					Name: "inngest/scheduled.timer",
 				}))
@@ -491,26 +492,11 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 		Str("function_id", fn.ID.String()).
 		Str("function", fn.Name).
 		Msg("initializing fn")
-	id, err := Initialize(ctx, fn, evt, s.executor)
+	_, err := Initialize(ctx, fn, evt, s.executor)
 	if err == executor.ErrFunctionDebounced {
 		return nil
 	}
-	if err != nil {
-		return err
-	}
-
-	triggerType := "event"
-	if evt.GetEvent().Name == "inngest/scheduled.timer" {
-		triggerType = "cron"
-	}
-
-	return s.cqrs.InsertFunctionRun(ctx, cqrs.FunctionRun{
-		RunID:        id.RunID,
-		RunStartedAt: ulid.Time(id.RunID.Time()),
-		FunctionID:   fn.ID,
-		EventID:      evt.GetInternalID(),
-		TriggerType:  triggerType,
-	})
+	return err
 }
 
 // Initialize creates a new funciton run identifier for the given workflow and

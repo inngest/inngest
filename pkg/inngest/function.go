@@ -51,9 +51,13 @@ type Function struct {
 	// Slug is the human-friendly ID for the function
 	Slug string `json:"slug"`
 
-	// Concurrency allows limiting the concurrency of running functions, optionally constrained
-	// by an individual concurrency key.
-	Concurrency *Concurrency `json:"concurrency,omitempty"`
+	Priority *Priority `json:"priority,omitempty"`
+
+	// ConcurrencyLimits allows limiting the concurrency of running functions, optionally constrained
+	// by individual concurrency keys.
+	//
+	// Users may specify up to 2 concurrency keys.
+	Concurrency *ConcurrencyLimits `json:"concurrency,omitempty"`
 
 	Debounce *Debounce `json:"debounce,omitempty"`
 
@@ -77,21 +81,13 @@ type Function struct {
 	Edges []Edge `json:"edges,omitempty"`
 }
 
+type Priority struct {
+	Run *string `json:"run"`
+}
+
 type Debounce struct {
 	Key    *string `json:"key"`
 	Period string  `json:"period"`
-}
-
-func (f Function) ConcurrencyLimit() int {
-	if f.Concurrency == nil {
-		return 0
-	}
-	return f.Concurrency.Limit
-}
-
-type Concurrency struct {
-	Limit int     `json:"limit"`
-	Key   *string `json:"key,omitempty"`
 }
 
 // Cancel represents a cancellation signal for a function.  When specified, this
@@ -128,6 +124,12 @@ func (f Function) Validate(ctx context.Context) error {
 	}
 	if len(f.Triggers) == 0 {
 		err = multierror.Append(err, fmt.Errorf("At least one trigger is required"))
+	}
+
+	if f.Concurrency != nil {
+		if cerr := f.Concurrency.Validate(ctx); cerr != nil {
+			err = multierror.Append(err, cerr)
+		}
 	}
 
 	for _, t := range f.Triggers {
@@ -190,6 +192,17 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 	}
 
+	// Validate priority expression
+	if f.Priority != nil && f.Priority.Run != nil {
+		if _, exprErr := expressions.NewExpressionEvaluator(ctx, *f.Priority.Run); exprErr != nil {
+			err = multierror.Append(err, fmt.Errorf("Priority.Run expression is invalid: %s", exprErr))
+		}
+		// NOTE: Priority.Run is not valid when batch is enabled.
+		if f.EventBatch != nil {
+			err = multierror.Append(err, fmt.Errorf("A function cannot specify Priority.Run and Batch together"))
+		}
+	}
+
 	// Validate cancellation expressions
 	for _, c := range f.Cancel {
 		if c.If != nil {
@@ -207,6 +220,7 @@ func (f Function) Validate(ctx context.Context) error {
 		if _, exprErr := expressions.NewExpressionEvaluator(ctx, *f.Debounce.Key); exprErr != nil {
 			err = multierror.Append(err, fmt.Errorf("Debounce expression is invalid: %s", exprErr))
 		}
+		// NOTE: Debounce is not valid when batch is enabled.
 		if f.EventBatch != nil {
 			err = multierror.Append(err, fmt.Errorf("A function cannot specify batch and debounce"))
 		}
@@ -230,6 +244,44 @@ func (f Function) Validate(ctx context.Context) error {
 	}
 
 	return err
+}
+
+// RunPriorityFactor returns the run priority factor for this function, given an input event.
+func (f Function) RunPriorityFactor(ctx context.Context, event map[string]any) (int64, error) {
+	if f.Priority == nil || f.Priority.Run == nil {
+		return 0, nil
+	}
+
+	expr, err := expressions.NewExpressionEvaluator(ctx, *f.Priority.Run)
+	if err != nil {
+		return 0, fmt.Errorf("Priority.Run expression is invalid: %s", err)
+	}
+
+	val, _, err := expr.Evaluate(ctx, expressions.NewData(map[string]any{"event": event}))
+	if err != nil {
+		return 0, fmt.Errorf("Priority.Run expression errored: %s", err)
+	}
+
+	var result int64
+
+	switch v := val.(type) {
+	case int:
+		result = int64(v)
+	case int64:
+		result = v
+	default:
+		return 0, fmt.Errorf("Priority.Run expression returned non-int: %v", val)
+	}
+
+	// Apply bounds
+	if result > consts.PriorityFactorMax {
+		return consts.PriorityFactorMax, nil
+	}
+	if result < consts.PriorityFactorMin {
+		return consts.PriorityFactorMin, nil
+	}
+
+	return result, nil
 }
 
 // URI returns the function's URI.  It is expected that the function has already been

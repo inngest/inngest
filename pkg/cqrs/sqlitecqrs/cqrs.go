@@ -315,6 +315,15 @@ func (w wrapper) InsertFunctionRun(ctx context.Context, e cqrs.FunctionRun) erro
 	if err := copier.CopyWithOption(&run, e, copier.Option{DeepCopy: true}); err != nil {
 		return err
 	}
+
+	// Need to manually set the cron field since `copier` won't do it.
+	if e.Cron != nil {
+		run.Cron = sql.NullString{
+			Valid:  true,
+			String: *e.Cron,
+		}
+	}
+
 	return w.q.InsertFunctionRun(ctx, run)
 }
 

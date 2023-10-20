@@ -193,7 +193,7 @@ type FunctionRun {
 
   timeline: [FunctionRunEvent!] @deprecated
   history: [RunHistoryItem!]!
-  historyItemOutput(id: ULID!): String!
+  historyItemOutput(id: ULID!): String
   name: String @deprecated # use the embedded function field instead.
 }
 
@@ -214,6 +214,13 @@ enum HistoryType {
 	StepWaiting
 }
 
+enum HistoryStepType {
+  Run
+  Send
+  Sleep
+  Wait
+}
+
 type RunHistoryItem {
   attempt: Int!
   cancel: RunHistoryCancel
@@ -224,6 +231,7 @@ type RunHistoryItem {
   result: RunHistoryResult
   sleep: RunHistorySleep
   stepName: String
+  stepType: HistoryStepType
   type: HistoryType!
   url: String
   waitForEvent: RunHistoryWaitForEvent

@@ -17,6 +17,7 @@ importOrderSortSpecifiers: true
 importOrderBuiltinModulesToTop: true
 importOrderMergeDuplicateImports: true
 importOrderCombineTypeAndValueImports: true
+pluginSearchDirs: false
 plugins:
-  - 'prettier-plugin-tailwindcss'
   - '@ianvs/prettier-plugin-sort-imports'
+  - 'prettier-plugin-tailwindcss'

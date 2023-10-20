@@ -150,6 +150,12 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 	// Use the queue item's score, ensuring we process older function runs first
 	// (eg. before at)
 	next := time.UnixMilli(qi.Score())
+
+	if factor := qi.Data.GetPriorityFactor(); factor != 0 {
+		// Ensure we mutate the AtMS time by the given priority factor.
+		qi.AtMS -= factor
+	}
+
 	_, err := q.EnqueueItem(ctx, qi, next)
 	if err != nil {
 		return err
@@ -414,6 +420,12 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition) error {
 	// up to this period for scheduled items behind the concurrency limits.
 	_, capacity, err := q.PartitionLease(ctx, *p, PartitionLeaseDuration)
 	if err == ErrPartitionConcurrencyLimit {
+		for _, l := range q.lifecycles {
+			// Track lifecycles; this function hit a partition limit ahead of
+			// even being leased, meaning the function is at max capacity and we skio
+			// scanning of jobs altogether.
+			go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
+		}
 		q.scope.Counter(counterPartitionConcurrencyLimitReached).Inc(1)
 		return q.PartitionRequeue(ctx, p.Queue(), time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
@@ -566,6 +578,9 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition) error {
 		// work in the future.
 		switch err {
 		case ErrPartitionConcurrencyLimit, ErrConcurrencyLimit:
+			for _, l := range q.lifecycles {
+				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
+			}
 			// Requeue this partition as we hit concurrency limits.
 			q.scope.Counter(counterConcurrencyLimit).Inc(1)
 			return q.PartitionRequeue(ctx, p.Queue(), time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)

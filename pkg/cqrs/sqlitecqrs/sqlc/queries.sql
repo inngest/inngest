@@ -70,8 +70,8 @@ DELETE FROM functions WHERE id IN (sqlc.slice('ids'));
 
 -- name: InsertFunctionRun :exec
 INSERT INTO function_runs
-	(run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?);
+	(run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: InsertFunctionFinish :exec
 INSERT INTO function_finishes

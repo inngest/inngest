@@ -110,23 +110,57 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithNumWorkers(100),
 		redis_state.WithPollTick(150*time.Millisecond),
 		redis_state.WithQueueKeyGenerator(queueKG),
+		redis_state.WithCustomConcurrencyKeyGenerator(func(ctx context.Context, i redis_state.QueueItem) []state.CustomConcurrency {
+			fn, err := dbcqrs.GetFunctionByID(ctx, i.Data.Identifier.WorkflowID)
+			if err != nil {
+				// Use what's stored in the state store.
+				return i.Data.Identifier.CustomConcurrencyKeys
+			}
+			f, err := fn.InngestFunction()
+			if err != nil {
+				return i.Data.Identifier.CustomConcurrencyKeys
+			}
+
+			if f.Concurrency != nil {
+				for _, c := range f.Concurrency.Limits {
+					if !c.IsCustomLimit() {
+						continue
+					}
+					// If there's a concurrency key with the same hash, use the new function's
+					// concurrency limits.
+					//
+					// NOTE:  This is accidentally quadratic but is okay as we bound concurrency
+					// keys to a low value (2-3).
+					for _, actual := range i.Data.Identifier.CustomConcurrencyKeys {
+						if actual.Hash != "" && actual.Hash == c.Hash {
+							actual.Limit = c.Limit
+						}
+					}
+				}
+			}
+			return i.Data.Identifier.CustomConcurrencyKeys
+		}),
+		redis_state.WithAccountConcurrencyKeyGenerator(func(ctx context.Context, i redis_state.QueueItem) (string, int) {
+			// NOTE: In the dev server there are no account concurrency limits.
+			return i.Queue(), consts.DefaultConcurrencyLimit
+		}),
 		redis_state.WithPartitionConcurrencyKeyGenerator(func(ctx context.Context, p redis_state.QueuePartition) (string, int) {
 			// Ensure that we return the correct concurrency values per
 			// partition.
 			funcs, err := dbcqrs.GetFunctions(ctx)
 			if err != nil {
-				return p.Queue(), 10_000
+				return p.Queue(), consts.DefaultConcurrencyLimit
 			}
 			for _, fn := range funcs {
 				f, _ := fn.InngestFunction()
 				if f.ID == uuid.Nil {
 					f.ID = inngest.DeterministicUUID(*f)
 				}
-				if f.ID == p.WorkflowID && f.ConcurrencyLimit() > 0 {
-					return p.Queue(), f.ConcurrencyLimit()
+				if f.ID == p.WorkflowID && f.Concurrency != nil && f.Concurrency.PartitionConcurrency() > 0 {
+					return p.Queue(), f.Concurrency.PartitionConcurrency()
 				}
 			}
-			return p.Queue(), 10_000
+			return p.Queue(), consts.DefaultConcurrencyLimit
 		}),
 	)
 
@@ -156,6 +190,10 @@ func start(ctx context.Context, opts StartOpts) error {
 				hd,
 				memory_writer.NewWriter(),
 			),
+			lifecycle{
+				sm:   sm,
+				cqrs: dbcqrs,
+			},
 		),
 		executor.WithStepLimits(consts.DefaultMaxStepLimit),
 		executor.WithDebouncer(debouncer),
@@ -191,18 +229,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	// embed the tracker
 	ds.tracker = t
 	ds.state = sm
-
-	// Add notifications to the state manager so that we can store new function runs
-	// in the core API service.
-	if notify, ok := sm.(state.FunctionNotifier); ok {
-		notify.OnFunctionStatus(func(ctx context.Context, id state.Identifier, rs enums.RunStatus) {
-			switch rs {
-			case enums.RunStatusRunning:
-				// A new function was added, so add this to the core API
-				// for listing functions by XYZ.
-			}
-		})
-	}
 
 	return service.StartAll(ctx, ds, runner, executorSvc)
 }

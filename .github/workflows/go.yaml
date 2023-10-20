@@ -3,7 +3,11 @@ name: Go
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "ui/apps/dashboard/**"
   pull_request:
+    paths-ignore:
+      - "ui/apps/dashboard/**"
 
 jobs:
   golangci:

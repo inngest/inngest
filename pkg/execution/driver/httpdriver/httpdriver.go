@@ -275,6 +275,16 @@ func (e executor) do(ctx context.Context, url string, input []byte) (*response, 
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
+	// If the SDK version is v2, unquoted the response body. This is because SDK
+	// v2 sometimes responds with a double-encoded body.
+	if sdkVersion, err := getSDKVersion(resp); err == nil {
+		if semver.Major(sdkVersion) == "v2" {
+			if unquoted, err := strconv.Unquote(string(byt)); err == nil {
+				byt = []byte(unquoted)
+			}
+		}
+	}
+
 	hv, _ := strconv.Atoi(resp.Header.Get("x-inngest-req-version"))
 
 	var retryAt *time.Time

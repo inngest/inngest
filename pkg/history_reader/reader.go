@@ -45,7 +45,7 @@ type Reader interface {
 		ctx context.Context,
 		historyID ulid.ULID,
 		opts GetHistoryOutputOpts,
-	) (string, error)
+	) (*string, error)
 	GetRunsByEventID(
 		ctx context.Context,
 		eventID ulid.ULID,
@@ -180,7 +180,8 @@ type GetUsageOpts struct {
 	WorkflowID  uuid.UUID
 	LowerTime   time.Time
 	UpperTime   time.Time
-	Period      enums.Period
+	Period      enums.Period // deprecated, no longer used
+	Granularity time.Duration
 	Statuses    []enums.RunStatus
 }
 
@@ -200,9 +201,7 @@ func (o GetUsageOpts) Validate() error {
 	if o.UpperTime.IsZero() {
 		return errors.New("upper time must be set")
 	}
-	if o.Period == enums.PeriodNone {
-		return errors.New("period must be set")
-	}
+
 	return nil
 }
 
@@ -231,6 +230,7 @@ type RunHistory struct {
 	RunID           ulid.ULID               `json:"runID"`
 	Sleep           *RunHistorySleep        `json:"sleep"`
 	StepName        *string                 `json:"stepName"`
+	StepType        *enums.HistoryStepType  `json:"stepType"`
 	Type            enums.HistoryType       `json:"type"`
 	URL             *string                 `json:"url"`
 	WaitForEvent    *RunHistoryWaitForEvent `json:"waitForEvent"`

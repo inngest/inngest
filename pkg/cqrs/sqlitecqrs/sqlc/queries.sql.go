@@ -433,7 +433,7 @@ func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([
 }
 
 const getFunctionRunsFromEvents = `-- name: GetFunctionRunsFromEvents :many
-SELECT run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id FROM function_runs WHERE event_id IN (/*SLICE:event_ids*/?)
+SELECT run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron FROM function_runs WHERE event_id IN (/*SLICE:event_ids*/?)
 `
 
 func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid.ULID) ([]*FunctionRun, error) {
@@ -464,6 +464,7 @@ func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid
 			&i.EventID,
 			&i.BatchID,
 			&i.OriginalRunID,
+			&i.Cron,
 		); err != nil {
 			return nil, err
 		}
@@ -479,7 +480,7 @@ func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid
 }
 
 const getFunctionRunsTimebound = `-- name: GetFunctionRunsTimebound :many
-SELECT run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id FROM function_runs WHERE run_started_at > ? AND run_started_at <= ? LIMIT ?
+SELECT run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron FROM function_runs WHERE run_started_at > ? AND run_started_at <= ? LIMIT ?
 `
 
 type GetFunctionRunsTimeboundParams struct {
@@ -506,6 +507,7 @@ func (q *Queries) GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionR
 			&i.EventID,
 			&i.BatchID,
 			&i.OriginalRunID,
+			&i.Cron,
 		); err != nil {
 			return nil, err
 		}
@@ -713,8 +715,8 @@ func (q *Queries) InsertFunctionFinish(ctx context.Context, arg InsertFunctionFi
 const insertFunctionRun = `-- name: InsertFunctionRun :exec
 
 INSERT INTO function_runs
-	(run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?)
+	(run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertFunctionRunParams struct {
@@ -726,6 +728,7 @@ type InsertFunctionRunParams struct {
 	EventID         ulid.ULID
 	BatchID         ulid.ULID
 	OriginalRunID   ulid.ULID
+	Cron            sql.NullString
 }
 
 // function runs
@@ -739,6 +742,7 @@ func (q *Queries) InsertFunctionRun(ctx context.Context, arg InsertFunctionRunPa
 		arg.EventID,
 		arg.BatchID,
 		arg.OriginalRunID,
+		arg.Cron,
 	)
 	return err
 }

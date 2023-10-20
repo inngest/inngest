@@ -3,19 +3,10 @@
 # Dependencies
 node_modules/
 
-# Next.js
-.next/
-dist/
-
 # TypeScript
 *.tsbuildinfo
-next-env.d.ts
 
 # Code editors and IDEs
 .idea/
 *.iml
 .vscode/
-
-# OS generated files
-.DS_Store
-Thumbs.db

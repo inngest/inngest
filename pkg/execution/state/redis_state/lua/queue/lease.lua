@@ -14,9 +14,10 @@ local partitionKey  = KEYS[3]
 -- We push our queue item ID into each concurrency queue
 local accountConcurrencyKey   = KEYS[4] -- Account concurrency level
 local partitionConcurrencyKey = KEYS[5] -- When leasing an item we need to place the lease into this key.
-local customConcurrencyKey    = KEYS[6] -- Optional for eg. for concurrency amongst steps 
+local customConcurrencyKeyA   = KEYS[6] -- Optional for eg. for concurrency amongst steps 
+local customConcurrencyKeyB   = KEYS[7] -- Optional for eg. for concurrency amongst steps 
 -- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer      = KEYS[7]
+local concurrencyPointer      = KEYS[8]
 
 local queueID       = ARGV[1]
 local newLeaseKey   = ARGV[2]
@@ -26,8 +27,9 @@ local currentTime   = tonumber(ARGV[3]) -- in ms
 -- steps across differing functions
 local accountConcurrency   = tonumber(ARGV[4])
 local partitionConcurrency = tonumber(ARGV[5])
-local customConcurrency    = tonumber(ARGV[6])
-local partitionName        = ARGV[7]
+local customConcurrencyA   = tonumber(ARGV[6])
+local customConcurrencyB   = tonumber(ARGV[7])
+local partitionName        = ARGV[8]
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -46,8 +48,13 @@ if accountConcurrency > 0 then
 		return 3
 	end
 end
-if customConcurrency > 0 then
-	if check_concurrency(currentTime, customConcurrencyKey, customConcurrency) <= 0 then
+if customConcurrencyA > 0 then
+	if check_concurrency(currentTime, customConcurrencyKeyA, customConcurrencyA) <= 0 then
+		return 3
+	end
+end
+if customConcurrencyB > 0 then
+	if check_concurrency(currentTime, customConcurrencyKeyB, customConcurrencyB) <= 0 then
 		return 3
 	end
 end
@@ -84,8 +91,11 @@ redis.call("ZADD", partitionConcurrencyKey, nextTime, item.id)
 if accountConcurrency > 0 then
 	redis.call("ZADD", accountConcurrencyKey, nextTime, item.id)
 end
-if customConcurrency > 0 then
-	redis.call("ZADD", customConcurrencyKey, nextTime, item.id)
+if customConcurrencyA > 0 then
+	redis.call("ZADD", customConcurrencyKeyA, nextTime, item.id)
+end
+if customConcurrencyB > 0 then
+	redis.call("ZADD", customConcurrencyKeyB, nextTime, item.id)
 end
 
 -- Get the earliest item in the partition concurrency set.  If the current lease is

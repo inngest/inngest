@@ -14,7 +14,8 @@ local partitionIndexKey = KEYS[3] -- partition:sorted - zset of queues by earlie
 -- We update the lease time in each concurrency queue, also
 local accountConcurrencyKey   = KEYS[4] -- Account concurrency level
 local partitionConcurrencyKey = KEYS[5] -- Partition/function level concurrency
-local customConcurrencyKey    = KEYS[6] -- Optional for eg. for concurrency amongst steps 
+local customConcurrencyKeyA   = KEYS[6] -- Optional for eg. for concurrency amongst steps 
+local customConcurrencyKeyB   = KEYS[7] -- Optional for eg. for concurrency amongst steps 
 
 local queueID         = ARGV[1]
 local currentLeaseKey = ARGV[2]
@@ -49,8 +50,11 @@ redis.call("ZADD", partitionConcurrencyKey, nextTime, item.id)
 if accountConcurrencyKey ~= nil and accountConcurrencyKey ~= "" then
 	redis.call("ZADD", accountConcurrencyKey, nextTime, item.id)
 end
-if customConcurrencyKey ~= nil and customConcurrencyKey ~= "" then
-	redis.call("ZADD", customConcurrencyKey, nextTime, item.id)
+if customConcurrencyKeyA ~= nil and customConcurrencyKeyA ~= "" then
+	redis.call("ZADD", customConcurrencyKeyA, nextTime, item.id)
+end
+if customConcurrencyKeyB ~= nil and customConcurrencyKeyA ~= "" then
+	redis.call("ZADD", customConcurrencyKeyB, nextTime, item.id)
 end
 
 -- If there's nothing in the queue of queues, extend the queue expiry time by the

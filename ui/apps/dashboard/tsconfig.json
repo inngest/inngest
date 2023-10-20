@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@inngest/tsconfig/nextjs.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo.json",
+    "plugins": [{ "name": "next" }],
+    "baseUrl": "./",
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": [
+    "./src/**/*",
+    "./next-env.d.ts",
+    ".next/types/**/*.ts",
+    "./next.config.js",
+    "./tailwind.config.ts",
+    "./svgo.config.js",
+    "./sentry.client.config.ts",
+    "./sentry.edge.config.ts",
+    "./sentry.server.config.ts"
+  ],
+  "exclude": ["node_modules"]
+}

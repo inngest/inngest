@@ -63,6 +63,7 @@ type FunctionRun struct {
 	EventID         ulid.ULID
 	BatchID         ulid.ULID
 	OriginalRunID   ulid.ULID
+	Cron            sql.NullString
 }
 
 type History struct {

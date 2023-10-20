@@ -70,6 +70,8 @@ models:
         resolver: true
   HistoryType:
     model: github.com/inngest/inngest/pkg/enums.HistoryType
+  HistoryStepType:
+    model: github.com/inngest/inngest/pkg/enums.HistoryStepType
   RunHistoryItem:
     model: github.com/inngest/inngest/pkg/history_reader.RunHistory
   RunHistoryCancel:

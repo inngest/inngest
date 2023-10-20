@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* sign-in flow custom bg */
+  .mesh-gradient {
+    background-color: hsla(240, 100%, 72%, 1);
+    background-image: radial-gradient(at 62% 96%, hsla(191, 100%, 59%, 0.85) 0px, transparent 50%),
+      radial-gradient(at 48% 9%, hsla(275, 100%, 69%, 1) 0px, transparent 50%),
+      radial-gradient(at 8% 11%, hsla(240, 100%, 69%, 1) 0px, transparent 50%),
+      radial-gradient(at 3% 93%, hsla(0, 78%, 70%, 0.6) 0px, transparent 50%),
+      radial-gradient(at 89% 26%, hsla(266, 100%, 57%, 1) 0px, transparent 50%),
+      radial-gradient(at 84% 79%, hsla(240, 100%, 70%, 1) 0px, transparent 50%);
+  }
+}
+
+@layer utilities {
+  /*
+    Tailwind doesn't support text shadows out of the box.
+    It's a whole _thing_.
+
+    https://github.com/tailwindlabs/tailwindcss/issues/162
+
+  */
+  .text-shadow {
+    text-shadow: 0px 1px 1px rgba(0, 0, 0, 0.2);
+  }
+  .text-shadow-md {
+    text-shadow: 4px 4px 8px black;
+  }
+  .text-shadow-lg {
+    text-shadow: 15px 15px 30px black;
+  }
+  .text-shadow-none {
+    text-shadow: none;
+  }
+}

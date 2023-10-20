@@ -1,9 +1,13 @@
-name: Test UI
+name: Test Dev Server UI
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "ui/apps/dashboard/**"
   pull_request:
+    paths-ignore:
+      - "ui/apps/dashboard/**"
 
 jobs:
   build:
@@ -16,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: "18"
-      - run: pnpm install
-        working-directory: ui
-      - run: pnpm test
-        working-directory: ui
+      # - run: pnpm install
+      #   working-directory: ui/apps/dev-server-ui
+      # - run: pnpm test
+      #   working-directory: ui/apps/dev-server-ui

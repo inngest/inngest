@@ -35,6 +35,9 @@ type GeneratorOpcode struct {
 	// Data is the resulting data from the operation, eg. the step
 	// output.
 	Data json.RawMessage `json:"data"`
+
+	// SDK versions < 3.?.? don't respond with the display name.
+	DisplayName *string `json:"displayName"`
 }
 
 func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {

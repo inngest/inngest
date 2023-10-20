@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="15px" height="15px" viewBox="0 0 15 15" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Group 67</title>
+    <g id="Prototyping" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Artboard-Copy" transform="translate(-1938.000000, -6250.000000)">
+            <g id="Group-67" transform="translate(1939.000000, 6251.000000)">
+                <g id="Group-66" fill="#0C1323" stroke="#818CF8">
+                    <circle id="Oval-Copy-76" cx="6.5" cy="6.5" r="7"></circle>
+                </g>
+                <g id="Group-3" transform="translate(2.300000, 4.100000)" fill="#818CF8">
+                    <circle id="Oval-Copy-3" cx="5.80977316" cy="2.45822816" r="2.45822816"></circle>
+                    <path d="M1.9191491,0.491646 C2.10630809,0.491646 2.28720971,0.519099133 2.45822816,0.570289982 C2.0049204,1.06355109 1.72723419,1.72765977 1.72723419,2.45822853 C1.72723419,3.1887973 2.0049204,3.85290597 2.4580368,4.34577119 C2.28720971,4.39735793 2.10630809,4.42481106 1.9191491,4.42481106 C0.859232319,4.42481106 0,3.54434207 0,2.45822853 C0,1.37211499 0.859232319,0.491646 1.9191491,0.491646 Z" id="Path" fill-rule="nonzero"></path>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

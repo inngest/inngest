@@ -1,1 +1,9 @@
-src/store/generated.ts
+# GraphQL generated files
+**/src/gql/
+**/src/store/generated.ts
+
+# Next.js build output
+.next/
+
+# pnpm lock file
+pnpm-lock.yaml

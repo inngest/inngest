@@ -78,26 +78,30 @@ func (r *reader) GetRunHistoryItemOutput(
 	ctx context.Context,
 	historyID ulid.ULID,
 	opts history_reader.GetHistoryOutputOpts,
-) (string, error) {
+) (*string, error) {
 	r.store.Mu.RLock()
 	defer r.store.Mu.RUnlock()
 
 	if err := opts.Validate(); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	run, ok := r.store.Data[opts.RunID]
 	if !ok {
-		return "", history_reader.ErrNotFound
+		return nil, history_reader.ErrNotFound
 	}
 
 	for _, item := range run.History {
-		if item.ID == historyID && item.Result != nil {
-			return item.Result.Output, nil
+		if item.ID == historyID {
+			if item.Result == nil {
+				return nil, nil
+			}
+
+			return &item.Result.Output, nil
 		}
 	}
 
-	return "", history_reader.ErrNotFound
+	return nil, history_reader.ErrNotFound
 }
 
 func (r *reader) GetRuns(
@@ -200,6 +204,7 @@ func toRunHistory(item history.History) (*history_reader.RunHistory, error) {
 		RunID:           item.RunID,
 		Sleep:           sleep,
 		StepName:        item.StepName,
+		StepType:        item.StepType,
 		Type:            historyType,
 		URL:             item.URL,
 		WaitForEvent:    waitForEvent,

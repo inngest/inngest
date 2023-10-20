@@ -21,7 +21,10 @@ type SDKFunction struct {
 	// by an individual concurrency key.
 	//
 	// This may be an int OR a struct, for backwards compatibility.
-	Concurrency any `json:"concurrency,omitempty"`
+	Concurrency *inngest.ConcurrencyLimits `json:"concurrency,omitempty"`
+
+	// Priority represents the priority information for this function.
+	Priority *inngest.Priority `json:"priority,omitempty"`
 
 	// EventBatch determines how a function will process a list of incoming events
 	EventBatch map[string]any `json:"batchEvents,omitempty"`
@@ -52,44 +55,24 @@ type SDKFunction struct {
 
 func (s SDKFunction) Function() (*inngest.Function, error) {
 	f := inngest.Function{
-		Name:      s.Name,
-		Slug:      s.Slug,
-		Triggers:  s.Triggers,
-		RateLimit: s.RateLimit,
-		Cancel:    s.Cancel,
-		Debounce:  s.Debounce,
+		Name:        s.Name,
+		Slug:        s.Slug,
+		Concurrency: s.Concurrency,
+		Triggers:    s.Triggers,
+		Priority:    s.Priority,
+		RateLimit:   s.RateLimit,
+		Cancel:      s.Cancel,
+		Debounce:    s.Debounce,
 	}
 	// Ensure we set the slug here if s.ID is nil.  This defaults to using
 	// the slugged version of the function name.
 	f.Slug = f.GetSlug()
-
-	switch v := s.Concurrency.(type) {
-	case float64:
-		// JSON is always unmarshalled as a float.
-		c := int(v)
-		f.Concurrency = &inngest.Concurrency{
-			Limit: c,
-		}
-	case map[string]any:
-		// Handle maps.
-		limit, ok := v["limit"].(float64)
-		key, _ := v["key"].(string)
-		if ok {
-			f.Concurrency = &inngest.Concurrency{
-				Limit: int(limit),
-			}
-		}
-		if key != "" {
-			f.Concurrency.Key = &key
-		}
-	}
 
 	eventbatch, err := inngest.NewEventBatchConfig(s.EventBatch)
 	if err != nil {
 		return nil, err
 	}
 	f.EventBatch = eventbatch
-
 	if s.Idempotency != nil {
 		f.RateLimit = &inngest.RateLimit{
 			Limit:  1,

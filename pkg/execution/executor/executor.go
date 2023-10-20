@@ -250,7 +250,47 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		mapped[n] = item.GetEvent().Map()
 	}
 
-	_, err := e.sm.New(ctx, state.Input{
+	if req.Function.Concurrency != nil {
+		// Ensure we evaluate concurrency keys when scheduling the function.
+		for _, limit := range req.Function.Concurrency.Limits {
+			if !limit.IsCustomLimit() {
+				continue
+			}
+
+			// Ensure we bind the limit to the correct scope.
+			scopeID := req.Function.ID
+			switch limit.Scope {
+			case enums.ConcurrencyScopeAccount:
+				scopeID = req.AccountID
+			case enums.ConcurrencyScopeEnv:
+				scopeID = req.WorkspaceID
+			}
+
+			// Store the concurrency limit in the function.  By copying in the raw expression hash,
+			// we can update the concurrency limits for in-progress runs as new function versions
+			// are stored.
+			//
+			// The raw keys are stored in the function state so that we don't need to re-evaluate
+			// keys and input each time, as they're constant through the function run.
+			id.CustomConcurrencyKeys = append(id.CustomConcurrencyKeys, state.CustomConcurrency{
+				Key:   limit.Evaluate(ctx, scopeID, mapped[0]),
+				Hash:  limit.Hash,
+				Limit: limit.Limit,
+			})
+		}
+	}
+
+	// Evaluate the run priority based off of the input event data.
+	factor, err := req.Function.RunPriorityFactor(ctx, mapped[0])
+	if err != nil && e.log != nil {
+		e.log.Warn().Err(err).Msg("run priority errored")
+	}
+	if factor != 0 {
+		id.PriorityFactor = &factor
+	}
+
+	// Create a new function.
+	_, err = e.sm.New(ctx, state.Input{
 		Identifier:     id,
 		EventBatchData: mapped,
 		Context:        req.Context,
@@ -354,7 +394,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnFunctionScheduled(context.WithoutCancel(ctx), id, item)
+		go e.OnFunctionScheduled(context.WithoutCancel(ctx), id, item, req.Events[0].GetEvent())
 	}
 
 	return &id, nil
@@ -485,6 +525,13 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 	if resp.Err != nil && resp.Retryable() {
 		// Retries are a native aspect of the queue;  returning errors always
 		// retries steps if possible.
+
+		for _, e := range e.lifecycles {
+			// Run the lifecycle method for this retry, which is baked into the queue.
+			item.Attempt += 1
+			go e.OnStepScheduled(context.WithoutCancel(ctx), id, item, &resp.Step.Name)
+		}
+
 		return resp
 	}
 
