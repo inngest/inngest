@@ -41,6 +41,24 @@ export default inngest.createFunction(
 );
 ```
 
+## Attempt counter
+
+Every time your function is executed, an `attempt` count is passed in as input, which is the current zero-based attempt number for this run.
+
+The first attempt will be `0`, the second `1`, and so on. It is incremented every time the function throws an error and is retried.
+
+```ts
+inngest.createFunction(
+  { id: "product-check" },
+  { event: "product.check.requested" },
+  async ({ attempt }) => {
+    // `attempt` is the zero-based attempt number
+  }
+);
+```
+
+If retries are caused by a step failing which then succeeds before retries are exhausted, `attempt` will reset back to `0`. See the [Errors within steps](#errors-within-steps) section below.
+
 ## Errors within steps
 
 Steps are individually retried. That means Inngest will handle the type of error, just as above, but on the per-step basis.
