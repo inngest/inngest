@@ -47,6 +47,7 @@ const GetFunctionsDocument = graphql(`
           totalPages
         }
         data {
+          appName
           id
           slug
           name

@@ -15,6 +15,7 @@ import Placeholder from '@/components/Placeholder';
 import cn from '@/utils/cn';
 
 export type FunctionTableRow = {
+  appName: string | null;
   name: string;
   isArchived: boolean;
   isActive: boolean;
@@ -147,6 +148,14 @@ function createColumns(environmentSlug: string) {
         });
       },
       header: 'Triggers',
+    }),
+    columnHelper.accessor('appName', {
+      cell: (info) => {
+        return (
+          <div className="px-2 py-3 text-sm font-medium text-slate-700">{info.getValue()}</div>
+        );
+      },
+      header: 'App',
     }),
     columnHelper.accessor('failureRate', {
       cell: (info) => {
