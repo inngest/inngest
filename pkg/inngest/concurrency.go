@@ -120,6 +120,11 @@ func (c Concurrency) Validate(ctx context.Context) error {
 	if c.Scope != enums.ConcurrencyScopeFn && c.Key == nil {
 		return fmt.Errorf("A concurrency key must be specified for %s scoped limits", c.Scope)
 	}
+	if c.Key != nil {
+		if _, err := expressions.NewExpressionEvaluator(ctx, *c.Key); err != nil {
+			return fmt.Errorf("Invalid concurrency key '%s': %w", *c.Key, err)
+		}
+	}
 	return nil
 }
 

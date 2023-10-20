@@ -107,6 +107,38 @@ func TestValidate(t *testing.T) {
 			require.Contains(t, err.Error(), "Non-HTTP steps are not yet supported")
 		})
 
+		t.Run("With an invalid cache expression", func(t *testing.T) {
+			f := Function{
+				Name: "hi",
+				Triggers: []Trigger{
+					{
+						EventTrigger: &EventTrigger{
+							Event: "fail",
+						},
+					},
+				},
+				Concurrency: &ConcurrencyLimits{
+					Limits: []Concurrency{
+						{
+							Limit: 5,
+							Key:   strptr("invalid because not a string"),
+						},
+					},
+				},
+				Steps: []Step{
+					{
+						ID:   "step",
+						Name: "Function body",
+						URI:  "http://lol/what.xml.api",
+					},
+				},
+			}
+
+			err := f.Validate(context.Background())
+			require.NotNil(t, err)
+			require.Contains(t, err.Error(), "Invalid concurrency key")
+		})
+
 		t.Run("Without edges", func(t *testing.T) {
 			f := Function{
 				Name: "hi",
