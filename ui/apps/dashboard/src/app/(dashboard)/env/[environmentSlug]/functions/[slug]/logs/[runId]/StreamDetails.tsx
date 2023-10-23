@@ -105,9 +105,5 @@ async function getHistoryItemOutput({
     throw res.error;
   }
 
-  const { historyItemOutput } = res.data?.environment.function?.run ?? {};
-  if (!historyItemOutput) {
-    throw new Error('invalid response');
-  }
-  return historyItemOutput;
+  return res.data?.environment.function?.run.historyItemOutput ?? undefined;
 }
