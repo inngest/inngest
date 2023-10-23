@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/concurrency"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -258,7 +259,7 @@ func WithPartitionConcurrencyKeyGenerator(f PartitionConcurrencyKeyGenerator) fu
 	}
 }
 
-func WithAccountConcurrencyKeyGenerator(f QueueItemConcurrencyKeyGenerator) func(q *queue) {
+func WithAccountConcurrencyKeyGenerator(f AccountConcurrencyKeyGenerator) func(q *queue) {
 	return func(q *queue) {
 		q.accountConcurrencyGen = f
 	}
@@ -275,7 +276,11 @@ func WithConcurrencyService(s concurrency.ConcurrencyService) func(q *queue) {
 // Each queue item can have its own concurrency keys.  For example, you can define
 // concurrency limits for steps within a function.  This ensures that there will never be
 // more than N concurrent items running at once.
-type QueueItemConcurrencyKeyGenerator func(ctx context.Context, i QueueItem) (string, int)
+type QueueItemConcurrencyKeyGenerator func(ctx context.Context, i QueueItem) []state.CustomConcurrency
+
+// AccountConcurrencyKeyGenerator returns a concurrency key given the queue item's account
+// identifier.
+type AccountConcurrencyKeyGenerator func(ctx context.Context, i QueueItem) (string, int)
 
 // PartitionConcurrencyKeyGenerator returns a concurrency key and limit for a given partition
 // (function).
@@ -325,7 +330,7 @@ type queue struct {
 
 	lifecycles []QueueLifecycleListener
 
-	accountConcurrencyGen   QueueItemConcurrencyKeyGenerator
+	accountConcurrencyGen   AccountConcurrencyKeyGenerator
 	partitionConcurrencyGen PartitionConcurrencyKeyGenerator
 	customConcurrencyGen    QueueItemConcurrencyKeyGenerator
 	// concurrencyService is an external concurrency limiter used when pulling
@@ -429,7 +434,6 @@ type QueueItem struct {
 	//
 	// This should almost always be nil.
 	QueueName *string `json:"queueID,omitempty"`
-
 	// IdempotencyPerioud allows customizing the idempotency period for this queue
 	// item.  For example, after a debounce queue has been consumed we want to remove
 	// the idempotency key immediately;  the same debounce key should become available
@@ -740,8 +744,11 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 // lease duration. This returns the newly acquired lease ID on success.
 func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, duration time.Duration) (*ulid.ULID, error) {
 	var (
-		ak, pk, ck string // account, partition, custom concurrency key
-		ac, pc, cc int    // account, partiiton, custom concurrency max
+		ak, pk string // account, partition concurrency key
+		ac, pc int    // account, partiiton concurrency max
+
+		customKeys   = make([]string, 2)
+		customLimits = make([]int, 2)
 	)
 
 	// required
@@ -751,7 +758,15 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		ak, ac = q.accountConcurrencyGen(ctx, item)
 	}
 	if q.customConcurrencyGen != nil {
-		ck, cc = q.customConcurrencyGen(ctx, item) // Get the custom concurrency key, if available.
+		// Get the custom concurrency key, if available.
+		for i, item := range q.customConcurrencyGen(ctx, item) {
+			if i >= 2 {
+				// We only support two concurrency keys right now.
+				break
+			}
+			customKeys[i] = item.Key
+			customLimits[i] = item.Limit
+		}
 	}
 
 	leaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), rnd)
@@ -765,7 +780,10 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		q.kg.PartitionMeta(item.Queue()),
 		q.kg.Concurrency("account", ak),
 		q.kg.Concurrency("p", pk),
-		q.kg.Concurrency("custom", ck),
+
+		q.kg.Concurrency("custom", customKeys[0]),
+		q.kg.Concurrency("custom", customKeys[1]),
+
 		q.kg.ConcurrencyIndex(),
 	}
 	args, err := StrSlice([]any{
@@ -774,7 +792,8 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		time.Now().UnixMilli(),
 		ac,
 		pc,
-		cc,
+		customLimits[0],
+		customLimits[1],
 		p.Queue(),
 	})
 	if err != nil {
@@ -813,7 +832,8 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 // lease duration. This returns the newly acquired lease ID on success.
 func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
 	var (
-		ak, pk, ck string // account, partition, custom concurrency key
+		ak, pk     string // account, partition, custom concurrency key
+		customKeys = make([]string, 2)
 	)
 	// required
 	pk, _ = q.partitionConcurrencyGen(ctx, p)
@@ -822,7 +842,14 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 		ak, _ = q.accountConcurrencyGen(ctx, i)
 	}
 	if q.customConcurrencyGen != nil {
-		ck, _ = q.customConcurrencyGen(ctx, i)
+		// Get the custom concurrency key, if available.
+		for n, item := range q.customConcurrencyGen(ctx, i) {
+			if n >= 2 {
+				// We only support two concurrency keys right now.
+				break
+			}
+			customKeys[n] = item.Key
+		}
 	}
 
 	newLeaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), rnd)
@@ -836,7 +863,8 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 		q.kg.PartitionIndex(),
 		q.kg.Concurrency("account", ak),
 		q.kg.Concurrency("p", pk),
-		q.kg.Concurrency("custom", ck),
+		q.kg.Concurrency("custom", customKeys[0]),
+		q.kg.Concurrency("custom", customKeys[1]),
 	}
 
 	args, err := StrSlice([]any{
@@ -874,7 +902,8 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 // Dequeue removes an item from the queue entirely.
 func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) error {
 	var (
-		ak, pk, ck string // account, partition, custom concurrency key
+		ak, pk     string // account, partition, custom concurrency key
+		customKeys = make([]string, 2)
 	)
 	// required
 	pk, _ = q.partitionConcurrencyGen(ctx, p)
@@ -883,7 +912,14 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		ak, _ = q.accountConcurrencyGen(ctx, i)
 	}
 	if q.customConcurrencyGen != nil {
-		ck, _ = q.customConcurrencyGen(ctx, i)
+		// Get the custom concurrency key, if available.
+		for n, item := range q.customConcurrencyGen(ctx, i) {
+			if n >= 2 {
+				// We only support two concurrency keys right now.
+				break
+			}
+			customKeys[n] = item.Key
+		}
 	}
 
 	qn := i.Queue()
@@ -894,7 +930,8 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		q.kg.Idempotency(i.ID),
 		q.kg.Concurrency("account", ak),
 		q.kg.Concurrency("p", pk),
-		q.kg.Concurrency("custom", ck),
+		q.kg.Concurrency("custom", customKeys[0]),
+		q.kg.Concurrency("custom", customKeys[1]),
 		q.kg.ConcurrencyIndex(),
 	}
 
@@ -942,7 +979,8 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 	}
 
 	var (
-		ak, pk, ck string // account, partition, custom concurrency key
+		ak, pk     string // account, partition, custom concurrency key
+		customKeys = make([]string, 2)
 	)
 
 	// required
@@ -952,7 +990,14 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		ak, _ = q.accountConcurrencyGen(ctx, i)
 	}
 	if q.customConcurrencyGen != nil {
-		ck, _ = q.customConcurrencyGen(ctx, i) // Get the custom concurrency key, if available.
+		// Get the custom concurrency key, if available.
+		for n, item := range q.customConcurrencyGen(ctx, i) {
+			if n >= 2 {
+				// We only support two concurrency keys right now.
+				break
+			}
+			customKeys[n] = item.Key
+		}
 	}
 
 	// Unset any lease ID as this is requeued.
@@ -975,7 +1020,8 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		q.kg.PartitionIndex(),
 		q.kg.Concurrency("account", ak),
 		q.kg.Concurrency("p", pk),
-		q.kg.Concurrency("custom", ck),
+		q.kg.Concurrency("custom", customKeys[0]),
+		q.kg.Concurrency("custom", customKeys[1]),
 		q.kg.ConcurrencyIndex(),
 	}
 

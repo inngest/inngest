@@ -12,12 +12,7 @@ type TableProps = {
   tableContainerRef: React.RefObject<HTMLDivElement>;
 };
 
-export default function Table({
-  options,
-  blankState,
-  customRowProps,
-  tableContainerRef,
-}: TableProps) {
+export function Table({ options, blankState, customRowProps, tableContainerRef }: TableProps) {
   const table = useReactTable(options);
   const { rows } = table.getRowModel();
 
@@ -43,15 +38,15 @@ export default function Table({
   }, 0);
 
   return (
-    <table className="w-full border-b border-slate-700/30">
-      <thead className="sticky top-0 z-[3] text-left">
+    <table className="dark:bg-slate-910 w-full border-b border-slate-200 bg-white dark:border-slate-700/30">
+      <thead className="shadow-outline-primary-light sticky top-0 z-[3] text-left">
         {table.getHeaderGroups().map((headerGroup) => (
           <tr key={headerGroup.id}>
             {headerGroup.headers.map((header) => (
               <th
                 className={classNames(
                   cellStyles,
-                  'bg-slate-900 font-medium text-slate-500',
+                  'bg-white font-medium text-slate-600 dark:bg-slate-900 dark:text-slate-500',
                   header.column.getIsPinned() && 'sticky left-0 z-[4]',
                   header.column.getCanSort() && 'cursor-pointer'
                 )}
@@ -79,7 +74,7 @@ export default function Table({
           </tr>
         ))}
       </thead>
-      <tbody className="divide-y divide-slate-800/30">
+      <tbody className="divide-y divide-slate-100 text-slate-700 dark:divide-slate-800/30 dark:text-slate-400">
         {options.data.length < 1 && (
           <tr>
             <td className={classNames(cellStyles, 'text-center')} colSpan={colSpanTotalSum}>
@@ -97,12 +92,15 @@ export default function Table({
             const row = table.getRowModel().rows[virtualRow.index];
             if (!row) return;
             return (
-              <tr key={row.id} {...(customRowProps ? customRowProps(row) : {})}>
+              <tr
+                key={row.id}
+                {...(customRowProps ? customRowProps(row) : {})}
+                className=" dark:bg-slate-910 bg-white hover:bg-slate-100 dark:hover:bg-slate-900"
+              >
                 {row.getVisibleCells().map((cell) => (
                   <td
                     className={classNames(
                       cellStyles,
-                      'bg-slate-910',
                       cell.column.getIsPinned() && 'sticky left-0 z-[2]'
                     )}
                     key={cell.id}

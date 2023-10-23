@@ -3,11 +3,10 @@
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { PlusIcon } from '@heroicons/react/24/solid';
+import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
-import Button from '@/components/Button';
-import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
 import { useEnvironment } from '@/queries';
 import useManagePageTerminology from './useManagePageTerminology';
@@ -41,6 +40,7 @@ export default function CreateKeyButton({ environmentSlug }: NewKeyButtonProps) 
     if (currentContent) {
       createSourceKey({
         input: {
+          filterList: null,
           workspaceID: environmentID,
           name: `My new ${currentContent.name}`,
           source: currentContent.type,
@@ -68,11 +68,11 @@ export default function CreateKeyButton({ environmentSlug }: NewKeyButtonProps) 
 
   return (
     <Button
-      icon={<PlusIcon className="h-4" />}
-      onClick={handleClick}
+      icon={<PlusIcon />}
+      btnAction={handleClick}
       disabled={!environment || isFetchingEnvironment || !currentContent}
-    >
-      Create {currentContent?.name}
-    </Button>
+      kind="primary"
+      label={`Create ${currentContent?.name}`}
+    />
   );
 }

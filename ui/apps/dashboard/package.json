@@ -32,7 +32,9 @@
     "@headlessui/tailwindcss": "0.1.2",
     "@heroicons/react": "2.0.16",
     "@inngest/components": "workspace:*",
+    "@radix-ui/react-popover": "1.0.7",
     "@radix-ui/react-select": "1.2.2",
+    "@radix-ui/react-toggle-group": "1.0.4",
     "@radix-ui/react-tooltip": "1.0.6",
     "@sentry/nextjs": "7.60.0",
     "@sindresorhus/slugify": "2.2.0",
@@ -43,6 +45,7 @@
     "@urql/exchange-request-policy": "1.0.2",
     "@urql/exchange-retry": "1.2.0",
     "change-case": "4.1.2",
+    "chrono-node": "2.7.0",
     "clsx": "1.2.1",
     "dayjs": "1.11.7",
     "graphql": "16.8.1",
@@ -66,9 +69,9 @@
     "zod": "3.22.3"
   },
   "devDependencies": {
-    "@inngest/tsconfig": "workspace:*",
     "@graphql-codegen/cli": "3.2.2",
     "@graphql-codegen/client-preset": "2.1.0",
+    "@inngest/tsconfig": "workspace:*",
     "@storybook/addon-essentials": "7.2.2",
     "@storybook/addon-interactions": "7.2.2",
     "@storybook/addon-links": "7.2.2",

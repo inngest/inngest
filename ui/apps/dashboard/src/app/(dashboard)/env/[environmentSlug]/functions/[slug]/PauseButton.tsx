@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PauseIcon, PlayIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
 
-import Button from '@/components/Button';
 import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
 import { useEnvironment } from '@/queries';
@@ -66,6 +66,8 @@ function PauseFunctionModal({
     if (functionID && currentVersion) {
       pauseFunctionMutation({
         input: {
+          description: null,
+          promote: null,
           workflowID: functionID,
           disable: new Date().toISOString(),
           version: currentVersion,
@@ -88,6 +90,8 @@ function PauseFunctionModal({
     if (functionID && previousVersion) {
       pauseFunctionMutation({
         input: {
+          disable: null,
+          description: null,
           workflowID: functionID,
           promote: new Date().toISOString(),
           version: previousVersion,
@@ -122,12 +126,13 @@ function PauseFunctionModal({
         </p>
       )}
       <div className="flex content-center justify-end">
-        <Button variant="secondary" onClick={() => onClose()}>
-          No
-        </Button>
-        <Button variant="text-danger" onClick={isPaused ? handleResume : handlePause}>
-          Yes
-        </Button>
+        <Button appearance="outlined" btnAction={() => onClose()} label="No" />
+        <Button
+          kind="danger"
+          appearance="text"
+          btnAction={isPaused ? handleResume : handlePause}
+          label="Yes"
+        />
       </div>
     </Modal>
   );
@@ -175,18 +180,15 @@ export default function PauseFunctionButton({
               <Button
                 icon={
                   isPaused ? (
-                    <PlayIcon className="h-4 text-green-600" />
+                    <PlayIcon className=" text-green-600" />
                   ) : (
-                    <PauseIcon className="h-4 text-amber-500" />
+                    <PauseIcon className=" text-amber-500" />
                   )
                 }
-                variant="secondary"
-                context="dark"
-                onClick={() => setIsPauseFunctionModalVisible(true)}
+                btnAction={() => setIsPauseFunctionModalVisible(true)}
                 disabled={disabled || !version || isFetchingVersions}
-              >
-                {isPaused ? 'Resume' : 'Pause'}
-              </Button>
+                label={isPaused ? 'Resume' : 'Pause'}
+              />
             </span>
           </Tooltip.Trigger>
           <Tooltip.Content className="align-center rounded-md bg-slate-800 px-2 text-xs text-slate-300">

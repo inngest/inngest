@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useQuery } from 'urql';
 
+import NewReplayButton from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/NewReplayButton';
+import { ClientFeatureFlag } from '@/components/FeatureFlags/ClientFeatureFlag';
 import { graphql } from '@/gql';
 import { FunctionRunStatus, FunctionRunTimeField } from '@/gql/graphql';
 import { useEnvironment } from '@/queries';
@@ -66,7 +68,7 @@ export default function FunctionRunsLayout({ children, params }: FunctionRunsLay
     variables: {
       environmentID: environment?.id!,
       functionSlug,
-      functionRunStatuses: selectedStatuses.length ? selectedStatuses : undefined,
+      functionRunStatuses: selectedStatuses.length ? selectedStatuses : null,
       timeRangeStart: selectedTimeRange.start.toISOString(),
       timeRangeEnd: selectedTimeRange.end.toISOString(),
       timeField: selectedTimeField,
@@ -121,7 +123,7 @@ export default function FunctionRunsLayout({ children, params }: FunctionRunsLay
 
   return (
     <>
-      <div className="flex items-center gap-2 border-b border-slate-300 px-5 py-2">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-300 px-5 py-2">
         <div className="gap flex items-center gap-1.5">
           <StatusFilter
             selectedStatuses={selectedStatuses}
@@ -137,6 +139,9 @@ export default function FunctionRunsLayout({ children, params }: FunctionRunsLay
             <p className="text-sm font-semibold text-slate-900">{functionRunsCount} Runs</p>
           )}
         </div>
+        <ClientFeatureFlag flag="function-replay">
+          <NewReplayButton environmentSlug={params.environmentSlug} functionSlug={functionSlug} />
+        </ClientFeatureFlag>
       </div>
       <div className="flex min-h-0 flex-1">
         <div className="w-80 flex-shrink-0 overflow-y-auto border-r border-slate-300">

@@ -2,6 +2,8 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { BlankSlate } from '@inngest/components/BlankSlate';
+import { Table } from '@inngest/components/Table';
+import { TriggerTags } from '@inngest/components/Tag/TriggerTags';
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -14,8 +16,6 @@ import SendEventButton from '@/components/Event/SendEventButton';
 import TriggerCronButton from '@/components/Event/TriggerCronButton';
 import SearchInput from '@/components/SearchInput/SearchInput';
 import Skeleton from '@/components/Skeleton';
-import Table from '@/components/Table';
-import TriggerTags from '@/components/Trigger/TriggerTags';
 import useDebounce from '@/hooks/useDebounce';
 import { FunctionTriggerTypes, useGetFunctionsQuery, type Function } from '@/store/generated';
 

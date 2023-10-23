@@ -37,10 +37,10 @@ export function useEvent(eventID: string | null): FetchResult<Data, { skippable:
 
     return {
       ...event,
-      createdAt: event.createdAt ? new Date(event.createdAt) : new Date(),
       functionRuns,
-      payload: event.raw ?? 'null',
       name: event.name ?? 'Unknown',
+      payload: event.raw ?? 'null',
+      receivedAt: event.createdAt ? new Date(event.createdAt) : new Date(),
     };
   }, [query.data?.event]);
 

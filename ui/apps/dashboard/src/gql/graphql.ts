@@ -16,7 +16,7 @@ export type Scalars = {
   Bytes: string;
   DSN: unknown;
   EdgeType: unknown;
-  FilterType: unknown;
+  FilterType: string;
   IP: string;
   IngestSource: string;
   JSON: null | boolean | number | string | Record<string, unknown> | unknown[];
@@ -26,7 +26,7 @@ export type Scalars = {
   Period: unknown;
   Role: unknown;
   Runtime: unknown;
-  SchemaSource: string;
+  SchemaSource: unknown;
   SearchObject: unknown;
   SegmentType: unknown;
   Time: string;
@@ -41,7 +41,7 @@ export type ApiKey = {
   author: User;
   createdAt: Scalars['Time'];
   id: Scalars['ID'];
-  name?: Maybe<Scalars['String']>;
+  name: Maybe<Scalars['String']>;
 };
 
 export type Account = {
@@ -50,16 +50,16 @@ export type Account = {
   billingEmail: Scalars['String'];
   createdAt: Scalars['Time'];
   id: Scalars['ID'];
-  identifier?: Maybe<AccountIdentifier>;
-  name?: Maybe<Scalars['NullString']>;
+  identifier: Maybe<AccountIdentifier>;
+  name: Maybe<Scalars['NullString']>;
   paymentIntents: Array<PaymentIntent>;
-  paymentMethods?: Maybe<Array<PaymentMethod>>;
-  plan?: Maybe<BillingPlan>;
+  paymentMethods: Maybe<Array<PaymentMethod>>;
+  plan: Maybe<BillingPlan>;
   search: SearchResults;
-  setting?: Maybe<AccountSetting>;
-  settings?: Maybe<Array<AccountSetting>>;
+  setting: Maybe<AccountSetting>;
+  settings: Maybe<Array<AccountSetting>>;
   status: Scalars['String'];
-  subscription?: Maybe<BillingSubscription>;
+  subscription: Maybe<BillingSubscription>;
   updatedAt: Scalars['Time'];
   users: Array<User>;
 };
@@ -78,14 +78,14 @@ export type AccountIdentifier = {
   __typename?: 'AccountIdentifier';
   account: Account;
   accountID: Scalars['ID'];
-  domain?: Maybe<Scalars['NullString']>;
-  dsnPrefix?: Maybe<Scalars['String']>;
+  domain: Maybe<Scalars['NullString']>;
+  dsnPrefix: Maybe<Scalars['String']>;
   id: Scalars['ID'];
-  verifiedAt?: Maybe<Scalars['Time']>;
+  verifiedAt: Maybe<Scalars['Time']>;
 };
 
 export type AccountIdentifierInput = {
-  dsnPrefix?: InputMaybe<Scalars['String']>;
+  dsnPrefix: InputMaybe<Scalars['String']>;
 };
 
 export type AccountSetting = {
@@ -99,8 +99,8 @@ export type AccountSetting = {
 
 export type Action = {
   __typename?: 'Action';
-  accountID?: Maybe<Scalars['ID']>;
-  aliases?: Maybe<Array<Scalars['String']>>;
+  accountID: Maybe<Scalars['ID']>;
+  aliases: Maybe<Array<Scalars['String']>>;
   category: ActionCategory;
   dsn: Scalars['DSN'];
   latest: ActionVersion;
@@ -108,7 +108,7 @@ export type Action = {
   secrets: Array<ActionSecret>;
   settings: Array<ActionSetting>;
   tagline: Scalars['String'];
-  version?: Maybe<ActionVersion>;
+  version: Maybe<ActionVersion>;
 };
 
 
@@ -118,14 +118,14 @@ export type ActionSecretsArgs = {
 
 
 export type ActionSettingsArgs = {
-  category?: InputMaybe<Scalars['String']>;
+  category: InputMaybe<Scalars['String']>;
   workspaceID: Scalars['ID'];
 };
 
 
 export type ActionVersionArgs = {
-  major?: InputMaybe<Scalars['Int']>;
-  minor?: InputMaybe<Scalars['Int']>;
+  major: InputMaybe<Scalars['Int']>;
+  minor: InputMaybe<Scalars['Int']>;
 };
 
 export type ActionCategory = {
@@ -135,9 +135,9 @@ export type ActionCategory = {
 };
 
 export type ActionFilter = {
-  category?: InputMaybe<Scalars['String']>;
-  dsn?: InputMaybe<Scalars['String']>;
-  excludePublic?: InputMaybe<Scalars['Boolean']>;
+  category: InputMaybe<Scalars['String']>;
+  dsn: InputMaybe<Scalars['String']>;
+  excludePublic: InputMaybe<Scalars['Boolean']>;
 };
 
 export type ActionSecret = {
@@ -164,27 +164,27 @@ export type ActionSetting = {
 
 export type ActionVersion = {
   __typename?: 'ActionVersion';
-  Edges?: Maybe<Array<Edge>>;
-  Response?: Maybe<Scalars['Map']>;
-  Settings?: Maybe<Scalars['Map']>;
+  Edges: Maybe<Array<Edge>>;
+  Response: Maybe<Scalars['Map']>;
+  Settings: Maybe<Scalars['Map']>;
   WorkflowMetadata: Array<Maybe<ActionWorkflowMetadata>>;
   config: Scalars['String'];
   createdAt: Scalars['Time'];
   dsn: Scalars['DSN'];
-  imageSha256?: Maybe<Scalars['String']>;
+  imageSha256: Maybe<Scalars['String']>;
   name: Scalars['String'];
   runtime: Scalars['Runtime'];
   runtimeData: Scalars['Map'];
   usage: Usage;
-  validFrom?: Maybe<Scalars['Time']>;
-  validTo?: Maybe<Scalars['Time']>;
+  validFrom: Maybe<Scalars['Time']>;
+  validTo: Maybe<Scalars['Time']>;
   versionMajor: Scalars['Int'];
   versionMinor: Scalars['Int'];
 };
 
 
 export type ActionVersionUsageArgs = {
-  opts?: InputMaybe<UsageInput>;
+  opts: InputMaybe<UsageInput>;
   workspaceID: Scalars['ID'];
 };
 
@@ -196,8 +196,8 @@ export type ActionVersionQualifier = {
 
 export type ActionWorkflowMetadata = {
   __typename?: 'ActionWorkflowMetadata';
-  expression?: Maybe<Scalars['String']>;
-  form?: Maybe<Scalars['Map']>;
+  expression: Maybe<Scalars['String']>;
+  form: Maybe<Scalars['Map']>;
   name: Scalars['String'];
   required: Scalars['Boolean'];
   type: Scalars['String'];
@@ -216,25 +216,25 @@ export type ArchiveWorkflowInput = {
 
 export type ArchivedEvent = {
   __typename?: 'ArchivedEvent';
-  contact?: Maybe<Contact>;
-  contactID?: Maybe<Scalars['ID']>;
+  contact: Maybe<Contact>;
+  contactID: Maybe<Scalars['ID']>;
   event: Scalars['Bytes'];
   eventModel: Event;
   eventVersion: EventType;
   functionRuns: Array<FunctionRun>;
   id: Scalars['ULID'];
-  ingestSourceID?: Maybe<Scalars['ID']>;
+  ingestSourceID: Maybe<Scalars['ID']>;
   name: Scalars['String'];
   occurredAt: Scalars['Time'];
   receivedAt: Scalars['Time'];
-  source?: Maybe<IngestKey>;
+  source: Maybe<IngestKey>;
   version: Scalars['String'];
 };
 
 export type AsyncEdge = {
   __typename?: 'AsyncEdge';
   event: Scalars['String'];
-  match?: Maybe<Scalars['String']>;
+  match: Maybe<Scalars['String']>;
   ttl: Scalars['String'];
 };
 
@@ -263,11 +263,11 @@ export type CommsUnsubscribe = {
 
 export type Communication = {
   __typename?: 'Communication';
-  body?: Maybe<Scalars['NullString']>;
-  bodyFile?: Maybe<File>;
-  bodyFileID?: Maybe<Scalars['ID']>;
+  body: Maybe<Scalars['NullString']>;
+  bodyFile: Maybe<File>;
+  bodyFileID: Maybe<Scalars['ID']>;
   category: Scalars['String'];
-  clientID?: Maybe<Scalars['Int']>;
+  clientID: Maybe<Scalars['Int']>;
   commsType: Scalars['String'];
   contactID: Scalars['ID'];
   createdAt: Scalars['Time'];
@@ -276,9 +276,9 @@ export type Communication = {
   recipient: Scalars['String'];
   statuses: Array<CommunicationStatus>;
   title: Scalars['String'];
-  workflow?: Maybe<Workflow>;
-  workflowID?: Maybe<Scalars['ID']>;
-  workflowVersion?: Maybe<Scalars['Int']>;
+  workflow: Maybe<Workflow>;
+  workflowID: Maybe<Scalars['ID']>;
+  workflowVersion: Maybe<Scalars['Int']>;
 };
 
 export type CommunicationStatus = {
@@ -292,7 +292,7 @@ export type Contact = {
   __typename?: 'Contact';
   attributes: Array<Maybe<ContactAttribute>>;
   createdAt: Scalars['Time'];
-  externalID?: Maybe<Scalars['NullString']>;
+  externalID: Maybe<Scalars['NullString']>;
   id: Scalars['ID'];
   predefinedAttributes: Scalars['Map'];
   unsubscribed: Scalars['Boolean'];
@@ -306,15 +306,15 @@ export type ContactAttribute = {
   id: Scalars['ID'];
   name: Scalars['String'];
   validFrom: Scalars['Time'];
-  validTo?: Maybe<Scalars['NullTime']>;
+  validTo: Maybe<Scalars['NullTime']>;
   value: Scalars['Bytes'];
 };
 
 export type ContactFilter = {
-  attributes?: InputMaybe<Scalars['Map']>;
-  email?: InputMaybe<Scalars['String']>;
-  externalID?: InputMaybe<Scalars['String']>;
-  phone?: InputMaybe<Scalars['String']>;
+  attributes: InputMaybe<Scalars['Map']>;
+  email: InputMaybe<Scalars['String']>;
+  externalID: InputMaybe<Scalars['String']>;
+  phone: InputMaybe<Scalars['String']>;
 };
 
 export type ContactSegment = {
@@ -336,7 +336,7 @@ export type ContactStats = {
 
 
 export type ContactStatsUsageArgs = {
-  opts?: InputMaybe<UsageInput>;
+  opts: InputMaybe<UsageInput>;
 };
 
 export type CreateStripeSubscriptionResponse = {
@@ -346,7 +346,7 @@ export type CreateStripeSubscriptionResponse = {
 };
 
 export type CreateVercelAppInput = {
-  path?: InputMaybe<Scalars['String']>;
+  path: InputMaybe<Scalars['String']>;
   projectID: Scalars['String'];
   workspaceID: Scalars['ID'];
 };
@@ -374,36 +374,36 @@ export type DeleteResponse = {
 export type Deploy = {
   __typename?: 'Deploy';
   appName: Scalars['String'];
-  authorID?: Maybe<Scalars['UUID']>;
+  authorID: Maybe<Scalars['UUID']>;
   checksum: Scalars['String'];
   createdAt: Scalars['Time'];
   deployedFunctions: Array<Workflow>;
-  error?: Maybe<Scalars['String']>;
-  framework?: Maybe<Scalars['String']>;
-  functionCount?: Maybe<Scalars['Int']>;
+  error: Maybe<Scalars['String']>;
+  framework: Maybe<Scalars['String']>;
+  functionCount: Maybe<Scalars['Int']>;
   id: Scalars['UUID'];
   metadata: Scalars['Map'];
-  prevFunctionCount?: Maybe<Scalars['Int']>;
+  prevFunctionCount: Maybe<Scalars['Int']>;
   removedFunctions: Array<Workflow>;
   sdkLanguage: Scalars['String'];
   sdkVersion: Scalars['String'];
   status: Scalars['String'];
-  url?: Maybe<Scalars['String']>;
+  url: Maybe<Scalars['String']>;
   workspaceID: Scalars['UUID'];
 };
 
 export type Edge = {
   __typename?: 'Edge';
-  async?: Maybe<AsyncEdge>;
+  async: Maybe<AsyncEdge>;
   if: Scalars['String'];
   name: Scalars['String'];
   type: Scalars['EdgeType'];
 };
 
 export type EditWorkflowInput = {
-  description?: InputMaybe<Scalars['String']>;
-  disable?: InputMaybe<Scalars['Time']>;
-  promote?: InputMaybe<Scalars['Time']>;
+  description: InputMaybe<Scalars['String']>;
+  disable: InputMaybe<Scalars['Time']>;
+  promote: InputMaybe<Scalars['Time']>;
   version: Scalars['Int'];
   workflowID: Scalars['ID'];
 };
@@ -417,45 +417,45 @@ export enum EnvironmentType {
 
 export type Event = {
   __typename?: 'Event';
-  description?: Maybe<Scalars['String']>;
-  events?: Maybe<EventConnection>;
-  firstSeen?: Maybe<Scalars['Time']>;
-  integrationName?: Maybe<Scalars['String']>;
+  description: Maybe<Scalars['String']>;
+  events: Maybe<EventConnection>;
+  firstSeen: Maybe<Scalars['Time']>;
+  integrationName: Maybe<Scalars['String']>;
   name: Scalars['String'];
   recent: Array<ArchivedEvent>;
-  schemaSource?: Maybe<Scalars['SchemaSource']>;
+  schemaSource: Maybe<Scalars['SchemaSource']>;
   usage: Usage;
   versionCount: Scalars['Int'];
   versions: Array<Maybe<EventType>>;
   workflows: Array<Workflow>;
-  workspaceID?: Maybe<Scalars['UUID']>;
+  workspaceID: Maybe<Scalars['UUID']>;
 };
 
 
 export type EventEventsArgs = {
-  after?: InputMaybe<Scalars['String']>;
+  after: InputMaybe<Scalars['String']>;
   filter: EventsFilter;
   first?: Scalars['Int'];
 };
 
 
 export type EventRecentArgs = {
-  count?: InputMaybe<Scalars['Int']>;
+  count: InputMaybe<Scalars['Int']>;
 };
 
 
 export type EventUsageArgs = {
-  opts?: InputMaybe<UsageInput>;
+  opts: InputMaybe<UsageInput>;
 };
 
 
 export type EventVersionsArgs = {
-  versions?: InputMaybe<Array<Scalars['String']>>;
+  versions: InputMaybe<Array<Scalars['String']>>;
 };
 
 export type EventConnection = {
   __typename?: 'EventConnection';
-  edges?: Maybe<Array<Maybe<EventEdge>>>;
+  edges: Maybe<Array<Maybe<EventEdge>>>;
   pageInfo: PageInfo;
   totalCount: Scalars['Int'];
 };
@@ -467,21 +467,21 @@ export type EventEdge = {
 };
 
 export type EventQuery = {
-  name?: InputMaybe<Scalars['String']>;
-  prefix?: InputMaybe<Scalars['String']>;
-  schemaSource?: InputMaybe<Scalars['SchemaSource']>;
-  workspaceID?: InputMaybe<Scalars['ID']>;
+  name: InputMaybe<Scalars['String']>;
+  prefix: InputMaybe<Scalars['String']>;
+  schemaSource: InputMaybe<Scalars['SchemaSource']>;
+  workspaceID: InputMaybe<Scalars['ID']>;
 };
 
 export type EventType = {
   __typename?: 'EventType';
-  createdAt?: Maybe<Scalars['Time']>;
+  createdAt: Maybe<Scalars['Time']>;
   cueType: Scalars['String'];
   id: Scalars['ID'];
   jsonSchema: Scalars['Map'];
   name: Scalars['String'];
   typescript: Scalars['String'];
-  updatedAt?: Maybe<Scalars['Time']>;
+  updatedAt: Maybe<Scalars['Time']>;
   version: Scalars['String'];
 };
 
@@ -492,7 +492,7 @@ export type EventsFilter = {
 export type File = {
   __typename?: 'File';
   createdAt: Scalars['Time'];
-  description?: Maybe<Scalars['NullString']>;
+  description: Maybe<Scalars['NullString']>;
   filename: Scalars['String'];
   filetype: Scalars['String'];
   id: Scalars['ID'];
@@ -504,36 +504,36 @@ export type File = {
 
 export type FilterList = {
   __typename?: 'FilterList';
-  events?: Maybe<Array<Scalars['String']>>;
-  ips?: Maybe<Array<Scalars['IP']>>;
-  type?: Maybe<Scalars['FilterType']>;
+  events: Maybe<Array<Scalars['String']>>;
+  ips: Maybe<Array<Scalars['IP']>>;
+  type: Maybe<Scalars['FilterType']>;
 };
 
 export type FilterListInput = {
-  events?: InputMaybe<Array<Scalars['String']>>;
-  ips?: InputMaybe<Array<Scalars['IP']>>;
-  type?: InputMaybe<Scalars['FilterType']>;
+  events: InputMaybe<Array<Scalars['String']>>;
+  ips: InputMaybe<Array<Scalars['IP']>>;
+  type: InputMaybe<Scalars['FilterType']>;
 };
 
 export type FunctionRun = {
   __typename?: 'FunctionRun';
   accountID: Scalars['UUID'];
-  batchID?: Maybe<Scalars['ULID']>;
+  batchID: Maybe<Scalars['ULID']>;
   canRerun: Scalars['Boolean'];
-  contactID?: Maybe<Scalars['UUID']>;
-  endedAt?: Maybe<Scalars['Time']>;
-  event?: Maybe<ArchivedEvent>;
-  eventID?: Maybe<Scalars['ULID']>;
+  contactID: Maybe<Scalars['UUID']>;
+  endedAt: Maybe<Scalars['Time']>;
+  event: Maybe<ArchivedEvent>;
+  eventID: Maybe<Scalars['ULID']>;
   events: Array<ArchivedEvent>;
   function: Workflow;
   history: Array<RunHistoryItem>;
-  historyItemOutput?: Maybe<Scalars['String']>;
+  historyItemOutput: Maybe<Scalars['String']>;
   id: Scalars['ULID'];
-  originalRunID?: Maybe<Scalars['ULID']>;
-  output?: Maybe<Scalars['Bytes']>;
+  originalRunID: Maybe<Scalars['ULID']>;
+  output: Maybe<Scalars['Bytes']>;
   startedAt: Scalars['Time'];
   status: FunctionRunStatus;
-  timeline?: Maybe<Array<RunTimeline>>;
+  timeline: Maybe<Array<RunTimeline>>;
   workflowID: Scalars['UUID'];
   workflowVersion: WorkflowVersion;
   workflowVersionInt: Scalars['Int'];
@@ -592,16 +592,16 @@ export type IngestKey = {
   createdAt: Scalars['Time'];
   filter: FilterList;
   id: Scalars['ID'];
-  metadata?: Maybe<Scalars['Map']>;
+  metadata: Maybe<Scalars['Map']>;
   name: Scalars['NullString'];
   presharedKey: Scalars['String'];
   source: Scalars['IngestSource'];
-  url?: Maybe<Scalars['String']>;
+  url: Maybe<Scalars['String']>;
 };
 
 export type IngestKeyFilter = {
-  name?: InputMaybe<Scalars['String']>;
-  source?: InputMaybe<Scalars['String']>;
+  name: InputMaybe<Scalars['String']>;
+  source: InputMaybe<Scalars['String']>;
 };
 
 export type InsertActionSetting = {
@@ -635,45 +635,45 @@ export type MetricsResponse = {
 export type Mutation = {
   __typename?: 'Mutation';
   archiveEnvironment: Workspace;
-  archiveEvent?: Maybe<Event>;
-  archiveWorkflow?: Maybe<WorkflowResponse>;
+  archiveEvent: Maybe<Event>;
+  archiveWorkflow: Maybe<WorkflowResponse>;
   createAPIKey: VisibleApiKey;
   createAction: Action;
   createIngestKey: IngestKey;
   createIntegrationWebhook: IngestKey;
   createSegment: Segment;
   createStripeSubscription: CreateStripeSubscriptionResponse;
-  createUser?: Maybe<User>;
-  createVercelApp?: Maybe<CreateVercelAppResponse>;
-  createWorkflow?: Maybe<WorkflowVersionResponse>;
+  createUser: Maybe<User>;
+  createVercelApp: Maybe<CreateVercelAppResponse>;
+  createWorkflow: Maybe<WorkflowVersionResponse>;
   createWorkspace: Array<Maybe<Workspace>>;
-  deleteActionSecret?: Maybe<DeleteResponse>;
-  deleteIngestKey?: Maybe<DeleteResponse>;
+  deleteActionSecret: Maybe<DeleteResponse>;
+  deleteIngestKey: Maybe<DeleteResponse>;
   deleteUser: Scalars['ID'];
   disableEnvironmentAutoArchive: Workspace;
   editSegment: Segment;
-  editWorkflow?: Maybe<WorkflowVersionResponse>;
+  editWorkflow: Maybe<WorkflowVersionResponse>;
   enableEnvironmentAutoArchive: Workspace;
   insertActionSetting: ActionSetting;
   register: RegisterResponse;
-  removeVercelApp?: Maybe<RemoveVercelAppResponse>;
-  retryWorkflowRun?: Maybe<StartWorkflowResponse>;
-  startWorkflowRun?: Maybe<StartWorkflowResponse>;
+  removeVercelApp: Maybe<RemoveVercelAppResponse>;
+  retryWorkflowRun: Maybe<StartWorkflowResponse>;
+  startWorkflowRun: Maybe<StartWorkflowResponse>;
   unarchiveEnvironment: Workspace;
   updateAccount: Account;
   updateAccountIdentifier: AccountIdentifier;
-  updateAccountSetting?: Maybe<AccountSetting>;
+  updateAccountSetting: Maybe<AccountSetting>;
   updateActionSetting: ActionSetting;
   updateActionVersion: ActionVersion;
   updateContact: Contact;
   updateIngestKey: IngestKey;
-  updatePaymentMethod?: Maybe<Array<PaymentMethod>>;
+  updatePaymentMethod: Maybe<Array<PaymentMethod>>;
   updatePlan: Account;
-  updateUser?: Maybe<User>;
-  updateVercelApp?: Maybe<UpdateVercelAppResponse>;
+  updateUser: Maybe<User>;
+  updateVercelApp: Maybe<UpdateVercelAppResponse>;
   upsertActionSecret: ActionSecret;
   upsertActionSetting: ActionSetting;
-  upsertWorkflow?: Maybe<WorkflowVersionResponse>;
+  upsertWorkflow: Maybe<WorkflowVersionResponse>;
 };
 
 
@@ -694,7 +694,7 @@ export type MutationArchiveWorkflowArgs = {
 
 
 export type MutationCreateApiKeyArgs = {
-  name?: InputMaybe<Scalars['String']>;
+  name: InputMaybe<Scalars['String']>;
 };
 
 
@@ -887,8 +887,8 @@ export type MutationUpsertWorkflowArgs = {
 };
 
 export type NewIngestKey = {
-  filterList?: InputMaybe<FilterListInput>;
-  metadata?: InputMaybe<Scalars['Map']>;
+  filterList: InputMaybe<FilterListInput>;
+  metadata: InputMaybe<Scalars['Map']>;
   name: Scalars['String'];
   source: Scalars['IngestSource'];
   workspaceID: Scalars['ID'];
@@ -896,12 +896,12 @@ export type NewIngestKey = {
 
 export type NewUser = {
   email: Scalars['String'];
-  name?: InputMaybe<Scalars['String']>;
+  name: InputMaybe<Scalars['String']>;
 };
 
 export type NewWorkflowInput = {
   config: Scalars['String'];
-  description?: InputMaybe<Scalars['String']>;
+  description: InputMaybe<Scalars['String']>;
   draft: Scalars['Boolean'];
   workspaceID: Scalars['ID'];
 };
@@ -914,22 +914,22 @@ export type NewWorkspaceInput = {
 export type PageInfo = {
   __typename?: 'PageInfo';
   /** When paginating forward, the cursor to query the next page. */
-  endCursor?: Maybe<Scalars['String']>;
+  endCursor: Maybe<Scalars['String']>;
   /** Indicates if there are any pages subsequent to the current page. */
   hasNextPage: Scalars['Boolean'];
   /** Indicates if there are any pages prior to the current page. */
   hasPreviousPage: Scalars['Boolean'];
   /** When paginating backward, the cursor to query the previous page. */
-  startCursor?: Maybe<Scalars['String']>;
+  startCursor: Maybe<Scalars['String']>;
 };
 
 export type PageResults = {
   __typename?: 'PageResults';
-  cursor?: Maybe<Scalars['String']>;
+  cursor: Maybe<Scalars['String']>;
   page: Scalars['Int'];
   perPage: Scalars['Int'];
-  totalItems?: Maybe<Scalars['Int']>;
-  totalPages?: Maybe<Scalars['Int']>;
+  totalItems: Maybe<Scalars['Int']>;
+  totalPages: Maybe<Scalars['Int']>;
 };
 
 export type PaginatedContactSegments = {
@@ -967,7 +967,7 @@ export type PaymentIntent = {
   amountLabel: Scalars['String'];
   createdAt: Scalars['Time'];
   description: Scalars['String'];
-  invoiceURL?: Maybe<Scalars['String']>;
+  invoiceURL: Maybe<Scalars['String']>;
   status: Scalars['String'];
 };
 
@@ -989,12 +989,12 @@ export type Query = {
   actions: Array<Action>;
   billableStepTimeSeries: Array<TimeSeries>;
   deploy: Deploy;
-  deploys?: Maybe<Array<Deploy>>;
-  events?: Maybe<PaginatedEvents>;
+  deploys: Maybe<Array<Deploy>>;
+  events: Maybe<PaginatedEvents>;
   plans: Array<Maybe<BillingPlan>>;
-  session?: Maybe<Session>;
+  session: Maybe<Session>;
   workspace: Workspace;
-  workspaces?: Maybe<Array<Workspace>>;
+  workspaces: Maybe<Array<Workspace>>;
 };
 
 
@@ -1004,7 +1004,7 @@ export type QueryActionArgs = {
 
 
 export type QueryActionsArgs = {
-  filter?: InputMaybe<ActionFilter>;
+  filter: InputMaybe<ActionFilter>;
 };
 
 
@@ -1019,12 +1019,12 @@ export type QueryDeployArgs = {
 
 
 export type QueryDeploysArgs = {
-  workspaceID?: InputMaybe<Scalars['ID']>;
+  workspaceID: InputMaybe<Scalars['ID']>;
 };
 
 
 export type QueryEventsArgs = {
-  query?: InputMaybe<EventQuery>;
+  query: InputMaybe<EventQuery>;
 };
 
 
@@ -1033,17 +1033,17 @@ export type QueryWorkspaceArgs = {
 };
 
 export type RegisterInput = {
-  anonId?: InputMaybe<Scalars['String']>;
-  company?: InputMaybe<Scalars['String']>;
+  anonId: InputMaybe<Scalars['String']>;
+  company: InputMaybe<Scalars['String']>;
   email: Scalars['String'];
   password: Scalars['String'];
-  userID?: InputMaybe<Scalars['String']>;
+  userID: InputMaybe<Scalars['String']>;
 };
 
 export type RegisterResponse = {
   __typename?: 'RegisterResponse';
-  account?: Maybe<Account>;
-  user?: Maybe<User>;
+  account: Maybe<Account>;
+  user: Maybe<User>;
 };
 
 export type RemoveVercelAppInput = {
@@ -1059,43 +1059,43 @@ export type RemoveVercelAppResponse = {
 export type RunHistory = {
   __typename?: 'RunHistory';
   createdAt: Scalars['Time'];
-  data?: Maybe<Scalars['Bytes']>;
+  data: Maybe<Scalars['Bytes']>;
   id: Scalars['ULID'];
-  stepData?: Maybe<RunHistoryStepData>;
+  stepData: Maybe<RunHistoryStepData>;
   type: RunHistoryType;
 };
 
 export type RunHistoryCancel = {
   __typename?: 'RunHistoryCancel';
-  eventID?: Maybe<Scalars['ULID']>;
-  expression?: Maybe<Scalars['String']>;
-  userID?: Maybe<Scalars['UUID']>;
+  eventID: Maybe<Scalars['ULID']>;
+  expression: Maybe<Scalars['String']>;
+  userID: Maybe<Scalars['UUID']>;
 };
 
 export type RunHistoryItem = {
   __typename?: 'RunHistoryItem';
   attempt: Scalars['Int'];
-  cancel?: Maybe<RunHistoryCancel>;
+  cancel: Maybe<RunHistoryCancel>;
   createdAt: Scalars['Time'];
   functionVersion: Scalars['Int'];
-  groupID?: Maybe<Scalars['UUID']>;
+  groupID: Maybe<Scalars['UUID']>;
   id: Scalars['ULID'];
-  result?: Maybe<RunHistoryResult>;
-  sleep?: Maybe<RunHistorySleep>;
-  stepName?: Maybe<Scalars['String']>;
-  stepType?: Maybe<HistoryStepType>;
+  result: Maybe<RunHistoryResult>;
+  sleep: Maybe<RunHistorySleep>;
+  stepName: Maybe<Scalars['String']>;
+  stepType: Maybe<HistoryStepType>;
   type: HistoryType;
-  url?: Maybe<Scalars['String']>;
-  waitForEvent?: Maybe<RunHistoryWaitForEvent>;
-  waitResult?: Maybe<RunHistoryWaitResult>;
+  url: Maybe<Scalars['String']>;
+  waitForEvent: Maybe<RunHistoryWaitForEvent>;
+  waitResult: Maybe<RunHistoryWaitResult>;
 };
 
 export type RunHistoryResult = {
   __typename?: 'RunHistoryResult';
   durationMS: Scalars['Int'];
-  errorCode?: Maybe<Scalars['String']>;
-  framework?: Maybe<Scalars['String']>;
-  platform?: Maybe<Scalars['String']>;
+  errorCode: Maybe<Scalars['String']>;
+  framework: Maybe<Scalars['String']>;
+  platform: Maybe<Scalars['String']>;
   sdkLanguage: Scalars['String'];
   sdkVersion: Scalars['String'];
   sizeBytes: Scalars['Int'];
@@ -1109,9 +1109,9 @@ export type RunHistorySleep = {
 export type RunHistoryStepData = {
   __typename?: 'RunHistoryStepData';
   attempt: Scalars['Int'];
-  data?: Maybe<Scalars['Bytes']>;
+  data: Maybe<Scalars['Bytes']>;
   id: Scalars['String'];
-  name?: Maybe<Scalars['String']>;
+  name: Maybe<Scalars['String']>;
 };
 
 export enum RunHistoryType {
@@ -1134,26 +1134,26 @@ export enum RunHistoryType {
 export type RunHistoryWaitForEvent = {
   __typename?: 'RunHistoryWaitForEvent';
   eventName: Scalars['String'];
-  expression?: Maybe<Scalars['String']>;
+  expression: Maybe<Scalars['String']>;
   timeout: Scalars['Time'];
 };
 
 export type RunHistoryWaitResult = {
   __typename?: 'RunHistoryWaitResult';
-  eventID?: Maybe<Scalars['ULID']>;
+  eventID: Maybe<Scalars['ULID']>;
   timeout: Scalars['Boolean'];
 };
 
 export type RunListConnection = {
   __typename?: 'RunListConnection';
-  edges?: Maybe<Array<Maybe<RunListItemEdge>>>;
+  edges: Maybe<Array<Maybe<RunListItemEdge>>>;
   pageInfo: PageInfo;
   totalCount: Scalars['Int'];
 };
 
 export type RunListItem = {
   __typename?: 'RunListItem';
-  endedAt?: Maybe<Scalars['Time']>;
+  endedAt: Maybe<Scalars['Time']>;
   eventID: Scalars['ULID'];
   id: Scalars['ULID'];
   startedAt: Scalars['Time'];
@@ -1168,19 +1168,19 @@ export type RunListItemEdge = {
 
 export type RunTimeline = {
   __typename?: 'RunTimeline';
-  durationInMillisconds?: Maybe<Scalars['Int']>;
-  history?: Maybe<Array<RunHistory>>;
-  latencyInMilliseconds?: Maybe<Scalars['Int']>;
-  output?: Maybe<Scalars['Bytes']>;
+  durationInMillisconds: Maybe<Scalars['Int']>;
+  history: Maybe<Array<RunHistory>>;
+  latencyInMilliseconds: Maybe<Scalars['Int']>;
+  output: Maybe<Scalars['Bytes']>;
   status: RunHistoryType;
   step: Scalars['Boolean'];
-  stepName?: Maybe<Scalars['String']>;
+  stepName: Maybe<Scalars['String']>;
 };
 
 export type RunsFilter = {
   lowerTime: Scalars['Time'];
-  status?: InputMaybe<Array<FunctionRunStatus>>;
-  timeField?: InputMaybe<FunctionRunTimeField>;
+  status: InputMaybe<Array<FunctionRunStatus>>;
+  timeField: InputMaybe<FunctionRunTimeField>;
   upperTime: Scalars['Time'];
 };
 
@@ -1210,9 +1210,9 @@ export type SearchResults = {
 
 export type Segment = {
   __typename?: 'Segment';
-  contacts?: Maybe<PaginatedContactSegments>;
+  contacts: Maybe<PaginatedContactSegments>;
   createdAt: Scalars['Time'];
-  expression?: Maybe<Scalars['NullString']>;
+  expression: Maybe<Scalars['NullString']>;
   id: Scalars['ID'];
   name: Scalars['String'];
   ratio: Scalars['Int'];
@@ -1221,14 +1221,14 @@ export type Segment = {
 };
 
 export type SegmentOpts = {
-  expression?: InputMaybe<Scalars['String']>;
+  expression: InputMaybe<Scalars['String']>;
   name: Scalars['String'];
-  ratio?: InputMaybe<Scalars['Int']>;
+  ratio: InputMaybe<Scalars['Int']>;
 };
 
 export type Session = {
   __typename?: 'Session';
-  expires?: Maybe<Scalars['Time']>;
+  expires: Maybe<Scalars['Time']>;
   user: User;
 };
 
@@ -1238,10 +1238,10 @@ export type StartWorkflow = {
 };
 
 export type StartWorkflowInput = {
-  baggage?: InputMaybe<WorkflowBaggageInput>;
-  fromActionID?: InputMaybe<Scalars['Int']>;
+  baggage: InputMaybe<WorkflowBaggageInput>;
+  fromActionID: InputMaybe<Scalars['Int']>;
   workflowID: Scalars['ID'];
-  workflowVersion?: InputMaybe<Scalars['Int']>;
+  workflowVersion: InputMaybe<Scalars['Int']>;
   workspaceID: Scalars['ID'];
 };
 
@@ -1251,9 +1251,9 @@ export type StartWorkflowResponse = {
 };
 
 export type StepUsageTimeOptions = {
-  interval?: InputMaybe<Scalars['String']>;
-  month?: InputMaybe<Scalars['Int']>;
-  year?: InputMaybe<Scalars['Int']>;
+  interval: InputMaybe<Scalars['String']>;
+  month: InputMaybe<Scalars['Int']>;
+  year: InputMaybe<Scalars['Int']>;
 };
 
 export type StripeSubscriptionInput = {
@@ -1275,12 +1275,12 @@ export type TimeSeries = {
 export type TimeSeriesPoint = {
   __typename?: 'TimeSeriesPoint';
   time: Scalars['Time'];
-  value?: Maybe<Scalars['Float']>;
+  value: Maybe<Scalars['Float']>;
 };
 
 export type UpdateAccount = {
-  billingEmail?: InputMaybe<Scalars['String']>;
-  name?: InputMaybe<Scalars['String']>;
+  billingEmail: InputMaybe<Scalars['String']>;
+  name: InputMaybe<Scalars['String']>;
 };
 
 export type UpdateActionSetting = {
@@ -1293,15 +1293,15 @@ export type UpdateActionSetting = {
 };
 
 export type UpdateIngestKey = {
-  filterList?: InputMaybe<FilterListInput>;
-  metadata?: InputMaybe<Scalars['Map']>;
-  name?: InputMaybe<Scalars['String']>;
+  filterList: InputMaybe<FilterListInput>;
+  metadata: InputMaybe<Scalars['Map']>;
+  name: InputMaybe<Scalars['String']>;
 };
 
 export type UpdateUser = {
-  email?: InputMaybe<Scalars['String']>;
-  name?: InputMaybe<Scalars['String']>;
-  password?: InputMaybe<Scalars['String']>;
+  email: InputMaybe<Scalars['String']>;
+  name: InputMaybe<Scalars['String']>;
+  password: InputMaybe<Scalars['String']>;
 };
 
 export type UpdateVercelAppInput = {
@@ -1312,12 +1312,12 @@ export type UpdateVercelAppInput = {
 export type UpdateVercelAppResponse = {
   __typename?: 'UpdateVercelAppResponse';
   success: Scalars['Boolean'];
-  vercelApp?: Maybe<VercelApp>;
+  vercelApp: Maybe<VercelApp>;
 };
 
 export type UpsertActionSecret = {
   data: Scalars['String'];
-  dsn?: InputMaybe<Scalars['DSN']>;
+  dsn: InputMaybe<Scalars['DSN']>;
   name: Scalars['String'];
   workspaceID: Scalars['ID'];
 };
@@ -1331,9 +1331,9 @@ export type UpsertActionSetting = {
 };
 
 export type UpsertWorkflowInput = {
-  config?: InputMaybe<Scalars['String']>;
-  description?: InputMaybe<Scalars['String']>;
-  live?: InputMaybe<Scalars['Boolean']>;
+  config: InputMaybe<Scalars['String']>;
+  description: InputMaybe<Scalars['String']>;
+  live: InputMaybe<Scalars['Boolean']>;
   workspaceID: Scalars['ID'];
 };
 
@@ -1347,10 +1347,10 @@ export type Usage = {
 };
 
 export type UsageInput = {
-  from?: InputMaybe<Scalars['Time']>;
-  period?: InputMaybe<Scalars['Period']>;
-  range?: InputMaybe<Scalars['Timerange']>;
-  to?: InputMaybe<Scalars['Time']>;
+  from: InputMaybe<Scalars['Time']>;
+  period: InputMaybe<Scalars['Period']>;
+  range: InputMaybe<Scalars['Timerange']>;
+  to: InputMaybe<Scalars['Time']>;
 };
 
 export type UsageSlot = {
@@ -1361,21 +1361,21 @@ export type UsageSlot = {
 
 export type User = {
   __typename?: 'User';
-  account?: Maybe<Account>;
+  account: Maybe<Account>;
   createdAt: Scalars['Time'];
   email: Scalars['String'];
   id: Scalars['ID'];
-  lastLoginAt?: Maybe<Scalars['Time']>;
-  name?: Maybe<Scalars['NullString']>;
-  passwordChangedAt?: Maybe<Scalars['Time']>;
-  roles?: Maybe<Array<Maybe<Scalars['Role']>>>;
+  lastLoginAt: Maybe<Scalars['Time']>;
+  name: Maybe<Scalars['NullString']>;
+  passwordChangedAt: Maybe<Scalars['Time']>;
+  roles: Maybe<Array<Maybe<Scalars['Role']>>>;
   updatedAt: Scalars['Time'];
 };
 
 export type VercelApp = {
   __typename?: 'VercelApp';
   id: Scalars['UUID'];
-  path?: Maybe<Scalars['String']>;
+  path: Maybe<Scalars['String']>;
   projectID: Scalars['String'];
   workspaceID: Scalars['UUID'];
 };
@@ -1391,10 +1391,10 @@ export type VisibleApiKey = {
 
 export type Workflow = {
   __typename?: 'Workflow';
-  appName?: Maybe<Scalars['String']>;
-  archivedAt?: Maybe<Scalars['Time']>;
+  appName: Maybe<Scalars['String']>;
+  archivedAt: Maybe<Scalars['Time']>;
   communication: Array<Communication>;
-  current?: Maybe<WorkflowVersion>;
+  current: Maybe<WorkflowVersion>;
   drafts: Array<Maybe<WorkflowVersion>>;
   id: Scalars['ID'];
   isArchived: Scalars['Boolean'];
@@ -1406,8 +1406,8 @@ export type Workflow = {
   previous: Array<Maybe<WorkflowVersion>>;
   run: FunctionRun;
   runMetrics: Usage;
-  runs?: Maybe<RunListConnection>;
-  runsV2?: Maybe<RunListConnection>;
+  runs: Maybe<RunListConnection>;
+  runsV2: Maybe<RunListConnection>;
   slug: Scalars['String'];
   url: Scalars['String'];
   usage: Usage;
@@ -1431,28 +1431,28 @@ export type WorkflowRunArgs = {
 
 
 export type WorkflowRunMetricsArgs = {
-  opts?: InputMaybe<UsageInput>;
-  status?: InputMaybe<Scalars['String']>;
+  opts: InputMaybe<UsageInput>;
+  status: InputMaybe<Scalars['String']>;
 };
 
 
 export type WorkflowRunsArgs = {
-  after?: InputMaybe<Scalars['String']>;
+  after: InputMaybe<Scalars['String']>;
   filter: RunsFilter;
   first?: Scalars['Int'];
 };
 
 
 export type WorkflowRunsV2Args = {
-  after?: InputMaybe<Scalars['String']>;
+  after: InputMaybe<Scalars['String']>;
   filter: RunsFilter;
   first?: Scalars['Int'];
 };
 
 
 export type WorkflowUsageArgs = {
-  event?: InputMaybe<Scalars['String']>;
-  opts?: InputMaybe<UsageInput>;
+  event: InputMaybe<Scalars['String']>;
+  opts: InputMaybe<UsageInput>;
 };
 
 
@@ -1461,19 +1461,19 @@ export type WorkflowVersionArgs = {
 };
 
 export type WorkflowBaggageInput = {
-  actions?: InputMaybe<Scalars['Map']>;
+  actions: InputMaybe<Scalars['Map']>;
   event: Scalars['Bytes'];
 };
 
 export type WorkflowEvent = {
   __typename?: 'WorkflowEvent';
   branchRunID: Scalars['ULID'];
-  contact?: Maybe<Contact>;
-  contactID?: Maybe<Scalars['ID']>;
+  contact: Maybe<Contact>;
+  contactID: Maybe<Scalars['ID']>;
   createdAt: Scalars['Time'];
-  data?: Maybe<Scalars['String']>;
+  data: Maybe<Scalars['String']>;
   eventID: Scalars['ULID'];
-  fromActionID?: Maybe<Scalars['Int']>;
+  fromActionID: Maybe<Scalars['Int']>;
   id: Scalars['ULID'];
   name: Scalars['String'];
   workflow: Workflow;
@@ -1486,14 +1486,14 @@ export type WorkflowEvent = {
 
 export type WorkflowPause = {
   __typename?: 'WorkflowPause';
-  actionID?: Maybe<Scalars['String']>;
-  childActionID?: Maybe<Scalars['String']>;
+  actionID: Maybe<Scalars['String']>;
+  childActionID: Maybe<Scalars['String']>;
   createdAt: Scalars['Time'];
-  eventName?: Maybe<Scalars['NullString']>;
+  eventName: Maybe<Scalars['NullString']>;
   expiresAt: Scalars['Time'];
-  expression?: Maybe<Scalars['NullString']>;
+  expression: Maybe<Scalars['NullString']>;
   id: Scalars['ID'];
-  parentActionID?: Maybe<Scalars['String']>;
+  parentActionID: Maybe<Scalars['String']>;
   workflowRunID: Scalars['ULID'];
 };
 
@@ -1510,8 +1510,8 @@ export type WorkflowStart = {
 
 export type WorkflowTrigger = {
   __typename?: 'WorkflowTrigger';
-  eventName?: Maybe<Scalars['NullString']>;
-  schedule?: Maybe<Scalars['NullString']>;
+  eventName: Maybe<Scalars['NullString']>;
+  schedule: Maybe<Scalars['NullString']>;
   workflowID: Scalars['ID'];
   workflowVersion: Scalars['Int'];
 };
@@ -1519,21 +1519,21 @@ export type WorkflowTrigger = {
 export type WorkflowVersion = {
   __typename?: 'WorkflowVersion';
   actions: Array<Action>;
-  alerts?: Maybe<Array<Alert>>;
+  alerts: Maybe<Array<Alert>>;
   communication: Array<Communication>;
   config: Scalars['String'];
   configJSON: Scalars['String'];
   createdAt: Scalars['Time'];
-  deploy?: Maybe<Deploy>;
-  description?: Maybe<Scalars['NullString']>;
+  deploy: Maybe<Deploy>;
+  description: Maybe<Scalars['NullString']>;
   retries: Scalars['Int'];
   throttleCount: Scalars['Int'];
   throttlePeriod: Scalars['String'];
   triggers: Array<WorkflowTrigger>;
   updatedAt: Scalars['Time'];
   url: Scalars['String'];
-  validFrom?: Maybe<Scalars['Time']>;
-  validTo?: Maybe<Scalars['Time']>;
+  validFrom: Maybe<Scalars['Time']>;
+  validTo: Maybe<Scalars['Time']>;
   version: Scalars['Int'];
   workflowID: Scalars['ID'];
   workflowType: Scalars['String'];
@@ -1548,12 +1548,12 @@ export type WorkflowVersionResponse = {
 export type Workspace = {
   __typename?: 'Workspace';
   actionSettings: Array<ActionSetting>;
-  archivedEvent?: Maybe<ArchivedEvent>;
+  archivedEvent: Maybe<ArchivedEvent>;
   contact: Contact;
   contactStats: ContactStats;
   contacts: PaginatedContacts;
   createdAt: Scalars['Time'];
-  event?: Maybe<Event>;
+  event: Maybe<Event>;
   eventByNames: Array<EventType>;
   eventTypes: PaginatedEventTypes;
   events: PaginatedEvents;
@@ -1561,12 +1561,12 @@ export type Workspace = {
   id: Scalars['ID'];
   ingestKey: IngestKey;
   ingestKeys: Array<IngestKey>;
-  integrations?: Maybe<Array<WorkspaceIntegration>>;
+  integrations: Maybe<Array<WorkspaceIntegration>>;
   isArchived: Scalars['Boolean'];
   isAutoArchiveEnabled: Scalars['Boolean'];
-  lastDeployedAt?: Maybe<Scalars['Time']>;
+  lastDeployedAt: Maybe<Scalars['Time']>;
   name: Scalars['String'];
-  parentID?: Maybe<Scalars['ID']>;
+  parentID: Maybe<Scalars['ID']>;
   secrets: Array<Maybe<ActionSecret>>;
   segment: Segment;
   segments: Array<Maybe<Segment>>;
@@ -1574,14 +1574,14 @@ export type Workspace = {
   type: EnvironmentType;
   vercelApps: Array<VercelApp>;
   webhookSigningKey: Scalars['String'];
-  workflow?: Maybe<Workflow>;
-  workflowBySlug?: Maybe<Workflow>;
+  workflow: Maybe<Workflow>;
+  workflowBySlug: Maybe<Workflow>;
   workflows: PaginatedWorkflows;
 };
 
 
 export type WorkspaceActionSettingsArgs = {
-  category?: InputMaybe<Scalars['String']>;
+  category: InputMaybe<Scalars['String']>;
   dsn: Scalars['DSN'];
 };
 
@@ -1597,7 +1597,7 @@ export type WorkspaceContactArgs = {
 
 
 export type WorkspaceContactsArgs = {
-  filter?: InputMaybe<Scalars['Map']>;
+  filter: InputMaybe<Scalars['Map']>;
 };
 
 
@@ -1612,7 +1612,7 @@ export type WorkspaceEventByNamesArgs = {
 
 
 export type WorkspaceEventsArgs = {
-  prefix?: InputMaybe<Scalars['String']>;
+  prefix: InputMaybe<Scalars['String']>;
 };
 
 
@@ -1622,12 +1622,12 @@ export type WorkspaceIngestKeyArgs = {
 
 
 export type WorkspaceIngestKeysArgs = {
-  filter?: InputMaybe<IngestKeyFilter>;
+  filter: InputMaybe<IngestKeyFilter>;
 };
 
 
 export type WorkspaceSecretsArgs = {
-  service?: InputMaybe<Scalars['DSN']>;
+  service: InputMaybe<Scalars['DSN']>;
 };
 
 
@@ -1637,7 +1637,7 @@ export type WorkspaceSegmentArgs = {
 
 
 export type WorkspaceSegmentsArgs = {
-  prefix?: InputMaybe<Scalars['String']>;
+  prefix: InputMaybe<Scalars['String']>;
 };
 
 
@@ -1704,7 +1704,7 @@ export type GetDeployQueryVariables = Exact<{
 }>;
 
 
-export type GetDeployQuery = { __typename?: 'Query', deploy: { __typename?: 'Deploy', id: string, appName: string, authorID?: string | null, checksum: string, createdAt: string, error?: string | null, framework?: string | null, metadata: Record<string, unknown>, sdkLanguage: string, sdkVersion: string, status: string, url?: string | null, deployedFunctions: Array<{ __typename?: 'Workflow', slug: string, name: string }>, removedFunctions: Array<{ __typename?: 'Workflow', slug: string, name: string }> } };
+export type GetDeployQuery = { __typename?: 'Query', deploy: { __typename?: 'Deploy', id: string, appName: string, authorID: string | null, checksum: string, createdAt: string, error: string | null, framework: string | null, metadata: Record<string, unknown>, sdkLanguage: string, sdkVersion: string, status: string, url: string | null, deployedFunctions: Array<{ __typename?: 'Workflow', slug: string, name: string }>, removedFunctions: Array<{ __typename?: 'Workflow', slug: string, name: string }> } };
 
 export type GetEventKeysForBlankSlateQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1719,15 +1719,15 @@ export type ArchiveEventMutationVariables = Exact<{
 }>;
 
 
-export type ArchiveEventMutation = { __typename?: 'Mutation', archiveEvent?: { __typename?: 'Event', name: string } | null };
+export type ArchiveEventMutation = { __typename?: 'Mutation', archiveEvent: { __typename?: 'Event', name: string } | null };
 
 export type GetLatestEventLogsQueryVariables = Exact<{
-  name?: InputMaybe<Scalars['String']>;
+  name: InputMaybe<Scalars['String']>;
   environmentID: Scalars['ID'];
 }>;
 
 
-export type GetLatestEventLogsQuery = { __typename?: 'Query', events?: { __typename?: 'PaginatedEvents', data: Array<{ __typename?: 'Event', recent: Array<{ __typename?: 'ArchivedEvent', id: string, receivedAt: string, event: string, source?: { __typename?: 'IngestKey', name: null | string } | null }> }> } | null };
+export type GetLatestEventLogsQuery = { __typename?: 'Query', events: { __typename?: 'PaginatedEvents', data: Array<{ __typename?: 'Event', recent: Array<{ __typename?: 'ArchivedEvent', id: string, receivedAt: string, event: string, source: { __typename?: 'IngestKey', name: null | string } | null }> }> } | null };
 
 export type GetEventKeysQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1739,12 +1739,12 @@ export type GetEventKeysQuery = { __typename?: 'Query', environment: { __typenam
 export type GetEventLogQueryVariables = Exact<{
   environmentID: Scalars['ID'];
   eventName: Scalars['String'];
-  cursor?: InputMaybe<Scalars['String']>;
+  cursor: InputMaybe<Scalars['String']>;
   perPage: Scalars['Int'];
 }>;
 
 
-export type GetEventLogQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', eventType?: { __typename?: 'Event', events: Array<{ __typename?: 'ArchivedEvent', id: string, receivedAt: string }> } | null } };
+export type GetEventLogQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', eventType: { __typename?: 'Event', events: Array<{ __typename?: 'ArchivedEvent', id: string, receivedAt: string }> } | null } };
 
 export type EventPayloadFragment = { __typename?: 'ArchivedEvent', payload: string } & { ' $fragmentName'?: 'EventPayloadFragment' };
 
@@ -1755,7 +1755,7 @@ export type GetFunctionRunCardQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunCardQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function?: { __typename?: 'Workflow', name: string, slug: string, run: { __typename?: 'FunctionRun', id: string, status: FunctionRunStatus, startedAt: string } } | null } };
+export type GetFunctionRunCardQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', name: string, slug: string, run: { __typename?: 'FunctionRun', id: string, status: FunctionRunStatus, startedAt: string } } | null } };
 
 export type GetEventQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1763,7 +1763,7 @@ export type GetEventQueryVariables = Exact<{
 }>;
 
 
-export type GetEventQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', event?: (
+export type GetEventQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', event: (
       { __typename?: 'ArchivedEvent', receivedAt: string, functionRuns: Array<{ __typename?: 'FunctionRun', id: string, function: { __typename?: 'Workflow', id: string } }> }
       & { ' $fragmentRefs'?: { 'EventPayloadFragment': EventPayloadFragment } }
     ) | null } };
@@ -1771,7 +1771,7 @@ export type GetEventQuery = { __typename?: 'Query', environment: { __typename?: 
 export type GetBillingPlanQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetBillingPlanQuery = { __typename?: 'Query', account: { __typename?: 'Account', plan?: { __typename?: 'BillingPlan', id: string, name: string, features: Record<string, unknown> } | null }, plans: Array<{ __typename?: 'BillingPlan', name: string, features: Record<string, unknown> } | null> };
+export type GetBillingPlanQuery = { __typename?: 'Query', account: { __typename?: 'Account', plan: { __typename?: 'BillingPlan', id: string, name: string, features: Record<string, unknown> } | null }, plans: Array<{ __typename?: 'BillingPlan', name: string, features: Record<string, unknown> } | null> };
 
 export type GetFunctionRunsMetricsQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1781,7 +1781,7 @@ export type GetFunctionRunsMetricsQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunsMetricsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function?: { __typename?: 'Workflow', completed: { __typename?: 'Usage', period: unknown, total: number, asOf: string, data: Array<{ __typename?: 'UsageSlot', slot: string, count: number }> }, canceled: { __typename?: 'Usage', period: unknown, total: number, asOf: string, data: Array<{ __typename?: 'UsageSlot', slot: string, count: number }> }, failed: { __typename?: 'Usage', period: unknown, total: number, asOf: string, data: Array<{ __typename?: 'UsageSlot', slot: string, count: number }> } } | null } };
+export type GetFunctionRunsMetricsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', completed: { __typename?: 'Usage', period: unknown, total: number, asOf: string, data: Array<{ __typename?: 'UsageSlot', slot: string, count: number }> }, canceled: { __typename?: 'Usage', period: unknown, total: number, asOf: string, data: Array<{ __typename?: 'UsageSlot', slot: string, count: number }> }, failed: { __typename?: 'Usage', period: unknown, total: number, asOf: string, data: Array<{ __typename?: 'UsageSlot', slot: string, count: number }> } } | null } };
 
 export type GetFnMetricsQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1791,7 +1791,7 @@ export type GetFnMetricsQueryVariables = Exact<{
 }>;
 
 
-export type GetFnMetricsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function?: { __typename?: 'Workflow', queued: { __typename?: 'MetricsResponse', from: string, to: string, granularity: string, data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> }, started: { __typename?: 'MetricsResponse', from: string, to: string, granularity: string, data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> }, ended: { __typename?: 'MetricsResponse', from: string, to: string, granularity: string, data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> }, concurrencyLimit: { __typename?: 'MetricsResponse', from: string, to: string, granularity: string, data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> } } | null } };
+export type GetFnMetricsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', queued: { __typename?: 'MetricsResponse', from: string, to: string, granularity: string, data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> }, started: { __typename?: 'MetricsResponse', from: string, to: string, granularity: string, data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> }, ended: { __typename?: 'MetricsResponse', from: string, to: string, granularity: string, data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> }, concurrencyLimit: { __typename?: 'MetricsResponse', from: string, to: string, granularity: string, data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> } } | null } };
 
 export type GetFailedFunctionRunsQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1801,7 +1801,7 @@ export type GetFailedFunctionRunsQueryVariables = Exact<{
 }>;
 
 
-export type GetFailedFunctionRunsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function?: { __typename?: 'Workflow', failedRuns?: { __typename?: 'RunListConnection', edges?: Array<{ __typename?: 'RunListItemEdge', node: { __typename?: 'RunListItem', id: string, endedAt?: string | null } } | null> | null } | null } | null } };
+export type GetFailedFunctionRunsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', failedRuns: { __typename?: 'RunListConnection', edges: Array<{ __typename?: 'RunListItemEdge', node: { __typename?: 'RunListItem', id: string, endedAt: string | null } } | null> | null } | null } | null } };
 
 export type GetSdkRequestMetricsQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1811,14 +1811,14 @@ export type GetSdkRequestMetricsQueryVariables = Exact<{
 }>;
 
 
-export type GetSdkRequestMetricsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function?: { __typename?: 'Workflow', queued: { __typename?: 'MetricsResponse', from: string, to: string, granularity: string, data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> }, started: { __typename?: 'MetricsResponse', from: string, to: string, granularity: string, data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> }, ended: { __typename?: 'MetricsResponse', from: string, to: string, granularity: string, data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> } } | null } };
+export type GetSdkRequestMetricsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', queued: { __typename?: 'MetricsResponse', from: string, to: string, granularity: string, data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> }, started: { __typename?: 'MetricsResponse', from: string, to: string, granularity: string, data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> }, ended: { __typename?: 'MetricsResponse', from: string, to: string, granularity: string, data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> } } | null } };
 
 export type ArchiveFunctionMutationVariables = Exact<{
   input: ArchiveWorkflowInput;
 }>;
 
 
-export type ArchiveFunctionMutation = { __typename?: 'Mutation', archiveWorkflow?: { __typename?: 'WorkflowResponse', workflow: { __typename?: 'Workflow', id: string } } | null };
+export type ArchiveFunctionMutation = { __typename?: 'Mutation', archiveWorkflow: { __typename?: 'WorkflowResponse', workflow: { __typename?: 'Workflow', id: string } } | null };
 
 export type GetFunctionArchivalQueryVariables = Exact<{
   slug: Scalars['String'];
@@ -1826,7 +1826,7 @@ export type GetFunctionArchivalQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionArchivalQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', workflow?: { __typename?: 'Workflow', id: string, isArchived: boolean, name: string } | null } };
+export type GetFunctionArchivalQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', workflow: { __typename?: 'Workflow', id: string, isArchived: boolean, name: string } | null } };
 
 export type GetFunctionVersionNumberQueryVariables = Exact<{
   slug: Scalars['String'];
@@ -1834,29 +1834,27 @@ export type GetFunctionVersionNumberQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionVersionNumberQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', workflow?: { __typename?: 'Workflow', id: string, archivedAt?: string | null, current?: { __typename?: 'WorkflowVersion', version: number } | null, previous: Array<{ __typename?: 'WorkflowVersion', version: number } | null> } | null } };
+export type GetFunctionVersionNumberQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', workflow: { __typename?: 'Workflow', id: string, archivedAt: string | null, current: { __typename?: 'WorkflowVersion', version: number } | null, previous: Array<{ __typename?: 'WorkflowVersion', version: number } | null> } | null } };
 
 export type PauseFunctionMutationVariables = Exact<{
   input: EditWorkflowInput;
 }>;
 
 
-export type PauseFunctionMutation = { __typename?: 'Mutation', editWorkflow?: { __typename?: 'WorkflowVersionResponse', workflow: { __typename?: 'Workflow', id: string, name: string } } | null };
+export type PauseFunctionMutation = { __typename?: 'Mutation', editWorkflow: { __typename?: 'WorkflowVersionResponse', workflow: { __typename?: 'Workflow', id: string, name: string } } | null };
 
 export type GetFunctionRunsQueryVariables = Exact<{
   environmentID: Scalars['ID'];
   functionSlug: Scalars['String'];
-  functionRunStatuses?: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
-  functionRunCursor?: InputMaybe<Scalars['String']>;
+  functionRunStatuses: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
+  functionRunCursor: InputMaybe<Scalars['String']>;
   timeRangeStart: Scalars['Time'];
   timeRangeEnd: Scalars['Time'];
   timeField: FunctionRunTimeField;
 }>;
 
 
-export type GetFunctionRunsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function?: { __typename?: 'Workflow', id: string, runs?: { __typename?: 'RunListConnection', edges?: Array<{ __typename?: 'RunListItemEdge', node: { __typename?: 'RunListItem', id: string, status: FunctionRunStatus, startedAt: string, endedAt?: string | null } } | null> | null, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null } } | null } | null } };
-
-export type FunctionItemFragment = { __typename?: 'Workflow', id: string, slug: string } & { ' $fragmentName'?: 'FunctionItemFragment' };
+export type GetFunctionRunsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', id: string, runs: { __typename?: 'RunListConnection', edges: Array<{ __typename?: 'RunListItemEdge', node: { __typename?: 'RunListItem', id: string, status: FunctionRunStatus, startedAt: string, endedAt: string | null } } | null> | null, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor: string | null } } | null } | null } };
 
 export type RerunFunctionRunMutationVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1865,7 +1863,7 @@ export type RerunFunctionRunMutationVariables = Exact<{
 }>;
 
 
-export type RerunFunctionRunMutation = { __typename?: 'Mutation', retryWorkflowRun?: { __typename?: 'StartWorkflowResponse', id: string } | null };
+export type RerunFunctionRunMutation = { __typename?: 'Mutation', retryWorkflowRun: { __typename?: 'StartWorkflowResponse', id: string } | null };
 
 export type GetFunctionRunTimelineQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1874,10 +1872,7 @@ export type GetFunctionRunTimelineQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunTimelineQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function?: (
-      { __typename?: 'Workflow', run: { __typename?: 'FunctionRun', canRerun: boolean, timeline?: Array<{ __typename?: 'RunTimeline', stepName?: string | null, output?: string | null, type: RunHistoryType, history?: Array<{ __typename?: 'RunHistory', id: string, type: RunHistoryType, createdAt: string, stepData?: { __typename?: 'RunHistoryStepData', data?: string | null } | null }> | null }> | null } }
-      & { ' $fragmentRefs'?: { 'FunctionItemFragment': FunctionItemFragment } }
-    ) | null } };
+export type GetFunctionRunTimelineQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', id: string, run: { __typename?: 'FunctionRun', canRerun: boolean, timeline: Array<{ __typename?: 'RunTimeline', stepName: string | null, output: string | null, type: RunHistoryType, history: Array<{ __typename?: 'RunHistory', id: string, type: RunHistoryType, createdAt: string, stepData: { __typename?: 'RunHistoryStepData', data: string | null } | null }> | null }> | null } } | null } };
 
 export type GetFunctionRunOutputQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1886,7 +1881,7 @@ export type GetFunctionRunOutputQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunOutputQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function?: { __typename?: 'Workflow', run: { __typename?: 'FunctionRun', output?: string | null } } | null } };
+export type GetFunctionRunOutputQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', run: { __typename?: 'FunctionRun', output: string | null } } | null } };
 
 export type GetFunctionRunPayloadQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1895,7 +1890,17 @@ export type GetFunctionRunPayloadQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunPayloadQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function?: { __typename?: 'Workflow', functionRun: { __typename?: 'FunctionRun', events: Array<{ __typename?: 'ArchivedEvent', payload: string }> } } | null } };
+export type GetFunctionRunPayloadQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', functionRun: { __typename?: 'FunctionRun', events: Array<{ __typename?: 'ArchivedEvent', payload: string }> } } | null } };
+
+export type GetHistoryItemOutputQueryVariables = Exact<{
+  envID: Scalars['ID'];
+  functionID: Scalars['ID'];
+  historyItemID: Scalars['ULID'];
+  runID: Scalars['ULID'];
+}>;
+
+
+export type GetHistoryItemOutputQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', run: { __typename?: 'FunctionRun', historyItemOutput: string | null } } | null } };
 
 export type GetFunctionRunDetailsQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1904,19 +1909,19 @@ export type GetFunctionRunDetailsQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunDetailsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function?: { __typename?: 'Workflow', run: { __typename?: 'FunctionRun', id: string, status: FunctionRunStatus, startedAt: string, endedAt?: string | null, functionVersion: { __typename?: 'WorkflowVersion', validFrom?: string | null, version: number, deploy?: { __typename?: 'Deploy', id: string, createdAt: string } | null }, version: { __typename?: 'WorkflowVersion', url: string, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName?: null | string | null, schedule?: null | string | null }> } } } | null } };
+export type GetFunctionRunDetailsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', id: string, name: string, slug: string, run: { __typename?: 'FunctionRun', canRerun: boolean, id: string, status: FunctionRunStatus, startedAt: string, endedAt: string | null, output: string | null, event: { __typename?: 'ArchivedEvent', id: string, name: string, receivedAt: string, payload: string } | null, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: string, functionVersion: number, groupID: string | null, id: string, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: string | null, expression: string | null, userID: string | null } | null, sleep: { __typename?: 'RunHistorySleep', until: string } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: string } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: string | null, timeout: boolean } | null }>, version: { __typename?: 'WorkflowVersion', url: string, validFrom: string | null, version: number, deploy: { __typename?: 'Deploy', id: string, createdAt: string } | null, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName: null | string | null, schedule: null | string | null }> } } } | null } };
 
 export type GetFunctionRunsCountQueryVariables = Exact<{
   environmentID: Scalars['ID'];
   functionSlug: Scalars['String'];
-  functionRunStatuses?: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
+  functionRunStatuses: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
   timeRangeStart: Scalars['Time'];
   timeRangeEnd: Scalars['Time'];
   timeField: FunctionRunTimeField;
 }>;
 
 
-export type GetFunctionRunsCountQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function?: { __typename?: 'Workflow', id: string, runs?: { __typename?: 'RunListConnection', totalCount: number } | null } | null } };
+export type GetFunctionRunsCountQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', id: string, runs: { __typename?: 'RunListConnection', totalCount: number } | null } | null } };
 
 export type NewIngestKeyMutationVariables = Exact<{
   input: NewIngestKey;
@@ -1938,14 +1943,14 @@ export type UpdateIngestKeyMutationVariables = Exact<{
 }>;
 
 
-export type UpdateIngestKeyMutation = { __typename?: 'Mutation', updateIngestKey: { __typename?: 'IngestKey', id: string, name: null | string, createdAt: string, presharedKey: string, url?: string | null, metadata?: Record<string, unknown> | null, filter: { __typename?: 'FilterList', type?: unknown | null, ips?: Array<string> | null, events?: Array<string> | null } } };
+export type UpdateIngestKeyMutation = { __typename?: 'Mutation', updateIngestKey: { __typename?: 'IngestKey', id: string, name: null | string, createdAt: string, presharedKey: string, url: string | null, metadata: Record<string, unknown> | null, filter: { __typename?: 'FilterList', type: string | null, ips: Array<string> | null, events: Array<string> | null } } };
 
 export type DeleteEventKeyMutationVariables = Exact<{
   input: DeleteIngestKey;
 }>;
 
 
-export type DeleteEventKeyMutation = { __typename?: 'Mutation', deleteIngestKey?: { __typename?: 'DeleteResponse', ids: Array<string> } | null };
+export type DeleteEventKeyMutation = { __typename?: 'Mutation', deleteIngestKey: { __typename?: 'DeleteResponse', ids: Array<string> } | null };
 
 export type GetIngestKeyQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1953,7 +1958,7 @@ export type GetIngestKeyQueryVariables = Exact<{
 }>;
 
 
-export type GetIngestKeyQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', ingestKey: { __typename?: 'IngestKey', id: string, name: null | string, createdAt: string, presharedKey: string, url?: string | null, metadata?: Record<string, unknown> | null, filter: { __typename?: 'FilterList', type?: unknown | null, ips?: Array<string> | null, events?: Array<string> | null } } } };
+export type GetIngestKeyQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', ingestKey: { __typename?: 'IngestKey', id: string, name: null | string, createdAt: string, presharedKey: string, url: string | null, metadata: Record<string, unknown> | null, filter: { __typename?: 'FilterList', type: string | null, ips: Array<string> | null, events: Array<string> | null } } } };
 
 export type GetSigningKeyQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1967,7 +1972,7 @@ export type UpdateAccountMutationVariables = Exact<{
 }>;
 
 
-export type UpdateAccountMutation = { __typename?: 'Mutation', account: { __typename?: 'Account', billingEmail: string, name?: null | string | null } };
+export type UpdateAccountMutation = { __typename?: 'Mutation', account: { __typename?: 'Account', billingEmail: string, name: null | string | null } };
 
 export type CreateStripeSubscriptionMutationVariables = Exact<{
   input: StripeSubscriptionInput;
@@ -1981,19 +1986,19 @@ export type UpdatePlanMutationVariables = Exact<{
 }>;
 
 
-export type UpdatePlanMutation = { __typename?: 'Mutation', updatePlan: { __typename?: 'Account', plan?: { __typename?: 'BillingPlan', id: string, name: string } | null } };
+export type UpdatePlanMutation = { __typename?: 'Mutation', updatePlan: { __typename?: 'Account', plan: { __typename?: 'BillingPlan', id: string, name: string } | null } };
 
 export type GetPaymentIntentsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetPaymentIntentsQuery = { __typename?: 'Query', account: { __typename?: 'Account', paymentIntents: Array<{ __typename?: 'PaymentIntent', status: string, createdAt: string, amountLabel: string, description: string, invoiceURL?: string | null }> } };
+export type GetPaymentIntentsQuery = { __typename?: 'Query', account: { __typename?: 'Account', paymentIntents: Array<{ __typename?: 'PaymentIntent', status: string, createdAt: string, amountLabel: string, description: string, invoiceURL: string | null }> } };
 
 export type UpdatePaymentMethodMutationVariables = Exact<{
   token: Scalars['String'];
 }>;
 
 
-export type UpdatePaymentMethodMutation = { __typename?: 'Mutation', updatePaymentMethod?: Array<{ __typename?: 'PaymentMethod', brand: string, last4: string, expMonth: string, expYear: string, createdAt: string, default: boolean }> | null };
+export type UpdatePaymentMethodMutation = { __typename?: 'Mutation', updatePaymentMethod: Array<{ __typename?: 'PaymentMethod', brand: string, last4: string, expMonth: string, expYear: string, createdAt: string, default: boolean }> | null };
 
 export type GetBillingInfoQueryVariables = Exact<{
   prevMonth: Scalars['Int'];
@@ -2001,35 +2006,35 @@ export type GetBillingInfoQueryVariables = Exact<{
 }>;
 
 
-export type GetBillingInfoQuery = { __typename?: 'Query', account: { __typename?: 'Account', billingEmail: string, name?: null | string | null, plan?: { __typename?: 'BillingPlan', id: string, name: string, amount: number, billingPeriod: unknown, features: Record<string, unknown> } | null, subscription?: { __typename?: 'BillingSubscription', nextInvoiceDate: string } | null, paymentMethods?: Array<{ __typename?: 'PaymentMethod', brand: string, last4: string, expMonth: string, expYear: string, createdAt: string, default: boolean }> | null }, plans: Array<{ __typename?: 'BillingPlan', id: string, name: string, amount: number, billingPeriod: unknown, features: Record<string, unknown> } | null>, billableStepTimeSeriesPrevMonth: Array<{ __typename?: 'TimeSeries', data: Array<{ __typename?: 'TimeSeriesPoint', time: string, value?: number | null }> }>, billableStepTimeSeriesThisMonth: Array<{ __typename?: 'TimeSeries', data: Array<{ __typename?: 'TimeSeriesPoint', time: string, value?: number | null }> }> };
+export type GetBillingInfoQuery = { __typename?: 'Query', account: { __typename?: 'Account', billingEmail: string, name: null | string | null, plan: { __typename?: 'BillingPlan', id: string, name: string, amount: number, billingPeriod: unknown, features: Record<string, unknown> } | null, subscription: { __typename?: 'BillingSubscription', nextInvoiceDate: string } | null, paymentMethods: Array<{ __typename?: 'PaymentMethod', brand: string, last4: string, expMonth: string, expYear: string, createdAt: string, default: boolean }> | null }, plans: Array<{ __typename?: 'BillingPlan', id: string, name: string, amount: number, billingPeriod: unknown, features: Record<string, unknown> } | null>, billableStepTimeSeriesPrevMonth: Array<{ __typename?: 'TimeSeries', data: Array<{ __typename?: 'TimeSeriesPoint', time: string, value: number | null }> }>, billableStepTimeSeriesThisMonth: Array<{ __typename?: 'TimeSeries', data: Array<{ __typename?: 'TimeSeriesPoint', time: string, value: number | null }> }> };
 
 export type GetSavedVercelProjectsQueryVariables = Exact<{
   environmentID: Scalars['ID'];
 }>;
 
 
-export type GetSavedVercelProjectsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', savedVercelProjects: Array<{ __typename?: 'VercelApp', projectID: string, path?: string | null }> } };
+export type GetSavedVercelProjectsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', savedVercelProjects: Array<{ __typename?: 'VercelApp', projectID: string, path: string | null }> } };
 
 export type CreateVercelAppMutationVariables = Exact<{
   input: CreateVercelAppInput;
 }>;
 
 
-export type CreateVercelAppMutation = { __typename?: 'Mutation', createVercelApp?: { __typename?: 'CreateVercelAppResponse', success: boolean } | null };
+export type CreateVercelAppMutation = { __typename?: 'Mutation', createVercelApp: { __typename?: 'CreateVercelAppResponse', success: boolean } | null };
 
 export type UpdateVercelAppMutationVariables = Exact<{
   input: UpdateVercelAppInput;
 }>;
 
 
-export type UpdateVercelAppMutation = { __typename?: 'Mutation', updateVercelApp?: { __typename?: 'UpdateVercelAppResponse', success: boolean } | null };
+export type UpdateVercelAppMutation = { __typename?: 'Mutation', updateVercelApp: { __typename?: 'UpdateVercelAppResponse', success: boolean } | null };
 
 export type RemoveVercelAppMutationVariables = Exact<{
   input: RemoveVercelAppInput;
 }>;
 
 
-export type RemoveVercelAppMutation = { __typename?: 'Mutation', removeVercelApp?: { __typename?: 'RemoveVercelAppResponse', success: boolean } | null };
+export type RemoveVercelAppMutation = { __typename?: 'Mutation', removeVercelApp: { __typename?: 'RemoveVercelAppResponse', success: boolean } | null };
 
 export type DeleteUserMutationVariables = Exact<{
   id: Scalars['ID'];
@@ -2043,22 +2048,22 @@ export type CreateUserMutationVariables = Exact<{
 }>;
 
 
-export type CreateUserMutation = { __typename?: 'Mutation', createUser?: { __typename?: 'User', id: string } | null };
+export type CreateUserMutation = { __typename?: 'Mutation', createUser: { __typename?: 'User', id: string } | null };
 
 export type GetUsersQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetUsersQuery = { __typename?: 'Query', account: { __typename?: 'Account', users: Array<{ __typename?: 'User', createdAt: string, email: string, id: string, lastLoginAt?: string | null, name?: null | string | null }> }, session?: { __typename?: 'Session', user: { __typename?: 'User', id: string } } | null };
+export type GetUsersQuery = { __typename?: 'Query', account: { __typename?: 'Account', users: Array<{ __typename?: 'User', createdAt: string, email: string, id: string, lastLoginAt: string | null, name: null | string | null }> }, session: { __typename?: 'Session', user: { __typename?: 'User', id: string } } | null };
 
 export type GetAccountSupportInfoQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetAccountSupportInfoQuery = { __typename?: 'Query', account: { __typename?: 'Account', id: string, plan?: { __typename?: 'BillingPlan', id: string, name: string, amount: number, features: Record<string, unknown> } | null } };
+export type GetAccountSupportInfoQuery = { __typename?: 'Query', account: { __typename?: 'Account', id: string, plan: { __typename?: 'BillingPlan', id: string, name: string, amount: number, features: Record<string, unknown> } | null } };
 
 export type GetAccountNameQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetAccountNameQuery = { __typename?: 'Query', account: { __typename?: 'Account', name?: null | string | null } };
+export type GetAccountNameQuery = { __typename?: 'Query', account: { __typename?: 'Account', name: null | string | null } };
 
 export type GetGlobalSearchQueryVariables = Exact<{
   opts: SearchInput;
@@ -2073,53 +2078,53 @@ export type GetFunctionSlugQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionSlugQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function?: { __typename?: 'Workflow', slug: string, name: string } | null } };
+export type GetFunctionSlugQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', slug: string, name: string } | null } };
 
 export type GetDeployssQueryVariables = Exact<{
   environmentID: Scalars['ID'];
 }>;
 
 
-export type GetDeployssQuery = { __typename?: 'Query', deploys?: Array<{ __typename?: 'Deploy', id: string, appName: string, authorID?: string | null, checksum: string, createdAt: string, error?: string | null, framework?: string | null, metadata: Record<string, unknown>, sdkLanguage: string, sdkVersion: string, status: string, deployedFunctions: Array<{ __typename?: 'Workflow', id: string, name: string }>, removedFunctions: Array<{ __typename?: 'Workflow', id: string, name: string }> }> | null };
+export type GetDeployssQuery = { __typename?: 'Query', deploys: Array<{ __typename?: 'Deploy', id: string, appName: string, authorID: string | null, checksum: string, createdAt: string, error: string | null, framework: string | null, metadata: Record<string, unknown>, sdkLanguage: string, sdkVersion: string, status: string, deployedFunctions: Array<{ __typename?: 'Workflow', id: string, name: string }>, removedFunctions: Array<{ __typename?: 'Workflow', id: string, name: string }> }> | null };
 
 export type GetEnvironmentsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetEnvironmentsQuery = { __typename?: 'Query', workspaces?: Array<{ __typename?: 'Workspace', id: string, name: string, parentID?: string | null, test: boolean, type: EnvironmentType, webhookSigningKey: string, createdAt: string, isArchived: boolean, functionCount: number, isAutoArchiveEnabled: boolean, lastDeployedAt?: string | null }> | null };
+export type GetEnvironmentsQuery = { __typename?: 'Query', workspaces: Array<{ __typename?: 'Workspace', id: string, name: string, parentID: string | null, test: boolean, type: EnvironmentType, webhookSigningKey: string, createdAt: string, isArchived: boolean, functionCount: number, isAutoArchiveEnabled: boolean, lastDeployedAt: string | null }> | null };
 
 export type GetEventTypesQueryVariables = Exact<{
   environmentID: Scalars['ID'];
-  page?: InputMaybe<Scalars['Int']>;
+  page: InputMaybe<Scalars['Int']>;
 }>;
 
 
-export type GetEventTypesQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', events: { __typename?: 'PaginatedEvents', data: Array<{ __typename?: 'Event', name: string, functions: Array<{ __typename?: 'Workflow', id: string, slug: string, name: string }>, dailyVolume: { __typename?: 'Usage', total: number, data: Array<{ __typename?: 'UsageSlot', count: number }> } }>, page: { __typename?: 'PageResults', page: number, totalPages?: number | null } } } };
+export type GetEventTypesQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', events: { __typename?: 'PaginatedEvents', data: Array<{ __typename?: 'Event', name: string, functions: Array<{ __typename?: 'Workflow', id: string, slug: string, name: string }>, dailyVolume: { __typename?: 'Usage', total: number, data: Array<{ __typename?: 'UsageSlot', count: number }> } }>, page: { __typename?: 'PageResults', page: number, totalPages: number | null } } } };
 
 export type GetEventTypeQueryVariables = Exact<{
-  eventName?: InputMaybe<Scalars['String']>;
+  eventName: InputMaybe<Scalars['String']>;
   environmentID: Scalars['ID'];
 }>;
 
 
-export type GetEventTypeQuery = { __typename?: 'Query', events?: { __typename?: 'PaginatedEvents', data: Array<{ __typename?: 'Event', name: string, description?: string | null, schemaSource?: string | null, integrationName?: string | null, workflows: Array<{ __typename?: 'Workflow', id: string, slug: string, name: string, current?: { __typename?: 'WorkflowVersion', createdAt: string } | null }>, recent: Array<{ __typename?: 'ArchivedEvent', id: string, receivedAt: string, occurredAt: string, name: string, event: string, version: string, contactID?: string | null, ingestSourceID?: string | null, contact?: { __typename?: 'Contact', predefinedAttributes: Record<string, unknown> } | null, source?: { __typename?: 'IngestKey', name: null | string } | null }>, usage: { __typename?: 'Usage', period: unknown, total: number, asOf: string, data: Array<{ __typename?: 'UsageSlot', slot: string, count: number }> } }> } | null };
+export type GetEventTypeQuery = { __typename?: 'Query', events: { __typename?: 'PaginatedEvents', data: Array<{ __typename?: 'Event', name: string, description: string | null, schemaSource: unknown | null, integrationName: string | null, workflows: Array<{ __typename?: 'Workflow', id: string, slug: string, name: string, current: { __typename?: 'WorkflowVersion', createdAt: string } | null }>, recent: Array<{ __typename?: 'ArchivedEvent', id: string, receivedAt: string, occurredAt: string, name: string, event: string, version: string, contactID: string | null, ingestSourceID: string | null, contact: { __typename?: 'Contact', predefinedAttributes: Record<string, unknown> } | null, source: { __typename?: 'IngestKey', name: null | string } | null }>, usage: { __typename?: 'Usage', period: unknown, total: number, asOf: string, data: Array<{ __typename?: 'UsageSlot', slot: string, count: number }> } }> } | null };
 
 export type GetFunctionsUsageQueryVariables = Exact<{
   environmentID: Scalars['ID'];
-  page?: InputMaybe<Scalars['Int']>;
-  archived?: InputMaybe<Scalars['Boolean']>;
+  page: InputMaybe<Scalars['Int']>;
+  archived: InputMaybe<Scalars['Boolean']>;
 }>;
 
 
-export type GetFunctionsUsageQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', workflows: { __typename?: 'PaginatedWorkflows', page: { __typename?: 'PageResults', page: number, perPage: number, totalItems?: number | null, totalPages?: number | null }, data: Array<{ __typename?: 'Workflow', id: string, slug: string, dailyStarts: { __typename?: 'Usage', total: number, data: Array<{ __typename?: 'UsageSlot', count: number }> }, dailyFailures: { __typename?: 'Usage', total: number, data: Array<{ __typename?: 'UsageSlot', count: number }> } }> } } };
+export type GetFunctionsUsageQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', workflows: { __typename?: 'PaginatedWorkflows', page: { __typename?: 'PageResults', page: number, perPage: number, totalItems: number | null, totalPages: number | null }, data: Array<{ __typename?: 'Workflow', id: string, slug: string, dailyStarts: { __typename?: 'Usage', total: number, data: Array<{ __typename?: 'UsageSlot', count: number }> }, dailyFailures: { __typename?: 'Usage', total: number, data: Array<{ __typename?: 'UsageSlot', count: number }> } }> } } };
 
 export type GetFunctionsQueryVariables = Exact<{
   environmentID: Scalars['ID'];
-  page?: InputMaybe<Scalars['Int']>;
-  archived?: InputMaybe<Scalars['Boolean']>;
+  page: InputMaybe<Scalars['Int']>;
+  archived: InputMaybe<Scalars['Boolean']>;
 }>;
 
 
-export type GetFunctionsQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', workflows: { __typename?: 'PaginatedWorkflows', page: { __typename?: 'PageResults', page: number, perPage: number, totalItems?: number | null, totalPages?: number | null }, data: Array<{ __typename?: 'Workflow', id: string, slug: string, name: string, isArchived: boolean, current?: { __typename?: 'WorkflowVersion', version: number, description?: null | string | null, validFrom?: string | null, validTo?: string | null, workflowType: string, throttlePeriod: string, throttleCount: number, alerts?: Array<{ __typename?: 'Alert', workflowID: string }> | null, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName?: null | string | null, schedule?: null | string | null }> } | null }> } } };
+export type GetFunctionsQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', workflows: { __typename?: 'PaginatedWorkflows', page: { __typename?: 'PageResults', page: number, perPage: number, totalItems: number | null, totalPages: number | null }, data: Array<{ __typename?: 'Workflow', appName: string | null, id: string, slug: string, name: string, isArchived: boolean, current: { __typename?: 'WorkflowVersion', version: number, description: null | string | null, validFrom: string | null, validTo: string | null, workflowType: string, throttlePeriod: string, throttleCount: number, alerts: Array<{ __typename?: 'Alert', workflowID: string }> | null, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName: null | string | null, schedule: null | string | null }> } | null }> } } };
 
 export type GetFunctionQueryVariables = Exact<{
   slug: Scalars['String'];
@@ -2127,9 +2132,9 @@ export type GetFunctionQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', id: string, workflow?: { __typename?: 'Workflow', id: string, name: string, slug: string, isArchived: boolean, url: string, current?: { __typename?: 'WorkflowVersion', workflowID: string, version: number, config: string, retries: number, validFrom?: string | null, validTo?: string | null, description?: null | string | null, updatedAt: string, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName?: null | string | null, schedule?: null | string | null }>, deploy?: { __typename?: 'Deploy', id: string, createdAt: string } | null } | null } | null } };
+export type GetFunctionQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', id: string, workflow: { __typename?: 'Workflow', id: string, name: string, slug: string, isArchived: boolean, url: string, current: { __typename?: 'WorkflowVersion', workflowID: string, version: number, config: string, retries: number, validFrom: string | null, validTo: string | null, description: null | string | null, updatedAt: string, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName: null | string | null, schedule: null | string | null }>, deploy: { __typename?: 'Deploy', id: string, createdAt: string } | null } | null } | null } };
 
-export type FunctionVersionFragment = { __typename?: 'WorkflowVersion', version: number, validFrom?: string | null, validTo?: string | null, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName?: null | string | null, schedule?: null | string | null }>, deploy?: { __typename?: 'Deploy', id: string } | null } & { ' $fragmentName'?: 'FunctionVersionFragment' };
+export type FunctionVersionFragment = { __typename?: 'WorkflowVersion', version: number, validFrom: string | null, validTo: string | null, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName: null | string | null, schedule: null | string | null }>, deploy: { __typename?: 'Deploy', id: string } | null } & { ' $fragmentName'?: 'FunctionVersionFragment' };
 
 export type GetFunctionVersionsQueryVariables = Exact<{
   slug: Scalars['String'];
@@ -2137,7 +2142,7 @@ export type GetFunctionVersionsQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionVersionsQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', workflow?: { __typename?: 'Workflow', archivedAt?: string | null, current?: (
+export type GetFunctionVersionsQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', workflow: { __typename?: 'Workflow', archivedAt: string | null, current: (
         { __typename?: 'WorkflowVersion' }
         & { ' $fragmentRefs'?: { 'FunctionVersionFragment': FunctionVersionFragment } }
       ) | null, previous: Array<(
@@ -2153,15 +2158,14 @@ export type GetFunctionUsageQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionUsageQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', workflow?: { __typename?: 'Workflow', dailyStarts: { __typename?: 'Usage', period: unknown, total: number, asOf: string, data: Array<{ __typename?: 'UsageSlot', slot: string, count: number }> }, dailyFailures: { __typename?: 'Usage', period: unknown, total: number, asOf: string, data: Array<{ __typename?: 'UsageSlot', slot: string, count: number }> } } | null } };
+export type GetFunctionUsageQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', workflow: { __typename?: 'Workflow', dailyStarts: { __typename?: 'Usage', period: unknown, total: number, asOf: string, data: Array<{ __typename?: 'UsageSlot', slot: string, count: number }> }, dailyFailures: { __typename?: 'Usage', period: unknown, total: number, asOf: string, data: Array<{ __typename?: 'UsageSlot', slot: string, count: number }> } } | null } };
 
 export type GetAllEnvironmentsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetAllEnvironmentsQuery = { __typename?: 'Query', workspaces?: Array<{ __typename?: 'Workspace', id: string, name: string, parentID?: string | null, test: boolean, type: EnvironmentType, createdAt: string, isArchived: boolean, isAutoArchiveEnabled: boolean }> | null };
+export type GetAllEnvironmentsQuery = { __typename?: 'Query', workspaces: Array<{ __typename?: 'Workspace', id: string, name: string, parentID: string | null, test: boolean, type: EnvironmentType, createdAt: string, isArchived: boolean, isAutoArchiveEnabled: boolean }> | null };
 
 export const EventPayloadFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"EventPayload"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ArchivedEvent"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"payload"},"name":{"kind":"Name","value":"event"}}]}}]} as unknown as DocumentNode<EventPayloadFragment, unknown>;
-export const FunctionItemFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FunctionItem"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Workflow"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}}]}}]} as unknown as DocumentNode<FunctionItemFragment, unknown>;
 export const FunctionVersionFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FunctionVersion"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowVersion"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"validFrom"}},{"kind":"Field","name":{"kind":"Name","value":"validTo"}},{"kind":"Field","name":{"kind":"Name","value":"triggers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventName"}},{"kind":"Field","name":{"kind":"Name","value":"schedule"}}]}},{"kind":"Field","name":{"kind":"Name","value":"deploy"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<FunctionVersionFragment, unknown>;
 export const CreateEnvironmentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateEnvironment"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"name"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createWorkspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"Variable","name":{"kind":"Name","value":"name"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<CreateEnvironmentMutation, CreateEnvironmentMutationVariables>;
 export const ArchiveEnvironmentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ArchiveEnvironment"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"archiveEnvironment"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<ArchiveEnvironmentMutation, ArchiveEnvironmentMutationVariables>;
@@ -2187,10 +2191,11 @@ export const GetFunctionVersionNumberDocument = {"kind":"Document","definitions"
 export const PauseFunctionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"PauseFunction"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"EditWorkflowInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"editWorkflow"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workflow"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode<PauseFunctionMutation, PauseFunctionMutationVariables>;
 export const GetFunctionRunsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctionRuns"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionRunStatuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"FunctionRunStatus"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionRunCursor"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeStart"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeEnd"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"timeField"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"FunctionRunTimeField"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","alias":{"kind":"Name","value":"runs"},"name":{"kind":"Name","value":"runsV2"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"filter"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionRunStatuses"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"lowerTime"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeStart"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"upperTime"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeEnd"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"timeField"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeField"}}}]}},{"kind":"Argument","name":{"kind":"Name","value":"first"},"value":{"kind":"IntValue","value":"20"}},{"kind":"Argument","name":{"kind":"Name","value":"after"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionRunCursor"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"edges"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"node"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"endedAt"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageInfo"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"hasNextPage"}},{"kind":"Field","name":{"kind":"Name","value":"endCursor"}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionRunsQuery, GetFunctionRunsQueryVariables>;
 export const RerunFunctionRunDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RerunFunctionRun"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"retryWorkflowRun"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"workflowID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionID"}}}]}},{"kind":"Argument","name":{"kind":"Name","value":"workflowRunID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<RerunFunctionRunMutation, RerunFunctionRunMutationVariables>;
-export const GetFunctionRunTimelineDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctionRunTimeline"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FunctionItem"}},{"kind":"Field","name":{"kind":"Name","value":"run"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"canRerun"}},{"kind":"Field","name":{"kind":"Name","value":"timeline"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"stepName"}},{"kind":"Field","alias":{"kind":"Name","value":"type"},"name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"output"}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"stepData"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"data"}}]}}]}}]}}]}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FunctionItem"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Workflow"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}}]}}]} as unknown as DocumentNode<GetFunctionRunTimelineQuery, GetFunctionRunTimelineQueryVariables>;
+export const GetFunctionRunTimelineDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctionRunTimeline"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"run"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"canRerun"}},{"kind":"Field","name":{"kind":"Name","value":"timeline"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"stepName"}},{"kind":"Field","alias":{"kind":"Name","value":"type"},"name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"output"}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"stepData"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"data"}}]}}]}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionRunTimelineQuery, GetFunctionRunTimelineQueryVariables>;
 export const GetFunctionRunOutputDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctionRunOutput"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"run"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"output"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionRunOutputQuery, GetFunctionRunOutputQueryVariables>;
 export const GetFunctionRunPayloadDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctionRunPayload"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"functionRun"},"name":{"kind":"Name","value":"run"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"events"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"payload"},"name":{"kind":"Name","value":"event"}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionRunPayloadQuery, GetFunctionRunPayloadQueryVariables>;
-export const GetFunctionRunDetailsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctionRunDetails"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"run"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"endedAt"}},{"kind":"Field","alias":{"kind":"Name","value":"functionVersion"},"name":{"kind":"Name","value":"workflowVersion"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"validFrom"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"deploy"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}},{"kind":"Field","alias":{"kind":"Name","value":"version"},"name":{"kind":"Name","value":"workflowVersion"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"triggers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventName"}},{"kind":"Field","name":{"kind":"Name","value":"schedule"}}]}},{"kind":"Field","name":{"kind":"Name","value":"url"}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionRunDetailsQuery, GetFunctionRunDetailsQueryVariables>;
+export const GetHistoryItemOutputDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetHistoryItemOutput"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"historyItemID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"runID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflow"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"run"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"runID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"historyItemOutput"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"historyItemID"}}}]}]}}]}}]}}]}}]} as unknown as DocumentNode<GetHistoryItemOutputQuery, GetHistoryItemOutputQueryVariables>;
+export const GetFunctionRunDetailsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctionRunDetails"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"run"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"canRerun"}},{"kind":"Field","name":{"kind":"Name","value":"event"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","alias":{"kind":"Name","value":"payload"},"name":{"kind":"Name","value":"event"}},{"kind":"Field","name":{"kind":"Name","value":"receivedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"attempt"}},{"kind":"Field","name":{"kind":"Name","value":"cancel"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventID"}},{"kind":"Field","name":{"kind":"Name","value":"expression"}},{"kind":"Field","name":{"kind":"Name","value":"userID"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"functionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"groupID"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"sleep"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"until"}}]}},{"kind":"Field","name":{"kind":"Name","value":"stepName"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"url"}},{"kind":"Field","name":{"kind":"Name","value":"waitForEvent"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventName"}},{"kind":"Field","name":{"kind":"Name","value":"expression"}},{"kind":"Field","name":{"kind":"Name","value":"timeout"}}]}},{"kind":"Field","name":{"kind":"Name","value":"waitResult"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventID"}},{"kind":"Field","name":{"kind":"Name","value":"timeout"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"endedAt"}},{"kind":"Field","name":{"kind":"Name","value":"output"}},{"kind":"Field","alias":{"kind":"Name","value":"version"},"name":{"kind":"Name","value":"workflowVersion"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deploy"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"triggers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventName"}},{"kind":"Field","name":{"kind":"Name","value":"schedule"}}]}},{"kind":"Field","name":{"kind":"Name","value":"url"}},{"kind":"Field","name":{"kind":"Name","value":"validFrom"}},{"kind":"Field","name":{"kind":"Name","value":"version"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"slug"}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionRunDetailsQuery, GetFunctionRunDetailsQueryVariables>;
 export const GetFunctionRunsCountDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctionRunsCount"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionRunStatuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"FunctionRunStatus"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeStart"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeEnd"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"timeField"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"FunctionRunTimeField"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","alias":{"kind":"Name","value":"runs"},"name":{"kind":"Name","value":"runsV2"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"filter"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionRunStatuses"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"lowerTime"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeStart"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"upperTime"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeEnd"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"timeField"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeField"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionRunsCountQuery, GetFunctionRunsCountQueryVariables>;
 export const NewIngestKeyDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"NewIngestKey"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"NewIngestKey"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"key"},"name":{"kind":"Name","value":"createIngestKey"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<NewIngestKeyMutation, NewIngestKeyMutationVariables>;
 export const GetIngestKeysDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetIngestKeys"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ingestKeys"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"source"}}]}}]}}]}}]} as unknown as DocumentNode<GetIngestKeysQuery, GetIngestKeysQueryVariables>;
@@ -2220,7 +2225,7 @@ export const GetEnvironmentsDocument = {"kind":"Document","definitions":[{"kind"
 export const GetEventTypesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetEventTypes"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"page"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"events"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"paginated"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"perPage"},"value":{"kind":"IntValue","value":"50"}},{"kind":"Argument","name":{"kind":"Name","value":"page"},"value":{"kind":"Variable","name":{"kind":"Name","value":"page"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","alias":{"kind":"Name","value":"functions"},"name":{"kind":"Name","value":"workflows"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","alias":{"kind":"Name","value":"dailyVolume"},"name":{"kind":"Name","value":"usage"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"opts"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"period"},"value":{"kind":"StringValue","value":"hour","block":false}},{"kind":"ObjectField","name":{"kind":"Name","value":"range"},"value":{"kind":"StringValue","value":"day","block":false}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"total"}},{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"count"}}]}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"page"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"page"}},{"kind":"Field","name":{"kind":"Name","value":"totalPages"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetEventTypesQuery, GetEventTypesQueryVariables>;
 export const GetEventTypeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetEventType"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"eventName"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"events"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"query"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"Variable","name":{"kind":"Name","value":"eventName"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"schemaSource"}},{"kind":"Field","name":{"kind":"Name","value":"integrationName"}},{"kind":"Field","name":{"kind":"Name","value":"workflows"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"current"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"recent"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"count"},"value":{"kind":"IntValue","value":"5"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"receivedAt"}},{"kind":"Field","name":{"kind":"Name","value":"occurredAt"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"event"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"contactID"}},{"kind":"Field","name":{"kind":"Name","value":"contact"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"predefinedAttributes"}}]}},{"kind":"Field","name":{"kind":"Name","value":"ingestSourceID"}},{"kind":"Field","name":{"kind":"Name","value":"source"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"usage"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"opts"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"period"},"value":{"kind":"StringValue","value":"hour","block":false}},{"kind":"ObjectField","name":{"kind":"Name","value":"range"},"value":{"kind":"StringValue","value":"day","block":false}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"period"}},{"kind":"Field","name":{"kind":"Name","value":"total"}},{"kind":"Field","name":{"kind":"Name","value":"asOf"}},{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slot"}},{"kind":"Field","name":{"kind":"Name","value":"count"}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetEventTypeQuery, GetEventTypeQueryVariables>;
 export const GetFunctionsUsageDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctionsUsage"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"page"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"archived"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workflows"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"archived"},"value":{"kind":"Variable","name":{"kind":"Name","value":"archived"}}}],"directives":[{"kind":"Directive","name":{"kind":"Name","value":"paginated"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"perPage"},"value":{"kind":"IntValue","value":"50"}},{"kind":"Argument","name":{"kind":"Name","value":"page"},"value":{"kind":"Variable","name":{"kind":"Name","value":"page"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"page"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"page"}},{"kind":"Field","name":{"kind":"Name","value":"perPage"}},{"kind":"Field","name":{"kind":"Name","value":"totalItems"}},{"kind":"Field","name":{"kind":"Name","value":"totalPages"}}]}},{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","alias":{"kind":"Name","value":"dailyStarts"},"name":{"kind":"Name","value":"usage"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"opts"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"period"},"value":{"kind":"StringValue","value":"hour","block":false}},{"kind":"ObjectField","name":{"kind":"Name","value":"range"},"value":{"kind":"StringValue","value":"day","block":false}}]}},{"kind":"Argument","name":{"kind":"Name","value":"event"},"value":{"kind":"StringValue","value":"started","block":false}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"total"}},{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"count"}}]}}]}},{"kind":"Field","alias":{"kind":"Name","value":"dailyFailures"},"name":{"kind":"Name","value":"usage"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"opts"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"period"},"value":{"kind":"StringValue","value":"hour","block":false}},{"kind":"ObjectField","name":{"kind":"Name","value":"range"},"value":{"kind":"StringValue","value":"day","block":false}}]}},{"kind":"Argument","name":{"kind":"Name","value":"event"},"value":{"kind":"StringValue","value":"errored","block":false}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"total"}},{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"count"}}]}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionsUsageQuery, GetFunctionsUsageQueryVariables>;
-export const GetFunctionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"page"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"archived"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workflows"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"archived"},"value":{"kind":"Variable","name":{"kind":"Name","value":"archived"}}}],"directives":[{"kind":"Directive","name":{"kind":"Name","value":"paginated"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"perPage"},"value":{"kind":"IntValue","value":"50"}},{"kind":"Argument","name":{"kind":"Name","value":"page"},"value":{"kind":"Variable","name":{"kind":"Name","value":"page"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"page"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"page"}},{"kind":"Field","name":{"kind":"Name","value":"perPage"}},{"kind":"Field","name":{"kind":"Name","value":"totalItems"}},{"kind":"Field","name":{"kind":"Name","value":"totalPages"}}]}},{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"isArchived"}},{"kind":"Field","name":{"kind":"Name","value":"current"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"validFrom"}},{"kind":"Field","name":{"kind":"Name","value":"validTo"}},{"kind":"Field","name":{"kind":"Name","value":"workflowType"}},{"kind":"Field","name":{"kind":"Name","value":"throttlePeriod"}},{"kind":"Field","name":{"kind":"Name","value":"throttleCount"}},{"kind":"Field","name":{"kind":"Name","value":"alerts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workflowID"}}]}},{"kind":"Field","name":{"kind":"Name","value":"triggers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventName"}},{"kind":"Field","name":{"kind":"Name","value":"schedule"}}]}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionsQuery, GetFunctionsQueryVariables>;
+export const GetFunctionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"page"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"archived"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workflows"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"archived"},"value":{"kind":"Variable","name":{"kind":"Name","value":"archived"}}}],"directives":[{"kind":"Directive","name":{"kind":"Name","value":"paginated"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"perPage"},"value":{"kind":"IntValue","value":"50"}},{"kind":"Argument","name":{"kind":"Name","value":"page"},"value":{"kind":"Variable","name":{"kind":"Name","value":"page"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"page"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"page"}},{"kind":"Field","name":{"kind":"Name","value":"perPage"}},{"kind":"Field","name":{"kind":"Name","value":"totalItems"}},{"kind":"Field","name":{"kind":"Name","value":"totalPages"}}]}},{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"appName"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"isArchived"}},{"kind":"Field","name":{"kind":"Name","value":"current"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"validFrom"}},{"kind":"Field","name":{"kind":"Name","value":"validTo"}},{"kind":"Field","name":{"kind":"Name","value":"workflowType"}},{"kind":"Field","name":{"kind":"Name","value":"throttlePeriod"}},{"kind":"Field","name":{"kind":"Name","value":"throttleCount"}},{"kind":"Field","name":{"kind":"Name","value":"alerts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workflowID"}}]}},{"kind":"Field","name":{"kind":"Name","value":"triggers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventName"}},{"kind":"Field","name":{"kind":"Name","value":"schedule"}}]}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionsQuery, GetFunctionsQueryVariables>;
 export const GetFunctionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunction"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"slug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","alias":{"kind":"Name","value":"workflow"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"slug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"isArchived"}},{"kind":"Field","name":{"kind":"Name","value":"current"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workflowID"}},{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"config"}},{"kind":"Field","name":{"kind":"Name","value":"retries"}},{"kind":"Field","name":{"kind":"Name","value":"validFrom"}},{"kind":"Field","name":{"kind":"Name","value":"validTo"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"triggers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventName"}},{"kind":"Field","name":{"kind":"Name","value":"schedule"}}]}},{"kind":"Field","name":{"kind":"Name","value":"deploy"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"url"}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionQuery, GetFunctionQueryVariables>;
 export const GetFunctionVersionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctionVersions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"slug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"workflow"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"slug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"archivedAt"}},{"kind":"Field","name":{"kind":"Name","value":"current"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FunctionVersion"}}]}},{"kind":"Field","name":{"kind":"Name","value":"previous"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"FunctionVersion"}}]}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"FunctionVersion"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WorkflowVersion"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"validFrom"}},{"kind":"Field","name":{"kind":"Name","value":"validTo"}},{"kind":"Field","name":{"kind":"Name","value":"triggers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventName"}},{"kind":"Field","name":{"kind":"Name","value":"schedule"}}]}},{"kind":"Field","name":{"kind":"Name","value":"deploy"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<GetFunctionVersionsQuery, GetFunctionVersionsQueryVariables>;
 export const GetFunctionUsageDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctionUsage"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"startTime"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"endTime"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workflow"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"dailyStarts"},"name":{"kind":"Name","value":"usage"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"opts"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"from"},"value":{"kind":"Variable","name":{"kind":"Name","value":"startTime"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"to"},"value":{"kind":"Variable","name":{"kind":"Name","value":"endTime"}}}]}},{"kind":"Argument","name":{"kind":"Name","value":"event"},"value":{"kind":"StringValue","value":"started","block":false}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"period"}},{"kind":"Field","name":{"kind":"Name","value":"total"}},{"kind":"Field","name":{"kind":"Name","value":"asOf"}},{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slot"}},{"kind":"Field","name":{"kind":"Name","value":"count"}}]}}]}},{"kind":"Field","alias":{"kind":"Name","value":"dailyFailures"},"name":{"kind":"Name","value":"usage"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"opts"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"from"},"value":{"kind":"Variable","name":{"kind":"Name","value":"startTime"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"to"},"value":{"kind":"Variable","name":{"kind":"Name","value":"endTime"}}}]}},{"kind":"Argument","name":{"kind":"Name","value":"event"},"value":{"kind":"StringValue","value":"errored","block":false}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"period"}},{"kind":"Field","name":{"kind":"Name","value":"total"}},{"kind":"Field","name":{"kind":"Name","value":"asOf"}},{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slot"}},{"kind":"Field","name":{"kind":"Name","value":"count"}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionUsageQuery, GetFunctionUsageQueryVariables>;

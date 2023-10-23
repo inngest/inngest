@@ -15,9 +15,10 @@ local partitionIndexKey = KEYS[4] -- partition:sorted - zset
 -- We push our queue item ID into each concurrency queue
 local accountConcurrencyKey   = KEYS[5] -- Account concurrency level
 local partitionConcurrencyKey = KEYS[6] -- When leasing an item we need to place the lease into this key.
-local customConcurrencyKey    = KEYS[7] -- Optional for eg. for concurrency amongst steps 
+local customConcurrencyKeyA   = KEYS[7] -- Optional for eg. for concurrency amongst steps 
+local customConcurrencyKeyB   = KEYS[8] -- Optional for eg. for concurrency amongst steps 
 -- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer      = KEYS[8]
+local concurrencyPointer      = KEYS[9]
 
 local queueItem      = ARGV[1] -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID        = ARGV[2] -- id
@@ -47,8 +48,11 @@ redis.call("ZREM", partitionConcurrencyKey, item.id)
 if accountConcurrencyKey ~= nil and accountConcurrencyKey ~= "" then
 	redis.call("ZREM", accountConcurrencyKey, item.id)
 end
-if customConcurrencyKey ~= nil and customConcurrencyKey ~= "" then
-	redis.call("ZREM", customConcurrencyKey, item.id)
+if customConcurrencyKeyA ~= nil and customConcurrencyKeyA ~= "" then
+	redis.call("ZREM", customConcurrencyKeyA, item.id)
+end
+if customConcurrencyKeyB ~= nil and customConcurrencyKeyB ~= "" then
+	redis.call("ZREM", customConcurrencyKeyB, item.id)
 end
 
 -- Fetch partition index;  ensure this is the same as our lowest queue item score

@@ -2,13 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@inngest/components/Button';
 import { capitalCase } from 'change-case';
-import { toast } from 'sonner';
-import { useMutation } from 'urql';
 
-import Button from '@/components/Button';
-import Input from '@/components/Forms/Input';
-import { graphql } from '@/gql';
 import BillingCard from './BillingCard';
 import UpdateCardModal from './UpdateCardModal';
 
@@ -38,11 +34,13 @@ export default function PaymentMethod({
       heading="Payment Method"
       className="mb-3"
       actions={
-        <>
-          <Button variant="text" className="font-semibold" onClick={() => setIsEditing(true)}>
-            Edit
-          </Button>
-        </>
+        <Button
+          appearance="text"
+          kind="primary"
+          btnAction={() => setIsEditing(true)}
+          label="Edit"
+          className="font-semibold"
+        />
       }
     >
       {paymentMethod ? (

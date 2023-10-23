@@ -1,6 +1,7 @@
 'use client';
 
-import Button from '@/components/Button';
+import { Button } from '@inngest/components/Button';
+
 import { StatusTag } from '@/components/Tag/StatusTag';
 import LoadingIcon from '@/icons/LoadingIcon';
 import CancelledIcon from '@/icons/status-icons/cancelled.svg';
@@ -87,13 +88,11 @@ export default function FunctionVersions({ params }: FunctionVersionsProps) {
               button={
                 v.deploy?.id && (
                   <Button
-                    variant="secondary"
+                    appearance={i === 0 ? 'solid' : 'outlined'}
                     href={`/env/${params.environmentSlug}/deploys/${v.deploy.id}`}
                     disabled={!v.deploy?.id}
-                    context={i === 0 ? 'dark' : 'light'}
-                  >
-                    View Deploy
-                  </Button>
+                    label="View Deploy"
+                  />
                 )
               }
             />

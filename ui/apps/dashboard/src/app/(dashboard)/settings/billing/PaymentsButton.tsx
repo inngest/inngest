@@ -1,14 +1,17 @@
 'use client';
 
-import Button from '@/components/Button';
+import { Button } from '@inngest/components/Button';
 
 export default function PaymentsButton() {
   function scrollToPayments() {
     document.getElementById('payments')?.scrollIntoView();
   }
   return (
-    <Button onClick={scrollToPayments} variant="secondary" className="mt-4">
-      View All Payments
-    </Button>
+    <Button
+      btnAction={scrollToPayments}
+      appearance="outlined"
+      className="mt-4"
+      label="View All Payments"
+    />
   );
 }

@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
-import Button from '@/components/Button';
 import Input from '@/components/Forms/Input';
 import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
@@ -78,7 +78,7 @@ export function UserCreator() {
 
   return (
     <>
-      <Button onClick={() => setIsModalOpen(true)}>Add User</Button>
+      <Button btnAction={() => setIsModalOpen(true)} kind="primary" label="Add User" />
 
       <Modal className="flex w-96 flex-col gap-4" isOpen={isModalOpen} onClose={cancel}>
         <h2 className="text-lg font-medium">Create a user</h2>
@@ -96,10 +96,8 @@ export function UserCreator() {
           />
 
           <div className="flex flex-row justify-end gap-4">
-            <Button onClick={cancel} variant="secondary">
-              Cancel
-            </Button>
-            <Button type="submit">Yes</Button>
+            <Button btnAction={cancel} appearance="outlined" label="Cancel" />
+            <Button type="submit" label="Create" kind="primary" />
           </div>
         </form>
       </Modal>

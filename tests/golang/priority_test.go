@@ -31,8 +31,12 @@ func TestFunctionPriorityRun(t *testing.T) {
 
 	a := inngestgo.CreateFunction(
 		inngestgo.FunctionOpts{
-			Name:        "Priority.Run test",
-			Concurrency: 1,
+			Name: "Priority.Run test",
+			Concurrency: []inngest.Concurrency{
+				{
+					Limit: 1,
+				},
+			},
 			Priority: &inngest.Priority{
 				Run: inngestgo.StrPtr(`event.data.priority == "high" ? 5 : 0`),
 			},

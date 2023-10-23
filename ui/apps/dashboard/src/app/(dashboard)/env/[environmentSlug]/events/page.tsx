@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowRightIcon, ChartBarIcon, CodeBracketSquareIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 
 import SendEventButton from '@/app/(dashboard)/env/[environmentSlug]/events/[eventName]/SendEventButton';
-import Button from '@/components/Button';
 import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
 import Header from '@/components/Header/Header';
 import HorizontalPillList from '@/components/Pill/HorizontalPillList';
@@ -181,9 +181,7 @@ function EventTypesListPaginationPage({
       {isLastLoadedPage && hasNextPage && (
         <tr>
           <td colSpan={3} className="py-2.5 text-center">
-            <Button variant="secondary" onClick={onLoadMore}>
-              Load More
-            </Button>
+            <Button appearance="outlined" btnAction={onLoadMore} label="Load More" />
           </td>
         </tr>
       )}

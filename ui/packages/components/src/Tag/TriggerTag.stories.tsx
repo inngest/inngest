@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { FunctionTriggerTypes } from '@/store/generated';
-import TriggerTag from './TriggerTag';
+import { TriggerTag } from './TriggerTag';
 
 const meta = {
   title: 'Components/TriggerTag',
@@ -18,14 +17,14 @@ type Story = StoryObj<typeof TriggerTag>;
 
 export const Event: Story = {
   args: {
-    type: FunctionTriggerTypes.Event,
+    type: 'EVENT',
     value: 'billing/payment.failed',
   },
 };
 
 export const Cron: Story = {
   args: {
-    type: FunctionTriggerTypes.Cron,
+    type: 'CRON',
     value: '* * * * *',
   },
 };

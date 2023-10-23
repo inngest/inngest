@@ -1,30 +1,50 @@
+'use client';
+
 import { Badge } from '@inngest/components/Badge';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { MetadataGrid } from '@inngest/components/Metadata';
 import { OutputCard } from '@inngest/components/OutputCard';
-import { SleepingSummary } from '@inngest/components/RunDetails/RunSection/SleepingSummary';
-import { WaitingSummary } from '@inngest/components/RunDetails/RunSection/WaitingSummary';
-import { renderRunMetadata } from '@inngest/components/RunDetails/RunSection/runMetadataRenderer';
 import { Timeline } from '@inngest/components/Timeline';
 import { IconClock } from '@inngest/components/icons/Clock';
 import type { Function } from '@inngest/components/types/function';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
+import type { FunctionVersion } from '@inngest/components/types/functionVersion';
 import type { HistoryParser } from '@inngest/components/utils/historyParser';
 import { type OutputType } from '@inngest/components/utils/outputRenderer';
 
+import { SleepingSummary } from './SleepingSummary';
+import { WaitingSummary } from './WaitingSummary';
+import { renderRunMetadata } from './runMetadataRenderer';
+
 interface Props {
   func: Pick<Function, 'name' | 'triggers'>;
+  functionVersion?: Pick<FunctionVersion, 'url' | 'version'>;
   getHistoryItemOutput: (historyItemID: string) => Promise<string | undefined>;
   history: HistoryParser;
+
+  // TODO: Replace this with an imported component.
+  rerunButton?: React.ReactNode;
+
   run: Pick<FunctionRun, 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'>;
 }
 
-export function RunSection({ func, getHistoryItemOutput, history, run }: Props) {
+export function RunDetails({
+  func,
+  functionVersion,
+  getHistoryItemOutput,
+  history,
+  rerunButton,
+  run,
+}: Props) {
   const firstTrigger = func.triggers[0] ?? null;
   const cron = firstTrigger && firstTrigger.type === 'CRON';
 
-  const metadataItems = renderRunMetadata(run, history);
+  const metadataItems = renderRunMetadata({
+    functionRun: run,
+    functionVersion,
+    history,
+  });
   let type: OutputType | undefined;
   if (run.status === 'COMPLETED') {
     type = 'completed';
@@ -34,6 +54,8 @@ export function RunSection({ func, getHistoryItemOutput, history, run }: Props) 
 
   return (
     <ContentCard
+      active
+      button={rerunButton}
       title={func.name}
       icon={run.status && <FunctionRunStatusIcon status={run.status} className="h-5 w-5" />}
       type="run"

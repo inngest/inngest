@@ -1,8 +1,7 @@
 'use client';
 
 import { ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
-
-import Button from '@/components/Button';
+import { Button } from '@inngest/components/Button';
 
 type FunctionRunOutputErrorProps = {
   error: Error;
@@ -17,13 +16,12 @@ export default function FunctionRunOutputError({ reset }: FunctionRunOutputError
         <h2 className="text-sm">Failed to load function output</h2>
       </div>
       <Button
-        variant="secondary"
+        appearance="outlined"
         iconSide="right"
-        icon={<ArrowPathIcon className="h-3 w-3 text-slate-700" />}
-        onClick={() => reset()}
-      >
-        Reload
-      </Button>
+        icon={<ArrowPathIcon className=" text-slate-700" />}
+        btnAction={() => reset()}
+        label="Reload"
+      />
     </div>
   );
 }

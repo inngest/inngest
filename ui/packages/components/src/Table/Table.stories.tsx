@@ -1,7 +1,8 @@
+import { createRef } from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 
-import Table from './Table';
+import { Table } from './Table';
 
 type Table = {
   firstName: string;
@@ -42,23 +43,35 @@ export default meta;
 type Story = StoryObj<typeof Table>;
 
 export const Default: Story = {
-  args: {
-    options: {
-      data: data,
-      columns: defaultColumns,
-      getCoreRowModel: getCoreRowModel(),
-    },
-    blankState: <p className="text-slate-400">No names</p>,
+  render: () => {
+    const tableContainerRef = createRef<HTMLDivElement>();
+    return (
+      <Table
+        options={{
+          data: data,
+          columns: defaultColumns,
+          getCoreRowModel: getCoreRowModel(),
+        }}
+        tableContainerRef={tableContainerRef}
+        blankState={<p className="text-slate-400">No names</p>}
+      />
+    );
   },
 };
 
 export const Empty: Story = {
-  args: {
-    options: {
-      data: [],
-      columns: defaultColumns,
-      getCoreRowModel: getCoreRowModel(),
-    },
-    blankState: <p className="text-slate-400">No names</p>,
+  render: () => {
+    const tableContainerRef = createRef<HTMLDivElement>();
+    return (
+      <Table
+        options={{
+          data: [],
+          columns: defaultColumns,
+          getCoreRowModel: getCoreRowModel(),
+        }}
+        tableContainerRef={tableContainerRef}
+        blankState={<p className="text-slate-400">No names</p>}
+      />
+    );
   },
 };

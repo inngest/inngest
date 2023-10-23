@@ -31,6 +31,7 @@ export function appendFunctionList(
     });
 
     return {
+      appName: fn.appName,
       name: fn.name,
       slug: fn.slug,
       isArchived: fn.isArchived,

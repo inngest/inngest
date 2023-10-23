@@ -13,7 +13,7 @@ type RootLayoutProps = {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <AppRoot>
+    <AppRoot mode="dark">
       <StoreProvider>{children}</StoreProvider>
     </AppRoot>
   );

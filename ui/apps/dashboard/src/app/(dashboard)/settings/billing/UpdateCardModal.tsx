@@ -2,17 +2,11 @@
 
 import { useState } from 'react';
 import { CreditCardIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
-import {
-  CardElement,
-  Elements,
-  PaymentElement,
-  useElements,
-  useStripe,
-} from '@stripe/react-stripe-js';
+import { Button } from '@inngest/components/Button';
+import { CardElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { useMutation } from 'urql';
 
-import Button from '@/components/Button';
 import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
 
@@ -120,13 +114,12 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
       <div className="mt-6 flex flex-row justify-end">
         <Button
           type="submit"
-          size="lg"
           className="px-16"
           disabled={!stripe || loading}
-          onClick={handleSubmit}
-        >
-          Change payment method
-        </Button>
+          btnAction={handleSubmit}
+          kind="primary"
+          label="Change Payment Method"
+        />
       </div>
       {/* TODO - Explore re-use alert from signing key page PR */}
       {Boolean(error) && (

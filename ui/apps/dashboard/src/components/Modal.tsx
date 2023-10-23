@@ -32,12 +32,12 @@ export default function Modal({
         >
           {/* The backdrop, rendered as a fixed sibling to the panel container */}
           <div
-            className={cn('fixed inset-0 bg-black/50 transition-opacity', backdropClassName)}
+            className={cn('fixed inset-0 z-50 bg-black/50 transition-opacity', backdropClassName)}
             aria-hidden="true"
           />
         </Transition.Child>
         {/* Full-screen container to center the panel */}
-        <div className="fixed inset-0 overflow-y-auto">
+        <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-6">
             <Transition.Child
               as={Fragment}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Button } from '@inngest/components/Button';
 
-import Button from '@/components/Button';
 import Modal from '@/components/Modal';
 
 type Props = {
@@ -40,13 +40,14 @@ export function EnvironmentArchiveModal(props: Props) {
       )}
 
       <div className="flex content-center justify-end">
-        <Button variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
+        <Button appearance="outlined" btnAction={onCancel} label="Cancel" />
 
-        <Button variant="text-danger" onClick={onConfirm}>
-          {isArchived ? 'Unarchive' : 'Archive'}
-        </Button>
+        <Button
+          kind="danger"
+          appearance="text"
+          btnAction={onConfirm}
+          label={isArchived ? 'Unarchive' : 'Archive'}
+        />
       </div>
     </Modal>
   );

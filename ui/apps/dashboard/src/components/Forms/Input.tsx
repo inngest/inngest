@@ -5,16 +5,20 @@ import cn from '@/utils/cn';
 type InputProps = {
   defaultValue?: HTMLAttributes<HTMLInputElement>['defaultValue'];
   error?: string | undefined;
-  name: string;
+  name?: string;
+  id?: string;
   label?: string;
   placeholder?: string;
   required?: boolean;
+  minLength?: number;
+  maxLength?: number;
   type?: 'text' | 'password' | 'email' | 'number';
   size?: 'base' | 'lg';
   className?: string;
   value?: string;
   readonly?: boolean;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 };
 
 const sizeStyles = {
@@ -26,10 +30,14 @@ export default function Input({
   defaultValue,
   error,
   name,
+  id,
   label,
   required,
+  minLength,
+  maxLength,
   value,
   onChange,
+  onKeyDown,
   type = 'text',
   size = 'base',
   placeholder = '',
@@ -46,8 +54,11 @@ export default function Input({
       <input
         defaultValue={defaultValue}
         required={required}
+        minLength={minLength}
+        maxLength={maxLength}
         type={type}
         name={name}
+        id={id}
         placeholder={placeholder}
         value={value}
         className={cn(
@@ -58,6 +69,7 @@ export default function Input({
         )}
         onChange={onChange}
         readOnly={readonly}
+        onKeyDown={onKeyDown}
       />
 
       {error && <p className="text-sm text-red-500">{error}</p>}

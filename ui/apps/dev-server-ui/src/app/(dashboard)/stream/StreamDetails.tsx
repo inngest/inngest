@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ContentCard } from '@inngest/components/ContentCard';
-import { EventSection } from '@inngest/components/RunDetails/EventSection';
-import { RunSection } from '@inngest/components/RunDetails/RunSection';
+import { EventDetails } from '@inngest/components/EventDetails';
+import { RunDetails } from '@inngest/components/RunDetails';
 import { classNames } from '@inngest/components/utils/classNames';
 import { ulid } from 'ulid';
 
@@ -81,7 +81,7 @@ export default function StreamDetails() {
       )}
     >
       {eventResult.data && (
-        <EventSection
+        <EventDetails
           event={eventResult.data}
           functionRuns={eventResult.data.functionRuns}
           onFunctionRunClick={setSelectedRunID}
@@ -92,7 +92,7 @@ export default function StreamDetails() {
       )}
 
       {runResult.data && (
-        <RunSection
+        <RunDetails
           func={runResult.data.func}
           getHistoryItemOutput={getHistoryItemOutput}
           history={runResult.data.history}

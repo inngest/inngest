@@ -4,9 +4,9 @@ import { useState } from 'react';
 import type { Route } from 'next';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Button } from '@inngest/components/Button';
 import { useQuery } from 'urql';
 
-import Button from '@/components/Button';
 import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import { FunctionRunStatus, FunctionRunTimeField } from '@/gql/graphql';
@@ -17,7 +17,6 @@ import FailedIcon from '@/icons/status-icons/failed.svg';
 import RunningIcon from '@/icons/status-icons/running.svg';
 import { useEnvironment } from '@/queries';
 import cn from '@/utils/cn';
-import { relativeTime } from '@/utils/date';
 import { type TimeRange } from './TimeRangeFilter';
 
 const functionRunStatusIcons = {
@@ -98,11 +97,11 @@ function FunctionRunListResultPage({
     variables: {
       environmentID: environment?.id!,
       functionSlug,
-      functionRunStatuses: selectedStatuses.length ? selectedStatuses : undefined,
+      functionRunStatuses: selectedStatuses.length ? selectedStatuses : null,
       timeRangeStart: selectedTimeRange.start.toISOString(),
       timeRangeEnd: selectedTimeRange.end.toISOString(),
       timeField,
-      functionRunCursor: functionRunCursor || undefined,
+      functionRunCursor: functionRunCursor || null,
     },
     pause: !environment?.id,
   });
@@ -202,9 +201,11 @@ function FunctionRunListResultPage({
       })}
       {isLastDisplayedPage && hasNextPage && (
         <div className="flex justify-center py-2.5">
-          <Button variant="secondary" onClick={() => onLoadMore(endCursor ?? '')}>
-            Load More
-          </Button>
+          <Button
+            appearance="outlined"
+            btnAction={() => onLoadMore(endCursor ?? '')}
+            label="Load More"
+          />
         </div>
       )}
     </>

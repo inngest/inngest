@@ -1,3 +1,5 @@
+'use client';
+
 import type { HistoryNode } from '@inngest/components/utils/historyParser';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 

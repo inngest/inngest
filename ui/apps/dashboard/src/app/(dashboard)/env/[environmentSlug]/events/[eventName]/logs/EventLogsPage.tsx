@@ -3,9 +3,9 @@
 import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Button } from '@inngest/components/Button';
 import { useQuery } from 'urql';
 
-import Button from '@/components/Button';
 import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
@@ -51,7 +51,7 @@ export function EventLogsPage({
     variables: {
       // API expects "unset cursor" to be undefined, so change empty strings to
       // undefined.
-      cursor: cursor || undefined,
+      cursor: cursor || null,
 
       environmentID,
       eventName,
@@ -135,9 +135,12 @@ export function EventLogsPage({
 
       {isLoadMoreVisible && (
         <div className="flex justify-center">
-          <Button className="mt-4" onClick={() => onLoadMore(lastEvent.id)} variant="secondary">
-            Load More
-          </Button>
+          <Button
+            className="mt-4"
+            btnAction={() => onLoadMore(lastEvent.id)}
+            appearance="outlined"
+            label="Load More"
+          />
         </div>
       )}
     </>
