@@ -51,8 +51,6 @@ type Event struct {
 	// If this is not provided, we will insert the current time upon receipt of the event
 	Timestamp int64  `json:"ts,omitempty"`
 	Version   string `json:"v,omitempty"`
-
-	Cron *string `json:"cron,omitempty"`
 }
 
 func (evt Event) Time() time.Time {
