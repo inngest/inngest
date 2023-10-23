@@ -94,6 +94,15 @@ The `createFunction` method accepts a series of arguments to define your functio
     </Properties>
   </Property>
 
+  <Property name="priority" type="object">
+    Prioritize specific function runs ahead of others ([reference](/docs/reference/functions/run-priority))
+
+    <Properties nested={true} collapse={true}>
+      <Property name="run" type="string">
+        An expression which must return an integer between -600 and 600 (by default), with higher return values resulting in a higher priority. See [reference](/docs/reference/functions/run-priority) for more information.
+      </Property>
+    </Properties>
+  </Property>
 
   <Property name="batchEvents" type="object">
     Configure how the function should consume batches of events ([reference](/docs/guides/batching))
@@ -132,12 +141,12 @@ The `createFunction` method accepts a series of arguments to define your functio
   <Properties>
     <Property name="priority" type="object">
       Options to configure how to prioritize functions
-  
+
       <Properties nested={true}>
         <Property name="run" type="string">
           An expression which must return an integer between -600 and 600 (by default), with higher
   	return values resulting in a higher priority.  Examples:
-  
+
           * Return the priority within an event directly: `event.data.priority` (where
   	  `event.data.priority` is an int within your account's range)
           * Rate limit by a string field: `event.data.plan == 'enterprise' ? 180 : 0`

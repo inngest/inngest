@@ -38,11 +38,11 @@ function Eyebrow({ tag, label }) {
   );
 }
 
-function Anchor({ id, inView, children }) {
+function Anchor({ id, inView, children, className = "" }) {
   return (
     <Link
       href={`#${id}`}
-      className="group text-inherit no-underline hover:text-inherit"
+      className={`group text-inherit no-underline hover:text-inherit ${className}`}
     >
       {inView && (
         <div className="absolute mt-1 ml-[calc(-1*var(--width))] hidden w-[var(--width)] opacity-0 transition [--width:calc(2.625rem+0.5px+50%-min(50%,calc(theme(maxWidth.lg)+theme(spacing.8))))] group-hover:opacity-100 group-focus:opacity-100 md:block lg:z-50 2xl:[--width:theme(spacing.10)]">
@@ -89,17 +89,22 @@ export function Heading({
     }
   });
 
+  const hasAnchor = anchor && id;
+  const flexClasses = `flex gap-4 items-center`;
+
   return (
     <>
       <Eyebrow tag={tag} label={label} />
       <Component
         ref={ref}
         id={anchor ? id : undefined}
-        className={tag || label ? "mt-2 scroll-mt-32" : "scroll-mt-24"}
+        className={`${flexClasses} ${
+          tag || label ? "mt-2 scroll-mt-32" : "scroll-mt-24"
+        }`}
         {...props}
       >
-        {anchor ? (
-          <Anchor id={id} inView={inView}>
+        {hasAnchor ? (
+          <Anchor id={id} inView={inView} className={flexClasses}>
             {children}
           </Anchor>
         ) : (

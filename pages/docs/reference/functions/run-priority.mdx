@@ -1,4 +1,4 @@
-# Function run priority
+# Function run priority <VersionBadge version="v3.2.1+" />
 
 Defining a function's run priority allows you to **prioritize specific function runs above other runs within the same function**.  For example:
 
@@ -48,6 +48,8 @@ export default inngest.createFunction(
 );
 ```
 
+---
+
 ## How `priority.run` works
 
 **The queue**
@@ -71,7 +73,7 @@ time (as seconds).  Returning `300` subtracts 300 seconds from the function run'
 pushing the new run ahead of any other functions in the last 300 seconds (5 minutes).
 
 If two function runs are scheduled at similar times, the functions with a higher priority run sooner
-when at capacity. 
+when at capacity.
 
 **Fairness**
 
