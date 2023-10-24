@@ -409,13 +409,13 @@ const sentryMiddleware = new InngestMiddleware({
     Sentry.init({ dsn: "..." });
 
     // Set up some tags that will be applied to all events
-    Sentry.setTag("inngest.client.name", client.name);
+    Sentry.setTag("inngest.client.id", client.id);
 
     return {
       onFunctionRun({ ctx, fn }) {
         // Add specific context for the given function run
         Sentry.setTags({
-          "inngest.function.id": fn.id(client.name),
+          "inngest.function.id": fn.id(client.id),
           "inngest.function.name": fn.name,
           "inngest.event": ctx.event.name,
           "inngest.run.id": ctx.runId,
@@ -458,7 +458,7 @@ const sentryMiddleware = new InngestMiddleware({
             // Capture step output and log errors
             if (step) {
               Sentry.setTags({
-                "inngest.step.name": step.name,
+                "inngest.step.name": step.displayName,
                 "inngest.step.op": step.op,
               });
 
