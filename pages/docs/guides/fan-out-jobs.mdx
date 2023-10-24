@@ -42,7 +42,7 @@ export const loadCron = inngest.createFunction(
 
     // Send all events to Inngest, which triggers any functions listening to
     // the given event names.
-    await step.sendEvent(events);
+    await step.sendEvent("fan-out-weekly-emails", events);
 
     // Return the number of users triggered.
     return { count: users.length };
