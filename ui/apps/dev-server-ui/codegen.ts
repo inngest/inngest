@@ -8,16 +8,15 @@ const config: CodegenConfig = {
     'src/store/generated.ts': {
       config: {
         avoidOptionals: {
-          avoidOptionals: {
-            // Default values only work if fields can be undefined.
-            defaultValue: false,
-            field: true,
+          // Default values only work if fields can be undefined.
+          defaultValue: false,
 
-            // We don't want to always specify optional fields in mutations.
-            inputValue: false,
+          field: true,
 
-            object: true,
-          },
+          // We don't want to always specify optional fields in mutations.
+          inputValue: false,
+
+          object: true,
         },
       },
       plugins: [
