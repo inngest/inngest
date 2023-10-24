@@ -212,6 +212,7 @@ type Run struct {
 	EventID         ulid.ULID
 	ID              ulid.ULID
 	OriginalRunID   *ulid.ULID
+	Output          *string
 	StartedAt       time.Time
 	Status          enums.RunStatus
 	WorkflowID      uuid.UUID

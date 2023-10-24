@@ -85,6 +85,11 @@ func (w *writer) writeWorkflowStart(
 	run.Run.EventID = item.EventID
 	run.Run.ID = item.RunID
 	run.Run.OriginalRunID = item.OriginalRunID
+
+	if item.Result != nil {
+		run.Run.Output = &item.Result.Output
+	}
+
 	run.Run.StartedAt = time.UnixMilli(int64(item.RunID.Time()))
 	run.Run.Status = enums.RunStatusRunning
 	run.Run.WorkflowID = item.FunctionID
