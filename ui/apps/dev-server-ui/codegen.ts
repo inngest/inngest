@@ -7,7 +7,17 @@ const config: CodegenConfig = {
   generates: {
     'src/store/generated.ts': {
       config: {
-        avoidOptionals: true,
+        avoidOptionals: {
+          // Default values only work if fields can be undefined.
+          defaultValue: false,
+
+          field: true,
+
+          // We don't want to always specify optional fields in mutations.
+          inputValue: false,
+
+          object: true,
+        },
       },
       plugins: [
         'typescript',
