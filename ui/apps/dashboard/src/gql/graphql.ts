@@ -85,7 +85,7 @@ export type AccountIdentifier = {
 };
 
 export type AccountIdentifierInput = {
-  dsnPrefix: InputMaybe<Scalars['String']>;
+  dsnPrefix?: InputMaybe<Scalars['String']>;
 };
 
 export type AccountSetting = {
@@ -135,9 +135,9 @@ export type ActionCategory = {
 };
 
 export type ActionFilter = {
-  category: InputMaybe<Scalars['String']>;
-  dsn: InputMaybe<Scalars['String']>;
-  excludePublic: InputMaybe<Scalars['Boolean']>;
+  category?: InputMaybe<Scalars['String']>;
+  dsn?: InputMaybe<Scalars['String']>;
+  excludePublic?: InputMaybe<Scalars['Boolean']>;
 };
 
 export type ActionSecret = {
@@ -311,10 +311,10 @@ export type ContactAttribute = {
 };
 
 export type ContactFilter = {
-  attributes: InputMaybe<Scalars['Map']>;
-  email: InputMaybe<Scalars['String']>;
-  externalID: InputMaybe<Scalars['String']>;
-  phone: InputMaybe<Scalars['String']>;
+  attributes?: InputMaybe<Scalars['Map']>;
+  email?: InputMaybe<Scalars['String']>;
+  externalID?: InputMaybe<Scalars['String']>;
+  phone?: InputMaybe<Scalars['String']>;
 };
 
 export type ContactSegment = {
@@ -346,7 +346,7 @@ export type CreateStripeSubscriptionResponse = {
 };
 
 export type CreateVercelAppInput = {
-  path: InputMaybe<Scalars['String']>;
+  path?: InputMaybe<Scalars['String']>;
   projectID: Scalars['String'];
   workspaceID: Scalars['ID'];
 };
@@ -401,9 +401,9 @@ export type Edge = {
 };
 
 export type EditWorkflowInput = {
-  description: InputMaybe<Scalars['String']>;
-  disable: InputMaybe<Scalars['Time']>;
-  promote: InputMaybe<Scalars['Time']>;
+  description?: InputMaybe<Scalars['String']>;
+  disable?: InputMaybe<Scalars['Time']>;
+  promote?: InputMaybe<Scalars['Time']>;
   version: Scalars['Int'];
   workflowID: Scalars['ID'];
 };
@@ -467,10 +467,10 @@ export type EventEdge = {
 };
 
 export type EventQuery = {
-  name: InputMaybe<Scalars['String']>;
-  prefix: InputMaybe<Scalars['String']>;
-  schemaSource: InputMaybe<Scalars['SchemaSource']>;
-  workspaceID: InputMaybe<Scalars['ID']>;
+  name?: InputMaybe<Scalars['String']>;
+  prefix?: InputMaybe<Scalars['String']>;
+  schemaSource?: InputMaybe<Scalars['SchemaSource']>;
+  workspaceID?: InputMaybe<Scalars['ID']>;
 };
 
 export type EventType = {
@@ -510,9 +510,9 @@ export type FilterList = {
 };
 
 export type FilterListInput = {
-  events: InputMaybe<Array<Scalars['String']>>;
-  ips: InputMaybe<Array<Scalars['IP']>>;
-  type: InputMaybe<Scalars['FilterType']>;
+  events?: InputMaybe<Array<Scalars['String']>>;
+  ips?: InputMaybe<Array<Scalars['IP']>>;
+  type?: InputMaybe<Scalars['FilterType']>;
 };
 
 export type FunctionRun = {
@@ -600,8 +600,8 @@ export type IngestKey = {
 };
 
 export type IngestKeyFilter = {
-  name: InputMaybe<Scalars['String']>;
-  source: InputMaybe<Scalars['String']>;
+  name?: InputMaybe<Scalars['String']>;
+  source?: InputMaybe<Scalars['String']>;
 };
 
 export type InsertActionSetting = {
@@ -887,8 +887,8 @@ export type MutationUpsertWorkflowArgs = {
 };
 
 export type NewIngestKey = {
-  filterList: InputMaybe<FilterListInput>;
-  metadata: InputMaybe<Scalars['Map']>;
+  filterList?: InputMaybe<FilterListInput>;
+  metadata?: InputMaybe<Scalars['Map']>;
   name: Scalars['String'];
   source: Scalars['IngestSource'];
   workspaceID: Scalars['ID'];
@@ -896,12 +896,12 @@ export type NewIngestKey = {
 
 export type NewUser = {
   email: Scalars['String'];
-  name: InputMaybe<Scalars['String']>;
+  name?: InputMaybe<Scalars['String']>;
 };
 
 export type NewWorkflowInput = {
   config: Scalars['String'];
-  description: InputMaybe<Scalars['String']>;
+  description?: InputMaybe<Scalars['String']>;
   draft: Scalars['Boolean'];
   workspaceID: Scalars['ID'];
 };
@@ -1033,11 +1033,11 @@ export type QueryWorkspaceArgs = {
 };
 
 export type RegisterInput = {
-  anonId: InputMaybe<Scalars['String']>;
-  company: InputMaybe<Scalars['String']>;
+  anonId?: InputMaybe<Scalars['String']>;
+  company?: InputMaybe<Scalars['String']>;
   email: Scalars['String'];
   password: Scalars['String'];
-  userID: InputMaybe<Scalars['String']>;
+  userID?: InputMaybe<Scalars['String']>;
 };
 
 export type RegisterResponse = {
@@ -1179,8 +1179,8 @@ export type RunTimeline = {
 
 export type RunsFilter = {
   lowerTime: Scalars['Time'];
-  status: InputMaybe<Array<FunctionRunStatus>>;
-  timeField: InputMaybe<FunctionRunTimeField>;
+  status?: InputMaybe<Array<FunctionRunStatus>>;
+  timeField?: InputMaybe<FunctionRunTimeField>;
   upperTime: Scalars['Time'];
 };
 
@@ -1221,9 +1221,9 @@ export type Segment = {
 };
 
 export type SegmentOpts = {
-  expression: InputMaybe<Scalars['String']>;
+  expression?: InputMaybe<Scalars['String']>;
   name: Scalars['String'];
-  ratio: InputMaybe<Scalars['Int']>;
+  ratio?: InputMaybe<Scalars['Int']>;
 };
 
 export type Session = {
@@ -1238,10 +1238,10 @@ export type StartWorkflow = {
 };
 
 export type StartWorkflowInput = {
-  baggage: InputMaybe<WorkflowBaggageInput>;
-  fromActionID: InputMaybe<Scalars['Int']>;
+  baggage?: InputMaybe<WorkflowBaggageInput>;
+  fromActionID?: InputMaybe<Scalars['Int']>;
   workflowID: Scalars['ID'];
-  workflowVersion: InputMaybe<Scalars['Int']>;
+  workflowVersion?: InputMaybe<Scalars['Int']>;
   workspaceID: Scalars['ID'];
 };
 
@@ -1251,9 +1251,9 @@ export type StartWorkflowResponse = {
 };
 
 export type StepUsageTimeOptions = {
-  interval: InputMaybe<Scalars['String']>;
-  month: InputMaybe<Scalars['Int']>;
-  year: InputMaybe<Scalars['Int']>;
+  interval?: InputMaybe<Scalars['String']>;
+  month?: InputMaybe<Scalars['Int']>;
+  year?: InputMaybe<Scalars['Int']>;
 };
 
 export type StripeSubscriptionInput = {
@@ -1279,8 +1279,8 @@ export type TimeSeriesPoint = {
 };
 
 export type UpdateAccount = {
-  billingEmail: InputMaybe<Scalars['String']>;
-  name: InputMaybe<Scalars['String']>;
+  billingEmail?: InputMaybe<Scalars['String']>;
+  name?: InputMaybe<Scalars['String']>;
 };
 
 export type UpdateActionSetting = {
@@ -1293,15 +1293,15 @@ export type UpdateActionSetting = {
 };
 
 export type UpdateIngestKey = {
-  filterList: InputMaybe<FilterListInput>;
-  metadata: InputMaybe<Scalars['Map']>;
-  name: InputMaybe<Scalars['String']>;
+  filterList?: InputMaybe<FilterListInput>;
+  metadata?: InputMaybe<Scalars['Map']>;
+  name?: InputMaybe<Scalars['String']>;
 };
 
 export type UpdateUser = {
-  email: InputMaybe<Scalars['String']>;
-  name: InputMaybe<Scalars['String']>;
-  password: InputMaybe<Scalars['String']>;
+  email?: InputMaybe<Scalars['String']>;
+  name?: InputMaybe<Scalars['String']>;
+  password?: InputMaybe<Scalars['String']>;
 };
 
 export type UpdateVercelAppInput = {
@@ -1317,7 +1317,7 @@ export type UpdateVercelAppResponse = {
 
 export type UpsertActionSecret = {
   data: Scalars['String'];
-  dsn: InputMaybe<Scalars['DSN']>;
+  dsn?: InputMaybe<Scalars['DSN']>;
   name: Scalars['String'];
   workspaceID: Scalars['ID'];
 };
@@ -1331,9 +1331,9 @@ export type UpsertActionSetting = {
 };
 
 export type UpsertWorkflowInput = {
-  config: InputMaybe<Scalars['String']>;
-  description: InputMaybe<Scalars['String']>;
-  live: InputMaybe<Scalars['Boolean']>;
+  config?: InputMaybe<Scalars['String']>;
+  description?: InputMaybe<Scalars['String']>;
+  live?: InputMaybe<Scalars['Boolean']>;
   workspaceID: Scalars['ID'];
 };
 
@@ -1347,10 +1347,10 @@ export type Usage = {
 };
 
 export type UsageInput = {
-  from: InputMaybe<Scalars['Time']>;
-  period: InputMaybe<Scalars['Period']>;
-  range: InputMaybe<Scalars['Timerange']>;
-  to: InputMaybe<Scalars['Time']>;
+  from?: InputMaybe<Scalars['Time']>;
+  period?: InputMaybe<Scalars['Period']>;
+  range?: InputMaybe<Scalars['Timerange']>;
+  to?: InputMaybe<Scalars['Time']>;
 };
 
 export type UsageSlot = {
@@ -1461,7 +1461,7 @@ export type WorkflowVersionArgs = {
 };
 
 export type WorkflowBaggageInput = {
-  actions: InputMaybe<Scalars['Map']>;
+  actions?: InputMaybe<Scalars['Map']>;
   event: Scalars['Bytes'];
 };
 
