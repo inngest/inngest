@@ -15,6 +15,7 @@ export const removeLeadingSpaces = (snippet: string): string => {
 
 const colors = {
   slate300: "rgb(203, 213, 225)",
+  slate500: "rgb(140, 149, 159)",
   fuchsia300: "rgb(240, 171, 252)",
   amber300: "rgb(252, 211, 77)",
   amber400: "rgb(251, 191, 36)",
@@ -28,7 +29,7 @@ const theme = {
   "hljs-attr": { color: colors.amber400 },
   "hljs-string": { color: colors.emerald300 },
   "hljs-number": { color: colors.sky300 },
-  "hljs-comment": { color: colors.slate300 },
+  "hljs-comment": { color: colors.slate500 },
 };
 
 const CodeWindow = ({

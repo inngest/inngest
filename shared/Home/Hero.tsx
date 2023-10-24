@@ -17,7 +17,11 @@ export default function Hero() {
       }}
     >
       <div className="mb-12 md:mb-28 text-center">
-        <h1 className="text-4xl md:text-[3.125rem] md:leading-[3.75rem] font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#E2BEFF] via-white to-[#AFC1FF] drop-shadow">
+        <h1 className="
+          text-4xl md:text-[3.125rem] md:leading-[3.75rem]
+          font-bold bg-clip-text
+          text-transparent bg-gradient-to-r from-[#E2BEFF] via-white to-[#AFC1FF] drop-shadow
+        ">
           Effortless serverless queues,
           <br />
           background jobs, and workflows
@@ -28,6 +32,7 @@ export default function Hero() {
           reliable products.
         </p>
       </div>
+
       <div className="flex flex-col gap-8 pt-12 lg:py-28 items-center justify-center">
         <div>
           <Link
@@ -40,7 +45,7 @@ export default function Hero() {
         </div>
         <Link
           href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=homepage-hero`}
-          className="group flex items-center gap-1 rounded-md px-3 py-1.5 bg-transparent transition-all text-indigo-200 border border-transparent hover:border-slate-800 whitespace-nowrap"
+          className="group flex items-center gap-1 rounded-md px-11 py-3.5 bg-transparent transition-all text-indigo-100 border border-transparent hover:border-slate-800 whitespace-nowrap"
         >
           Start Building For Free
         </Link>

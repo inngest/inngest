@@ -39,7 +39,11 @@ export default function Demo() {
       <Hero>
         <h1>Create, Test, and Deploy in minutes</h1>
         <div className="hero-ctas">
-          <Button size="medium" kind="primary" href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=demo-cta`}>
+          <Button
+            size="medium"
+            kind="primary"
+            href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=demo-cta`}
+          >
             Sign up for free
           </Button>
         </div>

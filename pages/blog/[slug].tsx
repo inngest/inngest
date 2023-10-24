@@ -19,14 +19,14 @@ import IconCalendar from "src/shared/Icons/Calendar";
 import CTACallout from "src/shared/CTACallout";
 import Blockquote from "src/shared/Blog/Blockquote";
 import rehypeCodeTitles from "rehype-code-titles";
-import YouTube from 'react-youtube-embed'
+import YouTube from "react-youtube-embed";
 
 const components = {
   DiscordCTA,
   Button,
   CTACallout,
   Blockquote,
-  YouTube
+  YouTube,
 };
 
 type Props = {

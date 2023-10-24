@@ -51,7 +51,7 @@ const productLinks = {
     },
     {
       title: "AI + LLMs",
-      url: "/uses/zero-infra-llm-ai?ref=nav",
+      url: "/ai?ref=nav",
       icon: IconSDK,
     },
     {

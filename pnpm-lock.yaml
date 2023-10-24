@@ -1,9 +1,5 @@
 lockfileVersion: '6.0'
 
-settings:
-  autoInstallPeers: true
-  excludeLinksFromLockfile: false
-
 dependencies:
   '@algolia/autocomplete-core':
     specifier: 1.7.4
@@ -47,6 +43,9 @@ dependencies:
   '@radix-ui/react-slider':
     specifier: 1.1.2
     version: 1.1.2(@types/react@18.0.26)(react-dom@18.2.0)(react@18.2.0)
+  '@rive-app/react-canvas':
+    specifier: 4.4.0
+    version: 4.4.0(react@18.2.0)
   '@sindresorhus/slugify':
     specifier: 2.1.1
     version: 2.1.1
@@ -152,6 +151,9 @@ dependencies:
   react-fast-compare:
     specifier: 3.2.0
     version: 3.2.0
+  react-fast-marquee:
+    specifier: 1.6.2
+    version: 1.6.2(react-dom@18.2.0)(react@18.2.0)
   react-feather:
     specifier: 2.0.10
     version: 2.0.10(react@18.2.0)
@@ -2899,6 +2901,19 @@ packages:
   /@resvg/resvg-wasm@2.0.0-alpha.4:
     resolution: {integrity: sha512-pWIG9a/x1ky8gXKRhPH1OPKpHFoMN1ISLbJ+O+gPXQHIAKhNd5I28RlWf7q576hAOQA9JZTlo3p/M2uyLzJmmw==}
     engines: {node: '>= 10'}
+    dev: false
+
+  /@rive-app/canvas@2.5.0:
+    resolution: {integrity: sha512-J2RMJ6+ZiuVTEOKdQJEAkOV0oPulaPQ47a2KrHERDGE9Ahk9eP1VgEXlxJKgOeXPs+ZctGjEej3B2Zjx141IUQ==}
+    dev: false
+
+  /@rive-app/react-canvas@4.4.0(react@18.2.0):
+    resolution: {integrity: sha512-E3Omy7Nag56XsxsgWCilUhTjDOXLCFmVVd0N/8mZlh/asGs/FstHypA72cjy/XepnObE5aDq008RQnVX93a7yQ==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0
+    dependencies:
+      '@rive-app/canvas': 2.5.0
+      react: 18.2.0
     dev: false
 
   /@rushstack/eslint-patch@1.2.0:
@@ -11883,6 +11898,16 @@ packages:
     resolution: {integrity: sha512-rtGImPZ0YyLrscKI9xTpV8psd6I8VAtjKCzQDlzyDvqJA8XOW78TXYQwNRNd8g8JZnDu8q9Fu/1v4HPAVwVdHA==}
     dev: false
 
+  /react-fast-marquee@1.6.2(react-dom@18.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-bXUuW1r+Yzd8ZjsPmMDy8WJMubHAZd/7n0W/IzUQHtd0iBfxWohP6hzCFnEHWMCOtC9wxSAq/BiEnig4kdI2Vw==}
+    peerDependencies:
+      react: '>= 16.8.0 || 18.0.0'
+      react-dom: '>= 16.8.0 || 18.0.0'
+    dependencies:
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
+    dev: false
+
   /react-feather@2.0.10(react@18.2.0):
     resolution: {integrity: sha512-BLhukwJ+Z92Nmdcs+EMw6dy1Z/VLiJTzEQACDUEnWMClhYnFykJCGWQx+NmwP/qQHGX/5CzQ+TGi8ofg2+HzVQ==}
     peerDependencies:
@@ -14635,3 +14660,7 @@ packages:
   /zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
     dev: false
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false

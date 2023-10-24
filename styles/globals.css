@@ -780,3 +780,7 @@ ul.check li {
   }
 }
 
+
+.hero-text-shadow {
+  text-shadow: 0 5px 30px rgba(224,198,210,0.2);
+}

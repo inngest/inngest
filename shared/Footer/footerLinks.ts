@@ -56,7 +56,7 @@ const footerLinks = [
       },
       {
         label: "AI + LLMs",
-        url: "/uses/zero-infra-llm-ai?ref=footer",
+        url: "/ai?ref=footer",
         icon: IconSDK,
       },
       {
