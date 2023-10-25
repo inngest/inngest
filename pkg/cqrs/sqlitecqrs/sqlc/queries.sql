@@ -75,6 +75,9 @@ INSERT INTO function_finishes
 	(run_id, status, output, completed_step_count, created_at) VALUES 
 	(?, ?, ?, ?, ?);
 
+-- name: GetFunctionRun :one
+SELECT * FROM function_runs WHERE run_id = @run_id;
+
 -- name: GetFunctionRunsTimebound :many
 SELECT * FROM function_runs WHERE run_started_at > @after AND run_started_at <= @before LIMIT ?;
 
@@ -90,14 +93,17 @@ SELECT * FROM function_finishes WHERE run_id IN (sqlc.slice('run_ids'));
 
 -- name: InsertEvent :exec
 INSERT INTO events
-	(internal_id, event_id, event_name, event_data, event_user, event_v, event_ts) VALUES
-	(?, ?, ?, ?, ?, ?, ?);
+	(internal_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetEventByInternalID :one
 SELECT * FROM events WHERE internal_id = ?;
 
 -- name: GetEventsTimebound :many
-SELECT * FROM events WHERE event_ts > @after AND event_ts <= @before ORDER BY event_ts DESC LIMIT ?;
+SELECT * FROM events WHERE received_at > @after AND received_at <= @before ORDER BY received_at DESC LIMIT ?;
+
+-- name: WorkspaceEvents :many
+SELECT * FROM events WHERE internal_id < @cursor AND received_at <= @before AND received_at >= @after ORDER BY internal_id DESC LIMIT ?;
 
 --
 -- History

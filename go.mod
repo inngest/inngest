@@ -15,7 +15,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.5.0
 	github.com/dmarkham/enumer v1.5.8
 	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
-	github.com/go-chi/chi/v5 v5.0.7
+	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-chi/cors v1.2.1
 	github.com/golang-migrate/migrate/v4 v4.16.2
 	github.com/golang/mock v1.6.0
@@ -25,7 +25,7 @@ require (
 	github.com/gowebpki/jcs v1.0.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/terraform v0.15.3
-	github.com/inngest/inngestgo v0.4.3-0.20231006155354-ce6c06378285
+	github.com/inngest/inngestgo v0.4.3-0.20231020163247-d187c871acac
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5
 	github.com/karlseguin/ccache/v2 v2.0.8
@@ -39,7 +39,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/viper v1.10.1
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.8.4
 	github.com/throttled/throttled/v2 v2.11.0
 	github.com/uber-go/tally/v4 v4.1.4
 	github.com/vektah/gqlparser/v2 v2.5.1
@@ -57,8 +57,8 @@ require (
 	go.opentelemetry.io/otel/trace v1.16.0
 	gocloud.dev v0.25.0
 	gocloud.dev/pubsub/natspubsub v0.25.0
-	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
-	golang.org/x/mod v0.10.0
+	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df
+	golang.org/x/mod v0.11.0
 	golang.org/x/sync v0.2.0
 	golang.org/x/term v0.13.0
 	gonum.org/v1/gonum v0.12.0

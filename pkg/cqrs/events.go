@@ -2,7 +2,9 @@ package cqrs
 
 import (
 	"context"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/oklog/ulid/v2"
 )
@@ -20,11 +22,17 @@ func ConvertFromEvent(internalID ulid.ULID, e event.Event) Event {
 }
 
 type Event struct {
-	ID           ulid.ULID      `json:"internal_id"`
+	ID          ulid.ULID  `json:"internal_id"`
+	AccountID   uuid.UUID  `json:"account_id"`
+	WorkspaceID uuid.UUID  `json:"workspace_id"`
+	Source      string     `json:"source"`
+	SourceID    *uuid.UUID `json:"source_id"`
+	ReceivedAt  time.Time  `json:"received_at"`
+
 	EventID      string         `json:"id,omitempty"`
 	EventName    string         `json:"name"`
 	EventData    map[string]any `json:"data"`
-	EventUser    map[string]any `json:"user,omitempty"`
+	EventUser    map[string]any `json:"uskr,omitempty"`
 	EventTS      int64          `json:"ts,omitempty"`
 	EventVersion string         `json:"v,omitempty"`
 }
@@ -53,7 +61,18 @@ type EventWriter interface {
 	InsertEvent(ctx context.Context, e Event) error
 }
 
+type WorkspaceEventsOpts struct {
+	Cursor *ulid.ULID
+	Limit  int
+	Before time.Time
+	After  time.Time
+}
+
 type EventReader interface {
 	GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*Event, error)
 	GetEventsTimebound(ctx context.Context, t Timebound, limit int) ([]*Event, error)
+	// WorkspaceEvents returns the latest events for a given workspace.
+	WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, name string, opts WorkspaceEventsOpts) ([]Event, error)
+	// Find returns a specific event given an ID.
+	FindEvent(ctx context.Context, workspaceID uuid.UUID, id ulid.ULID) (*Event, error)
 }
