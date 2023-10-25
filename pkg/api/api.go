@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi/apiutil"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/eventstream"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
@@ -48,6 +49,7 @@ func NewAPI(o Options) (chi.Router, error) {
 		MaxAge:           60 * 60, // 1 hour
 	})
 	api.Use(cors.Handler)
+	api.Use(headers.StaticHeadersMiddleware(headers.ServerKindDev))
 
 	api.Get("/health", api.HealthCheck)
 	api.Post("/e/{key}", api.ReceiveEvent)

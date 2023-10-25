@@ -6,7 +6,16 @@ extensions:
       './src/gql/':
         preset: 'client'
         config:
-          avoidOptionals: true
+          avoidOptionals:
+            # Default values only work if fields can be undefined.
+            defaultValue: false
+
+            field: true
+
+            # We don't want to always specify optional fields in mutations.
+            inputValue: false
+
+            object: true
           defaultScalarType: 'unknown'
           strictScalars: true
           useTypeImports: true

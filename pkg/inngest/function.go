@@ -99,6 +99,15 @@ type Cancel struct {
 	If      *string `json:"if,omitempty"`
 }
 
+// ConcurrencyLimit returns the limit for the function itself, ie. the concurrnecy limit
+// set without keys and scoped to the function.
+func (f Function) ConcurrencyLimit() int {
+	if f.Concurrency != nil {
+		return f.Concurrency.PartitionConcurrency()
+	}
+	return 0
+}
+
 // GetSlug returns the function slug, defaulting to creating a slug of the function name.
 func (f Function) GetSlug() string {
 	if f.Slug != "" {

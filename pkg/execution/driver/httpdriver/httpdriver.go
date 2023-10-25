@@ -285,7 +285,7 @@ func (e executor) do(ctx context.Context, url string, input []byte) (*response, 
 		}
 	}
 
-	hv, _ := strconv.Atoi(resp.Header.Get("x-inngest-req-version"))
+	hv, _ := strconv.Atoi(resp.Header.Get(headerRequestVersion))
 
 	var retryAt *time.Time
 	if after := resp.Header.Get("retry-after"); after != "" {
@@ -322,6 +322,8 @@ func (e executor) do(ctx context.Context, url string, input []byte) (*response, 
 			retryAt = &at
 		}
 	}
+
+	hv, _ = strconv.Atoi(stream.Headers[headerRequestVersion])
 
 	return &response{
 		body:           stream.Body,

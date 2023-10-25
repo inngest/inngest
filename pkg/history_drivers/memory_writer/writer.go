@@ -7,7 +7,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_store"
-	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/inngest/inngest/pkg/inngest/log"
 )
 
@@ -80,21 +79,23 @@ func (w *writer) writeWorkflowStart(
 	ctx context.Context,
 	item history.History,
 ) {
-	data := memory_store.RunData{
-		Run: history_reader.Run{
-			AccountID:       item.AccountID,
-			BatchID:         item.BatchID,
-			EventID:         item.EventID,
-			ID:              item.RunID,
-			OriginalRunID:   item.OriginalRunID,
-			StartedAt:       time.UnixMilli(int64(item.RunID.Time())),
-			Status:          enums.RunStatusRunning,
-			WorkflowID:      item.FunctionID,
-			WorkspaceID:     item.WorkspaceID,
-			WorkflowVersion: int(item.FunctionVersion),
-		},
+	run := w.store.Data[item.RunID]
+	run.Run.AccountID = item.AccountID
+	run.Run.BatchID = item.BatchID
+	run.Run.EventID = item.EventID
+	run.Run.ID = item.RunID
+	run.Run.OriginalRunID = item.OriginalRunID
+
+	if item.Result != nil {
+		run.Run.Output = &item.Result.Output
 	}
-	w.store.Data[item.RunID] = data
+
+	run.Run.StartedAt = time.UnixMilli(int64(item.RunID.Time()))
+	run.Run.Status = enums.RunStatusRunning
+	run.Run.WorkflowID = item.FunctionID
+	run.Run.WorkspaceID = item.WorkspaceID
+	run.Run.WorkflowVersion = int(item.FunctionVersion)
+	w.store.Data[item.RunID] = run
 }
 
 func timePtr(t time.Time) *time.Time {

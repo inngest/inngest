@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/tel"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/inngest/inngest/pkg/logger"
@@ -53,6 +54,7 @@ func (a *devapi) addRoutes() {
 		}
 		return http.HandlerFunc(fn)
 	})
+	a.Use(headers.StaticHeadersMiddleware(headers.ServerKindDev))
 
 	a.Get("/dev", a.Info)
 	a.Post("/fn/register", a.Register)

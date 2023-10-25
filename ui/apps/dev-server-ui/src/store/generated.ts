@@ -21,8 +21,8 @@ export type Scalars = {
 
 export type ActionVersionQuery = {
   dsn: Scalars['String'];
-  versionMajor: InputMaybe<Scalars['Int']>;
-  versionMinor: InputMaybe<Scalars['Int']>;
+  versionMajor?: InputMaybe<Scalars['Int']>;
+  versionMinor?: InputMaybe<Scalars['Int']>;
 };
 
 export type App = {
@@ -62,7 +62,7 @@ export type Event = {
 
 export type EventQuery = {
   eventId: Scalars['ID'];
-  workspaceId: Scalars['ID'];
+  workspaceId?: Scalars['ID'];
 };
 
 export enum EventStatus {
@@ -75,8 +75,8 @@ export enum EventStatus {
 }
 
 export type EventsQuery = {
-  lastEventId: InputMaybe<Scalars['ID']>;
-  workspaceId: Scalars['ID'];
+  lastEventId?: InputMaybe<Scalars['ID']>;
+  workspaceId?: Scalars['ID'];
 };
 
 export type Function = {
@@ -139,7 +139,7 @@ export type FunctionRunEvent = FunctionEvent | StepEvent;
 
 export type FunctionRunQuery = {
   functionRunId: Scalars['ID'];
-  workspaceId: Scalars['ID'];
+  workspaceId?: Scalars['ID'];
 };
 
 export enum FunctionRunStatus {
@@ -150,7 +150,7 @@ export enum FunctionRunStatus {
 }
 
 export type FunctionRunsQuery = {
-  workspaceId: Scalars['ID'];
+  workspaceId?: Scalars['ID'];
 };
 
 export enum FunctionStatus {
@@ -356,9 +356,9 @@ export type StreamItem = {
 };
 
 export type StreamQuery = {
-  after: InputMaybe<Scalars['Time']>;
-  before: InputMaybe<Scalars['Time']>;
-  limit: Scalars['Int'];
+  after?: InputMaybe<Scalars['Time']>;
+  before?: InputMaybe<Scalars['Time']>;
+  limit?: Scalars['Int'];
 };
 
 export enum StreamType {

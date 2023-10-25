@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	headerSDK = "x-inngest-sdk"
+	headerSDK            = "x-inngest-sdk"
+	headerRequestVersion = "x-inngest-req-version"
 )
 
 // getSDKVersion parses the SDK version from the response header.

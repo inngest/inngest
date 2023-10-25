@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_reader"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
@@ -54,6 +55,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 		AllowCredentials: false,
 	})
 	a.Use(cors.Handler)
+	a.Use(headers.StaticHeadersMiddleware(headers.ServerKindDev))
 
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{
 		Data:          o.Data,
