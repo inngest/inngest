@@ -19,6 +19,8 @@ local customConcurrencyKeyA   = KEYS[7] -- Optional for eg. for concurrency amon
 local customConcurrencyKeyB   = KEYS[8] -- Optional for eg. for concurrency amongst steps 
 -- We push pointers to partition concurrency items to the partition concurrency item
 local concurrencyPointer      = KEYS[9]
+local keyItemIndexA           = KEYS[10]  -- custom item index 1
+local keyItemIndexB           = KEYS[11]  -- custom item index 2
 
 local queueItem      = ARGV[1] -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID        = ARGV[2] -- id
@@ -62,10 +64,10 @@ local currentScore = redis.call("ZSCORE", partitionIndexKey, partitionIndex)
 -- the earliest time for the entire function set, as we may be
 -- rescheduling the only time in the queue;  this is the only way
 -- to update the partiton index.
-local queueScore = redis.call("ZRANGE", queueIndexKey, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+local earliestQueueScore = redis.call("ZRANGE", queueIndexKey, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 
 -- queues are ordered by ms precision, whereas pointers are second precision.
-local earliestTime = math.floor(tonumber(queueScore[2]) / 1000)
+local earliestTime = math.floor(tonumber(earliestQueueScore[2]) / 1000)
 
 -- earliest is a table containing {item, score}
 if currentScore == false or tonumber(currentScore) ~= earliestTime or tonumber(currentScore) == nil then
@@ -88,6 +90,15 @@ else
 		-- Ensure that we update the score with the earliest lease
 		redis.call("ZADD", concurrencyPointer, earliestLease, partitionIndex)
 	end
+end
+
+
+-- Add optional indexes.
+if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then
+	redis.call("ZADD", keyItemIndexA, queueScore, queueID)
+end
+if keyItemIndexB ~= "" and keyItemIndexB ~= false and keyItemIndexB ~= nil then
+	redis.call("ZADD", keyItemIndexB, queueScore, queueID)
 end
 
 return 0

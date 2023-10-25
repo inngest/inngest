@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -306,6 +308,25 @@ func TestQueueEnqueueItem(t *testing.T) {
 			Priority:   testPriority,
 			AtS:        at.Unix(),
 		}, qp)
+	})
+
+	t.Run("Stores default indexes", func(t *testing.T) {
+		at := time.Now().Truncate(time.Second)
+		rid := ulid.MustNew(ulid.Now(), rand.Reader)
+		_, err := q.EnqueueItem(ctx, QueueItem{
+			WorkflowID: uuid.New(),
+			Data: osqueue.Item{
+				Kind: osqueue.KindEdge,
+				Identifier: state.Identifier{
+					RunID: rid,
+				},
+			},
+		}, at)
+		require.NoError(t, err)
+
+		keys, err := r.ZMembers(fmt.Sprintf("{queue}:idx:run:%s", rid))
+		require.NoError(t, err)
+		require.Equal(t, 1, len(keys))
 	})
 }
 
@@ -806,7 +827,35 @@ func TestQueueDequeue(t *testing.T) {
 			val := r.HGet(defaultQueueKey.QueueItem(), id.String())
 			require.Empty(t, val)
 		})
+
+		t.Run("Removes default indexes", func(t *testing.T) {
+			at := time.Now().Truncate(time.Second)
+			rid := ulid.MustNew(ulid.Now(), rand.Reader)
+			item, err := q.EnqueueItem(ctx, QueueItem{
+				WorkflowID: uuid.New(),
+				Data: osqueue.Item{
+					Kind: osqueue.KindEdge,
+					Identifier: state.Identifier{
+						RunID: rid,
+					},
+				},
+			}, at)
+			require.NoError(t, err)
+
+			keys, err := r.ZMembers(fmt.Sprintf("{queue}:idx:run:%s", rid))
+			require.NoError(t, err)
+			require.Equal(t, 1, len(keys))
+
+			err = q.Dequeue(ctx, p, item)
+			require.NoError(t, err)
+
+			keys, err = r.ZMembers(fmt.Sprintf("{queue}:idx:run:%s", rid))
+			require.NotNil(t, err)
+			require.Equal(t, true, strings.Contains(err.Error(), "no such key"))
+			require.Equal(t, 0, len(keys))
+		})
 	})
+
 }
 
 func TestQueueRequeue(t *testing.T) {
@@ -872,6 +921,46 @@ func TestQueueRequeue(t *testing.T) {
 			require.NoError(t, err)
 
 			requirePartitionScoreEquals(t, r, pi.WorkflowID, now)
+		})
+
+		t.Run("Updates default indexes", func(t *testing.T) {
+			at := time.Now().Truncate(time.Second)
+			rid := ulid.MustNew(ulid.Now(), rand.Reader)
+			item, err := q.EnqueueItem(ctx, QueueItem{
+				WorkflowID: uuid.New(),
+				Data: osqueue.Item{
+					Kind: osqueue.KindEdge,
+					Identifier: state.Identifier{
+						RunID: rid,
+					},
+				},
+			}, at)
+			require.NoError(t, err)
+
+			key := fmt.Sprintf("{queue}:idx:run:%s", rid)
+
+			keys, err := r.ZMembers(key)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(keys))
+
+			// Score for entry should be the first enqueue time.
+			scores, err := r.ZMScore(key, keys[0])
+			require.NoError(t, err)
+			require.EqualValues(t, at.UnixMilli(), scores[0])
+
+			next := now.Add(2 * time.Hour)
+			err = q.Requeue(ctx, pi, item, next)
+			require.NoError(t, err)
+
+			// Score should be the requeue time.
+			scores, err = r.ZMScore(key, keys[0])
+			require.NoError(t, err)
+			require.EqualValues(t, next.UnixMilli(), scores[0])
+
+			// Still only one member.
+			keys, err = r.ZMembers(key)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(keys))
 		})
 	})
 }
@@ -1233,6 +1322,7 @@ func TestRequeueByJobID(t *testing.T) {
 		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) (string, int) {
 			return p.Queue(), 100
 		},
+		itemIndexer: defaultItemIndexer,
 	}
 
 	wsA, wsB := uuid.New(), uuid.New()
@@ -1253,7 +1343,6 @@ func TestRequeueByJobID(t *testing.T) {
 				WorkflowID:  wsA,
 				WorkspaceID: wsA,
 			}
-
 			_, err := q.EnqueueItem(ctx, item, time.Now().Add(time.Second))
 			require.NoError(t, err)
 

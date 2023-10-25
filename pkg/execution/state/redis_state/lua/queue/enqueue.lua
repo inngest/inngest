@@ -12,6 +12,9 @@ local partitionCounterKey = KEYS[4]   -- partition:item:$workflowID - hash: { "n
 local partitionIndexKey   = KEYS[5]   -- partition:sorted - zset
 local idempotencyKey      = KEYS[6]   -- seen:$key
 
+local keyItemIndexA       = KEYS[7]   -- custom item index 1
+local keyItemIndexB       = KEYS[8]   -- custom item index 2
+
 local queueItem      = ARGV[1] -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID        = ARGV[2] -- id
 local queueScore     = tonumber(ARGV[3]) -- vesting time, in milliseconds
@@ -52,6 +55,14 @@ if currentScore == false or tonumber(currentScore) > partitionScore then
 	redis.call("ZADD", partitionIndexKey, partitionScore, workflowID)
 	-- Update the partition item too
 	redis.call("HSET", partitionKey, workflowID, partitionItem)
+end
+
+-- Add optional indexes.
+if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then
+	redis.call("ZADD", keyItemIndexA, queueScore, queueID)
+end
+if keyItemIndexB ~= "" and keyItemIndexB ~= false and keyItemIndexB ~= nil then
+	redis.call("ZADD", keyItemIndexB, queueScore, queueID)
 end
 
 -- TODO: For the given workflow ID increase scheduled count, store a history item,

@@ -55,9 +55,8 @@ const (
 	// of additional latency.
 	PartitionConcurrencyLimitRequeueExtension = time.Second * 2
 
-	QueueSelectionMax   int64 = 50
 	QueuePeekMax        int64 = 1000
-	QueuePeekDefault    int64 = QueueSelectionMax * 3
+	QueuePeekDefault    int64 = 200
 	QueueLeaseDuration        = 10 * time.Second
 	ConfigLeaseDuration       = 10 * time.Second
 	ConfigLeaseMax            = 20 * time.Second
@@ -181,6 +180,12 @@ func WithTracer(t trace.Tracer) func(q *queue) {
 	}
 }
 
+func WithQueueItemIndexer(i QueueItemIndexer) func(q *queue) {
+	return func(q *queue) {
+		q.itemIndexer = i
+	}
+}
+
 // WithDenyQueueNames specifies that the worker cannot select jobs from queue partitions
 // within the given list of names.  This means that the worker will never work on jobs
 // in the specified queues.
@@ -288,6 +293,10 @@ type AccountConcurrencyKeyGenerator func(ctx context.Context, i QueueItem) (stri
 // This allows partitions (read: functions) to set their own concurrency limits.
 type PartitionConcurrencyKeyGenerator func(ctx context.Context, p QueuePartition) (string, int)
 
+func defaultItemIndexer(ctx context.Context, i QueueItem) QueueItemIndex {
+	return DefaultQueueItemIndexes(ctx, "{queue}", i)
+}
+
 func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 	q := &queue{
 		r: r,
@@ -308,6 +317,7 @@ func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) (string, int) {
 			return p.Queue(), 10_000
 		},
+		itemIndexer: defaultItemIndexer,
 	}
 
 	for _, opt := range opts {
@@ -364,6 +374,9 @@ type queue struct {
 	// queueKindMapping stores a map of job kind => queue names
 	queueKindMapping map[string]string
 	logger           *zerolog.Logger
+
+	// itemIndexer returns indexes for a given queue item.
+	itemIndexer QueueItemIndexer
 
 	// denyQueues provides a denylist ensuring that the queue will never claim
 	// this partition, meaning that no jobs from this queue will run on this worker.
@@ -602,6 +615,12 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		q.kg.PartitionMeta(qn), // Partition item
 		q.kg.PartitionIndex(),  // Global partition queue
 		q.kg.Idempotency(i.ID),
+	}
+	// Append indexes
+	for _, idx := range q.itemIndexer(ctx, i) {
+		if idx != "" {
+			keys = append(keys, idx)
+		}
 	}
 
 	args, err := StrSlice([]any{
@@ -934,6 +953,12 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		q.kg.Concurrency("custom", customKeys[1]),
 		q.kg.ConcurrencyIndex(),
 	}
+	// Append indexes
+	for _, idx := range q.itemIndexer(ctx, i) {
+		if idx != "" {
+			keys = append(keys, idx)
+		}
+	}
 
 	idempotency := q.idempotencyTTL
 	if q.idempotencyTTLFunc != nil {
@@ -1023,6 +1048,12 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		q.kg.Concurrency("custom", customKeys[0]),
 		q.kg.Concurrency("custom", customKeys[1]),
 		q.kg.ConcurrencyIndex(),
+	}
+	// Append indexes
+	for _, idx := range q.itemIndexer(ctx, i) {
+		if idx != "" {
+			keys = append(keys, idx)
+		}
 	}
 
 	args, err := StrSlice([]any{
