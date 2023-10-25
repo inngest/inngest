@@ -103,7 +103,7 @@ type Pause struct {
 	// gives each pause of a function a TTL.  This is required.
 	//
 	// NOTE: the pause should remain within the backing state store for
-	// some perioud after the expiry time for checking timeout branches:
+	// some period after the expiry time for checking timeout branches:
 	//
 	// If this pause has its OnTimeout flag set to true, we only traverse
 	// the edge if the event *has not* been received.  In order to check
