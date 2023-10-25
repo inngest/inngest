@@ -229,6 +229,8 @@ func start(ctx context.Context, opts StartOpts) error {
 	// embed the tracker
 	ds.tracker = t
 	ds.state = sm
+	ds.queue = queue
+	ds.executor = exec
 
 	return service.StartAll(ctx, ds, runner, executorSvc)
 }

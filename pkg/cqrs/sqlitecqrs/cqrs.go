@@ -18,6 +18,11 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+var (
+	// end represents a ulid ending with 'Z', eg. a far out cursor.
+	end = ulid.ULID([16]byte{'Z'})
+)
+
 func NewCQRS(db *sql.DB) cqrs.Manager {
 	return wrapper{
 		q:  sqlc.New(db),
@@ -243,6 +248,7 @@ func (w wrapper) InsertEvent(ctx context.Context, e cqrs.Event) error {
 	}
 	evt := sqlc.InsertEventParams{
 		InternalID: e.ID,
+		ReceivedAt: time.Now(),
 		EventID:    e.EventID,
 		EventName:  e.EventName,
 		EventData:  string(data),
@@ -264,6 +270,53 @@ func (w wrapper) GetEventByInternalID(ctx context.Context, internalID ulid.ULID)
 	evt := convertEvent(obj)
 	return &evt, nil
 }
+
+func (w wrapper) FindEvent(ctx context.Context, workspaceID uuid.UUID, internalID ulid.ULID) (*cqrs.Event, error) {
+	return w.GetEventByInternalID(ctx, internalID)
+}
+
+func (w wrapper) WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, opts *cqrs.WorkspaceEventsOpts) ([]cqrs.Event, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
+	if opts.Cursor == nil {
+		opts.Cursor = &end
+	}
+
+	var (
+		evts []*sqlc.Event
+		err  error
+	)
+
+	if opts.Name == nil {
+		params := sqlc.WorkspaceEventsParams{
+			Cursor: *opts.Cursor,
+			Before: opts.Newest,
+			After:  opts.Oldest,
+			Limit:  int64(opts.Limit),
+		}
+		evts, err = w.q.WorkspaceEvents(ctx, params)
+	} else {
+		params := sqlc.WorkspaceNamedEventsParams{
+			Name:   *opts.Name,
+			Cursor: *opts.Cursor,
+			Before: opts.Newest,
+			After:  opts.Oldest,
+			Limit:  int64(opts.Limit),
+		}
+		evts, err = w.q.WorkspaceNamedEvents(ctx, params)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	out := make([]cqrs.Event, len(evts))
+	for n, evt := range evts {
+		out[n] = convertEvent(evt)
+	}
+	return out, nil
+}
+
 func (w wrapper) GetEventsTimebound(ctx context.Context, t cqrs.Timebound, limit int) ([]*cqrs.Event, error) {
 	after := time.Time{}                           // after the beginning of time, eg all
 	before := time.Now().Add(time.Hour * 24 * 365) // before 1 year in the future, eg all
@@ -294,6 +347,7 @@ func (w wrapper) GetEventsTimebound(ctx context.Context, t cqrs.Timebound, limit
 func convertEvent(obj *sqlc.Event) cqrs.Event {
 	evt := &cqrs.Event{
 		ID:           obj.InternalID,
+		ReceivedAt:   obj.ReceivedAt,
 		EventID:      obj.EventID,
 		EventName:    obj.EventName,
 		EventVersion: obj.EventV.String,
@@ -333,6 +387,11 @@ func (w wrapper) GetFunctionRunsFromEvents(ctx context.Context, eventIDs []ulid.
 	}, []*cqrs.FunctionRun{})
 }
 
+func (w wrapper) GetFunctionRun(ctx context.Context, workspaceID uuid.UUID, id ulid.ULID) (*cqrs.FunctionRun, error) {
+	return copyInto(ctx, func(ctx context.Context) (*sqlc.FunctionRun, error) {
+		return w.q.GetFunctionRun(ctx, id)
+	}, &cqrs.FunctionRun{})
+}
 func (w wrapper) GetFunctionRunsTimebound(ctx context.Context, t cqrs.Timebound, limit int) ([]*cqrs.FunctionRun, error) {
 	after := time.Time{}                           // after the beginning of time, eg all
 	before := time.Now().Add(time.Hour * 24 * 365) // before 1 year in the future, eg all

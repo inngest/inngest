@@ -9,17 +9,20 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-// FunctionRun represents a currently ongoing ro past function run.
+// FunctionRun represents a currently ongoing or past function run.
 type FunctionRun struct {
-	RunID           ulid.ULID
-	RunStartedAt    time.Time
-	FunctionID      uuid.UUID
-	FunctionVersion int64
-	TriggerType     string
-	EventID         ulid.ULID
-	BatchID         ulid.ULID
-	OriginalRunID   ulid.ULID
-	Cron            *string
+	RunID           ulid.ULID `json:"run_id"`
+	RunStartedAt    time.Time `json:"run_started_at"`
+	FunctionID      uuid.UUID `json:"function_id"`
+	FunctionVersion int64     `json:"function_version"`
+	WorkspaceID     uuid.UUID `json:"workspace_id"`
+	TriggerType     string    `json:"trigger_type"`
+	EventID         ulid.ULID `json:"event_id"`
+	BatchID         ulid.ULID `json:"batch_id"`
+	OriginalRunID   ulid.ULID `json:"original_run_id"`
+	Cron            *string   `json:"cron,omitempty"`
+
+	Result *FunctionRunFinish `json:"result"`
 }
 
 // FunctionRunFinish represents the end of a function.  This may be
@@ -30,11 +33,11 @@ type FunctionRun struct {
 // that the function is still in progress and is part of the state
 // store.
 type FunctionRunFinish struct {
-	RunID              ulid.ULID
-	Status             string
-	Output             json.RawMessage
-	CompletedStepCount int64
-	CreatedAt          time.Time
+	RunID              ulid.ULID       `json:"-"`
+	Status             string          `json:"status"`
+	Output             json.RawMessage `json:"output"`
+	CompletedStepCount int64           `json:"-"`
+	CreatedAt          time.Time       `json:"finished_at"`
 }
 
 type FunctionRunManager interface {
@@ -47,6 +50,7 @@ type FunctionRunWriter interface {
 }
 
 type FunctionRunReader interface {
+	GetFunctionRun(ctx context.Context, workspaceID uuid.UUID, id ulid.ULID) (*FunctionRun, error)
 	GetFunctionRunsFromEvents(ctx context.Context, eventIDs []ulid.ULID) ([]*FunctionRun, error)
 	GetFunctionRunsTimebound(ctx context.Context, t Timebound, limit int) ([]*FunctionRun, error)
 	// GetFunctionRunFinishesByrunIDs loads all function finishes for the given run IDs.  Note that

@@ -72,8 +72,8 @@ func (a *devapi) addRoutes() {
 	a.Get("/{file}.svg", http.FileServer(http.FS(staticFS)).ServeHTTP)
 	a.Get("/{file}.jpg", http.FileServer(http.FS(staticFS)).ServeHTTP)
 	a.Get("/{file}.png", http.FileServer(http.FS(staticFS)).ServeHTTP)
-
-	a.Get("/*", a.UI)
+	// Everything else loads the UI.
+	a.NotFound(a.UI)
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {

@@ -9,14 +9,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api"
+	"github.com/inngest/inngest/pkg/api/apiv1"
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/devserver/discovery"
+	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest/log"
@@ -51,9 +55,11 @@ type devserver struct {
 	data cqrs.Manager
 
 	// runner stores the runner
-	runner  runner.Runner
-	tracker *runner.Tracker
-	state   state.Manager
+	runner   runner.Runner
+	tracker  *runner.Tracker
+	state    state.Manager
+	queue    queue.Queue
+	executor execution.Executor
 
 	apiservice service.Service
 
@@ -71,6 +77,16 @@ func (d *devserver) Pre(ctx context.Context) error {
 	// registering functions.
 	devAPI := newDevAPI(d)
 
+	devAPI.Route("/v1", func(r chi.Router) {
+		// Add the V1 API to our dev server API.
+		apiv1.AddRoutes(r, apiv1.Opts{
+			EventReader:       d.data,
+			FunctionRunReader: d.data,
+			JobQueueReader:    d.queue.(queue.JobQueueReader),
+			Executor:          d.executor,
+		})
+	})
+
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		Data:    d.data,
 		Config:  d.opts.Config,
@@ -82,11 +98,10 @@ func (d *devserver) Pre(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
 	// server UI, events, and API for loading data.
-
+	//
 	// Merge the dev server API (for handling files & registration) with the data
 	// API into the event API router.
 	d.apiservice = api.NewService(

@@ -15,6 +15,11 @@ CREATE TABLE apps (
 
 CREATE TABLE events (
 	internal_id CHAR(26) PRIMARY KEY,
+	account_id CHAR(36),
+	workspace_id CHAR(36),
+	source VARCHAR(255),
+	source_id CHAR(35),
+	received_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	event_id VARCHAR NOT NULL,
 	event_name VARCHAR NOT NULL,
 	event_data VARCHAR DEFAULT '{}' NOT NULL,

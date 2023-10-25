@@ -783,7 +783,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 
 			// Cancelling a function can happen before a lease, as it's an atomic operation that will always happen.
 			if pause.Cancel {
-				err := e.Cancel(ctx, pause.Identifier, execution.CancelRequest{
+				err := e.Cancel(ctx, pause.Identifier.RunID, execution.CancelRequest{
 					EventID:    &evtID,
 					Expression: pause.Expression,
 				})
@@ -821,8 +821,8 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 }
 
 // Cancel cancels an in-progress function.
-func (e *executor) Cancel(ctx context.Context, id state.Identifier, r execution.CancelRequest) error {
-	md, err := e.sm.Metadata(ctx, id.RunID)
+func (e *executor) Cancel(ctx context.Context, runID ulid.ULID, r execution.CancelRequest) error {
+	md, err := e.sm.Metadata(ctx, runID)
 	if err != nil {
 		return err
 	}
@@ -834,16 +834,15 @@ func (e *executor) Cancel(ctx context.Context, id state.Identifier, r execution.
 		return nil
 	}
 
-	// TODO: Load all pauses for the function and remove.
-
 	if err := e.sm.Cancel(ctx, md.Identifier); err != nil {
 		return fmt.Errorf("error cancelling function: %w", err)
 	}
 
-	s, _ := e.sm.Load(ctx, id.RunID)
+	// TODO: Load all pauses for the function and remove, once we index pauses.
 
+	s, _ := e.sm.Load(ctx, runID)
 	for _, e := range e.lifecycles {
-		go e.OnFunctionCancelled(context.WithoutCancel(ctx), id, r, s)
+		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md.Identifier, r, s)
 	}
 
 	return nil
