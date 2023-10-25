@@ -1004,6 +1004,8 @@ func (e *executor) HandleGenerator(ctx context.Context, gen state.GeneratorOpcod
 		return e.handleGeneratorSleep(ctx, gen, item, edge)
 	case enums.OpcodeWaitForEvent:
 		return e.handleGeneratorWaitForEvent(ctx, gen, item, edge)
+	case enums.OpcodeInvokeFunction:
+		return e.handleGeneratorInvokeFunction(ctx, gen, item, edge)
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -1163,6 +1165,77 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 
 	for _, e := range e.lifecycles {
 		go e.OnSleep(context.WithoutCancel(ctx), item.Identifier, item, gen, until)
+	}
+
+	return err
+}
+
+func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
+	opts, err := gen.InvokeFunctionOpts()
+	if err != nil {
+		return fmt.Errorf("unable to parse invoke function opts: %w", err)
+	}
+	expires, err := opts.Expires()
+	if err != nil {
+		return fmt.Errorf("unable to parse invoke function expires: %w", err)
+	}
+
+	eventName := event.FnCompletedName
+	strExpr := "async.data.runId == '" + item.Identifier.RunID.String() + "'"
+	_, err = e.newExpressionEvaluator(ctx, strExpr)
+	if err != nil {
+		return execError{err: fmt.Errorf("failed to create expression to wait for invoked function completion: %w", err)}
+	}
+
+	pauseID := uuid.New()
+	err = e.sm.SavePause(ctx, state.Pause{
+		ID:          pauseID,
+		WorkspaceID: item.WorkspaceID,
+		Identifier:  item.Identifier,
+		GroupID:     item.GroupID,
+		Outgoing:    gen.ID,
+		Incoming:    edge.Edge.Incoming,
+		StepName:    gen.Name,
+		Expires:     state.Time(expires),
+		Event:       &eventName,
+		Expression:  &strExpr,
+		DataKey:     gen.ID,
+	})
+	if err != nil {
+		return err
+	}
+
+	// This should also increase the waitgroup count, as we have an
+	// edge that is outstanding.
+	//
+	// TODO: Remove with function run specific queues
+	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.IncomingGeneratorStep, 0, nil); err != nil {
+		return fmt.Errorf("unable to schedule wait for event: %w", err)
+	}
+
+	// SDK-based event coordination is called both when an event is received
+	// OR on timeout, depending on which happens first.  Both routes consume
+	// the pause so this race will conclude by calling the function once, as only
+	// one thread can lease and consume a pause;  the other will find that the
+	// pause is no longer available and return.
+	err = e.queue.Enqueue(ctx, queue.Item{
+		WorkspaceID: item.WorkspaceID,
+		// Use the same group ID, allowing us to track the cancellation of
+		// the step correctly.
+		GroupID:    item.GroupID,
+		Kind:       queue.KindPause,
+		Identifier: item.Identifier,
+		Payload: queue.PayloadPauseTimeout{
+			PauseID:   pauseID,
+			OnTimeout: true,
+		},
+	}, expires)
+	if err == redis_state.ErrQueueItemExists {
+		return nil
+	}
+
+	for _, e := range e.lifecycles {
+		go e.OnInvokeFunction(context.WithoutCancel(ctx), item.Identifier, item, gen)
 	}
 
 	return err

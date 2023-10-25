@@ -17,32 +17,34 @@ type Driver interface {
 
 // Represents a row in the workflow_run_history table
 type History struct {
-	AccountID          uuid.UUID
-	Attempt            int64
-	BatchID            *ulid.ULID
-	Cancel             *execution.CancelRequest
-	CompletedStepCount *int64
-	CreatedAt          time.Time
-	EventID            ulid.ULID
-	FunctionID         uuid.UUID
-	FunctionVersion    int64
-	GroupID            *uuid.UUID
-	ID                 ulid.ULID
-	IdempotencyKey     string
-	LatencyMS          *int64
-	OriginalRunID      *ulid.ULID
-	Result             *Result
-	RunID              ulid.ULID
-	Sleep              *Sleep
-	Status             *string
-	StepID             *string
-	StepName           *string
-	StepType           *enums.HistoryStepType
-	Type               string
-	URL                *string
-	WaitForEvent       *WaitForEvent
-	WaitResult         *WaitResult
-	WorkspaceID        uuid.UUID
+	AccountID            uuid.UUID
+	Attempt              int64
+	BatchID              *ulid.ULID
+	Cancel               *execution.CancelRequest
+	CompletedStepCount   *int64
+	CreatedAt            time.Time
+	EventID              ulid.ULID
+	FunctionID           uuid.UUID
+	FunctionVersion      int64
+	GroupID              *uuid.UUID
+	ID                   ulid.ULID
+	IdempotencyKey       string
+	LatencyMS            *int64
+	OriginalRunID        *ulid.ULID
+	Result               *Result
+	RunID                ulid.ULID
+	Sleep                *Sleep
+	Status               *string
+	StepID               *string
+	StepName             *string
+	StepType             *enums.HistoryStepType
+	Type                 string
+	URL                  *string
+	WaitForEvent         *WaitForEvent
+	WaitResult           *WaitResult
+	InvokeFunction       *InvokeFunction
+	InvokeFunctionResult *InvokeFunctionResult
+	WorkspaceID          uuid.UUID
 }
 
 type CancelEvent struct {
@@ -65,6 +67,16 @@ type WaitForEvent struct {
 }
 
 type WaitResult struct {
+	EventID *ulid.ULID `json:"event_id"`
+	Timeout bool       `json:"timeout"`
+}
+
+type InvokeFunction struct {
+	FunctionID uuid.UUID `json:"function_id"`
+	Timeout    time.Time `json:"timeout"`
+}
+
+type InvokeFunctionResult struct {
 	EventID *ulid.ULID `json:"event_id"`
 	Timeout bool       `json:"timeout"`
 }

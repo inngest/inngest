@@ -107,6 +107,24 @@ type LifecycleListener interface {
 		string,
 	)
 
+	// OnInvokeFunction is called when a function is invoked from a step.
+	OnInvokeFunction(
+		context.Context,
+		state.Identifier,
+		queue.Item,
+		state.GeneratorOpcode,
+	)
+
+	// OnInvokeFunctionResumed is called when a function is resumed from an
+	// invoke function step. This happens when the invoked function has
+	// completed or the step timed out whilst waiting.
+	OnInvokeFunctionResumed(
+		context.Context,
+		state.Identifier,
+		ResumeRequest,
+		string,
+	)
+
 	// OnSleep is called when a sleep step is scheduled.  The
 	// state.GeneratorOpcode contains the sleep details.
 	OnSleep(
@@ -218,6 +236,26 @@ func (NoopLifecyceListener) OnWaitForEvent(
 // OnWaitForEventResumed is called when a function is resumed from waiting for
 // an event.
 func (NoopLifecyceListener) OnWaitForEventResumed(
+	context.Context,
+	state.Identifier,
+	ResumeRequest,
+	string,
+) {
+}
+
+// OnInvokeFunction is called when a function is invoked from a step.
+func (NoopLifecyceListener) OnInvokeFunction(
+	context.Context,
+	state.Identifier,
+	queue.Item,
+	state.GeneratorOpcode,
+) {
+}
+
+// OnInvokeFunctionResumed is called when a function is resumed from an
+// invoke function step. This happens when the invoked function has
+// completed or the step timed out whilst waiting.
+func (NoopLifecyceListener) OnInvokeFunctionResumed(
 	context.Context,
 	state.Identifier,
 	ResumeRequest,

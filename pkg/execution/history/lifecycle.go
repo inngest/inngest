@@ -482,6 +482,100 @@ func (l lifecycle) OnWaitForEventResumed(
 	}
 }
 
+// OnInvokeFunction is called when a function is invoked from a step.
+func (l lifecycle) OnInvokeFunction(
+	ctx context.Context,
+	id state.Identifier,
+	item queue.Item,
+	op state.GeneratorOpcode,
+) {
+	groupID, err := toUUID(item.GroupID)
+	if err != nil {
+		l.log.Error(
+			"error parsing group ID",
+			"error", err,
+			"group_id", item.GroupID,
+			"run_id", id.RunID.String(),
+		)
+	}
+
+	h := History{
+		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:       id.AccountID,
+		WorkspaceID:     id.WorkspaceID,
+		CreatedAt:       time.Now(),
+		FunctionID:      id.WorkflowID,
+		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         groupID,
+		RunID:           id.RunID,
+		Type:            enums.HistoryTypeStepInvokingFunction.String(),
+		Attempt:         int64(item.Attempt),
+		IdempotencyKey:  id.IdempotencyKey(),
+		EventID:         id.EventID,
+		BatchID:         id.BatchID,
+		StepName:        &op.Name,
+		StepID:          &op.ID,
+		// TODO Bad
+		InvokeFunction: &InvokeFunction{
+			FunctionID: uuid.New(),
+			Timeout:    time.Time{},
+		},
+	}
+	for _, d := range l.drivers {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
+			l.log.Error("execution lifecycle error", "lifecycle", "onInvokeFunction", "error", err)
+		}
+	}
+}
+
+// OnInvokeFunctionResumed is called when a function is resumed from an
+// invoke function step. This happens when the invoked function has
+// completed or the step timed out whilst waiting.
+func (l lifecycle) OnInvokeFunctionResumed(
+	ctx context.Context,
+	id state.Identifier,
+	req execution.ResumeRequest,
+	groupID string,
+) {
+	var groupIDUUID *uuid.UUID
+	if groupID != "" {
+		val, err := toUUID(groupID)
+		if err != nil {
+			l.log.Error(
+				"error parsing group ID",
+				"error", err,
+				"group_id", groupID,
+				"run_id", id.RunID.String(),
+			)
+		}
+		groupIDUUID = val
+	}
+
+	h := History{
+		AccountID:       id.AccountID,
+		WorkspaceID:     id.WorkspaceID,
+		CreatedAt:       time.Now(),
+		FunctionID:      id.WorkflowID,
+		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         groupIDUUID,
+		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		RunID:           id.RunID,
+		Type:            enums.HistoryTypeStepCompleted.String(),
+		IdempotencyKey:  id.IdempotencyKey(),
+		EventID:         id.EventID,
+		BatchID:         id.BatchID,
+		InvokeFunctionResult: &InvokeFunctionResult{
+			EventID: req.EventID,
+			Timeout: req.EventID == nil,
+		},
+	}
+	for _, d := range l.drivers {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
+			l.log.Error("execution lifecycle error", "lifecycle", "onInvokeFunctionResumed", "error", err)
+		}
+	}
+}
+
 // OnSleep is called when a sleep step is scheduled.  The
 // state.GeneratorOpcode contains the sleep details.
 func (l lifecycle) OnSleep(
