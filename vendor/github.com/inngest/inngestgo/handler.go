@@ -257,7 +257,6 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 			Name:        fn.Name(),
 			Slug:        fn.Slug(),
 			Idempotency: c.Idempotency,
-			Priority:    fn.Config().Priority,
 			Triggers:    []inngest.Trigger{{}},
 			RateLimit:   fn.Config().GetRateLimit(),
 			Cancel:      fn.Config().Cancel,
@@ -287,9 +286,10 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 			}
 		}
 
-		if len(c.Concurrency) > 0 {
-			// Marshal as an array, as the sdk/handler unmarshals correctly.
-			f.Concurrency = &inngest.ConcurrencyLimits{Limits: c.Concurrency}
+		if c.Concurrency > 0 {
+			f.Concurrency = &inngest.Concurrency{
+				Limit: c.Concurrency,
+			}
 		}
 
 		trigger := fn.Trigger()
