@@ -225,9 +225,11 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 			}
 			_, err := s.cronmanager.AddFunc(t.Cron, func() {
 				err := s.initialize(context.Background(), fn, event.NewOSSTrackedEvent(event.Event{
-					Cron: &t.CronTrigger.Cron,
+					Data: map[string]any{
+						"cron": t.CronTrigger.Cron,
+					},
 					ID:   time.Now().UTC().Format(time.RFC3339),
-					Name: "inngest/scheduled.timer",
+					Name: event.FnCronName,
 				}))
 				if err != nil {
 					logger.From(ctx).Error().Err(err).Msg("error initializing scheduled function")
