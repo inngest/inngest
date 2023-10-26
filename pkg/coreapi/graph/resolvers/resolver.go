@@ -26,8 +26,11 @@ func (r *Resolver) FunctionRun() generated.FunctionRunResolver { return &functio
 
 func (r *Resolver) App() generated.AppResolver { return &appResolver{r} }
 
+func (r *Resolver) Function() generated.FunctionResolver { return &functionResolver{r} }
+
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type eventResolver struct{ *Resolver }
 type appResolver struct{ *Resolver }
 type functionRunResolver struct{ *Resolver }
+type functionResolver struct{ *Resolver }

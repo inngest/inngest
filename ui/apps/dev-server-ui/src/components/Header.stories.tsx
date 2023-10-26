@@ -17,6 +17,6 @@ type Story = StoryObj<typeof Header>;
 
 export const Default: Story = {
   args: {
-    children: <p className="text-white pr-4">This is the header's middle component</p>,
+    children: <p className="pr-4 text-white">This is the header's middle component</p>,
   },
 };

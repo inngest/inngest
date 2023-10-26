@@ -12,6 +12,9 @@ SELECT * FROM apps WHERE deleted_at IS NULL;
 -- name: GetAppByChecksum :one
 SELECT * FROM apps WHERE checksum = ? LIMIT 1;
 
+-- name: GetAppByID :one
+SELECT * FROM apps WHERE id = ? LIMIT 1;
+
 -- name: GetAppByURL :one
 SELECT * FROM apps WHERE url = ? LIMIT 1;
 
