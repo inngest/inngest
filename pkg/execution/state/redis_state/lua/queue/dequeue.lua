@@ -17,6 +17,8 @@ local customConcurrencyKeyA   = KEYS[7] -- Optional for eg. for concurrency amon
 local customConcurrencyKeyB   = KEYS[8] -- Optional for eg. for concurrency amongst steps 
 -- We push pointers to partition concurrency items to the partition concurrency item
 local concurrencyPointer      = KEYS[9]
+local keyItemIndexA           = KEYS[10]   -- custom item index 1
+local keyItemIndexB           = KEYS[11]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local idempotencyTTL = tonumber(ARGV[2])
@@ -67,6 +69,14 @@ else
 		-- Ensure that we update the score with the earliest lease
 		redis.call("ZADD", concurrencyPointer, earliestLease, partitionName)
 	end
+end
+
+-- Add optional indexes.
+if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then
+	redis.call("ZREM", keyItemIndexA, queueID)
+end
+if keyItemIndexB ~= "" and keyItemIndexB ~= false and keyItemIndexB ~= nil then
+	redis.call("ZREM", keyItemIndexB, queueID)
 end
 
 return 0
