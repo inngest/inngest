@@ -1,0 +1,72 @@
+'use client';
+
+import { useState } from 'react';
+import { Button } from '@inngest/components/Button';
+import { useClient } from 'urql';
+
+import Input from '@/components/Forms/Input';
+import { useEnvironment } from '@/queries';
+import { EventTable } from './EventTable';
+import { searchEvents } from './searchEvents';
+import type { Event } from './types';
+
+const day = 1000 * 60 * 60 * 24;
+
+type Props = {
+  environmentSlug: string;
+};
+
+export function EventSearch({ environmentSlug }: Props) {
+  const [events, setEvents] = useState<Event[]>([]);
+  const [fetching, setFetching] = useState(false);
+  const [{ data: environment }] = useEnvironment({ environmentSlug });
+  const client = useClient();
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFetching(true);
+
+    try {
+      const form = new FormData(event.currentTarget);
+      const text = form.get('text');
+      if (typeof text !== 'string') {
+        // Should be unreachable
+        throw new Error('name must be a string');
+      }
+
+      if (!environment) {
+        // Should be unreachable
+        throw new Error('missing environment');
+      }
+
+      setEvents(
+        await searchEvents({
+          client,
+          environmentID: environment.id,
+          lowerTime: new Date(Date.now() - 3 * day),
+          text,
+          upperTime: new Date(),
+        })
+      );
+    } finally {
+      setFetching(false);
+    }
+  }
+
+  return (
+    <>
+      <form onSubmit={onSubmit} className="m-4 flex gap-4">
+        <Input
+          className="min-w-[300px]"
+          type="text"
+          name="text"
+          placeholder="Event data search"
+          required
+        />
+        <Button kind="primary" type="submit" disabled={fetching} label="Search" />
+      </form>
+
+      <EventTable environmentSlug={environmentSlug} events={events} />
+    </>
+  );
+}
