@@ -352,7 +352,15 @@ func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqr
 		return nil, err
 	}
 
-	name := evt.Data[consts.InvokeSlugKey]
+	name := ""
+	if inngestObj, ok := evt.Data[consts.InngestEventDataPrefix].(map[string]any); ok {
+		if slug, ok := inngestObj[consts.InvokeFnID].(string); ok {
+			logger.From(ctx).Debug().Str("event", evt.Name).Str("FunctionID", slug).Msg("invoking function by event; it was an invoke event")
+			name = slug
+		} else {
+			return nil, fmt.Errorf("invalid slug type")
+		}
+	}
 	if name == "" {
 		return nil, err
 	}

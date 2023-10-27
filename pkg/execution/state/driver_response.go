@@ -8,6 +8,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/dateutil"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/xhit/go-str2duration/v2"
 	"golang.org/x/exp/slog"
@@ -96,7 +97,9 @@ func (g GeneratorOpcode) InvokeFunctionOpts() (*InvokeFunctionOpts, error) {
 }
 
 type InvokeFunctionOpts struct {
-	Timeout string `json:"timeout"`
+	FunctionID string       `json:"function_id"`
+	Payload    *event.Event `json:"payload,omitempty"`
+	Timeout    string       `json:"timeout"`
 }
 
 func (i *InvokeFunctionOpts) UnmarshalAny(a any) error {

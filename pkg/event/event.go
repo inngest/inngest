@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -129,4 +130,33 @@ func (o ossTrackedEvent) GetEvent() Event {
 
 func (o ossTrackedEvent) GetInternalID() ulid.ULID {
 	return o.id
+}
+
+type NewInvocationEventOpts struct {
+	Event           Event
+	FnID            string
+	TriggeringRunID *string
+}
+
+func NewInvocationEvent(opts NewInvocationEventOpts) Event {
+	evt := opts.Event
+	if evt.Timestamp == 0 {
+		evt.Timestamp = time.Now().UnixMilli()
+	}
+	if evt.Data == nil {
+		evt.Data = map[string]interface{}{}
+	}
+
+	// Override the name. We create a different event entirely.
+	evt.Name = consts.InvokeEventName
+
+	inngestData := map[string]string{
+		consts.InvokeFnID: opts.FnID,
+	}
+	if opts.TriggeringRunID != nil && *opts.TriggeringRunID != "" {
+		inngestData[consts.InvokeCorrelationId] = *opts.TriggeringRunID
+	}
+	evt.Data[consts.InngestEventDataPrefix] = inngestData
+
+	return evt
 }

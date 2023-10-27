@@ -22,6 +22,8 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
 	"github.com/xhit/go-str2duration/v2"
@@ -165,6 +167,17 @@ func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
 	}
 }
 
+// WithPublisher specifies the pubsub publisher to use when sending internal
+// events.
+func WithPublisher(p pubsub.Publisher, topicName string) ExecutorOpt {
+	return func(exec execution.Executor) error {
+		e := exec.(*executor)
+		e.pb = p
+		e.eventTopic = topicName
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log *zerolog.Logger
@@ -176,6 +189,8 @@ type executor struct {
 	evalFactory    func(ctx context.Context, expr string) (expressions.Evaluator, error)
 	runtimeDrivers map[string]driver.Driver
 	failureHandler execution.FailureHandler
+	pb             pubsub.Publisher
+	eventTopic     string
 
 	lifecycles []execution.LifecycleListener
 
@@ -805,8 +820,23 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 				return
 			}
 
+			// TODO Does the pause need the op code here to safely do this?
+			// The user might be manually using
+			// `waitForEvent("inngest/function.completed")`
+			withEvt := evt.GetEvent()
+			with := withEvt.Map()
+			if withEvt.Name == event.FnCompletedName {
+				// TODO dangerous?
+				// with = map[string]any{}withEvt.Data["result"].(map[string]any)
+				with = map[string]any{
+					"data": withEvt.Data["result"],
+				}
+			}
+
+			logger.From(ctx).Debug().Interface("with", with).Str("pause.DataKey", pause.DataKey).Msg("resuming pause")
+
 			err := e.Resume(ctx, *pause, execution.ResumeRequest{
-				With:    evt.GetEvent().Map(),
+				With:    with,
 				EventID: &evtID,
 			})
 			if err != nil {
@@ -1171,6 +1201,8 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 }
 
 func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
+	logger.From(ctx).Info().Msg("handling invoke function")
+
 	opts, err := gen.InvokeFunctionOpts()
 	if err != nil {
 		return fmt.Errorf("unable to parse invoke function opts: %w", err)
@@ -1181,11 +1213,14 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	}
 
 	eventName := event.FnCompletedName
-	strExpr := "async.data.runId == '" + item.Identifier.RunID.String() + "'"
+	correlationID := item.Identifier.RunID.String() + "." + gen.ID
+	strExpr := "async.data." + consts.InvokeCorrelationId + " == '" + correlationID + "'"
 	_, err = e.newExpressionEvaluator(ctx, strExpr)
 	if err != nil {
 		return execError{err: fmt.Errorf("failed to create expression to wait for invoked function completion: %w", err)}
 	}
+
+	logger.From(ctx).Info().Interface("opts", opts).Time("expires", expires).Str("event", eventName).Str("expr", strExpr).Msg("parsed invoke function opts")
 
 	pauseID := uuid.New()
 	err = e.sm.SavePause(ctx, state.Pause{
@@ -1232,6 +1267,34 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	}, expires)
 	if err == redis_state.ErrQueueItemExists {
 		return nil
+	}
+
+	// Always create an invocation event.
+	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
+		Event:           *opts.Payload,
+		FnID:            opts.FunctionID,
+		TriggeringRunID: &correlationID,
+	})
+
+	logger.From(ctx).Debug().Interface("evt", evt).Str("gen.ID", gen.ID).Msg("created invocation event")
+
+	byt, err := json.Marshal(evt)
+	if err != nil {
+		return fmt.Errorf("error marshalling failure event: %w", err)
+	}
+
+	err = e.pb.Publish(
+		ctx,
+		e.eventTopic,
+		pubsub.Message{
+			Name:      event.EventReceivedName,
+			Data:      string(byt),
+			Timestamp: time.Now(),
+		},
+	)
+	if err != nil {
+		// TODO Cancel pause/timeout?
+		return fmt.Errorf("error publishing internal invocation event: %w", err)
 	}
 
 	for _, e := range e.lifecycles {

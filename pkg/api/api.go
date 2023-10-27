@@ -204,21 +204,17 @@ func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	evt := event.Event{}
-	if err := json.NewDecoder(r.Body).Decode(&evt); err != nil {
+	rawEvt := event.Event{}
+	if err := json.NewDecoder(r.Body).Decode(&rawEvt); err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Unable to read post data request"))
 		return
 	}
 
-	if evt.Timestamp == 0 {
-		evt.Timestamp = time.Now().UnixMilli()
+	newInvOpts := event.NewInvocationEventOpts{
+		Event: rawEvt,
+		FnID:  slug,
 	}
-	if evt.Data == nil {
-		evt.Data = map[string]interface{}{}
-	}
-	// Override the name and add the invoke key.
-	evt.Name = consts.InvokeEventName
-	evt.Data[consts.InvokeSlugKey] = slug
+	evt := event.NewInvocationEvent(newInvOpts)
 
 	evtID, err := a.handler(r.Context(), &evt)
 	if err != nil {

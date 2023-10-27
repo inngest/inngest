@@ -2,6 +2,7 @@ package devserver
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
@@ -25,6 +26,7 @@ import (
 	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/redis/rueidis"
@@ -176,6 +178,10 @@ func start(ctx context.Context, opts StartOpts) error {
 		}
 		drivers = append(drivers, d)
 	}
+	pb, err := pubsub.NewPublisher(ctx, opts.Config.EventStream.Service)
+	if err != nil {
+		return fmt.Errorf("failed to create publisher: %w", err)
+	}
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(sm),
 		executor.WithRuntimeDrivers(
@@ -191,12 +197,15 @@ func start(ctx context.Context, opts StartOpts) error {
 				memory_writer.NewWriter(),
 			),
 			lifecycle{
-				sm:   sm,
-				cqrs: dbcqrs,
+				sm:         sm,
+				cqrs:       dbcqrs,
+				pb:         pb,
+				eventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
 			},
 		),
 		executor.WithStepLimits(consts.DefaultMaxStepLimit),
 		executor.WithDebouncer(debouncer),
+		executor.WithPublisher(pb, opts.Config.EventStream.Service.Concrete.TopicName()),
 	)
 	if err != nil {
 		return err

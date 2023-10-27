@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/exp/slog"
 )
@@ -489,6 +490,8 @@ func (l lifecycle) OnInvokeFunction(
 	item queue.Item,
 	op state.GeneratorOpcode,
 ) {
+	logger.From(ctx).Debug().Interface("id", id).Msg("OnInvokeFunction")
+
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
 		l.log.Error(
