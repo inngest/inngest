@@ -56,8 +56,11 @@ export default function Page() {
 
   const prefix = slugify(name || '');
   const transform = createTransform({
-    eventName: `\`${prefix}/\${evt.type}\``,
-    dataParam: 'evt.data',
+    // Svix webhooks do not have a standard schema, so we use fields that
+    // are popular with a fallback
+    eventName: `\`${prefix}/\${evt.type || evt.name || evt.event_type || "webhook.received"}\``,
+    // Most webhooks have a data field, but not all, so we fallback to the entire event
+    dataParam: 'evt.data || evt',
     commentBlock: `// This was created by the ${name} integration.
     // Edit this to customize the event name and payload.`,
   });
