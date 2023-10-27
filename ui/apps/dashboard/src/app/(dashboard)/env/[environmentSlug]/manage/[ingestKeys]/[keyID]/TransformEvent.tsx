@@ -42,17 +42,28 @@ const defaultIncoming = `{
   "example": "paste the incoming JSON payload here to test your transform"
 }`;
 
+const defaultCommentBlock = `// Rename this webhook to give the events a unique name,
+    // or use a field from the incoming event as the event name.`;
+
 // XXX: our server-side JS AST parser does not like ES6 style functions.
-const defaultTransform = `// transform accepts the incoming JSON payload from your
+
+export function createTransform({
+  eventName = `"webhook/request.received"`,
+  dataParam = 'evt',
+  commentBlock = defaultCommentBlock,
+}): string {
+  return `// transform accepts the incoming JSON payload from your
 // webhook and must return an object that is in the Inngest event format
 function transform(evt, headers = {}) {
   return {
-    // Rename this webhook to give the events a unique name,
-    // or use a field from the incoming event as the event name.
-    name: "webhook/request.received",
-    data: evt,
-   };
+    ${commentBlock}
+    name: ${eventName},
+    data: ${dataParam},
+  };
 };`;
+}
+const defaultTransform = createTransform({});
+
 // This must match the output of the default transform and the default incoming!
 const defaultOutput = `{
   "name": "webhook/request.received",
@@ -182,7 +193,7 @@ export default function TransformEvents({ keyID, metadata, keyName }: FilterEven
         </TransformEditor>
       </div>
       <div className="mb-8 flex justify-end">
-        <Button kind="primary" type="submit" label="Save Transform Changes" />
+        <Button kind="primary" disabled={isDisabled} type="submit" label="Save Transform Changes" />
       </div>
     </form>
   );
