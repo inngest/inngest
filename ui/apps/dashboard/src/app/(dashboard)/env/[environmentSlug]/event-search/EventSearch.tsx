@@ -5,6 +5,11 @@ import { Button } from '@inngest/components/Button';
 import { useClient } from 'urql';
 
 import Input from '@/components/Forms/Input';
+import {
+  EventSearchFilterFieldDataType,
+  EventSearchFilterOperator,
+  type EventSearchFilterField,
+} from '@/gql/graphql';
 import { useEnvironment } from '@/queries';
 import { EventTable } from './EventTable';
 import { searchEvents } from './searchEvents';
@@ -28,23 +33,36 @@ export function EventSearch({ environmentSlug }: Props) {
 
     try {
       const form = new FormData(event.currentTarget);
-      const text = form.get('text');
-      if (typeof text !== 'string') {
+      const path = form.get('path');
+      if (typeof path !== 'string') {
         // Should be unreachable
-        throw new Error('name must be a string');
+        throw new Error('path must be a string');
       }
-
+      const value = form.get('value');
+      if (typeof value !== 'string') {
+        // Should be unreachable
+        throw new Error('value must be a string');
+      }
       if (!environment) {
         // Should be unreachable
         throw new Error('missing environment');
       }
 
+      const fields: EventSearchFilterField[] = [
+        {
+          dataType: EventSearchFilterFieldDataType.Str,
+          operator: EventSearchFilterOperator.Eq,
+          path,
+          value,
+        },
+      ];
+
       setEvents(
         await searchEvents({
           client,
           environmentID: environment.id,
+          fields,
           lowerTime: new Date(Date.now() - 3 * day),
-          text,
           upperTime: new Date(),
         })
       );
@@ -56,13 +74,8 @@ export function EventSearch({ environmentSlug }: Props) {
   return (
     <>
       <form onSubmit={onSubmit} className="m-4 flex gap-4">
-        <Input
-          className="min-w-[300px]"
-          type="text"
-          name="text"
-          placeholder="Event data search"
-          required
-        />
+        <Input className="min-w-[300px]" type="text" name="path" placeholder="Path" required />
+        <Input className="min-w-[300px]" type="text" name="value" placeholder="Value" required />
         <Button kind="primary" type="submit" disabled={fetching} label="Search" />
       </form>
 
