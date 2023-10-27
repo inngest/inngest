@@ -37,7 +37,8 @@ export type HistoryType =
   | 'StepScheduled'
   | 'StepSleeping'
   | 'StepStarted'
-  | 'StepWaiting';
+  | 'StepWaiting'
+  | 'StepInvokingFunction';
 
 export type RawHistoryItem = {
   attempt: number;

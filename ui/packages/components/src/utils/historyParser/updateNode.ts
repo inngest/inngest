@@ -145,6 +145,15 @@ const updaters: {
       waitForEventConfig,
     } satisfies HistoryNode;
   },
+  StepInvokingFunction: (node, rawItem) => {
+    console.log('node is:', node, rawItem);
+
+    return {
+      ...node,
+      scope: 'step',
+      status: 'waiting',
+    };
+  },
 } as const;
 
 function parseName(name: string | undefined): string | undefined {
