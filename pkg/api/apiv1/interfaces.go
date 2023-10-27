@@ -15,9 +15,3 @@ type EventReader interface {
 	// Find returns a specific event given an ID.
 	FindEvent(ctx context.Context, workspaceID uuid.UUID, id ulid.ULID) (*cqrs.Event, error)
 }
-
-type FunctionRunReader interface {
-	GetFunctionRun(ctx context.Context, workspaceID uuid.UUID, id ulid.ULID) (*cqrs.FunctionRun, error)
-	GetFunctionRunFinishesByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*cqrs.FunctionRunFinish, error)
-	GetFunctionRunsFromEvents(ctx context.Context, eventIDs []ulid.ULID) ([]*cqrs.FunctionRun, error)
-}

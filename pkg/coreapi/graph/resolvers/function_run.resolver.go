@@ -50,7 +50,12 @@ func (r *functionRunResolver) Function(ctx context.Context, obj *models.Function
 }
 
 func (r *functionRunResolver) FinishedAt(ctx context.Context, obj *models.FunctionRun) (*time.Time, error) {
-	f, err := r.Data.GetFunctionRunFinishesByRunIDs(ctx, []ulid.ULID{ulid.MustParse(obj.ID)})
+	f, err := r.Data.GetFunctionRunFinishesByRunIDs(
+		ctx,
+		uuid.UUID{},
+		uuid.UUID{},
+		[]ulid.ULID{ulid.MustParse(obj.ID)},
+	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
@@ -107,7 +112,12 @@ func (r *functionRunResolver) HistoryItemOutput(
 }
 
 func (r *functionRunResolver) Output(ctx context.Context, obj *models.FunctionRun) (*string, error) {
-	f, err := r.Data.GetFunctionRunFinishesByRunIDs(ctx, []ulid.ULID{ulid.MustParse(obj.ID)})
+	f, err := r.Data.GetFunctionRunFinishesByRunIDs(
+		ctx,
+		uuid.UUID{},
+		uuid.UUID{},
+		[]ulid.ULID{ulid.MustParse(obj.ID)},
+	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}

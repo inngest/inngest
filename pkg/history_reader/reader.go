@@ -28,6 +28,7 @@ const (
 	RunTimeFieldStartedAt RunTimeField = "started_at"
 )
 
+// Reader defines the history reader interface, loading runs and run history
 type Reader interface {
 	CountRuns(ctx context.Context, opts CountRunOpts) (int, error)
 	GetRun(

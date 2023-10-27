@@ -22,9 +22,9 @@ const (
 // and filtering params.
 func (a api) GetEvents(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	wsID, err := a.opts.WorkspaceFinder(ctx)
+	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No workspace found"))
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No auth found"))
 		return
 	}
 
@@ -74,7 +74,7 @@ func (a api) GetEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	events, err := a.opts.EventReader.WorkspaceEvents(ctx, wsID, &opts)
+	events, err := a.opts.EventReader.WorkspaceEvents(ctx, auth.WorkspaceID(), &opts)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error querying events", "error", err)
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Unable to query events"))
@@ -86,9 +86,9 @@ func (a api) GetEvents(w http.ResponseWriter, r *http.Request) {
 // GetEvent returns a specific event for the given workspace.
 func (a api) GetEvent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	wsID, err := a.opts.WorkspaceFinder(ctx)
+	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No workspace found"))
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No auth found"))
 		return
 	}
 
@@ -104,7 +104,7 @@ func (a api) GetEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	event, err := a.opts.EventReader.FindEvent(ctx, wsID, parsed)
+	event, err := a.opts.EventReader.FindEvent(ctx, auth.WorkspaceID(), parsed)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Unable to query events"))
 		return
@@ -115,9 +115,9 @@ func (a api) GetEvent(w http.ResponseWriter, r *http.Request) {
 // GetEventRuns returns function runs given an event ID.
 func (a api) GetEventRuns(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	wsID, err := a.opts.WorkspaceFinder(ctx)
+	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No workspace found"))
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No auth found"))
 		return
 	}
 
@@ -128,7 +128,12 @@ func (a api) GetEventRuns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fr, err := a.opts.FunctionRunReader.GetFunctionRunsFromEvents(ctx, []ulid.ULID{parsed})
+	fr, err := a.opts.FunctionRunReader.GetFunctionRunsFromEvents(
+		ctx,
+		auth.AccountID(),
+		auth.WorkspaceID(),
+		[]ulid.ULID{parsed},
+	)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Unable to query function runs"))
 		return
@@ -136,7 +141,7 @@ func (a api) GetEventRuns(w http.ResponseWriter, r *http.Request) {
 
 	result := []*cqrs.FunctionRun{}
 	for _, item := range fr {
-		if item.WorkspaceID == wsID {
+		if item.WorkspaceID == auth.WorkspaceID() {
 			result = append(result, item)
 		}
 	}

@@ -22,7 +22,7 @@ type FunctionRun struct {
 	OriginalRunID   ulid.ULID `json:"original_run_id"`
 	Cron            *string   `json:"cron,omitempty"`
 
-	Result *FunctionRunFinish `json:"result"`
+	Result *FunctionRunFinish `json:"result,omitempty"`
 }
 
 // FunctionRunFinish represents the end of a function.  This may be
@@ -50,9 +50,20 @@ type FunctionRunWriter interface {
 }
 
 type FunctionRunReader interface {
-	GetFunctionRun(ctx context.Context, workspaceID uuid.UUID, id ulid.ULID) (*FunctionRun, error)
-	GetFunctionRunsFromEvents(ctx context.Context, eventIDs []ulid.ULID) ([]*FunctionRun, error)
+	APIV1FunctionRunReader
+
 	GetFunctionRunsTimebound(ctx context.Context, t Timebound, limit int) ([]*FunctionRun, error)
+}
+
+type APIV1FunctionRunReader interface {
+	// GetFunctionRun returns a single function run for a given function.
+	GetFunctionRun(
+		ctx context.Context,
+		accountID uuid.UUID,
+		workspaceID uuid.UUID,
+		RunID ulid.ULID,
+	) (*FunctionRun, error)
+
 	// GetFunctionRunFinishesByrunIDs loads all function finishes for the given run IDs.  Note that
 	// the function run IDs specified may not have finished resulting in no data for those runs.
 	//
@@ -61,5 +72,17 @@ type FunctionRunReader interface {
 	//
 	// Function finishes are inserted via history lifecycles and are not directly written by
 	// the CQRS layer.
-	GetFunctionRunFinishesByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*FunctionRunFinish, error)
+	GetFunctionRunFinishesByRunIDs(
+		ctx context.Context,
+		accountID uuid.UUID,
+		workspaceID uuid.UUID,
+		runIDs []ulid.ULID,
+	) ([]*FunctionRunFinish, error)
+
+	GetFunctionRunsFromEvents(
+		ctx context.Context,
+		accountID uuid.UUID,
+		workspaceID uuid.UUID,
+		eventIDs []ulid.ULID,
+	) ([]*FunctionRun, error)
 }

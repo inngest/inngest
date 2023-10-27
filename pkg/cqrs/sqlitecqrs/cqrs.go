@@ -381,17 +381,28 @@ func (w wrapper) InsertFunctionRun(ctx context.Context, e cqrs.FunctionRun) erro
 	return w.q.InsertFunctionRun(ctx, run)
 }
 
-func (w wrapper) GetFunctionRunsFromEvents(ctx context.Context, eventIDs []ulid.ULID) ([]*cqrs.FunctionRun, error) {
+func (w wrapper) GetFunctionRunsFromEvents(
+	ctx context.Context,
+	accountID uuid.UUID,
+	workspaceID uuid.UUID,
+	eventIDs []ulid.ULID,
+) ([]*cqrs.FunctionRun, error) {
 	return copyInto(ctx, func(ctx context.Context) ([]*sqlc.FunctionRun, error) {
 		return w.q.GetFunctionRunsFromEvents(ctx, eventIDs)
 	}, []*cqrs.FunctionRun{})
 }
 
-func (w wrapper) GetFunctionRun(ctx context.Context, workspaceID uuid.UUID, id ulid.ULID) (*cqrs.FunctionRun, error) {
+func (w wrapper) GetFunctionRun(
+	ctx context.Context,
+	accountID uuid.UUID,
+	workspaceID uuid.UUID,
+	id ulid.ULID,
+) (*cqrs.FunctionRun, error) {
 	return copyInto(ctx, func(ctx context.Context) (*sqlc.FunctionRun, error) {
 		return w.q.GetFunctionRun(ctx, id)
 	}, &cqrs.FunctionRun{})
 }
+
 func (w wrapper) GetFunctionRunsTimebound(ctx context.Context, t cqrs.Timebound, limit int) ([]*cqrs.FunctionRun, error) {
 	after := time.Time{}                           // after the beginning of time, eg all
 	before := time.Now().Add(time.Hour * 24 * 365) // before 1 year in the future, eg all
@@ -411,7 +422,12 @@ func (w wrapper) GetFunctionRunsTimebound(ctx context.Context, t cqrs.Timebound,
 	}, []*cqrs.FunctionRun{})
 }
 
-func (w wrapper) GetFunctionRunFinishesByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*cqrs.FunctionRunFinish, error) {
+func (w wrapper) GetFunctionRunFinishesByRunIDs(
+	ctx context.Context,
+	accountID uuid.UUID,
+	workspaceID uuid.UUID,
+	runIDs []ulid.ULID,
+) ([]*cqrs.FunctionRunFinish, error) {
 	return copyInto(ctx, func(ctx context.Context) ([]*sqlc.FunctionFinish, error) {
 		return w.q.GetFunctionRunFinishesByRunIDs(ctx, runIDs)
 	}, []*cqrs.FunctionRunFinish{})
