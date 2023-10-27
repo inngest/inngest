@@ -69,15 +69,6 @@ export default function Page() {
     }
     setLoading(true);
 
-    console.log('create hook', {
-      workspaceID: productionEnv.id,
-      name: name || '',
-      source: 'webhook',
-      metadata: {
-        transform,
-      },
-    });
-
     createWebhook({
       input: {
         workspaceID: productionEnv.id,
