@@ -1,7 +1,7 @@
 import styled from "@emotion/styled";
-import Head from "next/head";
-import Footer from "../shared/legacy/Footer";
-import Nav from "../shared/legacy/nav";
+import Header from "src/shared/Header";
+import Container from "src/shared/layout/Container";
+import Footer from "src/shared/Footer";
 
 export async function getStaticProps() {
   return {
@@ -17,11 +17,13 @@ export async function getStaticProps() {
 export default function Terms() {
   return (
     <>
-      <Nav />
+      <Header />
 
-      <Content>
-        <iframe src="https://www.iubenda.com/terms-and-conditions/26885259" />
-      </Content>
+      <Container>
+        <Content>
+          <iframe src="https://www.iubenda.com/terms-and-conditions/26885259" />
+        </Content>
+      </Container>
 
       <Footer />
     </>
