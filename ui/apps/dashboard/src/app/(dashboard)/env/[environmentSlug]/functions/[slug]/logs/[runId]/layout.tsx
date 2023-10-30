@@ -185,7 +185,7 @@ export default async function FunctionRunDetailsLayout({
         <FunctionRunStatusCard status={run.status} />
         <header className="mt-6 flex flex-col gap-1 ">
           <h1 className="font-medium text-slate-800">
-            Started at: <Time value={new Date(run.startedAt)} />
+            Scheduled at: <Time value={new Date(run.startedAt)} />
           </h1>
 
           {run.endedAt && (
