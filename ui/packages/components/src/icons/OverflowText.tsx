@@ -2,7 +2,7 @@ export function IconOverflowText({ className }: { className?: string }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 14 11"
+      viewBox="-4 -5 20 20"
       fill="none"
       className={className}
       height="16"
