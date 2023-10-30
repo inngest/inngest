@@ -5,7 +5,6 @@ image: /assets/blog/durable-workflow-engines.png
 date: 2023-09-28
 author: Tony Holdstock-Brown
 disableCTA: true
-focus: true
 ---
 
 ## Contents
@@ -130,7 +129,7 @@ Modern workflow engines typically all do something similar:
 4. Another step in the workflow runs.  The workflow run's state is updated atomically, and a new step is enqueued.
 
 At a high level, it's a pretty simple loop.  Run the workflow, check for a new step, update state,
-and re-run the function.  
+and re-run the function.
 
 While you could describe workflow engines as memoization engines, it's also fair to say that
 workflow engines turn your functions into something like a [generator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Generator).
@@ -237,4 +236,4 @@ really need a better name for this style of working.
 I hope this gives an overview to workflow engines, how they're used, and the basic execution loops
 that power them.  Workflow engines are modern replacements for queues, offering tooling and semantics
 above and beyond what raw infrastructure provides.  They're a force multiplier, a new type of
-tool that improves how we build products day to day. 
+tool that improves how we build products day to day.
