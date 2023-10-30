@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react';
 import { Card } from '@inngest/components/Card';
 import { MetadataItem } from '@inngest/components/Metadata';
 import { IconEvent } from '@inngest/components/icons/Event';
-import type { HistoryNode } from '@inngest/components/utils/historyParser';
+import type { HistoryNode, HistoryParser } from '@inngest/components/utils/historyParser';
 
 type Props = {
-  history: Record<string, HistoryNode>;
+  history: HistoryParser;
 };
 
 export function WaitingSummary({ history }: Props) {
@@ -59,12 +59,12 @@ export function WaitingSummary({ history }: Props) {
   );
 }
 
-function useActiveWaits(history: Record<string, HistoryNode>): HistoryNode[] {
+function useActiveWaits(history: HistoryParser): HistoryNode[] {
   const [waits, setWaits] = useState<HistoryNode[]>([]);
 
   useEffect(() => {
     const newWaits: HistoryNode[] = [];
-    for (const node of Object.values(history)) {
+    for (const node of history.getGroups()) {
       if (node.status === 'waiting') {
         newWaits.push(node);
       }

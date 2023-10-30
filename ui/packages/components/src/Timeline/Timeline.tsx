@@ -1,17 +1,17 @@
 'use client';
 
-import type { HistoryNode } from '@inngest/components/utils/historyParser';
+import type { HistoryNode, HistoryParser } from '@inngest/components/utils/historyParser';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 
 import { TimelineNode } from './TimelineNode/TimelineNode';
 
 type Props = {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
-  history: Record<string, HistoryNode>;
+  history: HistoryParser;
 };
 
 export function Timeline({ getOutput, history }: Props) {
-  const nodes = Object.values(history).sort(sortAscending);
+  const nodes = history.getGroups({ sort: true });
 
   return (
     <div>
