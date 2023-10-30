@@ -1,4 +1,5 @@
 import Head from "next/head";
+import Link from "next/link";
 import Image from "next/image";
 import Header from "src/shared/Header";
 import Container from "src/shared/layout/Container";
@@ -37,11 +38,9 @@ export function Layout({
   companyDescription,
   companyURL,
 }: Props) {
-  // TODO - metatags
   const metaTitle = `Case Study - ${companyName}`;
   const description = title;
   const metaImage = getOpenGraphImageURL({ title: metaTitle });
-  console.log(metaTitle);
   return (
     <div className="bg-slate-1000 font-sans">
       <Head>
@@ -58,44 +57,54 @@ export function Layout({
       <Header />
       <Container>
         <div className="mx-auto my-12 flex flex-col lg:flex-row items-start justify-between gap-8 max-w-[1200px]">
-          <article className="w-full lg:max-w-[80ch]">
-            <div className="mb-4 text-sm font-medium text-slate-500">
-              Case Study - {companyName}
-            </div>
-            <h1 className="mr-8 text-4xl leading-[3rem] font-medium">
-              {title}
-            </h1>
+          <div>
+            <article className="w-full lg:max-w-[80ch]">
+              <div className="mb-4 text-sm font-medium text-slate-500">
+                Case Study - {companyName}
+              </div>
+              <h1 className="mr-8 text-4xl leading-[3rem] font-medium">
+                {title}
+              </h1>
 
-            <blockquote className="mx-auto my-8 max-w-3xl px-8 md:p-16 flex flex-col md:flex-row gap-8 bg-[url(/assets/textures/wave.svg)] bg-[length:auto_80%] bg-center bg-no-repeat">
-              <p className="text-lg leading-7 relative">
-                <span className="absolute top-1 -left-4 text-2xl leading-3 text-slate-400/80">
-                  &ldquo;
-                </span>
-                {quote.text}
-                <span className="ml-1 text-2xl leading-3 text-slate-400/80">
-                  &rdquo;
-                </span>
-              </p>
-              <footer className="min-w-[180px] flex flex-col gap-4">
-                <Image
-                  src={quote.avatar}
-                  alt={`Image of ${quote.attribution.name}`}
-                  height="72"
-                  width="72"
-                  className="rounded-full h-12 w-12 lg:h-20 lg:w-20"
-                />
-                <cite className="text-slate-300 leading-8 not-italic">
-                  <span className="text-lg">{quote.attribution.name}</span>
-                  <br />
-                  <span className="text-sm">{quote.attribution.title}</span>
-                </cite>
-              </footer>
-            </blockquote>
+              <blockquote className="mx-auto my-8 max-w-3xl px-8 md:p-16 flex flex-col md:flex-row gap-8 bg-[url(/assets/textures/wave.svg)] bg-[length:auto_80%] bg-center bg-no-repeat">
+                <p className="text-lg leading-7 relative">
+                  <span className="absolute top-1 -left-4 text-2xl leading-3 text-slate-400/80">
+                    &ldquo;
+                  </span>
+                  {quote.text}
+                  <span className="ml-1 text-2xl leading-3 text-slate-400/80">
+                    &rdquo;
+                  </span>
+                </p>
+                <footer className="min-w-[180px] flex flex-col gap-4">
+                  <Image
+                    src={quote.avatar}
+                    alt={`Image of ${quote.attribution.name}`}
+                    height="72"
+                    width="72"
+                    className="rounded-full h-12 w-12 lg:h-20 lg:w-20"
+                  />
+                  <cite className="text-slate-300 leading-8 not-italic">
+                    <span className="text-lg">{quote.attribution.name}</span>
+                    <br />
+                    <span className="text-sm">{quote.attribution.title}</span>
+                  </cite>
+                </footer>
+              </blockquote>
 
-            <div className="md:max-w-[70ch] prose mt-12 mb-20 prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert blog-content">
-              {children}
-            </div>
-          </article>
+              <div className="md:max-w-[70ch] prose mt-12 mb-20 prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert blog-content">
+                {children}
+              </div>
+            </article>
+            <p>
+              <Link
+                href="/customers"
+                className="hover:underline underline-offset-2	text-indigo-400 hover:text-slate-50 font-medium"
+              >
+                Read more customer success stories →
+              </Link>
+            </p>
+          </div>
           <aside className="md:sticky top-32 flex flex-col gap-6 min-w-[260px] px-8 py-4 mt-8 justify-between border-l border-slate-100/10">
             <img
               src={logo}
