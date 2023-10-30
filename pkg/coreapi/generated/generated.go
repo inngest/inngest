@@ -9657,6 +9657,7 @@ func (ec *executionContext) _FunctionRunEvent(ctx context.Context, sel ast.Selec
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
+	panic(fmt.Errorf("unexpected type %T", obj))
 }
 
 // endregion ************************** interface.gotpl ***************************
