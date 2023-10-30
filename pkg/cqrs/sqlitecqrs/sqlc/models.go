@@ -53,10 +53,10 @@ type Function struct {
 
 type FunctionFinish struct {
 	RunID              ulid.ULID
-	Status             string
-	Output             string
-	CompletedStepCount int64
-	CreatedAt          time.Time
+	Status             sql.NullString
+	Output             sql.NullString
+	CompletedStepCount sql.NullInt64
+	CreatedAt          sql.NullTime
 }
 
 type FunctionRun struct {

@@ -79,13 +79,20 @@ INSERT INTO function_finishes
 	(?, ?, ?, ?, ?);
 
 -- name: GetFunctionRun :one
-SELECT * FROM function_runs WHERE run_id = @run_id;
+SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes)
+  FROM function_runs
+  LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+  WHERE function_runs.run_id = @run_id;
 
 -- name: GetFunctionRunsTimebound :many
-SELECT * FROM function_runs WHERE run_started_at > @after AND run_started_at <= @before LIMIT ?;
+SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+WHERE function_runs.run_started_at > @after AND function_runs.run_started_at <= @before LIMIT ?;
 
 -- name: GetFunctionRunsFromEvents :many
-SELECT * FROM function_runs WHERE event_id IN (sqlc.slice('event_ids'));
+SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+WHERE function_runs.event_id IN (sqlc.slice('event_ids'));
 
 -- name: GetFunctionRunFinishesByRunIDs :many
 SELECT * FROM function_finishes WHERE run_id IN (sqlc.slice('run_ids'));

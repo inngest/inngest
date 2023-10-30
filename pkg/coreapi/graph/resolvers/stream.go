@@ -62,7 +62,7 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 		return nil, err
 	}
 	for _, i := range fns {
-		if i.TriggerType != "cron" {
+		if i.Cron == nil {
 			// These are children of events.
 			continue
 		}

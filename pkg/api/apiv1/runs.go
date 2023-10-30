@@ -32,18 +32,6 @@ func (a api) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if fr.Result == nil {
-		finish, err := a.opts.FunctionRunReader.GetFunctionRunFinishesByRunIDs(
-			ctx,
-			auth.AccountID(),
-			auth.WorkspaceID(),
-			[]ulid.ULID{runID},
-		)
-		if err == nil && len(finish) == 1 {
-			fr.Result = finish[0]
-		}
-	}
-
 	_ = json.NewEncoder(w).Encode(fr)
 }
 

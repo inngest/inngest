@@ -2,10 +2,12 @@ package history_reader
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/usage"
 	"github.com/oklog/ulid/v2"
@@ -53,6 +55,9 @@ type Reader interface {
 		opts GetRunsByEventIDOpts,
 	) ([]Run, error)
 	GetUsage(ctx context.Context, opts GetUsageOpts) ([]usage.UsageSlot, error)
+
+	// This also embeds the V1 function reader interface.
+	cqrs.APIV1FunctionRunReader
 }
 
 type CountRunOpts struct {
@@ -219,6 +224,28 @@ type Run struct {
 	WorkflowID      uuid.UUID
 	WorkspaceID     uuid.UUID
 	WorkflowVersion int
+	Cron            *string
+}
+
+func (r Run) ToCQRS() *cqrs.FunctionRun {
+	run := &cqrs.FunctionRun{
+		RunID:           r.ID,
+		RunStartedAt:    r.StartedAt,
+		FunctionID:      r.WorkflowID,
+		FunctionVersion: int64(r.WorkflowVersion),
+		WorkspaceID:     r.WorkspaceID,
+		EventID:         r.EventID,
+		BatchID:         r.BatchID,
+		OriginalRunID:   r.OriginalRunID,
+		Status:          r.Status,
+		EndedAt:         r.EndedAt,
+		Cron:            r.Cron,
+	}
+	if r.Output != nil {
+		bytes := json.RawMessage(*r.Output)
+		run.Output = bytes
+	}
+	return run
 }
 
 type RunHistory struct {

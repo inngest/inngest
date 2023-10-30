@@ -2,7 +2,6 @@ package resolvers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -50,19 +49,8 @@ func (r *functionRunResolver) Function(ctx context.Context, obj *models.Function
 }
 
 func (r *functionRunResolver) FinishedAt(ctx context.Context, obj *models.FunctionRun) (*time.Time, error) {
-	f, err := r.Data.GetFunctionRunFinishesByRunIDs(
-		ctx,
-		uuid.UUID{},
-		uuid.UUID{},
-		[]ulid.ULID{ulid.MustParse(obj.ID)},
-	)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	if len(f) == 1 {
-		return &f[0].CreatedAt, nil
-	}
-	return nil, nil
+	// Mapped in MakeFunctionRun
+	return obj.FinishedAt, nil
 }
 
 func (r *functionRunResolver) History(
@@ -112,20 +100,8 @@ func (r *functionRunResolver) HistoryItemOutput(
 }
 
 func (r *functionRunResolver) Output(ctx context.Context, obj *models.FunctionRun) (*string, error) {
-	f, err := r.Data.GetFunctionRunFinishesByRunIDs(
-		ctx,
-		uuid.UUID{},
-		uuid.UUID{},
-		[]ulid.ULID{ulid.MustParse(obj.ID)},
-	)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	if len(f) == 1 {
-		str := string(f[0].Output)
-		return &str, nil
-	}
-	return nil, nil
+	// Mapped in MakeFunctionRun
+	return obj.Output, nil
 }
 
 // TODO Duplicate code. Move to field-level resolvers and add dataloaders.

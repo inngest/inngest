@@ -23,17 +23,11 @@ func (l lifecycle) OnFunctionScheduled(
 	item queue.Item,
 	s state.State,
 ) {
-	triggerType := "event"
-	if s.IsCron() {
-		triggerType = "cron"
-	}
-
 	_ = l.cqrs.InsertFunctionRun(ctx, cqrs.FunctionRun{
 		RunID:        id.RunID,
 		RunStartedAt: ulid.Time(id.RunID.Time()),
 		FunctionID:   id.WorkflowID,
 		EventID:      id.EventID,
-		TriggerType:  triggerType,
 		Cron:         s.CronSchedule(),
 	})
 }

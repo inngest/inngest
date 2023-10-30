@@ -351,22 +351,35 @@ func (q *Queries) GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function,
 }
 
 const getFunctionRun = `-- name: GetFunctionRun :one
-SELECT run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron FROM function_runs WHERE run_id = ?1
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at
+  FROM function_runs
+  LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+  WHERE function_runs.run_id = ?1
 `
 
-func (q *Queries) GetFunctionRun(ctx context.Context, runID ulid.ULID) (*FunctionRun, error) {
+type GetFunctionRunRow struct {
+	FunctionRun    FunctionRun
+	FunctionFinish FunctionFinish
+}
+
+func (q *Queries) GetFunctionRun(ctx context.Context, runID ulid.ULID) (*GetFunctionRunRow, error) {
 	row := q.db.QueryRowContext(ctx, getFunctionRun, runID)
-	var i FunctionRun
+	var i GetFunctionRunRow
 	err := row.Scan(
-		&i.RunID,
-		&i.RunStartedAt,
-		&i.FunctionID,
-		&i.FunctionVersion,
-		&i.TriggerType,
-		&i.EventID,
-		&i.BatchID,
-		&i.OriginalRunID,
-		&i.Cron,
+		&i.FunctionRun.RunID,
+		&i.FunctionRun.RunStartedAt,
+		&i.FunctionRun.FunctionID,
+		&i.FunctionRun.FunctionVersion,
+		&i.FunctionRun.TriggerType,
+		&i.FunctionRun.EventID,
+		&i.FunctionRun.BatchID,
+		&i.FunctionRun.OriginalRunID,
+		&i.FunctionRun.Cron,
+		&i.FunctionFinish.RunID,
+		&i.FunctionFinish.Status,
+		&i.FunctionFinish.Output,
+		&i.FunctionFinish.CompletedStepCount,
+		&i.FunctionFinish.CreatedAt,
 	)
 	return &i, err
 }
@@ -464,10 +477,17 @@ func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([
 }
 
 const getFunctionRunsFromEvents = `-- name: GetFunctionRunsFromEvents :many
-SELECT run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron FROM function_runs WHERE event_id IN (/*SLICE:event_ids*/?)
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at FROM function_runs
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+WHERE function_runs.event_id IN (/*SLICE:event_ids*/?)
 `
 
-func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid.ULID) ([]*FunctionRun, error) {
+type GetFunctionRunsFromEventsRow struct {
+	FunctionRun    FunctionRun
+	FunctionFinish FunctionFinish
+}
+
+func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid.ULID) ([]*GetFunctionRunsFromEventsRow, error) {
 	query := getFunctionRunsFromEvents
 	var queryParams []interface{}
 	if len(eventIds) > 0 {
@@ -483,19 +503,24 @@ func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*FunctionRun
+	var items []*GetFunctionRunsFromEventsRow
 	for rows.Next() {
-		var i FunctionRun
+		var i GetFunctionRunsFromEventsRow
 		if err := rows.Scan(
-			&i.RunID,
-			&i.RunStartedAt,
-			&i.FunctionID,
-			&i.FunctionVersion,
-			&i.TriggerType,
-			&i.EventID,
-			&i.BatchID,
-			&i.OriginalRunID,
-			&i.Cron,
+			&i.FunctionRun.RunID,
+			&i.FunctionRun.RunStartedAt,
+			&i.FunctionRun.FunctionID,
+			&i.FunctionRun.FunctionVersion,
+			&i.FunctionRun.TriggerType,
+			&i.FunctionRun.EventID,
+			&i.FunctionRun.BatchID,
+			&i.FunctionRun.OriginalRunID,
+			&i.FunctionRun.Cron,
+			&i.FunctionFinish.RunID,
+			&i.FunctionFinish.Status,
+			&i.FunctionFinish.Output,
+			&i.FunctionFinish.CompletedStepCount,
+			&i.FunctionFinish.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -511,7 +536,9 @@ func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid
 }
 
 const getFunctionRunsTimebound = `-- name: GetFunctionRunsTimebound :many
-SELECT run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron FROM function_runs WHERE run_started_at > ? AND run_started_at <= ? LIMIT ?
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at FROM function_runs
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+WHERE function_runs.run_started_at > ? AND function_runs.run_started_at <= ? LIMIT ?
 `
 
 type GetFunctionRunsTimeboundParams struct {
@@ -520,25 +547,35 @@ type GetFunctionRunsTimeboundParams struct {
 	Limit  int64
 }
 
-func (q *Queries) GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionRunsTimeboundParams) ([]*FunctionRun, error) {
+type GetFunctionRunsTimeboundRow struct {
+	FunctionRun    FunctionRun
+	FunctionFinish FunctionFinish
+}
+
+func (q *Queries) GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionRunsTimeboundParams) ([]*GetFunctionRunsTimeboundRow, error) {
 	rows, err := q.db.QueryContext(ctx, getFunctionRunsTimebound, arg.After, arg.Before, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*FunctionRun
+	var items []*GetFunctionRunsTimeboundRow
 	for rows.Next() {
-		var i FunctionRun
+		var i GetFunctionRunsTimeboundRow
 		if err := rows.Scan(
-			&i.RunID,
-			&i.RunStartedAt,
-			&i.FunctionID,
-			&i.FunctionVersion,
-			&i.TriggerType,
-			&i.EventID,
-			&i.BatchID,
-			&i.OriginalRunID,
-			&i.Cron,
+			&i.FunctionRun.RunID,
+			&i.FunctionRun.RunStartedAt,
+			&i.FunctionRun.FunctionID,
+			&i.FunctionRun.FunctionVersion,
+			&i.FunctionRun.TriggerType,
+			&i.FunctionRun.EventID,
+			&i.FunctionRun.BatchID,
+			&i.FunctionRun.OriginalRunID,
+			&i.FunctionRun.Cron,
+			&i.FunctionFinish.RunID,
+			&i.FunctionFinish.Status,
+			&i.FunctionFinish.Output,
+			&i.FunctionFinish.CompletedStepCount,
+			&i.FunctionFinish.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -728,10 +765,10 @@ INSERT INTO function_finishes
 
 type InsertFunctionFinishParams struct {
 	RunID              ulid.ULID
-	Status             string
-	Output             string
-	CompletedStepCount int64
-	CreatedAt          time.Time
+	Status             sql.NullString
+	Output             sql.NullString
+	CompletedStepCount sql.NullInt64
+	CreatedAt          sql.NullTime
 }
 
 func (q *Queries) InsertFunctionFinish(ctx context.Context, arg InsertFunctionFinishParams) error {

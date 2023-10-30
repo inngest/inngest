@@ -51,10 +51,11 @@ CREATE TABLE function_runs (
 
 CREATE TABLE function_finishes (
 	run_id BLOB, 
-	status VARCHAR NOT NULL,
-	output VARCHAR NOT NULL DEFAULT '{}',
-	completed_step_count INT NOT NULL DEFAULT 1,
-	created_at TIMESTAMP NOT NULL
+	-- Ignoring not null because of https://github.com/sqlc-dev/sqlc/issues/2806#issuecomment-1750038624
+	status VARCHAR, 
+	output VARCHAR DEFAULT '{}',
+	completed_step_count INT DEFAULT 1,
+	created_at TIMESTAMP
 );
 
 CREATE TABLE history (
