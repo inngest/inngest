@@ -1,3 +1,4 @@
+import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { TimelineNode } from './TimelineNode';
@@ -9,7 +10,9 @@ const meta = {
     (Story) => {
       return (
         <div style={{ width: 600 }}>
-          <Story />
+          <AccordionPrimitive.Root type="multiple">
+            <Story />
+          </AccordionPrimitive.Root>
         </div>
       );
     },
