@@ -1,6 +1,9 @@
 import type { HistoryNode, RawHistoryItem } from './types';
 import { updateNode } from './updateNode';
 
+const runEndGroupID = 'function-run-end';
+const runStartGroupID = 'function-run-start';
+
 /**
  * Parses and groups raw history. Each history node has enough data to display a
  * history node as our users envision it. For example, if a user calls
@@ -13,7 +16,7 @@ import { updateNode } from './updateNode';
  * changed in the future, but that increases complexity.
  */
 export class HistoryParser {
-  groups: Record<string, HistoryNode> = {};
+  private groups: Record<string, HistoryNode> = {};
   runStartedAt?: Date;
 
   constructor(rawHistory?: RawHistoryItem[]) {
@@ -51,7 +54,7 @@ export class HistoryParser {
     if (rawItem.type === 'FunctionFailed' && node.scope === 'step') {
       // Put FunctionFailed into its own node. Its group ID is the same as
       // StepFailed but don't want to mess up the StepFailed node's data.
-      node.groupID = 'function-run-end';
+      node.groupID = runEndGroupID;
     }
 
     node = updateNode(node, rawItem);
@@ -100,7 +103,7 @@ export class HistoryParser {
     const node: HistoryNode = {
       attempt: 0,
       endedAt: startedAt,
-      groupID: 'function-run-start',
+      groupID: runStartGroupID,
       scheduledAt: startedAt,
       scope: 'function',
       startedAt,
@@ -113,6 +116,34 @@ export class HistoryParser {
     };
   }
 
+  getGroups({ sort = false }: { sort?: boolean } = {}): HistoryNode[] {
+    const unsortedGroups = Object.values(this.groups);
+    if (!sort) {
+      return unsortedGroups;
+    }
+
+    return unsortedGroups.sort((a, b) => {
+      // Always put run start group at the top.
+      if (a.groupID === runStartGroupID) {
+        return -1;
+      }
+      if (b.groupID === runStartGroupID) {
+        return 1;
+      }
+
+      // Always put run end group at the bottom.
+      if (a.groupID === runEndGroupID) {
+        return 1;
+      }
+      if (b.groupID === runEndGroupID) {
+        return -1;
+      }
+
+      // Sort by ascending time.
+      return a.scheduledAt.getTime() - b.scheduledAt.getTime();
+    });
+  }
+
   /**
    * Mark sleep nodes as completed if their wake time is reached.
    *
@@ -120,7 +151,7 @@ export class HistoryParser {
    * need to mark them as completed whenever their wake time is reached.
    */
   private handleCompletedSleepNodes(time: Date) {
-    for (const node of Object.values(this.groups)) {
+    for (const node of this.getGroups()) {
       if (node.status === 'sleeping' && node.sleepConfig) {
         const isCompleted = node.sleepConfig.until <= time;
         if (isCompleted) {

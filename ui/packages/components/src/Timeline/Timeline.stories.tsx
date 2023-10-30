@@ -39,7 +39,7 @@ const meta = {
   // is used. If there is a delayMS, then we'll simulate each history item being
   // added one at a time.
   render: ({ _rawHistory, _rawHistoryFrame, ...args }) => {
-    const [history, setHistory] = useState<Record<string, HistoryNode>>(args.history);
+    const [history, setHistory] = useState<HistoryParser>(args.history);
 
     useEffect(() => {
       const parser = new HistoryParser();
@@ -47,7 +47,7 @@ const meta = {
         // @ts-ignore
         parser.append(_rawHistory[i]);
       }
-      setHistory(parser.groups);
+      setHistory(parser);
     }, [_rawHistoryFrame]);
 
     return (
@@ -70,7 +70,7 @@ function createStory(rawHistory: unknown) {
     args: {
       _rawHistory: raw,
       _rawHistoryFrame: raw.length - 1,
-      history: new HistoryParser(raw).groups,
+      history: new HistoryParser(raw),
     },
     argTypes: {
       _rawHistory: {
