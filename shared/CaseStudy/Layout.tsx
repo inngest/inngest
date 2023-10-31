@@ -49,12 +49,18 @@ export function Layout({
         <meta name="description" content={description}></meta>
         <meta property="og:title" content={metaTitle} />
         <meta property="og:description" content={description} />
-        <meta property="og:image" content={ogImage} />
+        <meta
+          property="og:image"
+          content={`https://www.inngest.com${ogImage}`}
+        />
         <meta property="og:type" content="article" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:site" content="@inngest" />
         <meta name="twitter:title" content={metaTitle} />
-        <meta name="twitter:image" content={ogImage} />
+        <meta
+          name="twitter:image"
+          content={`https://www.inngest.com${ogImage}`}
+        />
       </Head>
       <Header />
       <Container>
