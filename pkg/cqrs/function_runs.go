@@ -6,20 +6,24 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
 )
 
-// FunctionRun represents a currently ongoing ro past function run.
+// FunctionRun represents a currently ongoing or past function run.
 type FunctionRun struct {
-	RunID           ulid.ULID
-	RunStartedAt    time.Time
-	FunctionID      uuid.UUID
-	FunctionVersion int64
-	TriggerType     string
-	EventID         ulid.ULID
-	BatchID         ulid.ULID
-	OriginalRunID   ulid.ULID
-	Cron            *string
+	RunID           ulid.ULID       `json:"run_id"`
+	RunStartedAt    time.Time       `json:"run_started_at"`
+	FunctionID      uuid.UUID       `json:"function_id"`
+	FunctionVersion int64           `json:"function_version"`
+	WorkspaceID     uuid.UUID       `json:"workspace_id"`
+	EventID         ulid.ULID       `json:"event_id"`
+	BatchID         *ulid.ULID      `json:"batch_id,omitempty"`
+	OriginalRunID   *ulid.ULID      `json:"original_run_id,omitempty"`
+	Cron            *string         `json:"cron,omitempty"`
+	Status          enums.RunStatus `json:"status"`
+	EndedAt         *time.Time      `json:"ended_at"`
+	Output          json.RawMessage `json:"output,omitempty"`
 }
 
 // FunctionRunFinish represents the end of a function.  This may be
@@ -30,11 +34,11 @@ type FunctionRun struct {
 // that the function is still in progress and is part of the state
 // store.
 type FunctionRunFinish struct {
-	RunID              ulid.ULID
-	Status             string
-	Output             json.RawMessage
-	CompletedStepCount int64
-	CreatedAt          time.Time
+	RunID              ulid.ULID       `json:"-"`
+	Status             enums.RunStatus `json:"status"`
+	Output             json.RawMessage `json:"output"`
+	CreatedAt          time.Time       `json:"finished_at"`
+	CompletedStepCount int64           `json:"-"`
 }
 
 type FunctionRunManager interface {
@@ -47,15 +51,25 @@ type FunctionRunWriter interface {
 }
 
 type FunctionRunReader interface {
-	GetFunctionRunsFromEvents(ctx context.Context, eventIDs []ulid.ULID) ([]*FunctionRun, error)
+	APIV1FunctionRunReader
+
 	GetFunctionRunsTimebound(ctx context.Context, t Timebound, limit int) ([]*FunctionRun, error)
-	// GetFunctionRunFinishesByrunIDs loads all function finishes for the given run IDs.  Note that
-	// the function run IDs specified may not have finished resulting in no data for those runs.
-	//
-	// This means that we never guarantee that the length of the returned slice equals the length
-	// of the given run IDs.
-	//
-	// Function finishes are inserted via history lifecycles and are not directly written by
-	// the CQRS layer.
-	GetFunctionRunFinishesByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*FunctionRunFinish, error)
+}
+
+type APIV1FunctionRunReader interface {
+	// GetFunctionRunsFromEvents returns all function runs invoked by the given event IDs.
+	GetFunctionRunsFromEvents(
+		ctx context.Context,
+		accountID uuid.UUID,
+		workspaceID uuid.UUID,
+		eventIDs []ulid.ULID,
+	) ([]*FunctionRun, error)
+
+	// GetFunctionRun returns a single function run for a given function.
+	GetFunctionRun(
+		ctx context.Context,
+		accountID uuid.UUID,
+		workspaceID uuid.UUID,
+		runID ulid.ULID,
+	) (*FunctionRun, error)
 }

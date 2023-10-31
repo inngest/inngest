@@ -99,7 +99,7 @@ type Executor interface {
 	// Resume where necessary, depending on pauses that have been loaded and matched.
 	HandlePauses(ctx context.Context, iter state.PauseIterator, event event.TrackedEvent) error
 	// Cancel cancels an in-progress function run, preventing any enqueued or future steps from running.
-	Cancel(ctx context.Context, id state.Identifier, r CancelRequest) error
+	Cancel(ctx context.Context, runID ulid.ULID, r CancelRequest) error
 	// Resume resumes an in-progress function run from the given waitForEvent pause.
 	Resume(ctx context.Context, p state.Pause, r ResumeRequest) error
 

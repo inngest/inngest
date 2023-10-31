@@ -5,6 +5,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/oklog/ulid/v2"
@@ -27,7 +28,12 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 	}
 
 	// Fetch all function runs by event
-	fns, err := r.Data.GetFunctionRunsFromEvents(ctx, ids)
+	fns, err := r.Data.GetFunctionRunsFromEvents(
+		ctx,
+		uuid.UUID{},
+		uuid.UUID{},
+		ids,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +62,7 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 		return nil, err
 	}
 	for _, i := range fns {
-		if i.TriggerType != "cron" {
+		if i.Cron == nil {
 			// These are children of events.
 			continue
 		}

@@ -18,11 +18,16 @@ import (
 // backtrace), and returns a HTTP 500 (Internal Server Error) status if
 // possible. Recoverer prints a request ID if one is provided.
 //
-// Alternatively, look at https://github.com/pressly/lg middleware pkgs.
+// Alternatively, look at https://github.com/go-chi/httplog middleware pkgs.
 func Recoverer(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
-			if rvr := recover(); rvr != nil && rvr != http.ErrAbortHandler {
+			if rvr := recover(); rvr != nil {
+				if rvr == http.ErrAbortHandler {
+					// we don't recover http.ErrAbortHandler so the response
+					// to the client is aborted, this should not be logged
+					panic(rvr)
+				}
 
 				logEntry := GetLogEntry(r)
 				if logEntry != nil {
@@ -31,7 +36,9 @@ func Recoverer(next http.Handler) http.Handler {
 					PrintPrettyStack(rvr)
 				}
 
-				w.WriteHeader(http.StatusInternalServerError)
+				if r.Header.Get("Connection") != "Upgrade" {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
 			}
 		}()
 

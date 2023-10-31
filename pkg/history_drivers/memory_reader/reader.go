@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_store"
@@ -47,6 +49,45 @@ func (r *reader) GetRun(
 	}
 
 	return run.Run, nil
+}
+
+func (r *reader) GetFunctionRun(
+	ctx context.Context,
+	accountID uuid.UUID,
+	workspaceID uuid.UUID,
+	runID ulid.ULID,
+) (*cqrs.FunctionRun, error) {
+	run, err := r.GetRun(ctx, runID, history_reader.GetRunOpts{
+		AccountID:   accountID,
+		WorkspaceID: &workspaceID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return run.ToCQRS(), nil
+}
+
+func (r *reader) GetFunctionRunsFromEvents(
+	ctx context.Context,
+	accountID uuid.UUID,
+	workspaceID uuid.UUID,
+	eventIDs []ulid.ULID,
+) ([]*cqrs.FunctionRun, error) {
+	// For each event, grab the function runs available.
+	result := []*cqrs.FunctionRun{}
+	for _, evt := range eventIDs {
+		runs, err := r.GetRunsByEventID(ctx, evt, history_reader.GetRunsByEventIDOpts{
+			AccountID:   accountID,
+			WorkspaceID: &workspaceID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, run := range runs {
+			result = append(result, run.ToCQRS())
+		}
+	}
+	return result, nil
 }
 
 func (r *reader) GetRunHistory(

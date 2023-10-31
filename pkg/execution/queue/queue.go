@@ -3,6 +3,9 @@ package queue
 import (
 	"context"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/oklog/ulid/v2"
 )
 
 type Queue interface {
@@ -83,3 +86,26 @@ type alwaysRetry struct {
 }
 
 func (a alwaysRetry) AlwaysRetryable() {}
+
+type JobResponse struct {
+	// At represents the time the job is scheduled for.
+	At time.Time `json:"at"`
+	// Position represents the position for the job in the queue
+	Position int64 `json:"position"`
+	// Kind represents the kind of job in the queue.
+	Kind string `json:"kind"`
+	// Attempt
+	Attempt int `json:"attempt"`
+}
+
+// JobQueueReader
+type JobQueueReader interface {
+	RunJobs(
+		ctx context.Context,
+		workspaceID uuid.UUID,
+		workflowID uuid.UUID,
+		runID ulid.ULID,
+		limit,
+		offset int64,
+	) ([]JobResponse, error)
+}

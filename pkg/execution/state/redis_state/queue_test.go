@@ -1322,7 +1322,7 @@ func TestRequeueByJobID(t *testing.T) {
 		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) (string, int) {
 			return p.Queue(), 100
 		},
-		itemIndexer: defaultItemIndexer,
+		itemIndexer: QueueItemIndexerFunc,
 	}
 
 	wsA, wsB := uuid.New(), uuid.New()

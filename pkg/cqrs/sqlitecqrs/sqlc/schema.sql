@@ -15,6 +15,11 @@ CREATE TABLE apps (
 
 CREATE TABLE events (
 	internal_id CHAR(26) PRIMARY KEY,
+	account_id CHAR(36),
+	workspace_id CHAR(36),
+	source VARCHAR(255),
+	source_id CHAR(35),
+	received_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	event_id VARCHAR NOT NULL,
 	event_name VARCHAR NOT NULL,
 	event_data VARCHAR DEFAULT '{}' NOT NULL,
@@ -46,10 +51,11 @@ CREATE TABLE function_runs (
 
 CREATE TABLE function_finishes (
 	run_id BLOB, 
-	status VARCHAR NOT NULL,
-	output VARCHAR NOT NULL DEFAULT '{}',
-	completed_step_count INT NOT NULL DEFAULT 1,
-	created_at TIMESTAMP NOT NULL
+	-- Ignoring not null because of https://github.com/sqlc-dev/sqlc/issues/2806#issuecomment-1750038624
+	status VARCHAR, 
+	output VARCHAR DEFAULT '{}',
+	completed_step_count INT DEFAULT 1,
+	created_at TIMESTAMP
 );
 
 CREATE TABLE history (

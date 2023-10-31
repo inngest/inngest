@@ -172,6 +172,9 @@ type QueueKeyGenerator interface {
 	// BatchMetadata returns the key used to store the metadata related
 	// to a batch
 	BatchMetadata(context.Context, ulid.ULID) string
+
+	// RunIndex returns the index for storing job IDs associated with run IDs.
+	RunIndex(runID ulid.ULID) string
 }
 
 type DebounceKeyGenerator interface {
@@ -252,4 +255,8 @@ func (d DefaultQueueKeyGenerator) DebouncePointer(ctx context.Context, fnID uuid
 // This is a hash of debounce IDs -> debounces.
 func (d DefaultQueueKeyGenerator) Debounce(ctx context.Context) string {
 	return fmt.Sprintf("%s:debounce-hash", d.Prefix)
+}
+
+func (d DefaultQueueKeyGenerator) RunIndex(runID ulid.ULID) string {
+	return fmt.Sprintf("%s:idx:run:%s", d.Prefix, runID)
 }

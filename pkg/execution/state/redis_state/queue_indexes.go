@@ -2,7 +2,6 @@ package redis_state
 
 import (
 	"context"
-	"fmt"
 
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 )
@@ -22,18 +21,18 @@ import (
 type QueueItemIndex [2]string
 
 // QueueItemIndexer represents a function which generates indexes for a given queue item.
-type QueueItemIndexer func(ctx context.Context, i QueueItem) QueueItemIndex
+type QueueItemIndexer func(ctx context.Context, i QueueItem, kg QueueKeyGenerator) QueueItemIndex
 
-// DefaultQueueItemIndexes reeturn default queue item indexes for a given queue item.
+// QueueItemIndexerFunc returns default queue item indexes for a given queue item.
 //
 // Reasonably, these indexes should always be provided for queue implementation.  If a
 // QueueItemIndexer is not provided, this function will be used with an "{queue}" predix.
-func DefaultQueueItemIndexes(ctx context.Context, prefix string, i QueueItem) QueueItemIndex {
+func QueueItemIndexerFunc(ctx context.Context, i QueueItem, kg QueueKeyGenerator) QueueItemIndex {
 	switch i.Data.Kind {
 	case osqueue.KindEdge, osqueue.KindSleep:
 		// For edges and sleeps, store an index for the given run ID.
 		return QueueItemIndex{
-			fmt.Sprintf("%s:idx:run:%s", prefix, i.Data.Identifier.RunID),
+			kg.RunIndex(i.Data.Identifier.RunID),
 		}
 	case osqueue.KindPause:
 		// Pause jobs are an implementation detail and are not indexed.  Instead,

@@ -105,6 +105,7 @@ func init() {
 }
 
 type QueueManager interface {
+	osqueue.JobQueueReader
 	osqueue.Queue
 
 	Requeue(ctx context.Context, p QueuePartition, i QueueItem, at time.Time) error
@@ -293,10 +294,6 @@ type AccountConcurrencyKeyGenerator func(ctx context.Context, i QueueItem) (stri
 // This allows partitions (read: functions) to set their own concurrency limits.
 type PartitionConcurrencyKeyGenerator func(ctx context.Context, p QueuePartition) (string, int)
 
-func defaultItemIndexer(ctx context.Context, i QueueItem) QueueItemIndex {
-	return DefaultQueueItemIndexes(ctx, "{queue}", i)
-}
-
 func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 	q := &queue{
 		r: r,
@@ -317,7 +314,7 @@ func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) (string, int) {
 			return p.Queue(), 10_000
 		},
-		itemIndexer: defaultItemIndexer,
+		itemIndexer: QueueItemIndexerFunc,
 	}
 
 	for _, opt := range opts {
@@ -556,6 +553,56 @@ func (q QueuePartition) MarshalBinary() ([]byte, error) {
 	return json.Marshal(q)
 }
 
+func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
+	if limit > 10 || limit <= 0 {
+		limit = 10
+	}
+
+	cmd := q.r.B().Zscan().Key(q.kg.RunIndex(runID)).Cursor(uint64(offset)).Count(limit).Build()
+	jobIDs, err := q.r.Do(ctx, cmd).AsScanEntry()
+	if err != nil {
+		return nil, fmt.Errorf("error reading index: %w", err)
+	}
+
+	if len(jobIDs.Elements) == 0 {
+		return []osqueue.JobResponse{}, nil
+	}
+
+	// Get all job items.
+	jsonItems, err := q.r.Do(ctx, q.r.B().Hmget().Key(q.kg.QueueItem()).Field(jobIDs.Elements...).Build()).AsStrSlice()
+	if err != nil {
+		return nil, fmt.Errorf("error reading jobs: %w", err)
+	}
+
+	resp := []osqueue.JobResponse{}
+	for _, str := range jsonItems {
+		if len(str) == 0 {
+			continue
+		}
+		qi := &QueueItem{}
+
+		if err := json.Unmarshal([]byte(str), qi); err != nil {
+			return nil, fmt.Errorf("error unmarshalling queue item: %w", err)
+		}
+		if qi.Data.Identifier.WorkspaceID != workspaceID {
+			continue
+		}
+		cmd := q.r.B().Zrank().Key(q.kg.QueueIndex(workflowID.String())).Member(qi.ID).Build()
+		pos, err := q.r.Do(ctx, cmd).AsInt64()
+		if !rueidis.IsRedisNil(err) && err != nil {
+			return nil, fmt.Errorf("error reading queue position: %w", err)
+		}
+		resp = append(resp, osqueue.JobResponse{
+			At:       time.UnixMilli(qi.AtMS),
+			Position: pos,
+			Kind:     qi.Data.Kind,
+			Attempt:  qi.Data.Attempt,
+		})
+	}
+
+	return resp, nil
+}
+
 // EnqueueItem enqueues a QueueItem.  It creates a QueuePartition for the workspace
 // if a partition does not exist.
 //
@@ -617,7 +664,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		q.kg.Idempotency(i.ID),
 	}
 	// Append indexes
-	for _, idx := range q.itemIndexer(ctx, i) {
+	for _, idx := range q.itemIndexer(ctx, i, q.kg) {
 		if idx != "" {
 			keys = append(keys, idx)
 		}
@@ -954,7 +1001,7 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		q.kg.ConcurrencyIndex(),
 	}
 	// Append indexes
-	for _, idx := range q.itemIndexer(ctx, i) {
+	for _, idx := range q.itemIndexer(ctx, i, q.kg) {
 		if idx != "" {
 			keys = append(keys, idx)
 		}
@@ -1050,7 +1097,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		q.kg.ConcurrencyIndex(),
 	}
 	// Append indexes
-	for _, idx := range q.itemIndexer(ctx, i) {
+	for _, idx := range q.itemIndexer(ctx, i, q.kg) {
 		if idx != "" {
 			keys = append(keys, idx)
 		}
