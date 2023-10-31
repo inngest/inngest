@@ -581,6 +581,9 @@ github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
+# github.com/pquerna/cachecontrol v0.2.0
+## explicit; go 1.16
+github.com/pquerna/cachecontrol/cacheobject
 # github.com/prometheus/client_golang v1.16.0
 ## explicit; go 1.17
 github.com/prometheus/client_golang/prometheus

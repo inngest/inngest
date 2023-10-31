@@ -6,13 +6,13 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"time"
 
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/lib/v4/store"
 	rcache "github.com/eko/gocache/store/rueidis/v4"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/pquerna/cachecontrol/cacheobject"
 	"github.com/redis/rueidis"
 )
 
@@ -48,7 +48,6 @@ func (c cacheMiddleware) Middleware(next http.Handler) http.Handler {
 		// Check the cache.
 		resp, err := c.cache.Get(ctx, *key)
 		if err == nil && len(resp) > 0 {
-			// This response is cached.
 			// TODO: Metrics on cache hit.
 			_, _ = w.Write(resp)
 			return
@@ -60,10 +59,12 @@ func (c cacheMiddleware) Middleware(next http.Handler) http.Handler {
 
 		// Write headers to the actual response, inspecting the max-age HTTP
 		// header which determines cacheability in the result itself.
-		maxAge := 0
+		maxAge := int32(0)
 		for key, result := range rec.Result().Header {
-			if key == "Max-Age" && len(result) == 1 {
-				maxAge, _ = strconv.Atoi(result[0])
+			if key == "Cache-Control" && len(result) == 1 {
+				if res, err := cacheobject.ParseResponseCacheControl(result[0]); err == nil {
+					maxAge = int32(res.MaxAge)
+				}
 			}
 			for _, item := range result {
 				w.Header().Add(key, item)

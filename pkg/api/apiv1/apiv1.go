@@ -3,8 +3,8 @@ package apiv1
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -88,7 +88,7 @@ func WriteCachedResponse[T any](w http.ResponseWriter, data T, cachePeriod time.
 		resp.Metadata.CachedUntil = &cachedUntil
 		// Set a max-age header if the response is cacheable.  This instructs
 		// our caching middleware to cache the result for this period of time.
-		w.Header().Set("max-age", strconv.Itoa(int(cachePeriod.Seconds())))
+		w.Header().Set("Cache-Control", fmt.Sprintf("private, max-age=%d", int(cachePeriod.Seconds())))
 	}
 
 	return json.NewEncoder(w).Encode(resp)
