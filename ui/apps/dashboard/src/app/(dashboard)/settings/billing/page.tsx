@@ -104,10 +104,11 @@ export default async function Billing() {
     ? transformData(billableStepDataThisMonth, includedStepCountLimit)
     : { totalStepCount: 0 };
 
+  // Always sort enterprise plans (including trials) last no matter the amount
   const plans =
     basePlans
       ?.map((plan) => (plan ? transformPlan({ plan, currentPlan, usage: totalStepCount }) : null))
-      .sort((a, b) => (a?.amount || 0) - (b?.amount || 0)) || [];
+      .sort((a, b) => (a?.isPremium ? 1 : (a?.amount || 0) - (b?.amount || 0))) || [];
   const isCurrentPlanEnterprise = currentPlan != undefined && isEnterprisePlan(currentPlan);
   const freePlan = plans.find((p) => p?.isFreeTier);
 
@@ -122,6 +123,7 @@ export default async function Billing() {
           <CurrentSubscription
             subscription={subscription || undefined}
             currentPlan={currentPlan || undefined}
+            isCurrentPlanEnterprise={isCurrentPlanEnterprise}
             freePlan={freePlan || undefined}
           />
           <div className="col-span-3 pl-6">
