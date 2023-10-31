@@ -10,6 +10,7 @@ import (
 
 const (
 	InngestCloudAPI = "https://api.inngest.com"
+	InngestEventAPI = "https://inn.gs"
 )
 
 // Client implements all functionality necessary to communicate with
