@@ -27,6 +27,7 @@ export type Props = {
   };
   companyDescription: string;
   companyURL: string;
+  ogImage?: string;
 };
 
 export function Layout({
@@ -37,10 +38,10 @@ export function Layout({
   quote,
   companyDescription,
   companyURL,
+  ogImage = "/assets/customers/case-study/og-image-default.png",
 }: Props) {
   const metaTitle = `Case Study - ${companyName}`;
   const description = title;
-  const metaImage = getOpenGraphImageURL({ title: metaTitle });
   return (
     <div className="bg-slate-1000 font-sans">
       <Head>
@@ -48,11 +49,12 @@ export function Layout({
         <meta name="description" content={description}></meta>
         <meta property="og:title" content={metaTitle} />
         <meta property="og:description" content={description} />
+        <meta property="og:image" content={ogImage} />
         <meta property="og:type" content="article" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:site" content="@inngest" />
         <meta name="twitter:title" content={metaTitle} />
-        <meta name="twitter:image" content={metaImage} />
+        <meta name="twitter:image" content={ogImage} />
       </Head>
       <Header />
       <Container>

@@ -114,7 +114,7 @@ function MyApp({ Component, pageProps }: AppProps<DefaultProps>) {
     "Reliable serverless background functions on any platform";
   const metaTitle = `Inngest - ${title}`;
   const disableMetadata = Boolean(
-    pageProps?.meta?.disabled === true || router.asPath.match(/^\/docs/)
+    isDocs || isCaseStudy || pageProps?.meta?.disabled === true
   );
   // Warn during local dev
   if (

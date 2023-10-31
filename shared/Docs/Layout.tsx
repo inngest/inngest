@@ -48,7 +48,6 @@ export function Layout({
   const metaDescription =
     description || `Inngest documentation for ${preferredTitle}`;
   const metaImage = getOpenGraphImageURL({ title: preferredTitle });
-
   return (
     <div className="dark:bg-slate-1000">
       <MDXProvider components={mdxComponents}>
@@ -57,6 +56,7 @@ export function Layout({
           <meta name="description" content={metaDescription}></meta>
           <meta property="og:title" content={pageTitle} />
           <meta property="og:description" content={metaDescription} />
+          <meta property="og:image" content={metaImage} />
           <meta property="og:type" content="article" />
           <meta name="twitter:card" content="summary_large_image" />
           <meta name="twitter:site" content="@inngest" />
