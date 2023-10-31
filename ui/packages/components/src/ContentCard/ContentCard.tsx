@@ -33,10 +33,10 @@ export function ContentCard({
       <div className={classNames(title ? 'relative z-30 px-5 py-4' : '')}>
         <div className="flex items-center justify-between leading-7">
           {title ? (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-1 items-center gap-2">
               {type === 'event' && <IconEvent className="text-slate-300" />}
               {type === 'run' && <IconFunction className="text-slate-400" />}
-              <h1 className="text-base text-slate-50">{title}</h1>
+              <h1 className="flex-1 text-base text-slate-50">{title}</h1>
               {icon}
             </div>
           ) : null}
