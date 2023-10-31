@@ -9,6 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/coocood/freecache"
+	"github.com/eko/gocache/lib/v4/cache"
+	freecachestore "github.com/eko/gocache/store/freecache/v4"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
@@ -79,7 +82,11 @@ func (d *devserver) Pre(ctx context.Context) error {
 
 	devAPI.Route("/v1", func(r chi.Router) {
 		// Add the V1 API to our dev server API.
+		cache := cache.New[[]byte](freecachestore.NewFreecache(freecache.NewCache(1024 * 1024)))
+		caching := apiv1.NewCacheMiddleware(cache)
+
 		apiv1.AddRoutes(r, apiv1.Opts{
+			CachingMiddleware: caching,
 			EventReader:       d.data,
 			FunctionRunReader: d.data,
 			JobQueueReader:    d.queue.(queue.JobQueueReader),

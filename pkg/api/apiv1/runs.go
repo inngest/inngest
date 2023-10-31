@@ -1,8 +1,8 @@
 package apiv1
 
 import (
-	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/execution"
@@ -32,7 +32,8 @@ func (a api) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = json.NewEncoder(w).Encode(fr)
+	// Update the cache every 3 seconds to prevent stale displays
+	WriteCachedResponse(w, fr, 3*time.Second)
 }
 
 // CancelFunctionRun cancels a function run.
@@ -112,5 +113,6 @@ func (a api) GetFunctionRunJobs(w http.ResponseWriter, r *http.Request) {
 	if jobs == nil {
 		jobs = []queue.JobResponse{}
 	}
-	_ = json.NewEncoder(w).Encode(jobs)
+
+	WriteCachedResponse(w, jobs, 5*time.Second)
 }

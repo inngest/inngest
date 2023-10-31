@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -267,7 +266,7 @@ func (w wrapper) InsertEvent(ctx context.Context, e cqrs.Event) error {
 func (w wrapper) GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*cqrs.Event, error) {
 	obj, err := w.q.GetEventByInternalID(ctx, internalID)
 	if err != nil {
-		return nil, fmt.Errorf("error quering event in ddb: %w", err)
+		return nil, err
 	}
 	evt := convertEvent(obj)
 	return &evt, nil

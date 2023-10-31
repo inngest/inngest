@@ -1,9 +1,10 @@
 package apiv1
 
 import (
-	"encoding/json"
+	"database/sql"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -80,7 +81,9 @@ func (a api) GetEvents(w http.ResponseWriter, r *http.Request) {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Unable to query events"))
 		return
 	}
-	_ = json.NewEncoder(w).Encode(events)
+
+	// Do not cache this response.
+	WriteResponse(w, events)
 }
 
 // GetEvent returns a specific event for the given workspace.
@@ -105,11 +108,15 @@ func (a api) GetEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	event, err := a.opts.EventReader.FindEvent(ctx, auth.WorkspaceID(), parsed)
+	if err == sql.ErrNoRows {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 404, "Event not found"))
+		return
+	}
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Unable to query events"))
 		return
 	}
-	_ = json.NewEncoder(w).Encode(event)
+	WriteCachedResponse(w, event, 5*time.Second)
 }
 
 // GetEventRuns returns function runs given an event ID.
@@ -145,5 +152,5 @@ func (a api) GetEventRuns(w http.ResponseWriter, r *http.Request) {
 			result = append(result, item)
 		}
 	}
-	_ = json.NewEncoder(w).Encode(result)
+	WriteCachedResponse(w, result, 5*time.Second)
 }
