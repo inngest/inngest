@@ -5,17 +5,21 @@ import { day } from '@/utils/date';
 import { FeatureRows, featureRows } from './BillingPlanOption';
 import PaymentsButton from './PaymentsButton';
 import PlanBadge from './PlanBadge';
-import { type ExtendedBillingPlan } from './utils';
+import { isTrialPlan, type ExtendedBillingPlan } from './utils';
 
 export default function CurrentSubscription({
   subscription,
   currentPlan,
+  isCurrentPlanEnterprise,
   freePlan,
 }: {
   subscription?: BillingSubscription;
   currentPlan?: BillingPlan;
+  isCurrentPlanEnterprise: boolean;
   freePlan?: ExtendedBillingPlan;
 }) {
+  const isOnPaidPlan = isCurrentPlanEnterprise || currentPlan?.amount !== 0;
+  const isTrial = currentPlan ? isTrialPlan(currentPlan) : false;
   const nextInvoiceDate = subscription?.nextInvoiceDate
     ? day(subscription?.nextInvoiceDate)
     : undefined;
@@ -24,19 +28,27 @@ export default function CurrentSubscription({
   return (
     <div className="rounded-lg border border-slate-300 bg-white">
       <div className="p-6">
-        {nextInvoiceDate ? (
+        {isOnPaidPlan ? (
           <>
-            <h2 className="mb-6 text-[1.375rem] font-semibold">Next Payment</h2>
+            <h2 className="mb-6 text-[1.375rem] font-semibold">
+              {isTrial ? 'Your account is on a trial plan' : 'Next Payment'}
+            </h2>
             <p className="my-4 flex gap-4 text-xl">
-              <span className="font-medium">
-                ${currentPlan?.amount ? currentPlan?.amount / 100 : '0'}
-              </span>
+              {!isTrial && (
+                <span className="font-medium">
+                  ${currentPlan?.amount ? currentPlan?.amount / 100 : '0'}
+                </span>
+              )}
               <PlanBadge variant="primary">{currentPlan?.name}</PlanBadge>
             </p>
-            <p className="my-4 text-sm text-slate-600">
-              Next charge on <strong>{nextInvoiceDate}</strong>
-            </p>
-            <PaymentsButton />
+            {!!nextInvoiceDate && (
+              <>
+                <p className="my-4 text-sm text-slate-600">
+                  Next charge on <strong>{nextInvoiceDate}</strong>
+                </p>
+                <PaymentsButton />
+              </>
+            )}
           </>
         ) : (
           <>
