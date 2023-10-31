@@ -33,7 +33,7 @@ func (a api) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update the cache every 3 seconds to prevent stale displays
-	WriteCachedResponse(w, fr, 3*time.Second)
+	_ = WriteCachedResponse(w, fr, 3*time.Second)
 }
 
 // CancelFunctionRun cancels a function run.
@@ -114,5 +114,5 @@ func (a api) GetFunctionRunJobs(w http.ResponseWriter, r *http.Request) {
 		jobs = []queue.JobResponse{}
 	}
 
-	WriteCachedResponse(w, jobs, 5*time.Second)
+	_ = WriteCachedResponse(w, jobs, 5*time.Second)
 }

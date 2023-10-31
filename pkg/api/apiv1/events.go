@@ -83,7 +83,7 @@ func (a api) GetEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Do not cache this response.
-	WriteResponse(w, events)
+	_ = WriteResponse(w, events)
 }
 
 // GetEvent returns a specific event for the given workspace.
@@ -116,7 +116,7 @@ func (a api) GetEvent(w http.ResponseWriter, r *http.Request) {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Unable to query events"))
 		return
 	}
-	WriteCachedResponse(w, event, 5*time.Second)
+	_ = WriteCachedResponse(w, event, 5*time.Second)
 }
 
 // GetEventRuns returns function runs given an event ID.
@@ -152,5 +152,5 @@ func (a api) GetEventRuns(w http.ResponseWriter, r *http.Request) {
 			result = append(result, item)
 		}
 	}
-	WriteCachedResponse(w, result, 5*time.Second)
+	_ = WriteCachedResponse(w, result, 5*time.Second)
 }

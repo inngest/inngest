@@ -112,10 +112,3 @@ func cacheKey(r *http.Request) *string {
 	hash := hex.EncodeToString(sum[:])
 	return &hash
 }
-
-func writeResponse(rec *httptest.ResponseRecorder, w http.ResponseWriter) ([]byte, error) {
-	byt := rec.Body.Bytes()
-
-	_, err := w.Write(byt)
-	return byt, err
-}
