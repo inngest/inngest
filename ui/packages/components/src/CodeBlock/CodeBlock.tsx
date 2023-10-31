@@ -208,10 +208,16 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
         </div>
         {!isOutputTooLarge && (
           <div className="mr-2 flex items-center gap-2">
-            <CopyButton code={content} isCopying={isCopying} handleCopyClick={handleCopyClick} />
+            <CopyButton
+              size="small"
+              code={content}
+              isCopying={isCopying}
+              handleCopyClick={handleCopyClick}
+            />
             <Button
               icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
               btnAction={handleWrapText}
+              size="small"
             />
           </div>
         )}
