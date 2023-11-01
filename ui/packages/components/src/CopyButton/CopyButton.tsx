@@ -23,6 +23,8 @@ export function CopyButton({ size, code, iconOnly, isCopying, handleCopyClick }:
       label={iconOnly ? undefined : label}
       appearance={iconOnly ? 'text' : 'solid'}
       icon={iconOnly && icon}
+      title="Click to copy"
+      aria-label="Copy"
     />
   );
 }
