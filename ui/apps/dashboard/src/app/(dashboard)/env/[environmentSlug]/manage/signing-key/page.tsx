@@ -1,5 +1,6 @@
+import { CodeKey } from '@inngest/components/CodeKey';
+
 import { Alert } from '@/components/Alert';
-import { KeyBox } from '@/components/KeyBox';
 import { graphql } from '@/gql';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getEnvironment } from '@/queries/server-only/getEnvironment';
@@ -38,9 +39,9 @@ export default async function Page({ params }: Props) {
       <div className="mt-8 max-w-3xl rounded-md border border-slate-200 px-8 pb-8 pt-6">
         <h2 className="mb-6 text-lg font-semibold text-slate-800">Inngest Signing Key</h2>
 
-        <KeyBox
-          value={res.environment.webhookSigningKey}
-          maskedValue={maskedSigningKey}
+        <CodeKey
+          fullKey={res.environment.webhookSigningKey}
+          maskedKey={maskedSigningKey}
           label="Signing key"
         />
 

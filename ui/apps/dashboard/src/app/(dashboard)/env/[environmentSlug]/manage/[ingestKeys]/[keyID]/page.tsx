@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
+import { CodeKey } from '@inngest/components/CodeKey';
 
-import { KeyBox } from '@/components/KeyBox';
 import { graphql } from '@/gql';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getEnvironment } from '@/queries/server-only/getEnvironment';
@@ -84,7 +84,7 @@ export default async function Keys({
     <div className="m-6 divide-y divide-slate-100">
       <Provider initialState={key}>
         <div className="pb-8">
-          <div className="mb-8 flex justify-between">
+          <div className="mb-8 flex flex-wrap justify-between">
             <EditKeyName keyID={keyID} keyName={key.name} />
             <DeleteKeyButton
               environmentSlug={environmentSlug}
@@ -92,9 +92,8 @@ export default async function Keys({
               keyID={keyID}
             />
           </div>
-          <div className="w-3/5">
-            <KeyBox value={value} maskedValue={maskedValue} label={keyLabel} />
-          </div>
+
+          <CodeKey fullKey={value} maskedKey={maskedValue} label={keyLabel} />
         </div>
         <TransformEvent keyID={keyID} metadata={key.metadata} keyName={key.name} />
         <FilterEvents
