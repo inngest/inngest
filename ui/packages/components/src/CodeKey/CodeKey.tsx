@@ -9,7 +9,7 @@ import { classNames } from '@inngest/components/utils/classNames';
 type CodeKeyProps = {
   fullKey: string;
   maskedKey?: string;
-  label: string;
+  label?: string;
   className?: string;
 };
 
@@ -18,15 +18,12 @@ export function CodeKey({ fullKey, maskedKey, label, className }: CodeKeyProps) 
   const { handleCopyClick, isCopying } = useCopyToClipboard();
 
   return (
-    <div>
+    <div className="rounded-md bg-slate-50 dark:bg-slate-800">
       <div
-        className={classNames(
-          className,
-          'dark:bg-slate-910 flex items-center justify-between rounded-t-md bg-slate-50 text-sm'
-        )}
+        className={classNames(className, 'flex items-center justify-between rounded-t-md text-sm')}
       >
         <Button
-          className="flex-1 !justify-start overflow-y-scroll whitespace-nowrap"
+          className="!block flex-1 truncate text-left font-mono"
           appearance="text"
           btnAction={() => {
             setShowKey(!showKey);
@@ -43,9 +40,11 @@ export function CodeKey({ fullKey, maskedKey, label, className }: CodeKeyProps) 
           handleCopyClick={handleCopyClick}
         />
       </div>
-      <h3 className="rounded-b-md bg-slate-100 p-2.5 text-xs font-semibold text-slate-500 dark:bg-slate-900">
-        {label}
-      </h3>
+      {label && (
+        <h3 className="rounded-b-md bg-slate-100 p-2.5 text-xs font-semibold text-slate-500 dark:bg-slate-900">
+          {label}
+        </h3>
+      )}
     </div>
   );
 }

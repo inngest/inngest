@@ -92,8 +92,9 @@ export default async function Keys({
               keyID={keyID}
             />
           </div>
-
-          <CodeKey fullKey={value} maskedKey={maskedValue} label={keyLabel} />
+          <div className="w-3/5">
+            <CodeKey fullKey={value} maskedKey={maskedValue} label={keyLabel} />
+          </div>
         </div>
         <TransformEvent keyID={keyID} metadata={key.metadata} keyName={key.name} />
         <FilterEvents
