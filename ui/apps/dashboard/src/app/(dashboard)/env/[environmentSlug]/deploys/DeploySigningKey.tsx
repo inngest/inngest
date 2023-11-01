@@ -1,17 +1,15 @@
 'use client';
 
-import SecretKey from '@/components/Secrets/SecretKey';
+import { CodeKey } from '@inngest/components/CodeKey';
+
 import { useEnvironment } from '@/queries';
 
 type DeploySigningKeyProps = {
   environmentSlug: string;
-  context?: 'dark' | 'light';
+  className?: string;
 };
 
-export default function DeploySigningKey({
-  environmentSlug,
-  context = 'light',
-}: DeploySigningKeyProps) {
+export default function DeploySigningKey({ environmentSlug, className }: DeploySigningKeyProps) {
   const [{ data: environment }] = useEnvironment({ environmentSlug });
   const signingKey = environment?.webhookSigningKey || '...';
   const maskedSigningKey = environment?.webhookSigningKey
@@ -21,5 +19,9 @@ export default function DeploySigningKey({
       )
     : '...';
 
-  return <SecretKey value={signingKey} masked={maskedSigningKey} context={context} />;
+  return (
+    <span className={className}>
+      <CodeKey fullKey={signingKey} maskedKey={maskedSigningKey} />
+    </span>
+  );
 }

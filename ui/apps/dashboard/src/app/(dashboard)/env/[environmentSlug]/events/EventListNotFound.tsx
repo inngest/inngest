@@ -4,10 +4,10 @@ import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { CodeKey } from '@inngest/components/CodeKey';
 import { useCopyToClipboard } from 'react-use';
 import { useQuery } from 'urql';
 
-import SecretKey from '@/components/Secrets/SecretKey';
 import { graphql } from '@/gql';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
 import { useEnvironment } from '@/queries';
@@ -95,12 +95,12 @@ export default function EventListNotFound({ environmentSlug }: { environmentSlug
               </code>{' '}
               file or you may need to set it manually on your platform.
             </p>
-            <SecretKey
-              value={key || '...'}
-              masked={`${key?.substring(0, 6)}-<click-to-reveal>`}
-              className="mt-4"
-              context="dark"
-            />
+            <span className="dark mt-4">
+              <CodeKey
+                fullKey={key || '...'}
+                maskedKey={`${key?.substring(0, 6)}-<click-to-reveal>`}
+              />
+            </span>
           </div>
 
           <div className="mt-6 flex items-center gap-2 border-t border-slate-800/50 py-4">
