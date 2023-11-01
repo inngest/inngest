@@ -2,8 +2,8 @@
 
 import { useContext, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { RocketLaunchIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { IconSave } from '@inngest/components/icons/Save';
 import { toast } from 'sonner';
 
 import Input from '@/components/Forms/Input';
@@ -55,7 +55,7 @@ export default function EditKeyButton({ keyID, keyName }: EditKeyNameProps) {
       />
       <Button
         type="submit"
-        icon={<RocketLaunchIcon />}
+        icon={<IconSave />}
         kind="primary"
         disabled={isDisabled}
         label="Save Name"

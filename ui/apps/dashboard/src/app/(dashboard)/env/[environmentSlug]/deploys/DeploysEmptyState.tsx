@@ -170,7 +170,7 @@ export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding
               </code>{' '}
               environment variable in your application with the value below.
             </p>
-            <DeploySigningKey context="dark" environmentSlug={environmentSlug} />
+            <DeploySigningKey className="dark" environmentSlug={environmentSlug} />
             <h4 className="mt-6 text-base font-semibold text-white">Add your API URL</h4>
             <p className="mt-2 text-sm tracking-wide text-slate-300">
               After you&apos;ve set up the{' '}

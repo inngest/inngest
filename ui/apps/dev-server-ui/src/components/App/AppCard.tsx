@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Badge } from '@inngest/components/Badge';
 import { Button } from '@inngest/components/Button';
+import { CodeLine } from '@inngest/components/CodeLine';
 import { Link } from '@inngest/components/Link/Link';
 import { IconChevron } from '@inngest/components/icons/Chevron';
 import { IconStatusCircleCheck } from '@inngest/components/icons/StatusCircleCheck';
@@ -10,7 +11,6 @@ import { classNames } from '@inngest/components/utils/classNames';
 import { toast } from 'sonner';
 
 import AppCardHeader from '@/components/App/AppCardHeader';
-import CodeLine from '@/components/Code/CodeLine';
 import useDebounce from '@/hooks/useDebounce';
 import { IconSpinner } from '@/icons';
 import {
@@ -240,7 +240,7 @@ export default function AppCard({ app }: { app: App }) {
                     There are currently no functions registered at this URL. Ensure you have created
                     a function and are exporting it correctly from your serve command.
                   </p>
-                  <CodeLine code="serve(client, [list_of_fns]);" className="mb-4 p-4" />
+                  <CodeLine code="serve(client, [list_of_fns]);" className="mb-4" />
                   <Link className="w-fit" href="https://www.inngest.com/docs/functions">
                     Creating Functions
                   </Link>
