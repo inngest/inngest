@@ -13,7 +13,7 @@ import { FunctionRunTimeField, type GetBillingPlanQuery } from '@/gql/graphql';
 export const defaultTimeField = FunctionRunTimeField.StartedAt;
 
 const fieldOptions = [
-  { name: 'Started', id: FunctionRunTimeField.StartedAt },
+  { name: 'Scheduled', id: FunctionRunTimeField.StartedAt },
   { name: 'Ended', id: FunctionRunTimeField.EndedAt },
 ] as const satisfies Readonly<{ name: string; id: FunctionRunTimeField }[]>;
 

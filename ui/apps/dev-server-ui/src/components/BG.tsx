@@ -1,7 +1,7 @@
 export default function BG() {
   return (
-    <div className="fixed inset-0 w-full h-full flex items-center justify-center overflow-hidden pointer-events-none -z-10 ">
-      <svg width="1104" height="870" className="opacity-10 scale-[2]">
+    <div className="pointer-events-none fixed inset-0 -z-10 flex h-full w-full items-center justify-center overflow-hidden ">
+      <svg width="1104" height="870" className="scale-[2] opacity-10">
         <defs>
           <radialGradient
             cx="50%"

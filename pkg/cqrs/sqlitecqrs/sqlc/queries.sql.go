@@ -140,6 +140,30 @@ func (q *Queries) GetAppByChecksum(ctx context.Context, checksum string) (*App, 
 	return &i, err
 }
 
+const getAppByID = `-- name: GetAppByID :one
+SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps WHERE id = ? LIMIT 1
+`
+
+func (q *Queries) GetAppByID(ctx context.Context, id uuid.UUID) (*App, error) {
+	row := q.db.QueryRowContext(ctx, getAppByID, id)
+	var i App
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.SdkLanguage,
+		&i.SdkVersion,
+		&i.Framework,
+		&i.Metadata,
+		&i.Status,
+		&i.Error,
+		&i.Checksum,
+		&i.CreatedAt,
+		&i.DeletedAt,
+		&i.Url,
+	)
+	return &i, err
+}
+
 const getAppByURL = `-- name: GetAppByURL :one
 SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps WHERE url = ? LIMIT 1
 `

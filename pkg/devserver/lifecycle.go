@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -22,17 +21,10 @@ func (l lifecycle) OnFunctionScheduled(
 	ctx context.Context,
 	id state.Identifier,
 	item queue.Item,
-	event event.Event,
+	s state.State,
 ) {
-	state, err := l.sm.Load(ctx, id.RunID)
-	if err != nil {
-		return
-	}
-
-	evt := state.Event()
-
 	triggerType := "event"
-	if name, _ := evt["name"].(string); name == "inngest/scheduled.timer" {
+	if s.IsCron() {
 		triggerType = "cron"
 	}
 
@@ -42,6 +34,6 @@ func (l lifecycle) OnFunctionScheduled(
 		FunctionID:   id.WorkflowID,
 		EventID:      id.EventID,
 		TriggerType:  triggerType,
-		Cron:         event.Cron,
+		Cron:         s.CronSchedule(),
 	})
 }

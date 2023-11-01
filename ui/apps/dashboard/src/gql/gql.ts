@@ -64,6 +64,7 @@ const documents = {
     "\n  mutation DeleteUser($id: ID!) {\n    deleteUser(id: $id)\n  }\n": types.DeleteUserDocument,
     "\n  mutation CreateUser($input: NewUser!) {\n    createUser(input: $input) {\n      id\n    }\n  }\n": types.CreateUserDocument,
     "\n  query GetUsers {\n    account {\n      users {\n        createdAt\n        email\n        id\n        lastLoginAt\n        name\n      }\n    }\n\n    session {\n      user {\n        id\n      }\n    }\n  }\n": types.GetUsersDocument,
+    "\n  mutation CreateWebhook($input: NewIngestKey!) {\n    key: createIngestKey(input: $input) {\n      id\n      url\n    }\n  }\n": types.CreateWebhookDocument,
     "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n": types.GetAccountSupportInfoDocument,
     "\n  query GetAccountName {\n    account {\n      name\n    }\n  }\n": types.GetAccountNameDocument,
     "\n  query GetGlobalSearch($opts: SearchInput!) {\n    account {\n      search(opts: $opts) {\n        results {\n          env {\n            name\n            id\n            type\n          }\n          kind\n          value {\n            ... on ArchivedEvent {\n              id\n              name\n            }\n            ... on FunctionRun {\n              id\n              functionID: workflowID\n            }\n          }\n        }\n      }\n    }\n  }\n": types.GetGlobalSearchDocument,
@@ -299,6 +300,10 @@ export function graphql(source: "\n  mutation CreateUser($input: NewUser!) {\n  
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetUsers {\n    account {\n      users {\n        createdAt\n        email\n        id\n        lastLoginAt\n        name\n      }\n    }\n\n    session {\n      user {\n        id\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetUsers {\n    account {\n      users {\n        createdAt\n        email\n        id\n        lastLoginAt\n        name\n      }\n    }\n\n    session {\n      user {\n        id\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation CreateWebhook($input: NewIngestKey!) {\n    key: createIngestKey(input: $input) {\n      id\n      url\n    }\n  }\n"): (typeof documents)["\n  mutation CreateWebhook($input: NewIngestKey!) {\n    key: createIngestKey(input: $input) {\n      id\n      url\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
