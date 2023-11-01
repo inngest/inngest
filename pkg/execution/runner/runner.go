@@ -352,22 +352,22 @@ func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqr
 		return nil, err
 	}
 
-	name := ""
+	fnID := ""
 	metadata := evt.InngestMetadata()
 	if metadata != nil && metadata.InvokeFnID != "" {
-		name = metadata.InvokeFnID
+		fnID = metadata.InvokeFnID
 	}
-	if name == "" {
-		return nil, err
+	if fnID == "" {
+		return nil, fmt.Errorf("could not extract function ID from event")
 	}
 
 	for _, fn := range fns {
-		if fn.GetSlug() == name {
+		if fn.GetSlug() == fnID {
 			return &fn, nil
 		}
 	}
 
-	return nil, nil
+	return nil, fmt.Errorf("could not find function with ID: %s", fnID)
 }
 
 // functions triggers all functions from the given event.
@@ -386,6 +386,18 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 		// Find any invoke functions specified.
 		fn, err := FindInvokedFunction(ctx, tracked, s.data)
 		if err != nil {
+			// If this errored, then we were supposed to find a function to
+			// invoke. In this case, emit a completion event with the error.
+			s.executor.PublishFinishedEvent(ctx, execution.PublishFinishedEventOpts{
+				OriginalEvent: evt.Map(),
+				FunctionID:    "",
+				RunID:         "",
+				// TODO unify
+				Err: map[string]any{
+					"name":    "Error",
+					"message": err.Error(),
+				},
+			})
 			errs = multierror.Append(errs, err)
 		}
 		if fn != nil {

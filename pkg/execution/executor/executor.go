@@ -107,9 +107,9 @@ func WithLogger(l *zerolog.Logger) ExecutorOpt {
 	}
 }
 
-func WithFailureHandler(f execution.FailureHandler) ExecutorOpt {
+func WithFinishHandler(f execution.FinishHandler) ExecutorOpt {
 	return func(e execution.Executor) error {
-		e.(*executor).failureHandler = f
+		e.(*executor).finishHandler = f
 		return nil
 	}
 }
@@ -188,7 +188,7 @@ type executor struct {
 	fl             state.FunctionLoader
 	evalFactory    func(ctx context.Context, expr string) (expressions.Evaluator, error)
 	runtimeDrivers map[string]driver.Driver
-	failureHandler execution.FailureHandler
+	finishHandler  execution.FinishHandler
 	pb             pubsub.Publisher
 	eventTopic     string
 
@@ -197,8 +197,8 @@ type executor struct {
 	steplimit uint
 }
 
-func (e *executor) SetFailureHandler(f execution.FailureHandler) {
-	e.failureHandler = f
+func (e *executor) SetFinishHandler(f execution.FinishHandler) {
+	e.finishHandler = f
 }
 
 func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
@@ -451,7 +451,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			resp.SetError(state.ErrFunctionOverflowed)
 			resp.SetFinal()
 
-			_ = e.failureHandler(ctx, id, s, resp)
+			_ = e.finishHandler(ctx, id, s, resp)
 			for _, e := range e.lifecycles {
 				go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, resp, s)
 			}
@@ -557,7 +557,7 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 			return fmt.Errorf("error marking function as complete: %w", serr)
 		}
 		s, _ := e.sm.Load(ctx, id.RunID)
-		if ferr := e.failureHandler(ctx, id, s, *resp); ferr != nil {
+		if ferr := e.finishHandler(ctx, id, s, *resp); ferr != nil {
 			// XXX: log
 			_ = ferr
 		}
@@ -579,7 +579,7 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 					return fmt.Errorf("error marking function as complete: %w", serr)
 				}
 				s, _ := e.sm.Load(ctx, id.RunID)
-				_ = e.failureHandler(ctx, id, s, *resp)
+				_ = e.finishHandler(ctx, id, s, *resp)
 				for _, e := range e.lifecycles {
 					go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp, s)
 				}
@@ -606,6 +606,10 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 
 	_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt)
 	s, _ := e.sm.Load(ctx, id.RunID)
+	if ferr := e.finishHandler(ctx, id, s, *resp); ferr != nil {
+		// XXX: log
+		_ = ferr
+	}
 
 	for _, e := range e.lifecycles {
 		go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp, s)
@@ -1271,9 +1275,9 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 
 	// Always create an invocation event.
 	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
-		Event:           *opts.Payload,
-		FnID:            opts.FunctionID,
-		TriggeringRunID: &correlationID,
+		Event:         *opts.Payload,
+		FnID:          opts.FunctionID,
+		CorrelationID: &correlationID,
 	})
 
 	logger.From(ctx).Debug().Interface("evt", evt).Str("gen.ID", gen.ID).Msg("created invocation event")
@@ -1386,6 +1390,78 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	}
 
 	return err
+}
+
+func (e *executor) PublishFinishedEvent(ctx context.Context, opts execution.PublishFinishedEventOpts) error {
+	now := time.Now()
+	data := map[string]interface{}{
+		"function_id": opts.FunctionID,
+		"run_id":      opts.RunID,
+	}
+
+	origEvt := opts.OriginalEvent
+
+	if dataMap, ok := origEvt["data"].(map[string]interface{}); ok {
+		if inngestObj, ok := dataMap[consts.InngestEventDataPrefix].(map[string]interface{}); ok {
+
+			if dataValue, ok := inngestObj[consts.InvokeCorrelationId].(string); ok {
+				logger.From(ctx).Debug().Str("data_value_str", dataValue).Msg("data_value")
+				data[consts.InvokeCorrelationId] = dataValue
+			}
+		}
+	}
+
+	if opts.Err != nil {
+		data["error"] = opts.Err
+	} else {
+		data["result"] = opts.Result
+	}
+
+	evt := event.Event{
+		ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+		Name:      event.FnFinishedName,
+		Timestamp: now.UnixMilli(),
+		Data:      data,
+	}
+
+	logger.From(ctx).Debug().Interface("event", evt).Msg("function finished event")
+
+	byt, err := json.Marshal(evt)
+	if err != nil {
+		logger.From(ctx).Error().Err(err).Msg("error marshalling function finished event")
+		return err
+	}
+
+	err = e.pb.Publish(
+		ctx,
+		e.eventTopic,
+		pubsub.Message{
+			Name:      event.EventReceivedName,
+			Data:      string(byt),
+			Timestamp: now,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("error publishing function finished event: %w", err)
+	}
+
+	return nil
+}
+
+func (e *executor) PublishFinishedEventFromResponse(ctx context.Context, id state.Identifier, resp state.DriverResponse, s state.State) error {
+	opts := execution.PublishFinishedEventOpts{
+		OriginalEvent: s.Event(),
+		FunctionID:    s.Function().Slug,
+		RunID:         id.RunID.String(),
+	}
+
+	if resp.Err != nil {
+		opts.Err = resp.UserError()
+	} else {
+		opts.Result = resp.Output
+	}
+
+	return e.PublishFinishedEvent(ctx, opts)
 }
 
 func (e *executor) newExpressionEvaluator(ctx context.Context, expr string) (expressions.Evaluator, error) {

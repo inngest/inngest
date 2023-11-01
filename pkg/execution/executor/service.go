@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/oklog/ulid/v2"
+	"golang.org/x/sync/errgroup"
 )
 
 type Opt func(s *svc)
@@ -101,11 +102,11 @@ func (s *svc) Pre(ctx context.Context) error {
 		return fmt.Errorf("no queue provided")
 	}
 
-	failureHandler, err := s.getFailureHandler(ctx)
+	finishHandler, err := s.getFinishHandler(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create failure handler: %w", err)
+		return fmt.Errorf("failed to create finish handler: %w", err)
 	}
-	s.exec.SetFailureHandler(failureHandler)
+	s.exec.SetFinishHandler(finishHandler)
 
 	return nil
 }
@@ -114,7 +115,7 @@ func (s *svc) Executor() execution.Executor {
 	return s.exec
 }
 
-func (s *svc) getFailureHandler(ctx context.Context) (func(context.Context, state.Identifier, state.State, state.DriverResponse) error, error) {
+func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state.Identifier, state.State, state.DriverResponse) error, error) {
 	pb, err := pubsub.NewPublisher(ctx, s.config.EventStream.Service)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create publisher: %w", err)
@@ -122,39 +123,51 @@ func (s *svc) getFailureHandler(ctx context.Context) (func(context.Context, stat
 
 	topicName := s.config.EventStream.Service.Concrete.TopicName()
 
-	return func(ctx context.Context, id state.Identifier, s state.State, r state.DriverResponse) error {
-		now := time.Now()
-		evt := event.Event{
-			ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
-			Name:      event.FnFailedName,
-			Timestamp: now.UnixMilli(),
-			Data: map[string]interface{}{
-				"function_id": s.Function().Slug,
-				"run_id":      id.RunID.String(),
-				"error":       r.UserError(),
-				"event":       s.Event(),
-			},
-		}
+	return func(ctx context.Context, id state.Identifier, st state.State, r state.DriverResponse) error {
+		eg := errgroup.Group{}
 
-		byt, err := json.Marshal(evt)
-		if err != nil {
-			return fmt.Errorf("error marshalling failure event: %w", err)
-		}
+		// Legacy - send inngest/function.failed
+		eg.Go(func() error {
+			now := time.Now()
+			evt := event.Event{
+				ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+				Name:      event.FnFailedName,
+				Timestamp: now.UnixMilli(),
+				Data: map[string]interface{}{
+					"function_id": st.Function().Slug,
+					"run_id":      id.RunID.String(),
+					"error":       r.UserError(),
+					"event":       st.Event(),
+				},
+			}
 
-		err = pb.Publish(
-			ctx,
-			topicName,
-			pubsub.Message{
-				Name:      event.EventReceivedName,
-				Data:      string(byt),
-				Timestamp: now,
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("error publishing failure event: %w", err)
-		}
+			byt, err := json.Marshal(evt)
+			if err != nil {
+				return fmt.Errorf("error marshalling failure event: %w", err)
+			}
 
-		return nil
+			err = pb.Publish(
+				ctx,
+				topicName,
+				pubsub.Message{
+					Name:      event.EventReceivedName,
+					Data:      string(byt),
+					Timestamp: now,
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("error publishing failure event: %w", err)
+			}
+
+			return nil
+		})
+
+		// send inngest/function.finished
+		eg.Go(func() error {
+			return s.Executor().PublishFinishedEventFromResponse(ctx, id, r, st)
+		})
+
+		return eg.Wait()
 	}, nil
 }
 

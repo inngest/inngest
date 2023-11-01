@@ -107,12 +107,27 @@ type Executor interface {
 	// always add to a list of listeners vs replace listeners.
 	AddLifecycleListener(l LifecycleListener)
 
-	// SetFailureHandler sets the failure handler, called when a function run permanently fails.
-	SetFailureHandler(f FailureHandler)
+	// SetFinishHandler sets the finish handler, called when a function run finishes.
+	SetFinishHandler(f FinishHandler)
+
+	// PublishFinishedEventFromResponse publishes a finished event to the event stream using a driver response.
+	PublishFinishedEventFromResponse(ctx context.Context, id state.Identifier, resp state.DriverResponse, s state.State) error
+
+	// PublishFinishedEvent publishes a finished event to the event stream.
+	PublishFinishedEvent(ctx context.Context, opts PublishFinishedEventOpts) error
 }
 
-// FailureHandler is a function that handles failures in the executor.
-type FailureHandler func(context.Context, state.Identifier, state.State, state.DriverResponse) error
+// PublishFinishedEventOpts represents the options for publishing a finished event.
+type PublishFinishedEventOpts struct {
+	OriginalEvent map[string]any
+	FunctionID    string
+	RunID         string
+	Err           map[string]any
+	Result        any
+}
+
+// FinishHandler is a function that handles functions finishing in the executor.
+type FinishHandler func(context.Context, state.Identifier, state.State, state.DriverResponse) error
 
 // ScheduleRequest represents all data necessary to schedule a new function.
 type ScheduleRequest struct {
