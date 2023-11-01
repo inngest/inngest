@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
-import CodeLine from './CodeLine';
+import { CodeLine } from './CodeLine';
 
 const meta = {
   title: 'Components/CodeLine',
@@ -24,7 +24,6 @@ type Story = StoryObj<typeof CodeLine>;
 
 export const Default: Story = {
   args: {
-    className: 'p-4',
     code: 'npm install inngest',
   },
 };
