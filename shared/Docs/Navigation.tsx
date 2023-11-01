@@ -279,7 +279,7 @@ export function Navigation(props) {
                 <NavLink href={item.href} key={idx} isTopLevel={true}>
                   <span className="flex flex-row gap-3 items-center">
                     {item.icon && (
-                      <item.icon className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
+                      <item.icon className="w-5 h-5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200" />
                     )}
                     {item.title}
                   </span>
@@ -301,7 +301,7 @@ export function Navigation(props) {
                       >
                         <span className="flex flex-row gap-3 items-center">
                           {link.icon && (
-                            <link.icon className="w-5 h-4 text-slate-400 group-hover:text-slate-600" />
+                            <link.icon className="w-5 h-4 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200" />
                           )}
                           {link.title}
                         </span>
