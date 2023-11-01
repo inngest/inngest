@@ -1,99 +1,94 @@
+import { CodeBracketSquareIcon } from "@heroicons/react/20/solid"
+import { Home } from 'src/shared/Docs/Home'
 import { Guides } from 'src/shared/Docs/Guides'
-import { Resources } from 'src/shared/Docs/Resources'
+import { ResourceGrid, Resource } from 'src/shared/Docs/Resources'
+import { GuideGrid, Guide } from 'src/shared/Docs/Guides'
 import { HeroPattern } from 'src/shared/Docs/HeroPattern'
+import EventIcon from 'src/shared/Icons/Event'
+import StepsIcon from 'src/shared/Icons/Steps'
 
 export const pageTitle = 'Inngest Documentation & Guides'
 export const description =
   'Learn how to use Inngest to deploy reliable background functions to any platform.'
 
-{/*export const sections = [
-   { title: 'Guides', id: 'guides' },
-  { title: 'Resources', id: 'resources' },
-]*/}
+{/* <HeroPattern/> TODO - Add cool header graphic*/}
 
-# Introduction to Inngest
+<Home/>
 
-Inngest is an open source platform that adds superpowers to serverless functions. {{ className: 'lead' }}
+## Getting Started
 
-Using our SDK, a single line of code adds retries, queues, sleeps, cron schedules, fan-out jobs, and reliable steps to serverless functions in your existing projects. It's deployable to any platform, without any infrastructure or configuration. And, everything is locally testable via our UI.
-
-Learn how to get started:
+Discover how to get set up with Inngest in just a few minutes:
 
 <div className="not-prose mb-16 mt-6 flex gap-3">
-  <Button size="sm" href="/docs/quick-start" arrow="right">Quick start tutorial</Button>
-  {/* <Button size="sm" href="/sdks" variant="secondary">Second Action</Button> */}
+  <Button  href="/docs/quick-start" arrow="right">Quick start tutorial</Button>
 </div>
 
-## A small but powerful example {{ anchor: false }}
+## Introduction to Inngest
 
-Adding sleeps, retries, and reliable steps to a function:
+Inngest as a durable workflow engine that enables you to run reliable code on any platform, including serverless.
 
-<CodeGroup>
-```ts
-import { EventSchemas, Inngest } from "inngest";
+With any Inngest SDK, you write <CodeBracketSquareIcon className="h-4 inline" style={{ marginTop: "-2px" }}/> **Functions** in your codebase and make them available to Inngest using an HTTP endpoint. Functions are triggered by <EventIcon className="inline" style={{ marginTop: "-2px" }}/> **Events** which can be sent with our SDKs, via a regular POST request, or can come from an external source such as webhooks.
 
-type Events = {
-  "user/new.signup": {
-    data: {
-      email: string;
-      name: string;
-    };
-  };
-};
+Functions are composed of <StepsIcon className="h-4 inline" style={{ marginTop: "-2px" }}/> **Steps**, which decouple parts of your functions into individually retriable blocks. Steps enable yuo to write complex, durable, long-lived workflows, _event on serverless_, in a single function.
 
-const inngest = new Inngest({
-  id: "nextjs-shop",
-  schemas: new EventSchemas().fromRecord<Events>(),
-});
+## Guides
 
-export default inngest.createFunction(
-  { id: "signup-flow" },        // Function options
-  { event: "user/new.signup" }, // One or more events that trigger this function
-  async ({ event, step }) => {
-    // ⚡ If this step fails it will retry automatically. It will only run once
-    // if it succeeds
-    const promo = await step.run("generate-promo-code", async () => {
-      const promoCode = await generatePromoCode();
-      return promoCode.code;
-    });
+<ResourceGrid cols={3}>
 
-    // ⚡ Again, if the email provider is down this will retry - but we will
-    // only generate one promo code
-    await step.run("send-a-welcome-promo", () =>
-      sendEmail({ email: event.data, promo })
-    );
+<Resource resource={{
+  href: "/docs/guides/background-jobs",
+  name: "Background jobs",
+  icon: "paper-airplane",
+  description: "Run long-running tasks in the background out of the critical path of a request.",
+  pattern: 0,
+}}/>
 
-    // 😴 You can sleep on any platform!
-    await step.sleep("wait-before-followup", "1 day");
+<Resource resource={{
+  href: "/docs/guides/enqueueing-future-jobs",
+  name: "Enqueueing future jobs",
+  icon: "chevron-double-right",
+  description: "Schedule or delay functions to run in the future.",
+  pattern: 1,
+}}/>
 
-    // ⏰ This runs exactly 1 day after the user signs up
-    await step.run("send-drip-campaign", () => sendDripCampaign());
-  }
-);
-```
-</CodeGroup>
+<Resource resource={{
+  href: "/docs/guides/step-parallelism",
+  name: "Parallelize steps",
+  icon: "parallel",
+  description: "Run function steps in parallel to speed up execution.",
+  pattern: 2,
+}}/>
 
-In this example, you can reliably run serverless functions even if external APIs are down. You can also sleep or delay work without configuring queues. Plus, all events, jobs, and functions are strictly typed via TypeScript for maximum correctness.
-Here's how things look when you run locally:
+<Resource resource={{
+  href: "/docs/guides/fan-out-jobs",
+  name: "Fan-out",
+  icon: "arrows-pointing-out",
+  description: "Use events to trigger multiple functions at once.",
+  pattern: 3,
+}}/>
 
-<img
-  src="/assets/docs/dev-server-overview-stream.jpg"
-  className="rounded-md"
-/>
-<img
-  src="/assets/docs/dev-server-overview-stream-details.jpg"
-  className="rounded-md"
-/>
+<Resource resource={{
+  href: "/docs/guides/batching",
+  name: "Batching events",
+  icon: "square-3-stack-3d",
+  description: "Improve efficiency with high-load systems by processing batches of events at once.",
+  pattern: 2,
+}}/>
 
-### Comparisons
+<Resource resource={{
+  href: "/docs/guides/scheduled-functions",
+  name: "Scheduled functions",
+  icon: "clock",
+  description: "Run functions periodically on a cron schedule.",
+  pattern: 1,
+}}/>
 
-Without Inngest, you would have to configure several jobs amongst several different queues, then handle retries yourself. There's also a chance that many promo codes are generated depending on the reliability of that API. With Inngest, you can push this function live and everything happens automatically.
+</ResourceGrid>
 
-{/* <Guides />
+## Support
 
-<Resources /> */}
+If you need help with Inngest, you can reach out to us in the following ways:
 
-
-### Resources and help
-
-If you have any questions we're always around in our [Discord community](https://www.inngest.com/discord) or on [GitHub](https://github.com/inngest/inngest).
+* [Open a ticket in our support center](https://app.inngest.com/support)
+* [Ask your questions in our Discord community](/discord)
+* [Contact our sales engineering team](/contact?ref=docs)

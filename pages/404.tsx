@@ -13,17 +13,24 @@ const REPLACE_PATHNAME = "%%PATHNAME%%";
 export async function getStaticProps() {
   // Matches mdx/rehyppe.mjs
   const highlighter = await shiki.getHighlighter({ theme: "css-variables" });
-  const shikiTokens = await highlighter.codeToThemedTokens(
-    getCode({ pathname: REPLACE_PATHNAME }),
-    "typescript"
-  );
-  const shikiCodeHtml = shiki.renderToHtml(shikiTokens, {
-    elements: {
-      pre: ({ children }) => children,
-      code: ({ children }) => children,
-      line: ({ children }) => `<span>${children}</span>`,
-    },
-  });
+  // This can fail locally
+  let shikiCodeHtml = "";
+  try {
+    const shikiTokens = await highlighter.codeToThemedTokens(
+      getCode({ pathname: REPLACE_PATHNAME }),
+      "typescript"
+    );
+    shikiCodeHtml = shiki.renderToHtml(shikiTokens, {
+      elements: {
+        pre: ({ children }) => children,
+        code: ({ children }) => children,
+        line: ({ children }) => `<span>${children}</span>`,
+      },
+    });
+  } catch (e) {
+    // If it fails, just leave it blank
+  }
+
   return {
     props: {
       designVersion: "2",
@@ -51,6 +58,9 @@ export default function Custom404({ shikiCodeHtml }) {
   const router = useRouter();
   const pathname = router.asPath;
   const isDocs = pathname.match(/^\/docs/);
+
+  // For debugging
+  // console.log("404 - Page not found: ", pathname);
 
   const title = `404 - Page not found`;
   const lede = `We've triggered an event and a serverless function is forwarding it to the team as you read this.`;

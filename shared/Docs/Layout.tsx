@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 
 import * as mdxComponents from "src/shared/Docs/mdx";
 import { Footer } from "./Footer";
+import { Home } from "./Home";
 import { Header } from "./Header";
 import Logo from "../Icons/Logo";
 import { Navigation } from "./Navigation";
@@ -48,6 +49,7 @@ export function Layout({
   const metaDescription =
     description || `Inngest documentation for ${preferredTitle}`;
   const metaImage = getOpenGraphImageURL({ title: preferredTitle });
+
   return (
     <div className="dark:bg-slate-1000">
       <MDXProvider components={mdxComponents}>

@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 import { Transition } from "@headlessui/react";
 
 import { Button } from "../Button";
-import { navigation } from "./Navigation";
+import { topLevelNav } from "./navigationStructure";
 import SocialBadges from "./SocialBadges";
 
 function CheckIcon(props) {
@@ -131,9 +131,19 @@ function PageLink({ label, page, previous = false }) {
   );
 }
 
+function flattenNav(nav) {
+  return nav.flatMap((group) => {
+    return group.sectionLinks
+      ? flattenNav(group.sectionLinks)
+      : group.links
+      ? flattenNav(group.links)
+      : group;
+  });
+}
+
 function PageNavigation() {
   let router = useRouter();
-  let allPages = navigation.flatMap((group) => group.links);
+  let allPages = flattenNav(topLevelNav);
   let currentPageIndex = allPages.findIndex(
     (page) => page.href === router.pathname
   );
@@ -144,6 +154,11 @@ function PageNavigation() {
 
   let previousPage = allPages[currentPageIndex - 1];
   let nextPage = allPages[currentPageIndex + 1];
+
+  // Skip next page if it's an external link
+  if (!nextPage?.href.match(/^\//)) {
+    nextPage = null;
+  }
 
   if (!previousPage && !nextPage) {
     return null;

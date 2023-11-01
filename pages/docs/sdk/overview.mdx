@@ -1,6 +1,6 @@
-# SDK Overview
+# Installing the SDK
 
-The Inngest SDK allows you to write reliable, durable functions in your existing projects incrementally.  Functions can be automatically triggered by events or run on a schedule without infrastructure, and can be fully serverless or added to your existing HTTP server.
+The Inngest SDK allows you to write reliable, durable functions in your existing projects incrementally. Functions can be automatically triggered by events or run on a schedule without infrastructure, and can be fully serverless or added to your existing HTTP server.
 
 - It works with any framework and platform by using HTTP to call your functions
 - It supports serverless providers, without any additional infrastructure
@@ -9,23 +9,22 @@ The Inngest SDK allows you to write reliable, durable functions in your existing
 
 ## Getting started
 
-To get started, install the SDK via npm or Yarn:
+To get started, install the SDK via your favorite package manager:
 
-```bash
-npm install inngest # or yarn add inngest
+<CodeGroup>
+```shell {{ title: "npm" }}
+npm install inngest
 ```
+```shell {{ title: "pnpm" }}
+pnpm add inngest
+```
+```shell {{ title: "yarn" }}
+yarn add inngest
+```
+</CodeGroup>
 
-You’ll need to do a few things to get set up, which will only take a few minutes.
+You'll need to do a few things to get set up, which will only take a few minutes.
 
-1. [Set up and serve the Inngest API](/docs/sdk/serve)
+1. [Set up and serve the Inngest API for your framework](/docs/sdk/serve)
 2. [Define and write your functions](/docs/functions)
 3. [Trigger functions with events](/docs/events)
-
-<>
-{/*
-TODO:
-You can skip straight to serving the Inngest API, or read on to learn how the SDK works.
-
-## How the SDK works
-*/}
-</>
