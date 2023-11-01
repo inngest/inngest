@@ -43,7 +43,7 @@ export function CodeKey({ fullKey, maskedKey, label, className }: CodeKeyProps) 
           handleCopyClick={handleCopyClick}
         />
       </div>
-      <h3 className="rounded-b-md bg-slate-100 p-2 text-xs font-semibold text-slate-500 dark:bg-slate-900">
+      <h3 className="rounded-b-md bg-slate-100 p-2.5 text-xs font-semibold text-slate-500 dark:bg-slate-900">
         {label}
       </h3>
     </div>
