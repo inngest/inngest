@@ -386,9 +386,11 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 		// Find any invoke functions specified.
 		fn, err := FindInvokedFunction(ctx, tracked, s.data)
 		if err != nil {
+			errs = multierror.Append(errs, err)
+
 			// If this errored, then we were supposed to find a function to
 			// invoke. In this case, emit a completion event with the error.
-			s.executor.PublishFinishedEvent(ctx, execution.PublishFinishedEventOpts{
+			perr := s.executor.PublishFinishedEvent(ctx, execution.PublishFinishedEventOpts{
 				OriginalEvent: evt.Map(),
 				FunctionID:    "",
 				RunID:         "",
@@ -398,7 +400,9 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 					"message": err.Error(),
 				},
 			})
-			errs = multierror.Append(errs, err)
+			if perr != nil {
+				errs = multierror.Append(errs, perr)
+			}
 		}
 		if fn != nil {
 			// Initialize this function for this event only once;  we don't
