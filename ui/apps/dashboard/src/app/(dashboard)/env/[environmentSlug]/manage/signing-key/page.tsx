@@ -30,8 +30,8 @@ export default async function Page({ params }: Props) {
   });
 
   const maskedSigningKey = res.environment.webhookSigningKey.replace(
-    /signkey-(prod|test)-(.{0,4}).+/,
-    'signkey-$1-$2...'
+    /signkey-(prod|test)-.+/,
+    'signkey-$1'
   );
 
   return (

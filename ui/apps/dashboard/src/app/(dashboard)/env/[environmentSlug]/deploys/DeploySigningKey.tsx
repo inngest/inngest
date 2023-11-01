@@ -13,10 +13,7 @@ export default function DeploySigningKey({ environmentSlug, className }: DeployS
   const [{ data: environment }] = useEnvironment({ environmentSlug });
   const signingKey = environment?.webhookSigningKey || '...';
   const maskedSigningKey = environment?.webhookSigningKey
-    ? environment.webhookSigningKey.replace(
-        /signkey-(prod|test)-.+/,
-        'signkey-$1-<click-to-reveal>'
-      )
+    ? environment.webhookSigningKey.replace(/signkey-(prod|test)-.+/, 'signkey-$1')
     : '...';
 
   return (

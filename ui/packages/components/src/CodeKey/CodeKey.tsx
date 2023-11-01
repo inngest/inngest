@@ -30,7 +30,7 @@ export function CodeKey({ fullKey, maskedKey, label, className }: CodeKeyProps) 
             handleCopyClick(fullKey);
           }}
           title={showKey ? 'Click to hide' : 'Click to reveal'}
-          label={showKey ? fullKey : maskedKey}
+          label={showKey ? fullKey : maskedKey + '-<click-to-reveal>'}
           kind="primary"
         />
         <CopyButton

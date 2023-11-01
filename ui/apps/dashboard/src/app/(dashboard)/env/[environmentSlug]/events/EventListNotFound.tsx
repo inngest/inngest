@@ -96,10 +96,7 @@ export default function EventListNotFound({ environmentSlug }: { environmentSlug
               file or you may need to set it manually on your platform.
             </p>
             <span className="dark mt-4">
-              <CodeKey
-                fullKey={key || '...'}
-                maskedKey={`${key?.substring(0, 6)}-<click-to-reveal>`}
-              />
+              <CodeKey fullKey={key || '...'} maskedKey={`${key?.substring(0, 6)}`} />
             </span>
           </div>
 

@@ -72,11 +72,11 @@ export default async function Keys({
   if (ingestKeys === 'webhooks') {
     value = key.url || '';
     // Leave the base url + the beginning of the key
-    maskedValue = value.replace(/(.{0,}\/e\/)(\w{0,8}).+/, '$1$2...');
+    maskedValue = value.replace(/(.{0,}\/e\/)(\w{0,8}).+/, '$1$2');
     keyLabel = 'Webhook URL';
   } else {
     value = key.presharedKey;
-    maskedValue = value.substring(0, 8) + '...';
+    maskedValue = value.substring(0, 8);
     keyLabel = 'Event Key';
   }
 
