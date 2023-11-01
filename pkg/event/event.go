@@ -105,6 +105,26 @@ func (e Event) Validate(ctx context.Context) error {
 	return nil
 }
 
+type InngestMetadata struct {
+	InvokeFnID          string `json:"fn_id"`
+	InvokeCorrelationId string `json:"correlation_id"`
+}
+
+func (e Event) InngestMetadata() *InngestMetadata {
+	if rawData, ok := e.Data[consts.InngestEventDataPrefix].(map[string]interface{}); ok {
+		jsonData, err := json.Marshal(rawData)
+		if err != nil {
+			return nil
+		}
+		var metadata InngestMetadata
+		if err := json.Unmarshal(jsonData, &metadata); err != nil {
+			return nil
+		}
+		return &metadata
+	}
+	return nil
+}
+
 func NewOSSTrackedEvent(e Event) TrackedEvent {
 	id, err := ulid.Parse(e.ID)
 	if err != nil {
@@ -133,9 +153,9 @@ func (o ossTrackedEvent) GetInternalID() ulid.ULID {
 }
 
 type NewInvocationEventOpts struct {
-	Event           Event
-	FnID            string
-	TriggeringRunID *string
+	Event         Event
+	FnID          string
+	CorrelationID *string
 }
 
 func NewInvocationEvent(opts NewInvocationEventOpts) Event {
@@ -150,13 +170,13 @@ func NewInvocationEvent(opts NewInvocationEventOpts) Event {
 	// Override the name. We create a different event entirely.
 	evt.Name = consts.InvokeEventName
 
-	inngestData := map[string]string{
-		consts.InvokeFnID: opts.FnID,
+	inngestMetadata := InngestMetadata{
+		InvokeFnID: opts.FnID,
 	}
-	if opts.TriggeringRunID != nil && *opts.TriggeringRunID != "" {
-		inngestData[consts.InvokeCorrelationId] = *opts.TriggeringRunID
+	if opts.CorrelationID != nil && *opts.CorrelationID != "" {
+		inngestMetadata.InvokeCorrelationId = *opts.CorrelationID
 	}
-	evt.Data[consts.InngestEventDataPrefix] = inngestData
+	evt.Data[consts.InngestEventDataPrefix] = inngestMetadata
 
 	return evt
 }
