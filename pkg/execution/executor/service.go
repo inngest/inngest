@@ -127,40 +127,42 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 		eg := errgroup.Group{}
 
 		// Legacy - send inngest/function.failed
-		eg.Go(func() error {
-			now := time.Now()
-			evt := event.Event{
-				ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
-				Name:      event.FnFailedName,
-				Timestamp: now.UnixMilli(),
-				Data: map[string]interface{}{
-					"function_id": st.Function().Slug,
-					"run_id":      id.RunID.String(),
-					"error":       r.UserError(),
-					"event":       st.Event(),
-				},
-			}
+		if r.Err != nil {
+			eg.Go(func() error {
+				now := time.Now()
+				evt := event.Event{
+					ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+					Name:      event.FnFailedName,
+					Timestamp: now.UnixMilli(),
+					Data: map[string]interface{}{
+						"function_id": st.Function().Slug,
+						"run_id":      id.RunID.String(),
+						"error":       r.UserError(),
+						"event":       st.Event(),
+					},
+				}
 
-			byt, err := json.Marshal(evt)
-			if err != nil {
-				return fmt.Errorf("error marshalling failure event: %w", err)
-			}
+				byt, err := json.Marshal(evt)
+				if err != nil {
+					return fmt.Errorf("error marshalling failure event: %w", err)
+				}
 
-			err = pb.Publish(
-				ctx,
-				topicName,
-				pubsub.Message{
-					Name:      event.EventReceivedName,
-					Data:      string(byt),
-					Timestamp: now,
-				},
-			)
-			if err != nil {
-				return fmt.Errorf("error publishing failure event: %w", err)
-			}
+				err = pb.Publish(
+					ctx,
+					topicName,
+					pubsub.Message{
+						Name:      event.EventReceivedName,
+						Data:      string(byt),
+						Timestamp: now,
+					},
+				)
+				if err != nil {
+					return fmt.Errorf("error publishing failure event: %w", err)
+				}
 
-			return nil
-		})
+				return nil
+			})
+		}
 
 		// send inngest/function.finished
 		eg.Go(func() error {
