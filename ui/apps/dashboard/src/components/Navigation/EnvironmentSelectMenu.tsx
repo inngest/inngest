@@ -115,7 +115,12 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
                 </>
               ) : selected ? (
                 <>
-                  <span className="mr-2 h-2 w-2 flex-shrink-0 rounded-full bg-cyan-500" />
+                  <span
+                    className={cn(
+                      'mr-2 h-2 w-2 flex-shrink-0 rounded-full',
+                      selected.isArchived ? 'bg-slate-300' : 'bg-cyan-500'
+                    )}
+                  />
                   <span className="block truncate">
                     {selected?.type === EnvironmentType.BranchParent
                       ? 'Branch Environments'
@@ -125,7 +130,6 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
               ) : (
                 <>
                   <CloudIcon className="mr-2 h-4" />
-                  {/* <span className="w-2 h-2 rounded-full bg-cyan-500 mr-2 flex-shrink-0" /> */}
                   <span className="block truncate">All Environments</span>
                 </>
               )}
@@ -178,7 +182,7 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
                 ) : (
                   <Link
                     href="/env"
-                    className="block flex items-center gap-2.5 px-3.5 py-3 font-medium text-slate-300 transition-all hover:bg-slate-800 hover:text-white"
+                    className="flex items-center gap-2.5 px-3.5 py-3 font-medium text-slate-300 transition-all hover:bg-slate-800 hover:text-white"
                   >
                     <RocketLaunchIcon className="h-3" />
                     Deploy a branch
