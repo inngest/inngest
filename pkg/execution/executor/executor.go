@@ -831,9 +831,14 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 			with := withEvt.Map()
 			if withEvt.Name == event.FnFinishedName {
 				// TODO dangerous?
-				// with = map[string]any{}withEvt.Data["result"].(map[string]any)
-				with = map[string]any{
-					"data": withEvt.Data["result"],
+				if withEvt.Data["error"] != nil {
+					with = map[string]any{
+						"error": withEvt.Data["error"],
+					}
+				} else {
+					with = map[string]any{
+						"data": withEvt.Data["result"],
+					}
 				}
 			}
 
