@@ -8,14 +8,48 @@ Inngest will call your functions securely via HTTP request on-demand, whether tr
 
 After you've written your functions using [Next.js](/docs/sdk/serve?ref=docs-deploy-vercel#framework-next-js) or Vercel's [Express-like](/docs/sdk/serve?ref=docs-deploy-vercel#framework-express) functions within your project, you need to serve them via the `serve` handler. Using the `serve` handler, create a Vercel/Next.js function at the `/api/inngest` endpoint. Here's an example in a Next.js app:
 
-```js
-// ./pages/api/inngest.js
-import { serve } from "inngest/next";
-import firstFunction from "../../inngest/first";
-import anotherFunction from "../../inngest/another";
+## Choose the Next.js App Router or Pages Router:
 
-export default serve("Your app's name", [ firstFunction, anotherFunction ]);
+<GuideSelector
+  options={[
+    { key: "nextappdir", title: "Next.js - App Router" },
+    { key: "nextpages", title: "Next.js - Pages Router" }
+  ]}
+>
+
+<GuideSection show="nextpages">
+```ts
+import { serve } from "inngest/next";
+import { client } from "../../inngest/client";
+import { firstFunction, anotherFunction } from "../../inngest/functions";
+
+export default serve({
+  client: client,
+  functions: [
+    firstFunction,
+    anotherFunction
+  ]
+});
 ```
+</GuideSection>
+
+<GuideSection show="nextappdir">
+```ts
+import { serve } from "inngest/next";
+import { client } from "../../inngest/client";
+import { firstFunction, anotherFunction } from "../../inngest/functions";
+
+export const { GET, POST, PUT } = serve({
+  client: client,
+  functions: [
+    firstFunction,
+    anotherFunction
+  ]
+});
+```
+</GuideSection>
+
+</GuideSelector>
 
 ## Deploying to Vercel
 
