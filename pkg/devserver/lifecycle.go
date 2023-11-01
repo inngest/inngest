@@ -87,7 +87,7 @@ func (l lifecycle) OnFunctionFinished(
 
 	evt := event.Event{
 		ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
-		Name:      event.FnCompletedName,
+		Name:      event.FnFinishedName,
 		Timestamp: now.UnixMilli(),
 		Data:      data,
 	}

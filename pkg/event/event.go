@@ -14,7 +14,7 @@ import (
 const (
 	EventReceivedName = "event/event.received"
 	FnFailedName      = "inngest/function.failed"
-	FnCompletedName   = "inngest/function.completed"
+	FnFinishedName    = "inngest/function.finished"
 )
 
 var (

@@ -825,7 +825,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 			// `waitForEvent("inngest/function.completed")`
 			withEvt := evt.GetEvent()
 			with := withEvt.Map()
-			if withEvt.Name == event.FnCompletedName {
+			if withEvt.Name == event.FnFinishedName {
 				// TODO dangerous?
 				// with = map[string]any{}withEvt.Data["result"].(map[string]any)
 				with = map[string]any{
@@ -1212,7 +1212,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		return fmt.Errorf("unable to parse invoke function expires: %w", err)
 	}
 
-	eventName := event.FnCompletedName
+	eventName := event.FnFinishedName
 	correlationID := item.Identifier.RunID.String() + "." + gen.ID
 	strExpr := "async.data." + consts.InvokeCorrelationId + " == '" + correlationID + "'"
 	_, err = e.newExpressionEvaluator(ctx, strExpr)
