@@ -6,7 +6,9 @@ import { CopyButton } from '@inngest/components/CopyButton';
 import { maxRenderedOutputSizeBytes } from '@inngest/components/constants';
 import { useCopyToClipboard } from '@inngest/components/hooks/useCopyToClipboard';
 import { IconArrayDownTray } from '@inngest/components/icons/ArrayDownTray';
+import { IconExpandText } from '@inngest/components/icons/ExpandText';
 import { IconOverflowText } from '@inngest/components/icons/OverflowText';
+import { IconShrinkText } from '@inngest/components/icons/ShrinkText';
 import { IconWrapText } from '@inngest/components/icons/WrapText';
 import { classNames } from '@inngest/components/utils/classNames';
 import Editor, { useMonaco } from '@monaco-editor/react';
@@ -41,6 +43,7 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
 
   const [originalContentHeight, setOriginalContentHeight] = useState(0);
   const [isWordWrap, setIsWordWrap] = useState(false);
+  const [isFullHeight, setIsFullHeight] = useState(false);
 
   const { handleCopyClick, isCopying } = useCopyToClipboard();
 
@@ -105,12 +108,26 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
     }
   }
 
+  const handleFullHeight = () => {
+    if (editorRef.current) {
+      const contentHeight = editorRef?.current?.getContentHeight();
+      const containerWidth = editorRef?.current?.getLayoutInfo().contentWidth;
+      const containerWidthWithLineNumbers =
+        containerWidth + editorRef.current.getLayoutInfo().contentLeft;
+      const newHeight = !isFullHeight || contentHeight < MAX_HEIGHT ? contentHeight : MAX_HEIGHT;
+      editorRef.current.layout({ height: newHeight, width: containerWidthWithLineNumbers });
+      setIsFullHeight(!isFullHeight);
+      setOriginalContentHeight(newHeight);
+    }
+  };
+
   const handleWrapText = () => {
     if (editorRef.current) {
       let containerWidth = editorRef?.current?.getLayoutInfo().contentWidth;
       const containerWidthWithLineNumbers =
         containerWidth + editorRef.current.getLayoutInfo().contentLeft;
       const contentWidth = editorRef?.current?.getContentWidth();
+      const contentHeight = editorRef?.current?.getContentHeight();
 
       // If lines are wider than the container, calculate approximately how many lines the code block has when text is wrapped
       if (contentWidth > containerWidth) {
@@ -133,11 +150,11 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
             }
           }
         }
-        if (totalLinesThatFit > MAX_LINES) {
+        if (totalLinesThatFit > MAX_LINES && !isFullHeight) {
           editorRef?.current?.layout({ height: MAX_HEIGHT, width: containerWidthWithLineNumbers });
         } else {
           editorRef?.current?.layout({
-            height: totalLinesThatFit * LINE_HEIGHT,
+            height: contentHeight + LINE_HEIGHT,
             width: containerWidthWithLineNumbers,
           });
         }
@@ -218,6 +235,15 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
               icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
               btnAction={handleWrapText}
               size="small"
+              aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+              title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+            />
+            <Button
+              btnAction={handleFullHeight}
+              size="small"
+              icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
+              aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
+              title={isFullHeight ? 'Shrink text' : 'Expand text'}
             />
           </div>
         )}
