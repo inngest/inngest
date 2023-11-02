@@ -88,6 +88,7 @@ type FunctionRun struct {
 	History           []*history_reader.RunHistory `json:"history"`
 	HistoryItemOutput *string                      `json:"historyItemOutput,omitempty"`
 	Name              *string                      `json:"name,omitempty"`
+	EventID           string                       `json:"eventID"`
 }
 
 type FunctionRunQuery struct {
