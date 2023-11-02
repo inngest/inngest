@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/publicerr"
 )
 
@@ -43,6 +44,7 @@ func Ping(ctx context.Context, url string) error {
 			},
 		)
 	}
+	req.Header.Set(headers.HeaderKeyServerKind, headers.ServerKindDev)
 	resp, err := Client.Do(req)
 	if err != nil {
 		err = handlePingError(err)
