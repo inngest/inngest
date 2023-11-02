@@ -27,7 +27,7 @@ func ConvertFromEvent(internalID ulid.ULID, e event.Event) Event {
 type Event struct {
 	ID          ulid.ULID  `json:"internal_id"`
 	AccountID   uuid.UUID  `json:"account_id"`
-	WorkspaceID uuid.UUID  `json:"workspace_id"`
+	WorkspaceID uuid.UUID  `json:"environment_id"`
 	Source      string     `json:"source"`
 	SourceID    *uuid.UUID `json:"source_id"`
 	ReceivedAt  time.Time  `json:"received_at"`
