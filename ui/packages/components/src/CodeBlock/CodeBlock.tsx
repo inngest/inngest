@@ -13,6 +13,7 @@ import { IconWrapText } from '@inngest/components/icons/WrapText';
 import { classNames } from '@inngest/components/utils/classNames';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { type editor } from 'monaco-editor';
+import colors from 'tailwindcss/colors';
 
 const LINE_HEIGHT = 26;
 const MAX_HEIGHT = 275; // Equivalent to 10 lines
@@ -67,29 +68,48 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
       rules: [
         {
           token: 'delimiter.bracket.json',
-          foreground: 'cbd5e1', //slate-300
+          foreground: colors.slate['300'],
         },
         {
           token: 'string.key.json',
-          foreground: '818cf8', //indigo-400
+          foreground: colors.indigo['400'],
         },
         {
           token: 'number.json',
-          foreground: 'fbbf24', //amber-400
+          foreground: colors.amber['400'],
         },
         {
           token: 'string.value.json',
-          foreground: '6ee7b7', //emerald-300
+          foreground: colors.emerald['300'],
         },
         {
           token: 'keyword.json',
-          foreground: 'f0abfc', //fuschia-300
+          foreground: colors.fuchsia['300'],
+        },
+        {
+          token: 'comment',
+          fontStyle: 'italic',
+          foreground: colors.slate['500'],
+        },
+        {
+          token: 'string',
+          foreground: colors.teal['400'],
+        },
+        {
+          token: 'keyword',
+          foreground: colors.indigo['400'],
+        },
+        {
+          token: 'entity.name.function',
+          foreground: colors.red['500'],
         },
       ],
       colors: {
         'editor.background': '#1e293b4d', // slate-800/40
         'editorLineNumber.foreground': '#cbd5e14d', // slate-300/30
-        'editorLineNumber.activeForeground': '#CBD5E1', // slate-300
+        'editorLineNumber.activeForeground': colors.slate['300'], // slate-300
+        'editorWidget.background': colors.slate['800'],
+        'editorWidget.border': colors.slate['500'],
       },
     });
   }, [monaco]);
