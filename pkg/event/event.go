@@ -18,6 +18,7 @@ const (
 	// InvokeEventName is the event name used to invoke specific functions via an
 	// API.  Note that invoking functions still sends an event in the usual manner.
 	InvokeFnName = "inngest/function.invoked"
+	FnCronName   = "inngest/scheduled.timer"
 )
 
 var (
@@ -55,8 +56,6 @@ type Event struct {
 	// If this is not provided, we will insert the current time upon receipt of the event
 	Timestamp int64  `json:"ts,omitempty"`
 	Version   string `json:"v,omitempty"`
-
-	Cron *string `json:"cron,omitempty"`
 }
 
 func (evt Event) Time() time.Time {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -23,7 +22,7 @@ type LifecycleListener interface {
 		context.Context,
 		state.Identifier,
 		queue.Item,
-		event.Event,
+		state.State,
 	)
 
 	// OnFunctionStarted is called when the function starts.  This may be
@@ -34,6 +33,7 @@ type LifecycleListener interface {
 		context.Context,
 		state.Identifier,
 		queue.Item,
+		state.State,
 	)
 
 	// OnFunctionFinished is called when a function finishes.  This will
@@ -155,7 +155,7 @@ func (NoopLifecyceListener) OnFunctionScheduled(
 	context.Context,
 	state.Identifier,
 	queue.Item,
-	event.Event,
+	state.State,
 ) {
 }
 
@@ -167,6 +167,7 @@ func (NoopLifecyceListener) OnFunctionStarted(
 	context.Context,
 	state.Identifier,
 	queue.Item,
+	state.State,
 ) {
 }
 

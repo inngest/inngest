@@ -6,7 +6,7 @@ export function useParsedHistory(rawHistory: RawHistoryItem[]): HistoryParser {
 
   useEffect(() => {
     if (rawHistory.length === 0) {
-      if (Object.keys(history.groups).length > 0) {
+      if (Object.keys(history.getGroups()).length > 0) {
         setHistory(new HistoryParser());
       }
 

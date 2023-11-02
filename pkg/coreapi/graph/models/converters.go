@@ -36,6 +36,7 @@ func MakeFunction(f *cqrs.Function) (*Function, error) {
 	}
 
 	return &Function{
+		AppID:       f.AppID.String(),
 		ID:          f.ID.String(),
 		Name:        f.Name,
 		Slug:        f.Slug,
@@ -47,8 +48,16 @@ func MakeFunction(f *cqrs.Function) (*Function, error) {
 }
 
 func MakeFunctionRun(f *cqrs.FunctionRun) *FunctionRun {
-	return &FunctionRun{
+	// TODO: Map GQL types to CQRS types and remove this.
+	r := &FunctionRun{
 		ID:         f.RunID.String(),
 		FunctionID: f.FunctionID.String(),
+		FinishedAt: f.EndedAt,
+		StartedAt:  &f.RunStartedAt,
 	}
+	if len(f.Output) > 0 {
+		str := string(f.Output)
+		r.Output = &str
+	}
+	return r
 }

@@ -12,9 +12,9 @@ type Props = {
 
 export function TimelineNodeHeader({ icon, badge, title, metadata }: Props) {
   return (
-    <div className="flex items-start justify-between leading-7 text-slate-100	">
+    <div className="flex items-start justify-between text-sm leading-8 text-slate-100">
       <div className="mr-2 flex flex-1 items-start gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex h-8 items-center gap-2">
           {icon}
           {badge && (
             <Badge kind="solid" className="bg-slate-800 text-slate-400">
@@ -22,11 +22,11 @@ export function TimelineNodeHeader({ icon, badge, title, metadata }: Props) {
             </Badge>
           )}
         </div>
-        <p className=" flex-1 text-base">{title}</p>
+        <p className="flex-1 align-top leading-8">{title}</p>
       </div>
-      <div className="flex items-center gap-2">
-        <p className="text-xs">{metadata?.label}</p>
-        <p className="text-sm">{metadata?.value}</p>
+      <div className="flex items-center gap-2 leading-8">
+        <p>{metadata?.label}</p>
+        <p>{metadata?.value}</p>
       </div>
     </div>
   );

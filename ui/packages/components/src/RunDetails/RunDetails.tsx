@@ -80,14 +80,14 @@ export function RunDetails({
           <OutputCard content={run.output} type={type} />
         )}
 
-        <WaitingSummary history={history.groups} />
-        <SleepingSummary history={history.groups} />
+        <WaitingSummary history={history} />
+        <SleepingSummary history={history} />
       </div>
 
       <hr className="mt-8 border-slate-800/50" />
       <div className="px-5 pt-4">
         <h3 className="py-4 text-sm text-slate-400">Timeline</h3>
-        <Timeline getOutput={getHistoryItemOutput} history={history.groups} />
+        <Timeline getOutput={getHistoryItemOutput} history={history} />
       </div>
     </ContentCard>
   );

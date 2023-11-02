@@ -19,6 +19,7 @@ const documents = {
     "\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.DisableEnvironmentAutoArchiveDocumentDocument,
     "\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.EnableEnvironmentAutoArchiveDocument,
     "\n  query GetDeploy($deployID: ID!) {\n    deploy(id: $deployID) {\n      id\n      appName\n      authorID\n      checksum\n      createdAt\n      error\n      framework\n      metadata\n      sdkLanguage\n      sdkVersion\n      status\n      url\n\n      deployedFunctions {\n        slug\n        name\n      }\n\n      removedFunctions {\n        slug\n        name\n      }\n    }\n  }\n": types.GetDeployDocument,
+    "\n  query SearchEvents(\n    $environmentID: ID!\n    $fields: [EventSearchFilterField!]!\n    $lowerTime: Time!\n    $upperTime: Time!\n  ) {\n    environment: workspace(id: $environmentID) {\n      id\n      eventSearch(filter: { fields: $fields, lowerTime: $lowerTime, upperTime: $upperTime }) {\n        edges {\n          node {\n            id\n            name\n            receivedAt\n          }\n        }\n        pageInfo {\n          hasNextPage\n          hasPreviousPage\n          startCursor\n          endCursor\n        }\n      }\n    }\n  }\n": types.SearchEventsDocument,
     "\n  query GetEventKeysForBlankSlate($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKeys(filter: { source: \"key\" }) {\n        name\n        presharedKey\n        createdAt\n      }\n    }\n  }\n": types.GetEventKeysForBlankSlateDocument,
     "\n  mutation ArchiveEvent($environmentId: ID!, $name: String!) {\n    archiveEvent(workspaceID: $environmentId, name: $name) {\n      name\n    }\n  }\n": types.ArchiveEventDocument,
     "\n  query GetLatestEventLogs($name: String, $environmentID: ID!) {\n    events(query: { name: $name, workspaceID: $environmentID }) {\n      data {\n        recent(count: 5) {\n          id\n          receivedAt\n          event\n          source {\n            name\n          }\n        }\n      }\n    }\n  }\n": types.GetLatestEventLogsDocument,
@@ -63,6 +64,7 @@ const documents = {
     "\n  mutation DeleteUser($id: ID!) {\n    deleteUser(id: $id)\n  }\n": types.DeleteUserDocument,
     "\n  mutation CreateUser($input: NewUser!) {\n    createUser(input: $input) {\n      id\n    }\n  }\n": types.CreateUserDocument,
     "\n  query GetUsers {\n    account {\n      users {\n        createdAt\n        email\n        id\n        lastLoginAt\n        name\n      }\n    }\n\n    session {\n      user {\n        id\n      }\n    }\n  }\n": types.GetUsersDocument,
+    "\n  mutation CreateWebhook($input: NewIngestKey!) {\n    key: createIngestKey(input: $input) {\n      id\n      url\n    }\n  }\n": types.CreateWebhookDocument,
     "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n": types.GetAccountSupportInfoDocument,
     "\n  query GetAccountName {\n    account {\n      name\n    }\n  }\n": types.GetAccountNameDocument,
     "\n  query GetGlobalSearch($opts: SearchInput!) {\n    account {\n      search(opts: $opts) {\n        results {\n          env {\n            name\n            id\n            type\n          }\n          kind\n          value {\n            ... on ArchivedEvent {\n              id\n              name\n            }\n            ... on FunctionRun {\n              id\n              functionID: workflowID\n            }\n          }\n        }\n      }\n    }\n  }\n": types.GetGlobalSearchDocument,
@@ -118,6 +120,10 @@ export function graphql(source: "\n  mutation EnableEnvironmentAutoArchive($id: 
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetDeploy($deployID: ID!) {\n    deploy(id: $deployID) {\n      id\n      appName\n      authorID\n      checksum\n      createdAt\n      error\n      framework\n      metadata\n      sdkLanguage\n      sdkVersion\n      status\n      url\n\n      deployedFunctions {\n        slug\n        name\n      }\n\n      removedFunctions {\n        slug\n        name\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetDeploy($deployID: ID!) {\n    deploy(id: $deployID) {\n      id\n      appName\n      authorID\n      checksum\n      createdAt\n      error\n      framework\n      metadata\n      sdkLanguage\n      sdkVersion\n      status\n      url\n\n      deployedFunctions {\n        slug\n        name\n      }\n\n      removedFunctions {\n        slug\n        name\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SearchEvents(\n    $environmentID: ID!\n    $fields: [EventSearchFilterField!]!\n    $lowerTime: Time!\n    $upperTime: Time!\n  ) {\n    environment: workspace(id: $environmentID) {\n      id\n      eventSearch(filter: { fields: $fields, lowerTime: $lowerTime, upperTime: $upperTime }) {\n        edges {\n          node {\n            id\n            name\n            receivedAt\n          }\n        }\n        pageInfo {\n          hasNextPage\n          hasPreviousPage\n          startCursor\n          endCursor\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query SearchEvents(\n    $environmentID: ID!\n    $fields: [EventSearchFilterField!]!\n    $lowerTime: Time!\n    $upperTime: Time!\n  ) {\n    environment: workspace(id: $environmentID) {\n      id\n      eventSearch(filter: { fields: $fields, lowerTime: $lowerTime, upperTime: $upperTime }) {\n        edges {\n          node {\n            id\n            name\n            receivedAt\n          }\n        }\n        pageInfo {\n          hasNextPage\n          hasPreviousPage\n          startCursor\n          endCursor\n        }\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -294,6 +300,10 @@ export function graphql(source: "\n  mutation CreateUser($input: NewUser!) {\n  
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetUsers {\n    account {\n      users {\n        createdAt\n        email\n        id\n        lastLoginAt\n        name\n      }\n    }\n\n    session {\n      user {\n        id\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetUsers {\n    account {\n      users {\n        createdAt\n        email\n        id\n        lastLoginAt\n        name\n      }\n    }\n\n    session {\n      user {\n        id\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation CreateWebhook($input: NewIngestKey!) {\n    key: createIngestKey(input: $input) {\n      id\n      url\n    }\n  }\n"): (typeof documents)["\n  mutation CreateWebhook($input: NewIngestKey!) {\n    key: createIngestKey(input: $input) {\n      id\n      url\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

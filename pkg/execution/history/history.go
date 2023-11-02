@@ -23,6 +23,7 @@ type History struct {
 	Cancel               *execution.CancelRequest
 	CompletedStepCount   *int64
 	CreatedAt            time.Time
+	Cron                 *string
 	EventID              ulid.ULID
 	FunctionID           uuid.UUID
 	FunctionVersion      int64

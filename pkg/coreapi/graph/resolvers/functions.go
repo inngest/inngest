@@ -51,7 +51,6 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 		status = models.FunctionRunStatusCancelled
 	}
 
-	startedAt := ulid.Time(runID.Time())
 	name := state.Function().Name
 
 	pending := state.Metadata().Pending
@@ -59,14 +58,21 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 		pending = 0
 	}
 
-	return &models.FunctionRun{
-		ID:           runID.String(),
-		FunctionID:   state.Function().ID.String(),
-		Name:         &name,
-		Status:       &status,
-		PendingSteps: &pending,
-		StartedAt:    &startedAt,
-	}, nil
+	run, err := r.Data.GetFunctionRun(
+		ctx,
+		state.Metadata().Identifier.AccountID,
+		state.Metadata().Identifier.WorkspaceID,
+		runID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("Run ID not found: %w", err)
+	}
+
+	fr := models.MakeFunctionRun(run)
+	fr.PendingSteps = &pending
+	fr.Name = &name
+	fr.Status = &status
+	return fr, nil
 }
 
 func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionRunsQuery) ([]*models.FunctionRun, error) {

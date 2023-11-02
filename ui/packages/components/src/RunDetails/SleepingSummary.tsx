@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import { Card } from '@inngest/components/Card';
 import { MetadataItem } from '@inngest/components/Metadata';
-import type { HistoryNode } from '@inngest/components/utils/historyParser';
+import type { HistoryNode, HistoryParser } from '@inngest/components/utils/historyParser';
 
 type Props = {
-  history: Record<string, HistoryNode>;
+  history: HistoryParser;
 };
 
 export function SleepingSummary({ history }: Props) {
@@ -43,12 +43,12 @@ export function SleepingSummary({ history }: Props) {
   );
 }
 
-function useActiveSleeps(history: Record<string, HistoryNode>): HistoryNode[] {
+function useActiveSleeps(history: HistoryParser): HistoryNode[] {
   const [nodes, setNodes] = useState<HistoryNode[]>([]);
 
   useEffect(() => {
     const newWaits: HistoryNode[] = [];
-    for (const node of Object.values(history)) {
+    for (const node of history.getGroups()) {
       if (node.status === 'sleeping') {
         newWaits.push(node);
       }

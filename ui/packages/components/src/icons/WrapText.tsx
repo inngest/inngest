@@ -2,7 +2,7 @@ export function IconWrapText({ className }: { className?: string }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 13 11"
+      viewBox="-2 -3 16 16"
       fill="none"
       className={className}
       height="16"

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/history_reader"
 )
 
@@ -57,6 +58,8 @@ type Function struct {
 	Concurrency int                `json:"concurrency"`
 	Triggers    []*FunctionTrigger `json:"triggers,omitempty"`
 	URL         string             `json:"url"`
+	AppID       string             `json:"appID"`
+	App         *cqrs.App          `json:"app"`
 }
 
 type FunctionEvent struct {

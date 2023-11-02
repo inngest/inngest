@@ -10,6 +10,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/event"
 	inngest "github.com/inngest/inngest/pkg/inngest"
 	v2 "github.com/oklog/ulid/v2"
 )
@@ -716,4 +717,22 @@ func (m *MockManager) Scheduled(ctx context.Context, i Identifier, step inngest.
 func (mr *MockManagerMockRecorder) Scheduled(ctx, i, step interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Scheduled", reflect.TypeOf((*MockManager)(nil).Scheduled), ctx, i, step)
+}
+
+func (m *MockState) CronSchedule() *string {
+	if data, ok := m.Event()["data"].(map[string]any); ok {
+		if cron, ok := data["cron"].(string); ok && cron != "" {
+			return &cron
+		}
+	}
+
+	return nil
+}
+
+func (m *MockState) IsCron() bool {
+	if name, _ := m.Event()["name"].(string); name != event.FnCronName {
+		return false
+	}
+
+	return true
 }

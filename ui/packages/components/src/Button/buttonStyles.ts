@@ -36,10 +36,14 @@ export const getButtonColors = ({ kind, appearance }: ButtonColorParams) => {
   };
 
   const textButtonStyles = {
-    default: 'text-slate-500 hover:text-slate-500/80 hover:underline',
-    primary: 'text-indigo-500 hover:text-indigo-500/80 hover:underline',
-    success: 'text-emerald-600 hover:text-emerald-600/80 hover:underline',
-    danger: 'text-rose-500 hover:text-rose-500/80 hover:underline',
+    default:
+      'text-slate-500 hover:text-slate-500/80 dark:text-slate-400 dark:hover:text-slate-400/80 hover:underline',
+    primary:
+      'text-indigo-500 hover:text-indigo-500/80 dark:text-indigo-400 hover:text-indigo-400/80 hover:underline',
+    success:
+      'text-emerald-600 hover:text-emerald-600/80 dark:text-emerald-500 dark:hover:text-emerald-500/80 hover:underline',
+    danger:
+      'text-rose-500 hover:text-rose-500/80 dark:text-rose-400 dark:hover:text-rose-400/80 hover:underline',
   };
 
   if (appearance === 'solid') {
@@ -96,8 +100,8 @@ export const getDisabledStyles = ({ appearance, kind }: ButtonColorParams) => {
 export const getIconSizeStyles = ({ size }: ButtonSizeParams) => {
   const sizeStyles = {
     small: 'h-3.5 w-3.5',
-    regular: 'h-3.5 w-3.5',
-    large: 'h-4 w-4',
+    regular: 'h-4 w-4',
+    large: 'h-5 w-5',
   };
 
   return sizeStyles[size];

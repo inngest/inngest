@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"strings"
 
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc"
 	"github.com/inngest/inngest/pkg/enums"
@@ -97,14 +98,24 @@ func (d historyDriver) Write(ctx context.Context, h history.History) (err error)
 	case enums.HistoryTypeFunctionCancelled.String(),
 		enums.HistoryTypeFunctionCompleted.String(),
 		enums.HistoryTypeFunctionFailed.String():
+
+		// We must convert the history type into a proper enums.RunStatus field.
+		status, err := enums.RunStatusString(strings.ReplaceAll(h.Type, "Function", ""))
+		if err != nil {
+			return err
+		}
+
 		// Add a function ends row.
 		end := sqlc.InsertFunctionFinishParams{
 			RunID:     h.RunID,
-			Status:    h.Type,
-			CreatedAt: h.CreatedAt,
+			Status:    sql.NullString{String: status.String(), Valid: true},
+			CreatedAt: sql.NullTime{Time: h.CreatedAt, Valid: true},
+			// TODO: Completed step count.
+			CompletedStepCount: sql.NullInt64{Int64: 0, Valid: true},
 		}
 		if h.Result != nil {
-			end.Output, _ = marshalJSONAsString(h.Result.Output)
+			marshalled, _ := marshalJSONAsString(h.Result.Output)
+			end.Output = sql.NullString{String: marshalled, Valid: true}
 		}
 		return d.q.InsertFunctionFinish(context.Background(), end)
 	default:

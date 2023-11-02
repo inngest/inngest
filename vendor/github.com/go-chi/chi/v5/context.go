@@ -76,6 +76,7 @@ type Context struct {
 
 	// methodNotAllowed hint
 	methodNotAllowed bool
+	methodsAllowed   []methodTyp // allowed methods in case of a 405
 }
 
 // Reset a routing context to its initial state.
@@ -121,7 +122,10 @@ func (x *Context) URLParam(key string) string {
 //   }
 func (x *Context) RoutePattern() string {
 	routePattern := strings.Join(x.RoutePatterns, "")
-	return replaceWildcards(routePattern)
+	routePattern = replaceWildcards(routePattern)
+	routePattern = strings.TrimSuffix(routePattern, "//")
+	routePattern = strings.TrimSuffix(routePattern, "/")
+	return routePattern
 }
 
 // replaceWildcards takes a route pattern and recursively replaces all
@@ -130,7 +134,6 @@ func replaceWildcards(p string) string {
 	if strings.Contains(p, "/*/") {
 		return replaceWildcards(strings.Replace(p, "/*/", "/", -1))
 	}
-
 	return p
 }
 

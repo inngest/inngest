@@ -4,18 +4,24 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jinzhu/copier"
 	"github.com/oklog/ulid/v2"
+)
+
+var (
+	// end represents a ulid ending with 'Z', eg. a far out cursor.
+	endULID = ulid.ULID([16]byte{'Z'})
+	nilULID = ulid.ULID{}
 )
 
 func NewCQRS(db *sql.DB) cqrs.Manager {
@@ -76,6 +82,13 @@ func (w wrapper) GetApps(ctx context.Context) ([]*cqrs.App, error) {
 func (w wrapper) GetAppByChecksum(ctx context.Context, checksum string) (*cqrs.App, error) {
 	f := func(ctx context.Context) (*sqlc.App, error) {
 		return w.q.GetAppByChecksum(ctx, checksum)
+	}
+	return copyInto(ctx, f, &cqrs.App{})
+}
+
+func (w wrapper) GetAppByID(ctx context.Context, id uuid.UUID) (*cqrs.App, error) {
+	f := func(ctx context.Context) (*sqlc.App, error) {
+		return w.q.GetAppByID(ctx, id)
 	}
 	return copyInto(ctx, f, &cqrs.App{})
 }
@@ -236,6 +249,7 @@ func (w wrapper) InsertEvent(ctx context.Context, e cqrs.Event) error {
 	}
 	evt := sqlc.InsertEventParams{
 		InternalID: e.ID,
+		ReceivedAt: time.Now(),
 		EventID:    e.EventID,
 		EventName:  e.EventName,
 		EventData:  string(data),
@@ -252,11 +266,58 @@ func (w wrapper) InsertEvent(ctx context.Context, e cqrs.Event) error {
 func (w wrapper) GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*cqrs.Event, error) {
 	obj, err := w.q.GetEventByInternalID(ctx, internalID)
 	if err != nil {
-		return nil, fmt.Errorf("error quering event in ddb: %w", err)
+		return nil, err
 	}
 	evt := convertEvent(obj)
 	return &evt, nil
 }
+
+func (w wrapper) FindEvent(ctx context.Context, workspaceID uuid.UUID, internalID ulid.ULID) (*cqrs.Event, error) {
+	return w.GetEventByInternalID(ctx, internalID)
+}
+
+func (w wrapper) WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, opts *cqrs.WorkspaceEventsOpts) ([]cqrs.Event, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
+	if opts.Cursor == nil {
+		opts.Cursor = &endULID
+	}
+
+	var (
+		evts []*sqlc.Event
+		err  error
+	)
+
+	if opts.Name == nil {
+		params := sqlc.WorkspaceEventsParams{
+			Cursor: *opts.Cursor,
+			Before: opts.Newest,
+			After:  opts.Oldest,
+			Limit:  int64(opts.Limit),
+		}
+		evts, err = w.q.WorkspaceEvents(ctx, params)
+	} else {
+		params := sqlc.WorkspaceNamedEventsParams{
+			Name:   *opts.Name,
+			Cursor: *opts.Cursor,
+			Before: opts.Newest,
+			After:  opts.Oldest,
+			Limit:  int64(opts.Limit),
+		}
+		evts, err = w.q.WorkspaceNamedEvents(ctx, params)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	out := make([]cqrs.Event, len(evts))
+	for n, evt := range evts {
+		out[n] = convertEvent(evt)
+	}
+	return out, nil
+}
+
 func (w wrapper) GetEventsTimebound(ctx context.Context, t cqrs.Timebound, limit int) ([]*cqrs.Event, error) {
 	after := time.Time{}                           // after the beginning of time, eg all
 	before := time.Now().Add(time.Hour * 24 * 365) // before 1 year in the future, eg all
@@ -287,6 +348,7 @@ func (w wrapper) GetEventsTimebound(ctx context.Context, t cqrs.Timebound, limit
 func convertEvent(obj *sqlc.Event) cqrs.Event {
 	evt := &cqrs.Event{
 		ID:           obj.InternalID,
+		ReceivedAt:   obj.ReceivedAt,
 		EventID:      obj.EventID,
 		EventName:    obj.EventName,
 		EventVersion: obj.EventV.String,
@@ -320,10 +382,34 @@ func (w wrapper) InsertFunctionRun(ctx context.Context, e cqrs.FunctionRun) erro
 	return w.q.InsertFunctionRun(ctx, run)
 }
 
-func (w wrapper) GetFunctionRunsFromEvents(ctx context.Context, eventIDs []ulid.ULID) ([]*cqrs.FunctionRun, error) {
-	return copyInto(ctx, func(ctx context.Context) ([]*sqlc.FunctionRun, error) {
-		return w.q.GetFunctionRunsFromEvents(ctx, eventIDs)
-	}, []*cqrs.FunctionRun{})
+func (w wrapper) GetFunctionRunsFromEvents(
+	ctx context.Context,
+	accountID uuid.UUID,
+	workspaceID uuid.UUID,
+	eventIDs []ulid.ULID,
+) ([]*cqrs.FunctionRun, error) {
+	runs, err := w.q.GetFunctionRunsFromEvents(ctx, eventIDs)
+	if err != nil {
+		return nil, err
+	}
+	result := []*cqrs.FunctionRun{}
+	for _, item := range runs {
+		result = append(result, toCQRSRun(item.FunctionRun, item.FunctionFinish))
+	}
+	return result, nil
+}
+
+func (w wrapper) GetFunctionRun(
+	ctx context.Context,
+	accountID uuid.UUID,
+	workspaceID uuid.UUID,
+	id ulid.ULID,
+) (*cqrs.FunctionRun, error) {
+	item, err := w.q.GetFunctionRun(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return toCQRSRun(item.FunctionRun, item.FunctionFinish), nil
 }
 
 func (w wrapper) GetFunctionRunsTimebound(ctx context.Context, t cqrs.Timebound, limit int) ([]*cqrs.FunctionRun, error) {
@@ -336,16 +422,27 @@ func (w wrapper) GetFunctionRunsTimebound(ctx context.Context, t cqrs.Timebound,
 		before = *t.Before
 	}
 
-	return copyInto(ctx, func(ctx context.Context) ([]*sqlc.FunctionRun, error) {
-		return w.q.GetFunctionRunsTimebound(ctx, sqlc.GetFunctionRunsTimeboundParams{
-			Before: before,
-			After:  after,
-			Limit:  int64(limit),
-		})
-	}, []*cqrs.FunctionRun{})
+	runs, err := w.q.GetFunctionRunsTimebound(ctx, sqlc.GetFunctionRunsTimeboundParams{
+		Before: before,
+		After:  after,
+		Limit:  int64(limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+	result := []*cqrs.FunctionRun{}
+	for _, item := range runs {
+		result = append(result, toCQRSRun(item.FunctionRun, item.FunctionFinish))
+	}
+	return result, nil
 }
 
-func (w wrapper) GetFunctionRunFinishesByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*cqrs.FunctionRunFinish, error) {
+func (w wrapper) GetFunctionRunFinishesByRunIDs(
+	ctx context.Context,
+	accountID uuid.UUID,
+	workspaceID uuid.UUID,
+	runIDs []ulid.ULID,
+) ([]*cqrs.FunctionRunFinish, error) {
 	return copyInto(ctx, func(ctx context.Context) ([]*sqlc.FunctionFinish, error) {
 		return w.q.GetFunctionRunFinishesByRunIDs(ctx, runIDs)
 	}, []*cqrs.FunctionRunFinish{})
@@ -367,6 +464,31 @@ func (w wrapper) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]
 	_, err := w.q.GetFunctionRunHistory(ctx, runID)
 	// TODO: Convert history
 	return nil, err
+}
+
+func toCQRSRun(run sqlc.FunctionRun, finish sqlc.FunctionFinish) *cqrs.FunctionRun {
+	copied := cqrs.FunctionRun{
+		RunID:           run.RunID,
+		RunStartedAt:    run.RunStartedAt,
+		FunctionID:      run.FunctionID,
+		FunctionVersion: run.FunctionVersion,
+		EventID:         run.EventID,
+	}
+	if run.BatchID != nilULID {
+		copied.BatchID = &run.BatchID
+	}
+	if run.OriginalRunID != nilULID {
+		copied.BatchID = &run.OriginalRunID
+	}
+	if run.Cron.Valid {
+		copied.Cron = &run.Cron.String
+	}
+	if finish.Status.Valid {
+		copied.Status, _ = enums.RunStatusString(finish.Status.String)
+		copied.Output = json.RawMessage(finish.Output.String)
+		copied.EndedAt = &finish.CreatedAt.Time
+	}
+	return &copied
 }
 
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types

@@ -20,6 +20,7 @@ type BillingPlanOptionProps = {
   isLowerTierPlan: boolean;
   isActive: boolean;
   isPremium: boolean;
+  isTrial: boolean;
   usagePercentage: number;
   features: Record<string, unknown>;
   preventDowngrade: boolean;
@@ -47,6 +48,7 @@ export default function BillingPlanOption({
   isLowerTierPlan,
   isActive,
   isPremium,
+  isTrial,
   usagePercentage,
   features,
   preventDowngrade,
@@ -68,7 +70,7 @@ export default function BillingPlanOption({
         <PlanBadge variant={isActive || !isLowerTierPlan ? 'primary' : 'default'}>
           {badgeText}
         </PlanBadge>
-        <div className="text-lg font-bold">{cost}</div>
+        <div className="text-lg font-bold">{isTrial ? 'Trial' : cost}</div>
       </Row>
 
       <Row className="mb-1.5">
@@ -91,14 +93,14 @@ export default function BillingPlanOption({
         target={isPremium ? '_blank' : undefined}
         btnAction={!isPremium ? onClick : undefined}
         className="mt-5 w-full"
-        appearance={isActive || isLowerTierPlan ? 'outlined' : 'solid'}
-        kind={isActive ? 'danger' : isLowerTierPlan ? 'default' : 'primary'}
+        appearance={!isPremium && (isActive || isLowerTierPlan) ? 'outlined' : 'solid'}
+        kind={isActive && !isPremium ? 'danger' : isLowerTierPlan ? 'default' : 'primary'}
         disabled={preventDowngrade && isLowerTierPlan}
         label={
-          isLowerTierPlan
-            ? 'Downgrade Plan'
-            : isActive && isPremium
+          isActive && isPremium
             ? 'Contact Account Manager'
+            : isLowerTierPlan
+            ? 'Downgrade Plan'
             : isActive
             ? 'Cancel Subscription'
             : isPremium

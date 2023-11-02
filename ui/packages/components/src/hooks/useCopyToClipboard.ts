@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 export function useCopyToClipboard() {
   const [clickedState, setClickedState] = useState(false);
@@ -8,8 +9,10 @@ export function useCopyToClipboard() {
 
     try {
       await navigator.clipboard.writeText(code);
+      toast.success(`Copied to clipboard`);
     } catch (error) {
       console.error('Failed to copy:', error);
+      toast.error(`Failed to copy`);
     }
 
     setTimeout(() => {
