@@ -341,7 +341,6 @@ export const topLevelNav = [
     title: "Getting started",
     icon: PlayIcon,
     href: "/docs/quick-start",
-    matcher: /\/(getting-started|quick-start)/,
     sectionLinks: sectionGettingStarted,
   },
   {
