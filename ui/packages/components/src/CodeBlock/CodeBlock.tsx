@@ -32,8 +32,11 @@ interface CodeBlockProps {
     color?: string;
   };
   tabs: {
-    label: string;
+    label?: string;
     content: string;
+    readOnly?: boolean;
+    language?: string;
+    handleChange?: (value: string) => void;
   }[];
 }
 
@@ -49,6 +52,9 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
 
   const monaco = useMonaco();
   const content = tabs[activeTab]?.content;
+  const readOnly = tabs[activeTab]?.readOnly ?? true;
+  const language = tabs[activeTab]?.language ?? 'json';
+  const handleChange = tabs[activeTab]?.handleChange ?? undefined;
 
   useEffect(() => {
     if (!monaco) {
@@ -94,6 +100,11 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
 
   function handleEditorDidMount(editor: MonacoEditorType) {
     editorRef.current = editor;
+
+    const element = document.querySelector('.overflow-guard');
+    if (element) {
+      element.classList.add('rounded-b-lg');
+    }
   }
 
   function getTextWidth(text: string, font: string) {
@@ -188,93 +199,93 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
   };
 
   return (
-    <div className="w-full overflow-hidden rounded-lg border border-slate-700/30 bg-slate-800/40 shadow">
-      {header && (
-        <div className={classNames(header.color, 'pt-3')}>
-          {(header.title || header.description) && (
-            <div className="flex flex-col gap-1 px-5 pb-2.5 font-mono text-xs">
-              <p className="text-white">{header.title}</p>
-              <p className="text-white/60">{header.description}</p>
+    <>
+      {monaco && (
+        <div className="bg-slate-910 w-full rounded-lg border border-slate-700/30 bg-slate-800/40 shadow">
+          {header && (
+            <div className={classNames(header.color, 'pt-3')}>
+              {(header.title || header.description) && (
+                <div className="flex flex-col gap-1 px-5 pb-2.5 font-mono text-xs">
+                  <p className="text-white">{header.title}</p>
+                  <p className="text-white/60">{header.description}</p>
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
-      <div className="flex justify-between border-b border-slate-700/20 bg-slate-800/40 shadow">
-        <div className="-mb-px flex">
-          {tabs.map((tab, i) => {
-            const isSingleTab = tabs.length === 1;
-            const isActive = i === activeTab && !isSingleTab;
+          <div className="flex justify-between rounded-t-lg border-b border-slate-700/20 bg-slate-800/40 shadow">
+            <div className="-mb-px flex">
+              {tabs.map((tab, i) => {
+                const isSingleTab = tabs.length === 1;
+                const isActive = i === activeTab && !isSingleTab;
 
-            return (
-              <button
-                key={i}
-                className={classNames(
-                  `px-5 py-2.5 text-xs`,
-                  isSingleTab
-                    ? 'text-slate-400'
-                    : 'block border-b outline-none transition-all duration-150',
-                  isActive && 'border-indigo-400 text-white',
-                  !isActive && !isSingleTab && 'border-transparent text-slate-400'
-                )}
-                onClick={() => handleTabClick(i)}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-        {!isOutputTooLarge && (
-          <div className="mr-2 flex items-center gap-2">
-            <CopyButton
-              size="small"
-              code={content}
-              isCopying={isCopying}
-              handleCopyClick={handleCopyClick}
-            />
-            <Button
-              icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
-              btnAction={handleWrapText}
-              size="small"
-              aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
-              title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
-            />
-            <Button
-              btnAction={handleFullHeight}
-              size="small"
-              icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
-              aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
-              title={isFullHeight ? 'Shrink text' : 'Expand text'}
-            />
+                return (
+                  <button
+                    key={i}
+                    className={classNames(
+                      `px-5 py-2.5 text-xs`,
+                      isSingleTab
+                        ? 'text-slate-400'
+                        : 'block border-b outline-none transition-all duration-150',
+                      isActive && 'border-indigo-400 text-white',
+                      !isActive && !isSingleTab && 'border-transparent text-slate-400'
+                    )}
+                    onClick={() => handleTabClick(i)}
+                  >
+                    {tab?.label}
+                  </button>
+                );
+              })}
+            </div>
+            {!isOutputTooLarge && (
+              <div className="mr-2 flex items-center gap-2 py-2">
+                <CopyButton
+                  size="small"
+                  code={content}
+                  isCopying={isCopying}
+                  handleCopyClick={handleCopyClick}
+                />
+                <Button
+                  icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
+                  btnAction={handleWrapText}
+                  size="small"
+                  aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                  title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                />
+                <Button
+                  btnAction={handleFullHeight}
+                  size="small"
+                  icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
+                  aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
+                  title={isFullHeight ? 'Shrink text' : 'Expand text'}
+                />
+              </div>
+            )}
           </div>
-        )}
-      </div>
-      {isOutputTooLarge ? (
-        <>
-          <div className="bg-amber-500/40 px-5 py-2.5 text-xs text-white">
-            Output size is too large to render {`( > 1MB )`}
-          </div>
-          <div className="flex h-24 items-center justify-center	">
-            <Button
-              label="Download Raw"
-              icon={<IconArrayDownTray />}
-              btnAction={() => downloadJson({ content: content })}
-            />
-          </div>
-        </>
-      ) : (
-        <div>
-          {monaco && (
+          {isOutputTooLarge ? (
+            <>
+              <div className="bg-amber-500/40 px-5 py-2.5 text-xs text-white">
+                Output size is too large to render {`( > 1MB )`}
+              </div>
+              <div className="flex h-24 items-center justify-center	">
+                <Button
+                  label="Download Raw"
+                  icon={<IconArrayDownTray />}
+                  btnAction={() => downloadJson({ content: content })}
+                />
+              </div>
+            </>
+          ) : (
             <Editor
-              defaultLanguage="json"
-              value={content}
+              defaultLanguage={language}
+              defaultValue={content}
               theme="inngest-theme"
               options={{
-                readOnly: true,
+                extraEditorClassName: 'rounded-b-lg',
+                readOnly: readOnly,
                 minimap: {
                   enabled: false,
                 },
                 lineNumbers: 'on',
-                extraEditorClassName: '',
                 contextmenu: false,
                 scrollBeyondLastLine: false,
                 fontFamily: FONT.font,
@@ -305,10 +316,15 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
                   setOriginalContentHeight(contentHeight);
                 }
               }}
+              onChange={(value) => {
+                if (value !== undefined) {
+                  handleChange && handleChange(value);
+                }
+              }}
             />
           )}
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -4,6 +4,7 @@ import { useContext, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
+import { CodeBlock } from '@inngest/components/CodeBlock';
 import { toast } from 'sonner';
 
 import CodeEditor from '@/components/Textarea/CodeEditor';
@@ -170,15 +171,17 @@ export default function TransformEvents({ keyID, metadata, keyName }: FilterEven
           label="Read Documentation"
         />
       </div>
-
-      <div className="mb-6 flex h-full w-full space-y-1.5 rounded-xl bg-slate-900 text-white">
-        <div className="mt-3 w-full px-6 py-2 font-mono text-sm font-light text-white">
-          <CodeEditor
-            language="javascript"
-            initialCode={rawTransform ?? defaultTransform}
-            onCodeChange={handleTransformCodeChange}
-          />
-        </div>
+      <div className="mb-6">
+        <CodeBlock
+          tabs={[
+            {
+              content: rawTransform ?? defaultTransform,
+              readOnly: false,
+              language: 'javascript',
+              handleChange: handleTransformCodeChange,
+            },
+          ]}
+        />
       </div>
       <div className="mb-5 flex gap-5">
         <TransformEditor type="incoming">
