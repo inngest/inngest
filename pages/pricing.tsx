@@ -159,7 +159,7 @@ const PLANS: Plan[] = [
         text: "Seats",
       },
       {
-        quantity: "1,000",
+        quantity: "500",
         text: "Concurrent functions",
       },
       {
