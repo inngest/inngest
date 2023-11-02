@@ -54,6 +54,7 @@ func MakeFunctionRun(f *cqrs.FunctionRun) *FunctionRun {
 		FunctionID: f.FunctionID.String(),
 		FinishedAt: f.EndedAt,
 		StartedAt:  &f.RunStartedAt,
+		EventID:    f.EventID.String(),
 	}
 	if len(f.Output) > 0 {
 		str := string(f.Output)

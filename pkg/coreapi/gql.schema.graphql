@@ -195,6 +195,7 @@ type FunctionRun {
   history: [RunHistoryItem!]!
   historyItemOutput(id: ULID!): String
   name: String @deprecated # use the embedded function field instead.
+  eventID: ID!
 }
 
 enum HistoryType {
