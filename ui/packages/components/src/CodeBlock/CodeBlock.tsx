@@ -16,7 +16,7 @@ import { type editor } from 'monaco-editor';
 import colors from 'tailwindcss/colors';
 
 const LINE_HEIGHT = 26;
-const MAX_HEIGHT = 275; // Equivalent to 10 lines
+const MAX_HEIGHT = 280; // Equivalent to 10 lines
 const MAX_LINES = 10;
 const FONT = {
   size: 13,
@@ -297,7 +297,7 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
           ) : (
             <Editor
               defaultLanguage={language}
-              defaultValue={content}
+              value={content}
               theme="inngest-theme"
               options={{
                 extraEditorClassName: 'rounded-b-lg',

@@ -7,11 +7,9 @@ import { Button } from '@inngest/components/Button';
 import { CodeBlock } from '@inngest/components/CodeBlock';
 import { toast } from 'sonner';
 
-import CodeEditor from '@/components/Textarea/CodeEditor';
 import { getManageKey } from '@/utils/urls';
 import makeVM from '@/utils/vm';
 import { Context } from './Context';
-import { TransformEditor } from './TransformEditor';
 
 type FilterEventsProps = {
   keyID: string;
@@ -184,16 +182,34 @@ export default function TransformEvents({ keyID, metadata, keyName }: FilterEven
         />
       </div>
       <div className="mb-5 flex gap-5">
-        <TransformEditor type="incoming">
-          <CodeEditor
-            language="json"
-            initialCode={incoming}
-            onCodeChange={handleIncomingCodeChange}
+        <div className="w-6/12">
+          <h2 className="pb-1 text-lg font-semibold">Incoming Event JSON</h2>
+          <p className="mb-6 text-sm text-slate-700">
+            Paste the incoming JSON payload here to test your transform.
+          </p>
+          <CodeBlock
+            tabs={[
+              {
+                content: incoming,
+                readOnly: false,
+                language: 'json',
+                handleChange: handleIncomingCodeChange,
+              },
+            ]}
           />
-        </TransformEditor>
-        <TransformEditor type="transformed">
-          <CodeEditor language="javascript" initialCode={output} readOnly={true} />
-        </TransformEditor>
+        </div>
+        <div className="w-6/12">
+          <h2 className="pb-1 text-lg font-semibold">Transformed Event</h2>
+          <p className="mb-6 text-sm text-slate-700">Preview the transformed JSON payload here.</p>
+          <CodeBlock
+            tabs={[
+              {
+                content: output,
+                language: 'json',
+              },
+            ]}
+          />
+        </div>
       </div>
       <div className="mb-8 flex justify-end">
         <Button kind="primary" disabled={isDisabled} type="submit" label="Save Transform Changes" />
