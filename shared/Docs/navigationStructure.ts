@@ -382,8 +382,9 @@ export const topLevelNav = [
       {
         title: "REST API",
         icon: CommandLineIcon,
-        href: `/docs/reference/rest-api`,
-        tag: "Coming soon",
+        href: `https://api-docs.inngest.com/docs/inngest-api`,
+        tag: "In progress",
+        target: "_blank",
       },
     ],
   },

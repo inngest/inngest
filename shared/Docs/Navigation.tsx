@@ -39,6 +39,7 @@ function NavLink({
   isTopLevel = false,
   className = "",
   children,
+  target,
 }: {
   href: string;
   tag?: any;
@@ -46,12 +47,14 @@ function NavLink({
   isAnchorLink?: boolean;
   isTopLevel?: boolean;
   className?: string;
+  target?: string;
   children: React.ReactNode;
 }) {
   return (
-    <Link
+    <LinkOrHref
       href={href}
       aria-current={active ? "page" : undefined}
+      target={target}
       className={clsx(
         "flex justify-between gap-2 py-1 pr-3 text-sm font-medium transition group", // group for nested hovers
         isTopLevel ? "pl-0" : isAnchorLink ? "pl-7" : "pl-4",
@@ -67,8 +70,17 @@ function NavLink({
           {tag}
         </Tag>
       )}
-    </Link>
+    </LinkOrHref>
   );
+}
+
+// LinkOrHref returns a standard link with target="_blank" if we want to open a docs
+// link in a new tab.
+const LinkOrHref = (props: any) => {
+  if (props.target === "_blank") {
+    return <a {...props} />
+  }
+  return <Link {...props} />
 }
 
 function VisibleSectionHighlight({ group, pathname }) {
@@ -298,6 +310,7 @@ export function Navigation(props) {
                         key={idx}
                         isTopLevel={true}
                         tag={link.tag}
+                        target={link.target}
                       >
                         <span className="flex flex-row gap-3 items-center">
                           {link.icon && (
