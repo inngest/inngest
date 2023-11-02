@@ -3,8 +3,10 @@ package driver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/gowebpki/jcs"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -35,12 +37,21 @@ func MarshalV1(
 	attempt int,
 ) ([]byte, error) {
 	md := s.Metadata()
+
+	// For event (`map[string]any`), if the "name" is set to `event.InvokeFnName`, we should
+	// overwrite it with the "name" of the trigger, accessed via `s.Function().Triggers`.
+	fn := s.Function()
+	events, err := mapInvocationEventNames(s.Events(), fn)
+	if err != nil {
+		return nil, fmt.Errorf("error mapping invocation event names: %w", err)
+	}
+
 	req := &SDKRequest{
-		Events:  s.Events(),
-		Event:   s.Event(),
+		Events:  events,
+		Event:   events[0],
 		Actions: s.Actions(),
 		Context: &SDKRequestContext{
-			FunctionID: s.Function().ID,
+			FunctionID: fn.ID,
 			Env:        env,
 			StepID:     step.ID,
 			RunID:      s.RunID(),
@@ -64,8 +75,32 @@ func MarshalV1(
 
 	j, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error marshalling request to JSON: %w", err)
 	}
 
-	return jcs.Transform(j)
+	b, err := jcs.Transform(j)
+	if err != nil {
+		return nil, fmt.Errorf("error transforming request with JCS: %w", err)
+	}
+
+	return b, nil
+}
+
+func mapInvocationEventNames(events []map[string]any, fn inngest.Function) ([]map[string]any, error) {
+	for _, evt := range events {
+		if name, ok := evt["name"].(string); !ok || name != event.InvokeFnName {
+			continue
+		}
+
+		if len(fn.Triggers) != 1 {
+			return nil, fmt.Errorf("invocation event found, but function %s has %d triggers; could not fill in invocation event name automatically", fn.Slug, len(fn.Triggers))
+		}
+
+		trigger := fn.Triggers[0]
+		// Crons can keep the original event name
+		if trigger.EventTrigger != nil && trigger.Event != "" {
+			evt["name"] = trigger.Event
+		}
+	}
+	return events, nil
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/config"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -343,7 +342,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqrs.ExecutionLoader) (*inngest.Function, error) {
 	evt := tracked.GetEvent()
 
-	if evt.Name != consts.InvokeEventName {
+	if evt.Name != event.InvokeFnName {
 		return nil, nil
 	}
 

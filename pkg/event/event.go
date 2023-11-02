@@ -15,6 +15,9 @@ const (
 	EventReceivedName = "event/event.received"
 	FnFailedName      = "inngest/function.failed"
 	FnFinishedName    = "inngest/function.finished"
+	// InvokeEventName is the event name used to invoke specific functions via an
+	// API.  Note that invoking functions still sends an event in the usual manner.
+	InvokeFnName = "inngest/function.invoked"
 )
 
 var (
@@ -168,7 +171,7 @@ func NewInvocationEvent(opts NewInvocationEventOpts) Event {
 	}
 
 	// Override the name. We create a different event entirely.
-	evt.Name = consts.InvokeEventName
+	evt.Name = InvokeFnName
 
 	inngestMetadata := InngestMetadata{
 		InvokeFnID: opts.FnID,
