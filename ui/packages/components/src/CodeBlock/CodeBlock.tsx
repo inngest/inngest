@@ -13,10 +13,11 @@ import { IconWrapText } from '@inngest/components/icons/WrapText';
 import { classNames } from '@inngest/components/utils/classNames';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { type editor } from 'monaco-editor';
+import { useLocalStorage } from 'react-use';
 import colors from 'tailwindcss/colors';
 
 const LINE_HEIGHT = 26;
-const MAX_HEIGHT = 280; // Equivalent to 10 lines
+const MAX_HEIGHT = 280; // Equivalent to 10 lines + padding
 const MAX_LINES = 10;
 const FONT = {
   size: 13,
@@ -45,9 +46,8 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
   const [activeTab, setActiveTab] = useState(0);
   const editorRef = useRef<MonacoEditorType>(null);
 
-  const [originalContentHeight, setOriginalContentHeight] = useState(0);
-  const [isWordWrap, setIsWordWrap] = useState(false);
-  const [isFullHeight, setIsFullHeight] = useState(false);
+  const [isWordWrap, setIsWordWrap] = useLocalStorage('isWordWrap', false);
+  const [isFullHeight, setIsFullHeight] = useLocalStorage('isFullHeight', false);
 
   const { handleCopyClick, isCopying } = useCopyToClipboard();
 
@@ -114,6 +114,12 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
     });
   }, [monaco]);
 
+  useEffect(() => {
+    if (editorRef.current) {
+      updateEditorLayout(editorRef.current);
+    }
+  }, [isWordWrap, isFullHeight]);
+
   const handleTabClick = (index: number) => {
     setActiveTab(index);
   };
@@ -139,65 +145,110 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
     }
   }
 
+  function updateEditorLayout(editor: MonacoEditorType) {
+    const container = editor?.getDomNode();
+    if (!editor || !container) return;
+    const containerWidthWithLineNumbers = container.getBoundingClientRect().width;
+
+    if (!isWordWrap) {
+      const contentHeight = editor.getContentHeight();
+      const contentHeightWithScroll =
+        contentHeight + editor.getLayoutInfo().horizontalScrollbarHeight;
+
+      const linesContent = editor.getModel()?.getLinesContent();
+      const containerWidth = containerWidthWithLineNumbers - editor.getLayoutInfo().contentLeft;
+
+      let isScroll = false;
+
+      if (linesContent) {
+        for (let lineNumber = 1; lineNumber <= linesContent.length; lineNumber++) {
+          const lineContent = linesContent[lineNumber - 1];
+          const lineLength = lineContent
+            ? getTextWidth(lineContent, `${FONT.size}px ${FONT.font}, ${FONT.type}`)
+            : 0;
+
+          if (lineLength > containerWidth) {
+            isScroll = true;
+            break;
+          }
+        }
+      }
+
+      const newHeight = isScroll ? contentHeightWithScroll : contentHeight;
+
+      if (isFullHeight) {
+        editor.layout({ height: newHeight, width: containerWidthWithLineNumbers });
+      } else {
+        const height = Math.min(MAX_HEIGHT, contentHeight);
+        editor.layout({ height: height, width: containerWidthWithLineNumbers });
+      }
+    }
+
+    if (isWordWrap) {
+      const containerWidth =
+        container.getBoundingClientRect().width -
+        editor.getLayoutInfo().contentLeft -
+        editor.getLayoutInfo().verticalScrollbarWidth;
+      const linesContent = editor.getModel()?.getLinesContent();
+      let totalLinesThatFit = 0;
+
+      if (containerWidth && linesContent && linesContent.length > 0) {
+        for (let lineNumber = 1; lineNumber <= linesContent.length; lineNumber++) {
+          const lineContent = linesContent[lineNumber - 1];
+
+          const lineLength = lineContent
+            ? getTextWidth(lineContent, `${FONT.size}px ${FONT.font}, ${FONT.type}`)
+            : 0;
+
+          if (lineLength <= containerWidth) {
+            totalLinesThatFit++;
+          } else {
+            // When using word wrap, monaco breaks keys and values in different lines
+            const keyValuePair = lineContent?.split(':');
+            let linesNeeded = 1;
+            if (keyValuePair && keyValuePair.length === 2 && keyValuePair[0] && keyValuePair[1]) {
+              const initialSpaces = (keyValuePair[0]?.match(/^\s*/) || [])[0];
+              const keyLength = getTextWidth(
+                keyValuePair[0] ?? '',
+                `${FONT.size}px ${FONT.font}, ${FONT.type}`
+              );
+              const valueLength = getTextWidth(
+                keyValuePair[1] + initialSpaces,
+                `${FONT.size}px ${FONT.font}, ${FONT.type}`
+              );
+              const keyLinesNeeded = Math.ceil(keyLength / containerWidth);
+              const valueLinesNeeded = Math.ceil(valueLength / containerWidth);
+              linesNeeded = keyLinesNeeded + valueLinesNeeded;
+            } else {
+              linesNeeded = Math.ceil(lineLength / containerWidth);
+            }
+            totalLinesThatFit += linesNeeded;
+          }
+        }
+      }
+
+      if (totalLinesThatFit > MAX_LINES && !isFullHeight) {
+        editor.layout({ height: MAX_HEIGHT, width: containerWidthWithLineNumbers });
+      } else {
+        editor.layout({
+          height: totalLinesThatFit * LINE_HEIGHT + 20,
+          width: containerWidthWithLineNumbers,
+        });
+      }
+    }
+  }
+
   const handleFullHeight = () => {
     if (editorRef.current) {
-      const contentHeight = editorRef?.current?.getContentHeight();
-      const containerWidth = editorRef?.current?.getLayoutInfo().contentWidth;
-      const containerWidthWithLineNumbers =
-        containerWidth + editorRef.current.getLayoutInfo().contentLeft;
-      const newHeight = !isFullHeight || contentHeight < MAX_HEIGHT ? contentHeight : MAX_HEIGHT;
-      editorRef.current.layout({ height: newHeight, width: containerWidthWithLineNumbers });
       setIsFullHeight(!isFullHeight);
-      setOriginalContentHeight(newHeight);
     }
   };
 
   const handleWrapText = () => {
+    const newWordWrap = isWordWrap ? 'off' : 'on';
+    setIsWordWrap(!isWordWrap);
     if (editorRef.current) {
-      let containerWidth = editorRef?.current?.getLayoutInfo().contentWidth;
-      const containerWidthWithLineNumbers =
-        containerWidth + editorRef.current.getLayoutInfo().contentLeft;
-      const contentWidth = editorRef?.current?.getContentWidth();
-      const contentHeight = editorRef?.current?.getContentHeight();
-
-      // If lines are wider than the container, calculate approximately how many lines the code block has when text is wrapped
-      if (contentWidth > containerWidth) {
-        const linesContent = editorRef?.current?.getModel()?.getLinesContent();
-        let totalLinesThatFit = 0;
-
-        if (linesContent && linesContent.length > 0) {
-          for (let lineNumber = 1; lineNumber <= linesContent.length; lineNumber++) {
-            const lineContent = linesContent[lineNumber - 1];
-
-            const lineLength = lineContent
-              ? getTextWidth(lineContent, `${FONT.size}px ${FONT.font}, ${FONT.type}`)
-              : 0;
-
-            if (lineLength <= containerWidth) {
-              totalLinesThatFit++;
-            } else {
-              const linesNeeded = Math.ceil(lineLength / containerWidth);
-              totalLinesThatFit += linesNeeded;
-            }
-          }
-        }
-        if (totalLinesThatFit > MAX_LINES && !isFullHeight) {
-          editorRef?.current?.layout({ height: MAX_HEIGHT, width: containerWidthWithLineNumbers });
-        } else {
-          editorRef?.current?.layout({
-            height: contentHeight + LINE_HEIGHT,
-            width: containerWidthWithLineNumbers,
-          });
-        }
-      } else {
-        editorRef.current.layout({
-          height: originalContentHeight,
-          width: containerWidthWithLineNumbers,
-        });
-      }
-      const newWordWrap = isWordWrap ? 'off' : 'on';
       editorRef.current.updateOptions({ wordWrap: newWordWrap });
-      setIsWordWrap(!isWordWrap);
     }
   };
 
@@ -223,7 +274,7 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
       {monaco && (
         <div className="bg-slate-910 w-full rounded-lg border border-slate-700/30 bg-slate-800/40 shadow">
           {header && (
-            <div className={classNames(header.color, 'pt-3')}>
+            <div className={classNames(header.color, 'rounded-t-lg pt-3')}>
               {(header.title || header.description) && (
                 <div className="flex flex-col gap-1 px-5 pb-2.5 font-mono text-xs">
                   <p className="text-white">{header.title}</p>
@@ -232,7 +283,12 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
               )}
             </div>
           )}
-          <div className="flex justify-between rounded-t-lg border-b border-slate-700/20 bg-slate-800/40 shadow">
+          <div
+            className={classNames(
+              !header && 'rounded-t-lg',
+              'flex justify-between border-b border-slate-700/20 bg-slate-800/40 shadow'
+            )}
+          >
             <div className="-mb-px flex">
               {tabs.map((tab, i) => {
                 const isSingleTab = tabs.length === 1;
@@ -300,7 +356,7 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
               value={content}
               theme="inngest-theme"
               options={{
-                extraEditorClassName: 'rounded-b-lg',
+                extraEditorClassName: 'rounded-b-lg !w-full',
                 readOnly: readOnly,
                 minimap: {
                   enabled: false,
@@ -324,21 +380,16 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
                   top: 10,
                   bottom: 10,
                 },
+                wordWrap: isWordWrap ? 'on' : 'off',
               }}
               onMount={(editor) => {
                 handleEditorDidMount(editor);
-                const contentHeight = editor.getContentHeight();
-                if (contentHeight > MAX_HEIGHT) {
-                  editor.layout({ height: MAX_HEIGHT, width: 0 });
-                  setOriginalContentHeight(MAX_HEIGHT);
-                } else {
-                  editor.layout({ height: contentHeight, width: 0 });
-                  setOriginalContentHeight(contentHeight);
-                }
+                updateEditorLayout(editor);
               }}
               onChange={(value) => {
                 if (value !== undefined) {
                   handleChange && handleChange(value);
+                  updateEditorLayout(editorRef.current);
                 }
               }}
             />

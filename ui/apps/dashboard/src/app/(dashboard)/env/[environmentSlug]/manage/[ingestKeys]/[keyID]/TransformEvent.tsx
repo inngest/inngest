@@ -173,6 +173,7 @@ export default function TransformEvents({ keyID, metadata, keyName }: FilterEven
         <CodeBlock
           tabs={[
             {
+              label: 'Payload',
               content: rawTransform ?? defaultTransform,
               readOnly: false,
               language: 'javascript',
@@ -190,6 +191,7 @@ export default function TransformEvents({ keyID, metadata, keyName }: FilterEven
           <CodeBlock
             tabs={[
               {
+                label: 'Payload',
                 content: incoming,
                 readOnly: false,
                 language: 'json',
@@ -204,6 +206,7 @@ export default function TransformEvents({ keyID, metadata, keyName }: FilterEven
           <CodeBlock
             tabs={[
               {
+                label: 'Payload',
                 content: output,
                 language: 'json',
               },
