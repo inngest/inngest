@@ -826,11 +826,18 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 
 			withEvt := evt.GetEvent()
 			with := withEvt.Map()
+			var runID *ulid.ULID
 
 			isInvokeFunctionOpcode := pause.Opcode != nil && *pause.Opcode == enums.OpcodeInvokeFunction.String()
 			isFnFinishedEvent := withEvt.Name == event.FnFinishedName
 
 			if isInvokeFunctionOpcode && isFnFinishedEvent {
+				if retRunID, ok := withEvt.Data["run_id"].(string); ok {
+					if ulidRunID, _ := ulid.Parse(retRunID); ulidRunID != (ulid.ULID{}) {
+						runID = &ulidRunID
+					}
+				}
+
 				if errorData, errorExists := withEvt.Data["error"]; errorExists {
 					with = map[string]any{"error": errorData}
 				} else if resultData, resultExists := withEvt.Data["result"]; resultExists {
@@ -843,6 +850,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 			err := e.Resume(ctx, *pause, execution.ResumeRequest{
 				With:    with,
 				EventID: &evtID,
+				RunID:   runID,
 			})
 			if err != nil {
 				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))

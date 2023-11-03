@@ -168,4 +168,5 @@ type CancelRequest struct {
 type ResumeRequest struct {
 	With    any
 	EventID *ulid.ULID
+	RunID   *ulid.ULID
 }
