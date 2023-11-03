@@ -6,6 +6,7 @@ import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
+import AppLink from '@/components/AppLink';
 import Input from '@/components/Forms/Input';
 import { graphql } from '@/gql';
 
@@ -47,11 +48,34 @@ export default function CreateEnvironment({}) {
   return (
     <>
       <h2 className="text-lg font-medium text-slate-800">Create an Environment</h2>
-      <p className="my-4 max-w-[400px] text-sm font-medium text-slate-600">
-        You can create a new fully isolated environment like <em>Staging</em> or <em>QA</em> for
-        your developer workflow needs
+      <p className="my-4 max-w-[600px] text-sm font-medium text-slate-600">
+        Create a shared, non-production environment like staging, QA, or canary.
       </p>
-      <form onSubmit={handleSubmit} className="flex flex-col items-start gap-4">
+      <div className="my-4 rounded-lg bg-slate-50 px-6 py-4">
+        <p className="mb-4 max-w-[600px] text-sm font-medium text-slate-600">
+          Some key things to know about custom environments:
+        </p>
+        <ul className="ml-8 flex list-disc flex-col gap-2 text-sm font-medium text-slate-600">
+          <li>
+            Each environment has its own keys, event history, and functions. All data is isolated
+            within each environment.
+          </li>
+          <li>
+            You can deploy multiple apps to the same environment to fully simulate your production
+            environment.
+          </li>
+          <li>You can create as many environments as you need.</li>
+        </ul>
+        <p className="mt-4 max-w-[600px] text-sm font-medium text-slate-600">
+          <AppLink
+            href="https://www.inngest.com/docs/platform/environments#custom-environments"
+            target="_blank"
+          >
+            Read the docs to learn more
+          </AppLink>
+        </p>
+      </div>
+      <form onSubmit={handleSubmit} className="my-8 flex flex-row items-start gap-4">
         <Input
           className="min-w-[300px]"
           type="text"
@@ -62,6 +86,14 @@ export default function CreateEnvironment({}) {
         />
         <Button kind="primary" type="submit" disabled={isDisabled} label="Create Environment" />
       </form>
+      <div className="mt-16 flex">
+        <Button
+          href="/env"
+          kind="default"
+          appearance="outlined"
+          label="← Back to all environments"
+        />
+      </div>
     </>
   );
 }
