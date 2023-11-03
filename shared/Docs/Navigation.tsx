@@ -289,7 +289,7 @@ export function Navigation(props) {
         ) : (
           topLevelNav.map((item, idx) =>
             item.href ? (
-              <li>
+              <li key={idx}>
                 <NavLink href={item.href} key={idx} isTopLevel={true}>
                   <span className="flex flex-row gap-3 items-center">
                     {item.icon && (
@@ -300,8 +300,8 @@ export function Navigation(props) {
                 </NavLink>
               </li>
             ) : (
-              <li className="mt-6">
-                <h2 className="text-xs font-semibold text-slate-900 dark:text-white uppercase font-mono">
+              <li className="mt-6" key={idx}>
+                <h2 className="text-xs font-semibold text-slate-900 dark:text-white uppercase">
                   {item.title}
                 </h2>
                 <ul role="list" className="mt-3 flex flex-col gap-2">

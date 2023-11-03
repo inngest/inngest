@@ -1,0 +1,28 @@
+# Frequently Asked Questions
+
+- [How do I run crons only in production?](#how-do-i-run-crons-only-in-production)
+- [Why am I getting “Event key not found" errors in branch environments?](#why-am-i-getting-event-key-not-found-errors-in-branch-environments)
+- [How do I specify multiple serve paths for a same Vercel application on the Dashboard?](#why-am-i-getting-event-key-not-found-errors-in-branch-environments)
+- [What's the recommended way to redact data from step outputs?](#what-s-the-recommended-way-to-redact-data-from-step-outputs)
+
+## How do I run crons only in production?
+
+There are multiple ways to achieve it:
+1. Conditionally rendering depending on the environment.
+```javascript 
+process.env.NODE_ENV === "production" ? { cron: "* * *" } : { event: "dev/manualXYZ" }
+```
+💡 If you render an event instead of a cron in the other environments, you can still trigger your functions manually if needed.
+
+2. [Disable branch environments](https://www.inngest.com/docs/platform/environments#disabling-branch-environments-in-vercel).
+
+## Why am I getting “Event key not found" errors in branch environments?
+Branch environments are [automatically archived](https://www.inngest.com/docs/platform/environments#archiving-branch-environments) 3 days after their latest deploy.
+It's possible to disable the auto archive functionality for each active environment on our [dashboard](https://app.inngest.com/env).
+
+
+## How do I specify multiple serve paths for a same Vercel application on the dashboard?
+You can pass multiple paths as comma-delimited values under the Vercel app in the [Vercel Integration’s settings](https://app.inngest.com/settings/integrations/vercel).
+
+## What's the recommended way to redact data from step outputs?
+We recommend doing [E2E encryption](https://www.inngest.com/docs/reference/middleware/examples#e2-e-encryption) instead, as it's more secure and plaintext data never leaves your servers. 

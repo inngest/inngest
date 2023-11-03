@@ -8,6 +8,7 @@ import {
   PlayIcon,
   CommandLineIcon,
   LifebuoyIcon,
+  QuestionMarkCircleIcon,
 } from "@heroicons/react/24/outline";
 
 // A basic link in the nav
@@ -390,6 +391,11 @@ export const topLevelNav = [
   {
     title: "Help",
     links: [
+      {
+        title: "FAQs",
+        icon: QuestionMarkCircleIcon,
+        href: `/docs/faq`,
+      },
       {
         title: "Status Page",
         icon: StatusIcon,
