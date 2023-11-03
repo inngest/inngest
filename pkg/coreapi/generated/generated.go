@@ -107,6 +107,7 @@ type ComplexityRoot struct {
 
 	FunctionRun struct {
 		Event             func(childComplexity int) int
+		EventID           func(childComplexity int) int
 		FinishedAt        func(childComplexity int) int
 		Function          func(childComplexity int) int
 		FunctionID        func(childComplexity int) int
@@ -562,6 +563,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FunctionRun.Event(childComplexity), true
+
+	case "FunctionRun.eventID":
+		if e.complexity.FunctionRun.EventID == nil {
+			break
+		}
+
+		return e.complexity.FunctionRun.EventID(childComplexity), true
 
 	case "FunctionRun.finishedAt":
 		if e.complexity.FunctionRun.FinishedAt == nil {
@@ -1514,6 +1522,7 @@ type FunctionRun {
   history: [RunHistoryItem!]!
   historyItemOutput(id: ULID!): String
   name: String @deprecated # use the embedded function field instead.
+  eventID: ID!
 }
 
 enum HistoryType {
@@ -2801,6 +2810,8 @@ func (ec *executionContext) fieldContext_Event_functionRuns(ctx context.Context,
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
 			case "name":
 				return ec.fieldContext_FunctionRun_name(ctx, field)
+			case "eventID":
+				return ec.fieldContext_FunctionRun_eventID(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRun", field.Name)
 		},
@@ -3344,6 +3355,8 @@ func (ec *executionContext) fieldContext_FunctionEvent_functionRun(ctx context.C
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
 			case "name":
 				return ec.fieldContext_FunctionRun_name(ctx, field)
+			case "eventID":
+				return ec.fieldContext_FunctionRun_eventID(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRun", field.Name)
 		},
@@ -4190,6 +4203,50 @@ func (ec *executionContext) fieldContext_FunctionRun_name(ctx context.Context, f
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionRun_eventID(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRun) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionRun_eventID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EventID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionRun_eventID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionRun",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
 		},
 	}
 	return fc, nil
@@ -5218,6 +5275,8 @@ func (ec *executionContext) fieldContext_Query_functionRun(ctx context.Context, 
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
 			case "name":
 				return ec.fieldContext_FunctionRun_name(ctx, field)
+			case "eventID":
+				return ec.fieldContext_FunctionRun_eventID(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRun", field.Name)
 		},
@@ -5302,6 +5361,8 @@ func (ec *executionContext) fieldContext_Query_functionRuns(ctx context.Context,
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
 			case "name":
 				return ec.fieldContext_FunctionRun_name(ctx, field)
+			case "eventID":
+				return ec.fieldContext_FunctionRun_eventID(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRun", field.Name)
 		},
@@ -6871,6 +6932,8 @@ func (ec *executionContext) fieldContext_StepEvent_functionRun(ctx context.Conte
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
 			case "name":
 				return ec.fieldContext_FunctionRun_name(ctx, field)
+			case "eventID":
+				return ec.fieldContext_FunctionRun_eventID(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRun", field.Name)
 		},
@@ -7500,6 +7563,8 @@ func (ec *executionContext) fieldContext_StreamItem_runs(ctx context.Context, fi
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
 			case "name":
 				return ec.fieldContext_FunctionRun_name(ctx, field)
+			case "eventID":
+				return ec.fieldContext_FunctionRun_eventID(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRun", field.Name)
 		},
@@ -9657,7 +9722,6 @@ func (ec *executionContext) _FunctionRunEvent(ctx context.Context, sel ast.Selec
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
-	panic(fmt.Errorf("unexpected type %T", obj))
 }
 
 // endregion ************************** interface.gotpl ***************************
@@ -10325,6 +10389,13 @@ func (ec *executionContext) _FunctionRun(ctx context.Context, sel ast.SelectionS
 
 			out.Values[i] = ec._FunctionRun_name(ctx, field, obj)
 
+		case "eventID":
+
+			out.Values[i] = ec._FunctionRun_eventID(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

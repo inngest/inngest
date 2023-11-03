@@ -22,6 +22,33 @@ export function isTrialPlan(plan: Partial<BillingPlan>): boolean {
   return Boolean(plan.name?.match(/Trial/i));
 }
 
+function getAdditionalStepRate(plan: BillingPlan): { cost: number; quantity: string } {
+  if (plan.name.toLowerCase() === 'startup') {
+    // $150 plan was add mid 2023
+    if (plan.amount === 14900) {
+      return {
+        cost: 1000,
+        quantity: '1M',
+      };
+    }
+    // The current default of the $350 plan
+    return {
+      cost: 500,
+      quantity: '200k',
+    };
+  } else if (plan.name.toLowerCase() === 'team') {
+    return {
+      cost: 100,
+      quantity: '10k',
+    };
+  }
+  // Default to $10/1M
+  return {
+    cost: 1000,
+    quantity: '1M',
+  };
+}
+
 export function transformPlan({
   plan,
   currentPlan,
@@ -53,17 +80,7 @@ export function transformPlan({
   // NOTE - Have to hard code this for now before backend support for this
   let additionalSteps;
   if (isUsagePlan) {
-    if (plan.name.toLowerCase() === 'startup') {
-      additionalSteps = {
-        cost: 1000,
-        quantity: '1M',
-      };
-    } else if (plan.name.toLowerCase() === 'team') {
-      additionalSteps = {
-        cost: 100,
-        quantity: '10k',
-      };
-    }
+    additionalSteps = getAdditionalStepRate(plan);
   }
 
   // Ensure that if the current plan is enterprise, we always show

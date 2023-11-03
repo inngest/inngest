@@ -12,10 +12,6 @@ import (
 
 const MaxEvents = 51
 
-var (
-	year = time.Hour * 24 * 365
-)
-
 func ConvertFromEvent(internalID ulid.ULID, e event.Event) Event {
 	return Event{
 		ID:           internalID,
@@ -31,7 +27,7 @@ func ConvertFromEvent(internalID ulid.ULID, e event.Event) Event {
 type Event struct {
 	ID          ulid.ULID  `json:"internal_id"`
 	AccountID   uuid.UUID  `json:"account_id"`
-	WorkspaceID uuid.UUID  `json:"workspace_id"`
+	WorkspaceID uuid.UUID  `json:"environment_id"`
 	Source      string     `json:"source"`
 	SourceID    *uuid.UUID `json:"source_id"`
 	ReceivedAt  time.Time  `json:"received_at"`
@@ -93,8 +89,8 @@ func (o *WorkspaceEventsOpts) Validate() error {
 		o.Newest = time.Now()
 	}
 	if o.Oldest.IsZero() {
-		// 1 year ago, ie all events
-		o.Oldest = time.Now().Add(year * -1)
+		// Default to one hour ago.
+		o.Oldest = time.Now().Add(time.Hour * -1)
 	}
 	return nil
 }

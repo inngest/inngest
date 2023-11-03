@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/history_reader"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -175,52 +175,26 @@ func (r *functionRunResolver) Timeline(ctx context.Context, obj *models.Function
 }
 
 func (r *functionRunResolver) Event(ctx context.Context, obj *models.FunctionRun) (*models.Event, error) {
-	history, err := r.Runner.History(ctx, state.Identifier{
-		RunID: ulid.MustParse(obj.ID),
-	})
+	eventID, err := ulid.Parse(obj.EventID)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(history) == 0 {
-		return nil, nil
-	}
-
-	// Find the function start event, which should contain the triggering event.
-	var startEvent *state.History
-	for _, h := range history {
-		if h.Type == enums.HistoryTypeFunctionStarted {
-			startEvent = &h
-			break
-		}
-	}
-
-	if startEvent == nil {
-		return nil, nil
-	}
-
-	jsonStr, err := json.Marshal(startEvent.Data)
+	evt, err := r.Data.GetEventByInternalID(ctx, eventID)
 	if err != nil {
 		return nil, err
 	}
 
-	event := &event.Event{}
-	if err := json.Unmarshal(jsonStr, event); err != nil {
-		return nil, err
-	}
-
-	createdAt := time.UnixMilli(event.Timestamp)
-	payloadByt, err := json.Marshal(event.Data)
+	payload, err := json.Marshal(evt.EventData)
 	if err != nil {
 		return nil, err
 	}
-	payload := string(payloadByt)
 
 	return &models.Event{
-		ID:        event.ID,
-		Name:      &event.Name,
-		CreatedAt: &createdAt,
-		Payload:   &payload,
+		CreatedAt: &evt.ReceivedAt,
+		ID:        evt.ID.String(),
+		Name:      &evt.EventName,
+		Payload:   util.StrPtr(string(payload)),
 	}, nil
 }
 

@@ -16,7 +16,7 @@ type FunctionRun struct {
 	RunStartedAt    time.Time       `json:"run_started_at"`
 	FunctionID      uuid.UUID       `json:"function_id"`
 	FunctionVersion int64           `json:"function_version"`
-	WorkspaceID     uuid.UUID       `json:"workspace_id"`
+	WorkspaceID     uuid.UUID       `json:"environment_id"`
 	EventID         ulid.ULID       `json:"event_id"`
 	BatchID         *ulid.ULID      `json:"batch_id,omitempty"`
 	OriginalRunID   *ulid.ULID      `json:"original_run_id,omitempty"`
