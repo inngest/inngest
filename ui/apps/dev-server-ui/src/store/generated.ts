@@ -111,6 +111,7 @@ export enum FunctionEventType {
 export type FunctionRun = {
   __typename?: 'FunctionRun';
   event: Maybe<Event>;
+  eventID: Scalars['ID'];
   finishedAt: Maybe<Scalars['Time']>;
   function: Maybe<Function>;
   functionID: Scalars['String'];
