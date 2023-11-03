@@ -113,18 +113,20 @@ type InngestMetadata struct {
 }
 
 func (e Event) InngestMetadata() *InngestMetadata {
-	if rawData, ok := e.Data[consts.InngestEventDataPrefix].(map[string]interface{}); ok {
-		jsonData, err := json.Marshal(rawData)
-		if err != nil {
-			return nil
-		}
-		var metadata InngestMetadata
-		if err := json.Unmarshal(jsonData, &metadata); err != nil {
-			return nil
-		}
-		return &metadata
+	rawData, ok := e.Data[consts.InngestEventDataPrefix].(map[string]interface{})
+	if !ok {
+		return nil
 	}
-	return nil
+
+	var metadata InngestMetadata
+	jsonData, err := json.Marshal(rawData)
+	if err != nil {
+		return nil
+	}
+	if err := json.Unmarshal(jsonData, &metadata); err != nil {
+		return nil
+	}
+	return &metadata
 }
 
 func NewOSSTrackedEvent(e Event) TrackedEvent {
@@ -162,6 +164,7 @@ type NewInvocationEventOpts struct {
 
 func NewInvocationEvent(opts NewInvocationEventOpts) Event {
 	evt := opts.Event
+
 	if evt.Timestamp == 0 {
 		evt.Timestamp = time.Now().UnixMilli()
 	}
@@ -169,19 +172,19 @@ func NewInvocationEvent(opts NewInvocationEventOpts) Event {
 		evt.ID = ulid.MustNew(uint64(evt.Timestamp), rand.Reader).String()
 	}
 	if evt.Data == nil {
-		evt.Data = map[string]interface{}{}
+		evt.Data = make(map[string]interface{})
 	}
-
-	// Override the name. We create a different event entirely.
 	evt.Name = InvokeFnName
 
-	inngestMetadata := InngestMetadata{
+	evt.Data[consts.InngestEventDataPrefix] = InngestMetadata{
 		InvokeFnID: opts.FnID,
+		InvokeCorrelationId: func() string {
+			if opts.CorrelationID != nil {
+				return *opts.CorrelationID
+			}
+			return ""
+		}(),
 	}
-	if opts.CorrelationID != nil && *opts.CorrelationID != "" {
-		inngestMetadata.InvokeCorrelationId = *opts.CorrelationID
-	}
-	evt.Data[consts.InngestEventDataPrefix] = inngestMetadata
 
 	return evt
 }
