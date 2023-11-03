@@ -4,8 +4,8 @@ Inngest accounts all have multiple environments that help support your entire so
 
 -   **Production Environment** for all of your production applications, functions and event data.
 -   [**Branch Environments**](#branch-environments) are sandbox environments that enables developers on your team to test your changes specific to current Git feature branch. These are designed to work with platforms that support branch-based deployment previews like Vercel or Netlify.
+-   [**Custom Environments**](#custom-environments) are used to create shared, non-production environments like staging, QA, or canary.
 -   [**Local Environment**](/docs/local-development) leverages the Inngest Dev Server (`npx inngest-cli@latest dev`) to test and debug functions on your own machine.
-{/* TODO - Add this after Branch Environments when added to the dashboard UI (see section below) **Custom Environments** enable bespoke developer workflows for teams that have other environments like QA, a shared staging, or a canary environment. */}
 
 The key things that you need to know about environments:
 
@@ -94,9 +94,6 @@ As all branch environments share Event Keys, all you need to do to send events t
 
 If you are sending events without an Inngest SDK, you'll need pass the `x-inngest-env` header along with your request. For more information about this and sending events from any environment with **the Event API**, [read the `send()` reference](/docs/reference/events/send#send-events-via-http-event-api).
 
-{/* ## Custom Environments */}
-{/* Section TBD - see above */}
-
 ### Archiving Branch Environments
 
 By default, branch environments are archived 3 days after their latest deploy. Each time you deploy, the auto archive date is extended by 3 days. Archiving a branch environment doesn't delete anything; it only prevents the environment's functions from triggering.
@@ -107,6 +104,20 @@ If you'd like to disable auto archive on a branch environment, click the toggle 
 
 The recommended way to disable branch environments is through the Vercel UI. Delete the "Preview" Inngest environment variables:
 ![Vercel environment keys](/assets/docs/environments/environment-keys.jpg)
+
+## Custom Environments
+
+Many teams have shared environments that are used for non-production purposes like staging, QA, or canary. Inngest's Custom Environments are designed to give you and your team an isolated sandbox for every non-production environment that you deploy.
+
+You can create an environment from the [environments page](https://app.inngest.com/env) in the Inngest dashboard.
+
+Some key things to know about custom environments:
+
+* Each environment has it's own keys, event history, and functions. All data is isolated within each environment.
+* You can deploy multiple apps to the same environment to fully simulate your production environment.
+* You can create as many environments as you need.
+
+[Create an environment in the dashboard](https://app.inngest.com/create-environment)
 
 ## Viewing and Switching Environments
 
