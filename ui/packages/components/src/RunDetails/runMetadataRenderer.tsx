@@ -109,7 +109,7 @@ export function renderRunMetadata({
       {
         label: 'URL',
         size: 'large',
-        value: <div className="overflow-scroll whitespace-nowrap">{functionVersion.url}</div>,
+        value: <div className="overflow-y-auto whitespace-nowrap">{functionVersion.url}</div>,
       },
       {
         label: 'Function Version',
