@@ -166,7 +166,7 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 
 		// send inngest/function.finished
 		eg.Go(func() error {
-			return s.Executor().PublishFinishedEventFromResponse(ctx, id, r, st)
+			return s.Executor().PublishFinishedEventWithResponse(ctx, id, r, st)
 		})
 
 		return eg.Wait()

@@ -493,6 +493,8 @@ func (l lifecycle) OnInvokeFunction(
 	id state.Identifier,
 	item queue.Item,
 	op state.GeneratorOpcode,
+	eventID ulid.ULID,
+	corrID string,
 ) {
 	logger.From(ctx).Debug().Interface("id", id).Msg("OnInvokeFunction")
 
@@ -504,6 +506,26 @@ func (l lifecycle) OnInvokeFunction(
 			"group_id", item.GroupID,
 			"run_id", id.RunID.String(),
 		)
+	}
+
+	fnID := ""
+	expiry := time.Time{}
+
+	opts, err := op.InvokeFunctionOpts()
+	if err != nil {
+		l.log.Error("error parsing invoke function options", "error", err)
+	}
+
+	if opts != nil {
+		fnID = opts.FunctionID
+		optsExp, err := opts.Expires()
+		if err != nil {
+			l.log.Error("error parsing invoke function options expiry", "error", err)
+		} else {
+			expiry = optsExp
+		}
+	} else {
+		l.log.Error("invoke function options are nil")
 	}
 
 	h := History{
@@ -522,10 +544,11 @@ func (l lifecycle) OnInvokeFunction(
 		BatchID:         id.BatchID,
 		StepName:        &op.Name,
 		StepID:          &op.ID,
-		// TODO Bad
 		InvokeFunction: &InvokeFunction{
-			FunctionID: uuid.New(),
-			Timeout:    time.Time{},
+			EventID:       eventID,
+			FunctionID:    fnID,
+			Timeout:       expiry,
+			CorrelationID: corrID,
 		},
 	}
 	for _, d := range l.drivers {

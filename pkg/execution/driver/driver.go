@@ -38,8 +38,6 @@ func MarshalV1(
 ) ([]byte, error) {
 	md := s.Metadata()
 
-	// For event (`map[string]any`), if the "name" is set to `event.InvokeFnName`, we should
-	// overwrite it with the "name" of the trigger, accessed via `s.Function().Triggers`.
 	fn := s.Function()
 	events, err := mapInvocationEventNames(s.Events(), fn)
 	if err != nil {
@@ -86,6 +84,8 @@ func MarshalV1(
 	return b, nil
 }
 
+// mapInvocationEventNames sets the name of any invocation events to the name of the trigger event.
+// This is used to ensure that SDKs receive the event they are expecting when invoked.
 func mapInvocationEventNames(events []map[string]any, fn inngest.Function) ([]map[string]any, error) {
 	for _, evt := range events {
 		if name, ok := evt["name"].(string); !ok || name != event.InvokeFnName {

@@ -824,21 +824,17 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 				return
 			}
 
-			// TODO Does the pause need the op code here to safely do this?
-			// The user might be manually using
-			// `waitForEvent("inngest/function.completed")`
 			withEvt := evt.GetEvent()
 			with := withEvt.Map()
-			if withEvt.Name == event.FnFinishedName {
-				// TODO dangerous?
-				if withEvt.Data["error"] != nil {
-					with = map[string]any{
-						"error": withEvt.Data["error"],
-					}
-				} else {
-					with = map[string]any{
-						"data": withEvt.Data["result"],
-					}
+
+			isInvokeFunctionOpcode := pause.Opcode != nil && *pause.Opcode == enums.OpcodeInvokeFunction.String()
+			isFnFinishedEvent := withEvt.Name == event.FnFinishedName
+
+			if isInvokeFunctionOpcode && isFnFinishedEvent {
+				if errorData, errorExists := withEvt.Data["error"]; errorExists {
+					with = map[string]any{"error": errorData}
+				} else if resultData, resultExists := withEvt.Data["result"]; resultExists {
+					with = map[string]any{"data": resultData}
 				}
 			}
 
@@ -943,8 +939,14 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		return fmt.Errorf("error enqueueing after pause: %w", err)
 	}
 
-	for _, e := range e.lifecycles {
-		go e.OnWaitForEventResumed(context.WithoutCancel(ctx), pause.Identifier, r, pause.GroupID)
+	if pause.Opcode != nil && *pause.Opcode == enums.OpcodeInvokeFunction.String() {
+		for _, e := range e.lifecycles {
+			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), pause.Identifier, r, pause.GroupID)
+		}
+	} else {
+		for _, e := range e.lifecycles {
+			go e.OnWaitForEventResumed(context.WithoutCancel(ctx), pause.Identifier, r, pause.GroupID)
+		}
 	}
 
 	return nil
@@ -1231,6 +1233,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	logger.From(ctx).Info().Interface("opts", opts).Time("expires", expires).Str("event", eventName).Str("expr", strExpr).Msg("parsed invoke function opts")
 
 	pauseID := uuid.New()
+	opcode := gen.Op.String()
 	err = e.sm.SavePause(ctx, state.Pause{
 		ID:          pauseID,
 		WorkspaceID: item.WorkspaceID,
@@ -1239,6 +1242,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		Outgoing:    gen.ID,
 		Incoming:    edge.Edge.Incoming,
 		StepName:    gen.Name,
+		Opcode:      &opcode,
 		Expires:     state.Time(expires),
 		Event:       &eventName,
 		Expression:  &strExpr,
@@ -1253,14 +1257,10 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	//
 	// TODO: Remove with function run specific queues
 	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.IncomingGeneratorStep, 0, nil); err != nil {
-		return fmt.Errorf("unable to schedule wait for event: %w", err)
+		return fmt.Errorf("unable to schedule function invocation: %w", err)
 	}
 
-	// SDK-based event coordination is called both when an event is received
-	// OR on timeout, depending on which happens first.  Both routes consume
-	// the pause so this race will conclude by calling the function once, as only
-	// one thread can lease and consume a pause;  the other will find that the
-	// pause is no longer available and return.
+	// Enqueue a job that will timeout the pause.
 	err = e.queue.Enqueue(ctx, queue.Item{
 		WorkspaceID: item.WorkspaceID,
 		// Use the same group ID, allowing us to track the cancellation of
@@ -1306,7 +1306,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnInvokeFunction(context.WithoutCancel(ctx), item.Identifier, item, gen)
+		go e.OnInvokeFunction(context.WithoutCancel(ctx), item.Identifier, item, gen, ulid.MustParse(evt.ID), correlationID)
 	}
 
 	return err
@@ -1342,6 +1342,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	}
 
 	pauseID := uuid.New()
+	opcode := gen.Op.String()
 	err = e.sm.SavePause(ctx, state.Pause{
 		ID:             pauseID,
 		WorkspaceID:    item.WorkspaceID,
@@ -1350,6 +1351,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		Outgoing:       gen.ID,
 		Incoming:       edge.Edge.Incoming,
 		StepName:       gen.Name,
+		Opcode:         &opcode,
 		Expires:        state.Time(expires),
 		Event:          &opts.Event,
 		Expression:     opts.If,
@@ -1452,7 +1454,7 @@ func (e *executor) PublishFinishedEvent(ctx context.Context, opts execution.Publ
 	return nil
 }
 
-func (e *executor) PublishFinishedEventFromResponse(ctx context.Context, id state.Identifier, resp state.DriverResponse, s state.State) error {
+func (e *executor) PublishFinishedEventWithResponse(ctx context.Context, id state.Identifier, resp state.DriverResponse, s state.State) error {
 	opts := execution.PublishFinishedEventOpts{
 		OriginalEvent: s.Event(),
 		FunctionID:    s.Function().Slug,

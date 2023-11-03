@@ -7,6 +7,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/oklog/ulid/v2"
 )
 
 var _ LifecycleListener = (*NoopLifecyceListener)(nil)
@@ -113,6 +114,8 @@ type LifecycleListener interface {
 		state.Identifier,
 		queue.Item,
 		state.GeneratorOpcode,
+		ulid.ULID,
+		string,
 	)
 
 	// OnInvokeFunctionResumed is called when a function is resumed from an
@@ -250,6 +253,8 @@ func (NoopLifecyceListener) OnInvokeFunction(
 	state.Identifier,
 	queue.Item,
 	state.GeneratorOpcode,
+	ulid.ULID,
+	string,
 ) {
 }
 

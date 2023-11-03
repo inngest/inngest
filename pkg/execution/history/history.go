@@ -73,8 +73,10 @@ type WaitResult struct {
 }
 
 type InvokeFunction struct {
-	FunctionID uuid.UUID `json:"function_id"`
-	Timeout    time.Time `json:"timeout"`
+	EventID       ulid.ULID `json:"event_id"`
+	CorrelationID string    `json:"correlation_id"`
+	FunctionID    string    `json:"function_id"`
+	Timeout       time.Time `json:"timeout"`
 }
 
 type InvokeFunctionResult struct {

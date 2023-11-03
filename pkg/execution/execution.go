@@ -110,11 +110,11 @@ type Executor interface {
 	// SetFinishHandler sets the finish handler, called when a function run finishes.
 	SetFinishHandler(f FinishHandler)
 
-	// PublishFinishedEventFromResponse publishes a finished event to the event stream using a driver response.
-	PublishFinishedEventFromResponse(ctx context.Context, id state.Identifier, resp state.DriverResponse, s state.State) error
-
 	// PublishFinishedEvent publishes a finished event to the event stream.
 	PublishFinishedEvent(ctx context.Context, opts PublishFinishedEventOpts) error
+
+	// PublishFinishedEventWithResponse publishes a finished event to the event stream using a driver response.
+	PublishFinishedEventWithResponse(ctx context.Context, id state.Identifier, resp state.DriverResponse, s state.State) error
 }
 
 // PublishFinishedEventOpts represents the options for publishing a finished event.
