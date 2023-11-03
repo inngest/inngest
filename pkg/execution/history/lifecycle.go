@@ -597,6 +597,7 @@ func (l lifecycle) OnInvokeFunctionResumed(
 		InvokeFunctionResult: &InvokeFunctionResult{
 			EventID: req.EventID,
 			Timeout: req.EventID == nil,
+			RunID:   req.RunID,
 		},
 	}
 	for _, d := range l.drivers {

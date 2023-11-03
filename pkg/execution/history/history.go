@@ -82,6 +82,7 @@ type InvokeFunction struct {
 type InvokeFunctionResult struct {
 	EventID *ulid.ULID `json:"event_id"`
 	Timeout bool       `json:"timeout"`
+	RunID   *ulid.ULID `json:"run_id"`
 }
 
 type Result struct {
