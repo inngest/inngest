@@ -84,6 +84,10 @@ models:
     model: github.com/inngest/inngest/pkg/history_reader.RunHistoryWaitForEvent
   RunHistoryWaitResult:
     model: github.com/inngest/inngest/pkg/history_reader.RunHistoryWaitResult
+  RunHistoryInvokeFunction:
+    model: github.com/inngest/inngest/pkg/history_reader.RunHistoryInvokeFunction
+  RunHistoryInvokeFunctionResult:
+    model: github.com/inngest/inngest/pkg/history_reader.RunHistoryInvokeFunctionResult
   ULID:
     model: github.com/inngest/inngest/pkg/gql_scalars.ULID
   UUID:

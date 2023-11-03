@@ -161,21 +161,36 @@ type ComplexityRoot struct {
 		UserID     func(childComplexity int) int
 	}
 
+	RunHistoryInvokeFunction struct {
+		CorrelationID func(childComplexity int) int
+		EventID       func(childComplexity int) int
+		FunctionID    func(childComplexity int) int
+		Timeout       func(childComplexity int) int
+	}
+
+	RunHistoryInvokeFunctionResult struct {
+		EventID func(childComplexity int) int
+		RunID   func(childComplexity int) int
+		Timeout func(childComplexity int) int
+	}
+
 	RunHistoryItem struct {
-		Attempt         func(childComplexity int) int
-		Cancel          func(childComplexity int) int
-		CreatedAt       func(childComplexity int) int
-		FunctionVersion func(childComplexity int) int
-		GroupID         func(childComplexity int) int
-		ID              func(childComplexity int) int
-		Result          func(childComplexity int) int
-		Sleep           func(childComplexity int) int
-		StepName        func(childComplexity int) int
-		StepType        func(childComplexity int) int
-		Type            func(childComplexity int) int
-		URL             func(childComplexity int) int
-		WaitForEvent    func(childComplexity int) int
-		WaitResult      func(childComplexity int) int
+		Attempt              func(childComplexity int) int
+		Cancel               func(childComplexity int) int
+		CreatedAt            func(childComplexity int) int
+		FunctionVersion      func(childComplexity int) int
+		GroupID              func(childComplexity int) int
+		ID                   func(childComplexity int) int
+		InvokeFunction       func(childComplexity int) int
+		InvokeFunctionResult func(childComplexity int) int
+		Result               func(childComplexity int) int
+		Sleep                func(childComplexity int) int
+		StepName             func(childComplexity int) int
+		StepType             func(childComplexity int) int
+		Type                 func(childComplexity int) int
+		URL                  func(childComplexity int) int
+		WaitForEvent         func(childComplexity int) int
+		WaitResult           func(childComplexity int) int
 	}
 
 	RunHistoryResult struct {
@@ -868,6 +883,55 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunHistoryCancel.UserID(childComplexity), true
 
+	case "RunHistoryInvokeFunction.correlationID":
+		if e.complexity.RunHistoryInvokeFunction.CorrelationID == nil {
+			break
+		}
+
+		return e.complexity.RunHistoryInvokeFunction.CorrelationID(childComplexity), true
+
+	case "RunHistoryInvokeFunction.eventID":
+		if e.complexity.RunHistoryInvokeFunction.EventID == nil {
+			break
+		}
+
+		return e.complexity.RunHistoryInvokeFunction.EventID(childComplexity), true
+
+	case "RunHistoryInvokeFunction.functionID":
+		if e.complexity.RunHistoryInvokeFunction.FunctionID == nil {
+			break
+		}
+
+		return e.complexity.RunHistoryInvokeFunction.FunctionID(childComplexity), true
+
+	case "RunHistoryInvokeFunction.timeout":
+		if e.complexity.RunHistoryInvokeFunction.Timeout == nil {
+			break
+		}
+
+		return e.complexity.RunHistoryInvokeFunction.Timeout(childComplexity), true
+
+	case "RunHistoryInvokeFunctionResult.eventID":
+		if e.complexity.RunHistoryInvokeFunctionResult.EventID == nil {
+			break
+		}
+
+		return e.complexity.RunHistoryInvokeFunctionResult.EventID(childComplexity), true
+
+	case "RunHistoryInvokeFunctionResult.runID":
+		if e.complexity.RunHistoryInvokeFunctionResult.RunID == nil {
+			break
+		}
+
+		return e.complexity.RunHistoryInvokeFunctionResult.RunID(childComplexity), true
+
+	case "RunHistoryInvokeFunctionResult.timeout":
+		if e.complexity.RunHistoryInvokeFunctionResult.Timeout == nil {
+			break
+		}
+
+		return e.complexity.RunHistoryInvokeFunctionResult.Timeout(childComplexity), true
+
 	case "RunHistoryItem.attempt":
 		if e.complexity.RunHistoryItem.Attempt == nil {
 			break
@@ -909,6 +973,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RunHistoryItem.ID(childComplexity), true
+
+	case "RunHistoryItem.invokeFunction":
+		if e.complexity.RunHistoryItem.InvokeFunction == nil {
+			break
+		}
+
+		return e.complexity.RunHistoryItem.InvokeFunction(childComplexity), true
+
+	case "RunHistoryItem.invokeFunctionResult":
+		if e.complexity.RunHistoryItem.InvokeFunctionResult == nil {
+			break
+		}
+
+		return e.complexity.RunHistoryItem.InvokeFunctionResult(childComplexity), true
 
 	case "RunHistoryItem.result":
 		if e.complexity.RunHistoryItem.Result == nil {
@@ -1564,6 +1642,8 @@ type RunHistoryItem {
   url: String
   waitForEvent: RunHistoryWaitForEvent
   waitResult: RunHistoryWaitResult
+  invokeFunction: RunHistoryInvokeFunction
+  invokeFunctionResult: RunHistoryInvokeFunctionResult
 }
 
 type RunHistoryCancel {
@@ -1595,7 +1675,21 @@ type RunHistoryWaitForEvent {
 type RunHistoryWaitResult {
   eventID: ULID
   timeout: Boolean!
-}`, BuiltIn: false},
+}
+
+type RunHistoryInvokeFunction {
+  eventID: ULID!
+  functionID: String!
+  correlationID: String!
+  timeout: Time!
+}
+
+type RunHistoryInvokeFunctionResult {
+  eventID: ULID
+  timeout: Boolean!
+  runID: ULID
+}
+`, BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
 
@@ -4108,6 +4202,10 @@ func (ec *executionContext) fieldContext_FunctionRun_history(ctx context.Context
 				return ec.fieldContext_RunHistoryItem_waitForEvent(ctx, field)
 			case "waitResult":
 				return ec.fieldContext_RunHistoryItem_waitResult(ctx, field)
+			case "invokeFunction":
+				return ec.fieldContext_RunHistoryItem_invokeFunction(ctx, field)
+			case "invokeFunctionResult":
+				return ec.fieldContext_RunHistoryItem_invokeFunctionResult(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunHistoryItem", field.Name)
 		},
@@ -5633,6 +5731,308 @@ func (ec *executionContext) fieldContext_RunHistoryCancel_userID(ctx context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _RunHistoryInvokeFunction_eventID(ctx context.Context, field graphql.CollectedField, obj *history_reader.RunHistoryInvokeFunction) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunHistoryInvokeFunction_eventID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EventID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(ulid.ULID)
+	fc.Result = res
+	return ec.marshalNULID2githubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunHistoryInvokeFunction_eventID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunHistoryInvokeFunction",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ULID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunHistoryInvokeFunction_functionID(ctx context.Context, field graphql.CollectedField, obj *history_reader.RunHistoryInvokeFunction) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunHistoryInvokeFunction_functionID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FunctionID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunHistoryInvokeFunction_functionID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunHistoryInvokeFunction",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunHistoryInvokeFunction_correlationID(ctx context.Context, field graphql.CollectedField, obj *history_reader.RunHistoryInvokeFunction) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunHistoryInvokeFunction_correlationID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CorrelationID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunHistoryInvokeFunction_correlationID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunHistoryInvokeFunction",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunHistoryInvokeFunction_timeout(ctx context.Context, field graphql.CollectedField, obj *history_reader.RunHistoryInvokeFunction) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunHistoryInvokeFunction_timeout(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Timeout, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(time.Time)
+	fc.Result = res
+	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunHistoryInvokeFunction_timeout(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunHistoryInvokeFunction",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunHistoryInvokeFunctionResult_eventID(ctx context.Context, field graphql.CollectedField, obj *history_reader.RunHistoryInvokeFunctionResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunHistoryInvokeFunctionResult_eventID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EventID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*ulid.ULID)
+	fc.Result = res
+	return ec.marshalOULID2ᚖgithubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunHistoryInvokeFunctionResult_eventID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunHistoryInvokeFunctionResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ULID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunHistoryInvokeFunctionResult_timeout(ctx context.Context, field graphql.CollectedField, obj *history_reader.RunHistoryInvokeFunctionResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunHistoryInvokeFunctionResult_timeout(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Timeout, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunHistoryInvokeFunctionResult_timeout(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunHistoryInvokeFunctionResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunHistoryInvokeFunctionResult_runID(ctx context.Context, field graphql.CollectedField, obj *history_reader.RunHistoryInvokeFunctionResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunHistoryInvokeFunctionResult_runID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.RunID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*ulid.ULID)
+	fc.Result = res
+	return ec.marshalOULID2ᚖgithubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunHistoryInvokeFunctionResult_runID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunHistoryInvokeFunctionResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ULID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RunHistoryItem_attempt(ctx context.Context, field graphql.CollectedField, obj *history_reader.RunHistory) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RunHistoryItem_attempt(ctx, field)
 	if err != nil {
@@ -6259,6 +6659,106 @@ func (ec *executionContext) fieldContext_RunHistoryItem_waitResult(ctx context.C
 				return ec.fieldContext_RunHistoryWaitResult_timeout(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunHistoryWaitResult", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunHistoryItem_invokeFunction(ctx context.Context, field graphql.CollectedField, obj *history_reader.RunHistory) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunHistoryItem_invokeFunction(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.InvokeFunction, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*history_reader.RunHistoryInvokeFunction)
+	fc.Result = res
+	return ec.marshalORunHistoryInvokeFunction2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋhistory_readerᚐRunHistoryInvokeFunction(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunHistoryItem_invokeFunction(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunHistoryItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "eventID":
+				return ec.fieldContext_RunHistoryInvokeFunction_eventID(ctx, field)
+			case "functionID":
+				return ec.fieldContext_RunHistoryInvokeFunction_functionID(ctx, field)
+			case "correlationID":
+				return ec.fieldContext_RunHistoryInvokeFunction_correlationID(ctx, field)
+			case "timeout":
+				return ec.fieldContext_RunHistoryInvokeFunction_timeout(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RunHistoryInvokeFunction", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunHistoryItem_invokeFunctionResult(ctx context.Context, field graphql.CollectedField, obj *history_reader.RunHistory) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunHistoryItem_invokeFunctionResult(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.InvokeFunctionResult, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*history_reader.RunHistoryInvokeFunctionResult)
+	fc.Result = res
+	return ec.marshalORunHistoryInvokeFunctionResult2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋhistory_readerᚐRunHistoryInvokeFunctionResult(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunHistoryItem_invokeFunctionResult(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunHistoryItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "eventID":
+				return ec.fieldContext_RunHistoryInvokeFunctionResult_eventID(ctx, field)
+			case "timeout":
+				return ec.fieldContext_RunHistoryInvokeFunctionResult_timeout(ctx, field)
+			case "runID":
+				return ec.fieldContext_RunHistoryInvokeFunctionResult_runID(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RunHistoryInvokeFunctionResult", field.Name)
 		},
 	}
 	return fc, nil
@@ -10784,6 +11284,91 @@ func (ec *executionContext) _RunHistoryCancel(ctx context.Context, sel ast.Selec
 	return out
 }
 
+var runHistoryInvokeFunctionImplementors = []string{"RunHistoryInvokeFunction"}
+
+func (ec *executionContext) _RunHistoryInvokeFunction(ctx context.Context, sel ast.SelectionSet, obj *history_reader.RunHistoryInvokeFunction) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, runHistoryInvokeFunctionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RunHistoryInvokeFunction")
+		case "eventID":
+
+			out.Values[i] = ec._RunHistoryInvokeFunction_eventID(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "functionID":
+
+			out.Values[i] = ec._RunHistoryInvokeFunction_functionID(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "correlationID":
+
+			out.Values[i] = ec._RunHistoryInvokeFunction_correlationID(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "timeout":
+
+			out.Values[i] = ec._RunHistoryInvokeFunction_timeout(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var runHistoryInvokeFunctionResultImplementors = []string{"RunHistoryInvokeFunctionResult"}
+
+func (ec *executionContext) _RunHistoryInvokeFunctionResult(ctx context.Context, sel ast.SelectionSet, obj *history_reader.RunHistoryInvokeFunctionResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, runHistoryInvokeFunctionResultImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RunHistoryInvokeFunctionResult")
+		case "eventID":
+
+			out.Values[i] = ec._RunHistoryInvokeFunctionResult_eventID(ctx, field, obj)
+
+		case "timeout":
+
+			out.Values[i] = ec._RunHistoryInvokeFunctionResult_timeout(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "runID":
+
+			out.Values[i] = ec._RunHistoryInvokeFunctionResult_runID(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var runHistoryItemImplementors = []string{"RunHistoryItem"}
 
 func (ec *executionContext) _RunHistoryItem(ctx context.Context, sel ast.SelectionSet, obj *history_reader.RunHistory) graphql.Marshaler {
@@ -10864,6 +11449,14 @@ func (ec *executionContext) _RunHistoryItem(ctx context.Context, sel ast.Selecti
 		case "waitResult":
 
 			out.Values[i] = ec._RunHistoryItem_waitResult(ctx, field, obj)
+
+		case "invokeFunction":
+
+			out.Values[i] = ec._RunHistoryItem_invokeFunction(ctx, field, obj)
+
+		case "invokeFunctionResult":
+
+			out.Values[i] = ec._RunHistoryItem_invokeFunctionResult(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -12646,6 +13239,20 @@ func (ec *executionContext) marshalORunHistoryCancel2ᚖgithubᚗcomᚋinngest�
 		return graphql.Null
 	}
 	return ec._RunHistoryCancel(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalORunHistoryInvokeFunction2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋhistory_readerᚐRunHistoryInvokeFunction(ctx context.Context, sel ast.SelectionSet, v *history_reader.RunHistoryInvokeFunction) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._RunHistoryInvokeFunction(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalORunHistoryInvokeFunctionResult2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋhistory_readerᚐRunHistoryInvokeFunctionResult(ctx context.Context, sel ast.SelectionSet, v *history_reader.RunHistoryInvokeFunctionResult) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._RunHistoryInvokeFunctionResult(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalORunHistoryResult2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋhistory_readerᚐRunHistoryResult(ctx context.Context, sel ast.SelectionSet, v *history_reader.RunHistoryResult) graphql.Marshaler {
