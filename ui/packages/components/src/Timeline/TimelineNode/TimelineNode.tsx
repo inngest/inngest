@@ -21,7 +21,7 @@ type Props = {
 };
 
 export function TimelineNode({ position, getOutput, node }: Props) {
-  const { icon, badge, name, metadata } = renderTimelineNode(node);
+  const { icon, badge, name, metadata, link } = renderTimelineNode(node);
   const isExpandable = node.scope === 'step';
   const [openItems, setOpenItems] = useState<string[]>([]);
 
@@ -50,7 +50,13 @@ export function TimelineNode({ position, getOutput, node }: Props) {
       />
       <AccordionPrimitive.Header className="flex items-start gap-2 py-6">
         <div className="z-10 flex-1">
-          <TimelineNodeHeader icon={icon} badge={badge} title={name} metadata={metadata} />
+          <TimelineNodeHeader
+            icon={icon}
+            badge={badge}
+            title={name}
+            metadata={metadata}
+            link={link}
+          />
         </div>
 
         {isExpandable && (

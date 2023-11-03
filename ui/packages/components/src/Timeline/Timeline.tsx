@@ -83,5 +83,10 @@ function isVisible(node: HistoryNode) {
     return true;
   }
 
+  if (node.invokeFunctionResult) {
+    // Invokes don't return a step name, but the group overall gives information
+    return true;
+  }
+
   return false;
 }

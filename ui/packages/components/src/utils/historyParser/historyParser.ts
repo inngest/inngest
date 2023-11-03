@@ -48,6 +48,8 @@ export class HistoryParser {
         status: 'scheduled',
         waitForEventConfig: undefined,
         waitForEventResult: undefined,
+        invokeFunctionConfig: undefined,
+        invokeFunctionResult: undefined,
       };
     }
 

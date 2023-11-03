@@ -21,6 +21,17 @@ export type HistoryNode = {
     eventID: string | undefined;
     timeout: boolean;
   };
+  invokeFunctionConfig?: {
+    eventID: string;
+    functionID: string;
+    correlationID: string;
+    timeout: Date;
+  };
+  invokeFunctionResult?: {
+    eventID: string | undefined;
+    timeout: boolean;
+    runID: string | undefined;
+  };
 };
 
 export type HistoryType =
@@ -69,6 +80,17 @@ export type RawHistoryItem = {
   waitResult?: {
     eventID?: string | null;
     timeout: boolean;
+  } | null;
+  invokeFunction?: {
+    eventID: string;
+    functionID: string;
+    correlationID: string;
+    timeout: string;
+  } | null;
+  invokeFunctionResult?: {
+    eventID?: string | null;
+    timeout: boolean;
+    runID?: string | null;
   } | null;
 };
 

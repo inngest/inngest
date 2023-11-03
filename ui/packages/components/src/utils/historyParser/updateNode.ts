@@ -47,8 +47,17 @@ const updaters: {
     let waitForEventResult: HistoryNode['waitForEventResult'] | undefined;
     if (rawItem.waitResult) {
       waitForEventResult = {
-        eventID: rawItem.waitResult.eventID ?? undefined,
+        eventID: rawItem.waitResult.eventID || undefined,
         timeout: rawItem.waitResult.timeout,
+      };
+    }
+
+    let invokeFunctionResult: HistoryNode['invokeFunctionResult'] | undefined;
+    if (rawItem.invokeFunctionResult) {
+      invokeFunctionResult = {
+        eventID: rawItem.invokeFunctionResult.eventID || undefined,
+        timeout: rawItem.invokeFunctionResult.timeout,
+        runID: rawItem.invokeFunctionResult.runID || undefined,
       };
     }
 
@@ -60,6 +69,7 @@ const updaters: {
       scope: 'step',
       status: 'completed',
       waitForEventResult,
+      invokeFunctionResult,
     } satisfies HistoryNode;
   },
   StepErrored: (node, rawItem) => {
@@ -146,12 +156,21 @@ const updaters: {
     } satisfies HistoryNode;
   },
   StepInvokingFunction: (node, rawItem) => {
-    console.log('node is:', node, rawItem);
+    let invokeFunctionConfig: HistoryNode['invokeFunctionConfig'] | undefined;
+    if (rawItem.invokeFunction) {
+      invokeFunctionConfig = {
+        eventID: rawItem.invokeFunction.eventID,
+        functionID: rawItem.invokeFunction.functionID,
+        correlationID: rawItem.invokeFunction.correlationID,
+        timeout: new Date(rawItem.invokeFunction.timeout),
+      };
+    }
 
     return {
       ...node,
       scope: 'step',
       status: 'waiting',
+      invokeFunctionConfig,
     };
   },
 } as const;
