@@ -165,6 +165,9 @@ func NewInvocationEvent(opts NewInvocationEventOpts) Event {
 	if evt.Timestamp == 0 {
 		evt.Timestamp = time.Now().UnixMilli()
 	}
+	if evt.ID == "" {
+		evt.ID = ulid.MustNew(uint64(evt.Timestamp), rand.Reader).String()
+	}
 	if evt.Data == nil {
 		evt.Data = map[string]interface{}{}
 	}
