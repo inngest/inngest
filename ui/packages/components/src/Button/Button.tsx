@@ -47,7 +47,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
     btnAction,
     href,
     isSplit,
-    type,
+    type = 'button',
     keys,
     className,
     ...props

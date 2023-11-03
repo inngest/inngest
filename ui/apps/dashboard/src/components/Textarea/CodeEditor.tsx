@@ -48,7 +48,7 @@ export default function CodeEditor({
         {label ?? name}
       </label>
       <div
-        className="overflow-y-hidden py-2 pr-3 text-right text-xs text-slate-500"
+        className="overflow-y-hidden py-2 pr-3 text-right text-sm text-slate-500"
         aria-hidden="true"
         ref={LineNumbersRef}
       >
