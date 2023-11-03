@@ -184,3 +184,10 @@ export default inngest.createFunction(
 </CodeGroup>
 
 [Retries follow this backoff schedule](https://github.com/inngest/inngest/blob/main/pkg/backoff/backoff.go#L10-L22), with 0-30 seconds of random jitter added.
+
+You can manually schedule a retry by throwing `RetryAfterError`:
+
+```ts
+// Retry in 5 seconds
+throw new RetryAfterError("your error message", 5)
+```
