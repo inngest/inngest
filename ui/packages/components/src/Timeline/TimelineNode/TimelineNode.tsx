@@ -98,6 +98,13 @@ function Content({
 }) {
   const output = useOutput({ getOutput, outputItemID: node.outputItemID, status: node.status });
 
+  let endedAtLabel = 'Completed At';
+  if (node.status === 'cancelled') {
+    endedAtLabel = 'Cancelled At';
+  } else if (node.status === 'failed') {
+    endedAtLabel = 'Failed At';
+  }
+
   let durationMS: number | undefined;
   if (node.scheduledAt && node.endedAt) {
     durationMS = node.endedAt.getTime() - node.scheduledAt.getTime();
@@ -111,14 +118,23 @@ function Content({
             {
               label: 'Started At',
               value: node.scheduledAt ? node.scheduledAt.toLocaleString() : '-',
+              title: node?.scheduledAt?.toLocaleString(),
             },
             {
-              label: 'Ended At',
+              label: endedAtLabel,
               value: node.endedAt ? node.endedAt.toLocaleString() : '-',
+              title: node?.endedAt?.toLocaleString(),
             },
             {
               label: 'Duration',
               value: durationMS ? formatMilliseconds(durationMS) : '-',
+              tooltip: `Time between step started and step ${
+                node.status === 'failed'
+                  ? 'failed'
+                  : node.status === 'cancelled'
+                  ? 'cancelled'
+                  : 'completed'
+              }`,
             },
           ]}
         />
