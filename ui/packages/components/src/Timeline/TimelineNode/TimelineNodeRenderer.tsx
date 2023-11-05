@@ -62,7 +62,7 @@ export function renderTimelineNode(node: HistoryNode): RenderedData {
     };
   } else if (node.status === 'errored') {
     metadata = {
-      label: 'Enqueueing Retry:',
+      label: 'Enqueued Retry',
       value: `${node.attempt + 1}`,
     };
   } else if (node.status === 'failed' && node.endedAt) {
@@ -98,7 +98,9 @@ export function renderTimelineNode(node: HistoryNode): RenderedData {
   } else if (node.waitForEventConfig) {
     badge = 'Wait';
   } else if (node.status === 'errored') {
-    badge = 'Retry';
+    badge = `Error`;
+  } else if (node.attempt > 0 && node.scope === 'step') {
+    badge = `Retry ${node.attempt}`;
   }
 
   return {
