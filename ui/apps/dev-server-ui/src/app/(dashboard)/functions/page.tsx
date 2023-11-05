@@ -40,6 +40,15 @@ const columns = [
     enableSorting: false,
     enableGlobalFilter: false,
   }),
+  columnHelper.accessor('app', {
+    header: () => <span>App</span>,
+    cell: (props) => {
+      const app = props.getValue();
+      return app?.name;
+    },
+    enableSorting: false,
+    enableGlobalFilter: false,
+  }),
   columnHelper.accessor('url', {
     header: () => <span>App URL</span>,
     cell: (props) => {
