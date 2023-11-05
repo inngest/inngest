@@ -42,10 +42,7 @@ const columns = [
   }),
   columnHelper.accessor('app', {
     header: () => <span>App</span>,
-    cell: (props) => {
-      const app = props.getValue();
-      return app?.name;
-    },
+    cell: (props) => props.getValue()?.name,
     enableSorting: false,
     enableGlobalFilter: false,
   }),
