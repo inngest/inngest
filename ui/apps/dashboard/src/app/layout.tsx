@@ -12,7 +12,6 @@ import { BaseWrapper } from './baseWrapper';
 export const metadata: Metadata = {
   title: 'Inngest Cloud',
   description: 'The Inngest Cloud dashboard',
-  viewport: 'width=device-width, initial-scale=1',
   icons: process.env.NEXT_PUBLIC_FAVICON,
 };
 
