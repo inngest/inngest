@@ -1,5 +1,6 @@
 import TypeScriptIcon from "src/shared/Icons/TypeScript";
 import PythonIcon from "src/shared/Icons/Python";
+import GoIcon from "src/shared/Icons/Go";
 import GuideIcon from "src/shared/Icons/Guide";
 import { StatusIcon } from "src/shared/StatusWidget";
 import {
@@ -373,6 +374,13 @@ export const topLevelNav = [
         href: `/docs/reference/python`,
         tag: "Beta",
         sectionLinks: sectionPythonReference,
+      },
+      {
+        title: "Go",
+        icon: GoIcon,
+        href: `https://pkg.go.dev/github.com/inngest/inngestgo`,
+        tag: "Beta",
+        target: "_blank",
       },
     ],
   },

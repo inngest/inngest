@@ -56,7 +56,7 @@ function NavLink({
       aria-current={active ? "page" : undefined}
       target={target}
       className={clsx(
-        "flex justify-between gap-2 py-1 pr-3 text-sm font-medium transition group", // group for nested hovers
+        "flex justify-between items-center gap-2 py-1 pr-3 text-sm font-medium transition group", // group for nested hovers
         isTopLevel ? "pl-0" : isAnchorLink ? "pl-7" : "pl-4",
         active
           ? "text-slate-900 dark:text-white"
@@ -78,10 +78,10 @@ function NavLink({
 // link in a new tab.
 const LinkOrHref = (props: any) => {
   if (props.target === "_blank") {
-    return <a {...props} />
+    return <a {...props} />;
   }
-  return <Link {...props} />
-}
+  return <Link {...props} />;
+};
 
 function VisibleSectionHighlight({ group, pathname }) {
   let [sections, visibleSections] = useInitialValue(

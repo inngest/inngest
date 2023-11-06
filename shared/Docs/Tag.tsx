@@ -1,4 +1,4 @@
-import clsx from 'clsx'
+import clsx from "clsx";
 
 const variantStyle = (variant: string): string => {
   switch (variant) {
@@ -8,7 +8,7 @@ const variantStyle = (variant: string): string => {
     default:
       return null;
   }
-}
+};
 
 const colorStyle = (color: string, variant: string): string => {
   switch (variant) {
@@ -21,29 +21,29 @@ const colorStyle = (color: string, variant: string): string => {
     default:
       return null;
   }
-}
+};
 
 const valueColorMap = {
-  get: 'indigo',
-  post: 'sky',
-  put: 'amber',
-  delete: 'rose',
-}
+  get: "indigo",
+  post: "sky",
+  put: "amber",
+  delete: "rose",
+};
 
 export function Tag({
   children,
-  variant = 'medium',
-  color = valueColorMap[children.toLowerCase()] ?? 'indigo',
+  variant = "medium",
+  color = valueColorMap[children.toLowerCase()] ?? "indigo",
 }) {
   return (
     <span
       className={clsx(
-        'font-mono text-[0.625rem] font-semibold leading-6',
+        "font-mono text-[0.625rem] font-semibold leading-4",
         variantStyle(variant),
         colorStyle(color, variant)
       )}
     >
       {children}
     </span>
-  )
+  );
 }
