@@ -189,5 +189,5 @@ You can manually schedule a retry by throwing `RetryAfterError`:
 
 ```ts
 // Retry in 5 seconds
-throw new RetryAfterError("your error message", 5)
+throw new RetryAfterError("your error message", 5 * 1000)
 ```
