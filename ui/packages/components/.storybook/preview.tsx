@@ -20,6 +20,9 @@ const preview: Preview = {
     }),
   ],
   parameters: {
+    nextjs: {
+      appDirectory: true,
+    },
     actions: { argTypesRegex: '^on[A-Z].*' },
     backgrounds: {
       default: 'dark',
