@@ -37,7 +37,7 @@
     "graphql-request": "6.1.0",
     "lodash.debounce": "4.0.8",
     "monaco-editor": "0.34.1",
-    "next": "13.4.12",
+    "next": "14.0.2",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-redux": "8.0.5",
@@ -47,12 +47,12 @@
     "ulid": "2.3.0"
   },
   "devDependencies": {
-    "@inngest/components": "workspace:*",
-    "@inngest/tsconfig": "workspace:*",
     "@graphql-codegen/cli": "3.2.2",
     "@graphql-codegen/typescript-operations": "2.5.7",
     "@graphql-codegen/typescript-rtk-query": "2.3.7",
     "@ianvs/prettier-plugin-sort-imports": "4.1.0",
+    "@inngest/components": "workspace:*",
+    "@inngest/tsconfig": "workspace:*",
     "@storybook/addon-a11y": "7.2.3",
     "@storybook/addon-actions": "7.2.3",
     "@storybook/addon-essentials": "7.2.2",
