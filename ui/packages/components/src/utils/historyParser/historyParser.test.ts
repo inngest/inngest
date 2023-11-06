@@ -12,6 +12,7 @@ async function loadHistory(filename: string) {
 
 const baseRunStartNode = {
   attempt: 0,
+  attempts: {},
   endedAt: expect.any(Date),
   groupID: expect.any(String),
   name: undefined,
@@ -28,6 +29,7 @@ const baseRunStartNode = {
 
 const baseStepNode = {
   attempt: 0,
+  attempts: {},
   endedAt: expect.any(Date),
   groupID: expect.any(String),
   outputItemID: expect.any(String),
@@ -40,8 +42,25 @@ const baseStepNode = {
   waitForEventResult: undefined,
 } as const;
 
+// We default to 2 attempts but the last one won't appear in a root-level node's
+// `attempts` field. That's because the top-level node is the latest attempt.
+const baseAttempts = {
+  '0': {
+    ...baseStepNode,
+    outputItemID: expect.any(String),
+    status: 'errored',
+  },
+  '1': {
+    ...baseStepNode,
+    attempt: 1,
+    outputItemID: expect.any(String),
+    status: 'errored',
+  },
+} as const;
+
 const baseRunEndNode = {
   attempt: 0,
+  attempts: {},
   endedAt: expect.any(Date),
   groupID: expect.any(String),
   name: undefined,
@@ -89,6 +108,7 @@ test('fails without steps', async () => {
     {
       ...baseStepNode,
       attempt: 2,
+      attempts: baseAttempts,
       status: 'failed',
     },
     {
@@ -114,6 +134,7 @@ test('fails with preceding step', async () => {
     {
       ...baseStepNode,
       attempt: 2,
+      attempts: baseAttempts,
       status: 'failed',
     },
     {
