@@ -111,6 +111,7 @@ export enum FunctionEventType {
 export type FunctionRun = {
   __typename?: 'FunctionRun';
   event: Maybe<Event>;
+  eventID: Scalars['ID'];
   finishedAt: Maybe<Scalars['Time']>;
   function: Maybe<Function>;
   functionID: Scalars['String'];
@@ -210,6 +211,7 @@ export type Mutation = {
   __typename?: 'Mutation';
   createApp: App;
   deleteApp: Scalars['String'];
+  deleteAppByName: Scalars['Boolean'];
   updateApp: App;
 };
 
@@ -221,6 +223,11 @@ export type MutationCreateAppArgs = {
 
 export type MutationDeleteAppArgs = {
   id: Scalars['String'];
+};
+
+
+export type MutationDeleteAppByNameArgs = {
+  name: Scalars['String'];
 };
 
 
@@ -403,7 +410,7 @@ export type GetFunctionRunQuery = { __typename?: 'Query', functionRun: { __typen
 export type GetFunctionsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetFunctionsQuery = { __typename?: 'Query', functions: Array<{ __typename?: 'Function', id: string, slug: string, name: string, url: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null }> | null };
+export type GetFunctionsQuery = { __typename?: 'Query', functions: Array<{ __typename?: 'Function', id: string, slug: string, name: string, url: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null, app: { __typename?: 'App', name: string } }> | null };
 
 export type GetAppsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -596,6 +603,9 @@ export const GetFunctionsDocument = `
     triggers {
       type
       value
+    }
+    app {
+      name
     }
     url
   }
