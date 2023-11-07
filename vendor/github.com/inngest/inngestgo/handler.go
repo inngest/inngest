@@ -85,6 +85,11 @@ type HandlerOpts struct {
 	UseStreaming bool
 }
 
+// GetSigningKey returns the signing key defined within HandlerOpts, or the default
+// defined within INNGEST_SIGNING_KEY.
+//
+// This is the private key used to register functions and communicate with the private
+// API.
 func (h HandlerOpts) GetSigningKey() string {
 	if h.SigningKey == nil {
 		return os.Getenv("INNGEST_SIGNING_KEY")
@@ -92,6 +97,10 @@ func (h HandlerOpts) GetSigningKey() string {
 	return *h.SigningKey
 }
 
+// GetEnv returns the env defined within HandlerOpts, or the default
+// defined within INNGEST_ENV.
+//
+// This is the environment name used for preview/branch environments within Inngest.
 func (h HandlerOpts) GetEnv() string {
 	if h.Env == nil {
 		return os.Getenv("INNGEST_ENV")
@@ -99,6 +108,8 @@ func (h HandlerOpts) GetEnv() string {
 	return *h.Env
 }
 
+// GetRegisterURL returns the registration URL defined wtihin HandlerOpts,
+// defaulting to the production Inngest URL if nil.
 func (h HandlerOpts) GetRegisterURL() string {
 	if h.RegisterURL == nil {
 		return "https://www.inngest.com/fn/register"
@@ -468,8 +479,8 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 			return json.NewEncoder(w).Encode(StreamResponse{
 				StatusCode: 500,
 				Body:       fmt.Sprintf("error calling function: %s", err.Error()),
-				NoRetry:    IsNoRetryError(err),
-				RetryAt:    GetRetryAtTime(err),
+				NoRetry:    isNoRetryError(err),
+				RetryAt:    getRetryAtTime(err),
 			})
 		}
 		if len(ops) > 0 {
@@ -487,11 +498,11 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		l.Error("error calling function", "error", err)
 
-		if IsNoRetryError(err) {
+		if isNoRetryError(err) {
 			w.Header().Add("x-inngest-no-retry", "true")
 		}
 
-		if at := GetRetryAtTime(err); at != nil {
+		if at := getRetryAtTime(err); at != nil {
 			w.Header().Add("retry-after", at.Format(time.RFC3339))
 		}
 

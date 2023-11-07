@@ -172,9 +172,9 @@ func (ge GenericEvent[D, U]) Validate() error {
 	return nil
 }
 
-// Now returns a timestamp with millisecond precision used for the Event.Timestamp
+// NowMillis returns a timestamp with millisecond precision used for the Event.Timestamp
 // field.
-func Now() int64 {
+func NowMillis() int64 {
 	return time.Now().UnixMilli()
 }
 
