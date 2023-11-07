@@ -528,28 +528,36 @@ func (l lifecycle) OnInvokeFunction(
 		l.log.Error("invoke function options are nil")
 	}
 
-	h := History{
-		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-		AccountID:       id.AccountID,
-		WorkspaceID:     id.WorkspaceID,
-		CreatedAt:       time.Now(),
-		FunctionID:      id.WorkflowID,
-		FunctionVersion: int64(id.WorkflowVersion),
-		GroupID:         groupID,
-		RunID:           id.RunID,
-		Type:            enums.HistoryTypeStepInvokingFunction.String(),
-		Attempt:         int64(item.Attempt),
-		IdempotencyKey:  id.IdempotencyKey(),
-		EventID:         id.EventID,
-		BatchID:         id.BatchID,
-		StepName:        &op.Name,
-		StepID:          &op.ID,
-		InvokeFunction: &InvokeFunction{
+	var invokeFunction *InvokeFunction
+	// Not having all of the required data here indicates that something is
+	// wrong; let's not add a partial history item for this. Either everything
+	// or nothing, to ensure the reader doesn't have to do too much work.
+	if corrID != "" && eventID.String() != "" && fnID != "" {
+		invokeFunction = &InvokeFunction{
+			CorrelationID: corrID,
 			EventID:       eventID,
 			FunctionID:    fnID,
 			Timeout:       expiry,
-			CorrelationID: corrID,
-		},
+		}
+	}
+
+	h := History{
+		AccountID:       id.AccountID,
+		Attempt:         int64(item.Attempt),
+		BatchID:         id.BatchID,
+		CreatedAt:       time.Now(),
+		EventID:         id.EventID,
+		FunctionID:      id.WorkflowID,
+		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         groupID,
+		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		IdempotencyKey:  id.IdempotencyKey(),
+		InvokeFunction:  invokeFunction,
+		RunID:           id.RunID,
+		StepID:          &op.ID,
+		StepName:        &op.Name,
+		Type:            enums.HistoryTypeStepInvokingFunction.String(),
+		WorkspaceID:     id.WorkspaceID,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
@@ -583,22 +591,22 @@ func (l lifecycle) OnInvokeFunctionResumed(
 
 	h := History{
 		AccountID:       id.AccountID,
-		WorkspaceID:     id.WorkspaceID,
+		BatchID:         id.BatchID,
 		CreatedAt:       time.Now(),
+		EventID:         id.EventID,
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
 		GroupID:         groupIDUUID,
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-		RunID:           id.RunID,
-		Type:            enums.HistoryTypeStepCompleted.String(),
 		IdempotencyKey:  id.IdempotencyKey(),
-		EventID:         id.EventID,
-		BatchID:         id.BatchID,
 		InvokeFunctionResult: &InvokeFunctionResult{
 			EventID: req.EventID,
-			Timeout: req.EventID == nil,
 			RunID:   req.RunID,
+			Timeout: req.EventID == nil,
 		},
+		RunID:       id.RunID,
+		Type:        enums.HistoryTypeStepCompleted.String(),
+		WorkspaceID: id.WorkspaceID,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
