@@ -85,7 +85,7 @@ Here's an example:
 ```ts
 import { Inngest } from "inngest";
 
-const inngest = new Inngest({ name: "My App" });
+const inngest = new Inngest({ id: "my-app" });
 
 // This function will be invoked by Inngest via HTTP any time the "app/user.signup"
 // event is sent to to Inngest
