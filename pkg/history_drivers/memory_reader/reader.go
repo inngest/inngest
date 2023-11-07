@@ -237,10 +237,10 @@ func toRunHistory(item history.History) (*history_reader.RunHistory, error) {
 	var invokeFunction *history_reader.RunHistoryInvokeFunction
 	if item.InvokeFunction != nil {
 		invokeFunction = &history_reader.RunHistoryInvokeFunction{
+			CorrelationID: item.InvokeFunction.CorrelationID,
+			EventID:       item.InvokeFunction.EventID,
 			FunctionID:    item.InvokeFunction.FunctionID,
 			Timeout:       item.InvokeFunction.Timeout,
-			EventID:       item.InvokeFunction.EventID,
-			CorrelationID: item.InvokeFunction.CorrelationID,
 		}
 	}
 
@@ -248,8 +248,8 @@ func toRunHistory(item history.History) (*history_reader.RunHistory, error) {
 	if item.InvokeFunctionResult != nil {
 		invokeFunctionResult = &history_reader.RunHistoryInvokeFunctionResult{
 			EventID: item.InvokeFunctionResult.EventID,
-			Timeout: item.InvokeFunctionResult.Timeout,
 			RunID:   item.InvokeFunctionResult.RunID,
+			Timeout: item.InvokeFunctionResult.Timeout,
 		}
 	}
 
@@ -260,6 +260,8 @@ func toRunHistory(item history.History) (*history_reader.RunHistory, error) {
 		FunctionVersion:      item.FunctionVersion,
 		GroupID:              item.GroupID,
 		ID:                   item.ID,
+		InvokeFunction:       invokeFunction,
+		InvokeFunctionResult: invokeFunctionResult,
 		Result:               result,
 		RunID:                item.RunID,
 		Sleep:                sleep,
@@ -269,7 +271,5 @@ func toRunHistory(item history.History) (*history_reader.RunHistory, error) {
 		URL:                  item.URL,
 		WaitForEvent:         waitForEvent,
 		WaitResult:           waitResult,
-		InvokeFunction:       invokeFunction,
-		InvokeFunctionResult: invokeFunctionResult,
 	}, nil
 }

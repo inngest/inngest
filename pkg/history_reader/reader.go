@@ -255,6 +255,8 @@ type RunHistory struct {
 	FunctionVersion      int64                           `json:"functionVersion"`
 	GroupID              *uuid.UUID                      `json:"groupID"`
 	ID                   ulid.ULID                       `json:"id"`
+	InvokeFunction       *RunHistoryInvokeFunction       `json:"invokeFunction"`
+	InvokeFunctionResult *RunHistoryInvokeFunctionResult `json:"invokeFunctionResult"`
 	Result               *RunHistoryResult               `json:"result"`
 	RunID                ulid.ULID                       `json:"runID"`
 	Sleep                *RunHistorySleep                `json:"sleep"`
@@ -264,8 +266,6 @@ type RunHistory struct {
 	URL                  *string                         `json:"url"`
 	WaitForEvent         *RunHistoryWaitForEvent         `json:"waitForEvent"`
 	WaitResult           *RunHistoryWaitResult           `json:"waitResult"`
-	InvokeFunction       *RunHistoryInvokeFunction       `json:"invokeFunction"`
-	InvokeFunctionResult *RunHistoryInvokeFunctionResult `json:"invokeFunctionResult"`
 }
 
 type RunHistoryCancel struct {
@@ -300,14 +300,14 @@ type RunHistoryWaitResult struct {
 }
 
 type RunHistoryInvokeFunction struct {
+	CorrelationID string    `json:"correlationID"`
 	EventID       ulid.ULID `json:"eventID"`
 	FunctionID    string    `json:"functionID"`
-	CorrelationID string    `json:"correlationID"`
 	Timeout       time.Time `json:"timeout"`
 }
 
 type RunHistoryInvokeFunctionResult struct {
 	EventID *ulid.ULID `json:"eventID"`
-	Timeout bool       `json:"timeout"`
 	RunID   *ulid.ULID `json:"runID"`
+	Timeout bool       `json:"timeout"`
 }

@@ -30,6 +30,8 @@ type History struct {
 	GroupID              *uuid.UUID
 	ID                   ulid.ULID
 	IdempotencyKey       string
+	InvokeFunction       *InvokeFunction
+	InvokeFunctionResult *InvokeFunctionResult
 	LatencyMS            *int64
 	OriginalRunID        *ulid.ULID
 	Result               *Result
@@ -43,8 +45,6 @@ type History struct {
 	URL                  *string
 	WaitForEvent         *WaitForEvent
 	WaitResult           *WaitResult
-	InvokeFunction       *InvokeFunction
-	InvokeFunctionResult *InvokeFunctionResult
 	WorkspaceID          uuid.UUID
 }
 
@@ -73,16 +73,16 @@ type WaitResult struct {
 }
 
 type InvokeFunction struct {
-	EventID       ulid.ULID `json:"event_id"`
 	CorrelationID string    `json:"correlation_id"`
+	EventID       ulid.ULID `json:"event_id"`
 	FunctionID    string    `json:"function_id"`
 	Timeout       time.Time `json:"timeout"`
 }
 
 type InvokeFunctionResult struct {
 	EventID *ulid.ULID `json:"event_id"`
-	Timeout bool       `json:"timeout"`
 	RunID   *ulid.ULID `json:"run_id"`
+	Timeout bool       `json:"timeout"`
 }
 
 type Result struct {
