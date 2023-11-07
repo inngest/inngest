@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/gowebpki/jcs"
-	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -38,18 +37,12 @@ func MarshalV1(
 ) ([]byte, error) {
 	md := s.Metadata()
 
-	fn := s.Function()
-	events, err := mapInvocationEventNames(s.Events(), fn)
-	if err != nil {
-		return nil, fmt.Errorf("error mapping invocation event names: %w", err)
-	}
-
 	req := &SDKRequest{
-		Events:  events,
-		Event:   events[0],
+		Events:  s.Events(),
+		Event:   s.Event(),
 		Actions: s.Actions(),
 		Context: &SDKRequestContext{
-			FunctionID: fn.ID,
+			FunctionID: s.Function().ID,
 			Env:        env,
 			StepID:     step.ID,
 			RunID:      s.RunID(),
@@ -82,25 +75,4 @@ func MarshalV1(
 	}
 
 	return b, nil
-}
-
-// mapInvocationEventNames sets the name of any invocation events to the name of the trigger event.
-// This is used to ensure that SDKs receive the event they are expecting when invoked.
-func mapInvocationEventNames(events []map[string]any, fn inngest.Function) ([]map[string]any, error) {
-	for _, evt := range events {
-		if name, ok := evt["name"].(string); !ok || name != event.InvokeFnName {
-			continue
-		}
-
-		if len(fn.Triggers) != 1 {
-			return nil, fmt.Errorf("invocation event found, but function %s has %d triggers; could not fill in invocation event name automatically", fn.Slug, len(fn.Triggers))
-		}
-
-		trigger := fn.Triggers[0]
-		// Crons can keep the original event name
-		if trigger.EventTrigger != nil && trigger.Event != "" {
-			evt["name"] = trigger.Event
-		}
-	}
-	return events, nil
 }
