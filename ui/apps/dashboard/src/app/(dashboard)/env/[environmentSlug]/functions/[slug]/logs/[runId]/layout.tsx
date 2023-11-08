@@ -106,10 +106,10 @@ export default async function FunctionRunDetailsLayout({
     notFound();
   }
 
-  const eventName = run.version.triggers[0]?.eventName;
-  const scheduleName = run.version.triggers[0]?.schedule;
+  const eventName = run.version?.triggers[0]?.eventName;
+  const scheduleName = run.version?.triggers[0]?.schedule;
   const func = response.environment?.function;
-  const triggers = (run?.version?.triggers ?? []).map((trigger) => {
+  const triggers = (run.version?.triggers ?? []).map((trigger) => {
     return {
       type: trigger.schedule ? 'CRON' : 'EVENT',
       value: trigger.schedule ?? trigger.eventName ?? '',
@@ -202,10 +202,10 @@ export default async function FunctionRunDetailsLayout({
           >
             <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
               <RectangleStackIcon className="h-3 w-3 text-sky-500" />
-              {`version-${run.version.version}`}
+              {`version-${run.version?.version}`}
             </div>
 
-            {run.version.validFrom && (
+            {run.version?.validFrom && (
               <Time
                 className="text-sm text-slate-500"
                 format="relative"
@@ -213,7 +213,7 @@ export default async function FunctionRunDetailsLayout({
               />
             )}
           </Link>
-          {run.version.deploy && (
+          {run.version?.deploy && (
             <Link
               href={`/env/${params.environmentSlug}/deploys/${run.version.deploy.id}`}
               className="block overflow-hidden rounded-md border border-slate-200 bg-white px-5 py-2.5 shadow hover:bg-slate-50"
@@ -231,7 +231,7 @@ export default async function FunctionRunDetailsLayout({
 
           <div className="block overflow-scroll rounded-md border border-slate-200 bg-white px-5 py-2.5 shadow">
             <div className="flex items-center gap-2 whitespace-nowrap text-sm font-medium text-slate-900">
-              {run.version.url}
+              {run.version?.url}
             </div>
             <span className="text-sm text-slate-500">URL</span>
           </div>

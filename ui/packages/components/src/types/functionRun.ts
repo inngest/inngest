@@ -5,7 +5,7 @@ export function isFunctionRunStatus(s: string): s is FunctionRunStatus {
 }
 
 export type FunctionRun = {
-  canRerun: boolean;
+  canRerun: boolean | null;
 
   // TODO: Change to Date
   endedAt: string | null;
