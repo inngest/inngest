@@ -41,7 +41,7 @@
     "@stripe/react-stripe-js": "2.1.0",
     "@stripe/stripe-js": "1.52.1",
     "@tanstack/react-table": "8.9.3",
-    "@team-plain/typescript-sdk": "2.11.1",
+    "@team-plain/typescript-sdk": "3.0.1",
     "@urql/exchange-request-policy": "1.0.2",
     "@urql/exchange-retry": "1.2.0",
     "change-case": "4.1.2",

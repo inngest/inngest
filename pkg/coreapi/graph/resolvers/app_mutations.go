@@ -63,3 +63,21 @@ func (r *mutationResolver) DeleteApp(ctx context.Context, idstr string) (string,
 	}
 	return idstr, nil
 }
+
+func (r *mutationResolver) DeleteAppByName(
+	ctx context.Context,
+	name string,
+) (bool, error) {
+	apps, err := r.Data.GetApps(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	for _, app := range apps {
+		if app.Name == name {
+			return true, r.Data.DeleteApp(ctx, app.ID)
+		}
+	}
+
+	return false, nil
+}

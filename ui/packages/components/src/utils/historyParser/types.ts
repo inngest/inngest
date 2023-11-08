@@ -1,5 +1,12 @@
+export const runEndGroupID = 'function-run-end';
+export const runStartGroupID = 'function-run-start';
+
 export type HistoryNode = {
   attempt: number;
+
+  // Use a record instead of array in case we're missing an attempt's data.
+  attempts: Record<number, HistoryNode>;
+
   endedAt?: Date;
   groupID: string;
   name?: string;

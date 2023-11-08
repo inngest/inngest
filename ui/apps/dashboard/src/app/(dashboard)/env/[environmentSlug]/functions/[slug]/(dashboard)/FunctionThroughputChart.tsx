@@ -86,30 +86,27 @@ export default function FunctionThroughputChart({
     pause: !environment?.id,
   });
 
-  let metrics: {
-    name: string;
-    values: {
-      queued: number;
-      started: number;
-      ended: number;
-    };
-  }[] = [];
-  const queued = data?.environment.function?.queued;
-  const started = data?.environment.function?.started;
-  const ended = data?.environment.function?.ended;
-  const concurrencyLimit = data?.environment.function?.concurrencyLimit;
+  const queued = data?.environment?.function?.queued?.data ?? [];
+  const started = data?.environment?.function?.started?.data ?? [];
+  const ended = data?.environment?.function?.ended?.data ?? [];
+  const concurrencyLimit = data?.environment?.function?.concurrencyLimit?.data ?? [];
 
-  if (queued && started && ended && concurrencyLimit) {
-    metrics = queued.data.map((d, idx) => ({
-      name: d.bucket,
-      values: {
-        queued: d.value,
-        started: started.data[idx]?.value ?? 0,
-        ended: ended.data[idx]?.value ?? 0,
-        concurrencyLimit: Boolean(concurrencyLimit.data[idx]?.value),
-      },
-    }));
-  }
+  const maxLength = Math.max(queued.length, started.length, ended.length, concurrencyLimit.length);
+
+  const metrics = Array.from({ length: maxLength }).map((_, idx) => ({
+    name:
+      queued[idx]?.bucket ||
+      started[idx]?.bucket ||
+      ended[idx]?.bucket ||
+      concurrencyLimit[idx]?.bucket ||
+      '',
+    values: {
+      queued: queued[idx]?.value ?? 0,
+      started: started[idx]?.value ?? 0,
+      ended: ended[idx]?.value ?? 0,
+      concurrencyLimit: Boolean(concurrencyLimit[idx]?.value),
+    },
+  }));
 
   return (
     <SimpleLineChart

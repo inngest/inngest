@@ -43,7 +43,7 @@ export function SelectInput<T extends string>(props: SelectProps<T>) {
       </Select.Trigger>
 
       <Select.Content
-        className="w-[var(--radix-select-trigger-width)] rounded-lg border border-slate-300 bg-white py-1 text-sm leading-none shadow outline-2 outline-offset-2 outline-indigo-500 transition-all focus:outline"
+        className="z-10 w-[var(--radix-select-trigger-width)] rounded-lg border border-slate-300 bg-white py-1 text-sm leading-none shadow outline-2 outline-offset-2 outline-indigo-500 transition-all focus:outline"
         position="popper"
         sideOffset={8}
       >

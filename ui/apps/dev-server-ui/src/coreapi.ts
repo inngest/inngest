@@ -149,6 +149,9 @@ export const FUNCTIONS = gql`
         type
         value
       }
+      app {
+        name
+      }
       url
     }
   }

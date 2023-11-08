@@ -1,9 +1,11 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { type Route } from 'next';
 import { useAuth } from '@clerk/nextjs';
-import { ArrowLeftIcon } from '@heroicons/react/20/solid';
+import { ArrowLeftIcon, CheckIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { ThreadStatus, type ThreadPartsFragment } from '@team-plain/typescript-sdk';
 import { useQuery } from 'urql';
 
 import AppLink from '@/components/AppLink';
@@ -14,6 +16,7 @@ import cn from '@/utils/cn';
 import { isEnterprisePlan } from '../(dashboard)/settings/billing/utils';
 import { SupportForm } from './SupportForm';
 import { useSystemStatus } from './statusPage';
+import { getLabelTitleByTypeId } from './ticketOptions';
 
 const GetAccountSupportInfoDocument = graphql(`
   query GetAccountSupportInfo {
@@ -95,7 +98,10 @@ export default function Page() {
                 </div>
               </>
             ) : (
-              <SupportForm isEnterprise={isEnterprise} isPaid={isPaid} />
+              <>
+                <SupportForm isEnterprise={isEnterprise} isPaid={isPaid} />
+                <SupportTickets isSignedIn={isSignedIn} />
+              </>
             )}
           </SupportChannel>
           <SupportChannel title="Live chat" label="Enterprise">
@@ -119,6 +125,7 @@ export default function Page() {
               </p>
             )}
           </SupportChannel>
+
           <SupportChannel title="Community">
             <p>
               Chat with other developers and the Inngest team in our{' '}
@@ -194,6 +201,71 @@ function SupportChannel({
         )}
       </h2>
       {children}
+    </div>
+  );
+}
+
+function SupportTickets({ isSignedIn }: { isSignedIn?: boolean }) {
+  const [isFetchingTickets, setIsFetchingTickets] = useState(false);
+  const [tickets, setTickets] = useState<ThreadPartsFragment[]>([]);
+  useEffect(
+    function () {
+      async function fetchTickets() {
+        setIsFetchingTickets(true);
+        const result = await fetch(`/api/support-tickets`, {
+          method: 'GET',
+          credentials: 'include',
+          redirect: 'error',
+        });
+        const body = await result.json();
+        if (body) {
+          setIsFetchingTickets(false);
+          setTickets(body.data);
+        }
+      }
+      fetchTickets();
+    },
+    [isSignedIn]
+  );
+
+  return isFetchingTickets ? (
+    <LoadingIcon />
+  ) : (
+    <div className="w-full">
+      <h3 className="mb-2 text-base font-semibold">Recent tickets</h3>
+      <div className="grid w-full grid-cols-1 divide-y divide-slate-300 rounded-md border border-slate-300 text-sm">
+        {tickets.length > 0
+          ? tickets.map((ticket) => (
+              <div key={ticket.id} className="flex items-center gap-2 px-2 py-2">
+                {ticket.status === ThreadStatus.Done ? (
+                  <span className="w-[50px] shrink-0 rounded bg-green-50 px-1.5 py-1 text-center text-xs font-medium text-green-800">
+                    Closed
+                  </span>
+                ) : (
+                  <span className="w-[50px] shrink-0 rounded bg-sky-50 px-1.5 py-1 text-center text-xs font-medium text-sky-600">
+                    Open
+                  </span>
+                )}
+                <span
+                  className="grow overflow-hidden text-ellipsis whitespace-nowrap"
+                  title={ticket.previewText || ticket.title}
+                >
+                  {ticket.previewText || ticket.title}
+                </span>
+                <span className="flex gap-2">
+                  {ticket.labels.map((label) => (
+                    <span
+                      key={label.id}
+                      className="whitespace-nowrap rounded bg-slate-50 px-1.5 py-1 text-center text-xs font-medium text-slate-600"
+                    >
+                      {label.labelType.name}
+                    </span>
+                  ))}
+                </span>
+              </div>
+            ))
+          : 'No open tickets'}
+      </div>
     </div>
   );
 }

@@ -85,6 +85,7 @@ export function SendEventModal({
       success: () => {
         router.refresh();
         onClose();
+        window.location.reload(); // We need to reload page to display new events, because we can't update the URQL cache without using mutations
         return 'Event sent!';
       },
       error: 'Could not send event. Please try again later.',

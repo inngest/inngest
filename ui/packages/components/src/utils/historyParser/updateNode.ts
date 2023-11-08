@@ -1,4 +1,4 @@
-import type { HistoryNode, HistoryType, RawHistoryItem } from './types';
+import { runEndGroupID, type HistoryNode, type HistoryType, type RawHistoryItem } from './types';
 
 type Updater = (node: HistoryNode, rawItem: RawHistoryItem) => HistoryNode;
 
@@ -26,18 +26,18 @@ const updaters: {
   FunctionFailed: (node, rawItem) => {
     return {
       ...node,
+      attempts: {},
       endedAt: new Date(rawItem.createdAt),
+      groupID: runEndGroupID,
       scope: 'function',
       status: 'failed',
     } satisfies HistoryNode;
   },
   FunctionScheduled: noop,
   FunctionStarted: (node, rawItem) => {
-    return {
-      ...node,
-      scheduledAt: new Date(rawItem.createdAt),
-      status: 'scheduled',
-    } satisfies HistoryNode;
+    // Treat this as a StepScheduled because the first step doesn't have a
+    // dedicated StepScheduled.
+    return updaters.StepScheduled(node, rawItem);
   },
   FunctionStatusUpdated: noop,
   None: noop,
@@ -77,6 +77,8 @@ const updaters: {
 
     return {
       ...node,
+      endedAt: new Date(rawItem.createdAt),
+      outputItemID: rawItem.id,
       scope: 'step',
       status: 'errored',
     } satisfies HistoryNode;
@@ -198,17 +200,23 @@ function parseURL(url: string): string {
   return parsed.toString();
 }
 
-/**
- * Updates that should happen on all history types.
- */
-const commonUpdater: Updater = (node, rawItem) => {
-  return {
-    ...node,
-    attempt: rawItem.attempt,
-  } satisfies HistoryNode;
-};
-
 export function updateNode(node: HistoryNode, rawItem: RawHistoryItem): HistoryNode {
-  node = updaters[rawItem.type](node, rawItem);
-  return commonUpdater(node, rawItem);
+  if (rawItem.attempt > node.attempt) {
+    // Since there's a new attempt, the existing group data represents an
+    // errored (and therefore ended) attempt. Move that errored attempt to the
+    // attempts.
+    node = {
+      ...node,
+      attempt: rawItem.attempt,
+      attempts: {
+        ...node.attempts,
+        [node.attempt]: {
+          ...node,
+          attempts: {},
+        },
+      },
+    };
+  }
+
+  return updaters[rawItem.type](node, rawItem);
 }

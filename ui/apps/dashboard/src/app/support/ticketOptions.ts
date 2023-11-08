@@ -34,6 +34,19 @@ export const ticketTypeTitles: { [K in Exclude<TicketType, null>]: string } = {
   question: 'General question',
 };
 
+export const labelTypeIDs: { [K in Exclude<TicketType, null>]: string } = {
+  bug: process.env.PLAIN_LABEL_TYPE_ID_BUG || '',
+  demo: process.env.PLAIN_LABEL_TYPE_ID_DEMO || '',
+  billing: process.env.PLAIN_LABEL_TYPE_ID_BILLING || '',
+  feature: process.env.PLAIN_LABEL_TYPE_ID_FEATURE_REQUEST || '',
+  security: process.env.PLAIN_LABEL_TYPE_ID_SECURITY || '',
+  question: process.env.PLAIN_LABEL_TYPE_ID_QUESTION || '',
+} as const;
+
+export function getLabelTitleByTypeId(typeId: string) {
+  return Object.entries(labelTypeIDs).find(([, id]) => id === typeId)?.[0] || '';
+}
+
 type SeverityOption = {
   label: string;
   description: string;

@@ -8,7 +8,7 @@ import * as Sentry from '@sentry/nextjs';
 import { Alert } from '@/components/Alert';
 import { SelectInput } from '@/components/Forms/SelectInput';
 import { Textarea } from '@/components/Forms/Textarea';
-import { type RequestBody } from '../api/support-form/route';
+import { type RequestBody } from '../api/support-tickets/route';
 import {
   DEFAULT_BUG_SEVERITY_LEVEL,
   formOptions,
@@ -92,7 +92,7 @@ export function SupportForm({ isEnterprise = false, isPaid = false }: SupportFor
         },
       };
 
-      const result = await fetch('/api/support-form', {
+      const result = await fetch('/api/support-tickets', {
         method: 'POST',
         credentials: 'include',
         redirect: 'error',
