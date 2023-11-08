@@ -81,7 +81,7 @@ export default function workflowEngine() {
       <Container>
         <div className="grid lg:grid-cols-2 lg:gap-40">
           <div className="flex items-center justify-center hidden lg:block">
-            <img src="/assets/florianworks.jpg" />
+            <img src="/assets/florianworks.jpg" className="rounded-lg" />
           </div>
 
           <div>
@@ -133,7 +133,7 @@ export default function workflowEngine() {
           />
           <p className="text-xl text-center py-4">
             "Inngest is a great platform to build reliability into your long
-            running tasks without drowning in complexity.""
+            running tasks without drowning in complexity."
           </p>
           <p className="text-slate-400">Ozan Şener, Principal Engineer</p>
         </div>

@@ -34,25 +34,30 @@ const productLinks = {
   linksTitle: "Use Cases",
   linksTheme: "indigo",
   links: [
-    {
-      title: "Serverless Queues",
-      url: "/uses/serverless-queues?ref=nav",
-      icon: IconSteps,
-    },
     // {
     //   title: "Durable Functions",
     //   url: "/uses/durable-functions?ref=nav",
     //   icon: IconScheduled,
     // },
     {
-      title: "Background Jobs",
-      url: "/uses/serverless-node-background-jobs?ref=nav",
-      icon: IconBackgroundTasks,
-    },
-    {
       title: "AI + LLMs",
       url: "/ai?ref=nav",
       icon: IconSDK,
+    },
+    {
+      title: "Workflow engines",
+      url: "/uses/workflow-engine?ref=nav",
+      icon: IconJourney,
+    },
+    {
+      title: "Serverless Queues",
+      url: "/uses/serverless-queues?ref=nav",
+      icon: IconSteps,
+    },
+    {
+      title: "Background Jobs",
+      url: "/uses/serverless-node-background-jobs?ref=nav",
+      icon: IconBackgroundTasks,
     },
     {
       title: "Scheduled & cron jobs",
@@ -89,7 +94,7 @@ const learnLinks = {
       url: "/patterns?ref=nav",
       icon: IconPatterns,
       iconBg: "bg-sky-500",
-    }
+    },
   ],
   linksTitle: "Quick Starts",
   linksTheme: "blue",
