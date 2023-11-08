@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { type Route } from 'next';
-import { ChartBarIcon, FolderIcon, RocketLaunchIcon, XCircleIcon } from '@heroicons/react/20/solid';
+import { ChartBarIcon, RocketLaunchIcon, XCircleIcon } from '@heroicons/react/20/solid';
 
 import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import { Alert } from '@/components/Alert';
@@ -138,26 +138,6 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
         </main>
         <aside className="border-l border-slate-200 bg-white px-6 py-4">
           <div className="flex flex-col gap-4 ">
-            <Block title="Latest Version">
-              {function_.current && (
-                <ListContainer className="bg-white">
-                  <ListItem
-                    href={
-                      `/env/${params.environmentSlug}/functions/${params.slug}/versions` as Route
-                    }
-                  >
-                    <div>
-                      <div className="mb-1 flex flex-row items-center gap-2 font-medium">
-                        <FolderIcon className="h-4 text-indigo-400" /> {function_.current?.version}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {relativeTime(function_.current?.validFrom)}
-                      </div>
-                    </div>
-                  </ListItem>
-                </ListContainer>
-              )}
-            </Block>
             <Block title="Latest Deployment">
               <ListContainer className="bg-white">
                 <ListItem
