@@ -331,6 +331,24 @@ const sectionPythonReference = [
       },
     ],
   },
+  {
+    title: "Inngest Client",
+    links: [
+      {
+        title: "Create the client",
+        href: `/docs/reference/python/client/create`,
+      },
+    ],
+  },
+  {
+    title: "Functions",
+    links: [
+      {
+        title: "Create function",
+        href: `/docs/reference/python/functions/create`,
+      },
+    ],
+  },
 ];
 
 export const topLevelNav = [

@@ -1,0 +1,224 @@
+# Create Function
+
+Define your functions using the `create_function` decorator.
+
+```py
+import inngest
+
+@inngest.create_function(
+    fn_id="import-product-images",
+    trigger=inngest.TriggerEvent(event="shop/product.imported"),
+)
+async def fn(**_kwargs: object):
+    # Your function code
+```
+
+---
+
+## `create_function`
+
+The `create_function` decorator accepts a configuration and wraps a plain function.
+
+### Configuration
+
+<Properties>
+  <Property name="batch_events" type="Batch">
+    Configure how the function should consume batches of events ([reference](/docs/guides/batching))
+
+    <Properties nested collapse>
+      <Property name="max_size" type="int" required>
+        The maximum number of events a batch can have. Current limit is `100`.
+      </Property>
+      <Property name="timeout" type="int | datetime.timedelta" required>
+        How long to wait before invoking the function with the batch even if it's not full.
+        Current permitted values are between 1 second and 1 minute. If you pass an `int` then it'll be interpreted in milliseconds.
+      </Property>
+    </Properties>
+  </Property>
+
+  <Property name="cancel" type="Cancel">
+    Define an event that can be used to cancel a running or sleeping function ([reference](/docs/functions/cancellation))
+    <Properties nested collapse>
+      <Property name="event" type="str" required>
+        The event name which will be used to cancel
+      </Property>
+      <Property name="if_exp" type="str">
+        A match expression using arbitrary event data. For example, `event.data.user_id == async.data.user_id` will only match events whose `data.user_id` matches the original trigger event's `data.user_id`.
+      </Property>
+      <Property name="timeout" type="int | datetime.timedelta">
+        The amount of time to wait to receive the cancelling event. If you pass an `int` then it'll be interpreted in milliseconds.
+      </Property>
+    </Properties>
+  </Property>
+
+  <Property name="debounce" type="Debounce">
+    Options to configure function debounce ([reference](/docs/reference/functions/debounce))
+    <Properties nested collapse>
+      <Property name="key" type="str">
+        A unique key expression to apply the debounce to. The expression is evaluated for each triggering event.
+
+        Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+
+        * Debounce per customer id: `'event.data.customer_id'`
+        * Debounce per account and email address: `'event.data.account_id + "-" + event.user.email'`
+      </Property>
+      <Property name="period" type="int | datetime.timedelta" required>
+        The time period of which to set the limit. The period begins when the first matching event is received.
+        How long to wait before invoking the function with the batch even if it's not full.
+        If you pass an `int` then it'll be interpreted in milliseconds.
+      </Property>
+    </Properties>
+  </Property>
+
+  <Property name="fn_id" type="str" required>
+    A unique identifier for your function. This should not change between deploys.
+  </Property>
+
+  <Property name="name" type="str">
+    A name for your function. If defined, this will be shown in the UI as a friendly display name instead of the ID.
+  </Property>
+
+  <Property name="on_failure" type="function">
+    A function that will be called only when this Inngest function fails after all retries have been attempted ([reference](/docs/reference/functions/handling-failures))
+  </Property>
+
+  <Property name="rate_limit" type="RateLimit">
+    Options to configure how to rate limit function execution ([reference](/docs/reference/functions/rate-limit))
+
+    <Properties nested collapse>
+      <Property name="key" type="str">
+        A unique key expression to apply the limit to. The expression is evaluated for each triggering event.
+
+        Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+
+        * Rate limit per customer id: `'event.data.customer_id'`
+        * Rate limit per account and email address: `'event.data.account_id + "-" + event.user.email'`
+      </Property>
+      <Property name="limit" type="int" required>
+        The maximum number of functions to run in the given time period.
+      </Property>
+      <Property name="period" type="int | datetime.timedelta" required>
+        The time period of which to set the limit. The period begins when the first matching event is received.
+        How long to wait before invoking the function with the batch even if it's not full.
+        Current permitted values are from 1 second to 1 minute. If you pass an `int` then it'll be interpreted in milliseconds.
+      </Property>
+    </Properties>
+  </Property>
+
+  <Property name="retries" type="int">
+    Configure the number of times the function will be retried from `0` to `20`. Default: `2`
+  </Property>
+
+  <Property name="throttle" type="Throttle">
+    Options to configure how to throttle function execution
+
+    <Properties nested collapse>
+      <Property name="count" type="int" required>
+        The maximum number of functions to run in the given time period.
+      </Property>
+      <Property name="key" type="str">
+        A unique key expression to apply the limit to. The expression is evaluated for each triggering event.
+
+        Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+
+        * Rate limit per customer id: `'event.data.customer_id'`
+        * Rate limit per account and email address: `'event.data.account_id + "-" + event.user.email'`
+      </Property>
+      <Property name="period" type="int | datetime.timedelta" required>
+        The time period of which to set the limit. The period begins when the first matching event is received.
+        How long to wait before invoking the function with the batch even if it's not full.
+        Current permitted values are from 1 second to 1 minute. If you pass an `int` then it'll be interpreted in milliseconds.
+      </Property>
+    </Properties>
+  </Property>
+
+  <Property name="trigger" type="TriggerEvent | TriggerCron" required>
+    What should trigger the function to run. Either an event or a cron schedule.
+  </Property>
+</Properties>
+
+## Triggers
+
+### `TriggerEvent`
+
+<Properties>
+  <Property name="event" type="str" required>
+    The name of the event.
+  </Property>
+  <Property name="expression" type="str">
+    A match expression using arbitrary event data. For example, `event.data.user_id == async.data.user_id` will only match events whose `data.user_id` matches the original trigger event's `data.user_id`.
+  </Property>
+</Properties>
+
+### `TriggerCron`
+
+<Properties>
+  <Property name="cron" type="str" required>
+    A [unix-cron](https://crontab.guru/) compatible schedule string. <br/>Optional timezone prefix, e.g. `TZ=Europe/Paris 0 12 * * 5`.
+  </Property>
+</Properties>
+
+## Handler
+
+The handler is your code that runs whenever the trigger occurs. Every function handler receives a single object argument which can be deconstructed. The key arguments are `event` and `step`. Note, that scheduled functions that use a `cron` trigger will not receive an `event` argument.
+
+```py
+@inngest.create_function(
+    # Function options
+)
+async def fn(
+  *,
+  attempt: int,
+  event: inngest.Event,
+  events: list[inngest.Event],
+  logger: inngest.Logger,
+  run_id: str,
+  step: inngest.Step,
+):
+    # Function code
+```
+
+### `attempt`
+
+The current zero-indexed attempt number for this function execution. The first attempt will be 0, the second 1, and so on. The attempt number is incremented every time the function throws an error and is retried.
+
+
+### `event`
+
+The event payload `object` that triggered the given function run. The event payload object will match what you send with [`inngest.send()`](/docs/reference/events/send). Below is an example event payload object:
+
+```py
+inngest.Event(
+  name="app/account.created",
+  data={
+    "user_id": "1234567890"
+  },
+  id="01HENNF0X3BNBCM2718B4SNMN1",
+  ts=1683898268584
+)
+```
+
+### `events`
+
+`events` is a list of `event` objects that's accessible when the `batch_events` is set on the function configuration.
+If batching is not configured, the list contains a single event payload matching the `event` argument.
+
+### `logger`
+
+The `logger` object. It's a proxy object around either the logger you provided or the default logger.
+
+### `run_id`
+
+The unique ID for the given function run. This can be useful for logging and looking up specific function runs in the Inngest dashboard.
+
+### `step`
+
+The `step` object has a method for each kind of step in the Inngest platform.
+{/* 
+- [`step.run()`](/docs/reference/functions/step-run) - Run synchronous or asynchronous code as a retryable step in your function
+- [`step.sleep()`](/docs/reference/functions/step-sleep) - Sleep for a given amount of time
+- [`step.sleepUntil()`](/docs/reference/functions/step-sleep-until) - Sleep until a given time
+- [`step.waitForEvent()`](/docs/reference/functions/step-wait-for-event) - Pause a function's execution until another event is received
+- [`step.sendEvent()`](/docs/reference/functions/step-send-event) - Send event(s) reliability within your function. Use this instead of `inngest.send()` to ensure reliable event delivery from within functions. */}
+
+If your function is `async` then its type is `Step` and you can use `await` to call its methods. If your function is not `async` then its type is `SyncStep`.
