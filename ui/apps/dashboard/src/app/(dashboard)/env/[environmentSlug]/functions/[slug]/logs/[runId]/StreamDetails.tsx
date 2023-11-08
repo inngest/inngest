@@ -49,6 +49,11 @@ export function StreamDetails({
 
   const history = useParsedHistory(rawHistory);
 
+  let rerunButton: React.ReactNode | undefined;
+  if (run.canRerun) {
+    rerunButton = <RerunButton environment={environment} func={func} functionRunID={run.id} />;
+  }
+
   return (
     <div
       className={classNames('dark grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}
@@ -60,7 +65,7 @@ export function StreamDetails({
         functionVersion={functionVersion}
         getHistoryItemOutput={getOutput}
         history={history}
-        rerunButton={<RerunButton environment={environment} func={func} functionRunID={run.id} />}
+        rerunButton={rerunButton}
         run={run}
       />
     </div>
