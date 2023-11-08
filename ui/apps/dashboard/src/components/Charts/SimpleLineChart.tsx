@@ -28,7 +28,7 @@ type SimpleLineChartProps = {
   data?: {
     name: string;
     values: {
-      [key: string]: number;
+      [key: string]: number | boolean;
     };
   }[];
   legend: {
