@@ -41,6 +41,7 @@ We provide framework-specific bindings to make this easy for common platforms:
 - [Next.js](#framework-next-js)
 - [Redwood](#framework-redwood)
 - [Remix](#framework-remix)
+- [SvelteKit](#framework-sveltekit)
 - [Custom](#custom-frameworks)
 
 Each of these bindings wrap our base API which implemnts the core logic, so adding support for new
@@ -534,6 +535,21 @@ const handler = serve(inngest, [...fns], {
 </CodeGroup>
 
 For more information, check out the [Streaming](/docs/streaming) page.
+
+## Framework: SvelteKit <VersionBadge version="v3.5.0+" />
+
+Add the following to `./src/routes/api/inngest/+server.ts`:
+
+<CodeGroup>
+```ts {{ title: "v3" }}
+import { functions, inngest } from '$lib/inngest';
+import { serve } from 'inngest/sveltekit';
+
+export const { GET, POST, PUT } = serve({ client: inngest, functions });
+```
+</CodeGroup>
+
+See the [SvelteKit example](https://github.com/inngest/inngest-js/tree/main/examples/framework-sveltekit) for more information.
 
 ## Reference
 
