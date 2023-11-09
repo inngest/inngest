@@ -1,0 +1,231 @@
+---
+heading: "Python errors as values: Comparing useful patterns from other languages"
+subtitle: Safer error handling, inspired by Go and Rust
+image: /assets/blog/python-errors-as-values/featured-image.png
+date: 2023-11-08
+author: Aaron Harper
+disableCTA: true
+---
+Errors happen in programs -- they're unavoidable! It's important to know both *where* errors can happen and *how* to effectively handle them. As we developed our [Python SDK](https://github.com/inngest/inngest-py), safe and effective error handling was paramount.
+
+In this post we'll:
+
+- Compare the two primary ways of handling errors: **thrown errors** and **errors as values**.
+- Demonstrate how to handle errors as values in Python (a traditionally thrown-error language).
+
+# Thrown errors
+
+A thrown error interrupts the control flow, propagating down the call stack until it's caught. If it isn't caught then the program cashes. A big problem with this approach is a lack of clarity on where an error might occur. For example, which lines in the following code throw an error?
+
+```python
+def upsert_thing(thing_id: str) -> Thing:
+    thing = get_thing(thing_id)
+    thing.set_name("Doodad")
+    update_thing(thing)
+    log_thing(thing)
+    return thing
+```
+
+It's impossible to know which line might throw an error without reading the functions themselves... and the functions those functions call... and the functions those functions call. Some thorough engineers may document thrown errors but documentation is untested and therefore untrustworthy. Java is a *little* better because it forces you to declare uncaught errors in method signatures.
+
+So if we want to be *really* safe then we'll wrap each call with a `try/catch`:
+
+```python
+def upsert_thing(thing_id: str) -> Thing:
+    try:
+        thing = get_thing(thing_id)
+    except Exception as err:
+        # Swallow error and create a new Thing
+        thing = Thing(thing_id)
+
+    try:
+        thing.set_name("Doodad")
+    except Exception as err:
+        raise Exception(f"failed to set name: {err}") from err
+
+    try:
+        update_thing(thing)
+    except Exception as err:
+        raise Exception(f"failed to update: {err}") from err
+
+    try:
+        log_thing(thing)
+    except Exception as err:
+        # Swallow error because logging isn't critical
+        pass
+
+	return user
+```
+
+As we think about each possible error we realize that our original logic would crash the program when we didn't want it to! But while this is safe it's also extremely verbose. Python engineers overwhelmingly agree, which is why most Python code has 1 large `try/catch` *at best*:
+
+```python
+def upsert_thing(thing_id: str) -> Thing:
+    try:
+        thing = get_thing(thing_id)
+        thing.set_name("Doodad")
+        update_thing(thing)
+        log_thing(thing)
+    except Exception as err:
+        raise Exception(f"something errored ¯\_(ツ)_/¯: {err}")
+
+	return thing
+```
+
+So the thrown error approach:
+
+- Doesn't tell us which functions could error.
+- Doesn't force us to handle errors where they happen.
+- Encourages engineers to use coarse-grained error handling (i.e. one big `try/catch`).
+
+There has to be a better way 🤔.
+
+# Errors as values
+
+Some languages (e.g. Go and Rust) take a different approach: they *return* errors rather than throwing them. By returning errors, these languages force engineers to notice, think about, and handle errors.
+
+Go returns errors using a tuple (well, not really a tuple but it looks like one!), putting the error last by convention:
+
+```go
+// Define a function that returns a User or error
+func getUser(userID string) (*User, error) {
+	rows := users.Find(userID)
+	if len(rows) == 0 {
+		return nil, errors.New("user not found")
+	}
+
+	return rows[0], nil
+}
+
+func renameUser(userID string, name string) (*User, error) {
+  // Consume the function
+	user, err := getUser(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	user.Name = name
+	return user, nil
+}
+```
+
+Rust returns returns errors using a "wrapper" type called `Result`. A `Result` contains both a non-error value (`Ok`) and an error value (`Err`):
+
+```rust
+// Define a function that returns a Result with a User or an error string
+fn get_user(user_id: &str) -> Result<Option<User>, &str> {
+    match find_user_by_id(user_id) {
+        Some(user) => Ok(Some(user)),
+        None => Err("user not found"),
+    }
+}
+
+fn rename_user(user_id: &str, name: String) -> Result<User, &str> {
+    // Consume the function
+    match get_user(user_id) {
+        Ok(Some(mut user)) => {
+            user.name = name;
+            Ok(user)
+        },
+        Ok(None) => Err("user not found"),
+        Err(e) => Err(e),
+    }
+}
+```
+
+Regardless of the specific approach, returning errors as values makes us consider all of the places an error could occur. The error scenarios become self-documenting and more thoroughly handled.
+
+# Errors as values in Python
+
+So how can we treat errors as values in Python? We could take the Go approach and return a tuple:
+
+```python
+
+# Define a function that returns a tuple of a User and an error
+def get_user(user_id: str) -> tuple[User | None, Exception | None]:
+    rows = users.find(user_id=user_id)
+    if len(rows) == 0:
+        return None, Exception("user not found")
+
+    return rows[0], None
+
+def rename_user(
+    user_id: str, name: str
+) -> tuple[User | None, Exception | None]:
+    # Consume the function
+    user, err = get_user(user_id)
+    if err is not None:
+        return None, err
+
+    # Unnecessary check but the type checker can't know that
+    assert user is not None
+
+    user.name = name
+    return user, None
+```
+
+Since the type checker doesn't know the tuple values are mutually exclusive, we're forced to do a superfluous `assert user is not None`. Otherwise, the type checker incorrectly thinks `user` is nullable.
+
+Next, let's try something Rust-like using the awesome library [result](https://github.com/rustedpy/result), which leverages pattern matching:
+
+```python
+import result
+
+# Define a function that returns a Result
+def get_user(user_id: str) -> result.Result[User, Exception]:
+    rows = users.find(user_id=user_id)
+    if len(rows) == 0:
+        return result.Error(Exception("user not found"))
+
+    return result.Ok(rows[0])
+
+def rename_user(user_id: str, name: str) -> result.Result[User, Exception]:
+    # Consume the function
+    match get_user(user_id):
+        case result.Ok(user):
+            pass
+        case result.Err(err):
+            return result.Err(err)
+
+    user.name = name
+    return result.Ok(user)
+```
+
+Better than the tuple! But we still have some downsides:
+
+- Verbose.
+- Language servers don't understand that a `return` in both cases will always end the function. In other words, they don't know that checking both `result.Ok` and `result.Err` is exhaustive.
+- Pattern matching is new in Python (`3.10`). Many people are on older versions and many others are hesitant to introduce the `match` statement into their codebase.
+- External dependency (the `result` package).
+
+The last approach we'll try is returning a union:
+
+```python
+# Define a function that returns a union of a User and an error
+def get_user(user_id: str) -> User | Exception:
+    rows = users.find(user_id=user_id)
+    if len(rows) == 0:
+        return Exception("user not found")
+
+    return rows[0]
+
+def rename_user(user_id: str, name: str) -> User | Exception:
+    # Consume the function
+    user = get_user(user_id)
+    if isinstance(user, Exception):
+        return user
+
+    user.name = name
+    return user
+```
+
+This looks great! We didn't need superfluous assertions (like the tuple approach) and we didn't introduce new patterns (like the `result` approach). Unions work because `isinstance` supports **type narrowing**:
+
+- Within the `if isinstance(user, Exception)` block, the `user` variable is narrowed from `User | Exception` to `Exception`.
+- Since we set `user = User()` when `user` is an `Exception`, type checkers will understand that `user` cannot be `Exception` after the `if` statement.
+
+# Conclusion
+
+Inngest's [Python SDK](https://github.com/inngest/inngest-py) handles errors as values, since this integrates error handling into the normal control flow of the program. This makes programs more verbose, but it ensures that we're properly handling errors.
+
+We implemented errors as values using unions, since that was the most idiomatic and terse approach. Other languages use tuples (e.g. Go) or wrapper types (e.g. Rust), but we felt that these patterns either didn't work well in Python, were too verbose, or heavily used a pattern that isn't yet idiomatic.
