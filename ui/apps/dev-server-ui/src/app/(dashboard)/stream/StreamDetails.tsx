@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { EventDetails } from '@inngest/components/EventDetails';
+import { Link } from '@inngest/components/Link';
 import { RunDetails } from '@inngest/components/RunDetails';
+import type { CreateLinkToRunFn } from '@inngest/components/Timeline';
 import { classNames } from '@inngest/components/utils/classNames';
 import { ulid } from 'ulid';
 
@@ -73,6 +75,19 @@ export default function StreamDetails() {
     }).unwrap();
   }
 
+  const createLinkToRun: CreateLinkToRunFn = ({ eventID, runID }) => {
+    const runParams = new URLSearchParams({
+      event: eventID,
+      run: runID,
+    });
+
+    return (
+      <Link internalNavigation href={`/stream/trigger?${runParams.toString()}`}>
+        Go to run
+      </Link>
+    );
+  };
+
   return (
     <div
       className={classNames(
@@ -97,6 +112,7 @@ export default function StreamDetails() {
           getHistoryItemOutput={getHistoryItemOutput}
           history={runResult.data.history}
           run={runResult.data.run}
+          createLinkToRun={createLinkToRun}
         />
       )}
     </div>

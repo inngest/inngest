@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { MetadataGrid } from '@inngest/components/Metadata';
 import { OutputCard } from '@inngest/components/OutputCard';
@@ -11,6 +11,7 @@ import { type HistoryNode } from '@inngest/components/utils/historyParser';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import { AnimatePresence, motion } from 'framer-motion';
 
+import type { Timeline } from '..';
 import { TimelineNodeHeader } from './TimelineNodeHeader';
 import { renderTimelineNode } from './TimelineNodeRenderer';
 
@@ -18,12 +19,21 @@ type Props = {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
   node: HistoryNode;
   position: 'first' | 'last' | 'middle';
+  createLinkToRun: React.ComponentProps<typeof Timeline>['createLinkToRun'];
 };
 
-export function TimelineNode({ position, getOutput, node }: Props) {
-  const { icon, badge, name, metadata, links } = renderTimelineNode(node);
+export function TimelineNode({ position, getOutput, node, createLinkToRun }: Props) {
+  const { icon, badge, name, metadata, runLink } = renderTimelineNode(node);
   const isExpandable = node.scope === 'step';
   const [openItems, setOpenItems] = useState<string[]>([]);
+
+  const runLinkNode = useMemo(() => {
+    if (!runLink) {
+      return null;
+    }
+
+    return createLinkToRun(runLink);
+  }, [...Object.values(runLink ?? {})]);
 
   const toggleItem = (itemValue: string) => {
     if (openItems.includes(itemValue)) {
@@ -80,7 +90,7 @@ export function TimelineNode({ position, getOutput, node }: Props) {
                 type: 'tween',
               }}
             >
-              <Content getOutput={getOutput} node={node} links={links} />
+              <Content getOutput={getOutput} node={node} links={[runLinkNode]} />
             </motion.div>
           </AccordionPrimitive.Content>
         )}

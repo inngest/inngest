@@ -1,5 +1,4 @@
 import { Badge } from '@inngest/components/Badge';
-import { Button } from '@inngest/components/Button';
 
 type Props = {
   icon: React.ReactNode;
@@ -9,14 +8,9 @@ type Props = {
     label: string;
     value: string;
   };
-  link?: {
-    label: string;
-    href: string;
-    icon?: React.ReactNode;
-  };
 };
 
-export function TimelineNodeHeader({ icon, badge, title, metadata, link }: Props) {
+export function TimelineNodeHeader({ icon, badge, title, metadata }: Props) {
   return (
     <div className="flex items-start justify-between text-sm leading-8 text-slate-100">
       <div className="mr-2 flex flex-1 items-start gap-2">
@@ -29,7 +23,6 @@ export function TimelineNodeHeader({ icon, badge, title, metadata, link }: Props
           )}
         </div>
         <p className="align-top leading-8">{title}</p>
-        {link ? <Button href={link.href} label={link.label} icon={link.icon} /> : null}
       </div>
       <div className="flex items-center gap-2 leading-8">
         <p>{metadata?.label}</p>

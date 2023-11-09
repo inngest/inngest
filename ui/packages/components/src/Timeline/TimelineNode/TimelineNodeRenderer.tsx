@@ -1,4 +1,3 @@
-import { Link } from '@inngest/components/Link';
 import { IconStatusCircleArrowPath } from '@inngest/components/icons/StatusCircleArrowPath';
 import { IconStatusCircleCheck } from '@inngest/components/icons/StatusCircleCheck';
 import { IconStatusCircleCross } from '@inngest/components/icons/StatusCircleCross';
@@ -7,12 +6,14 @@ import { IconStatusCircleMinus } from '@inngest/components/icons/StatusCircleMin
 import { IconStatusCircleMoon } from '@inngest/components/icons/StatusCircleMoon';
 import type { HistoryNode } from '@inngest/components/utils/historyParser';
 
+import type { Timeline } from '..';
+
 export type RenderedData = {
   icon: JSX.Element;
   name: string;
   metadata?: { label: string; value: string };
   badge?: string;
-  links?: React.ReactNode[];
+  runLink?: Parameters<React.ComponentProps<typeof Timeline>['createLinkToRun']>[0];
 };
 
 export function renderTimelineNode(node: HistoryNode): RenderedData {
@@ -37,7 +38,7 @@ export function renderTimelineNode(node: HistoryNode): RenderedData {
   }
 
   let name = '...';
-  const links: RenderedData['links'] = [];
+  let runLink: RenderedData['runLink'];
   if (node.scope === 'function') {
     name = `Function ${node.status}`;
   } else if (node.scope === 'step') {
@@ -54,16 +55,10 @@ export function renderTimelineNode(node: HistoryNode): RenderedData {
     }
 
     if (node.invokeFunctionConfig?.eventID && node.invokeFunctionResult?.runID) {
-      const params = new URLSearchParams({
-        event: node.invokeFunctionConfig.eventID,
-        run: node.invokeFunctionResult.runID,
-      });
-
-      links.push(
-        <Link internalNavigation href={`/stream/trigger?${params.toString()}`}>
-          Go to run
-        </Link>
-      );
+      runLink = {
+        eventID: node.invokeFunctionConfig.eventID,
+        runID: node.invokeFunctionResult.runID,
+      };
     }
   }
 
@@ -131,6 +126,6 @@ export function renderTimelineNode(node: HistoryNode): RenderedData {
     name,
     metadata,
     badge,
-    links,
+    runLink,
   };
 }

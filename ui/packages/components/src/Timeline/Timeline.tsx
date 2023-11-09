@@ -5,12 +5,15 @@ import * as AccordionPrimitive from '@radix-ui/react-accordion';
 
 import { TimelineNode } from './TimelineNode/TimelineNode';
 
+export type CreateLinkToRunFn = (options: { eventID: string; runID: string }) => React.ReactNode;
+
 type Props = {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
   history: HistoryParser;
+  createLinkToRun: CreateLinkToRunFn;
 };
 
-export function Timeline({ getOutput, history }: Props) {
+export function Timeline({ getOutput, history, createLinkToRun }: Props) {
   const nodes = history.getGroups({ sort: true });
 
   return (
@@ -39,6 +42,7 @@ export function Timeline({ getOutput, history }: Props) {
                 position={position}
                 getOutput={getOutput}
                 node={node}
+                createLinkToRun={createLinkToRun}
               />
             );
           })}
