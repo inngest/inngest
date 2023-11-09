@@ -10,6 +10,7 @@ import Learning from "src/shared/Cards/Learning";
 import PageContainer from "src/shared/layout/PageContainer";
 import Image from "next/image";
 import CustomerQuote from "src/shared/Home/CustomerQuote";
+import CodeWindow from "src/shared/CodeWindow";
 
 import {
   IconRetry,
@@ -23,6 +24,7 @@ import {
   IconSteps,
   IconFiles,
   IconCompiling,
+  IconPower,
 } from "../../shared/Icons/duotone";
 
 const Icons: { [key: string]: React.FC<IconProps> } = {
@@ -36,6 +38,7 @@ const Icons: { [key: string]: React.FC<IconProps> } = {
   Steps: IconSteps,
   Files: IconFiles,
   Compiling: IconCompiling,
+  Power: IconPower,
 };
 
 type IconType = keyof typeof Icons;
@@ -130,7 +133,7 @@ export default function useCase({ stringData }) {
           ctas={[
             {
               href: `${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=use-case-${data.slug}`,
-              text: `Sign Up`,
+              text: `Get started`,
               arrow: "right",
             },
           ]}
@@ -172,7 +175,7 @@ export default function useCase({ stringData }) {
         <SectionHeader title={data.codeSection.title} />
         {data.codeSection.examples.map((example) => (
           <div className="mt-16 grid lg:grid-cols-5 md:grid-cols-1">
-            <div className="text-slate-200 mb-10 lg:mb-0 lg:pr-20 max-w-[400px] justify-center flex flex-col gap-3 col-span-2">
+            <div className="text-slate-200 mb-10 lg:mb-0 lg:pr-20 max-w-[480px] justify-center flex flex-col gap-3 col-span-2">
               {!!example.title && (
                 <h3 className="mb-12 text-xl md:text-3xl font-semibold">
                   {example.title}
@@ -190,22 +193,11 @@ export default function useCase({ stringData }) {
                 {example.description}
               </p>
             </div>
-            <SyntaxHighlighter
-              language="typescript"
-              showLineNumbers={false}
-              style={syntaxThemeDark}
-              codeTagProps={{ className: "code-window" }}
-              // className="hello"
-              customStyle={{
-                fontSize: "0.8rem",
-                padding: "1.5rem",
-                backgroundColor: "#0C1323",
-                display: "inline-flex",
-              }}
+            <CodeWindow
+              snippet={example.code}
+              showLineNumbers={true}
               className="col-span-3"
-            >
-              {example.code}
-            </SyntaxHighlighter>
+            />
           </div>
         ))}
       </Container>

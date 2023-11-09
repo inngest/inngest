@@ -4,7 +4,8 @@ import { rehypePlugins } from "./mdx/rehype.mjs";
 import { recmaPlugins } from "./mdx/recma.mjs";
 
 // All permanent redirects (source -> destination)
-const legacyDocsUrls = [
+const permanentRedirects = [
+  // Legacy docs
   ["/docs/functions/testing-functions", "/docs/local-development"],
   ["/docs/what-is-inngest", "/docs"],
   ["/docs/reference/functions/retries", "/docs/functions/retries"],
@@ -22,6 +23,9 @@ const legacyDocsUrls = [
   ["/docs/frameworks/nextjs", "/docs/sdk/serve#framework-next-js"],
   ["/docs/frameworks/redwoodjs", "/docs/sdk/serve#framework-redwood"],
   ["/docs/sdk/reference/serve", "/docs/reference/serve"],
+
+  // Other pages
+  ["/uses/zero-infra-llm-ai", "/ai"],
 ];
 
 async function redirects() {
@@ -52,7 +56,7 @@ async function redirects() {
       destination: "/docs/functions/multi-step",
       permanent: true,
     },
-    ...legacyDocsUrls.map(([source, destination]) => ({
+    ...permanentRedirects.map(([source, destination]) => ({
       source,
       destination,
       permanent: true,
@@ -66,7 +70,7 @@ async function redirects() {
       source: "/sign-up",
       destination: process.env.NEXT_PUBLIC_SIGNUP_URL,
       permanent: true,
-    }
+    },
   ];
 }
 

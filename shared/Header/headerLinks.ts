@@ -11,6 +11,8 @@ import {
   IconTools,
   IconWritingFns,
   IconCompiling,
+  IconPower,
+  IconRetry,
 } from "../Icons/duotone";
 
 const productLinks = {
@@ -34,15 +36,15 @@ const productLinks = {
   linksTitle: "Use Cases",
   linksTheme: "indigo",
   links: [
-    // {
-    //   title: "Durable Functions",
-    //   url: "/uses/durable-functions?ref=nav",
-    //   icon: IconScheduled,
-    // },
     {
       title: "AI + LLMs",
       url: "/ai?ref=nav",
       icon: IconSDK,
+    },
+    {
+      title: "Durable workflows",
+      url: "/uses/durable-workflows?ref=nav",
+      icon: IconRetry,
     },
     {
       title: "Workflow engines",
@@ -50,12 +52,12 @@ const productLinks = {
       icon: IconJourney,
     },
     {
-      title: "Serverless Queues",
+      title: "Serverless queues",
       url: "/uses/serverless-queues?ref=nav",
       icon: IconSteps,
     },
     {
-      title: "Background Jobs",
+      title: "Background jobs",
       url: "/uses/serverless-node-background-jobs?ref=nav",
       icon: IconBackgroundTasks,
     },
@@ -64,17 +66,6 @@ const productLinks = {
       url: "/uses/serverless-cron-jobs?ref=nav",
       icon: IconScheduled,
     },
-    // {
-    //   title: "Complex Workflows",
-    //   url: "/uses/complex-workflows?ref=nav",
-    //   icon: IconJourney,
-    // },
-    //
-    // {
-    //   title: "User journey automation",
-    //   url: "/uses/user-journey-automation?ref=nav",
-    //   icon: IconJourney,
-    // },
   ],
 };
 
