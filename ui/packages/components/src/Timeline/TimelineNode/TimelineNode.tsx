@@ -21,7 +21,7 @@ type Props = {
 };
 
 export function TimelineNode({ position, getOutput, node }: Props) {
-  const { icon, badge, name, metadata, link } = renderTimelineNode(node);
+  const { icon, badge, name, metadata, links } = renderTimelineNode(node);
   const isExpandable = node.scope === 'step';
   const [openItems, setOpenItems] = useState<string[]>([]);
 
@@ -50,13 +50,7 @@ export function TimelineNode({ position, getOutput, node }: Props) {
       />
       <AccordionPrimitive.Header className="flex items-start gap-2 py-6">
         <div className="z-10 flex-1">
-          <TimelineNodeHeader
-            icon={icon}
-            badge={badge}
-            title={name}
-            metadata={metadata}
-            link={link}
-          />
+          <TimelineNodeHeader icon={icon} badge={badge} title={name} metadata={metadata} />
         </div>
 
         {isExpandable && (
@@ -86,7 +80,7 @@ export function TimelineNode({ position, getOutput, node }: Props) {
                 type: 'tween',
               }}
             >
-              <Content getOutput={getOutput} node={node} />
+              <Content getOutput={getOutput} node={node} links={links} />
             </motion.div>
           </AccordionPrimitive.Content>
         )}
@@ -98,9 +92,11 @@ export function TimelineNode({ position, getOutput, node }: Props) {
 function Content({
   getOutput,
   node,
+  links,
 }: {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
   node: HistoryNode;
+  links?: React.ReactNode[];
 }) {
   const output = useOutput({ getOutput, outputItemID: node.outputItemID, status: node.status });
 
@@ -111,6 +107,10 @@ function Content({
 
   return (
     <>
+      {links?.length ? (
+        <div className="flex flex-row justify-end gap-x-5 pb-5">{...links}</div>
+      ) : null}
+
       <div className="pb-5">
         <MetadataGrid
           metadataItems={[

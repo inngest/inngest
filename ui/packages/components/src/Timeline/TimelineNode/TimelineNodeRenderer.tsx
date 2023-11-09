@@ -1,4 +1,4 @@
-import { IconReplay } from '@inngest/components/icons/Replay';
+import { Link } from '@inngest/components/Link';
 import { IconStatusCircleArrowPath } from '@inngest/components/icons/StatusCircleArrowPath';
 import { IconStatusCircleCheck } from '@inngest/components/icons/StatusCircleCheck';
 import { IconStatusCircleCross } from '@inngest/components/icons/StatusCircleCross';
@@ -7,12 +7,12 @@ import { IconStatusCircleMinus } from '@inngest/components/icons/StatusCircleMin
 import { IconStatusCircleMoon } from '@inngest/components/icons/StatusCircleMoon';
 import type { HistoryNode } from '@inngest/components/utils/historyParser';
 
-type RenderedData = {
+export type RenderedData = {
   icon: JSX.Element;
   name: string;
   metadata?: { label: string; value: string };
   badge?: string;
-  link?: { label: string; href: string; icon?: React.ReactNode };
+  links?: React.ReactNode[];
 };
 
 export function renderTimelineNode(node: HistoryNode): RenderedData {
@@ -37,7 +37,7 @@ export function renderTimelineNode(node: HistoryNode): RenderedData {
   }
 
   let name = '...';
-  let link: RenderedData['link'];
+  const links: RenderedData['links'] = [];
   if (node.scope === 'function') {
     name = `Function ${node.status}`;
   } else if (node.scope === 'step') {
@@ -59,11 +59,11 @@ export function renderTimelineNode(node: HistoryNode): RenderedData {
         run: node.invokeFunctionResult.runID,
       });
 
-      link = {
-        label: 'See run',
-        href: `/stream/trigger?${params.toString()}`,
-        icon: <IconReplay />,
-      };
+      links.push(
+        <Link internalNavigation href={`/stream/trigger?${params.toString()}`}>
+          Go to run
+        </Link>
+      );
     }
   }
 
@@ -131,6 +131,6 @@ export function renderTimelineNode(node: HistoryNode): RenderedData {
     name,
     metadata,
     badge,
-    link,
+    links,
   };
 }
