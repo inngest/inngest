@@ -51,6 +51,17 @@ const GetFunctionRunDetailsDocument = graphql(`
               eventID
               timeout
             }
+            invokeFunction {
+              eventID
+              functionID
+              correlationID
+              timeout
+            }
+            invokeFunctionResult {
+              eventID
+              timeout
+              runID
+            }
           }
           id
           status
