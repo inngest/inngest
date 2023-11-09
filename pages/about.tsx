@@ -42,11 +42,6 @@ const TEAM = [
     role: "Engineer",
     avatar: "/assets/team/darwin-w-2023-06-26.jpg",
   },
-  {
-    name: "Joel Hooks",
-    role: "Developer Advocate",
-    avatar: "/assets/team/joel-h-2023-09-08.jpg",
-  },
 ];
 
 const INVESTORS: {
