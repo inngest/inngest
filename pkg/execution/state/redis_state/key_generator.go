@@ -178,6 +178,9 @@ type QueueKeyGenerator interface {
 }
 
 type DebounceKeyGenerator interface {
+	// QueueItem returns the key for the hash containing all items within a
+	// queue for a function.  This is used to check leases on debounce jobs.
+	QueueItem() string
 	// DebouncePointer returns the key which stores the pointer to the current debounce
 	// for a given function.
 	DebouncePointer(ctx context.Context, fnID uuid.UUID, key string) string

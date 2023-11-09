@@ -452,7 +452,7 @@ type QueueItem struct {
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {
-	q.ID = hashID(ctx, str)
+	q.ID = HashID(ctx, str)
 }
 
 // Score returns the score (time that the item should run) for the queue item.
@@ -616,7 +616,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	} else {
 		// Hash the ID.
 		// TODO: What if this is already hashed?
-		i.ID = hashID(ctx, i.ID)
+		i.ID = HashID(ctx, i.ID)
 	}
 
 	// TODO: If the length of ID >= max, error.
@@ -771,7 +771,7 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 // If the queue item referenced by the job ID is not outstanding (ie. it has a lease, is in
 // progress, or doesn't exist) this returns an error.
 func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID string, at time.Time) error {
-	jobID = hashID(ctx, jobID)
+	jobID = HashID(ctx, jobID)
 
 	keys := []string{
 		q.kg.QueueIndex(partitionName),
@@ -787,6 +787,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 			jobID,
 			strconv.Itoa(int(at.UnixMilli())),
 			partitionName,
+			strconv.Itoa(int(time.Now().UnixMilli())),
 		},
 	).AsInt64()
 	if err != nil {
@@ -797,6 +798,8 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 		return nil
 	case -1:
 		return ErrQueueItemNotFound
+	case -2:
+		return ErrQueueItemAlreadyLeased
 	default:
 		return fmt.Errorf("unknown requeue by id response: %d", status)
 	}
@@ -1569,7 +1572,7 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 	}
 }
 
-func hashID(ctx context.Context, id string) string {
+func HashID(ctx context.Context, id string) string {
 	ui := xxhash.Sum64String(id)
 	return strconv.FormatUint(ui, 36)
 }

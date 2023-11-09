@@ -9,6 +9,7 @@ Return values:
 
 - 0:  Successfully requeued
 - -1: Queue item not found
+- -2: Queue item is leased and being worked on.
 
 ]]--
 
@@ -20,6 +21,7 @@ local keyPartitionHash  = KEYS[4]
 local jobID       = ARGV[1] -- queue item ID
 local jobScore    = tonumber(ARGV[2]) -- enqueue at, in milliseconds
 local partitionID = ARGV[3] -- function ID
+local currentTime = tonumber(ARGV[4]) -- in ms
 
 if redis.call("ZSCORE", keyQueueIndex, jobID) == false then
 	-- This doesn't exist.
@@ -31,6 +33,13 @@ local item = get_queue_item(keyQueueHash, jobID)
 if item == nil then
 	return -1
 end
+
+-- Ensure that we're not requeueing a leased job.
+if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
+	-- This is already leased;  don't let this requester lease the item.
+	return -2
+end
+
 
 -- $include(get_partition_item.lua)
 local existing = get_partition_item(keyPartitionHash, partitionID)
