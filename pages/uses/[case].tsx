@@ -9,7 +9,7 @@ import SectionHeader from "src/shared/SectionHeader";
 import Learning from "src/shared/Cards/Learning";
 import PageContainer from "src/shared/layout/PageContainer";
 import Image from "next/image";
-import CustomerQuote from "src/shared/Home/CustomerQuote";
+import Quote from "src/shared/Home/Quote";
 import CodeWindow from "src/shared/CodeWindow";
 
 import {
@@ -70,6 +70,7 @@ export type UseCase = {
   quote?: {
     text: string;
     author: string;
+    title: string;
     avatar?: string;
     logo?: string;
   };
@@ -204,12 +205,14 @@ export default function useCase({ stringData }) {
 
       {!!data.quote && (
         <Container className="flex flex-col items-center gap-4 my-48">
-          <CustomerQuote
-            quote={data.quote.text}
-            name={data.quote.author}
-            avatar={data.quote.avatar}
-            logo={data.quote.logo}
-            className="mx-auto mb-24 max-w-2xl"
+          <Quote
+            text={data.quote.text}
+            attribution={{
+              name: data.quote.author,
+              title: data.quote.title,
+              avatar: data.quote.avatar,
+              logo: data.quote.logo,
+            }}
           />
         </Container>
       )}

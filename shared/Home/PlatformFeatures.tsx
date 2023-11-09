@@ -29,7 +29,7 @@ export default function PlatformFeatures() {
   return (
     <Container className="my-44 tracking-tight">
       <Heading
-        title="We’ve built the hard stuff for you"
+        title="Giving developers piece of mind"
         lede="Inngest gives you everything you need with sensible defaults."
         className="mx-auto max-w-3xl text-center"
       />

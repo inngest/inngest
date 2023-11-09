@@ -2,7 +2,6 @@ import Link from "next/link";
 import Container from "../layout/Container";
 
 import Heading from "./Heading";
-import CustomerQuote from "./CustomerQuote";
 
 const highlights = [
   {

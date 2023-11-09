@@ -139,7 +139,8 @@ export const data: UseCase = {
   ],
   quote: {
     text: "With Inngest, Vercel and Next.js developers can now go beyond request-response, and orchestrate complex business processes, like a recurring subscription that involves retrying payments, sending notifications, exponential backoff, human-in-the-loop intervention and more.",
-    author: "Guillermo Rauch - CEO of Vercel, Creator of Next.js",
+    author: "Guillermo Rauch",
+    title: "CEO of Vercel",
     avatar: "/assets/customers/vercel-guillermo-rauch.jpg",
   },
   learnMore: {

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Header from "src/shared/Header";
 import Container from "src/shared/layout/Container";
 import Footer from "src/shared/Footer";
-import CustomerQuote from "src/shared/Home/CustomerQuote";
+import Quote from "src/shared/Home/Quote";
 
 const CONTACT_KEY =
   "Z-ymc97Dae8u4HHybHknc4DGRb51u6NnTOUaW-qG71ah1ZqsJfRcI6SaHg5APWutNcnMcaN3oZrZky-VQxBIyw";
@@ -149,30 +149,34 @@ export default function Contact() {
             </form>
 
             <div className="mx-auto max-w-2xl">
-              <CustomerQuote
-                quote="We were struggling with the complexities of managing our social media and e-commerce workflows. Thanks to Inngest, we were able to simplify our development process, speed up our time to market, and deliver a better customer experience. Inngest has become an essential tool in our tech stack."
-                name="Aivaras Tumas  - CEO @ Ocoya"
-                avatar="/assets/customers/ocoya-aivaras-tumas.png"
-                variant="transparent"
+              <Quote
+                text="We were struggling with the complexities of managing our social media and e-commerce workflows. Thanks to Inngest, we were able to simplify our development process, speed up our time to market, and deliver a better customer experience. Inngest has become an essential tool in our tech stack."
+                attribution={{
+                  name: "Aivaras Tumas",
+                  title: "CEO @ Ocoya",
+                  avatar: "/assets/customers/ocoya-aivaras-tumas.png",
+                }}
+                variant="vertical"
+                className="p-4 md:p-4"
               />
               <p className="mt-16 mb-8 text-lg font-semibold text-indigo-50/80">
                 Trusted by
               </p>
               <div className="flex flex-row flex-wrap gap-8">
                 <img
-                  className="h-8"
+                  className="h-7"
                   src="/assets/customers/tripadvisor.svg"
                   alt="TripAdvisor"
+                />
+                <img
+                  className="h-7"
+                  src="/assets/customers/resend.svg"
+                  alt="Resend"
                 />
                 <img
                   className="h-8"
                   src="/assets/customers/snaplet-dark.svg"
                   alt="Snaplet"
-                />
-                <img
-                  className="h-8"
-                  src="/assets/customers/tono-logo.png"
-                  alt="Tono Health"
                 />
               </div>
             </div>
@@ -182,61 +186,4 @@ export default function Contact() {
       <Footer />
     </div>
   );
-  /*let x = (
-    <>
-
-      <Hero className="pt-16 pb-12">
-        <h1 className="pb-4">Contact us</h1>
-        <p>
-          How can we help you?
-          <br /> Reach out to us by live chat,{" "}
-          <a href="mailto:hello@inngest.com">email</a>, or the form below for
-          help.
-        </p>
-      </Hero>
-
-      <Content>
-        <Inner>
-          <form onSubmit={onSubmit} className={sent ? "sent" : ""}>
-            <label>
-              Your name
-              <input
-                type="text"
-                name="name"
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Your name, please"
-                required
-              />
-            </label>
-            <label>
-              Your email
-              <input
-                type="email"
-                name="email"
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Your email address too"
-                required
-              />
-            </label>
-            <label>
-              Your message to the team
-              <textarea
-                name="message"
-                required
-                onChange={(e) => setMsg(e.target.value)}
-                placeholder="Your message.  It'll go straight to the team, and you'll hear back within the day."
-              />
-            </label>
-            <div>
-              <button type="submit">Send</button>
-            </div>
-          </form>
-        </Inner>
-      </Content>
-
-      <div style={{ marginTop: 100 }}>
-        <Footer />
-      </div>
-    </>
-  );*/
 }

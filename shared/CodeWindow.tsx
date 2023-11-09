@@ -87,6 +87,7 @@ const CodeWindow = ({
             color: colors.slate300,
             background: "transparent",
           }}
+          className="!overflow-hidden"
         >
           {removeLeadingSpaces(snippet)}
         </SyntaxHighlighter>

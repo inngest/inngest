@@ -12,11 +12,12 @@ export default function Heading({
   className?: string;
 }) {
   return (
-    <div className={`tracking-tight ${className}`}>
+    <div className={`${className}`}>
       <h2
         className={clsx(
-          "text-2xl md:text-[40px] leading-snug font-semibold",
-          variant === "dark" && "text-white",
+          "text-2xl md:text-5xl leading-snug font-semibold tracking-tight ",
+          variant === "dark" &&
+            "bg-gradient-to-br from-white to-slate-300 bg-clip-text text-transparent",
           variant === "light" && "text-slate-800"
         )}
       >
@@ -25,8 +26,8 @@ export default function Heading({
       {!!lede && (
         <p
           className={clsx(
-            "my-4 leading-loose text-sm md:text-base",
-            variant === "dark" && "text-indigo-200",
+            "my-4 font-medium leading-loose text-md md:text-lg",
+            variant === "dark" && "text-indigo-100/90",
             variant === "light" && "text-slate-500 font-medium"
           )}
         >

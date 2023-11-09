@@ -3,7 +3,6 @@ import Container from "../layout/Container";
 import CopyBtn from "./CopyBtn";
 
 import Heading from "./Heading";
-import CustomerQuote from "./CustomerQuote";
 
 export default function LocalDev({ className }: { className?: string }) {
   const handleCopyClick = (copy) => {
@@ -21,8 +20,8 @@ export default function LocalDev({ className }: { className?: string }) {
       <Container className={`mt-44 relative z-30 ${className}`}>
         <div>
           <Heading
-            title="End-to-end local development, in&nbsp;one&nbsp;command"
-            lede="The open source Inngest dev server runs on your machine for a complete
+            title="Unparalleled Local Dev"
+            lede="Our open source Inngest dev server runs on your machine for a complete
           local development experience, with production parity. Get instant feedback on
           your work and deploy to prod with full confidence."
             className="mx-auto max-w-3xl text-center"
@@ -60,13 +59,6 @@ export default function LocalDev({ className }: { className?: string }) {
           max-w-6xl
           border border-white/10
         `}
-        />
-
-        <CustomerQuote
-          quote="It's sensational - this is the best way to test a background job! I’ve never had a UI like this that I can use to follow and see my workflows."
-          name="Garrett Tolbert - Vercel"
-          avatar="/assets/customers/vercel-garrett-tolbert.jpg"
-          className="max-w-lg m-auto -mt-20 md:m-auto md:absolute md:-bottom-20 md:left-[20%]"
         />
       </Container>
     </div>

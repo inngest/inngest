@@ -1,22 +1,28 @@
 import type { GetStaticPropsResult } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import React from "react";
 import Header from "../shared/Header";
 import Hero from "../shared/Home/Hero";
 import Logos from "src/shared/Home/Logos";
-import SDKOverview from "src/shared/Home/SDKOverview";
 
+// import SDKOverview from "src/shared/Home/SDKOverview";
+import UseCases from "src/shared/Home/UseCases";
+import Features from "src/shared/Home/Features";
 import LocalDev from "../shared/Home/LocalDev";
 import SocialCTA from "../shared/Home/SocialCTA";
 import Footer from "../shared/Footer";
-import CustomerQuote from "src/shared/Home/CustomerQuote";
+import Quote from "src/shared/Home/Quote";
 import SocialProof from "src/shared/Home/SocialProof";
 
-import GetThingsShipped from "src/shared/Home/GetThingsShipped";
-import RunAnywhere from "src/shared/Home/RunAnywhere";
-import PlatformFeatures from "src/shared/Home/PlatformFeatures";
-import FeatureCallouts from "src/shared/Home/FeatureCallouts";
+// import GetThingsShipped from "src/shared/Home/GetThingsShipped";
+// import RunAnywhere from "src/shared/Home/RunAnywhere";
+// import PlatformFeatures from "src/shared/Home/PlatformFeatures";
+import PlatformFeatures2 from "src/shared/Home/PlatformFeatures2";
+// import FeatureCallouts from "src/shared/Home/FeatureCallouts";
+import Flexibility from "src/shared/Home/Flexibility";
 import type { PageProps } from "src/shared/types";
+// import EnterpriseTrust from "src/shared/Home/EnterpriseTrust";
 
 export async function getStaticProps(): Promise<
   GetStaticPropsResult<PageProps>
@@ -25,7 +31,7 @@ export async function getStaticProps(): Promise<
     props: {
       designVersion: "2",
       meta: {
-        title: "Effortless serverless queues, background jobs, and workflows",
+        title: "Build reliable products - Durable workflow engine",
         description:
           "Easily develop serverless workflows in your current codebase, without any new infrastructure. Using Inngest, your entire team can ship reliable products.",
         image: "/assets/homepage/open-graph.png",
@@ -39,7 +45,7 @@ export default function Home() {
     <div
       className="home font-sans bg-slate-1000"
       style={{
-        backgroundImage: `radial-gradient(circle at center -20%, #231649 0%, rgba(5, 9, 17, 0) 1500px)`,
+        backgroundImage: `radial-gradient(circle at center -20%, #0e0821 0%, rgba(5, 9, 17, 0) 1500px)`,
         backgroundSize: "100% 1500px",
         backgroundRepeat: "no-repeat",
       }}
@@ -49,7 +55,8 @@ export default function Home() {
       <Hero />
 
       <Logos
-        heading="Trusted by teams all over the world"
+        className="my-20 lg:my-36 mb-20 lg:mb-40 xl:mb-52"
+        heading="Helping these teams deliver reliable products"
         logos={[
           {
             src: "/assets/customers/tripadvisor.svg",
@@ -75,124 +82,91 @@ export default function Home() {
           { src: "/assets/customers/ocoya.svg", name: "Ocoya" },
           { src: "/assets/customers/finta-logo.png?v=1", name: "Finta.io" },
         ]}
+        footer={
+          <div className="flex items-center">
+            <Link
+              href="/customers"
+              className="mx-auto rounded-md font-medium px-6 py-2 bg-transparent transition-all text-white border border-slate-800 hover:border-slate-600 hover:bg-slate-500/10 whitespace-nowrap"
+            >
+              Read customer success stories
+            </Link>
+          </div>
+        }
       />
 
-      <div className="relative">
-        <div className="absolute top-80 left-0 right-0 -skew-y-6 bottom-0 bg-gradient-to-b from-slate-900/80 border-t border-slate-800/70 to-slate-1000/0"></div>
-        <SDKOverview />
+      <UseCases />
 
-        <Logos
-          heading={
-            <>
-              Use your existing framework (<em>or no framework!</em>)
-            </>
-          }
-          logos={[
-            {
-              src: "/assets/brand-logos/next-js-white.svg",
-              name: "Next.js",
-              href: "/docs/sdk/serve?ref=homepage-frameworks#framework-next-js",
-            },
-            {
-              src: "/assets/brand-logos/express-js-white.svg",
-              name: "Express.js",
-              href: "/docs/sdk/serve?ref=homepage-frameworks#framework-express",
-            },
-            {
-              src: "/assets/brand-logos/redwoodjs-white.svg",
-              name: "RedwoodJS",
-              href: "/docs/sdk/serve?ref=homepage-frameworks#framework-redwood",
-            },
-            {
-              src: "/assets/brand-logos/remix-white.svg",
-              name: "Remix",
-              href: "/docs/sdk/serve?ref=homepage-frameworks#framework-remix",
-            },
-            {
-              src: "/assets/brand-logos/deno-white.svg",
-              name: "Deno",
-              href: "/docs/sdk/serve?ref=homepage-frameworks#framework-fresh-deno",
-            },
-          ]}
+      <div className="my-32 lg:my-48">
+        <Quote
+          text={`Inngest is an essential partner to Vercel's frontend cloud offering. It extends Vercel's DX and serverless operational model to a notoriously challenging yet crucial part of the stack: backend workflows and asynchronous process coordination.`}
+          attribution={{
+            name: "Guillermo Rauch",
+            title: (
+              <span>
+                <span className="text-white">▲</span> CEO of Vercel
+              </span>
+            ),
+            avatar: "/assets/about/guillermo-rauch-avatar.jpg",
+          }}
         />
       </div>
 
-      <LocalDev className="-mb-80 md:-mb-60" />
+      <Features />
 
-      <div className="pt-60 pb-20 md:pb-40">
-        <RunAnywhere />
-
-        <Logos
-          heading={
-            <>
-              Your code runs on your existing platform, or{" "}
-              <Link
-                href="/docs/deploy?ref=homepage-platforms"
-                className="underline hover:text-indigo-400"
-              >
-                anywhere you choose
-              </Link>
-              :
-            </>
-          }
-          logos={[
-            {
-              src: "/assets/brand-logos/vercel-white.svg",
-              name: "Vercel",
-              href: "/docs/deploy/vercel?ref=homepage-platforms",
-            },
-            {
-              src: "/assets/brand-logos/netlify-white.svg",
-              name: "Netlify",
-              href: "/docs/deploy/netlify?ref=homepage-platforms",
-            },
-            {
-              src: "/assets/brand-logos/cloudflare-white.svg",
-              name: "Cloudflare Pages",
-              href: "/docs/sdk/serve?ref=homepage-frameworks#framework-cloudflare",
-            },
-            {
-              src: "/assets/brand-logos/aws-white.svg",
-              name: "AWS Lambda",
-              href: "/docs/sdk/serve?ref=homepage-frameworks#framework-aws-lambda",
-            },
-            {
-              src: "/assets/brand-logos/google-cloud-white.svg",
-              name: "Google Cloud Functions",
-              href: "/docs/sdk/serve?ref=homepage-frameworks#framework-google-cloud-functions",
-            },
-          ]}
-        />
-
-        <CustomerQuote
-          quote="We switched from our PostgreSQL backed queue to Inngest in less than a day. Their approach is idiomatic with a great developer experience. Inngest allowed us to stop worrying about scalability and stability."
-          name="Peter Pistorius - CEO @ Snaplet"
-          avatar="/assets/customers/snaplet-peter-pistorius.png"
-          className="mx-auto mb-28 lg:mb-20 max-w-2xl"
+      <div className="my-32">
+        <Quote
+          text="The DX and visibility with Inngest is really incredible. We are able to develop functions locally easier and faster that with our previous queue. Also, Inngest's tools give us the visibility to debug issues much quicker than before."
+          attribution={{
+            name: "Bu Kinoshita",
+            title: "Co-founder @ Resend",
+            logo: "/assets/customers/resend.svg",
+          }}
+          caseStudy="/customers/resend?ref=homepage"
         />
       </div>
 
-      <FeatureCallouts />
+      <LocalDev className="mb-24" />
 
-      <PlatformFeatures />
+      <div className="mt-32 mb-48">
+        <Quote
+          text="The DX and code simplicity it brings is unmatched, especially around local development. We're currently working to migrate some of our larger systems over and it’s a joy to see all the complexity it replaces, and with a much better story around partial failures and retries."
+          attribution={{
+            name: "Justin Cypret",
+            title: "Director of Engineer @ Zamp",
+            logo: "/assets/customers/zamp-logo.svg",
+          }}
+        />
+      </div>
 
-      {/* TODO - Add button to link to case study - */}
-      <CustomerQuote
-        quote="We were struggling with the complexities of managing our social media and e-commerce workflows. Thanks to Inngest, we were able to simplify our development process, speed up our time to market, and deliver a better customer experience. Inngest has become an essential tool in our tech stack."
-        name="Aivaras Tumas  - CEO @ Ocoya"
-        avatar="/assets/customers/ocoya-aivaras-tumas.png"
-        className="mx-auto max-w-2xl"
-        cta={{
-          href: "/customers/ocoya?ref=homepage",
-          text: "Read the Case Study",
-        }}
-      />
+      <PlatformFeatures2 />
 
-      <GetThingsShipped />
+      <div className="my-32">
+        <Quote
+          text="We switched from our PostgreSQL backed queue to Inngest in less than a day. Their approach is idiomatic with a great developer experience. Inngest allowed us to stop worrying about scalability and stability."
+          attribution={{
+            name: "Peter Pistorius",
+            title: "CEO @ Snaplet",
+            avatar: "/assets/customers/snaplet-peter-pistorius.png",
+          }}
+        />
+      </div>
+
+      <Flexibility />
+
+      {/* <EnterpriseTrust /> */}
+
+      <div className="my-32">
+        <Quote
+          text={`I can't stress enough how integral Inngest has been to our operations. It's more than just "battle tested" for us—it's been a game-changer and a cornerstone of our processes.`}
+          attribution={{
+            name: "Robin Curbelo",
+            title: "Engineer @ Niftykit",
+            avatar: "/assets/customers/niftykit-robin-curbelo.jpg",
+          }}
+        />
+      </div>
 
       <SocialProof />
-
-      {/* <Roadmap /> */}
 
       <SocialCTA />
 

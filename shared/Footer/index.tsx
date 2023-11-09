@@ -3,7 +3,7 @@ import Link from "next/link";
 import Logo from "src/shared/Icons/Logo";
 import Discord from "../Icons/Discord";
 import Github from "../Icons/Github";
-import Twitter from "../Icons/Twitter";
+import XSocialIcon from "../Icons/XSocialIcon";
 import Container from "../layout/Container";
 import footerLinks from "./footerLinks";
 import StatusWidget from "../StatusWidget";
@@ -108,8 +108,8 @@ export default function Footer({ ctaRef }: { ctaRef?: string }) {
                     className="text-white text-sm flex items-center group gap-2 hover:text-indigo-400 transition-all"
                     href="https://twitter.com/inngest"
                   >
-                    <Twitter />
-                    Twitter
+                    <XSocialIcon />
+                    X.com
                   </a>
                 </li>
               </ul>

@@ -10,7 +10,6 @@ export default function Logos({
   footer,
   variant = "dark",
   className,
-  noMargin,
 }: {
   heading?: string | React.ReactNode;
   logos: {
@@ -23,28 +22,34 @@ export default function Logos({
   footer?: React.ReactNode;
   className?: string;
   variant?: "dark" | "light";
-  noMargin?: boolean;
 }) {
   const hasLinks = !!logos.find((l) => !!l.href);
   const nonFeaturedCount = logos.filter((l) => !l.featured).length;
   return (
-    <Container className={`my-20 lg:my-36 mx-auto max-w-4xl ${className}`}>
-      <h2
-        className={clsx(
-          "text-lg tracking-tight text-center",
-          variant === "dark" && "text-slate-400 drop-shadow",
-          variant === "light" && "text-slate-700"
-        )}
-      >
-        {heading}
-      </h2>
+    <Container
+      className={clsx(
+        "mx-auto max-w-4xl", // my-20 lg:my-36 mb-20 lg:mb-40 xl:mb-60
+        className
+      )}
+    >
+      {!!heading && (
+        <h2
+          className={clsx(
+            "text-lg tracking-tight text-center",
+            variant === "dark" && "text-slate-400 drop-shadow",
+            variant === "light" && "text-slate-700"
+          )}
+        >
+          {heading}
+        </h2>
+      )}
       <div
         className={clsx(
           "mt-16 grid grid-cols-2 items-center justify-center px-20 max-w-[1200px] m-auto",
           nonFeaturedCount === 4 && "px-20 lg:grid-cols-4",
           nonFeaturedCount === 5 && "px-6 lg:grid-cols-5",
           hasLinks ? "gap-x-4 gap-y-8" : "gap-x-16 gap-y-16",
-          noMargin ? "mb-0 lg:mb-0 xl:mb-0" : "mb-20 lg:mb-40 xl:mb-60",
+          footer && "mb-16"
         )}
       >
         {logos.map(({ src, name, href, featured, scale = 1 }, idx) => {
@@ -71,7 +76,7 @@ export default function Logos({
                   alt={name}
                   width={120}
                   height={30}
-                  className="text-white max-h-[40px] pointer-events-none opacity-80 transition-all group-hover:opacity-100 grayscale group-hover:grayscale-0"
+                  className="text-white max-h-[40px] pointer-events-none opacity-80 transition-all group-hover:opacity-100"
                 />
               </Link>
             );

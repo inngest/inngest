@@ -57,7 +57,7 @@ export default function AI() {
           mt-8 mb-24
           hidden
           lg:grid
-          lg:w-2/3 
+          lg:w-2/3
         "
         >
           <CodeWindow
@@ -194,7 +194,7 @@ export default function AI() {
             <div
               className={`flex items-center justify-center bg-[#0a0a12] back flex-col p-8 text-center
               rounded
-              m-[1px] 
+              m-[1px]
               lg:rounded-none lg:rounded-l-md`}
             >
               <span className="text-4xl">12x</span>
@@ -246,7 +246,6 @@ export default function AI() {
       </p>
       <Logos
         className="opacity-60 my-1 lg:my-1 pb-20"
-        noMargin
         logos={[
           {
             src: "/assets/brand-logos/next-js-white.svg",
@@ -284,7 +283,7 @@ export default function AI() {
 const AIHero = () => (
   <Container>
     <div
-      className="py-24 lg:py-48 gap-2 justify-between lg:items-center 
+      className="py-24 lg:py-48 gap-2 justify-between lg:items-center
       flex flex-col align-center
     "
     >
@@ -708,7 +707,7 @@ export const userWorkflow = inngest.createFunction(
       const prompt = createAgentPrompt(similar, event.data.input);
       return await llm.createCompletion({
         model: "gpt-3.5-turbo",
-        prompt: createAgentPrompt(similar),
+        prompt,
       });
     });
 

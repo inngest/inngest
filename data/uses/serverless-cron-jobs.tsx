@@ -84,7 +84,9 @@ inngest.createFunction(
   ],
   quote: {
     text: "It's sensational - This is the best way to test a background job",
-    author: "Garrett Tolbert, Vercel",
+    author: "Garrett Tolbert",
+    title: "Vercel",
+    avatar: "/assets/customers/vercel-garrett-tolbert.jpg",
   },
   learnMore: {
     description:

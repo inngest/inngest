@@ -4,7 +4,7 @@ import Logo from "../Icons/Logo";
 import classNames from "src/utils/classNames";
 import Github from "../Icons/Github";
 import Discord from "../Icons/Discord";
-import Twitter from "../Icons/Twitter";
+import XSocialIcon from "../Icons/XSocialIcon";
 import Container from "../layout/Container";
 import BurgerMenu from "../Icons/BurgerMenu";
 import CloseMenu from "../Icons/CloseMenu";
@@ -129,7 +129,7 @@ export default function Header() {
                     href="https://twitter.com/inngest"
                     className="flex flex-shrink-0 items-center text-white font-medium px-3.5 py-2 text-sm hover:opacity-60"
                   >
-                    <Twitter />
+                    <XSocialIcon />
                   </a>
                 </li>
               </ul>

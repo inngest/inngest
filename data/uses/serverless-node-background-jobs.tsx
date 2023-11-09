@@ -109,9 +109,10 @@ await inngest.send({
     },
   ],
   quote: {
-    text: "It's sensational - This is the best way to test a background job",
-    author: "Garrett Tolbert, Vercel",
-    avatar: "/assets/customers/vercel-garrett-tolbert.jpg",
+    text: `The nice thing about writing step functions for Inngest vs regular "async worker queues" is that we can express logic, e.g. "if X than wait for event Y", with a layer of caching/retries on top.`,
+    author: "Alex Kotliarskyi",
+    title: "Co-founder @ Secta AI Labs",
+    logo: "/assets/customers/secta-labs-logo.svg",
   },
   learnMore: {
     description:

@@ -9,6 +9,7 @@ import { ChevronRightIcon } from "@heroicons/react/20/solid";
 import { useRive } from "@rive-app/react-canvas";
 import { useEffect } from "react";
 import Footer from "src/shared/Footer";
+import Quote from "src/shared/Home/Quote";
 
 export const getStaticProps: GetStaticProps = async (ctx) => {
   return {
@@ -124,19 +125,16 @@ export default function workflowEngine() {
       </Container>
 
       <Container>
-        <div className="w-full lg:w-1/4 my-36 mx-auto flex flex-col items-center">
-          <img
-            className="rounded-full"
-            src="/assets/quotes/osenergy.jpeg"
-            height="60"
-            width="60"
-          />
-          <p className="text-xl text-center py-4">
-            "Inngest is a great platform to build reliability into your long
-            running tasks without drowning in complexity."
-          </p>
-          <p className="text-slate-400">Ozan Şener, Principal Engineer</p>
-        </div>
+        <Quote
+          text="Inngest is a great platform to build reliability into your long
+        running tasks without drowning in complexity."
+          attribution={{
+            name: "Ozan Şener",
+            title: "Principal Engineer",
+            avatar: "/assets/quotes/osenergy.jpeg",
+          }}
+          className="my-36"
+        />
       </Container>
 
       <Container className="mt-24 mb-24">

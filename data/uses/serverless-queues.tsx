@@ -97,9 +97,10 @@ inngest.createFunction(
     },
   ],
   quote: {
-    text: "With Inngest, Vercel and Next.js developers can now go beyond request-response, and orchestrate complex business processes, like a recurring subscription that involves retrying payments, sending notifications, exponential backoff, human-in-the-loop intervention and more.",
-    author: "Guillermo Rauch - CEO of Vercel, Creator of Next.js",
-    avatar: "/assets/customers/vercel-guillermo-rauch.jpg",
+    text: "The DX and visibility with Inngest is really incredible. We are able to develop functions locally easier and faster that with our previous queue. Also, Inngest's tools give us the visibility to debug issues much quicker than before.",
+    author: "Bu Kinoshita",
+    title: "Co-founder @ Resend",
+    logo: "/assets/customers/resend.svg",
   },
   learnMore: {
     description:

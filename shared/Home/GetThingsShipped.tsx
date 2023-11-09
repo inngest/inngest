@@ -222,33 +222,25 @@ export default function GetThingsShipped() {
           export const handleApptRequested = inngest.createFunction(
             { id: "..." },
             { event: "appointment.requested" },
-            async () => {
-              /* ... */
-            }
+            async () => { /* ... */ }
           );
 
           export const handleApptScheduled = inngest.createFunction(
             { id: "..." },
             { event: "appointment.scheduled" },
-            async () => {
-              /* ... */
-            }
+            async () => { /* ... */ }
           );
 
           export const handleApptConfirmed = inngest.createFunction(
             { id: "..." },
             { event: "appointment.confirmed" },
-            async () => {
-              /* ... */
-            }
+            async () => { /* ... */}
           );
 
           export const handleApptCancelled = inngest.createFunction(
             { id: "..." },
             { event: "appointment.cancelled" },
-            async () => {
-              /* ... */
-            }
+            async () => { /* ... */ }
           );`),
       },
     },

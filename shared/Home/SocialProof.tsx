@@ -8,16 +8,19 @@ function AtInngest() {
 
 const quotes = [
   {
-    // https://twitter.com/michealjroberts/status/1701162785529290989?s=20
+    // https://twitter.com/dzhng/status/1672022811890831362
     quote: (
       <>
-        Yeh so <AtInngest /> is perhaps one of the best SaaS platforms I have
-        EVER used, incredible stability and crystal clear APIs. Love it already!
+        For anyone who is building multi-step AI agents (e.g AutoGPT type
+        systems), I highly recommend building it on top of a job queue
+        orchestration framework like <AtInngest />, the traceability these
+        things provide out of the box is super useful, plus you get timeouts &
+        retries for free.
       </>
     ),
-    name: "Michael Roberts",
-    username: "codewithbhargav",
-    avatar: "/assets/customers/social-proof/michaeljroberts.jpg",
+    name: "David",
+    username: "dzhng",
+    avatar: "/assets/customers/social-proof/david-dzhng.jpg",
   },
   {
     // https://twitter.com/patrick_gvr/status/1699396090825437235?s=20
@@ -56,19 +59,16 @@ const quotes = [
     avatar: "/assets/customers/social-proof/rayamjad.jpg",
   },
   {
-    // https://twitter.com/dzhng/status/1672022811890831362
+    // https://twitter.com/michealjroberts/status/1701162785529290989?s=20
     quote: (
       <>
-        For anyone who is building multi-step AI agents (e.g AutoGPT type
-        systems), I highly recommend building it on top of a job queue
-        orchestration framework like <AtInngest />, the traceability these
-        things provide out of the box is super useful, plus you get timeouts &
-        retries for free.
+        Yeh so <AtInngest /> is perhaps one of the best SaaS platforms I have
+        EVER used, incredible stability and crystal clear APIs. Love it already!
       </>
     ),
-    name: "David",
-    username: "dzhng",
-    avatar: "/assets/customers/social-proof/david-dzhng.jpg",
+    name: "Michael Roberts",
+    username: "codewithbhargav",
+    avatar: "/assets/customers/social-proof/michaeljroberts.jpg",
   },
   {
     // https://twitter.com/codewithbhargav/status/1688079437911511042
@@ -145,7 +145,7 @@ export default function SocialProof({ className }: { className?: string }) {
       />
       <div className="mt-16 grid md:grid-cols-2 lg:grid-cols-3 gap-8">
         {quotes.map(({ name, username, quote, avatar }) => (
-          <div className="p-6 max-w-[420px] mx-auto flex flex-col gap-4 rounded-md bg-slate-900/80">
+          <div className="p-6 max-w-[420px] mx-auto flex flex-col gap-4 rounded-md bg-slate-900/80 border border-slate-500/10">
             <div className="flex flex-row gap-4 w-full items-center font-medium">
               <Image
                 src={avatar}
