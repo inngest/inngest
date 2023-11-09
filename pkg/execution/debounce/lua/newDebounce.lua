@@ -18,8 +18,12 @@ local ttl        = tonumber(ARGV[3])
 
 local existing = redis.call("GET", keyPtr)
 if existing ~= nil and existing ~= false then
-	-- A debounce for this function exists.
-	return existing
+	-- A debounce for this function exists.  Check that this is in the map, first.
+	local found = redis.call("HEXISTS", keyDbc, debounceID)
+	if found == 1 then
+		-- The debounce exists in the map, too.  Return this debounce.
+		return existing
+	end
 end
 
 -- Set the fn -> debounce ID pointer

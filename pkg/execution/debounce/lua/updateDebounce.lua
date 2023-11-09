@@ -18,4 +18,6 @@ local ttl        = tonumber(ARGV[3])
 redis.call("SETEX", keyPtr, ttl, debounceID)
 redis.call("HSET", keyDbc, debounceID, debounce)
 
+-- TODO: This should also reschedule the job directly in an atomic transaction.
+
 return 0
