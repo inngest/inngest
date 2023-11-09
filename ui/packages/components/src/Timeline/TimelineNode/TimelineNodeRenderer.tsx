@@ -54,10 +54,15 @@ export function renderTimelineNode(node: HistoryNode): RenderedData {
       name = 'Running next step...';
     }
 
-    if (node.invokeFunctionConfig?.eventID && node.invokeFunctionResult?.runID) {
+    if (
+      node.invokeFunctionConfig?.functionID &&
+      node.invokeFunctionConfig?.eventID &&
+      node.invokeFunctionResult?.runID
+    ) {
       runLink = {
         eventID: node.invokeFunctionConfig.eventID,
         runID: node.invokeFunctionResult.runID,
+        fnID: node.invokeFunctionConfig.functionID,
       };
     }
   }

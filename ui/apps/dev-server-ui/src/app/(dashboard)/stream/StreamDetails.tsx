@@ -75,10 +75,10 @@ export default function StreamDetails() {
     }).unwrap();
   }
 
-  const createLinkToRun: CreateLinkToRunFn = ({ eventID, runID }) => {
+  const createLinkToRun: CreateLinkToRunFn = (opts) => {
     const runParams = new URLSearchParams({
-      event: eventID,
-      run: runID,
+      event: opts.eventID,
+      run: opts.runID,
     });
 
     return (

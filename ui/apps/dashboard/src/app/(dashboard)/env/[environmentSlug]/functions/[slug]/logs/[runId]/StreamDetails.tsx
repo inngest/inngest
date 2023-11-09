@@ -2,7 +2,9 @@
 
 import { useMemo } from 'react';
 import { EventDetails } from '@inngest/components/EventDetails';
+import { Link } from '@inngest/components/Link';
 import { RunDetails } from '@inngest/components/RunDetails';
+import type { CreateLinkToRunFn } from '@inngest/components/Timeline';
 import { useParsedHistory } from '@inngest/components/hooks/useParsedHistory';
 import type { Environment } from '@inngest/components/types/environment';
 import type { Event } from '@inngest/components/types/event';
@@ -54,6 +56,19 @@ export function StreamDetails({
     rerunButton = <RerunButton environment={environment} func={func} functionRunID={run.id} />;
   }
 
+  const createLinkToRun: CreateLinkToRunFn = (opts) => {
+    return (
+      <Link
+        internalNavigation
+        href={`/env/${environment.slug}/functions/${encodeURIComponent(opts.fnID)}/logs/${
+          opts.runID
+        }`}
+      >
+        Go to run
+      </Link>
+    );
+  };
+
   return (
     <div
       className={classNames('dark grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}
@@ -67,6 +82,7 @@ export function StreamDetails({
         history={history}
         rerunButton={rerunButton}
         run={run}
+        createLinkToRun={createLinkToRun}
       />
     </div>
   );

@@ -5,7 +5,11 @@ import * as AccordionPrimitive from '@radix-ui/react-accordion';
 
 import { TimelineNode } from './TimelineNode/TimelineNode';
 
-export type CreateLinkToRunFn = (options: { eventID: string; runID: string }) => React.ReactNode;
+export type CreateLinkToRunFn = (options: {
+  eventID: string;
+  runID: string;
+  fnID: string;
+}) => React.ReactNode;
 
 type Props = {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
