@@ -48,7 +48,7 @@ export function Timeline({ getOutput, history }: Props) {
                         key={attempt.groupID + attempt.attempt}
                         getOutput={getOutput}
                         node={attempt}
-                        type="attempt"
+                        isAttempt
                       />
                     ))}
                   </>

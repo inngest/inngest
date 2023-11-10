@@ -55,10 +55,10 @@ function getIconsForAttempts({
 
 export function renderTimelineNode({
   node,
-  type,
+  isAttempt,
 }: {
   node: HistoryNode;
-  type?: 'attempt';
+  isAttempt?: boolean;
 }): RenderedData {
   const hasRetries = Object.values(node.attempts)?.length > 0;
   let icon: JSX.Element;
@@ -71,7 +71,7 @@ export function renderTimelineNode({
   if (node.scope === 'function') {
     name = `Function ${node.status}`;
   } else if (node.scope === 'step') {
-    if (type === 'attempt') {
+    if (isAttempt) {
       name = `Attempt ${node.attempt}`;
     } else if (node.waitForEventConfig) {
       name = node.waitForEventConfig.eventName;
@@ -97,12 +97,12 @@ export function renderTimelineNode({
       label: node.waitForEventResult?.timeout ? 'Timed Out At:' : 'Completed At:',
       value: node.endedAt.toLocaleString(),
     };
-  } else if (node.status === 'errored' && type !== 'attempt') {
+  } else if (node.status === 'errored' && !isAttempt) {
     metadata = {
       label: 'Enqueued Retry:',
       value: `${node.attempt + 1}`,
     };
-  } else if (node.status === 'errored' && type === 'attempt' && node.endedAt) {
+  } else if (node.status === 'errored' && isAttempt && node.endedAt) {
     metadata = {
       label: 'Errored At:',
       value: node.endedAt.toLocaleString(),

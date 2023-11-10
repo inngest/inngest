@@ -20,11 +20,11 @@ type Props = {
   node: HistoryNode;
   position?: 'first' | 'last' | 'middle';
   children?: React.ReactNode;
-  type?: 'attempt';
+  isAttempt?: boolean;
 };
 
-export function TimelineNode({ position, getOutput, node, children, type }: Props) {
-  const { icon, badge, name, metadata } = renderTimelineNode({ node, type });
+export function TimelineNode({ position, getOutput, node, children, isAttempt }: Props) {
+  const { icon, badge, name, metadata } = renderTimelineNode({ node, isAttempt });
   const isExpandable = node.scope === 'step';
   const [openItems, setOpenItems] = useState<string[]>([]);
 
@@ -35,7 +35,7 @@ export function TimelineNode({ position, getOutput, node, children, type }: Prop
       setOpenItems([...openItems, itemValue]);
     }
   };
-  const value = `${node.groupID}${type ? `/${type}${node.attempt}` : ''}`;
+  const value = `${node.groupID}${isAttempt ? `/attempt${node.attempt}` : ''}`;
 
   return (
     <AccordionPrimitive.Item
@@ -84,7 +84,7 @@ export function TimelineNode({ position, getOutput, node, children, type }: Prop
                 type: 'tween',
               }}
             >
-              <Content getOutput={getOutput} node={node} type={type} />
+              <Content getOutput={getOutput} node={node} isAttempt={isAttempt} />
               {children}
             </motion.div>
           </AccordionPrimitive.Content>
@@ -97,11 +97,11 @@ export function TimelineNode({ position, getOutput, node, children, type }: Prop
 function Content({
   getOutput,
   node,
-  type,
+  isAttempt,
 }: {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
   node: HistoryNode;
-  type?: 'attempt';
+  isAttempt?: boolean;
 }) {
   const output = useOutput({ getOutput, outputItemID: node.outputItemID, status: node.status });
 
@@ -142,8 +142,8 @@ function Content({
               {
                 label: 'Duration',
                 value: durationMS ? formatMilliseconds(durationMS) : '-',
-                tooltip: `Time between ${type ? type : 'step'} started and ${
-                  type ? type : 'step'
+                tooltip: `Time between ${isAttempt ? 'attempt' : 'step'} started and ${
+                  isAttempt ? 'attempt' : 'step'
                 } ${tootltipLabel}`,
               },
               ...(node.sleepConfig?.until
