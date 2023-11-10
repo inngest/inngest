@@ -36,7 +36,7 @@ export function WaitingSummary({ history }: Props) {
 
             <Card.Content>
               <MetadataItem
-                label="Event name"
+                label="Event Name"
                 value={
                   <>
                     <IconEvent className="inline-block" /> {config.eventName}
@@ -45,7 +45,7 @@ export function WaitingSummary({ history }: Props) {
               />
 
               <MetadataItem
-                label="Match expression"
+                label="Match Expression"
                 type="code"
                 value={config.expression ?? 'N/A'}
               />
