@@ -102,10 +102,12 @@ export function renderTimelineNode({
       label: 'Enqueued Retry:',
       value: `${node.attempt + 1}`,
     };
-  } else if (
-    (node.status === 'failed' && node.endedAt) ||
-    (node.status === 'errored' && type === 'attempt' && node.endedAt)
-  ) {
+  } else if (node.status === 'errored' && type === 'attempt' && node.endedAt) {
+    metadata = {
+      label: 'Errored At:',
+      value: node.endedAt.toLocaleString(),
+    };
+  } else if (node.status === 'failed' && node.endedAt) {
     metadata = {
       label: 'Failed At:',
       value: node.endedAt.toLocaleString(),

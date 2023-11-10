@@ -105,10 +105,16 @@ function Content({
   const output = useOutput({ getOutput, outputItemID: node.outputItemID, status: node.status });
 
   let endedAtLabel = 'Completed At';
+  let tootltipLabel = 'completed';
   if (node.status === 'cancelled') {
     endedAtLabel = 'Cancelled At';
-  } else if (node.status === 'failed' || node.status === 'errored') {
+    tootltipLabel = 'cancelled';
+  } else if (node.status === 'failed') {
     endedAtLabel = 'Failed At';
+    tootltipLabel = 'failed';
+  } else if (node.status === 'errored') {
+    endedAtLabel = 'Errored At';
+    tootltipLabel = 'errored';
   }
 
   let durationMS: number | undefined;
@@ -134,13 +140,9 @@ function Content({
             {
               label: 'Duration',
               value: durationMS ? formatMilliseconds(durationMS) : '-',
-              tooltip: `Time between ${type ? type : 'step'} started and ${type ? type : 'step'} ${
-                node.status === 'failed' || node.status === 'errored'
-                  ? 'failed'
-                  : node.status === 'cancelled'
-                  ? 'cancelled'
-                  : 'completed'
-              }`,
+              tooltip: `Time between ${type ? type : 'step'} started and ${
+                type ? type : 'step'
+              } ${tootltipLabel}`,
             },
           ]}
         />
