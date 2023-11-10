@@ -38,6 +38,7 @@ We provide framework-specific bindings to make this easy for common platforms:
 - [Fresh (Deno)](#framework-fresh-deno)
 - [Google Cloud Functions](#framework-google-cloud-functions)
 - [H3](#framework-h3)
+- [Koa](#framework-koa)
 - [Next.js](#framework-next-js)
 - [Redwood](#framework-redwood)
 - [Remix](#framework-remix)
@@ -351,6 +352,35 @@ createServer(toNodeListener(app)).listen(process.env.PORT || 3000);
 </CodeGroup>
 
 See the [github.com/unjs/h3](https://github.com/unjs/h3) repository for more information about how to host an H3 endpoint.
+
+## Framework: Koa <VersionBadge version="v3.6.0+" />
+
+Add the following to your routing file:
+
+<CodeGroup>
+```ts {{ title: "v3" }}
+import { serve } from "inngest/koa";
+import Koa from "koa";
+import bodyParser from "koa-bodyparser";
+import { functions, inngest } from "./inngest";
+
+const app = new Koa();
+app.use(bodyParser()); // make sure we're parsing incoming JSON
+
+const handler = serve({
+  client: inngest,
+  functions,
+});
+
+app.use((ctx) => {
+  if (ctx.request.path === "/api/inngest") {
+    return handler(ctx);
+  }
+});
+```
+</CodeGroup>
+
+See the [Koa example](https://github.com/inngest/inngest-js/tree/main/examples/framework-koa) for more information.
 
 ## Framework: Next.js
 
