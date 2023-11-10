@@ -1,4 +1,4 @@
-import { renderOutput, type OutputType } from '@inngest/components/utils/outputRenderer';
+import { renderOutput } from '@inngest/components/utils/outputRenderer';
 
 import {
   FunctionRunStatus,
@@ -32,20 +32,13 @@ type FunctionRunStatusSubset = Pick<FunctionRun, 'id' | 'status' | 'output'>;
 export function OutputItem({ functionRunID }: { functionRunID: string }) {
   const { data } = useGetFunctionRunOutputQuery({ id: functionRunID }, { pollingInterval: 1500 });
   const functionRun = (data?.functionRun as FunctionRunStatusSubset) || {};
-  let type: OutputType | undefined;
 
-  if (functionRun?.status === FunctionRunStatus.Completed) {
-    type = 'completed';
-  } else if (functionRun?.status === FunctionRunStatus.Failed) {
-    type = 'failed';
-  }
-
-  if (!functionRun || !functionRun?.output || !functionRun?.status || !type) {
+  if (!functionRun || !functionRun?.output || !functionRun?.status) {
     return null;
   }
 
   const { message, errorName, output } = renderOutput({
-    type,
+    isSuccess: functionRun.status === FunctionRunStatus.Completed,
     content: functionRun.output,
   });
 
