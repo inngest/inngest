@@ -67,7 +67,7 @@ export function UserCreator() {
 
     const res = await createUser({ input });
     if (res.error) {
-      toast.error('Failed to create user');
+      toast.error(`Failed to create user: ${res.error.graphQLErrors?.[0]?.message}`);
       return;
     }
 
