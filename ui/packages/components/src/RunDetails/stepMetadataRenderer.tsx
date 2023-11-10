@@ -11,6 +11,14 @@ export function renderStepMetadata({
   isAttempt?: boolean;
 }): MetadataItemProps[] {
   const name = isAttempt ? 'Attempt' : ' Step';
+  const isFinished =
+    node.status === 'cancelled' || node.status === 'completed' || node.status === 'failed';
+  const attemptsArray = Object.values(node.attempts);
+  const firstAttempt =
+    Array.isArray(attemptsArray) && attemptsArray.length > 0 ? attemptsArray[0] : undefined;
+  const startedAt = !isAttempt && firstAttempt ? firstAttempt.startedAt : node.startedAt;
+  const endedAt = (isAttempt || attemptsArray.length < 1 || isFinished) && node?.endedAt;
+
   let endedAtLabel = `${name} Completed`;
   let tootltipLabel = 'completed';
   if (node.status === 'cancelled') {
@@ -19,7 +27,7 @@ export function renderStepMetadata({
   } else if (node.status === 'failed') {
     endedAtLabel = `${name} Failed`;
     tootltipLabel = 'failed';
-  } else if (node.status === 'errored') {
+  } else if (node.status === 'errored' && attemptsArray.length < 1) {
     endedAtLabel = `${name} Errored`;
     tootltipLabel = 'errored';
   } else if (node.status === 'completed' && node.waitForEventResult?.timeout) {
@@ -28,20 +36,20 @@ export function renderStepMetadata({
   }
 
   let durationMS: number | undefined;
-  if (node.scheduledAt && node.endedAt) {
-    durationMS = node.endedAt.getTime() - node.scheduledAt.getTime();
+  if (startedAt && endedAt) {
+    durationMS = endedAt.getTime() - startedAt.getTime();
   }
 
   const metadataItems: MetadataItemProps[] = [
     {
       label: `${name} Started`,
-      value: node.scheduledAt ? node.scheduledAt.toLocaleString() : '-',
-      title: node?.scheduledAt?.toLocaleString(),
+      value: startedAt ? startedAt.toLocaleString() : '-',
+      title: node?.startedAt?.toLocaleString(),
     },
     {
       label: endedAtLabel,
-      value: node.endedAt ? node.endedAt.toLocaleString() : '-',
-      title: node?.endedAt?.toLocaleString(),
+      value: endedAt ? endedAt.toLocaleString() : '-',
+      title: endedAt?.toLocaleString(),
     },
     {
       label: 'Duration',

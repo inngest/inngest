@@ -70,6 +70,7 @@ function createStory(rawHistory: unknown) {
     args: {
       _rawHistory: raw,
       _rawHistoryFrame: raw.length - 1,
+      getOutput: async () => JSON.stringify('fake'),
       history: new HistoryParser(raw),
     },
     argTypes: {
