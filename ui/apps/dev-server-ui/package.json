@@ -43,7 +43,7 @@
     "react-redux": "8.0.5",
     "react-refractor": "2.1.7",
     "refractor": "4.8.0",
-    "sonner": "0.5.0",
+    "sonner": "1.2.0",
     "ulid": "2.3.0"
   },
   "devDependencies": {
