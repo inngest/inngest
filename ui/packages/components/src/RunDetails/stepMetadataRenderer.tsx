@@ -10,17 +10,20 @@ export function renderStepMetadata({
   node: HistoryNode;
   isAttempt?: boolean;
 }): MetadataItemProps[] {
-  let endedAtLabel = 'Completed At';
+  let endedAtLabel = 'Completed At:';
   let tootltipLabel = 'completed';
   if (node.status === 'cancelled') {
-    endedAtLabel = 'Cancelled At';
+    endedAtLabel = 'Cancelled At:';
     tootltipLabel = 'cancelled';
   } else if (node.status === 'failed') {
-    endedAtLabel = 'Failed At';
+    endedAtLabel = 'Failed At:';
     tootltipLabel = 'failed';
   } else if (node.status === 'errored') {
-    endedAtLabel = 'Errored At';
+    endedAtLabel = 'Errored At:';
     tootltipLabel = 'errored';
+  } else if (node.status === 'completed' && node.waitForEventResult?.timeout) {
+    endedAtLabel = 'Timed Out At:';
+    tootltipLabel = 'timed out';
   }
 
   let durationMS: number | undefined;
