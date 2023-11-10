@@ -102,8 +102,8 @@ type Response[T any] struct {
 
 // ResponseMetadata represents metadata regarding the response.
 type ResponseMetadata struct {
-	FetchedAt   time.Time  `json:"fetchedAt,omitempty"`
-	CachedUntil *time.Time `json:"cachedUntil,omitempty"`
+	FetchedAt   time.Time  `json:"fetched_at,omitempty"`
+	CachedUntil *time.Time `json:"cached_until,omitempty"`
 }
 
 // TODO (tonyhb) Open source the auth context.
