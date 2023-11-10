@@ -564,7 +564,7 @@ export type FunctionRun = {
   __typename?: 'FunctionRun';
   accountID: Scalars['UUID'];
   batchID: Maybe<Scalars['ULID']>;
-  canRerun: Scalars['Boolean'];
+  canRerun: Maybe<Scalars['Boolean']>;
   contactID: Maybe<Scalars['UUID']>;
   endedAt: Maybe<Scalars['Time']>;
   event: Maybe<ArchivedEvent>;
@@ -580,7 +580,7 @@ export type FunctionRun = {
   status: FunctionRunStatus;
   timeline: Maybe<Array<RunTimeline>>;
   workflowID: Scalars['UUID'];
-  workflowVersion: WorkflowVersion;
+  workflowVersion: Maybe<WorkflowVersion>;
   workflowVersionInt: Scalars['Int'];
   workspaceID: Scalars['UUID'];
 };
@@ -1952,7 +1952,7 @@ export type GetFunctionRunTimelineQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunTimelineQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', id: string, run: { __typename?: 'FunctionRun', canRerun: boolean, timeline: Array<{ __typename?: 'RunTimeline', stepName: string | null, output: string | null, type: RunHistoryType, history: Array<{ __typename?: 'RunHistory', id: string, type: RunHistoryType, createdAt: string, stepData: { __typename?: 'RunHistoryStepData', data: string | null } | null }> | null }> | null } } | null } };
+export type GetFunctionRunTimelineQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', id: string, run: { __typename?: 'FunctionRun', canRerun: boolean | null, timeline: Array<{ __typename?: 'RunTimeline', stepName: string | null, output: string | null, type: RunHistoryType, history: Array<{ __typename?: 'RunHistory', id: string, type: RunHistoryType, createdAt: string, stepData: { __typename?: 'RunHistoryStepData', data: string | null } | null }> | null }> | null } } | null } };
 
 export type GetFunctionRunOutputQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1989,7 +1989,7 @@ export type GetFunctionRunDetailsQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunDetailsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', id: string, name: string, slug: string, run: { __typename?: 'FunctionRun', canRerun: boolean, id: string, status: FunctionRunStatus, startedAt: string, endedAt: string | null, output: string | null, event: { __typename?: 'ArchivedEvent', id: string, name: string, receivedAt: string, payload: string } | null, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: string, functionVersion: number, groupID: string | null, id: string, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: string | null, expression: string | null, userID: string | null } | null, sleep: { __typename?: 'RunHistorySleep', until: string } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: string } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: string | null, timeout: boolean } | null, invokeFunction: { __typename?: 'RunHistoryInvokeFunction', eventID: string, functionID: string, correlationID: string, timeout: string } | null, invokeFunctionResult: { __typename?: 'RunHistoryInvokeFunctionResult', eventID: string | null, timeout: boolean, runID: string | null } | null }>, version: { __typename?: 'WorkflowVersion', url: string, validFrom: string | null, version: number, deploy: { __typename?: 'Deploy', id: string, createdAt: string } | null, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName: null | string | null, schedule: null | string | null }> } } } | null } };
+export type GetFunctionRunDetailsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', id: string, name: string, slug: string, run: { __typename?: 'FunctionRun', canRerun: boolean | null, id: string, status: FunctionRunStatus, startedAt: string, endedAt: string | null, output: string | null, event: { __typename?: 'ArchivedEvent', id: string, name: string, receivedAt: string, payload: string } | null, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: string, functionVersion: number, groupID: string | null, id: string, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: string | null, expression: string | null, userID: string | null } | null, sleep: { __typename?: 'RunHistorySleep', until: string } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: string } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: string | null, timeout: boolean } | null, invokeFunction: { __typename?: 'RunHistoryInvokeFunction', eventID: string, functionID: string, correlationID: string, timeout: string } | null, invokeFunctionResult: { __typename?: 'RunHistoryInvokeFunctionResult', eventID: string | null, timeout: boolean, runID: string | null } | null }>, version: { __typename?: 'WorkflowVersion', url: string, validFrom: string | null, version: number, deploy: { __typename?: 'Deploy', id: string, createdAt: string } | null, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName: null | string | null, schedule: null | string | null }> } | null } } | null } };
 
 export type GetFunctionRunsCountQueryVariables = Exact<{
   environmentID: Scalars['ID'];
