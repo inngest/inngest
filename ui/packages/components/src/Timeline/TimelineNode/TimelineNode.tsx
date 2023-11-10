@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import { MetadataGrid } from '@inngest/components/Metadata';
+import { MetadataGrid, type MetadataItemProps } from '@inngest/components/Metadata';
 import { OutputCard } from '@inngest/components/OutputCard';
 import { IconChevron } from '@inngest/components/icons/Chevron';
+import { IconEvent } from '@inngest/components/icons/Event';
 import { classNames } from '@inngest/components/utils/classNames';
 import { formatMilliseconds } from '@inngest/components/utils/date';
 import { type HistoryNode } from '@inngest/components/utils/historyParser';
@@ -126,25 +127,52 @@ function Content({
     <>
       <div className="pb-5">
         <MetadataGrid
-          metadataItems={[
-            {
-              label: 'Started At',
-              value: node.scheduledAt ? node.scheduledAt.toLocaleString() : '-',
-              title: node?.scheduledAt?.toLocaleString(),
-            },
-            {
-              label: endedAtLabel,
-              value: node.endedAt ? node.endedAt.toLocaleString() : '-',
-              title: node?.endedAt?.toLocaleString(),
-            },
-            {
-              label: 'Duration',
-              value: durationMS ? formatMilliseconds(durationMS) : '-',
-              tooltip: `Time between ${type ? type : 'step'} started and ${
-                type ? type : 'step'
-              } ${tootltipLabel}`,
-            },
-          ]}
+          metadataItems={
+            [
+              {
+                label: 'Started At',
+                value: node.scheduledAt ? node.scheduledAt.toLocaleString() : '-',
+                title: node?.scheduledAt?.toLocaleString(),
+              },
+              {
+                label: endedAtLabel,
+                value: node.endedAt ? node.endedAt.toLocaleString() : '-',
+                title: node?.endedAt?.toLocaleString(),
+              },
+              {
+                label: 'Duration',
+                value: durationMS ? formatMilliseconds(durationMS) : '-',
+                tooltip: `Time between ${type ? type : 'step'} started and ${
+                  type ? type : 'step'
+                } ${tootltipLabel}`,
+              },
+              ...(node.sleepConfig?.until
+                ? [
+                    {
+                      label: 'Sleep Until',
+                      value: node.sleepConfig?.until?.toLocaleString(),
+                    },
+                  ]
+                : []),
+              ...(node.waitForEventConfig
+                ? [
+                    {
+                      label: 'Event Name',
+                      value: (
+                        <>
+                          <IconEvent className="inline-block" /> {node.waitForEventConfig.eventName}
+                        </>
+                      ),
+                    },
+                    {
+                      label: 'Match Expression',
+                      value: node.waitForEventConfig.expression ?? 'N/A',
+                      type: 'code',
+                    },
+                  ]
+                : []),
+            ] as MetadataItemProps[]
+          }
         />
       </div>
 
