@@ -43,7 +43,10 @@ function getIconsForAttempts({
   attempts: Record<number, HistoryNode>;
   icon: JSX.Element;
 }) {
-  const firstAttempt = Object.values(attempts)[0];
+  const attemptsArray = Object.values(attempts);
+  const firstAttempt =
+    Array.isArray(attemptsArray) && attemptsArray.length > 0 ? attemptsArray[0] : undefined;
+
   return (
     <span className="flex items-center">
       {firstAttempt && <span className="z-0">{getIconForStatus(firstAttempt)}</span>}
@@ -60,7 +63,7 @@ export function renderTimelineNode({
   node: HistoryNode;
   isAttempt?: boolean;
 }): RenderedData {
-  const hasRetries = Object.values(node.attempts)?.length > 0;
+  const hasRetries = node.attempts && Object.values(node.attempts)?.length > 0;
   let icon: JSX.Element;
   icon = getIconForStatus(node);
   if (hasRetries) {
