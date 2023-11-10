@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { MetadataGrid } from '@inngest/components/Metadata';
 import { OutputCard } from '@inngest/components/OutputCard';
+import { renderStepMetadata } from '@inngest/components/RunDetails/stepMetadataRenderer';
 import { IconChevron } from '@inngest/components/icons/Chevron';
 import { classNames } from '@inngest/components/utils/classNames';
-import { formatMilliseconds } from '@inngest/components/utils/date';
 import { type HistoryNode } from '@inngest/components/utils/historyParser';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -17,11 +17,13 @@ import { renderTimelineNode } from './TimelineNodeRenderer';
 type Props = {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
   node: HistoryNode;
-  position: 'first' | 'last' | 'middle';
+  position?: 'first' | 'last' | 'middle';
+  children?: React.ReactNode;
+  isAttempt?: boolean;
 };
 
-export function TimelineNode({ position, getOutput, node }: Props) {
-  const { icon, badge, name, metadata } = renderTimelineNode(node);
+export function TimelineNode({ position, getOutput, node, children, isAttempt }: Props) {
+  const { icon, badge, name, metadata } = renderTimelineNode({ node, isAttempt });
   const isExpandable = node.scope === 'step';
   const [openItems, setOpenItems] = useState<string[]>([]);
 
@@ -32,19 +34,20 @@ export function TimelineNode({ position, getOutput, node }: Props) {
       setOpenItems([...openItems, itemValue]);
     }
   };
+  const value = `${node.groupID}${isAttempt ? `/attempt${node.attempt}` : ''}`;
 
   return (
     <AccordionPrimitive.Item
       className="relative border-t border-slate-800/50"
       disabled={!isExpandable}
-      value={node.groupID}
+      value={value}
     >
       <span
         className={classNames(
           'absolute left-[0.85rem] top-0 w-px bg-slate-800',
-          position === 'first' && 'top-[1.8rem] h-[calc(100%-1.8rem)]',
-          position === 'last' && 'h-[1.8rem]',
-          position === 'middle' && 'h-full'
+          position === 'first' && 'top-[1.9rem] h-[calc(100%-1.8rem)]',
+          position === 'last' && 'h-[1.9rem]',
+          position === 'middle' && 'h-[calc(100%+2px)]'
         )}
         aria-hidden="true"
       />
@@ -54,7 +57,7 @@ export function TimelineNode({ position, getOutput, node }: Props) {
         </div>
 
         {isExpandable && (
-          <AccordionPrimitive.Trigger asChild onClick={() => toggleItem(node.groupID)}>
+          <AccordionPrimitive.Trigger asChild onClick={() => toggleItem(value)}>
             <Button
               className="group"
               icon={
@@ -65,7 +68,7 @@ export function TimelineNode({ position, getOutput, node }: Props) {
         )}
       </AccordionPrimitive.Header>
       <AnimatePresence>
-        {openItems.includes(node.groupID) && (
+        {openItems.includes(value) && (
           <AccordionPrimitive.Content className="ml-9" forceMount>
             <motion.div
               initial={{ y: -20, opacity: 0.2 }}
@@ -80,7 +83,8 @@ export function TimelineNode({ position, getOutput, node }: Props) {
                 type: 'tween',
               }}
             >
-              <Content getOutput={getOutput} node={node} />
+              <Content getOutput={getOutput} node={node} isAttempt={isAttempt} />
+              {children}
             </motion.div>
           </AccordionPrimitive.Content>
         )}
@@ -92,36 +96,24 @@ export function TimelineNode({ position, getOutput, node }: Props) {
 function Content({
   getOutput,
   node,
+  isAttempt,
 }: {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
   node: HistoryNode;
+  isAttempt?: boolean;
 }) {
-  const output = useOutput({ getOutput, outputItemID: node.outputItemID, status: node.status });
+  const output = useOutput({
+    getOutput,
+    outputItemID: node.outputItemID,
+    isSuccess: node.status === 'completed',
+  });
 
-  let durationMS: number | undefined;
-  if (node.scheduledAt && node.endedAt) {
-    durationMS = node.endedAt.getTime() - node.scheduledAt.getTime();
-  }
+  const metadataItems = renderStepMetadata({ node, isAttempt });
 
   return (
     <>
       <div className="pb-5">
-        <MetadataGrid
-          metadataItems={[
-            {
-              label: 'Started At',
-              value: node.scheduledAt ? node.scheduledAt.toLocaleString() : '-',
-            },
-            {
-              label: 'Ended At',
-              value: node.endedAt ? node.endedAt.toLocaleString() : '-',
-            },
-            {
-              label: 'Duration',
-              value: durationMS ? formatMilliseconds(durationMS) : '-',
-            },
-          ]}
-        />
+        <MetadataGrid metadataItems={metadataItems} />
       </div>
 
       {output && <div className="pb-5">{output}</div>}
@@ -132,11 +124,11 @@ function Content({
 function useOutput({
   getOutput,
   outputItemID,
-  status,
+  isSuccess,
 }: {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
   outputItemID?: string;
-  status: HistoryNode['status'];
+  isSuccess: boolean;
 }): React.ReactNode | undefined {
   const [output, setOutput] = useState<React.ReactNode>(undefined);
 
@@ -158,7 +150,7 @@ function useOutput({
           return;
         }
 
-        setOutput(<OutputCard content={data} type={status} />);
+        setOutput(<OutputCard content={data} isSuccess={isSuccess} />);
       } catch (e) {
         let text = 'Error loading';
         if (e instanceof Error) {

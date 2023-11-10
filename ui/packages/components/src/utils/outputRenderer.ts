@@ -6,13 +6,11 @@ type RenderedData = {
   output: string;
 };
 
-export type OutputType = 'failed' | 'completed';
-
 export function renderOutput({
-  type,
+  isSuccess,
   content,
 }: {
-  type: OutputType;
+  isSuccess: boolean;
   content: string;
 }): RenderedData {
   let message = '';
@@ -22,7 +20,7 @@ export function renderOutput({
   if (content) {
     const isOutputTooLarge = content.length > maxRenderedOutputSizeBytes;
 
-    if (type === 'failed' && !isOutputTooLarge) {
+    if (!isSuccess && !isOutputTooLarge) {
       try {
         const jsonObject = JSON.parse(content);
         errorName = jsonObject?.name;

@@ -39,7 +39,21 @@ export function Timeline({ getOutput, history }: Props) {
                 position={position}
                 getOutput={getOutput}
                 node={node}
-              />
+              >
+                {Object.values(node.attempts).length > 0 && (
+                  <>
+                    <p className="py-4 text-sm text-slate-400">Previous attempts</p>
+                    {Object.values(node.attempts).map((attempt) => (
+                      <TimelineNode
+                        key={attempt.groupID + attempt.attempt}
+                        getOutput={getOutput}
+                        node={attempt}
+                        isAttempt
+                      />
+                    ))}
+                  </>
+                )}
+              </TimelineNode>
             );
           })}
         </AccordionPrimitive.Root>
