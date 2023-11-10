@@ -102,7 +102,11 @@ function Content({
   node: HistoryNode;
   isAttempt?: boolean;
 }) {
-  const output = useOutput({ getOutput, outputItemID: node.outputItemID, status: node.status });
+  const output = useOutput({
+    getOutput,
+    outputItemID: node.outputItemID,
+    isSuccess: node.status === 'completed',
+  });
 
   const metadataItems = renderStepMetadata({ node, isAttempt });
 
@@ -120,11 +124,11 @@ function Content({
 function useOutput({
   getOutput,
   outputItemID,
-  status,
+  isSuccess,
 }: {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
   outputItemID?: string;
-  status: HistoryNode['status'];
+  isSuccess: boolean;
 }): React.ReactNode | undefined {
   const [output, setOutput] = useState<React.ReactNode>(undefined);
 
@@ -146,7 +150,7 @@ function useOutput({
           return;
         }
 
-        setOutput(<OutputCard content={data} type={status} />);
+        setOutput(<OutputCard content={data} isSuccess={isSuccess} />);
       } catch (e) {
         let text = 'Error loading';
         if (e instanceof Error) {
