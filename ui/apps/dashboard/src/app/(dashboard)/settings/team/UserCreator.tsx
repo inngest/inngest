@@ -67,7 +67,14 @@ export function UserCreator() {
 
     const res = await createUser({ input });
     if (res.error) {
-      toast.error(`Failed to create user: ${res.error.graphQLErrors?.[0]?.message}`);
+      toast.error('Failed to create user', {
+        description: res.error.graphQLErrors?.[0]?.message,
+        action: {
+          label: 'Contact Support',
+          onClick: () => router.push('/support'),
+        },
+        duration: 5_000,
+      });
       return;
     }
 
