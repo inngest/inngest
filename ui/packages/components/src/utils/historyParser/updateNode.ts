@@ -173,22 +173,18 @@ function parseURL(url: string): string {
 }
 
 export function updateNode(node: HistoryNode, rawItem: RawHistoryItem): HistoryNode {
-  if (rawItem.attempt > node.attempt) {
-    // Since there's a new attempt, the existing group data represents an
-    // errored (and therefore ended) attempt. Move that errored attempt to the
-    // attempts.
-    node = {
-      ...node,
-      attempt: rawItem.attempt,
-      attempts: {
-        ...node.attempts,
-        [node.attempt]: {
-          ...node,
-          attempts: {},
-        },
-      },
-    };
+  const update = updaters[rawItem.type];
+  node = update(node, rawItem);
+  node.attempt = rawItem.attempt;
+
+  const attemptNode = node.attempts[rawItem.attempt];
+
+  // Should always be true but bugs can happen.
+  if (attemptNode) {
+    // Update logic is the same for attempts since they have the same shape
+    // as the top-level node.
+    node.attempts[rawItem.attempt] = update(attemptNode, rawItem);
   }
 
-  return updaters[rawItem.type](node, rawItem);
+  return node;
 }
