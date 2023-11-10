@@ -11,6 +11,12 @@ export function renderStepMetadata({
   isAttempt?: boolean;
 }): MetadataItemProps[] {
   const name = isAttempt ? 'Attempt' : ' Step';
+
+  const attemptsArray = Object.values(node.attempts);
+  const firstAttempt =
+    Array.isArray(attemptsArray) && attemptsArray.length > 0 ? attemptsArray[0] : undefined;
+  const startedAt = !isAttempt && firstAttempt ? firstAttempt.startedAt : node.startedAt;
+
   let endedAtLabel = `${name} Completed`;
   let tootltipLabel = 'completed';
   if (node.status === 'cancelled') {
@@ -28,15 +34,15 @@ export function renderStepMetadata({
   }
 
   let durationMS: number | undefined;
-  if (node.scheduledAt && node.endedAt) {
-    durationMS = node.endedAt.getTime() - node.scheduledAt.getTime();
+  if (startedAt && node.endedAt) {
+    durationMS = node.endedAt.getTime() - startedAt.getTime();
   }
 
   const metadataItems: MetadataItemProps[] = [
     {
       label: `${name} Started`,
-      value: node.scheduledAt ? node.scheduledAt.toLocaleString() : '-',
-      title: node?.scheduledAt?.toLocaleString(),
+      value: startedAt ? startedAt.toLocaleString() : '-',
+      title: node?.startedAt?.toLocaleString(),
     },
     {
       label: endedAtLabel,
