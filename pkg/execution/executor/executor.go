@@ -23,7 +23,6 @@ import (
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
 	"github.com/xhit/go-str2duration/v2"
@@ -194,8 +193,6 @@ type executor struct {
 	finishHandler         execution.FinishHandler
 	invokeNotFoundHandler execution.InvokeNotFoundHandler
 	handleSendingEvent    execution.HandleSendingEvent
-	pb                    pubsub.Publisher
-	eventTopic            string
 
 	lifecycles []execution.LifecycleListener
 
@@ -1312,10 +1309,14 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 
 	logger.From(ctx).Debug().Interface("evt", evt).Str("gen.ID", gen.ID).Msg("created invocation event")
 
-	err = e.handleSendingEvent(ctx, evt, item)
-	if err != nil {
-		// TODO Cancel pause/timeout?
-		return fmt.Errorf("error publishing internal invocation event: %w", err)
+	if e.handleSendingEvent == nil {
+		logger.From(ctx).Error().Msg("no handleSendingEvent function specified")
+	} else {
+		err = e.handleSendingEvent(ctx, evt, item)
+		if err != nil {
+			// TODO Cancel pause/timeout?
+			return fmt.Errorf("error publishing internal invocation event: %w", err)
+		}
 	}
 
 	for _, e := range e.lifecycles {
