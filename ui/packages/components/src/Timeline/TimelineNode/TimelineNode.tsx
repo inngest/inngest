@@ -61,9 +61,7 @@ export function TimelineNode({ position, getOutput, node, children, type }: Prop
             <Button
               className="group"
               icon={
-                <IconChevron
-                  className={`transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180`}
-                />
+                <IconChevron className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
               }
             />
           </AccordionPrimitive.Trigger>
@@ -85,7 +83,7 @@ export function TimelineNode({ position, getOutput, node, children, type }: Prop
                 type: 'tween',
               }}
             >
-              <Content getOutput={getOutput} node={node} />
+              <Content getOutput={getOutput} node={node} type={type} />
               {children}
             </motion.div>
           </AccordionPrimitive.Content>
@@ -98,11 +96,20 @@ export function TimelineNode({ position, getOutput, node, children, type }: Prop
 function Content({
   getOutput,
   node,
+  type,
 }: {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
   node: HistoryNode;
+  type?: 'attempt';
 }) {
   const output = useOutput({ getOutput, outputItemID: node.outputItemID, status: node.status });
+
+  let endedAtLabel = 'Completed At';
+  if (node.status === 'cancelled') {
+    endedAtLabel = 'Cancelled At';
+  } else if (node.status === 'failed' || node.status === 'errored') {
+    endedAtLabel = 'Failed At';
+  }
 
   let durationMS: number | undefined;
   if (node.scheduledAt && node.endedAt) {
@@ -117,14 +124,23 @@ function Content({
             {
               label: 'Started At',
               value: node.scheduledAt ? node.scheduledAt.toLocaleString() : '-',
+              title: node?.scheduledAt?.toLocaleString(),
             },
             {
-              label: 'Ended At',
+              label: endedAtLabel,
               value: node.endedAt ? node.endedAt.toLocaleString() : '-',
+              title: node?.endedAt?.toLocaleString(),
             },
             {
               label: 'Duration',
               value: durationMS ? formatMilliseconds(durationMS) : '-',
+              tooltip: `Time between ${type ? type : 'step'} started and ${type ? type : 'step'} ${
+                node.status === 'failed' || node.status === 'errored'
+                  ? 'failed'
+                  : node.status === 'cancelled'
+                  ? 'cancelled'
+                  : 'completed'
+              }`,
             },
           ]}
         />
