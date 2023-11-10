@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import { MetadataGrid, type MetadataItemProps } from '@inngest/components/Metadata';
+import { MetadataGrid } from '@inngest/components/Metadata';
 import { OutputCard } from '@inngest/components/OutputCard';
+import { renderStepMetadata } from '@inngest/components/RunDetails/stepMetadataRenderer';
 import { IconChevron } from '@inngest/components/icons/Chevron';
-import { IconEvent } from '@inngest/components/icons/Event';
 import { classNames } from '@inngest/components/utils/classNames';
-import { formatMilliseconds } from '@inngest/components/utils/date';
 import { type HistoryNode } from '@inngest/components/utils/historyParser';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -105,75 +104,12 @@ function Content({
 }) {
   const output = useOutput({ getOutput, outputItemID: node.outputItemID, status: node.status });
 
-  let endedAtLabel = 'Completed At';
-  let tootltipLabel = 'completed';
-  if (node.status === 'cancelled') {
-    endedAtLabel = 'Cancelled At';
-    tootltipLabel = 'cancelled';
-  } else if (node.status === 'failed') {
-    endedAtLabel = 'Failed At';
-    tootltipLabel = 'failed';
-  } else if (node.status === 'errored') {
-    endedAtLabel = 'Errored At';
-    tootltipLabel = 'errored';
-  }
-
-  let durationMS: number | undefined;
-  if (node.scheduledAt && node.endedAt) {
-    durationMS = node.endedAt.getTime() - node.scheduledAt.getTime();
-  }
+  const metadataItems = renderStepMetadata({ node, isAttempt });
 
   return (
     <>
       <div className="pb-5">
-        <MetadataGrid
-          metadataItems={
-            [
-              {
-                label: 'Started At',
-                value: node.scheduledAt ? node.scheduledAt.toLocaleString() : '-',
-                title: node?.scheduledAt?.toLocaleString(),
-              },
-              {
-                label: endedAtLabel,
-                value: node.endedAt ? node.endedAt.toLocaleString() : '-',
-                title: node?.endedAt?.toLocaleString(),
-              },
-              {
-                label: 'Duration',
-                value: durationMS ? formatMilliseconds(durationMS) : '-',
-                tooltip: `Time between ${isAttempt ? 'attempt' : 'step'} started and ${
-                  isAttempt ? 'attempt' : 'step'
-                } ${tootltipLabel}`,
-              },
-              ...(node.sleepConfig?.until
-                ? [
-                    {
-                      label: 'Sleep Until',
-                      value: node.sleepConfig?.until?.toLocaleString(),
-                    },
-                  ]
-                : []),
-              ...(node.waitForEventConfig
-                ? [
-                    {
-                      label: 'Event Name',
-                      value: (
-                        <>
-                          <IconEvent className="inline-block" /> {node.waitForEventConfig.eventName}
-                        </>
-                      ),
-                    },
-                    {
-                      label: 'Match Expression',
-                      value: node.waitForEventConfig.expression ?? 'N/A',
-                      type: 'code',
-                    },
-                  ]
-                : []),
-            ] as MetadataItemProps[]
-          }
-        />
+        <MetadataGrid metadataItems={metadataItems} />
       </div>
 
       {output && <div className="pb-5">{output}</div>}
