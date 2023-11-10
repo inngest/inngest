@@ -114,6 +114,13 @@ func WithFinishHandler(f execution.FinishHandler) ExecutorOpt {
 	}
 }
 
+func WithInvokeNotFoundHandler(f execution.InvokeNotFoundHandler) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).invokeNotFoundHandler = f
+		return nil
+	}
+}
+
 func WithLifecycleListeners(l ...execution.LifecycleListener) ExecutorOpt {
 	return func(e execution.Executor) error {
 		for _, item := range l {
@@ -182,15 +189,16 @@ func WithPublisher(p pubsub.Publisher, topicName string) ExecutorOpt {
 type executor struct {
 	log *zerolog.Logger
 
-	sm             state.Manager
-	queue          queue.Queue
-	debouncer      debounce.Debouncer
-	fl             state.FunctionLoader
-	evalFactory    func(ctx context.Context, expr string) (expressions.Evaluator, error)
-	runtimeDrivers map[string]driver.Driver
-	finishHandler  execution.FinishHandler
-	pb             pubsub.Publisher
-	eventTopic     string
+	sm                    state.Manager
+	queue                 queue.Queue
+	debouncer             debounce.Debouncer
+	fl                    state.FunctionLoader
+	evalFactory           func(ctx context.Context, expr string) (expressions.Evaluator, error)
+	runtimeDrivers        map[string]driver.Driver
+	finishHandler         execution.FinishHandler
+	invokeNotFoundHandler execution.InvokeNotFoundHandler
+	pb                    pubsub.Publisher
+	eventTopic            string
 
 	lifecycles []execution.LifecycleListener
 
@@ -199,6 +207,17 @@ type executor struct {
 
 func (e *executor) SetFinishHandler(f execution.FinishHandler) {
 	e.finishHandler = f
+}
+
+func (e *executor) SetInvokeNotFoundHandler(f execution.InvokeNotFoundHandler) {
+	e.invokeNotFoundHandler = f
+}
+
+func (e *executor) InvokeNotFoundHandler(ctx context.Context, opts execution.InvokeNotFoundHandlerOpts) error {
+	if e.invokeNotFoundHandler == nil {
+		return nil
+	}
+	return e.invokeNotFoundHandler(ctx, opts)
 }
 
 func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
@@ -1408,78 +1427,6 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	}
 
 	return err
-}
-
-func (e *executor) PublishFinishedEvent(ctx context.Context, opts execution.PublishFinishedEventOpts) error {
-	now := time.Now()
-	data := map[string]interface{}{
-		"function_id": opts.FunctionID,
-		"run_id":      opts.RunID,
-	}
-
-	origEvt := opts.OriginalEvent
-
-	if dataMap, ok := origEvt["data"].(map[string]interface{}); ok {
-		if inngestObj, ok := dataMap[consts.InngestEventDataPrefix].(map[string]interface{}); ok {
-
-			if dataValue, ok := inngestObj[consts.InvokeCorrelationId].(string); ok {
-				logger.From(ctx).Debug().Str("data_value_str", dataValue).Msg("data_value")
-				data[consts.InvokeCorrelationId] = dataValue
-			}
-		}
-	}
-
-	if opts.Err != nil {
-		data["error"] = opts.Err
-	} else {
-		data["result"] = opts.Result
-	}
-
-	evt := event.Event{
-		ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
-		Name:      event.FnFinishedName,
-		Timestamp: now.UnixMilli(),
-		Data:      data,
-	}
-
-	logger.From(ctx).Debug().Interface("event", evt).Msg("function finished event")
-
-	byt, err := json.Marshal(evt)
-	if err != nil {
-		logger.From(ctx).Error().Err(err).Msg("error marshalling function finished event")
-		return err
-	}
-
-	err = e.pb.Publish(
-		ctx,
-		e.eventTopic,
-		pubsub.Message{
-			Name:      event.EventReceivedName,
-			Data:      string(byt),
-			Timestamp: now,
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("error publishing function finished event: %w", err)
-	}
-
-	return nil
-}
-
-func (e *executor) PublishFinishedEventWithResponse(ctx context.Context, id state.Identifier, resp state.DriverResponse, s state.State) error {
-	opts := execution.PublishFinishedEventOpts{
-		OriginalEvent: s.Event(),
-		FunctionID:    s.Function().Slug,
-		RunID:         id.RunID.String(),
-	}
-
-	if resp.Err != nil {
-		opts.Err = resp.UserError()
-	} else {
-		opts.Result = resp.Output
-	}
-
-	return e.PublishFinishedEvent(ctx, opts)
 }
 
 func (e *executor) newExpressionEvaluator(ctx context.Context, expr string) (expressions.Evaluator, error) {

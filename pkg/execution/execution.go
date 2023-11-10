@@ -110,15 +110,16 @@ type Executor interface {
 	// SetFinishHandler sets the finish handler, called when a function run finishes.
 	SetFinishHandler(f FinishHandler)
 
-	// PublishFinishedEvent publishes a finished event to the event stream.
-	PublishFinishedEvent(ctx context.Context, opts PublishFinishedEventOpts) error
+	// SetInvokeNotFoundHandler sets the invoke not found handler, called when
+	// a function is invoked but not found.
+	SetInvokeNotFoundHandler(f InvokeNotFoundHandler)
 
-	// PublishFinishedEventWithResponse publishes a finished event to the event stream using a driver response.
-	PublishFinishedEventWithResponse(ctx context.Context, id state.Identifier, resp state.DriverResponse, s state.State) error
+	// InvokeNotFoundHandler invokes the invoke not found handler.
+	InvokeNotFoundHandler(context.Context, InvokeNotFoundHandlerOpts) error
 }
 
 // PublishFinishedEventOpts represents the options for publishing a finished event.
-type PublishFinishedEventOpts struct {
+type InvokeNotFoundHandlerOpts struct {
 	OriginalEvent map[string]any
 	FunctionID    string
 	RunID         string
@@ -128,6 +129,10 @@ type PublishFinishedEventOpts struct {
 
 // FinishHandler is a function that handles functions finishing in the executor.
 type FinishHandler func(context.Context, state.Identifier, state.State, state.DriverResponse) error
+
+// InvokeNotFoundHandler is a function that handles invocations failing due to
+// the function not being found.
+type InvokeNotFoundHandler func(context.Context, InvokeNotFoundHandlerOpts) error
 
 // ScheduleRequest represents all data necessary to schedule a new function.
 type ScheduleRequest struct {

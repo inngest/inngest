@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -125,11 +126,11 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 
 	return func(ctx context.Context, id state.Identifier, st state.State, r state.DriverResponse) error {
 		eg := errgroup.Group{}
+		now := time.Now()
 
 		// Legacy - send inngest/function.failed
 		if r.Err != nil {
 			eg.Go(func() error {
-				now := time.Now()
 				evt := event.Event{
 					ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
 					Name:      event.FnFailedName,
@@ -166,7 +167,56 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 
 		// send inngest/function.finished
 		eg.Go(func() error {
-			return s.Executor().PublishFinishedEventWithResponse(ctx, id, r, st)
+			data := map[string]interface{}{
+				"function_id": st.Function().Slug,
+				"run_id":      id.RunID.String(),
+			}
+
+			origEvt := st.Event()
+			if dataMap, ok := origEvt["data"].(map[string]interface{}); ok {
+				if inngestObj, ok := dataMap[consts.InngestEventDataPrefix].(map[string]interface{}); ok {
+					if dataValue, ok := inngestObj[consts.InvokeCorrelationId].(string); ok {
+						logger.From(ctx).Debug().Str("data_value_str", dataValue).Msg("data_value")
+						data[consts.InvokeCorrelationId] = dataValue
+					}
+				}
+			}
+
+			if r.Err != nil {
+				data["error"] = r.UserError()
+			} else {
+				data["result"] = r.Output
+			}
+
+			evt := event.Event{
+				ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+				Name:      event.FnFinishedName,
+				Timestamp: now.UnixMilli(),
+				Data:      data,
+			}
+
+			logger.From(ctx).Debug().Interface("event", evt).Msg("function finished event")
+
+			byt, err := json.Marshal(evt)
+			if err != nil {
+				logger.From(ctx).Error().Err(err).Msg("error marshalling function finished event")
+				return err
+			}
+
+			err = pb.Publish(
+				ctx,
+				topicName,
+				pubsub.Message{
+					Name:      event.EventReceivedName,
+					Data:      string(byt),
+					Timestamp: now,
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("error publishing function finished event: %w", err)
+			}
+
+			return nil
 		})
 
 		return eg.Wait()
