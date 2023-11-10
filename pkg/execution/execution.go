@@ -120,7 +120,7 @@ type Executor interface {
 
 // PublishFinishedEventOpts represents the options for publishing a finished event.
 type InvokeNotFoundHandlerOpts struct {
-	OriginalEvent map[string]any
+	OriginalEvent event.TrackedEvent
 	FunctionID    string
 	RunID         string
 	Err           map[string]any

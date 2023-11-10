@@ -392,7 +392,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 			// If this errored, then we were supposed to find a function to
 			// invoke. In this case, emit a completion event with the error.
 			perr := s.executor.InvokeNotFoundHandler(ctx, execution.InvokeNotFoundHandlerOpts{
-				OriginalEvent: evt.Map(),
+				OriginalEvent: tracked,
 				FunctionID:    "",
 				RunID:         "",
 				// TODO unify
