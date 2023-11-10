@@ -136,9 +136,6 @@ function useOutput({
     if (!outputItemID) {
       return;
     }
-    if (status !== 'completed' && status !== 'failed') {
-      return;
-    }
 
     (async () => {
       setOutput('Loading...');
