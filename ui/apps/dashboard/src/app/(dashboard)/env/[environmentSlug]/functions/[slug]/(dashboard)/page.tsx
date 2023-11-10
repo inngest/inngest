@@ -1,19 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { type Route } from 'next';
-import { ChartBarIcon, RocketLaunchIcon, XCircleIcon } from '@heroicons/react/20/solid';
+import Link from 'next/link';
+import { ChartBarIcon, ChevronRightIcon, XCircleIcon } from '@heroicons/react/20/solid';
+import { IconEvent } from '@inngest/components/icons/Event';
+import { IconFunction } from '@inngest/components/icons/Function';
 
 import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import { Alert } from '@/components/Alert';
 import { Badge } from '@/components/Badge/Badge';
 import Block from '@/components/Block';
-import ListContainer from '@/components/Lists/ListContainer';
-import ListItem from '@/components/Lists/ListItem';
+import { Time } from '@/components/Time';
 import LoadingIcon from '@/icons/LoadingIcon';
-import EventIcon from '@/icons/event.svg';
 import { useFunction, useFunctionUsage } from '@/queries';
-import { relativeTime } from '@/utils/date';
 import DashboardTimeRangeFilter, { defaultTimeRange } from './DashboardTimeRangeFilter';
 import FunctionRunsChart, { type UsageMetrics } from './FunctionRunsChart';
 import FunctionThroughputChart from './FunctionThroughputChart';
@@ -136,54 +135,183 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
             />
           </div>
         </main>
-        <aside className="border-l border-slate-200 bg-white px-6 py-4">
-          <div className="flex flex-col gap-4 ">
-            <Block title="Latest Deployment">
-              <ListContainer className="bg-white">
-                <ListItem
-                  href={
-                    `/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}` as Route
-                  }
-                >
-                  <div>
-                    <div className="mb-1 flex flex-row items-center gap-2 font-medium">
-                      <RocketLaunchIcon className="h-4 text-indigo-400" />{' '}
-                      {function_.current?.deploy?.id}
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      {relativeTime(function_.current?.deploy?.createdAt)}
-                    </div>
+        <aside className="overflow-y-auto border-l border-slate-200 bg-white px-6 py-4">
+          <div className="flex flex-col gap-10">
+            <Block title="App">
+              <Link
+                href={`/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}`}
+                className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
+              >
+                <div className="flex min-w-0 items-center">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">Growth</p>
+                    <Time className="text-xs text-slate-500" format="relative" value={new Date()} />
                   </div>
-                </ListItem>
-              </ListContainer>
+                  <ChevronRightIcon className="h-5" />
+                </div>
+              </Link>
             </Block>
             <Block title="Triggers">
-              <ListContainer className="bg-white">
-                {function_.current?.triggers?.map((t, idx) => (
-                  <ListItem
-                    key={idx}
-                    href={
-                      `/env/${params.environmentSlug}/events/${encodeURIComponent(
-                        t.eventName ?? 'unknown'
-                      )}` as Route
-                    }
-                  >
-                    <div className="mb-1 flex flex-row items-center gap-2 font-medium">
-                      <EventIcon className="h-3 text-indigo-400" /> {t.eventName || t.schedule}
+              <div className="space-y-3">
+                <Link
+                  href={`/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}`}
+                  className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
+                >
+                  <div className="flex min-w-0 items-center">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center">
+                        <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
+                        <p className="truncate font-medium">clerk/user.updated</p>
+                      </div>
                     </div>
-                  </ListItem>
-                ))}
-              </ListContainer>
-            </Block>
-
-            <Block title="URL">
-              <ListContainer className="bg-white">
-                <ListItem>
-                  <div className="mb-1 flex flex-row items-center gap-2 overflow-scroll whitespace-nowrap font-medium">
-                    {function_.url}
+                    <ChevronRightIcon className="h-5" />
                   </div>
-                </ListItem>
-              </ListContainer>
+                </Link>
+                <Link
+                  href={`/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}`}
+                  className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
+                >
+                  <div className="flex min-w-0 items-center">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center">
+                        <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
+                        <p className="truncate font-medium">app/user.signed.up</p>
+                      </div>
+                    </div>
+                    <ChevronRightIcon className="h-5" />
+                  </div>
+                </Link>
+              </div>
+            </Block>
+            <Block title="Cancel On">
+              <div className="space-y-3">
+                <Link
+                  href={`/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}`}
+                  className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
+                >
+                  <div className="flex min-w-0 items-center">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex min-w-0 items-center">
+                        <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
+                        <p className="truncate font-medium">app/user.deleted</p>
+                      </div>
+                      <dl className="text-xs">
+                        <div className="flex gap-1">
+                          <dt className="text-slate-500">If</dt>
+                          <dd className="font-mono text-slate-800">
+                            event.data.userId == async.data.userId
+                          </dd>
+                        </div>
+                        <div className="flex gap-1">
+                          <dt className="text-slate-500">Timeout</dt>
+                          <dd className="font-mono text-slate-800">30m</dd>
+                        </div>
+                      </dl>
+                    </div>
+                    <ChevronRightIcon className="h-5" />
+                  </div>
+                </Link>
+              </div>
+            </Block>
+            <Block title="Failure Handler">
+              <div className="space-y-3">
+                <Link
+                  href={`/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}`}
+                  className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
+                >
+                  <div className="flex min-w-0 items-center">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center">
+                        <IconFunction className="w-8 shrink-0 pr-2 text-indigo-500" />
+                        <p className="truncate font-medium">Failure: Customer Onboarding</p>
+                      </div>
+                    </div>
+                    <ChevronRightIcon className="h-5" />
+                  </div>
+                </Link>
+              </div>
+            </Block>
+            <Block title="Configuration">
+              <dl className="grid grid-cols-3 gap-y-5 text-sm font-medium">
+                <div className="col-span-3">
+                  <dt className="text-slate-500">Priority</dt>
+                  <dd className="font-mono text-xs text-slate-800">
+                    {"event.data.lastName == 'Doe' ? 120 : 0"}
+                  </dd>
+                </div>
+                <div className="col-span-3 space-y-1">
+                  <dt className="text-slate-500">Concurrency</dt>
+                  <dd>
+                    <dl className="grid grid-cols-3">
+                      <div>
+                        <dt className="text-xs font-normal text-slate-500">Scope</dt>
+                        <dd className="font-mono text-xs text-slate-800">Fn</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-normal text-slate-500">Limit</dt>
+                        <dd className="font-mono text-xs text-slate-800">1</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-normal text-slate-500">Key</dt>
+                        <dd className="font-mono text-xs text-slate-800">event.data.userId</dd>
+                      </div>
+                    </dl>
+                  </dd>
+                </div>
+                <div className="col-span-3 space-y-1">
+                  <dt className="text-slate-500">Rate Limit</dt>
+                  <dd>
+                    <dl className="grid grid-cols-3">
+                      <div>
+                        <dt className="text-xs font-normal text-slate-500">Period</dt>
+                        <dd className="font-mono text-xs text-slate-800">24h0m0s</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-normal text-slate-500">Limit</dt>
+                        <dd className="font-mono text-xs text-slate-800">1</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-normal text-slate-500">Key</dt>
+                        <dd className="font-mono text-xs text-slate-800">event.data.userId</dd>
+                      </div>
+                    </dl>
+                  </dd>
+                </div>
+                <div className="col-span-3 space-y-1">
+                  <dt className="text-slate-500">Debounce</dt>
+                  <dd>
+                    <dl className="grid grid-cols-3">
+                      <div>
+                        <dt className="text-xs font-normal text-slate-500">Period</dt>
+                        <dd className="font-mono text-xs text-slate-800">10s</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-normal text-slate-500">Key</dt>
+                        <dd className="font-mono text-xs text-slate-800">event.data.userId</dd>
+                      </div>
+                    </dl>
+                  </dd>
+                </div>
+                <div className="col-span-3 space-y-1">
+                  <dt className="text-slate-500">Events Batch</dt>
+                  <dd>
+                    <dl className="grid grid-cols-3">
+                      <div>
+                        <dt className="text-xs font-normal text-slate-500">Max Size</dt>
+                        <dd className="font-mono text-xs text-slate-800">100</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-normal text-slate-500">Timeout</dt>
+                        <dd className="font-mono text-xs text-slate-800">10s</dd>
+                      </div>
+                    </dl>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Retries</dt>
+                  <dd className="font-mono text-xs text-slate-800">3</dd>
+                </div>
+              </dl>
             </Block>
           </div>
         </aside>
