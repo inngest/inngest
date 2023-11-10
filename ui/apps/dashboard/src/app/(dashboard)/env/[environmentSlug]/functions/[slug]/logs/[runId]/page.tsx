@@ -77,13 +77,9 @@ type FunctionRunDetailsLayoutProps = {
     slug: string;
     runId: string;
   };
-  children: React.ReactNode;
 };
 
-export default async function FunctionRunDetailsLayout({
-  params,
-  children,
-}: FunctionRunDetailsLayoutProps) {
+export default async function FunctionRunDetailsLayout({ params }: FunctionRunDetailsLayoutProps) {
   const functionSlug = decodeURIComponent(params.slug);
   const environment = await getEnvironment({
     environmentSlug: params.environmentSlug,
