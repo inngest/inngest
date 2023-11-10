@@ -121,6 +121,13 @@ func WithInvokeNotFoundHandler(f execution.InvokeNotFoundHandler) ExecutorOpt {
 	}
 }
 
+func WithSendingEventHandler(f execution.HandleSendingEvent) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).handleSendingEvent = f
+		return nil
+	}
+}
+
 func WithLifecycleListeners(l ...execution.LifecycleListener) ExecutorOpt {
 	return func(e execution.Executor) error {
 		for _, item := range l {
@@ -197,6 +204,7 @@ type executor struct {
 	runtimeDrivers        map[string]driver.Driver
 	finishHandler         execution.FinishHandler
 	invokeNotFoundHandler execution.InvokeNotFoundHandler
+	handleSendingEvent    execution.HandleSendingEvent
 	pb                    pubsub.Publisher
 	eventTopic            string
 
@@ -1315,20 +1323,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 
 	logger.From(ctx).Debug().Interface("evt", evt).Str("gen.ID", gen.ID).Msg("created invocation event")
 
-	byt, err := json.Marshal(evt)
-	if err != nil {
-		return fmt.Errorf("error marshalling failure event: %w", err)
-	}
-
-	err = e.pb.Publish(
-		ctx,
-		e.eventTopic,
-		pubsub.Message{
-			Name:      event.EventReceivedName,
-			Data:      string(byt),
-			Timestamp: time.Now(),
-		},
-	)
+	err = e.handleSendingEvent(ctx, evt, item)
 	if err != nil {
 		// TODO Cancel pause/timeout?
 		return fmt.Errorf("error publishing internal invocation event: %w", err)

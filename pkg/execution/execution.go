@@ -110,10 +110,6 @@ type Executor interface {
 	// SetFinishHandler sets the finish handler, called when a function run finishes.
 	SetFinishHandler(f FinishHandler)
 
-	// SetInvokeNotFoundHandler sets the invoke not found handler, called when
-	// a function is invoked but not found.
-	SetInvokeNotFoundHandler(f InvokeNotFoundHandler)
-
 	// InvokeNotFoundHandler invokes the invoke not found handler.
 	InvokeNotFoundHandler(context.Context, InvokeNotFoundHandlerOpts) error
 }
@@ -133,6 +129,10 @@ type FinishHandler func(context.Context, state.Identifier, state.State, state.Dr
 // InvokeNotFoundHandler is a function that handles invocations failing due to
 // the function not being found.
 type InvokeNotFoundHandler func(context.Context, InvokeNotFoundHandlerOpts) error
+
+// HandleSendingEvent handles sending an event given an event and the queue
+// item.
+type HandleSendingEvent func(context.Context, event.Event, queue.Item) error
 
 // ScheduleRequest represents all data necessary to schedule a new function.
 type ScheduleRequest struct {

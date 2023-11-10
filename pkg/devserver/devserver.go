@@ -22,6 +22,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/history"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -209,6 +210,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		),
 		executor.WithStepLimits(consts.DefaultMaxStepLimit),
 		executor.WithInvokeNotFoundHandler(getInvokeNotFoundHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
+		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
 		executor.WithPublisher(pb, opts.Config.EventStream.Service.Concrete.TopicName()),
 	)
@@ -265,6 +267,30 @@ func createInmemoryRedis(ctx context.Context) (rueidis.Client, error) {
 		}
 	}()
 	return rc, nil
+}
+
+func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
+	return func(ctx context.Context, evt event.Event, item queue.Item) error {
+		byt, err := json.Marshal(evt)
+		if err != nil {
+			return fmt.Errorf("error marshalling invocation event: %w", err)
+		}
+
+		err = pb.Publish(
+			ctx,
+			topic,
+			pubsub.Message{
+				Name:      event.EventReceivedName,
+				Data:      string(byt),
+				Timestamp: time.Now(),
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("error publishing invocation event: %w", err)
+		}
+
+		return nil
+	}
 }
 
 func getInvokeNotFoundHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.InvokeNotFoundHandler {
