@@ -10,19 +10,20 @@ export function renderStepMetadata({
   node: HistoryNode;
   isAttempt?: boolean;
 }): MetadataItemProps[] {
-  let endedAtLabel = 'Completed At:';
+  const name = isAttempt ? 'Attempt' : ' Step';
+  let endedAtLabel = `${name} Completed`;
   let tootltipLabel = 'completed';
   if (node.status === 'cancelled') {
-    endedAtLabel = 'Cancelled At:';
+    endedAtLabel = `${name} Cancelled`;
     tootltipLabel = 'cancelled';
   } else if (node.status === 'failed') {
-    endedAtLabel = 'Failed At:';
+    endedAtLabel = `${name} Failed`;
     tootltipLabel = 'failed';
   } else if (node.status === 'errored') {
-    endedAtLabel = 'Errored At:';
+    endedAtLabel = `${name} Errored`;
     tootltipLabel = 'errored';
   } else if (node.status === 'completed' && node.waitForEventResult?.timeout) {
-    endedAtLabel = 'Timed Out At:';
+    endedAtLabel = `${name} Timed Out`;
     tootltipLabel = 'timed out';
   }
 
@@ -33,7 +34,7 @@ export function renderStepMetadata({
 
   const metadataItems: MetadataItemProps[] = [
     {
-      label: 'Started At',
+      label: `${name} Started`,
       value: node.scheduledAt ? node.scheduledAt.toLocaleString() : '-',
       title: node?.scheduledAt?.toLocaleString(),
     },
@@ -45,9 +46,7 @@ export function renderStepMetadata({
     {
       label: 'Duration',
       value: durationMS ? formatMilliseconds(durationMS) : '-',
-      tooltip: `Time between ${isAttempt ? 'attempt' : 'step'} started and ${
-        isAttempt ? 'attempt' : 'step'
-      } ${tootltipLabel}`,
+      tooltip: `Time between ${name.toLowerCase()} started and ${name.toLowerCase()} ${tootltipLabel}`,
     },
   ];
 
