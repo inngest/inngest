@@ -2,6 +2,8 @@ package devserver
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
@@ -29,6 +32,7 @@ import (
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
+	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
 
@@ -204,6 +208,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			},
 		),
 		executor.WithStepLimits(consts.DefaultMaxStepLimit),
+		executor.WithInvokeNotFoundHandler(getInvokeNotFoundHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
 		executor.WithPublisher(pb, opts.Config.EventStream.Service.Concrete.TopicName()),
 	)
@@ -260,4 +265,61 @@ func createInmemoryRedis(ctx context.Context) (rueidis.Client, error) {
 		}
 	}()
 	return rc, nil
+}
+
+func getInvokeNotFoundHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.InvokeNotFoundHandler {
+	return func(ctx context.Context, opts execution.InvokeNotFoundHandlerOpts) error {
+		now := time.Now()
+		data := map[string]interface{}{
+			"function_id": opts.FunctionID,
+			"run_id":      opts.RunID,
+		}
+
+		origEvt := opts.OriginalEvent.GetEvent().Map()
+		if dataMap, ok := origEvt["data"].(map[string]interface{}); ok {
+			if inngestObj, ok := dataMap[consts.InngestEventDataPrefix].(map[string]interface{}); ok {
+
+				if dataValue, ok := inngestObj[consts.InvokeCorrelationId].(string); ok {
+					logger.From(ctx).Debug().Str("data_value_str", dataValue).Msg("data_value")
+					data[consts.InvokeCorrelationId] = dataValue
+				}
+			}
+		}
+
+		if opts.Err != nil {
+			data["error"] = opts.Err
+		} else {
+			data["result"] = opts.Result
+		}
+
+		evt := event.Event{
+			ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+			Name:      event.FnFinishedName,
+			Timestamp: now.UnixMilli(),
+			Data:      data,
+		}
+
+		logger.From(ctx).Debug().Interface("event", evt).Msg("function finished event")
+
+		byt, err := json.Marshal(evt)
+		if err != nil {
+			logger.From(ctx).Error().Err(err).Msg("error marshalling function finished event")
+			return err
+		}
+
+		err = pb.Publish(
+			ctx,
+			topic,
+			pubsub.Message{
+				Name:      event.EventReceivedName,
+				Data:      string(byt),
+				Timestamp: now,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("error publishing function finished event: %w", err)
+		}
+
+		return nil
+	}
 }
