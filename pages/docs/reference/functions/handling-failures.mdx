@@ -82,6 +82,9 @@ Inngest sends an `"inngest/function.failed"` event to your [environment](/docs/p
           <Property name="name" type="string" attribute>
             The name of the error, defaulting to "Error" if unspecified
           </Property>
+          <Property name="stack" type="string">
+            The stack trace of the error, if supported by the language SDK
+          </Property>
         </Properties>
       </Property>
       <Property name="event" type="string" attribute>
@@ -109,8 +112,11 @@ Inngest sends an `"inngest/function.failed"` event to your [environment](/docs/p
     "name": "inngest/function.failed",
     "data": {
       "error": {
-        "body": "{\"name\":\"Error\",\"message\":\"Something failed\",\"stack\":\"Error: Something failed\\n    at /Users/danfarrelly/dev/inngest-google-cloud-functions/index.js:39:15\\n    at /Users/danfarrelly/dev/inngest-google-cloud-functions/node_modules/inngest/components/InngestStepTools.js:219:20\\n    at fn (/Users/danfarrelly/dev/inngest-google-cloud-functions/node_modules/inngest/components/InngestStepTools.js:97:113)\\n    at Promise.then.data (/Users/danfarrelly/dev/inngest-google-cloud-functions/node_modules/inngest/components/InngestFunction.js:289:32)\\n    at new Promise (<anonymous>)\\n    at InngestFunction.runFn (/Users/danfarrelly/dev/inngest-google-cloud-functions/node_modules/inngest/components/InngestFunction.js:288:34)\\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\\n    at async InngestCommHandler.runStep (/Users/danfarrelly/dev/inngest-google-cloud-functions/node_modules/inngest/components/InngestCommHandler.js:484:25)\\n    at async InngestCommHandler.handleAction (/Users/danfarrelly/dev/inngest-google-cloud-functions/node_modules/inngest/components/InngestCommHandler.js:349:33)\\n    at async ServerTiming.wrap (/Users/danfarrelly/dev/inngest-google-cloud-functions/node_modules/inngest/helpers/ServerTiming.js:69:21)\",\"__serialized\":true}",
-        "status": 500
+        "__serialized": true,
+        "error": "invalid status code: 500",
+        "message": "taylor@ok.com is already a list member. Use PUT to insert or update list members.",
+        "name": "Error",
+        "stack": "Error: taylor@ok.com is already a list member. Use PUT to insert or update list members.\n    at /var/task/.next/server/pages/api/inngest.js:2430:23\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async InngestFunction.runFn (/var/task/node_modules/.pnpm/inngest@2.6.0_typescript@5.1.6/node_modules/inngest/components/InngestFunction.js:378:32)\n    at async InngestCommHandler.runStep (/var/task/node_modules/.pnpm/inngest@2.6.0_typescript@5.1.6/node_modules/inngest/components/InngestCommHandler.js:459:25)\n    at async InngestCommHandler.handleAction (/var/task/node_modules/.pnpm/inngest@2.6.0_typescript@5.1.6/node_modules/inngest/components/InngestCommHandler.js:359:33)\n    at async ServerTiming.wrap (/var/task/node_modules/.pnpm/inngest@2.6.0_typescript@5.1.6/node_modules/inngest/helpers/ServerTiming.js:69:21)\n    at async ServerTiming.wrap (/var/task/node_modules/.pnpm/inngest@2.6.0_typescript@5.1.6/node_modules/inngest/helpers/ServerTiming.js:69:21)"
       },
       "event": {
         "data": { "billingPlan": "pro" },
@@ -181,7 +187,7 @@ export default inngest.createFunction(
 
 ### Track all function failures in Datadog
 
-You can use the `"inngest/function.failed"` event to handle all failed functions in a single place. This can enable you to send metrics, alerts, or events to external systems like Datadog for all of your Inngest functions. Here's an example using [Datadog's Events API](https://docs.datadoghq.com/api/latest/events/) to send all failures the Datadog event stream.
+You can use the `"inngest/function.failed"` event to handle all failed functions in a single place. This can enable you to send metrics, alerts, or events to external systems like Datadog or Sentry for all of your Inngest functions. Here's an example using [Datadog's Events API](https://docs.datadoghq.com/api/latest/events/) to send all failures the Datadog event stream.
 
 ```ts
 import { client, v1 } from "@datadog/datadog-api-client";
@@ -191,13 +197,15 @@ const configuration = client.createConfiguration();
 const apiInstance = new v1.EventsApi(configuration);
 
 export default inngest.createFunction(
-  { id: "send-failed-function-events-to-datadog" },
+  {
+    name: "Send failures to Datadog",
+    id: "send-failed-function-events-to-datadog"
+  },
   { event: "inngest/function.failed" },
   async ({ event, step }) => {
     // This is a normal Inngest function, so we can use steps as we normally do:
     await step.run("send-event-to-datadog", async () => {
-      // Parse the event from the event's error.body object as it's serialized JSON:
-      const error = JSON.parse(event.data.error.body);
+      const error = event.data.error;
 
       // Create the Datadog event body using information about the failed function:
       const params: v1.EventsApiCreateEventRequest = {
@@ -218,6 +226,50 @@ export default inngest.createFunction(
       // Return the data to Inngest for viewing in function logs:
       return { message: "Event sent successfully", data };
     });
+  }
+);
+```
+
+### Capture all failure errors with Sentry
+
+Similar to the above example, you can capture and all failed functions' errors and send them to a singular place. Here's an example using [Sentry's node.js library](https://docs.datadoghq.com/api/latest/events/) to capture and send all failure errors to Sentry.
+
+```ts
+import * as Sentry from "@sentry/node";
+import { inngest } from "./client";
+
+Sentry.init({
+  dsn: "https://examplePublicKey@o0.ingest.sentry.io/0",
+});
+
+export default inngest.createFunction(
+  {
+    name: "Send failures to Sentry",
+    id: "send-failed-function-errors-to-sentry"
+  },
+  { event: "inngest/function.failed" },
+  async ({ event, step }) => {
+
+    // The error is serialized as JSON, so we must re-construct it for Sentry's error handling:
+    const error = event.data.error;
+    const reconstructedEvent = new Error(error.message);
+    // Set the name in the newly created event:
+    // You can even customize the name here if you'd like,
+    // e.g. `Function Failure: ${event.} - ${error.name}`
+    reconstructedEvent.name = error.name;
+
+    // Add the stack trace to the error:
+    reconstructedEvent.stack = error.stack;
+
+    // Capture the error with Sentry and append any additional tags or metadata:
+    Sentry.captureException(reconstructedEvent,{
+      extra: {
+        function_id,
+      },
+    });
+
+    // Flush the Sentry queue to ensure the error is sent:
+    return await Sentry.flush();
   }
 );
 ```
