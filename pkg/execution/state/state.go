@@ -65,6 +65,8 @@ type Identifier struct {
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// If this is a rerun, the original run ID is stored here.
 	OriginalRunID *ulid.ULID `json:"oRunID,omitempty"`
+	// ReplayID stores the ID of the replay, if this identifier belongs to a replay.
+	ReplayID *uuid.UUID `json:"rID,omitempty"`
 	// PriorityFactor is the overall priority factor for this particular function
 	// run.  This allows individual runs to take precedence within the same queue.
 	// The higher the number (up to consts.PriorityFactorMax), the higher priority
@@ -131,10 +133,6 @@ type Metadata struct {
 	// RunType indicates the run type for this particular flow.  This allows
 	// us to store whether this is eg. a manual retry
 	RunType *string `json:"runType,omitempty"`
-
-	// OriginalRunID stores the original run ID, if this run is a retry.
-	// This is some basic book-keeping.
-	OriginalRunID *ulid.ULID `json:"originalRunID,omitempty"`
 
 	// Name stores the name of the workflow as it started.
 	//
@@ -393,10 +391,6 @@ type Input struct {
 	// RunType indicates the run type for this particular flow.  This allows
 	// us to store whether this is eg. a manual retry
 	RunType *string `json:"runType,omitempty"`
-
-	// OriginalRunID stores the original run ID, if this run is a retry.
-	// This is some basic book-keeping.
-	OriginalRunID *ulid.ULID `json:"originalRunID,omitempty"`
 
 	// Steps allows users to specify pre-defined steps to run workflows from
 	// arbitrary points.
