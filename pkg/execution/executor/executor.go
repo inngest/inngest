@@ -181,17 +181,6 @@ func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
 	}
 }
 
-// WithPublisher specifies the pubsub publisher to use when sending internal
-// events.
-func WithPublisher(p pubsub.Publisher, topicName string) ExecutorOpt {
-	return func(exec execution.Executor) error {
-		e := exec.(*executor)
-		e.pb = p
-		e.eventTopic = topicName
-		return nil
-	}
-}
-
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log *zerolog.Logger

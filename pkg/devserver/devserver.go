@@ -212,7 +212,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithInvokeNotFoundHandler(getInvokeNotFoundHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
-		executor.WithPublisher(pb, opts.Config.EventStream.Service.Concrete.TopicName()),
 	)
 	if err != nil {
 		return err
