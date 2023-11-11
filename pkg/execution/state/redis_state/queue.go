@@ -613,6 +613,15 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 	return resp, nil
 }
 
+func (q *queue) OutstandingJobCount(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID) (int, error) {
+	cmd := q.r.B().Zcard().Key(q.kg.RunIndex(runID)).Build()
+	count, err := q.r.Do(ctx, cmd).AsInt64()
+	if err != nil {
+		return 0, fmt.Errorf("error counting index cardinality: %w", err)
+	}
+	return int(count), nil
+}
+
 // EnqueueItem enqueues a QueueItem.  It creates a QueuePartition for the workspace
 // if a partition does not exist.
 //

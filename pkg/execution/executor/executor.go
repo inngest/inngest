@@ -458,7 +458,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if e.steplimit != 0 && len(s.Actions()) >= int(e.steplimit) {
 		// Update this function's state to overflowed, if running.
 		if md.Status == enums.RunStatusRunning {
-			_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt, enums.RunStatusFailed)
 			// XXX: Update error to failed, set error message
 			if err := e.sm.SetStatus(ctx, id, enums.RunStatusFailed); err != nil {
 				return nil, err
@@ -570,7 +569,6 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 
 	// Check if this step permanently failed.  If so, the function is a failure.
 	if resp.Err != nil && !resp.Retryable() {
-		_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt, enums.RunStatusFailed)
 		if serr := e.sm.SetStatus(ctx, id, enums.RunStatusFailed); serr != nil {
 			return fmt.Errorf("error marking function as complete: %w", serr)
 		}
@@ -606,7 +604,6 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 
 			return fmt.Errorf("error handling generator response: %w", serr)
 		}
-		_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt)
 		return nil
 	}
 
@@ -622,7 +619,6 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 		return fmt.Errorf("error saving function output: %w", serr)
 	}
 
-	_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt)
 	s, _ := e.sm.Load(ctx, id.RunID)
 	if ferr := e.runFinishHandler(ctx, id, s, *resp); ferr != nil {
 		// XXX: log
@@ -748,10 +744,6 @@ func (e *executor) executeDriverForStep(ctx context.Context, id state.Identifier
 	d, ok := e.runtimeDrivers[step.Driver()]
 	if !ok {
 		return nil, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, step.Driver())
-	}
-	// TODO: Remove.  This is unnecessary.
-	if err := e.sm.Started(ctx, id, step.ID, item.Attempt); err != nil {
-		return nil, fmt.Errorf("error saving started state: %w", err)
 	}
 
 	response, err := d.Execute(ctx, s, item, edge, *step, stackIndex, item.Attempt)
@@ -1150,10 +1142,6 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 	ctx = state.WithGroupID(ctx, groupID)
 
 	// Re-enqueue the exact same edge to run now.
-	if err := e.sm.Scheduled(ctx, item.Identifier, nextEdge.Incoming, 0, nil); err != nil {
-		return err
-	}
-
 	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
 	nextItem := queue.Item{
 		JobID:       &jobID,
@@ -1200,10 +1188,6 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 	ctx = state.WithGroupID(ctx, groupID)
 
 	// Re-enqueue the exact same edge to run now.
-	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil); err != nil {
-		return err
-	}
-
 	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID+"-plan")
 	nextItem := queue.Item{
 		JobID:       &jobID,
@@ -1235,7 +1219,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 	if err != nil {
 		return err
 	}
-	at := time.Now().Add(dur)
 
 	nextEdge := inngest.Edge{
 		Outgoing: gen.ID,             // Leaving sleep
@@ -1246,11 +1229,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 	// the function to run again after sleep, so need a new group.
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
-
-	// XXX: Remove this after we create queues for function runs.
-	if err := e.sm.Scheduled(ctx, item.Identifier, nextEdge.Incoming, 0, &at); err != nil {
-		return err
-	}
 
 	until := time.Now().Add(dur)
 
@@ -1422,14 +1400,6 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	})
 	if err != nil {
 		return err
-	}
-
-	// This should also increase the waitgroup count, as we have an
-	// edge that is outstanding.
-	//
-	// TODO: Remove with function run specific queues
-	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.IncomingGeneratorStep, 0, nil); err != nil {
-		return fmt.Errorf("unable to schedule wait for event: %w", err)
 	}
 
 	// SDK-based event coordination is called both when an event is received

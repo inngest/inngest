@@ -34,12 +34,13 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 		startedAt := ulid.Time(s.Metadata().Identifier.RunID.Time())
 
 		name := s.Function().Name
-		pending := s.Metadata().Pending
 
-		// Don't let pending be negative for clients
-		if pending < 0 {
-			pending = 0
-		}
+		pending, _ := r.Queue.OutstandingJobCount(
+			ctx,
+			s.Identifier().WorkspaceID,
+			s.Identifier().WorkflowID,
+			s.Identifier().RunID,
+		)
 
 		runs = append(runs, &models.FunctionRun{
 			ID:           s.Metadata().Identifier.RunID.String(),
