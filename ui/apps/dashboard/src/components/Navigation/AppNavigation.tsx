@@ -2,11 +2,12 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import {
   CodeBracketSquareIcon,
-  Cog6ToothIcon,
+  MagnifyingGlassIcon,
   RocketLaunchIcon,
   WrenchIcon,
 } from '@heroicons/react/20/solid';
 
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import InngestLogo from '@/icons/InngestLogo';
 import EventIcon from '@/icons/event.svg';
 import AccountDropdown from './AccountDropdown';
@@ -28,8 +29,10 @@ type NavItem = {
 const ALL_ENVIRONMENTS_SLUG = 'all';
 const BRANCH_PARENT_SLUG = 'branch';
 
-export default function AppNavigation({ environmentSlug }: AppNavigationProps) {
-  const items: NavItem[] = [
+export default async function AppNavigation({ environmentSlug }: AppNavigationProps) {
+  const isEventSearchEnabled = await getBooleanFlag('event-search');
+
+  let items: NavItem[] = [
     {
       href: `/env/${environmentSlug}/functions`,
       text: 'Functions',
@@ -55,6 +58,21 @@ export default function AppNavigation({ environmentSlug }: AppNavigationProps) {
       icon: <WrenchIcon className="w-3.5" />,
     },
   ];
+
+  if (isEventSearchEnabled) {
+    // Insert the "Event Search" item after the 2nd item.
+    items = [
+      ...items.slice(0, 2),
+      {
+        href: `/env/${environmentSlug}/event-search`,
+        text: 'Event Search',
+        hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
+        icon: <MagnifyingGlassIcon className="w-3.5" />,
+      },
+      ...items.slice(2),
+    ];
+  }
+
   const visibleItems = items.filter((item) => !item.hide.includes(environmentSlug));
 
   return (
