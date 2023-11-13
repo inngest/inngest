@@ -3,6 +3,12 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { ChartBarIcon, ChevronRightIcon, XCircleIcon } from '@heroicons/react/20/solid';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
 
@@ -18,6 +24,37 @@ import FunctionRunsChart, { type UsageMetrics } from './FunctionRunsChart';
 import FunctionThroughputChart from './FunctionThroughputChart';
 import LatestFailedFunctionRuns from './LatestFailedFunctionRuns';
 import SDKRequestThroughputChart from './SDKRequestThroughput';
+
+const functionConfig = {
+  priority: "event.data.lastName == 'Doe' ? 120 : 0",
+  concurrency: {
+    scope: 'Function',
+    limit: 1,
+    key: 'event.data.userId',
+  },
+  rateLimit: {
+    period: '24h0m0s',
+    limit: 1,
+    key: 'event.data.userId',
+  },
+  debounce: {
+    period: '10s',
+    key: 'event.data.userId',
+  },
+  eventsBatch: {
+    maxSize: 100,
+    timeout: '10s',
+  },
+  retries: 3,
+};
+
+const functionCancelOns = [
+  {
+    event: 'app/user.deleted',
+    timeout: '30m',
+    condition: 'event.data.userId == async.data.userId',
+  },
+];
 
 type FunctionDashboardProps = {
   params: {
@@ -185,32 +222,44 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
             </Block>
             <Block title="Cancel On">
               <div className="space-y-3">
-                <Link
-                  href={`/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}`}
-                  className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
-                >
-                  <div className="flex min-w-0 items-center">
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex min-w-0 items-center">
-                        <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
-                        <p className="truncate font-medium">app/user.deleted</p>
+                {functionCancelOns.map((cancelOn) => (
+                  <Link
+                    key={cancelOn.event}
+                    href={`/env/${params.environmentSlug}/events/${cancelOn.event}`}
+                    className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
+                  >
+                    <div className="flex min-w-0 items-center">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex min-w-0 items-center">
+                          <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
+                          <p className="truncate font-medium">{cancelOn.event}</p>
+                        </div>
+                        <dl className="text-xs">
+                          <div className="flex gap-1">
+                            <dt className="text-slate-500">If</dt>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <dd className="truncate font-mono text-slate-800">
+                                    {cancelOn.condition}
+                                  </dd>
+                                </TooltipTrigger>
+                                <TooltipContent className="font-mono text-xs">
+                                  {cancelOn.condition}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                          <div className="flex gap-1">
+                            <dt className="text-slate-500">Timeout</dt>
+                            <dd className="font-mono text-slate-800">{cancelOn.timeout}</dd>
+                          </div>
+                        </dl>
                       </div>
-                      <dl className="text-xs">
-                        <div className="flex gap-1">
-                          <dt className="text-slate-500">If</dt>
-                          <dd className="font-mono text-slate-800">
-                            event.data.userId == async.data.userId
-                          </dd>
-                        </div>
-                        <div className="flex gap-1">
-                          <dt className="text-slate-500">Timeout</dt>
-                          <dd className="font-mono text-slate-800">30m</dd>
-                        </div>
-                      </dl>
+                      <ChevronRightIcon className="h-5" />
                     </div>
-                    <ChevronRightIcon className="h-5" />
-                  </div>
-                </Link>
+                  </Link>
+                ))}
               </div>
             </Block>
             <Block title="Failure Handler">
@@ -235,9 +284,18 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               <dl className="grid grid-cols-3 gap-y-5 text-sm font-medium">
                 <div className="col-span-3">
                   <dt className="text-slate-500">Priority</dt>
-                  <dd className="font-mono text-xs text-slate-800">
-                    {"event.data.lastName == 'Doe' ? 120 : 0"}
-                  </dd>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <dd className="truncate font-mono text-xs text-slate-800">
+                          {functionConfig.priority}
+                        </dd>
+                      </TooltipTrigger>
+                      <TooltipContent className="font-mono text-xs">
+                        {functionConfig.priority}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
                 <div className="col-span-3 space-y-1">
                   <dt className="text-slate-500">Concurrency</dt>
@@ -245,15 +303,30 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                     <dl className="grid grid-cols-3">
                       <div>
                         <dt className="text-xs font-normal text-slate-500">Scope</dt>
-                        <dd className="font-mono text-xs text-slate-800">Fn</dd>
+                        <dd className="font-mono text-xs text-slate-800">
+                          {functionConfig.concurrency.scope}
+                        </dd>
                       </div>
                       <div>
                         <dt className="text-xs font-normal text-slate-500">Limit</dt>
-                        <dd className="font-mono text-xs text-slate-800">1</dd>
+                        <dd className="font-mono text-xs text-slate-800">
+                          {functionConfig.concurrency.limit}
+                        </dd>
                       </div>
                       <div>
                         <dt className="text-xs font-normal text-slate-500">Key</dt>
-                        <dd className="font-mono text-xs text-slate-800">event.data.userId</dd>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <dd className="truncate font-mono text-xs text-slate-800">
+                                {functionConfig.concurrency.key}
+                              </dd>
+                            </TooltipTrigger>
+                            <TooltipContent className="font-mono text-xs">
+                              {functionConfig.concurrency.key}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
                     </dl>
                   </dd>
@@ -264,15 +337,30 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                     <dl className="grid grid-cols-3">
                       <div>
                         <dt className="text-xs font-normal text-slate-500">Period</dt>
-                        <dd className="font-mono text-xs text-slate-800">24h0m0s</dd>
+                        <dd className="font-mono text-xs text-slate-800">
+                          {functionConfig.rateLimit.period}
+                        </dd>
                       </div>
                       <div>
                         <dt className="text-xs font-normal text-slate-500">Limit</dt>
-                        <dd className="font-mono text-xs text-slate-800">1</dd>
+                        <dd className="font-mono text-xs text-slate-800">
+                          {functionConfig.rateLimit.limit}
+                        </dd>
                       </div>
                       <div>
                         <dt className="text-xs font-normal text-slate-500">Key</dt>
-                        <dd className="font-mono text-xs text-slate-800">event.data.userId</dd>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <dd className="truncate font-mono text-xs text-slate-800">
+                                {functionConfig.rateLimit.key}
+                              </dd>
+                            </TooltipTrigger>
+                            <TooltipContent className="font-mono text-xs">
+                              {functionConfig.rateLimit.key}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
                     </dl>
                   </dd>
@@ -283,11 +371,24 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                     <dl className="grid grid-cols-3">
                       <div>
                         <dt className="text-xs font-normal text-slate-500">Period</dt>
-                        <dd className="font-mono text-xs text-slate-800">10s</dd>
+                        <dd className="font-mono text-xs text-slate-800">
+                          {functionConfig.debounce.period}
+                        </dd>
                       </div>
                       <div>
                         <dt className="text-xs font-normal text-slate-500">Key</dt>
-                        <dd className="font-mono text-xs text-slate-800">event.data.userId</dd>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <dd className="truncate font-mono text-xs text-slate-800">
+                                {functionConfig.debounce.key}
+                              </dd>
+                            </TooltipTrigger>
+                            <TooltipContent className="font-mono text-xs">
+                              {functionConfig.debounce.key}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
                     </dl>
                   </dd>
@@ -298,18 +399,22 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                     <dl className="grid grid-cols-3">
                       <div>
                         <dt className="text-xs font-normal text-slate-500">Max Size</dt>
-                        <dd className="font-mono text-xs text-slate-800">100</dd>
+                        <dd className="font-mono text-xs text-slate-800">
+                          {functionConfig.eventsBatch.maxSize}
+                        </dd>
                       </div>
                       <div>
                         <dt className="text-xs font-normal text-slate-500">Timeout</dt>
-                        <dd className="font-mono text-xs text-slate-800">10s</dd>
+                        <dd className="font-mono text-xs text-slate-800">
+                          {functionConfig.eventsBatch.timeout}
+                        </dd>
                       </div>
                     </dl>
                   </dd>
                 </div>
                 <div>
                   <dt className="text-slate-500">Retries</dt>
-                  <dd className="font-mono text-xs text-slate-800">3</dd>
+                  <dd className="font-mono text-xs text-slate-800">{functionConfig.retries}</dd>
                 </div>
               </dl>
             </Block>

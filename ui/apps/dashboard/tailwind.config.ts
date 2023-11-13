@@ -17,7 +17,7 @@ export default {
         },
       },
       gridTemplateColumns: {
-        dashboard: '1fr 1fr 1fr 400px',
+        dashboard: '1fr 1fr 1fr 432px',
       },
       boxShadow: {
         'outline-primary-light':
