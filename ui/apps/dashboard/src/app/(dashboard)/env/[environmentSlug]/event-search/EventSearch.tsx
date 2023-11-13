@@ -5,6 +5,7 @@ import { Button } from '@inngest/components/Button';
 import { useClient } from 'urql';
 
 import Input from '@/components/Forms/Input';
+import { TimeRangeInput } from '@/components/TimeRangeInput';
 import {
   EventSearchFilterFieldDataType,
   EventSearchFilterOperator,
@@ -24,6 +25,10 @@ type Props = {
 export function EventSearch({ environmentSlug }: Props) {
   const [events, setEvents] = useState<Event[]>([]);
   const [fetching, setFetching] = useState(false);
+  const [timeRange, setTimeRange] = useState({
+    end: new Date(),
+    start: new Date(Date.now() - 3 * day),
+  });
   const [{ data: environment }] = useEnvironment({ environmentSlug });
   const client = useClient();
 
@@ -62,8 +67,8 @@ export function EventSearch({ environmentSlug }: Props) {
           client,
           environmentID: environment.id,
           fields,
-          lowerTime: new Date(Date.now() - 3 * day),
-          upperTime: new Date(),
+          lowerTime: timeRange.start,
+          upperTime: timeRange.end,
         })
       );
     } finally {
@@ -74,9 +79,16 @@ export function EventSearch({ environmentSlug }: Props) {
   return (
     <>
       <form onSubmit={onSubmit} className="m-4 flex gap-4">
-        <Input className="min-w-[300px]" type="text" name="path" placeholder="Path" required />
-        <Input className="min-w-[300px]" type="text" name="value" placeholder="Value" required />
-        <Button kind="primary" type="submit" disabled={fetching} label="Search" />
+        <span className="flex grow gap-4">
+          <Input className="min-w-[300px]" type="text" name="path" placeholder="Path" required />
+          <Input className="min-w-[300px]" type="text" name="value" placeholder="Value" required />
+          <Button kind="primary" type="submit" disabled={fetching} label="Search" />
+        </span>
+
+        <span className="flex">
+          <span className="mr-2">Time:</span>
+          <TimeRangeInput onChange={setTimeRange} />
+        </span>
       </form>
 
       <EventTable environmentSlug={environmentSlug} events={events} />
