@@ -266,6 +266,23 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                             {/*    </TooltipProvider>*/}
                             {/*  </div>*/}
                             {/*)}*/}
+                            {/*{trigger.nextRun && (*/}
+                            {/*  <div className="flex gap-1">*/}
+                            {/*    <dt className="text-slate-500">Next Run</dt>*/}
+                            {/*    <TooltipProvider>*/}
+                            {/*      <Tooltip>*/}
+                            {/*        <TooltipTrigger asChild>*/}
+                            {/*          <dd className="truncate font-mono text-slate-800">*/}
+                            {/*            {trigger.nextRun}*/}
+                            {/*          </dd>*/}
+                            {/*        </TooltipTrigger>*/}
+                            {/*        <TooltipContent className="font-mono text-xs">*/}
+                            {/*          {trigger.nextRun}*/}
+                            {/*        </TooltipContent>*/}
+                            {/*      </Tooltip>*/}
+                            {/*    </TooltipProvider>*/}
+                            {/*  </div>*/}
+                            {/*)}*/}
                           </dl>
                         </div>
                       </div>
