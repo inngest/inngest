@@ -1,4 +1,9 @@
-import { Tooltip } from '@inngest/components/Tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip';
 import { IconInfo } from '@inngest/components/icons/Info';
 import { classNames } from '@inngest/components/utils/classNames';
 
@@ -24,7 +29,14 @@ export function MetadataItem({ className, value, title, label, type, tooltip }: 
       <span className="flex items-center gap-1">
         <span className="text-sm capitalize text-slate-500">{label}</span>
         {tooltip && (
-          <Tooltip children={<IconInfo className="h-4 w-4 text-slate-400" />} content={tooltip} />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <IconInfo className="h-4 w-4 text-slate-400" />
+              </TooltipTrigger>
+              <TooltipContent>{tooltip}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </span>
     </div>
