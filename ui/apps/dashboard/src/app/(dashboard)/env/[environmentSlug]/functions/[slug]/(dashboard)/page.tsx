@@ -9,6 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@inngest/components/Tooltip';
+import { IconClock } from '@inngest/components/icons/Clock';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
 
@@ -16,6 +17,7 @@ import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/function
 import { Alert } from '@/components/Alert';
 import { Badge } from '@/components/Badge/Badge';
 import Block from '@/components/Block';
+import { ClientFeatureFlag } from '@/components/FeatureFlags/ClientFeatureFlag';
 import { Time } from '@/components/Time';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
@@ -46,15 +48,14 @@ const functionConfig = {
     timeout: '10s',
   },
   retries: 3,
+  cancellations: [
+    {
+      event: 'app/user.deleted',
+      timeout: '30m',
+      condition: 'event.data.userId == async.data.userId',
+    },
+  ],
 };
-
-const functionCancelOns = [
-  {
-    event: 'app/user.deleted',
-    timeout: '30m',
-    condition: 'event.data.userId == async.data.userId',
-  },
-];
 
 type FunctionDashboardProps = {
   params: {
@@ -112,6 +113,8 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
   const failureRate = !usageMetrics?.totalRuns
     ? '0.00'
     : (((usageMetrics?.totalFailures || 0) / (usageMetrics?.totalRuns || 0)) * 100).toFixed(2);
+
+  const triggers = function_.current?.triggers || [];
 
   function handleTimeRangeChange(timeRange: TimeRange) {
     setSelectedTimeRange(timeRange);
@@ -181,8 +184,14 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               >
                 <div className="flex min-w-0 items-center">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">Growth</p>
-                    <Time className="text-xs text-slate-500" format="relative" value={new Date()} />
+                    <p className="truncate font-medium">{function_.appName}</p>
+                    {function_.current?.deploy?.createdAt && (
+                      <Time
+                        className="text-xs text-slate-500"
+                        format="relative"
+                        value={new Date(function_.current.deploy.createdAt)}
+                      />
+                    )}
                   </div>
                   <ChevronRightIcon className="h-5" />
                 </div>
@@ -190,234 +199,281 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
             </Block>
             <Block title="Triggers">
               <div className="space-y-3">
-                <Link
-                  href={`/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}`}
-                  className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
-                >
-                  <div className="flex min-w-0 items-center">
-                    <div className="min-w-0 flex-1">
+                {triggers.map((trigger) =>
+                  trigger.eventName ? (
+                    <Link
+                      key={trigger.eventName}
+                      href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
+                        trigger.eventName
+                      )}`}
+                      className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
+                    >
                       <div className="flex min-w-0 items-center">
-                        <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
-                        <p className="truncate font-medium">clerk/user.updated</p>
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex min-w-0 items-center">
+                            <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
+                            <p className="truncate font-medium">{trigger.eventName}</p>
+                          </div>
+                          <dl className="text-xs">
+                            {/*{trigger.condition && (*/}
+                            {/*  <div className="flex gap-1">*/}
+                            {/*    <dt className="text-slate-500">If</dt>*/}
+                            {/*    <TooltipProvider>*/}
+                            {/*      <Tooltip>*/}
+                            {/*        <TooltipTrigger asChild>*/}
+                            {/*          <dd className="truncate font-mono text-slate-800">*/}
+                            {/*            {trigger.condition}*/}
+                            {/*          </dd>*/}
+                            {/*        </TooltipTrigger>*/}
+                            {/*        <TooltipContent className="font-mono text-xs">*/}
+                            {/*          {trigger.condition}*/}
+                            {/*        </TooltipContent>*/}
+                            {/*      </Tooltip>*/}
+                            {/*    </TooltipProvider>*/}
+                            {/*  </div>*/}
+                            {/*)}*/}
+                          </dl>
+                        </div>
+                        <ChevronRightIcon className="h-5" />
+                      </div>
+                    </Link>
+                  ) : (
+                    <div
+                      key={trigger.schedule}
+                      className="rounded border border-slate-200 bg-white p-4"
+                    >
+                      <div className="flex min-w-0 items-center">
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex min-w-0 items-center">
+                            <IconClock className="w-8 shrink-0 pr-2 text-indigo-500" />
+                            <p className="truncate font-medium">{trigger.schedule}</p>
+                          </div>
+                          <dl className="text-xs">
+                            {/*{trigger.condition && (*/}
+                            {/*  <div className="flex gap-1">*/}
+                            {/*    <dt className="text-slate-500">If</dt>*/}
+                            {/*    <TooltipProvider>*/}
+                            {/*      <Tooltip>*/}
+                            {/*        <TooltipTrigger asChild>*/}
+                            {/*          <dd className="truncate font-mono text-slate-800">*/}
+                            {/*            {trigger.condition}*/}
+                            {/*          </dd>*/}
+                            {/*        </TooltipTrigger>*/}
+                            {/*        <TooltipContent className="font-mono text-xs">*/}
+                            {/*          {trigger.condition}*/}
+                            {/*        </TooltipContent>*/}
+                            {/*      </Tooltip>*/}
+                            {/*    </TooltipProvider>*/}
+                            {/*  </div>*/}
+                            {/*)}*/}
+                          </dl>
+                        </div>
                       </div>
                     </div>
-                    <ChevronRightIcon className="h-5" />
-                  </div>
-                </Link>
-                <Link
-                  href={`/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}`}
-                  className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
-                >
-                  <div className="flex min-w-0 items-center">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 items-center">
-                        <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
-                        <p className="truncate font-medium">app/user.signed.up</p>
-                      </div>
-                    </div>
-                    <ChevronRightIcon className="h-5" />
-                  </div>
-                </Link>
+                  )
+                )}
               </div>
             </Block>
-            <Block title="Cancel On">
-              <div className="space-y-3">
-                {functionCancelOns.map((cancelOn) => (
+            <ClientFeatureFlag flag="function-config">
+              <Block title="Cancellation">
+                <div className="space-y-3">
+                  {functionConfig.cancellations.map((cancellation) => (
+                    <Link
+                      key={cancellation.event}
+                      href={`/env/${params.environmentSlug}/events/${cancellation.event}`}
+                      className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
+                    >
+                      <div className="flex min-w-0 items-center">
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex min-w-0 items-center">
+                            <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
+                            <p className="truncate font-medium">{cancellation.event}</p>
+                          </div>
+                          <dl className="text-xs">
+                            <div className="flex gap-1">
+                              <dt className="text-slate-500">If</dt>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <dd className="truncate font-mono text-slate-800">
+                                      {cancellation.condition}
+                                    </dd>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="font-mono text-xs">
+                                    {cancellation.condition}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                            <div className="flex gap-1">
+                              <dt className="text-slate-500">Timeout</dt>
+                              <dd className="font-mono text-slate-800">{cancellation.timeout}</dd>
+                            </div>
+                          </dl>
+                        </div>
+                        <ChevronRightIcon className="h-5" />
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </Block>
+              <Block title="Failure Handler">
+                <div className="space-y-3">
                   <Link
-                    key={cancelOn.event}
-                    href={`/env/${params.environmentSlug}/events/${cancelOn.event}`}
+                    href={`/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}`}
                     className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
                   >
                     <div className="flex min-w-0 items-center">
-                      <div className="min-w-0 flex-1 space-y-1">
+                      <div className="min-w-0 flex-1">
                         <div className="flex min-w-0 items-center">
-                          <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
-                          <p className="truncate font-medium">{cancelOn.event}</p>
+                          <IconFunction className="w-8 shrink-0 pr-2 text-indigo-500" />
+                          <p className="truncate font-medium">Failure: Customer Onboarding</p>
                         </div>
-                        <dl className="text-xs">
-                          <div className="flex gap-1">
-                            <dt className="text-slate-500">If</dt>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <dd className="truncate font-mono text-slate-800">
-                                    {cancelOn.condition}
-                                  </dd>
-                                </TooltipTrigger>
-                                <TooltipContent className="font-mono text-xs">
-                                  {cancelOn.condition}
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
-                          <div className="flex gap-1">
-                            <dt className="text-slate-500">Timeout</dt>
-                            <dd className="font-mono text-slate-800">{cancelOn.timeout}</dd>
-                          </div>
-                        </dl>
                       </div>
                       <ChevronRightIcon className="h-5" />
                     </div>
                   </Link>
-                ))}
-              </div>
-            </Block>
-            <Block title="Failure Handler">
-              <div className="space-y-3">
-                <Link
-                  href={`/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}`}
-                  className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
-                >
-                  <div className="flex min-w-0 items-center">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 items-center">
-                        <IconFunction className="w-8 shrink-0 pr-2 text-indigo-500" />
-                        <p className="truncate font-medium">Failure: Customer Onboarding</p>
-                      </div>
-                    </div>
-                    <ChevronRightIcon className="h-5" />
-                  </div>
-                </Link>
-              </div>
-            </Block>
-            <Block title="Configuration">
-              <dl className="grid grid-cols-3 gap-y-5 text-sm font-medium">
-                <div className="col-span-3">
-                  <dt className="text-slate-500">Priority</dt>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <dd className="truncate font-mono text-xs text-slate-800">
+                </div>
+              </Block>
+              <Block title="Configuration">
+                <dl className="grid grid-cols-3 gap-y-5 text-sm font-medium">
+                  <div className="col-span-3">
+                    <dt className="text-slate-500">Priority</dt>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <dd className="truncate font-mono text-xs text-slate-800">
+                            {functionConfig.priority}
+                          </dd>
+                        </TooltipTrigger>
+                        <TooltipContent className="font-mono text-xs">
                           {functionConfig.priority}
-                        </dd>
-                      </TooltipTrigger>
-                      <TooltipContent className="font-mono text-xs">
-                        {functionConfig.priority}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-                <div className="col-span-3 space-y-1">
-                  <dt className="text-slate-500">Concurrency</dt>
-                  <dd>
-                    <dl className="grid grid-cols-3">
-                      <div>
-                        <dt className="text-xs font-normal text-slate-500">Scope</dt>
-                        <dd className="font-mono text-xs text-slate-800">
-                          {functionConfig.concurrency.scope}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-normal text-slate-500">Limit</dt>
-                        <dd className="font-mono text-xs text-slate-800">
-                          {functionConfig.concurrency.limit}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-normal text-slate-500">Key</dt>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <dd className="truncate font-mono text-xs text-slate-800">
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <div className="col-span-3 space-y-1">
+                    <dt className="text-slate-500">Concurrency</dt>
+                    <dd>
+                      <dl className="grid grid-cols-3">
+                        <div>
+                          <dt className="text-xs font-normal text-slate-500">Scope</dt>
+                          <dd className="font-mono text-xs text-slate-800">
+                            {functionConfig.concurrency.scope}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-normal text-slate-500">Limit</dt>
+                          <dd className="font-mono text-xs text-slate-800">
+                            {functionConfig.concurrency.limit}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-normal text-slate-500">Key</dt>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <dd className="truncate font-mono text-xs text-slate-800">
+                                  {functionConfig.concurrency.key}
+                                </dd>
+                              </TooltipTrigger>
+                              <TooltipContent className="font-mono text-xs">
                                 {functionConfig.concurrency.key}
-                              </dd>
-                            </TooltipTrigger>
-                            <TooltipContent className="font-mono text-xs">
-                              {functionConfig.concurrency.key}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </dl>
-                  </dd>
-                </div>
-                <div className="col-span-3 space-y-1">
-                  <dt className="text-slate-500">Rate Limit</dt>
-                  <dd>
-                    <dl className="grid grid-cols-3">
-                      <div>
-                        <dt className="text-xs font-normal text-slate-500">Period</dt>
-                        <dd className="font-mono text-xs text-slate-800">
-                          {functionConfig.rateLimit.period}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-normal text-slate-500">Limit</dt>
-                        <dd className="font-mono text-xs text-slate-800">
-                          {functionConfig.rateLimit.limit}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-normal text-slate-500">Key</dt>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <dd className="truncate font-mono text-xs text-slate-800">
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </dl>
+                    </dd>
+                  </div>
+                  <div className="col-span-3 space-y-1">
+                    <dt className="text-slate-500">Rate Limit</dt>
+                    <dd>
+                      <dl className="grid grid-cols-3">
+                        <div>
+                          <dt className="text-xs font-normal text-slate-500">Period</dt>
+                          <dd className="font-mono text-xs text-slate-800">
+                            {functionConfig.rateLimit.period}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-normal text-slate-500">Limit</dt>
+                          <dd className="font-mono text-xs text-slate-800">
+                            {functionConfig.rateLimit.limit}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-normal text-slate-500">Key</dt>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <dd className="truncate font-mono text-xs text-slate-800">
+                                  {functionConfig.rateLimit.key}
+                                </dd>
+                              </TooltipTrigger>
+                              <TooltipContent className="font-mono text-xs">
                                 {functionConfig.rateLimit.key}
-                              </dd>
-                            </TooltipTrigger>
-                            <TooltipContent className="font-mono text-xs">
-                              {functionConfig.rateLimit.key}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </dl>
-                  </dd>
-                </div>
-                <div className="col-span-3 space-y-1">
-                  <dt className="text-slate-500">Debounce</dt>
-                  <dd>
-                    <dl className="grid grid-cols-3">
-                      <div>
-                        <dt className="text-xs font-normal text-slate-500">Period</dt>
-                        <dd className="font-mono text-xs text-slate-800">
-                          {functionConfig.debounce.period}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-normal text-slate-500">Key</dt>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <dd className="truncate font-mono text-xs text-slate-800">
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </dl>
+                    </dd>
+                  </div>
+                  <div className="col-span-3 space-y-1">
+                    <dt className="text-slate-500">Debounce</dt>
+                    <dd>
+                      <dl className="grid grid-cols-3">
+                        <div>
+                          <dt className="text-xs font-normal text-slate-500">Period</dt>
+                          <dd className="font-mono text-xs text-slate-800">
+                            {functionConfig.debounce.period}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-normal text-slate-500">Key</dt>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <dd className="truncate font-mono text-xs text-slate-800">
+                                  {functionConfig.debounce.key}
+                                </dd>
+                              </TooltipTrigger>
+                              <TooltipContent className="font-mono text-xs">
                                 {functionConfig.debounce.key}
-                              </dd>
-                            </TooltipTrigger>
-                            <TooltipContent className="font-mono text-xs">
-                              {functionConfig.debounce.key}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </dl>
-                  </dd>
-                </div>
-                <div className="col-span-3 space-y-1">
-                  <dt className="text-slate-500">Events Batch</dt>
-                  <dd>
-                    <dl className="grid grid-cols-3">
-                      <div>
-                        <dt className="text-xs font-normal text-slate-500">Max Size</dt>
-                        <dd className="font-mono text-xs text-slate-800">
-                          {functionConfig.eventsBatch.maxSize}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-normal text-slate-500">Timeout</dt>
-                        <dd className="font-mono text-xs text-slate-800">
-                          {functionConfig.eventsBatch.timeout}
-                        </dd>
-                      </div>
-                    </dl>
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">Retries</dt>
-                  <dd className="font-mono text-xs text-slate-800">{functionConfig.retries}</dd>
-                </div>
-              </dl>
-            </Block>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </dl>
+                    </dd>
+                  </div>
+                  <div className="col-span-3 space-y-1">
+                    <dt className="text-slate-500">Events Batch</dt>
+                    <dd>
+                      <dl className="grid grid-cols-3">
+                        <div>
+                          <dt className="text-xs font-normal text-slate-500">Max Size</dt>
+                          <dd className="font-mono text-xs text-slate-800">
+                            {functionConfig.eventsBatch.maxSize}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-normal text-slate-500">Timeout</dt>
+                          <dd className="font-mono text-xs text-slate-800">
+                            {functionConfig.eventsBatch.timeout}
+                          </dd>
+                        </div>
+                      </dl>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Retries</dt>
+                    <dd className="font-mono text-xs text-slate-800">{functionConfig.retries}</dd>
+                  </div>
+                </dl>
+              </Block>
+            </ClientFeatureFlag>
           </div>
         </aside>
       </div>
