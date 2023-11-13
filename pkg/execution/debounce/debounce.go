@@ -28,8 +28,9 @@ import (
 var embedded embed.FS
 
 var (
-	ErrDebounceExists   = fmt.Errorf("a debounce exists for this function")
-	ErrDebounceNotFound = fmt.Errorf("debounce not found")
+	ErrDebounceExists     = fmt.Errorf("a debounce exists for this function")
+	ErrDebounceNotFound   = fmt.Errorf("debounce not found")
+	ErrDebounceInProgress = fmt.Errorf("debounce is in progress")
 )
 
 var (
@@ -125,7 +126,7 @@ type debouncer struct {
 	q redis_state.QueueManager
 }
 
-// DeleteDebounceItem returns a DebounceItem given a debounce ID.
+// DeleteDebounceItem removes a debounce from the map.
 func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID) error {
 	keyDbc := d.k.Debounce(ctx)
 	cmd := d.r.B().Hdel().Key(keyDbc).Field(debounceID.String()).Build()
@@ -186,7 +187,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 
 	// A debounce must already exist for this fn.  Update it.
 	err = d.updateDebounce(ctx, di, fn, ttl, *debounceID)
-	if err == context.DeadlineExceeded {
+	if err == context.DeadlineExceeded || err == ErrDebounceInProgress {
 		if n == 4 {
 			// Only recurse 5 times.
 			return fmt.Errorf("unable to update debounce: %w", err)
@@ -289,8 +290,18 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 	out, err := scripts["updateDebounce"].Exec(
 		ctx,
 		d.r,
-		[]string{keyPtr, keyDbc},
-		[]string{debounceID.String(), string(byt), strconv.Itoa(int(ttl.Seconds()))},
+		[]string{
+			keyPtr,
+			keyDbc,
+			d.k.QueueItem(),
+		},
+		[]string{
+			debounceID.String(),
+			string(byt),
+			strconv.Itoa(int(ttl.Seconds())),
+			redis_state.HashID(ctx, debounceID.String()),
+			strconv.Itoa(int(time.Now().UnixMilli())),
+		},
 	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error creating debounce: %w", err)
@@ -303,10 +314,17 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 			debounceID.String(),
 			now.Add(ttl).Add(buffer).Add(time.Second),
 		)
+		if err == redis_state.ErrQueueItemAlreadyLeased {
+			// This is in progress.
+			return ErrDebounceInProgress
+		}
 		if err != nil {
 			return fmt.Errorf("error requeueing debounce job '%s': %w", debounceID, err)
 		}
 		return nil
+	case -1:
+		// The debounce is in progress or has just finished.  Requeue.
+		return ErrDebounceInProgress
 	default:
 		return fmt.Errorf("unknown update debounce return value: %d", out)
 	}

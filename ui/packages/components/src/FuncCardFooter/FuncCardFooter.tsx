@@ -1,27 +1,20 @@
 import { IconExclamationTriangle } from '@inngest/components/icons/ExclamationTriangle';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
 import { classNames } from '@inngest/components/utils/classNames';
-import { renderOutput, type OutputType } from '@inngest/components/utils/outputRenderer';
+import { renderOutput } from '@inngest/components/utils/outputRenderer';
 
 interface FuncCardFooterProps {
   functionRun: Pick<FunctionRun, 'output' | 'status'>;
 }
 
 export function FuncCardFooter({ functionRun }: FuncCardFooterProps) {
-  let type: OutputType | undefined;
-  if (functionRun.status === 'COMPLETED') {
-    type = 'completed';
-  } else if (functionRun.status === 'FAILED') {
-    type = 'failed';
-  }
-
-  if (!functionRun || !functionRun.output || !functionRun.status || !type) {
+  if (!functionRun || !functionRun.output || !functionRun.status) {
     return null;
   }
 
   const { message, errorName } = renderOutput({
     content: functionRun.output,
-    type,
+    isSuccess: functionRun.status === 'COMPLETED',
   });
 
   const status = functionRun.status || 'Unknown';

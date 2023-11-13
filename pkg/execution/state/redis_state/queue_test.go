@@ -353,7 +353,7 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 		p := QueuePartition{WorkflowID: item.WorkflowID}
 
 		require.NoError(t, err)
-		require.Equal(t, hashID(ctx, "once"), item.ID)
+		require.Equal(t, HashID(ctx, "once"), item.ID)
 		require.NotEqual(t, i.ID, item.ID)
 		found := getQueueItem(t, r, item.ID)
 		require.Equal(t, item, found)
@@ -375,7 +375,7 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 
 		item, err = q.EnqueueItem(ctx, i, start)
 		require.NoError(t, err)
-		require.Equal(t, hashID(ctx, "once"), item.ID)
+		require.Equal(t, HashID(ctx, "once"), item.ID)
 		require.NotEqual(t, i.ID, item.ID)
 		found = getQueueItem(t, r, item.ID)
 		require.Equal(t, item, found)

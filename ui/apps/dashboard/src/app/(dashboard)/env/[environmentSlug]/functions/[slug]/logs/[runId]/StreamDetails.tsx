@@ -16,7 +16,7 @@ import { type RawHistoryItem } from '@inngest/components/utils/historyParser';
 import { Client, useClient } from 'urql';
 
 import { graphql } from '@/gql';
-import RerunButton from './(side-card)/(timeline)/RerunButton';
+import RerunButton from './RerunButton';
 
 type Props = {
   environment: Pick<Environment, 'id' | 'slug'>;

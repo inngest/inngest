@@ -11,7 +11,6 @@ import type { Function } from '@inngest/components/types/function';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
 import type { FunctionVersion } from '@inngest/components/types/functionVersion';
 import type { HistoryParser } from '@inngest/components/utils/historyParser';
-import { type OutputType } from '@inngest/components/utils/outputRenderer';
 
 import { SleepingSummary } from './SleepingSummary';
 import { WaitingSummary } from './WaitingSummary';
@@ -47,12 +46,8 @@ export function RunDetails({
     functionVersion,
     history,
   });
-  let type: OutputType | undefined;
-  if (run.status === 'COMPLETED') {
-    type = 'completed';
-  } else if (run.status === 'FAILED') {
-    type = 'failed';
-  }
+
+  const isSuccess = run.status === 'COMPLETED';
 
   return (
     <ContentCard
@@ -78,8 +73,8 @@ export function RunDetails({
       }
     >
       <div className="px-5 pt-4">
-        {run.status && run.endedAt && run.output && type && (
-          <OutputCard content={run.output} type={type} />
+        {run.status && run.endedAt && run.output && isSuccess && (
+          <OutputCard content={run.output} isSuccess={isSuccess} />
         )}
 
         <WaitingSummary history={history} />

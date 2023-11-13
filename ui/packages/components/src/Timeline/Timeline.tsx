@@ -1,11 +1,12 @@
 'use client';
 
+import { Badge } from '@inngest/components/Badge/Badge';
 import type { HistoryNode, HistoryParser } from '@inngest/components/utils/historyParser';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 
 import { TimelineNode } from './TimelineNode/TimelineNode';
 
-export type CreateLinkToRunFn = (options: {
+export type NavigateToRunFn = (options: {
   eventID: string;
   runID: string;
   fnID: string;
@@ -14,10 +15,10 @@ export type CreateLinkToRunFn = (options: {
 type Props = {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
   history: HistoryParser;
-  createLinkToRun: CreateLinkToRunFn;
+  navigateToRun: NavigateToRunFn;
 };
 
-export function Timeline({ getOutput, history, createLinkToRun }: Props) {
+export function Timeline({ getOutput, history, navigateToRun }: Props) {
   const nodes = history.getGroups({ sort: true });
 
   return (
@@ -46,8 +47,28 @@ export function Timeline({ getOutput, history, createLinkToRun }: Props) {
                 position={position}
                 getOutput={getOutput}
                 node={node}
-                createLinkToRun={createLinkToRun}
-              />
+                navigateToRun={navigateToRun}
+              >
+                {Object.values(node.attempts).length > 0 && (
+                  <>
+                    <div className="flex items-center gap-2 pt-4">
+                      <p className="py-4 text-sm text-slate-400">Attempts</p>
+                      <Badge kind="outlined">
+                        {Object.values(node.attempts).length.toString() || '0'}
+                      </Badge>
+                    </div>
+                    {Object.values(node.attempts).map((attempt) => (
+                      <TimelineNode
+                        key={attempt.groupID + attempt.attempt}
+                        getOutput={getOutput}
+                        node={attempt}
+                        isAttempt
+                        navigateToRun={navigateToRun}
+                      />
+                    ))}
+                  </>
+                )}
+              </TimelineNode>
             );
           })}
         </AccordionPrimitive.Root>

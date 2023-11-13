@@ -34,7 +34,7 @@ export function SleepingSummary({ history }: Props) {
             <Card.Header>Sleeping</Card.Header>
 
             <Card.Content>
-              <MetadataItem label="Sleep until" value={config.until.toLocaleString()} />
+              <MetadataItem label="Sleep Until" value={config.until.toLocaleString()} />
             </Card.Content>
           </Card>
         );

@@ -29,13 +29,15 @@ func TestDebounce(t *testing.T) {
 		calledWith DebounceEvent
 	)
 
+	period := 5 * time.Second
+
 	at := time.Now()
 	a := inngestgo.CreateFunction(
 		inngestgo.FunctionOpts{
 			Name: "test sdk",
 			Debounce: &inngestgo.Debounce{
 				Key:    "event.data.name",
-				Period: 10 * time.Second,
+				Period: period,
 			},
 		},
 		inngestgo.EventTrigger("test/sdk"),
@@ -46,9 +48,9 @@ func TestDebounce(t *testing.T) {
 			now := time.Now()
 			require.True(
 				t,
-				now.After(at.Add(10*time.Second)),
+				now.After(at.Add(period)),
 				"Expected %s, got %s",
-				at.Add(10*time.Second),
+				at.Add(period),
 				now,
 			)
 
@@ -69,39 +71,55 @@ func TestDebounce(t *testing.T) {
 	h.Register(a)
 	registerFuncs()
 
-	for i := 0; i < 5; i++ {
+	t.Run("It debounces the first function call", func(t *testing.T) {
+		for i := 0; i < 5; i++ {
+			_, err := inngestgo.Send(context.Background(), DebounceEvent{
+				Name: "test/sdk",
+				Data: DebounceEventData{
+					Counter: i,
+					Name:    "debounce",
+				},
+			})
+			require.NoError(t, err)
+
+			i := rand.Int31n(1000)
+			<-time.After(time.Duration(i) * time.Millisecond)
+		}
+
+		<-time.After(period - time.Second)
+		at = time.Now()
+		// Send one more.
 		_, err := inngestgo.Send(context.Background(), DebounceEvent{
 			Name: "test/sdk",
 			Data: DebounceEventData{
-				Counter: i,
+				Counter: 999,
 				Name:    "debounce",
 			},
 		})
 		require.NoError(t, err)
 
-		i := rand.Int31n(1000)
-		<-time.After(time.Duration(i) * time.Millisecond)
-	}
-
-	<-time.After(8 * time.Second)
-	at = time.Now()
-	// Send one more.
-	_, err := inngestgo.Send(context.Background(), DebounceEvent{
-		Name: "test/sdk",
-		Data: DebounceEventData{
-			Counter: 999,
-			Name:    "debounce",
-		},
+		require.Eventually(t, func() bool {
+			return atomic.LoadInt32(&counter) == 1
+		}, period*2, time.Second)
+		require.EqualValues(t, DebounceEventData{Counter: 999, Name: "debounce"}, calledWith.Data)
 	})
-	require.NoError(t, err)
 
-	require.Eventually(t, func() bool {
-		return atomic.LoadInt32(&counter) == 1
-	}, 17*time.Second, time.Second)
-	require.EqualValues(t, DebounceEventData{Counter: 999, Name: "debounce"}, calledWith.Data)
-
-	<-time.After(4 * time.Second)
+	<-time.After(period + time.Second)
 	require.EqualValues(t, 1, counter)
+
+	t.Run("It runs the function a second time", func(t *testing.T) {
+		_, err := inngestgo.Send(context.Background(), DebounceEvent{
+			Name: "test/sdk",
+			Data: DebounceEventData{
+				Counter: 1,
+				Name:    "debounce",
+			},
+		})
+		require.NoError(t, err)
+		require.Eventually(t, func() bool {
+			return atomic.LoadInt32(&counter) == 2
+		}, period*2, time.Second)
+	})
 }
 
 // TestDebounecWithMultipleKeys

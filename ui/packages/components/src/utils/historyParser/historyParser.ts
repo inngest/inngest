@@ -103,20 +103,50 @@ export class HistoryParser {
    */
   private getNode(rawItem: RawHistoryItem): HistoryNode {
     const groupID = rawItem.groupID ?? 'unknown';
+
+    const newNode = {
+      attempt: rawItem.attempt,
+      groupID,
+      attempts: {},
+      scheduledAt: new Date(rawItem.createdAt),
+      sleepConfig: undefined,
+      status: 'scheduled',
+      waitForEventConfig: undefined,
+      waitForEventResult: undefined,
+      invokeFunctionConfig: undefined,
+      invokeFunctionResult: undefined,
+    } as const;
+
+    // If the node doesn't exist then create it.
     let node = this.groups[groupID];
     if (!node) {
-      node = {
-        attempt: rawItem.attempt,
-        groupID,
-        attempts: {},
-        scheduledAt: new Date(rawItem.createdAt),
-        sleepConfig: undefined,
-        status: 'scheduled',
-        waitForEventConfig: undefined,
-        waitForEventResult: undefined,
-        invokeFunctionConfig: undefined,
-        invokeFunctionResult: undefined,
-      };
+      node = newNode;
+    }
+
+    // This item is for a retry.
+    if (rawItem.attempt > 0) {
+      // If the pre-updated node is for the first attempt then we need to add it
+      // to the attempts. This is necessary because attempts is empty until
+      // there's a retry.
+      if (node.attempt === 0) {
+        node = {
+          ...node,
+          attempts: {
+            '0': node,
+          },
+        };
+      }
+
+      // If the attempt doesn't exist then create it.
+      if (!(rawItem.attempt in node.attempts)) {
+        node = {
+          ...node,
+          attempts: {
+            ...node.attempts,
+            [rawItem.attempt]: newNode,
+          },
+        };
+      }
     }
 
     return node;
