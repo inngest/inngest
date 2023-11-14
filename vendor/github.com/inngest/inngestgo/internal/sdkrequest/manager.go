@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/gowebpki/jcs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 )
@@ -36,7 +35,7 @@ type InvocationManager interface {
 	Step(op UnhashedOp) (json.RawMessage, bool)
 	// NewOp generates a new unhashed op for creating a state.GeneratorOpcode.  This
 	// is required for future execution of a step.
-	NewOp(op enums.Opcode, name string, opts map[string]any) UnhashedOp
+	NewOp(op enums.Opcode, id string, opts map[string]any) UnhashedOp
 }
 
 // NewManager returns an InvocationManager to manage the incoming executor request.  This
@@ -117,12 +116,11 @@ func (r *requestCtxManager) Step(op UnhashedOp) (json.RawMessage, bool) {
 	return val, ok
 }
 
-func (r *requestCtxManager) NewOp(op enums.Opcode, name string, opts map[string]any) UnhashedOp {
+func (r *requestCtxManager) NewOp(op enums.Opcode, id string, opts map[string]any) UnhashedOp {
 	r.l.Lock()
 	defer r.l.Unlock()
 
-	key := fmt.Sprintf("%s-%s", op, name)
-	n, ok := r.indexes[key]
+	n, ok := r.indexes[id]
 	if ok {
 		// We have an index already, so increase the counter as we're
 		// adding to this key.
@@ -130,10 +128,10 @@ func (r *requestCtxManager) NewOp(op enums.Opcode, name string, opts map[string]
 	}
 
 	// Update indexes for each particualar key.
-	r.indexes[key] = n
+	r.indexes[id] = n
 
 	return UnhashedOp{
-		Name: name,
+		ID:   id,
 		Op:   op,
 		Opts: opts,
 		Pos:  uint(n),
@@ -141,23 +139,20 @@ func (r *requestCtxManager) NewOp(op enums.Opcode, name string, opts map[string]
 }
 
 type UnhashedOp struct {
-	Name   string         `json:"name"`
-	Op     enums.Opcode   `json:"op"`
-	Opts   map[string]any `json:"opts"`
-	Pos    uint           `json:"pos"`
-	Parent *string        `json:"parent,omitempty"`
+	Op   enums.Opcode   `json:"op"`
+	ID   string         `json:"id"`
+	Name string         `json:"name"`
+	Opts map[string]any `json:"opts"`
+	Pos  uint           `json:"-"`
 }
 
 func (u UnhashedOp) Hash() (string, error) {
-	j, err := json.Marshal(u)
-	if err != nil {
-		return "", err
+	input := u.ID
+	if u.Pos > 0 {
+		// We only suffix the counter if there's > 1 operation with the same ID.
+		input = fmt.Sprintf("%s:%d", u.ID, u.Pos)
 	}
-	byt, err := jcs.Transform(j)
-	if err != nil {
-		return "", err
-	}
-	sum := sha1.Sum(byt)
+	sum := sha1.Sum([]byte(input))
 	return hex.EncodeToString(sum[:]), nil
 }
 
