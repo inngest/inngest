@@ -138,6 +138,9 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	// Process those incoming events
 	eg.Go(func() error {
+		// Close the idChan so that we stop appending to the ID slice.
+		defer close(idChan)
+
 		for s := range stream {
 			evt := event.Event{}
 			if err := json.Unmarshal(s.Item, &evt); err != nil {
@@ -164,8 +167,6 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 			}{s.N, id}
 		}
 
-		// Close the idChan so that we stop appending to the ID slice.
-		close(idChan)
 		return nil
 	})
 
