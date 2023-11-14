@@ -236,7 +236,12 @@ function UseCaseGrid() {
               href={`${selectedContent.href}?ref=homepage-use-cases}`}
               className="mx-auto rounded-md font-medium px-6 py-2 bg-transparent transition-all text-white border border-slate-800 hover:border-slate-600 hover:bg-slate-500/10 whitespace-nowrap"
             >
-              Learn about {selectedContent.title} with Inngest →
+              <span className="hidden md:inline">
+                {" "}
+                Learn about {selectedContent.title}
+                with Inngest
+              </span>
+              <span className="md:hidden">Learn more</span> →
             </Link>
           </div>
         </div>
@@ -258,7 +263,7 @@ function Option({ isSelected = false, onClick, children }) {
     <button
       onClick={onClick}
       className={clsx(
-        `px-4 py-2 rounded-full border text-white border border-slate-800 hover:border-slate-600 hover:bg-slate-500/10 whitespace-nowrap text-lg font-semibold`,
+        `px-4 py-2 rounded-full border text-white border border-slate-800 hover:border-slate-600 hover:bg-slate-500/10 whitespace-nowrap text-base sm:text-lg font-semibold`,
         isSelected && "bg-slate-100 text-slate-900 hover:bg-slate-100/90"
       )}
     >

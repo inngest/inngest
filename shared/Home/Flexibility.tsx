@@ -158,7 +158,7 @@ export default function Flexibility() {
               },
               // FUTURE - Add other language frameworks like Flask
             ].map(({ src, name, size: { h, w }, release }, idx) => (
-              <div className="group relative h-full flex items-center justify-center">
+              <div className="group relative h-full w-full sm:w-auto flex items-center justify-center">
                 <Image
                   key={idx}
                   src={src}
@@ -168,7 +168,7 @@ export default function Flexibility() {
                   className="max-h-[60px] pointer-events-none transition-all"
                 />
                 {!!release && (
-                  <span className="absolute -bottom-1 -right-12 px-3 py-0.5 bg-slate-700 text-slate-50 text-xs font-semibold drop-shadow rounded-full whitespace-nowrap">
+                  <span className="absolute -bottom-2 sm:-bottom-1 -right-6 md:-right-12 px-3 py-0.5 bg-slate-700 text-slate-50 text-xs font-semibold drop-shadow rounded-full whitespace-nowrap">
                     {release}
                   </span>
                 )}

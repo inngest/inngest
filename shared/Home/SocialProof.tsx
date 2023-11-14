@@ -161,7 +161,7 @@ export default function SocialProof({ className }: { className?: string }) {
                 )}
               </span>
             </div>
-            <p>{quote}</p>
+            <p className="text-sm md:text-base">{quote}</p>
           </div>
         ))}
       </div>

@@ -45,9 +45,9 @@ export default function Logos({
       )}
       <div
         className={clsx(
-          "mt-16 grid grid-cols-2 items-center justify-center px-20 max-w-[1200px] m-auto",
-          nonFeaturedCount === 4 && "px-20 lg:grid-cols-4",
-          nonFeaturedCount === 5 && "px-6 lg:grid-cols-5",
+          "mt-16 grid grid-cols-2 items-center justify-center max-w-[1200px] m-auto",
+          nonFeaturedCount === 4 && "sm:px-8 md:px-20 lg:grid-cols-4",
+          nonFeaturedCount === 5 && "sm:px-6 lg:grid-cols-5",
           hasLinks ? "gap-x-4 gap-y-8" : "gap-x-16 gap-y-16",
           footer && "mb-16"
         )}

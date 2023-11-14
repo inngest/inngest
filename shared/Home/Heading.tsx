@@ -26,7 +26,7 @@ export default function Heading({
       {!!lede && (
         <p
           className={clsx(
-            "my-4 font-medium leading-loose text-md md:text-lg",
+            "my-4 font-medium leading-loose text-sm sm:text-base md:text-lg",
             variant === "dark" && "text-indigo-100/90",
             variant === "light" && "text-slate-500 font-medium"
           )}
