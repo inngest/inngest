@@ -104,9 +104,7 @@ func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
 
 // Info returns information about the dev server and its registered functions.
 func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
-	if !a.devserver.handlerLock.TryLock() {
-		return
-	}
+	a.devserver.handlerLock.Lock()
 	defer a.devserver.handlerLock.Unlock()
 
 	all, _ := a.devserver.data.GetFunctions(r.Context())
