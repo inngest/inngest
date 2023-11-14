@@ -150,7 +150,7 @@ function EventTypesListPaginationPage({
                 alwaysVisibleCount={2}
                 pills={event.functions.map((function_) => (
                   <Pill
-                    href={`/env/${environmentSlug}/functions/${function_.slug}`}
+                    href={`/env/${environmentSlug}/functions/${encodeURIComponent(function_.slug)}`}
                     key={function_.name}
                     className="bg-white align-middle text-slate-600"
                   >

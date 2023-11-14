@@ -70,7 +70,7 @@ export default function EventDashboard({ params }: EventDashboardProps) {
           {eventType && eventType.workflows?.length > 0
             ? eventType?.workflows.map((w) => (
                 <Link
-                  href={`/env/${params.environmentSlug}/functions/${w.slug}`}
+                  href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(w.slug)}`}
                   key={w.id}
                   className="shadow-outline-secondary-light mb-4 block overflow-hidden rounded bg-white p-4 hover:bg-slate-50"
                 >
