@@ -162,7 +162,7 @@ func Start(ctx context.Context, s Service) (err error) {
 	select {
 	case sig := <-sigs:
 		// Terminating via a signal
-		l.Info().Interface("signal", sig).Msg("received signal")
+		l.Info().Interface("signal", sig).Msg("received signal; shutting down gracefully")
 		cleanup()
 	case err = <-runErr:
 		// Run terminated.  Fetch the error from the goroutine.
@@ -193,6 +193,8 @@ func Start(ctx context.Context, s Service) (err error) {
 	case <-time.After(stopTimeout(s)):
 		l.Error().Msg("service did not clean up within timeout")
 		return err
+	case sig := <-sigs:
+		l.Info().Interface("signal", sig).Msg("received signal again; shutting down immediately")
 	case stopErr := <-stopCh:
 		if stopErr != nil {
 			err = multierror.Append(err, stopErr)
