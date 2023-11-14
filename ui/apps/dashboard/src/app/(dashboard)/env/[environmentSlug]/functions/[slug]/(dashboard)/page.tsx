@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { ChartBarIcon, ChevronRightIcon, XCircleIcon } from '@heroicons/react/20/solid';
+import { MetadataGrid } from '@inngest/components/Metadata';
 import {
   Tooltip,
   TooltipContent,
@@ -324,7 +325,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                             </div>
                             <div className="flex gap-1">
                               <dt className="text-slate-500">Timeout</dt>
-                              <dd className="font-mono text-slate-800">{cancellation.timeout}</dd>
+                              <dd className="text-slate-800">{cancellation.timeout}</dd>
                             </div>
                           </dl>
                         </div>
@@ -353,142 +354,75 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                 </div>
               </Block>
               <Block title="Configuration">
-                <dl className="grid grid-cols-3 gap-y-5 text-sm font-medium">
-                  <div className="col-span-3">
-                    <dt className="text-slate-500">Priority</dt>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <dd className="truncate font-mono text-xs text-slate-800">
-                            {functionConfig.priority}
-                          </dd>
-                        </TooltipTrigger>
-                        <TooltipContent className="font-mono text-xs">
-                          {functionConfig.priority}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                  <div className="col-span-3 space-y-1">
-                    <dt className="text-slate-500">Concurrency</dt>
-                    <dd>
-                      <dl className="grid grid-cols-3">
-                        <div>
-                          <dt className="text-xs font-normal text-slate-500">Scope</dt>
-                          <dd className="font-mono text-xs text-slate-800">
-                            {functionConfig.concurrency.scope}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-xs font-normal text-slate-500">Limit</dt>
-                          <dd className="font-mono text-xs text-slate-800">
-                            {functionConfig.concurrency.limit}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-xs font-normal text-slate-500">Key</dt>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <dd className="truncate font-mono text-xs text-slate-800">
-                                  {functionConfig.concurrency.key}
-                                </dd>
-                              </TooltipTrigger>
-                              <TooltipContent className="font-mono text-xs">
-                                {functionConfig.concurrency.key}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                      </dl>
-                    </dd>
-                  </div>
-                  <div className="col-span-3 space-y-1">
-                    <dt className="text-slate-500">Rate Limit</dt>
-                    <dd>
-                      <dl className="grid grid-cols-3">
-                        <div>
-                          <dt className="text-xs font-normal text-slate-500">Period</dt>
-                          <dd className="font-mono text-xs text-slate-800">
-                            {functionConfig.rateLimit.period}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-xs font-normal text-slate-500">Limit</dt>
-                          <dd className="font-mono text-xs text-slate-800">
-                            {functionConfig.rateLimit.limit}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-xs font-normal text-slate-500">Key</dt>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <dd className="truncate font-mono text-xs text-slate-800">
-                                  {functionConfig.rateLimit.key}
-                                </dd>
-                              </TooltipTrigger>
-                              <TooltipContent className="font-mono text-xs">
-                                {functionConfig.rateLimit.key}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                      </dl>
-                    </dd>
-                  </div>
-                  <div className="col-span-3 space-y-1">
-                    <dt className="text-slate-500">Debounce</dt>
-                    <dd>
-                      <dl className="grid grid-cols-3">
-                        <div>
-                          <dt className="text-xs font-normal text-slate-500">Period</dt>
-                          <dd className="font-mono text-xs text-slate-800">
-                            {functionConfig.debounce.period}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-xs font-normal text-slate-500">Key</dt>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <dd className="truncate font-mono text-xs text-slate-800">
-                                  {functionConfig.debounce.key}
-                                </dd>
-                              </TooltipTrigger>
-                              <TooltipContent className="font-mono text-xs">
-                                {functionConfig.debounce.key}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                      </dl>
-                    </dd>
-                  </div>
-                  <div className="col-span-3 space-y-1">
-                    <dt className="text-slate-500">Events Batch</dt>
-                    <dd>
-                      <dl className="grid grid-cols-3">
-                        <div>
-                          <dt className="text-xs font-normal text-slate-500">Max Size</dt>
-                          <dd className="font-mono text-xs text-slate-800">
-                            {functionConfig.eventsBatch.maxSize}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-xs font-normal text-slate-500">Timeout</dt>
-                          <dd className="font-mono text-xs text-slate-800">
-                            {functionConfig.eventsBatch.timeout}
-                          </dd>
-                        </div>
-                      </dl>
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500">Retries</dt>
-                    <dd className="font-mono text-xs text-slate-800">{functionConfig.retries}</dd>
-                  </div>
-                </dl>
+                <p className="pb-2 pt-2 text-sm font-medium text-slate-800">Generic</p>
+                <MetadataGrid
+                  columns={2}
+                  metadataItems={[
+                    {
+                      label: 'Priority',
+                      value: `${functionConfig.priority}`,
+                      size: 'large',
+                      type: 'code',
+                    },
+                    { label: 'Retries', value: `${functionConfig.retries}` },
+                  ]}
+                />
+                <p className="pb-2 pt-6 text-sm font-medium text-slate-800">Concurrency</p>
+                <MetadataGrid
+                  columns={2}
+                  metadataItems={[
+                    {
+                      label: 'Scope',
+                      value: `${functionConfig.concurrency.scope}`,
+                    },
+                    { label: 'Limit', value: `${functionConfig.concurrency.limit}` },
+                    {
+                      label: 'Key',
+                      value: `${functionConfig.concurrency.key}`,
+                      type: 'code',
+                      size: 'large',
+                    },
+                  ]}
+                />
+                <p className="pb-2 pt-6 text-sm font-medium text-slate-800">Rate Limit</p>
+                <MetadataGrid
+                  columns={2}
+                  metadataItems={[
+                    {
+                      label: 'Period',
+                      value: `${functionConfig.rateLimit.period}`,
+                    },
+                    { label: 'Limit', value: `${functionConfig.rateLimit.limit}` },
+                    {
+                      label: 'Key',
+                      value: `${functionConfig.rateLimit.key}`,
+                      type: 'code',
+                      size: 'large',
+                    },
+                  ]}
+                />
+                <p className="pb-2 pt-6 text-sm font-medium text-slate-800">Debounce</p>
+                <MetadataGrid
+                  columns={2}
+                  metadataItems={[
+                    {
+                      label: 'Period',
+                      value: `${functionConfig.debounce.period}`,
+                    },
+                    { label: 'Key', value: `${functionConfig.debounce.key}`, type: 'code' },
+                  ]}
+                />
+                <p className="pb-2 pt-6 text-sm font-medium text-slate-800">Events Batch</p>
+                <MetadataGrid
+                  columns={2}
+                  metadataItems={[
+                    {
+                      label: 'Max Size',
+                      value: `${functionConfig.eventsBatch.maxSize}`,
+                    },
+                    { label: 'Timeout', value: `${functionConfig.eventsBatch.timeout}` },
+                  ]}
+                />
               </Block>
             </ClientFeatureFlag>
           </div>
