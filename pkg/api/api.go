@@ -111,8 +111,9 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a new channel which receives a stream of events from the incoming HTTP request
+	ctx, cancel := context.WithCancel(ctx)
 	stream := make(chan eventstream.StreamItem)
-	eg := errgroup.Group{}
+	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
 		return eventstream.ParseStream(ctx, r.Body, stream, consts.AbsoluteMaxEventSize)
 	})
@@ -171,6 +172,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	})
 
 	err := eg.Wait()
+	cancel()
 
 	if max+1 > len(ids) {
 		max = len(ids) - 1
