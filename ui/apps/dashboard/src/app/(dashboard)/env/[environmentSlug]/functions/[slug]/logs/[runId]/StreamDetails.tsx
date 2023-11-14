@@ -4,7 +4,6 @@ import { useMemo } from 'react';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { Link } from '@inngest/components/Link';
 import { RunDetails } from '@inngest/components/RunDetails';
-import type { CreateLinkToRunFn } from '@inngest/components/Timeline';
 import { useParsedHistory } from '@inngest/components/hooks/useParsedHistory';
 import type { Environment } from '@inngest/components/types/environment';
 import type { Event } from '@inngest/components/types/event';
@@ -13,6 +12,7 @@ import type { FunctionRun } from '@inngest/components/types/functionRun';
 import type { FunctionVersion } from '@inngest/components/types/functionVersion';
 import { classNames } from '@inngest/components/utils/classNames';
 import { type RawHistoryItem } from '@inngest/components/utils/historyParser';
+import type { NavigateToRunFn } from 'node_modules/@inngest/components/src/Timeline/Timeline';
 import { Client, useClient } from 'urql';
 
 import { graphql } from '@/gql';
@@ -56,7 +56,7 @@ export function StreamDetails({
     rerunButton = <RerunButton environment={environment} func={func} functionRunID={run.id} />;
   }
 
-  const createLinkToRun: CreateLinkToRunFn = (opts) => {
+  const navigateToRun: NavigateToRunFn = (opts) => {
     return (
       <Link
         internalNavigation
@@ -82,7 +82,7 @@ export function StreamDetails({
         history={history}
         rerunButton={rerunButton}
         run={run}
-        createLinkToRun={createLinkToRun}
+        navigateToRun={navigateToRun}
       />
     </div>
   );

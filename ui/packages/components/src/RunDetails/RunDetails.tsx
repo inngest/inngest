@@ -26,7 +26,7 @@ interface Props {
   rerunButton?: React.ReactNode;
 
   run: Pick<FunctionRun, 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'>;
-  createLinkToRun: React.ComponentProps<typeof Timeline>['createLinkToRun'];
+  navigateToRun: React.ComponentProps<typeof Timeline>['navigateToRun'];
 }
 
 export function RunDetails({
@@ -36,7 +36,7 @@ export function RunDetails({
   history,
   rerunButton,
   run,
-  createLinkToRun,
+  navigateToRun,
 }: Props) {
   const firstTrigger = func.triggers[0] ?? null;
   const cron = firstTrigger && firstTrigger.type === 'CRON';
@@ -87,7 +87,7 @@ export function RunDetails({
         <Timeline
           getOutput={getHistoryItemOutput}
           history={history}
-          createLinkToRun={createLinkToRun}
+          navigateToRun={navigateToRun}
         />
       </div>
     </ContentCard>

@@ -4,8 +4,8 @@ import { ContentCard } from '@inngest/components/ContentCard';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { Link } from '@inngest/components/Link';
 import { RunDetails } from '@inngest/components/RunDetails';
-import type { CreateLinkToRunFn } from '@inngest/components/Timeline';
 import { classNames } from '@inngest/components/utils/classNames';
+import type { NavigateToRunFn } from 'node_modules/@inngest/components/src/Timeline/Timeline';
 import { ulid } from 'ulid';
 
 import SendEventButton from '@/components/Event/SendEventButton';
@@ -75,7 +75,7 @@ export default function StreamDetails() {
     }).unwrap();
   }
 
-  const createLinkToRun: CreateLinkToRunFn = (opts) => {
+  const navigateToRun: NavigateToRunFn = (opts) => {
     const runParams = new URLSearchParams({
       event: opts.eventID,
       run: opts.runID,
@@ -112,7 +112,7 @@ export default function StreamDetails() {
           getHistoryItemOutput={getHistoryItemOutput}
           history={runResult.data.history}
           run={runResult.data.run}
-          createLinkToRun={createLinkToRun}
+          navigateToRun={navigateToRun}
         />
       )}
     </div>
