@@ -329,6 +329,10 @@ const sectionPythonReference = [
         title: "Introduction",
         href: `/docs/reference/python`,
       },
+      {
+        title: "Quick start",
+        href: `/docs/reference/python/quick-start`,
+      },
     ],
   },
   {

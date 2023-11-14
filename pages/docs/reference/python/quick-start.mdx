@@ -1,0 +1,98 @@
+# Quick start
+
+This guide will teach you how to add Inngest to a FastAPI app and run an Inngest function.
+
+<Callout variant="info">
+  💡 Inngest currently supports FastAPI, Flask, and Tornado. If you'd like support for your favorite framework please open an issue on [GitHub](https://github.com/inngest/inngest-py)!
+</Callout>
+
+## Create an app
+
+<Callout variant="warning">
+  <span style={{fontFamily: 'none'}}>⚠</span> Use Python 3.10 or higher.
+</Callout>
+
+Create and source virtual environment:
+```sh
+python -m venv .venv && source .venv/bin/activate
+```
+
+Install dependencies:
+```sh
+pip install fastapi inngest uvicorn
+```
+
+Create a FastAPI app file:
+
+```py {{ filename: "main.py" }}
+from fastapi import FastAPI
+
+app = FastAPI()
+```
+
+## Add Inngest
+
+Let's add Inngest to the app! We'll do a few things
+1. Create an **Inngest client**, which is used to send events to an Inngest server.
+1. Create an **Inngest function**, which receives events.
+1. Serve the **Inngest endpoint** on the FastAPI app.
+
+```py {{ filename: "main.py" }}
+from fastapi import FastAPI
+import inngest
+import inngest.fast_api
+
+# Create an Inngest client
+inngest_client = inngest.Inngest(
+    app_id="fast_api_example",
+    logger=logging.getLogger("uvicorn"),
+)
+
+# Create an Inngest function
+@inngest.create_function(
+    fn_id="my_function",
+    # Event that triggers this function
+    trigger=inngest.TriggerEvent(event="app/my_function"),
+)
+def my_function(
+    *,
+    event: inngest.Event,
+    logger: inngest.Logger,
+    **_kwargs: object,
+) -> str:
+    logger.info(event)
+    return "done"
+
+app = FastAPI()
+
+# Serve the Inngest endpoint
+inngest.fast_api.serve(app, inngest_client, [my_function])
+```
+
+Start your app:
+```sh
+uvicorn main:app --reload
+```
+
+## Run Inngest Dev Server
+
+Inngest functions are run using an Inngest server. The Inngest [Dev Server](https://github.com/inngest/inngest) is the standard way to locally run an Inngest server:
+```sh
+npx inngest-cli@latest dev
+```
+
+After a few seconds, your app and function should now appear in the Dev Server UI:
+
+<img src="/assets/docs/python/quick-start-app.png" />
+
+<img src="/assets/docs/python/quick-start-functions.png" />
+
+<Callout variant="info">
+  💡 You can register multiple apps and multiple functions within each app.
+</Callout>
+
+## Run your function
+
+Click the function's "Trigger" button and a run should appear in the Dev Server stream tab:
+
+<img src="/assets/docs/python/quick-start-run.png" />
