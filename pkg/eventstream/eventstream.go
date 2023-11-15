@@ -26,19 +26,18 @@ type StreamItem struct {
 //
 // Usage:
 //
-//      var err error
-//      go func() {
-//              err = ParseStream(ctx, r, stream)
-//      ()
+//			var err error
+//			go func() {
+//			        err = ParseStream(ctx, r, stream)
+//			()
 //
-//      for bytes := range stream {
-//              // consume event, transform event, etc
-//      }
+//			for bytes := range stream {
+//			        // consume event, transform event, etc
+//			}
 //
-//      if err != nil {
-//              // handle error
-//      }
-//
+//	     if err != nil {
+//	             // handle error
+//	     }
 func ParseStream(ctx context.Context, r io.Reader, stream chan StreamItem, maxSize int) error {
 	defer func() {
 		close(stream)
@@ -75,7 +74,13 @@ func ParseStream(ctx context.Context, r io.Reader, stream chan StreamItem, maxSi
 			return fmt.Errorf("%w: Max %d bytes / Size %d bytes", ErrEventTooLarge, maxSize, len(data))
 		}
 
-		stream <- StreamItem{Item: data}
+		select {
+		case stream <- StreamItem{Item: data}:
+			// Sent
+		case <-ctx.Done():
+			// Early exit; a problem somewhere else in the pipeline
+			return nil
+		}
 	case '[':
 		i := 0
 		// Parse a stream of tokens
@@ -91,8 +96,14 @@ func ParseStream(ctx context.Context, r io.Reader, stream chan StreamItem, maxSi
 			if len(jsonEvt) > maxSize {
 				return fmt.Errorf("%w: Max %d bytes / Size %d bytes", ErrEventTooLarge, maxSize, len(jsonEvt))
 			}
-			stream <- StreamItem{N: i, Item: jsonEvt}
-			i++
+			select {
+			case stream <- StreamItem{N: i, Item: jsonEvt}:
+				// Sent
+				i++
+			case <-ctx.Done():
+				// Early exit; a problem somewhere else in the pipeline
+				return nil
+			}
 		}
 	default:
 		return ErrInvalidRequestBody
