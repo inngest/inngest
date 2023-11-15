@@ -73,14 +73,7 @@ export function Details({ envID, eventID, onClose }: Props) {
 
   return (
     <SlideOver isOpen={isOpen} onClose={onClose} size={selectedRunID ? 'large' : 'small'}>
-      {fetching && (
-        <div className="flex h-full w-full items-center justify-center">
-          <div className="flex flex-col items-center justify-center gap-2 text-white">
-            <LoadingIcon />
-            <div>Loading</div>
-          </div>
-        </div>
-      )}
+      {fetching && <Loading />}
 
       {event && runs && (
         <EventDetails
@@ -91,5 +84,16 @@ export function Details({ envID, eventID, onClose }: Props) {
         />
       )}
     </SlideOver>
+  );
+}
+
+function Loading() {
+  return (
+    <div className="flex h-full w-full items-center justify-center">
+      <div className="flex flex-col items-center justify-center gap-2 text-white">
+        <LoadingIcon />
+        <div>Loading</div>
+      </div>
+    </div>
   );
 }
