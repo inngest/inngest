@@ -19,23 +19,7 @@ export type MetadataItemProps = {
 
 export function MetadataItem({ className, value, title, label, type, tooltip }: MetadataItemProps) {
   return (
-    <dl className={classNames('flex flex-col p-1.5', className)}>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <dd
-              className={classNames(
-                type === 'code' && 'font-mono',
-                'truncate text-sm text-slate-800 dark:text-white'
-              )}
-            >
-              {value}
-            </dd>
-          </TooltipTrigger>
-          <TooltipContent className="font-mono text-xs">{title || `${value}`}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
+    <div className={classNames('flex flex-col-reverse p-1.5', className)}>
       <dt className="flex items-center gap-1">
         <span className="text-sm capitalize text-slate-400 dark:text-slate-500">{label}</span>
         {tooltip && (
@@ -49,6 +33,23 @@ export function MetadataItem({ className, value, title, label, type, tooltip }: 
           </TooltipProvider>
         )}
       </dt>
-    </dl>
+      <dd>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className={classNames(
+                  type === 'code' && 'font-mono',
+                  'truncate text-sm text-slate-800 dark:text-white'
+                )}
+              >
+                {value}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="font-mono text-xs">{title || `${value}`}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </dd>
+    </div>
   );
 }

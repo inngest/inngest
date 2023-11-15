@@ -354,7 +354,6 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                 </div>
               </Block>
               <Block title="Configuration">
-                <p className="pb-2 pt-2 text-sm font-medium text-slate-800">Generic</p>
                 <MetadataGrid
                   columns={2}
                   metadataItems={[
@@ -367,7 +366,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                     { label: 'Retries', value: `${functionConfig.retries}` },
                   ]}
                 />
-                <p className="pb-2 pt-6 text-sm font-medium text-slate-800">Concurrency</p>
+                <h3 className="pb-2 pt-6 text-sm font-medium text-slate-800">Concurrency</h3>
                 <MetadataGrid
                   columns={2}
                   metadataItems={[
@@ -384,7 +383,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                     },
                   ]}
                 />
-                <p className="pb-2 pt-6 text-sm font-medium text-slate-800">Rate Limit</p>
+                <h3 className="pb-2 pt-6 text-sm font-medium text-slate-800">Rate Limit</h3>
                 <MetadataGrid
                   columns={2}
                   metadataItems={[
@@ -401,7 +400,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                     },
                   ]}
                 />
-                <p className="pb-2 pt-6 text-sm font-medium text-slate-800">Debounce</p>
+                <h3 className="pb-2 pt-6 text-sm font-medium text-slate-800">Debounce</h3>
                 <MetadataGrid
                   columns={2}
                   metadataItems={[
@@ -409,10 +408,14 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                       label: 'Period',
                       value: `${functionConfig.debounce.period}`,
                     },
-                    { label: 'Key', value: `${functionConfig.debounce.key}`, type: 'code' },
+                    {
+                      label: 'Key',
+                      value: `${functionConfig.debounce.key}`,
+                      type: 'code',
+                    },
                   ]}
                 />
-                <p className="pb-2 pt-6 text-sm font-medium text-slate-800">Events Batch</p>
+                <h3 className="pb-2 pt-6 text-sm font-medium text-slate-800">Events Batch</h3>
                 <MetadataGrid
                   columns={2}
                   metadataItems={[
