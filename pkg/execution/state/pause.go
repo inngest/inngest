@@ -99,7 +99,8 @@ type Pause struct {
 	Incoming string `json:"incoming"`
 	// StepName is the readable step name of the step to save within history.
 	StepName string `json:"stepName"`
-	// Opcode is the opcode of the step to save within history.
+	// Opcode is the opcode of the step to save within history.  This is needed because
+	// a pause can belong to `WaitForEvent` or `Invoke`;  it's used in both methods.
 	Opcode *string `json:"opcode,omitempty"`
 	// Expires is a time at which the pause can no longer be consumed.  This
 	// gives each pause of a function a TTL.  This is required.
