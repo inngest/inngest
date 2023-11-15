@@ -1,6 +1,6 @@
 import { type Route } from 'next';
 import Image from 'next/image';
-import { SignOutButton, currentUser } from '@clerk/nextjs';
+import { currentUser } from '@clerk/nextjs';
 import type { User } from '@clerk/nextjs/server';
 import {
   CreditCardIcon,
@@ -13,6 +13,7 @@ import {
   UserGroupIcon,
 } from '@heroicons/react/20/solid';
 
+import SignOutButton from '@/components/Navigation/SignOutButton';
 import Dropdown from '../Dropdown/Dropdown';
 import DropdownItem from '../Dropdown/DropdownItem';
 import StatusPageItem from './StatusPageItem';
