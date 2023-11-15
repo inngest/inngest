@@ -99,6 +99,7 @@ const GetFunctionDocument = graphql(`
         name
         slug
         isArchived
+        appName
         current {
           workflowID
           version
