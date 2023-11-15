@@ -15,6 +15,9 @@ const eventQuery = graphql(`
         payload: event
         receivedAt
         runs: functionRuns {
+          function {
+            name
+          }
           id
           output
           status
@@ -63,9 +66,8 @@ export function Details({ envID, eventID, onClose }: Props) {
     runs = data.environment.event.runs.map((run) => {
       return {
         ...run,
-        name: 'Foo',
-        status: 'RUNNING',
-      } as const;
+        name: run.function.name,
+      };
     });
   }
 
