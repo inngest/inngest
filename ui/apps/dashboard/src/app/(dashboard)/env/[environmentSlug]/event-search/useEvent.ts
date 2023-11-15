@@ -1,16 +1,10 @@
 import { useMemo } from 'react';
 import type { Event } from '@inngest/components/types/event';
-import {
-  baseFetchFailed,
-  baseFetchLoading,
-  baseFetchSkipped,
-  baseFetchSucceeded,
-  type FetchResult,
-} from '@inngest/components/types/fetch';
+import { baseFetchFailed } from '@inngest/components/types/fetch';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
-import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const eventQuery = graphql(`
   query GetEventSearchEvent($envID: ID!, $eventID: ULID!) {
@@ -39,31 +33,24 @@ type Data = {
   runs: Pick<FunctionRun, 'functionID' | 'id' | 'name' | 'output' | 'status'>[];
 };
 
-export function useEvent({
-  envID,
-  eventID,
-}: {
-  envID: string;
-  eventID: string | undefined;
-}): FetchResult<Data, { skippable: true }> {
+export function useEvent({ envID, eventID }: { envID: string; eventID: string | undefined }) {
   const skip = !eventID;
 
-  const [res] = useQuery({
+  const res = useGraphQLQuery({
     query: eventQuery,
+    skip,
     variables: {
       envID,
       eventID: eventID ?? 'unset',
     },
-    pause: skip,
   });
 
-  // In addition to memoizing, this hook will also transform the API data into
-  // the shape our shared UI expects.
-  const data = useMemo((): Data | undefined => {
+  // Transform the API data into the shape our shared UI expects.
+  const data = useMemo((): Data | Error => {
     const event = res.data?.environment.event ?? undefined;
 
     if (!event) {
-      return undefined;
+      return new Error('result is missing event data');
     }
 
     const runs: Data['runs'] = (event.runs ?? []).map((run) => {
@@ -85,31 +72,20 @@ export function useEvent({
     };
   }, [res.data?.environment.event]);
 
-  if (res.fetching) {
-    return baseFetchLoading;
+  if (res.error || res.isLoading || res.isSkipped) {
+    return res;
   }
 
-  if (skip) {
-    return baseFetchSkipped;
-  }
-
-  if (res.error) {
+  if (data instanceof Error) {
+    // Should be unreachable
     return {
       ...baseFetchFailed,
-      error: new Error(res.error.message),
-    };
-  }
-
-  if (!data) {
-    // Should be unreachable.
-    return {
-      ...baseFetchFailed,
-      error: new Error('finished loading but missing data'),
+      error: data,
     };
   }
 
   return {
-    ...baseFetchSucceeded,
+    ...res,
     data,
   };
 }

@@ -1,20 +1,13 @@
 import { useMemo } from 'react';
-import type { Event } from '@inngest/components/types/event';
-import {
-  baseFetchFailed,
-  baseFetchLoading,
-  baseFetchSkipped,
-  baseFetchSucceeded,
-  type FetchResult,
-} from '@inngest/components/types/fetch';
+import { baseFetchFailed, type FetchResult } from '@inngest/components/types/fetch';
 import type { Function } from '@inngest/components/types/function';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
 import type { FunctionVersion } from '@inngest/components/types/functionVersion';
-import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
-const eventQuery = graphql(`
+const runQuery = graphql(`
   query GetEventSearchRun($envID: ID!, $functionID: ID!, $runID: ULID!) {
     environment: workspace(id: $envID) {
       function: workflow(id: $functionID) {
@@ -89,24 +82,26 @@ export function useRun({
 }): FetchResult<Data, { skippable: true }> {
   const skip = !functionID || !runID;
 
-  const [res] = useQuery({
-    query: eventQuery,
+  const res = useGraphQLQuery({
+    query: runQuery,
+    skip,
     variables: {
       envID,
       functionID: functionID ?? 'unset',
       runID: runID ?? 'unset',
     },
-    pause: skip,
   });
 
-  // In addition to memoizing, this hook will also transform the API data into
-  // the shape our shared UI expects.
-  const data = useMemo((): Data | undefined => {
+  // Transform the API data into the shape our shared UI expects.
+  const data = useMemo((): Data | Error => {
     const func = res.data?.environment.function ?? undefined;
     const run = res.data?.environment.function?.run ?? undefined;
 
-    if (!func || !run) {
-      return undefined;
+    if (!func) {
+      return new Error('result is missing function data');
+    }
+    if (!run) {
+      return new Error('result is missing run data');
     }
 
     const triggers = (run.version?.triggers ?? []).map((trigger) => {
@@ -131,31 +126,20 @@ export function useRun({
     };
   }, [res.data?.environment.function]);
 
-  if (res.fetching) {
-    return baseFetchLoading;
+  if (res.error || res.isLoading || res.isSkipped) {
+    return res;
   }
 
-  if (skip) {
-    return baseFetchSkipped;
-  }
-
-  if (res.error) {
+  if (data instanceof Error) {
+    // Should be unreachable
     return {
       ...baseFetchFailed,
-      error: new Error(res.error.message),
-    };
-  }
-
-  if (!data) {
-    // Should be unreachable.
-    return {
-      ...baseFetchFailed,
-      error: new Error('finished loading but missing data'),
+      error: data,
     };
   }
 
   return {
-    ...baseFetchSucceeded,
+    ...res,
     data,
   };
 }
