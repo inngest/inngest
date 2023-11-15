@@ -1,31 +1,10 @@
 import { useState } from 'react';
 import { EventDetails } from '@inngest/components/EventDetails';
-import { useQuery } from 'urql';
+import { classNames } from 'node_modules/@inngest/components/src/utils/classNames';
 
-import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { SlideOver } from './SlideOver';
-
-const eventQuery = graphql(`
-  query GetEventSearchEvent($envID: ID!, $eventID: ULID!) {
-    environment: workspace(id: $envID) {
-      event: archivedEvent(id: $eventID) {
-        id
-        name
-        payload: event
-        receivedAt
-        runs: functionRuns {
-          function {
-            name
-          }
-          id
-          output
-          status
-        }
-      }
-    }
-  }
-`);
+import { useEvent } from './useEvent';
 
 type Props = {
   envID: string;
@@ -38,51 +17,38 @@ export function Details({ envID, eventID, onClose }: Props) {
 
   const isOpen = Boolean(eventID);
 
-  const [{ data, error, fetching }] = useQuery({
-    query: eventQuery,
-    variables: {
-      envID,
-      eventID: eventID || 'unset',
-    },
-    pause: !isOpen,
-  });
-
-  if (error) {
-    throw error;
+  const res = useEvent({ envID, eventID });
+  if (res.error) {
+    throw res.error;
   }
 
-  let event: React.ComponentProps<typeof EventDetails>['event'] | undefined;
-  let runs: React.ComponentProps<typeof EventDetails>['functionRuns'] | undefined;
-  if (isOpen && !fetching) {
-    if (!data?.environment.event) {
-      // Should be unreachable.
-      throw new Error('missing data');
-    }
-
-    event = {
-      ...data.environment.event,
-      receivedAt: new Date(data.environment.event.receivedAt),
-    };
-    runs = data.environment.event.runs.map((run) => {
-      return {
-        ...run,
-        name: run.function.name,
-      };
-    });
+  let content;
+  if (res.isLoading) {
+    content = <Loading />;
+  } else if (res.isSkipped) {
+    content = null;
+  } else {
+    const { event, runs } = res.data;
+    content = (
+      <EventDetails
+        event={event}
+        functionRuns={runs}
+        onFunctionRunClick={setSelectedRunID}
+        selectedRunID={selectedRunID}
+      />
+    );
   }
 
   return (
     <SlideOver isOpen={isOpen} onClose={onClose} size={selectedRunID ? 'large' : 'small'}>
-      {fetching && <Loading />}
-
-      {event && runs && (
-        <EventDetails
-          event={event}
-          functionRuns={runs}
-          onFunctionRunClick={setSelectedRunID}
-          selectedRunID={selectedRunID}
-        />
-      )}
+      <div
+        className={classNames(
+          'dark grid h-full text-white',
+          selectedRunID ? 'grid-cols-2' : 'grid-cols-1'
+        )}
+      >
+        {content}
+      </div>
     </SlideOver>
   );
 }
@@ -90,7 +56,7 @@ export function Details({ envID, eventID, onClose }: Props) {
 function Loading() {
   return (
     <div className="flex h-full w-full items-center justify-center">
-      <div className="flex flex-col items-center justify-center gap-2 text-white">
+      <div className="flex flex-col items-center justify-center gap-2">
         <LoadingIcon />
         <div>Loading</div>
       </div>
