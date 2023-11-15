@@ -6,6 +6,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/inngest/inngest/pkg/consts"
@@ -32,11 +33,12 @@ import (
 
 // StartOpts configures the dev server
 type StartOpts struct {
-	Config       config.Config `json:"-"`
-	RootDir      string        `json:"dir"`
-	URLs         []string      `json:"urls"`
-	Autodiscover bool          `json:"autodiscover"`
-	Poll         bool          `json:"poll"`
+	Config        config.Config `json:"-"`
+	RootDir       string        `json:"dir"`
+	URLs          []string      `json:"urls"`
+	Autodiscover  bool          `json:"autodiscover"`
+	Poll          bool          `json:"poll"`
+	RetryInterval int           `json:"retry_interval"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -104,11 +106,10 @@ func start(ctx context.Context, opts StartOpts) error {
 	queueKG := &redis_state.DefaultQueueKeyGenerator{
 		Prefix: "{queue}",
 	}
-	queue := redis_state.NewQueue(
-		rc,
+	queueOpts := []redis_state.QueueOpt{
 		redis_state.WithIdempotencyTTL(time.Hour),
 		redis_state.WithNumWorkers(100),
-		redis_state.WithPollTick(150*time.Millisecond),
+		redis_state.WithPollTick(150 * time.Millisecond),
 		redis_state.WithQueueKeyGenerator(queueKG),
 		redis_state.WithCustomConcurrencyKeyGenerator(func(ctx context.Context, i redis_state.QueueItem) []state.CustomConcurrency {
 			fn, err := dbcqrs.GetFunctionByID(ctx, i.Data.Identifier.WorkflowID)
@@ -162,7 +163,13 @@ func start(ctx context.Context, opts StartOpts) error {
 			}
 			return p.Queue(), consts.DefaultConcurrencyLimit
 		}),
-	)
+	}
+	if opts.RetryInterval > 0 {
+		queueOpts = append(queueOpts, redis_state.WithBackoffFunc(
+			backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval)*time.Second),
+		))
+	}
+	queue := redis_state.NewQueue(rc, queueOpts...)
 
 	rl := ratelimit.New(ctx, rc, "{ratelimit}:")
 
