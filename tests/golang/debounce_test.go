@@ -72,7 +72,7 @@ func TestDebounce(t *testing.T) {
 	registerFuncs()
 
 	t.Run("It debounces the first function call", func(t *testing.T) {
-		for i := 0; i < 5; i++ {
+		sendEvent := func(i int) {
 			_, err := inngestgo.Send(context.Background(), DebounceEvent{
 				Name: "test/sdk",
 				Data: DebounceEventData{
@@ -81,23 +81,24 @@ func TestDebounce(t *testing.T) {
 				},
 			})
 			require.NoError(t, err)
-
-			i := rand.Int31n(1000)
-			<-time.After(time.Duration(i) * time.Millisecond)
 		}
 
-		<-time.After(period - time.Second)
-		at = time.Now()
-		// Send one more.
-		_, err := inngestgo.Send(context.Background(), DebounceEvent{
-			Name: "test/sdk",
-			Data: DebounceEventData{
-				Counter: 999,
-				Name:    "debounce",
-			},
-		})
-		require.NoError(t, err)
+		endOfPeriod := time.After(period + time.Second)
+		i := 0
 
+	loop:
+		for {
+			interval := time.Duration(rand.Int31n(800)) * time.Millisecond
+			select {
+			case <-endOfPeriod:
+				break loop
+			case <-time.After(interval):
+				sendEvent(int(i))
+			}
+			i++
+		}
+
+		sendEvent(999)
 		require.Eventually(t, func() bool {
 			return atomic.LoadInt32(&counter) == 1
 		}, period*2, time.Second)
