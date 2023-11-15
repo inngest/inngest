@@ -28,7 +28,7 @@ export function MetadataItem({ className, value, title, label, type, tooltip }: 
               <TooltipTrigger>
                 <IconInfo className="h-4 w-4 text-slate-400" />
               </TooltipTrigger>
-              <TooltipContent>{tooltip}</TooltipContent>
+              <TooltipContent className="whitespace-pre-line">{tooltip}</TooltipContent>
             </Tooltip>
           </TooltipProvider>
         )}

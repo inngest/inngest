@@ -362,6 +362,10 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                       value: `${functionConfig.priority}`,
                       size: 'large',
                       type: 'code',
+                      tooltip:
+                        'When the function is triggered multiple times simultaneously, the priority determines the order in which they are run.' +
+                        '\n\n' +
+                        'The priority value is determined by evaluating the configured expression. The higher the value, the higher the priority.',
                     },
                     { label: 'Retries', value: `${functionConfig.retries}` },
                   ]}
