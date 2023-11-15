@@ -53,7 +53,7 @@ export function createTransform({
 }): string {
   return `// transform accepts the incoming JSON payload from your
 // webhook and must return an object that is in the Inngest event format
-function transform(evt, headers = {}) {
+function transform(evt, headers = {}, queryParams = {}) {
   return {
     ${commentBlock}
     name: ${eventName},

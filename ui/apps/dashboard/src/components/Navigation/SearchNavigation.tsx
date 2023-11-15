@@ -135,11 +135,13 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
   /*
    * Generates the result to be displayed to the user
    */
-  if (globalResults?.value.__typename === 'FunctionRun') {
+  if (globalResults?.value.__typename === 'FunctionRun' && functionResults) {
     searchResult = {
       type: 'function',
-      href: `/env/${environmentSlug}/functions/${functionResults?.slug}/logs/${globalResults.value.id}`,
-      name: functionResults?.name || '',
+      href: `/env/${environmentSlug}/functions/${encodeURIComponent(functionResults.slug)}/logs/${
+        globalResults.value.id
+      }`,
+      name: functionResults.name || '',
     };
   } else if (globalResults?.value.__typename === 'ArchivedEvent') {
     searchResult = {

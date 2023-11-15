@@ -40,7 +40,8 @@ func Sign(ctx context.Context, at time.Time, key, body []byte) string {
 }
 
 // ValidateSignature ensures that the signature for the given body is signed with
-// the given key recently.
+// the given key within a given time period to prevent invalid requests or
+// replay attacks.
 func ValidateSignature(ctx context.Context, sig string, key, body []byte) (bool, error) {
 	key = normalizeKey(key)
 

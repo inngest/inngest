@@ -40,7 +40,7 @@ func TestDebounce(t *testing.T) {
 				Period: period,
 			},
 		},
-		inngestgo.EventTrigger("test/sdk"),
+		inngestgo.EventTrigger("test/sdk", nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
 
 			// We expect that this function is called after at least the debounce period
@@ -137,7 +137,7 @@ func TestDebounecWithMultipleKeys(t *testing.T) {
 				Period: 5 * time.Second,
 			},
 		},
-		inngestgo.EventTrigger("test/sdk"),
+		inngestgo.EventTrigger("test/sdk", nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
 			fmt.Println("Debounced function ran", input.Event.Data.Name)
 			atomic.AddInt32(&counter, 1)

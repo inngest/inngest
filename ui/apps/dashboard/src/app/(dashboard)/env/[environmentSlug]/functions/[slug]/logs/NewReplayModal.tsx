@@ -4,14 +4,12 @@ import { Button } from '@inngest/components/Button';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { Modal } from '@inngest/components/Modal';
 import { IconReplay } from '@inngest/components/icons/Replay';
-import * as Popover from '@radix-ui/react-popover';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
-import * as chrono from 'chrono-node';
-import { useDebounce } from 'react-use';
 import { toast } from 'sonner';
 
 import { type TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import Input from '@/components/Forms/Input';
+import { TimeRangeInput } from '@/components/TimeRangeInput';
 import { FunctionRunStatus } from '@/gql/graphql';
 
 type NewReplayModalProps = {
@@ -103,7 +101,7 @@ export default function NewReplayModal({
                 Specify a time range to replay function runs from.
               </p>
             </div>
-            <DateTimeRangeInput onChange={setTimeRange} />
+            <TimeRangeInput onChange={setTimeRange} />
           </div>
         </div>
         <div className="space-y-5 px-6 py-4">
@@ -144,128 +142,5 @@ export default function NewReplayModal({
         </div>
       </form>
     </Modal>
-  );
-}
-
-type DateTimeRangeInputProps = {
-  onChange: (timeRange: TimeRange) => void;
-};
-
-function DateTimeRangeInput({ onChange }: DateTimeRangeInputProps) {
-  const [startDateTime, setStartDateTime] = useState<Date>();
-  const [startDateTimeError, setStartDateTimeError] = useState<string>();
-  const [endDateTime, setEndDateTime] = useState<Date>();
-  const [endDateTimeError, setEndDateTimeError] = useState<string | undefined>();
-
-  function onStartDateTimeChange(newStartDateTime: Date) {
-    setStartDateTime(newStartDateTime);
-    setStartDateTimeError(undefined);
-    setEndDateTimeError(undefined);
-    if (endDateTime && newStartDateTime > endDateTime) {
-      setStartDateTimeError('Start time must be before end time.');
-      return;
-    }
-
-    if (endDateTime) {
-      onChange({ start: newStartDateTime, end: endDateTime });
-    }
-  }
-
-  function onEndDateTimeChange(newEndDateTime: Date) {
-    setEndDateTime(newEndDateTime);
-    setStartDateTimeError(undefined);
-    setEndDateTimeError(undefined);
-    if (startDateTime && newEndDateTime < startDateTime) {
-      setEndDateTimeError('End time must be after start time.');
-      return;
-    }
-
-    if (startDateTime) {
-      onChange({ start: startDateTime, end: newEndDateTime });
-    }
-  }
-
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-2">
-        <DateTimeInput onChange={onStartDateTimeChange} required />
-        <span className="text-sm font-medium text-slate-400">to</span>
-        <DateTimeInput onChange={onEndDateTimeChange} required />
-      </div>
-      {startDateTimeError && <p className="text-sm text-red-500">{startDateTimeError}</p>}
-      {endDateTimeError && <p className="text-right text-sm text-red-500">{endDateTimeError}</p>}
-    </div>
-  );
-}
-
-type DateTimeInputProps = {
-  onChange: (newDateTime: Date) => void;
-  required?: boolean;
-};
-
-function DateTimeInput({ onChange, required }: DateTimeInputProps) {
-  // TODO: This component's state management can probably be improved by using useReducer()
-  const [inputString, setInputString] = useState<string>('');
-  const [parsedDateTime, setParsedDateTime] = useState<Date>();
-  useDebounce(
-    () => {
-      if (status === 'selected') return;
-      const parsedDateTime = chrono.parseDate(inputString);
-      if (!parsedDateTime) {
-        setStatus('invalid');
-        return;
-      }
-      setStatus('valid');
-      setParsedDateTime(parsedDateTime);
-    },
-    350,
-    [inputString]
-  );
-  const [status, setStatus] = useState<'typing' | 'invalid' | 'valid' | 'selected'>('invalid');
-
-  function onInputChange(event: React.ChangeEvent<HTMLInputElement>) {
-    setStatus('typing');
-    setParsedDateTime(undefined);
-    setInputString(event.target.value);
-  }
-
-  function applyDateTime(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (event.code === 'Enter' && parsedDateTime && inputString.length > 0) {
-      event.preventDefault();
-      onChange(parsedDateTime);
-      setInputString(parsedDateTime.toLocaleString());
-      setStatus('selected');
-    }
-  }
-
-  const isPopoverOpen = status === 'valid';
-
-  return (
-    <Popover.Root open={isPopoverOpen}>
-      <Popover.Anchor>
-        <Input
-          type="text"
-          value={inputString}
-          onChange={onInputChange}
-          onKeyDown={applyDateTime}
-          required={required}
-        />
-      </Popover.Anchor>
-      <Popover.Portal>
-        <Popover.Content
-          className="shadow-floating z-[100] inline-flex items-center gap-2 space-y-4 rounded-md bg-white/95 p-2 text-sm text-slate-800 ring-1 ring-black/5 backdrop-blur-[3px]"
-          sideOffset={5}
-          onOpenAutoFocus={(event) => event.preventDefault()}
-        >
-          {parsedDateTime?.toLocaleString()}
-          <kbd
-            className="ml-auto flex h-6 w-6 items-center justify-center rounded bg-slate-100 p-2 font-sans text-xs"
-            aria-label="Press Enter to apply the parsed date and time."
-          >
-            ↵
-          </kbd>
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
   );
 }
