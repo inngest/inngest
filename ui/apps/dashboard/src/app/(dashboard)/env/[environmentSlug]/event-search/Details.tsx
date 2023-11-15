@@ -3,6 +3,7 @@ import { EventDetails } from '@inngest/components/EventDetails';
 import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
+import LoadingIcon from '@/icons/LoadingIcon';
 import { SlideOver } from './SlideOver';
 
 const eventQuery = graphql(`
@@ -70,6 +71,15 @@ export function Details({ envID, eventID, onClose }: Props) {
 
   return (
     <SlideOver isOpen={isOpen} onClose={onClose} size={selectedRunID ? 'large' : 'small'}>
+      {fetching && (
+        <div className="flex h-full w-full items-center justify-center">
+          <div className="flex flex-col items-center justify-center gap-2 text-white">
+            <LoadingIcon />
+            <div>Loading</div>
+          </div>
+        </div>
+      )}
+
       {event && runs && (
         <EventDetails
           event={event}
