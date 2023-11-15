@@ -652,11 +652,19 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		},
 	}
 
+	if r.Final() && r.IsSingleStepError() {
+		errOutput := map[string]any{"error": r.Output}
+		if data, err = json.Marshal(errOutput); err != nil {
+			return 0, fmt.Errorf("error marshalling step output for single step error: %w", err)
+		}
+	}
+
 	args, err := StrSlice([]any{
 		data,
 		r.Step.ID,
 		r.Err != nil,
 		r.Final(),
+		r.IsSingleStepError(),
 		stepHistory,
 		funcFailHistory,
 		now.UnixMilli(),

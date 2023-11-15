@@ -21,11 +21,12 @@ local data    = ARGV[1]
 local stepID  = ARGV[2]
 local isError = tonumber(ARGV[3])
 local isFinal = tonumber(ARGV[4])
-local stepLog = ARGV[5] -- The step log.
-local failLog = ARGV[6] -- An optional fail log, if the error is final
-local logTime = tonumber(ARGV[7]) -- The timestamp for the log, unix milliseconds
+local isStepError = tonumber(ARGV[5])
+local stepLog = ARGV[6] -- The step log.
+local failLog = ARGV[7] -- An optional fail log, if the error is final
+local logTime = tonumber(ARGV[8]) -- The timestamp for the log, unix milliseconds
 
-if isError == 0 then
+if isError == 0 or (isStepError == 1 and isFinal == 1) then
 	if redis.call("HEXISTS", actionKey, stepID) == 1 then
 		return -1
 	end

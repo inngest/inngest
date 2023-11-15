@@ -536,8 +536,15 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 		return resp
 	}
 
-	// Check if this step permanently failed.  If so, the function is a failure.
+	// Check if this step permanently failed.  If so, the function is a failure
+	// or we can retry one more time if it was a step error.
 	if resp.Err != nil && !resp.Retryable() {
+		// If this was a step error, we can retry one more time to give the
+		// user a chance to handle the error.
+		if resp.IsSingleStepError() {
+			return e.enqueueDiscoveryStep(ctx, *resp.SingleStep(), item, edge)
+		}
+
 		_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt, enums.RunStatusFailed)
 		if serr := e.sm.SetStatus(ctx, id, enums.RunStatusFailed); serr != nil {
 			return fmt.Errorf("error marking function as complete: %w", serr)
@@ -602,6 +609,52 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 	}
 
 	return nil
+}
+
+// enqueueDiscoveryStep enqueues an execution that will hit the SDK to see what
+// is next. This should be used after a successful or a failing step execution
+// to see what the next step(s) should be.
+func (e *executor) enqueueDiscoveryStep(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge inngest.Edge) error {
+	nextEdge := inngest.Edge{
+		Outgoing: gen.ID,        // Going from the current step
+		Incoming: edge.Incoming, // And re-calling the incoming function in a loop
+	}
+
+	// Update the group ID in context;  we've already saved this step's success and we're now
+	// running the step again, needing a new history group
+	groupID := uuid.New().String()
+	ctx = state.WithGroupID(ctx, groupID)
+
+	// Re-enqueue the exact same edge to run now.
+	if err := e.sm.Scheduled(ctx, item.Identifier, nextEdge.Incoming, 0, nil); err != nil {
+		return err
+	}
+
+	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
+	nextItem := queue.Item{
+		JobID:       &jobID,
+		WorkspaceID: item.WorkspaceID,
+		GroupID:     groupID,
+		Kind:        queue.KindEdge,
+		Identifier:  item.Identifier,
+		Attempt:     0,
+		MaxAttempts: item.MaxAttempts,
+		Payload:     queue.PayloadEdge{Edge: nextEdge},
+	}
+	err := e.queue.Enqueue(ctx, nextItem, time.Now())
+	if err == redis_state.ErrQueueItemExists {
+		return nil
+	}
+
+	for _, l := range e.lifecycles {
+		// We can't specify step name here since that will result in the
+		// "followup discovery step" having the same name as its predecessor.
+		var stepName *string = nil
+
+		go l.OnStepScheduled(ctx, item.Identifier, nextItem, stepName)
+	}
+
+	return err
 }
 
 // run executes the step with the given step ID.
@@ -1010,11 +1063,6 @@ func (e *executor) HandleGenerator(ctx context.Context, gen state.GeneratorOpcod
 }
 
 func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
-	nextEdge := inngest.Edge{
-		Outgoing: gen.ID,             // Going from the current step
-		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
-	}
-
 	resp := state.DriverResponse{
 		Step: inngest.Step{
 			ID:   gen.ID,
@@ -1032,41 +1080,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 		return err
 	}
 
-	// Update the group ID in context;  we've already saved this step's success and we're now
-	// running the step again, needing a new history group
-	groupID := uuid.New().String()
-	ctx = state.WithGroupID(ctx, groupID)
-
-	// Re-enqueue the exact same edge to run now.
-	if err := e.sm.Scheduled(ctx, item.Identifier, nextEdge.Incoming, 0, nil); err != nil {
-		return err
-	}
-
-	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
-	nextItem := queue.Item{
-		JobID:       &jobID,
-		WorkspaceID: item.WorkspaceID,
-		GroupID:     groupID,
-		Kind:        queue.KindEdge,
-		Identifier:  item.Identifier,
-		Attempt:     0,
-		MaxAttempts: item.MaxAttempts,
-		Payload:     queue.PayloadEdge{Edge: nextEdge},
-	}
-	err := e.queue.Enqueue(ctx, nextItem, time.Now())
-	if err == redis_state.ErrQueueItemExists {
-		return nil
-	}
-
-	for _, l := range e.lifecycles {
-		// We can't specify step name here since that will result in the
-		// "followup discovery step" having the same name as its predecessor.
-		var stepName *string = nil
-
-		go l.OnStepScheduled(ctx, item.Identifier, nextItem, stepName)
-	}
-
-	return err
+	return e.enqueueDiscoveryStep(ctx, gen, item, edge.Edge)
 }
 
 func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
