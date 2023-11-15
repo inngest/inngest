@@ -22,6 +22,7 @@ const eventQuery = graphql(`
         receivedAt
         runs: functionRuns {
           function {
+            id
             name
           }
           id
@@ -35,7 +36,7 @@ const eventQuery = graphql(`
 
 type Data = {
   event: Event;
-  runs: Pick<FunctionRun, 'id' | 'name' | 'output' | 'status'>[];
+  runs: Pick<FunctionRun, 'functionID' | 'id' | 'name' | 'output' | 'status'>[];
 };
 
 export function useEvent({
@@ -53,7 +54,7 @@ export function useEvent({
       envID,
       eventID: eventID ?? 'unset',
     },
-    pause: !eventID,
+    pause: skip,
   });
 
   // In addition to memoizing, this hook will also transform the API data into
@@ -67,6 +68,7 @@ export function useEvent({
 
     const runs: Data['runs'] = (event.runs ?? []).map((run) => {
       return {
+        functionID: run.function.id,
         id: run.id,
         name: run.function.name,
         output: run.output,
