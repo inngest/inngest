@@ -17,6 +17,7 @@ export function useSearchParam(name: string): [string | undefined, SetParam] {
       const params = new URLSearchParams(searchParams);
       params.set(name, value);
 
+      // @ts-expect-error Router doesn't like strings.
       router.push(pathname + '?' + params.toString());
     },
     [name, pathname, router, searchParams]

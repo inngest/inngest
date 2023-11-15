@@ -63,20 +63,22 @@ export function EventSearch({ environmentSlug }: Props) {
         throw new Error('missing environment');
       }
 
-      setFields([
+      const newFields = [
         {
           dataType: EventSearchFilterFieldDataType.Str,
           operator: EventSearchFilterOperator.Eq,
           path,
           value,
         },
-      ]);
+      ];
+
+      setFields(newFields);
 
       setEvents(
         await searchEvents({
           client,
           environmentID: environment.id,
-          fields,
+          fields: newFields,
           lowerTime: new Date(Date.now() - 3 * day),
           upperTime: new Date(),
         })
