@@ -1,12 +1,16 @@
-import { runEndGroupID, type HistoryNode, type HistoryType, type RawHistoryItem } from './types';
+import {
+  isHistoryType,
+  runEndGroupID,
+  type HistoryNode,
+  type HistoryType,
+  type RawHistoryItem,
+} from './types';
 
 type Updater = (node: HistoryNode, rawItem: RawHistoryItem) => HistoryNode;
 
 const noop: Updater = (node) => node;
 
-const updaters: {
-  [key in HistoryType]: Updater;
-} = {
+const updaters: Record<HistoryType, Updater> = {
   FunctionCancelled: (node, rawItem) => {
     return {
       ...node,
@@ -147,7 +151,9 @@ const updaters: {
       waitForEventConfig,
     } satisfies HistoryNode;
   },
-} as const;
+} satisfies {
+  [key in HistoryType]: Updater;
+};
 
 function parseName(name: string | undefined): string | undefined {
   // This is hacky, but assume that a name of "step" means we're discovering the
@@ -173,7 +179,13 @@ function parseURL(url: string): string {
 }
 
 export function updateNode(node: HistoryNode, rawItem: RawHistoryItem): HistoryNode {
-  const update = updaters[rawItem.type];
+  const historyType = rawItem.type;
+  if (!isHistoryType(historyType)) {
+    // Return the node unchanged if the history type is unexpected.
+    return node;
+  }
+
+  const update = updaters[historyType];
   node = update(node, rawItem);
   node.attempt = rawItem.attempt;
 
