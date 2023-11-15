@@ -1246,7 +1246,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 
 	eventName := event.FnFinishedName
 	correlationID := item.Identifier.RunID.String() + "." + gen.ID
-	strExpr := "async.data." + consts.InvokeCorrelationId + " == '" + correlationID + "'"
+	strExpr := fmt.Sprintf("async.data.%s == %s", consts.InvokeCorrelationId, strconv.Quote(correlationID))
 	_, err = e.newExpressionEvaluator(ctx, strExpr)
 	if err != nil {
 		return execError{err: fmt.Errorf("failed to create expression to wait for invoked function completion: %w", err)}
