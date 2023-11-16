@@ -30,7 +30,7 @@ The `createFunction` method accepts a series of arguments to define your functio
     A name for your function. If defined, this will be shown in the UI as a friendly display name instead of the ID.
   </Property>
 
-  <Property name="concurrency" type="number | object">
+  <Property name="concurrency" type="number | object | [object, object]">
     Limit the number of concurrently running functions ([reference](/docs/functions/concurrency))
 
     <Properties nested={true} collapse={true}>
@@ -56,7 +56,7 @@ The `createFunction` method accepts a series of arguments to define your functio
     Options to configure how to rate limit function execution ([reference](/docs/reference/functions/rate-limit))
 
     <Properties nested={true} collapse={true}>
-      <Property name="limit" type="integer" required>
+      <Property name="limit" type="number" required>
         The maximum number of functions to run in the given time period.
       </Property>
       <Property name="period" type="string" required>

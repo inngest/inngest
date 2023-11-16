@@ -50,11 +50,11 @@ Optionally, specifying a concurrency `key` applies the `limit` to unique values 
 ## Configuration
 
 <Properties>
-  <Property name="concurrency" type="object | integer">
-    Options to configure concurrency. Specifying an `integer` is a shorthand to set the `limit` property.
+  <Property name="concurrency" type="number | object | [object, object]">
+    Options to configure concurrency. Specifying a `number` is a shorthand to set the `limit` property.
 
     <Properties nested={true}>
-      <Property name="limit" type="integer" required>
+      <Property name="limit" type="number" required>
         The maximum number of concurrently running steps.
 
         A value of `0` or `undefined` is the equivalent of not setting a limit.
