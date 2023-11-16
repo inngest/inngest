@@ -144,16 +144,14 @@ export default function FunctionRunsLayout({ children, params }: FunctionRunsLay
         </ClientFeatureFlag>
       </div>
       <div className="flex min-h-0 flex-1">
-        <div className="w-80 flex-shrink-0 overflow-y-auto border-r border-slate-300">
-          <FunctionRunList
-            environmentSlug={params.environmentSlug}
-            functionSlug={functionSlug}
-            selectedStatuses={selectedStatuses}
-            selectedTimeRange={selectedTimeRange}
-            timeField={selectedTimeField}
-          />
-        </div>
-        <div className="min-w-0 flex-1 bg-slate-50">{children}</div>
+        <FunctionRunList
+          environmentSlug={params.environmentSlug}
+          functionSlug={functionSlug}
+          selectedStatuses={selectedStatuses}
+          selectedTimeRange={selectedTimeRange}
+          timeField={selectedTimeField}
+        />
+        {/* <div className="min-w-0 flex-1 bg-slate-50">{children}</div> */}
       </div>
     </>
   );

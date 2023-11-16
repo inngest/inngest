@@ -1,30 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import type { Route } from 'next';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
+import { useCallback, useRef, useState } from 'react';
+import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+import { Table } from '@inngest/components/Table';
+import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-table';
 import { useQuery } from 'urql';
 
-import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
-import { FunctionRunStatus, FunctionRunTimeField } from '@/gql/graphql';
-import LoadingIcon from '@/icons/LoadingIcon';
-import CancelledIcon from '@/icons/status-icons/cancelled.svg';
-import CompletedIcon from '@/icons/status-icons/completed.svg';
-import FailedIcon from '@/icons/status-icons/failed.svg';
-import RunningIcon from '@/icons/status-icons/running.svg';
+import { FunctionRunStatus, FunctionRunTimeField, type RunListItem } from '@/gql/graphql';
 import { useEnvironment } from '@/queries';
-import cn from '@/utils/cn';
 import { type TimeRange } from './TimeRangeFilter';
 
-const functionRunStatusIcons = {
-  [FunctionRunStatus.Cancelled]: { icon: CancelledIcon, color: 'text-gray-500' },
-  [FunctionRunStatus.Completed]: { icon: CompletedIcon, color: 'text-teal-500' },
-  [FunctionRunStatus.Failed]: { icon: FailedIcon, color: 'text-red-500' },
-  [FunctionRunStatus.Running]: { icon: RunningIcon, color: 'text-sky-500' },
-} as const satisfies Record<FunctionRunStatus, { icon: SVGComponent; color: `text-${string}-500` }>;
+const columnHelper = createColumnHelper<RunListItem>();
 
 const GetFunctionRunsDocument = graphql(`
   query GetFunctionRuns(
@@ -67,150 +54,29 @@ const GetFunctionRunsDocument = graphql(`
   }
 `);
 
-type FunctionRunListResultPageProps = {
-  environmentSlug: string;
-  functionSlug: string;
-  selectedStatuses: FunctionRunStatus[];
-  selectedTimeRange: TimeRange;
-  timeField: FunctionRunTimeField;
-  functionRunCursor: string;
-  isLastDisplayedPage: boolean;
-  onLoadMore: (nextCursor: string) => void;
-};
-
-function FunctionRunListResultPage({
-  environmentSlug,
-  functionSlug,
-  selectedStatuses,
-  selectedTimeRange,
-  timeField,
-  functionRunCursor,
-  isLastDisplayedPage,
-  onLoadMore,
-}: FunctionRunListResultPageProps) {
-  const [{ data: environment, fetching: isFetchingEnvironments }] = useEnvironment({
-    environmentSlug,
-  });
-
-  const [{ data, fetching: isFetchingFunctionRuns }] = useQuery({
-    query: GetFunctionRunsDocument,
-    variables: {
-      environmentID: environment?.id!,
-      functionSlug,
-      functionRunStatuses: selectedStatuses.length ? selectedStatuses : null,
-      timeRangeStart: selectedTimeRange.start.toISOString(),
-      timeRangeEnd: selectedTimeRange.end.toISOString(),
-      timeField,
-      functionRunCursor: functionRunCursor || null,
-    },
-    pause: !environment?.id,
-  });
-
-  const pathname = usePathname();
-
-  if (isFetchingEnvironments || isFetchingFunctionRuns) {
-    return (
-      <div className="flex h-full w-full items-center justify-center">
-        <LoadingIcon />
+const columns = [
+  columnHelper.accessor('id', {
+    header: () => <span>ID</span>,
+    cell: (props) => <p className="text-sm font-medium leading-7">{props.getValue()}</p>,
+  }),
+  columnHelper.accessor('status', {
+    header: () => <span>Status</span>,
+    cell: (props) => (
+      <div className="flex items-center gap-2 lowercase">
+        <FunctionRunStatusIcon status={props.getValue()} className="h-5 w-5" />
+        <p className="first-letter:capitalize">{props.getValue()}</p>
       </div>
-    );
-  }
-
-  const function_ = data?.environment.function;
-
-  if (!function_) {
-    return (
-      <div className="flex h-full w-full items-center justify-center">
-        <h2 className="text-sm font-semibold text-gray-900">Function not found</h2>
-      </div>
-    );
-  }
-
-  const hasNextPage = function_.runs?.pageInfo.hasNextPage;
-  const endCursor = function_.runs?.pageInfo.endCursor;
-  const functionRuns = function_.runs?.edges?.map((edge) => edge?.node);
-
-  if (!functionRuns || functionRuns.length === 0) {
-    return (
-      <div className="flex h-full w-full items-center justify-center">
-        <h2 className="text-sm font-semibold text-gray-900">No function runs yet</h2>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      {functionRuns?.map((functionRun, index) => {
-        if (!functionRun) {
-          return (
-            <li key={index}>
-              <div className="flex items-center gap-3 px-3 py-2.5 opacity-50">
-                <FailedIcon className="h-6 w-6 shrink-0 text-red-500" />
-                <div className="flex min-w-0 flex-col gap-1 text-ellipsis">
-                  <p className="text-sm font-semibold text-slate-800">Error</p>
-                  <p className="flex font-mono text-xs text-slate-500">
-                    Could not load function run
-                  </p>
-                </div>
-              </div>
-            </li>
-          );
-        }
-        const functionRunPathname = `/env/${environmentSlug}/functions/${encodeURIComponent(
-          functionSlug
-        )}/logs/${functionRun.id}`;
-        const isActive = pathname === functionRunPathname;
-        const StatusIcon = functionRunStatusIcons[functionRun.status].icon;
-
-        let time: string;
-        if (timeField === FunctionRunTimeField.EndedAt && functionRun.endedAt) {
-          time = functionRun.endedAt;
-        } else {
-          time = functionRun.startedAt;
-        }
-
-        return (
-          <li key={functionRun.id}>
-            <Link
-              href={functionRunPathname as Route}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100',
-                isActive && 'bg-slate-100'
-              )}
-            >
-              <StatusIcon
-                className={cn(
-                  functionRunStatusIcons[functionRun.status].color,
-                  'h-6 w-6 shrink-0 text-teal-500'
-                )}
-              />
-              <div className="flex min-w-0 flex-col gap-1 text-ellipsis">
-                <Time
-                  className="text-sm font-semibold text-slate-800"
-                  format="relative"
-                  value={new Date(time)}
-                />
-
-                <div className="flex items-center gap-2 font-mono text-xs text-slate-500">
-                  {functionRun.id}
-                </div>
-              </div>
-            </Link>
-          </li>
-        );
-      })}
-      {isLastDisplayedPage && hasNextPage && (
-        <div className="flex justify-center py-2.5">
-          <Button
-            appearance="outlined"
-            btnAction={() => onLoadMore(endCursor ?? '')}
-            label="Load More"
-          />
-        </div>
-      )}
-    </>
-  );
-}
+    ),
+  }),
+  columnHelper.accessor('startedAt', {
+    header: () => <span>Scheduled At</span>,
+    cell: (props) => <time>{props.getValue()}</time>,
+  }),
+  columnHelper.accessor('endedAt', {
+    header: () => <span>Ended At</span>,
+    cell: (props) => <time>{props.getValue()}</time>,
+  }),
+];
 
 type FunctionRunListProps = {
   environmentSlug: string;
@@ -228,7 +94,9 @@ export default function FunctionRunList({
   timeField,
 }: FunctionRunListProps) {
   const [pageCursors, setPageCursors] = useState<string[]>(['']);
+  const [functionRuns, setFunctionRuns] = useState<Array<RunListItem>>([]);
 
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   // We reset the page cursors when the selected statuses or time range change, which resets the list to the first page.
   const [prevSelectedStatuses, setPrevSelectedStatuses] = useState(selectedStatuses);
   const [prevSelectedTimeRange, setPrevSelectedTimeRange] = useState(selectedTimeRange);
@@ -236,23 +104,79 @@ export default function FunctionRunList({
     setPrevSelectedStatuses(selectedStatuses);
     setPrevSelectedTimeRange(selectedTimeRange);
     setPageCursors(['']);
+    setFunctionRuns([]);
+  }
+
+  const [{ data: environment, fetching: isFetchingEnvironments }] = useEnvironment({
+    environmentSlug,
+  });
+
+  const [{ data, fetching }] = useQuery({
+    query: GetFunctionRunsDocument,
+    variables: {
+      environmentID: environment?.id!,
+      functionSlug,
+      functionRunStatuses: selectedStatuses.length ? selectedStatuses : null,
+      timeRangeStart: selectedTimeRange.start.toISOString(),
+      timeRangeEnd: selectedTimeRange.end.toISOString(),
+      timeField,
+      functionRunCursor: pageCursors[pageCursors.length - 1] || null,
+    },
+    pause: !environment?.id,
+  });
+  const runs = data?.environment?.function?.runs?.edges?.map((edge) => edge?.node) ?? [];
+
+  const endCursor = data?.environment?.function?.runs?.pageInfo.endCursor;
+
+  const fetchMoreOnScroll = useCallback((containerRefElement?: HTMLDivElement | null) => {
+    if (containerRefElement && runs?.length > 0) {
+      const { scrollHeight, scrollTop, clientHeight } = containerRefElement;
+      // Check if scrolled to the bottom
+      const reachedBottom = scrollHeight - scrollTop - clientHeight < 50;
+
+      if (reachedBottom && endCursor) {
+        setPageCursors([...pageCursors, endCursor]);
+      }
+    }
+  }, []);
+
+  if (
+    !data ||
+    !data?.environment ||
+    !data?.environment?.function ||
+    !data?.environment?.function?.runs ||
+    !functionRuns
+  ) {
+    return;
   }
 
   return (
-    <ul role="list" className="h-full divide-y divide-slate-100">
-      {pageCursors.map((pageCursor, index) => (
-        <FunctionRunListResultPage
-          key={pageCursor}
-          environmentSlug={environmentSlug}
-          functionSlug={functionSlug}
-          selectedStatuses={selectedStatuses}
-          functionRunCursor={pageCursor}
-          selectedTimeRange={selectedTimeRange}
-          timeField={timeField}
-          isLastDisplayedPage={index === pageCursors.length - 1}
-          onLoadMore={(nextCursor) => setPageCursors([...pageCursors, nextCursor])}
-        />
-      ))}
-    </ul>
+    <div
+      className="min-h-0 w-full overflow-y-auto pb-10"
+      onScroll={(e) => fetchMoreOnScroll(e.target as HTMLDivElement)}
+      ref={tableContainerRef}
+    >
+      <Table
+        options={{
+          data: runs ?? [],
+          columns,
+          getCoreRowModel: getCoreRowModel(),
+          enableSorting: false,
+          enablePinning: true,
+          initialState: {
+            columnPinning: {
+              left: ['createdAt'],
+            },
+          },
+          defaultColumn: {
+            minSize: 0,
+            size: Number.MAX_SAFE_INTEGER,
+            maxSize: Number.MAX_SAFE_INTEGER,
+          },
+        }}
+        tableContainerRef={tableContainerRef}
+        blankState={<p>No function runs</p>}
+      />
+    </div>
   );
 }
