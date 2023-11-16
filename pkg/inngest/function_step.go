@@ -41,3 +41,12 @@ func (s Step) Driver() string {
 		return ""
 	}
 }
+
+// SpecificStep returns the ID of the step if it is a specific, targeted step,
+// and is not a generic discovery step.
+func (s Step) SpecificStep() string {
+	if s.ID != "" && s.ID != "step" {
+		return s.ID
+	}
+	return ""
+}

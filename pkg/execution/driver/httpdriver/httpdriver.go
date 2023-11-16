@@ -174,10 +174,16 @@ func (e executor) Execute(ctx context.Context, s state.State, item queue.Item, e
 		return nil, err
 	}
 
+	respStep := step
+	specificStep := edge.SpecificStep()
+	if specificStep != "" {
+		respStep.ID = specificStep
+	}
+
 	if resp.statusCode == 206 {
 		// This is a generator-based function returning opcodes.
 		dr := &state.DriverResponse{
-			Step:           step,
+			Step:           respStep,
 			Duration:       resp.duration,
 			Output:         string(resp.body),
 			OutputSize:     len(resp.body),
@@ -247,7 +253,7 @@ func (e executor) Execute(ctx context.Context, s state.State, item queue.Item, e
 	}
 
 	return &state.DriverResponse{
-		Step:           step,
+		Step:           respStep,
 		Output:         body,
 		Err:            errstr,
 		Duration:       resp.duration,

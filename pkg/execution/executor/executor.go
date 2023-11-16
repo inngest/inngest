@@ -539,10 +539,19 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 	// Check if this step permanently failed.  If so, the function is a failure
 	// or we can retry one more time if it was a step error.
 	if resp.Err != nil && !resp.Retryable() {
-		// If this was a step error, we can retry one more time to give the
-		// user a chance to handle the error.
-		if resp.IsSingleStepError() {
-			return e.enqueueDiscoveryStep(ctx, *resp.SingleStep(), item, edge)
+		// If this was a step run failing, we should try again to see what the
+		// function does when that step throws.
+		//
+		// A failed step run may come as a generator response or may be an
+		// entire function failure if the step running is causing catastrophic
+		// failure. For this reason, we look at what this queue item intended
+		// to do instead of just what the response is.
+		//
+		// In the case of an SDK optimistically executing a step which then
+		// results in a catastrophic failure, there's no way for us to know
+		// that the step was being run, so we can't retry.
+		if resp.Step.ID != "" && resp.Step.ID != "step" {
+			return e.enqueueDiscoveryStep(ctx, resp.Step.ID, item, edge)
 		}
 
 		_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt, enums.RunStatusFailed)
@@ -614,9 +623,9 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 // enqueueDiscoveryStep enqueues an execution that will hit the SDK to see what
 // is next. This should be used after a successful or a failing step execution
 // to see what the next step(s) should be.
-func (e *executor) enqueueDiscoveryStep(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge inngest.Edge) error {
+func (e *executor) enqueueDiscoveryStep(ctx context.Context, stepID string, item queue.Item, edge inngest.Edge) error {
 	nextEdge := inngest.Edge{
-		Outgoing: gen.ID,        // Going from the current step
+		Outgoing: stepID,        // Going from the current step
 		Incoming: edge.Incoming, // And re-calling the incoming function in a loop
 	}
 
@@ -630,7 +639,7 @@ func (e *executor) enqueueDiscoveryStep(ctx context.Context, gen state.Generator
 		return err
 	}
 
-	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
+	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), stepID)
 	nextItem := queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: item.WorkspaceID,
@@ -1080,7 +1089,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 		return err
 	}
 
-	return e.enqueueDiscoveryStep(ctx, gen, item, edge.Edge)
+	return e.enqueueDiscoveryStep(ctx, gen.ID, item, edge.Edge)
 }
 
 func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {

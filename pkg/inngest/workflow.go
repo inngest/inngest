@@ -111,6 +111,15 @@ func (e Edge) IsSource() bool {
 	return e.Outgoing == "" && e.Incoming == TriggerName || e.Outgoing == TriggerName
 }
 
+// SpecificStep returns the ID of a step if the edge is intended to run a
+// specific, targeted step and is not a generic discovery step.
+func (e Edge) SpecificStep() string {
+	if e.IncomingGeneratorStep != "" && e.IncomingGeneratorStep != "step" {
+		return e.IncomingGeneratorStep
+	}
+	return ""
+}
+
 type EdgeMetadata struct {
 	Name string `json:"name,omitempty"`
 	If   string `json:"if,omitempty"`

@@ -652,7 +652,9 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		},
 	}
 
-	if r.Final() && r.IsSingleStepError() {
+	isSpecificStep := r.Step.SpecificStep() != ""
+
+	if r.Final() && isSpecificStep {
 		errOutput := map[string]any{"error": r.Output}
 		if data, err = json.Marshal(errOutput); err != nil {
 			return 0, fmt.Errorf("error marshalling step output for single step error: %w", err)
@@ -664,7 +666,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		r.Step.ID,
 		r.Err != nil,
 		r.Final(),
-		r.IsSingleStepError(),
+		isSpecificStep,
 		stepHistory,
 		funcFailHistory,
 		now.UnixMilli(),
