@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -204,6 +205,11 @@ func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 	if slug == "" {
 		_ = publicerr.WriteHTTP(w, publicerr.Errorf(400, "Function slug is required"))
+		return
+	}
+	slug, err := url.QueryUnescape(slug)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Unable to decode function slug"))
 		return
 	}
 
