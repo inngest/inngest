@@ -19,7 +19,7 @@ export const devApi = createApi({
       { id: string; name: string; ts: number; data?: object; user?: object; functionId?: string }
     >({
       query: ({ functionId, ...event }) => ({
-        url: functionId ? `/invoke/${functionId}` : '/e/dev_key',
+        url: functionId ? `/invoke/${encodeURIComponent(functionId)}` : '/e/dev_key',
         method: 'POST',
         body: event,
       }),
