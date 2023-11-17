@@ -146,7 +146,7 @@ export default function TransformEvents({ keyID, metadata, keyName }: FilterEven
   }
 
   return (
-    <form className="pt-3" onSubmit={handleSubmit}>
+    <form className="pt-3" onSubmit={handleSubmit} id="save-transform">
       <div className="flex">
         <div>
           <h2 className="pb-1 text-lg font-semibold">Transform Event</h2>
@@ -215,7 +215,13 @@ export default function TransformEvents({ keyID, metadata, keyName }: FilterEven
         </div>
       </div>
       <div className="mb-8 flex justify-end">
-        <Button kind="primary" disabled={isDisabled} type="submit" label="Save Transform Changes" />
+        <Button
+          kind="primary"
+          disabled={isDisabled}
+          type="submit"
+          label="Save Transform Changes"
+          form="save-transform"
+        />
       </div>
     </form>
   );
