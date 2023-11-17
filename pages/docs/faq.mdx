@@ -30,3 +30,8 @@ You can pass multiple paths as comma-delimited values under the Vercel app in th
 
 ## What's the recommended way to redact data from step outputs?
 We recommend doing [E2E encryption](https://www.inngest.com/docs/reference/middleware/examples#e2-e-encryption) instead, as it's more secure and plaintext data never leaves your servers.
+
+## Why am I getting a `FUNCTION_INVOCATION_TIMEOUT` error?
+This is a Vercel error that means your function timed out within Vercel's infrastructure before it was able to respond to Inngest. More information can be found in [Vercel's docs](https://vercel.com/docs/functions/serverless-functions/runtimes#max-duration).
+
+If you're unable to sufficiently extend the timeout within Vercel, our [streaming feature](https://www.inngest.com/docs/streaming) can help.
