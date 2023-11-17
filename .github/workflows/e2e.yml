@@ -22,6 +22,9 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: "1.21"
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "18"
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
@@ -34,8 +37,8 @@ jobs:
       - name: Run E2E tests
         run: |
           cd ./tests/js
-          yarn install
-          yarn dev &
+          pnpm install
+          pnpm dev &
           sleep 5
           cd ../../
           echo "Running dev server"
