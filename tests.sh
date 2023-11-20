@@ -1,6 +1,6 @@
 #!/bin/bash
-sh -c 'cd ./tests/js && yarn install > /dev/null 2> /dev/null'
-sh -c 'cd ./tests/js && yarn dev > /dev/null 2> /dev/null' &
+sh -c 'cd ./tests/js && pnpm install > /dev/null 2> /dev/null'
+sh -c 'cd ./tests/js && pnpm dev > /dev/null 2> /dev/null' &
 
 sleep 2
 

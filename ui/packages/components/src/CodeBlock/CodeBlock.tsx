@@ -375,7 +375,7 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
                   highlightActiveBracketPair: false,
                   highlightActiveIndentation: false,
                 },
-                scrollbar: { verticalScrollbarSize: 10 },
+                scrollbar: { verticalScrollbarSize: 10, alwaysConsumeMouseWheel: false },
                 padding: {
                   top: 10,
                   bottom: 10,

@@ -2,6 +2,7 @@ package resolvers
 
 import (
 	"context"
+	"database/sql"
 	"sort"
 	"time"
 
@@ -39,7 +40,15 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 	}
 	fnsByID := map[ulid.ULID][]*models.FunctionRun{}
 	for _, fn := range fns {
-		fnsByID[fn.EventID] = append(fnsByID[fn.EventID], models.MakeFunctionRun(fn))
+		run := models.MakeFunctionRun(fn)
+		_, err := r.Data.GetFunctionByID(ctx, uuid.MustParse(run.FunctionID))
+		if err == sql.ErrNoRows {
+			// Skip run since its function doesn't exist. This can happen when
+			// deleting a function or changing its ID.
+			continue
+		}
+
+		fnsByID[fn.EventID] = append(fnsByID[fn.EventID], run)
 	}
 
 	items := make([]*models.StreamItem, len(evts))
@@ -72,12 +81,20 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 			trigger = *i.Cron
 		}
 
+		runs := []*models.FunctionRun{models.MakeFunctionRun(i)}
+		_, err := r.Data.GetFunctionByID(ctx, uuid.MustParse(runs[0].FunctionID))
+		if err == sql.ErrNoRows {
+			// Skip run since its function doesn't exist. This can happen when
+			// deleting a function or changing its ID.
+			runs = []*models.FunctionRun{}
+		}
+
 		items = append(items, &models.StreamItem{
 			ID:        i.RunID.String(),
 			Trigger:   trigger,
 			Type:      models.StreamTypeCron,
 			CreatedAt: i.RunStartedAt,
-			Runs:      []*models.FunctionRun{models.MakeFunctionRun(i)},
+			Runs:      runs,
 		})
 	}
 

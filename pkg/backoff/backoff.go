@@ -55,3 +55,11 @@ func TableBackoff(attemptNum int) time.Time {
 	jitter := time.Duration(rand.Int31n(30_000)) * time.Millisecond
 	return time.Now().Add(at).Add(jitter)
 }
+
+// GetLinearBackoffFunc returns a backoff function that returns a fixed interval
+// between attempts.
+func GetLinearBackoffFunc(interval time.Duration) BackoffFunc {
+	return func(attemptNum int) time.Time {
+		return time.Now().Add(interval)
+	}
+}

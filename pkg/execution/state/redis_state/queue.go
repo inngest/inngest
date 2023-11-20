@@ -15,6 +15,7 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
+	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/concurrency"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -277,6 +278,12 @@ func WithConcurrencyService(s concurrency.ConcurrencyService) func(q *queue) {
 	}
 }
 
+func WithBackoffFunc(f backoff.BackoffFunc) func(q *queue) {
+	return func(q *queue) {
+		q.backoffFunc = f
+	}
+}
+
 // QueueItemConcurrencyKeyGenerator returns concurrenc keys given a queue item to limits.
 //
 // Each queue item can have its own concurrency keys.  For example, you can define
@@ -315,6 +322,7 @@ func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 			return p.Queue(), 10_000
 		},
 		itemIndexer: QueueItemIndexerFunc,
+		backoffFunc: backoff.DefaultBackoff,
 	}
 
 	for _, opt := range opts {
@@ -406,6 +414,8 @@ type queue struct {
 	scope tally.Scope
 	// tracer is the tracer to use for opentelemetry tracing.
 	tracer trace.Tracer
+	// backoffFunc is the backoff function to use when retrying operations.
+	backoffFunc backoff.BackoffFunc
 }
 
 // processItem references the queue partition and queue item to be processed by a worker.

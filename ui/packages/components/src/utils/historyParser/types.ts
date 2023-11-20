@@ -41,22 +41,27 @@ export type HistoryNode = {
   };
 };
 
-export type HistoryType =
-  | 'FunctionCancelled'
-  | 'FunctionCompleted'
-  | 'FunctionFailed'
-  | 'FunctionScheduled'
-  | 'FunctionStarted'
-  | 'FunctionStatusUpdated'
-  | 'None'
-  | 'StepCompleted'
-  | 'StepErrored'
-  | 'StepFailed'
-  | 'StepScheduled'
-  | 'StepSleeping'
-  | 'StepStarted'
-  | 'StepWaiting'
-  | 'StepInvokingFunction';
+const historyTypes = [
+  'FunctionCancelled',
+  'FunctionCompleted',
+  'FunctionFailed',
+  'FunctionScheduled',
+  'FunctionStarted',
+  'FunctionStatusUpdated',
+  'None',
+  'StepCompleted',
+  'StepErrored',
+  'StepFailed',
+  'StepScheduled',
+  'StepSleeping',
+  'StepStarted',
+  'StepWaiting',
+  'StepInvokingFunction',
+] as const;
+export type HistoryType = (typeof historyTypes)[number];
+export function isHistoryType(value: string): value is HistoryType {
+  return historyTypes.includes(value as HistoryType);
+}
 
 export type RawHistoryItem = {
   attempt: number;
@@ -77,7 +82,7 @@ export type RawHistoryItem = {
   } | null;
   stepName?: string | null;
   stepType?: 'Run' | 'Send' | 'Sleep' | 'Wait' | null;
-  type: HistoryType;
+  type: string;
   url?: string | null;
   waitForEvent?: {
     eventName: string;

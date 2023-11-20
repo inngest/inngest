@@ -17,6 +17,8 @@ var (
 )
 
 type WaitForEventOpts struct {
+	// Name represents the optional step name.
+	Name string
 	// Event is the event name to wait for.
 	Event string
 	// Timeout is how long to wait.  We must always timebound event lsiteners.
@@ -25,7 +27,7 @@ type WaitForEventOpts struct {
 	If *string `json:"if"`
 }
 
-func WaitForEvent[T any](ctx context.Context, opts WaitForEventOpts) (T, error) {
+func WaitForEvent[T any](ctx context.Context, id string, opts WaitForEventOpts) (T, error) {
 	mgr := preflight(ctx)
 	args := map[string]any{
 		"timeout": str2duration.String(opts.Timeout),
@@ -34,7 +36,7 @@ func WaitForEvent[T any](ctx context.Context, opts WaitForEventOpts) (T, error) 
 		args["if"] = *opts.If
 	}
 
-	op := mgr.NewOp(enums.OpcodeWaitForEvent, opts.Event, args)
+	op := mgr.NewOp(enums.OpcodeWaitForEvent, id, args)
 	if val, ok := mgr.Step(op); ok {
 		var output T
 		if val == nil || bytes.Equal(val, []byte{0x6e, 0x75, 0x6c, 0x6c}) {
@@ -50,7 +52,7 @@ func WaitForEvent[T any](ctx context.Context, opts WaitForEventOpts) (T, error) 
 	mgr.AppendOp(state.GeneratorOpcode{
 		ID:   op.MustHash(),
 		Op:   op.Op,
-		Name: op.Name,
+		Name: opts.Name,
 		Opts: op.Opts,
 	})
 	panic(ControlHijack{})

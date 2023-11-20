@@ -35,7 +35,7 @@ export default function NavItem<PassedHref extends string>({
       key={href.toString()}
       href={href}
       className={cn(
-        'flex items-center gap-1.5 border-b-2 px-2.5 py-4 text-sm leading-none tracking-wide transition-all',
+        'flex items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 py-4 text-sm leading-none tracking-wide transition-all',
         isActive
           ? ' border-indigo-400 text-white'
           : 'border-transparent text-slate-400 hover:border-slate-400 hover:text-white'

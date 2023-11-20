@@ -52,7 +52,6 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
       console.error('Error creating app:', error);
     }
     onClose();
-    // To do: add optimistic render in the list
   }
 
   function handleSubmit(e: React.SyntheticEvent) {
@@ -76,11 +75,16 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
       footer={
         <div className="flex items-center justify-between">
           <Button label="Cancel" appearance="outlined" btnAction={onClose} />
-          <Button disabled={isDisabled || isUrlInvalid} label="Connect App" type="submit" />
+          <Button
+            disabled={isDisabled || isUrlInvalid}
+            label="Connect App"
+            type="submit"
+            form="add-app"
+          />
         </div>
       }
     >
-      <form onSubmit={handleSubmit}>
+      <form id="add-app" onSubmit={handleSubmit}>
         <div className="p-6">
           <label htmlFor="addAppUrlModal" className="text-sm font-semibold text-white">
             App URL
