@@ -189,7 +189,7 @@ Let's write your first reliable serverless function! <GuideSection show="nextpag
     async ({ event, step }) => {
       await step.sleep("wait-a-moment", "1s");
       return { event, body: "Hello, World!" };
-    }
+    },
   );
   ```
 
@@ -225,7 +225,7 @@ Full details about [`createFunction` can be found here](/docs/reference/function
     async ({ event, step }) => {
       await step.sleep("wait-a-moment", "1s");
       return { event, body: "Hello, World!" };
-    }
+    },
   );
   ```
 
@@ -296,13 +296,13 @@ The event is sent to Inngest running locally via `npx inngest-cli@latest dev`, w
 
 <img
   src="/assets/docs/quick-start/dev-server-stream.jpg"
-  width="800" height={800/2762*1868} quality="95" 
+  width="800" height={800/2762*1868} quality="95"
   className="rounded-md"
 />
 
 <img
   src="/assets/docs/quick-start/dev-server-stream-details.jpg"
-  width="800" height={800/2762*1868} quality="95" 
+  width="800" height={800/2762*1868} quality="95"
   className="rounded-md"
 />
 
@@ -329,8 +329,14 @@ To send an event from your code, you can use the `Inngest` client's `send()` met
   import { NextApiRequest, NextApiResponse } from "next";
   import { inngest } from "./inngest";
 
+  // Opt out of caching; every request should send a new event
+  export const dynamic = "force-dynamic";
+
   // Create a simple async Next.js API route handler
-  export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  export default async function handler(
+    req: NextApiRequest,
+    res: NextApiResponse,
+  ) {
     // Send your event payload to Inngest
     await inngest.send({
       name: "test/hello.world",
@@ -345,8 +351,11 @@ To send an event from your code, you can use the `Inngest` client's `send()` met
 </GuideSection>
 <GuideSection show="nextappdir">
   ```ts
-  import { NextResponse } from 'next/server';
+  import { NextResponse } from "next/server";
   import { inngest } from "../../../inngest/client"; // Import our client
+
+  // Opt out of caching; every request should send a new event
+  export const dynamic = "force-dynamic";
 
   // Create a simple async Next.js API route handler
   export async function GET() {
@@ -363,6 +372,8 @@ To send an event from your code, you can use the `Inngest` client's `send()` met
   ```
 </GuideSection>
 
+Note that we use [`"force-dynamic"`](https://nextjs.org/docs/app/building-your-application/caching) to ensure we always send a new event on every request. In most situations, you'll probably want to send an event during a `POST` request so that you don't need this config option.
+
 <Callout>
 Sending events requires an ["**event key**"](/docs/events/creating-an-event-key) to send data to Inngest in production. For local development, we only need a placeholder key. Create an `.env.local` file in your project and add the following environment variable:
 
@@ -371,7 +382,6 @@ INNGEST_EVENT_KEY="local"
 ```
 
 After adding this, restart the `npm run dev` command that you have running.
-
 </Callout>
 
 Every time this API route is requested, an event is sent to Inngest. To test it, drop this new API route's URL in your web browser: `http://localhost:3000/api/hello` (change your port if your app is running elsewhere). With the `send` function you now can:
