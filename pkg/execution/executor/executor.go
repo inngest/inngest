@@ -895,33 +895,14 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 				return
 			}
 
-			withEvt := evt.GetEvent()
-			with := withEvt.Map()
-			var runID *ulid.ULID
+			resumeData := pause.GetResumeData(evt.GetEvent())
 
-			isInvokeFunctionOpcode := pause.Opcode != nil && *pause.Opcode == enums.OpcodeInvokeFunction.String()
-			isFnFinishedEvent := withEvt.Name == event.FnFinishedName
-
-			if isInvokeFunctionOpcode && isFnFinishedEvent {
-				if retRunID, ok := withEvt.Data["run_id"].(string); ok {
-					if ulidRunID, _ := ulid.Parse(retRunID); ulidRunID != (ulid.ULID{}) {
-						runID = &ulidRunID
-					}
-				}
-
-				if errorData, errorExists := withEvt.Data["error"]; errorExists {
-					with = map[string]any{"error": errorData}
-				} else if resultData, resultExists := withEvt.Data["result"]; resultExists {
-					with = map[string]any{"data": resultData}
-				}
-			}
-
-			logger.From(ctx).Debug().Interface("with", with).Str("pause.DataKey", pause.DataKey).Msg("resuming pause")
+			logger.From(ctx).Debug().Interface("with", resumeData.With).Str("pause.DataKey", pause.DataKey).Msg("resuming pause")
 
 			err := e.Resume(ctx, *pause, execution.ResumeRequest{
-				With:    with,
+				With:    resumeData.With,
 				EventID: &evtID,
-				RunID:   runID,
+				RunID:   resumeData.RunID,
 			})
 			if err != nil {
 				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))

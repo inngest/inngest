@@ -4,7 +4,10 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/oklog/ulid/v2"
 )
 
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
@@ -162,4 +165,38 @@ func (p Pause) Edge() inngest.Edge {
 		Outgoing: p.Outgoing,
 		Incoming: p.Incoming,
 	}
+}
+
+type ResumeData struct {
+	// RunID is the
+	RunID *ulid.ULID
+	With  map[string]any
+}
+
+// Given an event, this returns data used to resume an execution.
+func (p Pause) GetResumeData(evt event.Event) ResumeData {
+	ret := ResumeData{
+		With: evt.Map(),
+	}
+
+	// Function invocations are resumed using an event, but we want to unwrap the event from this
+	// data and return only what the function returned. We do this here by unpacking the function
+	// finished event to pull out the correct data to place in state.
+	isInvokeFunctionOpcode := p.Opcode != nil && *p.Opcode == enums.OpcodeInvokeFunction.String()
+	isFnFinishedEvent := evt.Name == event.FnFinishedName
+	if isInvokeFunctionOpcode && isFnFinishedEvent {
+		if retRunID, ok := evt.Data["run_id"].(string); ok {
+			if ulidRunID, _ := ulid.Parse(retRunID); ulidRunID != (ulid.ULID{}) {
+				ret.RunID = &ulidRunID
+			}
+		}
+
+		if errorData, errorExists := evt.Data["error"]; errorExists {
+			ret.With = map[string]any{"error": errorData}
+		} else if resultData, resultExists := evt.Data["result"]; resultExists {
+			ret.With = map[string]any{"data": resultData}
+		}
+	}
+
+	return ret
 }

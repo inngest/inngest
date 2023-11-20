@@ -176,5 +176,7 @@ type CancelRequest struct {
 type ResumeRequest struct {
 	With    any
 	EventID *ulid.ULID
-	RunID   *ulid.ULID
+	// RunID is the ID of the run that causes this resume, used for invoking
+	// functions directly.
+	RunID *ulid.ULID
 }
