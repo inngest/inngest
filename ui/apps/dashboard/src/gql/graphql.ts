@@ -44,6 +44,17 @@ export type ApiKey = {
   name: Maybe<Scalars['String']>;
 };
 
+export type AwsMarketplaceSetupInput = {
+  awsAccountID: Scalars['String'];
+  customerID: Scalars['String'];
+  productCode: Scalars['String'];
+};
+
+export type AwsMarketplaceSetupResponse = {
+  __typename?: 'AWSMarketplaceSetupResponse';
+  message: Scalars['String'];
+};
+
 export type Account = {
   __typename?: 'Account';
   apiKeys: Array<Maybe<ApiKey>>;
@@ -564,7 +575,7 @@ export type FunctionRun = {
   __typename?: 'FunctionRun';
   accountID: Scalars['UUID'];
   batchID: Maybe<Scalars['ULID']>;
-  canRerun: Scalars['Boolean'];
+  canRerun: Maybe<Scalars['Boolean']>;
   contactID: Maybe<Scalars['UUID']>;
   endedAt: Maybe<Scalars['Time']>;
   event: Maybe<ArchivedEvent>;
@@ -580,7 +591,7 @@ export type FunctionRun = {
   status: FunctionRunStatus;
   timeline: Maybe<Array<RunTimeline>>;
   workflowID: Scalars['UUID'];
-  workflowVersion: WorkflowVersion;
+  workflowVersion: Maybe<WorkflowVersion>;
   workflowVersionInt: Scalars['Int'];
   workspaceID: Scalars['UUID'];
 };
@@ -682,6 +693,7 @@ export type Mutation = {
   archiveEnvironment: Workspace;
   archiveEvent: Maybe<Event>;
   archiveWorkflow: Maybe<WorkflowResponse>;
+  completeAWSMarketplaceSetup: Maybe<AwsMarketplaceSetupResponse>;
   createAPIKey: VisibleApiKey;
   createAction: Action;
   createIngestKey: IngestKey;
@@ -735,6 +747,11 @@ export type MutationArchiveEventArgs = {
 
 export type MutationArchiveWorkflowArgs = {
   input: ArchiveWorkflowInput;
+};
+
+
+export type MutationCompleteAwsMarketplaceSetupArgs = {
+  input: AwsMarketplaceSetupInput;
 };
 
 
@@ -1935,7 +1952,7 @@ export type GetFunctionRunTimelineQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunTimelineQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', id: string, run: { __typename?: 'FunctionRun', canRerun: boolean, timeline: Array<{ __typename?: 'RunTimeline', stepName: string | null, output: string | null, type: RunHistoryType, history: Array<{ __typename?: 'RunHistory', id: string, type: RunHistoryType, createdAt: string, stepData: { __typename?: 'RunHistoryStepData', data: string | null } | null }> | null }> | null } } | null } };
+export type GetFunctionRunTimelineQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', id: string, run: { __typename?: 'FunctionRun', canRerun: boolean | null, timeline: Array<{ __typename?: 'RunTimeline', stepName: string | null, output: string | null, type: RunHistoryType, history: Array<{ __typename?: 'RunHistory', id: string, type: RunHistoryType, createdAt: string, stepData: { __typename?: 'RunHistoryStepData', data: string | null } | null }> | null }> | null } } | null } };
 
 export type GetFunctionRunOutputQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1972,7 +1989,7 @@ export type GetFunctionRunDetailsQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunDetailsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', id: string, name: string, slug: string, run: { __typename?: 'FunctionRun', canRerun: boolean, id: string, status: FunctionRunStatus, startedAt: string, endedAt: string | null, output: string | null, event: { __typename?: 'ArchivedEvent', id: string, name: string, receivedAt: string, payload: string } | null, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: string, functionVersion: number, groupID: string | null, id: string, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: string | null, expression: string | null, userID: string | null } | null, sleep: { __typename?: 'RunHistorySleep', until: string } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: string } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: string | null, timeout: boolean } | null }>, version: { __typename?: 'WorkflowVersion', url: string, validFrom: string | null, version: number, deploy: { __typename?: 'Deploy', id: string, createdAt: string } | null, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName: null | string | null, schedule: null | string | null }> } } } | null } };
+export type GetFunctionRunDetailsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', id: string, name: string, slug: string, run: { __typename?: 'FunctionRun', canRerun: boolean | null, id: string, status: FunctionRunStatus, startedAt: string, endedAt: string | null, output: string | null, event: { __typename?: 'ArchivedEvent', id: string, name: string, receivedAt: string, payload: string } | null, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: string, functionVersion: number, groupID: string | null, id: string, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: string | null, expression: string | null, userID: string | null } | null, sleep: { __typename?: 'RunHistorySleep', until: string } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: string } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: string | null, timeout: boolean } | null }>, version: { __typename?: 'WorkflowVersion', url: string, validFrom: string | null, version: number, deploy: { __typename?: 'Deploy', id: string, createdAt: string } | null, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName: null | string | null, schedule: null | string | null }> } | null } } | null } };
 
 export type GetFunctionRunsCountQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -2124,6 +2141,13 @@ export type CreateWebhookMutationVariables = Exact<{
 
 
 export type CreateWebhookMutation = { __typename?: 'Mutation', key: { __typename?: 'IngestKey', id: string, url: string | null } };
+
+export type CompleteAwsMarketplaceSetupMutationVariables = Exact<{
+  input: AwsMarketplaceSetupInput;
+}>;
+
+
+export type CompleteAwsMarketplaceSetupMutation = { __typename?: 'Mutation', completeAWSMarketplaceSetup: { __typename?: 'AWSMarketplaceSetupResponse', message: string } | null };
 
 export type GetAccountSupportInfoQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -2288,6 +2312,7 @@ export const DeleteUserDocument = {"kind":"Document","definitions":[{"kind":"Ope
 export const CreateUserDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateUser"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"NewUser"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createUser"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<CreateUserMutation, CreateUserMutationVariables>;
 export const GetUsersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetUsers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"users"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"lastLoginAt"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"session"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]}}]} as unknown as DocumentNode<GetUsersQuery, GetUsersQueryVariables>;
 export const CreateWebhookDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateWebhook"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"NewIngestKey"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"key"},"name":{"kind":"Name","value":"createIngestKey"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"url"}}]}}]}}]} as unknown as DocumentNode<CreateWebhookMutation, CreateWebhookMutationVariables>;
+export const CompleteAwsMarketplaceSetupDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CompleteAWSMarketplaceSetup"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"AWSMarketplaceSetupInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"completeAWSMarketplaceSetup"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]} as unknown as DocumentNode<CompleteAwsMarketplaceSetupMutation, CompleteAwsMarketplaceSetupMutationVariables>;
 export const GetAccountSupportInfoDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetAccountSupportInfo"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"plan"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"amount"}},{"kind":"Field","name":{"kind":"Name","value":"features"}}]}}]}}]}}]} as unknown as DocumentNode<GetAccountSupportInfoQuery, GetAccountSupportInfoQueryVariables>;
 export const GetAccountNameDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetAccountName"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]} as unknown as DocumentNode<GetAccountNameQuery, GetAccountNameQueryVariables>;
 export const GetGlobalSearchDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetGlobalSearch"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"opts"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"SearchInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"search"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"opts"},"value":{"kind":"Variable","name":{"kind":"Name","value":"opts"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"results"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"env"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"type"}}]}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"value"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ArchivedEvent"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FunctionRun"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","alias":{"kind":"Name","value":"functionID"},"name":{"kind":"Name","value":"workflowID"}}]}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetGlobalSearchQuery, GetGlobalSearchQueryVariables>;

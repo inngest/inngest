@@ -3,17 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowRightIcon } from '@heroicons/react/20/solid';
-import { Button } from '@inngest/components/Button';
 import slugify from '@sindresorhus/slugify';
 import { useMutation } from 'urql';
 
-import { Alert } from '@/components/Alert';
 import { graphql } from '@/gql';
-import InngestLogo from '@/icons/InngestLogo';
 import WebhookIcon from '@/icons/webhookIcon.svg';
 import { useEnvironments } from '@/queries';
 import { getProductionEnvironment } from '@/utils/environments';
 import { createTransform } from '../../(dashboard)/env/[environmentSlug]/manage/[ingestKeys]/[keyID]/TransformEvent';
+import ApprovalDialog from '../ApprovalDialog';
 
 const CreateWebhook = graphql(`
   mutation CreateWebhook($input: NewIngestKey!) {
@@ -28,7 +26,7 @@ export default function Page() {
   // TODO - handle failure to fetch environments
   const [{ data: environments }] = useEnvironments();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<String>('');
+  const [error, setError] = useState<string>('');
 
   const params = useSearchParams();
   const [, createWebhook] = useMutation(CreateWebhook);
@@ -108,61 +106,39 @@ export default function Page() {
   }
 
   return (
-    <div className="h-full overflow-y-scroll">
-      <div className="mx-auto flex h-full max-w-screen-xl flex-col px-6">
-        <header className="flex items-center justify-between py-6">
-          <InngestLogo />
-          <h1 className="hidden">Inngest</h1>
-        </header>
-        <div className="flex grow items-center">
-          <main className="m-auto max-w-2xl pb-24 text-center font-medium">
-            <h2 className="my-6 text-xl font-bold">
-              {name} is requesting permission to create a new webhook URL
-            </h2>
-            <div className="my-12 flex flex-row place-content-center items-center justify-items-center gap-6">
-              <ArrowRightIcon className="w-16 text-indigo-400" />
-              <WebhookIcon className="w-16 text-indigo-400" />
-            </div>
-            <div className="mx-auto max-w-xl">
-              <p className="my-6">
-                This will create a new webhook within your <u>Production</u> environment. It can be
-                modified or deleted at any time from the Inngest dashboard.
-              </p>
-              <p className="my-6">
-                Upon creation, the webhook will begin sending events with the following prefix:{' '}
-                <br />
-                <br />
-                <pre>
-                  {prefix}
-                  {'/*'}
-                </pre>
-              </p>
-              <p className="my-6"></p>
-            </div>
-            <div className="my-12 flex justify-center gap-6">
-              <Button
-                btnAction={cancel}
-                appearance="outlined"
-                size="large"
-                disabled={loading}
-                label="Cancel"
-              />
-              <Button
-                btnAction={approve}
-                kind="primary"
-                size="large"
-                disabled={loading}
-                label="Approve"
-              />
-            </div>
-            {error && <Alert severity="error">{error}</Alert>}
-            <p className="mt-12 text-sm text-slate-500">
-              By approving this request, the created webhook URL will be shared with {name}. <br />
-              No other data from your Inngest account will be shared.
-            </p>
-          </main>
-        </div>
-      </div>
-    </div>
+    <ApprovalDialog
+      title={`${name} is requesting permission to create a new webhook URL`}
+      description={
+        <>
+          <p className="my-6">
+            This will create a new webhook within your <u>Production</u> environment. It can be
+            modified or deleted at any time from the Inngest dashboard.
+          </p>
+          <p className="my-6">
+            Upon creation, the webhook will begin sending events with the following prefix:{' '}
+          </p>
+          <pre>
+            {prefix}
+            {'/*'}
+          </pre>
+        </>
+      }
+      graphic={
+        <>
+          <ArrowRightIcon className="w-16 text-indigo-400" />
+          <WebhookIcon className="w-16 text-indigo-400" />
+        </>
+      }
+      isLoading={loading}
+      onApprove={approve}
+      onCancel={cancel}
+      error={error}
+      secondaryInfo={
+        <>
+          By approving this request, the created webhook URL will be shared with {name}. <br />
+          No other data from your Inngest account will be shared.
+        </>
+      }
+    />
   );
 }
