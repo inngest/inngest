@@ -19,7 +19,10 @@ var (
 
 // SetLevel sets the default log level.
 func SetLevel(to string) {
-	logLevel = to
+	lvl, err := zerolog.ParseLevel(to)
+	if err == nil {
+		logLevel = lvl.String()
+	}
 }
 
 // SetLogLevel sets the default log level.
