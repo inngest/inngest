@@ -124,7 +124,8 @@ type InvokeNotFoundHandlerOpts struct {
 }
 
 // FinishHandler is a function that handles functions finishing in the executor.
-type FinishHandler func(context.Context, state.Identifier, state.State, state.DriverResponse) error
+// It should be used to send the given events.
+type FinishHandler func(context.Context, state.State, []event.Event) error
 
 // InvokeNotFoundHandler is a function that handles invocations failing due to
 // the function not being found.

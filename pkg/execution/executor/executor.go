@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -465,7 +466,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			resp.SetError(state.ErrFunctionOverflowed)
 			resp.SetFinal()
 
-			_ = e.finishHandler(ctx, id, s, resp)
+			_ = e.runFinishHandler(ctx, id, s, resp)
 			for _, e := range e.lifecycles {
 				go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, resp, s)
 			}
@@ -571,7 +572,7 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 			return fmt.Errorf("error marking function as complete: %w", serr)
 		}
 		s, _ := e.sm.Load(ctx, id.RunID)
-		if ferr := e.finishHandler(ctx, id, s, *resp); ferr != nil {
+		if ferr := e.runFinishHandler(ctx, id, s, *resp); ferr != nil {
 			// XXX: log
 			_ = ferr
 		}
@@ -593,7 +594,7 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 					return fmt.Errorf("error marking function as complete: %w", serr)
 				}
 				s, _ := e.sm.Load(ctx, id.RunID)
-				_ = e.finishHandler(ctx, id, s, *resp)
+				_ = e.runFinishHandler(ctx, id, s, *resp)
 				for _, e := range e.lifecycles {
 					go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp, s)
 				}
@@ -620,7 +621,7 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 
 	_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt)
 	s, _ := e.sm.Load(ctx, id.RunID)
-	if ferr := e.finishHandler(ctx, id, s, *resp); ferr != nil {
+	if ferr := e.runFinishHandler(ctx, id, s, *resp); ferr != nil {
 		// XXX: log
 		_ = ferr
 	}
@@ -634,6 +635,62 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 	}
 
 	return nil
+}
+
+func (e *executor) runFinishHandler(ctx context.Context, id state.Identifier, s state.State, resp state.DriverResponse) error {
+	if e.finishHandler == nil {
+		return nil
+	}
+
+	// Prepare events that we must send
+	var events []event.Event
+	now := time.Now()
+
+	// Legacy - send inngest/function.failed
+	if resp.Err != nil {
+		events = append(events, event.Event{
+			ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+			Name:      event.FnFailedName,
+			Timestamp: now.UnixMilli(),
+			Data: map[string]interface{}{
+				"function_id": s.Function().Slug,
+				"run_id":      id.RunID.String(),
+				"error":       resp.UserError(),
+				"event":       s.Event(),
+			},
+		})
+	}
+
+	// send inngest/function.finished
+	data := map[string]interface{}{
+		"function_id": s.Function().Slug,
+		"run_id":      id.RunID.String(),
+	}
+
+	origEvt := s.Event()
+	if dataMap, ok := origEvt["data"].(map[string]interface{}); ok {
+		if inngestObj, ok := dataMap[consts.InngestEventDataPrefix].(map[string]interface{}); ok {
+			if dataValue, ok := inngestObj[consts.InvokeCorrelationId].(string); ok {
+				logger.From(ctx).Debug().Str("data_value_str", dataValue).Msg("data_value")
+				data[consts.InvokeCorrelationId] = dataValue
+			}
+		}
+	}
+
+	if resp.Err != nil {
+		data["error"] = resp.UserError()
+	} else {
+		data["result"] = resp.Output
+	}
+
+	events = append(events, event.Event{
+		ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+		Name:      event.FnFinishedName,
+		Timestamp: now.UnixMilli(),
+		Data:      data,
+	})
+
+	return e.finishHandler(ctx, s, events)
 }
 
 // run executes the step with the given step ID.

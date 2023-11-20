@@ -2,15 +2,12 @@ package executor
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -21,7 +18,6 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
-	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -116,7 +112,7 @@ func (s *svc) Executor() execution.Executor {
 	return s.exec
 }
 
-func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state.Identifier, state.State, state.DriverResponse) error, error) {
+func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state.State, []event.Event) error, error) {
 	pb, err := pubsub.NewPublisher(ctx, s.config.EventStream.Service)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create publisher: %w", err)
@@ -124,28 +120,15 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 
 	topicName := s.config.EventStream.Service.Concrete.TopicName()
 
-	return func(ctx context.Context, id state.Identifier, st state.State, r state.DriverResponse) error {
+	return func(ctx context.Context, st state.State, events []event.Event) error {
 		eg := errgroup.Group{}
-		now := time.Now()
 
-		// Legacy - send inngest/function.failed
-		if r.Err != nil {
+		for _, e := range events {
+			evt := e
 			eg.Go(func() error {
-				evt := event.Event{
-					ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
-					Name:      event.FnFailedName,
-					Timestamp: now.UnixMilli(),
-					Data: map[string]interface{}{
-						"function_id": st.Function().Slug,
-						"run_id":      id.RunID.String(),
-						"error":       r.UserError(),
-						"event":       st.Event(),
-					},
-				}
-
 				byt, err := json.Marshal(evt)
 				if err != nil {
-					return fmt.Errorf("error marshalling failure event: %w", err)
+					return fmt.Errorf("error marshalling event: %w", err)
 				}
 
 				err = pb.Publish(
@@ -154,70 +137,15 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 					pubsub.Message{
 						Name:      event.EventReceivedName,
 						Data:      string(byt),
-						Timestamp: now,
+						Timestamp: evt.Time(),
 					},
 				)
 				if err != nil {
-					return fmt.Errorf("error publishing failure event: %w", err)
+					return fmt.Errorf("error publishing event: %w", err)
 				}
-
 				return nil
 			})
 		}
-
-		// send inngest/function.finished
-		eg.Go(func() error {
-			data := map[string]interface{}{
-				"function_id": st.Function().Slug,
-				"run_id":      id.RunID.String(),
-			}
-
-			origEvt := st.Event()
-			if dataMap, ok := origEvt["data"].(map[string]interface{}); ok {
-				if inngestObj, ok := dataMap[consts.InngestEventDataPrefix].(map[string]interface{}); ok {
-					if dataValue, ok := inngestObj[consts.InvokeCorrelationId].(string); ok {
-						logger.From(ctx).Debug().Str("data_value_str", dataValue).Msg("data_value")
-						data[consts.InvokeCorrelationId] = dataValue
-					}
-				}
-			}
-
-			if r.Err != nil {
-				data["error"] = r.UserError()
-			} else {
-				data["result"] = r.Output
-			}
-
-			evt := event.Event{
-				ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
-				Name:      event.FnFinishedName,
-				Timestamp: now.UnixMilli(),
-				Data:      data,
-			}
-
-			logger.From(ctx).Debug().Interface("event", evt).Msg("function finished event")
-
-			byt, err := json.Marshal(evt)
-			if err != nil {
-				logger.From(ctx).Error().Err(err).Msg("error marshalling function finished event")
-				return err
-			}
-
-			err = pb.Publish(
-				ctx,
-				topicName,
-				pubsub.Message{
-					Name:      event.EventReceivedName,
-					Data:      string(byt),
-					Timestamp: now,
-				},
-			)
-			if err != nil {
-				return fmt.Errorf("error publishing function finished event: %w", err)
-			}
-
-			return nil
-		})
 
 		return eg.Wait()
 	}, nil
