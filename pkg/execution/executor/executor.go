@@ -642,6 +642,13 @@ func (e *executor) runFinishHandler(ctx context.Context, id state.Identifier, s 
 		return nil
 	}
 
+	triggerEvt := s.Event()
+	if name, ok := triggerEvt["name"].(string); ok && (name == event.FnFailedName || name == event.FnFinishedName) {
+		// Don't recursively trigger internal finish handlers.
+		logger.From(ctx).Debug().Str("name", name).Msg("not triggering finish handler for internal event")
+		return nil
+	}
+
 	// Prepare events that we must send
 	var events []event.Event
 	now := time.Now()
@@ -656,7 +663,7 @@ func (e *executor) runFinishHandler(ctx context.Context, id state.Identifier, s 
 				"function_id": s.Function().Slug,
 				"run_id":      id.RunID.String(),
 				"error":       resp.UserError(),
-				"event":       s.Event(),
+				"event":       triggerEvt,
 			},
 		})
 	}
@@ -667,8 +674,7 @@ func (e *executor) runFinishHandler(ctx context.Context, id state.Identifier, s 
 		"run_id":      id.RunID.String(),
 	}
 
-	origEvt := s.Event()
-	if dataMap, ok := origEvt["data"].(map[string]interface{}); ok {
+	if dataMap, ok := triggerEvt["data"].(map[string]interface{}); ok {
 		if inngestObj, ok := dataMap[consts.InngestEventDataPrefix].(map[string]interface{}); ok {
 			if dataValue, ok := inngestObj[consts.InvokeCorrelationId].(string); ok {
 				logger.From(ctx).Debug().Str("data_value_str", dataValue).Msg("data_value")
