@@ -1,0 +1,46 @@
+# Environment variables
+
+You can use environment variables to control some configuration.
+
+---
+
+## `INNGEST_API_BASE_URL`
+
+Origin for the Inngest API. Your app registers itself with this API.
+
+- Defaults to `https://api.inngest.com/`.
+- Can be overwritten by specifying `api_base_url` when calling a `serve` function.
+
+You likely won't need to set this.
+
+---
+
+## `INNGEST_EVENT_API_BASE_URL`
+
+Origin for the Inngest Event API. The Inngest client sends events to this API.
+
+- Defaults to `https://inn.gs/`.
+- If set, it should be an origin (protocol, host, and optional port). For example, `http://localhost:8288` or `https://my.tunnel.com` are both valid.
+- Can be overwritten by specifying `base_url` when creating the Inngest client.
+
+You likely won't need to set this. But some use cases include:
+- Forcing a production build of your app to use the Inngest Dev Server instead of Inngest Cloud for local integration testing. You might want `http://localhost:8288` for that.
+- Using the Dev Server within a Docker container. You might want `http://host.docker.internal:8288` for that.
+
+---
+
+## `INNGEST_EVENT_KEY`
+
+The secret key used to send events to Inngest.
+
+- Can be overwritten by specifying `event_key` when creating the Inngest client.
+- Not needed when using the Dev Server.
+
+---
+
+## `INNGEST_SIGNING_KEY`
+
+The secret key used to sign requests to and from Inngest, mitigating the risk of man-in-the-middle attacks.
+
+- Can be overwritten by specifying `signing_key` when calling a `serve` function.
+- Not needed when using the Dev Server.

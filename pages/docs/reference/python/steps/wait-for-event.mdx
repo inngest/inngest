@@ -1,0 +1,21 @@
+# Wait for event
+
+Wait until the Inngest server receives a specific event.
+
+If an event is received before the timeout then the event is returned. If the timeout is reached then `None` is returned.
+
+```py
+@inngest.create_function(
+    fn_id="my_function",
+    trigger=inngest.TriggerEvent(event="app/my_function"),
+)
+async def fn(
+    ctx: inngest.Context,
+    step: inngest.Step,
+) -> None:
+    res = await step.wait_for_event(
+        "wait",
+        event="app/wait_for_event.fulfill",
+        timeout=datetime.timedelta(seconds=2),
+    )
+```

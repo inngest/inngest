@@ -1,0 +1,32 @@
+# Parallel <VersionBadge version="v0.2.0+" />
+
+<Callout variant="warning">
+    <span style={{fontFamily: 'none'}}>⚠️</span> This is an experimental feature and may change in the future.
+</Callout>
+
+Run steps in parallel.
+
+Returns the parallel steps' result as a tuple.
+
+```py
+@inngest.create_function(
+    fn_id="my-function",
+    trigger=inngest.TriggerEvent(event="app/my-function"),
+)
+async def fn(
+    ctx: inngest.Context,
+    step: inngest.Step,
+) -> None:
+    def _step_1a() -> int:
+        return 1
+
+    def _step_1b() -> int:
+        return 2
+
+    (step_1_res, step_2_res) = await step._experimental_parallel(
+        (
+            lambda: step.run("1a", _step_1a),
+            lambda: step.run("1b", _step_1b),
+        )
+    )
+```

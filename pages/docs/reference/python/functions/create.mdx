@@ -9,7 +9,7 @@ import inngest
     fn_id="import-product-images",
     trigger=inngest.TriggerEvent(event="shop/product.imported"),
 )
-async def fn(**_kwargs: object):
+async def fn(ctx: inngest.Context, step: inngest.Step):
     # Your function code
 ```
 
@@ -137,6 +137,8 @@ The `create_function` decorator accepts a configuration and wraps a plain functi
   </Property>
 </Properties>
 
+---
+
 ## Triggers
 
 ### `TriggerEvent`
@@ -158,6 +160,8 @@ The `create_function` decorator accepts a configuration and wraps a plain functi
   </Property>
 </Properties>
 
+---
+
 ## Handler
 
 The handler is your code that runs whenever the trigger occurs. Every function handler receives a single object argument which can be deconstructed. The key arguments are `event` and `step`. Note, that scheduled functions that use a `cron` trigger will not receive an `event` argument.
@@ -166,59 +170,81 @@ The handler is your code that runs whenever the trigger occurs. Every function h
 @inngest.create_function(
     # Function options
 )
-async def fn(
-  *,
-  attempt: int,
-  event: inngest.Event,
-  events: list[inngest.Event],
-  logger: inngest.Logger,
-  run_id: str,
-  step: inngest.Step,
-):
+async def fn(ctx: inngest.Context, step: inngest.Step):
     # Function code
 ```
 
-### `attempt`
+### `ctx`
 
-The current zero-indexed attempt number for this function execution. The first attempt will be 0, the second 1, and so on. The attempt number is incremented every time the function throws an error and is retried.
+<Properties>
+  <Property name="attempt" type="int" attribute>
+    The current zero-indexed attempt number for this function execution. The first attempt will be 0, the second 1, and so on. The attempt number is incremented every time the function throws an error and is retried.
+  </Property>
 
+  <Property name="event" type="Event" attribute>
+    The event payload `object` that triggered the given function run. The event payload object will match what you send with [`inngest.send()`](/docs/reference/events/send). Below is an example event payload object:
 
-### `event`
+    <Properties nested>
+      <Property name="data" type="dict[str, object]" attribute>
+        The event payload data.
+      </Property>
 
-The event payload `object` that triggered the given function run. The event payload object will match what you send with [`inngest.send()`](/docs/reference/events/send). Below is an example event payload object:
+      <Property name="id" type="str" attribute>
+      </Property>
 
-```py
-inngest.Event(
-  name="app/account.created",
-  data={
-    "user_id": "1234567890"
-  },
-  id="01HENNF0X3BNBCM2718B4SNMN1",
-  ts=1683898268584
-)
-```
+      <Property name="name" type="str" attribute>
+      </Property>
 
-### `events`
+      <Property name="ts" type="int" attribute>
+        Time (Unix millis) the event was received by the Inngest server.
+      </Property>
 
-`events` is a list of `event` objects that's accessible when the `batch_events` is set on the function configuration.
-If batching is not configured, the list contains a single event payload matching the `event` argument.
+    </Properties>
+  </Property>
 
-### `logger`
+  <Property name="events" type="list[Event]" attribute>
+    A list of `event` objects that's accessible when the `batch_events` is set on the function configuration.
+    
+    If batching is not configured, the list contains a single event payload matching the `event` argument.
+  </Property>
 
-The `logger` object. It's a proxy object around either the logger you provided or the default logger.
+  <Property name="logger" type="logging.Logger" attribute>
+    A proxy object around either the logger you provided or the default logger.
+  </Property>
 
-### `run_id`
-
-The unique ID for the given function run. This can be useful for logging and looking up specific function runs in the Inngest dashboard.
+  <Property name="run_id" type="str" attribute>
+    The unique ID for the given function run. This can be useful for logging and looking up specific function runs in the Inngest dashboard.
+  </Property>
+</Properties>
 
 ### `step`
 
 The `step` object has a method for each kind of step in the Inngest platform.
-{/* 
-- [`step.run()`](/docs/reference/functions/step-run) - Run synchronous or asynchronous code as a retryable step in your function
-- [`step.sleep()`](/docs/reference/functions/step-sleep) - Sleep for a given amount of time
-- [`step.sleepUntil()`](/docs/reference/functions/step-sleep-until) - Sleep until a given time
-- [`step.waitForEvent()`](/docs/reference/functions/step-wait-for-event) - Pause a function's execution until another event is received
-- [`step.sendEvent()`](/docs/reference/functions/step-send-event) - Send event(s) reliability within your function. Use this instead of `inngest.send()` to ensure reliable event delivery from within functions. */}
 
 If your function is `async` then its type is `Step` and you can use `await` to call its methods. If your function is not `async` then its type is `SyncStep`.
+
+<Properties>
+  <Property name="run" type="Callable" attribute>
+    [Docs](/docs/reference/python/steps/run)
+  </Property>
+
+  <Property name="send_event" type="Callable" attribute>
+    [Docs](/docs/reference/python/steps/send_event)
+  </Property>
+
+  <Property name="send_event" type="Callable" attribute>
+    [Docs](/docs/reference/python/steps/send_event)
+  </Property>
+
+  <Property name="sleep" type="Callable" attribute>
+    [Docs](/docs/reference/python/steps/sleep)
+  </Property>
+
+  <Property name="sleep_until" type="Callable" attribute>
+    [Docs](/docs/reference/python/steps/sleep_until)
+  </Property>
+
+  <Property name="_experimental_parallel" type="Callable" attribute version="0.2.0+">
+    [Docs](/docs/reference/python/steps/parallel)
+  </Property>
+</Properties>

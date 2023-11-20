@@ -6,6 +6,8 @@ This guide will teach you how to add Inngest to a FastAPI app and run an Inngest
   💡 Inngest currently supports FastAPI, Flask, and Tornado. If you'd like support for your favorite framework please open an issue on [GitHub](https://github.com/inngest/inngest-py)!
 </Callout>
 
+---
+
 ## Create an app
 
 <Callout variant="warning">
@@ -29,6 +31,8 @@ from fastapi import FastAPI
 
 app = FastAPI()
 ```
+
+---
 
 ## Add Inngest
 
@@ -54,13 +58,8 @@ inngest_client = inngest.Inngest(
     # Event that triggers this function
     trigger=inngest.TriggerEvent(event="app/my_function"),
 )
-def my_function(
-    *,
-    event: inngest.Event,
-    logger: inngest.Logger,
-    **_kwargs: object,
-) -> str:
-    logger.info(event)
+async def my_function(ctx: inngest.Context, step: inngest.Step) -> str:
+    ctx.logger.info(ctx.event)
     return "done"
 
 app = FastAPI()
@@ -73,6 +72,8 @@ Start your app:
 ```sh
 uvicorn main:app --reload
 ```
+
+---
 
 ## Run Inngest Dev Server
 
@@ -90,6 +91,8 @@ After a few seconds, your app and function should now appear in the Dev Server U
 <Callout variant="info">
   💡 You can register multiple apps and multiple functions within each app.
 </Callout>
+
+---
 
 ## Run your function
 
