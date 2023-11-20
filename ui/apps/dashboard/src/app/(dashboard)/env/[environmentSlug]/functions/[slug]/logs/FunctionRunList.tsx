@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Button } from '@inngest/components/Button';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { Table } from '@inngest/components/Table';
 import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-table';
@@ -124,21 +125,17 @@ export default function FunctionRunList({
     },
     pause: !environment?.id,
   });
+
   const runs = data?.environment?.function?.runs?.edges?.map((edge) => edge?.node) ?? [];
-
   const endCursor = data?.environment?.function?.runs?.pageInfo.endCursor;
+  const hasNextPage = data?.environment?.function?.runs?.pageInfo.hasNextPage;
+  const isLoading = isFetchingEnvironments || fetching;
 
-  const fetchMoreOnScroll = useCallback((containerRefElement?: HTMLDivElement | null) => {
-    if (containerRefElement && runs?.length > 0) {
-      const { scrollHeight, scrollTop, clientHeight } = containerRefElement;
-      // Check if scrolled to the bottom
-      const reachedBottom = scrollHeight - scrollTop - clientHeight < 50;
-
-      if (reachedBottom && endCursor) {
-        setPageCursors([...pageCursors, endCursor]);
-      }
-    }
-  }, []);
+  useEffect(() => {
+    setFunctionRuns(
+      (prevFunctionRuns) => [...prevFunctionRuns, ...runs].filter(Boolean) as RunListItem[]
+    );
+  }, [data]);
 
   if (
     !data ||
@@ -151,14 +148,10 @@ export default function FunctionRunList({
   }
 
   return (
-    <div
-      className="min-h-0 w-full overflow-y-auto pb-10"
-      onScroll={(e) => fetchMoreOnScroll(e.target as HTMLDivElement)}
-      ref={tableContainerRef}
-    >
+    <div className="min-h-0 w-full overflow-y-auto pb-10" ref={tableContainerRef}>
       <Table
         options={{
-          data: runs ?? [],
+          data: functionRuns ?? [],
           columns,
           getCoreRowModel: getCoreRowModel(),
           enableSorting: false,
@@ -175,8 +168,19 @@ export default function FunctionRunList({
           },
         }}
         tableContainerRef={tableContainerRef}
-        blankState={<p>No function runs</p>}
+        blankState={isLoading ? <p>Loading...</p> : <p>No function runs</p>}
       />
+      {hasNextPage && (
+        <div className="flex justify-center pt-4">
+          <Button
+            label="Load More"
+            loading={fetching}
+            btnAction={() =>
+              pageCursors && endCursor && setPageCursors([...pageCursors, endCursor])
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }
