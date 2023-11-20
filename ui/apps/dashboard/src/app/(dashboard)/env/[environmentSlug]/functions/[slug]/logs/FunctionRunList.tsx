@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { Link } from '@inngest/components/Link';
@@ -12,8 +12,6 @@ import { graphql } from '@/gql';
 import { FunctionRunStatus, FunctionRunTimeField, type RunListItem } from '@/gql/graphql';
 import { useEnvironment } from '@/queries';
 import { type TimeRange } from './TimeRangeFilter';
-
-const columnHelper = createColumnHelper<RunListItem>();
 
 const GetFunctionRunsDocument = graphql(`
   query GetFunctionRuns(
@@ -55,40 +53,57 @@ const GetFunctionRunsDocument = graphql(`
     }
   }
 `);
+function createColumns({
+  environmentSlug,
+  functionSlug,
+}: {
+  environmentSlug: string;
+  functionSlug: string;
+}) {
+  const columnHelper = createColumnHelper<RunListItem>();
 
-const columns = [
-  columnHelper.accessor('id', {
-    header: () => <span>ID</span>,
-    cell: (props) => (
-      <Link className="text-sm font-medium leading-7" internalNavigation href="">
-        {props.getValue()}
-      </Link>
-    ),
-  }),
-  columnHelper.accessor('status', {
-    header: () => <span>Status</span>,
-    cell: (props) => (
-      <div className="flex items-center gap-2 lowercase">
-        <FunctionRunStatusIcon status={props.getValue()} className="h-5 w-5" />
-        <p className="first-letter:capitalize">{props.getValue()}</p>
-      </div>
-    ),
-    size: 300,
-    minSize: 300,
-  }),
-  columnHelper.accessor('startedAt', {
-    header: () => <span>Scheduled At</span>,
-    cell: (props) => <time>{props.getValue()}</time>,
-    size: 300,
-    minSize: 300,
-  }),
-  columnHelper.accessor('endedAt', {
-    header: () => <span>Ended At</span>,
-    cell: (props) => <time>{props.getValue()}</time>,
-    size: 300,
-    minSize: 300,
-  }),
-];
+  return [
+    columnHelper.accessor('id', {
+      header: () => <span>ID</span>,
+      cell: (props) => {
+        return (
+          <Link
+            className="text-sm font-medium leading-7"
+            internalNavigation
+            href={`/env/${environmentSlug}/functions/${encodeURIComponent(
+              functionSlug
+            )}/logs/${props.getValue()}`}
+          >
+            {props.getValue()}
+          </Link>
+        );
+      },
+    }),
+    columnHelper.accessor('status', {
+      header: () => <span>Status</span>,
+      cell: (props) => (
+        <div className="flex items-center gap-2 lowercase">
+          <FunctionRunStatusIcon status={props.getValue()} className="h-5 w-5" />
+          <p className="first-letter:capitalize">{props.getValue()}</p>
+        </div>
+      ),
+      size: 300,
+      minSize: 300,
+    }),
+    columnHelper.accessor('startedAt', {
+      header: () => <span>Scheduled At</span>,
+      cell: (props) => <time>{props.getValue()}</time>,
+      size: 300,
+      minSize: 300,
+    }),
+    columnHelper.accessor('endedAt', {
+      header: () => <span>Ended At</span>,
+      cell: (props) => <time>{props.getValue()}</time>,
+      size: 300,
+      minSize: 300,
+    }),
+  ];
+}
 
 type FunctionRunListProps = {
   environmentSlug: string;
@@ -105,6 +120,10 @@ export default function FunctionRunList({
   selectedTimeRange,
   timeField,
 }: FunctionRunListProps) {
+  const columns = useMemo(() => {
+    return createColumns({ environmentSlug, functionSlug });
+  }, [environmentSlug, functionSlug]);
+
   const [pageCursors, setPageCursors] = useState<string[]>(['']);
   const [functionRuns, setFunctionRuns] = useState<RunListItem[]>([]);
   const [prevSelectedTimeField, setPrevSelectedTimeField] = useState(timeField);
