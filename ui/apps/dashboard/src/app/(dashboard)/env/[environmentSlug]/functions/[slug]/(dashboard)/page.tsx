@@ -1,9 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ChartBarIcon, ChevronRightIcon, XCircleIcon } from '@heroicons/react/20/solid';
-import { MetadataGrid, type MetadataItemProps } from '@inngest/components/Metadata';
 import {
   Tooltip,
   TooltipContent,
@@ -13,7 +12,7 @@ import {
 import { IconClock } from '@inngest/components/icons/Clock';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
-import { noCase } from 'change-case';
+import Cron from 'croner';
 import { titleCase } from 'title-case';
 
 import FunctionConfiguration from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/(dashboard)/FunctionConfiguration';
@@ -212,57 +211,13 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                         <ChevronRightIcon className="h-5" />
                       </div>
                     </Link>
-                  ) : (
-                    <div
+                  ) : trigger.schedule ? (
+                    <ScheduleTrigger
                       key={trigger.schedule}
-                      className="rounded border border-slate-200 bg-white p-4"
-                    >
-                      <div className="flex min-w-0 items-center">
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex min-w-0 items-center">
-                            <IconClock className="w-8 shrink-0 pr-2 text-indigo-500" />
-                            <p className="truncate font-medium">{trigger.schedule}</p>
-                          </div>
-                          <dl className="text-xs">
-                            {trigger.condition && (
-                              <div className="flex gap-1">
-                                <dt className="text-slate-500">If</dt>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <dd className="truncate font-mono text-slate-800">
-                                        {trigger.condition}
-                                      </dd>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="font-mono text-xs">
-                                      {trigger.condition}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                            )}
-                            {trigger.nextRun && (
-                              <div className="flex gap-1">
-                                <dt className="text-slate-500">Next Run</dt>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <dd className="truncate text-slate-800">
-                                        {titleCase(relativeTime(new Date(trigger.nextRun)))}
-                                      </dd>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="font-mono text-xs">
-                                      {trigger.nextRun}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                            )}
-                          </dl>
-                        </div>
-                      </div>
-                    </div>
-                  )
+                      schedule={trigger.schedule}
+                      condition={trigger.condition}
+                    />
+                  ) : null
                 )}
               </div>
             </Block>
@@ -350,5 +305,66 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
         </aside>
       </div>
     </>
+  );
+}
+
+type ScheduleTriggerProps = {
+  schedule: string;
+  condition: string | null;
+};
+
+function ScheduleTrigger({ schedule, condition }: ScheduleTriggerProps) {
+  const [nextRun, setNextRun] = useState(() => Cron(schedule, { timezone: 'Etc/UTC' }).nextRun());
+
+  useEffect(() => {
+    const intervalID = setInterval(() => {
+      setNextRun(Cron(schedule, { timezone: 'Etc/UTC' }).nextRun());
+    }, 5_000);
+    return () => clearInterval(intervalID);
+  }, [schedule]); // ✅ Now count is not a dependency
+
+  return (
+    <div className="rounded border border-slate-200 bg-white p-4">
+      <div className="flex min-w-0 items-center">
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex min-w-0 items-center">
+            <IconClock className="w-8 shrink-0 pr-2 text-indigo-500" />
+            <p className="truncate font-medium">{schedule}</p>
+          </div>
+          <dl className="text-xs">
+            {condition && (
+              <div className="flex gap-1">
+                <dt className="text-slate-500">If</dt>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <dd className="truncate font-mono text-slate-800">{condition}</dd>
+                    </TooltipTrigger>
+                    <TooltipContent className="font-mono text-xs">{condition}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            )}
+            {nextRun && (
+              <div className="flex gap-1">
+                <dt className="text-slate-500">Next Run</dt>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <dd className="truncate text-slate-800">
+                        {titleCase(relativeTime(nextRun))}
+                      </dd>
+                    </TooltipTrigger>
+                    <TooltipContent className="font-mono text-xs">
+                      {nextRun.toISOString()}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            )}
+          </dl>
+        </div>
+      </div>
+    </div>
   );
 }
