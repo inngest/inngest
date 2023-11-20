@@ -1272,6 +1272,9 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 
 func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
 	logger.From(ctx).Info().Msg("handling invoke function")
+	if e.handleSendingEvent == nil {
+		return fmt.Errorf("no handleSendingEvent function specified")
+	}
 
 	opts, err := gen.InvokeFunctionOpts()
 	if err != nil {
@@ -1348,14 +1351,10 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 
 	logger.From(ctx).Debug().Interface("evt", evt).Str("gen.ID", gen.ID).Msg("created invocation event")
 
-	if e.handleSendingEvent == nil {
-		logger.From(ctx).Error().Msg("no handleSendingEvent function specified")
-	} else {
-		err = e.handleSendingEvent(ctx, evt, item)
-		if err != nil {
-			// TODO Cancel pause/timeout?
-			return fmt.Errorf("error publishing internal invocation event: %w", err)
-		}
+	err = e.handleSendingEvent(ctx, evt, item)
+	if err != nil {
+		// TODO Cancel pause/timeout?
+		return fmt.Errorf("error publishing internal invocation event: %w", err)
 	}
 
 	for _, e := range e.lifecycles {
