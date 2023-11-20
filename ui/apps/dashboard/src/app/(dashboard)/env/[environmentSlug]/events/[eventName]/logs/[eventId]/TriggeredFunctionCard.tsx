@@ -65,7 +65,9 @@ export default async function TriggeredFunctionCard({
 
   return (
     <Link
-      href={`/env/${environmentSlug}/functions/${function_.slug}/logs/${function_.run.id}`}
+      href={`/env/${environmentSlug}/functions/${encodeURIComponent(function_.slug)}/logs/${
+        function_.run.id
+      }`}
       className="flex items-center rounded-lg border bg-white p-5 shadow"
     >
       <div className="flex-1">

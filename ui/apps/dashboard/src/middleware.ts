@@ -2,7 +2,7 @@ import { authMiddleware } from '@clerk/nextjs';
 
 export default authMiddleware({
   publicRoutes: ['/password-reset', '/support'],
-  ignoredRoutes: '/(images|_next/static|_next/image|favicon)(.*)',
+  ignoredRoutes: '/(images|api|_next/static|_next/image|favicon)(.*)',
 });
 
 export const config = {
@@ -15,6 +15,6 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon (favicon file)
      */
-    '/((?!images|_next/static|_next/image|favicon).*)',
+    '/((?!images|api|_next/static|_next/image|favicon).*)',
   ],
 };

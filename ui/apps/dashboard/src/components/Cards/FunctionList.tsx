@@ -23,7 +23,7 @@ export function FunctionList({ functions, baseHref, status }: Props) {
             <FunctionListItem
               key={fn.name}
               name={fn.name}
-              href={`${baseHref}/${fn.slug}`}
+              href={`${baseHref}/${encodeURIComponent(fn.slug)}`}
               status={status}
             />
           );

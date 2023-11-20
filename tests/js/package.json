@@ -2,6 +2,7 @@
   "name": "inngest-js-tests",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@8.6.2",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

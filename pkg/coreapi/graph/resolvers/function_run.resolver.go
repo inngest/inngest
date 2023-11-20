@@ -2,6 +2,7 @@ package resolvers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -181,6 +182,9 @@ func (r *functionRunResolver) Event(ctx context.Context, obj *models.FunctionRun
 	}
 
 	evt, err := r.Data.GetEventByInternalID(ctx, eventID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}

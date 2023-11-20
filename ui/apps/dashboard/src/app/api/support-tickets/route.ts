@@ -1,11 +1,19 @@
 import { NextResponse } from 'next/server';
+import { auth, currentUser } from '@clerk/nextjs';
 import {
   PlainClient,
-  type CreateIssueInput,
+  type CreateThreadInput,
+  type ThreadPartsFragment,
   type UpsertCustomTimelineEntryInput,
 } from '@team-plain/typescript-sdk';
+import dayjs from 'dayjs';
 
-import { ticketTypeTitles, type BugSeverity, type TicketType } from '../../support/ticketOptions';
+import {
+  labelTypeIDs,
+  ticketTypeTitles,
+  type BugSeverity,
+  type TicketType,
+} from '../../support/ticketOptions';
 
 const apiKey = process.env.PLAIN_API_KEY;
 
@@ -43,16 +51,12 @@ function createComponents(
   ];
 }
 
-const issueTypeIDs: { [K in Exclude<TicketType, null>]: string } = {
-  bug: process.env.PLAIN_ISSUE_TYPE_ID_BUG || '',
-  demo: process.env.PLAIN_ISSUE_TYPE_ID_DEMO || '',
-  billing: process.env.PLAIN_ISSUE_TYPE_ID_BILLING || '',
-  feature: process.env.PLAIN_ISSUE_TYPE_ID_FEATURE_REQUEST || '',
-  security: process.env.PLAIN_ISSUE_TYPE_ID_SECURITY || '',
-  question: process.env.PLAIN_ISSUE_TYPE_ID_QUESTION || '',
-} as const;
-
 export async function POST(req: Request) {
+  const { userId } = auth();
+  if (!userId) {
+    return NextResponse.json({ error: 'Please sign in to create a ticket' }, { status: 401 });
+  }
+
   // In production validation of the request body might be necessary.
   const body = (await req.json()) as RequestBody;
 
@@ -89,23 +93,13 @@ export async function POST(req: Request) {
 
   console.log(`Customer upserted ${upsertCustomerRes.data.customer.id}`);
 
-  const upsertTimelineEntryRes = await client.upsertCustomTimelineEntry({
-    customerId: upsertCustomerRes.data.customer.id,
+  const thread: CreateThreadInput = {
     title: ticketTypeTitles[body.ticket.type],
     components: createComponents(body.ticket),
-    changeCustomerStatusToActive: true,
-  });
-
-  if (upsertTimelineEntryRes.error) {
-    console.error(upsertTimelineEntryRes.error);
-    return NextResponse.json({ error: upsertTimelineEntryRes.error.message }, { status: 500 });
-  }
-
-  console.log(`Custom timeline entry upserted ${upsertTimelineEntryRes.data.timelineEntry.id}.`);
-
-  const issue: CreateIssueInput = {
-    customerId: upsertCustomerRes.data.customer.id,
-    issueTypeId: issueTypeIDs[body.ticket.type],
+    customerIdentifier: {
+      customerId: upsertCustomerRes.data.customer.id,
+    },
+    labelTypeIds: [labelTypeIDs[body.ticket.type]],
   };
 
   // Plain only supports priority 0-3, ignore the lowest for now
@@ -113,17 +107,66 @@ export async function POST(req: Request) {
   // keep other issues as 0-3 priority customer issues
   const severity = body.ticket.severity ? parseInt(body.ticket.severity, 10) : null;
   if (severity && severity < 4) {
-    issue.priorityValue = severity;
+    thread.priority = severity;
   }
 
-  const createIssueRes = await client.createIssue(issue);
+  const threadRes = await client.createThread(thread);
 
-  if (createIssueRes.error) {
-    console.error(createIssueRes.error);
-    return NextResponse.json({ error: createIssueRes.error.message }, { status: 500 });
+  if (threadRes.error) {
+    console.error(JSON.stringify(threadRes.error));
+    return NextResponse.json({ error: threadRes.error.message }, { status: 500 });
   }
 
-  console.log(`Issue created ${createIssueRes.data.id}`);
+  console.log(`Thread created ${threadRes.data.id}`);
 
-  return NextResponse.json({ error: null }, { status: 200 });
+  return NextResponse.json(
+    {
+      error: null,
+      threadId: threadRes.data.id,
+    },
+    { status: 200 }
+  );
+}
+
+export async function GET(req: Request) {
+  const user = await currentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Please sign in to view your tickets' }, { status: 401 });
+  }
+  const emails = user?.emailAddresses.map((email) => email.emailAddress) || [];
+  let threads: ThreadPartsFragment[] = [];
+
+  for (const email of emails) {
+    const customerRes = await client.getCustomerByEmail({
+      email,
+    });
+    // Ignore if the customer doesn't yet exist in Plain
+    if (customerRes.error || !customerRes.data?.id) {
+      continue;
+    }
+
+    const threadsRes = await client.getThreads({
+      filters: {
+        customerIds: [customerRes.data?.id],
+      },
+      first: 10,
+    });
+    if (threadsRes.error) {
+      continue;
+    }
+    const oneMonthAgo = dayjs().subtract(30, 'days');
+    threads = threads.concat(
+      threadsRes.data.threads.filter(
+        (thread) => parseInt(thread.updatedAt.unixTimestamp, 10) > oneMonthAgo.unix()
+      )
+    );
+  }
+
+  return NextResponse.json(
+    {
+      data: threads,
+    },
+    { status: 200 }
+  );
 }

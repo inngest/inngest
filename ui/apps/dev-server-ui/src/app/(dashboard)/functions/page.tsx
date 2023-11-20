@@ -40,6 +40,12 @@ const columns = [
     enableSorting: false,
     enableGlobalFilter: false,
   }),
+  columnHelper.accessor('app', {
+    header: () => <span>App</span>,
+    cell: (props) => props.getValue()?.name,
+    enableSorting: false,
+    enableGlobalFilter: false,
+  }),
   columnHelper.accessor('url', {
     header: () => <span>App URL</span>,
     cell: (props) => {

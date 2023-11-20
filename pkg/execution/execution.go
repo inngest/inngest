@@ -128,6 +128,8 @@ type ScheduleRequest struct {
 	WorkspaceID uuid.UUID
 	// OriginalRunID is the ID of the ID of the original run, if this a replay.
 	OriginalRunID *ulid.ULID
+	// ReplayID is the ID of the ID of the replay, if this a replay.
+	ReplayID *uuid.UUID
 	// Events represent one or more events that the function is being triggered with.
 	Events []event.TrackedEvent
 	// BatchID refers to the batch ID, if this function is started as a batch.

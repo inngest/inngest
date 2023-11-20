@@ -42,7 +42,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </Navbar>
       </Header>
       {children}
-      <Toaster theme="dark" toastOptions={{ style: { background: colors.slate['700'] } }} />
+      <Toaster
+        theme="dark"
+        toastOptions={{
+          style: { background: colors.slate['700'] },
+        }}
+      />
     </div>
   );
 }

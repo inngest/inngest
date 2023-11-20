@@ -11,10 +11,10 @@ import type { FunctionRun } from '@inngest/components/types/functionRun';
 import type { FunctionVersion } from '@inngest/components/types/functionVersion';
 import { classNames } from '@inngest/components/utils/classNames';
 import { type RawHistoryItem } from '@inngest/components/utils/historyParser';
-import { Client, useClient } from 'urql';
+import { useClient } from 'urql';
 
-import { graphql } from '@/gql';
-import RerunButton from './(side-card)/(timeline)/RerunButton';
+import RerunButton from './RerunButton';
+import { getHistoryItemOutput } from './getHistoryItemOutput';
 
 type Props = {
   environment: Pick<Environment, 'id' | 'slug'>;
@@ -49,6 +49,11 @@ export function StreamDetails({
 
   const history = useParsedHistory(rawHistory);
 
+  let rerunButton: React.ReactNode | undefined;
+  if (run.canRerun) {
+    rerunButton = <RerunButton environment={environment} func={func} functionRunID={run.id} />;
+  }
+
   return (
     <div
       className={classNames('dark grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}
@@ -60,50 +65,9 @@ export function StreamDetails({
         functionVersion={functionVersion}
         getHistoryItemOutput={getOutput}
         history={history}
-        rerunButton={<RerunButton environment={environment} func={func} functionRunID={run.id} />}
+        rerunButton={rerunButton}
         run={run}
       />
     </div>
   );
-}
-
-const getHistoryItemOutputDocument = graphql(`
-  query GetHistoryItemOutput($envID: ID!, $functionID: ID!, $historyItemID: ULID!, $runID: ULID!) {
-    environment: workspace(id: $envID) {
-      function: workflow(id: $functionID) {
-        run(id: $runID) {
-          historyItemOutput(id: $historyItemID)
-        }
-      }
-    }
-  }
-`);
-
-async function getHistoryItemOutput({
-  client,
-  envID,
-  functionID,
-  historyItemID,
-  runID,
-}: {
-  client: Client;
-  envID: string;
-  functionID: string;
-  historyItemID: string;
-  runID: string;
-}): Promise<string | undefined> {
-  // TODO: How to get type annotations? It returns `any`.
-  const res = await client
-    .query(getHistoryItemOutputDocument, {
-      envID,
-      functionID,
-      historyItemID,
-      runID,
-    })
-    .toPromise();
-  if (res.error) {
-    throw res.error;
-  }
-
-  return res.data?.environment.function?.run.historyItemOutput ?? undefined;
 }

@@ -9,10 +9,15 @@ import (
 	str2duration "github.com/xhit/go-str2duration/v2"
 )
 
-func Sleep(ctx context.Context, duration time.Duration) {
+type SleepOpts struct {
+	ID string
+	// Name represents the optional step name.
+	Name string
+}
+
+func Sleep(ctx context.Context, id string, duration time.Duration) {
 	mgr := preflight(ctx)
-	name := str2duration.String(duration)
-	op := mgr.NewOp(enums.OpcodeSleep, name, nil)
+	op := mgr.NewOp(enums.OpcodeSleep, id, nil)
 	if _, ok := mgr.Step(op); ok {
 		// We've already slept.
 		return
@@ -20,7 +25,10 @@ func Sleep(ctx context.Context, duration time.Duration) {
 	mgr.AppendOp(state.GeneratorOpcode{
 		ID:   op.MustHash(),
 		Op:   enums.OpcodeSleep,
-		Name: name,
+		Name: id,
+		Opts: map[string]any{
+			"duration": str2duration.String(duration),
+		},
 	})
 	panic(ControlHijack{})
 }

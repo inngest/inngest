@@ -11,10 +11,12 @@ func NoRetryError(err error) error {
 	return noRetryError{Err: err}
 }
 
-func IsNoRetryError(err error) bool {
+// isNoRetryError returns whether an error is a NoRetryError
+func isNoRetryError(err error) bool {
 	return errors.Is(err, noRetryError{})
 }
 
+// noRetryError represents an error that will not be retried.
 type noRetryError struct {
 	Err error
 }
@@ -49,11 +51,8 @@ func RetryAtError(err error, at time.Time) error {
 	return retryAtError{Err: err, At: at}
 }
 
-func IsRetryAtError(err error) bool {
-	return errors.Is(err, retryAtError{})
-}
-
-func GetRetryAtTime(err error) *time.Time {
+// getRetryAtTime returns the time from a retryAtError, or nil.
+func getRetryAtTime(err error) *time.Time {
 	retryAt := &retryAtError{}
 	if ok := errors.As(err, retryAt); ok {
 		return &retryAt.At

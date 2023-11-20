@@ -11,7 +11,6 @@ import (
 
 	"github.com/VividCortex/ewma"
 	"github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/execution/concurrency"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -721,7 +720,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 		jobCancel()
 
 		if osqueue.ShouldRetry(err, qi.Data.Attempt, qi.Data.GetMaxAttempts()) {
-			at := backoff.DefaultBackoff(qi.Data.Attempt)
+			at := q.backoffFunc(qi.Data.Attempt)
 			// If the error contains a NextRetryAt method, use that to indicate
 			// when we should retry.
 			if specifier, ok := err.(osqueue.RetryAtSpecifier); ok {

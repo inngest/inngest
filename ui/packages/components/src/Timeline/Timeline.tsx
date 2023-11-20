@@ -1,5 +1,6 @@
 'use client';
 
+import { Badge } from '@inngest/components/Badge/Badge';
 import type { HistoryNode, HistoryParser } from '@inngest/components/utils/historyParser';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 
@@ -39,7 +40,26 @@ export function Timeline({ getOutput, history }: Props) {
                 position={position}
                 getOutput={getOutput}
                 node={node}
-              />
+              >
+                {Object.values(node.attempts).length > 0 && (
+                  <>
+                    <div className="flex items-center gap-2 pt-4">
+                      <p className="py-4 text-sm text-slate-400">Attempts</p>
+                      <Badge kind="outlined">
+                        {Object.values(node.attempts).length.toString() || '0'}
+                      </Badge>
+                    </div>
+                    {Object.values(node.attempts).map((attempt) => (
+                      <TimelineNode
+                        key={attempt.groupID + attempt.attempt}
+                        getOutput={getOutput}
+                        node={attempt}
+                        isAttempt
+                      />
+                    ))}
+                  </>
+                )}
+              </TimelineNode>
             );
           })}
         </AccordionPrimitive.Root>

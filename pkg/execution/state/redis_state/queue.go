@@ -15,6 +15,7 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
+	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/concurrency"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -277,6 +278,12 @@ func WithConcurrencyService(s concurrency.ConcurrencyService) func(q *queue) {
 	}
 }
 
+func WithBackoffFunc(f backoff.BackoffFunc) func(q *queue) {
+	return func(q *queue) {
+		q.backoffFunc = f
+	}
+}
+
 // QueueItemConcurrencyKeyGenerator returns concurrenc keys given a queue item to limits.
 //
 // Each queue item can have its own concurrency keys.  For example, you can define
@@ -315,6 +322,7 @@ func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 			return p.Queue(), 10_000
 		},
 		itemIndexer: QueueItemIndexerFunc,
+		backoffFunc: backoff.DefaultBackoff,
 	}
 
 	for _, opt := range opts {
@@ -406,6 +414,8 @@ type queue struct {
 	scope tally.Scope
 	// tracer is the tracer to use for opentelemetry tracing.
 	tracer trace.Tracer
+	// backoffFunc is the backoff function to use when retrying operations.
+	backoffFunc backoff.BackoffFunc
 }
 
 // processItem references the queue partition and queue item to be processed by a worker.
@@ -452,7 +462,7 @@ type QueueItem struct {
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {
-	q.ID = hashID(ctx, str)
+	q.ID = HashID(ctx, str)
 }
 
 // Score returns the score (time that the item should run) for the queue item.
@@ -616,7 +626,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	} else {
 		// Hash the ID.
 		// TODO: What if this is already hashed?
-		i.ID = hashID(ctx, i.ID)
+		i.ID = HashID(ctx, i.ID)
 	}
 
 	// TODO: If the length of ID >= max, error.
@@ -771,7 +781,7 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 // If the queue item referenced by the job ID is not outstanding (ie. it has a lease, is in
 // progress, or doesn't exist) this returns an error.
 func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID string, at time.Time) error {
-	jobID = hashID(ctx, jobID)
+	jobID = HashID(ctx, jobID)
 
 	keys := []string{
 		q.kg.QueueIndex(partitionName),
@@ -787,6 +797,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 			jobID,
 			strconv.Itoa(int(at.UnixMilli())),
 			partitionName,
+			strconv.Itoa(int(time.Now().UnixMilli())),
 		},
 	).AsInt64()
 	if err != nil {
@@ -797,6 +808,8 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 		return nil
 	case -1:
 		return ErrQueueItemNotFound
+	case -2:
+		return ErrQueueItemAlreadyLeased
 	default:
 		return fmt.Errorf("unknown requeue by id response: %d", status)
 	}
@@ -1569,7 +1582,7 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 	}
 }
 
-func hashID(ctx context.Context, id string) string {
+func HashID(ctx context.Context, id string) string {
 	ui := xxhash.Sum64String(id)
 	return strconv.FormatUint(ui, 36)
 }

@@ -22,7 +22,7 @@ func TestFunctionSteps(t *testing.T) {
 
 	a := inngestgo.CreateFunction(
 		inngestgo.FunctionOpts{Name: "test sdk"},
-		inngestgo.EventTrigger("test/sdk"),
+		inngestgo.EventTrigger("test/sdk", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			step.Run(ctx, "1", func(ctx context.Context) (any, error) {
 				<-time.After(time.Second)
@@ -38,7 +38,7 @@ func TestFunctionSteps(t *testing.T) {
 				return "test", nil
 			})
 
-			step.Sleep(ctx, 2*time.Second)
+			step.Sleep(ctx, "delay", 2*time.Second)
 
 			fmt.Println("3")
 			atomic.AddInt32(&counter, 1)

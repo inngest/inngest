@@ -243,6 +243,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		AccountID:       req.AccountID,
 		WorkspaceID:     req.WorkspaceID,
 		OriginalRunID:   req.OriginalRunID,
+		ReplayID:        req.ReplayID,
 	}
 
 	mapped := make([]map[string]any, len(req.Events))
@@ -1228,7 +1229,9 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	// the pause so this race will conclude by calling the function once, as only
 	// one thread can lease and consume a pause;  the other will find that the
 	// pause is no longer available and return.
+	jobID := fmt.Sprintf("%s-%s-%s", item.Identifier.IdempotencyKey(), gen.ID, "wait")
 	err = e.queue.Enqueue(ctx, queue.Item{
+		JobID:       &jobID,
 		WorkspaceID: item.WorkspaceID,
 		// Use the same group ID, allowing us to track the cancellation of
 		// the step correctly.

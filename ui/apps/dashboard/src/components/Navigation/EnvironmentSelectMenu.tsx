@@ -30,6 +30,9 @@ import isNonEmptyArray from '@/utils/isNonEmptyArray';
 // for the user to switch context correctly
 const useSwitchablePathname = (): string => {
   const segments = useSelectedLayoutSegments();
+  const segmentsWithoutRouteGroups = segments.filter(
+    (segment) => !segment.startsWith('(') && !segment.endsWith(')')
+  );
   const pathname = usePathname();
 
   // Accounts are not environment specific
@@ -38,24 +41,24 @@ const useSwitchablePathname = (): string => {
   }
 
   // Deploys should always move to the root resource level
-  if (segments[0] === 'deploys') {
+  if (segmentsWithoutRouteGroups[0] === 'deploys') {
     return '/deploys';
   }
   // Manage paths, we drop the id at the end
-  if (segments[0] === 'manage') {
-    return '/' + segments.slice(0, 2).join('/');
+  if (segmentsWithoutRouteGroups[0] === 'manage') {
+    return '/' + segmentsWithoutRouteGroups.slice(0, 2).join('/');
   }
 
   // Logs are specific to a given environment, return to the function dashboard
-  if (segments[0] === 'functions' && segments[2] === 'logs') {
-    return '/' + segments.slice(0, 3).join('/');
+  if (segmentsWithoutRouteGroups[0] === 'functions' && segmentsWithoutRouteGroups[2] === 'logs') {
+    return '/' + segmentsWithoutRouteGroups.slice(0, 3).join('/');
   }
 
-  if (segments.length === 0) {
+  if (segmentsWithoutRouteGroups.length === 0) {
     return '/functions'; // default if selected from /env
   }
 
-  return '/' + segments.join('/');
+  return '/' + segmentsWithoutRouteGroups.join('/');
 };
 
 type EnvironmentSelectMenuProps = {

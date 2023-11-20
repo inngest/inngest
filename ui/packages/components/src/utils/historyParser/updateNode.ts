@@ -1,12 +1,16 @@
-import type { HistoryNode, HistoryType, RawHistoryItem } from './types';
+import {
+  isHistoryType,
+  runEndGroupID,
+  type HistoryNode,
+  type HistoryType,
+  type RawHistoryItem,
+} from './types';
 
 type Updater = (node: HistoryNode, rawItem: RawHistoryItem) => HistoryNode;
 
 const noop: Updater = (node) => node;
 
-const updaters: {
-  [key in HistoryType]: Updater;
-} = {
+const updaters: Record<HistoryType, Updater> = {
   FunctionCancelled: (node, rawItem) => {
     return {
       ...node,
@@ -26,18 +30,18 @@ const updaters: {
   FunctionFailed: (node, rawItem) => {
     return {
       ...node,
+      attempts: {},
       endedAt: new Date(rawItem.createdAt),
+      groupID: runEndGroupID,
       scope: 'function',
       status: 'failed',
     } satisfies HistoryNode;
   },
   FunctionScheduled: noop,
   FunctionStarted: (node, rawItem) => {
-    return {
-      ...node,
-      scheduledAt: new Date(rawItem.createdAt),
-      status: 'scheduled',
-    } satisfies HistoryNode;
+    // Treat this as a StepScheduled because the first step doesn't have a
+    // dedicated StepScheduled.
+    return updaters.StepScheduled(node, rawItem);
   },
   FunctionStatusUpdated: noop,
   None: noop,
@@ -67,6 +71,8 @@ const updaters: {
 
     return {
       ...node,
+      endedAt: new Date(rawItem.createdAt),
+      outputItemID: rawItem.id,
       scope: 'step',
       status: 'errored',
     } satisfies HistoryNode;
@@ -145,7 +151,9 @@ const updaters: {
       waitForEventConfig,
     } satisfies HistoryNode;
   },
-} as const;
+} satisfies {
+  [key in HistoryType]: Updater;
+};
 
 function parseName(name: string | undefined): string | undefined {
   // This is hacky, but assume that a name of "step" means we're discovering the
@@ -170,17 +178,25 @@ function parseURL(url: string): string {
   return parsed.toString();
 }
 
-/**
- * Updates that should happen on all history types.
- */
-const commonUpdater: Updater = (node, rawItem) => {
-  return {
-    ...node,
-    attempt: rawItem.attempt,
-  } satisfies HistoryNode;
-};
-
 export function updateNode(node: HistoryNode, rawItem: RawHistoryItem): HistoryNode {
-  node = updaters[rawItem.type](node, rawItem);
-  return commonUpdater(node, rawItem);
+  const historyType = rawItem.type;
+  if (!isHistoryType(historyType)) {
+    // Return the node unchanged if the history type is unexpected.
+    return node;
+  }
+
+  const update = updaters[historyType];
+  node = update(node, rawItem);
+  node.attempt = rawItem.attempt;
+
+  const attemptNode = node.attempts[rawItem.attempt];
+
+  // Should always be true but bugs can happen.
+  if (attemptNode) {
+    // Update logic is the same for attempts since they have the same shape
+    // as the top-level node.
+    node.attempts[rawItem.attempt] = update(attemptNode, rawItem);
+  }
+
+  return node;
 }

@@ -1,8 +1,5 @@
-import type { HistoryNode, RawHistoryItem } from './types';
+import { runEndGroupID, runStartGroupID, type HistoryNode, type RawHistoryItem } from './types';
 import { updateNode } from './updateNode';
-
-const runEndGroupID = 'function-run-end';
-const runStartGroupID = 'function-run-start';
 
 /**
  * Parses and groups raw history. Each history node has enough data to display a
@@ -28,42 +25,26 @@ export class HistoryParser {
   }
 
   append(rawItem: RawHistoryItem) {
-    const groupID = rawItem.groupID ?? 'unknown';
-
+    // Handle FunctionStarted here because we need to do 2 things that
+    // updateNode can't:
+    // - Set the start time for the whole HistoryParser object.
+    // - Create a new function-level node that's dedicated to the function run
+    //    start.
     if (rawItem.type === 'FunctionStarted') {
       this.runStartedAt = new Date(rawItem.createdAt);
       this.createFunctionRunStartNode(new Date(rawItem.createdAt));
     }
 
-    let node: HistoryNode;
-    const existingNode = this.groups[groupID];
-    if (existingNode) {
-      node = { ...existingNode };
-    } else {
-      node = {
-        attempt: rawItem.attempt,
-        groupID,
-        scheduledAt: new Date(rawItem.createdAt),
-        sleepConfig: undefined,
-        status: 'scheduled',
-        waitForEventConfig: undefined,
-        waitForEventResult: undefined,
-      };
-    }
-
-    if (rawItem.type === 'FunctionFailed' && node.scope === 'step') {
-      // Put FunctionFailed into its own node. Its group ID is the same as
-      // StepFailed but don't want to mess up the StepFailed node's data.
-      node.groupID = runEndGroupID;
-    }
-
+    let node = this.getNode(rawItem);
     node = updateNode(node, rawItem);
 
     this.groups = {
       ...this.groups,
-      [node.groupID]: node,
+      [node.groupID]: updateNode(node, rawItem),
     };
 
+    // Handle FunctionCancelled here because we need to do something that
+    // updateNode can't: mark all in-progress nodes as cancelled.
     if (rawItem.type === 'FunctionCancelled') {
       this.cancelNodes(new Date(rawItem.createdAt));
     }
@@ -104,6 +85,7 @@ export class HistoryParser {
       attempt: 0,
       endedAt: startedAt,
       groupID: runStartGroupID,
+      attempts: {},
       scheduledAt: startedAt,
       scope: 'function',
       startedAt,
@@ -114,6 +96,58 @@ export class HistoryParser {
       ...this.groups,
       [node.groupID]: node,
     };
+  }
+
+  /**
+   * Get the raw item's node. If one doesn't exist then create it.
+   */
+  private getNode(rawItem: RawHistoryItem): HistoryNode {
+    const groupID = rawItem.groupID ?? 'unknown';
+
+    const newNode = {
+      attempt: rawItem.attempt,
+      groupID,
+      attempts: {},
+      scheduledAt: new Date(rawItem.createdAt),
+      sleepConfig: undefined,
+      status: 'scheduled',
+      waitForEventConfig: undefined,
+      waitForEventResult: undefined,
+    } as const;
+
+    // If the node doesn't exist then create it.
+    let node = this.groups[groupID];
+    if (!node) {
+      node = newNode;
+    }
+
+    // This item is for a retry.
+    if (rawItem.attempt > 0) {
+      // If the pre-updated node is for the first attempt then we need to add it
+      // to the attempts. This is necessary because attempts is empty until
+      // there's a retry.
+      if (node.attempt === 0) {
+        node = {
+          ...node,
+          attempts: {
+            '0': node,
+          },
+        };
+      }
+
+      // If the attempt doesn't exist then create it.
+      if (!(rawItem.attempt in node.attempts)) {
+        node = {
+          ...node,
+          attempts: {
+            ...node.attempts,
+            [rawItem.attempt]: newNode,
+          },
+        };
+      }
+    }
+
+    return node;
   }
 
   getGroups({ sort = false }: { sort?: boolean } = {}): HistoryNode[] {

@@ -32,6 +32,7 @@ type ButtonProps<PassedHref extends string> = {
   target?: string;
   rel?: string;
   title?: string;
+  form?: string;
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(function Button(
@@ -47,7 +48,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
     btnAction,
     href,
     isSplit,
-    type,
+    type = 'button',
     keys,
     className,
     ...props

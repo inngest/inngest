@@ -49,7 +49,7 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 				},
 			},
 		},
-		inngestgo.EventTrigger(trigger),
+		inngestgo.EventTrigger(trigger, nil),
 		handler,
 	)
 	b := inngestgo.CreateFunction(
@@ -63,7 +63,7 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 				},
 			},
 		},
-		inngestgo.EventTrigger(trigger),
+		inngestgo.EventTrigger(trigger, nil),
 		handler,
 	)
 	h.Register(a, b)

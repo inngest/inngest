@@ -143,7 +143,6 @@ func decode(i *cue.Instance) (*Config, error) {
 
 	// Ensure we set log levels and formats here, globally.
 	// XXX: This could/should be refactored;  this is messy (but minimal impact rn).
-	logger.SetLevel(c.Log.Level)
 	logger.SetFormat(c.Log.Format)
 
 	return c, nil

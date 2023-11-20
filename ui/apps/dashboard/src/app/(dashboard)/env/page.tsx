@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 
+import AppLink from '@/components/AppLink';
 import AppNavigation from '@/components/Navigation/AppNavigation';
 import Toaster from '@/components/Toaster';
 import getAllEnvironments from '@/queries/server-only/getAllEnvironments';
@@ -153,6 +154,25 @@ export default async function Envs() {
                   </Link>
                 </div>
               ))}
+
+            <div className="mt-12 border-t border-slate-100 pt-8">
+              <div className="mb-4 flex w-full items-center  justify-between">
+                <h2 className="text-lg font-medium text-slate-800">Create an environment</h2>
+                <div className="flex items-center gap-2">
+                  <Button href="create-environment" kind="primary" label="Create environment" />
+                </div>
+              </div>
+              <p className="mt-2 text-sm font-medium text-slate-600">
+                Create a shared, non-production environment like staging, QA, or canary.{' '}
+                <AppLink
+                  href="https://www.inngest.com/docs/platform/environments#custom-environments"
+                  target="_blank"
+                >
+                  Read the docs to learn more
+                </AppLink>
+                .
+              </p>
+            </div>
           </div>
         </div>
       </div>

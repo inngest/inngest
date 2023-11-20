@@ -1,0 +1,31 @@
+name: Sync Staging
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set GH_TOKEN
+        if: env.GH_TOKEN == ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "GH_TOKEN=${GITHUB_TOKEN}" >> $GITHUB_ENV
+
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          ref: main
+          token: ${{ env.GH_TOKEN }}
+
+      - name: push to next branch
+        run: |
+          git config --local user.name gh-actions
+          git config --local user.email gh-actions@github.com
+
+          git push origin main:next

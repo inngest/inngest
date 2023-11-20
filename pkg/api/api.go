@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -111,8 +112,9 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a new channel which receives a stream of events from the incoming HTTP request
+	ctx, cancel := context.WithCancel(ctx)
 	stream := make(chan eventstream.StreamItem)
-	eg := errgroup.Group{}
+	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
 		return eventstream.ParseStream(ctx, r.Body, stream, consts.AbsoluteMaxEventSize)
 	})
@@ -138,6 +140,9 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	// Process those incoming events
 	eg.Go(func() error {
+		// Close the idChan so that we stop appending to the ID slice.
+		defer close(idChan)
+
 		for s := range stream {
 			evt := event.Event{}
 			if err := json.Unmarshal(s.Item, &evt); err != nil {
@@ -164,12 +169,11 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 			}{s.N, id}
 		}
 
-		// Close the idChan so that we stop appending to the ID slice.
-		close(idChan)
 		return nil
 	})
 
 	err := eg.Wait()
+	cancel()
 
 	if max+1 > len(ids) {
 		max = len(ids) - 1
@@ -201,6 +205,11 @@ func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 	if slug == "" {
 		_ = publicerr.WriteHTTP(w, publicerr.Errorf(400, "Function slug is required"))
+		return
+	}
+	slug, err := url.QueryUnescape(slug)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Unable to decode function slug"))
 		return
 	}
 

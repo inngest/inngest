@@ -280,9 +280,6 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		RequestVersion: consts.RequestVersionUnknown, // Always use -1 to indicate unset hash version until first request.
 		Context:        input.Context,
 	}
-	if input.OriginalRunID != nil {
-		metadata.OriginalRunID = input.OriginalRunID.String()
-	}
 	if input.RunType != nil {
 		metadata.RunType = *input.RunType
 	}
@@ -1374,9 +1371,6 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 			m.Debugger = true
 		}
 	}
-	if val, ok := data["originalRunID"]; ok {
-		m.OriginalRunID = val
-	}
 	if val, ok := data["runType"]; ok {
 		m.RunType = val
 	}
@@ -1413,7 +1407,7 @@ type runMetadata struct {
 	Pending                   int            `json:"pending"`
 	Debugger                  bool           `json:"debugger"`
 	RunType                   string         `json:"runType,omitempty"`
-	OriginalRunID             string         `json:"originalRunID,omitempty"`
+	ReplayID                  string         `json:"rID,omitempty"`
 	Version                   int            `json:"version"`
 	RequestVersion            int            `json:"rv"`
 	Context                   map[string]any `json:"ctx,omitempty"`
@@ -1422,16 +1416,15 @@ type runMetadata struct {
 
 func (r runMetadata) Map() map[string]any {
 	return map[string]any{
-		"id":            r.Identifier,
-		"status":        int(r.Status), // Always store this as an int
-		"pending":       r.Pending,
-		"debugger":      r.Debugger,
-		"runType":       r.RunType,
-		"originalRunID": r.OriginalRunID,
-		"version":       r.Version,
-		"rv":            r.RequestVersion,
-		"ctx":           r.Context,
-		"die":           r.DisableImmediateExecution,
+		"id":       r.Identifier,
+		"status":   int(r.Status), // Always store this as an int
+		"pending":  r.Pending,
+		"debugger": r.Debugger,
+		"runType":  r.RunType,
+		"version":  r.Version,
+		"rv":       r.RequestVersion,
+		"ctx":      r.Context,
+		"die":      r.DisableImmediateExecution,
 	}
 }
 
@@ -1449,10 +1442,6 @@ func (r runMetadata) Metadata() state.Metadata {
 
 	if r.RunType != "" {
 		m.RunType = &r.RunType
-	}
-	if r.OriginalRunID != "" {
-		id := ulid.MustParse(r.OriginalRunID)
-		m.OriginalRunID = &id
 	}
 	return m
 }

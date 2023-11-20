@@ -5,6 +5,7 @@ import (
 	"os"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/inngest/inngest/pkg/inngest/clistate"
 	"github.com/inngest/inngest/pkg/inngest/version"
@@ -80,7 +81,7 @@ func (m *Metadata) Event() inngestgo.Event {
 			"os":          m.OS,
 			"context":     m.Context,
 		},
-		Timestamp: inngestgo.Now(),
+		Timestamp: time.Now().UnixMilli(),
 		Version:   "2022-12-16",
 	}
 }
