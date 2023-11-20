@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	DefaultLevel = zerolog.InfoLevel
+	DefaultLevel     = zerolog.InfoLevel
+	ViperLogLevelKey = "log.level"
 )
 
 var (
@@ -54,7 +55,7 @@ func Copy(l zerolog.Logger) zerolog.Logger {
 }
 
 func Default() *zerolog.Logger {
-	lvl, err := zerolog.ParseLevel(viper.GetString("log.level"))
+	lvl, err := zerolog.ParseLevel(viper.GetString(ViperLogLevelKey))
 	if err != nil {
 		lvl = zerolog.InfoLevel
 	}
