@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+import { Link } from '@inngest/components/Link';
 import { Table } from '@inngest/components/Table';
-import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-table';
+import { createColumnHelper, getCoreRowModel, type ColumnOrderState } from '@tanstack/react-table';
 import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
@@ -58,7 +59,11 @@ const GetFunctionRunsDocument = graphql(`
 const columns = [
   columnHelper.accessor('id', {
     header: () => <span>ID</span>,
-    cell: (props) => <p className="text-sm font-medium leading-7">{props.getValue()}</p>,
+    cell: (props) => (
+      <Link className="text-sm font-medium leading-7" internalNavigation href="">
+        {props.getValue()}
+      </Link>
+    ),
   }),
   columnHelper.accessor('status', {
     header: () => <span>Status</span>,
@@ -68,14 +73,20 @@ const columns = [
         <p className="first-letter:capitalize">{props.getValue()}</p>
       </div>
     ),
+    size: 300,
+    minSize: 300,
   }),
   columnHelper.accessor('startedAt', {
     header: () => <span>Scheduled At</span>,
     cell: (props) => <time>{props.getValue()}</time>,
+    size: 300,
+    minSize: 300,
   }),
   columnHelper.accessor('endedAt', {
     header: () => <span>Ended At</span>,
     cell: (props) => <time>{props.getValue()}</time>,
+    size: 300,
+    minSize: 300,
   }),
 ];
 
@@ -95,7 +106,8 @@ export default function FunctionRunList({
   timeField,
 }: FunctionRunListProps) {
   const [pageCursors, setPageCursors] = useState<string[]>(['']);
-  const [functionRuns, setFunctionRuns] = useState<Array<RunListItem>>([]);
+  const [functionRuns, setFunctionRuns] = useState<RunListItem[]>([]);
+  const [prevSelectedTimeField, setPrevSelectedTimeField] = useState(timeField);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
   // We reset the page cursors when the selected statuses or time range change, which resets the list to the first page.
@@ -132,9 +144,15 @@ export default function FunctionRunList({
   const isLoading = isFetchingEnvironments || fetching;
 
   useEffect(() => {
-    setFunctionRuns(
-      (prevFunctionRuns) => [...prevFunctionRuns, ...runs].filter(Boolean) as RunListItem[]
-    );
+    if (timeField !== prevSelectedTimeField) {
+      const validRuns = runs ? (runs.filter(Boolean) as RunListItem[]) : [];
+      setFunctionRuns(validRuns);
+      setPrevSelectedTimeField(timeField);
+    } else {
+      setFunctionRuns(
+        (prevFunctionRuns) => [...prevFunctionRuns, ...runs].filter(Boolean) as RunListItem[]
+      );
+    }
   }, [data]);
 
   if (
@@ -155,11 +173,12 @@ export default function FunctionRunList({
           columns,
           getCoreRowModel: getCoreRowModel(),
           enableSorting: false,
-          enablePinning: true,
-          initialState: {
-            columnPinning: {
-              left: ['createdAt'],
-            },
+          enablePinning: false,
+          state: {
+            columnOrder:
+              timeField === FunctionRunTimeField.StartedAt
+                ? ['id', 'status', 'startedAt', 'endedAt']
+                : ['id', 'status', 'endedAt', 'startedAt'],
           },
           defaultColumn: {
             minSize: 0,
@@ -174,6 +193,7 @@ export default function FunctionRunList({
         <div className="flex justify-center pt-4">
           <Button
             label="Load More"
+            appearance="outlined"
             loading={fetching}
             btnAction={() =>
               pageCursors && endCursor && setPageCursors([...pageCursors, endCursor])
