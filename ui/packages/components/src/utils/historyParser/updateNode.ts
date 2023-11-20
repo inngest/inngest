@@ -161,7 +161,7 @@ const updaters: Record<HistoryType, Updater> = {
       waitForEventConfig,
     } satisfies HistoryNode;
   },
-  StepInvokingFunction: (node, rawItem) => {
+  StepInvoking: (node, rawItem) => {
     let invokeFunctionConfig: HistoryNode['invokeFunctionConfig'] | undefined;
     if (rawItem.invokeFunction) {
       invokeFunctionConfig = {

@@ -556,7 +556,7 @@ func (l lifecycle) OnInvokeFunction(
 		RunID:           id.RunID,
 		StepID:          &op.ID,
 		StepName:        &op.Name,
-		Type:            enums.HistoryTypeStepInvokingFunction.String(),
+		Type:            enums.HistoryTypeStepInvoking.String(),
 		WorkspaceID:     id.WorkspaceID,
 	}
 	for _, d := range l.drivers {

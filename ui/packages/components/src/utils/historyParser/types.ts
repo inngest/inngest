@@ -56,7 +56,7 @@ const historyTypes = [
   'StepSleeping',
   'StepStarted',
   'StepWaiting',
-  'StepInvokingFunction',
+  'StepInvoking',
 ] as const;
 export type HistoryType = (typeof historyTypes)[number];
 export function isHistoryType(value: string): value is HistoryType {
