@@ -32,6 +32,7 @@
     "@headlessui/tailwindcss": "0.1.2",
     "@heroicons/react": "2.0.16",
     "@inngest/components": "workspace:*",
+    "@radix-ui/react-dialog": "1.0.5",
     "@radix-ui/react-popover": "1.0.7",
     "@radix-ui/react-select": "1.2.2",
     "@radix-ui/react-toggle-group": "1.0.4",
