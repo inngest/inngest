@@ -88,7 +88,7 @@ const ANGELS: {
     avatar: "/assets/about/guillermo-rauch-avatar.jpg",
   },
   {
-    name: "Tom Preson-Werner",
+    name: "Tom Preston-Werner",
     bio: "Founder of Github",
     featured: true,
     avatar: "/assets/about/tom-preston-werner-avatar.png",
