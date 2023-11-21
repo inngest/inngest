@@ -33,13 +33,15 @@ export default function CurrentSubscription({
             <h2 className="mb-6 text-[1.375rem] font-semibold">
               {isTrial ? 'Your account is on a trial plan' : 'Next Payment'}
             </h2>
-            <p className="my-4 flex gap-4 text-xl">
+            <p className="my-4 flex flex-wrap gap-4 text-xl">
               {!isTrial && (
                 <span className="font-medium">
-                  ${currentPlan?.amount ? currentPlan?.amount / 100 : '0'}
+                  ${currentPlan?.amount ? (currentPlan?.amount / 100).toLocaleString() : '0'}
                 </span>
               )}
-              <PlanBadge variant="primary">{currentPlan?.name}</PlanBadge>
+              <PlanBadge variant="primary" className="whitespace-nowrap">
+                {currentPlan?.name}
+              </PlanBadge>
             </p>
             {!!nextInvoiceDate && (
               <>
