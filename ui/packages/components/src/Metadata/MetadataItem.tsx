@@ -25,8 +25,11 @@ export function MetadataItem({ className, value, title, label, type, tooltip }: 
         {tooltip && (
           <TooltipProvider>
             <Tooltip>
-              <TooltipTrigger>
-                <IconInfo className="h-4 w-4 text-slate-400" />
+              <TooltipTrigger asChild>
+                {/* Temporarily breaks accessibility https://github.com/radix-ui/primitives/discussions/560 */}
+                <span>
+                  <IconInfo className="h-4 w-4 text-slate-400" />
+                </span>
               </TooltipTrigger>
               <TooltipContent className="whitespace-pre-line">{tooltip}</TooltipContent>
             </Tooltip>
