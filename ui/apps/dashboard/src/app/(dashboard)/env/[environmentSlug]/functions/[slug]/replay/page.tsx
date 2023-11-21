@@ -5,9 +5,8 @@ import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon
 import { Table } from '@inngest/components/Table';
 import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
-import dayjs from 'dayjs';
 
-import { duration } from '@/utils/date';
+import { Time } from '@/components/Time';
 
 const replays = [
   {
@@ -33,14 +32,20 @@ const replays = [
 type ReplayItem = {
   status: FunctionRunStatus;
   name: string;
-  startedAt: string;
-  elapsed: string;
+  startedAt: Date;
+  elapsed: Date;
   runsCount: number;
 };
 
 const columnHelper = createColumnHelper<ReplayItem>();
 
 const columns = [
+  columnHelper.accessor('name', {
+    header: () => <span>Replay Name</span>,
+    cell: (props) => props.getValue(),
+    size: 250,
+    minSize: 250,
+  }),
   columnHelper.accessor('status', {
     header: () => <span>Status</span>,
     cell: (props) => (
@@ -52,21 +57,15 @@ const columns = [
     size: 250,
     minSize: 250,
   }),
-  columnHelper.accessor('name', {
-    header: () => <span>Replay Name</span>,
-    cell: (props) => props.getValue(),
-    size: 250,
-    minSize: 250,
-  }),
   columnHelper.accessor('startedAt', {
     header: () => <span>Started At</span>,
-    cell: (props) => props.getValue(),
+    cell: (props) => <Time value={props.getValue()} />,
     size: 250,
     minSize: 250,
   }),
   columnHelper.accessor('elapsed', {
     header: () => <span>Elapsed</span>,
-    cell: (props) => props.getValue(),
+    cell: (props) => <Time value={props.getValue()} format="duration" />,
     size: 250,
     minSize: 250,
   }),
@@ -89,8 +88,7 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
   const replaysInTableFormat = replays.map((replay) => {
     return {
       ...replay,
-      startedAt: replay.startedAt.toLocaleString(),
-      elapsed: duration(dayjs.duration(dayjs().diff(replay.startedAt))),
+      elapsed: replay.startedAt,
     };
   });
 

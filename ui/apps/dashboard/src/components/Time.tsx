@@ -1,6 +1,8 @@
 'use client';
 
-import { relativeTime } from '@/utils/date';
+import dayjs from 'dayjs';
+
+import { duration, relativeTime } from '@/utils/date';
 
 /**
  * Use this component instead of the builtin <time> element. Since server-side
@@ -10,7 +12,7 @@ import { relativeTime } from '@/utils/date';
 
 type Props = {
   className?: string;
-  format?: 'relative';
+  format?: 'relative' | 'duration';
   value: Date;
 };
 
@@ -20,12 +22,19 @@ export function Time({ className, format, value }: Props) {
   if (format === 'relative') {
     dateString = relativeTime(value);
     title = value.toLocaleString();
+  } else if (format === 'duration') {
+    dateString = duration(dayjs().diff(value));
   } else {
     dateString = value.toLocaleString();
   }
 
   return (
-    <time className={className} dateTime={value.toISOString()} title={title}>
+    <time
+      suppressHydrationWarning={true}
+      className={className}
+      dateTime={value.toISOString()}
+      title={title}
+    >
       {dateString}
     </time>
   );

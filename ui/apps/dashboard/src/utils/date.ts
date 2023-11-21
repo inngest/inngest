@@ -55,7 +55,7 @@ export function day(d: dayjs.ConfigType): string {
 }
 
 export function duration(d: dayjs.ConfigType): string {
-  return d
+  return dayjs(d)
     .format('D[d] H[h] m[m] s[s]')
     .replace(/\b0+[a-z]+\s*/gi, '')
     .trim();
