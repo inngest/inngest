@@ -7,7 +7,7 @@ interface LinkProps {
   internalNavigation?: boolean;
   children: React.ReactNode;
   className?: string;
-  href: string;
+  href: URL | string;
 }
 
 const defaultLinkStyles =
@@ -21,11 +21,12 @@ export function Link({ href, children, className, internalNavigation = false }: 
         <IconArrowRight className="h-3 w-3 -translate-x-3 text-indigo-600 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
       </NextLink>
     );
+  } else if (typeof href === 'string') {
+    return (
+      <a className={classNames(className, defaultLinkStyles)} target="_blank" href={href}>
+        {children}
+        {<IconArrowTopRightOnSquare />}
+      </a>
+    );
   }
-  return (
-    <a className={classNames(className, defaultLinkStyles)} target="_blank" href={href}>
-      {children}
-      {<IconArrowTopRightOnSquare />}
-    </a>
-  );
 }
