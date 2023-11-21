@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation } from 'urql';
 
+import AppLink from '@/components/AppLink';
 import { graphql } from '@/gql';
 import { type AwsMarketplaceSetupInput, type MakeMaybe } from '@/gql/graphql';
 import AWSLogo from '@/icons/aws-logo.svg';
@@ -18,9 +19,10 @@ const CompleteAWSMarketplaceSetup = graphql(`
 `);
 
 export default function Page() {
+  const router = useRouter();
   const params = useSearchParams();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string | React.ReactNode>('');
   const [, completeSetup] = useMutation(CompleteAWSMarketplaceSetup);
 
   // Params and validation
@@ -52,17 +54,26 @@ export default function Page() {
     }).then((result) => {
       setLoading(false);
       if (result.error) {
-        setError(result.error.message);
+        const cleanError = result.error.message.replace('[GraphQL]', '').trim();
+        setError(
+          <>
+            {cleanError}. <AppLink href="/support">Contact support</AppLink> or{' '}
+            <AppLink href="/settings/billing">manage billing</AppLink>.
+          </>
+        );
         console.log('error', result.error);
       } else {
-        // TODO - Setup complete and give options to proceed to dashboard or close?
-        console.log('result', result);
+        router.push('/settings/billing');
       }
     });
   }
 
   function cancel() {
-    window.close();
+    if (window.opener != null || window.history.length == 1) {
+      window.close();
+    } else {
+      router.push('/');
+    }
   }
 
   return (

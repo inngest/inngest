@@ -19,7 +19,7 @@ export default function ApprovalDialog({
   onCancel: () => void;
   onApprove: () => void;
   isLoading: boolean;
-  error?: string;
+  error?: string | React.ReactNode;
 }) {
   return (
     <main className="m-auto max-w-2xl pb-24 text-center font-medium">
