@@ -1,22 +1,31 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { useClient } from 'urql';
+import { z } from 'zod';
 
 import Input from '@/components/Forms/Input';
-import { TimeRangeInput } from '@/components/TimeRangeInput';
 import {
   EventSearchFilterFieldDataType,
   EventSearchFilterOperator,
   type EventSearchFilterField,
 } from '@/gql/graphql';
 import { useEnvironment } from '@/queries';
+import { useSearchParam } from '@/utils/useSearchParam';
+import { Details } from './Details';
 import { EventTable } from './EventTable';
 import { searchEvents } from './searchEvents';
 import type { Event } from './types';
 
 const day = 1000 * 60 * 60 * 24;
+
+const fieldSchema = z.object({
+  dataType: z.nativeEnum(EventSearchFilterFieldDataType),
+  operator: z.nativeEnum(EventSearchFilterOperator),
+  path: z.string(),
+  value: z.string(),
+});
 
 type Props = {
   environmentSlug: string;
@@ -25,17 +34,18 @@ type Props = {
 export function EventSearch({ environmentSlug }: Props) {
   const [events, setEvents] = useState<Event[]>([]);
   const [fetching, setFetching] = useState(false);
-  const [timeRange, setTimeRange] = useState({
-    end: new Date(),
-    start: new Date(Date.now() - 3 * day),
-  });
+  const [selectedEventID, setSelectedEventID] = useState<string | undefined>(undefined);
   const [{ data: environment }] = useEnvironment({ environmentSlug });
+  const envID = environment?.id;
   const client = useClient();
+
+  const [fields, setFields] = useFields();
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFetching(true);
 
+    // TODO: Find a better way to extract form data.
     try {
       const form = new FormData(event.currentTarget);
       const path = form.get('path');
@@ -53,7 +63,7 @@ export function EventSearch({ environmentSlug }: Props) {
         throw new Error('missing environment');
       }
 
-      const fields: EventSearchFilterField[] = [
+      const newFields = [
         {
           dataType: EventSearchFilterFieldDataType.Str,
           operator: EventSearchFilterOperator.Eq,
@@ -62,13 +72,15 @@ export function EventSearch({ environmentSlug }: Props) {
         },
       ];
 
+      setFields(newFields);
+
       setEvents(
         await searchEvents({
           client,
           environmentID: environment.id,
-          fields,
-          lowerTime: timeRange.start,
-          upperTime: timeRange.end,
+          fields: newFields,
+          lowerTime: new Date(Date.now() - 3 * day),
+          upperTime: new Date(),
         })
       );
     } finally {
@@ -79,19 +91,68 @@ export function EventSearch({ environmentSlug }: Props) {
   return (
     <>
       <form onSubmit={onSubmit} className="m-4 flex gap-4">
-        <span className="flex grow gap-4">
-          <Input className="min-w-[300px]" type="text" name="path" placeholder="Path" required />
-          <Input className="min-w-[300px]" type="text" name="value" placeholder="Value" required />
-          <Button kind="primary" type="submit" disabled={fetching} label="Search" />
-        </span>
-
-        <span className="flex">
-          <span className="mr-2">Time:</span>
-          <TimeRangeInput onChange={setTimeRange} />
-        </span>
+        {fields.map((field, index) => {
+          return (
+            // TODO: Don't use index as key.
+            <div className="flex gap-4" key={index}>
+              <Input
+                className="min-w-[300px]"
+                defaultValue={field.path}
+                name="path"
+                placeholder="Path"
+                required
+                type="text"
+              />
+              <Input
+                className="min-w-[300px]"
+                defaultValue={field.value}
+                name="value"
+                placeholder="Value"
+                required
+                type="text"
+              />
+              <Button kind="primary" type="submit" disabled={fetching} label="Search" />
+            </div>
+          );
+        })}
       </form>
 
-      <EventTable environmentSlug={environmentSlug} events={events} />
+      <EventTable events={events} onSelect={setSelectedEventID} />
+
+      {envID && (
+        <Details
+          envID={envID}
+          eventID={selectedEventID}
+          onClose={() => setSelectedEventID(undefined)}
+        />
+      )}
     </>
   );
+}
+
+function useFields(): [EventSearchFilterField[], (fields: EventSearchFilterField[]) => void] {
+  const [fieldsParam, setFieldsParam] = useSearchParam('fields');
+
+  const setFields = useCallback(
+    (fields: EventSearchFilterField[]) => {
+      setFieldsParam(JSON.stringify(fields));
+    },
+    [setFieldsParam]
+  );
+
+  let fields: EventSearchFilterField[] = [
+    {
+      dataType: EventSearchFilterFieldDataType.Str,
+      operator: EventSearchFilterOperator.Eq,
+      path: '',
+      value: '',
+    },
+  ];
+  if (fieldsParam) {
+    fields = JSON.parse(fieldsParam).map((field: unknown) => {
+      return fieldSchema.parse(field);
+    });
+  }
+
+  return [fields, setFields];
 }

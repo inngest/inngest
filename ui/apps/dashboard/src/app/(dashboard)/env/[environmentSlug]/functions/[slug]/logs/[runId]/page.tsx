@@ -131,8 +131,9 @@ export default async function FunctionRunDetailsLayout({ params }: FunctionRunDe
       rawHistory={run?.history ?? []}
       run={{
         ...run,
-        endedAt: run.endedAt ?? null,
+        endedAt: run.endedAt ? new Date(run.endedAt) : null,
         output: run.output ?? null,
+        startedAt: new Date(run.startedAt),
       }}
     />
   );
