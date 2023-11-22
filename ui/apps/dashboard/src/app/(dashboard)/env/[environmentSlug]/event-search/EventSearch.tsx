@@ -2,6 +2,8 @@
 
 import { useCallback, useState } from 'react';
 import { Button } from '@inngest/components/Button';
+import { Link } from '@inngest/components/Link';
+import type { NavigateToRunFn } from '@inngest/components/Timeline';
 import { useClient } from 'urql';
 import { z } from 'zod';
 
@@ -37,6 +39,7 @@ export function EventSearch({ environmentSlug }: Props) {
   const [selectedEventID, setSelectedEventID] = useState<string | undefined>(undefined);
   const [{ data: environment }] = useEnvironment({ environmentSlug });
   const envID = environment?.id;
+  const envSlug = environment?.slug;
   const client = useClient();
 
   const [fields, setFields] = useFields();
@@ -88,6 +91,26 @@ export function EventSearch({ environmentSlug }: Props) {
     }
   }
 
+  const navigateToRun: NavigateToRunFn = useCallback(
+    (opts) => {
+      if (!environment?.slug) {
+        return null;
+      }
+
+      return (
+        <Link
+          internalNavigation
+          href={`/env/${encodeURIComponent(environment.slug)}/functions/${encodeURIComponent(
+            opts.fnID
+          )}/logs/${opts.runID}`}
+        >
+          Go to run
+        </Link>
+      );
+    },
+    [environment?.slug]
+  );
+
   return (
     <>
       <form onSubmit={onSubmit} className="m-4 flex gap-4">
@@ -124,6 +147,7 @@ export function EventSearch({ environmentSlug }: Props) {
           envID={envID}
           eventID={selectedEventID}
           onClose={() => setSelectedEventID(undefined)}
+          navigateToRun={navigateToRun}
         />
       )}
     </>

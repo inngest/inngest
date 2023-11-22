@@ -1,3 +1,4 @@
+import type { Route } from 'next';
 import NextLink from 'next/link';
 import { IconArrowTopRightOnSquare } from '@inngest/components/icons/ArrowTopRightOnSquare';
 import { IconChevron } from '@inngest/components/icons/Chevron';
@@ -16,7 +17,7 @@ const defaultLinkStyles =
 export function Link({ href, children, className, internalNavigation = false }: LinkProps) {
   if (internalNavigation) {
     return (
-      <NextLink href={href} className={classNames(className, defaultLinkStyles)}>
+      <NextLink href={href as Route} className={classNames(className, defaultLinkStyles)}>
         {children}
         <IconChevron className="-rotate-90" />
       </NextLink>
