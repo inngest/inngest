@@ -9,14 +9,14 @@ type LinkProps = {
   internalNavigation?: boolean;
   children: React.ReactNode;
   className?: string;
-  href?: Route | UrlObject;
+  href: Route | UrlObject;
 };
 
 const defaultLinkStyles =
   'group text-indigo-400 hover:decoration-indigo-400 decoration-transparent decoration-2 underline underline-offset-4 cursor-pointer transition-color duration-300 flex items-center gap-1';
 
 export function Link({ href, children, className, internalNavigation = false }: LinkProps) {
-  if (internalNavigation && href) {
+  if (internalNavigation) {
     return (
       <NextLink href={href} className={classNames(className, defaultLinkStyles)}>
         {children}
