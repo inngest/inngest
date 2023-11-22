@@ -12,7 +12,7 @@ import { duration, relativeTime } from '@/utils/date';
 
 type Props = {
   className?: string;
-  format?: 'relative' | 'duration';
+  format?: 'relative';
   value: Date;
 };
 
@@ -22,8 +22,6 @@ export function Time({ className, format, value }: Props) {
   if (format === 'relative') {
     dateString = relativeTime(value);
     title = value.toLocaleString();
-  } else if (format === 'duration') {
-    dateString = duration(dayjs().diff(value));
   } else {
     dateString = value.toLocaleString();
   }

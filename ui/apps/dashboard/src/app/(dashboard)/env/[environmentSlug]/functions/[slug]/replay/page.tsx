@@ -1,71 +1,82 @@
 'use client';
 
 import { useRef } from 'react';
-import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
+import { ReplayStatusIcon } from '@inngest/components/ReplayStatusIcon';
 import { Table } from '@inngest/components/Table';
-import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
+import type { Replay } from '@inngest/components/types/replay';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
+import dayjs from 'dayjs';
 
 import { Time } from '@/components/Time';
+import { graphql } from '@/gql';
+import LoadingIcon from '@/icons/LoadingIcon';
+import { useEnvironment } from '@/queries';
+import { duration } from '@/utils/date';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
-const replays = [
-  {
-    name: 'Replay 1',
-    status: 'COMPLETED',
-    startedAt: new Date('2023-10-18T12:00:00Z'),
-    runsCount: 130,
-  },
-  {
-    name: 'Replay 2',
-    status: 'RUNNING',
-    startedAt: new Date('2023-10-20T12:00:00Z'),
-    runsCount: 130,
-  },
-  {
-    name: 'Replay 3',
-    status: 'FAILED',
-    startedAt: new Date('2023-10-18T12:00:00Z'),
-    runsCount: 130,
-  },
-];
+const GetReplaysDocument = graphql(`
+  query GetReplays($environmentID: ID!, $functionSlug: String!) {
+    environment: workspace(id: $environmentID) {
+      id
+      function: workflowBySlug(slug: $functionSlug) {
+        id
+        replays {
+          id
+          name
+          createdAt
+          endedAt
+          totalRunCount
+        }
+      }
+    }
+  }
+`);
 
-type ReplayItem = {
-  status: FunctionRunStatus;
-  name: string;
-  startedAt: Date;
-  elapsed: Date;
-  runsCount: number;
-};
-
-const columnHelper = createColumnHelper<ReplayItem>();
+const columnHelper = createColumnHelper<Replay>();
 
 const columns = [
   columnHelper.accessor('name', {
     header: () => <span>Replay Name</span>,
-    cell: (props) => props.getValue(),
-    size: 250,
-    minSize: 250,
+    cell: (props) => {
+      const name = props.row.original.name;
+      const status = props.row.original.status;
+
+      return (
+        <div className="flex items-center gap-2">
+          <ReplayStatusIcon status={status} className="h-5 w-5" />
+          <span>{name}</span>
+        </div>
+      );
+    },
   }),
-  columnHelper.accessor('status', {
-    header: () => <span>Status</span>,
-    cell: (props) => (
-      <div className="flex items-center gap-2 lowercase">
-        <FunctionRunStatusIcon status={props.getValue()} className="h-5 w-5" />
-        <p className="first-letter:capitalize">{props.getValue()}</p>
-      </div>
-    ),
-    size: 250,
-    minSize: 250,
-  }),
-  columnHelper.accessor('startedAt', {
-    header: () => <span>Started At</span>,
+  columnHelper.accessor('createdAt', {
+    header: () => <span>Created At</span>,
     cell: (props) => <Time value={props.getValue()} />,
     size: 250,
     minSize: 250,
   }),
-  columnHelper.accessor('elapsed', {
-    header: () => <span>Elapsed</span>,
-    cell: (props) => <Time value={props.getValue()} format="duration" />,
+  columnHelper.accessor('endedAt', {
+    header: () => <span>Ended At</span>,
+    cell: (props) => {
+      const replayEndedAt = props.getValue();
+      if (!replayEndedAt) {
+        return <span>-</span>;
+      }
+      return <Time value={replayEndedAt} />;
+    },
+    size: 250,
+    minSize: 250,
+  }),
+  columnHelper.accessor('duration', {
+    header: () => <span>Duration</span>,
+    cell: (props) => {
+      const replayDuration = props.getValue();
+      if (!replayDuration) {
+        return <span>-</span>;
+      }
+      return <time dateTime={replayDuration.toString()}>{duration(replayDuration)}</time>;
+    },
     size: 250,
     minSize: 250,
   }),
@@ -84,20 +95,69 @@ type FunctionReplayPageProps = {
   };
 };
 export default function FunctionReplayPage({ params }: FunctionReplayPageProps) {
-  const tableContainerRef = useRef<HTMLDivElement>(null);
-  const replaysInTableFormat = replays.map((replay) => {
-    return {
-      ...replay,
-      elapsed: replay.startedAt,
-    };
+  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
+    environmentSlug: params.environmentSlug,
   });
+  const { data, isLoading, error } = useGraphQLQuery({
+    query: GetReplaysDocument,
+    variables: {
+      environmentID: environment?.id!,
+      functionSlug: params.slug,
+    },
+    skip: !environment?.id,
+  });
+
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  if (isFetchingEnvironment || isLoading) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <LoadingIcon />
+      </div>
+    );
+  }
+
+  const replays: Replay[] =
+    data?.environment?.function?.replays?.map((replay) => {
+      const baseReplay = {
+        ...replay,
+        createdAt: new Date(replay.createdAt),
+        runsCount: replay.totalRunCount ?? 0,
+      };
+
+      if (replay.endedAt) {
+        return {
+          ...baseReplay,
+          status: 'ENDED',
+          endedAt: new Date(replay.endedAt),
+          duration: dayjs.duration(dayjs(replay.endedAt).diff(replay.createdAt)),
+        };
+      }
+
+      return {
+        ...baseReplay,
+        status: 'CREATED',
+        endedAt: undefined, // Convert from `null` to `undefined` to match the expected type
+      };
+    }) ?? [];
+
+  if (error) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-5">
+        <div className="inline-flex items-center gap-2 text-red-600">
+          <ExclamationCircleIcon className="h-4 w-4" />
+          <h2 className="text-sm">Could not load replays</h2>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-y-auto">
       <Table
         tableContainerRef={tableContainerRef}
         options={{
-          data: replaysInTableFormat,
+          data: replays,
           columns,
           getCoreRowModel: getCoreRowModel(),
           enableSorting: false,
