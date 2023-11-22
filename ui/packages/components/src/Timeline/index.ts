@@ -1,1 +1,1 @@
-export { Timeline, type CreateLinkToRunFn } from './Timeline';
+export { Timeline, type NavigateToRunFn } from './Timeline';
