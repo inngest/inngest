@@ -168,7 +168,8 @@ func (p Pause) Edge() inngest.Edge {
 }
 
 type ResumeData struct {
-	// RunID is the
+	// If non-nil, RunID is the ID of the run that completed to cause this
+	// resume.
 	RunID    *ulid.ULID
 	With     map[string]any
 	StepName string
