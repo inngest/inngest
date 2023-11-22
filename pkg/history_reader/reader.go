@@ -148,13 +148,16 @@ func (o GetRunsByEventIDOpts) Validate() error {
 type GetRunsOpts struct {
 	AccountID   uuid.UUID
 	WorkspaceID uuid.UUID
-	WorkflowID  uuid.UUID
-	LowerTime   time.Time
-	UpperTime   time.Time
-	TimeField   RunTimeField
-	Limit       int
-	Cursor      *ulid.ULID
-	Statuses    []enums.RunStatus
+	// If the workflow ID is nil, all functions in an env will be queried.
+	WorkflowID *uuid.UUID
+	LowerTime  time.Time
+	UpperTime  time.Time
+	TimeField  RunTimeField
+	Limit      int
+	Cursor     *ulid.ULID
+	Statuses   []enums.RunStatus
+	// If true returns oldest first.  Defaults to descending/newest first.
+	Ascending bool
 }
 
 func (c GetRunsOpts) Validate() error {
@@ -164,7 +167,7 @@ func (c GetRunsOpts) Validate() error {
 	if c.WorkspaceID == uuid.Nil {
 		return errors.New("workspace ID must be provided")
 	}
-	if c.WorkflowID == uuid.Nil {
+	if c.WorkflowID != nil && *c.WorkflowID == uuid.Nil {
 		return errors.New("workflow ID must be provided")
 	}
 	if c.LowerTime.IsZero() {
