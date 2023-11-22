@@ -4,11 +4,11 @@ import {
   ChartBarSquareIcon,
   CodeBracketSquareIcon,
   CommandLineIcon,
-  FolderIcon,
 } from '@heroicons/react/20/solid';
 import { Badge } from '@inngest/components/Badge';
 import { IconReplay } from '@inngest/components/icons/Replay';
 
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { Tag } from '@/components/Tag/Tag';
 import { useFunction } from '@/queries';
@@ -34,6 +34,8 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
   const { isArchived = false } = fn ?? {};
   const isPaused = !isArchived && !data?.workspace.workflow?.current;
 
+  const isReplayEnabled = useBooleanFlag('function-replay');
+
   const emptyData = !data || fetching || !fn;
   const navLinks: HeaderLink[] = [
     {
@@ -47,7 +49,10 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
       text: 'Logs',
       icon: <CommandLineIcon className="w-3.5" />,
     },
-    {
+  ];
+
+  if (isReplayEnabled) {
+    navLinks.push({
       href: `/env/${params.environmentSlug}/functions/${params.slug}/replay`,
       text: 'Replay',
       icon: <IconReplay className="h-3.5 w-3.5" />,
@@ -56,8 +61,9 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
           New
         </Badge>
       ),
-    },
-  ];
+    });
+  }
+
   return (
     <>
       <Header
