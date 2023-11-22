@@ -410,6 +410,7 @@ func (l lifecycle) OnWaitForEvent(
 
 	opts, _ := op.WaitForEventOpts()
 	expires, _ := opts.Expires()
+	stepName := op.UserDefinedName()
 	// nothing right now.
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
@@ -425,7 +426,7 @@ func (l lifecycle) OnWaitForEvent(
 		IdempotencyKey:  id.IdempotencyKey(),
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
-		StepName:        &op.Name,
+		StepName:        &stepName,
 		StepID:          &op.ID,
 		WaitForEvent: &WaitForEvent{
 			EventName:  opts.Event,
@@ -479,6 +480,7 @@ func (l lifecycle) OnWaitForEventResumed(
 			EventID: req.EventID,
 			Timeout: req.EventID == nil,
 		},
+		StepName: &req.StepName,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
@@ -541,6 +543,7 @@ func (l lifecycle) OnInvokeFunction(
 		}
 	}
 
+	stepName := op.UserDefinedName()
 	h := History{
 		AccountID:       id.AccountID,
 		Attempt:         int64(item.Attempt),
@@ -555,7 +558,7 @@ func (l lifecycle) OnInvokeFunction(
 		InvokeFunction:  invokeFunction,
 		RunID:           id.RunID,
 		StepID:          &op.ID,
-		StepName:        &op.Name,
+		StepName:        &stepName,
 		Type:            enums.HistoryTypeStepInvoking.String(),
 		WorkspaceID:     id.WorkspaceID,
 	}
@@ -607,6 +610,7 @@ func (l lifecycle) OnInvokeFunctionResumed(
 		RunID:       id.RunID,
 		Type:        enums.HistoryTypeStepCompleted.String(),
 		WorkspaceID: id.WorkspaceID,
+		StepName:    &req.StepName,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
@@ -634,6 +638,7 @@ func (l lifecycle) OnSleep(
 		)
 	}
 
+	stepName := op.UserDefinedName()
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:       id.AccountID,
@@ -648,7 +653,7 @@ func (l lifecycle) OnSleep(
 		IdempotencyKey:  id.IdempotencyKey(),
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
-		StepName:        &op.Name,
+		StepName:        &stepName,
 		StepID:          &op.ID,
 		Sleep: &Sleep{
 			Until: until,
@@ -679,19 +684,12 @@ func applyResponse(
 		if isGeneratorStep {
 			var opcodes []state.GeneratorOpcode
 			if err := json.Unmarshal([]byte(outputStr), &opcodes); err == nil {
-				if len(opcodes) > 0 && opcodes[0].Op != enums.OpcodeStepPlanned {
+				if len(opcodes) == 1 && opcodes[0].Op != enums.OpcodeStepPlanned {
 					h.StepID = &opcodes[0].ID
 					h.StepType = getStepType(opcodes[0])
 					h.Result.Output = string(opcodes[0].Data)
-
-					if opcodes[0].DisplayName != nil {
-						h.StepName = opcodes[0].DisplayName
-					} else {
-						// SDK versions < 3.?.? don't respond with the display
-						// name, so we we'll use the deprecated name field as a
-						// fallback.
-						h.StepName = &opcodes[0].Name
-					}
+					stepName := opcodes[0].UserDefinedName()
+					h.StepName = &stepName
 				}
 				return nil
 			}

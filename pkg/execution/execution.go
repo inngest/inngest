@@ -178,5 +178,6 @@ type ResumeRequest struct {
 	EventID *ulid.ULID
 	// RunID is the ID of the run that causes this resume, used for invoking
 	// functions directly.
-	RunID *ulid.ULID
+	RunID    *ulid.ULID
+	StepName string
 }

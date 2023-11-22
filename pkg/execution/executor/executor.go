@@ -906,9 +906,10 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 			logger.From(ctx).Debug().Interface("with", resumeData.With).Str("pause.DataKey", pause.DataKey).Msg("resuming pause")
 
 			err := e.Resume(ctx, *pause, execution.ResumeRequest{
-				With:    resumeData.With,
-				EventID: &evtID,
-				RunID:   resumeData.RunID,
+				With:     resumeData.With,
+				EventID:  &evtID,
+				RunID:    resumeData.RunID,
+				StepName: resumeData.StepName,
 			})
 			if err != nil {
 				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
@@ -1310,7 +1311,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		GroupID:     item.GroupID,
 		Outgoing:    gen.ID,
 		Incoming:    edge.Edge.Incoming,
-		StepName:    gen.Name,
+		StepName:    gen.UserDefinedName(),
 		Opcode:      &opcode,
 		Expires:     state.Time(expires),
 		Event:       &eventName,
@@ -1408,7 +1409,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		GroupID:        item.GroupID,
 		Outgoing:       gen.ID,
 		Incoming:       edge.Edge.Incoming,
-		StepName:       gen.Name,
+		StepName:       gen.UserDefinedName(),
 		Opcode:         &opcode,
 		Expires:        state.Time(expires),
 		Event:          &opts.Event,

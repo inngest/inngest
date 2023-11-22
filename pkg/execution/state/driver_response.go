@@ -41,6 +41,18 @@ type GeneratorOpcode struct {
 	DisplayName *string `json:"displayName"`
 }
 
+// Get the name of the step as defined in code by the user.
+func (g GeneratorOpcode) UserDefinedName() string {
+	if g.DisplayName != nil {
+		return *g.DisplayName
+	}
+
+	// SDK versions < 3.?.? don't respond with the display
+	// name, so we we'll use the deprecated name field as a
+	// fallback.
+	return g.Name
+}
+
 func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {
 	opts := &WaitForEventOpts{}
 	if err := opts.UnmarshalAny(g.Opts); err != nil {

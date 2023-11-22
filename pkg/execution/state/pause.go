@@ -169,14 +169,16 @@ func (p Pause) Edge() inngest.Edge {
 
 type ResumeData struct {
 	// RunID is the
-	RunID *ulid.ULID
-	With  map[string]any
+	RunID    *ulid.ULID
+	With     map[string]any
+	StepName string
 }
 
 // Given an event, this returns data used to resume an execution.
 func (p Pause) GetResumeData(evt event.Event) ResumeData {
 	ret := ResumeData{
-		With: evt.Map(),
+		With:     evt.Map(),
+		StepName: p.StepName,
 	}
 
 	// Function invocations are resumed using an event, but we want to unwrap the event from this
