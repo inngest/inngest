@@ -128,8 +128,8 @@ type InvokeNotFoundHandlerOpts struct {
 type FinishHandler func(context.Context, state.State, []event.Event) error
 
 // InvokeNotFoundHandler is a function that handles invocations failing due to
-// the function not being found.
-type InvokeNotFoundHandler func(context.Context, InvokeNotFoundHandlerOpts) error
+// the function not being found. It is passed a list of events to send.
+type InvokeNotFoundHandler func(context.Context, InvokeNotFoundHandlerOpts, []event.Event) error
 
 // HandleSendingEvent handles sending an event given an event and the queue
 // item.

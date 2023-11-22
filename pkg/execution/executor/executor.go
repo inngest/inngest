@@ -212,7 +212,10 @@ func (e *executor) InvokeNotFoundHandler(ctx context.Context, opts execution.Inv
 	if e.invokeNotFoundHandler == nil {
 		return nil
 	}
-	return e.invokeNotFoundHandler(ctx, opts)
+
+	evt := CreateInvokeNotFoundEvent(ctx, opts)
+
+	return e.invokeNotFoundHandler(ctx, opts, []event.Event{evt})
 }
 
 func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
