@@ -112,7 +112,6 @@ const GetFunctionDocument = graphql(`
             eventName
             schedule
             condition
-            nextRun
           }
           deploy {
             id
