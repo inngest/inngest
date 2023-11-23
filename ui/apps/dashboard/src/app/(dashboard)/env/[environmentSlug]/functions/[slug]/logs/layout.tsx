@@ -8,7 +8,7 @@ import NewReplayButton from '@/app/(dashboard)/env/[environmentSlug]/functions/[
 import { ClientFeatureFlag } from '@/components/FeatureFlags/ClientFeatureFlag';
 import { graphql } from '@/gql';
 import { FunctionRunStatus, FunctionRunTimeField } from '@/gql/graphql';
-import { useEnvironment } from '@/queries';
+import { useEnvironment, useFunction } from '@/queries';
 import FunctionRunList from './FunctionRunList';
 import StatusFilter from './StatusFilter';
 import TimeRangeFilter, {
@@ -77,6 +77,7 @@ export default function FunctionRunsLayout({ children, params }: FunctionRunsLay
   });
   const { user } = useUser();
 
+  const functionID = data?.environment.function?.id;
   const functionRunsCount = data?.environment.function?.runs?.totalCount;
 
   function handleStatusesChange(statuses: FunctionRunStatus[]) {
@@ -140,7 +141,9 @@ export default function FunctionRunsLayout({ children, params }: FunctionRunsLay
           )}
         </div>
         <ClientFeatureFlag flag="function-replay">
-          <NewReplayButton environmentSlug={params.environmentSlug} functionSlug={functionSlug} />
+          {environment && functionID && (
+            <NewReplayButton environmentID={environment.id} functionID={functionID} />
+          )}
         </ClientFeatureFlag>
       </div>
       <div className="flex min-h-0 flex-1">

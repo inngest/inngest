@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import React, { useRef } from 'react';
 import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { ReplayStatusIcon } from '@inngest/components/ReplayStatusIcon';
 import { Table } from '@inngest/components/Table';
@@ -8,6 +8,7 @@ import type { Replay } from '@inngest/components/types/replay';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 
+import NewReplayButton from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/NewReplayButton';
 import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
@@ -102,7 +103,7 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
     query: GetReplaysDocument,
     variables: {
       environmentID: environment?.id!,
-      functionSlug: params.slug,
+      functionSlug: decodeURIComponent(params.slug),
     },
     skip: !environment?.id,
   });
@@ -116,6 +117,11 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
       </div>
     );
   }
+
+  const environmentID = data?.environment?.id;
+  const functionID = data?.environment?.function?.id;
+
+  console.log({ environmentID, functionID });
 
   const replays: Replay[] =
     data?.environment?.function?.replays?.map((replay) => {
@@ -153,17 +159,24 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
   }
 
   return (
-    <div className="overflow-y-auto">
-      <Table
-        tableContainerRef={tableContainerRef}
-        options={{
-          data: replays,
-          columns,
-          getCoreRowModel: getCoreRowModel(),
-          enableSorting: false,
-        }}
-        blankState={<p>You have no replays for this function.</p>}
-      />
-    </div>
+    <>
+      {environmentID && functionID && (
+        <div className="flex items-center justify-end border-b border-slate-300 px-5 py-2">
+          <NewReplayButton environmentID={environmentID} functionID={functionID} />
+        </div>
+      )}
+      <div className="overflow-y-auto">
+        <Table
+          tableContainerRef={tableContainerRef}
+          options={{
+            data: replays,
+            columns,
+            getCoreRowModel: getCoreRowModel(),
+            enableSorting: false,
+          }}
+          blankState={<p>You have no replays for this function.</p>}
+        />
+      </div>
+    </>
   );
 }

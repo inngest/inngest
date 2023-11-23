@@ -6,22 +6,48 @@ import { Modal } from '@inngest/components/Modal';
 import { IconReplay } from '@inngest/components/icons/Replay';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { toast } from 'sonner';
+import { useMutation } from 'urql';
 
 import { type TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import Input from '@/components/Forms/Input';
 import { TimeRangeInput } from '@/components/TimeRangeInput';
+import { graphql } from '@/gql';
 import { FunctionRunStatus } from '@/gql/graphql';
 
+const CreateFunctionReplayDocument = graphql(`
+  mutation CreateFunctionReplay(
+    $environmentID: UUID!
+    $functionID: UUID!
+    $name: String!
+    $fromRange: Time!
+    $toRange: Time!
+    $statuses: [RunStatus!]
+  ) {
+    createFunctionReplay(
+      input: {
+        workspaceID: $environmentID
+        workflowID: $functionID
+        name: $name
+        fromRange: $fromRange
+        toRange: $toRange
+        statuses: $statuses
+      }
+    ) {
+      id
+    }
+  }
+`);
+
 type NewReplayModalProps = {
-  environmentSlug: string;
-  functionSlug?: string;
+  environmentID: string;
+  functionID: string;
   isOpen: boolean;
   onClose: () => void;
 };
 
 export default function NewReplayModal({
-  environmentSlug,
-  functionSlug,
+  environmentID,
+  functionID,
   isOpen,
   onClose,
 }: NewReplayModalProps) {
@@ -31,19 +57,31 @@ export default function NewReplayModal({
   const [selectedStatuses, setSelectedStatuses] = useState<FunctionRunStatus[]>([
     FunctionRunStatus.Failed,
   ]);
+  const [{ fetching: isCreatingFunctionReplay }, createFunctionReplayMutation] = useMutation(
+    CreateFunctionReplayDocument
+  );
 
-  async function newReplay(event: React.FormEvent<HTMLFormElement>) {
+  async function createFunctionReplay(event: React.FormEvent<HTMLFormElement>) {
+    console.log('newReplay');
     event.preventDefault();
     if (!timeRange) {
       toast.error('Please specify a valid time range.');
       return;
     }
 
-    const replayFunctionMutation = async () => {
-      // TODO: Implement this mutation
-    };
+    console.log('timeRange', timeRange);
+    console.log('name', name);
 
-    toast.promise(replayFunctionMutation, {
+    const createFunctionReplayPromise = createFunctionReplayMutation({
+      environmentID: environmentID,
+      functionID: functionID,
+      name,
+      fromRange: timeRange.start.toISOString(),
+      toRange: timeRange.end.toISOString(),
+      statuses: selectedStatuses,
+    });
+
+    toast.promise(createFunctionReplayPromise, {
       loading: 'Loading...',
       success: () => {
         router.refresh();
@@ -73,7 +111,7 @@ export default function NewReplayModal({
       isOpen={isOpen}
       onClose={onClose}
     >
-      <form onSubmit={newReplay}>
+      <form onSubmit={createFunctionReplay}>
         <div className="divide-y divide-gray-900/10 border-b border-slate-100">
           <div className="flex items-start justify-between gap-7 px-6 py-4">
             <label htmlFor="name" className="block space-y-0.5">
@@ -137,7 +175,9 @@ export default function NewReplayModal({
           <Button
             label="Replay Function"
             kind="primary"
+            type="submit"
             icon={<IconReplay className="h-5 w-5 text-white" />}
+            disabled={isCreatingFunctionReplay}
           />
         </div>
       </form>
