@@ -151,7 +151,7 @@ export default function FunctionRunsLayout({ children, params }: FunctionRunsLay
           selectedTimeRange={selectedTimeRange}
           timeField={selectedTimeField}
         />
-        {/* <div className="min-w-0 flex-1 bg-slate-50">{children}</div> */}
+        <div className="min-w-0 flex-1">{children}</div>
       </div>
     </>
   );

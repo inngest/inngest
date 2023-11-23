@@ -1,8 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
+import { type Route } from 'next';
+import { useRouter } from 'next/navigation';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { RunDetails } from '@inngest/components/RunDetails';
+import { SlideOver } from '@inngest/components/SlideOver';
 import { useParsedHistory } from '@inngest/components/hooks/useParsedHistory';
 import type { Environment } from '@inngest/components/types/environment';
 import type { Event } from '@inngest/components/types/event';
@@ -34,6 +37,7 @@ export function StreamDetails({
   run,
 }: Props) {
   const client = useClient();
+  const router = useRouter();
 
   const getOutput = useMemo(() => {
     return (historyItemID: string) => {
@@ -48,6 +52,9 @@ export function StreamDetails({
   }, [client, environment.id, func.id, run.id]);
 
   const history = useParsedHistory(rawHistory);
+  const parentURL = `/env/${environment.slug}/functions/${encodeURIComponent(
+    func.slug
+  )}/logs` as Route;
 
   let rerunButton: React.ReactNode | undefined;
   if (run.canRerun) {
@@ -55,19 +62,21 @@ export function StreamDetails({
   }
 
   return (
-    <div
-      className={classNames('dark grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}
-    >
-      {event && <EventDetails event={event} />}
+    <SlideOver size={event ? 'large' : 'small'} onClose={() => router.push(parentURL)}>
+      <div
+        className={classNames('dark grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}
+      >
+        {event && <EventDetails event={event} />}
 
-      <RunDetails
-        func={func}
-        functionVersion={functionVersion}
-        getHistoryItemOutput={getOutput}
-        history={history}
-        rerunButton={rerunButton}
-        run={run}
-      />
-    </div>
+        <RunDetails
+          func={func}
+          functionVersion={functionVersion}
+          getHistoryItemOutput={getOutput}
+          history={history}
+          rerunButton={rerunButton}
+          run={run}
+        />
+      </div>
+    </SlideOver>
   );
 }

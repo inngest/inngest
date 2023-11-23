@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { type Route } from 'next';
 import { Button } from '@inngest/components/Button';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { Link } from '@inngest/components/Link';
@@ -70,9 +71,11 @@ function createColumns({
           <Link
             className="text-sm font-medium leading-7"
             internalNavigation
-            href={`/env/${environmentSlug}/functions/${encodeURIComponent(
-              functionSlug
-            )}/logs/${props.getValue()}`}
+            href={
+              `/env/${environmentSlug}/functions/${encodeURIComponent(
+                functionSlug
+              )}/logs/${props.getValue()}` as Route
+            }
           >
             {props.getValue()}
           </Link>
