@@ -21,6 +21,7 @@
     "@radix-ui/react-select": "1.2.2",
     "@radix-ui/react-tooltip": "1.0.6",
     "@tanstack/react-table": "8.9.3",
+    "croner": "7.0.5",
     "framer-motion": "10.16.4",
     "monaco-editor": "0.34.1",
     "next": "14.0.2",

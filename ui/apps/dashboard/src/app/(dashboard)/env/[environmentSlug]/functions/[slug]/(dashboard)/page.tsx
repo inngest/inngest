@@ -12,7 +12,7 @@ import {
 import { IconClock } from '@inngest/components/icons/Clock';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
-import Cron from 'croner';
+import { getCronNextRun } from '@inngest/components/utils/cron';
 import { titleCase } from 'title-case';
 
 import FunctionConfiguration from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/(dashboard)/FunctionConfiguration';
@@ -314,11 +314,11 @@ type ScheduleTriggerProps = {
 };
 
 function ScheduleTrigger({ schedule, condition }: ScheduleTriggerProps) {
-  const [nextRun, setNextRun] = useState(() => Cron(schedule, { timezone: 'Etc/UTC' }).nextRun());
+  const [nextRun, setNextRun] = useState(() => getCronNextRun(schedule));
 
   useEffect(() => {
     const intervalID = setInterval(() => {
-      setNextRun(Cron(schedule, { timezone: 'Etc/UTC' }).nextRun());
+      setNextRun(getCronNextRun(schedule));
     }, 5_000);
     return () => clearInterval(intervalID);
   }, [schedule]); // ✅ Now count is not a dependency
