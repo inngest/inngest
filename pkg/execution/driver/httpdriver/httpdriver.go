@@ -28,8 +28,8 @@ var (
 		Proxy:                 http.ProxyFromEnvironment,
 		DialContext:           dialer.DialContext,
 		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          -1,
-		IdleConnTimeout:       -1,
+		MaxIdleConns:          0,
+		IdleConnTimeout:       0,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 		// New, ensuring that services can take their time before
