@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { ChartBarIcon, ChevronRightIcon, XCircleIcon } from '@heroicons/react/20/solid';
 import {
@@ -9,10 +9,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@inngest/components/Tooltip';
+import { useCron } from '@inngest/components/hooks/useCron';
 import { IconClock } from '@inngest/components/icons/Clock';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
-import Cron from 'croner';
 import { titleCase } from 'title-case';
 
 import FunctionConfiguration from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/(dashboard)/FunctionConfiguration';
@@ -314,14 +314,7 @@ type ScheduleTriggerProps = {
 };
 
 function ScheduleTrigger({ schedule, condition }: ScheduleTriggerProps) {
-  const [nextRun, setNextRun] = useState(() => Cron(schedule, { timezone: 'Etc/UTC' }).nextRun());
-
-  useEffect(() => {
-    const intervalID = setInterval(() => {
-      setNextRun(Cron(schedule, { timezone: 'Etc/UTC' }).nextRun());
-    }, 5_000);
-    return () => clearInterval(intervalID);
-  }, [schedule]); // ✅ Now count is not a dependency
+  const { nextRun } = useCron(schedule);
 
   return (
     <div className="rounded border border-slate-200 bg-white p-4">
