@@ -7,11 +7,11 @@ import { IconReplay } from '@inngest/components/icons/Replay';
 import NewReplayModal from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/NewReplayModal';
 
 type NewReplayButtonProps = {
-  environmentID: string;
-  functionID: string;
+  environmentSlug: string;
+  functionSlug: string;
 };
 
-export default function NewReplayButton({ environmentID, functionID }: NewReplayButtonProps) {
+export default function NewReplayButton({ environmentSlug, functionSlug }: NewReplayButtonProps) {
   const [isModalVisible, setIsModalVisible] = useState(false);
 
   return (
@@ -24,8 +24,8 @@ export default function NewReplayButton({ environmentID, functionID }: NewReplay
       />
       <NewReplayModal
         isOpen={isModalVisible}
-        environmentID={environmentID}
-        functionID={functionID}
+        environmentSlug={environmentSlug}
+        functionSlug={functionSlug}
         onClose={() => setIsModalVisible(false)}
       />
     </>

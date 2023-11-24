@@ -146,6 +146,9 @@ importers:
       type-fest:
         specifier: 3.7.2
         version: 3.7.2
+      ulid:
+        specifier: 2.3.0
+        version: 2.3.0
       urql:
         specifier: 4.0.5
         version: 4.0.5(graphql@16.8.1)(react@18.2.0)

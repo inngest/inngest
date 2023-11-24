@@ -142,7 +142,7 @@ export default function FunctionRunsLayout({ children, params }: FunctionRunsLay
         </div>
         <ClientFeatureFlag flag="function-replay">
           {environment && functionID && (
-            <NewReplayButton environmentID={environment.id} functionID={functionID} />
+            <NewReplayButton environmentSlug={params.environmentSlug} functionSlug={functionSlug} />
           )}
         </ClientFeatureFlag>
       </div>

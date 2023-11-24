@@ -96,6 +96,7 @@ type FunctionReplayPageProps = {
   };
 };
 export default function FunctionReplayPage({ params }: FunctionReplayPageProps) {
+  const functionSlug = decodeURIComponent(params.slug);
   const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
     environmentSlug: params.environmentSlug,
   });
@@ -103,7 +104,7 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
     query: GetReplaysDocument,
     variables: {
       environmentID: environment?.id!,
-      functionSlug: decodeURIComponent(params.slug),
+      functionSlug: functionSlug,
     },
     skip: !environment?.id,
   });
@@ -162,7 +163,7 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
     <>
       {environmentID && functionID && (
         <div className="flex items-center justify-end border-b border-slate-300 px-5 py-2">
-          <NewReplayButton environmentID={environmentID} functionID={functionID} />
+          <NewReplayButton environmentSlug={params.environmentSlug} functionSlug={functionSlug} />
         </div>
       )}
       <div className="overflow-y-auto">
