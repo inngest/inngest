@@ -96,7 +96,7 @@ export const send = inngest.createFunction(
   { event: "billing/invoice.pending" },
   async ({ event, step }) => {
     await step.run("send-email", async () => {
-      return await resend.sendEmail({
+      return await resend.emails.send({
         from: "hello@myco.com",
         to: event.user.email,
         subject: `Invoice pending for ${event.data.invoicePeriod}`,

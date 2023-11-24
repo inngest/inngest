@@ -185,7 +185,7 @@ export default inngest.createFunction(
   { event: "service/check.failed" },
   async ({ event, step }) => {
     await step.run("send-alert-email", async () => {
-      return await resend.sendEmail({
+      return await resend.emails.send({
         from: "notifications@myco.com",
         to: event.user.email,
         subject: `ALERT: ${event.data.issue}`,

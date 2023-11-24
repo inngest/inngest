@@ -145,6 +145,10 @@ const sectionPlatform = [
         title: "Creating an Event Key",
         href: `/docs/events/creating-an-event-key`,
       },
+      {
+        title: "Consuming webhook events",
+        href: `/docs/platform/webhooks`,
+      },
     ],
   },
   {

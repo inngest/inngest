@@ -71,7 +71,7 @@ export const welcomeEmail = inngest.createFunction(
   },
   async ({ event, step }) => {
     await step.run('send-email', async () => {
-      return await resend.sendEmail({
+      return await resend.emails.send({
         from: 'noreply@inngest.com',
         to: event.user.email,
         subject: "Welcome to Inngest!",

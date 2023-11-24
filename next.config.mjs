@@ -23,6 +23,7 @@ const permanentRedirects = [
   ["/docs/frameworks/nextjs", "/docs/sdk/serve#framework-next-js"],
   ["/docs/frameworks/redwoodjs", "/docs/sdk/serve#framework-redwood"],
   ["/docs/sdk/reference/serve", "/docs/reference/serve"],
+  ["/docs/events/webhooks", "/docs/platform/webhooks"],
 
   // Other pages
   ["/uses/zero-infra-llm-ai", "/ai"],
