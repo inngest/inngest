@@ -82,3 +82,30 @@ func sortOps(opcodes []*state.GeneratorOpcode) {
 		return opcodes[i].Op < opcodes[j].Op
 	})
 }
+
+// opGroups groups opcodes by their type, ensuring we run `waitForEvent` opcodes
+// first. This is used to ensure that we save wait triggers as soon as possible,
+// as well as capturing expression errors early.
+func opGroups(opcodes []*state.GeneratorOpcode) [][]*state.GeneratorOpcode {
+	var waitForEventGroup []*state.GeneratorOpcode
+	var otherGroup []*state.GeneratorOpcode
+
+	for _, op := range opcodes {
+		if op.Op == enums.OpcodeWaitForEvent {
+			waitForEventGroup = append(waitForEventGroup, op)
+		} else {
+			otherGroup = append(otherGroup, op)
+		}
+	}
+
+	// filter out any empty groups
+	groups := [][]*state.GeneratorOpcode{}
+	if len(waitForEventGroup) > 0 {
+		groups = append(groups, waitForEventGroup)
+	}
+	if len(otherGroup) > 0 {
+		groups = append(groups, otherGroup)
+	}
+
+	return groups
+}

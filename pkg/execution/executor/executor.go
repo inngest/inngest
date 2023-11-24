@@ -953,14 +953,14 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, resp *state.Driv
 	}
 
 	// Ensure that we process waitForEvents first, as these are highest priority.
-	sortOps(resp.Generator)
-
 	isParallel := len(resp.Generator) > 1
-	eg := errgroup.Group{}
-	for _, op := range resp.Generator {
-		if op == nil {
-			// This is clearly an error.
-			if e.log != nil {
+	groups := opGroups(resp.Generator)
+	for _, group := range groups {
+		eg := errgroup.Group{}
+		for _, op := range group {
+			if op == nil {
+				// This is clearly an error.
+				if e.log != nil {
 				e.log.Error().Err(fmt.Errorf("nil generator returned")).Msg("error handling generator")
 			}
 			continue
@@ -974,10 +974,15 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, resp *state.Driv
 			newItem.GroupID = uuid.New().String()
 		}
 
-		eg.Go(func() error { return e.HandleGenerator(ctx, copied, newItem) })
+			eg.Go(func() error { return e.HandleGenerator(ctx, copied, newItem) })
+		}
+		err = eg.Wait()
+		if err != nil {
+			return err
+		}
 	}
 
-	return eg.Wait()
+	return nil
 }
 
 func (e *executor) HandleGenerator(ctx context.Context, gen state.GeneratorOpcode, item queue.Item) error {
