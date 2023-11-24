@@ -559,6 +559,7 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 		if serr := e.HandleGeneratorResponse(ctx, resp, item); serr != nil {
 			// If this is an error compiling async expressions, fail the function.
 			if strings.Contains(serr.Error(), "error compiling expression") {
+				resp.SetError(serr)
 				_, _ = e.sm.SaveResponse(ctx, id, *resp, item.Attempt)
 				// XXX: failureHandler is legacy.
 				if serr := e.sm.SetStatus(ctx, id, enums.RunStatusFailed); serr != nil {
@@ -961,18 +962,18 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, resp *state.Driv
 			if op == nil {
 				// This is clearly an error.
 				if e.log != nil {
-				e.log.Error().Err(fmt.Errorf("nil generator returned")).Msg("error handling generator")
+					e.log.Error().Err(fmt.Errorf("nil generator returned")).Msg("error handling generator")
+				}
+				continue
 			}
-			continue
-		}
-		copied := *op
+			copied := *op
 
-		newItem := item
-		if isParallel {
-			// Give each opcode its own group ID, since we want to track each
-			// parellel step individually.
-			newItem.GroupID = uuid.New().String()
-		}
+			newItem := item
+			if isParallel {
+				// Give each opcode its own group ID, since we want to track each
+				// parellel step individually.
+				newItem.GroupID = uuid.New().String()
+			}
 
 			eg.Go(func() error { return e.HandleGenerator(ctx, copied, newItem) })
 		}
