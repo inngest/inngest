@@ -560,6 +560,7 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 			// If this is an error compiling async expressions, fail the function.
 			if strings.Contains(serr.Error(), "error compiling expression") {
 				resp.SetError(serr)
+				resp.SetFinal()
 				_, _ = e.sm.SaveResponse(ctx, id, *resp, item.Attempt)
 				// XXX: failureHandler is legacy.
 				if serr := e.sm.SetStatus(ctx, id, enums.RunStatusFailed); serr != nil {
