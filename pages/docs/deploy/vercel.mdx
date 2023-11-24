@@ -61,11 +61,12 @@ Installing [Inngest's official Vercel integration](https://vercel.com/integratio
 
 <ButtonDeploy href="https://vercel.com/integrations/inngest" type="vercel" label="Install the Inngest Vercel integration" />
 
-After you're installed, every new deploy to Vercel will update functions in [the Inngest dashboard](https://app.inngest.com/functions) within a few seconds!
+To enable communication between Inngest and your app, you need to either [disable Deployment Protection](https://vercel.com/docs/security/deployment-protection#configuring-deployment-protection)
+or, if you're on Vercel's Pro plan, configure protection bypass:
 
 ## Bypassing Deployment Protection
 
-If you have Vercel's [Deployment Protection feature](https://vercel.com/docs/security/deployment-protection) enabled, _by default_, Inngest will not be able to send HTTP requests to your application's preview environments. To enable this, you will need to leverage Vercel's "[Protection Bypass for Automation](https://vercel.com/docs/security/deployment-protection#protection-bypass-for-automation)" feature. Access to this feature may be dependent on the Vercel plan that you're paying for (please see docs linked above). Here's how to set it up:
+If you have Vercel’s [Deployment Protection feature](https://vercel.com/docs/security/deployment-protection) enabled, _by default_, Inngest will not be able to send HTTP requests to your application's preview environments. To enable this, you will need to leverage Vercel's "[Protection Bypass for Automation](https://vercel.com/docs/security/deployment-protection#protection-bypass-for-automation)" feature. Access to this feature may be dependent on the Vercel plan that you're paying for (please see docs linked above). Here's how to set it up:
 
 1. Enable "Protection Bypass for Automation" on your Vercel project
 2. Copy your secret
