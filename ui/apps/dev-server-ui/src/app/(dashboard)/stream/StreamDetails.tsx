@@ -86,8 +86,8 @@ export default function StreamDetails() {
           event={eventResult.data}
           functionRuns={eventResult.data.functionRuns}
           onFunctionRunClick={(runId) => {
-            setSelectedRunID(runId),
-              router.push(`/stream/trigger?event=${eventResult.data.id}&run=${runId}`);
+            setSelectedRunID(runId);
+            router.push(`/stream/trigger?event=${eventResult.data.id}&run=${runId}`);
           }}
           onReplayEvent={onReplayEvent}
           selectedRunID={selectedRunID}
