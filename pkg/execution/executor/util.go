@@ -2,13 +2,18 @@ package executor
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"sort"
 	"time"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/xhit/go-str2duration/v2"
 )
@@ -81,4 +86,38 @@ func sortOps(opcodes []*state.GeneratorOpcode) {
 		}
 		return opcodes[i].Op < opcodes[j].Op
 	})
+}
+
+func CreateInvokeNotFoundEvent(ctx context.Context, opts execution.InvokeNotFoundHandlerOpts) event.Event {
+	now := time.Now()
+	data := map[string]interface{}{
+		"function_id": opts.FunctionID,
+		"run_id":      opts.RunID,
+	}
+
+	origEvt := opts.OriginalEvent.GetEvent().Map()
+	if dataMap, ok := origEvt["data"].(map[string]interface{}); ok {
+		if inngestObj, ok := dataMap[consts.InngestEventDataPrefix].(map[string]interface{}); ok {
+			if dataValue, ok := inngestObj[consts.InvokeCorrelationId].(string); ok {
+				data[consts.InvokeCorrelationId] = dataValue
+			}
+		}
+	}
+
+	if opts.Err != nil {
+		data["error"] = opts.Err
+	} else {
+		data["result"] = opts.Result
+	}
+
+	evt := event.Event{
+		ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+		Name:      event.FnFinishedName,
+		Timestamp: now.UnixMilli(),
+		Data:      data,
+	}
+
+	logger.From(ctx).Debug().Interface("event", evt).Msg("function finished event")
+
+	return evt
 }

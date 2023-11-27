@@ -428,7 +428,7 @@ func (q *Queries) GetFunctionRunFinishesByRunIDs(ctx context.Context, runIds []u
 }
 
 const getFunctionRunHistory = `-- name: GetFunctionRunHistory :many
-SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, result FROM history WHERE run_id = ? ORDER BY created_at ASC
+SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result FROM history WHERE run_id = ? ORDER BY created_at ASC
 `
 
 func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*History, error) {
@@ -461,6 +461,8 @@ func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([
 			&i.Sleep,
 			&i.WaitForEvent,
 			&i.WaitResult,
+			&i.InvokeFunction,
+			&i.InvokeFunctionResult,
 			&i.Result,
 		); err != nil {
 			return nil, err
@@ -820,32 +822,34 @@ func (q *Queries) InsertFunctionRun(ctx context.Context, arg InsertFunctionRunPa
 const insertHistory = `-- name: InsertHistory :exec
 
 INSERT INTO history
-	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, result) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertHistoryParams struct {
-	ID              ulid.ULID
-	CreatedAt       time.Time
-	RunStartedAt    time.Time
-	FunctionID      uuid.UUID
-	FunctionVersion int64
-	RunID           ulid.ULID
-	EventID         ulid.ULID
-	BatchID         ulid.ULID
-	GroupID         sql.NullString
-	IdempotencyKey  string
-	Type            string
-	Attempt         int64
-	LatencyMs       sql.NullInt64
-	StepName        sql.NullString
-	StepID          sql.NullString
-	Url             sql.NullString
-	CancelRequest   sql.NullString
-	Sleep           sql.NullString
-	WaitForEvent    sql.NullString
-	WaitResult      sql.NullString
-	Result          sql.NullString
+	ID                   ulid.ULID
+	CreatedAt            time.Time
+	RunStartedAt         time.Time
+	FunctionID           uuid.UUID
+	FunctionVersion      int64
+	RunID                ulid.ULID
+	EventID              ulid.ULID
+	BatchID              ulid.ULID
+	GroupID              sql.NullString
+	IdempotencyKey       string
+	Type                 string
+	Attempt              int64
+	LatencyMs            sql.NullInt64
+	StepName             sql.NullString
+	StepID               sql.NullString
+	Url                  sql.NullString
+	CancelRequest        sql.NullString
+	Sleep                sql.NullString
+	WaitForEvent         sql.NullString
+	WaitResult           sql.NullString
+	InvokeFunction       sql.NullString
+	InvokeFunctionResult sql.NullString
+	Result               sql.NullString
 }
 
 // History
@@ -871,6 +875,8 @@ func (q *Queries) InsertHistory(ctx context.Context, arg InsertHistoryParams) er
 		arg.Sleep,
 		arg.WaitForEvent,
 		arg.WaitResult,
+		arg.InvokeFunction,
+		arg.InvokeFunctionResult,
 		arg.Result,
 	)
 	return err

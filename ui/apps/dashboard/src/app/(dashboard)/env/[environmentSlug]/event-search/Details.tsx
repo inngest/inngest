@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { RunDetails } from '@inngest/components/RunDetails';
+import type { NavigateToRunFn } from '@inngest/components/Timeline';
 import { HistoryParser } from '@inngest/components/utils/historyParser';
 import { useClient } from 'urql';
 
@@ -14,9 +15,10 @@ type Props = {
   envID: string;
   eventID: string | undefined;
   onClose: () => void;
+  navigateToRun: NavigateToRunFn;
 };
 
-export function Details({ envID, eventID, onClose }: Props) {
+export function Details({ envID, eventID, onClose, navigateToRun }: Props) {
   const [selectedRun, setSelectedRun] = useState<{ functionID: string; runID: string } | undefined>(
     undefined
   );
@@ -107,6 +109,7 @@ export function Details({ envID, eventID, onClose }: Props) {
         getHistoryItemOutput={getOutput}
         history={new HistoryParser(runRes.data.run.history)}
         run={runRes.data.run}
+        navigateToRun={navigateToRun}
       />
     );
   }

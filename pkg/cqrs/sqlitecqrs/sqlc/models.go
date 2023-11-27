@@ -72,25 +72,27 @@ type FunctionRun struct {
 }
 
 type History struct {
-	ID              ulid.ULID
-	CreatedAt       time.Time
-	RunStartedAt    time.Time
-	FunctionID      uuid.UUID
-	FunctionVersion int64
-	RunID           ulid.ULID
-	EventID         ulid.ULID
-	BatchID         ulid.ULID
-	GroupID         sql.NullString
-	IdempotencyKey  string
-	Type            string
-	Attempt         int64
-	LatencyMs       sql.NullInt64
-	StepName        sql.NullString
-	StepID          sql.NullString
-	Url             sql.NullString
-	CancelRequest   sql.NullString
-	Sleep           sql.NullString
-	WaitForEvent    sql.NullString
-	WaitResult      sql.NullString
-	Result          sql.NullString
+	ID                   ulid.ULID
+	CreatedAt            time.Time
+	RunStartedAt         time.Time
+	FunctionID           uuid.UUID
+	FunctionVersion      int64
+	RunID                ulid.ULID
+	EventID              ulid.ULID
+	BatchID              ulid.ULID
+	GroupID              sql.NullString
+	IdempotencyKey       string
+	Type                 string
+	Attempt              int64
+	LatencyMs            sql.NullInt64
+	StepName             sql.NullString
+	StepID               sql.NullString
+	Url                  sql.NullString
+	CancelRequest        sql.NullString
+	Sleep                sql.NullString
+	WaitForEvent         sql.NullString
+	WaitResult           sql.NullString
+	InvokeFunction       sql.NullString
+	InvokeFunctionResult sql.NullString
+	Result               sql.NullString
 }

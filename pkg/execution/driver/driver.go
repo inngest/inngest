@@ -3,6 +3,7 @@ package driver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/gowebpki/jcs"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -35,6 +36,7 @@ func MarshalV1(
 	attempt int,
 ) ([]byte, error) {
 	md := s.Metadata()
+
 	req := &SDKRequest{
 		Events:  s.Events(),
 		Event:   s.Event(),
@@ -64,8 +66,13 @@ func MarshalV1(
 
 	j, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error marshalling request to JSON: %w", err)
 	}
 
-	return jcs.Transform(j)
+	b, err := jcs.Transform(j)
+	if err != nil {
+		return nil, fmt.Errorf("error transforming request with JCS: %w", err)
+	}
+
+	return b, nil
 }

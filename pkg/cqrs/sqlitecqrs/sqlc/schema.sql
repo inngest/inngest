@@ -38,21 +38,21 @@ CREATE TABLE functions (
 );
 
 CREATE TABLE function_runs (
-	run_id CHAR(26) NOT NULL, 
+	run_id CHAR(26) NOT NULL,
 	run_started_at TIMESTAMP NOT NULL,
 	function_id UUID,
 	function_version INT NOT NULL,
 	trigger_type VARCHAR NOT NULL,
-	event_id CHAR(26) NOT NULL, 
-	batch_id CHAR(26), 
+	event_id CHAR(26) NOT NULL,
+	batch_id CHAR(26),
 	original_run_id CHAR(26),
 	cron VARCHAR
 );
 
 CREATE TABLE function_finishes (
-	run_id BLOB, 
+	run_id BLOB,
 	-- Ignoring not null because of https://github.com/sqlc-dev/sqlc/issues/2806#issuecomment-1750038624
-	status VARCHAR, 
+	status VARCHAR,
 	output VARCHAR DEFAULT '{}',
 	completed_step_count INT DEFAULT 1,
 	created_at TIMESTAMP
@@ -64,9 +64,9 @@ CREATE TABLE history (
 	run_started_at TIMESTAMP NOT NULL,
 	function_id UUID,
 	function_version INT NOT NULL,
-	run_id BLOB NOT NULL, 
-	event_id BLOB NOT NULL, 
-	batch_id BLOB, 
+	run_id BLOB NOT NULL,
+	event_id BLOB NOT NULL,
+	batch_id BLOB,
 	group_id VARCHAR,
 	idempotency_key VARCHAR NOT NULL,
 	type VARCHAR NOT NULL,
@@ -79,5 +79,7 @@ CREATE TABLE history (
 	sleep VARCHAR,
 	wait_for_event VARCHAR,
 	wait_result VARCHAR,
+	invoke_function VARCHAR,
+	invoke_function_result VARCHAR,
 	result VARCHAR
 );
