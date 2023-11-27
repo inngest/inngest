@@ -131,18 +131,12 @@ export default function FunctionRunList({
 
   const [pageCursors, setPageCursors] = useState<string[]>(['']);
   const [functionRuns, setFunctionRuns] = useState<RunListItem[]>([]);
-  const [prevSelectedTimeField, setPrevSelectedTimeField] = useState(timeField);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
   // We reset the page cursors when the selected statuses or time range change, which resets the list to the first page.
   const [prevSelectedStatuses, setPrevSelectedStatuses] = useState(selectedStatuses);
   const [prevSelectedTimeRange, setPrevSelectedTimeRange] = useState(selectedTimeRange);
-  if (selectedStatuses !== prevSelectedStatuses || selectedTimeRange !== prevSelectedTimeRange) {
-    setPrevSelectedStatuses(selectedStatuses);
-    setPrevSelectedTimeRange(selectedTimeRange);
-    setPageCursors(['']);
-    setFunctionRuns([]);
-  }
+  const [prevSelectedTimeField, setPrevSelectedTimeField] = useState(timeField);
 
   const [{ data: environment, fetching: isFetchingEnvironments }] = useEnvironment({
     environmentSlug,
@@ -168,10 +162,17 @@ export default function FunctionRunList({
   const isLoading = isFetchingEnvironments || fetching;
 
   useEffect(() => {
-    if (timeField !== prevSelectedTimeField) {
+    if (
+      selectedStatuses !== prevSelectedStatuses ||
+      selectedTimeRange !== prevSelectedTimeRange ||
+      timeField !== prevSelectedTimeField
+    ) {
+      setPrevSelectedStatuses(selectedStatuses);
+      setPrevSelectedTimeRange(selectedTimeRange);
+      setPrevSelectedTimeField(timeField);
+      setPageCursors(['']);
       const validRuns = runs ? (runs.filter(Boolean) as RunListItem[]) : [];
       setFunctionRuns(validRuns);
-      setPrevSelectedTimeField(timeField);
     } else {
       setFunctionRuns(
         (prevFunctionRuns) => [...prevFunctionRuns, ...runs].filter(Boolean) as RunListItem[]
