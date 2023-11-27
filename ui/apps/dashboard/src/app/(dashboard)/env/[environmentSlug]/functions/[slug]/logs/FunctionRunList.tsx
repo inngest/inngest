@@ -171,14 +171,13 @@ export default function FunctionRunList({
       setPrevSelectedTimeRange(selectedTimeRange);
       setPrevSelectedTimeField(timeField);
       setPageCursors(['']);
-      const validRuns = runs ? (runs.filter(Boolean) as RunListItem[]) : [];
-      setFunctionRuns(validRuns);
+      setFunctionRuns([]);
     } else {
       setFunctionRuns(
         (prevFunctionRuns) => [...prevFunctionRuns, ...runs].filter(Boolean) as RunListItem[]
       );
     }
-  }, [data]);
+  }, [data, selectedStatuses, selectedTimeRange, timeField]);
 
   if (
     !data ||
