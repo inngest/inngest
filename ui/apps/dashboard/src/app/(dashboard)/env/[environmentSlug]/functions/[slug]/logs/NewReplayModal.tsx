@@ -201,14 +201,14 @@ export default function NewReplayModal({
       <form className="divide-y divide-slate-100" onSubmit={createFunctionReplay}>
         <div className="divide-y divide-slate-100">
           <div className="flex items-start justify-between gap-7 px-6 py-4">
-            <label htmlFor="name" className="block space-y-0.5">
+            <label htmlFor="replayName" className="block space-y-0.5">
               <span className="text-sm font-semibold text-slate-800">Replay Name</span>
               <p className="text-xs text-slate-500">Give your Replay a name to reference later.</p>
             </label>
             <div className="w-64">
               <Input
                 type="text"
-                id="name"
+                id="replayName"
                 value={name}
                 minLength={3}
                 maxLength={64}
