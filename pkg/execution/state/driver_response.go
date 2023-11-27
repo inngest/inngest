@@ -8,6 +8,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/dateutil"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/xhit/go-str2duration/v2"
 	"golang.org/x/exp/slog"
@@ -111,6 +112,52 @@ func (g GeneratorOpcode) SleepDuration() (time.Duration, error) {
 	}
 
 	return str2duration.ParseDuration(opts.Duration)
+}
+
+func (g GeneratorOpcode) InvokeFunctionOpts() (*InvokeFunctionOpts, error) {
+	opts := &InvokeFunctionOpts{}
+	if err := opts.UnmarshalAny(g.Opts); err != nil {
+		return nil, err
+	}
+	return opts, nil
+}
+
+type InvokeFunctionOpts struct {
+	FunctionID string       `json:"function_id"`
+	Payload    *event.Event `json:"payload,omitempty"`
+	Timeout    string       `json:"timeout"`
+}
+
+func (i *InvokeFunctionOpts) UnmarshalAny(a any) error {
+	opts := InvokeFunctionOpts{}
+	var mappedByt []byte
+	switch typ := a.(type) {
+	case []byte:
+		mappedByt = typ
+	default:
+		byt, err := json.Marshal(a)
+		if err != nil {
+			return err
+		}
+		mappedByt = byt
+	}
+	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+		return err
+	}
+	*i = opts
+	return nil
+}
+
+func (i InvokeFunctionOpts) Expires() (time.Time, error) {
+	if i.Timeout == "" {
+		return time.Now().AddDate(1, 0, 0), nil
+	}
+
+	dur, err := str2duration.ParseDuration(i.Timeout)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Now().Add(dur), nil
 }
 
 type SleepOpts struct {

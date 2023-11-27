@@ -64,12 +64,11 @@ const (
 	// MaxEvents is the maximum number of events we can parse in a single batch.
 	MaxEvents = 5_000
 
-	// InvokeEventName is the event name used to invoke specific functions via an
-	// API.  Note that invoking functions still sends an event in the usual manner.
-	InvokeEventName = "inngest/function.invoked"
+	InngestEventDataPrefix = "_inngest"
 	// InvokeSlugKey is the data key used to store the fn name when invoking a function
 	// via an RPC-like call, abstracting event-driven fanout.
-	InvokeSlugKey = "_inngest_fn"
+	InvokeFnID          = "fn_id"
+	InvokeCorrelationId = "correlation_id"
 
 	// CancelTimeout is the maximum time a cancellation can exist
 	CancelTimeout = time.Hour * 24 * 365

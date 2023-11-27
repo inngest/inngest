@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
 	"github.com/xhit/go-str2duration/v2"
@@ -105,9 +107,23 @@ func WithLogger(l *zerolog.Logger) ExecutorOpt {
 	}
 }
 
-func WithFailureHandler(f execution.FailureHandler) ExecutorOpt {
+func WithFinishHandler(f execution.FinishHandler) ExecutorOpt {
 	return func(e execution.Executor) error {
-		e.(*executor).failureHandler = f
+		e.(*executor).finishHandler = f
+		return nil
+	}
+}
+
+func WithInvokeNotFoundHandler(f execution.InvokeNotFoundHandler) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).invokeNotFoundHandler = f
+		return nil
+	}
+}
+
+func WithSendingEventHandler(f execution.HandleSendingEvent) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).handleSendingEvent = f
 		return nil
 	}
 }
@@ -169,21 +185,37 @@ func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
 type executor struct {
 	log *zerolog.Logger
 
-	sm             state.Manager
-	queue          queue.Queue
-	debouncer      debounce.Debouncer
-	fl             state.FunctionLoader
-	evalFactory    func(ctx context.Context, expr string) (expressions.Evaluator, error)
-	runtimeDrivers map[string]driver.Driver
-	failureHandler execution.FailureHandler
+	sm                    state.Manager
+	queue                 queue.Queue
+	debouncer             debounce.Debouncer
+	fl                    state.FunctionLoader
+	evalFactory           func(ctx context.Context, expr string) (expressions.Evaluator, error)
+	runtimeDrivers        map[string]driver.Driver
+	finishHandler         execution.FinishHandler
+	invokeNotFoundHandler execution.InvokeNotFoundHandler
+	handleSendingEvent    execution.HandleSendingEvent
 
 	lifecycles []execution.LifecycleListener
 
 	steplimit uint
 }
 
-func (e *executor) SetFailureHandler(f execution.FailureHandler) {
-	e.failureHandler = f
+func (e *executor) SetFinishHandler(f execution.FinishHandler) {
+	e.finishHandler = f
+}
+
+func (e *executor) SetInvokeNotFoundHandler(f execution.InvokeNotFoundHandler) {
+	e.invokeNotFoundHandler = f
+}
+
+func (e *executor) InvokeNotFoundHandler(ctx context.Context, opts execution.InvokeNotFoundHandlerOpts) error {
+	if e.invokeNotFoundHandler == nil {
+		return nil
+	}
+
+	evt := CreateInvokeNotFoundEvent(ctx, opts)
+
+	return e.invokeNotFoundHandler(ctx, opts, []event.Event{evt})
 }
 
 func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
@@ -437,7 +469,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			resp.SetError(state.ErrFunctionOverflowed)
 			resp.SetFinal()
 
-			_ = e.failureHandler(ctx, id, s, resp)
+			_ = e.runFinishHandler(ctx, id, s, resp)
 			for _, e := range e.lifecycles {
 				go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, resp, s)
 			}
@@ -543,7 +575,7 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 			return fmt.Errorf("error marking function as complete: %w", serr)
 		}
 		s, _ := e.sm.Load(ctx, id.RunID)
-		if ferr := e.failureHandler(ctx, id, s, *resp); ferr != nil {
+		if ferr := e.runFinishHandler(ctx, id, s, *resp); ferr != nil {
 			// XXX: log
 			_ = ferr
 		}
@@ -565,7 +597,7 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 					return fmt.Errorf("error marking function as complete: %w", serr)
 				}
 				s, _ := e.sm.Load(ctx, id.RunID)
-				_ = e.failureHandler(ctx, id, s, *resp)
+				_ = e.runFinishHandler(ctx, id, s, *resp)
 				for _, e := range e.lifecycles {
 					go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp, s)
 				}
@@ -592,6 +624,10 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 
 	_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt)
 	s, _ := e.sm.Load(ctx, id.RunID)
+	if ferr := e.runFinishHandler(ctx, id, s, *resp); ferr != nil {
+		// XXX: log
+		_ = ferr
+	}
 
 	for _, e := range e.lifecycles {
 		go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp, s)
@@ -602,6 +638,68 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 	}
 
 	return nil
+}
+
+func (e *executor) runFinishHandler(ctx context.Context, id state.Identifier, s state.State, resp state.DriverResponse) error {
+	if e.finishHandler == nil {
+		return nil
+	}
+
+	triggerEvt := s.Event()
+	if name, ok := triggerEvt["name"].(string); ok && (name == event.FnFailedName || name == event.FnFinishedName) {
+		// Don't recursively trigger internal finish handlers.
+		logger.From(ctx).Debug().Str("name", name).Msg("not triggering finish handler for internal event")
+		return nil
+	}
+
+	// Prepare events that we must send
+	var events []event.Event
+	now := time.Now()
+
+	// Legacy - send inngest/function.failed
+	if resp.Err != nil {
+		events = append(events, event.Event{
+			ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+			Name:      event.FnFailedName,
+			Timestamp: now.UnixMilli(),
+			Data: map[string]interface{}{
+				"function_id": s.Function().Slug,
+				"run_id":      id.RunID.String(),
+				"error":       resp.UserError(),
+				"event":       triggerEvt,
+			},
+		})
+	}
+
+	// send inngest/function.finished
+	data := map[string]interface{}{
+		"function_id": s.Function().Slug,
+		"run_id":      id.RunID.String(),
+	}
+
+	if dataMap, ok := triggerEvt["data"].(map[string]interface{}); ok {
+		if inngestObj, ok := dataMap[consts.InngestEventDataPrefix].(map[string]interface{}); ok {
+			if dataValue, ok := inngestObj[consts.InvokeCorrelationId].(string); ok {
+				logger.From(ctx).Debug().Str("data_value_str", dataValue).Msg("data_value")
+				data[consts.InvokeCorrelationId] = dataValue
+			}
+		}
+	}
+
+	if resp.Err != nil {
+		data["error"] = resp.UserError()
+	} else {
+		data["result"] = resp.Output
+	}
+
+	events = append(events, event.Event{
+		ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+		Name:      event.FnFinishedName,
+		Timestamp: now.UnixMilli(),
+		Data:      data,
+	})
+
+	return e.finishHandler(ctx, s, events)
 }
 
 // run executes the step with the given step ID.
@@ -806,9 +904,15 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 				return
 			}
 
+			resumeData := pause.GetResumeData(evt.GetEvent())
+
+			logger.From(ctx).Debug().Interface("with", resumeData.With).Str("pause.DataKey", pause.DataKey).Msg("resuming pause")
+
 			err := e.Resume(ctx, *pause, execution.ResumeRequest{
-				With:    evt.GetEvent().Map(),
-				EventID: &evtID,
+				With:     resumeData.With,
+				EventID:  &evtID,
+				RunID:    resumeData.RunID,
+				StepName: resumeData.StepName,
 			})
 			if err != nil {
 				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
@@ -905,8 +1009,14 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		return fmt.Errorf("error enqueueing after pause: %w", err)
 	}
 
-	for _, e := range e.lifecycles {
-		go e.OnWaitForEventResumed(context.WithoutCancel(ctx), pause.Identifier, r, pause.GroupID)
+	if pause.Opcode != nil && *pause.Opcode == enums.OpcodeInvokeFunction.String() {
+		for _, e := range e.lifecycles {
+			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), pause.Identifier, r, pause.GroupID)
+		}
+	} else {
+		for _, e := range e.lifecycles {
+			go e.OnWaitForEventResumed(context.WithoutCancel(ctx), pause.Identifier, r, pause.GroupID)
+		}
 	}
 
 	return nil
@@ -1004,6 +1114,8 @@ func (e *executor) HandleGenerator(ctx context.Context, gen state.GeneratorOpcod
 		return e.handleGeneratorSleep(ctx, gen, item, edge)
 	case enums.OpcodeWaitForEvent:
 		return e.handleGeneratorWaitForEvent(ctx, gen, item, edge)
+	case enums.OpcodeInvokeFunction:
+		return e.handleGeneratorInvokeFunction(ctx, gen, item, edge)
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -1168,6 +1280,100 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 	return err
 }
 
+func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
+	logger.From(ctx).Info().Msg("handling invoke function")
+	if e.handleSendingEvent == nil {
+		return fmt.Errorf("no handleSendingEvent function specified")
+	}
+
+	opts, err := gen.InvokeFunctionOpts()
+	if err != nil {
+		return fmt.Errorf("unable to parse invoke function opts: %w", err)
+	}
+	expires, err := opts.Expires()
+	if err != nil {
+		return fmt.Errorf("unable to parse invoke function expires: %w", err)
+	}
+
+	eventName := event.FnFinishedName
+	correlationID := item.Identifier.RunID.String() + "." + gen.ID
+	strExpr := fmt.Sprintf("async.data.%s == %s", consts.InvokeCorrelationId, strconv.Quote(correlationID))
+	_, err = e.newExpressionEvaluator(ctx, strExpr)
+	if err != nil {
+		return execError{err: fmt.Errorf("failed to create expression to wait for invoked function completion: %w", err)}
+	}
+
+	logger.From(ctx).Info().Interface("opts", opts).Time("expires", expires).Str("event", eventName).Str("expr", strExpr).Msg("parsed invoke function opts")
+
+	pauseID := uuid.New()
+	opcode := gen.Op.String()
+	err = e.sm.SavePause(ctx, state.Pause{
+		ID:          pauseID,
+		WorkspaceID: item.WorkspaceID,
+		Identifier:  item.Identifier,
+		GroupID:     item.GroupID,
+		Outgoing:    gen.ID,
+		Incoming:    edge.Edge.Incoming,
+		StepName:    gen.UserDefinedName(),
+		Opcode:      &opcode,
+		Expires:     state.Time(expires),
+		Event:       &eventName,
+		Expression:  &strExpr,
+		DataKey:     gen.ID,
+	})
+	if err != nil {
+		return err
+	}
+
+	// This should also increase the waitgroup count, as we have an
+	// edge that is outstanding.
+	//
+	// TODO: Remove with function run specific queues
+	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.IncomingGeneratorStep, 0, nil); err != nil {
+		return fmt.Errorf("unable to schedule function invocation: %w", err)
+	}
+
+	// Enqueue a job that will timeout the pause.
+	jobID := fmt.Sprintf("%s-%s-%s", item.Identifier.IdempotencyKey(), gen.ID, "invoke")
+	err = e.queue.Enqueue(ctx, queue.Item{
+		JobID:       &jobID,
+		WorkspaceID: item.WorkspaceID,
+		// Use the same group ID, allowing us to track the cancellation of
+		// the step correctly.
+		GroupID:    item.GroupID,
+		Kind:       queue.KindPause,
+		Identifier: item.Identifier,
+		Payload: queue.PayloadPauseTimeout{
+			PauseID:   pauseID,
+			OnTimeout: true,
+		},
+	}, expires)
+	if err == redis_state.ErrQueueItemExists {
+		return nil
+	}
+
+	// Always create an invocation event.
+	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
+		Event:         *opts.Payload,
+		FnID:          opts.FunctionID,
+		CorrelationID: &correlationID,
+	})
+
+	logger.From(ctx).Debug().Interface("evt", evt).Str("gen.ID", gen.ID).Msg("created invocation event")
+
+	err = e.handleSendingEvent(ctx, evt, item)
+	if err != nil {
+		// TODO Cancel pause/timeout?
+		return fmt.Errorf("error publishing internal invocation event: %w", err)
+	}
+
+	for _, e := range e.lifecycles {
+		go e.OnInvokeFunction(context.WithoutCancel(ctx), item.Identifier, item, gen, ulid.MustParse(evt.ID), correlationID)
+	}
+
+	return err
+}
+
 func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
 	opts, err := gen.WaitForEventOpts()
 	if err != nil {
@@ -1198,6 +1404,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	}
 
 	pauseID := uuid.New()
+	opcode := gen.Op.String()
 	err = e.sm.SavePause(ctx, state.Pause{
 		ID:             pauseID,
 		WorkspaceID:    item.WorkspaceID,
@@ -1205,7 +1412,8 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		GroupID:        item.GroupID,
 		Outgoing:       gen.ID,
 		Incoming:       edge.Edge.Incoming,
-		StepName:       gen.Name,
+		StepName:       gen.UserDefinedName(),
+		Opcode:         &opcode,
 		Expires:        state.Time(expires),
 		Event:          &opts.Event,
 		Expression:     opts.If,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { MetadataGrid } from '@inngest/components/Metadata';
 import { OutputCard } from '@inngest/components/OutputCard';
@@ -11,6 +11,7 @@ import { type HistoryNode } from '@inngest/components/utils/historyParser';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import { AnimatePresence, motion } from 'framer-motion';
 
+import type { Timeline } from '..';
 import { TimelineNodeHeader } from './TimelineNodeHeader';
 import { renderTimelineNode } from './TimelineNodeRenderer';
 
@@ -20,12 +21,28 @@ type Props = {
   position?: 'first' | 'last' | 'middle';
   children?: React.ReactNode;
   isAttempt?: boolean;
+  navigateToRun: React.ComponentProps<typeof Timeline>['navigateToRun'];
 };
 
-export function TimelineNode({ position, getOutput, node, children, isAttempt }: Props) {
-  const { icon, badge, name, metadata } = renderTimelineNode({ node, isAttempt });
+export function TimelineNode({
+  position,
+  getOutput,
+  node,
+  children,
+  isAttempt,
+  navigateToRun,
+}: Props) {
+  const { icon, badge, name, metadata, runLink } = renderTimelineNode({ node, isAttempt });
   const isExpandable = node.scope === 'step';
   const [openItems, setOpenItems] = useState<string[]>([]);
+
+  const runLinkNode = useMemo(() => {
+    if (!runLink) {
+      return null;
+    }
+
+    return navigateToRun(runLink);
+  }, [...Object.values(runLink ?? {})]);
 
   const toggleItem = (itemValue: string) => {
     if (openItems.includes(itemValue)) {
@@ -83,7 +100,12 @@ export function TimelineNode({ position, getOutput, node, children, isAttempt }:
                 type: 'tween',
               }}
             >
-              <Content getOutput={getOutput} node={node} isAttempt={isAttempt} />
+              <Content
+                getOutput={getOutput}
+                node={node}
+                isAttempt={isAttempt}
+                links={[runLinkNode]}
+              />
               {children}
             </motion.div>
           </AccordionPrimitive.Content>
@@ -97,10 +119,12 @@ function Content({
   getOutput,
   node,
   isAttempt,
+  links,
 }: {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
   node: HistoryNode;
   isAttempt?: boolean;
+  links?: React.ReactNode[];
 }) {
   const output = useOutput({
     getOutput,
@@ -112,6 +136,10 @@ function Content({
 
   return (
     <>
+      {links?.length ? (
+        <div className="flex flex-row justify-end gap-x-5 pb-5">{...links}</div>
+      ) : null}
+
       <div className="pb-5">
         <MetadataGrid metadataItems={metadataItems} />
       </div>

@@ -113,6 +113,8 @@ export class HistoryParser {
       status: 'scheduled',
       waitForEventConfig: undefined,
       waitForEventResult: undefined,
+      invokeFunctionConfig: undefined,
+      invokeFunctionResult: undefined,
     } as const;
 
     // If the node doesn't exist then create it.
