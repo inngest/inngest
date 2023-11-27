@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { RunDetails } from '@inngest/components/RunDetails';
@@ -52,9 +51,6 @@ export function StreamDetails({
   }, [client, environment.id, func.id, run.id]);
 
   const history = useParsedHistory(rawHistory);
-  const parentURL = `/env/${environment.slug}/functions/${encodeURIComponent(
-    func.slug
-  )}/logs` as Route;
 
   let rerunButton: React.ReactNode | undefined;
   if (run.canRerun) {
@@ -62,7 +58,7 @@ export function StreamDetails({
   }
 
   return (
-    <SlideOver size={event ? 'large' : 'small'} onClose={() => router.push(parentURL)}>
+    <SlideOver size={event ? 'large' : 'small'} onClose={() => router.back()}>
       <div
         className={classNames('dark grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}
       >

@@ -6,7 +6,7 @@ import { Button } from '@inngest/components/Button';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { Link } from '@inngest/components/Link';
 import { Table } from '@inngest/components/Table';
-import { createColumnHelper, getCoreRowModel, type ColumnOrderState } from '@tanstack/react-table';
+import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
@@ -71,6 +71,8 @@ function createColumns({
           <Link
             className="text-sm font-medium leading-7"
             internalNavigation
+            //@ts-ignore
+            scroll={false}
             href={
               `/env/${environmentSlug}/functions/${encodeURIComponent(
                 functionSlug
