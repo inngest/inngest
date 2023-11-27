@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"testing"
 	"time"
@@ -15,6 +16,11 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/stretchr/testify/require"
 )
+
+func parseURL(s string) url.URL {
+	u, _ := url.Parse(s)
+	return *u
+}
 
 func TestRedirect(t *testing.T) {
 	input := []byte(`{"event":{"name":"hi","data":{}}}`)
@@ -37,7 +43,7 @@ func TestRedirect(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	res, err := DefaultExecutor.do(context.Background(), ts.URL, input)
+	res, err := do(context.Background(), DefaultClient, Request{URL: parseURL(ts.URL), Input: input})
 	require.NoError(t, err)
 	require.Equal(t, 200, res.statusCode)
 	require.Equal(t, []byte("ok"), res.body)
@@ -58,7 +64,7 @@ func TestRetryAfter(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		res, err := DefaultExecutor.do(context.Background(), ts.URL, input)
+		res, err := do(context.Background(), DefaultClient, Request{URL: parseURL(ts.URL), Input: input})
 		require.NoError(t, err)
 		require.Equal(t, 500, res.statusCode)
 		require.Equal(t, []byte(`{"error":true}`), res.body)

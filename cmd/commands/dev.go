@@ -24,6 +24,7 @@ func NewCmdDev() *cobra.Command {
 	cmd.Flags().StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
 	cmd.Flags().Bool("no-discovery", false, "Disable autodiscovery")
 	cmd.Flags().Bool("no-poll", false, "Disable polling of apps for updates")
+	cmd.Flags().Int("retry-interval", 0, "Retry interval in seconds for linear backoff when retrying functions - must be 1 or above")
 
 	return cmd
 }
@@ -54,11 +55,14 @@ func doDev(cmd *cobra.Command, args []string) {
 	noDiscovery, _ := cmd.Flags().GetBool("no-discovery")
 	noPoll, _ := cmd.Flags().GetBool("no-poll")
 
+	retryInterval, _ := cmd.Flags().GetInt("retry-interval")
+
 	opts := devserver.StartOpts{
-		Config:       *conf,
-		URLs:         urls,
-		Autodiscover: !noDiscovery,
-		Poll:         !noPoll,
+		Config:        *conf,
+		URLs:          urls,
+		Autodiscover:  !noDiscovery,
+		Poll:          !noPoll,
+		RetryInterval: retryInterval,
 	}
 
 	close, err := telemetry.TracerSetup("devserver", telemetry.TracerTypeNoop)

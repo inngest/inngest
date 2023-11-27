@@ -45,6 +45,7 @@ export const ExternalNavigation: Story = {
   args: {
     children: <p>This is a link to outside the app</p>,
     internalNavigation: false,
+    href: 'inngest.com',
   },
   parameters: {
     docs: {

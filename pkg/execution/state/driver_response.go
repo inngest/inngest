@@ -182,15 +182,12 @@ func (w WaitForEventOpts) Expires() (time.Time, error) {
 type DriverResponse struct {
 	// Step represents the step that this response is for.
 	Step inngest.Step `json:"step"`
-
 	// Duration is how long the step took to run, from the driver itsef.
 	Duration time.Duration `json:"dur"`
-
 	// RequestVersion represents the hashing version used within the current SDK request.
 	//
 	// This allows us to store the hash version for each function run to check backcompat.
 	RequestVersion int `json:"request_version"`
-
 	// Generator indicates that this response is a partial repsonse from a
 	// SDK-based step (generator) function.  These functions are invoked
 	// multiple times with function state, and return a 206 Partial Content
@@ -206,7 +203,6 @@ type DriverResponse struct {
 	//       with mutated state.  Each tool inside the function (step/wait)
 	//       returns a new opcode which we store in step state.
 	Generator []*GeneratorOpcode `json:"generator,omitempty"`
-
 	// Scheduled, if set to true, represents that the action has been
 	// scheduled and will run asynchronously.  The output is not available.
 	//
@@ -214,23 +210,23 @@ type DriverResponse struct {
 	// the scope of this executor.  It's possible to store your own queues
 	// and state for managing asynchronous jobs in another manager.
 	Scheduled bool `json:"scheduled"`
-
 	// Output is the output from an action, as a JSON-marshalled value.
 	Output any `json:"output"`
-
 	// OutputSize is the size of the response payload, verbatim, in bytes.
 	OutputSize int `json:"size"`
-
 	// Err represents the error from the action, if the action errored.
 	// If the action terminated successfully this must be nil.
 	Err *string `json:"err"`
-
 	// RetryAt is an optional retry at field, specifying when we should retry
 	// the step if the step errored.
 	RetryAt *time.Time `json:"retryAt,omitempty"`
-
 	// Noretry, if true, indicates that we should never retry this step.
 	NoRetry bool `json:"noRetry,omitempty"`
+	// StatusCode represents the status code for the response.
+	StatusCode int `json:"statusCode,omitempty"`
+	// SDK represents the SDK language and version used for these
+	// functions, in the format: "js:v0.1.0"
+	SDK string `json:"sdk,omitempty"`
 
 	// final indicates whether the error has been marked as final.  This occurs
 	// when the response errors and the executor detects that this is the final
@@ -238,8 +234,6 @@ type DriverResponse struct {
 	//
 	// When final is true, Retryable() always returns false.
 	final bool
-
-	StatusCode int `json:"statusCode,omitempty"`
 }
 
 // SetFinal indicates that this error is final, regardless of the status code
@@ -410,7 +404,7 @@ func UserErrorFromRaw(errstr *string, rawAny any) map[string]any {
 	switch rawJson := rawAny.(type) {
 	case json.RawMessage:
 		// Try to unmarshal, but don't return on error, use raw map as fallback
-		json.Unmarshal(rawJson, &raw)
+		_ = json.Unmarshal(rawJson, &raw)
 	case map[string]any:
 		raw = rawJson
 	default:

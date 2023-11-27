@@ -93,7 +93,6 @@ const GetFunctionDocument = graphql(`
   query GetFunction($slug: String!, $environmentID: ID!) {
     workspace(id: $environmentID) {
       id
-
       workflow: workflowBySlug(slug: $slug) {
         id
         name
@@ -112,6 +111,7 @@ const GetFunctionDocument = graphql(`
           triggers {
             eventName
             schedule
+            condition
           }
           deploy {
             id
@@ -119,6 +119,43 @@ const GetFunctionDocument = graphql(`
           }
         }
         url
+        failureHandler {
+          slug
+          name
+        }
+        configuration {
+          cancellations {
+            event
+            timeout
+            condition
+          }
+          retries {
+            value
+            isDefault
+          }
+          priority
+          eventsBatch {
+            maxSize
+            timeout
+          }
+          concurrency {
+            scope
+            limit {
+              value
+              isPlanLimit
+            }
+            key
+          }
+          rateLimit {
+            limit
+            period
+            key
+          }
+          debounce {
+            period
+            key
+          }
+        }
       }
     }
   }
