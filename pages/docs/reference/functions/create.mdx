@@ -95,11 +95,18 @@ The `createFunction` method accepts a series of arguments to define your functio
   </Property>
 
   <Property name="priority" type="object">
-    Prioritize specific function runs ahead of others ([reference](/docs/reference/functions/run-priority))
+    Options to configure how to prioritize functions
 
     <Properties nested={true} collapse={true}>
       <Property name="run" type="string">
-        An expression which must return an integer between -600 and 600 (by default), with higher return values resulting in a higher priority. See [reference](/docs/reference/functions/run-priority) for more information.
+        An expression which must return an integer between -600 and 600 (by default), with higher return values resulting in a higher priority.
+
+        Examples:
+        * Return the priority within an event directly: `event.data.priority` (where
+    `event.data.priority` is an int within your account's range)
+        * Rate limit by a string field: `event.data.plan == 'enterprise' ? 180 : 0`
+
+        See [reference](/docs/reference/functions/run-priority) for more information.
       </Property>
     </Properties>
   </Property>
@@ -107,7 +114,7 @@ The `createFunction` method accepts a series of arguments to define your functio
   <Property name="batchEvents" type="object">
     Configure how the function should consume batches of events ([reference](/docs/guides/batching))
 
-    <Properties nested={true}>
+    <Properties nested={true} collapse={true}>
       <Property name="maxSize" type="number" required>
         The maximum number of events a batch can have. Current limit is `100`.
       </Property>
@@ -125,7 +132,7 @@ The `createFunction` method accepts a series of arguments to define your functio
   </Property>
   <Property name="cancelOn" type="object">
     Define an event that can be used to cancel a running or sleeping function ([reference](/docs/functions/cancellation))
-    <Properties nested={true}>
+    <Properties nested={true} collapse={true}>
       <Property name="event" type="string" required>
         The event name which will be used to cancel
       </Property>
@@ -137,24 +144,6 @@ The `createFunction` method accepts a series of arguments to define your functio
       </Property>
     </Properties>
   </Property>
-
-  <Properties>
-    <Property name="priority" type="object">
-      Options to configure how to prioritize functions
-
-      <Properties nested={true}>
-        <Property name="run" type="string">
-          An expression which must return an integer between -600 and 600 (by default), with higher
-  	return values resulting in a higher priority.  Examples:
-
-          * Return the priority within an event directly: `event.data.priority` (where
-  	  `event.data.priority` is an int within your account's range)
-          * Rate limit by a string field: `event.data.plan == 'enterprise' ? 180 : 0`
-        </Property>
-      </Properties>
-    </Property>
-  </Properties>
-
 </Properties>
 
 {/* TODO - Document fns arg */}
