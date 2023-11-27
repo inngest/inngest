@@ -404,7 +404,7 @@ func UserErrorFromRaw(errstr *string, rawAny any) map[string]any {
 	switch rawJson := rawAny.(type) {
 	case json.RawMessage:
 		// Try to unmarshal, but don't return on error, use raw map as fallback
-		json.Unmarshal(rawJson, &raw)
+		_ = json.Unmarshal(rawJson, &raw)
 	case map[string]any:
 		raw = rawJson
 	default:
