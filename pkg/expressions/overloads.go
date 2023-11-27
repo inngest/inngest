@@ -32,7 +32,7 @@ func (customLibrary) CompileOptions() []cel.EnvOption {
 
 // ProgramOptions returns function implementations for the standard CEL functions.
 func (customLibrary) ProgramOptions() []cel.ProgramOption {
-	overloads := append(functions.StandardOverloads(), celOverloads()...)
+	overloads := celOverloads()
 
 	return []cel.ProgramOption{
 		// Always inject standard overloads into our program
@@ -45,7 +45,7 @@ func celDeclarations() []*exprpb.Decl {
 	// Take the standard overloads from checker.  We'll filter this to add our own
 	// heterogeneous comparison types that allow any type conversions.
 	filtered := []*exprpb.Decl{}
-	for _, d := range checker.StandardDeclarations() {
+	for _, d := range checker.StandardTypes() {
 		if _, ok := d.DeclKind.(*exprpb.Decl_Function); ok {
 			// This is a function that we will overload directly in the cel env to
 			// provide easier type handling.

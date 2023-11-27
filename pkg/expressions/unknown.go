@@ -9,7 +9,6 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter"
-	"github.com/google/cel-go/interpreter/functions"
 )
 
 // unknownDecorator returns a decorator for inspecting and handling unknowns at runtime.  This
@@ -21,7 +20,7 @@ import (
 func unknownDecorator(act interpreter.PartialActivation) interpreter.InterpretableDecorator {
 	// Create a new dispatcher with all functions added
 	dispatcher := interpreter.NewDispatcher()
-	overloads := append(functions.StandardOverloads(), celOverloads()...)
+	overloads := celOverloads()
 	_ = dispatcher.Add(overloads...)
 
 	return func(i interpreter.Interpretable) (interpreter.Interpretable, error) {
