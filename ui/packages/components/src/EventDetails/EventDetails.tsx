@@ -17,10 +17,10 @@ type BaseProps = {
 type WithRunSelector = {
   functionRuns: Pick<FunctionRun, 'id' | 'name' | 'output' | 'status'>[];
   onFunctionRunClick: (runID: string) => void;
-  onReplayEvent: () => void;
+  onReplayEvent?: () => void;
 
   // TODO: Replace this with an imported component.
-  SendEventButton: React.ElementType;
+  SendEventButton?: React.ElementType;
 
   selectedRunID: string | undefined;
 };

@@ -6,6 +6,8 @@ import (
 
 	"github.com/inngest/inngest/pkg/api/tel"
 	"github.com/inngest/inngest/pkg/cli"
+	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/logger"
 	isatty "github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -41,6 +43,15 @@ func Execute() {
 			DisableDefaultCmd: true,
 		},
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if viper.IsSet("log-level") {
+				viper.Set(log.ViperLogLevelKey, viper.GetString("log-level"))
+			} else if viper.GetBool("verbose") {
+				viper.Set(log.ViperLogLevelKey, "debug")
+			} else {
+				viper.Set(log.ViperLogLevelKey, log.DefaultLevel.String())
+			}
+			logger.SetLevel(viper.GetString(log.ViperLogLevelKey))
+
 			m := tel.NewMetadata(cmd.Context())
 			m.SetCobraCmd(cmd)
 			tel.SendMetadata(cmd.Context(), m)
@@ -54,6 +65,7 @@ func Execute() {
 	rootCmd.PersistentFlags().Bool("prod", false, "Use the production environment for the current command.")
 	rootCmd.PersistentFlags().Bool("json", false, "Output logs as JSON.  Set to true if stdout is not a TTY.")
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose logging.")
+	rootCmd.PersistentFlags().StringP("log-level", "l", "info", "Set the log level.  One of: trace, debug, info, warn, error.")
 
 	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		panic(err)

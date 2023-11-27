@@ -7,13 +7,13 @@ import { Time } from '@/components/Time';
 import type { Event } from './types';
 
 type Props = {
-  environmentSlug: string;
   events: Event[];
+  onSelect: (eventID: string) => void;
 };
 
-export function EventTable({ environmentSlug, events }: Props) {
+export function EventTable({ events, onSelect }: Props) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const columns = useColumns({ environmentSlug });
+  const columns = useColumns(onSelect);
 
   return (
     <main className="min-h-0 overflow-y-auto" ref={tableContainerRef}>
@@ -26,22 +26,14 @@ export function EventTable({ environmentSlug, events }: Props) {
   );
 }
 
-function useColumns({ environmentSlug }: { environmentSlug: string }) {
+function useColumns(onSelect: (eventID: string) => void) {
   const columnHelper = createColumnHelper<Event>();
 
   return [
     columnHelper.accessor('id', {
       cell: (props) => {
         const { id, name } = props.row.original;
-        return (
-          <Link
-            href={`/env/${environmentSlug}/events/${encodeURIComponent(name)}/logs/${id}`}
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            {id}
-          </Link>
-        );
+        return <button onClick={() => onSelect(id)}>{id}</button>;
       },
       header: () => <span>ID</span>,
     }),

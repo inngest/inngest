@@ -1,4 +1,4 @@
-//go:generate go run github.com/dmarkham/enumer -trimprefix=RunStatus -type=RunStatus -json -text
+//go:generate go run github.com/dmarkham/enumer -trimprefix=RunStatus -type=RunStatus -json -text -gqlgen
 
 package enums
 

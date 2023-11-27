@@ -38,7 +38,7 @@ export function Table({ options, blankState, customRowProps, tableContainerRef }
   }, 0);
 
   return (
-    <table className="dark:bg-slate-910 w-full border-b border-slate-200 bg-white dark:border-slate-700/30">
+    <table className="dark:bg-slate-910 w-full border-b border-slate-200 bg-white text-sm dark:border-slate-700/30">
       <thead className="shadow-outline-primary-light sticky top-0 z-[3] text-left">
         {table.getHeaderGroups().map((headerGroup) => (
           <tr key={headerGroup.id}>

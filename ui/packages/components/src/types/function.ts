@@ -6,4 +6,5 @@ export type Function = {
     type: 'CRON' | 'EVENT';
     value: string;
   }[];
+  version: number | null;
 };
