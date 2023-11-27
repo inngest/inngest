@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import type { Route } from 'next';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
 import type { NavigateToRunFn } from '@inngest/components/Timeline';
@@ -100,9 +101,11 @@ export function EventSearch({ environmentSlug }: Props) {
       return (
         <Link
           internalNavigation
-          href={`/env/${encodeURIComponent(environment.slug)}/functions/${encodeURIComponent(
-            opts.fnID
-          )}/logs/${opts.runID}`}
+          href={
+            `/env/${encodeURIComponent(environment.slug)}/functions/${encodeURIComponent(
+              opts.fnID
+            )}/logs/${opts.runID}` as Route
+          }
         >
           Go to run
         </Link>

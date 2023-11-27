@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import type { Route } from 'next';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { Link } from '@inngest/components/Link';
 import { RunDetails } from '@inngest/components/RunDetails';
@@ -60,9 +61,11 @@ export function StreamDetails({
     return (
       <Link
         internalNavigation
-        href={`/env/${environment.slug}/functions/${encodeURIComponent(opts.fnID)}/logs/${
-          opts.runID
-        }`}
+        href={
+          `/env/${environment.slug}/functions/${encodeURIComponent(opts.fnID)}/logs/${
+            opts.runID
+          }` as Route
+        }
       >
         Go to run
       </Link>

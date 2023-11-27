@@ -18,7 +18,7 @@ const defaultLinkStyles =
 export function Link({ href, children, className, internalNavigation = false }: LinkProps) {
   if (internalNavigation) {
     return (
-      <NextLink href={href as Route} className={classNames(className, defaultLinkStyles)}>
+      <NextLink href={href} className={classNames(className, defaultLinkStyles)}>
         {children}
         <IconArrowRight className="h-3 w-3 -translate-x-3 text-indigo-400 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
       </NextLink>
