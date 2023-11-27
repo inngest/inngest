@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { classNames } from '@inngest/components/utils/classNames';
 import * as Dialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -12,7 +12,14 @@ type SlideOverProps = {
 };
 
 export function SlideOver({ children, onClose, size = 'large' }: SlideOverProps) {
-  const [isOpen, setOpen] = useState(true);
+  // This hack is needed to prevent hydration errors.
+  // The Radix Dialog is not rendered correctly server side, so we need to prevent it from rendering until the client side hydration is complete (and `useEffect` is run).
+  // The issue is reported here: https://github.com/radix-ui/primitives/issues/1386
+  const [isOpen, setOpen] = useState(false);
+
+  useEffect(() => {
+    setOpen(true);
+  }, []);
 
   function handleClose() {
     setOpen(false);
