@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { ChartBarIcon, ChevronRightIcon, XCircleIcon } from '@heroicons/react/20/solid';
 import {
@@ -9,10 +9,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@inngest/components/Tooltip';
+import { useCron } from '@inngest/components/hooks/useCron';
 import { IconClock } from '@inngest/components/icons/Clock';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
-import Cron from 'croner';
 import { titleCase } from 'title-case';
 
 import FunctionConfiguration from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/(dashboard)/FunctionConfiguration';
@@ -20,7 +20,6 @@ import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/function
 import { Alert } from '@/components/Alert';
 import { Badge as LegacyBadge } from '@/components/Badge/Badge';
 import Block from '@/components/Block';
-import { ClientFeatureFlag } from '@/components/FeatureFlags/ClientFeatureFlag';
 import { Time } from '@/components/Time';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
@@ -221,86 +220,84 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                 )}
               </div>
             </Block>
-            <ClientFeatureFlag flag="function-config">
-              {function_.configuration?.cancellations &&
-                function_.configuration?.cancellations.length > 0 && (
-                  <Block title="Cancellation">
-                    <div className="space-y-3">
-                      {function_.configuration.cancellations.map((cancellation) => {
-                        return (
-                          <Link
-                            key={cancellation.event}
-                            href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
-                              cancellation.event
-                            )}`}
-                            className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
-                          >
-                            <div className="flex min-w-0 items-center">
-                              <div className="min-w-0 flex-1 space-y-1">
-                                <div className="flex min-w-0 items-center">
-                                  <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
-                                  <p className="truncate font-medium">{cancellation.event}</p>
-                                </div>
-                                <dl className="text-xs">
-                                  {cancellation.condition && (
-                                    <div className="flex gap-1">
-                                      <dt className="text-slate-500">If</dt>
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <dd className="truncate font-mono text-slate-800">
-                                              {cancellation.condition}
-                                            </dd>
-                                          </TooltipTrigger>
-                                          <TooltipContent className="font-mono text-xs">
-                                            {cancellation.condition}
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    </div>
-                                  )}
-                                  {cancellation.timeout && (
-                                    <div className="flex gap-1">
-                                      <dt className="text-slate-500">Timeout</dt>
-                                      <dd className="text-slate-800">{cancellation.timeout}</dd>
-                                    </div>
-                                  )}
-                                </dl>
-                              </div>
-                              <ChevronRightIcon className="h-5" />
-                            </div>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </Block>
-                )}
-              {function_.failureHandler && (
-                <Block title="Failure Handler">
+            {function_.configuration?.cancellations &&
+              function_.configuration?.cancellations.length > 0 && (
+                <Block title="Cancellation">
                   <div className="space-y-3">
-                    <Link
-                      href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(
-                        function_.failureHandler.slug
-                      )}`}
-                      className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
-                    >
-                      <div className="flex min-w-0 items-center">
-                        <div className="min-w-0 flex-1">
+                    {function_.configuration.cancellations.map((cancellation) => {
+                      return (
+                        <Link
+                          key={cancellation.event}
+                          href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
+                            cancellation.event
+                          )}`}
+                          className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
+                        >
                           <div className="flex min-w-0 items-center">
-                            <IconFunction className="w-8 shrink-0 pr-2 text-indigo-500" />
-                            <p className="truncate font-medium">{function_.failureHandler.name}</p>
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex min-w-0 items-center">
+                                <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
+                                <p className="truncate font-medium">{cancellation.event}</p>
+                              </div>
+                              <dl className="text-xs">
+                                {cancellation.condition && (
+                                  <div className="flex gap-1">
+                                    <dt className="text-slate-500">If</dt>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <dd className="truncate font-mono text-slate-800">
+                                            {cancellation.condition}
+                                          </dd>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="font-mono text-xs">
+                                          {cancellation.condition}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </div>
+                                )}
+                                {cancellation.timeout && (
+                                  <div className="flex gap-1">
+                                    <dt className="text-slate-500">Timeout</dt>
+                                    <dd className="text-slate-800">{cancellation.timeout}</dd>
+                                  </div>
+                                )}
+                              </dl>
+                            </div>
+                            <ChevronRightIcon className="h-5" />
                           </div>
-                        </div>
-                        <ChevronRightIcon className="h-5" />
-                      </div>
-                    </Link>
+                        </Link>
+                      );
+                    })}
                   </div>
                 </Block>
               )}
-              {function_.configuration && (
-                <FunctionConfiguration configuration={function_.configuration} />
-              )}
-            </ClientFeatureFlag>
+            {function_.failureHandler && (
+              <Block title="Failure Handler">
+                <div className="space-y-3">
+                  <Link
+                    href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(
+                      function_.failureHandler.slug
+                    )}`}
+                    className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
+                  >
+                    <div className="flex min-w-0 items-center">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center">
+                          <IconFunction className="w-8 shrink-0 pr-2 text-indigo-500" />
+                          <p className="truncate font-medium">{function_.failureHandler.name}</p>
+                        </div>
+                      </div>
+                      <ChevronRightIcon className="h-5" />
+                    </div>
+                  </Link>
+                </div>
+              </Block>
+            )}
+            {function_.configuration && (
+              <FunctionConfiguration configuration={function_.configuration} />
+            )}
           </div>
         </aside>
       </div>
@@ -314,14 +311,7 @@ type ScheduleTriggerProps = {
 };
 
 function ScheduleTrigger({ schedule, condition }: ScheduleTriggerProps) {
-  const [nextRun, setNextRun] = useState(() => Cron(schedule, { timezone: 'Etc/UTC' }).nextRun());
-
-  useEffect(() => {
-    const intervalID = setInterval(() => {
-      setNextRun(Cron(schedule, { timezone: 'Etc/UTC' }).nextRun());
-    }, 5_000);
-    return () => clearInterval(intervalID);
-  }, [schedule]); // ✅ Now count is not a dependency
+  const { nextRun } = useCron(schedule);
 
   return (
     <div className="rounded border border-slate-200 bg-white p-4">

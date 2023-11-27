@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { Link } from '@inngest/components/Link';
@@ -30,6 +30,7 @@ export default function StreamDetails() {
   }
 
   const getHistoryItemOutput = useGetHistoryItemOutput(runID);
+  const router = useRouter();
 
   const [selectedRunID, setSelectedRunID] = useState<string | undefined>(runID ?? undefined);
   const [sendEvent] = useSendEventMutation();
@@ -99,7 +100,10 @@ export default function StreamDetails() {
         <EventDetails
           event={eventResult.data}
           functionRuns={eventResult.data.functionRuns}
-          onFunctionRunClick={setSelectedRunID}
+          onFunctionRunClick={(runId) => {
+            setSelectedRunID(runId);
+            router.push(`/stream/trigger?event=${eventResult.data.id}&run=${runId}`);
+          }}
           onReplayEvent={onReplayEvent}
           selectedRunID={selectedRunID}
           SendEventButton={renderSendEventButton}

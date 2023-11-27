@@ -48,7 +48,6 @@
     "change-case": "4.1.2",
     "chrono-node": "2.7.0",
     "clsx": "1.2.1",
-    "croner": "7.0.5",
     "dayjs": "1.11.7",
     "graphql": "16.8.1",
     "graphql-config": "4.5.0",

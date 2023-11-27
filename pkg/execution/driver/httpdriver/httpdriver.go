@@ -24,25 +24,26 @@ import (
 var (
 	dialer = &net.Dialer{KeepAlive: 15 * time.Second}
 
-	client = &http.Client{
+	DefaultTransport = &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           dialer.DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          0,
+		IdleConnTimeout:       0,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		// New, ensuring that services can take their time before
+		// responding with headers as they process long running
+		// kjobs.
+		ResponseHeaderTimeout: consts.MaxFunctionTimeout,
+	}
+	DefaultClient = &http.Client{
 		Timeout:       consts.MaxFunctionTimeout,
 		CheckRedirect: checkRedirect,
-		Transport: &http.Transport{
-			Proxy:                 http.ProxyFromEnvironment,
-			DialContext:           dialer.DialContext,
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          -1,
-			IdleConnTimeout:       -1,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-			// New, ensuring that services can take their time before
-			// responding with headers as they process long running
-			// kjobs.
-			ResponseHeaderTimeout: consts.MaxFunctionTimeout,
-		},
+		Transport:     DefaultTransport,
 	}
 
-	DefaultExecutor = &executor{Client: client}
+	DefaultExecutor = &executor{Client: DefaultClient}
 
 	ErrEmptyResponse = fmt.Errorf("no response data")
 	ErrNoRetryAfter  = fmt.Errorf("no retry after present")
@@ -89,7 +90,7 @@ type Request struct {
 // DoRequest executes the HTTP request with the given input.
 func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverResponse, error) {
 	if c == nil {
-		c = client
+		c = DefaultClient
 	}
 
 	if r.URL.Scheme != "http" && r.URL.Scheme != "https" {
@@ -165,7 +166,7 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 
 func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 	if c == nil {
-		c = client
+		c = DefaultClient
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, consts.MaxFunctionTimeout)
