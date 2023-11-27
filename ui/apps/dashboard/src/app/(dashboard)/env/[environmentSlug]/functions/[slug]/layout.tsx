@@ -51,7 +51,7 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
     },
   ];
 
-  if (isReplayEnabled) {
+  if (isReplayEnabled.value) {
     navLinks.push({
       href: `/env/${params.environmentSlug}/functions/${params.slug}/replay`,
       text: 'Replay',
