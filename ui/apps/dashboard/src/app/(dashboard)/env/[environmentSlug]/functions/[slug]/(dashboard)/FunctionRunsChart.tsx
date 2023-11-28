@@ -20,7 +20,6 @@ const GetFunctionRunsMetricsDocument = graphql(`
         completed: usage(opts: { from: $startTime, to: $endTime }, event: "completed") {
           period
           total
-          asOf
           data {
             slot
             count
@@ -29,7 +28,6 @@ const GetFunctionRunsMetricsDocument = graphql(`
         canceled: usage(opts: { from: $startTime, to: $endTime }, event: "cancelled") {
           period
           total
-          asOf
           data {
             slot
             count
@@ -38,7 +36,6 @@ const GetFunctionRunsMetricsDocument = graphql(`
         failed: usage(opts: { from: $startTime, to: $endTime }, event: "errored") {
           period
           total
-          asOf
           data {
             slot
             count
