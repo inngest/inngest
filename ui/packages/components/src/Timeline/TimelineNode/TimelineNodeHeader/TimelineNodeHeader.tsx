@@ -22,7 +22,7 @@ export function TimelineNodeHeader({ icon, badge, title, metadata }: Props) {
             </Badge>
           )}
         </div>
-        <p className="flex-1 align-top leading-8">{title}</p>
+        <p className="align-top leading-8">{title}</p>
       </div>
       <div className="flex items-center gap-2 leading-8">
         <p>{metadata?.label}</p>

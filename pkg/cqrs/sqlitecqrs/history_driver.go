@@ -89,6 +89,14 @@ func (d historyDriver) Write(ctx context.Context, h history.History) (err error)
 	if err != nil {
 		return err
 	}
+	params.InvokeFunction, err = marshalJSONAsNullString(h.InvokeFunction)
+	if err != nil {
+		return err
+	}
+	params.InvokeFunctionResult, err = marshalJSONAsNullString(h.InvokeFunctionResult)
+	if err != nil {
+		return err
+	}
 
 	if err := d.q.InsertHistory(context.Background(), params); err != nil {
 		return err

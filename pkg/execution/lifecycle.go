@@ -7,6 +7,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/oklog/ulid/v2"
 )
 
 var _ LifecycleListener = (*NoopLifecyceListener)(nil)
@@ -101,6 +102,26 @@ type LifecycleListener interface {
 	// OnWaitForEventResumed is called when a function is resumed from waiting for
 	// an event.
 	OnWaitForEventResumed(
+		context.Context,
+		state.Identifier,
+		ResumeRequest,
+		string,
+	)
+
+	// OnInvokeFunction is called when a function is invoked from a step.
+	OnInvokeFunction(
+		context.Context,
+		state.Identifier,
+		queue.Item,
+		state.GeneratorOpcode,
+		ulid.ULID,
+		string,
+	)
+
+	// OnInvokeFunctionResumed is called when a function is resumed from an
+	// invoke function step. This happens when the invoked function has
+	// completed or the step timed out whilst waiting.
+	OnInvokeFunctionResumed(
 		context.Context,
 		state.Identifier,
 		ResumeRequest,
@@ -219,6 +240,28 @@ func (NoopLifecyceListener) OnWaitForEvent(
 // OnWaitForEventResumed is called when a function is resumed from waiting for
 // an event.
 func (NoopLifecyceListener) OnWaitForEventResumed(
+	context.Context,
+	state.Identifier,
+	ResumeRequest,
+	string,
+) {
+}
+
+// OnInvokeFunction is called when a function is invoked from a step.
+func (NoopLifecyceListener) OnInvokeFunction(
+	context.Context,
+	state.Identifier,
+	queue.Item,
+	state.GeneratorOpcode,
+	ulid.ULID,
+	string,
+) {
+}
+
+// OnInvokeFunctionResumed is called when a function is resumed from an
+// invoke function step. This happens when the invoked function has
+// completed or the step timed out whilst waiting.
+func (NoopLifecyceListener) OnInvokeFunctionResumed(
 	context.Context,
 	state.Identifier,
 	ResumeRequest,

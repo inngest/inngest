@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/exp/slog"
 )
@@ -409,6 +410,7 @@ func (l lifecycle) OnWaitForEvent(
 
 	opts, _ := op.WaitForEventOpts()
 	expires, _ := opts.Expires()
+	stepName := op.UserDefinedName()
 	// nothing right now.
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
@@ -424,7 +426,7 @@ func (l lifecycle) OnWaitForEvent(
 		IdempotencyKey:  id.IdempotencyKey(),
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
-		StepName:        &op.Name,
+		StepName:        &stepName,
 		StepID:          &op.ID,
 		WaitForEvent: &WaitForEvent{
 			EventName:  opts.Event,
@@ -478,10 +480,141 @@ func (l lifecycle) OnWaitForEventResumed(
 			EventID: req.EventID,
 			Timeout: req.EventID == nil,
 		},
+		StepName: &req.StepName,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
 			l.log.Error("execution lifecycle error", "lifecycle", "onWaitForEventResumed", "error", err)
+		}
+	}
+}
+
+// OnInvokeFunction is called when a function is invoked from a step.
+func (l lifecycle) OnInvokeFunction(
+	ctx context.Context,
+	id state.Identifier,
+	item queue.Item,
+	op state.GeneratorOpcode,
+	eventID ulid.ULID,
+	corrID string,
+) {
+	logger.From(ctx).Debug().Interface("id", id).Msg("OnInvokeFunction")
+
+	groupID, err := toUUID(item.GroupID)
+	if err != nil {
+		l.log.Error(
+			"error parsing group ID",
+			"error", err,
+			"group_id", item.GroupID,
+			"run_id", id.RunID.String(),
+		)
+	}
+
+	fnID := ""
+	expiry := time.Time{}
+
+	opts, err := op.InvokeFunctionOpts()
+	if err != nil {
+		l.log.Error("error parsing invoke function options", "error", err)
+	}
+
+	if opts != nil {
+		fnID = opts.FunctionID
+		optsExp, err := opts.Expires()
+		if err != nil {
+			l.log.Error("error parsing invoke function options expiry", "error", err)
+		} else {
+			expiry = optsExp
+		}
+	} else {
+		l.log.Error("invoke function options are nil")
+	}
+
+	var invokeFunction *InvokeFunction
+	// Not having all of the required data here indicates that something is
+	// wrong; let's not add a partial history item for this. Either everything
+	// or nothing, to ensure the reader doesn't have to do too much work.
+	if corrID != "" && eventID.String() != "" && fnID != "" {
+		invokeFunction = &InvokeFunction{
+			CorrelationID: corrID,
+			EventID:       eventID,
+			FunctionID:    fnID,
+			Timeout:       expiry,
+		}
+	}
+
+	stepName := op.UserDefinedName()
+	h := History{
+		AccountID:       id.AccountID,
+		Attempt:         int64(item.Attempt),
+		BatchID:         id.BatchID,
+		CreatedAt:       time.Now(),
+		EventID:         id.EventID,
+		FunctionID:      id.WorkflowID,
+		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         groupID,
+		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		IdempotencyKey:  id.IdempotencyKey(),
+		InvokeFunction:  invokeFunction,
+		RunID:           id.RunID,
+		StepID:          &op.ID,
+		StepName:        &stepName,
+		Type:            enums.HistoryTypeStepInvoking.String(),
+		WorkspaceID:     id.WorkspaceID,
+	}
+	for _, d := range l.drivers {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
+			l.log.Error("execution lifecycle error", "lifecycle", "onInvokeFunction", "error", err)
+		}
+	}
+}
+
+// OnInvokeFunctionResumed is called when a function is resumed from an
+// invoke function step. This happens when the invoked function has
+// completed or the step timed out whilst waiting.
+func (l lifecycle) OnInvokeFunctionResumed(
+	ctx context.Context,
+	id state.Identifier,
+	req execution.ResumeRequest,
+	groupID string,
+) {
+	var groupIDUUID *uuid.UUID
+	if groupID != "" {
+		val, err := toUUID(groupID)
+		if err != nil {
+			l.log.Error(
+				"error parsing group ID",
+				"error", err,
+				"group_id", groupID,
+				"run_id", id.RunID.String(),
+			)
+		}
+		groupIDUUID = val
+	}
+
+	h := History{
+		AccountID:       id.AccountID,
+		BatchID:         id.BatchID,
+		CreatedAt:       time.Now(),
+		EventID:         id.EventID,
+		FunctionID:      id.WorkflowID,
+		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         groupIDUUID,
+		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		IdempotencyKey:  id.IdempotencyKey(),
+		InvokeFunctionResult: &InvokeFunctionResult{
+			EventID: req.EventID,
+			RunID:   req.RunID,
+			Timeout: req.EventID == nil,
+		},
+		RunID:       id.RunID,
+		Type:        enums.HistoryTypeStepCompleted.String(),
+		WorkspaceID: id.WorkspaceID,
+		StepName:    &req.StepName,
+	}
+	for _, d := range l.drivers {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
+			l.log.Error("execution lifecycle error", "lifecycle", "onInvokeFunctionResumed", "error", err)
 		}
 	}
 }
@@ -505,6 +638,7 @@ func (l lifecycle) OnSleep(
 		)
 	}
 
+	stepName := op.UserDefinedName()
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:       id.AccountID,
@@ -519,7 +653,7 @@ func (l lifecycle) OnSleep(
 		IdempotencyKey:  id.IdempotencyKey(),
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
-		StepName:        &op.Name,
+		StepName:        &stepName,
 		StepID:          &op.ID,
 		Sleep: &Sleep{
 			Until: until,
@@ -550,19 +684,12 @@ func applyResponse(
 		if isGeneratorStep {
 			var opcodes []state.GeneratorOpcode
 			if err := json.Unmarshal([]byte(outputStr), &opcodes); err == nil {
-				if len(opcodes) > 0 && opcodes[0].Op != enums.OpcodeStepPlanned {
+				if len(opcodes) == 1 && opcodes[0].Op != enums.OpcodeStepPlanned {
 					h.StepID = &opcodes[0].ID
 					h.StepType = getStepType(opcodes[0])
 					h.Result.Output = string(opcodes[0].Data)
-
-					if opcodes[0].DisplayName != nil {
-						h.StepName = opcodes[0].DisplayName
-					} else {
-						// SDK versions < 3.?.? don't respond with the display
-						// name, so we we'll use the deprecated name field as a
-						// fallback.
-						h.StepName = &opcodes[0].Name
-					}
+					stepName := opcodes[0].UserDefinedName()
+					h.StepName = &stepName
 				}
 				return nil
 			}

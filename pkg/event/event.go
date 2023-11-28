@@ -7,13 +7,18 @@ import (
 	"errors"
 	"time"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/oklog/ulid/v2"
 )
 
 const (
 	EventReceivedName = "event/event.received"
 	FnFailedName      = "inngest/function.failed"
-	FnCronName        = "inngest/scheduled.timer"
+	FnFinishedName    = "inngest/function.finished"
+	// InvokeEventName is the event name used to invoke specific functions via an
+	// API.  Note that invoking functions still sends an event in the usual manner.
+	InvokeFnName = "inngest/function.invoked"
+	FnCronName   = "inngest/scheduled.timer"
 )
 
 var (
@@ -102,6 +107,28 @@ func (e Event) Validate(ctx context.Context) error {
 	return nil
 }
 
+type InngestMetadata struct {
+	InvokeFnID          string `json:"fn_id"`
+	InvokeCorrelationId string `json:"correlation_id"`
+}
+
+func (e Event) InngestMetadata() *InngestMetadata {
+	rawData, ok := e.Data[consts.InngestEventDataPrefix].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	var metadata InngestMetadata
+	jsonData, err := json.Marshal(rawData)
+	if err != nil {
+		return nil
+	}
+	if err := json.Unmarshal(jsonData, &metadata); err != nil {
+		return nil
+	}
+	return &metadata
+}
+
 func NewOSSTrackedEvent(e Event) TrackedEvent {
 	id, err := ulid.Parse(e.ID)
 	if err != nil {
@@ -127,4 +154,37 @@ func (o ossTrackedEvent) GetEvent() Event {
 
 func (o ossTrackedEvent) GetInternalID() ulid.ULID {
 	return o.id
+}
+
+type NewInvocationEventOpts struct {
+	Event         Event
+	FnID          string
+	CorrelationID *string
+}
+
+func NewInvocationEvent(opts NewInvocationEventOpts) Event {
+	evt := opts.Event
+
+	if evt.Timestamp == 0 {
+		evt.Timestamp = time.Now().UnixMilli()
+	}
+	if evt.ID == "" {
+		evt.ID = ulid.MustNew(uint64(evt.Timestamp), rand.Reader).String()
+	}
+	if evt.Data == nil {
+		evt.Data = make(map[string]interface{})
+	}
+	evt.Name = InvokeFnName
+
+	evt.Data[consts.InngestEventDataPrefix] = InngestMetadata{
+		InvokeFnID: opts.FnID,
+		InvokeCorrelationId: func() string {
+			if opts.CorrelationID != nil {
+				return *opts.CorrelationID
+			}
+			return ""
+		}(),
+	}
+
+	return evt
 }

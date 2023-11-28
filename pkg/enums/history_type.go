@@ -22,4 +22,5 @@ const (
 	HistoryTypeStepFailed // Permanently failed
 	HistoryTypeStepWaiting
 	HistoryTypeStepSleeping
+	HistoryTypeStepInvoking
 )

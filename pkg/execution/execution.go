@@ -107,12 +107,33 @@ type Executor interface {
 	// always add to a list of listeners vs replace listeners.
 	AddLifecycleListener(l LifecycleListener)
 
-	// SetFailureHandler sets the failure handler, called when a function run permanently fails.
-	SetFailureHandler(f FailureHandler)
+	// SetFinishHandler sets the finish handler, called when a function run finishes.
+	SetFinishHandler(f FinishHandler)
+
+	// InvokeNotFoundHandler invokes the invoke not found handler.
+	InvokeNotFoundHandler(context.Context, InvokeNotFoundHandlerOpts) error
 }
 
-// FailureHandler is a function that handles failures in the executor.
-type FailureHandler func(context.Context, state.Identifier, state.State, state.DriverResponse) error
+// PublishFinishedEventOpts represents the options for publishing a finished event.
+type InvokeNotFoundHandlerOpts struct {
+	OriginalEvent event.TrackedEvent
+	FunctionID    string
+	RunID         string
+	Err           map[string]any
+	Result        any
+}
+
+// FinishHandler is a function that handles functions finishing in the executor.
+// It should be used to send the given events.
+type FinishHandler func(context.Context, state.State, []event.Event) error
+
+// InvokeNotFoundHandler is a function that handles invocations failing due to
+// the function not being found. It is passed a list of events to send.
+type InvokeNotFoundHandler func(context.Context, InvokeNotFoundHandlerOpts, []event.Event) error
+
+// HandleSendingEvent handles sending an event given an event and the queue
+// item.
+type HandleSendingEvent func(context.Context, event.Event, queue.Item) error
 
 // ScheduleRequest represents all data necessary to schedule a new function.
 type ScheduleRequest struct {
@@ -155,4 +176,8 @@ type CancelRequest struct {
 type ResumeRequest struct {
 	With    any
 	EventID *ulid.ULID
+	// RunID is the ID of the run that causes this resume, used for invoking
+	// functions directly.
+	RunID    *ulid.ULID
+	StepName string
 }

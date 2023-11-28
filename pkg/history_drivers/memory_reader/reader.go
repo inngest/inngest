@@ -234,21 +234,42 @@ func toRunHistory(item history.History) (*history_reader.RunHistory, error) {
 		}
 	}
 
+	var invokeFunction *history_reader.RunHistoryInvokeFunction
+	if item.InvokeFunction != nil {
+		invokeFunction = &history_reader.RunHistoryInvokeFunction{
+			CorrelationID: item.InvokeFunction.CorrelationID,
+			EventID:       item.InvokeFunction.EventID,
+			FunctionID:    item.InvokeFunction.FunctionID,
+			Timeout:       item.InvokeFunction.Timeout,
+		}
+	}
+
+	var invokeFunctionResult *history_reader.RunHistoryInvokeFunctionResult
+	if item.InvokeFunctionResult != nil {
+		invokeFunctionResult = &history_reader.RunHistoryInvokeFunctionResult{
+			EventID: item.InvokeFunctionResult.EventID,
+			RunID:   item.InvokeFunctionResult.RunID,
+			Timeout: item.InvokeFunctionResult.Timeout,
+		}
+	}
+
 	return &history_reader.RunHistory{
-		Attempt:         item.Attempt,
-		Cancel:          cancel,
-		CreatedAt:       item.CreatedAt,
-		FunctionVersion: item.FunctionVersion,
-		GroupID:         item.GroupID,
-		ID:              item.ID,
-		Result:          result,
-		RunID:           item.RunID,
-		Sleep:           sleep,
-		StepName:        item.StepName,
-		StepType:        item.StepType,
-		Type:            historyType,
-		URL:             item.URL,
-		WaitForEvent:    waitForEvent,
-		WaitResult:      waitResult,
+		Attempt:              item.Attempt,
+		Cancel:               cancel,
+		CreatedAt:            item.CreatedAt,
+		FunctionVersion:      item.FunctionVersion,
+		GroupID:              item.GroupID,
+		ID:                   item.ID,
+		InvokeFunction:       invokeFunction,
+		InvokeFunctionResult: invokeFunctionResult,
+		Result:               result,
+		RunID:                item.RunID,
+		Sleep:                sleep,
+		StepName:             item.StepName,
+		StepType:             item.StepType,
+		Type:                 historyType,
+		URL:                  item.URL,
+		WaitForEvent:         waitForEvent,
+		WaitResult:           waitResult,
 	}, nil
 }

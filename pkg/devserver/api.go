@@ -129,11 +129,17 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 // Register regsters functions served via SDKs
 func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
+	ctx := r.Context()
+
+	expectedServerKind := r.Header.Get(headers.HeaderKeyExpectedServerKind)
+	if expectedServerKind != "" && expectedServerKind != headers.ServerKindDev {
+		a.err(ctx, w, 400, fmt.Errorf("Expected server kind %s, got %s", expectedServerKind, headers.ServerKindDev))
+		return
+	}
 
 	a.devserver.handlerLock.Lock()
 	defer a.devserver.handlerLock.Unlock()
 
-	ctx := r.Context()
 	req := &sdk.RegisterRequest{}
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		logger.From(ctx).Warn().Msgf("Invalid request:\n%s", err)

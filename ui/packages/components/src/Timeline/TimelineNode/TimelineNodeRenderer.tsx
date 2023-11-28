@@ -6,11 +6,14 @@ import { IconStatusCircleMinus } from '@inngest/components/icons/StatusCircleMin
 import { IconStatusCircleMoon } from '@inngest/components/icons/StatusCircleMoon';
 import type { HistoryNode } from '@inngest/components/utils/historyParser';
 
-type RenderedData = {
+import type { Timeline } from '..';
+
+export type RenderedData = {
   icon: JSX.Element;
   name: string;
   metadata?: { label: string; value: string };
   badge?: string;
+  runLink?: Parameters<React.ComponentProps<typeof Timeline>['navigateToRun']>[0];
 };
 
 function getIconForStatus(node: HistoryNode) {
@@ -71,6 +74,7 @@ export function renderTimelineNode({
   }
 
   let name = '...';
+  let runLink: RenderedData['runLink'];
   if (node.scope === 'function') {
     name = `Function ${node.status}`;
   } else if (node.scope === 'step') {
@@ -78,6 +82,8 @@ export function renderTimelineNode({
       name = `Attempt ${node.attempt}`;
     } else if (node.waitForEventConfig) {
       name = node.waitForEventConfig.eventName;
+    } else if (node.invokeFunctionConfig) {
+      name = node.invokeFunctionConfig.functionID;
     } else if (node.name) {
       name = node.name;
     } else if (node.status === 'scheduled') {
@@ -86,6 +92,18 @@ export function renderTimelineNode({
       name = 'Running next attempt...';
     } else if (node.status === 'started') {
       name = 'Running next step...';
+    }
+
+    if (
+      node.invokeFunctionConfig?.functionID &&
+      node.invokeFunctionConfig?.eventID &&
+      node.invokeFunctionResult?.runID
+    ) {
+      runLink = {
+        eventID: node.invokeFunctionConfig.eventID,
+        runID: node.invokeFunctionResult.runID,
+        fnID: node.invokeFunctionConfig.functionID,
+      };
     }
   }
 
@@ -135,6 +153,11 @@ export function renderTimelineNode({
       label: 'Waiting For:',
       value: node.waitForEventConfig.eventName,
     };
+  } else if (node.status === 'waiting' && node.invokeFunctionConfig) {
+    metadata = {
+      label: 'Waiting For Function:',
+      value: node.invokeFunctionConfig.functionID,
+    };
   }
 
   let badge: string | undefined;
@@ -142,6 +165,10 @@ export function renderTimelineNode({
     badge = 'Sleep';
   } else if (node.waitForEventConfig) {
     badge = 'Wait';
+  } else if (node.invokeFunctionConfig) {
+    badge = 'Invoke';
+  } else if (node.status === 'errored') {
+    badge = 'Retry';
   }
 
   return {
@@ -149,5 +176,6 @@ export function renderTimelineNode({
     name,
     metadata,
     badge,
+    runLink,
   };
 }

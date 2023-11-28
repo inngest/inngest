@@ -2,7 +2,9 @@
 
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import type { Route } from 'next';
 import { EventDetails } from '@inngest/components/EventDetails';
+import { Link } from '@inngest/components/Link';
 import { RunDetails } from '@inngest/components/RunDetails';
 import { SlideOver } from '@inngest/components/SlideOver';
 import { useParsedHistory } from '@inngest/components/hooks/useParsedHistory';
@@ -13,6 +15,7 @@ import type { FunctionRun } from '@inngest/components/types/functionRun';
 import type { FunctionVersion } from '@inngest/components/types/functionVersion';
 import { classNames } from '@inngest/components/utils/classNames';
 import { type RawHistoryItem } from '@inngest/components/utils/historyParser';
+import type { NavigateToRunFn } from 'node_modules/@inngest/components/src/Timeline/Timeline';
 import { useClient } from 'urql';
 
 import RerunButton from './RerunButton';
@@ -57,13 +60,27 @@ export function StreamDetails({
     rerunButton = <RerunButton environment={environment} func={func} functionRunID={run.id} />;
   }
 
+  const navigateToRun: NavigateToRunFn = (opts) => {
+    return (
+      <Link
+        internalNavigation
+        href={
+          `/env/${environment.slug}/functions/${encodeURIComponent(opts.fnID)}/logs/${
+            opts.runID
+          }` as Route
+        }
+      >
+        Go to run
+      </Link>
+    );
+  };
+
   return (
     <SlideOver size={event ? 'large' : 'small'} onClose={() => router.back()}>
       <div
         className={classNames('dark grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}
       >
         {event && <EventDetails event={event} />}
-
         <RunDetails
           func={func}
           functionVersion={functionVersion}
@@ -71,6 +88,7 @@ export function StreamDetails({
           history={history}
           rerunButton={rerunButton}
           run={run}
+          navigateToRun={navigateToRun}
         />
       </div>
     </SlideOver>
