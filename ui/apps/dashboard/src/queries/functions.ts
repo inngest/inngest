@@ -53,16 +53,6 @@ const GetFunctionsDocument = graphql(`
           name
           isArchived
           current {
-            version
-            description
-            validFrom
-            validTo
-            workflowType
-            throttlePeriod
-            throttleCount
-            alerts {
-              workflowID
-            }
             triggers {
               eventName
               schedule
@@ -100,14 +90,6 @@ const GetFunctionDocument = graphql(`
         isArchived
         appName
         current {
-          workflowID
-          version
-          config
-          retries
-          validFrom
-          validTo
-          description
-          updatedAt
           triggers {
             eventName
             schedule
@@ -118,7 +100,6 @@ const GetFunctionDocument = graphql(`
             createdAt
           }
         }
-        url
         failureHandler {
           slug
           name
@@ -188,73 +169,6 @@ export const useFunction = ({
   return [{ ...result, fetching: isFetchingEnvironment || result.fetching }, refetch];
 };
 
-export const FunctionVersionFragment = graphql(`
-  fragment FunctionVersion on WorkflowVersion {
-    version
-    validFrom
-    validTo
-    triggers {
-      eventName
-      schedule
-    }
-    deploy {
-      id
-    }
-  }
-`);
-const GetFunctionVersionsDocument = graphql(`
-  query GetFunctionVersions($slug: String!, $environmentID: ID!) {
-    workspace(id: $environmentID) {
-      workflow: workflowBySlug(slug: $slug) {
-        archivedAt
-        current {
-          ...FunctionVersion
-        }
-        previous {
-          ...FunctionVersion
-        }
-      }
-    }
-  }
-`);
-
-type UseFunctionVersionsParams = {
-  environmentSlug: string;
-  functionSlug: string;
-};
-
-export const useFunctionVersions = ({
-  environmentSlug,
-  functionSlug,
-}: UseFunctionVersionsParams): UseQueryResponse<WorkflowVersion[]> => {
-  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
-  const [result, refetch] = useQuery({
-    query: GetFunctionVersionsDocument,
-    variables: {
-      environmentID: environment?.id!,
-      slug: functionSlug,
-    },
-    pause: !environment?.id,
-  });
-
-  const { data } = result;
-  const versions: WorkflowVersion[] = data?.workspace.workflow?.current
-    ? ([
-        data?.workspace.workflow?.current,
-        ...data?.workspace.workflow?.previous,
-      ] as WorkflowVersion[])
-    : data?.workspace.workflow?.previous
-    ? (data?.workspace.workflow?.previous as WorkflowVersion[])
-    : [];
-
-  return [
-    { ...result, data: versions, fetching: isFetchingEnvironment || result.fetching },
-    refetch,
-  ];
-};
-
 const GetFunctionUsageDocument = graphql(`
   query GetFunctionUsage($id: ID!, $environmentID: ID!, $startTime: Time!, $endTime: Time!) {
     workspace(id: $environmentID) {
@@ -262,7 +176,6 @@ const GetFunctionUsageDocument = graphql(`
         dailyStarts: usage(opts: { from: $startTime, to: $endTime }, event: "started") {
           period
           total
-          asOf
           data {
             slot
             count
@@ -271,7 +184,6 @@ const GetFunctionUsageDocument = graphql(`
         dailyFailures: usage(opts: { from: $startTime, to: $endTime }, event: "errored") {
           period
           total
-          asOf
           data {
             slot
             count
