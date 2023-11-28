@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	headers_lib "github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
@@ -47,6 +48,7 @@ var (
 
 	ErrEmptyResponse = fmt.Errorf("no response data")
 	ErrNoRetryAfter  = fmt.Errorf("no retry after present")
+	ErrNotSDK        = errors.New("response is not from an SDK")
 )
 
 type executor struct {
@@ -154,6 +156,9 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 			}
 		}
 
+		if !resp.isSDK {
+			dr.SetError(ErrNotSDK)
+		}
 		return dr, nil
 	}
 
@@ -179,6 +184,9 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 		// we're not retrying when we store the error message.
 		err = errors.New("NonRetriableError")
 		dr.SetError(err)
+	}
+	if !resp.isSDK {
+		dr.SetError(ErrNotSDK)
 	}
 	return dr, err
 }
@@ -286,6 +294,20 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		}
 	}
 
+	// TODO: Check the X-Inngest-SDK header instead of content type.
+	// https://linear.app/inngest/issue/INN-2388/check-x-inngest-sdk-header-in-sdk-response
+	//
+	// JS SDKs before v0.5 did not send the SDK header, so we'll check the
+	// content type instead. Checking the content type is imperfect but it's
+	// better than nothing.
+	//
+	// Checking the prefix because content-type could be something like:
+	// "application/json; charset=utf-8"
+	isSDK := strings.HasPrefix(
+		headers_lib.ContentTypeFromMap(headers),
+		"application/json",
+	)
+
 	// Get the request version
 	rv, _ := strconv.Atoi(headers[headerRequestVersion])
 	return &response{
@@ -296,6 +318,7 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		noRetry:        noRetry,
 		requestVersion: rv,
 		sdk:            headers[headerSDK],
+		isSDK:          isSDK,
 	}, err
 
 }
@@ -314,4 +337,7 @@ type response struct {
 	// sdk represents the SDK language and version used for these
 	// functions, in the format: "js:v0.1.0"
 	sdk string
+
+	// If response came from the SDK
+	isSDK bool
 }
