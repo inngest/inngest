@@ -159,6 +159,12 @@ func run(t *testing.T, test *Test) {
 			require.Fail(t, "unexpected sdk response")
 		}
 
+		for k, v := range sdkResponse.Header {
+			for _, v := range v {
+				w.Header().Set(k, v)
+			}
+		}
+
 		// Forward the response from the SDK to the executor.
 		w.WriteHeader(sdkResponse.StatusCode)
 		_, err = w.Write(byt)

@@ -294,20 +294,7 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		}
 	}
 
-	// TODO: Check the X-Inngest-SDK header instead of content type.
-	// https://linear.app/inngest/issue/INN-2388/check-x-inngest-sdk-header-in-sdk-response
-	//
-	// JS SDKs before v0.5 did not send the SDK header, so we'll check the
-	// content type instead. Checking the content type is imperfect but it's
-	// better than nothing.
-	//
-	// Checking the prefix because content-type could be something like:
-	// "application/json; charset=utf-8"
-	isSDK := headers_lib.ValueFromMap(headers_lib.HeaderKeySDK, headers) != "" ||
-		strings.HasPrefix(
-			headers_lib.ValueFromMap(headers_lib.HeaderKeyContentType, headers),
-			"application/json",
-		)
+	isSDK := headers_lib.ValueFromMap(headers_lib.HeaderKeySDK, headers) != ""
 
 	// Get the request version
 	rv, _ := strconv.Atoi(headers[headerRequestVersion])
