@@ -303,10 +303,11 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 	//
 	// Checking the prefix because content-type could be something like:
 	// "application/json; charset=utf-8"
-	isSDK := strings.HasPrefix(
-		headers_lib.ContentTypeFromMap(headers),
-		"application/json",
-	)
+	isSDK := headers_lib.ValueFromMap(headers_lib.HeaderKeySDK, headers) != "" ||
+		strings.HasPrefix(
+			headers_lib.ValueFromMap(headers_lib.HeaderKeyContentType, headers),
+			"application/json",
+		)
 
 	// Get the request version
 	rv, _ := strconv.Atoi(headers[headerRequestVersion])

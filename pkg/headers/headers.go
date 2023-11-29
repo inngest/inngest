@@ -36,13 +36,9 @@ const (
 	ServerKindDev   = "dev"
 )
 
-func ContentTypeFromMap(m map[string]string) string {
-	return valueFromMap(HeaderKeyContentType, m)
-}
-
 // ValueFromMap returns the value of the header with the given case insensitive
 // key. Returns an empty string if the header doesn't exist.
-func valueFromMap(key string, m map[string]string) string {
+func ValueFromMap(key string, m map[string]string) string {
 	for k, v := range m {
 		if strings.EqualFold(k, key) {
 			return v
