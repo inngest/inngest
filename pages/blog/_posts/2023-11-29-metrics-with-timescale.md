@@ -3,7 +3,7 @@ focus: false
 heading: Building Metrics with TimescaleDB
 subtitle: How we built better observability into Inngest
 image: /assets/blog/metrics-with-timescaledb/feature.png
-date: 2023-11-20
+date: 2023-11-29
 author: Darwin Wu
 disableCTA: true
 ---
