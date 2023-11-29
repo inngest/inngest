@@ -63,39 +63,8 @@ const GetEventTypeDocument = graphql(`
     events(query: { name: $eventName, workspaceID: $environmentID }) {
       data {
         name
-        description
-        schemaSource
-        integrationName
-        workflows {
-          id
-          slug
-          name
-          current {
-            createdAt
-          }
-        }
-        recent(count: 5) {
-          id
-          receivedAt
-          occurredAt
-          name
-          event
-          version
-          contactID
-          contact {
-            predefinedAttributes
-          }
-          ingestSourceID
-
-          source {
-            name
-          }
-        }
-
         usage(opts: { period: "hour", range: "day" }) {
-          period
           total
-          asOf
           data {
             slot
             count

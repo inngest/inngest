@@ -463,6 +463,11 @@ func (l lifecycle) OnWaitForEventResumed(
 		groupIDUUID = val
 	}
 
+	var stepName *string
+	if req.StepName != "" {
+		stepName = &req.StepName
+	}
+
 	h := History{
 		AccountID:       id.AccountID,
 		WorkspaceID:     id.WorkspaceID,
@@ -480,7 +485,7 @@ func (l lifecycle) OnWaitForEventResumed(
 			EventID: req.EventID,
 			Timeout: req.EventID == nil,
 		},
-		StepName: &req.StepName,
+		StepName: stepName,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
@@ -592,6 +597,11 @@ func (l lifecycle) OnInvokeFunctionResumed(
 		groupIDUUID = val
 	}
 
+	var stepName *string
+	if req.StepName != "" {
+		stepName = &req.StepName
+	}
+
 	h := History{
 		AccountID:       id.AccountID,
 		BatchID:         id.BatchID,
@@ -610,7 +620,7 @@ func (l lifecycle) OnInvokeFunctionResumed(
 		RunID:       id.RunID,
 		Type:        enums.HistoryTypeStepCompleted.String(),
 		WorkspaceID: id.WorkspaceID,
-		StepName:    &req.StepName,
+		StepName:    stepName,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
