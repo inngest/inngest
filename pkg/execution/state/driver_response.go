@@ -58,11 +58,13 @@ func (g GeneratorOpcode) UserDefinedName() string {
 
 // Get the stringified output of the step.
 func (g GeneratorOpcode) Output() string {
+	// Errors must always be non-null to be defined.
+	if isJsonNonNullish(g.Error) {
+		return string(g.Error)
+	}
+	// Data is allowed to be `null` if no error is found and the op returned no data.
 	if g.Data != nil {
 		return string(g.Data)
-	}
-	if g.Error != nil {
-		return string(g.Error)
 	}
 	return ""
 }
@@ -411,7 +413,7 @@ func (r *DriverResponse) SingleStep() *GeneratorOpcode {
 // IsSingleStepError returns whether this response is an error from running a
 // step.
 func (r *DriverResponse) IsSingleStepError() bool {
-	if step := r.SingleStep(); step != nil && step.Error != nil {
+	if step := r.SingleStep(); step != nil && isJsonNonNullish(step.Error) {
 		return true
 	}
 	return false
@@ -443,6 +445,20 @@ func (r DriverResponse) UserError() map[string]any {
 	}
 
 	return UserErrorFromRaw(r.Err, r.Output)
+}
+
+// isJsonNonNullish returns a boolean indicating whether the JSON value is
+// defined and not `null`, the latter of which is not caught by `== nil` checks.
+func isJsonNonNullish(v json.RawMessage) bool {
+	if v == nil {
+		return false
+	}
+
+	var temp interface{}
+	err := json.Unmarshal(v, &temp)
+	isNull := err == nil && temp == nil
+
+	return !isNull
 }
 
 func UserErrorFromRaw(errstr *string, rawAny any) map[string]any {
