@@ -315,6 +315,7 @@ Because we went with the pattern created/spreaded by Prometheus, we inherently h
 For example,
 
 > We have no choice but to stop recording RunIDs for function runs, and reset the related metrics table.
+
 Earlier when I was talking about high cardinality, I mentioned we need to remove the RunID from the metrics tag, and need to reset, and here’s why.
 
 If you take a look at the window function SQL code again, you’ll see something like this,
