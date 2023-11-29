@@ -1,12 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import type { Route } from 'next';
+import { useRouter } from 'next/navigation';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { Link } from '@inngest/components/Link';
 import { RunDetails } from '@inngest/components/RunDetails';
-import { SlideOver } from '@inngest/components/SlideOver';
 import { useParsedHistory } from '@inngest/components/hooks/useParsedHistory';
 import type { Environment } from '@inngest/components/types/environment';
 import type { Event } from '@inngest/components/types/event';
@@ -76,21 +75,19 @@ export function StreamDetails({
   };
 
   return (
-    <SlideOver size={event ? 'large' : 'small'} onClose={() => router.back()}>
-      <div
-        className={classNames('dark grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}
-      >
-        {event && <EventDetails event={event} />}
-        <RunDetails
-          func={func}
-          functionVersion={functionVersion}
-          getHistoryItemOutput={getOutput}
-          history={history}
-          rerunButton={rerunButton}
-          run={run}
-          navigateToRun={navigateToRun}
-        />
-      </div>
-    </SlideOver>
+    <div
+      className={classNames('dark grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}
+    >
+      {event && <EventDetails event={event} />}
+      <RunDetails
+        func={func}
+        functionVersion={functionVersion}
+        getHistoryItemOutput={getOutput}
+        history={history}
+        rerunButton={rerunButton}
+        run={run}
+        navigateToRun={navigateToRun}
+      />
+    </div>
   );
 }
