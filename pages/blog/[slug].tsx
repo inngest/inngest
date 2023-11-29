@@ -20,6 +20,7 @@ import CTACallout from "src/shared/CTACallout";
 import Blockquote from "src/shared/Blog/Blockquote";
 import rehypeCodeTitles from "rehype-code-titles";
 import YouTube from "react-youtube-embed";
+import remarkGfm from "remark-gfm";
 
 const components = {
   DiscordCTA,
@@ -259,6 +260,7 @@ export async function getStaticProps({ params }) {
         rehypeShiki,
         [rehypeRaw, { passThrough: nodeTypes }],
         rehypeSlug,
+        remarkGfm,
       ],
     },
   });

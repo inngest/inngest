@@ -344,6 +344,14 @@ module.exports = ({ theme }) => ({
       ".button:hover": {
         textDecoration: "none !important",
       },
+
+      // Footnotes
+      ".footnotes li": {
+        scrollMarginTop: theme("spacing.32"),
+      },
+      "a[data-footnote-ref]": {
+        scrollMarginTop: theme("spacing.32"),
+      },
     },
   },
   invert: {
