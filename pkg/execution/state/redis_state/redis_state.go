@@ -274,7 +274,6 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 
 	metadata := runMetadata{
 		Identifier:     input.Identifier,
-		Pending:        1,
 		Debugger:       input.Debugger,
 		Version:        currentVersion,
 		RequestVersion: consts.RequestVersionUnknown, // Always use -1 to indicate unset hash version until first request.
@@ -297,17 +296,10 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		}
 	}
 
-	history := state.NewHistory()
-	history.Type = enums.HistoryTypeFunctionStarted
-	history.Identifier = input.Identifier
-	history.CreatedAt = time.UnixMilli(int64(input.Identifier.RunID.Time()))
-
 	args, err := StrSlice([]any{
 		events,
 		metadataByt,
 		stepsByt,
-		history,
-		history.CreatedAt.UnixMilli(),
 	})
 	if err != nil {
 		return nil, err
@@ -321,7 +313,6 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 			m.kf.Events(ctx, input.Identifier),
 			m.kf.RunMetadata(ctx, input.Identifier.RunID),
 			m.kf.Actions(ctx, input.Identifier),
-			m.kf.History(ctx, input.Identifier.RunID),
 		},
 		args,
 	).AsInt64()
@@ -383,12 +374,12 @@ func (m mgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.Metad
 }
 
 func (m mgr) IsComplete(ctx context.Context, runID ulid.ULID) (bool, error) {
-	cmd := m.r.B().Hget().Key(m.kf.RunMetadata(ctx, runID)).Field("pending").Build()
+	cmd := m.r.B().Hget().Key(m.kf.RunMetadata(ctx, runID)).Field("status").Build()
 	val, err := m.r.Do(ctx, cmd).AsBytes()
 	if err != nil {
 		return false, err
 	}
-	return bytes.Equal(val, []byte("0")), nil
+	return !bytes.Equal(val, []byte("0")), nil
 }
 
 func (m mgr) Exists(ctx context.Context, runID ulid.ULID) (bool, error) {
@@ -406,27 +397,11 @@ func (m mgr) metadata(ctx context.Context, runID ulid.ULID) (*runMetadata, error
 }
 
 func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
-	now := time.Now()
-
-	args, err := StrSlice([]any{
-		state.History{
-			ID:         state.HistoryID(),
-			GroupID:    state.GroupIDFromContext(ctx),
-			Type:       enums.HistoryTypeFunctionCancelled,
-			Identifier: id,
-			CreatedAt:  now,
-		},
-		now.UnixMilli(),
-	})
-	if err != nil {
-		return err
-	}
-
 	status, err := scripts["cancel"].Exec(
 		ctx,
 		m.r,
-		[]string{m.kf.RunMetadata(ctx, id.RunID), m.kf.History(ctx, id.RunID)},
-		args,
+		[]string{m.kf.RunMetadata(ctx, id.RunID)},
+		[]string{},
 	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error cancelling: %w", err)
@@ -446,21 +421,8 @@ func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 }
 
 func (m mgr) SetStatus(ctx context.Context, id state.Identifier, status enums.RunStatus) error {
-	now := time.Now()
-
 	args, err := StrSlice([]any{
 		int(status),
-		state.History{
-			ID:         state.HistoryID(),
-			GroupID:    state.GroupIDFromContext(ctx),
-			Type:       enums.HistoryTypeFunctionStatusUpdated,
-			Identifier: id,
-			CreatedAt:  now,
-			Data: map[string]any{
-				"status": status.String(),
-			},
-		},
-		now.UnixMilli(),
 	})
 	if err != nil {
 		return err
@@ -469,7 +431,7 @@ func (m mgr) SetStatus(ctx context.Context, id state.Identifier, status enums.Ru
 	ret, err := scripts["setStatus"].Exec(
 		ctx,
 		m.r,
-		[]string{m.kf.RunMetadata(ctx, id.RunID), m.kf.History(ctx, id.RunID)},
+		[]string{m.kf.RunMetadata(ctx, id.RunID)},
 		args,
 	).AsInt64()
 	if err != nil {
@@ -597,59 +559,19 @@ func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (in
 
 func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (int, error) {
 	var (
-		data            any
-		result          any
-		err             error
-		typ             enums.HistoryType
-		funcFailHistory state.History
+		data any
+		err  error
 	)
 
-	now := time.Now()
-
 	if r.Err == nil {
-		result = r.Output
-		typ = enums.HistoryTypeStepCompleted
 		if data, err = json.Marshal(r.Output); err != nil {
 			return 0, fmt.Errorf("error marshalling step output: %w", err)
 		}
 	} else {
-		typ = enums.HistoryTypeStepErrored
 		data = output(map[string]any{
 			"error":  r.Err,
 			"output": r.Output,
 		})
-		result = data
-		if r.Final() {
-			typ = enums.HistoryTypeStepFailed
-			funcFailHistory = state.History{
-				ID:         state.HistoryID(),
-				Type:       enums.HistoryTypeFunctionFailed,
-				Identifier: i,
-				CreatedAt:  now,
-			}
-		}
-	}
-
-	stepOutput := false
-	if len(r.Generator) == 0 && (typ == enums.HistoryTypeStepCompleted || typ == enums.HistoryTypeStepFailed) {
-		// This is only the step output if the step is complete and this
-		// isn't a generator response.
-		stepOutput = true
-	}
-
-	stepHistory := state.History{
-		ID:         state.HistoryID(),
-		GroupID:    state.GroupIDFromContext(ctx),
-		Type:       typ,
-		Identifier: i,
-		CreatedAt:  now,
-		Data: state.HistoryStep{
-			ID:         r.Step.ID,
-			Name:       r.Step.Name,
-			Attempt:    attempt,
-			Data:       result,
-			StepOutput: stepOutput,
-		},
 	}
 
 	args, err := StrSlice([]any{
@@ -657,9 +579,6 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		r.Step.ID,
 		r.Err != nil,
 		r.Final(),
-		stepHistory,
-		funcFailHistory,
-		now.UnixMilli(),
 	})
 	if err != nil {
 		return 0, err
@@ -672,7 +591,6 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 			m.kf.Actions(ctx, i),
 			m.kf.Errors(ctx, i),
 			m.kf.RunMetadata(ctx, i.RunID),
-			m.kf.History(ctx, i.RunID),
 			m.kf.Stack(ctx, i.RunID),
 		},
 		args,
@@ -693,118 +611,6 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 	return int(index), nil
 }
 
-func (m mgr) Started(ctx context.Context, id state.Identifier, stepID string, attempt int) error {
-	now := time.Now()
-	byt, err := json.Marshal(state.History{
-		ID:         state.HistoryID(),
-		GroupID:    state.GroupIDFromContext(ctx),
-		Type:       enums.HistoryTypeStepStarted,
-		Identifier: id,
-		CreatedAt:  now,
-		Data: state.HistoryStep{
-			ID:      stepID,
-			Attempt: attempt,
-		},
-	})
-	if err != nil {
-		return err
-	}
-	cmd := m.r.B().Zadd().
-		Key(m.kf.History(ctx, id.RunID)).
-		ScoreMember().
-		ScoreMember(float64(now.UnixMilli()), string(byt)).
-		Build()
-	return m.r.Do(ctx, cmd).Error()
-}
-
-func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int, at *time.Time) error {
-	now := time.Now()
-
-	if at != nil && at.Before(time.Now()) {
-		// No need to save time if it's before now.
-		at = nil
-	}
-
-	args, err := StrSlice([]any{
-		state.History{
-			ID:         state.HistoryID(),
-			GroupID:    state.GroupIDFromContext(ctx),
-			Type:       enums.HistoryTypeStepScheduled,
-			Identifier: i,
-			CreatedAt:  now,
-			Data: state.HistoryStep{
-				ID:      stepID,
-				Attempt: attempt,
-				Data:    at,
-			},
-		},
-		now.UnixMilli(),
-	})
-	if err != nil {
-		return err
-	}
-
-	err = scripts["scheduled"].Exec(
-		ctx,
-		m.r,
-		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
-		args,
-	).Error()
-	if err != nil {
-		return fmt.Errorf("error updating scheduled state: %w", err)
-	}
-	return nil
-}
-
-func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, attempt int, withStatus ...enums.RunStatus) error {
-	now := time.Now()
-
-	// Don't set status by default.
-	finalStatus := -1
-	if len(withStatus) >= 1 {
-		finalStatus = int(withStatus[0])
-	}
-
-	history := enums.HistoryTypeFunctionCompleted
-	switch finalStatus {
-	case int(enums.RunStatusFailed):
-		history = enums.HistoryTypeFunctionFailed
-	}
-
-	args, err := StrSlice([]any{
-		state.History{
-			ID: state.HistoryID(),
-			// Function completions have no group ID.
-			Type:       history,
-			Identifier: i,
-			CreatedAt:  now,
-		},
-		now.UnixMilli(),
-		int(finalStatus),
-	})
-	if err != nil {
-		return err
-	}
-
-	status, err := scripts["finalize"].Exec(
-		ctx,
-		m.r,
-		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
-		args,
-	).AsInt64()
-	if err != nil {
-		return fmt.Errorf("error finalizing: %w", err)
-	}
-	if status == 1 && len(withStatus) == 1 {
-		go m.runCallbacks(ctx, i, withStatus[0])
-		return nil
-	}
-	if status == 1 {
-		go m.runCallbacks(ctx, i, enums.RunStatusCompleted)
-	}
-	return nil
-}
-
 func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 	packed, err := json.Marshal(p)
 	if err != nil {
@@ -820,30 +626,6 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		m.kf.PauseID(ctx, p.ID),
 		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 		m.kf.PauseEvent(ctx, p.WorkspaceID, evt),
-		m.kf.History(ctx, p.Identifier.RunID),
-	}
-
-	stepID := p.Incoming
-	if p.DataKey != "" {
-		stepID = p.DataKey
-	}
-	now := time.Now()
-	log := state.History{
-		ID:         state.HistoryID(),
-		GroupID:    state.GroupIDFromContext(ctx),
-		Type:       enums.HistoryTypeStepWaiting,
-		Identifier: p.Identifier,
-		CreatedAt:  now,
-		Data: state.HistoryStep{
-			ID:      stepID,
-			Name:    p.StepName,
-			Attempt: p.Attempt,
-			Data: state.HistoryStepWaitingData{
-				EventName:  p.Event,
-				Expression: p.Expression,
-				ExpiryTime: time.Time(p.Expires),
-			},
-		},
 	}
 
 	// Add 1 second because int will truncate the float. Otherwise, timeouts
@@ -865,8 +647,6 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		// Add at least 10 minutes to this pause, allowing us to process the
 		// pause by ID for 10 minutes past expiry.
 		int(time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()),
-		log,
-		now.UnixMilli(),
 	})
 	if err != nil {
 		return err
@@ -973,34 +753,12 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		eventKey,
 		m.kf.Actions(ctx, p.Identifier),
 		m.kf.Stack(ctx, p.Identifier.RunID),
-		m.kf.History(ctx, p.Identifier.RunID),
-	}
-
-	stepID := p.Incoming
-	if p.DataKey != "" {
-		stepID = p.DataKey
-	}
-	now := time.Now()
-	log := state.History{
-		ID:         state.HistoryID(),
-		GroupID:    state.GroupIDFromContext(ctx),
-		Type:       enums.HistoryTypeStepCompleted,
-		Identifier: p.Identifier,
-		CreatedAt:  now,
-		Data: state.HistoryStep{
-			ID:      stepID,
-			Name:    p.StepName,
-			Attempt: p.Attempt,
-			Data:    data,
-		},
 	}
 
 	args, err := StrSlice([]any{
 		id.String(),
 		p.DataKey,
 		string(marshalledData),
-		log,
-		now.UnixMilli(),
 	})
 	if err != nil {
 		return err
@@ -1112,73 +870,6 @@ func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID strin
 	pause := &state.Pause{}
 	err = json.Unmarshal(byt, pause)
 	return pause, err
-}
-
-func (m mgr) History(ctx context.Context, runID ulid.ULID) ([]state.History, error) {
-	cmd := m.r.B().Zrange().Key(m.kf.History(ctx, runID)).Min("-inf").Max("+inf").Byscore().Build()
-	items, err := m.r.Do(ctx, cmd).AsStrSlice()
-	if err != nil {
-		return nil, err
-	}
-
-	history := make([]state.History, len(items))
-	for n, i := range items {
-		var h state.History
-		err := h.UnmarshalBinary([]byte(i))
-		if err != nil {
-			return nil, err
-		}
-		history[n] = h
-	}
-
-	return history, nil
-}
-
-func (m mgr) DeleteHistory(ctx context.Context, runID ulid.ULID, historyID ulid.ULID) error {
-	// Fetch the items from the zset, and remove if the ID matches.
-	//
-	// XXX: We can make this more efficient by recording a map and zset as separate
-	// keys.
-	key := m.kf.History(ctx, runID)
-
-	cmd := m.r.B().Zrange().Key(key).Min("-inf").Max("+inf").Byscore().Build()
-	items, err := m.r.Do(ctx, cmd).AsStrSlice()
-	if err != nil {
-		return err
-	}
-
-	for _, i := range items {
-		var h state.History
-		err := h.UnmarshalBinary([]byte(i))
-		if err != nil {
-			return err
-		}
-		if h.ID == historyID {
-			cmd = m.r.B().Zrem().Key(key).Member(i).Build()
-			if err := m.r.Do(ctx, cmd).Error(); err != nil {
-				return err
-			}
-			return nil
-		}
-	}
-
-	return nil
-}
-
-func (m mgr) SaveHistory(ctx context.Context, i state.Identifier, h state.History) error {
-	hkey := m.kf.History(ctx, i.RunID)
-
-	byt, err := json.Marshal(h)
-	if err != nil {
-		return err
-	}
-
-	cmd := m.r.B().Zadd().
-		Key(hkey).
-		ScoreMember().
-		ScoreMember(float64(h.CreatedAt.UnixMilli()), string(byt)).
-		Build()
-	return m.r.Do(ctx, cmd).Error()
 }
 
 func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {
@@ -1431,7 +1122,6 @@ func (r runMetadata) Map() map[string]any {
 func (r runMetadata) Metadata() state.Metadata {
 	m := state.Metadata{
 		Identifier:                r.Identifier,
-		Pending:                   r.Pending,
 		Debugger:                  r.Debugger,
 		Status:                    r.Status,
 		Version:                   r.Version,

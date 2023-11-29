@@ -101,6 +101,7 @@ func (d *devserver) Pre(ctx context.Context) error {
 		Runner:  d.runner,
 		Tracker: d.tracker,
 		State:   d.state,
+		Queue:   d.queue,
 	})
 	if err != nil {
 		return err

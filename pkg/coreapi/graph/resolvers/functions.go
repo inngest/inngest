@@ -42,7 +42,8 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 
 	status := models.FunctionRunStatusRunning
 
-	switch state.Metadata().Status {
+	m := state.Metadata()
+	switch m.Status {
 	case enums.RunStatusCompleted:
 		status = models.FunctionRunStatusCompleted
 	case enums.RunStatusFailed:
@@ -53,15 +54,17 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 
 	name := state.Function().Name
 
-	pending := state.Metadata().Pending
-	if pending < 0 {
-		pending = 0
-	}
+	pending, _ := r.Queue.OutstandingJobCount(
+		ctx,
+		m.Identifier.WorkspaceID,
+		m.Identifier.WorkflowID,
+		m.Identifier.RunID,
+	)
 
 	run, err := r.Data.GetFunctionRun(
 		ctx,
-		state.Metadata().Identifier.AccountID,
-		state.Metadata().Identifier.WorkspaceID,
+		m.Identifier.AccountID,
+		m.Identifier.WorkspaceID,
 		runID,
 	)
 	if err != nil {
@@ -99,12 +102,12 @@ func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionR
 		startedAt := ulid.Time(m.Identifier.RunID.Time())
 
 		name := s.Function().Name
-		pending := int(m.Pending)
-
-		// Don't let pending be negative for clients
-		if pending < 0 {
-			pending = 0
-		}
+		pending, _ := r.Queue.OutstandingJobCount(
+			ctx,
+			m.Identifier.WorkspaceID,
+			m.Identifier.WorkflowID,
+			m.Identifier.RunID,
+		)
 
 		runs = append(runs, &models.FunctionRun{
 			ID:           m.Identifier.RunID.String(),
