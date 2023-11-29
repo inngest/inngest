@@ -258,8 +258,6 @@ WITH
       END AS diff
     FROM
       base
-    WHERE
-      time != (SELECT time FROM function_run_scheduled_total LIMIT 1)
   )
 
 SELECT
