@@ -191,7 +191,6 @@ type FunctionRun {
   finishedAt: Time
   output: String # JSON encoded output of the function, or JSON encoded error if this is a failure.
 
-  timeline: [FunctionRunEvent!] @deprecated
   history: [RunHistoryItem!]!
   historyItemOutput(id: ULID!): String
   name: String @deprecated # use the embedded function field instead.

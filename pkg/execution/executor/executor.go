@@ -1303,14 +1303,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		return err
 	}
 
-	// This should also increase the waitgroup count, as we have an
-	// edge that is outstanding.
-	//
-	// TODO: Remove with function run specific queues
-	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.IncomingGeneratorStep, 0, nil); err != nil {
-		return fmt.Errorf("unable to schedule function invocation: %w", err)
-	}
-
 	// Enqueue a job that will timeout the pause.
 	jobID := fmt.Sprintf("%s-%s-%s", item.Identifier.IdempotencyKey(), gen.ID, "invoke")
 	err = e.queue.Enqueue(ctx, queue.Item{

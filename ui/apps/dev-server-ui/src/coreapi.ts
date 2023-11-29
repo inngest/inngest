@@ -78,25 +78,6 @@ export const FUNCTION_RUN = gql`
         id
         raw
       }
-      timeline {
-        __typename
-        ... on StepEvent {
-          stepType: type
-          createdAt
-          output
-          name
-          waitingFor {
-            expiryTime
-            eventName
-            expression
-          }
-        }
-        ... on FunctionEvent {
-          functionType: type
-          createdAt
-          output
-        }
-      }
       history {
         attempt
         cancel {

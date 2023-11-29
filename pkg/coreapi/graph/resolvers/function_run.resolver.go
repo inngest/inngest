@@ -110,11 +110,6 @@ func (r *functionRunResolver) Output(ctx context.Context, obj *models.FunctionRu
 	return obj.Output, nil
 }
 
-func (r *functionRunResolver) Timeline(ctx context.Context, obj *models.FunctionRun) ([]models.FunctionRunEvent, error) {
-	// TODO
-	return nil, nil
-}
-
 func (r *functionRunResolver) Event(ctx context.Context, obj *models.FunctionRun) (*models.Event, error) {
 	eventID, err := ulid.Parse(obj.EventID)
 	if err != nil {
@@ -144,38 +139,4 @@ func (r *functionRunResolver) Event(ctx context.Context, obj *models.FunctionRun
 
 func (r *functionRunResolver) WaitingFor(ctx context.Context, obj *models.FunctionRun) (*models.StepEventWait, error) {
 	return nil, nil
-}
-
-func isFunctionEvent(h enums.HistoryType) bool {
-	return h == enums.HistoryTypeFunctionStarted || h == enums.HistoryTypeFunctionCompleted || h == enums.HistoryTypeFunctionCancelled || h == enums.HistoryTypeFunctionFailed
-}
-
-func functionEventEnum(h enums.HistoryType) models.FunctionEventType {
-	switch h {
-	case enums.HistoryTypeFunctionCompleted:
-		return models.FunctionEventTypeCompleted
-	case enums.HistoryTypeFunctionCancelled:
-		return models.FunctionEventTypeCancelled
-	case enums.HistoryTypeFunctionFailed:
-		return models.FunctionEventTypeFailed
-	}
-
-	return models.FunctionEventTypeStarted
-}
-
-func stepEventEnum(h enums.HistoryType) models.StepEventType {
-	switch h {
-	case enums.HistoryTypeStepStarted:
-		return models.StepEventTypeStarted
-	case enums.HistoryTypeStepCompleted:
-		return models.StepEventTypeCompleted
-	case enums.HistoryTypeStepErrored:
-		return models.StepEventTypeErrored
-	case enums.HistoryTypeStepFailed:
-		return models.StepEventTypeFailed
-	case enums.HistoryTypeStepWaiting:
-		return models.StepEventTypeWaiting
-	}
-
-	return models.StepEventTypeScheduled
 }
