@@ -33,7 +33,6 @@ extensions:
             NullTime: 'null | string'
             Period: 'unknown'
             Role: 'unknown'
-            RunStatus: 'unknown'
             Runtime: 'unknown'
             SchemaSource: 'unknown'
             SearchObject: 'unknown'

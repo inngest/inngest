@@ -4,7 +4,6 @@ import { Button } from '@inngest/components/Button';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { Modal } from '@inngest/components/Modal';
 import { IconReplay } from '@inngest/components/icons/Replay';
-import type { FunctionRunEndStatus } from '@inngest/components/types/functionRun';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
@@ -70,7 +69,7 @@ const CreateFunctionReplayDocument = graphql(`
     $name: String!
     $fromRange: ULID!
     $toRange: ULID!
-    $statuses: [RunStatus!]
+    $statuses: [FunctionRunStatus!]
   ) {
     createFunctionReplay(
       input: {
@@ -86,6 +85,11 @@ const CreateFunctionReplayDocument = graphql(`
     }
   }
 `);
+
+type FunctionRunEndStatus =
+  | FunctionRunStatus.Failed
+  | FunctionRunStatus.Cancelled
+  | FunctionRunStatus.Completed;
 
 type NewReplayModalProps = {
   environmentSlug: string;

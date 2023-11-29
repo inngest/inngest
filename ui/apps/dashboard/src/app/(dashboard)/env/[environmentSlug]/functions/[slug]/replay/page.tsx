@@ -122,8 +122,6 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
   const environmentID = data?.environment?.id;
   const functionID = data?.environment?.function?.id;
 
-  console.log({ environmentID, functionID });
-
   const replays: Replay[] =
     data?.environment?.function?.replays?.map((replay) => {
       const baseReplay = {
