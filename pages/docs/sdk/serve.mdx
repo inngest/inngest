@@ -417,11 +417,10 @@ Next.js Edge Functions hosted on [Vercel](/docs/deploy/vercel) can also stream r
 
 To enable this, set your runtime to `"edge"` (see [Quickstart for Using Edge Functions | Vercel Docs](https://vercel.com/docs/concepts/functions/edge-functions/quickstart)) and add the `streaming: "allow"` option to your serve handler:
 
+**Next.js 13+**
 <CodeGroup>
 ```ts {{ title: "v3" }}
-export const config = {
-  runtime: "edge",
-};
+export const runtime = "edge";
 
 export default serve({
   client: inngest,
@@ -430,15 +429,39 @@ export default serve({
 });
 ```
 ```ts {{ title: "v2" }}
-export const config = {
-  runtime: "edge",
-};
+export const runtime = "edge";
 
 export default serve(inngest, [...fns], {
   streaming: "allow",
 });
 ```
 </CodeGroup>
+
+<details>
+  <summary>**Older versions (Next.js 12)**</summary>
+  <CodeGroup>
+    ```ts {{ title: "v3" }}
+    export const config = {
+      runtime: "edge",
+    };
+
+    const handler = serve({
+      client: inngest,
+      functions: [...fns],
+      streaming: "allow",
+    });
+    ```
+    ```ts {{ title: "v2" }}
+    export const config = {
+      runtime: "edge",
+    };
+
+    const handler = serve(inngest, [...fns], {
+      streaming: "allow",
+    });
+    ```
+  </CodeGroup>
+</details>
 
 For more information, check out the [Streaming](/docs/streaming) page.
 
