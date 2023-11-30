@@ -136,9 +136,7 @@ function Content({
 
   return (
     <>
-      {links?.length ? (
-        <div className="flex flex-row justify-end gap-x-5 pb-5">{...links}</div>
-      ) : null}
+      {links?.length ? <div className="flex flex-row justify-end gap-x-5 pb-5">{links}</div> : null}
 
       <div className="pb-5">
         <MetadataGrid metadataItems={metadataItems} />
