@@ -10,8 +10,14 @@ import type { Event } from '@inngest/components/types/event';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
 import { shortDate } from '@inngest/components/utils/date';
 
-type BaseProps = {
+type EventProps = {
   event: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>;
+  loading?: false;
+};
+
+type LoadingEvent = {
+  event: Partial<Event>;
+  loading: true;
 };
 
 type WithRunSelector = {
@@ -33,7 +39,7 @@ type WithoutRunSelector = {
   selectedRunID?: undefined;
 };
 
-type Props = BaseProps & (WithoutRunSelector | WithRunSelector);
+type Props = (EventProps | LoadingEvent) & (WithoutRunSelector | WithRunSelector);
 
 export function EventDetails({
   event,
@@ -42,6 +48,7 @@ export function EventDetails({
   onReplayEvent,
   selectedRunID,
   SendEventButton,
+  loading = false,
 }: Props) {
   const prettyPayload = usePrettyJson(event.payload);
 
@@ -53,9 +60,13 @@ export function EventDetails({
         <div className="pt-8">
           <MetadataGrid
             metadataItems={[
-              { label: 'Event ID', value: event.id, size: 'large', type: 'code' },
-              { label: 'Received At', value: shortDate(event.receivedAt) },
+              { label: 'Event ID', value: event.id || '', size: 'large', type: 'code' },
+              {
+                label: 'Received At',
+                value: (event.receivedAt && shortDate(event.receivedAt)) || '',
+              },
             ]}
+            loading={loading}
           />
         </div>
       }
@@ -72,9 +83,11 @@ export function EventDetails({
       }
       active
     >
-      <div className="px-5 pt-4">
-        <CodeBlock tabs={[{ label: 'Payload', content: prettyPayload ?? 'Unknown' }]} />
-      </div>
+      {!loading && (
+        <div className="px-5 pt-4">
+          <CodeBlock tabs={[{ label: 'Payload', content: prettyPayload ?? 'Unknown' }]} />
+        </div>
+      )}
 
       {functionRuns && onFunctionRunClick && (
         <>
