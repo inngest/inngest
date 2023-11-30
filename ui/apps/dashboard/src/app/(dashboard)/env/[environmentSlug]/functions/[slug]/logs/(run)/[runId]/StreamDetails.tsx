@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react';
 import type { Route } from 'next';
-import { useRouter } from 'next/navigation';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { Link } from '@inngest/components/Link';
 import { RunDetails } from '@inngest/components/RunDetails';
@@ -38,7 +37,6 @@ export function StreamDetails({
   run,
 }: Props) {
   const client = useClient();
-  const router = useRouter();
 
   const getOutput = useMemo(() => {
     return (historyItemID: string) => {

@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { classNames } from '@inngest/components/utils/classNames';
 import * as Dialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
 
 type SlideOverProps = {
   children?: React.ReactNode;
-  onClose: () => void;
+  onClose?: () => void;
   size?: 'small' | 'large';
 };
 
@@ -16,6 +17,7 @@ export function SlideOver({ children, onClose, size = 'large' }: SlideOverProps)
   // The Radix Dialog is not rendered correctly server side, so we need to prevent it from rendering until the client side hydration is complete (and `useEffect` is run).
   // The issue is reported here: https://github.com/radix-ui/primitives/issues/1386
   const [isOpen, setOpen] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     setOpen(true);
@@ -25,7 +27,11 @@ export function SlideOver({ children, onClose, size = 'large' }: SlideOverProps)
     setOpen(false);
     // Allows the exit transition to happen before unmounting
     setTimeout(() => {
-      onClose();
+      if (onClose) {
+        onClose();
+      } else {
+        router.back();
+      }
     }, 500);
   }
 
