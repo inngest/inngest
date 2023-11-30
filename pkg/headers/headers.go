@@ -5,6 +5,9 @@ import (
 )
 
 const (
+	// SDK version (e.g. "js:v3.2.1")
+	HeaderKeySDK = "X-Inngest-SDK"
+
 	// Tells the consumers (e.g. SDKs) what kind of Inngest server they're
 	// communicating with (Cloud or Dev Server).
 	HeaderKeyServerKind = "X-Inngest-Server-Kind"
