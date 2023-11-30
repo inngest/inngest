@@ -179,16 +179,6 @@ export default function FunctionRunList({
     }
   }, [data, selectedStatuses, selectedTimeRange, timeField]);
 
-  if (
-    !data ||
-    !data?.environment ||
-    !data?.environment?.function ||
-    !data?.environment?.function?.runs ||
-    !functionRuns
-  ) {
-    return;
-  }
-
   return (
     <div className="min-h-0 w-full overflow-y-auto pb-10" ref={tableContainerRef}>
       <Table
