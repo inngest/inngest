@@ -324,19 +324,25 @@ func upsertErroredApp(
 		})
 		if err != nil {
 			logger.From(ctx).Error().Err(err).Msg("error inserting app")
+			fmt.Println(1)
 			rollback(ctx)
 			return
 		}
 
 		if err = tx.Commit(ctx); err != nil {
 			logger.From(ctx).Error().Err(err).Msg("error inserting app")
+			fmt.Println(2)
 			rollback(ctx)
 			return
 		}
+
+		return
 	}
+
 	if err != nil {
 		logger.From(ctx).Error().Err(err).Msg("error getting app")
 		rollback(ctx)
+		fmt.Println(3)
 		return
 	}
 	_, err = tx.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
@@ -349,12 +355,14 @@ func upsertErroredApp(
 	if err != nil {
 		logger.From(ctx).Error().Err(err).Msg("error updating app")
 		rollback(ctx)
+		fmt.Println(4)
 		return
 	}
 
 	if err = tx.Commit(ctx); err != nil {
 		logger.From(ctx).Error().Err(err).Msg("error updating app")
 		rollback(ctx)
+		fmt.Println(5)
 		return
 	}
 }
