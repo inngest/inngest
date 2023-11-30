@@ -43,6 +43,8 @@ export default function RerunButton({ environment, functionRunID, func }: RerunB
     if (response.error) {
       toast.error('Failed to rerun function');
       return;
+    } else {
+      toast.success('Successfully rerun. Loading new run...');
     }
     const newFunctionRunID = response.data?.retryWorkflowRun?.id as string;
     router.refresh();
