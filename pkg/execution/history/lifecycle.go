@@ -463,6 +463,11 @@ func (l lifecycle) OnWaitForEventResumed(
 		groupIDUUID = val
 	}
 
+	var stepName *string
+	if req.StepName != "" {
+		stepName = &req.StepName
+	}
+
 	h := History{
 		AccountID:       id.AccountID,
 		WorkspaceID:     id.WorkspaceID,
@@ -480,7 +485,7 @@ func (l lifecycle) OnWaitForEventResumed(
 			EventID: req.EventID,
 			Timeout: req.EventID == nil,
 		},
-		StepName: &req.StepName,
+		StepName: stepName,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
@@ -592,6 +597,11 @@ func (l lifecycle) OnInvokeFunctionResumed(
 		groupIDUUID = val
 	}
 
+	var stepName *string
+	if req.StepName != "" {
+		stepName = &req.StepName
+	}
+
 	h := History{
 		AccountID:       id.AccountID,
 		BatchID:         id.BatchID,
@@ -610,7 +620,7 @@ func (l lifecycle) OnInvokeFunctionResumed(
 		RunID:       id.RunID,
 		Type:        enums.HistoryTypeStepCompleted.String(),
 		WorkspaceID: id.WorkspaceID,
-		StepName:    &req.StepName,
+		StepName:    stepName,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
@@ -677,24 +687,18 @@ func applyResponse(
 		// XXX: Add more fields here
 	}
 
-	if outputStr, ok := resp.Output.(string); ok {
-		// If it's a completed generator step then some data is stored in the
-		// output. We'll try to extract it.
-		isGeneratorStep := len(resp.Generator) > 0
-		if isGeneratorStep {
-			var opcodes []state.GeneratorOpcode
-			if err := json.Unmarshal([]byte(outputStr), &opcodes); err == nil {
-				if len(opcodes) == 1 && opcodes[0].Op != enums.OpcodeStepPlanned {
-					h.StepID = &opcodes[0].ID
-					h.StepType = getStepType(opcodes[0])
-					h.Result.Output = string(opcodes[0].Data)
-					stepName := opcodes[0].UserDefinedName()
-					h.StepName = &stepName
-				}
-				return nil
-			}
-		}
+	// If it's a completed generator step then some data is stored in the
+	// output. We'll try to extract it.
+	if op := resp.SingleStep(); op != nil && op.Op != enums.OpcodeStepPlanned {
+		h.StepID = &op.ID
+		h.StepType = getStepType(*op)
+		h.Result.Output = op.Output()
+		stepName := op.UserDefinedName()
+		h.StepName = &stepName
+		return nil
+	}
 
+	if outputStr, ok := resp.Output.(string); ok {
 		// If it's a string and doesn't have extractable data, then
 		// assume it's already the stringified JSON for the data
 		// returned by the user's step. Some scenarios when that can
@@ -739,7 +743,7 @@ func getStepType(opcode state.GeneratorOpcode) *enums.HistoryStepType {
 	case enums.OpcodeSleep:
 		out = enums.HistoryStepTypeSleep
 	case enums.OpcodeStep:
-		if opcode.Data == nil {
+		if opcode.Data == nil && opcode.Error == nil {
 			// Not a user-facing step.
 			return nil
 		}

@@ -13,6 +13,7 @@ type NavItemProps<PassedHref extends string> = {
   text: string;
   icon?: React.ReactNode;
   active?: ActiveMatching;
+  badge?: React.ReactNode;
 };
 
 export default function NavItem<PassedHref extends string>({
@@ -20,6 +21,7 @@ export default function NavItem<PassedHref extends string>({
   text,
   icon,
   active = 'basePath',
+  badge,
 }: NavItemProps<PassedHref>) {
   const pathname = usePathname();
 
@@ -43,6 +45,7 @@ export default function NavItem<PassedHref extends string>({
     >
       {icon && icon}
       {text}
+      {badge}
     </Link>
   );
 }

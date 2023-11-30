@@ -11,6 +11,8 @@ import (
 type Queue interface {
 	Producer
 	Consumer
+
+	JobQueueReader
 }
 
 type RunFunc func(context.Context, Item) error
@@ -100,6 +102,15 @@ type JobResponse struct {
 
 // JobQueueReader
 type JobQueueReader interface {
+	// OutstandingJobCount returns the number of jobs in progress
+	// or scheduled for a given run.
+	OutstandingJobCount(
+		ctx context.Context,
+		workspaceID uuid.UUID,
+		workflowID uuid.UUID,
+		runID ulid.ULID,
+	) (int, error)
+
 	RunJobs(
 		ctx context.Context,
 		workspaceID uuid.UUID,

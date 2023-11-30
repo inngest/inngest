@@ -84,7 +84,6 @@ type FunctionRun struct {
 	StartedAt         *time.Time                   `json:"startedAt,omitempty"`
 	FinishedAt        *time.Time                   `json:"finishedAt,omitempty"`
 	Output            *string                      `json:"output,omitempty"`
-	Timeline          []FunctionRunEvent           `json:"timeline,omitempty"`
 	History           []*history_reader.RunHistory `json:"history"`
 	HistoryItemOutput *string                      `json:"historyItemOutput,omitempty"`
 	Name              *string                      `json:"name,omitempty"`

@@ -34,7 +34,7 @@ var (
 )
 
 var (
-	buffer = 2 * time.Second
+	buffer = 1 * time.Second
 	// scripts stores all embedded lua scripts on initialization
 	scripts = map[string]*rueidis.Lua{}
 	include = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
