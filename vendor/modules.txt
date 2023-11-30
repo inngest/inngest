@@ -746,10 +746,9 @@ go.opentelemetry.io/otel/internal/attribute
 go.opentelemetry.io/otel/internal/baggage
 go.opentelemetry.io/otel/internal/global
 go.opentelemetry.io/otel/propagation
-go.opentelemetry.io/otel/semconv/v1.17.0
 go.opentelemetry.io/otel/semconv/v1.20.0
 go.opentelemetry.io/otel/semconv/v1.21.0
-# go.opentelemetry.io/otel/exporters/jaeger v1.16.0
+# go.opentelemetry.io/otel/exporters/jaeger v1.17.0
 ## explicit; go 1.19
 go.opentelemetry.io/otel/exporters/jaeger
 go.opentelemetry.io/otel/exporters/jaeger/internal/gen-go/agent
@@ -781,8 +780,8 @@ go.opentelemetry.io/otel/exporters/prometheus
 # go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v0.44.0
 ## explicit; go 1.20
 go.opentelemetry.io/otel/exporters/stdout/stdoutmetric
-# go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.16.0
-## explicit; go 1.19
+# go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.21.0
+## explicit; go 1.20
 go.opentelemetry.io/otel/exporters/stdout/stdouttrace
 # go.opentelemetry.io/otel/metric v1.21.0
 ## explicit; go 1.20
