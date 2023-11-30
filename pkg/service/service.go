@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -9,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/logger"
 	"golang.org/x/sync/errgroup"
 )
@@ -17,7 +17,8 @@ import (
 var (
 	defaultTimeout = 30 * time.Second
 
-	ErrPreTimeout = fmt.Errorf("service did not pre-up within the given timeout")
+	ErrPreTimeout = fmt.Errorf("service.Pre did not end within the given timeout")
+	ErrRunTimeout = fmt.Errorf("service.Run did not end within the given timeout")
 
 	wgctxVal = wgctx{}
 )
@@ -63,6 +64,21 @@ type StartTimeouter interface {
 func startTimeout(s Service) time.Duration {
 	if t, ok := s.(StartTimeouter); ok {
 		return t.StartTimeout()
+	}
+	return defaultTimeout
+}
+
+// RunTimeouter lets a Service define how long the Run method can block for prior
+// to starting cleanup.
+type RunTimeouter interface {
+	Service
+	RunTimeout() time.Duration
+}
+
+// runTimeout returns the timeout duration used when an interrupt is received.
+func runTimeout(s Service) time.Duration {
+	if t, ok := s.(RunTimeouter); ok {
+		return t.RunTimeout()
 	}
 	return defaultTimeout
 }
@@ -114,6 +130,37 @@ func Start(ctx context.Context, s Service) (err error) {
 	l := logger.From(ctx).With().Str("caller", s.Name()).Logger()
 	ctx = logger.With(ctx, l)
 
+	ctx, cleanup := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	defer cleanup()
+
+	// Create a new parent waitgroup which can be used to prevent stopping
+	// until the WG reaches 0.  This can be used for ephemeral goroutines.
+	wg := &sync.WaitGroup{}
+	ctx = context.WithValue(ctx, wgctxVal, wg)
+
+	defer func() {
+		if r := recover(); r != nil {
+			l.Error().Interface("recover", r).Msg("service panicked")
+		}
+	}()
+
+	if preErr := pre(ctx, s); preErr != nil {
+		return preErr
+	}
+
+	if runErr := run(ctx, cleanup, s); runErr != nil && runErr != context.Canceled {
+		logger.From(ctx).Error().Err(runErr).Msg("service run errored")
+		err = errors.Join(err, runErr)
+	}
+	if stopErr := stop(ctx, s); stopErr != nil {
+		logger.From(ctx).Error().Err(stopErr).Msg("service cleanup errored")
+		err = errors.Join(err, stopErr)
+	}
+
+	return err
+}
+
+func pre(ctx context.Context, s Service) error {
 	// Start the pre-run function with the timeout provided.
 	preCh := make(chan error)
 	go func() {
@@ -124,87 +171,84 @@ func Start(ctx context.Context, s Service) (err error) {
 	select {
 	case <-time.After(startTimeout(s)):
 		return ErrPreTimeout
-	case err = <-preCh:
+	case err := <-preCh:
 		close(preCh)
 		if err != nil {
 			return err
 		}
 	}
+	return nil
+}
 
-	// Listen for signals straight after running pre.
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
-
-	runCtx, cleanup := context.WithCancel(ctx)
-	defer func() {
-		if r := recover(); r != nil {
-			l.Error().Interface("recover", r).Msg("service panicked")
-			cleanup()
-		}
-	}()
-
-	// Create a new parent waitgroup which can be used to prevent stopping
-	// until the WG reaches 0.  This can be used for ephemeral goroutines.
-	wg := &sync.WaitGroup{}
-	runCtx = context.WithValue(runCtx, wgctxVal, wg)
-
+// run calls the service's Run method, blocking until run completes or the
+// parent context is cancelled.  If the parent context is cancelled, we wait
+// up to 30 seconds
+func run(ctx context.Context, stop func(), s Service) error {
 	runErr := make(chan error)
-	l.Info().Msg("service starting")
 	go func() {
-		err := s.Run(runCtx)
+		logger.From(ctx).Info().Msg("service starting")
+		err := s.Run(ctx)
 		// Communicate this error to the outer select.
 		runErr <- err
-		// Call cleanup, triggering Stop below.  In this case
-		// we don't need to wait for a signal to terminate.
-		cleanup()
 	}()
 
 	select {
-	case sig := <-sigs:
-		// Terminating via a signal
-		l.Info().Interface("signal", sig).Msg("received signal; shutting down gracefully")
-		cleanup()
-	case err = <-runErr:
+	case err := <-runErr:
 		// Run terminated.  Fetch the error from the goroutine.
 		if err != nil {
-			l.Error().Err(err).Msg("service errored")
-		} else {
-			l.Warn().Msg("service run stopped")
+			return err
 		}
-	case <-runCtx.Done():
-		l.Warn().Msg("service run stopped")
-	}
+		logger.From(ctx).Info().Interface("signal", ctx.Err()).Msg("service finished")
+	case <-ctx.Done():
+		// We received a cancellation signal.  Allow Run to continue for up
+		// to RunTimoeut period before quitting and cleaning up.
 
+		// Ensure that we prevent the paretn context from capturing signals again.
+		stop()
+		// And set up a new context to quit if we receive the same signal again.
+		repeat, cleanup := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+		defer cleanup()
+
+		timeout := runTimeout(s)
+		logger.From(ctx).Info().
+			Interface("signal", ctx.Err()).
+			Float64("seconds", timeout.Seconds()).
+			Msg("signal received, service stopping")
+
+		select {
+		case <-repeat.Done():
+			return fmt.Errorf("repeated signal received")
+		case <-time.After(timeout):
+			return ErrRunTimeout
+		case err := <-runErr:
+			return err
+		}
+
+	}
+	return nil
+}
+
+func stop(ctx context.Context, s Service) error {
 	stopCh := make(chan error)
 	go func() {
-		l.Info().Msg("service cleaning up")
+		logger.From(ctx).Info().Msg("service cleaning up")
 		// Create a new context that's not cancelled.
 		if err := s.Stop(context.Background()); err != nil && err != context.Canceled {
 			stopCh <- err
 			return
 		}
-
 		// Wait for everything in the run waitgroup
-		wg.Wait()
-
+		GetWaitgroup(ctx).Wait()
 		stopCh <- nil
 	}()
+
 	select {
 	case <-time.After(stopTimeout(s)):
-		l.Error().Msg("service did not clean up within timeout")
-		return err
-	case sig := <-sigs:
-		l.Info().Interface("signal", sig).Msg("received signal again; shutting down immediately")
+		return fmt.Errorf("service did not clean up within timeout")
 	case stopErr := <-stopCh:
 		if stopErr != nil {
-			err = multierror.Append(err, stopErr)
+			return stopErr
 		}
 	}
-
-	if err == context.Canceled {
-		// Ignore plz.
-		return nil
-	}
-
-	return err
+	return nil
 }
