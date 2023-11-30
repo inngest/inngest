@@ -5,9 +5,10 @@ import { MetadataItem, type MetadataItemProps } from './MetadataItem';
 type Props = {
   metadataItems: MetadataItemProps[];
   columns?: 2 | 3;
+  loading?: boolean;
 };
 
-export function MetadataGrid({ metadataItems, columns = 3 }: Props) {
+export function MetadataGrid({ metadataItems, columns = 3, loading = false }: Props) {
   // Each metadata element that has a large size counts as two items
   const items = metadataItems.reduce((count, item) => {
     return count + (item.size === 'large' ? 2 : 1);
@@ -56,6 +57,7 @@ export function MetadataGrid({ metadataItems, columns = 3 }: Props) {
               !lastOrOnlyRow && horizontalDividers,
               item.size === 'large' ? 'col-span-2' : 'col-span-1'
             )}
+            loading={loading}
             {...item}
           />
         );

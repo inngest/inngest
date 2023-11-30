@@ -1,4 +1,5 @@
 import { Badge } from '@inngest/components/Badge';
+import { Skeleton } from '@inngest/components/Skeleton';
 import {
   Tooltip,
   TooltipContent,
@@ -20,6 +21,7 @@ export type MetadataItemProps = {
   };
   type?: 'code' | 'text';
   size?: 'small' | 'large';
+  loading?: boolean;
 };
 
 export function MetadataItem({
@@ -30,6 +32,7 @@ export function MetadataItem({
   type,
   tooltip,
   badge,
+  loading = false,
 }: MetadataItemProps) {
   return (
     <div className={classNames('flex flex-col-reverse p-1.5', className)}>
@@ -50,29 +53,32 @@ export function MetadataItem({
         )}
       </dt>
       <dd className="flex justify-between gap-2">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger
-              className={classNames(
-                type === 'code' && 'font-mono',
-                'truncate text-sm text-slate-800 dark:text-white'
-              )}
-            >
-              <span
+        {loading ? (
+          <Skeleton className="h-5 w-full" />
+        ) : (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
                 className={classNames(
                   type === 'code' && 'font-mono',
                   'truncate text-sm text-slate-800 dark:text-white'
                 )}
               >
-                {value}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent className={classNames(type === 'code' && 'font-mono', 'text-xs')}>
-              {title || `${value}`}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-
+                <span
+                  className={classNames(
+                    type === 'code' && 'font-mono',
+                    'truncate text-sm text-slate-800 dark:text-white'
+                  )}
+                >
+                  {value}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent className={classNames(type === 'code' && 'font-mono', 'text-xs')}>
+                {title || `${value}`}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         {badge && (
           <TooltipProvider>
             <Tooltip>

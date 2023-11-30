@@ -5,7 +5,7 @@ export function Skeleton({ className }: { className?: string }) {
     <span
       className={classNames(
         className,
-        'relative overflow-hidden rounded-md before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_2s_infinite] before:bg-gradient-to-r before:from-transparent before:via-slate-700/70 before:to-transparent'
+        'relative my-[0.3rem] block overflow-hidden rounded-md before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_2s_infinite] before:bg-gradient-to-r before:from-transparent before:via-slate-700/70 before:to-transparent'
       )}
     />
   );

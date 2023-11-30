@@ -24,6 +24,6 @@ type Story = StoryObj<typeof Skeleton>;
 
 export const Default: Story = {
   args: {
-    className: 'my-[0.3rem] block h-5',
+    className: 'h-5',
   },
 };
