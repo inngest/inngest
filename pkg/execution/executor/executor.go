@@ -468,7 +468,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			resp.SetError(state.ErrFunctionOverflowed)
 			resp.SetFinal()
 
-			_ = e.runFinishHandler(ctx, id, s, resp)
+			if err := e.runFinishHandler(ctx, id, s, resp); err != nil {
+				logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+			}
+
 			for _, e := range e.lifecycles {
 				go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, resp, s)
 			}
@@ -576,10 +579,11 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 		if err != nil {
 			return fmt.Errorf("unable to load run: %w", err)
 		}
-		if ferr := e.runFinishHandler(ctx, id, s, *resp); ferr != nil {
-			// XXX: log
-			_ = ferr
+
+		if err := e.runFinishHandler(ctx, id, s, *resp); err != nil {
+			logger.From(ctx).Error().Err(err).Msg("error running finish handler")
 		}
+
 		for _, e := range e.lifecycles {
 			go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp, s)
 		}
@@ -597,11 +601,16 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 				if serr := e.sm.SetStatus(ctx, id, enums.RunStatusFailed); serr != nil {
 					return fmt.Errorf("error marking function as complete: %w", serr)
 				}
+
 				s, err := e.sm.Load(ctx, id.RunID)
 				if err != nil {
 					return fmt.Errorf("unable to load run: %w", err)
 				}
-				_ = e.runFinishHandler(ctx, id, s, *resp)
+
+				if err := e.runFinishHandler(ctx, id, s, *resp); err != nil {
+					logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+				}
+
 				for _, e := range e.lifecycles {
 					go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp, s)
 				}
@@ -629,9 +638,9 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 	if err != nil {
 		return fmt.Errorf("unable to load run: %w", err)
 	}
-	if ferr := e.runFinishHandler(ctx, id, s, *resp); ferr != nil {
-		// XXX: log
-		_ = ferr
+
+	if err := e.runFinishHandler(ctx, id, s, *resp); err != nil {
+		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
 	}
 
 	for _, e := range e.lifecycles {
