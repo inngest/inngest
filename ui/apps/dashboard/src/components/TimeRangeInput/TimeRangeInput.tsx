@@ -50,9 +50,9 @@ export function TimeRangeInput({ onChange }: Props) {
   return (
     <div className="space-y-1">
       <div className="flex items-center gap-2">
-        <TimeInput onChange={onStartDateTimeChange} required />
+        <TimeInput onChange={onStartDateTimeChange} placeholder="2 hours ago" required />
         <span className="text-sm font-medium text-slate-400">to</span>
-        <TimeInput onChange={onEndDateTimeChange} required />
+        <TimeInput onChange={onEndDateTimeChange} placeholder="now" required />
       </div>
       {startDateTimeError && <p className="text-sm text-red-500">{startDateTimeError}</p>}
       {endDateTimeError && <p className="text-right text-sm text-red-500">{endDateTimeError}</p>}

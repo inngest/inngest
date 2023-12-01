@@ -174,7 +174,7 @@ export default function NewReplayModal({
 
     toast.promise(createFunctionReplayPromise, {
       loading: 'Loading...',
-      success: (response) => {
+      success: () => {
         onClose();
         router.push(`/env/${environmentSlug}/functions/${encodeURIComponent(functionSlug)}/replay`);
         return 'Replay created!';
@@ -213,6 +213,7 @@ export default function NewReplayModal({
               <Input
                 type="text"
                 id="replayName"
+                placeholder="Incident #1234"
                 value={name}
                 minLength={3}
                 maxLength={64}
