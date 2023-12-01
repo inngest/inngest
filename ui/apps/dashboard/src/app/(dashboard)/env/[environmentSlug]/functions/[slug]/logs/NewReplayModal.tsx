@@ -246,7 +246,7 @@ export default function NewReplayModal({
             {statusOptions.map(({ label, value, count }) => (
               <div key={value} className="flex flex-1 flex-col items-center gap-3.5">
                 <ToggleGroup.Item
-                  className="flex w-full flex-col items-center gap-1 rounded-md bg-slate-100 py-6 text-sm font-semibold text-slate-800 hover:bg-slate-200 focus:outline-1 focus:outline-indigo-500 data-[state=on]:ring-2 data-[state=on]:ring-indigo-500 data-[state=on]:ring-offset-2"
+                  className="flex w-full flex-col items-center gap-1 rounded-md bg-slate-100 py-6 text-sm font-semibold text-slate-800 hover:bg-slate-200 focus:outline-1 focus:outline-indigo-500 data-[state=on]:ring data-[state=on]:ring-indigo-500 data-[state=on]:ring-offset-2"
                   value={value}
                 >
                   <FunctionRunStatusIcon status={value} className="mx-auto h-8" />
