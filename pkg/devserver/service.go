@@ -333,7 +333,10 @@ func upsertErroredApp(
 			rollback(ctx)
 			return
 		}
+
+		return
 	}
+
 	if err != nil {
 		logger.From(ctx).Error().Err(err).Msg("error getting app")
 		rollback(ctx)
