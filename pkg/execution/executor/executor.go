@@ -937,10 +937,11 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 
 // Cancel cancels an in-progress function.
 func (e *executor) Cancel(ctx context.Context, runID ulid.ULID, r execution.CancelRequest) error {
-	md, err := e.sm.Metadata(ctx, runID)
+	s, err := e.sm.Load(ctx, runID)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to load run: %w", err)
 	}
+	md := s.Metadata()
 
 	switch md.Status {
 	case enums.RunStatusFailed, enums.RunStatusCompleted, enums.RunStatusOverflowed:
@@ -954,11 +955,6 @@ func (e *executor) Cancel(ctx context.Context, runID ulid.ULID, r execution.Canc
 	}
 
 	// TODO: Load all pauses for the function and remove, once we index pauses.
-
-	s, err := e.sm.Load(ctx, runID)
-	if err != nil {
-		return fmt.Errorf("unable to load run: %w", err)
-	}
 
 	fnCancelledErr := state.ErrFunctionCancelled.Error()
 	if err := e.runFinishHandler(ctx, s.Identifier(), s, state.DriverResponse{
