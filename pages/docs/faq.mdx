@@ -50,3 +50,6 @@ By default, Vercel enables [Deployment Protection](https://vercel.com/docs/secur
 for both preview and generated production URLs. This means that your app's serve endpoint will be
 unreachable by our servers unless you [disable Deployment Protection](https://vercel.com/docs/security/deployment-protection#configuring-deployment-protection)
 or, if you're on Vercel's Pro plan, [configure protection bypass](/docs/deploy/vercel#bypassing-deployment-protection).
+
+## Why am I getting a `killed` error when running the Dev Server?
+This is likely an npx issue, which can be solved by running `rm -rf ~/.npm/_npx`. If the error still persist, please reach out to us on [our Discord](https://www.inngest.com/discord).
