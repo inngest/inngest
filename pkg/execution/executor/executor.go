@@ -468,7 +468,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			resp.SetError(state.ErrFunctionOverflowed)
 			resp.SetFinal()
 
-			_ = e.runFinishHandler(ctx, id, s, resp)
+			if err := e.runFinishHandler(ctx, id, s, resp); err != nil {
+				logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+			}
+
 			for _, e := range e.lifecycles {
 				go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, resp, s)
 			}
@@ -572,11 +575,15 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 		if serr := e.sm.SetStatus(ctx, id, enums.RunStatusFailed); serr != nil {
 			return fmt.Errorf("error marking function as complete: %w", serr)
 		}
-		s, _ := e.sm.Load(ctx, id.RunID)
-		if ferr := e.runFinishHandler(ctx, id, s, *resp); ferr != nil {
-			// XXX: log
-			_ = ferr
+		s, err := e.sm.Load(ctx, id.RunID)
+		if err != nil {
+			return fmt.Errorf("unable to load run: %w", err)
 		}
+
+		if err := e.runFinishHandler(ctx, id, s, *resp); err != nil {
+			logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+		}
+
 		for _, e := range e.lifecycles {
 			go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp, s)
 		}
@@ -594,8 +601,16 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 				if serr := e.sm.SetStatus(ctx, id, enums.RunStatusFailed); serr != nil {
 					return fmt.Errorf("error marking function as complete: %w", serr)
 				}
-				s, _ := e.sm.Load(ctx, id.RunID)
-				_ = e.runFinishHandler(ctx, id, s, *resp)
+
+				s, err := e.sm.Load(ctx, id.RunID)
+				if err != nil {
+					return fmt.Errorf("unable to load run: %w", err)
+				}
+
+				if err := e.runFinishHandler(ctx, id, s, *resp); err != nil {
+					logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+				}
+
 				for _, e := range e.lifecycles {
 					go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp, s)
 				}
@@ -619,10 +634,13 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 		return fmt.Errorf("error saving function output: %w", serr)
 	}
 
-	s, _ := e.sm.Load(ctx, id.RunID)
-	if ferr := e.runFinishHandler(ctx, id, s, *resp); ferr != nil {
-		// XXX: log
-		_ = ferr
+	s, err := e.sm.Load(ctx, id.RunID)
+	if err != nil {
+		return fmt.Errorf("unable to load run: %w", err)
+	}
+
+	if err := e.runFinishHandler(ctx, id, s, *resp); err != nil {
+		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
 	}
 
 	for _, e := range e.lifecycles {
@@ -919,10 +937,11 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 
 // Cancel cancels an in-progress function.
 func (e *executor) Cancel(ctx context.Context, runID ulid.ULID, r execution.CancelRequest) error {
-	md, err := e.sm.Metadata(ctx, runID)
+	s, err := e.sm.Load(ctx, runID)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to load run: %w", err)
 	}
+	md := s.Metadata()
 
 	switch md.Status {
 	case enums.RunStatusFailed, enums.RunStatusCompleted, enums.RunStatusOverflowed:
@@ -937,7 +956,13 @@ func (e *executor) Cancel(ctx context.Context, runID ulid.ULID, r execution.Canc
 
 	// TODO: Load all pauses for the function and remove, once we index pauses.
 
-	s, _ := e.sm.Load(ctx, runID)
+	fnCancelledErr := state.ErrFunctionCancelled.Error()
+	if err := e.runFinishHandler(ctx, s.Identifier(), s, state.DriverResponse{
+		Err: &fnCancelledErr,
+	}); err != nil {
+		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+	}
+
 	for _, e := range e.lifecycles {
 		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md.Identifier, r, s)
 	}
