@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useReducer } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import * as chrono from 'chrono-node';
 import { useDebounce } from 'react-use';
@@ -12,51 +12,107 @@ type Props = {
   required?: boolean;
 };
 
+type State =
+  | {
+      inputString: string;
+      suggestedDateTime: undefined;
+      status: 'typing' | 'idle';
+    }
+  | {
+      inputString: string;
+      suggestedDateTime: Date;
+      status: 'suggestion_available';
+    }
+  | {
+      inputString: string;
+      suggestedDateTime: Date | undefined;
+      status: 'suggestion_applied';
+    };
+
+type Action =
+  | {
+      type: 'typed_string';
+      string: string;
+    }
+  | {
+      type: 'stopped_typing';
+    }
+  | {
+      type: 'applied_suggestion';
+    };
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case 'typed_string':
+      return {
+        ...state,
+        inputString: action.string,
+        suggestedDateTime: undefined,
+        status: 'typing',
+      };
+    case 'stopped_typing':
+      const parsedDateTime = chrono.parseDate(state.inputString);
+      if (!parsedDateTime) {
+        return {
+          ...state,
+          suggestedDateTime: undefined,
+          status: 'idle',
+        };
+      }
+      return {
+        ...state,
+        suggestedDateTime: parsedDateTime,
+        status: 'suggestion_available',
+      };
+    case 'applied_suggestion':
+      return {
+        ...state,
+        inputString: state.suggestedDateTime?.toLocaleString() ?? '',
+        status: 'suggestion_applied',
+      };
+    default:
+      throw new Error('Unknown action type');
+  }
+}
+
 export function TimeInput({ onChange, required }: Props) {
-  // TODO: This component's state management can probably be improved by using useReducer()
-  const [inputString, setInputString] = useState<string>('');
-  const [parsedDateTime, setParsedDateTime] = useState<Date>();
+  const [state, dispatch] = useReducer(reducer, {
+    inputString: '',
+    suggestedDateTime: undefined,
+    status: 'idle',
+  });
   useDebounce(
     () => {
-      if (status === 'selected') return;
-      const parsedDateTime = chrono.parseDate(inputString);
-      if (!parsedDateTime) {
-        setStatus('invalid');
-        return;
-      }
-      setStatus('valid');
-      setParsedDateTime(parsedDateTime);
+      // Debounce gets called when a suggestion is applied, which doesn't mean the user stopped
+      // typing, so we need to check if the suggestion was applied before we dispatch the
+      // stopped_typing action.
+      if (state.status === 'suggestion_applied') return;
+      dispatch({ type: 'stopped_typing' });
     },
     350,
-    [inputString]
+    [state.inputString]
   );
-  const [status, setStatus] = useState<'typing' | 'invalid' | 'valid' | 'selected'>('invalid');
 
   function onInputChange(event: React.ChangeEvent<HTMLInputElement>) {
-    setStatus('typing');
-    setParsedDateTime(undefined);
-    setInputString(event.target.value);
+    dispatch({ type: 'typed_string', string: event.target.value });
   }
 
-  function applyDateTime(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (event.code === 'Enter' && parsedDateTime && inputString.length > 0) {
+  function onInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.code === 'Enter' && state.status === 'suggestion_available') {
       event.preventDefault();
-      onChange(parsedDateTime);
-      setInputString(parsedDateTime.toLocaleString());
-      setStatus('selected');
+      dispatch({ type: 'applied_suggestion' });
+      onChange(state.suggestedDateTime);
     }
   }
 
-  const isPopoverOpen = status === 'valid';
-
   return (
-    <Popover.Root open={isPopoverOpen}>
+    <Popover.Root open={state.status === 'suggestion_available'}>
       <Popover.Anchor>
         <Input
           type="text"
-          value={inputString}
+          value={state.inputString}
           onChange={onInputChange}
-          onKeyDown={applyDateTime}
+          onKeyDown={onInputKeyDown}
           required={required}
         />
       </Popover.Anchor>
@@ -66,7 +122,7 @@ export function TimeInput({ onChange, required }: Props) {
           sideOffset={5}
           onOpenAutoFocus={(event) => event.preventDefault()}
         >
-          {parsedDateTime?.toLocaleString()}
+          {state.suggestedDateTime?.toLocaleString()}
           <kbd
             className="ml-auto flex h-6 w-6 items-center justify-center rounded bg-slate-100 p-2 font-sans text-xs"
             aria-label="Press Enter to apply the parsed date and time."
