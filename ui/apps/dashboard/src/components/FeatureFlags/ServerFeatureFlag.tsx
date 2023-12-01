@@ -1,5 +1,6 @@
 import type { PropsWithChildren } from 'react';
 import { currentUser } from '@clerk/nextjs';
+import * as Sentry from '@sentry/nextjs';
 
 import { getLaunchDarklyClient } from '@/launchDarkly';
 
@@ -48,9 +49,8 @@ export async function getBooleanFlag(
     const variation = await client.variation(flag, context, defaultValue);
     return variation;
   } catch (err) {
+    Sentry.captureException(err);
     console.error('Failed to get LaunchDarkly variation', err);
     return false;
   }
-
-  return false;
 }
