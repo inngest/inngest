@@ -1,4 +1,4 @@
-import { type HTMLAttributes } from 'react';
+import { forwardRef, type HTMLAttributes } from 'react';
 
 import cn from '@/utils/cn';
 
@@ -16,9 +16,11 @@ type InputProps = {
   size?: 'base' | 'lg';
   className?: string;
   value?: string;
-  readonly?: boolean;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  readonly?: boolean;
 };
 
 const sizeStyles = {
@@ -26,53 +28,47 @@ const sizeStyles = {
   lg: 'text-sm px-3.5 py-3 rounded-lg',
 };
 
-export default function Input({
-  defaultValue,
-  error,
-  name,
-  id,
-  label,
-  required,
-  minLength,
-  maxLength,
-  value,
-  onChange,
-  onKeyDown,
-  type = 'text',
-  size = 'base',
-  placeholder = '',
-  className = '',
-  readonly,
-}: InputProps) {
+const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
+  const type = props.type === undefined ? 'text' : props.type;
+  const size = props.size === undefined ? 'base' : props.size;
+  const placeholder = props.placeholder === undefined ? '' : props.placeholder;
+  const className = props.className === undefined ? '' : props.className;
   return (
     <div className="flex flex-col gap-1">
-      {label && (
-        <label htmlFor={name} className="text-sm font-medium text-slate-700">
-          {label}
+      {props.label && (
+        <label htmlFor={props.name} className="text-sm font-medium text-slate-700">
+          {props.label}
         </label>
       )}
       <input
-        defaultValue={defaultValue}
-        required={required}
-        minLength={minLength}
-        maxLength={maxLength}
+        ref={ref}
+        defaultValue={props.defaultValue}
+        required={props.required}
+        minLength={props.minLength}
+        maxLength={props.maxLength}
         type={type}
-        name={name}
-        id={id}
+        name={props.name}
+        id={props.id}
         placeholder={placeholder}
-        value={value}
+        value={props.value}
         className={cn(
           'border border-slate-300 text-sm leading-none placeholder-slate-500 shadow outline-2 outline-offset-2 outline-indigo-500 transition-all focus:outline',
           sizeStyles[size],
-          readonly && 'border-transparent shadow-transparent outline-transparent',
+          props.readonly && 'border-transparent shadow-transparent outline-transparent',
           className
         )}
-        onChange={onChange}
-        readOnly={readonly}
-        onKeyDown={onKeyDown}
+        onChange={props.onChange}
+        onKeyDown={props.onKeyDown}
+        onFocus={props.onFocus}
+        onBlur={props.onBlur}
+        readOnly={props.readonly}
       />
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {props.error && <p className="text-sm text-red-500">{props.error}</p>}
     </div>
   );
-}
+});
+
+Input.displayName = 'Input';
+
+export default Input;

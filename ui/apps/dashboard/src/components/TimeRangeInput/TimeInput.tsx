@@ -1,6 +1,6 @@
 'use client';
 
-import { useReducer } from 'react';
+import { useEffect, useReducer, useRef } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import * as chrono from 'chrono-node';
 import { useDebounce } from 'react-use';
@@ -9,14 +9,15 @@ import Input from '@/components/Forms/Input';
 
 type Props = {
   onChange: (newDateTime: Date) => void;
+  placeholder?: string;
   required?: boolean;
 };
 
 type State =
   | {
       inputString: string;
-      suggestedDateTime: undefined;
-      status: 'typing' | 'idle';
+      suggestedDateTime: Date | undefined;
+      status: 'typing' | 'idle' | 'focused';
     }
   | {
       inputString: string;
@@ -31,8 +32,18 @@ type State =
 
 type Action =
   | {
-      type: 'typed_string';
-      string: string;
+      type: 'focused';
+    }
+  | {
+      type: 'applied_example';
+      exampleDate: Date;
+    }
+  | {
+      type: 'blurred';
+    }
+  | {
+      type: 'typed';
+      value: string;
     }
   | {
       type: 'stopped_typing';
@@ -43,10 +54,26 @@ type Action =
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case 'typed_string':
+    case 'focused':
       return {
         ...state,
-        inputString: action.string,
+        status: 'focused',
+      };
+    case 'applied_example':
+      return {
+        inputString: action.exampleDate.toLocaleString(),
+        suggestedDateTime: action.exampleDate,
+        status: 'suggestion_applied',
+      };
+    case 'blurred':
+      return {
+        ...state,
+        status: 'idle',
+      };
+    case 'typed':
+      return {
+        ...state,
+        inputString: action.value,
         suggestedDateTime: undefined,
         status: 'typing',
       };
@@ -75,7 +102,8 @@ function reducer(state: State, action: Action): State {
   }
 }
 
-export function TimeInput({ onChange, required }: Props) {
+export function TimeInput({ onChange, placeholder, required }: Props) {
+  const inputRef = useRef<HTMLInputElement>(null);
   const [state, dispatch] = useReducer(reducer, {
     inputString: '',
     suggestedDateTime: undefined,
@@ -93,11 +121,33 @@ export function TimeInput({ onChange, required }: Props) {
     [state.inputString]
   );
 
-  function onInputChange(event: React.ChangeEvent<HTMLInputElement>) {
-    dispatch({ type: 'typed_string', string: event.target.value });
+  function handleInputFocus(event: React.FocusEvent<HTMLInputElement>) {
+    dispatch({ type: 'focused' });
   }
 
-  function onInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+  function handleInputBlur(event: React.FocusEvent<HTMLInputElement>) {
+    // If we click on the popover, we don't want to blur the input.
+    if (event.relatedTarget?.closest('[data-radix-popper-content-wrapper]')) return;
+    dispatch({ type: 'blurred' });
+  }
+
+  function handleExampleClick(example: string) {
+    const exampleDate = chrono.parseDate(example);
+    if (!exampleDate) {
+      throw new Error('Could not parse clicked example');
+    }
+    // Focus the input after applying the example so that the user can tab to the next element
+    inputRef.current?.focus();
+
+    dispatch({ type: 'applied_example', exampleDate });
+    onChange(exampleDate);
+  }
+
+  function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+    dispatch({ type: 'typed', value: event.target.value });
+  }
+
+  function handleInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.code === 'Enter' && state.status === 'suggestion_available') {
       event.preventDefault();
       dispatch({ type: 'applied_suggestion' });
@@ -106,30 +156,67 @@ export function TimeInput({ onChange, required }: Props) {
   }
 
   return (
-    <Popover.Root open={state.status === 'suggestion_available'}>
+    <Popover.Root open={state.status === 'focused' || state.status === 'suggestion_available'}>
       <Popover.Anchor>
         <Input
           type="text"
           value={state.inputString}
-          onChange={onInputChange}
-          onKeyDown={onInputKeyDown}
+          placeholder={placeholder}
+          onChange={handleInputChange}
+          onKeyDown={handleInputKeyDown}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
           required={required}
+          ref={inputRef}
         />
       </Popover.Anchor>
       <Popover.Portal>
-        <Popover.Content
-          className="shadow-floating z-[100] inline-flex items-center gap-2 space-y-4 rounded-md bg-white/95 p-2 text-sm text-slate-800 ring-1 ring-black/5 backdrop-blur-[3px]"
-          sideOffset={5}
-          onOpenAutoFocus={(event) => event.preventDefault()}
-        >
-          {state.suggestedDateTime?.toLocaleString()}
-          <kbd
-            className="ml-auto flex h-6 w-6 items-center justify-center rounded bg-slate-100 p-2 font-sans text-xs"
-            aria-label="Press Enter to apply the parsed date and time."
-          >
-            ↵
-          </kbd>
-        </Popover.Content>
+        <>
+          {state.status === 'focused' && (
+            <Popover.Content
+              className="shadow-floating z-[100] w-[--radix-popover-trigger-width] space-y-2 rounded-md bg-white/95 p-2 text-sm ring-1 ring-black/5 backdrop-blur-[3px]"
+              sideOffset={5}
+              onOpenAutoFocus={(event) => event.preventDefault()}
+            >
+              <p className="text-slate-500">Type a date and/or time</p>
+              <div className="flex flex-wrap gap-1 text-black">
+                {[
+                  '10 AM',
+                  '1 hour ago',
+                  'yesterday',
+                  '3 days ago',
+                  '15:30:24',
+                  'Jan 14',
+                  '2020-01-01T10:00:00Z',
+                ].map((example) => (
+                  <button
+                    className="h-5 rounded bg-slate-200 px-1.5 text-xs text-black hover:bg-slate-300"
+                    type="button"
+                    key={example}
+                    onClick={() => handleExampleClick(example)}
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
+            </Popover.Content>
+          )}
+          {state.status === 'suggestion_available' && (
+            <Popover.Content
+              className="shadow-floating z-[100] inline-flex items-center gap-2 rounded-md bg-white/95 p-2 text-sm text-slate-800 ring-1 ring-black/5 backdrop-blur-[3px]"
+              sideOffset={5}
+              onOpenAutoFocus={(event) => event.preventDefault()}
+            >
+              {state.suggestedDateTime?.toLocaleString()}
+              <kbd
+                className="ml-auto flex h-6 w-6 items-center justify-center rounded bg-slate-100 p-2 font-sans text-xs"
+                aria-label="Press Enter to apply the parsed date and time."
+              >
+                ↵
+              </kbd>
+            </Popover.Content>
+          )}
+        </>
       </Popover.Portal>
     </Popover.Root>
   );
