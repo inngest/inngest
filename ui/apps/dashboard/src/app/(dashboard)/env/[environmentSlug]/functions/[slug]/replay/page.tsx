@@ -27,7 +27,7 @@ const GetReplaysDocument = graphql(`
           name
           createdAt
           endedAt
-          totalRunCount
+          functionRunsScheduledCount
         }
       }
     }
@@ -127,7 +127,7 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
       const baseReplay = {
         ...replay,
         createdAt: new Date(replay.createdAt),
-        runsCount: replay.totalRunCount ?? 0,
+        runsCount: replay.functionRunsScheduledCount ?? 0,
       };
 
       if (replay.endedAt) {
