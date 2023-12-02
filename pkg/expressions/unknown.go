@@ -9,7 +9,6 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter"
-	"github.com/google/cel-go/interpreter/functions"
 )
 
 // unknownDecorator returns a decorator for inspecting and handling unknowns at runtime.  This
@@ -21,7 +20,7 @@ import (
 func unknownDecorator(act interpreter.PartialActivation) interpreter.InterpretableDecorator {
 	// Create a new dispatcher with all functions added
 	dispatcher := interpreter.NewDispatcher()
-	overloads := append(functions.StandardOverloads(), celOverloads()...)
+	overloads := celOverloads()
 	_ = dispatcher.Add(overloads...)
 
 	return func(i interpreter.Interpretable) (interpreter.Interpretable, error) {
@@ -58,7 +57,7 @@ func unknownDecorator(act interpreter.PartialActivation) interpreter.Interpretab
 			}
 
 			switch call.OverloadID() {
-			case "add_any":
+			case operators.Add:
 				//
 				// This allows concatenation of distinct types, eg string + number.
 				//
@@ -121,11 +120,12 @@ func unknownDecorator(act interpreter.PartialActivation) interpreter.Interpretab
 				return i, nil
 			}
 
-			fn, ok := dispatcher.FindOverload(call.Function())
-			if !ok {
+			// Get the actual implementation which we've copied into overloads.go.
+			fn := getBindings(call.Function(), nil)
+			if fn == nil {
 				return i, nil
 			}
-			return staticCall{result: fn.Binary(args[0], args[1]), InterpretableCall: call}, nil
+			return staticCall{result: fn(args[0], args[1]), InterpretableCall: call}, nil
 		}
 
 		return i, nil
