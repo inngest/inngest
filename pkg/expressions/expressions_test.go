@@ -40,7 +40,7 @@ func TestParse(t *testing.T) {
 
 	for _, test := range tests {
 		expr, err := NewExpressionEvaluator(context.Background(), test.expr)
-		require.NoError(t, err)
+		require.NoError(t, err, test.expr)
 		attrs := expr.UsedAttributes(context.Background()).FullPaths()
 		require.Equal(t, err == nil, !test.shouldErr, "unexpected err result %s for '%s'", err, test.expr)
 		require.Equal(t, len(test.expected), len(attrs), test.expr)
@@ -594,13 +594,6 @@ func TestEvaluateExpression(t *testing.T) {
 		{
 			expr: `steps.first.foo == 'test'`,
 			data: map[string]interface{}{
-				/*
-					"steps": map[string]map[string]interface{}{
-						"first": {
-							"foo": "test",
-						},
-					},
-				*/
 				"steps": map[string]interface{}{
 					"first": map[string]interface{}{
 						"foo": "test",
@@ -810,9 +803,9 @@ func TestEvaluateExpression(t *testing.T) {
 		// multiline
 		{
 			`
-									int(response.status) >= 400 &&
-									response.error == true
-								`,
+											int(response.status) >= 400 &&
+											response.error == true
+										`,
 			map[string]interface{}{
 				"response": map[string]interface{}{"status": "400", "error": true},
 			},

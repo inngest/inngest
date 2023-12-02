@@ -57,7 +57,7 @@ func unknownDecorator(act interpreter.PartialActivation) interpreter.Interpretab
 			}
 
 			switch call.OverloadID() {
-			case "add_any":
+			case operators.Add:
 				//
 				// This allows concatenation of distinct types, eg string + number.
 				//
@@ -120,11 +120,11 @@ func unknownDecorator(act interpreter.PartialActivation) interpreter.Interpretab
 				return i, nil
 			}
 
-			fn, ok := dispatcher.FindOverload(call.Function())
-			if !ok {
+			fn := getBindings(call.Function(), nil)
+			if fn == nil {
 				return i, nil
 			}
-			return staticCall{result: fn.Binary(args[0], args[1]), InterpretableCall: call}, nil
+			return staticCall{result: fn(args[0], args[1]), InterpretableCall: call}, nil
 		}
 
 		return i, nil
