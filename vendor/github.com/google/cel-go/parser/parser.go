@@ -21,9 +21,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 
-	antlr "github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	antlr "github.com/antlr4-go/antlr/v4"
 
 	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/common/ast"
@@ -299,53 +298,21 @@ type parser struct {
 	enableVariadicOperatorASTs       bool
 }
 
-var (
-	_ gen.CELVisitor = (*parser)(nil)
-
-	lexerPool *sync.Pool = &sync.Pool{
-		New: func() any {
-			l := gen.NewCELLexer(nil)
-			l.RemoveErrorListeners()
-			return l
-		},
-	}
-
-	parserPool *sync.Pool = &sync.Pool{
-		New: func() any {
-			p := gen.NewCELParser(nil)
-			p.RemoveErrorListeners()
-			return p
-		},
-	}
-)
+var _ gen.CELVisitor = (*parser)(nil)
 
 func (p *parser) parse(expr runes.Buffer, desc string) ast.Expr {
-	// TODO: get rid of these pools once https://github.com/antlr/antlr4/pull/3571 is in a release
-	lexer := lexerPool.Get().(*gen.CELLexer)
-	prsr := parserPool.Get().(*gen.CELParser)
+	lexer := gen.NewCELLexer(newCharStream(expr, desc))
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(p)
+
+	prsr := gen.NewCELParser(antlr.NewCommonTokenStream(lexer, 0))
+	prsr.RemoveErrorListeners()
 
 	prsrListener := &recursionListener{
 		maxDepth:      p.maxRecursionDepth,
 		ruleTypeDepth: map[int]*int{},
 	}
 
-	defer func() {
-		// Unfortunately ANTLR Go runtime is missing (*antlr.BaseParser).RemoveParseListeners,
-		// so this is good enough until that is exported.
-		// Reset the lexer and parser before putting them back in the pool.
-		lexer.RemoveErrorListeners()
-		prsr.RemoveParseListener(prsrListener)
-		prsr.RemoveErrorListeners()
-		lexer.SetInputStream(nil)
-		prsr.SetInputStream(nil)
-		lexerPool.Put(lexer)
-		parserPool.Put(prsr)
-	}()
-
-	lexer.SetInputStream(newCharStream(expr, desc))
-	prsr.SetInputStream(antlr.NewCommonTokenStream(lexer, 0))
-
-	lexer.AddErrorListener(p)
 	prsr.AddErrorListener(p)
 	prsr.AddParseListener(prsrListener)
 
@@ -372,7 +339,7 @@ func (p *parser) parse(expr runes.Buffer, desc string) ast.Expr {
 		}
 	}()
 
-	return p.Visit(prsr.Start()).(ast.Expr)
+	return p.Visit(prsr.Start_()).(ast.Expr)
 }
 
 // Visitor implementations.
@@ -908,15 +875,15 @@ func (p *parser) SyntaxError(recognizer antlr.Recognizer, offendingSymbol any, l
 	}
 }
 
-func (p *parser) ReportAmbiguity(recognizer antlr.Parser, dfa *antlr.DFA, startIndex, stopIndex int, exact bool, ambigAlts *antlr.BitSet, configs antlr.ATNConfigSet) {
+func (p *parser) ReportAmbiguity(recognizer antlr.Parser, dfa *antlr.DFA, startIndex, stopIndex int, exact bool, ambigAlts *antlr.BitSet, configs *antlr.ATNConfigSet) {
 	// Intentional
 }
 
-func (p *parser) ReportAttemptingFullContext(recognizer antlr.Parser, dfa *antlr.DFA, startIndex, stopIndex int, conflictingAlts *antlr.BitSet, configs antlr.ATNConfigSet) {
+func (p *parser) ReportAttemptingFullContext(recognizer antlr.Parser, dfa *antlr.DFA, startIndex, stopIndex int, conflictingAlts *antlr.BitSet, configs *antlr.ATNConfigSet) {
 	// Intentional
 }
 
-func (p *parser) ReportContextSensitivity(recognizer antlr.Parser, dfa *antlr.DFA, startIndex, stopIndex, prediction int, configs antlr.ATNConfigSet) {
+func (p *parser) ReportContextSensitivity(recognizer antlr.Parser, dfa *antlr.DFA, startIndex, stopIndex, prediction int, configs *antlr.ATNConfigSet) {
 	// Intentional
 }
 

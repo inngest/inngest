@@ -200,6 +200,8 @@ func CopySourceInfo(info *SourceInfo) *SourceInfo {
 		syntax:       info.syntax,
 		desc:         info.desc,
 		lines:        info.lines,
+		baseLine:     info.baseLine,
+		baseCol:      info.baseCol,
 		offsetRanges: rangesCopy,
 		macroCalls:   callsCopy,
 	}

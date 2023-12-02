@@ -120,6 +120,7 @@ func unknownDecorator(act interpreter.PartialActivation) interpreter.Interpretab
 				return i, nil
 			}
 
+			// Get the actual implementation which we've copied into overloads.go.
 			fn := getBindings(call.Function(), nil)
 			if fn == nil {
 				return i, nil
