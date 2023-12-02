@@ -387,9 +387,10 @@ func (q *queue) scan(ctx context.Context) error {
 			return nil
 		}
 		if err := q.processPartition(ctx, p); err != nil {
-			if err == ErrPartitionNotFound {
-				// Another worker grabbed the partition
-				// TODO: Increase counter
+			if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
+				// Another worker grabbed the partition, or the partition was deleted
+				// during the scan by an another worker.
+				// TODO: Increase internal metrics
 				continue
 			}
 			if errors.Unwrap(err) != context.Canceled {
