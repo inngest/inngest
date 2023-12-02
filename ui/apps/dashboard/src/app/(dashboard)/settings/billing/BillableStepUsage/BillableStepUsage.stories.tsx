@@ -2,7 +2,8 @@ import type { Meta, StoryObj } from '@storybook/react';
 
 import { BaseWrapper } from '@/app/baseWrapper';
 import { type TimeSeries } from '@/gql/graphql';
-import { BillableStepUsage } from './BillableStepUsage';
+
+// import { BillableStepUsage } from './BillableStepUsage';
 
 function createData({ month, year }: { month: number; year: number }): TimeSeries['data'] {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -26,12 +27,15 @@ function generateRandomNumber(seed: number): number {
   return x - Math.floor(x);
 }
 
-const meta: Meta<typeof BillableStepUsage> = {
+const Disable = () => <>disabled story</>;
+
+// const meta: Meta<typeof BillableStepUsage> = {
+const meta: Meta<typeof Disable> = {
   args: {
-    data: {
-      prevMonth: createData({ month: 3, year: 2023 }),
-      thisMonth: createData({ month: 4, year: 2023 }),
-    },
+    // data: {
+    //   prevMonth: createData({ month: 3, year: 2023 }),
+    //   thisMonth: createData({ month: 4, year: 2023 }),
+    // },
     includedStepCountLimit: 50_000,
   },
   decorators: [
@@ -43,12 +47,12 @@ const meta: Meta<typeof BillableStepUsage> = {
       );
     },
   ],
-  component: BillableStepUsage,
+  component: Disable, // BillableStepUsage,
   tags: ['autodocs'],
   title: 'BillableStepUsage',
 };
 
 export default meta;
-type Story = StoryObj<typeof BillableStepUsage>;
+// type Story = StoryObj<typeof BillableStepUsage>;
 
-export const Primary: Story = {};
+export const Primary = {};
