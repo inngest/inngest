@@ -403,8 +403,10 @@ func (r *DriverResponse) Final() bool {
 
 // SingleStep returns a single generator op if this response is a generator
 // containing only one op, otherwise nil.
+//
+// Will ignore `StepPlanned` opcodes and return nil if they are the only op.
 func (r *DriverResponse) SingleStep() *GeneratorOpcode {
-	if r.Generator == nil || len(r.Generator) != 1 {
+	if r.Generator == nil || len(r.Generator) != 1 || r.Generator[0].Op == enums.OpcodeStepPlanned {
 		return nil
 	}
 	return r.Generator[0]

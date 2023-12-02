@@ -705,12 +705,19 @@ func applyResponse(
 
 	// If it's a completed generator step then some data is stored in the
 	// output. We'll try to extract it.
-	if op := resp.SingleStep(); op != nil && op.Op != enums.OpcodeStepPlanned {
-		h.StepID = &op.ID
-		h.StepType = getStepType(*op)
-		h.Result.Output = op.Output()
-		stepName := op.UserDefinedName()
-		h.StepName = &stepName
+	if len(resp.Generator) > 0 {
+		if op := resp.SingleStep(); op != nil {
+			h.StepID = &op.ID
+			h.StepType = getStepType(*op)
+			h.Result.Output = op.Output()
+			stepName := op.UserDefinedName()
+			h.StepName = &stepName
+		}
+
+		// If we're a generator, exit now to prevent attempting to parse
+		// generator response as an output; the generator response may be in
+		// relation to many parallel steps, not just the one we're currently
+		// writing history for.
 		return nil
 	}
 
