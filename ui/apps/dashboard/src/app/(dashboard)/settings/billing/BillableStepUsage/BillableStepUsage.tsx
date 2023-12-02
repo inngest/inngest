@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import Link from 'next/link';
 import { ChartBarIcon } from '@heroicons/react/20/solid';
 import {
   Bar,
@@ -14,11 +15,25 @@ import {
   YAxis,
 } from 'recharts';
 import colors from 'tailwindcss/colors';
+import { useQuery } from 'urql';
 
-import { type TimeSeries } from '@/gql/graphql';
+import { Alert } from '@/components/Alert';
+import { graphql } from '@/gql';
+import LoadingIcon from '@/icons/LoadingIcon';
 import { StepCounter } from './StepCounter';
 import { formatXAxis, formatYAxis, toLocaleUTCDateString } from './format';
 import { transformData } from './transformData';
+
+const GetBillableSteps = graphql(`
+  query GetBillableSteps($month: Int!) {
+    billableStepTimeSeries(timeOptions: { month: $month }) {
+      data {
+        time
+        value
+      }
+    }
+  }
+`);
 
 const dataKeys = {
   additionalStepCount: {
@@ -32,22 +47,47 @@ const dataKeys = {
 } as const;
 
 type Props = {
-  data: {
-    prevMonth: TimeSeries['data'];
-    thisMonth: TimeSeries['data'];
-  };
-
   // Step count included in the plan.
   includedStepCountLimit?: number;
 };
 
-export function BillableStepUsage({ data, includedStepCountLimit }: Props) {
+export function BillableStepUsage({ includedStepCountLimit }: Props) {
+  const currentMonthIndex = new Date().getUTCMonth();
+  const options = {
+    prevMonth: currentMonthIndex === 0 ? 11 : currentMonthIndex,
+    thisMonth: currentMonthIndex + 1,
+  };
+
   const [selectedMonth, setSelectedMonth] = useState<'prevMonth' | 'thisMonth'>('thisMonth');
+  const [{ data, fetching }] = useQuery({
+    query: GetBillableSteps,
+    variables: {
+      month: options[selectedMonth],
+    },
+  });
 
-  const monthData = useMemo(() => {
-    return data[selectedMonth];
-  }, [data, selectedMonth]);
+  if (fetching) {
+    return (
+      <div className="flex h-full min-h-[297px] w-full items-center justify-center overflow-hidden">
+        <LoadingIcon />
+      </div>
+    );
+  }
+  if (!data) {
+    return (
+      <div className="flex h-full min-h-[297px] w-full items-center justify-center overflow-hidden">
+        <Alert severity="warning">
+          Failed to load usage data. Please{' '}
+          <Link href="/support" className="underline">
+            contact support
+          </Link>{' '}
+          if this does not resolve.
+        </Alert>
+      </div>
+    );
+  }
 
+  const monthData = data?.billableStepTimeSeries?.[0]?.data || [];
   const { additionalStepCount, series, totalStepCount } = transformData(
     monthData,
     includedStepCountLimit

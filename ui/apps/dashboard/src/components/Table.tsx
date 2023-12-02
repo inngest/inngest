@@ -43,7 +43,7 @@ export default function Table<T extends Row>({
             ))
           ) : (
             <tr>
-              <td className="p-4 text-center" colSpan={3}>
+              <td className="p-4 text-center" colSpan={columns.length + 1}>
                 {empty}
               </td>
             </tr>
