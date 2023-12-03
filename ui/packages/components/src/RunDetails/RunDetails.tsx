@@ -16,18 +16,30 @@ import { SleepingSummary } from './SleepingSummary';
 import { WaitingSummary } from './WaitingSummary';
 import { renderRunMetadata } from './runMetadataRenderer';
 
-interface Props {
-  func: Pick<Function, 'name' | 'triggers'>;
+type FuncProps = {
   functionVersion?: Pick<FunctionVersion, 'url' | 'version'>;
-  getHistoryItemOutput: (historyItemID: string) => Promise<string | undefined>;
-  history: HistoryParser;
-
   // TODO: Replace this with an imported component.
   rerunButton?: React.ReactNode;
+};
+type LoadingRun = {
+  func?: Pick<Function, 'name' | 'triggers'>;
+  loading: true;
+  history?: undefined;
+  run?: Pick<FunctionRun, 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'>;
+  getHistoryItemOutput?: (historyItemID: string) => Promise<string | undefined>;
+  navigateToRun?: undefined;
+};
 
+type WithRun = {
+  func: Pick<Function, 'name' | 'triggers'>;
+  loading?: false;
+  history: HistoryParser;
+  getHistoryItemOutput: (historyItemID: string) => Promise<string | undefined>;
   run: Pick<FunctionRun, 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'>;
   navigateToRun: React.ComponentProps<typeof Timeline>['navigateToRun'];
-}
+};
+
+type Props = FuncProps & (WithRun | LoadingRun);
 
 export function RunDetails({
   func,
@@ -37,8 +49,9 @@ export function RunDetails({
   rerunButton,
   run,
   navigateToRun,
+  loading = false,
 }: Props) {
-  const firstTrigger = func.triggers[0] ?? null;
+  const firstTrigger = (func?.triggers && func.triggers[0]) ?? null;
   const cron = firstTrigger && firstTrigger.type === 'CRON';
 
   const metadataItems = renderRunMetadata({
@@ -47,14 +60,14 @@ export function RunDetails({
     history,
   });
 
-  const isSuccess = run.status === 'COMPLETED';
+  const isSuccess = run?.status === 'COMPLETED';
 
   return (
     <ContentCard
       active
       button={rerunButton}
-      title={func.name}
-      icon={run.status && <FunctionRunStatusIcon status={run.status} className="h-5 w-5" />}
+      title={func?.name || '...'}
+      icon={run?.status && <FunctionRunStatusIcon status={run?.status} className="h-5 w-5" />}
       type="run"
       badge={
         cron ? (
@@ -68,28 +81,32 @@ export function RunDetails({
       }
       metadata={
         <div className="pt-8">
-          <MetadataGrid metadataItems={metadataItems} />
+          <MetadataGrid metadataItems={metadataItems} loading={loading} />
         </div>
       }
     >
-      <div className="px-5 pt-4">
-        {run.status && run.endedAt && run.output && isSuccess && (
-          <OutputCard content={run.output} isSuccess={isSuccess} />
-        )}
+      {run && history && getHistoryItemOutput && (
+        <>
+          <div className="px-5 pt-4">
+            {run.status && run.endedAt && run.output && isSuccess && (
+              <OutputCard content={run.output} isSuccess={isSuccess} />
+            )}
 
-        <WaitingSummary history={history} />
-        <SleepingSummary history={history} />
-      </div>
+            <WaitingSummary history={history} />
+            <SleepingSummary history={history} />
+          </div>
 
-      <hr className="mt-8 border-slate-800/50" />
-      <div className="px-5 pt-4">
-        <h3 className="py-4 text-sm text-slate-400">Timeline</h3>
-        <Timeline
-          getOutput={getHistoryItemOutput}
-          history={history}
-          navigateToRun={navigateToRun}
-        />
-      </div>
+          <hr className="mt-8 border-slate-800/50" />
+          <div className="px-5 pt-4">
+            <h3 className="py-4 text-sm text-slate-400">Timeline</h3>
+            <Timeline
+              getOutput={getHistoryItemOutput}
+              history={history}
+              navigateToRun={navigateToRun}
+            />
+          </div>
+        </>
+      )}
     </ContentCard>
   );
 }
