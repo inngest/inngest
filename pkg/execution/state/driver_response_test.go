@@ -276,7 +276,6 @@ func TestDriverResponseUserError(t *testing.T) {
 			name: "non map Output",
 			r:    DriverResponse{Output: "YOLO"},
 			expected: map[string]any{
-				"error":   DefaultErrorMessage,
 				"name":    "Error",
 				"message": "YOLO",
 			},
@@ -286,7 +285,6 @@ func TestDriverResponseUserError(t *testing.T) {
 			name: "non map Output with error",
 			r:    DriverResponse{Output: "YOLO", Err: strptr("502 broken")},
 			expected: map[string]any{
-				"error":   "502 broken",
 				"name":    "Error",
 				"message": "YOLO",
 			},

@@ -9,6 +9,7 @@ export type HeaderLink = {
   text: string;
   icon?: React.ReactNode;
   active?: ActiveMatching;
+  badge?: React.ReactNode;
 };
 
 type HeaderTypes = {

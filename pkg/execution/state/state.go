@@ -139,20 +139,6 @@ type Metadata struct {
 	// DEPRECATED
 	Name string `json:"name"`
 
-	// Pending is the number of steps that have been enqueued but have
-	// not yet finalized.
-	//
-	// Finalized refers to:
-	// - A step that has errored out and cannot be retried
-	// - A step that has retried a maximum number of times and will not
-	//   further be retried.
-	// - A step that has completed, and has its next steps (children in
-	//   the dag) enqueued. Note that the step must have its children
-	//   enqueued to be considered finalized.
-	//
-	// DEPRECATED
-	Pending int `json:"pending"`
-
 	// Version represents the version of _metadata_ in particular.
 	//
 	// TODO: This should be removed and made specific to each particular state
@@ -283,9 +269,6 @@ type StateLoader interface {
 	// Load returns run state for the given identifier.
 	Load(ctx context.Context, runID ulid.ULID) (State, error)
 
-	// History loads history for the given run identifier.
-	History(ctx context.Context, runID ulid.ULID) ([]History, error)
-
 	// IsComplete returns whether the given identifier is complete, ie. the
 	// pending count in the identifier's metadata is zero.
 	IsComplete(ctx context.Context, runID ulid.ULID) (complete bool, err error)
@@ -321,35 +304,6 @@ type Mutater interface {
 	// SetStatus sets a status specifically.
 	SetStatus(ctx context.Context, i Identifier, status enums.RunStatus) error
 
-	// scheduled increases the scheduled count for a run's metadata.
-	//
-	// We need to store the total number of steps enqueued to calculate when a step function
-	// has finished execution.  If the state store is the same as the queuee (eg. an all-in-one
-	// MySQL store) it makes sense to atomically increase this when enqueueing the step.  However,
-	// we must provide compatibility for queues that exist separately to the state store (eg.
-	// SQS, Celery).  In thise cases recording that a step was scheduled is a separate step.
-	//
-	// Attempt is zero-indexed.
-	Scheduled(ctx context.Context, i Identifier, stepID string, attempt int, at *time.Time) error
-
-	// Started is called when a step is started.
-	//
-	// Attempt is zero-indexed.
-	Started(ctx context.Context, i Identifier, stepID string, attempt int) error
-
-	// Finalized increases the finalized count for a run's metadata. This must be called after
-	// storing a response and scheduling all child steps.  This MUST happen after child steps
-	// else the distributed waitgroup doesn't work;  the counter will go to 0 before being re-increased
-	// to N child steps.
-	//
-	// If a status is provided, the function status will be set _if_ there are no more in-progress
-	// steps running for this function run.  This lets the executor specify failed statuses if
-	// no step output was received for the last step, and the last step failed (eg. SaveResponse
-	// is a no-op and didn't set the status).
-	//
-	// Attempt is zero-indexed.
-	Finalized(ctx context.Context, i Identifier, stepID string, attempt int, status ...enums.RunStatus) error
-
 	// SaveResponse saves the driver response for the attempt to the backing state store.
 	//
 	// If the response is an error, this must store the error for the specific attempt, allowing
@@ -361,17 +315,6 @@ type Mutater interface {
 	// This returns the position of this step in the stack, if the stack is modified.  For temporary
 	// errors the stack position is 0, ie. unmodified.
 	SaveResponse(ctx context.Context, i Identifier, r DriverResponse, attempt int) (int, error)
-
-	// SaveHistory allows saving arbitrary history records for a function run.  While most
-	// state store mutations save history automatically, in some circumstances (eg. generator noops)
-	// it's important to be able to manually save history.
-	SaveHistory(ctx context.Context, i Identifier, h History) error
-}
-
-// HistoryDeleter is an optional interface a state can implement, deleting specific history items
-// for a run.
-type HistoryDeleter interface {
-	DeleteHistory(ctx context.Context, runID ulid.ULID, historyID ulid.ULID) error
 }
 
 // Input is the input for creating new state.  The required fields are Workflow,

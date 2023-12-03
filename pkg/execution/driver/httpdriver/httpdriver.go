@@ -135,7 +135,26 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 			err = errors.New("NonRetriableError")
 			dr.SetError(err)
 		}
-		return dr, err
+
+		// If this was a generator response with a single op, set some
+		// relevant step data so that it's easier to identify this step in
+		// history.
+		if op := dr.SingleStep(); op != nil {
+			dr.Step.ID = op.ID
+			dr.Step.Name = op.UserDefinedName()
+
+			if dr.IsSingleStepError() {
+				defaultErrMsg := state.DefaultStepErrorMessage
+				userErr := state.UserErrorFromRaw(&defaultErrMsg, op.Error)
+				if mapped, ok := userErr["message"].(string); ok {
+					dr.Err = &mapped
+				} else {
+					dr.Err = &defaultErrMsg
+				}
+			}
+		}
+
+		return dr, nil
 	}
 
 	body := parseResponse(resp.body)

@@ -39,7 +39,6 @@ type Runner interface {
 
 	StateManager() state.Manager
 	InitializeCrons(ctx context.Context) error
-	History(ctx context.Context, id state.Identifier) ([]state.History, error)
 	Runs(ctx context.Context, eventId string) ([]state.State, error)
 	Events(ctx context.Context, eventId string) ([]event.Event, error)
 }
@@ -242,10 +241,6 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 
 	s.cronmanager.Start()
 	return nil
-}
-
-func (s *svc) History(ctx context.Context, id state.Identifier) ([]state.History, error) {
-	return s.state.History(ctx, id.RunID)
 }
 
 func (s *svc) Runs(ctx context.Context, eventID string) ([]state.State, error) {

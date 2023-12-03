@@ -1,7 +1,7 @@
-{ pkgs ? import (fetchTarball
-  "https://github.com/NixOS/nixpkgs/archive/refs/tags/23.05.tar.gz") { } }:
-
 let
+  pkgs = import <nixos-23.05> { };
+  unstable = import <nixpkgs> { };
+
   corepack = pkgs.stdenv.mkDerivation {
     name = "corepack";
     buildInputs = [ pkgs.nodejs-18_x ];
@@ -15,8 +15,8 @@ let
 in pkgs.mkShell {
   nativeBuildInputs = [
     # Go
-    pkgs.go
-    pkgs.golangci-lint
+    unstable.go_1_21
+    unstable.golangci-lint
     pkgs.gotests
     pkgs.gomodifytags
     pkgs.gore

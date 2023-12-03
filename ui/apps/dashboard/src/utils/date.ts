@@ -1,9 +1,11 @@
 import dayjs from 'dayjs';
 import calendar from 'dayjs/plugin/calendar';
+import durationPlugin from 'dayjs/plugin/duration';
 import localizedFormat from 'dayjs/plugin/localizedFormat';
 import { default as relativeTimePlugin } from 'dayjs/plugin/relativeTime';
 
 dayjs.extend(calendar);
+dayjs.extend(durationPlugin);
 dayjs.extend(localizedFormat);
 dayjs.extend(relativeTimePlugin, {
   thresholds: [
@@ -50,4 +52,11 @@ export function minuteTime(d: dayjs.ConfigType): string {
 
 export function day(d: dayjs.ConfigType): string {
   return dayjs(d).format('MMMM D, YYYY');
+}
+
+export function duration(d: durationPlugin.Duration): string {
+  return d
+    .format('D[d] H[h] m[m] s[s]')
+    .replace(/\b0+[a-z]+\s*/gi, '')
+    .trim();
 }

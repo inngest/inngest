@@ -15,6 +15,7 @@ import (
 )
 
 const DefaultErrorMessage = "Function execution error"
+const DefaultStepErrorMessage = "Step execution error"
 
 type Retryable interface {
 	Retryable() bool
@@ -36,7 +37,9 @@ type GeneratorOpcode struct {
 	// Data is the resulting data from the operation, eg. the step
 	// output.
 	Data json.RawMessage `json:"data"`
-
+	// Error is the failing result from the operation, e.g. an error thrown
+	// from a step.
+	Error json.RawMessage `json:"error"`
 	// SDK versions < 3.?.? don't respond with the display name.
 	DisplayName *string `json:"displayName"`
 }
@@ -51,6 +54,19 @@ func (g GeneratorOpcode) UserDefinedName() string {
 	// name, so we we'll use the deprecated name field as a
 	// fallback.
 	return g.Name
+}
+
+// Get the stringified output of the step.
+func (g GeneratorOpcode) Output() string {
+	// Errors must always be non-null to be defined.
+	if isJsonNonNullish(g.Error) {
+		return string(g.Error)
+	}
+	// Data is allowed to be `null` if no error is found and the op returned no data.
+	if g.Data != nil {
+		return string(g.Data)
+	}
+	return ""
 }
 
 func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {
@@ -354,6 +370,10 @@ func (r DriverResponse) Retryable() bool {
 		return true
 	}
 
+	if r.IsSingleStepError() {
+		return true
+	}
+
 	return false
 }
 
@@ -381,6 +401,26 @@ func (r *DriverResponse) Final() bool {
 	return false
 }
 
+// SingleStep returns a single generator op if this response is a generator
+// containing only one op, otherwise nil.
+//
+// Will ignore `StepPlanned` opcodes and return nil if they are the only op.
+func (r *DriverResponse) SingleStep() *GeneratorOpcode {
+	if r.Generator == nil || len(r.Generator) != 1 || r.Generator[0].Op == enums.OpcodeStepPlanned {
+		return nil
+	}
+	return r.Generator[0]
+}
+
+// IsSingleStepError returns whether this response is an error from running a
+// step.
+func (r *DriverResponse) IsSingleStepError() bool {
+	if step := r.SingleStep(); step != nil && isJsonNonNullish(step.Error) {
+		return true
+	}
+	return false
+}
+
 // UserError returns the error that the user reported for this response. Can be
 // used to safely fetch the error from the response.
 //
@@ -400,17 +440,61 @@ func (r *DriverResponse) Final() bool {
 //
 // NOTE: There are several required fields:  "name", "message".
 func (r DriverResponse) UserError() map[string]any {
-	if r.Output == nil && r.Err != nil {
-		return map[string]any{
-			"error":   *r.Err,
-			"name":    "Error",
-			"message": *r.Err,
+	// Catch step-specific errors first.
+	if r.IsSingleStepError() {
+		defaultErrMsg := DefaultStepErrorMessage
+		return UserErrorFromRaw(&defaultErrMsg, r.Generator[0].Error)
+	}
+
+	return UserErrorFromRaw(r.Err, r.Output)
+}
+
+// isJsonNonNullish returns a boolean indicating whether the JSON value is
+// defined and not `null`, the latter of which is not caught by `== nil` checks.
+func isJsonNonNullish(v json.RawMessage) bool {
+	if v == nil {
+		return false
+	}
+
+	var temp interface{}
+	err := json.Unmarshal(v, &temp)
+	isNull := err == nil && temp == nil
+
+	return !isNull
+}
+
+func UserErrorFromRaw(errstr *string, rawAny any) map[string]any {
+	var raw map[string]any
+
+	switch rawJson := rawAny.(type) {
+	case json.RawMessage:
+		// Try to unmarshal, but don't return on error, use raw map as fallback
+		_ = json.Unmarshal(rawJson, &raw)
+	case map[string]any:
+		raw = rawJson
+	default:
+		// Handle other types by setting their value directly as a message
+		switch v := rawAny.(type) {
+		case []byte:
+			if len(v) > 0 {
+				raw = map[string]any{"message": string(v)}
+			}
+		case string:
+			if len(v) > 0 {
+				raw = map[string]any{"message": v}
+			}
+		case interface{}:
+			if v != nil {
+				raw = map[string]any{"message": v}
+			}
 		}
 	}
 
-	if mapped, ok := r.Output.(map[string]any); ok {
-		if processed, err := processErrorFields(mapped); err == nil {
-			// Ensure that all fields are added.
+	// Process the raw map if it's not empty
+	if len(raw) > 0 {
+		processed, err := processErrorFields(raw)
+		if err == nil {
+			// Set default values if they don't exist
 			if _, ok := processed["name"]; !ok {
 				processed["name"] = "Error"
 			}
@@ -421,39 +505,15 @@ func (r DriverResponse) UserError() map[string]any {
 		}
 	}
 
+	// Fallback error handling
 	err := DefaultErrorMessage
-	if r.Err != nil {
-		err = *r.Err
+	if errstr != nil {
+		err = *errstr
 	}
-
-	output := any(DefaultErrorMessage)
-	switch v := r.Output.(type) {
-	case json.RawMessage:
-		if len(v) > 0 {
-			output = v
-		}
-	case []byte:
-		if len(v) > 0 {
-			output = v
-		}
-	case string:
-		if len(v) > 0 {
-			output = v
-		}
-	case interface{}:
-		if v != nil {
-			output = v
-		}
-	case nil:
-		// ignore.
-	default:
-		output = v
-	}
-
 	return map[string]any{
 		"error":   err,
 		"name":    "Error",
-		"message": output,
+		"message": err,
 	}
 }
 

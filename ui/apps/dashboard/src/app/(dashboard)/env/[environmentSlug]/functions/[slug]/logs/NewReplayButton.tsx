@@ -8,7 +8,7 @@ import NewReplayModal from '@/app/(dashboard)/env/[environmentSlug]/functions/[s
 
 type NewReplayButtonProps = {
   environmentSlug: string;
-  functionSlug?: string;
+  functionSlug: string;
 };
 
 export default function NewReplayButton({ environmentSlug, functionSlug }: NewReplayButtonProps) {
