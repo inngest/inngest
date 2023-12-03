@@ -173,9 +173,16 @@ export default function FunctionRunList({
       setPageCursors(['']);
       setFunctionRuns([]);
     } else {
-      setFunctionRuns(
-        (prevFunctionRuns) => [...prevFunctionRuns, ...runs].filter(Boolean) as RunListItem[]
-      );
+      setFunctionRuns((prevFunctionRuns) => {
+        const updatedFunctionRuns = prevFunctionRuns.map((prevRun) => {
+          const matchingRun = runs.find((run) => run?.id === prevRun.id);
+          return matchingRun ?? prevRun;
+        });
+        return [
+          ...updatedFunctionRuns,
+          ...runs.filter((run) => !prevFunctionRuns.some((prevRun) => prevRun.id === run?.id)),
+        ].filter(Boolean) as RunListItem[];
+      });
     }
   }, [data, selectedStatuses, selectedTimeRange, timeField]);
 
