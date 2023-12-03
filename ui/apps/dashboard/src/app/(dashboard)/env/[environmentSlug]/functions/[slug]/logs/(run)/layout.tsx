@@ -1,7 +1,7 @@
 'use client';
 
 import { type Route } from 'next';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { SlideOver } from '@inngest/components/SlideOver';
 import { useQuery } from 'urql';
 
@@ -17,15 +17,12 @@ type RunLayoutProps = {
 };
 
 const GetFunctionRunTriggersDocument = graphql(`
-  query GetFunctionRunTriggers($environmentID: ID!, $functionSlug: String!, $functionRunID: ULID!) {
+  query GetFunctionRunTriggers($environmentID: ID!, $functionSlug: String!) {
     environment: workspace(id: $environmentID) {
       function: workflowBySlug(slug: $functionSlug) {
-        run(id: $functionRunID) {
-          id
-          version: workflowVersion {
-            triggers {
-              schedule
-            }
+        current {
+          triggers {
+            schedule
           }
         }
       }
@@ -35,8 +32,6 @@ const GetFunctionRunTriggersDocument = graphql(`
 
 export default function RunLayout({ children, params }: RunLayoutProps) {
   const router = useRouter();
-  const { runId } = useParams();
-  const functionRunID = typeof runId === 'string' ? runId : '';
 
   const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
     environmentSlug: params.environmentSlug,
@@ -46,12 +41,11 @@ export default function RunLayout({ children, params }: RunLayoutProps) {
     variables: {
       environmentID: environment?.id!,
       functionSlug: params.slug,
-      functionRunID,
     },
     pause: !environment?.id,
   });
 
-  const triggers = data?.environment?.function?.run?.version?.triggers;
+  const triggers = data?.environment?.function?.current?.triggers;
   const hasCron =
     Array.isArray(triggers) && triggers.length > 0 && triggers.some((trigger) => trigger.schedule);
 
