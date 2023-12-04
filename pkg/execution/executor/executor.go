@@ -671,7 +671,7 @@ func (e *executor) runFinishHandler(ctx context.Context, id state.Identifier, s 
 	now := time.Now()
 
 	// Legacy - send inngest/function.failed
-	if resp.Err != nil {
+	if resp.Err != nil && !strings.Contains(*resp.Err, state.ErrFunctionCancelled.Error()) {
 		events = append(events, event.Event{
 			ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
 			Name:      event.FnFailedName,
