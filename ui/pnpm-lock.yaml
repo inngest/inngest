@@ -44,6 +44,9 @@ importers:
       '@inngest/components':
         specifier: workspace:*
         version: link:../../packages/components
+      '@launchdarkly/node-server-sdk':
+        specifier: 9.0.3
+        version: 9.0.3
       '@radix-ui/react-dialog':
         specifier: 1.0.5
         version: 1.0.5(@types/react-dom@18.2.4)(@types/react@18.2.11)(react-dom@18.2.0)(react@18.2.0)
@@ -5699,6 +5702,27 @@ packages:
   /@juggle/resize-observer@3.4.0:
     resolution: {integrity: sha512-dfLbk+PwWvFzSxwk3n5ySL0hfBog779o8h68wK/7/APo/7cgyWp5jcXockbxdk5kFRkbeXWm4Fbi9FrdN381sA==}
     dev: true
+
+  /@launchdarkly/js-sdk-common@2.1.0:
+    resolution: {integrity: sha512-163KRinNJgoh9ybup2BHr9jHzTsnNlb2AknLgV2edCe0cZoiiCOLTzo4KDJFY7B7EImMMyRmTefXvb6d64eF8Q==}
+    dev: false
+
+  /@launchdarkly/js-server-sdk-common@2.1.0:
+    resolution: {integrity: sha512-76oI2ISVh9kwRXerYRg1ou7p4QhJn+NslXZKvT1AmCNaF4Ni8FZhZLBXzg5Onh1tm41DqfYjB4W54xK6kSPzPQ==}
+    dependencies:
+      '@launchdarkly/js-sdk-common': 2.1.0
+      semver: 7.5.4
+    dev: false
+
+  /@launchdarkly/node-server-sdk@9.0.3:
+    resolution: {integrity: sha512-sxXMitMOgXc53y9yGQoDpTJ9xIAoVWUtXoNf2qYLGj6grNhLwFrwhRCpoFu3+t1dI6jVzP26mrVKtT6RsrgFTg==}
+    dependencies:
+      '@launchdarkly/js-server-sdk-common': 2.1.0
+      https-proxy-agent: 5.0.1
+      launchdarkly-eventsource: 2.0.1
+    transitivePeerDependencies:
+      - supports-color
+    dev: false
 
   /@mapbox/node-pre-gyp@1.0.11:
     resolution: {integrity: sha512-Yhlar6v9WQgUp/He7BdgzOz8lqMQ8sU+jkCq7Wx8Myc5YFJLbEe7lgui/V7G1qB1DJykHSGwreceSaD60Y0PUQ==}
@@ -15116,6 +15140,11 @@ packages:
       language-subtag-registry: 0.3.22
     dev: true
 
+  /launchdarkly-eventsource@2.0.1:
+    resolution: {integrity: sha512-zyceGtRni8ct4es5hH8Q+2evvttItb5lOKMm8JtudZbfQFfVdH55NitgJQoGTRYkIvyMGjcaXnyt0FlzCTfspA==}
+    engines: {node: '>=0.12.0'}
+    dev: false
+
   /launchdarkly-js-client-sdk@3.1.3:
     resolution: {integrity: sha512-/JR/ri8z3bEj9RFTTKDjd+con4F1MsWUea1MmBDtFj4gDA0l9NDm1KzhMKiIeoBdmB2rSaeFYe4CaYOEp8IryA==}
     dependencies:
@@ -15423,7 +15452,6 @@ packages:
     engines: {node: '>=10'}
     dependencies:
       yallist: 4.0.0
-    dev: true
 
   /lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
@@ -18031,7 +18059,6 @@ packages:
     hasBin: true
     dependencies:
       lru-cache: 6.0.0
-    dev: true
 
   /send@0.18.0:
     resolution: {integrity: sha512-qqWzuOjSFOuqPjFe4NOsMLafToQQwBSOEpS+FwEt3A2V3vKubTquT3vmLTQpFgMXp8AlFWFuP1qKaJZOtPpVXg==}
@@ -20111,7 +20138,6 @@ packages:
 
   /yallist@4.0.0:
     resolution: {integrity: sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==}
-    dev: true
 
   /yaml-ast-parser@0.0.43:
     resolution: {integrity: sha512-2PTINUwsRqSd+s8XxKaJWQlUuEMHJQyEuh2edBbW8KNJz0SJPwUSD2zRWqezFEdN7IzAgeuYHFUCF7o8zRdZ0A==}
