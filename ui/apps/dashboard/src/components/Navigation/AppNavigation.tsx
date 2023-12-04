@@ -7,6 +7,7 @@ import {
   WrenchIcon,
 } from '@heroicons/react/20/solid';
 
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import InngestLogo from '@/icons/InngestLogo';
 import EventIcon from '@/icons/event.svg';
 import AccountDropdown from './AccountDropdown';
@@ -29,9 +30,7 @@ const ALL_ENVIRONMENTS_SLUG = 'all';
 const BRANCH_PARENT_SLUG = 'branch';
 
 export default async function AppNavigation({ environmentSlug }: AppNavigationProps) {
-  // TEMPORARILY DISABLED TO TEST IF LAUNCHDARKLY IS CAUSING ISSUES
-  // const isEventSearchEnabled = await getBooleanFlag('event-search');
-  const isEventSearchEnabled = false;
+  const isEventSearchEnabled = await getBooleanFlag('event-search');
 
   let items: NavItem[] = [
     {
