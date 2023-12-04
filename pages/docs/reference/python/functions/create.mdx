@@ -204,7 +204,7 @@ async def fn(ctx: inngest.Context, step: inngest.Step):
 
   <Property name="events" type="list[Event]" attribute>
     A list of `event` objects that's accessible when the `batch_events` is set on the function configuration.
-    
+
     If batching is not configured, the list contains a single event payload matching the `event` argument.
   </Property>
 
@@ -229,11 +229,7 @@ If your function is `async` then its type is `Step` and you can use `await` to c
   </Property>
 
   <Property name="send_event" type="Callable" attribute>
-    [Docs](/docs/reference/python/steps/send_event)
-  </Property>
-
-  <Property name="send_event" type="Callable" attribute>
-    [Docs](/docs/reference/python/steps/send_event)
+    [Docs](/docs/reference/python/steps/send-event)
   </Property>
 
   <Property name="sleep" type="Callable" attribute>
@@ -241,7 +237,7 @@ If your function is `async` then its type is `Step` and you can use `await` to c
   </Property>
 
   <Property name="sleep_until" type="Callable" attribute>
-    [Docs](/docs/reference/python/steps/sleep_until)
+    [Docs](/docs/reference/python/steps/sleep-until)
   </Property>
 
   <Property name="_experimental_parallel" type="Callable" attribute version="0.2.0+">

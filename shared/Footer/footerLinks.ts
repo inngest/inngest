@@ -1,12 +1,9 @@
 import {
   IconSDK,
-  IconSteps,
   IconDocs,
   IconPatterns,
-  IconDeploying,
   IconScheduled,
   IconBackgroundTasks,
-  IconTools,
   IconJourney,
 } from "../Icons/duotone";
 
@@ -33,12 +30,7 @@ const footerLinks = [
         label: "Patterns: Async + Event-Driven",
         url: "/patterns?ref=footer",
         icon: IconPatterns,
-      },
-      // {
-      //   label: "Self Hosting",
-      //   url: "/docs/self-hosting?ref=footer",
-      //   icon: IconDeploying,
-      // },
+      }
     ],
   },
   {
