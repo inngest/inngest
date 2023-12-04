@@ -37,7 +37,7 @@
     "graphql-request": "6.1.0",
     "lodash.debounce": "4.0.8",
     "monaco-editor": "0.34.1",
-    "next": "14.0.2",
+    "next": "14.0.3",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-redux": "8.0.5",
