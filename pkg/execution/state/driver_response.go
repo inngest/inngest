@@ -370,7 +370,7 @@ func (r DriverResponse) Retryable() bool {
 		return true
 	}
 
-	if r.IsSingleStepError() {
+	if r.IsHistoryVisibleStepError() {
 		return true
 	}
 
@@ -401,21 +401,37 @@ func (r *DriverResponse) Final() bool {
 	return false
 }
 
-// SingleStep returns a single generator op if this response is a generator
-// containing only one op, otherwise nil.
-//
-// Will ignore `StepPlanned` opcodes and return nil if they are the only op.
-func (r *DriverResponse) SingleStep() *GeneratorOpcode {
-	if r.Generator == nil || len(r.Generator) != 1 || r.Generator[0].Op == enums.OpcodeStepPlanned {
+// HistoryVisibleStep returns a single generator op if this response is a
+// generator containing only one op and should be visible in history, otherwise
+// nil. This function should only be used in the context of StepCompleted, since
+// other op codes should have visible StepScheduled, StepStarted, etc.
+func (r *DriverResponse) HistoryVisibleStep() *GeneratorOpcode {
+	if r.Generator == nil {
 		return nil
 	}
-	return r.Generator[0]
+
+	// If multiple ops are being reported then we can't know which specific op
+	// to return.
+	if len(r.Generator) != 1 {
+		return nil
+	}
+
+	op := r.Generator[0]
+
+	// The other opcodes should not have visible StepCompleted history items.
+	// For example OpcodeWaitForEvent should get a visible StepWaiting instead
+	// of a visible StepCompleted.
+	if op.Op != enums.OpcodeStep {
+		return nil
+	}
+
+	return op
 }
 
-// IsSingleStepError returns whether this response is an error from running a
+// IsHistoryVisibleStepError returns whether this response is an error from running a
 // step.
-func (r *DriverResponse) IsSingleStepError() bool {
-	if step := r.SingleStep(); step != nil && isJsonNonNullish(step.Error) {
+func (r *DriverResponse) IsHistoryVisibleStepError() bool {
+	if step := r.HistoryVisibleStep(); step != nil && isJsonNonNullish(step.Error) {
 		return true
 	}
 	return false
@@ -441,7 +457,7 @@ func (r *DriverResponse) IsSingleStepError() bool {
 // NOTE: There are several required fields:  "name", "message".
 func (r DriverResponse) UserError() map[string]any {
 	// Catch step-specific errors first.
-	if r.IsSingleStepError() {
+	if r.IsHistoryVisibleStepError() {
 		defaultErrMsg := DefaultStepErrorMessage
 		return UserErrorFromRaw(&defaultErrMsg, r.Generator[0].Error)
 	}

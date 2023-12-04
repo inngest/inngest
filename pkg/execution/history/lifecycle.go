@@ -706,7 +706,7 @@ func applyResponse(
 	// If it's a completed generator step then some data is stored in the
 	// output. We'll try to extract it.
 	if len(resp.Generator) > 0 {
-		if op := resp.SingleStep(); op != nil {
+		if op := resp.HistoryVisibleStep(); op != nil {
 			h.StepID = &op.ID
 			h.StepType = getStepType(*op)
 			h.Result.Output = op.Output()
