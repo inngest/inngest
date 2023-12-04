@@ -105,8 +105,8 @@
     "vercel": "32.4.1"
   },
   "engines": {
-    "node": ">=18.x",
-    "pnpm": ">=8.6.2"
+    "node": "18.x",
+    "pnpm": "8.6.2"
   },
   "packageManager": "pnpm@8.6.2",
   "private": true

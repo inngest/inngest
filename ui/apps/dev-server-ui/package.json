@@ -79,8 +79,8 @@
     "vitest": "0.34.5"
   },
   "engines": {
-    "node": ">=18.x",
-    "pnpm": ">=8.6.2"
+    "node": "18.x",
+    "pnpm": "8.6.2"
   },
   "packageManager": "pnpm@8.6.2",
   "private": true
