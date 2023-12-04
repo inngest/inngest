@@ -1,7 +1,7 @@
 import { graphql } from '@/gql';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getEnvironment } from '@/queries/server-only/getEnvironment';
-import type VercelIntegration from './VercelIntegration';
+import { type VercelProject, type VercelProjectViaAPI } from './VercelIntegration';
 
 const GetSavedVercelProjectsDocument = graphql(`
   query GetSavedVercelProjects($environmentID: ID!) {
@@ -21,8 +21,8 @@ const GetSavedVercelProjectsDocument = graphql(`
  * @returns The enriched Vercel projects.
  */
 export default async function enrichVercelProjects(
-  vercelProjects: { id: string; name: string }[]
-): Promise<VercelIntegration['projects']> {
+  vercelProjects: VercelProjectViaAPI[]
+): Promise<VercelProject[]> {
   const environment = await getEnvironment({
     environmentSlug: 'production',
   });
@@ -31,7 +31,7 @@ export default async function enrichVercelProjects(
   });
   const savedVercelProjects = getSavedVercelProjectsResponse.environment.savedVercelProjects;
 
-  const projects = vercelProjects.map((project) => {
+  const projects: VercelProject[] = vercelProjects.map((project) => {
     const savedProject = savedVercelProjects.find(
       (savedProject) => savedProject.projectID === project.id
     );
@@ -41,6 +41,7 @@ export default async function enrichVercelProjects(
       name: project.name,
       servePath: savedProject?.path ?? undefined,
       isEnabled: isProjectEnabled,
+      ssoProtection: project.ssoProtection,
     };
   });
 
