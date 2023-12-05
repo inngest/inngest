@@ -377,7 +377,7 @@ func (l lifecycle) OnStepFinished(
 		)
 	}
 
-	if h.Result != nil {
+	if h.Result != nil && resp.SDK != "" {
 		parts := strings.Split(resp.SDK, ":")
 		if len(parts) == 2 {
 			// Trim prefix because the TS SDK sends "inngest-js:vX.X.X"
