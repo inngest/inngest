@@ -76,7 +76,10 @@ export function AlertModal({
                   <Button
                     kind="danger"
                     label={primaryAction.label}
-                    btnAction={primaryAction.btnAction}
+                    btnAction={() => {
+                      primaryAction.btnAction();
+                      onClose();
+                    }}
                   />
                 </div>
               </AlertDialog.Content>
