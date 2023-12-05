@@ -139,11 +139,11 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 		// If this was a generator response with a single op, set some
 		// relevant step data so that it's easier to identify this step in
 		// history.
-		if op := dr.SingleStep(); op != nil {
+		if op := dr.HistoryVisibleStep(); op != nil {
 			dr.Step.ID = op.ID
 			dr.Step.Name = op.UserDefinedName()
 
-			if dr.IsSingleStepError() {
+			if dr.IsHistoryVisibleStepError() {
 				defaultErrMsg := state.DefaultStepErrorMessage
 				userErr := state.UserErrorFromRaw(&defaultErrMsg, op.Error)
 				if mapped, ok := userErr["message"].(string); ok {

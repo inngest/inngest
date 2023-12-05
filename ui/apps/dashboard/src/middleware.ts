@@ -1,7 +1,7 @@
 import { authMiddleware } from '@clerk/nextjs';
 
 export default authMiddleware({
-  publicRoutes: ['/password-reset', '/support'],
+  publicRoutes: ['/password-reset', '/support', '/api/sentry'],
   ignoredRoutes: '/(images|_next/static|_next/image|favicon)(.*)',
 });
 
