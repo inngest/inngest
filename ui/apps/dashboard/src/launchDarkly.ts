@@ -7,7 +7,7 @@ async function initialize() {
   if (!launchDarklySDKKey) {
     throw new Error('LAUNCH_DARKLY_SDK_KEY environment variable is not set.');
   }
-  const client = init(launchDarklySDKKey);
+  const client = init(launchDarklySDKKey, { stream: false });
   await client.waitForInitialization();
   return client;
 }
