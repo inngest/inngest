@@ -159,7 +159,8 @@ export default function FunctionRunList({
   const runs = data?.environment?.function?.runs?.edges?.map((edge) => edge?.node) ?? [];
   const endCursor = data?.environment?.function?.runs?.pageInfo.endCursor;
   const hasNextPage = data?.environment?.function?.runs?.pageInfo.hasNextPage;
-  const isLoading = isFetchingEnvironments || fetching;
+  const isLoading =
+    isFetchingEnvironments || fetching || (runs.length > 0 && functionRuns.length === 0);
 
   useEffect(() => {
     if (
@@ -210,7 +211,7 @@ export default function FunctionRunList({
         tableContainerRef={tableContainerRef}
         blankState={isLoading ? <p>Loading...</p> : <p>No function runs</p>}
       />
-      {hasNextPage && (
+      {hasNextPage && functionRuns.length > 0 && (
         <div className="flex justify-center pt-4">
           <Button
             label="Load More"
