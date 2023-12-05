@@ -130,7 +130,7 @@ export default function FunctionRunList({
   }, [environmentSlug, functionSlug]);
 
   const [pageCursors, setPageCursors] = useState<string[]>(['']);
-  const [functionRuns, setFunctionRuns] = useState<RunListItem[]>([]);
+  const [aggregatedFunctionRuns, setAggregatedFunctionRuns] = useState<RunListItem[]>([]);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
   // We reset the page cursors when the selected statuses or time range change, which resets the list to the first page.
@@ -160,7 +160,7 @@ export default function FunctionRunList({
   const endCursor = data?.environment?.function?.runs?.pageInfo.endCursor;
   const hasNextPage = data?.environment?.function?.runs?.pageInfo.hasNextPage;
   const isLoading =
-    isFetchingEnvironments || fetching || (runs.length > 0 && functionRuns.length === 0);
+    isFetchingEnvironments || fetching || (runs.length > 0 && aggregatedFunctionRuns.length === 0);
 
   useEffect(() => {
     if (
@@ -172,9 +172,9 @@ export default function FunctionRunList({
       setPrevSelectedTimeRange(selectedTimeRange);
       setPrevSelectedTimeField(timeField);
       setPageCursors(['']);
-      setFunctionRuns([]);
+      setAggregatedFunctionRuns([]);
     } else {
-      setFunctionRuns((prevFunctionRuns) => {
+      setAggregatedFunctionRuns((prevFunctionRuns) => {
         const updatedFunctionRuns = prevFunctionRuns.map((prevRun) => {
           const matchingRun = runs.find((run) => run?.id === prevRun.id);
           return matchingRun ?? prevRun;
@@ -191,7 +191,7 @@ export default function FunctionRunList({
     <div className="min-h-0 w-full overflow-y-auto pb-10" ref={tableContainerRef}>
       <Table
         options={{
-          data: functionRuns ?? [],
+          data: aggregatedFunctionRuns ?? [],
           columns,
           getCoreRowModel: getCoreRowModel(),
           enableSorting: false,
@@ -211,7 +211,7 @@ export default function FunctionRunList({
         tableContainerRef={tableContainerRef}
         blankState={isLoading ? <p>Loading...</p> : <p>No function runs</p>}
       />
-      {hasNextPage && functionRuns.length > 0 && (
+      {hasNextPage && aggregatedFunctionRuns.length > 0 && (
         <div className="flex justify-center pt-4">
           <Button
             label="Load More"
