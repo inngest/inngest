@@ -157,6 +157,7 @@ const updaters: Record<HistoryType, Updater> = {
     return {
       ...node,
       scope: 'step',
+      startedAt: new Date(rawItem.createdAt),
       status: 'waiting',
       waitForEventConfig,
     } satisfies HistoryNode;

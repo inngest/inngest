@@ -5,9 +5,9 @@ import { expect, test } from 'vitest';
 import { HistoryParser } from './historyParser';
 import type { HistoryNode } from './types';
 
-async function loadHistory(filename: string) {
+async function loadHistory(filename: string): Promise<HistoryParser> {
   const raw = JSON.parse(await fs.readFile(path.join(__dirname, `testData/${filename}`), 'utf8'));
-  return new HistoryParser(raw).getGroups({ sort: true });
+  return new HistoryParser(raw);
 }
 
 const baseRunStartNode = {
@@ -103,7 +103,12 @@ test('cancels', async () => {
     },
   ];
 
-  expect(history).toEqual(expectation);
+  expect(history.getGroups({ sort: true })).toEqual(expectation);
+  expect(history.cancellation).toEqual({
+    eventID: expect.any(String),
+    expression: null,
+    userID: null,
+  });
 });
 
 test('fails without steps', async () => {
@@ -124,7 +129,7 @@ test('fails without steps', async () => {
     },
   ];
 
-  expect(history).toEqual(expectation);
+  expect(history.getGroups({ sort: true })).toEqual(expectation);
 });
 
 test('fails with preceding step', async () => {
@@ -150,7 +155,7 @@ test('fails with preceding step', async () => {
     },
   ];
 
-  expect(history[2]).toEqual(expectation[2]);
+  expect(history.getGroups({ sort: true })[2]).toEqual(expectation[2]);
 });
 
 test('no steps', async () => {
@@ -164,7 +169,7 @@ test('no steps', async () => {
     },
   ];
 
-  expect(history).toEqual(expectation);
+  expect(history.getGroups({ sort: true })).toEqual(expectation);
 });
 
 test('parallel steps', async () => {
@@ -201,7 +206,7 @@ test('parallel steps', async () => {
     },
   ];
 
-  expect(history).toEqual(expectation);
+  expect(history.getGroups({ sort: true })).toEqual(expectation);
 });
 
 test('sleeps', async () => {
@@ -223,7 +228,7 @@ test('sleeps', async () => {
     },
   ];
 
-  expect(history).toEqual(expectation);
+  expect(history.getGroups({ sort: true })).toEqual(expectation);
 });
 
 test('succeeds with 2 steps', async () => {
@@ -247,7 +252,7 @@ test('succeeds with 2 steps', async () => {
     },
   ];
 
-  expect(history.slice(0, 1)).toEqual(expectation.slice(0, 1));
+  expect(history.getGroups({ sort: true }).slice(0, 1)).toEqual(expectation.slice(0, 1));
 });
 
 test('times out waiting for events', async () => {
@@ -274,7 +279,7 @@ test('times out waiting for events', async () => {
     },
   ];
 
-  expect(history).toEqual(expectation);
+  expect(history.getGroups({ sort: true })).toEqual(expectation);
 });
 
 test('waits for event', async () => {
@@ -301,5 +306,5 @@ test('waits for event', async () => {
     },
   ];
 
-  expect(history).toEqual(expectation);
+  expect(history.getGroups({ sort: true })).toEqual(expectation);
 });

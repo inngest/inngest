@@ -12,6 +12,7 @@ import type { FunctionRun } from '@inngest/components/types/functionRun';
 import type { FunctionVersion } from '@inngest/components/types/functionVersion';
 import type { HistoryParser } from '@inngest/components/utils/historyParser';
 
+import { CancellationSummary } from './CancellationSummary';
 import { SleepingSummary } from './SleepingSummary';
 import { WaitingSummary } from './WaitingSummary';
 import { renderRunMetadata } from './runMetadataRenderer';
@@ -91,7 +92,7 @@ export function RunDetails({
             {run.status && run.endedAt && run.output && isSuccess && (
               <OutputCard content={run.output} isSuccess={isSuccess} />
             )}
-
+            <CancellationSummary history={history} />    
             <WaitingSummary history={history} />
             <SleepingSummary history={history} />
           </div>

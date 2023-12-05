@@ -120,6 +120,10 @@ func (d historyDriver) Write(ctx context.Context, h history.History) (err error)
 			CreatedAt: sql.NullTime{Time: h.CreatedAt, Valid: true},
 			// TODO: Completed step count.
 			CompletedStepCount: sql.NullInt64{Int64: 0, Valid: true},
+			Output: sql.NullString{
+				String: "{}",
+				Valid:  true,
+			},
 		}
 		if h.Result != nil {
 			marshalled, _ := marshalJSONAsString(h.Result.Output)
