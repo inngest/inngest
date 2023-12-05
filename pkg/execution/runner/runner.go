@@ -484,7 +484,8 @@ func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 	if err != nil {
 		return fmt.Errorf("error finding event pauses: %w", err)
 	}
-	return s.executor.HandlePauses(ctx, iter, evt)
+	_, err = s.executor.HandlePauses(ctx, iter, evt)
+	return err
 }
 
 func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.TrackedEvent) error {

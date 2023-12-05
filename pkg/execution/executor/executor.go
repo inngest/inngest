@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -791,10 +792,18 @@ func (e *executor) executeDriverForStep(ctx context.Context, id state.Identifier
 }
 
 // HandlePauses handles pauses loaded from an incoming event.
-func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, evt event.TrackedEvent) error {
+func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
+	res := execution.HandlePauseResult{0, 0}
+
 	if e.queue == nil || e.sm == nil {
-		return fmt.Errorf("No queue or state manager specified")
+		return res, fmt.Errorf("No queue or state manager specified")
 	}
+
+	log := e.log
+	if log == nil {
+		log = logger.From(ctx)
+	}
+	base := log.With().Str("event_id", evt.GetInternalID().String()).Logger()
 
 	var (
 		goerr error
@@ -808,19 +817,17 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 	sem := semaphore.NewWeighted(int64(PauseHandleConcurrency))
 
 	for iter.Next(ctx) {
-		if goerr != nil {
-			break
-		}
-
 		pause := iter.Val(ctx)
 
 		// Block until we have capacity
 		if err := sem.Acquire(ctx, 1); err != nil {
-			return fmt.Errorf("error blocking on semaphore: %w", err)
+			return res, fmt.Errorf("error blocking on semaphore: %w", err)
 		}
 
 		wg.Add(1)
 		go func() {
+			atomic.AddInt32(&res[0], 1)
+
 			defer wg.Done()
 			// Always release one from the capacity
 			defer sem.Release(1)
@@ -829,11 +836,19 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 				return
 			}
 
+			l := base.With().
+				Str("pause_id", pause.ID.String()).
+				Str("run_id", pause.Identifier.RunID.String()).
+				Str("workflow_id", pause.Identifier.WorkflowID.String()).
+				Str("expires", pause.Expires.String()).
+				Logger()
+
 			// NOTE: Some pauses may be nil or expired, as the iterator may take
 			// time to process.  We handle that here and assume that the event
 			// did not occur in time.
 			if pause.Expires.Time().Before(time.Now()) {
 				// Consume this pause to remove it entirely
+				l.Debug().Msg("deleting expired pause")
 				_ = e.sm.DeletePause(context.Background(), *pause)
 				return
 			}
@@ -876,16 +891,18 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 
 				expr, err := expressions.NewExpressionEvaluator(ctx, *pause.Expression)
 				if err != nil {
+					l.Error().Err(err).Msg("error compiling pause expression")
 					return
 				}
 
 				val, _, err := expr.Evaluate(ctx, data)
 				if err != nil {
-					// XXX: Track error here.
+					l.Warn().Err(err).Msg("error evaluating pause expression")
 					return
 				}
 				result, _ := val.(bool)
 				if !result {
+					l.Trace().Msg("pause did not match expression")
 					return
 				}
 			}
@@ -896,18 +913,22 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 					EventID:    &evtID,
 					Expression: pause.Expression,
 				})
-				if err == state.ErrFunctionCancelled || err == state.ErrFunctionComplete || err == state.ErrFunctionFailed {
+				if errors.Is(err, state.ErrFunctionCancelled) ||
+					errors.Is(err, state.ErrFunctionComplete) ||
+					errors.Is(err, state.ErrFunctionFailed) ||
+					errors.Is(err, ErrFunctionEnded) {
 					// Safe to ignore.
 					return
 				}
-				if err != nil && err != ErrFunctionEnded && !strings.Contains(err.Error(), "no status stored in metadata") {
+				if err != nil && !strings.Contains(err.Error(), "no status stored in metadata") {
 					goerr = errors.Join(goerr, fmt.Errorf("error cancelling function: %w", err))
 					return
 				}
 				// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
 				err = e.sm.ConsumePause(ctx, pause.ID, nil)
 				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
-					// Done.
+					// Done. Add to the counter.
+					atomic.AddInt32(&res[1], 1)
 					return
 				}
 				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
@@ -916,7 +937,13 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 
 			resumeData := pause.GetResumeData(evt.GetEvent())
 
-			logger.From(ctx).Debug().Interface("with", resumeData.With).Str("pause.DataKey", pause.DataKey).Msg("resuming pause")
+			if e.log != nil {
+				e.log.
+					Debug().
+					Interface("with", resumeData.With).
+					Str("pause.DataKey", pause.DataKey).
+					Msg("resuming pause")
+			}
 
 			err := e.Resume(ctx, *pause, execution.ResumeRequest{
 				With:     resumeData.With,
@@ -926,13 +953,16 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 			})
 			if err != nil {
 				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
+				return
 			}
+			// Add to the counter.
+			atomic.AddInt32(&res[1], 1)
 		}()
 
 	}
 
 	wg.Wait()
-	return goerr
+	return res, goerr
 }
 
 // Cancel cancels an in-progress function.
@@ -1423,6 +1453,16 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		ExpressionData: data,
 		DataKey:        gen.ID,
 	})
+	if err == state.ErrPauseAlreadyExists {
+		if e.log != nil {
+			e.log.Warn().
+				Str("pause_id", pauseID.String()).
+				Str("run_id", item.Identifier.RunID.String()).
+				Str("workflow_id", item.Identifier.WorkflowID.String()).
+				Msg("created duplicate pause")
+		}
+		return nil
+	}
 	if err != nil {
 		return err
 	}

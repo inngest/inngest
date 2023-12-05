@@ -97,7 +97,7 @@ type Executor interface {
 
 	// HandlePauses handles pauses loaded from an incoming event.  This delegates to Cancel and
 	// Resume where necessary, depending on pauses that have been loaded and matched.
-	HandlePauses(ctx context.Context, iter state.PauseIterator, event event.TrackedEvent) error
+	HandlePauses(ctx context.Context, iter state.PauseIterator, event event.TrackedEvent) (HandlePauseResult, error)
 	// Cancel cancels an in-progress function run, preventing any enqueued or future steps from running.
 	Cancel(ctx context.Context, runID ulid.ULID, r CancelRequest) error
 	// Resume resumes an in-progress function run from the given waitForEvent pause.
@@ -180,4 +180,18 @@ type ResumeRequest struct {
 	// functions directly.
 	RunID    *ulid.ULID
 	StepName string
+}
+
+// HandlePauseResult returns status information about pause handling.
+type HandlePauseResult [2]int32
+
+// Processed returns the number of pauses processed.
+func (h HandlePauseResult) Processed() int32 {
+	return h[0]
+}
+
+// Processed returns the number of pauses handled, eg. pauses that matched
+// and successfully impacted runs (either by cancellation or continuing).
+func (h HandlePauseResult) Handled() int32 {
+	return h[1]
 }
