@@ -77,7 +77,6 @@ export function StreamDetails({
       className={classNames('dark grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}
     >
       {event && <EventDetails event={event} />}
-
       <RunDetails
         func={func}
         functionVersion={functionVersion}

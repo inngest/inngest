@@ -231,14 +231,6 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 							Valid:  true,
 						},
 					})
-				} else {
-					_, _ = d.data.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
-						ID: app.ID,
-						Error: sql.NullString{
-							String: "",
-							Valid:  false,
-						},
-					})
 				}
 			}
 		}

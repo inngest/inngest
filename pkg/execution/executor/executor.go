@@ -671,7 +671,7 @@ func (e *executor) runFinishHandler(ctx context.Context, id state.Identifier, s 
 	now := time.Now()
 
 	// Legacy - send inngest/function.failed
-	if resp.Err != nil {
+	if resp.Err != nil && !strings.Contains(*resp.Err, state.ErrFunctionCancelled.Error()) {
 		events = append(events, event.Event{
 			ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
 			Name:      event.FnFailedName,
@@ -1308,7 +1308,11 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 
 	logger.From(ctx).Info().Interface("opts", opts).Time("expires", expires).Str("event", eventName).Str("expr", strExpr).Msg("parsed invoke function opts")
 
-	pauseID := uuid.New()
+	pauseID := uuid.NewSHA1(
+		uuid.NameSpaceOID,
+		[]byte(item.Identifier.RunID.String()+gen.ID),
+	)
+
 	opcode := gen.Op.String()
 	err = e.sm.SavePause(ctx, state.Pause{
 		ID:          pauseID,
@@ -1398,7 +1402,11 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		data = expr.FilteredAttributes(ctx, ed).Map()
 	}
 
-	pauseID := uuid.New()
+	pauseID := uuid.NewSHA1(
+		uuid.NameSpaceOID,
+		[]byte(item.Identifier.RunID.String()+gen.ID),
+	)
+
 	opcode := gen.Op.String()
 	err = e.sm.SavePause(ctx, state.Pause{
 		ID:             pauseID,

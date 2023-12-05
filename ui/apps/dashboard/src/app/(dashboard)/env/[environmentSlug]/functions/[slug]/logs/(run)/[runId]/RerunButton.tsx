@@ -43,6 +43,8 @@ export default function RerunButton({ environment, functionRunID, func }: RerunB
     if (response.error) {
       toast.error('Failed to rerun function');
       return;
+    } else {
+      toast.success('Successfully rerun. Loading new run...');
     }
     const newFunctionRunID = response.data?.retryWorkflowRun?.id as string;
     router.refresh();
@@ -57,10 +59,10 @@ export default function RerunButton({ environment, functionRunID, func }: RerunB
     <Button
       size="small"
       iconSide="right"
-      disabled={isMutating}
+      loading={isMutating}
       btnAction={() => rerunFunction()}
       icon={<ArrowPathIcon className={cn(' text-sky-500', isMutating && 'animate-spin')} />}
-      label="Rerun"
+      label={isMutating ? 'Running...' : 'Rerun'}
     />
   );
 }

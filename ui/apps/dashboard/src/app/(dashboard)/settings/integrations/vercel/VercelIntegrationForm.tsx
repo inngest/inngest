@@ -4,11 +4,15 @@ import { useState } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@headlessui/react';
-import { ArrowPathIcon } from '@heroicons/react/20/solid';
+import { ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 
-import type VercelIntegration from '@/app/(dashboard)/settings/integrations/vercel/VercelIntegration';
+import {
+  VercelDeploymentProtection,
+  type VercelIntegration,
+} from '@/app/(dashboard)/settings/integrations/vercel/VercelIntegration';
+import AppLink from '@/components/AppLink';
 import Input from '@/components/Forms/Input';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
 import VercelWordmark from '@/logos/vercel-wordmark.svg';
@@ -98,6 +102,20 @@ export default function VercelIntegrationForm({ vercelIntegration }: VercelInteg
                 projectName={project.name}
               />
               <ProjectServePathInput projectID={project.id} servePath={project.servePath} />
+              {(project.ssoProtection?.deploymentType ===
+                VercelDeploymentProtection.ProdDeploymentURLsAndAllPreviews ||
+                project.ssoProtection?.deploymentType === VercelDeploymentProtection.Previews) && (
+                <div className="flex items-center gap-2 text-sm">
+                  <ExclamationCircleIcon className="h-4 text-amber-500" /> Deployment protection
+                  enabled -{' '}
+                  <AppLink
+                    href="https://www.inngest.com/docs/deploy/vercel#bypassing-deployment-protection"
+                    target="_blank"
+                  >
+                    Learn more
+                  </AppLink>
+                </div>
+              )}
             </li>
           ))}
         </ul>
