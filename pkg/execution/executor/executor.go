@@ -1308,7 +1308,11 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 
 	logger.From(ctx).Info().Interface("opts", opts).Time("expires", expires).Str("event", eventName).Str("expr", strExpr).Msg("parsed invoke function opts")
 
-	pauseID := uuid.New()
+	pauseID := uuid.NewSHA1(
+		uuid.NameSpaceOID,
+		[]byte(item.Identifier.RunID.String()+gen.ID),
+	)
+
 	opcode := gen.Op.String()
 	err = e.sm.SavePause(ctx, state.Pause{
 		ID:          pauseID,
@@ -1398,7 +1402,11 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		data = expr.FilteredAttributes(ctx, ed).Map()
 	}
 
-	pauseID := uuid.New()
+	pauseID := uuid.NewSHA1(
+		uuid.NameSpaceOID,
+		[]byte(item.Identifier.RunID.String()+gen.ID),
+	)
+
 	opcode := gen.Op.String()
 	err = e.sm.SavePause(ctx, state.Pause{
 		ID:             pauseID,
