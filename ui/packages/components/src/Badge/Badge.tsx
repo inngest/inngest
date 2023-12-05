@@ -11,7 +11,7 @@ export function Badge({
   className = '',
   kind = 'outlined',
 }: {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   className?: string;
   kind?: 'outlined' | 'error' | 'solid';
 }) {

@@ -12,9 +12,8 @@ import { IconFeed, IconFunction, IconWindow } from '@/icons';
 import { useGetAppsQuery } from '@/store/generated';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { appsCount, hasConnectedError } = useGetAppsQuery(undefined, {
+  const { hasConnectedError } = useGetAppsQuery(undefined, {
     selectFromResult: (result) => ({
-      appsCount: result.data?.apps?.length || 0,
       hasConnectedError: result?.data?.apps?.some((app) => app.connected === false),
     }),
     pollingInterval: 1500,
@@ -34,7 +33,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <NavbarLink
             icon={<IconWindow />}
             href="/apps"
-            badge={appsCount}
             hasError={hasConnectedError}
             tabName="Apps"
           />
