@@ -222,24 +222,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 
 				// Make a new PUT request to each app, indicating that the
 				// SDK should push functions to the dev server.
-				res := deploy.Ping(ctx, app.Url)
-				if res.Err != nil {
-					_, _ = d.data.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
-						ID: app.ID,
-						Error: sql.NullString{
-							String: res.Err.Error(),
-							Valid:  true,
-						},
-					})
-				} else {
-					_, _ = d.data.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
-						ID: app.ID,
-						Error: sql.NullString{
-							String: "",
-							Valid:  false,
-						},
-					})
-				}
+				_ = deploy.Ping(ctx, app.Url)
 			}
 		}
 
