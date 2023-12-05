@@ -46,7 +46,7 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
     },
     {
       href: `/env/${params.environmentSlug}/functions/${params.slug}/logs`,
-      text: 'Logs',
+      text: 'Runs',
       icon: <CommandLineIcon className="w-3.5" />,
     },
   ];
