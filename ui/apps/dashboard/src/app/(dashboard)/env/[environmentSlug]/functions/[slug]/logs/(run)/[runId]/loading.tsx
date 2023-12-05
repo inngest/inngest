@@ -5,7 +5,7 @@ import { classNames } from '@inngest/components/utils/classNames';
 export default function FunctionRunLoading() {
   return (
     <div className={classNames('dark grid h-full text-white', 'grid-cols-2')}>
-      <EventDetails loading event={{}} />
+      <EventDetails loading />
       <RunDetails loading />
     </div>
   );

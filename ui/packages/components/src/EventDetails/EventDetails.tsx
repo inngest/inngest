@@ -16,7 +16,7 @@ type EventProps = {
 };
 
 type LoadingEvent = {
-  event: Partial<Event>;
+  event?: Partial<Event>;
   loading: true;
 };
 
@@ -50,20 +50,20 @@ export function EventDetails({
   SendEventButton,
   loading = false,
 }: Props) {
-  const prettyPayload = usePrettyJson(event.payload);
+  const prettyPayload = event?.payload && usePrettyJson(event.payload);
 
   return (
     <ContentCard
-      title={event.name || 'unknown'}
+      title={event?.name || 'unknown'}
       type="event"
       metadata={
         <div className="pt-8">
           <MetadataGrid
             metadataItems={[
-              { label: 'Event ID', value: event.id || '', size: 'large', type: 'code' },
+              { label: 'Event ID', value: event?.id || '', size: 'large', type: 'code' },
               {
                 label: 'Received At',
-                value: (event.receivedAt && shortDate(event.receivedAt)) || '',
+                value: (event?.receivedAt && shortDate(event.receivedAt)) || '',
               },
             ]}
             loading={loading}

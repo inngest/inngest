@@ -4,10 +4,10 @@ import { useMemo } from 'react';
  * Given a JSON string, returns a pretty-printed version of it if it's valid
  * JSON, else returns `null`.
  */
-export const usePrettyJson = (json: string | null | undefined): string | null => {
+export const usePrettyJson = (json: string): string | null => {
   return useMemo(() => {
     try {
-      const data = JSON.parse(json as string);
+      const data = JSON.parse(json);
       if (data === null) {
         throw new Error();
       }
