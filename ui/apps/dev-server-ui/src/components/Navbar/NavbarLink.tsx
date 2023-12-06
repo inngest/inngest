@@ -7,12 +7,11 @@ import { classNames } from '@inngest/components/utils/classNames';
 export type NavbarLinkProps = {
   icon: React.ReactNode;
   href: Route;
-  badge?: number;
   hasError?: boolean;
   tabName: string;
 };
 
-export default function NavbarLink({ icon, href, badge, tabName, hasError }: NavbarLinkProps) {
+export default function NavbarLink({ icon, href, tabName, hasError }: NavbarLinkProps) {
   const pathname = usePathname();
   const isActive = pathname === href;
 
@@ -28,9 +27,7 @@ export default function NavbarLink({ icon, href, badge, tabName, hasError }: Nav
     >
       {icon}
       {tabName}
-      {typeof badge === 'number' && (
-        <Badge kind={hasError ? 'error' : 'outlined'}>{badge.toString()}</Badge>
-      )}
+      {hasError && <Badge kind={'error'} />}
     </Link>
   );
 }

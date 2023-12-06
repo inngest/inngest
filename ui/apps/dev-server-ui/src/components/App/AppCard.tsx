@@ -3,6 +3,7 @@ import { Badge } from '@inngest/components/Badge';
 import { Button } from '@inngest/components/Button';
 import { CodeLine } from '@inngest/components/CodeLine';
 import { Link } from '@inngest/components/Link/Link';
+import { AlertModal } from '@inngest/components/Modal';
 import { IconChevron } from '@inngest/components/icons/Chevron';
 import { IconStatusCircleCheck } from '@inngest/components/icons/StatusCircleCheck';
 import { IconStatusCircleExclamation } from '@inngest/components/icons/StatusCircleExclamation';
@@ -40,6 +41,7 @@ export default function AppCard({ app }: { app: App }) {
   const [inputUrl, setInputUrl] = useState(app.url || '');
   const [isUrlInvalid, setUrlInvalid] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
   const [_updateApp, updateAppState] = useUpdateAppMutation();
   const [_deleteApp, deleteAppState] = useDeleteAppMutation();
 
@@ -264,7 +266,18 @@ export default function AppCard({ app }: { app: App }) {
         />
         {!app.autodiscovered && (
           <div className="p-4 pr-6 text-white">
-            <Button kind="danger" appearance="text" btnAction={handleDelete} label="Delete App" />
+            <AlertModal
+              isOpen={isAlertModalOpen}
+              title="Are you sure you want to delete the app?"
+              onClose={() => setIsAlertModalOpen(false)}
+              primaryAction={{ label: 'Delete', btnAction: handleDelete }}
+            />
+            <Button
+              kind="danger"
+              appearance="text"
+              btnAction={() => setIsAlertModalOpen(true)}
+              label="Delete App"
+            />
           </div>
         )}
       </div>
