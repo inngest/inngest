@@ -67,14 +67,24 @@ type PauseGetter interface {
 // PauseIterator allows the runner to iterate over all pauses returned by a PauseGetter.  This
 // ensures that, at scale, all pauses do not need to be loaded into memory.
 type PauseIterator interface {
-	// Next advances the iterator and returns whether the next call to Val will
-	// return a non-nil pause.
+	// Count returns the count of the pause iteration at the time of querying.
+	//
+	// Due to concurrent processing, the total number of iterated fields may not match
+	// this count;  the count is a snapshot in time.
+	Count() int
+
+	// Next advances the iterator, returning an erorr or context.Canceled if the iteration
+	// is complete.
 	//
 	// Next should be called prior to any call to the iterator's Val method, after
 	// the iterator has been created.
 	//
 	// The order of the iterator is unspecified.
 	Next(ctx context.Context) bool
+
+	// Error returns the error returned during iteration, if any.  Use this to check
+	// for errors during iteration when Next() returns false.
+	Error() error
 
 	// Val returns the current Pause from the iterator.
 	Val(context.Context) *Pause

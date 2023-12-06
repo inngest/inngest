@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
@@ -105,6 +107,82 @@ func TestStateHarness(t *testing.T) {
 	}
 
 	testharness.CheckState(t, create)
+}
+
+func TestScanIter(t *testing.T) {
+	ctx := context.Background()
+	redis := miniredis.RunT(t)
+	r, err := rueidis.NewClient(rueidis.ClientOption{
+		// InitAddress: []string{"127.0.0.1:6379"},
+		InitAddress:  []string{redis.Addr()},
+		Password:     "",
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	entries := 50_000
+	key := "test-scan"
+	for i := 0; i < entries; i++ {
+
+		cmd := r.B().Hset().Key(key).FieldValue().
+			FieldValue(strconv.Itoa(i), strconv.Itoa(i)).
+			Build()
+		require.NoError(t, r.Do(ctx, cmd).Error())
+	}
+	fmt.Println("loaded keys")
+
+	// Create a new scanIter, which iterates through all items.
+	si := &scanIter{r: r}
+	err = si.init(ctx, key, 1000)
+	require.NoError(t, err)
+
+	listed := 0
+
+	for n := 0; n < entries*2; n++ {
+		if !si.Next(ctx) {
+			break
+		}
+		listed++
+	}
+
+	require.Equal(t, context.Canceled, si.Error())
+	require.Equal(t, entries, listed)
+}
+
+func TestBufIter(t *testing.T) {
+	ctx := context.Background()
+	redis := miniredis.RunT(t)
+	r, err := rueidis.NewClient(rueidis.ClientOption{
+		// InitAddress: []string{"127.0.0.1:6379"},
+		InitAddress:  []string{redis.Addr()},
+		Password:     "",
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	entries := 10_000
+	key := "test-bufiter"
+	for i := 0; i < entries; i++ {
+		cmd := r.B().Hset().Key(key).FieldValue().FieldValue(strconv.Itoa(i), "{}").Build()
+		require.NoError(t, r.Do(ctx, cmd).Error())
+	}
+	fmt.Println("loaded keys")
+
+	// Create a new scanIter, which iterates through all items.
+	bi := &bufIter{r: r}
+	err = bi.init(ctx, key)
+	require.NoError(t, err)
+
+	listed := 0
+	for n := 0; n < entries*2; n++ {
+		if !bi.Next(ctx) {
+			break
+		}
+		listed++
+	}
+
+	require.Equal(t, context.Canceled, bi.Error())
+	require.Equal(t, entries, listed)
 }
 
 func BenchmarkNew(b *testing.B) {

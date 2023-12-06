@@ -790,30 +790,22 @@ func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event str
 
 	cntCmd := m.pauseR.B().Hlen().Key(key).Build()
 	cnt, err := m.pauseR.Do(ctx, cntCmd).AsInt64()
+
 	if err != nil || cnt > 1000 {
 		key := m.kf.PauseEvent(ctx, workspaceID, event)
-		cmd := m.pauseR.B().Hscan().Key(key).Cursor(0).Count(500).Build()
-		scan, err := m.pauseR.Do(ctx, cmd).AsScanEntry()
-		if err != nil {
-			return nil, err
+		iter := &scanIter{
+			count: cnt,
+			r:     m.pauseR,
 		}
-		return &scanIter{
-			r:      m.pauseR,
-			key:    key,
-			i:      -1,
-			vals:   scan,
-			cursor: int(scan.Cursor),
-		}, nil
+		err := iter.init(ctx, key, 1000)
+		return iter, err
 	}
 
-	cmd := m.pauseR.B().Hkeys().Key(key).Cache()
-	// Cache this for a second
-	keys, err := m.pauseR.DoCache(ctx, cmd, time.Second).AsStrSlice()
-	if err != nil {
-		return nil, err
-	}
-
-	return &keyIter{i: 0, keys: keys, r: m.pauseR, key: key}, nil
+	// If there are less than a thousand items, query the keys
+	// for iteration.
+	iter := &bufIter{r: m.pauseR}
+	err = iter.init(ctx, key)
+	return iter, err
 }
 
 func (m mgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID, event string) (bool, error) {
@@ -882,115 +874,151 @@ func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums
 	}
 }
 
-type keyIter struct {
-	l sync.Mutex
+type bufIter struct {
+	r     rueidis.Client
+	items []string
 
-	i    int
-	keys []string
-
-	// buffer stores items returned from HMGet temporarily.
-	buffer []string
-
-	// val stores the next val
 	val *state.Pause
-
-	r   rueidis.Client
-	key string
 	err error
+
+	l sync.Mutex
 }
 
-func (i *keyIter) Err() error {
-	return i.err
+func (i *bufIter) init(ctx context.Context, key string) error {
+	var err error
+	// If there are less than a thousand items, query the keys
+	// for iteration.
+	cmd := i.r.B().Hvals().Key(key).Build()
+	i.items, err = i.r.Do(ctx, cmd).AsStrSlice()
+	i.l = sync.Mutex{}
+	return err
 }
 
-func (i *keyIter) Next(ctx context.Context) bool {
+func (i *bufIter) Count() int {
+	return len(i.items)
+}
+
+func (i *bufIter) Next(ctx context.Context) bool {
 	i.l.Lock()
 	defer i.l.Unlock()
 
-	if len(i.buffer) > 0 {
-		i.getNext(ctx)
-		return i.err == nil
-	}
-
-	if len(i.keys) == 0 || i.i == len(i.keys) {
-		return false
-	}
-
-	amt := 100
-	if 100 > len(i.keys) {
-		// Fetch all remaining keys.
-		amt = len(i.keys)
-	}
-
-	// Take a buffer from the keys
-	buffer := i.keys[:amt]
-
-	cmd := i.r.B().Hmget().Key(i.key).Field(buffer...).Build()
-	vals, err := i.r.Do(ctx, cmd).AsStrSlice()
-	if err != nil {
-		i.err = err
-		return false
-	}
-	// Remove the fetched keys from remaining list
-	i.keys = i.keys[amt:]
-	// Update our buffer.
-	i.buffer = vals
-
 	// get the next item into Val
-	i.getNext(ctx)
+	if len(i.items) == 0 {
+		i.err = context.Canceled
+		return false
+	}
 
+	pause := &state.Pause{}
+	i.err = json.Unmarshal([]byte(i.items[0]), pause)
+	i.val = pause
+	// Remove one from the slice.
+	i.items = i.items[1:]
 	return i.err == nil
 }
 
 // Buffer by running an MGET to get the values of the pauses.
-func (i *keyIter) Val(ctx context.Context) *state.Pause {
+func (i *bufIter) Val(ctx context.Context) *state.Pause {
 	return i.val
 }
 
-func (i *keyIter) getNext(ctx context.Context) {
-	if len(i.buffer) == 0 {
-		return
-	}
-	str := i.buffer[0]
-	i.buffer = i.buffer[1:]
-
-	pause := &state.Pause{}
-	i.err = json.Unmarshal([]byte(str), pause)
-	i.val = pause
+func (i *bufIter) Error() error {
+	return i.err
 }
 
-type scanIter struct {
-	r rueidis.Client
+var scanDoneErr = fmt.Errorf("scan done")
 
-	key    string
+type scanIter struct {
+	r   rueidis.Client
+	key string
+	// chunk is the size of scans to load in one.
+	chunk int64
+
+	// count is the cached number of items to return in Count(),
+	// ie the hlen result when creating the iterator.
+	count int64
+
+	// iterator fields
 	i      int
 	cursor int
 	vals   rueidis.ScanEntry
+	err    error
+
+	l sync.Mutex
 }
 
-func (i *scanIter) fetch(ctx context.Context) error {
-	cmd := i.r.B().Hscan().Key(i.key).Cursor(uint64(i.cursor)).Count(500).Build()
+func (i *scanIter) Error() error {
+	return i.err
+}
+
+func (i *scanIter) init(ctx context.Context, key string, chunk int64) error {
+	i.key = key
+	i.chunk = chunk
+	cmd := i.r.B().Hscan().Key(key).Cursor(0).Count(i.chunk).Build()
 	scan, err := i.r.Do(ctx, cmd).AsScanEntry()
 	if err != nil {
+		i.err = err
 		return err
 	}
 	i.cursor = int(scan.Cursor)
 	i.vals = scan
-	i.i = -1
+	i.l = sync.Mutex{}
 	return nil
 }
 
-func (i *scanIter) Next(ctx context.Context) bool {
-	if i.i >= (len(i.vals.Elements)-1) && i.cursor != 0 {
-		if err := i.fetch(ctx); err != nil {
-			return false
+func (i *scanIter) Count() int {
+	return int(i.count)
+}
+
+func (i *scanIter) fetch(ctx context.Context) error {
+	// Reset the index.
+	i.i = -1
+
+	if i.cursor == 0 {
+		// We're done, no need to fetch.
+		return scanDoneErr
+	}
+
+	// Scan 100 times up until there are values
+	for scans := 0; scans < 100; scans++ {
+		cmd := i.r.B().Hscan().
+			Key(i.key).
+			Cursor(uint64(i.cursor)).
+			Count(i.chunk).
+			Build()
+
+		scan, err := i.r.Do(ctx, cmd).AsScanEntry()
+		if err != nil {
+			return err
+		}
+
+		i.cursor = int(scan.Cursor)
+		i.vals = scan
+
+		if len(i.vals.Elements) > 0 {
+			return nil
 		}
 	}
 
-	if len(i.vals.Elements) == 0 || i.i >= (len(i.vals.Elements)-1) {
-		return false
-	}
+	return fmt.Errorf("Scanned max times without finding pause values")
+}
 
+func (i *scanIter) Next(ctx context.Context) bool {
+	i.l.Lock()
+	defer i.l.Unlock()
+
+	if i.i >= (len(i.vals.Elements) - 1) {
+		err := i.fetch(ctx)
+		if err == scanDoneErr {
+			// No more present.
+			i.err = context.Canceled
+			return false
+		}
+		if err != nil {
+			i.err = err
+			// Stop iterating, set error.
+			return false
+		}
+	}
 	// Skip the ID
 	i.i++
 	// Get the value.
