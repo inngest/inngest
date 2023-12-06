@@ -1,19 +1,13 @@
 import { Client } from 'urql';
 
 import { graphql } from '@/gql';
-import type { EventSearchFilterField } from '@/gql/graphql';
 import type { Event } from './types';
 
-const query = graphql(`
-  query SearchEvents(
-    $environmentID: ID!
-    $fields: [EventSearchFilterField!]!
-    $lowerTime: Time!
-    $upperTime: Time!
-  ) {
+const queryDoc = graphql(`
+  query SearchEvents($environmentID: ID!, $lowerTime: Time!, $query: String!, $upperTime: Time!) {
     environment: workspace(id: $environmentID) {
       id
-      eventSearch(filter: { fields: $fields, lowerTime: $lowerTime, upperTime: $upperTime }) {
+      eventSearch(filter: { lowerTime: $lowerTime, query: $query, upperTime: $upperTime }) {
         edges {
           node {
             id
@@ -33,23 +27,23 @@ const query = graphql(`
 `);
 
 type Filter = {
-  fields: EventSearchFilterField[];
   lowerTime: Date;
+  query: string;
   upperTime: Date;
 };
 
 export async function searchEvents({
   client,
   environmentID,
-  fields,
   lowerTime,
+  query,
   upperTime,
 }: { client: Client; environmentID: string } & Filter): Promise<Event[]> {
   const res = await client
-    .query(query, {
+    .query(queryDoc, {
       environmentID,
-      fields,
       lowerTime: lowerTime.toISOString(),
+      query,
       upperTime: upperTime.toISOString(),
     })
     .toPromise();
