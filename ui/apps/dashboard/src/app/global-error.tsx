@@ -5,7 +5,7 @@ import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import * as Sentry from '@sentry/nextjs';
 
 type GlobalErrorProps = {
-  error: Error;
+  error: Error & { digest?: string };
   reset: () => void;
 };
 
