@@ -961,6 +961,7 @@ func (i *scanIter) init(ctx context.Context, key string, chunk int64) error {
 	}
 	i.cursor = int(scan.Cursor)
 	i.vals = scan
+	i.i = -1
 	i.l = sync.Mutex{}
 	return nil
 }
