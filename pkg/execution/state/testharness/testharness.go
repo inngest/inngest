@@ -1173,7 +1173,7 @@ func checkPausesByEvent_multi(t *testing.T, m state.Manager) {
 	n := 0
 	for iter.Next(ctx) {
 		result := iter.Val(ctx)
-		require.NotNil(t, result, "Nil pause returned from iterator")
+		require.NotNil(t, result, "Nil pause returned from iterator: %T: %s", iter, iter.Error())
 
 		found := false
 		for _, existing := range pauses {
@@ -1238,6 +1238,7 @@ func checkPausesByEvent_concurrent(t *testing.T, m state.Manager) {
 	a := 0
 	for a <= (len(pauses)/2) && iterA.Next(ctx) {
 		result := iterA.Val(ctx)
+		require.NotNil(t, result, "Nil pause returned from iterator")
 		found := false
 		for _, existing := range pauses {
 			if existing.ID == result.ID {
