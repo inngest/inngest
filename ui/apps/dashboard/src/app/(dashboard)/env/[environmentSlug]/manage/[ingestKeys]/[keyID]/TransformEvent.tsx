@@ -3,11 +3,10 @@
 import { useContext, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
-import { useClerk } from '@clerk/nextjs';
 import { Button } from '@inngest/components/Button';
-import { CodeBlock } from '@inngest/components/CodeBlock';
 import { toast } from 'sonner';
 
+import DashboardCodeBlock from '@/components/DashboardCodeBlock/DashboardCodeBlock';
 import { getManageKey } from '@/utils/urls';
 import makeVM from '@/utils/vm';
 import { Context } from './Context';
@@ -84,7 +83,6 @@ export default function TransformEvents({ keyID, metadata, keyName }: FilterEven
   const [output, setOutput] = useState(defaultOutput);
   const { save } = useContext(Context);
   const router = useRouter();
-  const clerk = useClerk();
   const pathname = usePathname();
   const page = getManageKey(pathname);
 
@@ -172,21 +170,17 @@ export default function TransformEvents({ keyID, metadata, keyName }: FilterEven
         />
       </div>
       <div className="mb-6">
-        {/* This is needed because Monaco editor collides with Clerk which causes bugs.
-          See https://github.com/clerk/javascript/issues/1643 */}
-        {clerk.loaded && (
-          <CodeBlock
-            tabs={[
-              {
-                label: 'Payload',
-                content: rawTransform ?? defaultTransform,
-                readOnly: false,
-                language: 'javascript',
-                handleChange: handleTransformCodeChange,
-              },
-            ]}
-          />
-        )}
+        <DashboardCodeBlock
+          tabs={[
+            {
+              label: 'Payload',
+              content: rawTransform ?? defaultTransform,
+              readOnly: false,
+              language: 'javascript',
+              handleChange: handleTransformCodeChange,
+            },
+          ]}
+        />
       </div>
       <div className="mb-5 flex gap-5">
         <div className="w-6/12">
@@ -194,38 +188,30 @@ export default function TransformEvents({ keyID, metadata, keyName }: FilterEven
           <p className="mb-6 text-sm text-slate-700">
             Paste the incoming JSON payload here to test your transform.
           </p>
-          {/* This is needed because Monaco editor collides with Clerk which causes bugs.
-          See https://github.com/clerk/javascript/issues/1643 */}
-          {clerk.loaded && (
-            <CodeBlock
-              tabs={[
-                {
-                  label: 'Payload',
-                  content: incoming,
-                  readOnly: false,
-                  language: 'json',
-                  handleChange: handleIncomingCodeChange,
-                },
-              ]}
-            />
-          )}
+          <DashboardCodeBlock
+            tabs={[
+              {
+                label: 'Payload',
+                content: incoming,
+                readOnly: false,
+                language: 'json',
+                handleChange: handleIncomingCodeChange,
+              },
+            ]}
+          />
         </div>
         <div className="w-6/12">
           <h2 className="pb-1 text-lg font-semibold">Transformed Event</h2>
           <p className="mb-6 text-sm text-slate-700">Preview the transformed JSON payload here.</p>
-          {/* This is needed because Monaco editor collides with Clerk which causes bugs.
-          See https://github.com/clerk/javascript/issues/1643 */}
-          {clerk.loaded && (
-            <CodeBlock
-              tabs={[
-                {
-                  label: 'Payload',
-                  content: output,
-                  language: 'json',
-                },
-              ]}
-            />
-          )}
+          <DashboardCodeBlock
+            tabs={[
+              {
+                label: 'Payload',
+                content: output,
+                language: 'json',
+              },
+            ]}
+          />
         </div>
       </div>
       <div className="mb-8 flex justify-end">
