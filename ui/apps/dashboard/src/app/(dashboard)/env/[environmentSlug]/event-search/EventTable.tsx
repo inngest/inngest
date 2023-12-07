@@ -8,16 +8,17 @@ import type { Event } from './types';
 type Props = {
   events: Event[];
   onSelect: (eventID: string) => void;
+  blankState: React.ReactNode;
 };
 
-export function EventTable({ events, onSelect }: Props) {
+export function EventTable({ events, onSelect, blankState }: Props) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const columns = useColumns(onSelect);
 
   return (
     <main className="min-h-0 overflow-y-auto" ref={tableContainerRef}>
       <Table
-        blankState={<></>}
+        blankState={blankState}
         options={{ columns, data: events, getCoreRowModel: getCoreRowModel() }}
         tableContainerRef={tableContainerRef}
       />
