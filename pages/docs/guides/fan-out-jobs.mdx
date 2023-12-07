@@ -129,3 +129,11 @@ Another technique similar to fan-out is step parallelism ([read the guide here](
 - Parallelism has a limit of 1,000 steps, though you can trigger as many functions as you'd like using fan-out
 - You can replay events via fan-out, eg. to test functions locally
 - You can retry individual functions easily if they permanently fail, whereas if a step permanently fails (after retrying) the function itself will fail and terminate.
+
+## Fan-out vs invoking
+
+A related pattern is invoking external functions directly instead of just triggering them with an event. See the [Invoking functions directly](/docs/guides/invoking-functions-directly) guide. Here are some key differences:
+
+- Fan-out will trigger multiple functions simultaneously, whereas invocation will only trigger one
+- Unlike invocation, fan-out will not receive the result of the invoked function
+- Choose fan-out for parallel processing of independent tasks and invocation for coordinated, interdependent functions

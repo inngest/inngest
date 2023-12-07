@@ -84,6 +84,10 @@ const sectionGuides = [
         href: `/docs/guides/fan-out-jobs`,
       },
       {
+        title: "Invoking functions directly",
+        href: `/docs/guides/invoking-functions-directly`,
+      },
+      {
         title: "Batching events",
         href: `/docs/guides/batching`,
       },

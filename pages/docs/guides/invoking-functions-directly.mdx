@@ -1,0 +1,50 @@
+# Invoking functions directly
+
+Inngest's `step.invoke()` function provides a powerful tool for calling functions directly within your event-driven system. It differs from traditional event-driven triggers, offering a more direct, RPC-like approach. This encourages a few key benefits:
+
+- Allows functions to call and receive the result of other functions
+- Naturally separates your system into reusable functions that can spread across process boundaries
+- Allows use of synchronous interaction between functions in an otherwise-asynchronous event-driven architecture, making it much easier to manage functions that require immediate outcomes
+
+## Invoking another function
+
+```ts
+// Some function we'll call
+const computeSquare = inngest.createFunction(
+  { id: "compute-square" },
+  { event: "calculate/square" },
+  async ({ event }) => {
+    return { result: event.data.number * event.data.number }; // Result typed as { result: number }
+  }
+);
+
+// In this function, we'll call `computeSquare`
+const mainFunction = inngest.createFunction(
+  { id: "main-function" },
+  { event: "main/event" },
+  async ({ step }) => {
+    const square = await step.invoke("compute-square-value", {
+      function: computeSquare,
+      data: { number: 4 }, // input data is typed, requiring input if it's needed
+    });
+
+    return `Square of 4 is ${square.result}.`; // square.result is typed as number
+  }
+);
+```
+
+In the above example, our `mainFunction` calls `computeSquare` to retrieve the resulting value. `computeSquare` can now be called from here or any other process connected to Inngest.
+
+## Creating a distributed system
+
+The use of `step.invoke()` means that we can separate functions out into compositions of steps that can be reused by _any_ process connected to Inngest.
+
+By starting to define these blocks of functionality, you're creating a smart, distributed system with all of the benefits of event-driven architecture and without any of the hassle.
+
+## Similar patterns: Fan-Out
+
+A similar pattern to invoking functions directly is that of fan-out - [check out the guide here](/docs/guides/fan-out-jobs). Here are some key differences:
+
+- Fan-out will trigger multiple functions simultaneously, whereas invocation will only trigger one
+- Unlike invocation, fan-out will not receive the result of the invoked function
+- Choose fan-out for parallel processing of independent tasks and invocation for coordinated, interdependent functions
