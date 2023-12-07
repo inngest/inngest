@@ -15,7 +15,7 @@ type Args<
   query: TypedDocumentNode<ResultT, VariablesT>;
   skip: boolean;
   variables: VariablesT;
-  context: UseQueryArgs<VariablesT, ResultT>['context'];
+  context?: UseQueryArgs<VariablesT, ResultT>['context'];
   pollIntervalInMilliseconds?: number;
 };
 
