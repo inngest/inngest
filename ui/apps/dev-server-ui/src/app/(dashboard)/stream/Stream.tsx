@@ -98,6 +98,7 @@ export default function Stream() {
     const variables = {
       limit: 40, // Page size
       before: tableScrollTopPosition > 0 ? pageParam : null,
+      includeInternalEvents: showInternalEvents,
     };
 
     const data = await client.request(GetTriggersStreamDocument, variables);
@@ -122,21 +123,10 @@ export default function Stream() {
 
   // We must flatten the array of arrays from the useInfiniteQuery hook
   const triggers = useMemo(() => {
-    let ret = data?.pages.reduce((acc, page) => {
+    return data?.pages.reduce((acc, page) => {
       return [...acc, ...page];
     });
-
-    if (showInternalEvents || !ret) {
-      return ret;
-    }
-
-    return (ret as { runs: unknown[]; trigger: string }[]).filter((trigger) => {
-      const hasRuns = Boolean(trigger.runs.length);
-      const isInternalEvent = trigger.trigger.startsWith('inngest/');
-
-      return hasRuns || !isInternalEvent;
-    });
-  }, [data?.pages, showInternalEvents]);
+  }, [data?.pages]);
 
   const fetchMoreOnScroll = useCallback(
     (containerRefElement?: HTMLDivElement | null) => {

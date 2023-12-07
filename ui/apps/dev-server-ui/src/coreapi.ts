@@ -187,8 +187,20 @@ export const DELETE_APP = gql`
 `;
 
 export const TRIGGERS_STREAM = gql`
-  query GetTriggersStream($limit: Int!, $after: Time, $before: Time) {
-    stream(query: { limit: $limit, after: $after, before: $before }) {
+  query GetTriggersStream(
+    $limit: Int!
+    $after: Time
+    $before: Time
+    $includeInternalEvents: Boolean!
+  ) {
+    stream(
+      query: {
+        limit: $limit
+        after: $after
+        before: $before
+        includeInternalEvents: $includeInternalEvents
+      }
+    ) {
       createdAt
       id
       trigger
