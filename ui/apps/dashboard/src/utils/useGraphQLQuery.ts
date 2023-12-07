@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import {
   baseFetchFailed,
   baseFetchLoading,
@@ -14,6 +15,7 @@ type Args<
   query: TypedDocumentNode<ResultT, VariablesT>;
   skip: boolean;
   variables: VariablesT;
+  pollIntervalInMilliseconds?: number;
 };
 
 /**
@@ -28,14 +30,27 @@ export function useGraphQLQuery<
   query,
   skip,
   variables,
+  pollIntervalInMilliseconds,
 }: Args<ResultT, VariablesT>): FetchResult<ResultT, { skippable: true }> {
-  const [res] = useQuery({
+  const [res, executeQuery] = useQuery({
     query,
     variables,
     pause: skip,
   });
 
-  if (res.fetching) {
+  useEffect(() => {
+    if (skip || res.fetching || !pollIntervalInMilliseconds) {
+      return;
+    }
+
+    const timeoutID = setTimeout(
+      () => executeQuery({ requestPolicy: 'network-only' }),
+      pollIntervalInMilliseconds
+    );
+    return () => clearTimeout(timeoutID);
+  }, [skip, res.fetching, pollIntervalInMilliseconds, executeQuery]);
+
+  if (res.fetching && !res.data) {
     return baseFetchLoading;
   }
 

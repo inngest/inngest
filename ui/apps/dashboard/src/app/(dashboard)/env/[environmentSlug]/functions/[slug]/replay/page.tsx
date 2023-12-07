@@ -107,6 +107,7 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
       functionSlug: functionSlug,
     },
     skip: !environment?.id,
+    pollIntervalInMilliseconds: 5_000,
   });
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
