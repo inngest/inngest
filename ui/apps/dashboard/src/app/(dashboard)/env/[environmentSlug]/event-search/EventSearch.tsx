@@ -2,6 +2,13 @@
 
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip';
+import { IconInfo } from '@inngest/components/icons/Info';
 import { useClient } from 'urql';
 
 import Input from '@/components/Forms/Input';
@@ -61,23 +68,63 @@ export function EventSearch({ environmentSlug }: Props) {
     }
   }
 
+  function getEmptyTableMessage({
+    fetching,
+    query,
+    events,
+  }: {
+    fetching: boolean;
+    query?: string;
+    events: Event[];
+  }) {
+    if (fetching) {
+      return <p>Searching for events...</p>;
+    } else if (query && events.length < 1) {
+      return <p>No events found. Try adjusting your search.</p>;
+    } else {
+      return <p>Search to see events.</p>;
+    }
+  }
+
   return (
     <>
-      <form onSubmit={onSubmit} className="m-4 flex gap-4">
-        <div className="flex gap-4">
-          <Input
-            className="min-w-[800px]"
-            defaultValue={query}
-            name="query"
-            placeholder="CEL query"
-            required
-            type="text"
-          />
-          <Button kind="primary" type="submit" disabled={fetching} label="Search" />
+      <div className="block items-center justify-between lg:flex">
+        <form onSubmit={onSubmit} className="m-4 flex gap-4">
+          <div className="flex gap-4">
+            <Input
+              className="min-w-[800px]"
+              defaultValue={query}
+              name="query"
+              placeholder="CEL query"
+              required
+              type="text"
+            />
+            <Button kind="primary" type="submit" loading={fetching} label="Search" />
+          </div>
+        </form>
+        <div className="m-4 flex gap-1">
+          <p className="text-sm">Experimental feature</p>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <IconInfo className="h-4 w-4 text-slate-400" />
+              </TooltipTrigger>
+              <TooltipContent className="whitespace-pre-line">
+                This is an experimental feature, with a few limitations:
+                <ul>
+                  <li> - Filter is only returning the last 3 days</li>
+                </ul>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
-      </form>
+      </div>
 
-      <EventTable events={events} onSelect={setSelectedEventID} />
+      <EventTable
+        events={events}
+        onSelect={setSelectedEventID}
+        blankState={getEmptyTableMessage({ fetching, query, events })}
+      />
 
       {envID && (
         <Details
