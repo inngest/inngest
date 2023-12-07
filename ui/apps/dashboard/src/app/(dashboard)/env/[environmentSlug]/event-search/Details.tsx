@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { RunDetails } from '@inngest/components/RunDetails';
+import { SlideOver } from '@inngest/components/SlideOver';
 import type { NavigateToRunFn } from '@inngest/components/Timeline';
 import { HistoryParser } from '@inngest/components/utils/historyParser';
 import { useClient } from 'urql';
 
 import LoadingIcon from '@/icons/LoadingIcon';
 import { getHistoryItemOutput } from '../functions/[slug]/logs/(run)/[runId]/getHistoryItemOutput';
-import { SlideOver } from './SlideOver';
 import { useEvent } from './useEvent';
 import { useRun } from './useRun';
 
@@ -115,12 +115,16 @@ export function Details({ envID, eventID, onClose, navigateToRun }: Props) {
   }
 
   return (
-    <SlideOver isOpen={Boolean(eventID)} onClose={onClose} size="large">
-      <div className={'dark grid h-full grid-cols-2 text-white'}>
-        {eventDetails}
-        {runDetails}
-      </div>
-    </SlideOver>
+    <>
+      {eventID && (
+        <SlideOver onClose={onClose} size="large">
+          <div className={'dark grid h-full grid-cols-2 text-white'}>
+            {eventDetails}
+            {runDetails}
+          </div>
+        </SlideOver>
+      )}
+    </>
   );
 }
 
