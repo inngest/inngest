@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { Table } from '@inngest/components/Table';
+import { IconArrowRight } from '@inngest/components/icons/ArrowRight';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 
 import { Time } from '@/components/Time';
@@ -32,8 +33,16 @@ function useColumns(onSelect: (eventID: string) => void) {
   const columns = [
     columnHelper.accessor('id', {
       cell: (props) => {
-        const { id, name } = props.row.original;
-        return <button onClick={() => onSelect(id)}>{id}</button>;
+        const { id } = props.row.original;
+        return (
+          <button
+            className="transition-color group flex cursor-pointer items-center gap-1 text-indigo-400 underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:decoration-indigo-400"
+            onClick={() => onSelect(id)}
+          >
+            {id}
+            <IconArrowRight className="h-3 w-3 -translate-x-3 text-indigo-400 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+          </button>
+        );
       },
       header: () => <span>ID</span>,
     }),
