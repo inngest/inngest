@@ -28,20 +28,11 @@ export type Scalars = {
   Runtime: unknown;
   SchemaSource: unknown;
   SearchObject: unknown;
-  SegmentType: unknown;
   Time: string;
   Timerange: unknown;
   ULID: string;
   UUID: string;
   Upload: unknown;
-};
-
-export type ApiKey = {
-  __typename?: 'APIKey';
-  author: User;
-  createdAt: Scalars['Time'];
-  id: Scalars['ID'];
-  name: Maybe<Scalars['String']>;
 };
 
 export type AwsMarketplaceSetupInput = {
@@ -57,18 +48,14 @@ export type AwsMarketplaceSetupResponse = {
 
 export type Account = {
   __typename?: 'Account';
-  apiKeys: Array<Maybe<ApiKey>>;
   billingEmail: Scalars['String'];
   createdAt: Scalars['Time'];
   id: Scalars['ID'];
-  identifier: Maybe<AccountIdentifier>;
   name: Maybe<Scalars['NullString']>;
   paymentIntents: Array<PaymentIntent>;
   paymentMethods: Maybe<Array<PaymentMethod>>;
   plan: Maybe<BillingPlan>;
   search: SearchResults;
-  setting: Maybe<AccountSetting>;
-  settings: Maybe<Array<AccountSetting>>;
   status: Scalars['String'];
   subscription: Maybe<BillingSubscription>;
   updatedAt: Scalars['Time'];
@@ -80,146 +67,6 @@ export type AccountSearchArgs = {
   opts: SearchInput;
 };
 
-
-export type AccountSettingArgs = {
-  name: Scalars['String'];
-};
-
-export type AccountIdentifier = {
-  __typename?: 'AccountIdentifier';
-  account: Account;
-  accountID: Scalars['ID'];
-  domain: Maybe<Scalars['NullString']>;
-  dsnPrefix: Maybe<Scalars['String']>;
-  id: Scalars['ID'];
-  verifiedAt: Maybe<Scalars['Time']>;
-};
-
-export type AccountIdentifierInput = {
-  dsnPrefix?: InputMaybe<Scalars['String']>;
-};
-
-export type AccountSetting = {
-  __typename?: 'AccountSetting';
-  createdAt: Scalars['Time'];
-  id: Scalars['ID'];
-  name: Scalars['String'];
-  updatedAt: Scalars['Time'];
-  value: Scalars['String'];
-};
-
-export type Action = {
-  __typename?: 'Action';
-  accountID: Maybe<Scalars['ID']>;
-  aliases: Maybe<Array<Scalars['String']>>;
-  category: ActionCategory;
-  dsn: Scalars['DSN'];
-  latest: ActionVersion;
-  name: Scalars['String'];
-  secrets: Array<ActionSecret>;
-  settings: Array<ActionSetting>;
-  tagline: Scalars['String'];
-  version: Maybe<ActionVersion>;
-};
-
-
-export type ActionSecretsArgs = {
-  workspaceID: Scalars['ID'];
-};
-
-
-export type ActionSettingsArgs = {
-  category: InputMaybe<Scalars['String']>;
-  workspaceID: Scalars['ID'];
-};
-
-
-export type ActionVersionArgs = {
-  major: InputMaybe<Scalars['Int']>;
-  minor: InputMaybe<Scalars['Int']>;
-};
-
-export type ActionCategory = {
-  __typename?: 'ActionCategory';
-  actions: Array<Action>;
-  name: Scalars['String'];
-};
-
-export type ActionFilter = {
-  category?: InputMaybe<Scalars['String']>;
-  dsn?: InputMaybe<Scalars['String']>;
-  excludePublic?: InputMaybe<Scalars['Boolean']>;
-};
-
-export type ActionSecret = {
-  __typename?: 'ActionSecret';
-  actionDSN: Scalars['DSN'];
-  createdAt: Scalars['Time'];
-  dataPrefix: Scalars['String'];
-  id: Scalars['ID'];
-  name: Scalars['String'];
-  service: Scalars['String'];
-  updatedAt: Scalars['Time'];
-};
-
-export type ActionSetting = {
-  __typename?: 'ActionSetting';
-  actionDSN: Scalars['DSN'];
-  category: Scalars['String'];
-  createdAt: Scalars['Time'];
-  data: Scalars['JSON'];
-  id: Scalars['ID'];
-  name: Scalars['String'];
-  updatedAt: Scalars['Time'];
-};
-
-export type ActionVersion = {
-  __typename?: 'ActionVersion';
-  Edges: Maybe<Array<Edge>>;
-  Response: Maybe<Scalars['Map']>;
-  Settings: Maybe<Scalars['Map']>;
-  WorkflowMetadata: Array<Maybe<ActionWorkflowMetadata>>;
-  config: Scalars['String'];
-  createdAt: Scalars['Time'];
-  dsn: Scalars['DSN'];
-  imageSha256: Maybe<Scalars['String']>;
-  name: Scalars['String'];
-  runtime: Scalars['Runtime'];
-  runtimeData: Scalars['Map'];
-  usage: Usage;
-  validFrom: Maybe<Scalars['Time']>;
-  validTo: Maybe<Scalars['Time']>;
-  versionMajor: Scalars['Int'];
-  versionMinor: Scalars['Int'];
-};
-
-
-export type ActionVersionUsageArgs = {
-  opts: InputMaybe<UsageInput>;
-  workspaceID: Scalars['ID'];
-};
-
-export type ActionVersionQualifier = {
-  dsn: Scalars['DSN'];
-  versionMajor: Scalars['Int'];
-  versionMinor: Scalars['Int'];
-};
-
-export type ActionWorkflowMetadata = {
-  __typename?: 'ActionWorkflowMetadata';
-  expression: Maybe<Scalars['String']>;
-  form: Maybe<Scalars['Map']>;
-  name: Scalars['String'];
-  required: Scalars['Boolean'];
-  type: Scalars['String'];
-};
-
-export type Alert = {
-  __typename?: 'Alert';
-  workflow: Workflow;
-  workflowID: Scalars['String'];
-};
-
 export type ArchiveWorkflowInput = {
   archive: Scalars['Boolean'];
   workflowID: Scalars['ID'];
@@ -227,8 +74,6 @@ export type ArchiveWorkflowInput = {
 
 export type ArchivedEvent = {
   __typename?: 'ArchivedEvent';
-  contact: Maybe<Contact>;
-  contactID: Maybe<Scalars['ID']>;
   event: Scalars['Bytes'];
   eventModel: Event;
   eventVersion: EventType;
@@ -240,13 +85,6 @@ export type ArchivedEvent = {
   receivedAt: Scalars['Time'];
   source: Maybe<IngestKey>;
   version: Scalars['String'];
-};
-
-export type AsyncEdge = {
-  __typename?: 'AsyncEdge';
-  event: Scalars['String'];
-  match: Maybe<Scalars['String']>;
-  ttl: Scalars['String'];
 };
 
 export type BillingPlan = {
@@ -270,42 +108,6 @@ export type CancellationConfiguration = {
   timeout: Maybe<Scalars['String']>;
 };
 
-export type CommsUnsubscribe = {
-  __typename?: 'CommsUnsubscribe';
-  commType: Scalars['String'];
-  contactID: Scalars['ID'];
-  id: Scalars['ID'];
-  service: Scalars['String'];
-  workspaceID: Scalars['ID'];
-};
-
-export type Communication = {
-  __typename?: 'Communication';
-  body: Maybe<Scalars['NullString']>;
-  bodyFile: Maybe<File>;
-  bodyFileID: Maybe<Scalars['ID']>;
-  category: Scalars['String'];
-  clientID: Maybe<Scalars['Int']>;
-  commsType: Scalars['String'];
-  contactID: Scalars['ID'];
-  createdAt: Scalars['Time'];
-  currentStatus: CommunicationStatus;
-  id: Scalars['ID'];
-  recipient: Scalars['String'];
-  statuses: Array<CommunicationStatus>;
-  title: Scalars['String'];
-  workflow: Maybe<Workflow>;
-  workflowID: Maybe<Scalars['ID']>;
-  workflowVersion: Maybe<Scalars['Int']>;
-};
-
-export type CommunicationStatus = {
-  __typename?: 'CommunicationStatus';
-  createdAt: Scalars['Time'];
-  id: Scalars['ID'];
-  status: Scalars['String'];
-};
-
 export type ConcurrencyConfiguration = {
   __typename?: 'ConcurrencyConfiguration';
   key: Maybe<Scalars['String']>;
@@ -324,63 +126,6 @@ export enum ConcurrencyScope {
   Environment = 'ENVIRONMENT',
   Function = 'FUNCTION'
 }
-
-export type ConcurrencyScopeConfiguration = {
-  __typename?: 'ConcurrencyScopeConfiguration';
-  isDefault: Maybe<Scalars['Boolean']>;
-  value: ConcurrencyScope;
-};
-
-export type Contact = {
-  __typename?: 'Contact';
-  attributes: Array<Maybe<ContactAttribute>>;
-  createdAt: Scalars['Time'];
-  externalID: Maybe<Scalars['NullString']>;
-  id: Scalars['ID'];
-  predefinedAttributes: Scalars['Map'];
-  unsubscribed: Scalars['Boolean'];
-  updatedAt: Scalars['Time'];
-  workspaceID: Scalars['ID'];
-};
-
-export type ContactAttribute = {
-  __typename?: 'ContactAttribute';
-  contactID: Scalars['ID'];
-  id: Scalars['ID'];
-  name: Scalars['String'];
-  validFrom: Scalars['Time'];
-  validTo: Maybe<Scalars['NullTime']>;
-  value: Scalars['Bytes'];
-};
-
-export type ContactFilter = {
-  attributes?: InputMaybe<Scalars['Map']>;
-  email?: InputMaybe<Scalars['String']>;
-  externalID?: InputMaybe<Scalars['String']>;
-  phone?: InputMaybe<Scalars['String']>;
-};
-
-export type ContactSegment = {
-  __typename?: 'ContactSegment';
-  contact: Contact;
-  contactID: Scalars['ID'];
-  createdAt: Scalars['Time'];
-  id: Scalars['ID'];
-  segment: Segment;
-  segmentID: Scalars['ID'];
-};
-
-export type ContactStats = {
-  __typename?: 'ContactStats';
-  total: Scalars['Int'];
-  usage: Usage;
-  workspaceID: Scalars['ID'];
-};
-
-
-export type ContactStatsUsageArgs = {
-  opts: InputMaybe<UsageInput>;
-};
 
 export type CreateFunctionReplayInput = {
   fromRange: Scalars['ULID'];
@@ -414,11 +159,6 @@ export type DebounceConfiguration = {
   period: Scalars['String'];
 };
 
-export type DeleteActionSecret = {
-  secretID: Scalars['ID'];
-  workspaceID: Scalars['ID'];
-};
-
 export type DeleteIngestKey = {
   id: Scalars['ID'];
   workspaceID: Scalars['ID'];
@@ -448,14 +188,6 @@ export type Deploy = {
   status: Scalars['String'];
   url: Maybe<Scalars['String']>;
   workspaceID: Scalars['UUID'];
-};
-
-export type Edge = {
-  __typename?: 'Edge';
-  async: Maybe<AsyncEdge>;
-  if: Scalars['String'];
-  name: Scalars['String'];
-  type: Scalars['EdgeType'];
 };
 
 export type EditWorkflowInput = {
@@ -600,19 +332,6 @@ export type EventsFilter = {
   lowerTime: Scalars['Time'];
 };
 
-export type File = {
-  __typename?: 'File';
-  createdAt: Scalars['Time'];
-  description: Maybe<Scalars['NullString']>;
-  filename: Scalars['String'];
-  filetype: Scalars['String'];
-  id: Scalars['ID'];
-  presignedURL: Scalars['String'];
-  private: Scalars['Boolean'];
-  sha256: Scalars['String'];
-  size: Scalars['Int'];
-};
-
 export type FilterList = {
   __typename?: 'FilterList';
   events: Maybe<Array<Scalars['String']>>;
@@ -652,7 +371,6 @@ export type FunctionRun = {
   accountID: Scalars['UUID'];
   batchID: Maybe<Scalars['ULID']>;
   canRerun: Maybe<Scalars['Boolean']>;
-  contactID: Maybe<Scalars['UUID']>;
   endedAt: Maybe<Scalars['Time']>;
   event: Maybe<ArchivedEvent>;
   eventID: Maybe<Scalars['ULID']>;
@@ -661,11 +379,9 @@ export type FunctionRun = {
   history: Array<RunHistoryItem>;
   historyItemOutput: Maybe<Scalars['String']>;
   id: Scalars['ULID'];
-  originalRunID: Maybe<Scalars['ULID']>;
   output: Maybe<Scalars['Bytes']>;
   startedAt: Scalars['Time'];
   status: FunctionRunStatus;
-  timeline: Maybe<Array<RunTimeline>>;
   workflowID: Scalars['UUID'];
   workflowVersion: Maybe<WorkflowVersion>;
   workflowVersionInt: Scalars['Int'];
@@ -736,14 +452,6 @@ export type IngestKeyFilter = {
   source?: InputMaybe<Scalars['String']>;
 };
 
-export type InsertActionSetting = {
-  category: Scalars['String'];
-  data: Scalars['String'];
-  dsn: Scalars['DSN'];
-  name: Scalars['String'];
-  workspaceID: Scalars['ID'];
-};
-
 export type MetricsData = {
   __typename?: 'MetricsData';
   bucket: Scalars['Time'];
@@ -770,44 +478,25 @@ export type Mutation = {
   archiveEvent: Maybe<Event>;
   archiveWorkflow: Maybe<WorkflowResponse>;
   completeAWSMarketplaceSetup: Maybe<AwsMarketplaceSetupResponse>;
-  createAPIKey: VisibleApiKey;
-  createAction: Action;
   createFunctionReplay: Replay;
   createIngestKey: IngestKey;
-  createIntegrationWebhook: IngestKey;
-  createSegment: Segment;
   createStripeSubscription: CreateStripeSubscriptionResponse;
   createUser: Maybe<User>;
   createVercelApp: Maybe<CreateVercelAppResponse>;
-  createWorkflow: Maybe<WorkflowVersionResponse>;
   createWorkspace: Array<Maybe<Workspace>>;
-  deleteActionSecret: Maybe<DeleteResponse>;
   deleteIngestKey: Maybe<DeleteResponse>;
   deleteUser: Scalars['ID'];
   disableEnvironmentAutoArchive: Workspace;
-  editSegment: Segment;
   editWorkflow: Maybe<WorkflowVersionResponse>;
   enableEnvironmentAutoArchive: Workspace;
-  insertActionSetting: ActionSetting;
-  register: RegisterResponse;
   removeVercelApp: Maybe<RemoveVercelAppResponse>;
   retryWorkflowRun: Maybe<StartWorkflowResponse>;
-  startWorkflowRun: Maybe<StartWorkflowResponse>;
   unarchiveEnvironment: Workspace;
   updateAccount: Account;
-  updateAccountIdentifier: AccountIdentifier;
-  updateAccountSetting: Maybe<AccountSetting>;
-  updateActionSetting: ActionSetting;
-  updateActionVersion: ActionVersion;
-  updateContact: Contact;
   updateIngestKey: IngestKey;
   updatePaymentMethod: Maybe<Array<PaymentMethod>>;
   updatePlan: Account;
-  updateUser: Maybe<User>;
   updateVercelApp: Maybe<UpdateVercelAppResponse>;
-  upsertActionSecret: ActionSecret;
-  upsertActionSetting: ActionSetting;
-  upsertWorkflow: Maybe<WorkflowVersionResponse>;
 };
 
 
@@ -832,16 +521,6 @@ export type MutationCompleteAwsMarketplaceSetupArgs = {
 };
 
 
-export type MutationCreateApiKeyArgs = {
-  name: InputMaybe<Scalars['String']>;
-};
-
-
-export type MutationCreateActionArgs = {
-  config: Scalars['String'];
-};
-
-
 export type MutationCreateFunctionReplayArgs = {
   input: CreateFunctionReplayInput;
 };
@@ -849,18 +528,6 @@ export type MutationCreateFunctionReplayArgs = {
 
 export type MutationCreateIngestKeyArgs = {
   input: NewIngestKey;
-};
-
-
-export type MutationCreateIntegrationWebhookArgs = {
-  service: Scalars['String'];
-  workspaceID: Scalars['ID'];
-};
-
-
-export type MutationCreateSegmentArgs = {
-  opts: SegmentOpts;
-  workspaceID: Scalars['ID'];
 };
 
 
@@ -879,18 +546,8 @@ export type MutationCreateVercelAppArgs = {
 };
 
 
-export type MutationCreateWorkflowArgs = {
-  input: NewWorkflowInput;
-};
-
-
 export type MutationCreateWorkspaceArgs = {
   input: NewWorkspaceInput;
-};
-
-
-export type MutationDeleteActionSecretArgs = {
-  input: DeleteActionSecret;
 };
 
 
@@ -909,12 +566,6 @@ export type MutationDisableEnvironmentAutoArchiveArgs = {
 };
 
 
-export type MutationEditSegmentArgs = {
-  id: Scalars['ID'];
-  opts: SegmentOpts;
-};
-
-
 export type MutationEditWorkflowArgs = {
   input: EditWorkflowInput;
 };
@@ -922,16 +573,6 @@ export type MutationEditWorkflowArgs = {
 
 export type MutationEnableEnvironmentAutoArchiveArgs = {
   id: Scalars['ID'];
-};
-
-
-export type MutationInsertActionSettingArgs = {
-  input: InsertActionSetting;
-};
-
-
-export type MutationRegisterArgs = {
-  input: RegisterInput;
 };
 
 
@@ -946,12 +587,6 @@ export type MutationRetryWorkflowRunArgs = {
 };
 
 
-export type MutationStartWorkflowRunArgs = {
-  debug: Scalars['Boolean'];
-  input: StartWorkflowInput;
-};
-
-
 export type MutationUnarchiveEnvironmentArgs = {
   id: Scalars['ID'];
 };
@@ -959,34 +594,6 @@ export type MutationUnarchiveEnvironmentArgs = {
 
 export type MutationUpdateAccountArgs = {
   input: UpdateAccount;
-};
-
-
-export type MutationUpdateAccountIdentifierArgs = {
-  input: AccountIdentifierInput;
-};
-
-
-export type MutationUpdateAccountSettingArgs = {
-  name: Scalars['String'];
-  value: Scalars['String'];
-};
-
-
-export type MutationUpdateActionSettingArgs = {
-  input: UpdateActionSetting;
-};
-
-
-export type MutationUpdateActionVersionArgs = {
-  enabled: Scalars['Boolean'];
-  version: ActionVersionQualifier;
-};
-
-
-export type MutationUpdateContactArgs = {
-  attributes: Scalars['Map'];
-  id: Scalars['ID'];
 };
 
 
@@ -1006,28 +613,8 @@ export type MutationUpdatePlanArgs = {
 };
 
 
-export type MutationUpdateUserArgs = {
-  input: UpdateUser;
-};
-
-
 export type MutationUpdateVercelAppArgs = {
   input: UpdateVercelAppInput;
-};
-
-
-export type MutationUpsertActionSecretArgs = {
-  input: UpsertActionSecret;
-};
-
-
-export type MutationUpsertActionSettingArgs = {
-  input: UpsertActionSetting;
-};
-
-
-export type MutationUpsertWorkflowArgs = {
-  input: UpsertWorkflowInput;
 };
 
 export type NewIngestKey = {
@@ -1041,13 +628,6 @@ export type NewIngestKey = {
 export type NewUser = {
   email: Scalars['String'];
   name?: InputMaybe<Scalars['String']>;
-};
-
-export type NewWorkflowInput = {
-  config: Scalars['String'];
-  description?: InputMaybe<Scalars['String']>;
-  draft: Scalars['Boolean'];
-  workspaceID: Scalars['ID'];
 };
 
 export type NewWorkspaceInput = {
@@ -1074,18 +654,6 @@ export type PageResults = {
   perPage: Scalars['Int'];
   totalItems: Maybe<Scalars['Int']>;
   totalPages: Maybe<Scalars['Int']>;
-};
-
-export type PaginatedContactSegments = {
-  __typename?: 'PaginatedContactSegments';
-  data: Array<ContactSegment>;
-  page: PageResults;
-};
-
-export type PaginatedContacts = {
-  __typename?: 'PaginatedContacts';
-  data: Array<Contact>;
-  page: PageResults;
 };
 
 export type PaginatedEventTypes = {
@@ -1128,9 +696,6 @@ export type PaymentMethod = {
 export type Query = {
   __typename?: 'Query';
   account: Account;
-  action: Action;
-  actionCategories: Array<ActionCategory>;
-  actions: Array<Action>;
   billableStepTimeSeries: Array<TimeSeries>;
   deploy: Deploy;
   deploys: Maybe<Array<Deploy>>;
@@ -1139,16 +704,6 @@ export type Query = {
   session: Maybe<Session>;
   workspace: Workspace;
   workspaces: Maybe<Array<Workspace>>;
-};
-
-
-export type QueryActionArgs = {
-  dsn: Scalars['String'];
-};
-
-
-export type QueryActionsArgs = {
-  filter: InputMaybe<ActionFilter>;
 };
 
 
@@ -1181,20 +736,6 @@ export type RateLimitConfiguration = {
   key: Maybe<Scalars['String']>;
   limit: Scalars['Int'];
   period: Scalars['String'];
-};
-
-export type RegisterInput = {
-  anonId?: InputMaybe<Scalars['String']>;
-  company?: InputMaybe<Scalars['String']>;
-  email: Scalars['String'];
-  password: Scalars['String'];
-  userID?: InputMaybe<Scalars['String']>;
-};
-
-export type RegisterResponse = {
-  __typename?: 'RegisterResponse';
-  account: Maybe<Account>;
-  user: Maybe<User>;
 };
 
 export type RemoveVercelAppInput = {
@@ -1247,15 +788,6 @@ export type RetryConfiguration = {
   __typename?: 'RetryConfiguration';
   isDefault: Maybe<Scalars['Boolean']>;
   value: Scalars['Int'];
-};
-
-export type RunHistory = {
-  __typename?: 'RunHistory';
-  createdAt: Scalars['Time'];
-  data: Maybe<Scalars['Bytes']>;
-  id: Scalars['ULID'];
-  stepData: Maybe<RunHistoryStepData>;
-  type: RunHistoryType;
 };
 
 export type RunHistoryCancel = {
@@ -1316,14 +848,6 @@ export type RunHistorySleep = {
   until: Scalars['Time'];
 };
 
-export type RunHistoryStepData = {
-  __typename?: 'RunHistoryStepData';
-  attempt: Scalars['Int'];
-  data: Maybe<Scalars['Bytes']>;
-  id: Scalars['String'];
-  name: Maybe<Scalars['String']>;
-};
-
 export enum RunHistoryType {
   EventReceived = 'EVENT_RECEIVED',
   FunctionCancelled = 'FUNCTION_CANCELLED',
@@ -1376,17 +900,6 @@ export type RunListItemEdge = {
   node: RunListItem;
 };
 
-export type RunTimeline = {
-  __typename?: 'RunTimeline';
-  durationInMillisconds: Maybe<Scalars['Int']>;
-  history: Maybe<Array<RunHistory>>;
-  latencyInMilliseconds: Maybe<Scalars['Int']>;
-  output: Maybe<Scalars['Bytes']>;
-  status: RunHistoryType;
-  step: Scalars['Boolean'];
-  stepName: Maybe<Scalars['String']>;
-};
-
 export type RunsFilter = {
   lowerTime: Scalars['Time'];
   status?: InputMaybe<Array<FunctionRunStatus>>;
@@ -1418,38 +931,13 @@ export type SearchResults = {
   results: Array<Maybe<SearchResult>>;
 };
 
-export type Segment = {
-  __typename?: 'Segment';
-  contacts: Maybe<PaginatedContactSegments>;
-  createdAt: Scalars['Time'];
-  expression: Maybe<Scalars['NullString']>;
-  id: Scalars['ID'];
-  name: Scalars['String'];
-  ratio: Scalars['Int'];
-  type: Scalars['SegmentType'];
-  updatedAt: Scalars['Time'];
-};
-
-export type SegmentOpts = {
-  expression?: InputMaybe<Scalars['String']>;
-  name: Scalars['String'];
-  ratio?: InputMaybe<Scalars['Int']>;
-};
-
 export type Session = {
   __typename?: 'Session';
   expires: Maybe<Scalars['Time']>;
   user: User;
 };
 
-export type StartWorkflow = {
-  workflowID: Scalars['ID'];
-  workspaceID: Scalars['ID'];
-};
-
 export type StartWorkflowInput = {
-  baggage?: InputMaybe<WorkflowBaggageInput>;
-  fromActionID?: InputMaybe<Scalars['Int']>;
   workflowID: Scalars['ID'];
   workflowVersion?: InputMaybe<Scalars['Int']>;
   workspaceID: Scalars['ID'];
@@ -1493,25 +981,10 @@ export type UpdateAccount = {
   name?: InputMaybe<Scalars['String']>;
 };
 
-export type UpdateActionSetting = {
-  category: Scalars['String'];
-  data: Scalars['String'];
-  dsn: Scalars['DSN'];
-  id: Scalars['ID'];
-  name: Scalars['String'];
-  workspaceID: Scalars['ID'];
-};
-
 export type UpdateIngestKey = {
   filterList?: InputMaybe<FilterListInput>;
   metadata?: InputMaybe<Scalars['Map']>;
   name?: InputMaybe<Scalars['String']>;
-};
-
-export type UpdateUser = {
-  email?: InputMaybe<Scalars['String']>;
-  name?: InputMaybe<Scalars['String']>;
-  password?: InputMaybe<Scalars['String']>;
 };
 
 export type UpdateVercelAppInput = {
@@ -1523,28 +996,6 @@ export type UpdateVercelAppResponse = {
   __typename?: 'UpdateVercelAppResponse';
   success: Scalars['Boolean'];
   vercelApp: Maybe<VercelApp>;
-};
-
-export type UpsertActionSecret = {
-  data: Scalars['String'];
-  dsn?: InputMaybe<Scalars['DSN']>;
-  name: Scalars['String'];
-  workspaceID: Scalars['ID'];
-};
-
-export type UpsertActionSetting = {
-  category: Scalars['String'];
-  data: Scalars['String'];
-  dsn: Scalars['DSN'];
-  name: Scalars['String'];
-  workspaceID: Scalars['ID'];
-};
-
-export type UpsertWorkflowInput = {
-  config?: InputMaybe<Scalars['String']>;
-  description?: InputMaybe<Scalars['String']>;
-  live?: InputMaybe<Scalars['Boolean']>;
-  workspaceID: Scalars['ID'];
 };
 
 export type Usage = {
@@ -1590,31 +1041,18 @@ export type VercelApp = {
   workspaceID: Scalars['UUID'];
 };
 
-export type VisibleApiKey = {
-  __typename?: 'VisibleAPIKey';
-  author: User;
-  createdAt: Scalars['Time'];
-  id: Scalars['ID'];
-  name: Scalars['NullString'];
-  private: Scalars['String'];
-};
-
 export type Workflow = {
   __typename?: 'Workflow';
   appName: Maybe<Scalars['String']>;
   archivedAt: Maybe<Scalars['Time']>;
-  communication: Array<Communication>;
   configuration: Maybe<FunctionConfiguration>;
   current: Maybe<WorkflowVersion>;
-  drafts: Array<Maybe<WorkflowVersion>>;
   failureHandler: Maybe<Workflow>;
   id: Scalars['ID'];
   isArchived: Scalars['Boolean'];
   isPaused: Scalars['Boolean'];
-  latest: WorkflowVersion;
   metrics: MetricsResponse;
   name: Scalars['String'];
-  pauses: Array<WorkflowPause>;
   previous: Array<Maybe<WorkflowVersion>>;
   /**
    * A list of all the function’s replays.
@@ -1629,17 +1067,11 @@ export type Workflow = {
   slug: Scalars['String'];
   url: Scalars['String'];
   usage: Usage;
-  version: WorkflowVersion;
 };
 
 
 export type WorkflowMetricsArgs = {
   opts: MetricsRequest;
-};
-
-
-export type WorkflowPausesArgs = {
-  runID: Scalars['ULID'];
 };
 
 
@@ -1673,57 +1105,9 @@ export type WorkflowUsageArgs = {
   opts: InputMaybe<UsageInput>;
 };
 
-
-export type WorkflowVersionArgs = {
-  id: Scalars['Int'];
-};
-
-export type WorkflowBaggageInput = {
-  actions?: InputMaybe<Scalars['Map']>;
-  event: Scalars['Bytes'];
-};
-
-export type WorkflowEvent = {
-  __typename?: 'WorkflowEvent';
-  branchRunID: Scalars['ULID'];
-  contact: Maybe<Contact>;
-  contactID: Maybe<Scalars['ID']>;
-  createdAt: Scalars['Time'];
-  data: Maybe<Scalars['String']>;
-  eventID: Scalars['ULID'];
-  fromActionID: Maybe<Scalars['Int']>;
-  id: Scalars['ULID'];
-  name: Scalars['String'];
-  workflow: Workflow;
-  workflowID: Scalars['ID'];
-  workflowRunID: Scalars['ULID'];
-  workflowVersion: Scalars['Int'];
-  workflowVersionInstance: WorkflowVersion;
-  workspaceID: Scalars['UUID'];
-};
-
-export type WorkflowPause = {
-  __typename?: 'WorkflowPause';
-  actionID: Maybe<Scalars['String']>;
-  childActionID: Maybe<Scalars['String']>;
-  createdAt: Scalars['Time'];
-  eventName: Maybe<Scalars['NullString']>;
-  expiresAt: Scalars['Time'];
-  expression: Maybe<Scalars['NullString']>;
-  id: Scalars['ID'];
-  parentActionID: Maybe<Scalars['String']>;
-  workflowRunID: Scalars['ULID'];
-};
-
 export type WorkflowResponse = {
   __typename?: 'WorkflowResponse';
   workflow: Workflow;
-};
-
-export type WorkflowStart = {
-  __typename?: 'WorkflowStart';
-  event: WorkflowEvent;
-  status: Scalars['String'];
 };
 
 export type WorkflowTrigger = {
@@ -1731,17 +1115,10 @@ export type WorkflowTrigger = {
   condition: Maybe<Scalars['NullString']>;
   eventName: Maybe<Scalars['NullString']>;
   schedule: Maybe<Scalars['NullString']>;
-  workflowID: Scalars['ID'];
-  workflowVersion: Scalars['Int'];
 };
 
 export type WorkflowVersion = {
   __typename?: 'WorkflowVersion';
-  actions: Array<Action>;
-  alerts: Maybe<Array<Alert>>;
-  communication: Array<Communication>;
-  config: Scalars['String'];
-  configJSON: Scalars['String'];
   createdAt: Scalars['Time'];
   deploy: Maybe<Deploy>;
   description: Maybe<Scalars['NullString']>;
@@ -1766,11 +1143,7 @@ export type WorkflowVersionResponse = {
 
 export type Workspace = {
   __typename?: 'Workspace';
-  actionSettings: Array<ActionSetting>;
   archivedEvent: Maybe<ArchivedEvent>;
-  contact: Contact;
-  contactStats: ContactStats;
-  contacts: PaginatedContacts;
   createdAt: Scalars['Time'];
   event: Maybe<Event>;
   eventByNames: Array<EventType>;
@@ -1781,15 +1154,11 @@ export type Workspace = {
   id: Scalars['ID'];
   ingestKey: IngestKey;
   ingestKeys: Array<IngestKey>;
-  integrations: Maybe<Array<WorkspaceIntegration>>;
   isArchived: Scalars['Boolean'];
   isAutoArchiveEnabled: Scalars['Boolean'];
   lastDeployedAt: Maybe<Scalars['Time']>;
   name: Scalars['String'];
   parentID: Maybe<Scalars['ID']>;
-  secrets: Array<Maybe<ActionSecret>>;
-  segment: Segment;
-  segments: Array<Maybe<Segment>>;
   test: Scalars['Boolean'];
   type: EnvironmentType;
   vercelApps: Array<VercelApp>;
@@ -1800,24 +1169,8 @@ export type Workspace = {
 };
 
 
-export type WorkspaceActionSettingsArgs = {
-  category: InputMaybe<Scalars['String']>;
-  dsn: Scalars['DSN'];
-};
-
-
 export type WorkspaceArchivedEventArgs = {
   id: Scalars['ULID'];
-};
-
-
-export type WorkspaceContactArgs = {
-  id: Scalars['ID'];
-};
-
-
-export type WorkspaceContactsArgs = {
-  filter: InputMaybe<Scalars['Map']>;
 };
 
 
@@ -1853,21 +1206,6 @@ export type WorkspaceIngestKeysArgs = {
 };
 
 
-export type WorkspaceSecretsArgs = {
-  service: InputMaybe<Scalars['DSN']>;
-};
-
-
-export type WorkspaceSegmentArgs = {
-  id: Scalars['ID'];
-};
-
-
-export type WorkspaceSegmentsArgs = {
-  prefix: InputMaybe<Scalars['String']>;
-};
-
-
 export type WorkspaceWorkflowArgs = {
   id: Scalars['ID'];
 };
@@ -1880,15 +1218,6 @@ export type WorkspaceWorkflowBySlugArgs = {
 
 export type WorkspaceWorkflowsArgs = {
   archived?: InputMaybe<Scalars['Boolean']>;
-};
-
-export type WorkspaceIntegration = {
-  __typename?: 'WorkspaceIntegration';
-  actions: Scalars['Boolean'];
-  events: Scalars['Boolean'];
-  name: Scalars['String'];
-  service: Scalars['String'];
-  webhookEndpoints: Array<Scalars['String']>;
 };
 
 export type CreateEnvironmentMutationVariables = Exact<{
@@ -2123,7 +1452,7 @@ export type GetFunctionRunDetailsQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunDetailsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', id: string, name: string, slug: string, run: { __typename?: 'FunctionRun', canRerun: boolean | null, id: string, status: FunctionRunStatus, startedAt: string, endedAt: string | null, output: string | null, event: { __typename?: 'ArchivedEvent', id: string, name: string, receivedAt: string, payload: string } | null, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: string, functionVersion: number, groupID: string | null, id: string, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: string | null, expression: string | null, userID: string | null } | null, sleep: { __typename?: 'RunHistorySleep', until: string } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: string } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: string | null, timeout: boolean } | null }>, version: { __typename?: 'WorkflowVersion', url: string, validFrom: string | null, version: number, deploy: { __typename?: 'Deploy', id: string, createdAt: string } | null, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName: null | string | null, schedule: null | string | null }> } | null } } | null } };
+export type GetFunctionRunDetailsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', id: string, name: string, slug: string, run: { __typename?: 'FunctionRun', canRerun: boolean | null, id: string, status: FunctionRunStatus, startedAt: string, endedAt: string | null, output: string | null, event: { __typename?: 'ArchivedEvent', id: string, name: string, receivedAt: string, payload: string } | null, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: string, functionVersion: number, groupID: string | null, id: string, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: string | null, expression: string | null, userID: string | null } | null, sleep: { __typename?: 'RunHistorySleep', until: string } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: string } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: string | null, timeout: boolean } | null, invokeFunction: { __typename?: 'RunHistoryInvokeFunction', eventID: string, functionID: string, correlationID: string, timeout: string } | null, invokeFunctionResult: { __typename?: 'RunHistoryInvokeFunctionResult', eventID: string | null, timeout: boolean, runID: string | null } | null }>, version: { __typename?: 'WorkflowVersion', url: string, validFrom: string | null, version: number, deploy: { __typename?: 'Deploy', id: string, createdAt: string } | null, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName: null | string | null, schedule: null | string | null }> } | null } } | null } };
 
 export type GetFunctionRunTriggersQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -2460,7 +1789,7 @@ export const GetFunctionVersionNumberDocument = {"kind":"Document","definitions"
 export const PauseFunctionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"PauseFunction"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"EditWorkflowInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"editWorkflow"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workflow"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode<PauseFunctionMutation, PauseFunctionMutationVariables>;
 export const RerunFunctionRunDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RerunFunctionRun"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"retryWorkflowRun"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"workflowID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionID"}}}]}},{"kind":"Argument","name":{"kind":"Name","value":"workflowRunID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<RerunFunctionRunMutation, RerunFunctionRunMutationVariables>;
 export const GetHistoryItemOutputDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetHistoryItemOutput"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"historyItemID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"runID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflow"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"run"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"runID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"historyItemOutput"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"historyItemID"}}}]}]}}]}}]}}]}}]} as unknown as DocumentNode<GetHistoryItemOutputQuery, GetHistoryItemOutputQueryVariables>;
-export const GetFunctionRunDetailsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctionRunDetails"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"run"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"canRerun"}},{"kind":"Field","name":{"kind":"Name","value":"event"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","alias":{"kind":"Name","value":"payload"},"name":{"kind":"Name","value":"event"}},{"kind":"Field","name":{"kind":"Name","value":"receivedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"attempt"}},{"kind":"Field","name":{"kind":"Name","value":"cancel"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventID"}},{"kind":"Field","name":{"kind":"Name","value":"expression"}},{"kind":"Field","name":{"kind":"Name","value":"userID"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"functionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"groupID"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"sleep"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"until"}}]}},{"kind":"Field","name":{"kind":"Name","value":"stepName"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"url"}},{"kind":"Field","name":{"kind":"Name","value":"waitForEvent"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventName"}},{"kind":"Field","name":{"kind":"Name","value":"expression"}},{"kind":"Field","name":{"kind":"Name","value":"timeout"}}]}},{"kind":"Field","name":{"kind":"Name","value":"waitResult"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventID"}},{"kind":"Field","name":{"kind":"Name","value":"timeout"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"endedAt"}},{"kind":"Field","name":{"kind":"Name","value":"output"}},{"kind":"Field","alias":{"kind":"Name","value":"version"},"name":{"kind":"Name","value":"workflowVersion"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deploy"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"triggers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventName"}},{"kind":"Field","name":{"kind":"Name","value":"schedule"}}]}},{"kind":"Field","name":{"kind":"Name","value":"url"}},{"kind":"Field","name":{"kind":"Name","value":"validFrom"}},{"kind":"Field","name":{"kind":"Name","value":"version"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"slug"}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionRunDetailsQuery, GetFunctionRunDetailsQueryVariables>;
+export const GetFunctionRunDetailsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctionRunDetails"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"run"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionRunID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"canRerun"}},{"kind":"Field","name":{"kind":"Name","value":"event"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","alias":{"kind":"Name","value":"payload"},"name":{"kind":"Name","value":"event"}},{"kind":"Field","name":{"kind":"Name","value":"receivedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"attempt"}},{"kind":"Field","name":{"kind":"Name","value":"cancel"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventID"}},{"kind":"Field","name":{"kind":"Name","value":"expression"}},{"kind":"Field","name":{"kind":"Name","value":"userID"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"functionVersion"}},{"kind":"Field","name":{"kind":"Name","value":"groupID"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"sleep"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"until"}}]}},{"kind":"Field","name":{"kind":"Name","value":"stepName"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"url"}},{"kind":"Field","name":{"kind":"Name","value":"waitForEvent"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventName"}},{"kind":"Field","name":{"kind":"Name","value":"expression"}},{"kind":"Field","name":{"kind":"Name","value":"timeout"}}]}},{"kind":"Field","name":{"kind":"Name","value":"waitResult"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventID"}},{"kind":"Field","name":{"kind":"Name","value":"timeout"}}]}},{"kind":"Field","name":{"kind":"Name","value":"invokeFunction"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventID"}},{"kind":"Field","name":{"kind":"Name","value":"functionID"}},{"kind":"Field","name":{"kind":"Name","value":"correlationID"}},{"kind":"Field","name":{"kind":"Name","value":"timeout"}}]}},{"kind":"Field","name":{"kind":"Name","value":"invokeFunctionResult"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventID"}},{"kind":"Field","name":{"kind":"Name","value":"timeout"}},{"kind":"Field","name":{"kind":"Name","value":"runID"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"endedAt"}},{"kind":"Field","name":{"kind":"Name","value":"output"}},{"kind":"Field","alias":{"kind":"Name","value":"version"},"name":{"kind":"Name","value":"workflowVersion"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deploy"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"triggers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventName"}},{"kind":"Field","name":{"kind":"Name","value":"schedule"}}]}},{"kind":"Field","name":{"kind":"Name","value":"url"}},{"kind":"Field","name":{"kind":"Name","value":"validFrom"}},{"kind":"Field","name":{"kind":"Name","value":"version"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"slug"}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionRunDetailsQuery, GetFunctionRunDetailsQueryVariables>;
 export const GetFunctionRunTriggersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctionRunTriggers"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"current"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"triggers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"schedule"}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionRunTriggersQuery, GetFunctionRunTriggersQueryVariables>;
 export const GetFunctionRunsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctionRuns"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionRunStatuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"FunctionRunStatus"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionRunCursor"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeStart"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeEnd"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"timeField"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"FunctionRunTimeField"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","alias":{"kind":"Name","value":"runs"},"name":{"kind":"Name","value":"runsV2"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"filter"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionRunStatuses"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"lowerTime"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeStart"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"upperTime"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeEnd"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"timeField"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeField"}}}]}},{"kind":"Argument","name":{"kind":"Name","value":"first"},"value":{"kind":"IntValue","value":"20"}},{"kind":"Argument","name":{"kind":"Name","value":"after"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionRunCursor"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"edges"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"node"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"endedAt"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageInfo"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"hasNextPage"}},{"kind":"Field","name":{"kind":"Name","value":"endCursor"}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionRunsQuery, GetFunctionRunsQueryVariables>;
 export const GetFunctionEndedRunsCountDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFunctionEndedRunsCount"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeStart"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeEnd"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","alias":{"kind":"Name","value":"failedRuns"},"name":{"kind":"Name","value":"runsV2"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"filter"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"status"},"value":{"kind":"ListValue","values":[{"kind":"EnumValue","value":"FAILED"}]}},{"kind":"ObjectField","name":{"kind":"Name","value":"lowerTime"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeStart"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"upperTime"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeEnd"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"timeField"},"value":{"kind":"EnumValue","value":"STARTED_AT"}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}},{"kind":"Field","alias":{"kind":"Name","value":"canceledRuns"},"name":{"kind":"Name","value":"runsV2"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"filter"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"status"},"value":{"kind":"ListValue","values":[{"kind":"EnumValue","value":"CANCELLED"}]}},{"kind":"ObjectField","name":{"kind":"Name","value":"lowerTime"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeStart"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"upperTime"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeEnd"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"timeField"},"value":{"kind":"EnumValue","value":"STARTED_AT"}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}},{"kind":"Field","alias":{"kind":"Name","value":"succeededRuns"},"name":{"kind":"Name","value":"runsV2"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"filter"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"status"},"value":{"kind":"ListValue","values":[{"kind":"EnumValue","value":"COMPLETED"}]}},{"kind":"ObjectField","name":{"kind":"Name","value":"lowerTime"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeStart"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"upperTime"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeRangeEnd"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"timeField"},"value":{"kind":"EnumValue","value":"STARTED_AT"}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetFunctionEndedRunsCountQuery, GetFunctionEndedRunsCountQueryVariables>;
