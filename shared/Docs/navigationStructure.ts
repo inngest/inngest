@@ -1,16 +1,16 @@
-import TypeScriptIcon from "src/shared/Icons/TypeScript";
-import PythonIcon from "src/shared/Icons/Python";
-import GoIcon from "src/shared/Icons/Go";
-import GuideIcon from "src/shared/Icons/Guide";
-import { StatusIcon } from "src/shared/StatusWidget";
 import {
-  HomeIcon,
   CogIcon,
-  PlayIcon,
   CommandLineIcon,
+  HomeIcon,
   LifebuoyIcon,
+  PlayIcon,
   QuestionMarkCircleIcon,
 } from "@heroicons/react/24/outline";
+import GoIcon from "src/shared/Icons/Go";
+import GuideIcon from "src/shared/Icons/Guide";
+import PythonIcon from "src/shared/Icons/Python";
+import TypeScriptIcon from "src/shared/Icons/TypeScript";
+import { StatusIcon } from "src/shared/StatusWidget";
 
 // A basic link in the nav
 type NavLink = {
@@ -250,6 +250,11 @@ const sectionTypeScriptReference = [
       {
         title: "step.sleepUntil()",
         href: `/docs/reference/functions/step-sleep-until`,
+        className: "font-mono",
+      },
+      {
+        title: "step.invoke()",
+        href: `/docs/reference/functions/step-invoke`,
         className: "font-mono",
       },
       {
