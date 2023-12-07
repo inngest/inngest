@@ -35,7 +35,7 @@ export default function PlatformFeatures() {
             </p>
             <a
               href="/docs/platform/environments"
-              className="mt-4 font-medium text-slate-200 hover:text-white hover:underline decoration-dotted underline-offset-4 decoration-slate-50/30"
+              className="mt-4 font-medium text-slate-200 underline decoration-dotted underline-offset-4 decoration-slate-50/30 hover:text-white hover:decoration-white/50"
             >
               Learn more →
             </a>
@@ -69,7 +69,7 @@ export default function PlatformFeatures() {
             </p>
             <a
               href="/blog/2023-10-27-fn-metrics-release"
-              className="mt-4 font-medium text-slate-200 hover:text-white hover:underline decoration-dotted underline-offset-4 decoration-slate-50/30"
+              className="mt-4 font-medium text-slate-200 underline decoration-dotted underline-offset-4 decoration-slate-50/30 hover:text-white hover:decoration-white/50"
             >
               Learn more →
             </a>
@@ -113,7 +113,7 @@ export default function PlatformFeatures() {
           <div className="md:pb-8 lg:py-12 lg:pb-12">
             <h3 className="flex gap-2 items-center text-2xl font-semibold mb-5">
               <Replay />
-              Bulk Replay
+              Bulk Function Replay
             </h3>
             <p className="text-lg mb-7 font-medium text-slate-300">
               Never deal with the hassle of dead-letter-queues. Replay one or{" "}
@@ -121,16 +121,12 @@ export default function PlatformFeatures() {
               of a button.
             </p>
 
-            <p className="text-xl mb-7 font-bold text-slate-300">
-              Coming Q4 2023
-            </p>
-
-            {/* <a
-              href="/docs/platform/environments"
-              className="mt-4 font-medium text-slate-200 hover:text-white hover:underline decoration-dotted underline-offset-4 decoration-slate-50/30"
+            <a
+              href="/docs/platform/replay"
+              className="mt-4 font-medium text-slate-200 underline decoration-dotted underline-offset-4 decoration-slate-50/30 hover:text-white hover:decoration-white/50"
             >
               Learn more →
-            </a> */}
+            </a>
           </div>
 
           <div className="flex flex-col justify-end h-full md:pt-8">

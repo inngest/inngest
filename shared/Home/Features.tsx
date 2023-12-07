@@ -175,6 +175,12 @@ const content = [
         in a single click.
       </p>
     ),
+    ctas: [
+      {
+        href: "/docs/platform/replay",
+        text: "Learn about replay",
+      },
+    ],
   },
 ];
 
