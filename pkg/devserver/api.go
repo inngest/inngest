@@ -171,9 +171,24 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		return publicerr.Wrap(err, 400, "Invalid request")
 	}
 
-	if _, err := a.devserver.data.GetAppByChecksum(ctx, sum); err == nil {
-		// Already registered.
-		return nil
+	if app, err := a.devserver.data.GetAppByChecksum(ctx, sum); err == nil {
+		if !app.Error.Valid {
+			// Skip registration since the app was already successfully
+			// registered.
+			return nil
+		}
+
+		// Clear app error.
+		_, err = a.devserver.data.UpdateAppError(
+			ctx,
+			cqrs.UpdateAppErrorParams{
+				ID:    app.ID,
+				Error: sql.NullString{},
+			},
+		)
+		if err != nil {
+			return publicerr.Wrap(err, 500, "Error updating app error")
+		}
 	}
 
 	// Attempt to get the existing app by URL, and delete it if possible.
