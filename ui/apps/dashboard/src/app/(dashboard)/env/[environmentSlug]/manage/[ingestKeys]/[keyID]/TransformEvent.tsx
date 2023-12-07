@@ -4,9 +4,9 @@ import { useContext, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
-import { CodeBlock } from '@inngest/components/CodeBlock';
 import { toast } from 'sonner';
 
+import DashboardCodeBlock from '@/components/DashboardCodeBlock/DashboardCodeBlock';
 import { getManageKey } from '@/utils/urls';
 import makeVM from '@/utils/vm';
 import { Context } from './Context';
@@ -170,7 +170,7 @@ export default function TransformEvents({ keyID, metadata, keyName }: FilterEven
         />
       </div>
       <div className="mb-6">
-        <CodeBlock
+        <DashboardCodeBlock
           tabs={[
             {
               label: 'Payload',
@@ -188,7 +188,7 @@ export default function TransformEvents({ keyID, metadata, keyName }: FilterEven
           <p className="mb-6 text-sm text-slate-700">
             Paste the incoming JSON payload here to test your transform.
           </p>
-          <CodeBlock
+          <DashboardCodeBlock
             tabs={[
               {
                 label: 'Payload',
@@ -203,7 +203,7 @@ export default function TransformEvents({ keyID, metadata, keyName }: FilterEven
         <div className="w-6/12">
           <h2 className="pb-1 text-lg font-semibold">Transformed Event</h2>
           <p className="mb-6 text-sm text-slate-700">Preview the transformed JSON payload here.</p>
-          <CodeBlock
+          <DashboardCodeBlock
             tabs={[
               {
                 label: 'Payload',
