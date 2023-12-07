@@ -1,0 +1,75 @@
+# Replay functions
+
+Functions will fail. It's unavoidable. When they do, you need to recover from the failure quickly.
+
+When a large number of functions fail, you can easily _replay_ them in bulk from the Inngest dashboard.
+
+![Relay graphic](/assets/docs/platform/replay/featured-image.png)
+
+The recovery flow in other systems may require dead-letter queues or some other form of manual intervention.
+With Replay, you can replay functions in bulk from the Inngest dashboard:
+
+1. You detect an issue with your functions (e.g. a failure due to a bug or external system)
+2. You fix the issue and push to production
+3. You use Replay to replay the functions from the time range when the issues occurred
+
+Let's learn how you can use Replay to recover from function failures:
+
+## How to create a new Replay
+
+To replay a function, click the replay button which is present on both the function runs page and
+the function replay page. This will open a modal where you can select the runs you want to replay.
+
+<img
+  src="/assets/docs/platform/replay/replay-function-runs.png"
+  width="800"
+  height={800/559*1}
+  quality="95"
+  className="rounded-md"
+  alt="Replay button in function runs page"
+/>
+
+Each replay requires a name, a time range and status(es) to filter the runs to be replayed.
+We recommend using a name that describes the incident that you're resolving so your team can
+understand this later, or maybe just mention the bug tracker issue:  e.g. "Bug fix from PR #958",
+"API-395: Networking blip."
+
+<img
+  src="/assets/docs/platform/replay/replay-function-modal-empty.png"
+  width="600"
+  height="600"
+  quality="95"
+  className="rounded-md max-w-[600px]"
+  alt="Replay modal form"
+/>
+
+Here's an example of a Replay that fixed a bug triggered by daylight savings time between the given timestamp.
+For this issue, we only want to target the "Failed" function runs statuses. You can select multiple run
+statuses in case your function might have had a bug that failed silently, so you want to replay anything
+previously marked as "Succeeded" as well.
+
+<img
+  src="/assets/docs/platform/replay/replay-function-modal-filled.png"
+  width="600"
+  height="600"
+  quality="95"
+  className="rounded-md max-w-[600px]"
+  alt="Replay modal form filled"
+/>
+
+Once you have selected the runs you want to replay, click the replay button to start the replay. You
+will be redirected to the replay page where you can see the progress of the replay.
+
+<img
+  src="/assets/docs/platform/replay/replay-function-replays.png"
+  width="800"
+  height={800/559*1}
+  quality="95"
+  className="rounded-md"
+  alt="List of all Replays"
+/>
+
+The replay will spread out the runs over time as to not overwhelm your application with requests.
+Depending on the number of runs to be replayed, this could take seconds or minutes to complete.
+
+When all the runs have been replayed, the replay will be marked as "Completed."

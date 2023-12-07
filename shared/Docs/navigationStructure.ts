@@ -138,16 +138,20 @@ const sectionPlatform = [
     title: "Inngest Cloud",
     links: [
       {
-        title: "Working With Environments",
+        title: "Working with environments",
         href: `/docs/platform/environments`,
       },
       {
-        title: "Creating an Event Key",
+        title: "Creating an event key",
         href: `/docs/events/creating-an-event-key`,
       },
       {
         title: "Consuming webhook events",
         href: `/docs/platform/webhooks`,
+      },
+      {
+        title: "Replaying functions",
+        href: `/docs/platform/replay`,
       },
     ],
   },
@@ -159,7 +163,7 @@ const sectionPlatform = [
         href: `/docs/usage-limits/inngest`,
       },
       {
-        title: "Serverless Providers",
+        title: "Serverless providers",
         href: `/docs/usage-limits/providers`,
       },
     ],
