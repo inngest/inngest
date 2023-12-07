@@ -6,7 +6,7 @@ import {
   baseFetchSucceeded,
   type FetchResult,
 } from '@inngest/components/types/fetch';
-import { useQuery, type TypedDocumentNode } from 'urql';
+import { useQuery, type TypedDocumentNode, type UseQueryArgs } from 'urql';
 
 type Args<
   ResultT extends { [key in string]: unknown },
@@ -15,6 +15,7 @@ type Args<
   query: TypedDocumentNode<ResultT, VariablesT>;
   skip: boolean;
   variables: VariablesT;
+  context: UseQueryArgs<VariablesT, ResultT>['context'];
   pollIntervalInMilliseconds?: number;
 };
 
@@ -30,11 +31,13 @@ export function useGraphQLQuery<
   query,
   skip,
   variables,
+  context,
   pollIntervalInMilliseconds,
 }: Args<ResultT, VariablesT>): FetchResult<ResultT, { skippable: true }> {
   const [res, executeQuery] = useQuery({
     query,
     variables,
+    context,
     pause: skip,
   });
 

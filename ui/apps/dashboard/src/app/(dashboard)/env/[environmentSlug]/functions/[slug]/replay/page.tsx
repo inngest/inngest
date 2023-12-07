@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { ReplayStatusIcon } from '@inngest/components/ReplayStatusIcon';
 import { Table } from '@inngest/components/Table';
@@ -106,6 +106,7 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
       environmentID: environment?.id!,
       functionSlug: functionSlug,
     },
+    context: useMemo(() => ({ additionalTypenames: ['Replay'] }), []),
     skip: !environment?.id,
     pollIntervalInMilliseconds: 5_000,
   });
