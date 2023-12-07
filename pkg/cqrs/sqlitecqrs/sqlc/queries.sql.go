@@ -287,19 +287,22 @@ func (q *Queries) GetEventByInternalID(ctx context.Context, internalID ulid.ULID
 }
 
 const getEventsTimebound = `-- name: GetEventsTimebound :many
-SELECT internal_id, account_id, workspace_id, source, source_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts
-FROM events
+SELECT DISTINCT e.internal_id, e.account_id, e.workspace_id, e.source, e.source_id, e.received_at, e.event_id, e.event_name, e.event_data, e.event_user, e.event_v, e.event_ts
+FROM events AS e
+LEFT OUTER JOIN function_runs AS r ON r.event_id = e.internal_id
 WHERE
-	received_at > ?
-	AND received_at <= ?
+	e.received_at > ?
+	AND e.received_at <= ?
 	AND (
+		r.run_id IS NOT NULL
+
 		-- It'd be better to use a boolean but sqlc keeps making
 		-- @include_internal a string.
-		CASE WHEN event_name LIKE 'inngest/%' THEN 'true' ELSE 'false' END = ?
+		OR CASE WHEN e.event_name LIKE 'inngest/%' THEN 'true' ELSE 'false' END = ?
 
-		OR event_name NOT LIKE 'inngest/%'
+		-- OR e.event_name NOT LIKE 'inngest/%'
 	)
-ORDER BY received_at DESC
+ORDER BY e.received_at DESC
 LIMIT ?
 `
 

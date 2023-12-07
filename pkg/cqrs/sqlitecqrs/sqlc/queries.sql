@@ -110,19 +110,23 @@ INSERT INTO events
 SELECT * FROM events WHERE internal_id = ?;
 
 -- name: GetEventsTimebound :many
-SELECT *
-FROM events
+SELECT DISTINCT e.*
+FROM events AS e
+LEFT OUTER JOIN function_runs AS r ON r.event_id = e.internal_id
 WHERE
-	received_at > @after
-	AND received_at <= @before
+	e.received_at > @after
+	AND e.received_at <= @before
 	AND (
-		-- It'd be better to use a boolean but sqlc keeps making
-		-- @include_internal a string.
-		CASE WHEN event_name LIKE 'inngest/%' THEN 'true' ELSE 'false' END = @include_internal
+		-- Include internal events that triggered a run (e.g. an onFailure
+		-- handler)
+		r.run_id IS NOT NULL
 
-		OR event_name NOT LIKE 'inngest/%'
+		-- Optionally include internal events that did not trigger a run. It'd
+		-- be better to use a boolean param instead of a string param but sqlc
+		-- keeps making @include_internal a string.
+		OR CASE WHEN e.event_name LIKE 'inngest/%' THEN 'true' ELSE 'false' END = @include_internal
 	)
-ORDER BY received_at DESC
+ORDER BY e.received_at DESC
 LIMIT ?;
 
 -- name: WorkspaceEvents :many
