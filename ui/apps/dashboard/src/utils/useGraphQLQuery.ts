@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import {
   baseFetchFailed,
   baseFetchLoading,
@@ -5,7 +6,7 @@ import {
   baseFetchSucceeded,
   type FetchResult,
 } from '@inngest/components/types/fetch';
-import { useQuery, type TypedDocumentNode } from 'urql';
+import { useQuery, type TypedDocumentNode, type UseQueryArgs } from 'urql';
 
 type Args<
   ResultT extends { [key in string]: unknown },
@@ -14,6 +15,8 @@ type Args<
   query: TypedDocumentNode<ResultT, VariablesT>;
   skip: boolean;
   variables: VariablesT;
+  context?: UseQueryArgs<VariablesT, ResultT>['context'];
+  pollIntervalInMilliseconds?: number;
 };
 
 /**
@@ -28,14 +31,29 @@ export function useGraphQLQuery<
   query,
   skip,
   variables,
+  context,
+  pollIntervalInMilliseconds,
 }: Args<ResultT, VariablesT>): FetchResult<ResultT, { skippable: true }> {
-  const [res] = useQuery({
+  const [res, executeQuery] = useQuery({
     query,
     variables,
+    context,
     pause: skip,
   });
 
-  if (res.fetching) {
+  useEffect(() => {
+    if (skip || res.fetching || !pollIntervalInMilliseconds) {
+      return;
+    }
+
+    const timeoutID = setTimeout(
+      () => executeQuery({ requestPolicy: 'network-only' }),
+      pollIntervalInMilliseconds
+    );
+    return () => clearTimeout(timeoutID);
+  }, [skip, res.fetching, pollIntervalInMilliseconds, executeQuery]);
+
+  if (res.fetching && !res.data) {
     return baseFetchLoading;
   }
 
