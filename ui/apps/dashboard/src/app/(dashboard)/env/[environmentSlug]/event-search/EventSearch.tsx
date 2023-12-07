@@ -88,31 +88,37 @@ export function EventSearch({ environmentSlug }: Props) {
 
   return (
     <>
-      <form onSubmit={onSubmit} className="m-4 flex gap-4">
-        <div className="flex gap-4">
-          <Input
-            className="min-w-[800px]"
-            defaultValue={query}
-            name="query"
-            placeholder="CEL query"
-            required
-            type="text"
-          />
-          <div className="flex items-start gap-1">
+      <div className="block items-center justify-between lg:flex">
+        <form onSubmit={onSubmit} className="m-4 flex gap-4">
+          <div className="flex gap-4">
+            <Input
+              className="min-w-[800px]"
+              defaultValue={query}
+              name="query"
+              placeholder="CEL query"
+              required
+              type="text"
+            />
             <Button kind="primary" type="submit" loading={fetching} label="Search" />
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <IconInfo className="h-4 w-4 text-slate-400" />
-                </TooltipTrigger>
-                <TooltipContent className="whitespace-pre-line">
-                  Filter is only returning the last 3 days
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
           </div>
+        </form>
+        <div className="m-4 flex gap-1">
+          <p className="text-sm">Experimental feature</p>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <IconInfo className="h-4 w-4 text-slate-400" />
+              </TooltipTrigger>
+              <TooltipContent className="whitespace-pre-line">
+                This is an experimental feature, with a few limitations:
+                <ul>
+                  <li> - Filter is only returning the last 3 days</li>
+                </ul>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
-      </form>
+      </div>
 
       <EventTable
         events={events}
