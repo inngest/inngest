@@ -18,7 +18,17 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 		After:  q.After,
 	}
 
-	evts, err := r.Data.GetEventsTimebound(ctx, tb, q.Limit)
+	includeInternalEvents := false
+	if q.IncludeInternalEvents != nil {
+		includeInternalEvents = *q.IncludeInternalEvents
+	}
+
+	evts, err := r.Data.GetEventsTimebound(
+		ctx,
+		tb,
+		q.Limit,
+		includeInternalEvents,
+	)
 	if err != nil {
 		return nil, err
 	}

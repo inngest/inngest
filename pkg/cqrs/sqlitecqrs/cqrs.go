@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -318,7 +319,12 @@ func (w wrapper) WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, opt
 	return out, nil
 }
 
-func (w wrapper) GetEventsTimebound(ctx context.Context, t cqrs.Timebound, limit int) ([]*cqrs.Event, error) {
+func (w wrapper) GetEventsTimebound(
+	ctx context.Context,
+	t cqrs.Timebound,
+	limit int,
+	includeInternal bool,
+) ([]*cqrs.Event, error) {
 	after := time.Time{}                           // after the beginning of time, eg all
 	before := time.Now().Add(time.Hour * 24 * 365) // before 1 year in the future, eg all
 	if t.After != nil {
@@ -329,9 +335,10 @@ func (w wrapper) GetEventsTimebound(ctx context.Context, t cqrs.Timebound, limit
 	}
 
 	evts, err := w.q.GetEventsTimebound(ctx, sqlc.GetEventsTimeboundParams{
-		After:  after,
-		Before: before,
-		Limit:  int64(limit),
+		After:           after,
+		Before:          before,
+		IncludeInternal: strconv.FormatBool(includeInternal),
+		Limit:           int64(limit),
 	})
 	if err != nil {
 		return []*cqrs.Event{}, err

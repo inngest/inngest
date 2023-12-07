@@ -54,4 +54,5 @@ input StreamQuery {
   # field, ensuring that only new items are received.
   before: Time
   limit: Int! = 20
+  includeInternalEvents: Boolean
 }

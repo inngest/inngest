@@ -1407,6 +1407,7 @@ input StreamQuery {
   # field, ensuring that only new items are received.
   before: Time
   limit: Int! = 20
+  includeInternalEvents: Boolean
 }
 `, BuiltIn: false},
 	{Name: "../gql.schema.graphql", Input: `scalar Time
@@ -10146,7 +10147,7 @@ func (ec *executionContext) unmarshalInputStreamQuery(ctx context.Context, obj i
 		asMap["limit"] = 20
 	}
 
-	fieldsInOrder := [...]string{"after", "before", "limit"}
+	fieldsInOrder := [...]string{"after", "before", "limit", "includeInternalEvents"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -10174,6 +10175,14 @@ func (ec *executionContext) unmarshalInputStreamQuery(ctx context.Context, obj i
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
 			it.Limit, err = ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "includeInternalEvents":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includeInternalEvents"))
+			it.IncludeInternalEvents, err = ec.unmarshalOBoolean2ᚖbool(ctx, v)
 			if err != nil {
 				return it, err
 			}

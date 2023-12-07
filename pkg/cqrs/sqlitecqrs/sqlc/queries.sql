@@ -110,7 +110,20 @@ INSERT INTO events
 SELECT * FROM events WHERE internal_id = ?;
 
 -- name: GetEventsTimebound :many
-SELECT * FROM events WHERE received_at > @after AND received_at <= @before ORDER BY received_at DESC LIMIT ?;
+SELECT *
+FROM events
+WHERE
+	received_at > @after
+	AND received_at <= @before
+	AND (
+		-- It'd be better to use a boolean but sqlc keeps making
+		-- @include_internal a string.
+		CASE WHEN event_name LIKE 'inngest/%' THEN 'true' ELSE 'false' END = @include_internal
+
+		OR event_name NOT LIKE 'inngest/%'
+	)
+ORDER BY received_at DESC
+LIMIT ?;
 
 -- name: WorkspaceEvents :many
 SELECT * FROM events WHERE internal_id < @cursor AND received_at <= @before AND received_at >= @after ORDER BY internal_id DESC LIMIT ?;

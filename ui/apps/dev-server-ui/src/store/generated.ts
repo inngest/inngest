@@ -125,8 +125,6 @@ export type FunctionRun = {
   pendingSteps: Maybe<Scalars['Int']>;
   startedAt: Maybe<Scalars['Time']>;
   status: Maybe<FunctionRunStatus>;
-  /** @deprecated Field no longer supported */
-  timeline: Maybe<Array<FunctionRunEvent>>;
   waitingFor: Maybe<StepEventWait>;
   workspace: Maybe<Workspace>;
 };
@@ -382,6 +380,7 @@ export type StreamItem = {
 export type StreamQuery = {
   after?: InputMaybe<Scalars['Time']>;
   before?: InputMaybe<Scalars['Time']>;
+  includeInternalEvents?: InputMaybe<Scalars['Boolean']>;
   limit?: Scalars['Int'];
 };
 
@@ -459,6 +458,7 @@ export type GetTriggersStreamQueryVariables = Exact<{
   limit: Scalars['Int'];
   after: InputMaybe<Scalars['Time']>;
   before: InputMaybe<Scalars['Time']>;
+  includeInternalEvents: Scalars['Boolean'];
 }>;
 
 
@@ -665,8 +665,10 @@ export const DeleteAppDocument = `
 }
     `;
 export const GetTriggersStreamDocument = `
-    query GetTriggersStream($limit: Int!, $after: Time, $before: Time) {
-  stream(query: {limit: $limit, after: $after, before: $before}) {
+    query GetTriggersStream($limit: Int!, $after: Time, $before: Time, $includeInternalEvents: Boolean!) {
+  stream(
+    query: {limit: $limit, after: $after, before: $before, includeInternalEvents: $includeInternalEvents}
+  ) {
     createdAt
     id
     trigger
