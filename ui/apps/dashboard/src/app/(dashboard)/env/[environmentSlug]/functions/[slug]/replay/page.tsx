@@ -2,6 +2,7 @@
 
 import React, { useRef } from 'react';
 import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
+import { Link } from '@inngest/components/Link';
 import { ReplayStatusIcon } from '@inngest/components/ReplayStatusIcon';
 import { Table } from '@inngest/components/Table';
 import type { Replay } from '@inngest/components/types/replay';
@@ -173,7 +174,14 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
             getCoreRowModel: getCoreRowModel(),
             enableSorting: false,
           }}
-          blankState={<p>You have no replays for this function.</p>}
+          blankState={
+            <p>
+              You have no replays for this function.{' '}
+              <Link className="inline-flex" href="https://inngest.com/docs/platform/replay">
+                Learn about Replay
+              </Link>
+            </p>
+          }
         />
       </div>
     </>

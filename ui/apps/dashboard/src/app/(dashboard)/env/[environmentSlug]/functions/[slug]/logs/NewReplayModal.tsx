@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
 import { IconReplay } from '@inngest/components/icons/Replay';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -286,15 +287,18 @@ export default function NewReplayModal({
             </p>
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
-          <Button type="button" appearance="outlined" label="Cancel" btnAction={onClose} />
-          <Button
-            label="Replay Function"
-            kind="primary"
-            type="submit"
-            icon={<IconReplay className="h-5 w-5 text-white" />}
-            disabled={isCreatingFunctionReplay}
-          />
+        <div className="flex justify-between border-t border-slate-100 px-5 py-4">
+          <Link href="https://inngest.com/docs/platform/replay">Learn about Replay</Link>
+          <div className="flex gap-2">
+            <Button type="button" appearance="outlined" label="Cancel" btnAction={onClose} />
+            <Button
+              label="Replay Function"
+              kind="primary"
+              type="submit"
+              icon={<IconReplay className="h-5 w-5 text-white" />}
+              disabled={isCreatingFunctionReplay}
+            />
+          </div>
         </div>
       </form>
     </Modal>
