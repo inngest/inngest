@@ -1,5 +1,4 @@
 import { useRef } from 'react';
-import Link from 'next/link';
 import { Table } from '@inngest/components/Table';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 
@@ -29,7 +28,7 @@ export function EventTable({ events, onSelect }: Props) {
 function useColumns(onSelect: (eventID: string) => void) {
   const columnHelper = createColumnHelper<Event>();
 
-  return [
+  const columns = [
     columnHelper.accessor('id', {
       cell: (props) => {
         const { id, name } = props.row.original;
@@ -47,4 +46,6 @@ function useColumns(onSelect: (eventID: string) => void) {
       header: () => <span>Received At</span>,
     }),
   ];
+
+  return columns;
 }
