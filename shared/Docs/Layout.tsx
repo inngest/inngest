@@ -42,10 +42,12 @@ export function Layout({
   metaTitle,
   description,
 }: Props) {
-  const preferredTitle: string = metaTitle || title;
-  const pageTitle = preferredTitle
-    ? `${preferredTitle} - Inngest Documentation`
-    : `Inngest Documentation`;
+  const siteTitle = `Inngest Documentation`;
+  const preferredTitle: string = metaTitle || title || siteTitle;
+  const pageTitle =
+    preferredTitle === siteTitle
+      ? preferredTitle
+      : `${preferredTitle} - ${siteTitle}`;
   const metaDescription =
     description || `Inngest documentation for ${preferredTitle}`;
   const metaImage = getOpenGraphImageURL({ title: preferredTitle });
