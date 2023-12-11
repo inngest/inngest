@@ -196,6 +196,9 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 	}
 	req.Header.Add("Content-Type", "application/json")
 
+	// Always close the request after reading the body, ensuring the connection is not recycled.
+	req.Close = true
+
 	if len(r.SigningKey) > 0 {
 		req.Header.Add("X-Inngest-Signature", Sign(ctx, r.SigningKey, r.Input))
 	}
@@ -203,7 +206,11 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 	pre := time.Now()
 	resp, err := c.Do(req)
 	dur := time.Since(pre)
-
+	defer func() {
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+	}()
 	if err != nil {
 		if urlErr, ok := err.(*url.Error); ok && urlErr.Err == context.DeadlineExceeded {
 			// This timed out.
@@ -221,7 +228,6 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error executing request: %w", err)
 	}
-	defer resp.Body.Close()
 	byt, err := io.ReadAll(io.LimitReader(resp.Body, consts.MaxBodySize))
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
