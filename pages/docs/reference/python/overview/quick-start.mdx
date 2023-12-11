@@ -3,7 +3,7 @@
 This guide will teach you how to add Inngest to a FastAPI app and run an Inngest function.
 
 <Callout variant="info">
-  💡 Inngest currently supports FastAPI, Flask, and Tornado. If you'd like support for your favorite framework please open an issue on [GitHub](https://github.com/inngest/inngest-py)!
+  💡 Inngest currently supports Django, FastAPI, Flask, and Tornado. If you'd like support for your favorite framework please open an issue on [GitHub](https://github.com/inngest/inngest-py)!
 </Callout>
 
 ---
@@ -11,7 +11,7 @@ This guide will teach you how to add Inngest to a FastAPI app and run an Inngest
 ## Create an app
 
 <Callout variant="warning">
-  <span style={{fontFamily: 'none'}}>⚠</span> Use Python 3.10 or higher.
+  ⚠️ Use Python 3.10 or higher.
 </Callout>
 
 Create and source virtual environment:
@@ -77,7 +77,9 @@ uvicorn main:app --reload
 
 ## Run Inngest Dev Server
 
-Inngest functions are run using an Inngest server. The Inngest [Dev Server](https://github.com/inngest/inngest) is the standard way to locally run an Inngest server:
+Inngest functions are run using an **Inngest server**. For this guide we'll use the [Dev Server](https://github.com/inngest/inngest), which is a single-binary version of our [Cloud](https://app.inngest.com) offering. The Dev Server is great for local development and testing, while Cloud is for deployed apps (e.g. production).
+
+Start the Dev Server:
 ```sh
 npx inngest-cli@latest dev
 ```
