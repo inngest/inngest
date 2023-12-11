@@ -20,13 +20,13 @@ func TestParse(t *testing.T) {
 	}{
 		// with events
 		{
-			expr: `"lol" == event.data || event.name == "foo" || (user.source == 'test' || user.source == 'google') && date(user.next_visit) > now_plus("24h") && user.email == 'test@example.com'`,
+			expr: `"lol" == event.data || event.name == "foo" || (async.source == 'test' || async.source == 'google') && date(async.next_visit) > now_plus("24h") && async.email == 'test@example.com'`,
 			expected: [][]string{
 				{"event", "data"},
 				{"event", "name"},
-				{"user", "email"},
-				{"user", "next_visit"},
-				{"user", "source"},
+				{"async", "email"},
+				{"async", "next_visit"},
+				{"async", "source"},
 			},
 		},
 		// nested
@@ -432,9 +432,9 @@ func TestEvaluateExpression(t *testing.T) {
 		},
 		// basics
 		{
-			expr: `steps.first.foo == 'test' && steps.second.bar != true && steps.second.baz != true`,
+			expr: `event.first.foo == 'test' && event.second.bar != true && event.second.baz != true`,
 			data: map[string]interface{}{
-				"steps": map[string]map[string]interface{}{
+				"event": map[string]map[string]interface{}{
 					"first": {
 						"foo": "test",
 					},
@@ -448,9 +448,9 @@ func TestEvaluateExpression(t *testing.T) {
 			shouldErr: false,
 		},
 		{
-			expr: `actions.first.foo != 'test' && (actions.first.bar == true || actions.second.baz == true)`,
+			expr: `async.first.foo != 'test' && (async.first.bar == true || async.second.baz == true)`,
 			data: map[string]interface{}{
-				"actions": map[string]map[string]interface{}{
+				"async": map[string]map[string]interface{}{
 					"first": {
 						"foo": "test",
 					},
@@ -527,7 +527,7 @@ func TestEvaluateExpression(t *testing.T) {
 			"",
 		},
 		{
-			"event.data.name == action.first.result.name",
+			"event.data.name == async.first.result.name",
 			map[string]interface{}{
 				"event": event.Event{
 					Data: map[string]interface{}{"name": "no"},
@@ -585,30 +585,15 @@ func TestEvaluateExpression(t *testing.T) {
 		},
 		// includes
 		{
-			expr:      `user.nonexistent.exists(x, x == 'a')`,
+			expr:      `event.nonexistent.exists(x, x == 'a')`,
 			expected:  false,
 			earliest:  nil,
 			shouldErr: false,
 		},
-		// steps
 		{
-			expr: `steps.first.foo == 'test'`,
+			expr: `async.first.foo == 'test' && async.first.bar != true`,
 			data: map[string]interface{}{
-				"steps": map[string]interface{}{
-					"first": map[string]interface{}{
-						"foo": "test",
-					},
-				},
-			},
-			expected:  true,
-			earliest:  nil,
-			shouldErr: false,
-		},
-		// action
-		{
-			expr: `actions.first.foo == 'test' && actions.first.bar != true`,
-			data: map[string]interface{}{
-				"actions": map[string]map[string]interface{}{
+				"async": map[string]map[string]interface{}{
 					"first": {
 						"foo": "test",
 					},
@@ -619,9 +604,9 @@ func TestEvaluateExpression(t *testing.T) {
 			shouldErr: false,
 		},
 		{
-			expr: `actions.first.foo == 'test' && actions.first.bar != true`,
+			expr: `async.first.foo == 'test' && async.first.bar != true`,
 			data: map[string]interface{}{
-				"actions": map[string]map[string]interface{}{
+				"async": map[string]map[string]interface{}{
 					"first": {
 						"foo": "test",
 					},
@@ -683,7 +668,7 @@ func TestEvaluateExpression(t *testing.T) {
 						"action": "opened",
 					},
 				},
-				"response": map[string]interface{}{"status": "200"},
+				"async": map[string]interface{}{"status": "200"},
 			},
 			true,
 			nil,
@@ -698,7 +683,7 @@ func TestEvaluateExpression(t *testing.T) {
 						"action": "opened",
 					},
 				},
-				"response": map[string]interface{}{"status": "200"},
+				"async": map[string]interface{}{"status": "200"},
 			},
 			false,
 			nil,
@@ -758,7 +743,7 @@ func TestEvaluateExpression(t *testing.T) {
 						"action": "opened",
 					},
 				},
-				"response": map[string]interface{}{"status": "200"},
+				"async": map[string]interface{}{"status": "200"},
 			},
 			true,
 			nil,
@@ -766,9 +751,9 @@ func TestEvaluateExpression(t *testing.T) {
 			"",
 		},
 		{
-			"int(response.status) == 200",
+			"int(async.status) == 200",
 			map[string]interface{}{
-				"response": map[string]interface{}{"status": "200"},
+				"async": map[string]interface{}{"status": "200"},
 			},
 			true,
 			nil,
@@ -803,11 +788,11 @@ func TestEvaluateExpression(t *testing.T) {
 		// multiline
 		{
 			`
-											int(response.status) >= 400 &&
-											response.error == true
+											int(event.status) >= 400 &&
+											event.error == true
 										`,
 			map[string]interface{}{
-				"response": map[string]interface{}{"status": "400", "error": true},
+				"event": map[string]interface{}{"status": "400", "error": true},
 			},
 			true,
 			nil,
@@ -968,9 +953,9 @@ func TestEvaluateExpression(t *testing.T) {
 		},
 		// Struct + cel stdlib expressions
 		{
-			"[1, 2, 3].all(x, x > 0) && response.status == '200'",
+			"[1, 2, 3].all(x, x > 0) && event.status == '200'",
 			map[string]interface{}{
-				"response": map[string]interface{}{"status": "200"},
+				"event": map[string]interface{}{"status": "200"},
 			},
 			true,
 			nil,
@@ -978,10 +963,10 @@ func TestEvaluateExpression(t *testing.T) {
 			"",
 		},
 		{
-			"response.status == 200",
+			"async.status == 200",
 			map[string]interface{}{
-				"event":    map[string]interface{}{"foo": "bar"},
-				"response": map[string]interface{}{"status": "200"},
+				"event": map[string]interface{}{"foo": "bar"},
+				"async": map[string]interface{}{"status": "200"},
 			},
 			false,
 			nil,
@@ -1043,14 +1028,14 @@ func TestFilteredAttributes(t *testing.T) {
 	}{
 		{
 			// one present, one mising
-			expr: `event.data.name == "hi" && user.favourites == ['a']`,
+			expr: `event.data.name == "hi" && event.favourites == ['a']`,
 			in: NewData(map[string]interface{}{
 				"event": map[string]interface{}{
 					"data": map[string]interface{}{
 						"name":  "hi",
 						"email": "some",
 					},
-					"user": map[string]interface{}{
+					"event": map[string]interface{}{
 						"external_id": 1,
 						"email":       "test@egypt.lol",
 					},
@@ -1065,8 +1050,7 @@ func TestFilteredAttributes(t *testing.T) {
 			}),
 		},
 		{
-			// actions vs action
-			expr: `event.data.name == "hi" && event.user.email == "what" && actions.first.data.ok == true && response.something == false`,
+			expr: `event.data.name == "hi" && event.user.email == "what" && async.first.data.ok == true && async.something == false`,
 			in: NewData(map[string]interface{}{
 				"event": map[string]interface{}{
 					"data": map[string]interface{}{
@@ -1078,7 +1062,7 @@ func TestFilteredAttributes(t *testing.T) {
 						"email":       "test@egypt.lol",
 					},
 				},
-				"actions": map[string]interface{}{
+				"async": map[string]interface{}{
 					"first": map[string]interface{}{
 						"data": map[string]interface{}{
 							"ok":      false,
@@ -1101,7 +1085,7 @@ func TestFilteredAttributes(t *testing.T) {
 						"email": "test@egypt.lol",
 					},
 				},
-				"actions": map[string]interface{}{
+				"async": map[string]interface{}{
 					"first": map[string]interface{}{
 						"data": map[string]interface{}{
 							"ok": false,
@@ -1112,7 +1096,7 @@ func TestFilteredAttributes(t *testing.T) {
 		},
 		{
 			// three present, different attrs
-			expr: `event.data.name == "hi" && event.user.email == "what" && action.first.data.ok == true && response.something == false`,
+			expr: `event.data.name == "hi" && event.user.email == "what" && async.first.data.ok == true && async.something == false`,
 			in: NewData(map[string]interface{}{
 				"event": map[string]interface{}{
 					"data": map[string]interface{}{
@@ -1124,7 +1108,7 @@ func TestFilteredAttributes(t *testing.T) {
 						"email":       "test@egypt.lol",
 					},
 				},
-				"action": map[string]interface{}{
+				"async": map[string]interface{}{
 					"first": map[string]interface{}{
 						"data": map[string]interface{}{
 							"ok":      false,
@@ -1147,7 +1131,7 @@ func TestFilteredAttributes(t *testing.T) {
 						"email": "test@egypt.lol",
 					},
 				},
-				"action": map[string]interface{}{
+				"async": map[string]interface{}{
 					"first": map[string]interface{}{
 						"data": map[string]interface{}{
 							"ok": false,

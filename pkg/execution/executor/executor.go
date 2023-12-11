@@ -1428,7 +1428,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		}
 
 		// Take the data for expressions based off of state.
-		ed := expressions.NewData(state.EdgeExpressionData(ctx, run, ""))
+		ed := expressions.NewData(state.ExpressionData(ctx, run))
 		data = expr.FilteredAttributes(ctx, ed).Map()
 	}
 
