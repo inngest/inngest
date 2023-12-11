@@ -208,7 +208,7 @@ inngest.createFunction(
   { name: "Send welcome email", id: "send-welcome-email" },
   { event: "clerk/user.created" },
   async ({ event, step }) => {
-    const emailAddress = user.email_addresses[0].email_address;
+    const emailAddress = event.data.email_addresses[0].email_address;
     await step.run('send-email', async () => {
       return await resend.emails.send({
         to: emailAddress,
