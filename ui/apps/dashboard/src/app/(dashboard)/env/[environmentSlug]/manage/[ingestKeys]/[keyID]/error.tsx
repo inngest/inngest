@@ -1,11 +1,22 @@
 'use client';
 
+import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
+import * as Sentry from '@sentry/nextjs';
 
 import { getManageKey } from '@/utils/urls';
 
-export default function EventKeyError() {
+type EventKeyErrorProps = {
+  error: Error & { digest?: string };
+  reset: () => void;
+};
+
+export default function EventKeyError({ error }: EventKeyErrorProps) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   const pathname = usePathname();
   const page = getManageKey(pathname);
 
