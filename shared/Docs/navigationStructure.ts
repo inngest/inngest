@@ -332,6 +332,10 @@ const sectionTypeScriptReference = [
         title: "Using TypeScript",
         href: `/docs/typescript`,
       },
+      {
+        title: "ESLint plugin",
+        href: `/docs/sdk/eslint`,
+      },
       { title: "Upgrading to v3", href: `/docs/sdk/migration` },
     ],
   },

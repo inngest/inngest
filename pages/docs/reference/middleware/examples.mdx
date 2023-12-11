@@ -120,6 +120,8 @@ type FilterActions<Fns extends Record<string, any>> = {
 
 Inngest helps memoize state between steps within a function, but you may want to encrypt this, ensuring plaintext data never leaves your server.
 
+Our [@inngest/middleware-encryption](https://www.npmjs.com/package/@inngest/middleware-encryption) package uses this method to encrypt and decrypt data.
+
 <Callout>
 ⚠️ If you encrypt your step data and lose your encryption key, you'll lose access to all encrypted state. Be careful!
 </Callout>
