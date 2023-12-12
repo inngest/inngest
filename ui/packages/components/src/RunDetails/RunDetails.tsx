@@ -62,6 +62,7 @@ export function RunDetails({
   });
 
   const isSuccess = run?.status === 'COMPLETED';
+  const isFail = run?.status === 'FAILED';
 
   return (
     <ContentCard
@@ -89,10 +90,10 @@ export function RunDetails({
       {run && history && getHistoryItemOutput && (
         <>
           <div className="px-5 pt-4">
-            {run.status && run.endedAt && run.output && isSuccess && (
+            {run.status && run.endedAt && run.output && (isSuccess || isFail) && (
               <OutputCard content={run.output} isSuccess={isSuccess} />
             )}
-            <CancellationSummary history={history} />    
+            <CancellationSummary history={history} />
             <WaitingSummary history={history} />
             <SleepingSummary history={history} />
           </div>
