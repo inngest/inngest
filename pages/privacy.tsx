@@ -1,7 +1,9 @@
 import styled from "@emotion/styled";
-import Head from "next/head";
-import Footer from "../shared/legacy/Footer";
-import Nav from "../shared/legacy/nav";
+import React from "react";
+import Header from "src/shared/Header";
+import Container from "src/shared/layout/Container";
+import Footer from "src/shared/Footer";
+import { Button } from "src/shared/Button";
 
 export async function getStaticProps() {
   return {
@@ -17,11 +19,13 @@ export async function getStaticProps() {
 export default function Privacy() {
   return (
     <>
-      <Nav />
+      <Header />
 
-      <Content>
-        <iframe src="https://www.iubenda.com/privacy-policy/26885259" />
-      </Content>
+      <Container>
+        <Content>
+          <iframe src="https://www.iubenda.com/privacy-policy/26885259" />
+        </Content>
+      </Container>
 
       <Footer />
     </>
@@ -35,7 +39,7 @@ const Content = styled.div`
   iframe {
     border: 0;
     width: 100%;
-    min-height: calc(100vh - 200px);
+    min-height: 1200px;
     margin: 50px 0;
   }
 
