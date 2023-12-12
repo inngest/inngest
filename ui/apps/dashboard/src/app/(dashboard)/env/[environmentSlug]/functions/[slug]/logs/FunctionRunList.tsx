@@ -9,6 +9,7 @@ import { Table } from '@inngest/components/Table';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import { useQuery } from 'urql';
 
+import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import { FunctionRunStatus, FunctionRunTimeField, type RunListItem } from '@/gql/graphql';
 import { useEnvironment } from '@/queries';
@@ -97,13 +98,16 @@ function createColumns({
     }),
     columnHelper.accessor('startedAt', {
       header: () => <span>Scheduled At</span>,
-      cell: (props) => <time>{props.getValue()}</time>,
+      cell: (props) => <Time value={new Date(props.getValue())} />,
       size: 300,
       minSize: 300,
     }),
     columnHelper.accessor('endedAt', {
       header: () => <span>Ended At</span>,
-      cell: (props) => <time>{props.getValue()}</time>,
+      cell: (props) => {
+        const endedAt = props.getValue();
+        return <>{endedAt ? <Time value={new Date(endedAt)} /> : <p>-</p>}</>;
+      },
       size: 300,
       minSize: 300,
     }),
