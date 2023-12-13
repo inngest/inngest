@@ -4,6 +4,7 @@ import {
   CodeBracketSquareIcon,
   MagnifyingGlassIcon,
   RocketLaunchIcon,
+  Squares2X2Icon,
   WrenchIcon,
 } from '@heroicons/react/20/solid';
 
@@ -59,17 +60,31 @@ export default async function AppNavigation({ environmentSlug }: AppNavigationPr
     },
   ];
 
-  if (isEventSearchEnabled) {
-    // Insert the "Event Search" item after the 2nd item.
+  if (await getBooleanFlag('apps-page')) {
+    // Insert the "Apps" item after the 1st item.
     items = [
-      ...items.slice(0, 2),
+      ...items.slice(0, 1),
+      {
+        href: `/env/${environmentSlug}/apps`,
+        text: 'Apps',
+        hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
+        icon: <Squares2X2Icon className="w-3.5" />,
+      },
+      ...items.slice(1),
+    ];
+  }
+
+  if (isEventSearchEnabled) {
+    // Insert the "Event Search" item after the 3rd item.
+    items = [
+      ...items.slice(0, 3),
       {
         href: `/env/${environmentSlug}/event-search`,
         text: 'Event Search',
         hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
         icon: <MagnifyingGlassIcon className="w-3.5" />,
       },
-      ...items.slice(2),
+      ...items.slice(3),
     ];
   }
 
