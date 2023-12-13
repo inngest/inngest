@@ -47,7 +47,6 @@ const meta = {
             createdAt: now,
             framework,
             platform,
-            removedFunctions: [],
             sdkLanguage: language,
             sdkVersion: '1.0.0',
             status: 'success',
