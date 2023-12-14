@@ -6,7 +6,7 @@ import { type JsonValue } from 'type-fest';
 import DashboardCodeBlock from '@/components/DashboardCodeBlock/DashboardCodeBlock';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { getFragmentData, graphql, type FragmentType } from '@/gql';
-import { useDevServer } from '@/utils/useDevServer';
+import { devServerURL, useDevServer } from '@/utils/useDevServer';
 
 const EventPayloadFragment = graphql(`
   fragment EventPayload on ArchivedEvent {
@@ -52,7 +52,7 @@ export default function EventPayload({ event }: EventPayloadProps) {
                 label: 'Send to Dev Server',
                 title: isRunning
                   ? 'Send event payload to running Dev Server'
-                  : 'Dev Server is not running',
+                  : `Dev Server is not running at ${devServerURL}`,
                 icon: <IconCloudArrowDown />,
                 onClick: () => send(payload),
                 disabled: !isRunning,

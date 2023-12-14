@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-const devServerURL = 'http://localhost:8288';
+export const devServerURL = 'http://localhost:8288';
 
 function getStreamEventURL(devServerURL: string, eventID: string): string {
   return `${devServerURL}/stream/trigger?event=${eventID}`;
