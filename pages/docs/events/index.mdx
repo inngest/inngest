@@ -94,9 +94,9 @@ await inngest.send(events);
 
 ## Deduplication
 
-Often, you may need to prevent duplicate events from being sent and therefore processed by Inngest. If your system could possibly send the same event more than once, you will want to ensure that it is not ingested more than once.
+Often, you may need to prevent duplicate events from being processed by Inngest. If your system could possibly send the same event more than once, you will want to ensure that it does not run functions more than once.
 
-To prevent duplicate events, you can add an `id` parameter to the event payload. Once Inngest receives an event with an `id`, any events send with the exact same `id` will be ignored regardless of the event's payload.
+To prevent duplicate function runs from events, you can add an `id` parameter to the event payload. Once Inngest receives an event with an `id`, any events sent with the same `id` will be ignored, regardless of the event's payload.
 
 ```ts
 await inngest.send({
