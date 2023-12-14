@@ -40,9 +40,16 @@ interface CodeBlockProps {
     language?: string;
     handleChange?: (value: string) => void;
   }[];
+  actions?: {
+    label: string;
+    title?: string;
+    icon?: React.ReactNode;
+    onClick: () => void;
+    disabled?: boolean;
+  }[];
 }
 
-export function CodeBlock({ header, tabs }: CodeBlockProps) {
+export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
   const [activeTab, setActiveTab] = useState(0);
   const editorRef = useRef<MonacoEditorType>(null);
 
@@ -313,7 +320,19 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
               })}
             </div>
             {!isOutputTooLarge && (
-              <div className="mr-2 flex items-center gap-2 py-2">
+              <div className="dark mr-2 flex items-center gap-2 py-2">
+                {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
+                  <Button
+                    key={idx}
+                    icon={icon}
+                    btnAction={onClick}
+                    size="small"
+                    aria-label={label}
+                    title={title ?? label}
+                    label={label}
+                    disabled={disabled}
+                  />
+                ))}
                 <CopyButton
                   size="small"
                   code={content}

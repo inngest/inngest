@@ -1,7 +1,12 @@
+'use client';
+
+import { IconCloudArrowDown } from '@inngest/components/icons/CloudArrowDown';
 import { type JsonValue } from 'type-fest';
 
-import SyntaxHighlighter from '@/components/SyntaxHighlighter';
+import DashboardCodeBlock from '@/components/DashboardCodeBlock/DashboardCodeBlock';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { getFragmentData, graphql, type FragmentType } from '@/gql';
+import { devServerURL, useDevServer } from '@/utils/useDevServer';
 
 const EventPayloadFragment = graphql(`
   fragment EventPayload on ArchivedEvent {
@@ -13,8 +18,10 @@ type EventPayloadProps = {
   event: FragmentType<typeof EventPayloadFragment>;
 };
 
-export default async function EventPayload({ event }: EventPayloadProps) {
+export default function EventPayload({ event }: EventPayloadProps) {
   const { payload } = getFragmentData(EventPayloadFragment, event);
+  const { isRunning, send } = useDevServer();
+  const { value: isSendToDevServerEnabled } = useBooleanFlag('send-to-dev-server', false);
 
   let parsedPayload: string | JsonValue = '';
   if (typeof payload === 'string') {
@@ -29,15 +36,30 @@ export default async function EventPayload({ event }: EventPayloadProps) {
   const formattedPayload = JSON.stringify(parsedPayload, null, 2);
 
   return (
-    <div className="flex h-full flex-col space-y-1.5 rounded-xl bg-slate-900 text-white">
-      <header className="bg-slate-910 flex items-center justify-between rounded-t-xl p-1.5">
-        <h3 className="px-6 py-2.5">Payload</h3>
-      </header>
-      <div className="flex-1 overflow-auto">
-        <div className="p-6">
-          <SyntaxHighlighter language="json">{formattedPayload}</SyntaxHighlighter>
-        </div>
-      </div>
-    </div>
+    <DashboardCodeBlock
+      tabs={[
+        {
+          label: 'Payload',
+          content: formattedPayload,
+          language: 'json',
+          readOnly: true,
+        },
+      ]}
+      actions={
+        isSendToDevServerEnabled
+          ? [
+              {
+                label: 'Send to Dev Server',
+                title: isRunning
+                  ? 'Send event payload to running Dev Server'
+                  : `Dev Server is not running at ${devServerURL}`,
+                icon: <IconCloudArrowDown />,
+                onClick: () => send(payload),
+                disabled: !isRunning,
+              },
+            ]
+          : []
+      }
+    />
   );
 }
