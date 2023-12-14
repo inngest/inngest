@@ -1,6 +1,6 @@
 'use client';
 
-import { IconLightningBolt } from '@inngest/components/icons/LightningBolt';
+import { IconCloudArrowDown } from '@inngest/components/icons/CloudArrowDown';
 import { type JsonValue } from 'type-fest';
 
 import DashboardCodeBlock from '@/components/DashboardCodeBlock/DashboardCodeBlock';
@@ -53,7 +53,7 @@ export default function EventPayload({ event }: EventPayloadProps) {
                 title: isRunning
                   ? 'Send event payload to running Dev Server'
                   : 'Dev Server is not running',
-                icon: <IconLightningBolt />,
+                icon: <IconCloudArrowDown />,
                 onClick: () => send(payload),
                 disabled: !isRunning,
               },

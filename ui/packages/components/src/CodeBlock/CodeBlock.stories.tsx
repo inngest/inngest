@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { IconLightningBolt } from '../icons/LightningBolt';
+import { CloudArrowDown } from '../icons/CloudArrowDown';
 import { CodeBlock } from './CodeBlock';
 
 const meta = {
@@ -60,7 +60,7 @@ export const Actions: Story = {
     actions: [
       {
         label: 'Send to Dev Server',
-        icon: <IconLightningBolt />,
+        icon: <CloudArrowDown />,
         onClick: () => alert('Sending to dev server...'),
       },
     ],
