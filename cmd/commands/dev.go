@@ -1,9 +1,12 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
@@ -30,6 +33,20 @@ func NewCmdDev() *cobra.Command {
 }
 
 func doDev(cmd *cobra.Command, args []string) {
+
+	go func() {
+		ctx, cleanup := signal.NotifyContext(
+			context.Background(),
+			os.Interrupt,
+			syscall.SIGTERM,
+			syscall.SIGINT,
+			syscall.SIGQUIT,
+		)
+		defer cleanup()
+		<-ctx.Done()
+		os.Exit(0)
+	}()
+
 	ctx := cmd.Context()
 	conf, err := config.Dev(ctx)
 	if err != nil {
@@ -54,7 +71,6 @@ func doDev(cmd *cobra.Command, args []string) {
 	// Run auto-discovery unless we've explicitly disabled it.
 	noDiscovery, _ := cmd.Flags().GetBool("no-discovery")
 	noPoll, _ := cmd.Flags().GetBool("no-poll")
-
 	retryInterval, _ := cmd.Flags().GetInt("retry-interval")
 
 	opts := devserver.StartOpts{
