@@ -1,21 +1,30 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-const devServerUrl = 'http://localhost:8288';
+const devServerURL = 'http://localhost:8288';
+
+function getStreamEventURL(devServerURL: string, eventID: string): string {
+  return `${devServerURL}/stream/trigger?event=${eventID}`;
+}
 
 async function sendToDevServer(payload: string) {
   try {
-    await fetch(`${devServerUrl}/e/cloud_ui_key`, {
+    const response = await fetch(`${devServerURL}/e/cloud_ui_key`, {
       body: payload,
       method: 'POST',
       mode: 'cors',
     });
+    if (!response.ok) {
+      return toast.error('Failed to send to Dev Server');
+    }
+    const body = await response.json();
+    const eventID = body.ids[0];
     toast.success('Sent to Dev Server', {
       description: (
         <>
-          View at{' '}
-          <a href={devServerUrl} className="underline" target="_blank">
-            {devServerUrl.replace(/https?:\/\//, '')}
+          Go to:{' '}
+          <a href={getStreamEventURL(devServerURL, eventID)} className="underline" target="_blank">
+            {eventID}
           </a>
         </>
       ),
@@ -28,7 +37,7 @@ async function sendToDevServer(payload: string) {
 export function useDevServer() {
   const [isRunning, setRunning] = useState<boolean>(false);
   useEffect(() => {
-    fetch(devServerUrl)
+    fetch(devServerURL)
       .then(() => setRunning(true))
       .catch(() => setRunning(false));
   }, []);
