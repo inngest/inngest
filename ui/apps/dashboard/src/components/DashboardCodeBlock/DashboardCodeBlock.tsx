@@ -1,3 +1,5 @@
+'use client';
+
 import type { ComponentProps } from 'react';
 import { useClerk } from '@clerk/nextjs';
 import { CodeBlock } from '@inngest/components/CodeBlock';

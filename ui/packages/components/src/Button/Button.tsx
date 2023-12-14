@@ -68,6 +68,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
       })
     : null;
 
+  console.log('label', label);
+
   const children = (
     <>
       {loading && <IconSpinner className={classNames(spinnerStyles, iconSizes)} />}

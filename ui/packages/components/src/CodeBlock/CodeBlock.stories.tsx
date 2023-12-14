@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
+import { IconLightningBolt } from '../icons/LightningBolt';
 import { CodeBlock } from './CodeBlock';
 
 const meta = {
@@ -7,7 +8,7 @@ const meta = {
   component: CodeBlock,
   decorators: [
     (Story) => (
-      <div className="w-80">
+      <div className="w-[480px]">
         <Story />
       </div>
     ),
@@ -43,6 +44,24 @@ export const MultipleTabs: Story = {
       {
         label: 'Error',
         content: '{\n  "error": "invalid status code: 500"\n}',
+      },
+    ],
+  },
+};
+
+export const Actions: Story = {
+  args: {
+    tabs: [
+      {
+        label: 'Output',
+        content: '{\n  "customerId": "cus_1234"\n}',
+      },
+    ],
+    actions: [
+      {
+        label: 'Send to Dev Server',
+        icon: <IconLightningBolt />,
+        onClick: () => alert('Sending to dev server...'),
       },
     ],
   },
