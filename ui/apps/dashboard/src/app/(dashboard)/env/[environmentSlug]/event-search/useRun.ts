@@ -5,7 +5,7 @@ import type { FunctionRun } from '@inngest/components/types/functionRun';
 import type { FunctionVersion } from '@inngest/components/types/functionVersion';
 
 import { graphql } from '@/gql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const runQuery = graphql(`
   query GetEventSearchRun($envID: ID!, $functionID: ID!, $runID: ULID!) {
@@ -82,7 +82,7 @@ export function useRun({
 }): FetchResult<Data, { skippable: true }> {
   const skip = !functionID || !runID;
 
-  const res = useGraphQLQuery({
+  const res = useSkippableGraphQLQuery({
     query: runQuery,
     skip,
     variables: {

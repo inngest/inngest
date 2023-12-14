@@ -13,7 +13,6 @@ type Args<
   VariablesT extends { [key in string]: unknown }
 > = {
   query: TypedDocumentNode<ResultT, VariablesT>;
-  skip: boolean;
   variables: VariablesT;
   context?: UseQueryArgs<VariablesT, ResultT>['context'];
   pollIntervalInMilliseconds?: number;
@@ -21,10 +20,67 @@ type Args<
 
 /**
  * Thin wrapper around urql's `useQuery` hook. The purpose is to convert urql's
- * result into a discriminated union, which makes it loading/error/skipped state
- * handling more type safe.
+ * result into a discriminated union, which improves type safety around
+ * loading/error/done states.
  */
 export function useGraphQLQuery<
+  ResultT extends { [key in string]: unknown },
+  VariablesT extends { [key in string]: unknown }
+>({
+  query,
+  variables,
+  context,
+  pollIntervalInMilliseconds,
+}: Args<ResultT, VariablesT>): FetchResult<ResultT> {
+  const [res, executeQuery] = useQuery({
+    query,
+    variables,
+    context,
+  });
+
+  useEffect(() => {
+    if (res.fetching || !pollIntervalInMilliseconds) {
+      return;
+    }
+
+    const timeoutID = setTimeout(
+      () => executeQuery({ requestPolicy: 'network-only' }),
+      pollIntervalInMilliseconds
+    );
+    return () => clearTimeout(timeoutID);
+  }, [res.fetching, pollIntervalInMilliseconds, executeQuery]);
+
+  if (res.fetching && !res.data) {
+    return baseFetchLoading;
+  }
+
+  if (res.error) {
+    return {
+      ...baseFetchFailed,
+      error: new Error(res.error.message),
+    };
+  }
+
+  if (!res.data) {
+    // Should be unreachable.
+    return {
+      ...baseFetchFailed,
+      error: new Error('finished loading but missing data'),
+    };
+  }
+
+  return {
+    ...baseFetchSucceeded,
+    data: res.data,
+  };
+}
+
+/**
+ * Thin wrapper around urql's `useQuery` hook. The purpose is to convert urql's
+ * result into a discriminated union, which improves type safety around
+ * loading/error/skipped/done states.
+ */
+export function useSkippableGraphQLQuery<
   ResultT extends { [key in string]: unknown },
   VariablesT extends { [key in string]: unknown }
 >({
@@ -33,7 +89,7 @@ export function useGraphQLQuery<
   variables,
   context,
   pollIntervalInMilliseconds,
-}: Args<ResultT, VariablesT>): FetchResult<ResultT, { skippable: true }> {
+}: Args<ResultT, VariablesT> & { skip: boolean }): FetchResult<ResultT, { skippable: true }> {
   const [res, executeQuery] = useQuery({
     query,
     variables,
