@@ -7,10 +7,21 @@ function getStreamEventURL(devServerURL: string, eventID: string): string {
   return `${devServerURL}/stream/trigger?event=${eventID}`;
 }
 
+// We want the event to appear at the top of the stream, so we omit the timestamp
+function omitTimestampFromPayload(payload: string): string {
+  try {
+    const parsed = JSON.parse(payload);
+    delete parsed.ts;
+    return JSON.stringify(parsed);
+  } catch (err) {
+    return payload;
+  }
+}
+
 async function sendToDevServer(payload: string) {
   try {
     const response = await fetch(`${devServerURL}/e/cloud_ui_key`, {
-      body: payload,
+      body: omitTimestampFromPayload(payload),
       method: 'POST',
       mode: 'cors',
     });
@@ -43,6 +54,6 @@ export function useDevServer() {
   }, []);
   return {
     isRunning,
-    send: (payload: string) => sendToDevServer(payload),
+    send: sendToDevServer,
   };
 }
