@@ -103,7 +103,7 @@ type Props = {
   framework: string | null | undefined;
 };
 
-export function Framework({ framework }: Props) {
+export function FrameworkInfo({ framework }: Props) {
   if (!framework) {
     return '-';
   }

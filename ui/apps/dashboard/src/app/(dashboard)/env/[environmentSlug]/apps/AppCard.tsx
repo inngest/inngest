@@ -3,7 +3,7 @@
 import type { Function } from '@inngest/components/types/function';
 import { classNames } from '@inngest/components/utils/classNames';
 
-import { Framework } from '@/components/FrameworkMetadata';
+import { FrameworkInfo } from '@/components/FrameworkInfo';
 import { Labeled } from '@/components/Labeled';
 import { LanguageInfo } from '@/components/LanguageInfo';
 import { PlatformInfo } from '@/components/PlatformInfo';
@@ -66,7 +66,10 @@ export function AppCard({ app, className }: Props) {
         {/* Row 2 */}
         <Labeled label="SDK Version" value={app.latestSync?.sdkVersion} />
         <Labeled label="Language" value={<LanguageInfo language={app.latestSync?.sdkLanguage} />} />
-        <Labeled label="Framework" value={<Framework framework={app.latestSync?.framework} />} />
+        <Labeled
+          label="Framework"
+          value={<FrameworkInfo framework={app.latestSync?.framework} />}
+        />
 
         {/* Row 3 */}
         <Labeled label="Platform" value={<PlatformInfo platform={app.latestSync?.platform} />} />

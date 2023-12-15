@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { frameworks } from '@/components/FrameworkMetadata';
+import { frameworks } from '@/components/FrameworkInfo';
 import { languages } from '@/components/LanguageInfo';
 import { platforms } from '@/components/PlatformInfo';
 import { AppCard } from './AppCard';
