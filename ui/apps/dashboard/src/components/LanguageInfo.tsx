@@ -32,7 +32,7 @@ type Props = {
   language: string | null | undefined;
 };
 
-export function LanguageMetadata({ language }: Props) {
+export function LanguageInfo({ language }: Props) {
   if (!language) {
     return '-';
   }

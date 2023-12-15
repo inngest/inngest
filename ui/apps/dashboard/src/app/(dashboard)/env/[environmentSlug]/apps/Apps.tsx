@@ -1,14 +1,14 @@
 'use client';
 
-import { useContext } from 'react';
-
-import { EnvContext } from '@/contexts/env';
 import { AppCard } from './AppCard';
 import { useApps } from './useApps';
 
-export function Apps() {
-  const envCtx = useContext(EnvContext);
-  const res = useApps(envCtx.id);
+type Props = {
+  envID: string;
+};
+
+export function Apps({ envID }: Props) {
+  const res = useApps(envID);
   if (res.error) {
     throw res.error;
   }

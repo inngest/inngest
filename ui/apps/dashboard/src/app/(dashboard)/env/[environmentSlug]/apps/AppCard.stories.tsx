@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { frameworks } from '@/components/FrameworkMetadata';
-import { languages } from '@/components/LanguageMetadata';
-import { platforms } from '@/components/PlatformMetadata';
+import { languages } from '@/components/LanguageInfo';
+import { platforms } from '@/components/PlatformInfo';
 import { AppCard } from './AppCard';
 
 type PropsAndCustomArgs = React.ComponentProps<typeof AppCard> & {

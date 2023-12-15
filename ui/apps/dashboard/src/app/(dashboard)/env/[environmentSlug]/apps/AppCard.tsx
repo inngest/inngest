@@ -3,10 +3,10 @@
 import type { Function } from '@inngest/components/types/function';
 import { classNames } from '@inngest/components/utils/classNames';
 
-import { FrameworkMetadata } from '@/components/FrameworkMetadata';
+import { Framework } from '@/components/FrameworkMetadata';
 import { Labeled } from '@/components/Labeled';
-import { LanguageMetadata } from '@/components/LanguageMetadata';
-import { PlatformMetadata } from '@/components/PlatformMetadata';
+import { LanguageInfo } from '@/components/LanguageInfo';
+import { PlatformInfo } from '@/components/PlatformInfo';
 import { SyncStatus } from '@/components/SyncStatus';
 import { Time } from '@/components/Time';
 
@@ -65,20 +65,11 @@ export function AppCard({ app, className }: Props) {
 
         {/* Row 2 */}
         <Labeled label="SDK Version" value={app.latestSync?.sdkVersion} />
-        <Labeled
-          label="Language"
-          value={<LanguageMetadata language={app.latestSync?.sdkLanguage} />}
-        />
-        <Labeled
-          label="Framework"
-          value={<FrameworkMetadata framework={app.latestSync?.framework} />}
-        />
+        <Labeled label="Language" value={<LanguageInfo language={app.latestSync?.sdkLanguage} />} />
+        <Labeled label="Framework" value={<Framework framework={app.latestSync?.framework} />} />
 
         {/* Row 3 */}
-        <Labeled
-          label="Platform"
-          value={<PlatformMetadata platform={app.latestSync?.platform} />}
-        />
+        <Labeled label="Platform" value={<PlatformInfo platform={app.latestSync?.platform} />} />
         <Labeled label="Functions" value={app.latestSync?.syncedFunctions.length} />
 
         {/* Row 4 */}

@@ -32,7 +32,7 @@ type Props = {
   platform: string | null | undefined;
 };
 
-export function PlatformMetadata({ platform }: Props) {
+export function PlatformInfo({ platform }: Props) {
   if (!platform) {
     return '-';
   }
