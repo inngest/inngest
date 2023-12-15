@@ -4,7 +4,6 @@ import type { Function } from '@inngest/components/types/function';
 import { classNames } from '@inngest/components/utils/classNames';
 
 import { FrameworkInfo } from '@/components/FrameworkInfo';
-import { Labeled } from '@/components/Labeled';
 import { LanguageInfo } from '@/components/LanguageInfo';
 import { PlatformInfo } from '@/components/PlatformInfo';
 import { SyncStatus } from '@/components/SyncStatus';
@@ -47,13 +46,12 @@ export function AppCard({ app, className }: Props) {
         </h2>
       </div>
 
-      <div className="m-4 grid grow grid-cols-3 gap-4">
+      <dl className="m-4 grid grow grid-cols-3 gap-4">
         {/* Row 1 */}
-        <Labeled label="App ID" value={app.externalID} />
-        <Labeled
+        <Description detail={app.externalID} term="App ID" />
+        <Description
           className="col-span-2"
-          label="Last Sync"
-          value={
+          detail={
             app.latestSync && (
               <div className="flex gap-2">
                 <Time value={app.latestSync?.createdAt} />
@@ -61,23 +59,47 @@ export function AppCard({ app, className }: Props) {
               </div>
             )
           }
+          term="App ID"
         />
 
         {/* Row 2 */}
-        <Labeled label="SDK Version" value={app.latestSync?.sdkVersion} />
-        <Labeled label="Language" value={<LanguageInfo language={app.latestSync?.sdkLanguage} />} />
-        <Labeled
-          label="Framework"
-          value={<FrameworkInfo framework={app.latestSync?.framework} />}
+        <Description detail={app.latestSync?.sdkVersion} term="SDK Version" />
+        <Description
+          detail={<LanguageInfo language={app.latestSync?.sdkLanguage} />}
+          term="Language"
+        />
+        <Description
+          detail={<FrameworkInfo framework={app.latestSync?.framework} />}
+          term="Framework"
         />
 
         {/* Row 3 */}
-        <Labeled label="Platform" value={<PlatformInfo platform={app.latestSync?.platform} />} />
-        <Labeled label="Functions" value={app.latestSync?.syncedFunctions.length} />
+        <Description
+          detail={<PlatformInfo platform={app.latestSync?.platform} />}
+          term="Platform"
+        />
+        <Description detail={app.latestSync?.syncedFunctions.length} term="Functions" />
 
         {/* Row 4 */}
-        <Labeled className="col-span-3" label="URL" value={app.latestSync?.url} />
-      </div>
+        <Description className="col-span-3" detail={app.latestSync?.url} term="URL" />
+      </dl>
+    </div>
+  );
+}
+
+function Description({
+  className,
+  detail,
+  term,
+}: {
+  className?: string;
+  detail: React.ReactNode;
+  term: string;
+}) {
+  return (
+    <div className={className}>
+      <dt className="text-xs text-slate-600">{term}</dt>
+      <dd>{detail ?? ''}</dd>
     </div>
   );
 }
