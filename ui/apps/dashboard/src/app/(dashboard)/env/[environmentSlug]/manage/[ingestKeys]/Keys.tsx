@@ -1,7 +1,6 @@
 'use client';
 
 import { notFound } from 'next/navigation';
-import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Skeleton } from '@inngest/components/Skeleton';
 
 import { graphql } from '@/gql';
@@ -65,21 +64,8 @@ export default function Keys({ environmentSlug }: KeysProps) {
     );
   }
 
-  if (!keys) {
+  if (environmentError || error || !keys) {
     notFound();
-  }
-
-  if (environmentError || error) {
-    return (
-      <div className="flex h-full w-full flex-col items-center justify-center gap-5">
-        <div className="inline-flex items-center gap-2 text-red-600">
-          <ExclamationCircleIcon className="h-4 w-4" />
-          <h2 className="text-sm">{`Could not load ${
-            environmentError ? 'environment' : 'list'
-          }`}</h2>
-        </div>
-      </div>
-    );
   }
 
   const orderedKeys = keys.sort(sortFunction);
