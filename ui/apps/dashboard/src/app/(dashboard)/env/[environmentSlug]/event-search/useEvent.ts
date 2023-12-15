@@ -4,7 +4,7 @@ import { baseFetchFailed } from '@inngest/components/types/fetch';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
 
 import { graphql } from '@/gql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const eventQuery = graphql(`
   query GetEventSearchEvent($envID: ID!, $eventID: ULID!) {
@@ -36,7 +36,7 @@ type Data = {
 export function useEvent({ envID, eventID }: { envID: string; eventID: string | undefined }) {
   const skip = !eventID;
 
-  const res = useGraphQLQuery({
+  const res = useSkippableGraphQLQuery({
     query: eventQuery,
     skip,
     variables: {

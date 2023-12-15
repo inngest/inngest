@@ -15,7 +15,7 @@ import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useEnvironment } from '@/queries';
 import { duration } from '@/utils/date';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const GetReplaysDocument = graphql(`
   query GetReplays($environmentID: ID!, $functionSlug: String!) {
@@ -101,7 +101,7 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
   const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
     environmentSlug: params.environmentSlug,
   });
-  const { data, isLoading, error } = useGraphQLQuery({
+  const { data, isLoading, error } = useSkippableGraphQLQuery({
     query: GetReplaysDocument,
     variables: {
       environmentID: environment?.id!,
