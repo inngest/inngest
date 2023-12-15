@@ -1,11 +1,12 @@
 'use client';
 
 import { notFound } from 'next/navigation';
+import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Skeleton } from '@inngest/components/Skeleton';
-import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
 import { useEnvironment } from '@/queries';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import KeysListItem from './KeysListItem';
 
 const GetKeysDocument = graphql(`
@@ -35,15 +36,16 @@ export default function Keys({ environmentSlug }: KeysProps) {
   const [{ data: environment, fetching: fetchingEnvironment }] = useEnvironment({
     environmentSlug,
   });
-  const [{ data, fetching: fetchingKey }] = useQuery({
+
+  const { data, isLoading, error } = useGraphQLQuery({
     query: GetKeysDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment?.id || '',
     },
-    pause: !environment?.id,
+    skip: !environment?.id,
   });
 
-  const loading = fetchingEnvironment || fetchingKey;
+  const loading = fetchingEnvironment || isLoading;
 
   const keys = data?.environment?.ingestKeys;
 
@@ -64,6 +66,17 @@ export default function Keys({ environmentSlug }: KeysProps) {
 
   if (!keys) {
     notFound();
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-5">
+        <div className="inline-flex items-center gap-2 text-red-600">
+          <ExclamationCircleIcon className="h-4 w-4" />
+          <h2 className="text-sm">Could not load list</h2>
+        </div>
+      </div>
+    );
   }
 
   const orderedKeys = keys.sort(sortFunction);
