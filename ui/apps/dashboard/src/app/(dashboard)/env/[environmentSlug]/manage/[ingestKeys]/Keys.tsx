@@ -33,9 +33,10 @@ const LoadingSkeleton = () => (
 );
 
 export default function Keys({ environmentSlug }: KeysProps) {
-  const [{ data: environment, fetching: fetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
+  const [{ data: environment, fetching: fetchingEnvironment, error: environmentError }] =
+    useEnvironment({
+      environmentSlug,
+    });
 
   const { data, isLoading, error } = useGraphQLQuery({
     query: GetKeysDocument,
@@ -68,12 +69,14 @@ export default function Keys({ environmentSlug }: KeysProps) {
     notFound();
   }
 
-  if (error) {
+  if (environmentError || error) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-5">
         <div className="inline-flex items-center gap-2 text-red-600">
           <ExclamationCircleIcon className="h-4 w-4" />
-          <h2 className="text-sm">Could not load list</h2>
+          <h2 className="text-sm">{`Could not load ${
+            environmentError ? 'environment' : 'list'
+          }`}</h2>
         </div>
       </div>
     );
