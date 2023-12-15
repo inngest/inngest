@@ -1,16 +1,10 @@
 import { ServerFeatureFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { EventSearch } from './EventSearch';
 
-type Props = {
-  params: {
-    environmentSlug: string;
-  };
-};
-
-export default async function Page({ params: { environmentSlug } }: Props) {
+export default async function Page() {
   return (
     <ServerFeatureFlag flag="event-search">
-      <EventSearch environmentSlug={environmentSlug} />
+      <EventSearch />
     </ServerFeatureFlag>
   );
 }

@@ -1,36 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 
-import LoadingIcon from '@/icons/LoadingIcon';
-import { useEnvironment } from '@/queries';
+import { EnvContext } from '@/contexts/env';
 import { EventLogsPage } from './EventLogsPage';
 
 type EventLogsProps = {
-  environmentSlug: string;
   eventName: string;
 };
 
-export default function EventLogs({ environmentSlug, eventName }: EventLogsProps) {
+export default function EventLogs({ eventName }: EventLogsProps) {
   const [cursors, setCursors] = useState(['']);
-  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
-
-  if (isFetchingEnvironment) {
-    return (
-      <div className="flex h-full w-full items-center justify-center">
-        <LoadingIcon />
-      </div>
-    );
-  }
-
-  // Should be impossible.
-  if (!environment) {
-    return null;
-  }
-
-  const pathPrefix = `/env/${environmentSlug}/events/${encodeURIComponent(eventName)}/logs`;
+  const env = useContext(EnvContext);
+  const pathPrefix = `/env/${env.slug}/events/${encodeURIComponent(eventName)}/logs`;
 
   function loadNextPage(cursor: string) {
     setCursors((cursors) => {
@@ -49,7 +31,7 @@ export default function EventLogs({ environmentSlug, eventName }: EventLogsProps
         return (
           <EventLogsPage
             cursor={cursor}
-            environmentID={environment.id}
+            environmentID={env.id}
             eventName={eventName}
             isFirstPage={index === 0}
             isLastPage={index === cursors.length - 1}
