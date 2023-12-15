@@ -136,7 +136,7 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
     if (!exampleDate) {
       throw new Error('Could not parse clicked example');
     }
-    // Focus the input after applying the example so that the user can tab to the next element
+    // Focus the input after applying the example so that the user can tab to the next element.
     inputRef.current?.focus();
 
     dispatch({ type: 'applied_example', exampleDate });
@@ -148,11 +148,18 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
   }
 
   function handleInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (event.code === 'Enter' && state.status === 'suggestion_available') {
-      event.preventDefault();
-      dispatch({ type: 'applied_suggestion' });
-      onChange(state.suggestedDateTime);
+    if (!(event.code === 'Enter' && state.status === 'suggestion_available')) {
+      return;
     }
+    event.preventDefault();
+    dispatch({ type: 'applied_suggestion' });
+    onChange(state.suggestedDateTime);
+  }
+
+  function handleSuggestionClick() {
+    if (state.status !== 'suggestion_available') return;
+    dispatch({ type: 'applied_suggestion' });
+    onChange(state.suggestedDateTime);
   }
 
   return (
@@ -203,9 +210,10 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
           )}
           {state.status === 'suggestion_available' && (
             <Popover.Content
-              className="shadow-floating z-[100] inline-flex items-center gap-2 rounded-md bg-white/95 p-2 text-sm text-slate-800 ring-1 ring-black/5 backdrop-blur-[3px]"
+              className="shadow-floating z-[100] inline-flex cursor-pointer items-center gap-2 rounded-md bg-white/95 p-2 text-sm text-slate-800 ring-1 ring-black/5 backdrop-blur-[3px]"
               sideOffset={5}
               onOpenAutoFocus={(event) => event.preventDefault()}
+              onClick={handleSuggestionClick}
             >
               {state.suggestedDateTime?.toLocaleString()}
               <kbd
