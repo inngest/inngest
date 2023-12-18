@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { ChartBarIcon, ChevronRightIcon, XCircleIcon } from '@heroicons/react/20/solid';
 import {
@@ -24,7 +23,11 @@ import { Time } from '@/components/Time';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
 import { relativeTime } from '@/utils/date';
-import DashboardTimeRangeFilter, { defaultTimeRange } from './DashboardTimeRangeFilter';
+import { useSearchParam } from '@/utils/useSearchParam';
+import DashboardTimeRangeFilter, {
+  defaultTimeRange,
+  getTimeRangeByKey,
+} from './DashboardTimeRangeFilter';
 import FunctionRunsChart, { type UsageMetrics } from './FunctionRunsChart';
 import FunctionThroughputChart from './FunctionThroughputChart';
 import LatestFailedFunctionRuns from './LatestFailedFunctionRuns';
@@ -45,7 +48,9 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
   });
   const function_ = data?.workspace.workflow;
 
-  const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(defaultTimeRange);
+  const [timeRangeParam, setTimeRangeParam] = useSearchParam('timeRange');
+  const selectedTimeRange: TimeRange =
+    getTimeRangeByKey(timeRangeParam ?? '24h') ?? defaultTimeRange;
 
   const [{ data: usage }] = useFunctionUsage({
     environmentSlug: params.environmentSlug,
@@ -90,7 +95,9 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
   const triggers = function_.current?.triggers || [];
 
   function handleTimeRangeChange(timeRange: TimeRange) {
-    setSelectedTimeRange(timeRange);
+    if (timeRange?.key) {
+      setTimeRangeParam(timeRange.key);
+    }
   }
 
   return (
