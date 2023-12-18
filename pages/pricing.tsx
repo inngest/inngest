@@ -417,6 +417,7 @@ const FEATURES: Feature[] = [
   {
     name: "Discord support",
     plans: {
+      [PLAN_NAMES.free]: true,
       [PLAN_NAMES.team]: true,
       [PLAN_NAMES.startup]: true,
       [PLAN_NAMES.enterprise]: true,
@@ -606,7 +607,11 @@ export default function Pricing() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-y-8 lg:gap-0 text-center mb-8">
             {PLANS.filter((p) => p.hideFromCards !== true).map((p) => (
-              <PlanCard content={p} variant={p.popular ? "focus" : "light"} />
+              <PlanCard
+                key={p.name}
+                content={p}
+                variant={p.popular ? "focus" : "light"}
+              />
             ))}
           </div>
 

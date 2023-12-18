@@ -237,9 +237,7 @@ function UseCaseGrid() {
               className="mx-auto rounded-md font-medium px-6 py-2 bg-transparent transition-all text-white border border-slate-800 hover:border-slate-600 hover:bg-slate-500/10 whitespace-nowrap"
             >
               <span className="hidden md:inline">
-                {" "}
-                Learn about {selectedContent.title}
-                with Inngest
+                Learn about {selectedContent.title} with Inngest
               </span>
               <span className="md:hidden">Learn more</span> →
             </Link>
