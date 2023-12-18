@@ -5,7 +5,7 @@ import { Skeleton } from '@inngest/components/Skeleton';
 
 import { graphql } from '@/gql';
 import { useEnvironment } from '@/queries';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import KeysListItem from './KeysListItem';
 
 const GetKeysDocument = graphql(`
@@ -37,7 +37,7 @@ export default function Keys({ environmentSlug }: KeysProps) {
       environmentSlug,
     });
 
-  const { data, isLoading, error } = useGraphQLQuery({
+  const { data, isLoading, error } = useSkippableGraphQLQuery({
     query: GetKeysDocument,
     variables: {
       environmentID: environment?.id || '',
