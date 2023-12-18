@@ -99,7 +99,7 @@ export default function FunctionRunsChart({
 
   return (
     <StackedBarChart
-      title="Function Runs"
+      title="Ended Function Runs"
       data={metrics}
       legend={[
         { name: 'Completed', dataKey: 'completed', color: colors.teal['500'] },
