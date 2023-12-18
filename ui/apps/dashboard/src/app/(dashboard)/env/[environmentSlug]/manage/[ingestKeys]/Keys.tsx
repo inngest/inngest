@@ -1,8 +1,11 @@
+'use client';
+
 import { notFound } from 'next/navigation';
+import { Skeleton } from '@inngest/components/Skeleton';
 
 import { graphql } from '@/gql';
-import graphqlAPI from '@/queries/graphqlAPI';
-import { getEnvironment } from '@/queries/server-only/getEnvironment';
+import { useEnvironment } from '@/queries';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import KeysListItem from './KeysListItem';
 
 const GetKeysDocument = graphql(`
@@ -22,25 +25,47 @@ type KeysProps = {
   environmentSlug: string;
 };
 
-export default async function Keys({ environmentSlug }: KeysProps) {
-  const environment = await getEnvironment({
-    environmentSlug,
+const LoadingSkeleton = () => (
+  <div className="border-b border-slate-100 px-4 py-3">
+    <Skeleton className="mb-1 block h-11 w-full" />
+  </div>
+);
+
+export default function Keys({ environmentSlug }: KeysProps) {
+  const [{ data: environment, fetching: fetchingEnvironment, error: environmentError }] =
+    useEnvironment({
+      environmentSlug,
+    });
+
+  const { data, isLoading, error } = useGraphQLQuery({
+    query: GetKeysDocument,
+    variables: {
+      environmentID: environment?.id || '',
+    },
+    skip: !environment?.id,
   });
 
-  const response = await graphqlAPI.request(GetKeysDocument, {
-    environmentID: environment.id,
-  });
+  const loading = fetchingEnvironment || isLoading;
 
-  const keys = response?.environment?.ingestKeys;
-
-  if (!keys) {
-    notFound();
-  }
+  const keys = data?.environment?.ingestKeys;
 
   function sortFunction(a: { createdAt: string }, b: { createdAt: string }) {
     const dateA = new Date(a.createdAt).getTime();
     const dateB = new Date(b.createdAt).getTime();
     return dateA < dateB ? 1 : -1;
+  }
+
+  if (loading) {
+    return (
+      <>
+        <LoadingSkeleton />
+        <LoadingSkeleton />
+      </>
+    );
+  }
+
+  if (environmentError || error || !keys) {
+    notFound();
   }
 
   const orderedKeys = keys.sort(sortFunction);

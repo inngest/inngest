@@ -2,11 +2,10 @@
 
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
+import { AlertModal } from '@inngest/components/Modal';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
-import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
 import useManagePageTerminology from './../useManagePageTerminology';
 
@@ -61,12 +60,11 @@ export default function DeleteKeyModal({
   }
 
   return (
-    <Modal className="flex max-w-xl flex-col gap-4" isOpen={isOpen} onClose={onClose}>
-      <p className="pb-4">{'Are you sure you want to delete this ' + currentContent?.name + '?'}</p>
-      <div className="flex content-center justify-end">
-        <Button appearance="outlined" btnAction={() => onClose()} label="No" />
-        <Button kind="danger" appearance="text" btnAction={handleDelete} label="Yes" />
-      </div>
-    </Modal>
+    <AlertModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={'Are you sure you want to delete this ' + currentContent?.name?.toLowerCase() + '?'}
+      primaryAction={{ label: 'Yes', btnAction: () => handleDelete() }}
+    />
   );
 }
