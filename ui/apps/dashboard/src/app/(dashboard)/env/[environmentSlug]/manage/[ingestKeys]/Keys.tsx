@@ -42,7 +42,6 @@ export default function Keys({ environmentSlug }: KeysProps) {
     variables: {
       environmentID: environment?.id || '',
     },
-    skip: !environment?.id,
   });
 
   const loading = fetchingEnvironment || isLoading;
