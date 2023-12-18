@@ -24,7 +24,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
 
   return (
     <div className="overflow-y-auto bg-slate-100">
-      <Apps envID={data.id} />
+      <Apps envID={data.id} envSlug={environmentSlug} />
     </div>
   );
 }

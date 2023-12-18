@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { Function } from '@inngest/components/types/function';
 import { classNames } from '@inngest/components/utils/classNames';
 
@@ -12,6 +13,7 @@ import { Time } from '@/components/Time';
 type Props = {
   app: App;
   className?: string;
+  envSlug: string;
 };
 
 type App = {
@@ -31,7 +33,7 @@ type Sync = {
   url: string | null;
 };
 
-export function AppCard({ app, className }: Props) {
+export function AppCard({ app, className, envSlug }: Props) {
   return (
     <div
       className={classNames(
@@ -41,8 +43,12 @@ export function AppCard({ app, className }: Props) {
     >
       <div className="m-4 mt-8 flex w-64 items-center border-r border-slate-400">
         <h2>
-          {/* TODO: Make this a link */}
-          {app.name}
+          <Link
+            className="text-indigo-600 hover:underline"
+            href={`/env/${envSlug}/apps/${encodeURIComponent(app.externalID)}`}
+          >
+            {app.name}
+          </Link>
         </h2>
       </div>
 
