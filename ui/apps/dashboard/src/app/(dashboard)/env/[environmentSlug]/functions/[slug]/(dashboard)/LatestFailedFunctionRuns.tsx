@@ -94,7 +94,7 @@ export default function LatestFailedFunctionRuns({
           href={
             `/env/${environmentSlug}/functions/${encodeURIComponent(functionSlug)}/logs` as Route
           }
-          label="View All Logs"
+          label="View All Runs"
         />
       </header>
       <div className="rounded-md border border-slate-200 text-sm text-slate-500">
