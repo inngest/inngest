@@ -24,6 +24,7 @@ export function GitCard({ className, sync }: Props) {
         <a
           className="text-indigo-600 hover:underline"
           href={`${repoURL}/commit/${commitHash}`}
+          rel="noopener noreferrer"
           target="_blank"
         >
           {commitHash.substring(0, 7)}
@@ -43,6 +44,7 @@ export function GitCard({ className, sync }: Props) {
         <a
           className="text-indigo-600 hover:underline"
           href={`${repoURL}/tree/${commitRef}`}
+          rel="noopener noreferrer"
           target="_blank"
         >
           {commitRef}
@@ -58,7 +60,12 @@ export function GitCard({ className, sync }: Props) {
   let repositoryValue;
   if (repoURL) {
     repositoryValue = (
-      <a className="text-indigo-600 hover:underline" href={repoURL} target="_blank">
+      <a
+        className="text-indigo-600 hover:underline"
+        href={repoURL}
+        rel="noopener noreferrer"
+        target="_blank"
+      >
         {repoURL}
       </a>
     );

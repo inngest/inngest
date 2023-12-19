@@ -21,7 +21,12 @@ export function PlatformSection({ className, sync }: Props) {
   let deploymentValue;
   if (vercelDeploymentID && vercelDeploymentURL) {
     deploymentValue = (
-      <a className="text-indigo-600 hover:underline" href={vercelDeploymentURL} target="_blank">
+      <a
+        className="text-indigo-600 hover:underline"
+        href={vercelDeploymentURL}
+        rel="noopener noreferrer"
+        target="_blank"
+      >
         {vercelDeploymentID}
       </a>
     );
@@ -32,7 +37,12 @@ export function PlatformSection({ className, sync }: Props) {
   let projectValue;
   if (vercelProjectID && vercelProjectURL) {
     projectValue = (
-      <a className="text-indigo-600 hover:underline" href={vercelProjectURL} target="_blank">
+      <a
+        className="text-indigo-600 hover:underline"
+        href={vercelProjectURL}
+        rel="noopener noreferrer"
+        target="_blank"
+      >
         {vercelProjectID}
       </a>
     );
