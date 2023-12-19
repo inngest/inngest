@@ -49,7 +49,7 @@ export default async function EventPage({ params }: EventPageProps) {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-y-scroll">
       <header className="space-y-1 bg-white p-5 shadow">
         <h2 className="font-medium capitalize text-slate-800">
           <Time format="relative" value={new Date(event.receivedAt)} />
