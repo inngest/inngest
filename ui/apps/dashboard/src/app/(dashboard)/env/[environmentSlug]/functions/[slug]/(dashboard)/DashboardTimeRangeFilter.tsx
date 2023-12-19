@@ -15,44 +15,57 @@ const currentTime = new Date();
 
 const timeRanges: TimeRange[] = [
   {
+    key: '30m',
     start: new Date(currentTime.valueOf() - 30 * 60 * 1_000), // 30 Minutes
     end: currentTime,
   },
   {
+    key: '60m',
     start: new Date(currentTime.valueOf() - 60 * 60 * 1_000), // 60 Minutes
     end: currentTime,
   },
   {
+    key: '6h',
     start: new Date(currentTime.valueOf() - 6 * 60 * 60 * 1_000), // 6 Hours
     end: currentTime,
   },
   {
+    key: '12h',
     start: new Date(currentTime.valueOf() - 12 * 60 * 60 * 1_000), // 12 Hours
     end: currentTime,
   },
   {
+    key: '24h',
     start: new Date(currentTime.valueOf() - 24 * 60 * 60 * 1_000), // 24 Hours
     end: currentTime,
   },
   {
+    key: '3d',
     start: new Date(currentTime.valueOf() - 3 * 24 * 60 * 60 * 1_000), // 3 Days
     end: currentTime,
   },
   {
+    key: '7d',
     start: new Date(currentTime.valueOf() - 7 * 24 * 60 * 60 * 1_000), // 7 Days
     end: currentTime,
   },
   {
+    key: '14d',
     start: new Date(currentTime.valueOf() - 14 * 24 * 60 * 60 * 1_000), // 14 Days
     end: currentTime,
   },
   {
+    key: '30d',
     start: new Date(currentTime.valueOf() - 30 * 24 * 60 * 60 * 1_000), // 30 Days
     end: currentTime,
   },
 ];
 
 export const defaultTimeRange = timeRanges[4]!;
+
+export function getTimeRangeByKey(key: string): TimeRange | undefined {
+  return timeRanges.find((timeRange) => timeRange.key === key);
+}
 
 const GetBillingPlanDocument = graphql(`
   query GetBillingPlan {
