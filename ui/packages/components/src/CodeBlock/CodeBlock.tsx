@@ -49,15 +49,14 @@ interface CodeBlockProps {
     handleChange?: (value: string) => void;
   }[];
   actions?: CodeBlockAction[];
-  fullHeight?: boolean;
 }
 
-export function CodeBlock({ header, tabs, actions = [], fullHeight = false }: CodeBlockProps) {
+export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
   const [activeTab, setActiveTab] = useState(0);
   const editorRef = useRef<MonacoEditorType>(null);
 
   const [isWordWrap, setIsWordWrap] = useLocalStorage('isWordWrap', false);
-  const [isFullHeight, setIsFullHeight] = useLocalStorage('isFullHeight', fullHeight);
+  const [isFullHeight, setIsFullHeight] = useLocalStorage('isFullHeight', false);
 
   const { handleCopyClick, isCopying } = useCopyToClipboard();
 
