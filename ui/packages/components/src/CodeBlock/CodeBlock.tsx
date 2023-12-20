@@ -27,6 +27,14 @@ const FONT = {
 
 type MonacoEditorType = editor.IStandaloneCodeEditor | null;
 
+export type CodeBlockAction = {
+  label: string;
+  title?: string;
+  icon?: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+};
+
 interface CodeBlockProps {
   header?: {
     title?: string;
@@ -40,21 +48,16 @@ interface CodeBlockProps {
     language?: string;
     handleChange?: (value: string) => void;
   }[];
-  actions?: {
-    label: string;
-    title?: string;
-    icon?: React.ReactNode;
-    onClick: () => void;
-    disabled?: boolean;
-  }[];
+  actions?: CodeBlockAction[];
+  fullHeight?: boolean;
 }
 
-export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
+export function CodeBlock({ header, tabs, actions = [], fullHeight = false }: CodeBlockProps) {
   const [activeTab, setActiveTab] = useState(0);
   const editorRef = useRef<MonacoEditorType>(null);
 
   const [isWordWrap, setIsWordWrap] = useLocalStorage('isWordWrap', false);
-  const [isFullHeight, setIsFullHeight] = useLocalStorage('isFullHeight', false);
+  const [isFullHeight, setIsFullHeight] = useLocalStorage('isFullHeight', fullHeight);
 
   const { handleCopyClick, isCopying } = useCopyToClipboard();
 
