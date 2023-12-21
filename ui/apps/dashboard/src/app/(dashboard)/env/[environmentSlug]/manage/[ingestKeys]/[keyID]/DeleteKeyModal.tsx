@@ -42,12 +42,15 @@ export default function DeleteKeyModal({
   const currentContent = useManagePageTerminology();
 
   function handleDelete() {
-    deleteEventKey({
-      input: {
-        id: keyID,
-        workspaceID: environmentID,
+    deleteEventKey(
+      {
+        input: {
+          id: keyID,
+          workspaceID: environmentID,
+        },
       },
-    }).then((result) => {
+      { additionalTypenames: ['IngestKey'] }
+    ).then((result) => {
       if (result.error) {
         toast.error(`${currentContent?.name} could not be deleted`);
       } else {

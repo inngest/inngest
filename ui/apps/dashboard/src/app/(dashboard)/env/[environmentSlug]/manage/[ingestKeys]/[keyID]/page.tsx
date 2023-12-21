@@ -1,14 +1,22 @@
 'use client';
 
+import { useState } from 'react';
 import { notFound } from 'next/navigation';
+import { EllipsisVerticalIcon, PencilIcon, TrashIcon } from '@heroicons/react/20/solid';
 import { CodeKey } from '@inngest/components/CodeKey';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@inngest/components/DropdownMenu';
 
 import { graphql } from '@/gql';
 import { useEnvironment } from '@/queries';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { Provider } from './Context';
-import DeleteKeyButton from './DeleteKeyButton';
-import EditKeyName from './EditKeyName';
+import DeleteKeyModal from './DeleteKeyModal';
+import EditKeyNameModal from './EditKeyNameModal';
 import FilterEvents from './FilterEvents';
 import TransformEvent from './TransformEvent';
 
@@ -41,6 +49,9 @@ type KeyDetailsProps = {
 };
 
 export default function Keys({ params: { environmentSlug, ingestKeys, keyID } }: KeyDetailsProps) {
+  const [isDeleteKeyModalVisible, setIsDeleteKeyModalVisible] = useState(false);
+  const [isEditKeyNameModalVisible, setIsEditKeyNameModalVisible] = useState(false);
+
   const [{ data: environment, fetching: fetchingEnvironment, error: environmentError }] =
     useEnvironment({
       environmentSlug,
@@ -90,12 +101,36 @@ export default function Keys({ params: { environmentSlug, ingestKeys, keyID } }:
     <div className="m-6 divide-y divide-slate-100">
       <Provider initialState={key}>
         <div className="pb-8">
-          <div className="mb-8 flex flex-wrap justify-between">
-            <EditKeyName keyID={keyID} keyName={key.name} />
-            <DeleteKeyButton
-              environmentSlug={environmentSlug}
+          <div className="mb-8 flex items-center gap-1">
+            <h2 className="text-lg font-semibold">{key.name}</h2>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="relative data-[state=open]:before:absolute data-[state=open]:before:-bottom-3 data-[state=open]:before:left-0 data-[state=open]:before:h-6 data-[state=open]:before:w-6 data-[state=open]:before:rounded-full data-[state=open]:before:bg-slate-100">
+                <EllipsisVerticalIcon className="absolute -top-2 left-1 z-10 h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => setIsEditKeyNameModalVisible(true)}>
+                  <PencilIcon className="h-4 w-4" />
+                  Edit Name
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setIsDeleteKeyModalVisible(true)}>
+                  <TrashIcon className="h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DeleteKeyModal
               environmentID={environment.id}
+              environmentSlug={environmentSlug}
               keyID={keyID}
+              isOpen={isDeleteKeyModalVisible}
+              onClose={() => setIsDeleteKeyModalVisible(false)}
+            />
+            <EditKeyNameModal
+              keyID={keyID}
+              keyName={key.name}
+              isOpen={isEditKeyNameModalVisible}
+              onClose={() => setIsEditKeyNameModalVisible(false)}
             />
           </div>
           <div className="w-3/5">
