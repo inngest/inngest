@@ -13,6 +13,7 @@ func NewGateway(o Opts) chi.Router {
 		Router: chi.NewMux(),
 		opts:   o,
 	}
+	r.setup()
 
 	return r
 }
