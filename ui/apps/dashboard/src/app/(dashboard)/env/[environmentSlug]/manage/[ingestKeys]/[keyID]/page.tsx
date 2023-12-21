@@ -1,9 +1,11 @@
+'use client';
+
 import { notFound } from 'next/navigation';
 import { CodeKey } from '@inngest/components/CodeKey';
 
 import { graphql } from '@/gql';
-import graphqlAPI from '@/queries/graphqlAPI';
-import { getEnvironment } from '@/queries/server-only/getEnvironment';
+import { useEnvironment } from '@/queries';
+import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { Provider } from './Context';
 import DeleteKeyButton from './DeleteKeyButton';
 import EditKeyName from './EditKeyName';
@@ -38,29 +40,33 @@ type KeyDetailsProps = {
   };
 };
 
-export const runtime = 'nodejs';
+export default function Keys({ params: { environmentSlug, ingestKeys, keyID } }: KeyDetailsProps) {
+  const [{ data: environment, fetching: fetchingEnvironment, error: environmentError }] =
+    useEnvironment({
+      environmentSlug,
+    });
 
-export default async function Keys({
-  params: { environmentSlug, ingestKeys, keyID },
-}: KeyDetailsProps) {
-  const environment = await getEnvironment({
-    environmentSlug: environmentSlug,
+  const { data, isLoading, error } = useSkippableGraphQLQuery({
+    query: GetKeyDocument,
+    variables: {
+      environmentID: environment?.id || '',
+      keyID,
+    },
+    skip: !environment?.id,
   });
 
-  const response = await graphqlAPI.request(GetKeyDocument, {
-    environmentID: environment.id,
-    keyID,
-  });
+  const loading = fetchingEnvironment || isLoading;
 
-  if (!response) {
+  if (loading) {
+    return <>{/* To do: skeleton */}</>;
+  }
+
+  const key = data?.environment.ingestKey;
+
+  if (!environment || environmentError || error || !key) {
     notFound();
   }
 
-  const key = response.environment.ingestKey;
-
-  if (!key) {
-    return null;
-  }
   const filterType = key.filter.type;
   if (!filterType || !isFilterType(filterType)) {
     throw new Error(`invalid filter type: ${filterType}`);
