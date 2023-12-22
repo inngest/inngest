@@ -52,6 +52,9 @@ const (
 	// MaxConcurrencyLimits limits the max concurrency constraints for a specific function.
 	MaxConcurrencyLimits = 2
 
+	// MaxBatchTTL represents the maximum amount of duration the batch key will last
+	MaxBatchTTL = 10 * time.Minute
+
 	// DefaultConcurrencyLimit is the default concurrency limit applied when not specified
 	DefaultConcurrencyLimit = 1_000
 

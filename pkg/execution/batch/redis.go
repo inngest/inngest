@@ -2,7 +2,9 @@ package batch
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -34,5 +36,26 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 }
 
 func (b redisBatchManager) ExpireKeys(ctx context.Context, batchID ulid.ULID) error {
+	keys := []string{
+		b.k.Batch(ctx, batchID),
+		b.k.BatchMetadata(ctx, batchID),
+	}
+
+	timeout := consts.MaxBatchTTL.Seconds()
+
+	args, err := redis_state.StrSlice([]any{timeout})
+	if err != nil {
+		return fmt.Errorf("error constructing batch expiration: %w", err)
+	}
+
+	if _, err = scripts["expire"].Exec(
+		ctx,
+		b.r,
+		keys,
+		args,
+	).AsInt64(); err != nil {
+		return fmt.Errorf("failed to expire batch '%s' related keys: %v", batchID, err)
+	}
+
 	return nil
 }
