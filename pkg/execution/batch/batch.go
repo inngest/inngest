@@ -59,7 +59,7 @@ type BatchAppendResult struct {
 	//   0: Appended to Batch
 	//   1: A new batch is created and appended to it
 	//   2: Appened to batch, and the batch is now full
-	Status  int    `json:"status"`
+	Status  int    `json:"status"` // TODO: change this to use enums.Batch instead
 	BatchID string `json:"batchID,omitempty"`
 }
 
