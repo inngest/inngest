@@ -195,18 +195,10 @@ type QueueKeyGenerator interface {
 	// RunIndex returns the index for storing job IDs associated with run IDs.
 	RunIndex(runID ulid.ULID) string
 
-	// BatchPointer returns the key used as the pointer reference to the
-	// actual batch
+	// ***************** Deprecated ************************
 	BatchPointer(context.Context, uuid.UUID) string
-	// Batch returns the key used to store the specific batch of
-	// events, that is used to trigger a function run
 	Batch(context.Context, ulid.ULID) string
-	// BatchMetadata returns the key used to store the metadata related
-	// to a batch
 	BatchMetadata(context.Context, ulid.ULID) string
-
-	// Status returns the key used for status queue for the provided function.
-	Status(status string, fnID uuid.UUID) string
 }
 
 type DebounceKeyGenerator interface {
@@ -218,6 +210,21 @@ type DebounceKeyGenerator interface {
 	DebouncePointer(ctx context.Context, fnID uuid.UUID, key string) string
 	// Debounce returns the key for storing debounce-related data given a debounce ID.
 	Debounce(ctx context.Context) string
+}
+
+type BatchKeyGenerator interface {
+	// QueueItem returns the key for the hash containing all items within a
+	// queue for a function.  This is used to check leases on debounce jobs.
+	QueueItem() string
+	// BatchPointer returns the key used as the pointer reference to the
+	// actual batch
+	BatchPointer(context.Context, uuid.UUID) string
+	// Batch returns the key used to store the specific batch of
+	// events, that is used to trigger a function run
+	Batch(context.Context, ulid.ULID) string
+	// BatchMetadata returns the key used to store the metadata related
+	// to a batch
+	BatchMetadata(context.Context, ulid.ULID) string
 }
 
 type DefaultQueueKeyGenerator struct {
