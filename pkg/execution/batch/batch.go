@@ -29,7 +29,7 @@ import (
 //	#4 needs to happen in one transaction in order to make sure there will not be any race conditions.
 type BatchManager interface {
 	Append(context.Context, BatchItem) (*BatchAppendResult, error)
-	RetrieveEvents(context.Context, ulid.ULID) ([]event.Event, error)
+	RetrieveItems(context.Context, ulid.ULID) ([]BatchItem, error)
 	ScheduleExecution(context.Context, ScheduleBatchOpts) error
 	ExpireKeys(context.Context, ulid.ULID) error
 }
