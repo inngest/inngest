@@ -37,5 +37,5 @@ func (gw *Gateway) setup() {
 
 func (gw *Gateway) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
-	w.Write([]byte("{ \"result\": \"ok\" }"))
+	_, _ = w.Write([]byte("{ \"result\": \"ok\" }"))
 }
