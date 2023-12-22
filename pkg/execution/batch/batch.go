@@ -30,6 +30,7 @@ import (
 type BatchManager interface {
 	Append(context.Context, BatchItem) (*BatchAppendResult, error)
 	RetrieveItems(context.Context, ulid.ULID) ([]BatchItem, error)
+	// StartExecution(context.Context, uuid.UUID, ulid.ULID) (string, error)
 	ScheduleExecution(context.Context, ScheduleBatchOpts) error
 	ExpireKeys(context.Context, ulid.ULID) error
 }
