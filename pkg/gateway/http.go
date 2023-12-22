@@ -9,7 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest/log"
 )
 
-func Invoke(w http.ResponseWriter, r *http.Request) {
+func (gw *Gateway) Invoke(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 
 	if err := handleHTTPInvoke(w, r); err != nil {

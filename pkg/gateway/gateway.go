@@ -31,7 +31,7 @@ func (gw *Gateway) setup() {
 		r.Use(middleware.Recoverer)
 
 		r.Get("/health", gw.HealthCheck)
-		r.Get("/invoke", gw.invoke)
+		r.Get("/invoke", gw.Invoke)
 	})
 }
 
