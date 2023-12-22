@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import {
   Tooltip,
@@ -12,7 +12,7 @@ import { IconInfo } from '@inngest/components/icons/Info';
 import { useClient } from 'urql';
 
 import Input from '@/components/Forms/Input';
-import { useEnvironment } from '@/queries';
+import { EnvContext } from '@/contexts/env';
 import { useSearchParam } from '@/utils/useSearchParam';
 import { Details } from './Details';
 import { EventTable } from './EventTable';
@@ -21,16 +21,11 @@ import type { Event } from './types';
 
 const day = 1000 * 60 * 60 * 24;
 
-type Props = {
-  environmentSlug: string;
-};
-
-export function EventSearch({ environmentSlug }: Props) {
+export function EventSearch() {
   const [events, setEvents] = useState<Event[]>([]);
   const [fetching, setFetching] = useState(false);
   const [selectedEventID, setSelectedEventID] = useState<string | undefined>(undefined);
-  const [{ data: environment }] = useEnvironment({ environmentSlug });
-  const envID = environment?.id;
+  const env = useContext(EnvContext);
   const client = useClient();
 
   const [query, setQuery] = useSearchParam('query');
@@ -47,17 +42,13 @@ export function EventSearch({ environmentSlug }: Props) {
         // Should be unreachable
         throw new Error('query must be a string');
       }
-      if (!environment) {
-        // Should be unreachable
-        throw new Error('missing environment');
-      }
 
       setQuery(newQuery);
 
       setEvents(
         await searchEvents({
           client,
-          environmentID: environment.id,
+          environmentID: env.id,
           query: newQuery,
           lowerTime: new Date(Date.now() - 3 * day),
           upperTime: new Date(),
@@ -126,14 +117,12 @@ export function EventSearch({ environmentSlug }: Props) {
         blankState={getEmptyTableMessage({ fetching, query, events })}
       />
 
-      {envID && (
-        <Details
-          envID={envID}
-          eventID={selectedEventID}
-          onClose={() => setSelectedEventID(undefined)}
-          navigateToRun={() => <></>}
-        />
-      )}
+      <Details
+        envID={env.id}
+        eventID={selectedEventID}
+        onClose={() => setSelectedEventID(undefined)}
+        navigateToRun={() => <></>}
+      />
     </>
   );
 }
