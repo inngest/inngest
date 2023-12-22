@@ -11,7 +11,7 @@ import { useQuery } from 'urql';
 import { graphql } from '@/gql';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
 import { useEnvironment } from '@/queries';
-import { urlCreator } from '@/utils/urls';
+import { pathCreator } from '@/utils/urls';
 
 const GetEventKeysForBlankSlateDocument = graphql(`
   query GetEventKeysForBlankSlate($environmentID: ID!) {
@@ -104,7 +104,7 @@ export default function EventListNotFound({ environmentSlug }: { environmentSlug
           <div className="mt-6 flex items-center gap-2 border-t border-slate-800/50 py-4">
             <Button
               kind="primary"
-              href={urlCreator.deploys({ envSlug: environmentSlug })}
+              href={pathCreator.deploys({ envSlug: environmentSlug })}
               label="Deploy Your Functions"
             />
             <div className="flex gap-2 border-l border-slate-800/50 pl-2">

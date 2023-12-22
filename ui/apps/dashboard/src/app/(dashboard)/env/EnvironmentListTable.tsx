@@ -11,7 +11,7 @@ import { graphql } from '@/gql';
 import cn from '@/utils/cn';
 import { type Environment } from '@/utils/environments';
 import { notNullish } from '@/utils/typeGuards';
-import { urlCreator } from '@/utils/urls';
+import { pathCreator } from '@/utils/urls';
 import { EnvironmentArchiveModal } from './EnvironmentArchiveModal';
 
 const ArchiveEnvironmentDocument = graphql(`
@@ -252,7 +252,7 @@ function TableRow(props: { env: Environment }) {
 
       <td className="px-4">
         <Button
-          href={urlCreator.functions({ envSlug: slug })}
+          href={pathCreator.functions({ envSlug: slug })}
           kind="primary"
           appearance="outlined"
           label="View"

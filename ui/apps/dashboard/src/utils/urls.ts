@@ -17,7 +17,7 @@ export function getManageKey(pathname: string) {
   }
 }
 
-export const urlCreator = {
+export const pathCreator = {
   deploys({ envSlug }: { envSlug: string }): Route {
     // @ts-expect-error
     return `/env/${envSlug}/deploys`;

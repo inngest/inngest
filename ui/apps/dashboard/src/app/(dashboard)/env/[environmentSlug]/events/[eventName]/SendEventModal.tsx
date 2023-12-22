@@ -15,7 +15,7 @@ import CodeEditor from '@/components/Textarea/CodeEditor';
 import { graphql } from '@/gql';
 import { EnvironmentType } from '@/gql/graphql';
 import { useEnvironment } from '@/queries';
-import { urlCreator } from '@/utils/urls';
+import { pathCreator } from '@/utils/urls';
 
 type UseDefaultEventKeyParams = {
   environmentSlug: string;
@@ -184,7 +184,7 @@ await inngest.send({
         {!hasEventKey && (
           <Alert severity="warning">
             There are no Event Keys for this environment. Please create an Event Key in{' '}
-            <Link href={urlCreator.keys({ envSlug: environmentSlug })} className="underline">
+            <Link href={pathCreator.keys({ envSlug: environmentSlug })} className="underline">
               the Manage tab
             </Link>{' '}
             first.

@@ -14,7 +14,7 @@ import LoadingIcon from '@/icons/LoadingIcon';
 import EventIcon from '@/icons/event.svg';
 import { useEventTypes } from '@/queries';
 import cn from '@/utils/cn';
-import { urlCreator } from '@/utils/urls';
+import { pathCreator } from '@/utils/urls';
 import EventListNotFound from './EventListNotFound';
 
 type EventTypesPageProps = {
@@ -138,7 +138,7 @@ function EventTypesListPaginationPage({
             <td className="w-96 whitespace-nowrap">
               <div className="flex items-center gap-2.5 pl-4">
                 <Link
-                  href={urlCreator.eventType({ envSlug: environmentSlug, eventName: event.name })}
+                  href={pathCreator.eventType({ envSlug: environmentSlug, eventName: event.name })}
                   className="group flex w-full items-center gap-2 px-2 py-3 text-sm font-medium text-slate-700  hover:text-indigo-600"
                 >
                   {event.name}
@@ -151,7 +151,7 @@ function EventTypesListPaginationPage({
                 alwaysVisibleCount={2}
                 pills={event.functions.map((function_) => (
                   <Pill
-                    href={urlCreator.function({
+                    href={pathCreator.function({
                       envSlug: environmentSlug,
                       functionSlug: function_.slug,
                     })}

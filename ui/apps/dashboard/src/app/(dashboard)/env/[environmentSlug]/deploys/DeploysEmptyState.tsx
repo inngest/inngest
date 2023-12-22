@@ -12,7 +12,7 @@ import SyntaxHighlighter from '@/components/SyntaxHighlighter';
 import LoadingIcon from '@/icons/LoadingIcon';
 import VercelLogomark from '@/logos/vercel-logomark-dark.svg';
 import { useDeploys } from '@/queries/deploys';
-import { urlCreator } from '@/utils/urls';
+import { pathCreator } from '@/utils/urls';
 import { DeployFailure } from './DeployFailure';
 import DeploySigningKey from './DeploySigningKey';
 import { deployViaUrl, type RegistrationFailure } from './utils';
@@ -76,7 +76,7 @@ export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding
       throw new Error('missing deploy ID');
     }
 
-    router.push(urlCreator.deploy({ deployID: firstDeployId, envSlug: environmentSlug }));
+    router.push(pathCreator.deploy({ deployID: firstDeployId, envSlug: environmentSlug }));
     return <></>;
   }
 
@@ -246,7 +246,7 @@ export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding
             ) : (
               <Button
                 kind="primary"
-                href={urlCreator.events({ envSlug: environmentSlug })}
+                href={pathCreator.events({ envSlug: environmentSlug })}
                 label="Go To Events"
               />
             )}

@@ -7,7 +7,7 @@ import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
 import { useEnvironment } from '@/queries';
-import { urlCreator } from '@/utils/urls';
+import { pathCreator } from '@/utils/urls';
 
 type RunLayoutProps = {
   children: React.ReactNode;
@@ -59,7 +59,7 @@ export default function RunLayout({ children, params }: RunLayoutProps) {
       size={hasCron ? 'small' : 'large'}
       onClose={() =>
         router.push(
-          urlCreator.functionRuns({
+          pathCreator.functionRuns({
             envSlug: params.environmentSlug,
             functionSlug: params.slug,
           })
