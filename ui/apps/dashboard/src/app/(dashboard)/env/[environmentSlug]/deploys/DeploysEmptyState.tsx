@@ -12,6 +12,7 @@ import SyntaxHighlighter from '@/components/SyntaxHighlighter';
 import LoadingIcon from '@/icons/LoadingIcon';
 import VercelLogomark from '@/logos/vercel-logomark-dark.svg';
 import { useDeploys } from '@/queries/deploys';
+import { urlCreator } from '@/utils/urls';
 import { DeployFailure } from './DeployFailure';
 import DeploySigningKey from './DeploySigningKey';
 import { deployViaUrl, type RegistrationFailure } from './utils';
@@ -71,7 +72,11 @@ export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding
   // Branch parents should always show the empty state w/ deploy instructions
   if (!fetching && data?.deploys?.length && !isBranchParent) {
     const firstDeployId = data?.deploys?.[0]?.id;
-    router.push(`/env/${environmentSlug}/deploys/${firstDeployId}` as Route);
+    if (!firstDeployId) {
+      throw new Error('missing deploy ID');
+    }
+
+    router.push(urlCreator.deploy({ deployID: firstDeployId, envSlug: environmentSlug }));
     return <></>;
   }
 
@@ -241,7 +246,7 @@ export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding
             ) : (
               <Button
                 kind="primary"
-                href={`/env/${environmentSlug}/events` as Route}
+                href={urlCreator.events({ envSlug: environmentSlug })}
                 label="Go To Events"
               />
             )}
