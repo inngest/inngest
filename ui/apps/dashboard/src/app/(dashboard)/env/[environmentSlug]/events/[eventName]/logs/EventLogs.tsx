@@ -2,7 +2,7 @@
 
 import { useContext, useState } from 'react';
 
-import { EnvContext } from '@/contexts/env';
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { EventLogsPage } from './EventLogsPage';
 
 type EventLogsProps = {
@@ -11,8 +11,8 @@ type EventLogsProps = {
 
 export default function EventLogs({ eventName }: EventLogsProps) {
   const [cursors, setCursors] = useState(['']);
-  const env = useContext(EnvContext);
-  const pathPrefix = `/env/${env.slug}/events/${encodeURIComponent(eventName)}/logs`;
+  const environment = useEnvironment();
+  const pathPrefix = `/env/${environment.slug}/events/${encodeURIComponent(eventName)}/logs`;
 
   function loadNextPage(cursor: string) {
     setCursors((cursors) => {
@@ -31,7 +31,7 @@ export default function EventLogs({ eventName }: EventLogsProps) {
         return (
           <EventLogsPage
             cursor={cursor}
-            environmentID={env.id}
+            environmentID={environment.id}
             eventName={eventName}
             isFirstPage={index === 0}
             isLastPage={index === cursors.length - 1}

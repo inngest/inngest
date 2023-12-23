@@ -11,8 +11,8 @@ import {
 import { IconInfo } from '@inngest/components/icons/Info';
 import { useClient } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import Input from '@/components/Forms/Input';
-import { EnvContext } from '@/contexts/env';
 import { useSearchParam } from '@/utils/useSearchParam';
 import { Details } from './Details';
 import { EventTable } from './EventTable';
@@ -25,7 +25,7 @@ export function EventSearch() {
   const [events, setEvents] = useState<Event[]>([]);
   const [fetching, setFetching] = useState(false);
   const [selectedEventID, setSelectedEventID] = useState<string | undefined>(undefined);
-  const env = useContext(EnvContext);
+  const environment = useEnvironment();
   const client = useClient();
 
   const [query, setQuery] = useSearchParam('query');
@@ -48,7 +48,7 @@ export function EventSearch() {
       setEvents(
         await searchEvents({
           client,
-          environmentID: env.id,
+          environmentID: environment.id,
           query: newQuery,
           lowerTime: new Date(Date.now() - 3 * day),
           upperTime: new Date(),
@@ -118,7 +118,7 @@ export function EventSearch() {
       />
 
       <Details
-        envID={env.id}
+        envID={environment.id}
         eventID={selectedEventID}
         onClose={() => setSelectedEventID(undefined)}
         navigateToRun={() => <></>}
