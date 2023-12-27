@@ -124,6 +124,7 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 			RequestVersion: resp.requestVersion,
 			StatusCode:     resp.statusCode,
 			SDK:            resp.sdk,
+			Header:         resp.header,
 		}
 		dr.Generator, err = ParseGenerator(ctx, resp.body)
 		if err != nil {
@@ -168,6 +169,7 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 		RequestVersion: resp.requestVersion,
 		StatusCode:     resp.statusCode,
 		SDK:            resp.sdk,
+		Header:         resp.header,
 	}
 	if resp.statusCode < 200 || resp.statusCode > 299 {
 		// Add an error to driver.Response if the status code isn't 2XX.
@@ -296,6 +298,7 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		noRetry:        noRetry,
 		requestVersion: rv,
 		sdk:            headers[headerSDK],
+		header:         resp.Header,
 	}, err
 
 }
@@ -314,4 +317,6 @@ type response struct {
 	// sdk represents the SDK language and version used for these
 	// functions, in the format: "js:v0.1.0"
 	sdk string
+
+	header http.Header
 }
