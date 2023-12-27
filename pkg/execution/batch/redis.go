@@ -29,12 +29,25 @@ type redisBatchManager struct {
 	q redis_state.QueueManager
 }
 
+// Append add an item to a batch, and handle things slightly differently based on the batch sitation after
+// the item is appended.
+//
+//  1. First item in the batch
+//     Schedule a job to start the batch execution after the provided `timeout`. The scheduled job actually
+//     executes or not depends on the batch state at the time.
+//
+//  2. Batch is full
+//     Starts the batch job immediately and update the status.
+//
+//  3. Neither #1 or #2
+//     No-op
 func (b redisBatchManager) Append(ctx context.Context, bi BatchItem) (*BatchAppendResult, error) {
 	// NOTE: how to get fn config?
 
 	return nil, nil
 }
 
+// RetrieveItems retrieve the data associated with the specified batch.
 func (b redisBatchManager) RetrieveItems(ctx context.Context, batchID ulid.ULID) ([]BatchItem, error) {
 	empty := make([]BatchItem, 0)
 
@@ -61,6 +74,7 @@ func (b redisBatchManager) RetrieveItems(ctx context.Context, batchID ulid.ULID)
 	return items, nil
 }
 
+// ScheduleExecution enqueues a job to run the batch job after the specified duration.
 func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error {
 	jobID := fmt.Sprintf("%s:%s", opts.WorkspaceID, opts.BatchID)
 	maxAttempts := 20
@@ -100,6 +114,7 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 	return nil
 }
 
+// ExpireKeys sets the TTL for the keys related to the provided batchID.
 func (b redisBatchManager) ExpireKeys(ctx context.Context, batchID ulid.ULID) error {
 	keys := []string{
 		b.k.Batch(ctx, batchID),
