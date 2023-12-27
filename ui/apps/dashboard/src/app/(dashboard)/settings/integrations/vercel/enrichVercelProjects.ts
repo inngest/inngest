@@ -1,6 +1,6 @@
 import { graphql } from '@/gql';
 import graphqlAPI from '@/queries/graphqlAPI';
-import { getEnvironment } from '@/queries/server-only/getEnvironment';
+import { getProductionEnvironment } from '@/queries/server-only/getEnvironment';
 import { type VercelProject, type VercelProjectViaAPI } from './VercelIntegration';
 
 const GetSavedVercelProjectsDocument = graphql(`
@@ -23,9 +23,7 @@ const GetSavedVercelProjectsDocument = graphql(`
 export default async function enrichVercelProjects(
   vercelProjects: VercelProjectViaAPI[]
 ): Promise<VercelProject[]> {
-  const environment = await getEnvironment({
-    environmentSlug: 'production',
-  });
+  const environment = await getProductionEnvironment();
   const getSavedVercelProjectsResponse = await graphqlAPI.request(GetSavedVercelProjectsDocument, {
     environmentID: environment.id,
   });

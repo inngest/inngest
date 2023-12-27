@@ -8,16 +8,10 @@ import useManagePageTerminology from './../useManagePageTerminology';
 import DeleteKeyModal from './DeleteKeyModal';
 
 type ArchiveKeyProps = {
-  environmentSlug: string;
-  environmentID: string;
   keyID: string;
 };
 
-export default function DeleteKeyButton({
-  environmentSlug,
-  environmentID,
-  keyID,
-}: ArchiveKeyProps) {
+export default function DeleteKeyButton({ keyID }: ArchiveKeyProps) {
   const [isDeleteKeyModalVisible, setIsDeleteKeyModalVisible] = useState<boolean>(false);
   const currentContent = useManagePageTerminology();
 
@@ -32,8 +26,6 @@ export default function DeleteKeyButton({
       />
       {isDeleteKeyModalVisible && (
         <DeleteKeyModal
-          environmentID={environmentID}
-          environmentSlug={environmentSlug}
           keyID={keyID}
           isOpen={isDeleteKeyModalVisible}
           onClose={() => setIsDeleteKeyModalVisible(false)}

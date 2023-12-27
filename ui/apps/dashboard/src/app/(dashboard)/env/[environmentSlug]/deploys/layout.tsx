@@ -6,21 +6,18 @@ import DeployList from './DeployList';
 
 type DeploysLayoutProps = {
   children: React.ReactNode;
-  params: {
-    environmentSlug: string;
-  };
 };
 
-export default async function DeploysLayout({ children, params }: DeploysLayoutProps) {
+export default async function DeploysLayout({ children }: DeploysLayoutProps) {
   return (
     <>
       <Header
         title="Deploys"
         icon={<RocketLaunchIcon className="h-3.5 w-3.5 text-white" />}
-        action={<DeployButton environmentSlug={params.environmentSlug} />}
+        action={<DeployButton />}
       />
       <div className="flex flex-grow overflow-hidden bg-slate-50">
-        <DeployList environmentSlug={params.environmentSlug} />
+        <DeployList />
         {children}
       </div>
     </>

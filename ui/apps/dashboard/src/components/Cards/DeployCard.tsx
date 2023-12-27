@@ -1,7 +1,10 @@
+'use client';
+
 import type { Route } from 'next';
 import { Button } from '@inngest/components/Button';
 import { capitalCase } from 'change-case';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import DeployStatus from '@/components/Status/DeployStatus';
 import { Time } from '@/components/Time';
 import ClockIcon from '@/icons/ClockIcon';
@@ -26,7 +29,6 @@ export type DeployCardProps = {
   createdAt: string;
   deployedFunctions: { slug: string; name: string }[];
   removedFunctions: { slug: string; name: string }[];
-  environmentSlug: string;
   error?: string | null | undefined;
   framework?: string | null;
   metadata: DeployMetadata;
@@ -41,7 +43,6 @@ export default function DeployCard({
   appName,
   createdAt,
   deployedFunctions,
-  environmentSlug,
   framework,
   metadata,
   removedFunctions,
@@ -49,6 +50,8 @@ export default function DeployCard({
   status,
   url,
 }: DeployCardProps) {
+  const env = useEnvironment();
+
   return (
     <div className="w-full px-8 py-8">
       <div className="rounded-lg bg-white shadow">
@@ -88,12 +91,12 @@ export default function DeployCard({
       <div className="mt-4 grid-cols-2 items-start gap-4 xl:grid">
         <FunctionList
           functions={deployedFunctions}
-          baseHref={`/env/${environmentSlug}/functions`}
+          baseHref={`/env/${env.slug}/functions`}
           status="active"
         />
         <FunctionList
           functions={removedFunctions}
-          baseHref={`/env/${environmentSlug}/functions`}
+          baseHref={`/env/${env.slug}/functions`}
           status="removed"
         />
       </div>

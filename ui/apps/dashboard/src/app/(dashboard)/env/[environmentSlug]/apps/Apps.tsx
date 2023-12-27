@@ -1,14 +1,13 @@
 'use client';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { AppCard } from './AppCard';
 import { useApps } from './useApps';
 
-type Props = {
-  envID: string;
-};
+export function Apps() {
+  const env = useEnvironment();
 
-export function Apps({ envID }: Props) {
-  const res = useApps(envID);
+  const res = useApps(env.id);
   if (res.error) {
     throw res.error;
   }
