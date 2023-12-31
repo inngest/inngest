@@ -82,9 +82,10 @@ const (
 	RequestVersionUnknown = -1
 
 	// PriorityFactorMin is the minimum priority factor for any function run, in seconds.
-	PriorityFactorMin = int64(-600)
+	PriorityFactorMin = int64(-1 * 60 * 60 * 12)
 	// PriorityFactorMax is the maximum priority factor for any function run, in seconds.
-	PriorityFactorMax = int64(600)
+	// This is set to 12 hours.
+	PriorityFactorMax = int64(60 * 60 * 12)
 	// FutureQueeueFudgeLimit is the inclusive time range between [now, now() + FutureAtLimit]
 	// in which priority factors are taken into account.
 	FutureAtLimit = 2 * time.Second
