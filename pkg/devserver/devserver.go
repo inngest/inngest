@@ -58,6 +58,7 @@ func New(ctx context.Context, opts StartOpts) error {
 		opts.Config.Execution.LogOutput = true
 	}
 
+	// NOTE: looks deprecated?
 	// Before running the development service, ensure that we change the http
 	// driver in development to use our AWS Gateway http client, attempting to
 	// automatically transform dev requests to lambda invocations.

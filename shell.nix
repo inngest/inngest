@@ -1,5 +1,5 @@
 let
-  pkgs = import <nixos-23.05> { };
+  pkgs = import <nixos-23.11> { };
   unstable = import <nixpkgs> { };
 
   corepack = pkgs.stdenv.mkDerivation {
@@ -15,14 +15,15 @@ let
 in pkgs.mkShell {
   nativeBuildInputs = [
     # Go
-    unstable.go_1_21
-    unstable.golangci-lint
+    pkgs.go
+    pkgs.golangci-lint
     pkgs.gotests
     pkgs.gomodifytags
     pkgs.gore
     pkgs.gotools
     pkgs.gocode
     pkgs.protoc-gen-go
+    pkgs.goreleaser
 
     # Lua
     pkgs.lua
