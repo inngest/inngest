@@ -42,20 +42,16 @@ export default function DeleteKeyModal({
   const currentContent = useManagePageTerminology();
 
   function handleDelete() {
-    deleteEventKey(
-      {
-        input: {
-          id: keyID,
-          workspaceID: environmentID,
-        },
+    deleteEventKey({
+      input: {
+        id: keyID,
+        workspaceID: environmentID,
       },
-      { additionalTypenames: ['IngestKey'] }
-    ).then((result) => {
+    }).then((result) => {
       if (result.error) {
         toast.error(`${currentContent?.name} could not be deleted`);
       } else {
         toast.success(`${currentContent?.name} was successfully deleted`);
-        router.refresh();
         router.push(`/env/${environmentSlug}/manage/${currentContent?.param}` as Route);
       }
     });

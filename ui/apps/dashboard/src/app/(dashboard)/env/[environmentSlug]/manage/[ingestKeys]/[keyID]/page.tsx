@@ -11,8 +11,8 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { graphql } from '@/gql';
-import { useEnvironment } from '@/queries';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { Provider } from './Context';
 import DeleteKeyModal from './DeleteKeyModal';
@@ -52,10 +52,7 @@ export default function Keys({ params: { environmentSlug, ingestKeys, keyID } }:
   const [isDeleteKeyModalVisible, setIsDeleteKeyModalVisible] = useState(false);
   const [isEditKeyNameModalVisible, setIsEditKeyNameModalVisible] = useState(false);
 
-  const [{ data: environment, fetching: fetchingEnvironment, error: environmentError }] =
-    useEnvironment({
-      environmentSlug,
-    });
+  const environment = useEnvironment();
 
   const { data, isLoading, error } = useSkippableGraphQLQuery({
     query: GetKeyDocument,
@@ -66,15 +63,13 @@ export default function Keys({ params: { environmentSlug, ingestKeys, keyID } }:
     skip: !environment?.id,
   });
 
-  const loading = fetchingEnvironment || isLoading;
-
-  if (loading) {
+  if (isLoading) {
     return <>{/* To do: skeleton */}</>;
   }
 
   const key = data?.environment.ingestKey;
 
-  if (!environment || environmentError || error || !key) {
+  if (!environment || error || !key) {
     notFound();
   }
 
