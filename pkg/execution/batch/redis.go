@@ -118,7 +118,35 @@ func (b redisBatchManager) RetrieveItems(ctx context.Context, batchID ulid.ULID)
 
 // StartExecution sets the status to `started`
 func (b redisBatchManager) StartExecution(ctx context.Context, fnID uuid.UUID, batchID ulid.ULID) (string, error) {
-	return "", nil
+	keys := []string{
+		b.k.BatchMetadata(ctx, batchID),
+		b.k.BatchPointer(ctx, fnID),
+	}
+	args := []string{
+		enums.BatchStatusStarted.String(),
+		ulid.Make().String(),
+	}
+
+	status, err := scripts["start"].Exec(
+		ctx,
+		b.r,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return "", fmt.Errorf("failed to start batch execution: %w", err)
+	}
+
+	switch status {
+	case 0: // can start, and has mark it started
+		return enums.BatchStatusReady.String(), nil
+
+	case 1: // Already started
+		return enums.BatchStatusStarted.String(), nil
+
+	default:
+		return "", fmt.Errorf("invalid status for start batch ops: %d", status)
+	}
 }
 
 // ScheduleExecution enqueues a job to run the batch job after the specified duration.
