@@ -13,7 +13,7 @@ import {
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { graphql } from '@/gql';
-import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { Provider } from './Context';
 import DeleteKeyModal from './DeleteKeyModal';
 import EditKeyNameModal from './EditKeyNameModal';
@@ -54,13 +54,12 @@ export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps)
 
   const environment = useEnvironment();
 
-  const { data, isLoading, error } = useSkippableGraphQLQuery({
+  const { data, isLoading, error } = useGraphQLQuery({
     query: GetKeyDocument,
     variables: {
-      environmentID: environment?.id || '',
+      environmentID: environment.id,
       keyID,
     },
-    skip: !environment?.id,
   });
 
   if (isLoading) {
@@ -69,7 +68,7 @@ export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps)
 
   const key = data?.environment.ingestKey;
 
-  if (!environment || error || !key) {
+  if (error || !key) {
     notFound();
   }
 
