@@ -29,11 +29,11 @@ import (
 //
 //	#4 needs to happen in one transaction in order to make sure there will not be any race conditions.
 type BatchManager interface {
-	Append(context.Context, BatchItem, inngest.Function) (*BatchAppendResult, error)
-	RetrieveItems(context.Context, ulid.ULID) ([]BatchItem, error)
+	Append(ctx context.Context, bi BatchItem, fn inngest.Function) (*BatchAppendResult, error)
+	RetrieveItems(ctx context.Context, batchID ulid.ULID) ([]BatchItem, error)
 	// StartExecution(context.Context, uuid.UUID, ulid.ULID) (string, error)
-	ScheduleExecution(context.Context, ScheduleBatchOpts) error
-	ExpireKeys(context.Context, ulid.ULID) error
+	ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error
+	ExpireKeys(ctx context.Context, batchID ulid.ULID) error
 }
 
 // BatchItem represents the item that are being batched.
