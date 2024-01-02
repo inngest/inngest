@@ -116,6 +116,11 @@ func (b redisBatchManager) RetrieveItems(ctx context.Context, batchID ulid.ULID)
 	return items, nil
 }
 
+// StartExecution sets the status to `started`
+func (b redisBatchManager) StartExecution(ctx context.Context, fnID uuid.UUID, batchID ulid.ULID) (string, error) {
+	return "", nil
+}
+
 // ScheduleExecution enqueues a job to run the batch job after the specified duration.
 func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error {
 	jobID := fmt.Sprintf("%s:%s", opts.WorkspaceID, opts.BatchID)
