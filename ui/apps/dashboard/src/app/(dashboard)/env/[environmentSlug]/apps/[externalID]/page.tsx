@@ -14,6 +14,7 @@ type Props = {
 };
 
 export default function Page({ params: { environmentSlug, externalID } }: Props) {
+  externalID = decodeURIComponent(externalID);
   const env = useEnvironment();
 
   const appRes = useApp({

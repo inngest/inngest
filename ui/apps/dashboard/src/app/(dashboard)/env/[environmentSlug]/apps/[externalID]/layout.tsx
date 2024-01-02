@@ -13,6 +13,7 @@ type Props = React.PropsWithChildren<{
 }>;
 
 export default function Layout({ children, params: { externalID } }: Props) {
+  externalID = decodeURIComponent(externalID);
   const env = useEnvironment();
 
   const res = useAppName({
