@@ -20,6 +20,10 @@ export default function Layout({ children, params: { externalID } }: Props) {
     externalAppID: externalID,
   });
   if (res.error) {
+    if (res.error.message.includes('no rows')) {
+      // TODO: Make this look better.
+      return <span className="m-auto">App not found: {externalID}</span>;
+    }
     throw res.error;
   }
   if (res.isLoading) {
