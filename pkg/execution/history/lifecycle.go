@@ -377,18 +377,22 @@ func (l lifecycle) OnStepFinished(
 		)
 	}
 
-	if h.Result != nil && resp.SDK != "" {
-		parts := strings.Split(resp.SDK, ":")
-		if len(parts) == 2 {
-			// Trim prefix because the TS SDK sends "inngest-js:vX.X.X"
-			h.Result.SDKLanguage = strings.TrimPrefix(parts[0], "inngest-")
+	if h.Result != nil {
+		h.Result.Headers = resp.Header
 
-			h.Result.SDKVersion = parts[1]
-		} else {
-			l.log.Warn(
-				"invalid SDK version",
-				"sdk", resp.SDK,
-			)
+		if resp.SDK != "" {
+			parts := strings.Split(resp.SDK, ":")
+			if len(parts) == 2 {
+				// Trim prefix because the TS SDK sends "inngest-js:vX.X.X"
+				h.Result.SDKLanguage = strings.TrimPrefix(parts[0], "inngest-")
+
+				h.Result.SDKVersion = parts[1]
+			} else {
+				l.log.Warn(
+					"invalid SDK version",
+					"sdk", resp.SDK,
+				)
+			}
 		}
 	}
 
