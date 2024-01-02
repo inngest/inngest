@@ -158,6 +158,7 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
    */
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.code === 'Enter' && resultRef.current && searchResult.href.length > 0) {
+      e.preventDefault();
       router.push(searchResult.href as Route);
       onClose();
     }

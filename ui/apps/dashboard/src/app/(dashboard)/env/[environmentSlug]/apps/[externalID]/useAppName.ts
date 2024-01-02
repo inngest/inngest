@@ -1,5 +1,5 @@
 import { graphql } from '@/gql';
-import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const query = graphql(`
   query AppName($envID: ID!, $externalAppID: String!) {
@@ -11,18 +11,9 @@ const query = graphql(`
   }
 `);
 
-export function useAppName({
-  envID,
-  externalAppID,
-  skip,
-}: {
-  envID: string;
-  externalAppID: string;
-  skip: boolean;
-}) {
-  const res = useSkippableGraphQLQuery({
+export function useAppName({ envID, externalAppID }: { envID: string; externalAppID: string }) {
+  const res = useGraphQLQuery({
     query,
-    skip,
     variables: { envID, externalAppID },
   });
 

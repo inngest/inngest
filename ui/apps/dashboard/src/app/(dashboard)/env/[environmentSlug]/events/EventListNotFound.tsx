@@ -8,9 +8,9 @@ import { CodeKey } from '@inngest/components/CodeKey';
 import { useCopyToClipboard } from 'react-use';
 import { useQuery } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { graphql } from '@/gql';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
-import { useEnvironment } from '@/queries';
 
 const GetEventKeysForBlankSlateDocument = graphql(`
   query GetEventKeysForBlankSlate($environmentID: ID!) {
@@ -36,16 +36,14 @@ function getDefaultEventKey<T extends { createdAt: string; name: null | string }
   );
 }
 
-export default function EventListNotFound({ environmentSlug }: { environmentSlug: string }) {
+export default function EventListNotFound() {
   const router = useRouter();
   const [, copy] = useCopyToClipboard();
-  const [{ data: environment, fetching: fetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
+  const environment = useEnvironment();
   const [{ data, fetching: fetchingKey }] = useQuery({
     query: GetEventKeysForBlankSlateDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
     },
     pause: !environment?.id,
   });
@@ -103,7 +101,7 @@ export default function EventListNotFound({ environmentSlug }: { environmentSlug
           <div className="mt-6 flex items-center gap-2 border-t border-slate-800/50 py-4">
             <Button
               kind="primary"
-              href={`/env/${environmentSlug}/deploys` as Route}
+              href={`/env/${environment.slug}/deploys` as Route}
               label="Deploy Your Functions"
             />
             <div className="flex gap-2 border-l border-slate-800/50 pl-2">

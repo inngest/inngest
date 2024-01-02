@@ -1,15 +1,13 @@
 'use client';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { AppCard } from './AppCard';
 import { useApps } from './useApps';
 
-type Props = {
-  envID: string;
-  envSlug: string;
-};
+export function Apps() {
+  const env = useEnvironment();
 
-export function Apps({ envID, envSlug }: Props) {
-  const res = useApps(envID);
+  const res = useApps(env.id);
   if (res.error) {
     throw res.error;
   }
@@ -21,7 +19,7 @@ export function Apps({ envID, envSlug }: Props) {
     <div className="mt-4 flex items-center justify-center">
       <div className="w-full max-w-[1200px]">
         {res.data.map((app) => {
-          return <AppCard app={app} className="mb-4" envSlug={envSlug} key={app.id} />;
+          return <AppCard app={app} className="mb-4" envSlug={env.slug} key={app.id} />;
         })}
       </div>
     </div>

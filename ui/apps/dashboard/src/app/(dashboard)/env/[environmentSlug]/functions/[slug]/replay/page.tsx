@@ -9,13 +9,13 @@ import type { Replay } from '@inngest/components/types/replay';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import NewReplayButton from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/NewReplayButton';
 import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
-import { useEnvironment } from '@/queries';
 import { duration } from '@/utils/date';
-import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const GetReplaysDocument = graphql(`
   query GetReplays($environmentID: ID!, $functionSlug: String!) {
@@ -92,29 +92,25 @@ const columns = [
 
 type FunctionReplayPageProps = {
   params: {
-    environmentSlug: string;
     slug: string;
   };
 };
 export default function FunctionReplayPage({ params }: FunctionReplayPageProps) {
   const functionSlug = decodeURIComponent(params.slug);
-  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
-    environmentSlug: params.environmentSlug,
-  });
-  const { data, isLoading, error } = useSkippableGraphQLQuery({
+  const environment = useEnvironment();
+  const { data, isLoading, error } = useGraphQLQuery({
     query: GetReplaysDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
       functionSlug: functionSlug,
     },
     context: useMemo(() => ({ additionalTypenames: ['Replay'] }), []),
-    skip: !environment?.id,
     pollIntervalInMilliseconds: 5_000,
   });
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  if (isFetchingEnvironment || isLoading) {
+  if (isLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <LoadingIcon />
@@ -164,7 +160,7 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
     <>
       {environmentID && functionID && (
         <div className="flex items-center justify-end border-b border-slate-300 px-5 py-2">
-          <NewReplayButton environmentSlug={params.environmentSlug} functionSlug={functionSlug} />
+          <NewReplayButton functionSlug={functionSlug} />
         </div>
       )}
       <div className="overflow-y-auto">

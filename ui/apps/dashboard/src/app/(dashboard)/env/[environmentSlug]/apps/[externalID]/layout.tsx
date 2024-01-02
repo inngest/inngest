@@ -2,40 +2,34 @@
 
 import { Squares2X2Icon } from '@heroicons/react/20/solid';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import Header, { type HeaderLink } from '@/components/Header/Header';
-import { useEnvironment } from '@/queries';
 import { useAppName } from './useAppName';
 
 type Props = React.PropsWithChildren<{
   params: {
-    environmentSlug: string;
     externalID: string;
   };
 }>;
 
-export default function Layout({ children, params: { environmentSlug, externalID } }: Props) {
-  const [envRes] = useEnvironment({ environmentSlug });
-  if (envRes.error) {
-    throw envRes.error;
-  }
+export default function Layout({ children, params: { externalID } }: Props) {
+  const env = useEnvironment();
 
   const res = useAppName({
-    envID: envRes.data?.id ?? '',
+    envID: env.id,
     externalAppID: externalID,
-    skip: !envRes.data,
   });
   if (res.error) {
     throw res.error;
   }
-
-  if (envRes.fetching || res.isLoading || res.isSkipped) {
+  if (res.isLoading) {
     return null;
   }
 
   const navLinks: HeaderLink[] = [
     {
       active: 'exact',
-      href: `/env/${environmentSlug}/apps/${encodeURIComponent(externalID)}`,
+      href: `/env/${env.slug}/apps/${encodeURIComponent(externalID)}`,
       text: 'Info',
     },
     // TODO: Uncomment when the syncs page is added

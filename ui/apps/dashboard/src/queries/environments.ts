@@ -1,23 +1,17 @@
 import { useQuery, type UseQueryResponse } from 'urql';
 
 import { graphql } from '@/gql';
-import { workspacesToEnvironments, type Environment } from '@/utils/environments';
+import { EnvironmentType, workspacesToEnvironments, type Environment } from '@/utils/environments';
 
-type UseEnvironmentParams = {
-  environmentSlug: string;
-};
-
-export const useEnvironment = ({
-  environmentSlug,
-}: UseEnvironmentParams): UseQueryResponse<Environment> => {
+export function useProductionEnvironment(): UseQueryResponse<Environment> {
   const [{ data: environments, fetching, error, stale }, refetch] = useEnvironments();
 
   const environment = environments?.find((e) => {
-    return e.slug === environmentSlug;
+    return e.type === EnvironmentType.Production;
   });
 
   return [{ data: environment, fetching, error, stale }, refetch];
-};
+}
 
 const GetEnvironmentsDocument = graphql(`
   query GetEnvironments {

@@ -1,9 +1,9 @@
 import { Client, useQuery, type UseQueryResponse } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import { graphql } from '@/gql';
 import type { GetFunctionQuery, WorkflowVersion } from '@/gql/graphql';
-import { useEnvironment } from '@/queries/environments';
 
 const GetFunctionsUsageDocument = graphql(`
   query GetFunctionsUsage($environmentID: ID!, $page: Int, $archived: Boolean) {
@@ -143,30 +143,25 @@ const GetFunctionDocument = graphql(`
 `);
 
 type UseFunctionParams = {
-  environmentSlug: string;
   functionSlug: string;
 };
 
 export const useFunction = ({
-  environmentSlug,
   functionSlug,
 }: UseFunctionParams): UseQueryResponse<
   GetFunctionQuery,
   { environmentID: string; slug: string }
 > => {
-  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
+  const environment = useEnvironment();
   const [result, refetch] = useQuery({
     query: GetFunctionDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
       slug: functionSlug,
     },
-    pause: !environment?.id,
   });
 
-  return [{ ...result, fetching: isFetchingEnvironment || result.fetching }, refetch];
+  return [{ ...result, fetching: result.fetching }, refetch];
 };
 
 const GetFunctionUsageDocument = graphql(`
@@ -219,32 +214,27 @@ type UsageItem = {
 };
 
 type UseFunctionUsageParams = {
-  environmentSlug: string;
   functionSlug: string;
   timeRange: TimeRange;
 };
 
 export const useFunctionUsage = ({
-  environmentSlug,
   functionSlug,
   timeRange,
 }: UseFunctionUsageParams): UseQueryResponse<UsageItem[]> => {
-  const [{ data: functionData }] = useFunction({ environmentSlug, functionSlug });
+  const environment = useEnvironment();
+  const [{ data: functionData }] = useFunction({ functionSlug });
   const functionId = functionData?.workspace.workflow?.id;
-
-  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
 
   const [{ data, ...rest }, refetch] = useQuery({
     query: GetFunctionUsageDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
       id: functionId!,
       startTime: timeRange.start.toISOString(),
       endTime: timeRange.end.toISOString(),
     },
-    pause: !functionId || !environment?.id,
+    pause: !functionId,
   });
 
   // Combine usage arrays into single array
@@ -265,5 +255,5 @@ export const useFunctionUsage = ({
     });
   }
 
-  return [{ ...rest, data: usage, fetching: isFetchingEnvironment || rest.fetching }, refetch];
+  return [{ ...rest, data: usage, fetching: rest.fetching }, refetch];
 };

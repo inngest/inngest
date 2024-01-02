@@ -3,6 +3,7 @@ package state
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -283,6 +284,8 @@ type DriverResponse struct {
 	//
 	// When final is true, Retryable() always returns false.
 	final bool
+
+	Header http.Header `json:"header,omitempty"`
 }
 
 // SetFinal indicates that this error is final, regardless of the status code

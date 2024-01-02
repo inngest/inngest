@@ -1,7 +1,7 @@
 import type { Function } from '@inngest/components/types/function';
 
 import { graphql } from '@/gql';
-import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const query = graphql(`
   query App($envID: ID!, $externalAppID: String!) {
@@ -45,19 +45,10 @@ const query = graphql(`
   }
 `);
 
-export function useApp({
-  envID,
-  externalAppID,
-  skip,
-}: {
-  envID: string;
-  externalAppID: string;
-  skip: boolean;
-}) {
-  const res = useSkippableGraphQLQuery({
+export function useApp({ envID, externalAppID }: { envID: string; externalAppID: string }) {
+  const res = useGraphQLQuery({
     pollIntervalInMilliseconds: 10_000,
     query,
-    skip,
     variables: { envID, externalAppID },
   });
 

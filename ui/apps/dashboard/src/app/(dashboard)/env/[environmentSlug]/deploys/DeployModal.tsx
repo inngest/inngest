@@ -13,12 +13,11 @@ import DeploySigningKey from './DeploySigningKey';
 import { deployViaUrl, type RegistrationErrorCode, type RegistrationFailure } from './utils';
 
 type DeployModalProps = {
-  environmentSlug: string;
   isOpen: boolean;
   onClose: () => void;
 };
 
-export default function DeployModal({ environmentSlug, isOpen, onClose }: DeployModalProps) {
+export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
   const [failure, setFailure] = useState<RegistrationFailure>();
   const [input = '', setInput] = useLocalStorage('deploymentUrl', '');
   const [isLoading, setIsLoading] = useState(false);
@@ -71,7 +70,7 @@ export default function DeployModal({ environmentSlug, isOpen, onClose }: Deploy
         to register your functions with Inngest.
       </p>
       {/* TODO - Add CTA/info block about Vercel/Netlify integrations */}
-      <DeploySigningKey environmentSlug={environmentSlug} />
+      <DeploySigningKey />
       <div>
         <input
           className="w-full rounded-lg border px-4 py-2"

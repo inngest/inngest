@@ -1,6 +1,6 @@
 'use client';
 
-import { useEnvironment } from '@/queries';
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { AppCard } from './AppCard';
 import { FunctionList } from './FunctionList';
 import { GitCard } from './GitCard';
@@ -14,21 +14,16 @@ type Props = {
 };
 
 export default function Page({ params: { environmentSlug, externalID } }: Props) {
-  const [envRes] = useEnvironment({ environmentSlug });
-  if (envRes.error) {
-    throw envRes.error;
-  }
+  const env = useEnvironment();
 
   const appRes = useApp({
-    envID: envRes.data?.id ?? '',
+    envID: env.id,
     externalAppID: externalID,
-    skip: !envRes.data,
   });
   if (appRes.error) {
     throw appRes.error;
   }
-
-  if (envRes.fetching || appRes.isLoading || appRes.isSkipped) {
+  if (appRes.isLoading) {
     return null;
   }
 
