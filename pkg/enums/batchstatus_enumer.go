@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _BatchStatusName = "PendingStarted"
+const _BatchStatusName = "PendingReadyStarted"
 
-var _BatchStatusIndex = [...]uint8{0, 7, 14}
+var _BatchStatusIndex = [...]uint8{0, 7, 12, 19}
 
-const _BatchStatusLowerName = "pendingstarted"
+const _BatchStatusLowerName = "pendingreadystarted"
 
 func (i BatchStatus) String() string {
 	if i < 0 || i >= BatchStatus(len(_BatchStatusIndex)-1) {
@@ -26,21 +26,25 @@ func (i BatchStatus) String() string {
 func _BatchStatusNoOp() {
 	var x [1]struct{}
 	_ = x[BatchStatusPending-(0)]
-	_ = x[BatchStatusStarted-(1)]
+	_ = x[BatchStatusReady-(1)]
+	_ = x[BatchStatusStarted-(2)]
 }
 
-var _BatchStatusValues = []BatchStatus{BatchStatusPending, BatchStatusStarted}
+var _BatchStatusValues = []BatchStatus{BatchStatusPending, BatchStatusReady, BatchStatusStarted}
 
 var _BatchStatusNameToValueMap = map[string]BatchStatus{
-	_BatchStatusName[0:7]:       BatchStatusPending,
-	_BatchStatusLowerName[0:7]:  BatchStatusPending,
-	_BatchStatusName[7:14]:      BatchStatusStarted,
-	_BatchStatusLowerName[7:14]: BatchStatusStarted,
+	_BatchStatusName[0:7]:        BatchStatusPending,
+	_BatchStatusLowerName[0:7]:   BatchStatusPending,
+	_BatchStatusName[7:12]:       BatchStatusReady,
+	_BatchStatusLowerName[7:12]:  BatchStatusReady,
+	_BatchStatusName[12:19]:      BatchStatusStarted,
+	_BatchStatusLowerName[12:19]: BatchStatusStarted,
 }
 
 var _BatchStatusNames = []string{
 	_BatchStatusName[0:7],
-	_BatchStatusName[7:14],
+	_BatchStatusName[7:12],
+	_BatchStatusName[12:19],
 }
 
 // BatchStatusString retrieves an enum value from the enum constants string name.
