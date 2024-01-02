@@ -24,7 +24,6 @@ export const runtime = 'nodejs';
 
 export default function EventDashboard({ params }: EventDashboardProps) {
   const [{ data, fetching }] = useEventType({
-    environmentSlug: params.environmentSlug,
     name: decodeURIComponent(params.eventName),
   });
 

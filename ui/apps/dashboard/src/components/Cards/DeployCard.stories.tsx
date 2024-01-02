@@ -13,7 +13,6 @@ const meta: Meta<typeof DeployCard> = {
       { slug: 'app-send-upgrade-email', name: 'Send upgrade email' },
       { slug: 'app-handle-failed-payments', name: 'Handle failed payments' },
     ],
-    environmentSlug: 'my-branch',
     removedFunctions: [{ slug: 'app-send-welcome-email', name: 'Send welcome email' }],
     sdkLanguage: 'node',
     sdkVersion: '1.2.3',

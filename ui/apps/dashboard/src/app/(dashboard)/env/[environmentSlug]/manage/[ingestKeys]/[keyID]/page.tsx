@@ -48,7 +48,7 @@ type KeyDetailsProps = {
   };
 };
 
-export default function Keys({ params: { environmentSlug, ingestKeys, keyID } }: KeyDetailsProps) {
+export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps) {
   const [isDeleteKeyModalVisible, setIsDeleteKeyModalVisible] = useState(false);
   const [isEditKeyNameModalVisible, setIsEditKeyNameModalVisible] = useState(false);
 
@@ -115,8 +115,6 @@ export default function Keys({ params: { environmentSlug, ingestKeys, keyID } }:
             </DropdownMenu>
 
             <DeleteKeyModal
-              environmentID={environment.id}
-              environmentSlug={environmentSlug}
               keyID={keyID}
               isOpen={isDeleteKeyModalVisible}
               onClose={() => setIsDeleteKeyModalVisible(false)}

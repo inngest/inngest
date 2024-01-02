@@ -1,8 +1,8 @@
 import { useQuery, type UseQueryResponse } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { graphql } from '@/gql';
 import { type GetDeployssQuery } from '@/gql/graphql';
-import { useEnvironment } from '@/queries/environments';
 
 const GetDeploysDocument = graphql(`
   query GetDeployss($environmentID: ID!) {
@@ -32,24 +32,15 @@ const GetDeploysDocument = graphql(`
   }
 `);
 
-type UseDeploysParams = {
-  environmentSlug: string;
-};
-
 // TODO - Support pagination/cursors
-export const useDeploys = ({
-  environmentSlug,
-}: UseDeploysParams): UseQueryResponse<GetDeployssQuery, { environmentID: string }> => {
-  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
+export const useDeploys = (): UseQueryResponse<GetDeployssQuery, { environmentID: string }> => {
+  const environment = useEnvironment();
   const [result, refetch] = useQuery({
     query: GetDeploysDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
     },
-    pause: !environment?.id,
   });
 
-  return [{ ...result, fetching: isFetchingEnvironment || result.fetching }, refetch];
+  return [{ ...result, fetching: result.fetching }, refetch];
 };

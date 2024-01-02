@@ -1,3 +1,5 @@
+'use client';
+
 import { useMemo } from 'react';
 import Link from 'next/link';
 import { ArrowRightIcon, ChartBarIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
@@ -8,6 +10,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
 import { Pill } from '@/components/Pill/Pill';
 import TriggerPill, { TRIGGER_TYPE, type Trigger } from '@/components/Pill/TriggerPill';
@@ -31,14 +34,15 @@ export type FunctionTableRow = {
 };
 
 type Props = {
-  environmentSlug: string;
   rows: FunctionTableRow[] | undefined;
 };
 
-export function FunctionTable({ environmentSlug, rows = [] }: Props) {
+export function FunctionTable({ rows = [] }: Props) {
+  const env = useEnvironment();
+
   const columns = useMemo(() => {
-    return createColumns(environmentSlug);
-  }, [environmentSlug]);
+    return createColumns(env.slug);
+  }, [env.slug]);
 
   const table = useReactTable({
     data: rows,

@@ -33,12 +33,7 @@ export default function EventLayout({ children, params }: EventLayoutProps) {
         icon={<EventIcon className="h-5 w-5 text-white" />}
         title={decodeURIComponent(params.eventName)}
         links={navLinks}
-        action={
-          <SendEventButton
-            environmentSlug={params.environmentSlug}
-            eventName={decodeURIComponent(params.eventName)}
-          />
-        }
+        action={<SendEventButton eventName={decodeURIComponent(params.eventName)} />}
       />
       {children}
     </>

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { Alert } from '@/components/Alert';
 import DeployStatus from '@/components/Status/DeployStatus';
 import { Time } from '@/components/Time';
@@ -7,7 +8,6 @@ import ClockIcon from '@/icons/ClockIcon';
 import cn from '@/utils/cn';
 
 interface Props {
-  environmentSlug: string;
   activeFunctionCount: number | undefined;
   createdAt: string;
   deployID: string;
@@ -18,7 +18,6 @@ interface Props {
 }
 
 export function DeployListItem({
-  environmentSlug,
   activeFunctionCount,
   createdAt,
   deployID,
@@ -27,6 +26,8 @@ export function DeployListItem({
   removedFunctionCount,
   status,
 }: Props) {
+  const env = useEnvironment();
+
   const classNames = cn(
     'block py-3.5 px-4 hover:bg-slate-100 transition-all w-full',
     isSelected && 'bg-slate-100'
@@ -39,7 +40,7 @@ export function DeployListItem({
 
   return (
     <li className={classNames} key={deployID}>
-      <Link href={`/env/${environmentSlug}/deploys/${deployID}`}>
+      <Link href={`/env/${env.slug}/deploys/${deployID}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <DeployStatus status={status || ''} />
