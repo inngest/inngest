@@ -5,17 +5,17 @@ import { useUser } from '@clerk/nextjs';
 import * as Sentry from '@sentry/nextjs';
 
 export default function SentryUserIdentification() {
-  const { user } = useUser();
+  const { user, isSignedIn } = useUser();
 
   useEffect(() => {
-    if (!user?.externalId) return;
+    if (!isSignedIn) return;
 
     Sentry.setUser({
-      id: user.externalId,
+      ...(user.externalId && { id: user.externalId }),
       clerk_user_id: user.id,
       email: user.primaryEmailAddress?.emailAddress,
     });
-  }, [user?.externalId, user?.id, user?.primaryEmailAddress?.emailAddress]);
+  }, [isSignedIn, user?.externalId, user?.id, user?.primaryEmailAddress?.emailAddress]);
 
   return null;
 }
