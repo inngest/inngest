@@ -2,14 +2,18 @@ package batch
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -41,10 +45,48 @@ type redisBatchManager struct {
 //
 //  3. Neither #1 or #2
 //     No-op
-func (b redisBatchManager) Append(ctx context.Context, bi BatchItem) (*BatchAppendResult, error) {
-	// NOTE: how to get fn config?
+func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.Function) (*BatchAppendResult, error) {
+	batchConfig := fn.EventBatch
+	if batchConfig == nil {
+		// TODO: this should not happen, report this to sentry or logs
+		return nil, fmt.Errorf("no batch config found for for function: %s", fn.Slug)
+	}
 
-	return nil, nil
+	// script keys
+	keys := []string{
+		b.k.BatchPointer(ctx, bi.FunctionID),
+	}
+
+	// script args
+	newULID := ulid.MustNew(uint64(time.Now().UnixMilli()), rand.Reader)
+	args, err := redis_state.StrSlice([]any{
+		batchConfig.MaxSize,
+		bi.GetEvent(), // NOTE
+		newULID,
+		// TODO: queue prefix
+		enums.BatchStatusPending,
+		enums.BatchStatusStarted,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error preparing batch: %w", err)
+	}
+
+	resp, err := scripts["append"].Exec(
+		ctx,
+		b.r,
+		keys,
+		args,
+	).AsBytes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to append event: '%s' to a batch: %v", bi.EventID, err)
+	}
+
+	result := &BatchAppendResult{}
+	if err := json.Unmarshal(resp, result); err != nil {
+		return nil, fmt.Errorf("failed to decode append result: %v", err)
+	}
+
+	return result, nil
 }
 
 // RetrieveItems retrieve the data associated with the specified batch.

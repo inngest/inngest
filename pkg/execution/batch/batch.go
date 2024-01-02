@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -28,7 +29,7 @@ import (
 //
 //	#4 needs to happen in one transaction in order to make sure there will not be any race conditions.
 type BatchManager interface {
-	Append(context.Context, BatchItem) (*BatchAppendResult, error)
+	Append(context.Context, BatchItem, inngest.Function) (*BatchAppendResult, error)
 	RetrieveItems(context.Context, ulid.ULID) ([]BatchItem, error)
 	// StartExecution(context.Context, uuid.UUID, ulid.ULID) (string, error)
 	ScheduleExecution(context.Context, ScheduleBatchOpts) error
