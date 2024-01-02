@@ -2,17 +2,16 @@
 
 import { CodeKey } from '@inngest/components/CodeKey';
 
-import { useEnvironment } from '@/queries';
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 
 type DeploySigningKeyProps = {
-  environmentSlug: string;
   className?: string;
 };
 
-export default function DeploySigningKey({ environmentSlug, className }: DeploySigningKeyProps) {
-  const [{ data: environment }] = useEnvironment({ environmentSlug });
-  const signingKey = environment?.webhookSigningKey || '...';
-  const maskedSigningKey = environment?.webhookSigningKey
+export default function DeploySigningKey({ className }: DeploySigningKeyProps) {
+  const environment = useEnvironment();
+  const signingKey = environment.webhookSigningKey || '...';
+  const maskedSigningKey = environment.webhookSigningKey
     ? environment.webhookSigningKey.replace(/signkey-(prod|test)-.+/, 'signkey-$1')
     : '...';
 

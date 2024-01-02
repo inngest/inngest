@@ -43,7 +43,6 @@ type FunctionDashboardProps = {
 export default function FunctionDashboardPage({ params }: FunctionDashboardProps) {
   const functionSlug = decodeURIComponent(params.slug);
   const [{ data, fetching: isFetchingFunction }] = useFunction({
-    environmentSlug: params.environmentSlug,
     functionSlug,
   });
   const function_ = data?.workspace.workflow;
@@ -53,7 +52,6 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     getTimeRangeByKey(timeRangeParam ?? '24h') ?? defaultTimeRange;
 
   const [{ data: usage }] = useFunctionUsage({
-    environmentSlug: params.environmentSlug,
     functionSlug,
     timeRange: selectedTimeRange,
   });
@@ -133,21 +131,9 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               />
             </div>
           </div>
-          <FunctionRunsChart
-            environmentSlug={params.environmentSlug}
-            functionSlug={functionSlug}
-            timeRange={selectedTimeRange}
-          />
-          <FunctionThroughputChart
-            environmentSlug={params.environmentSlug}
-            functionSlug={functionSlug}
-            timeRange={selectedTimeRange}
-          />
-          <SDKRequestThroughputChart
-            environmentSlug={params.environmentSlug}
-            functionSlug={functionSlug}
-            timeRange={selectedTimeRange}
-          />
+          <FunctionRunsChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
+          <FunctionThroughputChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
+          <SDKRequestThroughputChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
           <div className="mt-4 px-6">
             <LatestFailedFunctionRuns
               environmentSlug={params.environmentSlug}

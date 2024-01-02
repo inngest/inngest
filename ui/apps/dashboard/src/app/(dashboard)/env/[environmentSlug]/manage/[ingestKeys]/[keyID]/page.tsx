@@ -86,11 +86,7 @@ export default async function Keys({
         <div className="pb-8">
           <div className="mb-8 flex flex-wrap justify-between">
             <EditKeyName keyID={keyID} keyName={key.name} />
-            <DeleteKeyButton
-              environmentSlug={environmentSlug}
-              environmentID={environment.id}
-              keyID={keyID}
-            />
+            <DeleteKeyButton keyID={keyID} />
           </div>
           <div className="w-3/5">
             <CodeKey fullKey={value} maskedKey={maskedValue} label={keyLabel} />

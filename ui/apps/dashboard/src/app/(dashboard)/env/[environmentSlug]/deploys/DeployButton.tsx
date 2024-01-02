@@ -6,11 +6,7 @@ import { Button } from '@inngest/components/Button';
 
 import DeployModal from './DeployModal';
 
-type DeployButtonProps = {
-  environmentSlug: string;
-};
-
-export default function DeployButton({ environmentSlug }: DeployButtonProps) {
+export default function DeployButton() {
   const searchParams = useSearchParams();
   const hasDeployIntent = searchParams.get('intent') === 'deploy-modal';
   const [isDeployModalVisible, setIsDeployModalVisible] = useState<boolean>(hasDeployIntent);
@@ -18,11 +14,7 @@ export default function DeployButton({ environmentSlug }: DeployButtonProps) {
   return (
     <>
       <Button kind="primary" btnAction={() => setIsDeployModalVisible(true)} label="Deploy" />
-      <DeployModal
-        isOpen={isDeployModalVisible}
-        environmentSlug={environmentSlug}
-        onClose={() => setIsDeployModalVisible(false)}
-      />
+      <DeployModal isOpen={isDeployModalVisible} onClose={() => setIsDeployModalVisible(false)} />
     </>
   );
 }

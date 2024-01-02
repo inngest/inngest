@@ -4,11 +4,11 @@ import React, { useState } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useQuery } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import NewReplayButton from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/NewReplayButton';
 import { ClientFeatureFlag } from '@/components/FeatureFlags/ClientFeatureFlag';
 import { graphql } from '@/gql';
 import { FunctionRunStatus, FunctionRunTimeField } from '@/gql/graphql';
-import { useEnvironment } from '@/queries';
 import FunctionRunList from './FunctionRunList';
 import StatusFilter from './StatusFilter';
 import TimeRangeFilter, {
@@ -19,7 +19,6 @@ import TimeRangeFilter, {
 
 type RunsPageProps = {
   params: {
-    environmentSlug: string;
     slug: string;
   };
 };
@@ -57,22 +56,18 @@ export default function RunsPage({ params }: RunsPageProps) {
   const [selectedTimeField, setSelectedTimeField] =
     useState<FunctionRunTimeField>(defaultTimeField);
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(defaultTimeRange);
-
-  const [{ data: environment }] = useEnvironment({
-    environmentSlug: params.environmentSlug,
-  });
+  const environment = useEnvironment();
 
   const [{ data }] = useQuery({
     query: GetFunctionRunsCountDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
       functionSlug,
       functionRunStatuses: selectedStatuses.length ? selectedStatuses : null,
       timeRangeStart: selectedTimeRange.start.toISOString(),
       timeRangeEnd: selectedTimeRange.end.toISOString(),
       timeField: selectedTimeField,
     },
-    pause: !environment?.id,
   });
   const { user } = useUser();
 
@@ -139,12 +134,11 @@ export default function RunsPage({ params }: RunsPageProps) {
           )}
         </div>
         <ClientFeatureFlag flag="function-replay">
-          <NewReplayButton environmentSlug={params.environmentSlug} functionSlug={functionSlug} />
+          <NewReplayButton functionSlug={functionSlug} />
         </ClientFeatureFlag>
       </div>
       <div className="flex min-h-0 flex-1">
         <FunctionRunList
-          environmentSlug={params.environmentSlug}
           functionSlug={functionSlug}
           selectedStatuses={selectedStatuses}
           selectedTimeRange={selectedTimeRange}

@@ -26,7 +26,6 @@ type FunctionLayoutProps = {
 export default function FunctionLayout({ children, params }: FunctionLayoutProps) {
   const functionSlug = decodeURIComponent(params.slug);
   const [{ data, fetching }] = useFunction({
-    environmentSlug: params.environmentSlug,
     functionSlug,
   });
 
@@ -75,15 +74,8 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
             <div className="flex items-center gap-2">
               {/* Disable buttons that do not yet work */}
               <div className="flex items-center gap-2 pr-2">
-                <PauseFunctionButton
-                  environmentSlug={params.environmentSlug}
-                  functionSlug={functionSlug}
-                  disabled={isArchived}
-                />
-                <ArchiveFunctionButton
-                  environmentSlug={params.environmentSlug}
-                  functionSlug={functionSlug}
-                />
+                <PauseFunctionButton functionSlug={functionSlug} disabled={isArchived} />
+                <ArchiveFunctionButton functionSlug={functionSlug} />
               </div>
               {/* <Button context="dark">
               <RocketLaunchIcon className="h-3" />
