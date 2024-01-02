@@ -13,3 +13,32 @@ async def fn(
 ) -> list[str]:
     return await step.send_event("send", inngest.Event(name="foo"))
 ```
+
+## Configuration
+
+<Properties>
+    <Property name="step_id" required type="str">
+        Step ID. Should be unique within the function.
+    </Property>
+
+    <Property name="events" required type="Event | list[Event]">
+        1 or more events to send.
+
+        <Properties nested required>
+            <Property name="data" type="dict">
+                Any data to associate with the event.
+            </Property>
+            <Property name="id" type="str">
+                A unique ID used to idempotently trigger function runs. If duplicate event IDs are seen, only the first event will trigger function runs.
+            </Property>
+            <Property name="name" required type="str">
+                The event name. We recommend using lowercase dot notation for names (e.g. `app/user.created`)
+            </Property>
+            <Property name="ts" type="int">
+                A timestamp integer representing the time (in milliseconds) at which the event occurred. Defaults to the time the Inngest receives the event.
+
+                If the `ts` time is in the future, function runs will be scheduled to start at the given time. This has the same effect as sleeping at the start of the function.
+            </Property>
+        </Properties>
+    </Property>
+</Properties>

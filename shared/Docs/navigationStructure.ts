@@ -408,6 +408,15 @@ const sectionPythonReference = [
     ],
   },
   {
+    title: "Events",
+    links: [
+      {
+        title: "Send",
+        href: `/docs/reference/python/events/send`,
+      },
+    ],
+  },
+  {
     title: "Middleware",
     links: [
       {

@@ -1,0 +1,56 @@
+# Send events
+
+<Callout variant="warning">
+    ⚠️ This guide is only for sending events from *outside* an Inngest function. To send events within an Inngest function, refer to the [step.send_event](/docs/reference/python/steps/send-event) guide.
+</Callout>
+
+Sends 1 or more events to the Inngest server. Returns a list of the event IDs.
+
+```py
+import inngest
+
+inngest_client = inngest.Inngest(app_id="my_app")
+
+# Call the `send` method if you're using async/await
+ids = await inngest_client.send(
+    inngest.Event(name="my_event", data={"msg": "Hello!"})
+)
+
+# Call the `send_sync` method if you aren't using async/await
+ids = inngest_client.send_sync(
+    inngest.Event(name="my_event", data={"msg": "Hello!"})
+)
+
+# Can pass a list of events
+ids = await inngest_client.send(
+    [
+        inngest.Event(name="my_event", data={"msg": "Hello!"}),
+        inngest.Event(name="my_other_event", data={"name": "Alice"}),
+    ]
+)
+```
+
+## `send` and `send_sync`
+
+<Properties>
+    <Property name="events" required type="Event | list[Event]">
+    1 or more events to send.
+
+    <Properties nested required>
+        <Property name="data" type="dict">
+            Any data to associate with the event.
+        </Property>
+        <Property name="id" type="str">
+            A unique ID used to idempotently trigger function runs. If duplicate event IDs are seen, only the first event will trigger function runs.
+        </Property>
+        <Property name="name" required type="str">
+            The event name. We recommend using lowercase dot notation for names (e.g. `app/user.created`)
+        </Property>
+        <Property name="ts" type="int">
+            A timestamp integer representing the time (in milliseconds) at which the event occurred. Defaults to the time the Inngest receives the event.
+
+            If the `ts` time is in the future, function runs will be scheduled to start at the given time. This has the same effect as sleeping at the start of the function.
+        </Property>
+    </Properties>
+    </Property>
+</Properties>
