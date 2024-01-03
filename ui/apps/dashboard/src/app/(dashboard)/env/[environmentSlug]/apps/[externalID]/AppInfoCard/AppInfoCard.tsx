@@ -28,7 +28,7 @@ type Sync = {
   url: string | null;
 } & React.ComponentProps<typeof PlatformSection>['sync'];
 
-export function AppCard({ app, className }: Props) {
+export function AppInfoCard({ app, className }: Props) {
   let lastSyncValue;
   if (app.latestSync) {
     lastSyncValue = (

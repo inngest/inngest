@@ -1,1 +1,0 @@
-export { AppCard } from './AppCard';
