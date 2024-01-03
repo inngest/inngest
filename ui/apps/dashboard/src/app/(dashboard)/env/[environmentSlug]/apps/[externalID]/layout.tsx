@@ -52,7 +52,7 @@ export default function Layout({ children, params: { externalID } }: Props) {
         links={navLinks}
         title={res.data}
       />
-      <div className="overflow-y-auto">{children}</div>
+      <div className="overflow-y-auto bg-slate-100">{children}</div>
     </>
   );
 }

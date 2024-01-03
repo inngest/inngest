@@ -31,7 +31,7 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
   const { syncedFunctions } = appRes.data.latestSync ?? {};
 
   return (
-    <div className="flex items-center justify-center bg-slate-100 pt-4">
+    <div className="flex items-center justify-center pt-4">
       <div className="w-full max-w-[1200px]">
         <AppInfoCard app={appRes.data} className="mb-4" />
 
