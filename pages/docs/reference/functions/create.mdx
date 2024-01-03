@@ -38,7 +38,7 @@ The `createFunction` method accepts a series of arguments to define your functio
         The maximum number of concurrently running steps.
       </Property>
       <Property name="key" type="string">
-        A unique key expression for which to restrict concurrently running steps to. The expression is evaluated for each triggering event and a unique key is generate.
+        A unique key expression for which to restrict concurrently running steps to. The expression is evaluated for each triggering event and a unique key is generate. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info.
       </Property>
     </Properties>
   </Property>
@@ -46,7 +46,7 @@ The `createFunction` method accepts a series of arguments to define your functio
   <Property name="idempotency" type="string">
     A key expression which is used to prevent duplicate events from triggering a function more than once in 24 hours. This is equivalent to setting `rateLimit` with a `key`, a `limit` of `1`  and `period` of `24hr`.
 
-    Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+    Expressions are defined using the Common Expression Language (CEL) with the original event accessible using dot-notation. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info. Examples:
 
     * Only run once for each customer id: `'event.data.customer_id'`
     * Only run once for each account and email address: `'event.data.account_id + "-" + event.user.email'`
@@ -67,7 +67,7 @@ The `createFunction` method accepts a series of arguments to define your functio
       <Property name="key" type="string">
         A unique key expression to apply the limit to. The expression is evaluated for each triggering event.
 
-        Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+        Expressions are defined using the Common Expression Language (CEL) with the original event accessible using dot-notation. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info. Examples:
 
         * Rate limit per customer id: `'event.data.customer_id'`
         * Rate limit per account and email address: `'event.data.account_id + "-" + event.user.email'`
@@ -86,7 +86,7 @@ The `createFunction` method accepts a series of arguments to define your functio
       <Property name="key" type="string">
         A unique key expression to apply the debounce to. The expression is evaluated for each triggering event.
 
-        Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+        Expressions are defined using the Common Expression Language (CEL) with the original event accessible using dot-notation. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info. Examples:
 
         * Debounce per customer id: `'event.data.customer_id'`
         * Debounce per account and email address: `'event.data.account_id + "-" + event.user.email'`
@@ -130,14 +130,14 @@ The `createFunction` method accepts a series of arguments to define your functio
   <Property name="onFailure" type="function">
     A function that will be called only when this Inngest function fails after all retries have been attempted ([reference](/docs/reference/functions/handling-failures))
   </Property>
-  <Property name="cancelOn" type="object">
-    Define an event that can be used to cancel a running or sleeping function ([reference](/docs/functions/cancellation))
+  <Property name="cancelOn" type="array of objects">
+    Define events that can be used to cancel a running or sleeping function ([reference](/docs/functions/cancellation))
     <Properties nested={true} collapse={true}>
       <Property name="event" type="string" required>
         The event name which will be used to cancel
       </Property>
       <Property name="match" type="string">
-        The property to match the event trigger and the cancelling event, using dot-notation, e.g. `data.userId`
+        The property to match the event trigger and the cancelling event, using dot-notation, for example, `data.userId`. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info.
       </Property>
       <Property name="timeout" type="string">
         The amount of time to wait to receive the cancelling event. A time string compatible with the [ms](https://npm.im/ms) package, e.g. `"30m"`, `"3 hours"`, or `"2.5d"`
@@ -167,7 +167,7 @@ When using an `event` trigger, you can optionally combine it with the `if` optio
   <Property name="if" type="string">
     A comparison expression that returns true or false whether the function should handle or ignore a given matching event.
 
-    Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+    Expressions are defined using the Common Expression Language (CEL) with the original event accessible using dot-notation. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info. Examples:
 
     * `'event.data.action == "published"'`
     * `'event.data.priority >= 4'`

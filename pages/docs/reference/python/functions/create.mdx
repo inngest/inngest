@@ -57,7 +57,7 @@ The `create_function` decorator accepts a configuration and wraps a plain functi
       <Property name="key" type="str">
         A unique key expression to apply the debounce to. The expression is evaluated for each triggering event.
 
-        Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+        Expressions are defined using the Common Expression Language (CEL) with the events accessible using dot-notation. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info. Examples:
 
         * Debounce per customer id: `'event.data.customer_id'`
         * Debounce per account and email address: `'event.data.account_id + "-" + event.user.email'`
@@ -89,7 +89,7 @@ The `create_function` decorator accepts a configuration and wraps a plain functi
       <Property name="key" type="str">
         A unique key expression to apply the limit to. The expression is evaluated for each triggering event.
 
-        Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+        Expressions are defined using the Common Expression Language (CEL) with the events accessible using dot-notation. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info. Examples:
 
         * Rate limit per customer id: `'event.data.customer_id'`
         * Rate limit per account and email address: `'event.data.account_id + "-" + event.user.email'`
@@ -119,7 +119,7 @@ The `create_function` decorator accepts a configuration and wraps a plain functi
       <Property name="key" type="str">
         A unique key expression to apply the limit to. The expression is evaluated for each triggering event.
 
-        Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+        Expressions are defined using the Common Expression Language (CEL) with the events accessible using dot-notation. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info. Examples:
 
         * Rate limit per customer id: `'event.data.customer_id'`
         * Rate limit per account and email address: `'event.data.account_id + "-" + event.user.email'`

@@ -104,6 +104,10 @@ const sectionGuides = [
         title: "Logging",
         href: `/docs/guides/logging`,
       },
+      {
+        title: "Writing expressions",
+        href: `/docs/guides/writing-expressions`,
+      },
     ],
   },
   {

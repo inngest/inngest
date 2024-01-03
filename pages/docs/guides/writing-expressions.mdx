@@ -1,0 +1,128 @@
+# Writing expressions
+
+Expressions are used in a number of ways for configuring your functions. They are used for:
+
+* Defining keys for [concurrency](/docs/functions/concurrency), [rate limiting](/docs/reference/functions/rate-limit), [debounce](/docs/reference/functions/debounce), or idempotency {/* TODO - Link to: /docs/guides/handling-idempotency */}
+* Conditionally matching events for [wait for event](/docs/reference/functions/step-wait-for-event), [cancellation](/docs/functions/cancellation), or the [function trigger's `if` option](/docs/reference/functions/create#trigger)
+* Returning values for function [run priority](/docs/reference/functions/run-priority)
+
+All expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go). CEL offers simple, fast, non-turing complete expressions. It allows Inngest to evaluate millions of expressions for all users at scale.
+
+## Types of Expressions
+
+Within the scope of Inngest, expressions should evaluate to either a boolean or a value:
+
+* **Booleans** - Any expression used for conditional matching should return a boolean value. These are used in wait for event, cancellation, and the function trigger's `if` option.
+* **Values** - Other expressions can return any value which might be used as keys (for example, concurrency, rate limit, debounce or idempotency keys) or a dynamic value (for example, run priority). {/* TODO - Link to: /docs/guides/handling-idempotency */}
+
+## Examples
+
+Most expressions are given the `event` payload object as the input. Expressions that match additional events (for example, wait for event, cancellation) will also have the `async` object for the matched event payload. To learn more, consult this [reference of all the operators available in CEL](https://github.com/google/cel-spec/blob/master/doc/langdef.md#list-of-standard-definitions).
+
+### Boolean Expressions
+
+```js
+// Match a field to a string
+"event.data.billingPlan == 'enterprise'"
+
+// Number comparison
+"event.data.amount > 1000"
+
+// Combining multiple conditions
+"event.data.billingPlan == 'enterprise' && event.data.amount > 1000"
+"event.data.billingPlan != 'pro' || event.data.amount < 300"
+
+// Compare the function trigger with an inbound event (for wait for event or cancellation)
+"event.data.userId == async.data.userId"
+
+// Alternatively, you can use JavaScript string interpolation for wait for event
+`${userId} == async.data.userId` // => "user_1234 == async.data.userId"
+
+// Advanced CEL methods (see reference linked above):
+// Check if a string contains a substring
+"event.data.email.contains('gmail.com')"
+
+// Check that a field is set
+"has(event.data.email)"
+
+// Compare timestamps
+"timestamp(event.data.created) > timestamp('2024-01-01T00:00:00Z')"
+"timestamp(event.data.createdAt) + duration('5m') > timestamp(event.data.expireAt)"
+```
+
+### Value Expressions
+
+#### Keys
+
+```js
+// Use the user's id as a concurrency key
+"event.data.id" // => "1234"
+
+// Concatenate two strings together to create a unique key
+`event.data.userId + "-" + event.type` // => "user_1234-signup"
+
+// Advanced CEL methods (see reference linked above):
+// Convert a number to a string for concatenation
+`string(event.data.amount) + "-" event.data.planId`
+```
+
+#### Dynamic Values
+
+```js
+// Return a 0 priority if the billing plan is enterprise, otherwise return 1800
+`event.data.billingPlan == 'enterprise' ? 0 : 1800`
+
+// Return a value based on multiple conditions
+`event.data.billingPlan == 'enterprise' && event.data.requestNumber < 10 ? 0 : 1800`
+
+// Advanced CEL methods (see reference linked above):
+// Return a priority if the value is set in the payload
+`has(event.data.priority) ? event.data.priority : 0`
+```
+
+## Tips
+
+* Use `+` to concatenate strings
+* Use `==` for equality checks
+* You can use single `'` or double quotes `"` for strings, but we recommend sticking with one for code consistency
+* When working with the TypeScript SDK, write expressions within backticks `` ` `` to use quotes in your expression or use JavaScript's string interpolation.
+* Use ternary operators to return default values
+* When using the or operator (`||`), CEL will always return a boolean. This is different from JavaScript, where the or operator returns the value of the statement left of the operator if truthy. Use the ternary operator (`?`) instead of `||` for conditional returns.
+
+### CEL Helpers & Macros
+
+This is a non-exhaustive list of CEL [helpers](https://github.com/google/cel-spec/blob/master/doc/langdef.md#list-of-standard-definitions) and [macros](https://github.com/google/cel-spec/blob/master/doc/langdef.md#macros) that are useful for writing expressions:
+
+```js
+// Check if a field is set
+"has(event.data.email)"
+
+// Convert a number to a string
+"string(event.data.count)"
+
+// Convert a string to an int
+"int(event.data.amount)"
+
+// Get the first item in an array
+"event.data.items[0]"
+
+// Check if an item exists in an array
+"event.data.items.exists(e, e == 'shirt_1234')"
+
+// Check if only one item matches a condition
+"event.data.items.exists_one(e, e.starsWith('shirt_'))"
+
+// Check if all items in an array match a condition
+"event.data.amounts.all(n, n > 10)"
+
+// Convert a timestamp to an int (unix timestamp)
+"int(timestamp(event.data.createdAt))"
+
+// Add a duration to a timestamp
+"timestamp(event.data.createdAt) + duration('5m')"
+```
+
+
+## Testing out expressions
+
+You can test out expressions on [Undistro's CEL Playground](https://playcel.undistro.io/). It's a great way to quickly test out more complex expressions, especially with conditional returns.

@@ -45,7 +45,7 @@ Internally, Inngest creates a queue for each of your functions in order to execu
 
 ## Limiting concurrency for a specific `key`
 
-Optionally, specifying a concurrency `key` applies the `limit` to unique values of your `key` expression. This is useful to limit throughput of a function for particular subsets of your events. In essence, this creates a "sub-queue" for each unique `key` (e.g. a `limit` of `2` concurrent steps processed for each `event.data.customer_id`).
+Optionally, specifying a concurrency `key` applies the `limit` to unique values of your `key` expression. This is useful to limit throughput of a function for particular subsets of your events. In essence, this creates a "sub-queue" for each unique `key` (e.g. a `limit` of `2` concurrent steps processed for each `event.data.customer_id`). Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info.
 
 ## Configuration
 
@@ -62,7 +62,7 @@ Optionally, specifying a concurrency `key` applies the `limit` to unique values 
       <Property name="key" type="string">
         A unique key expression for which to restrict concurrently running steps to. The expression is evaluated for each triggering event.
 
-        Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+        Expressions are defined using the Common Expression Language (CEL) with the original event accessible using dot-notation. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info. Examples:
 
         * Limit concurrency to `n` (via `limit`) per customer id: `'event.data.customer_id'`
         * Limit concurrency to `n` per user, per import id: `'event.data.user_id + "-" + event.data.import_id'`

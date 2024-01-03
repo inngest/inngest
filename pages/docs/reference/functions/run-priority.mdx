@@ -66,6 +66,8 @@ the input event's data.  By default, this returns 0.
 For example, the expression `"event.data.plan == 'enterprise' ? 300 : 0"` may return 300 or 0.  If
 an event's `data.plan` field equals `enterprise`, the expression returns `300`.
 
+Expressions are defined using the Common Expression Language (CEL) with the original event accessible using dot-notation. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info.
+
 **Prioritization**
 
 We take the returning number from the expression, and subtract this from the function run's epoch
@@ -95,12 +97,16 @@ some level of fairness.
 
     <Properties nested={true}>
       <Property name="run" type="string">
-        An expression which must return an integer between -600 and 600 (by default), with higher
-	return values resulting in a higher priority.  Examples:
+        An expression which must return an integer between -600 and 600 (by default), with higher return
+        values resulting in a higher priority.
+
+        Expressions are defined using the Common Expression Language (CEL) with the original event accessible using dot-notation. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info. Examples:
 
         * Return the priority within an event directly: `event.data.priority` (where
 	  `event.data.priority` is an int within your account's range)
         * Rate limit by a string field: `event.data.plan == 'enterprise' ? 180 : 0`
+
+
       </Property>
     </Properties>
   </Property>
