@@ -39,7 +39,7 @@ export function SyncStatus({ status }: Props) {
   }
 
   return (
-    <div className="flex">
+    <div className="flex whitespace-nowrap">
       <Icon className="h-6 w-6" />
       {text}
     </div>

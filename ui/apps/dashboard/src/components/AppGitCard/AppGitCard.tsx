@@ -11,7 +11,7 @@ type Props = {
   };
 };
 
-export function GitCard({ className, sync }: Props) {
+export function AppGitCard({ className, sync }: Props) {
   const { commitAuthor, commitHash, commitMessage, commitRef, repoURL } = sync;
   if (!commitAuthor && !commitHash && !commitMessage && !commitRef && !repoURL) {
     return null;
