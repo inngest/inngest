@@ -52,7 +52,6 @@ export function useSync({
   syncID: string;
 }) {
   const res = useGraphQLQuery({
-    pollIntervalInMilliseconds: 10_000,
     query,
     variables: { envID, externalAppID, syncID },
   });

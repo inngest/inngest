@@ -7,27 +7,23 @@ import { FunctionList } from './FunctionList';
 import { useSync } from './useSync';
 
 type Props = {
-  params: {
-    externalID: string;
-    syncID: string;
-  };
+  externalAppID: string;
+  syncID: string;
 };
 
-export default function Page({ params }: Props) {
-  const externalAppID = decodeURIComponent(params.externalID);
-  const syncID = params.syncID;
+export function Sync({ externalAppID, syncID }: Props) {
   const env = useEnvironment();
 
   const syncRes = useSync({ envID: env.id, externalAppID, syncID });
   if (syncRes.error) {
     if (syncRes.error.message.includes('no rows')) {
-      // TODO: Make prettier.
+      // TODO: Make pretty
       return <div>Sync not found</div>;
     }
     throw syncRes.error;
   }
   if (syncRes.isLoading) {
-    // TODO: Make prettier.
+    // TODO: Make pretty
     return 'Loading...';
   }
 

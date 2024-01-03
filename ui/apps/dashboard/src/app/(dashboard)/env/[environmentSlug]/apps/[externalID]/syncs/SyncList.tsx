@@ -1,47 +1,42 @@
 'use client';
 
-import Link from 'next/link';
 import { classNames } from '@inngest/components/utils/classNames';
 
-import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { SyncStatus } from '@/components/SyncStatus';
 import { Time } from '@/components/Time';
-import { useSyncs } from './useSyncs';
 
 type Props = {
   className?: string;
-  externalAppID: string;
-  selectedSyncID: string | null;
+  onClick: (syncID: string) => void;
+  selectedSyncID: string;
+  syncs: Sync[];
 };
 
-export function SyncList({ className, externalAppID, selectedSyncID }: Props) {
-  const env = useEnvironment();
+type Sync = {
+  createdAt: Date;
+  id: string;
+  status: string;
+  syncedFunctions: unknown[];
+};
 
-  const appRes = useSyncs({ envID: env.id, externalAppID });
-  if (appRes.error) {
-    throw appRes.error;
-  }
-  if (appRes.isLoading) {
-    return null;
-  }
-
+export function SyncList({ className, onClick, selectedSyncID, syncs }: Props) {
   return (
     <div className={classNames('h-full border-r border-slate-300 bg-white', className)}>
       <div className="table border-collapse">
-        {appRes.data.syncs.map((sync) => {
+        {syncs.map((sync) => {
           let bgColor = 'bg-white';
           if (sync.id === selectedSyncID) {
             bgColor = 'bg-slate-100';
           }
 
           return (
-            <Link
+            <div
               className={classNames(
-                'table-row border border-r-0 border-slate-300 hover:bg-slate-100',
+                'table-row cursor-pointer border border-r-0 border-slate-300 hover:bg-slate-100',
                 bgColor
               )}
-              href={`/env/${env.slug}/apps/${externalAppID}/syncs/${sync.id}`}
               key={sync.id}
+              onClick={() => onClick(sync.id)}
             >
               <div className="table-cell p-4 align-middle">
                 <SyncStatus status={sync.status} />
@@ -52,7 +47,7 @@ export function SyncList({ className, externalAppID, selectedSyncID }: Props) {
               <div className="table-cell whitespace-nowrap p-4 pl-0 align-middle">
                 {sync.syncedFunctions.length} functions
               </div>
-            </Link>
+            </div>
           );
         })}
       </div>

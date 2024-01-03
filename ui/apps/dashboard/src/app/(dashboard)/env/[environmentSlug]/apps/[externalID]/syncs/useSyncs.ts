@@ -42,7 +42,6 @@ const query = graphql(`
 
 export function useSyncs({ envID, externalAppID }: { envID: string; externalAppID: string }) {
   const res = useGraphQLQuery({
-    // pollIntervalInMilliseconds: 1000,
     query,
     variables: { envID, externalAppID },
   });
@@ -59,10 +58,7 @@ export function useSyncs({ envID, externalAppID }: { envID: string; externalAppI
 
     return {
       ...res,
-      data: {
-        ...app,
-        syncs,
-      },
+      data: syncs,
     };
   }
 
