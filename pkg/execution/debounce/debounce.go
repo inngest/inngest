@@ -193,6 +193,8 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 			return fmt.Errorf("unable to update debounce: %w", err)
 		}
 		// Re-invoke this to see if we need to extend the debounce or continue.
+		// Wait 5 milliseconds for the current lock and job to have evaluated.
+		<-time.After(5 * time.Millisecond)
 		return d.debounce(ctx, di, fn, ttl, n+1)
 	}
 
