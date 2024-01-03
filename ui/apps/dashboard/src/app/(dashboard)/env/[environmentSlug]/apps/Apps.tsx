@@ -19,7 +19,7 @@ export function Apps() {
     <div className="mt-4 flex items-center justify-center">
       <div className="w-full max-w-[1200px]">
         {res.data.map((app) => {
-          return <AppCard className="mb-4" key={app.id} app={app} />;
+          return <AppCard app={app} className="mb-4" envSlug={env.slug} key={app.id} />;
         })}
       </div>
     </div>

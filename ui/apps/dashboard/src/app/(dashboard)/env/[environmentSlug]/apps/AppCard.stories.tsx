@@ -54,6 +54,7 @@ const meta = {
             url: 'https://example.com',
           },
         }}
+        envSlug="fake"
       />
     );
   },
