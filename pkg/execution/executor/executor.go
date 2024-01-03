@@ -962,6 +962,11 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 	}
 
 	wg.Wait()
+
+	if iter.Error() != context.Canceled {
+		goerr = errors.Join(goerr, fmt.Errorf("pause iteration error: %w", iter.Error()))
+	}
+
 	return res, goerr
 }
 
@@ -1029,6 +1034,16 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 
 	if err = e.sm.ConsumePause(ctx, pause.ID, r.With); err != nil {
 		return fmt.Errorf("error consuming pause via event: %w", err)
+	}
+
+	if e.log != nil {
+		e.log.Debug().
+			Str("pause_id", pause.ID.String()).
+			Str("run_id", pause.Identifier.RunID.String()).
+			Str("workflow_id", pause.Identifier.WorkflowID.String()).
+			Bool("timeout", pause.OnTimeout).
+			Bool("cancel", pause.Cancel).
+			Msg("resuming from pause")
 	}
 
 	// Schedule an execution from the pause's entrypoint.  We do this after
