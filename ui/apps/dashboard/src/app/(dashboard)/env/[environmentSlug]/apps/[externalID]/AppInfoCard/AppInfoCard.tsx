@@ -47,7 +47,7 @@ export function AppInfoCard({ app, className }: Props) {
           className
         )}
       >
-        <div className="border-b border-slate-300 px-4 py-2">App Info</div>
+        <h2 className="border-b border-slate-300 px-4 py-2">App Info</h2>
 
         <dl className="grid grow grid-cols-4 gap-4 p-4">
           {/* Row 1 */}
