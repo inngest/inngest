@@ -1,12 +1,22 @@
-import { notFound } from 'next/navigation';
-import { CodeKey } from '@inngest/components/CodeKey';
+'use client';
 
+import { useState } from 'react';
+import { notFound } from 'next/navigation';
+import { EllipsisVerticalIcon, PencilIcon, TrashIcon } from '@heroicons/react/20/solid';
+import { CodeKey } from '@inngest/components/CodeKey';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@inngest/components/DropdownMenu';
+
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { graphql } from '@/gql';
-import graphqlAPI from '@/queries/graphqlAPI';
-import { getEnvironment } from '@/queries/server-only/getEnvironment';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { Provider } from './Context';
-import DeleteKeyButton from './DeleteKeyButton';
-import EditKeyName from './EditKeyName';
+import DeleteKeyModal from './DeleteKeyModal';
+import EditKeyNameModal from './EditKeyNameModal';
 import FilterEvents from './FilterEvents';
 import TransformEvent from './TransformEvent';
 
@@ -38,29 +48,30 @@ type KeyDetailsProps = {
   };
 };
 
-export const runtime = 'nodejs';
+export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps) {
+  const [isDeleteKeyModalVisible, setIsDeleteKeyModalVisible] = useState(false);
+  const [isEditKeyNameModalVisible, setIsEditKeyNameModalVisible] = useState(false);
 
-export default async function Keys({
-  params: { environmentSlug, ingestKeys, keyID },
-}: KeyDetailsProps) {
-  const environment = await getEnvironment({
-    environmentSlug: environmentSlug,
+  const environment = useEnvironment();
+
+  const { data, isLoading, error } = useGraphQLQuery({
+    query: GetKeyDocument,
+    variables: {
+      environmentID: environment.id,
+      keyID,
+    },
   });
 
-  const response = await graphqlAPI.request(GetKeyDocument, {
-    environmentID: environment.id,
-    keyID,
-  });
+  if (isLoading) {
+    return <>{/* To do: skeleton */}</>;
+  }
 
-  if (!response) {
+  const key = data?.environment.ingestKey;
+
+  if (error || !key) {
     notFound();
   }
 
-  const key = response.environment.ingestKey;
-
-  if (!key) {
-    return null;
-  }
   const filterType = key.filter.type;
   if (!filterType || !isFilterType(filterType)) {
     throw new Error(`invalid filter type: ${filterType}`);
@@ -84,9 +95,35 @@ export default async function Keys({
     <div className="m-6 divide-y divide-slate-100">
       <Provider initialState={key}>
         <div className="pb-8">
-          <div className="mb-8 flex flex-wrap justify-between">
-            <EditKeyName keyID={keyID} keyName={key.name} />
-            <DeleteKeyButton keyID={keyID} />
+          <div className="mb-8 flex items-center gap-1">
+            <h2 className="text-lg font-semibold">{key.name}</h2>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="relative data-[state=open]:before:absolute data-[state=open]:before:-bottom-3 data-[state=open]:before:left-0 data-[state=open]:before:h-6 data-[state=open]:before:w-6 data-[state=open]:before:rounded-full data-[state=open]:before:bg-slate-100">
+                <EllipsisVerticalIcon className="absolute -top-2 left-1 z-10 h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => setIsEditKeyNameModalVisible(true)}>
+                  <PencilIcon className="h-4 w-4" />
+                  Edit Name
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setIsDeleteKeyModalVisible(true)}>
+                  <TrashIcon className="h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DeleteKeyModal
+              keyID={keyID}
+              isOpen={isDeleteKeyModalVisible}
+              onClose={() => setIsDeleteKeyModalVisible(false)}
+            />
+            <EditKeyNameModal
+              keyID={keyID}
+              keyName={key.name}
+              isOpen={isEditKeyNameModalVisible}
+              onClose={() => setIsEditKeyNameModalVisible(false)}
+            />
           </div>
           <div className="w-3/5">
             <CodeKey fullKey={value} maskedKey={maskedValue} label={keyLabel} />

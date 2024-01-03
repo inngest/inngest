@@ -41,7 +41,6 @@ export default function DeleteKeyModal({ keyID, isOpen, onClose }: DeleteKeyModa
         toast.error(`${currentContent?.name} could not be deleted`);
       } else {
         toast.success(`${currentContent?.name} was successfully deleted`);
-        router.refresh();
         router.push(`/env/${env.slug}/manage/${currentContent?.param}` as Route);
       }
     });
