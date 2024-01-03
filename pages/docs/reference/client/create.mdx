@@ -227,3 +227,48 @@ import { inngest } from "./client";
 
 export default inngest.createFunction(...);
 ```
+
+### Handling multiple environments with middleware
+
+If your client uses middleware, that middleware may import dependencies that are not supported across multiple environments such as "Edge" and "Serverless" (commonly with either access to WebAPIs or Node).
+
+In this case, we'd recommend creating a separate client for each environment, ensuring Node-compatible middleware is only used in Node-compatible environments and vice versa.
+
+This need is common in places where function execution should declare more involved middleware, while sending events from the edge often requires much less.
+
+<CodeGroup filename="./inngest/client.ts">
+```ts  {{ title: "v3" }}
+// inngest/client.ts
+import { Inngest } from "inngest";
+import { nodeMiddleware } from "some-node-middleware";
+
+export const inngest = new Inngest({
+  id: "my-app",
+  middleware: [nodeMiddleware],
+});
+
+// inngest/edgeClient.ts
+import { Inngest } from "inngest";
+
+export const inngest = new Inngest({
+  id: "my-app-edge",
+});
+```
+```ts  {{ title: "v2" }}
+// inngest/client.ts
+import { Inngest } from "inngest";
+import { nodeMiddleware } from "some-node-middleware";
+
+export const inngest = new Inngest({
+  name: "My App",
+  middleware: [nodeMiddleware],
+});
+
+// inngest/edgeClient.ts
+import { Inngest } from "inngest";
+
+export const inngest = new Inngest({
+  id: "My App (Edge)",
+});
+```
+</CodeGroup>
