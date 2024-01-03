@@ -19,35 +19,27 @@ export function getManageKey(pathname: string) {
 
 export const pathCreator = {
   deploys({ envSlug }: { envSlug: string }): Route {
-    // @ts-expect-error
-    return `/env/${envSlug}/deploys`;
+    return `/env/${envSlug}/deploys` as Route;
   },
   deploy({ deployID, envSlug }: { deployID: string; envSlug: string }): Route {
-    // @ts-expect-error
-    return `/env/${envSlug}/deploys/${deployID}`;
+    return `/env/${envSlug}/deploys/${deployID}` as Route;
   },
   events({ envSlug }: { envSlug: string }): Route {
-    // @ts-expect-error
-    return `/env/${envSlug}/events`;
+    return `/env/${envSlug}/events` as Route;
   },
-  eventType({ envSlug }: { envSlug: string; eventName: string }): Route {
-    // @ts-expect-error
-    return `/env/${envSlug}/events/${encodeURIComponent(eventName)}`;
+  eventType({ envSlug, eventName }: { envSlug: string; eventName: string }): Route {
+    return `/env/${envSlug}/events/${encodeURIComponent(eventName)}` as Route;
   },
   functions({ envSlug }: { envSlug: string }): Route {
-    // @ts-expect-error
-    return `/env/${envSlug}/functions`;
+    return `/env/${envSlug}/functions` as Route;
   },
   function({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
-    // @ts-expect-error
-    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}`;
+    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}` as Route;
   },
   functionRuns({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
-    // @ts-expect-error
-    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/logs`;
+    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/logs` as Route;
   },
   keys({ envSlug }: { envSlug: string }): Route {
-    // @ts-expect-error
-    return `/env/${envSlug}/manage/keys`;
+    return `/env/${envSlug}/manage/keys` as Route;
   },
 };
