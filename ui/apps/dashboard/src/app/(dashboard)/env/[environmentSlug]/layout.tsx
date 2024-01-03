@@ -1,6 +1,6 @@
 import AppNavigation from '@/components/Navigation/AppNavigation';
 import Toaster from '@/components/Toaster';
-import { Contexts } from './Contexts';
+import { EnvironmentProvider } from './environment-context';
 
 type RootLayoutProps = {
   params: {
@@ -12,12 +12,12 @@ type RootLayoutProps = {
 export default function RootLayout({ params, children }: RootLayoutProps) {
   const environmentSlug = params.environmentSlug ?? 'production';
   return (
-    <Contexts envSlug={environmentSlug}>
+    <EnvironmentProvider environmentSlug={environmentSlug}>
       <div className="isolate flex h-full flex-col">
         <AppNavigation environmentSlug={environmentSlug} />
         {children}
       </div>
       <Toaster />
-    </Contexts>
+    </EnvironmentProvider>
   );
 }

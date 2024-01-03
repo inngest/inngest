@@ -7,11 +7,10 @@ import { Button } from '@inngest/components/Button';
 import ArchiveEventModal from './ArchiveEventModal';
 
 type ArchiveButtonProps = {
-  environmentSlug: string;
   eventName: string;
 };
 
-export default function ArchiveEventButton({ environmentSlug, eventName }: ArchiveButtonProps) {
+export default function ArchiveEventButton({ eventName }: ArchiveButtonProps) {
   const [isArchiveEventModalVisible, setIsArchiveEventModalVisible] = useState<boolean>(false);
   return (
     <>
@@ -22,7 +21,6 @@ export default function ArchiveEventButton({ environmentSlug, eventName }: Archi
         label="Archive Event"
       />
       <ArchiveEventModal
-        environmentSlug={environmentSlug}
         eventName={eventName}
         isOpen={isArchiveEventModalVisible}
         onClose={() => setIsArchiveEventModalVisible(false)}

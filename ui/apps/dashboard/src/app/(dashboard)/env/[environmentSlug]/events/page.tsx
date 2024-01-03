@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowRightIcon, ChartBarIcon, CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import SendEventButton from '@/app/(dashboard)/env/[environmentSlug]/events/[eventName]/SendEventButton';
 import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
 import Header from '@/components/Header/Header';
@@ -17,15 +18,9 @@ import cn from '@/utils/cn';
 import { pathCreator } from '@/utils/urls';
 import EventListNotFound from './EventListNotFound';
 
-type EventTypesPageProps = {
-  params: {
-    environmentSlug: string;
-  };
-};
-
 export const runtime = 'nodejs';
 
-export default function EventTypesPage({ params }: EventTypesPageProps) {
+export default function EventTypesPage() {
   const [pages, setPages] = useState([1]);
 
   function appendPage() {
@@ -40,7 +35,7 @@ export default function EventTypesPage({ params }: EventTypesPageProps) {
       <Header
         title="Events"
         icon={<EventIcon className="h-4 w-4 text-white" />}
-        action={<SendEventButton environmentSlug={params.environmentSlug} />}
+        action={<SendEventButton />}
       />
 
       <main className="min-h-0 flex-1 overflow-y-auto bg-slate-100">
@@ -65,7 +60,6 @@ export default function EventTypesPage({ params }: EventTypesPageProps) {
             {pages.map((page) => (
               <EventTypesListPaginationPage
                 key={page}
-                environmentSlug={params.environmentSlug}
                 isLastLoadedPage={page === pages[pages.length - 1]}
                 page={page}
                 onLoadMore={appendPage}
@@ -79,20 +73,18 @@ export default function EventTypesPage({ params }: EventTypesPageProps) {
 }
 
 type EventListPaginationPageProps = {
-  environmentSlug: string;
   isLastLoadedPage: boolean;
   page: number;
   onLoadMore: () => void;
 };
 
 function EventTypesListPaginationPage({
-  environmentSlug,
   isLastLoadedPage,
   page,
   onLoadMore,
 }: EventListPaginationPageProps) {
+  const env = useEnvironment();
   const [{ data, fetching: isFetchingEvents }] = useEventTypes({
-    environmentSlug,
     page,
   });
 
@@ -117,7 +109,7 @@ function EventTypesListPaginationPage({
     return (
       <tr>
         <td colSpan={3}>
-          <EventListNotFound environmentSlug={environmentSlug} />
+          <EventListNotFound />
         </td>
       </tr>
     );
@@ -138,7 +130,7 @@ function EventTypesListPaginationPage({
             <td className="w-96 whitespace-nowrap">
               <div className="flex items-center gap-2.5 pl-4">
                 <Link
-                  href={pathCreator.eventType({ envSlug: environmentSlug, eventName: event.name })}
+                  href={pathCreator.eventType({ envSlug: env.slug, eventName: event.name })}
                   className="group flex w-full items-center gap-2 px-2 py-3 text-sm font-medium text-slate-700  hover:text-indigo-600"
                 >
                   {event.name}
@@ -152,7 +144,7 @@ function EventTypesListPaginationPage({
                 pills={event.functions.map((function_) => (
                   <Pill
                     href={pathCreator.function({
-                      envSlug: environmentSlug,
+                      envSlug: env.slug,
                       functionSlug: function_.slug,
                     })}
                     key={function_.name}

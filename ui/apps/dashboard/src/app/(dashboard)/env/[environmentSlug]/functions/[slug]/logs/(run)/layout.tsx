@@ -5,14 +5,13 @@ import { useRouter } from 'next/navigation';
 import { SlideOver } from '@inngest/components/SlideOver';
 import { useQuery } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { graphql } from '@/gql';
-import { useEnvironment } from '@/queries';
 import { pathCreator } from '@/utils/urls';
 
 type RunLayoutProps = {
   children: React.ReactNode;
   params: {
-    environmentSlug: string;
     slug: string;
   };
 };
@@ -33,24 +32,20 @@ const GetFunctionRunTriggersDocument = graphql(`
 
 export default function RunLayout({ children, params }: RunLayoutProps) {
   const router = useRouter();
-
-  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
-    environmentSlug: params.environmentSlug,
-  });
+  const environment = useEnvironment();
   const [{ data, fetching: fetchingRunTriggers }] = useQuery({
     query: GetFunctionRunTriggersDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
       functionSlug: params.slug,
     },
-    pause: !environment?.id,
   });
 
   const triggers = data?.environment?.function?.current?.triggers;
   const hasCron =
     Array.isArray(triggers) && triggers.length > 0 && triggers.some((trigger) => trigger.schedule);
 
-  if (isFetchingEnvironment || fetchingRunTriggers) {
+  if (fetchingRunTriggers) {
     return;
   }
 
@@ -60,7 +55,7 @@ export default function RunLayout({ children, params }: RunLayoutProps) {
       onClose={() =>
         router.push(
           pathCreator.functionRuns({
-            envSlug: params.environmentSlug,
+            envSlug: environment.slug,
             functionSlug: params.slug,
           })
         )

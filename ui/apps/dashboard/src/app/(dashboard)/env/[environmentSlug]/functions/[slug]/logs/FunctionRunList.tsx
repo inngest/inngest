@@ -9,10 +9,10 @@ import { Table } from '@inngest/components/Table';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import { useQuery } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import { FunctionRunStatus, FunctionRunTimeField, type RunListItem } from '@/gql/graphql';
-import { useEnvironment } from '@/queries';
 import { type TimeRange } from './TimeRangeFilter';
 
 const GetFunctionRunsDocument = graphql(`
@@ -115,7 +115,6 @@ function createColumns({
 }
 
 type FunctionRunListProps = {
-  environmentSlug: string;
   functionSlug: string;
   selectedStatuses: FunctionRunStatus[];
   selectedTimeRange: TimeRange;
@@ -123,15 +122,16 @@ type FunctionRunListProps = {
 };
 
 export default function FunctionRunList({
-  environmentSlug,
   functionSlug,
   selectedStatuses,
   selectedTimeRange,
   timeField,
 }: FunctionRunListProps) {
+  const env = useEnvironment();
+
   const columns = useMemo(() => {
-    return createColumns({ environmentSlug, functionSlug });
-  }, [environmentSlug, functionSlug]);
+    return createColumns({ environmentSlug: env.slug, functionSlug });
+  }, [env.slug, functionSlug]);
 
   const [pageCursors, setPageCursors] = useState<string[]>(['']);
   const [aggregatedFunctionRuns, setAggregatedFunctionRuns] = useState<RunListItem[]>([]);
@@ -142,14 +142,12 @@ export default function FunctionRunList({
   const [prevSelectedTimeRange, setPrevSelectedTimeRange] = useState(selectedTimeRange);
   const [prevSelectedTimeField, setPrevSelectedTimeField] = useState(timeField);
 
-  const [{ data: environment, fetching: isFetchingEnvironments }] = useEnvironment({
-    environmentSlug,
-  });
+  const environment = useEnvironment();
 
   const [{ data, fetching }] = useQuery({
     query: GetFunctionRunsDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
       functionSlug,
       functionRunStatuses: selectedStatuses.length ? selectedStatuses : null,
       timeRangeStart: selectedTimeRange.start.toISOString(),
@@ -157,14 +155,12 @@ export default function FunctionRunList({
       timeField,
       functionRunCursor: pageCursors[pageCursors.length - 1] || null,
     },
-    pause: !environment?.id,
   });
 
   const runs = data?.environment?.function?.runs?.edges?.map((edge) => edge?.node) ?? [];
   const endCursor = data?.environment?.function?.runs?.pageInfo.endCursor;
   const hasNextPage = data?.environment?.function?.runs?.pageInfo.hasNextPage;
-  const isLoading =
-    isFetchingEnvironments || fetching || (runs.length > 0 && aggregatedFunctionRuns.length === 0);
+  const isLoading = fetching || (runs.length > 0 && aggregatedFunctionRuns.length === 0);
 
   useEffect(() => {
     if (
