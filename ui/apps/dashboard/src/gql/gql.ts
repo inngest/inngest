@@ -57,7 +57,7 @@ const documents = {
     "\n  mutation DeleteEventKey($input: DeleteIngestKey!) {\n    deleteIngestKey(input: $input) {\n      ids\n    }\n  }\n": types.DeleteEventKeyDocument,
     "\n  query GetIngestKey($environmentID: ID!, $keyID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKey(id: $keyID) {\n        id\n        name\n        createdAt\n        presharedKey\n        url\n        filter {\n          type\n          ips\n          events\n        }\n        metadata\n      }\n    }\n  }\n": types.GetIngestKeyDocument,
     "\n  query GetSigningKey($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      webhookSigningKey\n    }\n  }\n": types.GetSigningKeyDocument,
-    "\n  query GetBillableSteps($month: Int!) {\n    billableStepTimeSeries(timeOptions: { month: $month }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": types.GetBillableStepsDocument,
+    "\n  query GetBillableSteps($month: Int!, $year: Int!) {\n    billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": types.GetBillableStepsDocument,
     "\n  mutation UpdateAccount($input: UpdateAccount!) {\n    account: updateAccount(input: $input) {\n      billingEmail\n      name\n    }\n  }\n": types.UpdateAccountDocument,
     "\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n    }\n  }\n": types.CreateStripeSubscriptionDocument,
     "\n  mutation UpdatePlan($planID: ID!) {\n    updatePlan(to: $planID) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n": types.UpdatePlanDocument,
@@ -281,7 +281,7 @@ export function graphql(source: "\n  query GetSigningKey($environmentID: ID!) {\
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query GetBillableSteps($month: Int!) {\n    billableStepTimeSeries(timeOptions: { month: $month }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetBillableSteps($month: Int!) {\n    billableStepTimeSeries(timeOptions: { month: $month }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n"];
+export function graphql(source: "\n  query GetBillableSteps($month: Int!, $year: Int!) {\n    billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetBillableSteps($month: Int!, $year: Int!) {\n    billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
