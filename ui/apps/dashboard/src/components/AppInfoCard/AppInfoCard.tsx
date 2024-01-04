@@ -11,11 +11,11 @@ import { PlatformSection } from './PlatformSection';
 type Props = {
   app: App;
   className?: string;
+  sync: Sync | null;
 };
 
 type App = {
   externalID: string;
-  latestSync: Sync | null;
   name: string;
 };
 
@@ -28,13 +28,13 @@ type Sync = {
   url: string | null;
 } & React.ComponentProps<typeof PlatformSection>['sync'];
 
-export function AppInfoCard({ app, className }: Props) {
+export function AppInfoCard({ app, className, sync }: Props) {
   let lastSyncValue;
-  if (app.latestSync) {
+  if (sync) {
     lastSyncValue = (
       <div className="flex gap-2">
-        <Time value={app.latestSync.createdAt} />
-        <SyncStatus status={app.latestSync.status} />
+        <Time value={sync.createdAt} />
+        <SyncStatus status={sync.status} />
       </div>
     );
   }
@@ -52,11 +52,7 @@ export function AppInfoCard({ app, className }: Props) {
         <dl className="grid grow grid-cols-4 gap-4 p-4">
           {/* Row 1 */}
           <Description className="truncate" detail={app.externalID} term="ID" />
-          <Description
-            className="truncate"
-            detail={app.latestSync?.sdkVersion ?? '-'}
-            term="SDK Version"
-          />
+          <Description className="truncate" detail={sync?.sdkVersion ?? '-'} term="SDK Version" />
           <Description
             className="col-span-2 truncate"
             detail={lastSyncValue ?? '-'}
@@ -66,22 +62,18 @@ export function AppInfoCard({ app, className }: Props) {
           {/* Row 2 */}
           <Description
             className="truncate"
-            detail={<FrameworkInfo framework={app.latestSync?.framework} />}
+            detail={<FrameworkInfo framework={sync?.framework} />}
             term="Framework"
           />
           <Description
             className="truncate"
-            detail={<LanguageInfo language={app.latestSync?.sdkLanguage} />}
+            detail={<LanguageInfo language={sync?.sdkLanguage} />}
             term="Language"
           />
-          <Description
-            className="col-span-2 truncate"
-            detail={app.latestSync?.url ?? '-'}
-            term="URL"
-          />
+          <Description className="col-span-2 truncate" detail={sync?.url ?? '-'} term="URL" />
 
           {/* Row 3 */}
-          {app.latestSync && <PlatformSection sync={app.latestSync} />}
+          {sync && <PlatformSection sync={sync} />}
         </dl>
       </div>
     </>

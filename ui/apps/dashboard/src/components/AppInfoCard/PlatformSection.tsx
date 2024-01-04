@@ -1,7 +1,6 @@
 import { PlatformInfo } from '@/components/PlatformInfo';
 
 type Props = {
-  className?: string;
   sync: {
     platform: string | null;
     vercelDeploymentID: string | null;
@@ -11,7 +10,7 @@ type Props = {
   };
 };
 
-export function PlatformSection({ className, sync }: Props) {
+export function PlatformSection({ sync }: Props) {
   const { platform, vercelDeploymentID, vercelDeploymentURL, vercelProjectID, vercelProjectURL } =
     sync;
   if (!platform) {

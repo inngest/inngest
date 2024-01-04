@@ -37,12 +37,11 @@ export default function Layout({ children, params: { externalID } }: Props) {
       href: `/env/${env.slug}/apps/${encodeURIComponent(externalID)}`,
       text: 'Info',
     },
-    // TODO: Uncomment when the syncs page is added
-    // {
-    //   active: 'exact',
-    //   href: `/env/${environmentSlug}/apps/${encodeURIComponent(externalID)}/syncs`,
-    //   text: 'Syncs',
-    // },
+    {
+      active: 'exact',
+      href: `/env/${env.slug}/apps/${encodeURIComponent(externalID)}/syncs`,
+      text: 'Syncs',
+    },
   ];
 
   return (
@@ -52,7 +51,7 @@ export default function Layout({ children, params: { externalID } }: Props) {
         links={navLinks}
         title={res.data}
       />
-      <div className="overflow-y-auto bg-slate-100">{children}</div>
+      <div className="h-full overflow-y-auto bg-slate-100">{children}</div>
     </>
   );
 }
