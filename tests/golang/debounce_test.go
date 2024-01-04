@@ -164,3 +164,53 @@ func TestDebounecWithMultipleKeys(t *testing.T) {
 		return atomic.LoadInt32(&counter) == int32(n)
 	}, 10*time.Second, 100*time.Millisecond, "Expected %d, got %d", n, counter)
 }
+
+func TestDebounce_OutOfOrderTS(t *testing.T) {
+	h, server, registerFuncs := NewSDKHandler(t)
+	defer server.Close()
+
+	var counter int32
+
+	a := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name: "test out of order debounce is ignored",
+			Debounce: &inngestgo.Debounce{
+				Period: 5 * time.Second,
+			},
+		},
+		inngestgo.EventTrigger("test/sdk", nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			fmt.Println("Debounced function ran", input.Event.Data.Name)
+			require.Equal(t, "future", input.Event.Data.Name)
+			atomic.AddInt32(&counter, 1)
+			return nil, nil
+		},
+	)
+	h.Register(a)
+	registerFuncs()
+
+	now := time.Now()
+	in_2_s := now.Add(time.Second * 2)
+
+	_, err := inngestgo.Send(context.Background(), DebounceEvent{
+		Name: "test/sdk",
+		Data: DebounceEventData{
+			Name: "future",
+		},
+		Timestamp: in_2_s.UnixMilli(),
+	})
+	require.NoError(t, err)
+
+	_, err = inngestgo.Send(context.Background(), DebounceEvent{
+		Name: "test/sdk",
+		Data: DebounceEventData{
+			Name: "now",
+		},
+		Timestamp: now.UnixMilli(),
+	})
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt32(&counter) == 1
+	}, 10*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
+}
