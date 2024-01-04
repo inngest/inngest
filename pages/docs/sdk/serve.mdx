@@ -30,6 +30,7 @@ serve(
 
 We provide framework-specific bindings to make this easy for common platforms:
 
+- [Astro](#framework-astro)
 - [AWS Lambda](#framework-aws-lambda)
 - [Cloudflare](#framework-cloudflare)
 - [DigitalOcean functions](#framework-digital-ocean-functions)
@@ -55,6 +56,24 @@ You'll need to assign your signing key to an [`INNGEST_SIGNING_KEY`](/docs/sdk/e
 provider or `.env` file locally.  This lets the SDK securely communicate with Inngest.  If you can't
 provide this as a signing key, you can pass it in to `serve` when setting up your framework.  [Read
 the reference for more information](/docs/sdk/reference/serve#reference).
+
+## Framework: Astro <VersionBadge version="v3.8.0+" />
+
+Add the following to `./src/pages/api/inngest.ts`:
+
+<CodeGroup>
+```ts {{ title: "v3" }}
+import { serve } from "inngest/astro";
+import { functions, inngest } from "../../inngest";
+
+export const { GET, POST, PUT } = serve({
+  client: inngest,
+  functions,
+});
+```
+</CodeGroup>
+
+See the [Astro example](https://github.com/inngest/inngest-js/tree/main/examples/framework-astro) for more information.
 
 ## Framework: AWS Lambda <VersionBadge version="v1.5.0+" />
 
