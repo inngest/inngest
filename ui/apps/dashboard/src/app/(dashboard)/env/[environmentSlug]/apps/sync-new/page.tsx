@@ -106,7 +106,43 @@ export default function Page({ params: { environmentSlug } }: Props) {
                 </div>
               </footer>
             </Tabs.Content>
-            <Tabs.Content value="tab2"></Tabs.Content>
+            <Tabs.Content value="tab2">
+              <div className="border-b border-slate-200 p-8">
+                <p>
+                  Inngest allows you to host your app code on any platform then invokes your
+                  functions via HTTP. To deploy functions to Inngest, all you need to do is tell
+                  Inngest where to find them!
+                </p>
+                <br />
+                <p>
+                  Inngest enables you to host your Apps on Vercel using their serverless functions
+                  platform. This allows you to deploy your Inngest functions right alongside your
+                  existing website and API functions running on Vercel. Inngest will call your
+                  functions securely via HTTP request on-demand, whether triggered by an event or on
+                  a schedule in the case of cron jobs.
+                </p>
+              </div>
+              <footer className="flex items-center justify-between px-8 py-6">
+                {/* To do:  create apps docs and link them here */}
+                <InngestLink href="https://www.inngest.com/docs/">View Docs</InngestLink>
+                <div className="flex items-center gap-3">
+                  <Button
+                    label="Cancel"
+                    btnAction={() => {
+                      router.push(`/env/${environmentSlug}/apps` as Route);
+                    }}
+                    appearance="outlined"
+                  />
+                  <Button
+                    label="Go To Vercel Configuration"
+                    btnAction={() => {
+                      router.push('/settings/integrations/vercel' as Route);
+                    }}
+                    kind="primary"
+                  />
+                </div>
+              </footer>
+            </Tabs.Content>
             <Tabs.Content value="tab3">
               <div className="border-b border-slate-200 p-8">
                 <p>
