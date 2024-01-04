@@ -1,3 +1,5 @@
+import { InformationCircleIcon } from '@heroicons/react/24/outline'
+
 # Cancel running functions
 
 Stop the execution of a running function when a specific event is received using `cancelOn`.
@@ -72,6 +74,12 @@ And this is an example of an event that would cancel the function as it and the 
 ```
 
 Match expressions can be simple equalities or be more complex. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info.
+
+<Callout Icon={InformationCircleIcon}>
+  Functions are cancelled _between steps_, meaning that if there is a `step.run` currently executing, it will finish before the function is cancelled.
+
+  Inngest does this to ensure that steps are treated like atomic operations and each step either completes or does not run at all.
+</Callout>
 
 ## Configuration
 

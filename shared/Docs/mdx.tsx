@@ -104,24 +104,37 @@ export function Note({ children }) {
 
 export function Callout({
   variant = "default",
+  Icon = null,
   children,
 }: {
   variant: "default" | "info" | "warning";
+  Icon?: typeof React.Component<any, any>;
   children: React.ReactNode;
 }) {
   return (
     <div
       className={clsx(
-        "my-6 border border-transparent rounded-lg p-6 mt- [&>:first-child]:mt-0 [&>:last-child]:mb-0",
+        "my-6 border border-transparent rounded-lg p-6",
+        !Icon && "[&>:first-child]:mt-0 [&>:last-child]:mb-0",
         variant === "default" &&
           "dark:border-indigo-600/20 text-indigo-600 dark:text-indigo-200 bg-indigo-600/10",
         variant === "info" &&
           "dark:border-sky-600/20 text-sky-600 dark:text-sky-100 bg-sky-300/10",
         variant === "warning" &&
-          "dark:border-amber-700/20 text-amber-900 dark:text-amber-50 bg-amber-300/10"
+          "dark:border-amber-700/20 text-amber-900 dark:text-amber-50 bg-amber-300/10",
+        Icon && "flex gap-2.5"
       )}
     >
-      {children}
+      {Icon ? (
+        <>
+          <Icon className="block h-5 w-5 mt-1 shrink-0" />
+          <div className="[&>:first-child]:mt-0 [&>:last-child]:mb-0">
+            {children}
+          </div>
+        </>
+      ) : (
+        children
+      )}
     </div>
   );
 }
