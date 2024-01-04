@@ -366,6 +366,10 @@ const sectionPythonReference = [
         title: "Environment variables",
         href: `/docs/reference/python/overview/env-vars`,
       },
+      {
+        title: "Production mode",
+        href: `/docs/reference/python/overview/prod-mode`,
+      },
     ],
   },
   {
@@ -374,6 +378,10 @@ const sectionPythonReference = [
       {
         title: "Overview",
         href: `/docs/reference/python/client/overview`,
+      },
+      {
+        title: "Send events",
+        href: `/docs/reference/python/client/send`,
       },
     ],
   },
@@ -389,6 +397,14 @@ const sectionPythonReference = [
   {
     title: "Steps",
     links: [
+      {
+        title: "invoke",
+        href: `/docs/reference/python/steps/invoke`,
+      },
+      {
+        title: "invoke_by_id",
+        href: `/docs/reference/python/steps/invoke_by_id`,
+      },
       {
         title: "parallel",
         href: `/docs/reference/python/steps/parallel`,
@@ -412,15 +428,6 @@ const sectionPythonReference = [
       {
         title: "wait_for_event",
         href: `/docs/reference/python/steps/wait-for-event`,
-      },
-    ],
-  },
-  {
-    title: "Events",
-    links: [
-      {
-        title: "Send",
-        href: `/docs/reference/python/events/send`,
       },
     ],
   },

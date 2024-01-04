@@ -2,8 +2,22 @@
 
 Sleep until a specific time. Accepts a `datetime.datetime` object.
 
+## Arguments
+
+<Properties>
+    <Property name="step_id" required type="str">
+        Step ID. Should be unique within the function.
+    </Property>
+
+    <Property name="until" required type="datetime.datetime">
+        Time to sleep until.
+    </Property>
+</Properties>
+
+## Examples
+
 ```py
-@inngest.create_function(
+@inngest_client.create_function(
     fn_id="my_function",
     trigger=inngest.TriggerEvent(event="app/my_function"),
 )

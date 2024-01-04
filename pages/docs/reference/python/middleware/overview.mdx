@@ -1,13 +1,9 @@
-# Middleware <VersionBadge version="v0.2.0+" />
-
-<Callout variant="warning">
-    <span style={{fontFamily: 'none'}}>⚠️</span> This is an experimental feature and may change in the future.
-</Callout>
+# Middleware <VersionBadge version="v0.3.0+" />
 
 Middleware allows you to run code at various points in an Inngest function's lifecycle.
 
 ```py
-class MyMiddleware(inngest.experimental.Middleware):
+class MyMiddleware(inngest.Middleware):
     async def transform_input(
         self,
         ctx: inngest.Context,

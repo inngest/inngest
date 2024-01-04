@@ -1,20 +1,12 @@
 # Send event
 
+<Callout variant="info">
+    💡️ This guide is for sending events from *inside* an Inngest function. To send events outside an Inngest function, refer to the [client event sending](/docs/reference/python/events/send) guide.
+</Callout>
+
 Sends 1 or more events to the Inngest server. Returns a list of the event IDs.
 
-```py
-@inngest.create_function(
-    fn_id="my_function",
-    trigger=inngest.TriggerEvent(event="app/my_function"),
-)
-async def fn(
-    ctx: inngest.Context,
-    step: inngest.Step,
-) -> list[str]:
-    return await step.send_event("send", inngest.Event(name="foo"))
-```
-
-## Configuration
+## Arguments
 
 <Properties>
     <Property name="step_id" required type="str">
@@ -42,3 +34,17 @@ async def fn(
         </Properties>
     </Property>
 </Properties>
+
+## Examples
+
+```py
+@inngest_client.create_function(
+    fn_id="my_function",
+    trigger=inngest.TriggerEvent(event="app/my_function"),
+)
+async def fn(
+    ctx: inngest.Context,
+    step: inngest.Step,
+) -> list[str]:
+    return await step.send_event("send", inngest.Event(name="foo"))
+```

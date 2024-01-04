@@ -2,8 +2,23 @@
 
 Run steps in parallel.
 
+
+## Arguments
+
+<Properties>
+    <Property name="step_id" required type="str">
+        Step ID. Should be unique within the function.
+    </Property>
+
+    <Property name="handler" required type="Callable[[], object]">
+        A callable that has no arguments and returns a JSON serializable value.
+    </Property>
+</Properties>
+
+## Examples
+
 ```py
-@inngest.create_function(
+@inngest_client.create_function(
     fn_id="my_function",
     trigger=inngest.TriggerEvent(event="app/my_function"),
 )

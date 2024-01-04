@@ -53,7 +53,7 @@ inngest_client = inngest.Inngest(
 )
 
 # Create an Inngest function
-@inngest.create_function(
+@inngest_client.create_function(
     fn_id="my_function",
     # Event that triggers this function
     trigger=inngest.TriggerEvent(event="app/my_function"),

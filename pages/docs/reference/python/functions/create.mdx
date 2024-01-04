@@ -5,7 +5,7 @@ Define your functions using the `create_function` decorator.
 ```py
 import inngest
 
-@inngest.create_function(
+@inngest_client.create_function(
     fn_id="import-product-images",
     trigger=inngest.TriggerEvent(event="shop/product.imported"),
 )
@@ -167,7 +167,7 @@ The `create_function` decorator accepts a configuration and wraps a plain functi
 The handler is your code that runs whenever the trigger occurs. Every function handler receives a single object argument which can be deconstructed. The key arguments are `event` and `step`. Note, that scheduled functions that use a `cron` trigger will not receive an `event` argument.
 
 ```py
-@inngest.create_function(
+@inngest_client.create_function(
     # Function options
 )
 async def fn(ctx: inngest.Context, step: inngest.Step):
