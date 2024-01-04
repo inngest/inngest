@@ -21,7 +21,7 @@ export default inngest.createFunction(
 );
 ```
 
-As debounce uses the *last* event received, it is a complement to [`idempotency`](https://www.inngest.com/docs/reference/functions/create#inngest-create-function-configuration-trigger-handler-inngest-function) (a [rate limit](/docs/reference/functions/rate-limit) of 1).  Idempotency ensures that a function runs once for each `key` the *first* time an event is received, while debounce uses the *last* event during a specified period.  These can be combined to ensure that once a function is debounced it does not run again.
+As debounce uses the *last* event received, it is a complement to [`idempotency`](/docs/guides/handling-idempotency#at-the-function-level-the-consumer) (a [rate limit](/docs/reference/functions/rate-limit) of 1).  Idempotency ensures that a function runs once for each `key` the *first* time an event is received, while debounce uses the *last* event during a specified period.  These can be combined to ensure that once a function is debounced it does not run again.
 
 **Use cases**
 

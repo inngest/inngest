@@ -44,7 +44,7 @@ The `createFunction` method accepts a series of arguments to define your functio
   </Property>
 
   <Property name="idempotency" type="string">
-    A key expression which is used to prevent duplicate events from triggering a function more than once in 24 hours. This is equivalent to setting `rateLimit` with a `key`, a `limit` of `1`  and `period` of `24hr`.
+    A key expression which is used to prevent duplicate events from triggering a function more than once in 24 hours. This is equivalent to setting `rateLimit` with a `key`, a `limit` of `1`  and `period` of `24hr`. [Read the idempotency guide here](/docs/guides/handling-idempotency).
 
     Expressions are defined using the Common Expression Language (CEL) with the original event accessible using dot-notation. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info. Examples:
 

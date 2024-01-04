@@ -50,7 +50,7 @@ To send events from within of the context of a function, use [`step.sendEvent()`
           </Property>
           <Property name="id" type="string">
             A unique ID used to idempotently trigger function runs.  If duplicate event IDs are seen,
-	    only the first event will trigger function runs.
+	    only the first event will trigger function runs. [Read the idempotency guide here](/docs/guides/handling-idempotency).
           </Property>
           <Property name="ts" type="number">
             A timestamp integer representing the time (in milliseconds) at which the event occurred. Defaults to the time the Inngest receives the event.

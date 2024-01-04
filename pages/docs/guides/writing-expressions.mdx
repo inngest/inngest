@@ -2,7 +2,7 @@
 
 Expressions are used in a number of ways for configuring your functions. They are used for:
 
-* Defining keys for [concurrency](/docs/functions/concurrency), [rate limiting](/docs/reference/functions/rate-limit), [debounce](/docs/reference/functions/debounce), or idempotency {/* TODO - Link to: /docs/guides/handling-idempotency */}
+* Defining keys for [concurrency](/docs/functions/concurrency), [rate limiting](/docs/reference/functions/rate-limit), [debounce](/docs/reference/functions/debounce), or [idempotency](/docs/guides/handling-idempotency)
 * Conditionally matching events for [wait for event](/docs/reference/functions/step-wait-for-event), [cancellation](/docs/functions/cancellation), or the [function trigger's `if` option](/docs/reference/functions/create#trigger)
 * Returning values for function [run priority](/docs/reference/functions/run-priority)
 
@@ -13,7 +13,7 @@ All expressions are defined using the [Common Expression Language (CEL)](https:/
 Within the scope of Inngest, expressions should evaluate to either a boolean or a value:
 
 * **Booleans** - Any expression used for conditional matching should return a boolean value. These are used in wait for event, cancellation, and the function trigger's `if` option.
-* **Values** - Other expressions can return any value which might be used as keys (for example, concurrency, rate limit, debounce or idempotency keys) or a dynamic value (for example, run priority). {/* TODO - Link to: /docs/guides/handling-idempotency */}
+* **Values** - Other expressions can return any value which might be used as keys (for example, concurrency, rate limit, debounce or[idempotency keys](/docs/guides/handling-idempotency)) or a dynamic value (for example, run priority).
 
 ## Examples
 
