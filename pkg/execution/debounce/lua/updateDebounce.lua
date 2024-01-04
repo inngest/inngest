@@ -3,7 +3,7 @@
 Updates a debounce to use new data.
 
 Return values:
-- 0 (int): OK
+- >=0 (int): OK, and the new TTL from our debounce.
 - -1: Debounce is already in progress, as the queue item is leased.
 - -2: Event is out of order and has no effect
 
@@ -54,6 +54,31 @@ if existing ~= false then
 		-- The stored event occurs after the event we're updating, so do nothing.
 		return -2
 	end
+
+	-- Also, if there's an existing debounce, ensure that we respect the max timeout
+	-- for the debounce.  We don't want to keep pushing a debounce out indefinitely,
+	-- so if (now + new TTL in seconds) > the debounce's max time, use the debounce's
+	-- max time instead.
+	if item ~= nil and item.t ~= nil and item.t > 0 then
+		local nextTTL = currentTime + (ttl  * 1000)
+		if nextTTL > item.t then
+			ttl = math.floor((item.t - currentTime) / 1000)
+			if ttl <= 0 then
+				-- Ensure we always use a minimum.
+				ttl = 1
+			end
+			ttl = tonumber(ttl)
+		end
+
+		-- Also set the max within the updated debounce item.  We have to decode
+		-- then re-encode the item to keep the max timeout consistent,
+		-- as we do not know the max when calling update.
+		--
+		-- This makes updates transactional.
+		local next = cjson.decode(debounce)
+		next.t = item.t
+		debounce = cjson.encode(next)
+	end
 end
 
 -- Set the fn -> debounce ID pointer
@@ -62,6 +87,4 @@ redis.call("HSET", keyDbc, debounceID, debounce)
 
 -- TODO: This should also reschedule the job directly in an atomic transaction.
 
-return 0
-
-
+return ttl

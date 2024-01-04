@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/google/uuid"
@@ -86,8 +87,19 @@ type Priority struct {
 }
 
 type Debounce struct {
-	Key    *string `json:"key"`
-	Period string  `json:"period"`
+	Key     *string `json:"key,omitempty"`
+	Period  string  `json:"period"`
+	Timeout *string `json:"timeout,omitempty"`
+}
+
+func (d Debounce) TimeoutDuration() *time.Duration {
+	if d.Timeout == nil || *d.Timeout == "" {
+		return nil
+	}
+	if dur, err := str2duration.ParseDuration(*d.Timeout); err == nil {
+		return &dur
+	}
+	return nil
 }
 
 // Cancel represents a cancellation signal for a function.  When specified, this
