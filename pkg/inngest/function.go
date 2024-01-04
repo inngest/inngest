@@ -225,10 +225,18 @@ func (f Function) Validate(ctx context.Context) error {
 		err = multierror.Append(err, fmt.Errorf("This function exceeds the max number of cancellation events: %d", consts.MaxCancellations))
 	}
 
-	if f.Debounce != nil && f.Debounce.Key != nil {
-		if _, exprErr := expressions.NewExpressionEvaluator(ctx, *f.Debounce.Key); exprErr != nil {
-			err = multierror.Append(err, fmt.Errorf("Debounce expression is invalid: %s", exprErr))
+	if f.Debounce != nil {
+		if f.Debounce.Key != nil && *f.Debounce.Key == "" {
+			// Some clients may send an empty string.
+			f.Debounce.Key = nil
 		}
+		if f.Debounce.Key != nil {
+			// Ensure the expression is valid if present.
+			if _, exprErr := expressions.NewExpressionEvaluator(ctx, *f.Debounce.Key); exprErr != nil {
+				err = multierror.Append(err, fmt.Errorf("Debounce expression is invalid: %s", exprErr))
+			}
+		}
+
 		// NOTE: Debounce is not valid when batch is enabled.
 		if f.EventBatch != nil {
 			err = multierror.Append(err, fmt.Errorf("A function cannot specify batch and debounce"))
