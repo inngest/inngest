@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckIcon, ClockIcon, XMarkIcon } from '@heroicons/react/20/solid';
+import { CheckIcon, ClockIcon, ExclamationCircleIcon, XMarkIcon } from '@heroicons/react/20/solid';
 import * as Tooltip from '@radix-ui/react-tooltip';
 
 type PaymentIconProps = {
@@ -26,6 +26,10 @@ export default function PaymentIcon({ status }: PaymentIconProps) {
     case 'processing':
       icon = <ClockIcon className="mx-auto w-4 text-slate-500" />;
       label = 'Processing';
+      break;
+    case 'requires_confirmation':
+      icon = <ExclamationCircleIcon className="mx-auto w-4 text-amber-500" />;
+      label = 'Awaiting payment';
       break;
     default:
       icon = null;
