@@ -87,7 +87,9 @@ SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes)
 -- name: GetFunctionRunsTimebound :many
 SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
-WHERE function_runs.run_started_at > @after AND function_runs.run_started_at <= @before LIMIT ?;
+WHERE function_runs.run_started_at > @after AND function_runs.run_started_at <= @before
+ORDER BY function_runs.run_started_at DESC
+LIMIT ?;
 
 -- name: GetFunctionRunsFromEvents :many
 SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs

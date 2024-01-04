@@ -562,7 +562,9 @@ func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid
 const getFunctionRunsTimebound = `-- name: GetFunctionRunsTimebound :many
 SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
-WHERE function_runs.run_started_at > ? AND function_runs.run_started_at <= ? LIMIT ?
+WHERE function_runs.run_started_at > ? AND function_runs.run_started_at <= ?
+ORDER BY function_runs.run_started_at DESC
+LIMIT ?
 `
 
 type GetFunctionRunsTimeboundParams struct {
