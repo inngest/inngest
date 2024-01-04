@@ -73,13 +73,14 @@ export default function Page({ params: { environmentSlug } }: Props) {
                   >
                     see docs
                   </Link>
-                  ) at /api/inngest, and your domain is https://myapp.com, you'll need to inform
-                  Inngest that your app is hosted at https://myapp.com/api/inngest.
+                  ) at /api/inngest, and your domain is https://myapp.com, you&apos;ll need to
+                  inform Inngest that your app is hosted at https://myapp.com/api/inngest.
                 </p>
                 <br />
                 <p>
-                  After you've set up the serve API and deployed your application, enter the URL of
-                  your application's serve endpoint to register your functions with Inngest.
+                  After you&apos;ve set up the serve API and deployed your application, enter the
+                  URL of your application&apos;s serve endpoint to register your functions with
+                  Inngest.
                 </p>
                 <DeploySigningKey className="py-6" />
                 <div className="border-t border-slate-200 pt-2">
