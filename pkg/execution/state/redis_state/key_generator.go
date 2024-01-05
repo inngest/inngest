@@ -189,6 +189,9 @@ type QueueKeyGenerator interface {
 
 	// RunIndex returns the index for storing job IDs associated with run IDs.
 	RunIndex(runID ulid.ULID) string
+
+	// Status returns the key used for status queue for the provided function.
+	Status(status string, fnID uuid.UUID) string
 }
 
 type DebounceKeyGenerator interface {
@@ -276,4 +279,8 @@ func (d DefaultQueueKeyGenerator) Debounce(ctx context.Context) string {
 
 func (d DefaultQueueKeyGenerator) RunIndex(runID ulid.ULID) string {
 	return fmt.Sprintf("%s:idx:run:%s", d.Prefix, runID)
+}
+
+func (d DefaultQueueKeyGenerator) Status(status string, fnID uuid.UUID) string {
+	return fmt.Sprintf("%s:queue:status:%s:%s", d.Prefix, fnID, status)
 }
