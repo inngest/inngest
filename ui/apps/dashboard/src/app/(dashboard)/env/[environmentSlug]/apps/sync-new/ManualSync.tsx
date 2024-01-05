@@ -99,7 +99,7 @@ export default function ManualSync({ appsURL }: Props) {
           ) : null}
         </div>
       </div>
-      <footer className="flex items-center justify-between px-8 py-6">
+      <div className="flex items-center justify-between px-8 py-6">
         {/* To do:  create apps docs and link them here */}
         <InngestLink href="https://www.inngest.com/docs/">View Docs</InngestLink>
         <div className="flex items-center gap-3">
@@ -118,7 +118,7 @@ export default function ManualSync({ appsURL }: Props) {
             loading={isLoading}
           />
         </div>
-      </footer>
+      </div>
     </>
   );
 }

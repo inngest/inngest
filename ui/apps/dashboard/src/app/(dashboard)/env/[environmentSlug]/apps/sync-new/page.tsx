@@ -76,7 +76,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
                   a schedule in the case of cron jobs.
                 </p>
               </div>
-              <footer className="flex items-center justify-between px-8 py-6">
+              <div className="flex items-center justify-between px-8 py-6">
                 {/* To do:  create apps docs and link them here */}
                 <InngestLink href="https://www.inngest.com/docs/">View Docs</InngestLink>
                 <div className="flex items-center gap-3">
@@ -95,7 +95,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
                     kind="primary"
                   />
                 </div>
-              </footer>
+              </div>
             </Tabs.Content>
             <Tabs.Content value="tab3">
               <div className="border-b border-slate-200 p-8">
@@ -124,7 +124,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
                 </p>
                 <CodeLine code="curl -X PUT https://<your-app>.com/api/inngest" className="mt-6" />
               </div>
-              <footer className="flex items-center justify-between px-8 py-6">
+              <div className="flex items-center justify-between px-8 py-6">
                 {/* To do:  create apps docs and link them here */}
                 <InngestLink href="https://www.inngest.com/docs/">View Docs</InngestLink>
                 <div className="flex items-center gap-3">
@@ -136,7 +136,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
                     kind="primary"
                   />
                 </div>
-              </footer>
+              </div>
             </Tabs.Content>
           </Tabs.Root>
         </section>
