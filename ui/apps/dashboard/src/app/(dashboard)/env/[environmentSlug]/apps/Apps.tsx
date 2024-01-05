@@ -31,13 +31,15 @@ export function Apps({ isArchived = false }: Props) {
         {res.data.map((app) => {
           return <AppCard app={app} className="mb-4" envSlug={env.slug} key={app.id} />;
         })}
-        <Button
-          className="mx-auto"
-          kind="primary"
-          label="Sync New App"
-          btnAction={() => router.push(`/env/${env.slug}/apps/sync-new` as Route)}
-          icon={<PlusIcon />}
-        />
+        {!isArchived && (
+          <Button
+            className="mx-auto"
+            kind="primary"
+            label="Sync New App"
+            btnAction={() => router.push(`/env/${env.slug}/apps/sync-new` as Route)}
+            icon={<PlusIcon />}
+          />
+        )}
       </div>
     </div>
   );
