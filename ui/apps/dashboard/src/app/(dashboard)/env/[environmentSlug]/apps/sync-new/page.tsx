@@ -120,7 +120,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
                 <br />
                 <p>
                   You can deploy from your machine or automate this within a CI/CD pipeline. Send a
-                  simple PUT request to your own application's serve endpoint.
+                  simple PUT request to your own application&apos;s serve endpoint.
                 </p>
                 <CodeLine code="curl -X PUT https://<your-app>.com/api/inngest" className="mt-6" />
               </div>
