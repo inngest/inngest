@@ -41,7 +41,7 @@ func TestFunctionPriorityRun(t *testing.T) {
 				Run: inngestgo.StrPtr(`event.data.priority == "high" ? 5 : 0`),
 			},
 		},
-		inngestgo.EventTrigger("test/sdk", nil),
+		inngestgo.EventTrigger("test/priority", nil),
 		func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[map[string]any, any]]) (any, error) {
 			priority, _ := input.Event.Data["priority"].(string)
 			results <- result{
@@ -79,7 +79,7 @@ func TestFunctionPriorityRun(t *testing.T) {
 	priorities := []string{"none", "low", "high"}
 	for _, p := range priorities {
 		_, err := inngestgo.Send(context.Background(), inngestgo.Event{
-			Name: "test/sdk",
+			Name: "test/priority",
 			Data: map[string]any{
 				"priority": p,
 			},
