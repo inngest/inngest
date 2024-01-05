@@ -18,6 +18,7 @@ type Props = {
 
 type App = {
   externalID: string;
+  functionCount: number;
   latestSync: Sync | null;
   name: string;
 };
@@ -29,7 +30,6 @@ type Sync = {
   sdkLanguage: string | null;
   sdkVersion: string | null;
   status: string;
-  syncedFunctions: Pick<Function, 'id'>[];
   url: string | null;
 };
 
@@ -84,7 +84,7 @@ export function AppCard({ app, className, envSlug }: Props) {
           detail={<PlatformInfo platform={app.latestSync?.platform} />}
           term="Platform"
         />
-        <Description detail={app.latestSync?.syncedFunctions.length} term="Functions" />
+        <Description detail={app.functionCount} term="Functions" />
 
         {/* Row 4 */}
         <Description className="col-span-3" detail={app.latestSync?.url} term="URL" />

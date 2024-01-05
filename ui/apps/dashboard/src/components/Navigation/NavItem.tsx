@@ -12,7 +12,7 @@ type NavItemProps<PassedHref extends string> = {
   href: Route<PassedHref>;
   text: string;
   icon?: React.ReactNode;
-  active?: ActiveMatching;
+  active?: ActiveMatching | boolean;
   badge?: React.ReactNode;
 };
 
@@ -25,12 +25,17 @@ export default function NavItem<PassedHref extends string>({
 }: NavItemProps<PassedHref>) {
   const pathname = usePathname();
 
-  const isActive =
-    active === 'basePath'
-      ? pathname?.startsWith(href)
-      : active === 'exact'
-      ? pathname === href
-      : false;
+  let isActive: boolean;
+  if (typeof active === 'boolean') {
+    isActive = active;
+  } else {
+    isActive =
+      active === 'basePath'
+        ? pathname?.startsWith(href)
+        : active === 'exact'
+        ? pathname === href
+        : false;
+  }
 
   return (
     <Link
