@@ -43,6 +43,7 @@ const meta = {
         app={{
           name: 'App Name',
           externalID: 'app-id',
+          functionCount: 1,
           latestSync: {
             createdAt: now,
             framework,
@@ -50,7 +51,6 @@ const meta = {
             sdkLanguage: language,
             sdkVersion: '1.0.0',
             status: 'success',
-            syncedFunctions: [],
             url: 'https://example.com',
           },
         }}
