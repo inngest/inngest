@@ -10,9 +10,8 @@ import { CodeLine } from '@inngest/components/CodeLine';
 import { Link as InngestLink, defaultLinkStyles } from '@inngest/components/Link';
 import * as Tabs from '@radix-ui/react-tabs';
 
-import Input from '@/components/Forms/Input';
 import Header from '@/components/Header/Header';
-import DeploySigningKey from '../../deploys/DeploySigningKey';
+import ManualSync from './ManualSync';
 
 type Props = {
   params: {
@@ -22,6 +21,7 @@ type Props = {
 
 export default function Page({ params: { environmentSlug } }: Props) {
   const router = useRouter();
+  const APPS_URL = `/env/${environmentSlug}/apps` as Route;
   return (
     <>
       <Header title="Apps" icon={<Squares2X2Icon className="h-5 w-5 text-white" />} />
@@ -58,53 +58,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
               </Tabs.Trigger>
             </Tabs.List>
             <Tabs.Content value="tab1">
-              <div className="border-b border-slate-200 p-8">
-                <p>
-                  Inngest allows you to host your app code on any platform then invokes your
-                  functions via HTTP. To deploy functions to Inngest, all you need to do is tell
-                  Inngest where to find them!
-                </p>
-                <br />
-                <p>
-                  Since your code is hosted on another platform, you need to register where your
-                  functions are hosted with Inngest. For example, if you set up the serve handler (
-                  <Link
-                    className={defaultLinkStyles}
-                    href="https://www.inngest.com/docs/reference/serve#how-the-serve-api-handler-works"
-                  >
-                    see docs
-                  </Link>
-                  ) at /api/inngest, and your domain is https://myapp.com, you&apos;ll need to
-                  inform Inngest that your app is hosted at https://myapp.com/api/inngest.
-                </p>
-                <br />
-                <p>
-                  After you&apos;ve set up the serve API and deployed your application, enter the
-                  URL of your application&apos;s serve endpoint to register your functions with
-                  Inngest.
-                </p>
-                <DeploySigningKey className="py-6" />
-                <div className="border-t border-slate-200 pt-2">
-                  <label htmlFor="url" className="text-slate-500">
-                    App URL
-                  </label>
-                  <Input placeholder="https://example.com/api/inngest" name="url" />
-                </div>
-              </div>
-              <footer className="flex items-center justify-between px-8 py-6">
-                {/* To do:  create apps docs and link them here */}
-                <InngestLink href="https://www.inngest.com/docs/">View Docs</InngestLink>
-                <div className="flex items-center gap-3">
-                  <Button
-                    label="Cancel"
-                    btnAction={() => {
-                      router.push(`/env/${environmentSlug}/apps` as Route);
-                    }}
-                    appearance="outlined"
-                  />
-                  <Button label="Sync App" btnAction={() => {}} kind="primary" />
-                </div>
-              </footer>
+              <ManualSync appsURL={APPS_URL} />
             </Tabs.Content>
             <Tabs.Content value="tab2">
               <div className="border-b border-slate-200 p-8">
@@ -129,7 +83,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
                   <Button
                     label="Cancel"
                     btnAction={() => {
-                      router.push(`/env/${environmentSlug}/apps` as Route);
+                      router.push(APPS_URL);
                     }}
                     appearance="outlined"
                   />
@@ -177,7 +131,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
                   <Button
                     label="Done"
                     btnAction={() => {
-                      router.push(`/env/${environmentSlug}/apps` as Route);
+                      router.push(APPS_URL);
                     }}
                     kind="primary"
                   />
