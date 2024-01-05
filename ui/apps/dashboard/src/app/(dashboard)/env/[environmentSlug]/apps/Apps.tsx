@@ -9,11 +9,15 @@ import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environm
 import { AppCard } from './AppCard';
 import { useApps } from './useApps';
 
-export function Apps() {
+type Props = {
+  isArchived?: boolean;
+};
+
+export function Apps({ isArchived = false }: Props) {
   const env = useEnvironment();
   const router = useRouter();
 
-  const res = useApps(env.id);
+  const res = useApps({ envID: env.id, isArchived });
   if (res.error) {
     throw res.error;
   }

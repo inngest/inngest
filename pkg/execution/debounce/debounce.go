@@ -303,6 +303,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 			strconv.Itoa(int(ttl.Seconds())),
 			redis_state.HashID(ctx, debounceID.String()),
 			strconv.Itoa(int(time.Now().UnixMilli())),
+			strconv.Itoa(int(di.Event.Timestamp)),
 		},
 	).AsInt64()
 	if err != nil {
@@ -327,6 +328,10 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 	case -1:
 		// The debounce is in progress or has just finished.  Requeue.
 		return ErrDebounceInProgress
+	case -2:
+		// The event is out-of-order and a newer event exists within the debounce.
+		// Do nothing.
+		return nil
 	default:
 		return fmt.Errorf("unknown update debounce return value: %d", out)
 	}
