@@ -6,15 +6,15 @@ When the SDK is in production mode it will try to connect to Inngest Cloud inste
 
 You'll want to disable production mode whenever you're using the Inngest Dev Server. This is typically during local development and CI. Production mode can be disabled in 2 ways:
 1. Set the `INNGEST_DEV` environment variable to `1`.
-2. Set the `InngestClient`'s `is_production` constructor argument to `false`.
+2. Set the `Inngest`'s `is_production` constructor argument to `false`.
 
 Using the `INNGEST_DEV` environment variable is the recommended way to disable production mode. But make sure that it isn't set in production!
 
-`InngestClient`'s `is_production` constructor argument is useful for disabling production mode based on whatever logic you want. For example, you could control it using the `FLASK_ENV` environment variable:
+`Inngest`'s `is_production` constructor argument is useful for disabling production mode based on whatever logic you want. For example, you could control it using the `FLASK_ENV` environment variable:
 ```py
 import inngest
 
-inngest.InngestClient(
+inngest.Inngest(
     app_id="my_flask_app",
     is_production=os.environ.get("FLASK_ENV") == "production",
 )
