@@ -8,7 +8,7 @@ export type HeaderLink = {
   href: string;
   text: string;
   icon?: React.ReactNode;
-  active?: ActiveMatching;
+  active?: ActiveMatching | boolean;
   badge?: React.ReactNode;
 };
 
