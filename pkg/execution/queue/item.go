@@ -12,6 +12,9 @@ import (
 )
 
 const (
+	// KindStart represents a state that the function state has been created but not started yet.
+	// Essentially a status that represents the backlog.
+	KindStart    = "start"
 	KindEdge     = "edge"
 	KindSleep    = "sleep"
 	KindPause    = "pause"
@@ -84,7 +87,7 @@ type Item struct {
 // Note: the returned time is the factor in milliseconds.
 func (i Item) GetPriorityFactor() int64 {
 	switch i.Kind {
-	case KindEdge:
+	case KindStart, KindEdge:
 		// Only support edges right now.  We don't account for the factor on other queue entries,
 		// else eg. sleeps would wake up at the wrong time.
 		if i.Identifier.PriorityFactor != nil {
@@ -132,7 +135,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	}
 
 	switch temp.Kind {
-	case KindEdge, KindSleep:
+	case KindStart, KindEdge, KindSleep:
 		// Edge and Sleep are the same;  the only difference is that the executor
 		// runner should always save nil to the state store using the outgoing edge's
 		// ID when processing a sleep so that the state + stack are updated properly.

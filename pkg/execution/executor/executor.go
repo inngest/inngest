@@ -440,7 +440,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		JobID:       &queueKey,
 		GroupID:     uuid.New().String(),
 		WorkspaceID: req.WorkspaceID,
-		Kind:        queue.KindEdge,
+		Kind:        queue.KindStart,
 		Identifier:  id,
 		Attempt:     0,
 		MaxAttempts: &sourceEdgeRetries,

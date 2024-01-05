@@ -476,7 +476,7 @@ func (q *QueueItem) SetID(ctx context.Context, str string) {
 // are not sleeps (eg. immediate runs)
 func (q QueueItem) Score() int64 {
 	// If this is not an edge, we can ignore this.
-	if q.Data.Kind != osqueue.KindEdge || q.Data.Attempt > 0 {
+	if (q.Data.Kind != osqueue.KindStart && q.Data.Kind != osqueue.KindEdge) || q.Data.Attempt > 0 {
 		return q.AtMS
 	}
 
