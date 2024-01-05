@@ -49,16 +49,8 @@ func (f FunctionOpts) GetRateLimit() *inngest.RateLimit {
 // Debounce represents debounce configuration used when creating a new function within
 // FunctionOpts
 type Debounce struct {
-	// Key is an optional expression to use for constraining the debounce to a given
-	// value.
-	Key string `json:"key,omitempty"`
-	// Period is how long to listen for new events matching the optional key.  Any event
-	// received during this period will reschedule the debounce to run after another period
-	// interval.
+	Key    string        `json:"key"`
 	Period time.Duration `json:"period"`
-	// Timeout specifies the optional max lifetime of a debounce, ensuring that functions
-	// run after the given duration when a debounce is rescheduled indefinitely.
-	Timeout *time.Duration `json:"timeout,omitempty"`
 }
 
 type RateLimit struct {
