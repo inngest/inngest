@@ -62,12 +62,22 @@ func (a *api) setup() {
 			r.Use(a.opts.CachingMiddleware.Middleware)
 		}
 
+		// Set all response type to JSON
+		r.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Add("Content-Type", "application/json")
+				next.ServeHTTP(w, r)
+			})
+		})
+
 		r.Get("/events", a.GetEvents)
 		r.Get("/events/{eventID}", a.GetEvent)
 		r.Get("/events/{eventID}/runs", a.GetEventRuns)
 		r.Get("/runs/{runID}", a.GetFunctionRun)
 		r.Delete("/runs/{runID}", a.CancelFunctionRun)
 		r.Get("/runs/{runID}/jobs", a.GetFunctionRunJobs)
+		r.Get("/functions", a.GetFunctions)
+		r.Get("/functions/{id}", a.GetFunction)
 	})
 }
 
