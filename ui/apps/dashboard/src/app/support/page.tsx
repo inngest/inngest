@@ -17,7 +17,7 @@ import cn from '@/utils/cn';
 import { isEnterprisePlan } from '../(dashboard)/settings/billing/utils';
 import { SupportForm } from './SupportForm';
 import { useSystemStatus } from './statusPage';
-import { getLabelTitleByTypeId } from './ticketOptions';
+import { getLabelTitleByTypeId, type TicketType } from './ticketOptions';
 
 const GetAccountSupportInfoDocument = graphql(`
   query GetAccountSupportInfo {
@@ -44,7 +44,7 @@ export default function Page() {
   const plan = data?.account.plan;
   const isPaid = (plan?.amount || 0) > 0;
   const isEnterprise = plan ? isEnterprisePlan(plan) : false;
-  const preselectedTicketType = searchParams.get('q');
+  const preselectedTicketType = searchParams.get('q') as TicketType;
 
   return (
     <div className="h-full overflow-y-scroll">

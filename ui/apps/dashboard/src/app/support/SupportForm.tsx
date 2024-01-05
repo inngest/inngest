@@ -29,7 +29,7 @@ const instructions: { [K in Exclude<TicketType, null>]: string } = {
 type SupportFormProps = {
   isEnterprise: boolean;
   isPaid: boolean;
-  preselectedTicketType?: TicketType;
+  preselectedTicketType: TicketType;
 };
 
 export function SupportForm({
