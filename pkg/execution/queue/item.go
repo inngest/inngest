@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	// KindStart represents a state that the function state has been created but not started yet.
+	// KindStart represents a queue state that the function state has been created but not started yet.
 	// Essentially a status that represents the backlog.
 	KindStart    = "start"
 	KindEdge     = "edge"
