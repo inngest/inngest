@@ -1,3 +1,5 @@
+import type { Route } from 'next';
+import { Link } from '@inngest/components/Link';
 import { classNames } from '@inngest/components/utils/classNames';
 
 type Props = {
@@ -21,14 +23,9 @@ export function AppGitCard({ className, sync }: Props) {
   if (commitHash) {
     if (repoURL) {
       commitHashValue = (
-        <a
-          className="text-indigo-600 hover:underline"
-          href={`${repoURL}/commit/${commitHash}`}
-          rel="noopener noreferrer"
-          target="_blank"
-        >
+        <Link href={`${repoURL}/commit/${commitHash}` as Route} internalNavigation={false}>
           {commitHash.substring(0, 7)}
-        </a>
+        </Link>
       );
     } else {
       commitHashValue = commitHash.substring(0, 7);
@@ -41,14 +38,9 @@ export function AppGitCard({ className, sync }: Props) {
   if (commitRef) {
     if (repoURL) {
       commitRefValue = (
-        <a
-          className="text-indigo-600 hover:underline"
-          href={`${repoURL}/tree/${commitRef}`}
-          rel="noopener noreferrer"
-          target="_blank"
-        >
+        <Link href={`${repoURL}/tree/${commitRef}` as Route} internalNavigation={false}>
           {commitRef}
-        </a>
+        </Link>
       );
     } else {
       commitRefValue = commitRef;
@@ -60,14 +52,9 @@ export function AppGitCard({ className, sync }: Props) {
   let repositoryValue;
   if (repoURL) {
     repositoryValue = (
-      <a
-        className="text-indigo-600 hover:underline"
-        href={repoURL}
-        rel="noopener noreferrer"
-        target="_blank"
-      >
+      <Link href={repoURL as Route} internalNavigation={false}>
         {repoURL}
-      </a>
+      </Link>
     );
   } else {
     repositoryValue = '-';
@@ -80,9 +67,11 @@ export function AppGitCard({ className, sync }: Props) {
         className
       )}
     >
-      <div className="border-b border-slate-300 px-4 py-2">Commit Info</div>
+      <div className="border-b border-slate-300 px-6 py-3 text-sm font-medium text-slate-600">
+        Commit Information
+      </div>
 
-      <dl className="grid grow grid-cols-4 gap-4 p-4">
+      <dl className="grid grow grid-cols-4 gap-4 px-6 py-4">
         {/* Row 1 */}
         <Description
           className="col-span-4"
@@ -117,8 +106,8 @@ function Description({
 }) {
   return (
     <div className={className}>
-      <dt className="text-xs text-slate-600">{term}</dt>
-      <dd>{detail ?? ''}</dd>
+      <dt className="pb-2 text-sm text-slate-400">{term}</dt>
+      <dd className="text-slate-800">{detail ?? ''}</dd>
     </div>
   );
 }
