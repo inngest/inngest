@@ -637,6 +637,8 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		m.kf.PauseID(ctx, p.ID),
 		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 		m.kf.PauseEvent(ctx, p.WorkspaceID, evt),
+		m.kf.PauseIndex(ctx, "add", p.WorkspaceID, evt),
+		m.kf.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 	}
 
 	// Add 1 second because int will truncate the float. Otherwise, timeouts
@@ -658,6 +660,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		// Add at least 10 minutes to this pause, allowing us to process the
 		// pause by ID for 10 minutes past expiry.
 		int(time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()),
+		time.Now().Unix(),
 	})
 	if err != nil {
 		return err
@@ -876,8 +879,28 @@ func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event str
 }
 
 func (m mgr) PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time) (state.PauseIterator, error) {
-	// DO IT
-	return nil, fmt.Errorf("not implemented")
+	if since.IsZero() {
+		return m.PausesByEvent(ctx, workspaceID, event)
+	}
+
+	// Load all items in the set.
+	cmd := m.r.B().
+		Zrangebyscore().
+		Key(m.kf.PauseIndex(ctx, "add", workspaceID, event)).
+		Min(strconv.Itoa(int(since.Unix()))).
+		Max("+inf").
+		Build()
+	ids, err := m.r.Do(ctx, cmd).AsStrSlice()
+	if err != nil {
+		return nil, err
+	}
+
+	iter := &keyIter{
+		r:  m.r,
+		kf: m.kf,
+	}
+	err = iter.init(ctx, ids, 100)
+	return iter, err
 }
 
 func (m mgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {
@@ -927,7 +950,6 @@ func (i *bufIter) Next(ctx context.Context) bool {
 	i.l.Lock()
 	defer i.l.Unlock()
 
-	// get the next item into Val
 	if len(i.items) == 0 {
 		i.err = context.Canceled
 		return false
@@ -1140,6 +1162,90 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 
 	return m, nil
+}
+
+// keyIter loads all pauses in batches given a list of IDs
+type keyIter struct {
+	r  rueidis.Client
+	kf KeyGenerator
+	// chunk is the size of scans to load in one.
+	chunk int64
+	// keys stores pause IDs to fetch in batches
+	keys []string
+	// vals stores pauses as strings from MGET
+	vals []string
+	err  error
+}
+
+func (i *keyIter) Error() error {
+	return i.err
+}
+
+func (i *keyIter) init(ctx context.Context, keys []string, chunk int64) error {
+	i.keys = keys
+	i.chunk = chunk
+	return i.fetch(ctx)
+}
+
+func (i *keyIter) Count() int {
+	return len(i.keys)
+}
+
+func (i *keyIter) fetch(ctx context.Context) error {
+	if len(i.keys) == 0 {
+		// No more present.
+		i.err = context.Canceled
+		return scanDoneErr
+	}
+
+	var load []string
+	if len(i.keys) > int(i.chunk) {
+		load = i.keys[:]
+		i.keys = []string{}
+	} else {
+		load = i.keys[0:i.chunk]
+		i.keys = i.keys[i.chunk:]
+	}
+
+	for n, id := range load {
+		load[n] = i.kf.PauseID(ctx, uuid.MustParse(id))
+	}
+
+	cmd := i.r.B().Mget().Key(load...).Build()
+	i.vals, i.err = i.r.Do(ctx, cmd).AsStrSlice()
+	return i.err
+}
+
+func (i *keyIter) Next(ctx context.Context) bool {
+	if len(i.vals) > 0 {
+		return true
+	}
+
+	err := i.fetch(ctx)
+	if err != nil {
+		return false
+	}
+
+	return true
+}
+
+func (i *keyIter) Val(ctx context.Context) *state.Pause {
+	if len(i.vals) == 0 {
+		return nil
+	}
+
+	val := i.vals[0]
+	i.vals = i.vals[1:]
+	if val == "" {
+		return nil
+	}
+
+	pause := &state.Pause{}
+	err := json.Unmarshal([]byte(val), pause)
+	if err != nil {
+		return nil
+	}
+	return pause
 }
 
 // runMetadata is stored for each invocation of a function.  This is inserted when

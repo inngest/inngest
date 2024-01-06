@@ -384,6 +384,12 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			// The triggering event ID should be the first ID in the batch.
 			triggeringID := req.Events[0].GetInternalID().String()
 
+			// TODO: Remove `event` data from the expression and replace with actual event
+			// data as values.
+			//
+			// This improves performance in matching, as we can then use the values within
+			// aggregate trees.
+
 			pause := state.Pause{
 				WorkspaceID:       req.WorkspaceID,
 				Identifier:        id,
@@ -806,15 +812,8 @@ func (e *executor) executeDriverForStep(ctx context.Context, id state.Identifier
 
 // HandlePauses handles pauses loaded from an incoming event.
 func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
+	// TODO: Switch to aggregate pauses on release.
 	res, err := e.handlePausesAllNaively(ctx, iter, evt)
-	go func() {
-		aggRes, err := e.handleAggregatePauses(ctx, evt)
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("error handling aggregate pauses", "error", err)
-		}
-		fmt.Printf("%#v\n", aggRes)
-		fmt.Printf("%#v\n", res)
-	}()
 	return res, err
 }
 
@@ -823,11 +822,9 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 		return execution.HandlePauseResult{}, nil
 	}
 
-	evals, count, err := e.exprAggregator.EvaluateEvent(ctx, evt)
-
+	evals, count, err := e.exprAggregator.EvaluateAsyncEvent(ctx, evt)
 	// For each matching eval, consume the pause.
 	// TODO: Replicate what we had down in naive.
-
 	return execution.HandlePauseResult{count, int32(len(evals))}, err
 }
 
@@ -1490,6 +1487,12 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		uuid.NameSpaceOID,
 		[]byte(item.Identifier.RunID.String()+gen.ID),
 	)
+
+	// TODO: Remove `event` data from the expression and replace with actual event
+	// data as values.
+	//
+	// This improves performance in matching, as we can then use the values within
+	// aggregate trees.
 
 	opcode := gen.Op.String()
 	err = e.sm.SavePause(ctx, state.Pause{

@@ -50,9 +50,9 @@ type EvaluableLoader interface {
 //
 // This is used across all pauses — `waitForEvent` and cancellations.
 type Aggregator interface {
-	// EvaluateEvent is a shorthand to evaluate Evaluable isntances tracked for a given event,
+	// EvaluateAsyncEvent is a shorthand to evaluate Evaluable isntances tracked for a given event,
 	// eg. all pauses stored in the state store.
-	EvaluateEvent(ctx context.Context, event event.TrackedEvent) ([]expr.Evaluable, int32, error)
+	EvaluateAsyncEvent(ctx context.Context, event event.TrackedEvent) ([]expr.Evaluable, int32, error)
 
 	// LoadEventEvaluator returns the aggregate evaluator for a given event.  This does a few
 	// things under the hood:
@@ -89,7 +89,7 @@ type aggregator struct {
 	evaluator expr.ExpressionEvaluator
 }
 
-func (a aggregator) EvaluateEvent(ctx context.Context, event event.TrackedEvent) ([]expr.Evaluable, int32, error) {
+func (a aggregator) EvaluateAsyncEvent(ctx context.Context, event event.TrackedEvent) ([]expr.Evaluable, int32, error) {
 	name := event.GetEvent().Name
 	eval, err := a.LoadEventEvaluator(ctx, event.GetWorkspaceID(), name)
 	if err != nil {
@@ -97,7 +97,7 @@ func (a aggregator) EvaluateEvent(ctx context.Context, event event.TrackedEvent)
 	}
 
 	found, evalCount, err := eval.Evaluate(ctx, map[string]any{
-		"event": event.GetEvent().Map(),
+		"async": event.GetEvent().Map(),
 	})
 	if err != nil {
 		a.log.Error(
@@ -151,6 +151,7 @@ func (a aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, even
 		// matching will be stale.
 		a.log.Warn(
 			"using stale evaluator",
+			"error", err,
 			"age", time.Since(bk.updatedAt),
 			"workspace_id", wsID,
 			"event", eventName,
@@ -176,8 +177,13 @@ type bookkeeper struct {
 }
 
 func (b *bookkeeper) update(ctx context.Context, l EvaluableLoader) error {
-	return l.LoadEvaluablesSince(ctx, b.wsID, b.event, b.updatedAt, func(ctx context.Context, eval expr.Evaluable) error {
+	at := time.Now()
+	err := l.LoadEvaluablesSince(ctx, b.wsID, b.event, b.updatedAt, func(ctx context.Context, eval expr.Evaluable) error {
 		_, err := b.ae.Add(ctx, eval)
 		return err
 	})
+	if err == nil {
+		b.updatedAt = at
+	}
+	return err
 }
