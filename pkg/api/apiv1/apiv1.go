@@ -28,6 +28,8 @@ type Opts struct {
 	Executor execution.Executor
 	// EventReader allows reading of events from storage.
 	EventReader EventReader
+	// FunctionReader reads function data, including queue status.
+	FunctionReader cqrs.FunctionReader
 	// FunctionRunReader reads function runs, history, etc. from backing storage
 	FunctionRunReader cqrs.APIV1FunctionRunReader
 	// JobQueueReader reads information around a function run's job queues.
