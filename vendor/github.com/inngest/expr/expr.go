@@ -73,14 +73,21 @@ func NewAggregateEvaluator(
 	}
 }
 
+// Evaluable represents an evaluable expression with a unique identifier.
 type Evaluable interface {
-	// Identifier returns a unique identifier for the evaluable item.  If there are
+	// GetID returns a unique identifier for the evaluable item.  If there are
 	// two instances of the same expression, the identifier should return a unique
 	// string for each instance of the expression (eg. for two pauses).
-	Identifier() string
+	//
+	// It has the Get prefix to reduce collisions with implementations who expose an
+	// ID member.
+	GetID() string
 
-	// Expression returns an expression as a raw string.
-	Expression() string
+	// GetExpression returns an expression as a raw string.
+	//
+	// It has the Get prefix to reduce collisions with implementations who expose an
+	// Expression member.
+	GetExpression() string
 }
 
 type aggregator struct {
@@ -124,6 +131,12 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 	// TODO: Concurrently match constant expressions using a semaphore for capacity.
 	for _, expr := range a.constants {
 		atomic.AddInt32(&matched, 1)
+
+		if expr.Evaluable.GetExpression() == "" {
+			result = append(result, expr.Evaluable)
+			continue
+		}
+
 		// NOTE: We don't need to add lifted expression variables,
 		// because match.Parsed.Evaluable() returns the original expression
 		// string.
@@ -242,6 +255,14 @@ func (a *aggregator) Add(ctx context.Context, eval Evaluable) (bool, error) {
 		return false, err
 	}
 
+	if eval.GetExpression() == "" {
+		// This is an empty expression which always matches.
+		a.lock.Lock()
+		a.constants = append(a.constants, parsed)
+		a.lock.Unlock()
+		return false, nil
+	}
+
 	aggregateable := true
 	for _, g := range parsed.RootGroups() {
 		ok, err := a.iterGroup(ctx, g, parsed, a.addNode)
@@ -266,6 +287,10 @@ func (a *aggregator) Add(ctx context.Context, eval Evaluable) (bool, error) {
 }
 
 func (a *aggregator) Remove(ctx context.Context, eval Evaluable) error {
+	if eval.GetExpression() == "" {
+		return a.removeConstantEvaluable(ctx, eval)
+	}
+
 	// parse the expression using our tree parser.
 	parsed, err := a.parser.Parse(ctx, eval)
 	if err != nil {
@@ -282,22 +307,9 @@ func (a *aggregator) Remove(ctx context.Context, eval Evaluable) error {
 			return err
 		}
 		if !ok && aggregateable {
-			// Find the index of the evaluable in constants and yank out.
-			idx := -1
-			for n, item := range a.constants {
-				if item.Evaluable.Identifier() == eval.Identifier() {
-					idx = n
-					break
-				}
+			if err := a.removeConstantEvaluable(ctx, eval); err != nil {
+				return err
 			}
-
-			if idx == -1 {
-				return ErrEvaluableNotFound
-			}
-
-			a.lock.Lock()
-			a.constants = append(a.constants[:idx], a.constants[idx+1:]...)
-			a.lock.Unlock()
 			aggregateable = false
 		}
 	}
@@ -306,6 +318,25 @@ func (a *aggregator) Remove(ctx context.Context, eval Evaluable) error {
 		atomic.AddInt32(&a.len, -1)
 	}
 
+	return nil
+}
+
+func (a *aggregator) removeConstantEvaluable(ctx context.Context, eval Evaluable) error {
+	// Find the index of the evaluable in constants and yank out.
+	idx := -1
+	for n, item := range a.constants {
+		if item.Evaluable.GetID() == eval.GetID() {
+			idx = n
+			break
+		}
+	}
+	if idx == -1 {
+		return ErrEvaluableNotFound
+	}
+
+	a.lock.Lock()
+	a.constants = append(a.constants[:idx], a.constants[idx+1:]...)
+	a.lock.Unlock()
 	return nil
 }
 

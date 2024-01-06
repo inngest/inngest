@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/expr"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -257,6 +258,16 @@ type mgr struct {
 // transition status.
 func (m *mgr) OnFunctionStatus(f state.FunctionCallback) {
 	m.callbacks = append(m.callbacks, f)
+}
+
+func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {
+	// Replace the context so that this isn't cancelled by any parents.
+	callCtx := context.Background()
+	for _, f := range m.callbacks {
+		go func(fn state.FunctionCallback) {
+			fn(callCtx, id, status)
+		}(f)
+	}
 }
 
 func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
@@ -783,31 +794,6 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 	}
 }
 
-// PausesByEvent returns all pauses for a given event within a workspace.
-func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
-	key := m.kf.PauseEvent(ctx, workspaceID, event)
-	// If there are > 1000 keys in the hmap, use scanning
-
-	cntCmd := m.pauseR.B().Hlen().Key(key).Build()
-	cnt, err := m.pauseR.Do(ctx, cntCmd).AsInt64()
-
-	if err != nil || cnt > 1000 {
-		key := m.kf.PauseEvent(ctx, workspaceID, event)
-		iter := &scanIter{
-			count: cnt,
-			r:     m.pauseR,
-		}
-		err := iter.init(ctx, key, 1000)
-		return iter, err
-	}
-
-	// If there are less than a thousand items, query the keys
-	// for iteration.
-	iter := &bufIter{r: m.pauseR}
-	err = iter.init(ctx, key)
-	return iter, err
-}
-
 func (m mgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID, event string) (bool, error) {
 	key := m.kf.PauseEvent(ctx, workspaceID, event)
 	cmd := m.pauseR.B().Exists().Key(key).Build()
@@ -864,14 +850,53 @@ func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID strin
 	return pause, err
 }
 
-func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {
-	// Replace the context so that this isn't cancelled by any parents.
-	callCtx := context.Background()
-	for _, f := range m.callbacks {
-		go func(fn state.FunctionCallback) {
-			fn(callCtx, id, status)
-		}(f)
+// PausesByEvent returns all pauses for a given event within a workspace.
+func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
+	key := m.kf.PauseEvent(ctx, workspaceID, event)
+	// If there are > 1000 keys in the hmap, use scanning
+
+	cntCmd := m.pauseR.B().Hlen().Key(key).Build()
+	cnt, err := m.pauseR.Do(ctx, cntCmd).AsInt64()
+
+	if err != nil || cnt > 1000 {
+		key := m.kf.PauseEvent(ctx, workspaceID, event)
+		iter := &scanIter{
+			count: cnt,
+			r:     m.pauseR,
+		}
+		err := iter.init(ctx, key, 1000)
+		return iter, err
 	}
+
+	// If there are less than a thousand items, query the keys
+	// for iteration.
+	iter := &bufIter{r: m.pauseR}
+	err = iter.init(ctx, key)
+	return iter, err
+}
+
+func (m mgr) PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time) (state.PauseIterator, error) {
+	// DO IT
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (m mgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {
+
+	it, err := m.PausesByEventSince(ctx, workspaceID, eventName, since)
+	if err != nil {
+		return err
+	}
+	for it.Next(ctx) {
+		pause := it.Val(ctx)
+		if err := do(ctx, pause); err != nil {
+			return err
+		}
+	}
+
+	if it.Error() != context.Canceled {
+		return it.Error()
+	}
+	return nil
 }
 
 type bufIter struct {

@@ -46,11 +46,11 @@ func (e envparser) Parse(txt string) (*cel.Ast, *cel.Issues, LiftedArgs) {
 }
 
 // NewTreeParser returns a new tree parser for a given *cel.Env
-func NewTreeParser(ep CELParser) (TreeParser, error) {
+func NewTreeParser(ep CELParser) TreeParser {
 	parser := &parser{
 		ep: ep,
 	}
-	return parser, nil
+	return parser
 }
 
 type parser struct {
@@ -63,7 +63,14 @@ type parser struct {
 }
 
 func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, error) {
-	ast, issues, vars := p.ep.Parse(eval.Expression())
+	expression := eval.GetExpression()
+	if expression == "" {
+		return &ParsedExpression{
+			Evaluable: eval,
+		}, nil
+	}
+
+	ast, issues, vars := p.ep.Parse(expression)
 	if issues != nil {
 		return nil, issues.Err()
 	}
@@ -76,7 +83,7 @@ func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, 
 		// group IDs will be deterministic as the randomness is sourced from the ID.
 		//
 		// We only overwrite this if rander is not nil so that we can inject rander during tests.
-		digest := sha256.Sum256([]byte(eval.Identifier()))
+		digest := sha256.Sum256([]byte(eval.GetID()))
 		seed := int64(binary.NativeEndian.Uint64(digest[:8]))
 		r = rand.New(rand.NewSource(seed)).Read
 	}

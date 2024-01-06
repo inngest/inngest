@@ -40,6 +40,15 @@ func TestFunctionSteps(t *testing.T) {
 
 			step.Sleep(ctx, "delay", 2*time.Second)
 
+			_, err := step.WaitForEvent[any](ctx, "wait", step.WaitForEventOpts{
+				Name:    "step name",
+				Event:   "api/new.event",
+				Timeout: time.Minute,
+			})
+			if err == step.ErrEventNotReceived {
+				panic("no event found")
+			}
+
 			fmt.Println("3")
 			atomic.AddInt32(&counter, 1)
 			return true, nil
@@ -55,7 +64,18 @@ func TestFunctionSteps(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+
+	<-time.After(8 * time.Second)
+
+	_, err = inngestgo.Send(context.Background(), inngestgo.Event{
+		Name: "api/new.event",
+		Data: map[string]any{
+			"test": true,
+		},
+	})
+	require.NoError(t, err)
+
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&counter) == 3
-	}, 10*time.Second, time.Second)
+	}, 15*time.Second, time.Second)
 }

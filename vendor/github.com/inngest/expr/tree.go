@@ -60,5 +60,5 @@ func (p ExpressionPart) Equals(n ExpressionPart) bool {
 	if p.Predicate.String() != n.Predicate.String() {
 		return false
 	}
-	return p.Parsed.Evaluable.Expression() == n.Parsed.Evaluable.Expression()
+	return p.Parsed.Evaluable.GetExpression() == n.Parsed.Evaluable.GetExpression()
 }

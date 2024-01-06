@@ -90,6 +90,16 @@ type BooleanEvaluator interface {
 	FilteredAttributes(ctx context.Context, data *Data) *Data
 }
 
+func exprEvaluator(ctx context.Context, e expr.Evaluable, input map[string]any) (bool, error) {
+	eval, err := NewBooleanEvaluator(ctx, e.GetExpression())
+	if err != nil {
+		return false, err
+	}
+	data := NewData(input)
+	ok, _, err := eval.Evaluate(ctx, data)
+	return ok, err
+}
+
 // Evaluate is a helper function to create a new, cached expression evaluator to evaluate
 // the given data immediately.
 func Evaluate(ctx context.Context, expression string, input map[string]interface{}) (interface{}, *time.Time, error) {

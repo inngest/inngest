@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/oklog/ulid/v2"
 )
@@ -27,6 +28,7 @@ var (
 )
 
 type TrackedEvent interface {
+	GetWorkspaceID() uuid.UUID
 	GetInternalID() ulid.ULID
 	GetEvent() Event
 }
@@ -154,6 +156,11 @@ func (o ossTrackedEvent) GetEvent() Event {
 
 func (o ossTrackedEvent) GetInternalID() ulid.ULID {
 	return o.id
+}
+
+func (o ossTrackedEvent) GetWorkspaceID() uuid.UUID {
+	// There are no workspaces in OSS yet.
+	return uuid.UUID{}
 }
 
 type NewInvocationEventOpts struct {

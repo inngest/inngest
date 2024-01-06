@@ -2,5 +2,5 @@ package inngestgo
 
 const (
 	SDKLanguage = "go"
-	SDKVersion  = "0.5.2"
+	SDKVersion  = "0.5.3"
 )

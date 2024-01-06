@@ -93,6 +93,10 @@ func (d DebounceItem) GetEvent() event.Event {
 	return d.Event
 }
 
+func (d DebounceItem) GetWorkspaceID() uuid.UUID {
+	return d.WorkspaceID
+}
+
 // DebouncePayload represents the data stored within the queue's payload.
 type DebouncePayload struct {
 	DebounceID ulid.ULID `json:"debounceID"`

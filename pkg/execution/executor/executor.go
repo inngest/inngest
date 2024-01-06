@@ -94,6 +94,15 @@ func WithQueue(q queue.Queue) ExecutorOpt {
 	}
 }
 
+// WithExpressionAggregator sets the expression aggregator singleton to use
+// for matching events using our aggregate evaluator.
+func WithExpressionAggregator(agg expressions.Aggregator) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).exprAggregator = agg
+		return nil
+	}
+}
+
 func WithFunctionLoader(l state.FunctionLoader) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).fl = l
@@ -185,6 +194,10 @@ func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log *zerolog.Logger
+
+	// exprAggregator is an expression aggregator used to parse and aggregate expressions
+	// using trees.
+	exprAggregator expressions.Aggregator
 
 	sm                    state.Manager
 	queue                 queue.Queue
@@ -793,6 +806,32 @@ func (e *executor) executeDriverForStep(ctx context.Context, id state.Identifier
 
 // HandlePauses handles pauses loaded from an incoming event.
 func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
+	res, err := e.handlePausesAllNaively(ctx, iter, evt)
+	go func() {
+		aggRes, err := e.handleAggregatePauses(ctx, evt)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error handling aggregate pauses", "error", err)
+		}
+		fmt.Printf("%#v\n", aggRes)
+		fmt.Printf("%#v\n", res)
+	}()
+	return res, err
+}
+
+func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
+	if e.exprAggregator == nil {
+		return execution.HandlePauseResult{}, nil
+	}
+
+	evals, count, err := e.exprAggregator.EvaluateEvent(ctx, evt)
+
+	// For each matching eval, consume the pause.
+	// TODO: Replicate what we had down in naive.
+
+	return execution.HandlePauseResult{count, int32(len(evals))}, err
+}
+
+func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseIterator, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
 	res := execution.HandlePauseResult{0, 0}
 
 	if e.queue == nil || e.sm == nil {
