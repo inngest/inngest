@@ -28,7 +28,7 @@ require (
 	github.com/gowebpki/jcs v1.0.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/terraform v0.15.3
-	github.com/inngest/expr v0.0.0-20240105032110-921f6fca0a15
+	github.com/inngest/expr v0.0.0-20240106161226-5bf5dca4ded5
 	github.com/inngest/inngestgo v0.5.2
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5

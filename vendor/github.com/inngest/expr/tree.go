@@ -20,6 +20,7 @@ const (
 // ART tree, while LTE operations may check against a b+-tree.
 type PredicateTree interface {
 	Add(ctx context.Context, p ExpressionPart) error
+	Remove(ctx context.Context, p ExpressionPart) error
 	Search(ctx context.Context, input any) (*Leaf, bool)
 }
 
@@ -50,4 +51,14 @@ type ExpressionPart struct {
 	GroupID   groupID
 	Predicate Predicate
 	Parsed    *ParsedExpression
+}
+
+func (p ExpressionPart) Equals(n ExpressionPart) bool {
+	if p.GroupID != n.GroupID {
+		return false
+	}
+	if p.Predicate.String() != n.Predicate.String() {
+		return false
+	}
+	return p.Parsed.Evaluable.Expression() == n.Parsed.Evaluable.Expression()
 }

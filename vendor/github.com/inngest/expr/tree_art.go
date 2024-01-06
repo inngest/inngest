@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	ErrInvalidType = fmt.Errorf("invalid type for tree")
+	ErrInvalidType            = fmt.Errorf("invalid type for tree")
+	ErrExpressionPartNotFound = fmt.Errorf("expression part not found")
 )
 
 func newArtTree() PredicateTree {
@@ -46,6 +47,36 @@ func (a *artTree) Search(ctx context.Context, input any) (*Leaf, bool) {
 		return nil, false
 	}
 	return val.(*Leaf), true
+}
+
+func (a *artTree) Remove(ctx context.Context, p ExpressionPart) error {
+	str, ok := p.Predicate.Literal.(string)
+	if !ok {
+		return ErrInvalidType
+	}
+
+	key := artKeyFromString(str)
+
+	// Don't allow multiple gorutines to modify the tree simultaneously.
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	val, ok := a.Tree.Search(key)
+	if !ok {
+		return ErrExpressionPartNotFound
+	}
+
+	next := val.(*Leaf)
+	// Remove the expression part from the leaf.
+	for n, eval := range next.Evals {
+		if p.Equals(eval) {
+			next.Evals = append(next.Evals[:n], next.Evals[n+1:]...)
+			a.Insert(key, next)
+			return nil
+		}
+	}
+
+	return ErrExpressionPartNotFound
 }
 
 func (a *artTree) Add(ctx context.Context, p ExpressionPart) error {

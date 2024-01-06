@@ -15,7 +15,12 @@ const (
 var (
 	// replace is truly hack city.  these are 20 variable names for values that are
 	// lifted out of expressions via liftLiterals.
-	replace = []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t"}
+	replace = []string{
+		"a", "b", "c", "d", "e",
+		"f", "g", "h", "i", "j",
+		"k", "l", "m", "n", "o",
+		"p", "q", "r", "s", "t",
+	}
 )
 
 // LiftedArgs represents a set of variables that have been lifted from expressions and
