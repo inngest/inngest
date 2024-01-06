@@ -41,7 +41,7 @@ export function AppCard({ app, className, envSlug }: Props) {
         className
       )}
     >
-      <div className="bg-slate-910 flex flex-col justify-center gap-2 px-10">
+      <div className="bg-slate-910 flex w-[410px] flex-col justify-center gap-2 px-10">
         <h2>
           <Link
             className="transition-color flex cursor-pointer items-center gap-1 text-white underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-400 hover:decoration-indigo-400"
@@ -55,14 +55,6 @@ export function AppCard({ app, className, envSlug }: Props) {
           <dl>
             <dt className="hidden">URL</dt>
             <dd className="text-slate-400">{app.latestSync?.url}</dd>
-          </dl>
-        )}
-        {true && (
-          <dl>
-            <dt className="hidden">URL</dt>
-            <dd className="text-slate-400">
-              {app.latestSync?.url || 'https://growth-546lz4dmn-inngest.vercel.app'}
-            </dd>
           </dl>
         )}
       </div>

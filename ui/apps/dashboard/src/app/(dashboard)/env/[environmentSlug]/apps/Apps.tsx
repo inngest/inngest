@@ -33,7 +33,7 @@ export function Apps({ isArchived = false }: Props) {
         })}
         {!isArchived && (
           <Button
-            className="mx-auto"
+            className="mx-auto mt-12"
             kind="primary"
             label="Sync New App"
             btnAction={() => router.push(`/env/${env.slug}/apps/sync-new` as Route)}
