@@ -1222,11 +1222,7 @@ func (i *keyIter) Next(ctx context.Context) bool {
 	}
 
 	err := i.fetch(ctx)
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 func (i *keyIter) Val(ctx context.Context) *state.Pause {

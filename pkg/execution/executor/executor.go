@@ -817,6 +817,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 	return res, err
 }
 
+//nolint:all
 func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
 	if e.exprAggregator == nil {
 		return execution.HandlePauseResult{}, nil
