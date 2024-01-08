@@ -29,8 +29,8 @@ export async function getBooleanFlag(
     const client = await getLaunchDarklyClient();
 
     const accountID =
-      user?.publicMetadata.accountID && typeof user?.publicMetadata.accountID === 'string'
-        ? user?.publicMetadata.accountID
+      user?.publicMetadata.accountID && typeof user.publicMetadata.accountID === 'string'
+        ? user.publicMetadata.accountID
         : 'Unknown';
 
     const context = {

@@ -157,9 +157,9 @@ export default function FunctionRunList({
     },
   });
 
-  const runs = data?.environment?.function?.runs?.edges?.map((edge) => edge?.node) ?? [];
-  const endCursor = data?.environment?.function?.runs?.pageInfo.endCursor;
-  const hasNextPage = data?.environment?.function?.runs?.pageInfo.hasNextPage;
+  const runs = data?.environment.function?.runs?.edges?.map((edge) => edge?.node) ?? [];
+  const endCursor = data?.environment.function?.runs?.pageInfo.endCursor;
+  const hasNextPage = data?.environment.function?.runs?.pageInfo.hasNextPage;
   const isLoading = fetching || (runs.length > 0 && aggregatedFunctionRuns.length === 0);
 
   useEffect(() => {
@@ -191,7 +191,7 @@ export default function FunctionRunList({
     <div className="min-h-0 w-full overflow-y-auto pb-10" ref={tableContainerRef}>
       <Table
         options={{
-          data: aggregatedFunctionRuns ?? [],
+          data: aggregatedFunctionRuns,
           columns,
           getCoreRowModel: getCoreRowModel(),
           enableSorting: false,
@@ -217,9 +217,7 @@ export default function FunctionRunList({
             label="Load More"
             appearance="outlined"
             loading={fetching}
-            btnAction={() =>
-              pageCursors && endCursor && setPageCursors([...pageCursors, endCursor])
-            }
+            btnAction={() => endCursor && setPageCursors([...pageCursors, endCursor])}
           />
         </div>
       )}

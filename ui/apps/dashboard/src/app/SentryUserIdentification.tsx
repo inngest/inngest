@@ -34,7 +34,7 @@ export default function SentryUserIdentification() {
     user?.id,
     user?.externalId,
     user?.primaryEmailAddress?.emailAddress,
-    user?.publicMetadata?.accountID,
+    user?.publicMetadata.accountID,
   ]);
 
   return null;

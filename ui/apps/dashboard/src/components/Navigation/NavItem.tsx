@@ -29,12 +29,7 @@ export default function NavItem<PassedHref extends string>({
   if (typeof active === 'boolean') {
     isActive = active;
   } else {
-    isActive =
-      active === 'basePath'
-        ? pathname?.startsWith(href)
-        : active === 'exact'
-        ? pathname === href
-        : false;
+    isActive = active === 'basePath' ? pathname.startsWith(href) : pathname === href;
   }
 
   return (

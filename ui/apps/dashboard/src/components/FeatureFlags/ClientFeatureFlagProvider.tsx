@@ -28,7 +28,7 @@ function LaunchDarkly({ children }: { children: React.ReactNode }) {
   const userName = user?.fullName;
 
   const [{ data }] = useQuery({ query: GetAccountNameDocument, pause: !accountID });
-  const accountName = data?.account?.name;
+  const accountName = data?.account.name;
 
   useEffect(() => {
     if (!client || !accountID || !externalID) {

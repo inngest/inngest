@@ -116,7 +116,7 @@ export default function ArchiveFunctionButton({ functionSlug }: ArchiveFunctionP
     },
   });
 
-  const fn = version?.workspace?.workflow;
+  const fn = version?.workspace.workflow;
 
   if (!fn) {
     return null;
@@ -139,7 +139,7 @@ export default function ArchiveFunctionButton({ functionSlug }: ArchiveFunctionP
                   )
                 }
                 btnAction={() => setIsArchivedFunctionModalVisible(true)}
-                disabled={!version || isFetchingVersions}
+                disabled={isFetchingVersions}
                 label={isArchived ? 'Unarchive' : 'Archive'}
               />
             </span>
@@ -153,8 +153,8 @@ export default function ArchiveFunctionButton({ functionSlug }: ArchiveFunctionP
         </Tooltip.Root>
       </Tooltip.Provider>
       <ArchiveFunctionModal
-        functionID={fn?.id}
-        functionName={fn?.name ?? 'This function'}
+        functionID={fn.id}
+        functionName={fn.name || 'This function'}
         isOpen={isArchivedFunctionModalVisible}
         onClose={() => setIsArchivedFunctionModalVisible(false)}
         isArchived={isArchived}

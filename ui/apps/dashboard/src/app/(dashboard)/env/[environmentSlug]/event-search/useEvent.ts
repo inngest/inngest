@@ -53,7 +53,7 @@ export function useEvent({ envID, eventID }: { envID: string; eventID: string | 
       return new Error('result is missing event data');
     }
 
-    const runs: Data['runs'] = (event.runs ?? []).map((run) => {
+    const runs: Data['runs'] = event.runs.map((run) => {
       return {
         functionID: run.function.id,
         id: run.id,

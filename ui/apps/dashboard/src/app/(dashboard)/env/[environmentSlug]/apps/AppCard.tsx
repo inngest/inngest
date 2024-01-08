@@ -60,8 +60,8 @@ export function AppCard({ app, className, envSlug }: Props) {
           detail={
             app.latestSync && (
               <div className="flex gap-2">
-                <Time value={app.latestSync?.createdAt} />
-                <SyncStatus status={app.latestSync?.status} />
+                <Time value={app.latestSync.createdAt} />
+                <SyncStatus status={app.latestSync.status} />
               </div>
             )
           }

@@ -121,9 +121,9 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
     CreateFunctionReplayDocument
   );
 
-  const failedRunsCount = data?.environment?.function?.failedRuns?.totalCount ?? 0;
-  const canceledRunsCount = data?.environment?.function?.canceledRuns?.totalCount ?? 0;
-  const succeededRunsCount = data?.environment?.function?.succeededRuns?.totalCount ?? 0;
+  const failedRunsCount = data?.environment.function?.failedRuns?.totalCount ?? 0;
+  const canceledRunsCount = data?.environment.function?.canceledRuns?.totalCount ?? 0;
+  const succeededRunsCount = data?.environment.function?.succeededRuns?.totalCount ?? 0;
 
   const statusCounts: Record<FunctionRunEndStatus, number> = {
     [FunctionRunStatus.Failed]: failedRunsCount,
@@ -145,7 +145,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
       return;
     }
 
-    const functionID = data?.environment?.function?.id;
+    const functionID = data?.environment.function?.id;
 
     if (!functionID) {
       toast.error('Could not find function. Please try again later.');

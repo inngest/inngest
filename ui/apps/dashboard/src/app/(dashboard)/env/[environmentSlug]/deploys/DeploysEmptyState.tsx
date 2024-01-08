@@ -65,8 +65,8 @@ export default function DeploysOnboarding() {
 
   // Redirect to the first deploy if there are any ONLY if it's not the branch parent
   // Branch parents should always show the empty state w/ deploy instructions
-  if (!fetching && data?.deploys?.length && !isBranchParent) {
-    const firstDeployId = data?.deploys?.[0]?.id;
+  if (data?.deploys?.length && !isBranchParent) {
+    const firstDeployId = data.deploys[0]?.id;
     router.push(`/env/${env.slug}/deploys/${firstDeployId}` as Route);
     return <></>;
   }

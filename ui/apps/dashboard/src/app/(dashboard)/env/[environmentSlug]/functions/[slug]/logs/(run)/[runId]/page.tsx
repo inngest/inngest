@@ -107,7 +107,7 @@ export default async function FunctionRunDetailsLayout({ params }: FunctionRunDe
     notFound();
   }
 
-  const func = response.environment?.function;
+  const func = response.environment.function;
   const triggers = (run.version?.triggers ?? []).map((trigger) => {
     return {
       type: trigger.schedule ? 'CRON' : 'EVENT',
@@ -139,7 +139,7 @@ export default async function FunctionRunDetailsLayout({ params }: FunctionRunDe
         triggers,
       }}
       functionVersion={run.version ?? undefined}
-      rawHistory={run?.history ?? []}
+      rawHistory={run.history}
       run={{
         ...run,
         endedAt: run.endedAt ? new Date(run.endedAt) : null,

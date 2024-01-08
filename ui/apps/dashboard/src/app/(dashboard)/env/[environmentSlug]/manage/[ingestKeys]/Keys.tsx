@@ -37,7 +37,7 @@ export default function Keys() {
     },
   });
 
-  const keys = data?.environment?.ingestKeys;
+  const keys = data?.environment.ingestKeys;
 
   function sortFunction(a: { createdAt: string }, b: { createdAt: string }) {
     const dateA = new Date(a.createdAt).getTime();

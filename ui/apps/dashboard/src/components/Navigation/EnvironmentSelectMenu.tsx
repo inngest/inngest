@@ -125,9 +125,9 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
                     )}
                   />
                   <span className="block truncate">
-                    {selected?.type === EnvironmentType.BranchParent
+                    {selected.type === EnvironmentType.BranchParent
                       ? 'Branch Environments'
-                      : selected?.name}
+                      : selected.name}
                   </span>
                 </>
               ) : (

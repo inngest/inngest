@@ -134,7 +134,7 @@ export async function GET(req: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Please sign in to view your tickets' }, { status: 401 });
   }
-  const emails = user?.emailAddresses.map((email) => email.emailAddress) || [];
+  const emails = user.emailAddresses.map((email) => email.emailAddress);
   let threads: ThreadPartsFragment[] = [];
 
   for (const email of emails) {
@@ -148,7 +148,7 @@ export async function GET(req: Request) {
 
     const threadsRes = await client.getThreads({
       filters: {
-        customerIds: [customerRes.data?.id],
+        customerIds: [customerRes.data.id],
       },
       first: 10,
     });

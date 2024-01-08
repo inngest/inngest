@@ -70,7 +70,7 @@ function useColumns({ envSlug }: { envSlug: string }) {
                   }
                   key={trigger.type + trigger.value}
                   trigger={{
-                    type: trigger.type ? 'event' : 'schedule',
+                    type: trigger.type === 'EVENT' ? 'event' : 'schedule',
                     value: trigger.value,
                   }}
                 />

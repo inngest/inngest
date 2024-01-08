@@ -58,14 +58,15 @@ type SearchModalProps = {
 function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const [isSearchResultsListOpened, setIsSearchResultsListOpened] = useState(false);
   const [search, setSearch] = useState('');
-  const resultRef = useRef(null);
+  const resultRef = useRef<HTMLLIElement>(null);
   const router = useRouter();
   const { user } = useUser();
-  let searchResult = {
+
+  const [searchResult, setSearchResult] = useState({
     type: '',
     href: '',
     name: '',
-  };
+  });
 
   useEffect(() => {
     let debounce = setTimeout(() => {
@@ -116,7 +117,7 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
     variables: {
       environmentID: globalResults?.env.id || '',
       functionID:
-        globalResults?.value.__typename === 'FunctionRun' ? globalResults?.value?.functionID : '',
+        globalResults?.value.__typename === 'FunctionRun' ? globalResults.value.functionID : '',
     },
     pause: !globalSearchData || globalResults?.value.__typename === 'ArchivedEvent',
   });
@@ -136,21 +137,21 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
    * Generates the result to be displayed to the user
    */
   if (globalResults?.value.__typename === 'FunctionRun' && functionResults) {
-    searchResult = {
+    setSearchResult({
       type: 'function',
       href: `/env/${environmentSlug}/functions/${encodeURIComponent(functionResults.slug)}/logs/${
         globalResults.value.id
       }`,
       name: functionResults.name || '',
-    };
+    });
   } else if (globalResults?.value.__typename === 'ArchivedEvent') {
-    searchResult = {
+    setSearchResult({
       type: 'event',
-      href: `/env/${environmentSlug}/events/${encodeURIComponent(globalResults.value?.name)}/logs/${
+      href: `/env/${environmentSlug}/events/${encodeURIComponent(globalResults.value.name)}/logs/${
         globalResults.value.id
       }`,
-      name: globalResults.value?.name,
-    };
+      name: globalResults.value.name,
+    });
   }
 
   /*

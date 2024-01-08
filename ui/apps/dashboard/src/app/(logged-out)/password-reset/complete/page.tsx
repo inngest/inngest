@@ -62,8 +62,15 @@ export default function PasswordResetComplete() {
 
     let error;
     try {
-      const json = await result?.json();
-      error = json?.error;
+      const json: unknown = await result.json();
+      if (
+        typeof json === 'object' &&
+        json !== null &&
+        'error' in json &&
+        typeof json.error === 'string'
+      ) {
+        error = json.error;
+      }
     } catch (e) {}
 
     setLoading(false);

@@ -34,13 +34,6 @@ export default async function Page({}: Props) {
     return <div>Not logged in</div>;
   }
 
-  const users = [];
-  for (const user of res.account.users) {
-    if (user !== null && user !== undefined) {
-      users.push(user);
-    }
-  }
-
   return (
     <div className="flex place-content-center">
       <div>
@@ -49,7 +42,7 @@ export default async function Page({}: Props) {
           <UserCreator />
         </div>
 
-        <TeamTable loggedInUserID={loggedInUserID} users={users} />
+        <TeamTable loggedInUserID={loggedInUserID} users={res.account.users} />
       </div>
     </div>
   );

@@ -118,15 +118,15 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
     );
   }
 
-  const environmentID = data?.environment?.id;
-  const functionID = data?.environment?.function?.id;
+  const environmentID = data?.environment.id;
+  const functionID = data?.environment.function?.id;
 
   const replays: Replay[] =
-    data?.environment?.function?.replays?.map((replay) => {
+    data?.environment.function?.replays.map((replay) => {
       const baseReplay = {
         ...replay,
         createdAt: new Date(replay.createdAt),
-        runsCount: replay.functionRunsScheduledCount ?? 0,
+        runsCount: replay.functionRunsScheduledCount,
       };
 
       if (replay.endedAt) {

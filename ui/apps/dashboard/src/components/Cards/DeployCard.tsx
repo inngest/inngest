@@ -109,17 +109,13 @@ function IntegrationCard({ metadata }: { metadata: DeployMetadata }): JSX.Elemen
   const IntegrationWordmark = integrationName ? integrationLogos[integrationName].wordmark : null;
   const IntegrationLogomark = integrationName ? integrationLogos[integrationName].logomark : null;
 
-  // We need to cast the following URLs to Route because they are all external links.
-  // See https://beta.nextjs.org/docs/configuring/typescript#statically-typed-links
-  const projectUrl = metadata?.payload?.links?.project as Route;
-  const deploymentUrl = metadata?.payload?.links?.deployment as Route;
-  const url = metadata?.payload?.deployment?.url
-    ? `https://${metadata.payload.deployment.url}`
-    : '';
+  const projectUrl = metadata.payload?.links.project;
+  const deploymentUrl = metadata.payload?.links.deployment;
+  const url = metadata.payload?.deployment.url ? `https://${metadata.payload.deployment.url}` : '';
 
   // TODO - Support Gitlab and Bitbucket URLs
-  const meta = metadata?.payload?.deployment?.meta;
-  const repo = meta?.githubOrg && meta?.githubRepo ? `${meta?.githubOrg}/${meta?.githubRepo}` : '';
+  const meta = metadata.payload?.deployment.meta;
+  const repo = meta?.githubOrg && meta.githubRepo ? `${meta.githubOrg}/${meta.githubRepo}` : '';
   // NOTE - This assumes it is public Github, not a privately hosted Github Enterprise
   const repoUrl = repo ? (`https://github.com/${repo}` as Route) : '';
 
