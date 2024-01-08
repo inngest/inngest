@@ -1213,6 +1213,11 @@ func (i *keyIter) fetch(ctx context.Context) error {
 
 	cmd := i.r.B().Mget().Key(load...).Build()
 	i.vals, i.err = i.r.Do(ctx, cmd).AsStrSlice()
+	if rueidis.IsRedisNil(i.err) {
+		// Somehow none of these pauses no longer exist, which is okay:
+		// another concurrent thread may have already consumed it.
+		i.err = nil
+	}
 	return i.err
 }
 
