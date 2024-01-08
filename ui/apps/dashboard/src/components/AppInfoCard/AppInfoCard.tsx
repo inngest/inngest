@@ -1,7 +1,10 @@
 'use client';
 
+import Link from 'next/link';
+import ChevronRightIcon from '@heroicons/react/20/solid/ChevronRightIcon';
 import { classNames } from '@inngest/components/utils/classNames';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { FrameworkInfo } from '@/components/FrameworkInfo';
 import { LanguageInfo } from '@/components/LanguageInfo';
 import { SyncStatus } from '@/components/SyncStatus';
@@ -29,12 +32,19 @@ type Sync = {
 } & React.ComponentProps<typeof PlatformSection>['sync'];
 
 export function AppInfoCard({ app, className, sync }: Props) {
+  const env = useEnvironment();
   let lastSyncValue;
   if (sync) {
     lastSyncValue = (
       <div className="flex gap-2">
-        <Time value={sync.createdAt} />
         <SyncStatus status={sync.status} />
+        <Link
+          className="transition-color flex cursor-pointer items-center gap-1 text-indigo-400 underline decoration-transparent decoration-2 underline-offset-4 duration-300  hover:decoration-indigo-400"
+          href={`/env/${env.slug}/apps/${encodeURIComponent(app.externalID)}/syncs`}
+        >
+          <Time value={sync?.createdAt} />
+          <ChevronRightIcon className="h-4 w-4" />
+        </Link>
       </div>
     );
   }
@@ -47,9 +57,11 @@ export function AppInfoCard({ app, className, sync }: Props) {
           className
         )}
       >
-        <h2 className="border-b border-slate-300 px-4 py-2">App Info</h2>
+        <h2 className="border-b border-slate-300 px-6 py-3 text-sm font-medium text-slate-600">
+          App Information
+        </h2>
 
-        <dl className="grid grow grid-cols-4 gap-4 p-4">
+        <dl className="grid grow grid-cols-4 gap-4 px-6 py-4">
           {/* Row 1 */}
           <Description className="truncate" detail={app.externalID} term="ID" />
           <Description className="truncate" detail={sync?.sdkVersion ?? '-'} term="SDK Version" />
@@ -91,8 +103,8 @@ function Description({
 }) {
   return (
     <div className={className}>
-      <dt className="text-xs text-slate-600">{term}</dt>
-      <dd>{detail}</dd>
+      <dt className="pb-2 text-sm text-slate-400">{term}</dt>
+      <dd className="text-slate-800">{detail}</dd>
     </div>
   );
 }

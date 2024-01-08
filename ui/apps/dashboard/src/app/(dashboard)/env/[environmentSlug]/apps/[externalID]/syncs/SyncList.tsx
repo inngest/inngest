@@ -32,7 +32,7 @@ export function SyncList({ className, onClick, selectedSyncID, syncs }: Props) {
           return (
             <div
               className={classNames(
-                'table-row cursor-pointer border border-r-0 border-slate-300 hover:bg-slate-100',
+                'table-row cursor-pointer border border-r-0 border-slate-300 text-slate-800 hover:bg-slate-100',
                 bgColor
               )}
               key={sync.id}

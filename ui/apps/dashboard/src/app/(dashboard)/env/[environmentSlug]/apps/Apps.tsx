@@ -6,7 +6,7 @@ import PlusIcon from '@heroicons/react/20/solid/PlusIcon';
 import { Button } from '@inngest/components/Button';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
-import { AppCard } from './AppCard';
+import { AppCard, EmptyAppCard, SkeletonCard } from './AppCard';
 import { useApps } from './useApps';
 
 type Props = {
@@ -22,22 +22,45 @@ export function Apps({ isArchived = false }: Props) {
     throw res.error;
   }
   if (res.isLoading) {
-    return null;
+    return (
+      <div className="mt-4 flex items-center justify-center">
+        <div className="w-full max-w-[1200px]">
+          <SkeletonCard />
+        </div>
+      </div>
+    );
   }
+
+  const hasApps = res.data.length > 0;
 
   return (
     <div className="mt-4 flex items-center justify-center">
       <div className="w-full max-w-[1200px]">
+        {!hasApps && !isArchived && (
+          <EmptyAppCard>
+            <div>
+              <Button
+                className="mt-4"
+                kind="primary"
+                label="Sync App"
+                btnAction={() => router.push(`/env/${env.slug}/apps/sync-new` as Route)}
+                icon={<PlusIcon />}
+              />
+            </div>
+          </EmptyAppCard>
+        )}
         {res.data.map((app) => {
           return <AppCard app={app} className="mb-4" envSlug={env.slug} key={app.id} />;
         })}
-        <Button
-          className="mx-auto"
-          kind="primary"
-          label="Sync New App"
-          btnAction={() => router.push(`/env/${env.slug}/apps/sync-new` as Route)}
-          icon={<PlusIcon />}
-        />
+        {!isArchived && hasApps && (
+          <Button
+            className="mx-auto mt-12"
+            kind="primary"
+            label="Sync New App"
+            btnAction={() => router.push(`/env/${env.slug}/apps/sync-new` as Route)}
+            icon={<PlusIcon />}
+          />
+        )}
       </div>
     </div>
   );
