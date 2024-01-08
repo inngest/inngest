@@ -384,11 +384,21 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			// The triggering event ID should be the first ID in the batch.
 			triggeringID := req.Events[0].GetInternalID().String()
 
-			// TODO: Remove `event` data from the expression and replace with actual event
-			// data as values.
+			// Remove `event` data from the expression and replace with actual event
+			// data as values, now that we have the event.
 			//
 			// This improves performance in matching, as we can then use the values within
 			// aggregate trees.
+			interpolated, err := expressions.Interpolate(ctx, expr, map[string]any{
+				"event": mapped[0],
+			})
+			if err != nil {
+				logger.StdlibLogger(ctx).Warn(
+					"error interpolating cancellation expression",
+					"error", err,
+					"expression", expr,
+				)
+			}
 
 			pause := state.Pause{
 				WorkspaceID:       req.WorkspaceID,
@@ -396,7 +406,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				ID:                pauseID,
 				Expires:           state.Time(expires),
 				Event:             &c.Event,
-				Expression:        c.If,
+				Expression:        &interpolated,
 				ExpressionData:    data,
 				Cancel:            true,
 				TriggeringEventID: &triggeringID,
@@ -1489,11 +1499,33 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		[]byte(item.Identifier.RunID.String()+gen.ID),
 	)
 
-	// TODO: Remove `event` data from the expression and replace with actual event
-	// data as values.
-	//
-	// This improves performance in matching, as we can then use the values within
-	// aggregate trees.
+	expr := opts.If
+	if expr != nil && strings.Contains(*expr, "event.") {
+		// Remove `event` data from the expression and replace with actual event
+		// data as values, now that we have the event.
+		//
+		// This improves performance in matching, as we can then use the values within
+		// aggregate trees.
+		if state, err := e.sm.Load(ctx, item.Identifier.RunID); err != nil {
+			logger.StdlibLogger(ctx).Error(
+				"error loading state to interpolate waitForEvent",
+				"error", err,
+				"run_id", item.Identifier.RunID,
+			)
+		} else {
+			interpolated, err := expressions.Interpolate(ctx, *opts.If, map[string]any{
+				"event": state.Event(),
+			})
+			if err != nil {
+				logger.StdlibLogger(ctx).Warn(
+					"error interpolating waitForEvent expression",
+					"error", err,
+					"expression", *opts.If,
+				)
+			}
+			expr = &interpolated
+		}
+	}
 
 	opcode := gen.Op.String()
 	err = e.sm.SavePause(ctx, state.Pause{
@@ -1507,7 +1539,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		Opcode:         &opcode,
 		Expires:        state.Time(expires),
 		Event:          &opts.Event,
-		Expression:     opts.If,
+		Expression:     expr,
 		ExpressionData: data,
 		DataKey:        gen.ID,
 	})

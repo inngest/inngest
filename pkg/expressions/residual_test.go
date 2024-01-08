@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestInterpolated(t *testing.T) {
+func TestInterpolate(t *testing.T) {
 	tests := []struct {
 		exprInput    string
 		exprExpected string
@@ -81,7 +81,7 @@ func TestInterpolated(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual, err := Interpolated(context.Background(), test.exprInput, test.vars)
+		actual, err := Interpolate(context.Background(), test.exprInput, test.vars)
 		require.NoError(t, err)
 		fmt.Println(actual)
 		require.EqualValues(t, test.exprExpected, actual)

@@ -13,7 +13,10 @@ import (
 //
 // However, for fast parsing we want to interpolate these variables when saving the expressions,
 // else we can't add the values to aggregate trees.
-func Interpolated(ctx context.Context, expr string, data map[string]any) (string, error) {
+//
+// If this returns an error, it also returns the original expression.  Note that if the
+// expression doesn't contain `event.`, we won't interpolate at all.
+func Interpolate(ctx context.Context, expr string, data map[string]any) (string, error) {
 	if !strings.Contains(expr, "event.") {
 		// Don't interpolate anything in the event, as it isn't being referenced.
 		return expr, nil
@@ -27,12 +30,12 @@ func Interpolated(ctx context.Context, expr string, data map[string]any) (string
 	// "vars.a".
 	eval, err := cachedParse(ctx, expr)
 	if err != nil {
-		return "", err
+		return expr, err
 	}
 
 	ast, err := residual(ctx, eval.ast, eval.env, data)
 	if err != nil {
-		return "", err
+		return expr, err
 	}
 
 	return ast.Source().Content(), nil
