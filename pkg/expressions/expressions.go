@@ -22,9 +22,10 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
+	"github.com/inngest/expr"
 	"github.com/karlseguin/ccache/v2"
 	"github.com/pkg/errors"
-	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
+	pbexpr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 var (
@@ -35,10 +36,15 @@ var (
 
 	// On average, 20 compiled expressions fit into 1mb of ram.
 	CacheMaxSize int64 = 50_000
+
+	exprParser expr.CELParser
 )
 
 func init() {
 	cache = ccache.New(ccache.Configure().MaxSize(CacheMaxSize))
+	if e, err := env(); err == nil {
+		exprParser = expr.NewCachingParser(e, cache)
+	}
 }
 
 var (
@@ -108,6 +114,30 @@ func EvaluateBoolean(ctx context.Context, expression string, input map[string]in
 // instance can be used across many goroutines to evaluate the expression against any
 // data. The Evaluable instance is loaded from the cache, or is cached if not found.
 func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluator, error) {
+	// Use the lifting expression parser in order to compile our env,
+	// if it's not nil.
+	if exprParser != nil {
+		ast, issues, vars := exprParser.Parse(expression)
+		if issues != nil {
+			return nil, fmt.Errorf("error compiling expression: %w", issues.Err())
+		}
+		e, err := env()
+		if err != nil {
+			return nil, err
+		}
+		eval := &expressionEvaluator{
+			ast:        ast,
+			env:        e,
+			expression: expression,
+			liftedVars: vars.Map(),
+		}
+		if err := eval.parseAttributes(ctx); err != nil {
+			return nil, err
+		}
+		return eval, nil
+	}
+
+	// Use default parsing, if the exprParser isn't specified.
 	sha := sum(expression)
 	if eval := cache.Get(sha); eval != nil {
 		eval.Extend(CacheExtendTime)
@@ -175,6 +205,10 @@ type expressionEvaluator struct {
 	// expression is the raw expression
 	expression string
 
+	// liftedVars are vars lifted from the expression, if parsed with a lifting
+	// parser.
+	liftedVars map[string]any
+
 	// attrs is allows us to determine which attributes are used within an expression.
 	// This is needed to create partial activations, and is also used to optimistically
 	// load only necessary attributes.
@@ -187,6 +221,12 @@ type expressionEvaluator struct {
 func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (interface{}, *time.Time, error) {
 	if data == nil {
 		return false, nil, nil
+	}
+
+	if len(e.liftedVars) > 0 {
+		data.Add(map[string]any{
+			"vars": e.liftedVars,
+		})
 	}
 
 	act, err := data.Partial(ctx, *e.attrs)
@@ -297,30 +337,30 @@ func (e *expressionEvaluator) parseAttributes(ctx context.Context) error {
 	// Walk through the AST, looking for all instances of "select_expr" expression
 	// kinds.  These elements are specifically selecting fields from parents, which
 	// is exactly what we need to figure out the variables used within an expression.
-	stack := []*expr.Expr{e.ast.Expr()}
+	stack := []*pbexpr.Expr{e.ast.Expr()}
 	for len(stack) > 0 {
 		ast := stack[0]
 		stack = stack[1:]
 
 		// Depending on the item, add the following
 		switch ast.ExprKind.(type) {
-		case *expr.Expr_ComprehensionExpr:
+		case *pbexpr.Expr_ComprehensionExpr:
 			// eg. "event.data.tags.exists(x, x == 'Open'), so put what we're iterating over
 			// onto the stack to parse, ignoring this function call but adding the data.
 			c := ast.GetComprehensionExpr()
 			stack = append(stack, c.IterRange)
-		case *expr.Expr_CallExpr:
+		case *pbexpr.Expr_CallExpr:
 			// Everything is a function call:
 			// - > evaluates to _>_ with two arguments, etc.
 			// This means pop all args onto the stack so that we can find
 			// all select expressions.
 			stack = append(stack, ast.GetCallExpr().GetArgs()...)
 
-		case *expr.Expr_IdentExpr:
+		case *pbexpr.Expr_IdentExpr:
 			name := ast.GetIdentExpr().Name
 			attrs.add(name, nil)
 
-		case *expr.Expr_SelectExpr:
+		case *pbexpr.Expr_SelectExpr:
 			// Note that the select expression unravels from the deepest key first:
 			// given "event.data.foo.bar", the current ast node will be for "foo"
 			// and the field name will be for "bar".
