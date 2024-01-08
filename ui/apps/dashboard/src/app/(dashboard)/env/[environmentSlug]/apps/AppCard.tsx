@@ -1,14 +1,14 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import ChevronRightIcon from '@heroicons/react/20/solid/ChevronRightIcon';
+import { Skeleton } from '@inngest/components/Skeleton';
 import { classNames } from '@inngest/components/utils/classNames';
 
-import { FrameworkInfo } from '@/components/FrameworkInfo';
-import { LanguageInfo } from '@/components/LanguageInfo';
-import { PlatformInfo } from '@/components/PlatformInfo';
 import { SyncStatus } from '@/components/SyncStatus';
 import { Time } from '@/components/Time';
+import AppDiagramImage from '@/images/app-diagram.png';
 
 type Props = {
   app: App;
@@ -33,15 +33,14 @@ type Sync = {
   url: string | null;
 };
 
+const cardWrapperStyles =
+  'flex h-56 w-full min-w-[800px] max-w-[1200px] overflow-hidden rounded-lg border border-slate-300 bg-white';
+const cardLeftPanelStyles = 'bg-slate-910 flex w-[410px] flex-col justify-center gap-2 px-10';
+
 export function AppCard({ app, className, envSlug }: Props) {
   return (
-    <div
-      className={classNames(
-        'flex h-56 w-full min-w-[800px] max-w-[1200px] overflow-hidden rounded-lg border border-slate-300 bg-white',
-        className
-      )}
-    >
-      <div className="bg-slate-910 flex w-[410px] flex-col justify-center gap-2 px-10">
+    <div className={classNames(cardWrapperStyles, className)}>
+      <div className={cardLeftPanelStyles}>
         <h2>
           <Link
             className="transition-color flex cursor-pointer items-center gap-1 text-white underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-400 hover:decoration-indigo-400"
@@ -77,26 +76,11 @@ export function AppCard({ app, className, envSlug }: Props) {
                 </div>
               )
             }
-            term="App ID"
+            term="Last sync"
           />
           <Description detail={app.latestSync?.sdkVersion} term="SDK Version" />
 
           {/* Row 2 */}
-          {/* <Description
-          detail={<LanguageInfo language={app.latestSync?.sdkLanguage} />}
-          term="Language"
-        />
-        <Description
-          detail={<FrameworkInfo framework={app.latestSync?.framework} />}
-          term="Framework"
-        />
-        <Description
-          detail={<PlatformInfo platform={app.latestSync?.platform} />}
-          term="Platform"
-        /> */}
-
-          {/* Row 3 */}
-
           <Description detail={`${app.functionCount} Functions`} term="Functions" />
         </dl>
       </div>
@@ -117,6 +101,50 @@ function Description({
     <div className={className}>
       <dt className="pb-2 text-sm text-slate-400">{term}</dt>
       <dd className="text-slate-800">{detail ?? ''}</dd>
+    </div>
+  );
+}
+
+export function EmptyAppCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div className={cardWrapperStyles}>
+      <div className={classNames(cardLeftPanelStyles, 'overflow-hidden')}>
+        <Image src={AppDiagramImage} alt="App diagram" />
+      </div>
+      <div className="flex flex-1 flex-col justify-center px-8">
+        <p>
+          Apps on Inngest act as clients for serving your functions.{' '}
+          <span className="hidden lg:inline">
+            In order to have your functions invoked by Inngest, you must sync your app.
+          </span>{' '}
+          Syncing is easy!
+        </p>
+        <ol className="mt-3 hidden flex-col gap-3 md:flex">
+          <li className="flex items-center gap-2">
+            <span className="h-6 w-6 rounded-full bg-slate-400 text-center text-white">1</span>
+            <span className="flex-1">Deploy your app on your host environment of choices.</span>
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="h-6 w-6 rounded-full bg-slate-400 text-center text-white">2</span>
+            <span className="flex-1">Sync with Inngest.</span>
+          </li>
+        </ol>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export function SkeletonCard() {
+  return (
+    <div className={cardWrapperStyles}>
+      <div className={cardLeftPanelStyles} />
+      <div className="flex flex-1 flex-col justify-center px-8">
+        <Skeleton className="mb-2 block h-8 w-full" />
+        <Skeleton className="mb-2 block h-8 w-full" />
+        <Skeleton className="mb-2 block h-8 w-full" />
+        <Skeleton className="mb-2 block h-8 w-full" />
+      </div>
     </div>
   );
 }
