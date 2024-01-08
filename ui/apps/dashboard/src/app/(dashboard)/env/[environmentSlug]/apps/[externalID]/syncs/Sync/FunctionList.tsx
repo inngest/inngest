@@ -60,7 +60,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
             <p>Synced Functions ({syncedFunctions.length})</p>
             <CollapsibleCardTrigger
               asChild
-              onClick={() => setIsSyncedFunctionsCardOpen((prev) => !prev)}
+              onClick={() => setIsSyncedFunctionsCardOpen(!isSyncedFunctionsCardOpen)}
             >
               <Button
                 className="group"
@@ -109,7 +109,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
             <p>Removed Functions ({removedFunctions.length})</p>
             <CollapsibleCardTrigger
               asChild
-              onClick={() => setIsRemovedFunctionsCardOpen((prev) => !prev)}
+              onClick={() => setIsRemovedFunctionsCardOpen(!isRemovedFunctionsCardOpen)}
             >
               <Button
                 className="group"
