@@ -12,6 +12,7 @@ import (
 	"github.com/google/cel-go/cel"
 	celast "github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/operators"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // TreeParser parses an expression into a tree, with a root node and branches for
@@ -337,6 +338,8 @@ func (p Predicate) TreeType() TreeType {
 		return TreeTypeART
 	case int64, float64:
 		return TreeTypeBTree
+	case nil:
+		return TreeTypeNullMatch
 	default:
 		return TreeTypeNone
 	}
@@ -573,6 +576,12 @@ func callToPredicate(item celast.Expr, negated bool, vars LiftedArgs) *Predicate
 		}
 	}
 
+	// If the literal is of type `structpb.NullValue`, replace this with a simple `nil`
+	// to make nil checks easy.
+	if _, ok := literal.(structpb.NullValue); ok {
+		literal = nil
+	}
+
 	if identA != "" && identB != "" {
 		// We're matching two variables together.  Check to see whether any
 		// of these idents have variable data being passed in above.
@@ -628,9 +637,9 @@ func callToPredicate(item celast.Expr, negated bool, vars LiftedArgs) *Predicate
 		}
 	}
 
-	if identA == "" || literal == nil {
-		return nil
-	}
+	// if identA == "" || literal == nil {
+	// 	return nil
+	// }
 
 	// We always assume that the ident is on the LHS.  In the case of comparisons,
 	// we need to switch these and the operator if the literal is on the RHS.  This lets

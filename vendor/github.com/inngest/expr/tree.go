@@ -11,6 +11,7 @@ const (
 
 	TreeTypeART
 	TreeTypeBTree
+	TreeTypeNullMatch
 )
 
 // PredicateTree represents a tree which matches a predicate over
@@ -21,7 +22,7 @@ const (
 type PredicateTree interface {
 	Add(ctx context.Context, p ExpressionPart) error
 	Remove(ctx context.Context, p ExpressionPart) error
-	Search(ctx context.Context, input any) (*Leaf, bool)
+	Search(ctx context.Context, variable string, input any) []ExpressionPart
 }
 
 // Leaf represents the leaf within a tree.  This stores all expressions

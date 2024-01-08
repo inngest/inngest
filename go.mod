@@ -28,7 +28,7 @@ require (
 	github.com/gowebpki/jcs v1.0.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/terraform v0.15.3
-	github.com/inngest/expr v0.0.0-20240106183120-ded13d972517
+	github.com/inngest/expr v0.0.0-20240108142918-63ecd3f49bb5
 	github.com/inngest/inngestgo v0.5.4
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5
@@ -64,7 +64,7 @@ require (
 	gocloud.dev/pubsub/natspubsub v0.25.0
 	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df
 	golang.org/x/mod v0.12.0
-	golang.org/x/sync v0.4.0
+	golang.org/x/sync v0.6.0
 	golang.org/x/term v0.15.0
 	gonum.org/v1/gonum v0.12.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20231127180814-3a041ad873d4
