@@ -2,9 +2,9 @@ import { forwardRef } from 'react';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import { AnimatePresence, motion } from 'framer-motion';
 
-export const Root = AccordionPrimitive.Root;
+export const CollapsibleCardRoot = AccordionPrimitive.Root;
 
-export const Item = forwardRef<
+const CollapsibleCardItem = forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Item>
 >(({ children, ...props }, forwardedRef) => {
@@ -19,11 +19,11 @@ export const Item = forwardRef<
   );
 });
 
-export const Header = AccordionPrimitive.Header;
-export const Trigger = AccordionPrimitive.Trigger;
-export const ContentWrapper = AnimatePresence;
+export const CollapsibleCardHeader = AccordionPrimitive.Header;
+export const CollapsibleCardTrigger = AccordionPrimitive.Trigger;
+export const CollapsibleCardContentWrapper = AnimatePresence;
 
-export const Content = forwardRef<
+const CollapsibleCardContent = forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Content>
 >(({ children, ...props }, forwardedRef) => {
@@ -47,3 +47,8 @@ export const Content = forwardRef<
     </AccordionPrimitive.Content>
   );
 });
+
+CollapsibleCardItem.displayName = AccordionPrimitive.Item.displayName;
+CollapsibleCardContent.displayName = AccordionPrimitive.Content.displayName;
+
+export { CollapsibleCardItem, CollapsibleCardContent };

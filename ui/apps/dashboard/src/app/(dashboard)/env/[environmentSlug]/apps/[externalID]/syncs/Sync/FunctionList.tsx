@@ -8,7 +8,14 @@ import { classNames } from '@inngest/components/utils/classNames';
 import { useLocalStorage } from 'react-use';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
-import * as CollapsibleCard from '@/components/CollapsibleCard';
+import {
+  CollapsibleCardContent,
+  CollapsibleCardContentWrapper,
+  CollapsibleCardHeader,
+  CollapsibleCardItem,
+  CollapsibleCardRoot,
+  CollapsibleCardTrigger,
+} from '@/components/CollapsibleCard';
 
 type Fn = Pick<Function, 'id' | 'name' | 'slug'>;
 
@@ -43,15 +50,15 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
 
   return (
     <>
-      <CollapsibleCard.Root
+      <CollapsibleCardRoot
         type="single"
         defaultValue={openSyncedFunctions ? 'syncedFunctions' : undefined}
         collapsible
       >
-        <CollapsibleCard.Item value="syncedFunctions">
-          <CollapsibleCard.Header className="flex items-center justify-between border-slate-300 px-6 py-3 text-sm font-medium text-slate-600 data-[state=open]:border-b">
+        <CollapsibleCardItem value="syncedFunctions">
+          <CollapsibleCardHeader className="flex items-center justify-between border-slate-300 px-6 py-3 text-sm font-medium text-slate-600 data-[state=open]:border-b">
             <h2>Synced Functions ({syncedFunctions.length})</h2>
-            <CollapsibleCard.Trigger
+            <CollapsibleCardTrigger
               asChild
               onClick={() => setSyncedFunctions(!openSyncedFunctions)}
             >
@@ -62,11 +69,11 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                   <ChevronDownIcon className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
                 }
               />
-            </CollapsibleCard.Trigger>
-          </CollapsibleCard.Header>
-          <CollapsibleCard.ContentWrapper>
+            </CollapsibleCardTrigger>
+          </CollapsibleCardHeader>
+          <CollapsibleCardContentWrapper>
             {openSyncedFunctions && (
-              <CollapsibleCard.Content>
+              <CollapsibleCardContent>
                 {syncedFunctions.map((fn, i) => {
                   const isLast = i === syncedFunctions.length - 1;
 
@@ -91,20 +98,20 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                 {syncedFunctions.length === 0 && (
                   <div className="p-2 text-center text-sm text-slate-600">No synced functions</div>
                 )}
-              </CollapsibleCard.Content>
+              </CollapsibleCardContent>
             )}
-          </CollapsibleCard.ContentWrapper>
-        </CollapsibleCard.Item>
-      </CollapsibleCard.Root>
-      <CollapsibleCard.Root
+          </CollapsibleCardContentWrapper>
+        </CollapsibleCardItem>
+      </CollapsibleCardRoot>
+      <CollapsibleCardRoot
         type="single"
         defaultValue={openRemovedFunctions ? 'RemovedFunctions' : undefined}
         collapsible
       >
-        <CollapsibleCard.Item value="RemovedFunctions">
-          <CollapsibleCard.Header className="flex items-center justify-between border-slate-300 px-6 py-3 text-sm font-medium text-slate-600 data-[state=open]:border-b">
+        <CollapsibleCardItem value="RemovedFunctions">
+          <CollapsibleCardHeader className="flex items-center justify-between border-slate-300 px-6 py-3 text-sm font-medium text-slate-600 data-[state=open]:border-b">
             <h2>Removed Functions ({removedFunctions.length})</h2>
-            <CollapsibleCard.Trigger
+            <CollapsibleCardTrigger
               asChild
               onClick={() => setOpenRemovedFunctions(!openRemovedFunctions)}
             >
@@ -115,10 +122,10 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                   <ChevronDownIcon className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
                 }
               />
-            </CollapsibleCard.Trigger>
-          </CollapsibleCard.Header>
+            </CollapsibleCardTrigger>
+          </CollapsibleCardHeader>
           {openRemovedFunctions && (
-            <CollapsibleCard.Content>
+            <CollapsibleCardContent>
               {removedFunctions.map((fn, i) => {
                 const isLast = i === removedFunctions.length - 1;
 
@@ -143,10 +150,10 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
               {removedFunctions.length === 0 && (
                 <div className="p-2 text-center text-sm text-slate-600">No synced functions</div>
               )}
-            </CollapsibleCard.Content>
+            </CollapsibleCardContent>
           )}
-        </CollapsibleCard.Item>
-      </CollapsibleCard.Root>
+        </CollapsibleCardItem>
+      </CollapsibleCardRoot>
     </>
   );
 }

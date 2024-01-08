@@ -1,1 +1,8 @@
-export { Root, Item, Header, Trigger, ContentWrapper, Content } from './CollapsibleCard';
+export {
+  CollapsibleCardRoot,
+  CollapsibleCardItem,
+  CollapsibleCardHeader,
+  CollapsibleCardTrigger,
+  CollapsibleCardContentWrapper,
+  CollapsibleCardContent,
+} from './CollapsibleCard';
