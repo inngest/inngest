@@ -29,7 +29,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/terraform v0.15.3
 	github.com/inngest/expr v0.0.0-20240108142918-63ecd3f49bb5
-	github.com/inngest/inngestgo v0.5.4
+	github.com/inngest/inngestgo v0.5.5-0.20240108200533-4b598cb93ff5
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5
 	github.com/karlseguin/ccache/v2 v2.0.8

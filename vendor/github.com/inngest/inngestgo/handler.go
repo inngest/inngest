@@ -291,6 +291,10 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 				Key:    &c.Debounce.Key,
 				Period: c.Debounce.Period.String(),
 			}
+			if c.Debounce.Timeout != nil {
+				str := c.Debounce.Timeout.String()
+				f.Debounce.Timeout = &str
+			}
 		}
 
 		if c.BatchEvents != nil {
