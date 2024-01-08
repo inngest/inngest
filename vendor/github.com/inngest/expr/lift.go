@@ -36,6 +36,13 @@ type LiftedArgs interface {
 // liftLiterals lifts quoted literals into variables, allowing us to normalize
 // expressions to increase cache hit rates.
 func liftLiterals(expr string) (string, LiftedArgs) {
+	if strings.Contains(expr, VarPrefix+".") {
+		// Do not lift an expression twice, else we run the risk of using
+		// eg. `vars.a` to reference two separate strings, breaking the
+		// expression.
+		return expr, nil
+	}
+
 	// TODO: Lift numeric literals out of expressions.
 	lp := liftParser{expr: expr}
 	return lp.lift()

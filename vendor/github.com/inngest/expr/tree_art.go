@@ -26,27 +26,34 @@ type artTree struct {
 	art.Tree
 }
 
-func (a *artTree) Search(ctx context.Context, input any) (*Leaf, bool) {
-	var key art.Key
-
-	switch val := input.(type) {
-	case art.Key:
-		key = val
-	case []byte:
-		key = val
-	case string:
-		key = artKeyFromString(val)
+func (a *artTree) Add(ctx context.Context, p ExpressionPart) error {
+	str, ok := p.Predicate.Literal.(string)
+	if !ok {
+		return ErrInvalidType
 	}
 
-	if len(key) == 0 {
-		return nil, false
-	}
+	key := artKeyFromString(str)
+
+	// Don't allow multiple gorutines to modify the tree simultaneously.
+	a.lock.Lock()
+	defer a.lock.Unlock()
 
 	val, ok := a.Tree.Search(key)
 	if !ok {
-		return nil, false
+		// Insert the ExpressionPart as-is.
+		a.Insert(key, art.Value(&Leaf{
+			Evals: []ExpressionPart{p},
+		}))
+		return nil
 	}
-	return val.(*Leaf), true
+
+	// Add the expressionpart as an expression matched by the already-existing
+	// value.  Many expressions may match on the same string, eg. a user may set
+	// up 3 matches for order ID "abc".  All 3 matches must be evaluated.
+	next := val.(*Leaf)
+	next.Evals = append(next.Evals, p)
+	a.Insert(key, next)
+	return nil
 }
 
 func (a *artTree) Remove(ctx context.Context, p ExpressionPart) error {
@@ -79,34 +86,35 @@ func (a *artTree) Remove(ctx context.Context, p ExpressionPart) error {
 	return ErrExpressionPartNotFound
 }
 
-func (a *artTree) Add(ctx context.Context, p ExpressionPart) error {
-	str, ok := p.Predicate.Literal.(string)
-	if !ok {
-		return ErrInvalidType
+func (a *artTree) Search(ctx context.Context, variable string, input any) []ExpressionPart {
+	leaf, ok := a.searchLeaf(ctx, input)
+	if !ok || leaf == nil {
+		return nil
+	}
+	return leaf.Evals
+}
+
+func (a *artTree) searchLeaf(ctx context.Context, input any) (*Leaf, bool) {
+	var key art.Key
+
+	switch val := input.(type) {
+	case art.Key:
+		key = val
+	case []byte:
+		key = val
+	case string:
+		key = artKeyFromString(val)
 	}
 
-	key := artKeyFromString(str)
-
-	// Don't allow multiple gorutines to modify the tree simultaneously.
-	a.lock.Lock()
-	defer a.lock.Unlock()
+	if len(key) == 0 {
+		return nil, false
+	}
 
 	val, ok := a.Tree.Search(key)
 	if !ok {
-		// Insert the ExpressionPart as-is.
-		a.Insert(key, art.Value(&Leaf{
-			Evals: []ExpressionPart{p},
-		}))
-		return nil
+		return nil, false
 	}
-
-	// Add the expressionpart as an expression matched by the already-existing
-	// value.  Many expressions may match on the same string, eg. a user may set
-	// up 3 matches for order ID "abc".  All 3 matches must be evaluated.
-	next := val.(*Leaf)
-	next.Evals = append(next.Evals, p)
-	a.Insert(key, next)
-	return nil
+	return val.(*Leaf), true
 }
 
 func artKeyFromString(str string) art.Key {

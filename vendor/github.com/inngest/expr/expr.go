@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/cel-go/common/operators"
 	"github.com/ohler55/ojg/jp"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -66,29 +67,38 @@ func NewAggregateEvaluator(
 	eval ExpressionEvaluator,
 ) AggregateEvaluator {
 	return &aggregator{
-		eval:      eval,
-		parser:    parser,
-		artIdents: map[string]PredicateTree{},
-		lock:      &sync.RWMutex{},
+		eval:        eval,
+		parser:      parser,
+		artIdents:   map[string]PredicateTree{},
+		nullLookups: map[string]PredicateTree{},
+		lock:        &sync.RWMutex{},
 	}
 }
 
+// Evaluable represents an evaluable expression with a unique identifier.
 type Evaluable interface {
-	// Identifier returns a unique identifier for the evaluable item.  If there are
+	// GetID returns a unique identifier for the evaluable item.  If there are
 	// two instances of the same expression, the identifier should return a unique
 	// string for each instance of the expression (eg. for two pauses).
-	Identifier() string
+	//
+	// It has the Get prefix to reduce collisions with implementations who expose an
+	// ID member.
+	GetID() string
 
-	// Expression returns an expression as a raw string.
-	Expression() string
+	// GetExpression returns an expression as a raw string.
+	//
+	// It has the Get prefix to reduce collisions with implementations who expose an
+	// Expression member.
+	GetExpression() string
 }
 
 type aggregator struct {
 	eval   ExpressionEvaluator
 	parser TreeParser
 
-	artIdents map[string]PredicateTree
-	lock      *sync.RWMutex
+	artIdents   map[string]PredicateTree
+	nullLookups map[string]PredicateTree
+	lock        *sync.RWMutex
 
 	len int32
 
@@ -124,6 +134,12 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 	// TODO: Concurrently match constant expressions using a semaphore for capacity.
 	for _, expr := range a.constants {
 		atomic.AddInt32(&matched, 1)
+
+		if expr.Evaluable.GetExpression() == "" {
+			result = append(result, expr.Evaluable)
+			continue
+		}
+
 		// NOTE: We don't need to add lifted expression variables,
 		// because match.Parsed.Evaluable() returns the original expression
 		// string.
@@ -142,7 +158,7 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 		err = errors.Join(err, merr)
 	}
 
-	// TODO: Each match here is a potential success.  When other trees and operators which are walkable
+	// Each match here is a potential success.  When other trees and operators which are walkable
 	// are added (eg. >= operators on strings), ensure that we find the correct number of matches
 	// for each group ID and then skip evaluating expressions if the number of matches is <= the group
 	// ID's length.
@@ -173,17 +189,41 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 	return result, matched, nil
 }
 
+// AggregateMatch attempts to match incoming data to all PredicateTrees, resulting in a selection
+// of parts of an expression that have matched.
 func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([]ExpressionPart, error) {
 	result := []ExpressionPart{}
 
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	// Store the number of times each GroupID has found a match.  We need at least
-	// as many matches as stored in the group ID to consider the match.
+	// Each match here is a potential success.  Ensure that we find the correct number of matches
+	// for each group ID and then skip evaluating expressions if the number of matches is <= the group
+	// ID's length.  For example, (A && B && C) is a single group ID and must have a count >= 3,
+	// else we know a required comparason did not match.
+	//
+	// Note that having a count >= the group ID value does not guarantee that the expression is valid.
 	counts := map[groupID]int{}
 	// Store all expression parts per group ID for returning.
 	found := map[groupID][]ExpressionPart{}
+	// protect the above locks with a map.
+	lock := &sync.Mutex{}
+	// run lookups concurrently.
+	eg := errgroup.Group{}
+
+	add := func(all []ExpressionPart) {
+		// This is called concurrently, so don't mess with maps in goroutines
+		lock.Lock()
+		defer lock.Unlock()
+
+		for _, eval := range all {
+			counts[eval.GroupID] += 1
+			if _, ok := found[eval.GroupID]; !ok {
+				found[eval.GroupID] = []ExpressionPart{}
+			}
+			found[eval.GroupID] = append(found[eval.GroupID], eval)
+		}
+	}
 
 	// Iterate through all known variables/idents in the aggregate tree to see if
 	// the data has those keys set.  If so, we can immediately evaluate the data with
@@ -191,33 +231,54 @@ func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([
 	//
 	// TODO: we should iterate through the expression in a top-down order, ensuring that if
 	// any of the top groups fail to match we quit early.
-	for k, tree := range a.artIdents {
-		x, err := jp.ParseString(k)
-		if err != nil {
-			return nil, err
-		}
-		res := x.Get(data)
-		if len(res) != 1 {
-			continue
-		}
+	for n, item := range a.artIdents {
+		tree := item
+		path := n
+		eg.Go(func() error {
+			x, err := jp.ParseString(path)
+			if err != nil {
+				return err
+			}
+			res := x.Get(data)
+			if len(res) != 1 {
+				return nil
+			}
 
-		switch cast := res[0].(type) {
-		case string:
-			all, ok := tree.Search(ctx, cast)
+			cast, ok := res[0].(string)
 			if !ok {
-				continue
+				// This isn't a string, so we can't compare within the radix tree.
+				return nil
 			}
 
-			for _, eval := range all.Evals {
-				counts[eval.GroupID] += 1
-				if _, ok := found[eval.GroupID]; !ok {
-					found[eval.GroupID] = []ExpressionPart{}
-				}
-				found[eval.GroupID] = append(found[eval.GroupID], eval)
+			add(tree.Search(ctx, path, cast))
+			return nil
+		})
+	}
+
+	// Match on nulls.
+	for n, item := range a.nullLookups {
+		tree := item
+		path := n
+		eg.Go(func() error {
+			x, err := jp.ParseString(path)
+			if err != nil {
+				return err
 			}
-		default:
-			continue
-		}
+
+			res := x.Get(data)
+			if len(res) == 0 {
+				// This isn't present, which matches null in our overloads.  Set the
+				// value to nil.
+				res = []any{nil}
+			}
+			// This matches null, nil (as null), and any non-null items.
+			add(tree.Search(ctx, path, res[0]))
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
 	}
 
 	for k, count := range counts {
@@ -240,6 +301,14 @@ func (a *aggregator) Add(ctx context.Context, eval Evaluable) (bool, error) {
 	parsed, err := a.parser.Parse(ctx, eval)
 	if err != nil {
 		return false, err
+	}
+
+	if eval.GetExpression() == "" {
+		// This is an empty expression which always matches.
+		a.lock.Lock()
+		a.constants = append(a.constants, parsed)
+		a.lock.Unlock()
+		return false, nil
 	}
 
 	aggregateable := true
@@ -266,6 +335,10 @@ func (a *aggregator) Add(ctx context.Context, eval Evaluable) (bool, error) {
 }
 
 func (a *aggregator) Remove(ctx context.Context, eval Evaluable) error {
+	if eval.GetExpression() == "" {
+		return a.removeConstantEvaluable(ctx, eval)
+	}
+
 	// parse the expression using our tree parser.
 	parsed, err := a.parser.Parse(ctx, eval)
 	if err != nil {
@@ -282,22 +355,9 @@ func (a *aggregator) Remove(ctx context.Context, eval Evaluable) error {
 			return err
 		}
 		if !ok && aggregateable {
-			// Find the index of the evaluable in constants and yank out.
-			idx := -1
-			for n, item := range a.constants {
-				if item.Evaluable.Identifier() == eval.Identifier() {
-					idx = n
-					break
-				}
+			if err := a.removeConstantEvaluable(ctx, eval); err != nil {
+				return err
 			}
-
-			if idx == -1 {
-				return ErrEvaluableNotFound
-			}
-
-			a.lock.Lock()
-			a.constants = append(a.constants[:idx], a.constants[idx+1:]...)
-			a.lock.Unlock()
 			aggregateable = false
 		}
 	}
@@ -306,6 +366,25 @@ func (a *aggregator) Remove(ctx context.Context, eval Evaluable) error {
 		atomic.AddInt32(&a.len, -1)
 	}
 
+	return nil
+}
+
+func (a *aggregator) removeConstantEvaluable(ctx context.Context, eval Evaluable) error {
+	// Find the index of the evaluable in constants and yank out.
+	idx := -1
+	for n, item := range a.constants {
+		if item.Evaluable.GetID() == eval.GetID() {
+			idx = n
+			break
+		}
+	}
+	if idx == -1 {
+		return ErrEvaluableNotFound
+	}
+
+	a.lock.Lock()
+	a.constants = append(a.constants[:idx], a.constants[idx+1:]...)
+	a.lock.Unlock()
 	return nil
 }
 
@@ -362,6 +441,25 @@ func (a *aggregator) iterGroup(ctx context.Context, node *Node, parsed *ParsedEx
 	return true, nil
 }
 
+func treeType(p Predicate) TreeType {
+	// switch on type of literal AND operator type.  int64/float64 literals require
+	// btrees, texts require ARTs.
+	switch p.Literal.(type) {
+	case string:
+		return TreeTypeART
+	case int64, float64:
+		return TreeTypeBTree
+	case nil:
+		// Only allow this if we're not comparing two idents.
+		if p.LiteralIdent != nil {
+			return TreeTypeNone
+		}
+		return TreeTypeNullMatch
+	default:
+		return TreeTypeNone
+	}
+}
+
 // nodeOp represents an op eg. addNode or removeNode
 type nodeOp func(ctx context.Context, n *Node, parsed *ParsedExpression) error
 
@@ -372,7 +470,7 @@ func (a *aggregator) addNode(ctx context.Context, n *Node, parsed *ParsedExpress
 	defer a.lock.Unlock()
 
 	// Each node is aggregateable, so add this to the map for fast filtering.
-	switch n.Predicate.TreeType() {
+	switch treeType(*n.Predicate) {
 	case TreeTypeART:
 		tree, ok := a.artIdents[n.Predicate.Ident]
 		if !ok {
@@ -388,6 +486,21 @@ func (a *aggregator) addNode(ctx context.Context, n *Node, parsed *ParsedExpress
 		}
 		a.artIdents[n.Predicate.Ident] = tree
 		return nil
+	case TreeTypeNullMatch:
+		tree, ok := a.nullLookups[n.Predicate.Ident]
+		if !ok {
+			tree = newNullMatcher()
+		}
+		err := tree.Add(ctx, ExpressionPart{
+			GroupID:   n.GroupID,
+			Predicate: *n.Predicate,
+			Parsed:    parsed,
+		})
+		if err != nil {
+			return err
+		}
+		a.nullLookups[n.Predicate.Ident] = tree
+		return nil
 	}
 	return errTreeUnimplemented
 }
@@ -399,11 +512,11 @@ func (a *aggregator) removeNode(ctx context.Context, n *Node, parsed *ParsedExpr
 	defer a.lock.Unlock()
 
 	// Each node is aggregateable, so add this to the map for fast filtering.
-	switch n.Predicate.TreeType() {
+	switch treeType(*n.Predicate) {
 	case TreeTypeART:
 		tree, ok := a.artIdents[n.Predicate.Ident]
 		if !ok {
-			tree = newArtTree()
+			return ErrExpressionPartNotFound
 		}
 		err := tree.Remove(ctx, ExpressionPart{
 			GroupID:   n.GroupID,
@@ -414,6 +527,21 @@ func (a *aggregator) removeNode(ctx context.Context, n *Node, parsed *ParsedExpr
 			return err
 		}
 		a.artIdents[n.Predicate.Ident] = tree
+		return nil
+	case TreeTypeNullMatch:
+		tree, ok := a.nullLookups[n.Predicate.Ident]
+		if !ok {
+			return ErrExpressionPartNotFound
+		}
+		err := tree.Remove(ctx, ExpressionPart{
+			GroupID:   n.GroupID,
+			Predicate: *n.Predicate,
+			Parsed:    parsed,
+		})
+		if err != nil {
+			return err
+		}
+		a.nullLookups[n.Predicate.Ident] = tree
 		return nil
 	}
 	return errTreeUnimplemented
@@ -448,6 +576,10 @@ func isAggregateable(n *Node) bool {
 	case int64, float64:
 		// TODO: Add binary tree matching for ints/floats
 		return false
+	case nil:
+		// This is null, which is supported and a simple lookup to check
+		// if the event's key in question is present and is not nil.
+		return true
 	default:
 		return false
 	}
