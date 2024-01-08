@@ -1,0 +1,49 @@
+import { forwardRef } from 'react';
+import * as AccordionPrimitive from '@radix-ui/react-accordion';
+import { AnimatePresence, motion } from 'framer-motion';
+
+export const Root = AccordionPrimitive.Root;
+
+export const Item = forwardRef<
+  React.ElementRef<typeof AccordionPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Item>
+>(({ children, ...props }, forwardedRef) => {
+  return (
+    <AccordionPrimitive.Item
+      {...props}
+      ref={forwardedRef}
+      className="mb-4 rounded-lg border border-slate-300 bg-white"
+    >
+      {children}
+    </AccordionPrimitive.Item>
+  );
+});
+
+export const Header = AccordionPrimitive.Header;
+export const Trigger = AccordionPrimitive.Trigger;
+export const ContentWrapper = AnimatePresence;
+
+export const Content = forwardRef<
+  React.ElementRef<typeof AccordionPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Content>
+>(({ children, ...props }, forwardedRef) => {
+  return (
+    <AccordionPrimitive.Content {...props} ref={forwardedRef} forceMount>
+      <motion.div
+        initial={{ y: -20, opacity: 0.2 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{
+          y: -20,
+          opacity: 0.2,
+          transition: { duration: 0.2, type: 'tween' },
+        }}
+        transition={{
+          duration: 0.15,
+          type: 'tween',
+        }}
+      >
+        {children}
+      </motion.div>
+    </AccordionPrimitive.Content>
+  );
+});
