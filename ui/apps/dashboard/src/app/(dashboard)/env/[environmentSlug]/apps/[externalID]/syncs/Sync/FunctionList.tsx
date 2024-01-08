@@ -27,11 +27,11 @@ type Props = {
 
 export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
   const env = useEnvironment();
-  const [openSyncedFunctions, setSyncedFunctions] = useLocalStorage(
+  const [isSyncedFunctionsCardOpen, setIsSyncedFunctionsCardOpen] = useLocalStorage(
     'AppSyncedFunctionsOpened',
     true
   );
-  const [openRemovedFunctions, setOpenRemovedFunctions] = useLocalStorage(
+  const [isRemovedFunctionsCardOpen, setIsRemovedFunctionsCardOpen] = useLocalStorage(
     'AppRemovedFunctionsOpened',
     true
   );
@@ -52,7 +52,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
     <>
       <CollapsibleCardRoot
         type="single"
-        defaultValue={openSyncedFunctions ? 'syncedFunctions' : undefined}
+        defaultValue={isSyncedFunctionsCardOpen ? 'syncedFunctions' : undefined}
         collapsible
       >
         <CollapsibleCardItem value="syncedFunctions">
@@ -60,7 +60,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
             <h2>Synced Functions ({syncedFunctions.length})</h2>
             <CollapsibleCardTrigger
               asChild
-              onClick={() => setSyncedFunctions(!openSyncedFunctions)}
+              onClick={() => setIsSyncedFunctionsCardOpen((prev) => !prev)}
             >
               <Button
                 className="group"
@@ -72,7 +72,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
             </CollapsibleCardTrigger>
           </CollapsibleCardHeader>
           <CollapsibleCardContentWrapper>
-            {openSyncedFunctions && (
+            {isSyncedFunctionsCardOpen && (
               <CollapsibleCardContent>
                 {syncedFunctions.map((fn, i) => {
                   const isLast = i === syncedFunctions.length - 1;
@@ -94,10 +94,6 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                     </Link>
                   );
                 })}
-
-                {syncedFunctions.length === 0 && (
-                  <div className="p-2 text-center text-sm text-slate-600">No synced functions</div>
-                )}
               </CollapsibleCardContent>
             )}
           </CollapsibleCardContentWrapper>
@@ -105,7 +101,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
       </CollapsibleCardRoot>
       <CollapsibleCardRoot
         type="single"
-        defaultValue={openRemovedFunctions ? 'RemovedFunctions' : undefined}
+        defaultValue={isRemovedFunctionsCardOpen ? 'RemovedFunctions' : undefined}
         collapsible
       >
         <CollapsibleCardItem value="RemovedFunctions">
@@ -113,7 +109,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
             <h2>Removed Functions ({removedFunctions.length})</h2>
             <CollapsibleCardTrigger
               asChild
-              onClick={() => setOpenRemovedFunctions(!openRemovedFunctions)}
+              onClick={() => setIsRemovedFunctionsCardOpen((prev) => !prev)}
             >
               <Button
                 className="group"
@@ -124,7 +120,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
               />
             </CollapsibleCardTrigger>
           </CollapsibleCardHeader>
-          {openRemovedFunctions && (
+          {isRemovedFunctionsCardOpen && (
             <CollapsibleCardContent>
               {removedFunctions.map((fn, i) => {
                 const isLast = i === removedFunctions.length - 1;

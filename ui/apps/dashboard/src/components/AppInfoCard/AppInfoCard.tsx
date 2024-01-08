@@ -37,7 +37,7 @@ export function AppInfoCard({ app, className, sync }: Props) {
   if (sync) {
     lastSyncValue = (
       <div className="flex gap-2">
-        <SyncStatus status={sync?.status} />
+        <SyncStatus status={sync.status} />
         <Link
           className="transition-color flex cursor-pointer items-center gap-1 text-indigo-400 underline decoration-transparent decoration-2 underline-offset-4 duration-300  hover:decoration-indigo-400"
           href={`/env/${env.slug}/apps/${encodeURIComponent(app.externalID)}/syncs`}
