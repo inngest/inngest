@@ -34,13 +34,19 @@ var (
 	CacheMaxSize int64 = 50_000
 
 	exprParser expr.CELParser
+	treeParser expr.TreeParser
 )
 
 func init() {
 	cache = ccache.New(ccache.Configure().MaxSize(CacheMaxSize))
 	if e, err := env(); err == nil {
 		exprParser = expr.NewCachingParser(e, cache)
+		treeParser = expr.NewTreeParser(exprParser)
 	}
+}
+
+func ParserSingleton() expr.TreeParser {
+	return treeParser
 }
 
 var (
