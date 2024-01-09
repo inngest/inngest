@@ -1002,9 +1002,11 @@ func TestEvaluateExpression(t *testing.T) {
 		test := item
 		t.Run(test.expr, func(t *testing.T) {
 			for i := 0; i <= 100; i++ {
-				// Test thread safety of evaluate and Validate()
 				go func() {
-					Evaluate(context.Background(), test.expr, test.data)
+					// Test thread safety of evaluate and Validate().  We don't care about the results,
+					// as these are checked below.
+					_, _, _ = Evaluate(context.Background(), test.expr, test.data)
+					_ = Validate(context.Background(), test.expr)
 				}()
 			}
 
