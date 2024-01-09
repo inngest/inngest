@@ -21,7 +21,7 @@ type Sync = {
 
 export function SyncList({ className, onClick, selectedSyncID, syncs }: Props) {
   return (
-    <div className={classNames('h-full border-r border-slate-300 bg-white', className)}>
+    <div className={classNames('min-h-full border-r border-slate-300 bg-white', className)}>
       <div className="table border-collapse">
         {syncs.map((sync) => {
           let bgColor = 'bg-white';
