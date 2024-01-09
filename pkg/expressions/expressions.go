@@ -129,11 +129,15 @@ func EvaluateBoolean(ctx context.Context, expression string, input map[string]in
 // NewExpressionEvaluator returns a new BooleanEvaluator instance for a given expression. The
 // instance can be used across many goroutines to evaluate the expression against any
 // data. The Evaluable instance is loaded from the cache, or is cached if not found.
+//
+// NOTE: This does NOT validate that the expression uses known variables.  Validation is SLOW,
+// NOT THREAD SAFE:  It is expected that you call Validate() separaetly.  We do NOT bundle it
+// here because evaluating expressions needs to be fast in the hot path.
 func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluator, error) {
 	// Use the lifting expression parser in order to compile our env,
 	// if it's not nil.
 	if exprCompiler != nil {
-		ast, issues, vars := exprCompiler.Compile(expression)
+		ast, issues, vars := exprCompiler.Parse(expression)
 		if issues != nil {
 			return nil, fmt.Errorf("error compiling expression: %w", issues.Err())
 		}
@@ -169,7 +173,7 @@ func cachedCompile(ctx context.Context, expression string) (*expressionEvaluator
 	if err != nil {
 		return nil, err
 	}
-	ast, issues := e.Compile(expression)
+	ast, issues := e.Parse(expression)
 	if issues != nil {
 		return nil, fmt.Errorf("error compiling expression: %w", issues.Err())
 	}
@@ -229,6 +233,20 @@ type expressionEvaluator struct {
 	attrs *UsedAttributes
 }
 
+// Validate calls parse and check on an ASTs using NON CACHING parsing.  This MUST be non-caching
+// as calling Check on an AST is not thread safe.
+func Validate(ctx context.Context, expression string) error {
+	// Compile the expression as new.
+	env, err := env()
+	if err != nil {
+		return err
+	}
+	if _, issues := env.Compile(expression); issues != nil {
+		return fmt.Errorf("error validating expression: %w", issues.Err())
+	}
+	return nil
+}
+
 // Evaluate compiles an expression string against a set of variables, returning whether the
 // expression evaluates to true, the next earliest time to re-test the evaluation (if dates are
 // compared), and any errors.
@@ -244,9 +262,11 @@ func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (interfa
 	}
 
 	program, act, err := program(ctx, e.ast, e.env, data, true, e.attrs)
+
 	if err != nil {
 		return nil, nil, err
 	}
+
 	return eval(program, act)
 }
 
@@ -303,7 +323,9 @@ func (e *expressionEvaluator) parseAttributes(ctx context.Context) error {
 	if e.attrs != nil {
 		return nil
 	}
+
 	attrs, err := parseUsedAttributes(ctx, e.ast)
+
 	if err != nil {
 		return err
 	}

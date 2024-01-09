@@ -1479,6 +1479,10 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	// in the expression.
 	data := map[string]any{}
 	if opts.If != nil {
+		if err := expressions.Validate(ctx, *opts.If); err != nil {
+			return execError{err, true}
+		}
+
 		expr, err := e.newExpressionEvaluator(ctx, *opts.If)
 		if err != nil {
 			return execError{err, true}
