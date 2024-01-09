@@ -42,7 +42,7 @@ export function AppInfoCard({ app, className, sync }: Props) {
           className="transition-color flex cursor-pointer items-center gap-1 text-indigo-400 underline decoration-transparent decoration-2 underline-offset-4 duration-300  hover:decoration-indigo-400"
           href={`/env/${env.slug}/apps/${encodeURIComponent(app.externalID)}/syncs`}
         >
-          <Time value={sync?.createdAt} />
+          <Time value={sync.createdAt} />
           <ChevronRightIcon className="h-4 w-4" />
         </Link>
       </div>
