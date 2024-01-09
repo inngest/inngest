@@ -61,12 +61,11 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const resultRef = useRef<HTMLLIElement>(null);
   const router = useRouter();
   const { user } = useUser();
-
-  const [searchResult, setSearchResult] = useState({
+  let searchResult = {
     type: '',
     href: '',
     name: '',
-  });
+  };
 
   useEffect(() => {
     let debounce = setTimeout(() => {
@@ -137,21 +136,21 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
    * Generates the result to be displayed to the user
    */
   if (globalResults?.value.__typename === 'FunctionRun' && functionResults) {
-    setSearchResult({
+    searchResult = {
       type: 'function',
       href: `/env/${environmentSlug}/functions/${encodeURIComponent(functionResults.slug)}/logs/${
         globalResults.value.id
       }`,
       name: functionResults.name || '',
-    });
+    };
   } else if (globalResults?.value.__typename === 'ArchivedEvent') {
-    setSearchResult({
+    searchResult = {
       type: 'event',
       href: `/env/${environmentSlug}/events/${encodeURIComponent(globalResults.value.name)}/logs/${
         globalResults.value.id
       }`,
       name: globalResults.value.name,
-    });
+    };
   }
 
   /*
