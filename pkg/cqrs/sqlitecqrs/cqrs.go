@@ -217,6 +217,10 @@ func (w wrapper) InsertFunction(ctx context.Context, params cqrs.InsertFunctionP
 	)
 }
 
+func (w wrapper) GetFunctionBySlug(ctx context.Context, slug string) (*cqrs.Function, error) {
+	return nil, nil
+}
+
 func (w wrapper) DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) error {
 	return w.q.DeleteFunctionsByAppID(ctx, appID)
 }
