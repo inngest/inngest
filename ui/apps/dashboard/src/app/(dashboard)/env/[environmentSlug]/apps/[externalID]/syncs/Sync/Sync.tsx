@@ -31,8 +31,8 @@ export function Sync({ externalAppID, syncID }: Props) {
   const { sync } = syncRes.data;
 
   return (
-    <div className="flex w-full justify-center p-4">
-      <div className="w-full max-w-[1200px]">
+    <div className="h-full w-full overflow-y-auto">
+      <div className="mx-auto w-full max-w-[1200px] p-4">
         <AppInfoCard app={app} className="mb-4" sync={sync} />
         <AppGitCard className="mb-4" sync={sync} />
 

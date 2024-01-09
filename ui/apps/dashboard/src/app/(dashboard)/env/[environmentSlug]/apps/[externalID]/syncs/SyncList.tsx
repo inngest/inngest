@@ -21,8 +21,13 @@ type Sync = {
 
 export function SyncList({ className, onClick, selectedSyncID, syncs }: Props) {
   return (
-    <div className={classNames('min-h-full border-r border-slate-300 bg-white', className)}>
-      <div className="table border-collapse">
+    <div
+      className={classNames(
+        'flex-shrink-0 overflow-y-auto border-r border-slate-300 bg-white',
+        className
+      )}
+    >
+      <ul className="table border-collapse">
         {syncs.map((sync) => {
           let bgColor = 'bg-white';
           if (sync.id === selectedSyncID) {
@@ -50,7 +55,7 @@ export function SyncList({ className, onClick, selectedSyncID, syncs }: Props) {
             </div>
           );
         })}
-      </div>
+      </ul>
     </div>
   );
 }

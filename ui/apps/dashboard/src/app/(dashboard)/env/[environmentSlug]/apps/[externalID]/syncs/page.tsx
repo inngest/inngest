@@ -31,7 +31,7 @@ export default function Page({ params }: Props) {
   }
 
   return (
-    <div className="flex min-h-full">
+    <div className="flex h-full min-h-0">
       <SyncList
         onClick={setSelectedSyncID}
         selectedSyncID={selectedSyncID ?? firstSync.id}

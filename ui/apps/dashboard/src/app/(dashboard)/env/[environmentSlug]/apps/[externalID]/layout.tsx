@@ -51,7 +51,7 @@ export default function Layout({ children, params: { externalID } }: Props) {
         links={navLinks}
         title={res.data}
       />
-      <div className="h-full overflow-y-auto bg-slate-100">{children}</div>
+      <div className="h-full overflow-hidden bg-slate-100">{children}</div>
     </>
   );
 }
