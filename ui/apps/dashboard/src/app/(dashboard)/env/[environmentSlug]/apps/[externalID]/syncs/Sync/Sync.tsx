@@ -1,5 +1,7 @@
 'use client';
 
+import ExclamationTriangleIcon from '@heroicons/react/20/solid/ExclamationTriangleIcon';
+
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
@@ -17,8 +19,16 @@ export function Sync({ externalAppID, syncID }: Props) {
   const syncRes = useSync({ envID: env.id, externalAppID, syncID });
   if (syncRes.error) {
     if (syncRes.error.message.includes('no rows')) {
-      // TODO: Make pretty
-      return <div>Sync not found</div>;
+      return (
+        <div className="h-full w-full overflow-y-auto">
+          <div className="mx-auto w-full max-w-[1200px] p-4">
+            <div className="flex items-center gap-2.5 rounded-lg border border-red-500 bg-red-100 px-8 py-4 text-red-500">
+              <ExclamationTriangleIcon className="h-5 w-5" />
+              Sync not found
+            </div>
+          </div>
+        </div>
+      );
     }
     throw syncRes.error;
   }
