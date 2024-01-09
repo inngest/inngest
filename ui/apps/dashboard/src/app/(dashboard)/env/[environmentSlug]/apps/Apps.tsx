@@ -2,6 +2,7 @@
 
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
+import ExclamationTriangleIcon from '@heroicons/react/20/solid/ExclamationTriangleIcon';
 import PlusIcon from '@heroicons/react/20/solid/PlusIcon';
 import { Button } from '@inngest/components/Button';
 
@@ -23,7 +24,7 @@ export function Apps({ isArchived = false }: Props) {
   }
   if (res.isLoading) {
     return (
-      <div className="my-4 flex items-center justify-center">
+      <div className="mb-4 mt-16 flex items-center justify-center">
         <div className="w-full max-w-[1200px]">
           <SkeletonCard />
         </div>
@@ -34,7 +35,7 @@ export function Apps({ isArchived = false }: Props) {
   const hasApps = res.data.length > 0;
 
   return (
-    <div className="my-4 flex items-center justify-center">
+    <div className="mb-4 mt-16 flex items-center justify-center">
       <div className="w-full max-w-[1200px]">
         {!hasApps && !isArchived && (
           <EmptyAppCard>
@@ -49,8 +50,21 @@ export function Apps({ isArchived = false }: Props) {
             </div>
           </EmptyAppCard>
         )}
+        {!hasApps && isArchived && (
+          <div className="flex items-center justify-center gap-1.5 rounded-lg bg-slate-500 p-4 text-white">
+            <ExclamationTriangleIcon className="h-5 w-5 text-slate-300" /> No Archived Apps
+          </div>
+        )}
         {res.data.map((app) => {
-          return <AppCard app={app} className="mb-4" envSlug={env.slug} key={app.id} />;
+          return (
+            <AppCard
+              app={app}
+              className="mb-4"
+              envSlug={env.slug}
+              key={app.id}
+              isArchived={isArchived}
+            />
+          );
         })}
         {!isArchived && hasApps && (
           <Button
