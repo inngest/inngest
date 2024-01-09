@@ -88,12 +88,12 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
 
   const failureRate = !usageMetrics?.totalRuns
     ? '0.00'
-    : (((usageMetrics?.totalFailures || 0) / (usageMetrics?.totalRuns || 0)) * 100).toFixed(2);
+    : (((usageMetrics.totalFailures || 0) / (usageMetrics.totalRuns || 0)) * 100).toFixed(2);
 
   const triggers = function_.current?.triggers || [];
 
   function handleTimeRangeChange(timeRange: TimeRange) {
-    if (timeRange?.key) {
+    if (timeRange.key) {
       setTimeRangeParam(timeRange.key);
     }
   }
@@ -214,7 +214,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               </div>
             </Block>
             {function_.configuration?.cancellations &&
-              function_.configuration?.cancellations.length > 0 && (
+              function_.configuration.cancellations.length > 0 && (
                 <Block title="Cancellation">
                   <div className="space-y-3">
                     {function_.configuration.cancellations.map((cancellation) => {

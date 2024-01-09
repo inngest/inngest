@@ -21,7 +21,7 @@ export default function CurrentSubscription({
   const isOnPaidPlan = isCurrentPlanEnterprise || currentPlan?.amount !== 0;
   const isTrial = currentPlan ? isTrialPlan(currentPlan) : false;
   const nextInvoiceDate = subscription?.nextInvoiceDate
-    ? day(subscription?.nextInvoiceDate)
+    ? day(subscription.nextInvoiceDate)
     : undefined;
   const freeTierFeatureRows = featureRows.filter(({ showFreeTier }) => showFreeTier);
 
@@ -36,7 +36,7 @@ export default function CurrentSubscription({
             <p className="my-4 flex flex-wrap gap-4 text-xl">
               {!isTrial && (
                 <span className="font-medium">
-                  ${currentPlan?.amount ? (currentPlan?.amount / 100).toLocaleString() : '0'}
+                  ${currentPlan?.amount ? (currentPlan.amount / 100).toLocaleString() : '0'}
                 </span>
               )}
               <PlanBadge variant="primary" className="whitespace-nowrap">

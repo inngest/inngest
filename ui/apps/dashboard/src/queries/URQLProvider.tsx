@@ -32,14 +32,12 @@ export default function URQLProvider({ children }: { children: React.ReactNode }
           maxNumberAttempts: 3,
           retryIf: (error) => {
             // TODO: Remove the legacy check once https://github.com/inngest/monorepo/pull/2133 has been released
-            const legacyCheck = error.graphQLErrors.some((e) =>
-              e.message?.includes('unauthorized')
-            );
+            const legacyCheck = error.graphQLErrors.some((e) => e.message.includes('unauthorized'));
             // Retry the operation if Clerk is not loaded yet and we got an UNAUTHENTICATED error
             return (
               !isLoaded &&
               (legacyCheck ||
-                error.graphQLErrors.some((e) => e.extensions?.code === 'UNAUTHENTICATED'))
+                error.graphQLErrors.some((e) => e.extensions.code === 'UNAUTHENTICATED'))
             );
           },
         }),

@@ -93,8 +93,8 @@ export const useEventType = ({
     },
   });
 
-  const eventType = data?.events?.data?.[0] as Event | undefined;
-  const dailyUsage: UsageItem[] | undefined = data?.events?.data?.[0]?.usage.data.map((d) => ({
+  const eventType = data?.events?.data[0] as Event | undefined;
+  const dailyUsage: UsageItem[] | undefined = data?.events?.data[0]?.usage.data.map((d) => ({
     name: d.slot,
     values: {
       count: d.count,

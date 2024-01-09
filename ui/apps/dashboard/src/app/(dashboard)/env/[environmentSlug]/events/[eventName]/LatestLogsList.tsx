@@ -85,8 +85,8 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
                   </td>
                 </tr>
               )}
-              {orderedList && orderedList?.length > 0
-                ? orderedList?.map((e) => (
+              {orderedList && orderedList.length > 0
+                ? orderedList.map((e) => (
                     <tr className="truncate" key={e.id}>
                       <td className="p-4">
                         <Time

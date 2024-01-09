@@ -53,7 +53,7 @@ export default function CreateKeyButton() {
           toast.success(`${currentContent.name} was successfully created`);
           router.refresh();
 
-          const newKeyID = result?.data?.key?.id;
+          const newKeyID = result.data?.key.id;
           if (newKeyID) {
             router.push(
               `/env/${environment.slug}/manage/${currentContent.param}/${newKeyID}` as Route
@@ -69,15 +69,15 @@ export default function CreateKeyButton() {
       <Button
         icon={<PlusIcon />}
         btnAction={() => setModalOpen(true)}
-        disabled={!environment || !currentContent}
+        disabled={!currentContent}
         kind="primary"
-        label={`Create ${currentContent?.name}`}
+        label={`Create ${currentContent.name}`}
       />
       <Modal
         isOpen={isModalOpen}
         className={'w-1/4'}
         onClose={() => setModalOpen(false)}
-        title={`Create a New ${currentContent?.name}`}
+        title={`Create a New ${currentContent.name}`}
         footer={
           <div className="flex justify-end gap-2">
             <Button
@@ -103,7 +103,7 @@ export default function CreateKeyButton() {
         <div className="p-6">
           <Input
             name="keyName"
-            placeholder={`${currentContent?.name} Name`}
+            placeholder={`${currentContent.name} Name`}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
           />

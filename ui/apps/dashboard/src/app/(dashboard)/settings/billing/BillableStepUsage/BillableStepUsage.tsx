@@ -94,7 +94,7 @@ export function BillableStepUsage({ includedStepCountLimit }: Props) {
     );
   }
 
-  const monthData = data?.billableStepTimeSeries?.[0]?.data || [];
+  const monthData = data.billableStepTimeSeries[0]?.data || [];
   const { additionalStepCount, series, totalStepCount } = transformData(
     monthData,
     includedStepCountLimit

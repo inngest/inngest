@@ -79,13 +79,11 @@ function reducer(state: State, action: Action): State {
       };
     case 'stopped_typing':
       const parsedDateTime = chrono.parseDate(state.inputString);
-      if (!parsedDateTime) {
-        return {
-          ...state,
-          suggestedDateTime: undefined,
-          status: 'idle',
-        };
-      }
+      return {
+        ...state,
+        suggestedDateTime: undefined,
+        status: 'idle',
+      };
       return {
         ...state,
         suggestedDateTime: parsedDateTime,
@@ -133,9 +131,6 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
 
   function handleExampleClick(example: string) {
     const exampleDate = chrono.parseDate(example);
-    if (!exampleDate) {
-      throw new Error('Could not parse clicked example');
-    }
     // Focus the input after applying the example so that the user can tab to the next element.
     inputRef.current?.focus();
 
@@ -215,7 +210,7 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
               onOpenAutoFocus={(event) => event.preventDefault()}
               onClick={handleSuggestionClick}
             >
-              {state.suggestedDateTime?.toLocaleString()}
+              {state.suggestedDateTime.toLocaleString()}
               <kbd
                 className="ml-auto flex h-6 w-6 items-center justify-center rounded bg-slate-100 p-2 font-sans text-xs"
                 aria-label="Press Enter to apply the parsed date and time."

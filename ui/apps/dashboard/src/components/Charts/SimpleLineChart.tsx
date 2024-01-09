@@ -160,7 +160,7 @@ export default function SimpleLineChart({
                 stroke="red"
                 fill="red"
               />
-              {data?.map(({ name, values }, index) => {
+              {data.map(({ name, values }, index) => {
                 if (!values.concurrencyLimit) return;
                 return (
                   <ReferenceArea
