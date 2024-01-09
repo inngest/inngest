@@ -28,7 +28,7 @@ func Interpolate(ctx context.Context, expr string, data map[string]any) (string,
 	// NOTE: If this used the lifting parser things would break massively!  We would
 	// lift the same expression twice, resulting in two different values referencing
 	// "vars.a".
-	eval, err := cachedParse(ctx, expr)
+	eval, err := cachedCompile(ctx, expr)
 	if err != nil {
 		return expr, err
 	}

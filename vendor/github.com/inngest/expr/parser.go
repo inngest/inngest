@@ -21,19 +21,24 @@ type TreeParser interface {
 	Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, error)
 }
 
-// CELParser represents a CEL parser which takes an expression string
+// CELCompiler represents a CEL compiler which takes an expression string
 // and returns a CEL AST, any issues during parsing, and any lifted and replaced
 // from the expression.
 //
 // By default, *cel.Env fulfils this interface.  In production, it's common
 // to provide a caching layer on top of *cel.Env to optimize parsing, as it's
 // the slowest part of the expression process.
-type CELParser interface {
+type CELCompiler interface {
+	// Compile calls Compile on the expression, parsing and validating the AST.
+	// This returns the AST, issues during validation, and args lifted.
+	Compile(expr string) (*cel.Ast, *cel.Issues, LiftedArgs)
+	// Parse calls Parse on an expression, but does not check the expression
+	// for valid variable names etc. within the env.
 	Parse(expr string) (*cel.Ast, *cel.Issues, LiftedArgs)
 }
 
-// EnvParser turns a *cel.Env into a CELParser.
-func EnvParser(env *cel.Env) CELParser {
+// EnvCompiler turns a *cel.Env into a CELParser.
+func EnvCompiler(env *cel.Env) CELCompiler {
 	return envparser{env}
 }
 
@@ -46,8 +51,13 @@ func (e envparser) Parse(txt string) (*cel.Ast, *cel.Issues, LiftedArgs) {
 	return ast, iss, nil
 }
 
+func (e envparser) Compile(txt string) (*cel.Ast, *cel.Issues, LiftedArgs) {
+	ast, iss := e.env.Compile(txt)
+	return ast, iss, nil
+}
+
 // NewTreeParser returns a new tree parser for a given *cel.Env
-func NewTreeParser(ep CELParser) TreeParser {
+func NewTreeParser(ep CELCompiler) TreeParser {
 	parser := &parser{
 		ep: ep,
 	}
@@ -55,7 +65,7 @@ func NewTreeParser(ep CELParser) TreeParser {
 }
 
 type parser struct {
-	ep CELParser
+	ep CELCompiler
 
 	// rander is a random reader set during testing.  it is never used outside
 	// of the test package during Parse.  Instead,  a new deterministic random
@@ -64,7 +74,7 @@ type parser struct {
 }
 
 func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, error) {
-	expression := eval.GetExpression()
+	expression := eval.GetExpression() // "event.data.id == '1'"
 	if expression == "" {
 		return &ParsedExpression{
 			Evaluable: eval,
@@ -77,7 +87,6 @@ func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, 
 	}
 
 	r := p.rander
-
 	if r == nil {
 		// Create a new deterministic random reader based off of the evaluable's identifier.
 		// This means that every time we parse an expression with the given identifier, the
@@ -188,6 +197,7 @@ type Node struct {
 	// for the expression to be truthy.
 	//
 	// If this is nil, this is a parent container for a series of AND or Or checks.
+	// a == b
 	Predicate *Predicate
 }
 
@@ -301,7 +311,7 @@ type Predicate struct {
 	Ident string
 
 	// LiteralIdent represents the second literal that we're comparing against,
-	// eg. in the expression "event.data.a == event.data.b this stores event.data.b
+	// eg. in the expression "event.data.a == event.data.b" this stores event.data.b
 	LiteralIdent *string
 
 	// Operator is the binary operator being used.  NOTE:  This always assumes that the

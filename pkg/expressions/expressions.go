@@ -33,16 +33,20 @@ var (
 	// On average, 20 compiled expressions fit into 1mb of ram.
 	CacheMaxSize int64 = 50_000
 
-	exprParser expr.CELParser
-	treeParser expr.TreeParser
+	exprCompiler expr.CELCompiler
+	treeParser   expr.TreeParser
 )
 
 func init() {
 	cache = ccache.New(ccache.Configure().MaxSize(CacheMaxSize))
 	if e, err := env(); err == nil {
-		exprParser = expr.NewCachingParser(e, cache)
-		treeParser = expr.NewTreeParser(exprParser)
+		exprCompiler = expr.NewCachingCompiler(e, cache)
+		treeParser = expr.NewTreeParser(exprCompiler)
 	}
+}
+
+func CompilerSingleton() expr.CELCompiler {
+	return exprCompiler
 }
 
 func ParserSingleton() expr.TreeParser {
@@ -128,8 +132,8 @@ func EvaluateBoolean(ctx context.Context, expression string, input map[string]in
 func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluator, error) {
 	// Use the lifting expression parser in order to compile our env,
 	// if it's not nil.
-	if exprParser != nil {
-		ast, issues, vars := exprParser.Parse(expression)
+	if exprCompiler != nil {
+		ast, issues, vars := exprCompiler.Compile(expression)
 		if issues != nil {
 			return nil, fmt.Errorf("error compiling expression: %w", issues.Err())
 		}
@@ -149,12 +153,12 @@ func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluator, 
 		return eval, nil
 	}
 
-	// Use default parsing, if the exprParser isn't specified.
-	return cachedParse(ctx, expression)
+	// Use default parsing, if the exprCompiler isn't specified.
+	return cachedCompile(ctx, expression)
 }
 
-func cachedParse(ctx context.Context, expression string) (*expressionEvaluator, error) {
-	// NOTE: We use an "eval:" prefix to avoid any conflicts with the `exprParser` singleton which
+func cachedCompile(ctx context.Context, expression string) (*expressionEvaluator, error) {
+	// NOTE: We use an "eval:" prefix to avoid any conflicts with the `exprCompiler` singleton which
 	// may use the expression as a key.
 	if eval := cache.Get("eval:" + expression); eval != nil {
 		eval.Extend(CacheExtendTime)

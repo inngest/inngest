@@ -21,7 +21,7 @@ func NewAggregator(
 ) Aggregator {
 	// use the package's singleton caching parser to create a new tree parser.
 	// this uses lifted expression parsing with caching for speed.
-	parser := expr.NewTreeParser(exprParser)
+	parser := expr.NewTreeParser(exprCompiler)
 	if log == nil {
 		log = logger.StdlibLogger(ctx)
 	}

@@ -75,23 +75,6 @@ func NewAggregateEvaluator(
 	}
 }
 
-// Evaluable represents an evaluable expression with a unique identifier.
-type Evaluable interface {
-	// GetID returns a unique identifier for the evaluable item.  If there are
-	// two instances of the same expression, the identifier should return a unique
-	// string for each instance of the expression (eg. for two pauses).
-	//
-	// It has the Get prefix to reduce collisions with implementations who expose an
-	// ID member.
-	GetID() string
-
-	// GetExpression returns an expression as a raw string.
-	//
-	// It has the Get prefix to reduce collisions with implementations who expose an
-	// Expression member.
-	GetExpression() string
-}
-
 type aggregator struct {
 	eval   ExpressionEvaluator
 	parser TreeParser
