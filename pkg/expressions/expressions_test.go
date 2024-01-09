@@ -998,8 +998,16 @@ func TestEvaluateExpression(t *testing.T) {
 		},
 	}
 
-	for n, test := range tests {
+	for n, item := range tests {
+		test := item
 		t.Run(test.expr, func(t *testing.T) {
+			for i := 0; i <= 100; i++ {
+				// Test thread safety of evaluate and Validate()
+				go func() {
+					Evaluate(context.Background(), test.expr, test.data)
+				}()
+			}
+
 			actual, earliest, err := Evaluate(context.Background(), test.expr, test.data)
 
 			require.Equal(t, err == nil, !test.shouldErr, "unexpected err result '%v' for '%s'", err, test.expr)
