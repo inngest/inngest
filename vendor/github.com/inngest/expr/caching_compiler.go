@@ -12,10 +12,12 @@ var (
 	CacheTime = time.Hour
 )
 
+type EnvCreator func() (*cel.Env, error)
+
 // NewCachingCompiler returns a CELCompiler which lifts quoted literals out of the expression
 // as variables and uses caching to cache expression parsing, resulting in improved
 // performance when parsing expressions.
-func NewCachingCompiler(env *cel.Env, cache *ccache.Cache) CELCompiler {
+func NewCachingCompiler(env EnvCreator, cache *ccache.Cache) CELCompiler {
 	return &cachingCompiler{
 		cache: cache,
 		env:   env,
@@ -26,7 +28,7 @@ type cachingCompiler struct {
 	// cache is a global cache of precompiled expressions.
 	cache *ccache.Cache
 
-	env *cel.Env
+	env EnvCreator
 
 	hits   int64
 	misses int64
@@ -47,7 +49,12 @@ func (c *cachingCompiler) Parse(expr string) (*cel.Ast, *cel.Issues, LiftedArgs)
 		return p.AST, p.ParseIssues, vars
 	}
 
-	ast, issues := c.env.Parse(expr)
+	env, err := c.env()
+	if err != nil {
+		return nil, nil, nil
+	}
+
+	ast, issues := env.Parse(expr)
 
 	c.cache.Set("cc:"+expr, parsedCELExpr{
 		Expr:        expr,
@@ -64,7 +71,13 @@ func (c *cachingCompiler) Compile(expr string) (*cel.Ast, *cel.Issues, LiftedArg
 	if issues != nil {
 		return ast, issues, args
 	}
-	ast, issues = c.env.Check(ast)
+
+	env, err := c.env()
+	if err != nil {
+		return nil, nil, nil
+	}
+
+	ast, issues = env.Check(ast)
 	return ast, issues, args
 }
 

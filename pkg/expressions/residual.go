@@ -33,7 +33,12 @@ func Interpolate(ctx context.Context, expr string, data map[string]any) (string,
 		return expr, err
 	}
 
-	ast, err := residual(ctx, eval.ast, eval.env, data)
+	env, err := env()
+	if err != nil {
+		return expr, err
+	}
+
+	ast, err := residual(ctx, eval.ast, env, data)
 	if err != nil {
 		return expr, err
 	}

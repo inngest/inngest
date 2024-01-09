@@ -39,10 +39,8 @@ var (
 
 func init() {
 	cache = ccache.New(ccache.Configure().MaxSize(CacheMaxSize))
-	if e, err := env(); err == nil {
-		exprCompiler = expr.NewCachingCompiler(e, cache)
-		treeParser = expr.NewTreeParser(exprCompiler)
-	}
+	exprCompiler = expr.NewCachingCompiler(defaultEnv, cache)
+	treeParser = expr.NewTreeParser(exprCompiler)
 }
 
 func CompilerSingleton() expr.CELCompiler {
@@ -137,13 +135,8 @@ func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluator, 
 		if issues != nil {
 			return nil, fmt.Errorf("error compiling expression: %w", issues.Err())
 		}
-		e, err := env()
-		if err != nil {
-			return nil, err
-		}
 		eval := &expressionEvaluator{
 			ast:        ast,
-			env:        e,
 			expression: expression,
 			liftedVars: vars.Map(),
 		}
@@ -175,7 +168,6 @@ func cachedCompile(ctx context.Context, expression string) (*expressionEvaluator
 	}
 	eval := &expressionEvaluator{
 		ast:        ast,
-		env:        e,
 		expression: expression,
 	}
 
@@ -214,7 +206,6 @@ type expressionEvaluator struct {
 	// evaluator as it's thread safe.  Without these changes, Programs are bound
 	// to specific expression & data combinations.
 	ast *cel.Ast
-	env *cel.Env
 
 	// expression is the raw expression
 	expression string
@@ -243,7 +234,12 @@ func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (interfa
 		})
 	}
 
-	program, act, err := program(ctx, e.ast, e.env, data, true, e.attrs)
+	env, err := env()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	program, act, err := program(ctx, e.ast, env, data, true, e.attrs)
 	if err != nil {
 		return nil, nil, err
 	}
