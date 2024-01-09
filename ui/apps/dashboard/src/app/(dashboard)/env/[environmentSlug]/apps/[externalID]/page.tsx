@@ -25,7 +25,13 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
     throw appRes.error;
   }
   if (appRes.isLoading) {
-    return null;
+    return (
+      <div className="h-full overflow-y-auto">
+        <div className="mx-auto w-full max-w-[1200px] py-4">
+          <AppInfoCard className="mb-4" loading />
+        </div>
+      </div>
+    );
   }
 
   const { syncedFunctions } = appRes.data.latestSync ?? {};

@@ -23,8 +23,13 @@ export function Sync({ externalAppID, syncID }: Props) {
     throw syncRes.error;
   }
   if (syncRes.isLoading) {
-    // TODO: Make pretty
-    return 'Loading...';
+    return (
+      <div className="h-full w-full overflow-y-auto">
+        <div className="mx-auto w-full max-w-[1200px] p-4">
+          <AppInfoCard className="mb-4" loading />
+        </div>
+      </div>
+    );
   }
 
   const { app } = syncRes.data.environment;

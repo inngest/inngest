@@ -56,7 +56,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
         collapsible
       >
         <CollapsibleCardItem value="syncedFunctions">
-          <CollapsibleCardHeader className="flex items-center justify-between border-slate-300 px-6 py-3 text-sm font-medium text-slate-600 data-[state=open]:border-b">
+          <CollapsibleCardHeader className="flex h-11 items-center justify-between border-slate-300 px-6 text-sm font-medium text-slate-600 data-[state=open]:border-b">
             <p>Synced Functions ({syncedFunctions.length})</p>
             <CollapsibleCardTrigger
               asChild
@@ -105,7 +105,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
         collapsible
       >
         <CollapsibleCardItem value="RemovedFunctions">
-          <CollapsibleCardHeader className="flex items-center justify-between border-slate-300 px-6 py-3 text-sm font-medium text-slate-600 data-[state=open]:border-b">
+          <CollapsibleCardHeader className="flex h-11 items-center justify-between border-slate-300 px-6 text-sm font-medium text-slate-600 data-[state=open]:border-b">
             <p>Removed Functions ({removedFunctions.length})</p>
             <CollapsibleCardTrigger
               asChild
