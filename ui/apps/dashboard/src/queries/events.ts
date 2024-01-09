@@ -2,7 +2,7 @@ import { useQuery, type UseQueryResponse } from 'urql';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { graphql } from '@/gql';
-import type { Event, GetEventTypesQuery } from '@/gql/graphql';
+import type { GetEventTypesQuery } from '@/gql/graphql';
 
 const GetEventTypesDocument = graphql(`
   query GetEventTypes($environmentID: ID!, $page: Int) {
@@ -61,6 +61,14 @@ const GetEventTypeDocument = graphql(`
             count
           }
         }
+        workflows {
+          id
+          slug
+          name
+          current {
+            createdAt
+          }
+        }
       }
     }
   }
@@ -78,6 +86,25 @@ type UseEventTypeParams = {
   name: string;
 };
 
+type Event = {
+  name: string;
+  workflows: {
+    id: string;
+    slug: string;
+    name: string;
+    current: {
+      createdAt: string;
+    } | null;
+  }[];
+  usage: {
+    total: number;
+    data: {
+      slot: string;
+      count: number;
+    }[];
+  };
+};
+
 export const useEventType = ({
   name,
 }: UseEventTypeParams): UseQueryResponse<{
@@ -93,7 +120,7 @@ export const useEventType = ({
     },
   });
 
-  const eventType = data?.events?.data[0] as Event | undefined;
+  const eventType = data?.events?.data[0];
   const dailyUsage: UsageItem[] | undefined = data?.events?.data[0]?.usage.data.map((d) => ({
     name: d.slot,
     values: {
