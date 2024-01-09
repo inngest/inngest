@@ -170,6 +170,17 @@ type Pause struct {
 	TriggeringEventID *string `json:"tID,omitempty"`
 }
 
+func (p Pause) GetID() string {
+	return p.ID.String()
+}
+
+func (p Pause) GetExpression() string {
+	if p.Expression == nil {
+		return ""
+	}
+	return *p.Expression
+}
+
 func (p Pause) Edge() inngest.Edge {
 	return inngest.Edge{
 		Outgoing: p.Outgoing,

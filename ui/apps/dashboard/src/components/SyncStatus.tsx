@@ -1,9 +1,5 @@
-import { IconStatusCircleArrowPath } from '@inngest/components/icons/StatusCircleArrowPath';
-import { IconStatusCircleCheck } from '@inngest/components/icons/StatusCircleCheck';
-import { IconStatusCircleCross } from '@inngest/components/icons/StatusCircleCross';
-import { IconStatusCircleMinus } from '@inngest/components/icons/StatusCircleMinus';
-
-import { Time } from '@/components/Time';
+import { ArrowPathIcon, CheckIcon, MinusIcon, XMarkIcon } from '@heroicons/react/20/solid';
+import { classNames } from '@inngest/components/utils/classNames';
 
 const syncStatuses = ['error', 'pending', 'success'] as const;
 type SyncStatus = (typeof syncStatuses)[number];
@@ -12,15 +8,21 @@ function isSyncStatus(status: string): status is SyncStatus {
 }
 
 const syncStatusIcons = {
-  error: IconStatusCircleCross,
-  pending: IconStatusCircleArrowPath,
-  success: IconStatusCircleCheck,
+  error: XMarkIcon,
+  pending: ArrowPathIcon,
+  success: CheckIcon,
 } as const satisfies { [key in SyncStatus]: React.ComponentType };
 
 const syncStatusText = {
   error: 'Error',
   pending: 'Pending',
   success: 'Success',
+} as const satisfies { [key in SyncStatus]: string };
+
+const syncStatusColor = {
+  error: 'text-red-300',
+  pending: 'text-sky-300',
+  success: 'text-emerald-300',
 } as const satisfies { [key in SyncStatus]: string };
 
 type Props = {
@@ -30,17 +32,25 @@ type Props = {
 export function SyncStatus({ status }: Props) {
   let Icon;
   let text: string;
+  let color: string;
   if (isSyncStatus(status)) {
     Icon = syncStatusIcons[status];
     text = syncStatusText[status];
+    color = syncStatusColor[status];
   } else {
-    Icon = IconStatusCircleMinus;
+    Icon = MinusIcon;
     text = 'Unknown';
+    color = 'text-slate-100';
   }
 
   return (
-    <div className="flex whitespace-nowrap">
-      <Icon className="h-6 w-6" />
+    <div
+      className={classNames(
+        color,
+        'py-.5 flex items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-800 px-2'
+      )}
+    >
+      <Icon className="h-4 w-4" />
       {text}
     </div>
   );

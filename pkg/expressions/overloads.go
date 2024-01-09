@@ -44,6 +44,7 @@ func (customLibrary) CompileOptions() []cel.EnvOption {
 			fn.Name() == operators.Less ||
 			fn.Name() == operators.Greater ||
 			fn.Name() == operators.GreaterEquals {
+
 			// These are functions in which we want to be loosely typed,
 			// ie. they should work with heterogeneously typed inputs such as
 			// adding a string and an int.
@@ -52,7 +53,6 @@ func (customLibrary) CompileOptions() []cel.EnvOption {
 			//
 			// Instead of adding the default StdLib functions, we add our own
 			// function kind with the default overload and an any type param.
-
 			overloads, err := fn.Bindings()
 			if err != nil || len(overloads) != 1 {
 				continue
@@ -230,7 +230,7 @@ func celDeclarations() []cel.EnvOption {
 		newFunctionEnvOption(
 			"date",
 			decls.Overload(
-				"to_date",
+				"date",
 				[]*types.Type{types.AnyType},
 				types.TimestampType,
 			),
@@ -268,7 +268,7 @@ func celDeclarations() []cel.EnvOption {
 func celOverloads() []*functions.Overload {
 	return []*functions.Overload{
 		{
-			Operator: "to_date",
+			Operator: "date",
 			Unary: func(i ref.Val) ref.Val {
 				switch i.Type().TypeName() {
 				case "string":

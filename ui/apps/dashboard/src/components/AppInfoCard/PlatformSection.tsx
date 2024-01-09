@@ -1,3 +1,6 @@
+import type { Route } from 'next';
+import { Link } from '@inngest/components/Link';
+
 import { PlatformInfo } from '@/components/PlatformInfo';
 
 type Props = {
@@ -20,14 +23,9 @@ export function PlatformSection({ sync }: Props) {
   let deploymentValue;
   if (vercelDeploymentID && vercelDeploymentURL) {
     deploymentValue = (
-      <a
-        className="text-indigo-600 hover:underline"
-        href={vercelDeploymentURL}
-        rel="noopener noreferrer"
-        target="_blank"
-      >
+      <Link href={vercelDeploymentURL as Route} internalNavigation={false}>
         {vercelDeploymentID}
-      </a>
+      </Link>
     );
   } else {
     deploymentValue = '-';
@@ -36,14 +34,9 @@ export function PlatformSection({ sync }: Props) {
   let projectValue;
   if (vercelProjectID && vercelProjectURL) {
     projectValue = (
-      <a
-        className="text-indigo-600 hover:underline"
-        href={vercelProjectURL}
-        rel="noopener noreferrer"
-        target="_blank"
-      >
+      <Link href={vercelProjectURL as Route} internalNavigation={false}>
         {vercelProjectID}
-      </a>
+      </Link>
     );
   } else {
     projectValue = '-';
@@ -73,8 +66,8 @@ function Description({
 }) {
   return (
     <div className={className}>
-      <dt className="text-xs text-slate-600">{term}</dt>
-      <dd>{detail}</dd>
+      <dt className="pb-2 text-sm text-slate-400">{term}</dt>
+      <dd className="text-slate-800">{detail}</dd>
     </div>
   );
 }

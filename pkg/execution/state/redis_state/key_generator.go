@@ -62,6 +62,13 @@ type KeyGenerator interface {
 	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
 	PauseStep(context.Context, state.Identifier, string) string
 
+	// PauseIndex is a key that's used to index added/expired times for pauses.
+	//
+	// Added times are necessary to load pauses after a specific point in time,
+	// which is used when caching pauses in-memory to only load the subset of pauses
+	// added after the cache was last updated.
+	PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string
+
 	// History returns the key used to store a log entry for run hisotry
 	History(ctx context.Context, runID ulid.ULID) string
 
@@ -120,6 +127,13 @@ func (d DefaultKeyFunc) PauseStepPrefix(ctx context.Context, id state.Identifier
 func (d DefaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step string) string {
 	prefix := d.PauseStepPrefix(ctx, id)
 	return fmt.Sprintf("%s-%s", prefix, step)
+}
+
+func (d DefaultKeyFunc) PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string {
+	if event == "" {
+		return fmt.Sprintf("%s:pause-idx:%s:%s:-", d.Prefix, kind, wsID)
+	}
+	return fmt.Sprintf("%s:pause-idx:%s:%s:%s", d.Prefix, kind, wsID, event)
 }
 
 func (d DefaultKeyFunc) History(ctx context.Context, runID ulid.ULID) string {

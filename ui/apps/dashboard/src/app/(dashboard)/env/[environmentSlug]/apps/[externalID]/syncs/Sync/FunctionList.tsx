@@ -1,11 +1,21 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
-import CheckCircleIcon from '@heroicons/react/20/solid/CheckCircleIcon';
-import MinusCircleIcon from '@heroicons/react/20/solid/MinusCircleIcon';
+import ArrowRightIcon from '@heroicons/react/20/solid/ArrowRightIcon';
+import ChevronDownIcon from '@heroicons/react/20/solid/ChevronDownIcon';
+import { Button } from '@inngest/components/Button';
 import type { Function } from '@inngest/components/types/function';
 import { classNames } from '@inngest/components/utils/classNames';
+import { useLocalStorage } from 'react-use';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
+import {
+  CollapsibleCardContent,
+  CollapsibleCardContentWrapper,
+  CollapsibleCardHeader,
+  CollapsibleCardItem,
+  CollapsibleCardRoot,
+  CollapsibleCardTrigger,
+} from '@/components/CollapsibleCard';
 
 type Fn = Pick<Function, 'id' | 'name' | 'slug'>;
 
@@ -15,8 +25,16 @@ type Props = {
   syncedFunctions: Fn[];
 };
 
-export function FunctionList({ className, removedFunctions, syncedFunctions }: Props) {
+export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
   const env = useEnvironment();
+  const [isSyncedFunctionsCardOpen, setIsSyncedFunctionsCardOpen] = useLocalStorage(
+    'AppSyncedFunctionsOpened',
+    true
+  );
+  const [isRemovedFunctionsCardOpen, setIsRemovedFunctionsCardOpen] = useLocalStorage(
+    'AppRemovedFunctionsOpened',
+    true
+  );
 
   removedFunctions = useMemo(() => {
     return [...removedFunctions].sort((a, b) => {
@@ -31,57 +49,107 @@ export function FunctionList({ className, removedFunctions, syncedFunctions }: P
   }, [syncedFunctions]);
 
   return (
-    <div className={classNames('grid grid-cols-2 border border-slate-300 bg-white', className)}>
-      <div className="flex border-b border-r border-slate-300 p-2">
-        <CheckCircleIcon className="mr-1 text-green-600" height={20} />
-        <h2>Synced Functions ({syncedFunctions.length})</h2>
-      </div>
-      <div className="flex border-b border-slate-300 p-2">
-        <MinusCircleIcon className="mr-1 text-red-600" height={20} />
-        <h2>Removed Functions ({removedFunctions.length})</h2>
-      </div>
+    <>
+      <CollapsibleCardRoot
+        type="single"
+        defaultValue={isSyncedFunctionsCardOpen ? 'syncedFunctions' : undefined}
+        collapsible
+      >
+        <CollapsibleCardItem value="syncedFunctions">
+          <CollapsibleCardHeader className="flex items-center justify-between border-slate-300 px-6 py-3 text-sm font-medium text-slate-600 data-[state=open]:border-b">
+            <p>Synced Functions ({syncedFunctions.length})</p>
+            <CollapsibleCardTrigger
+              asChild
+              onClick={() => setIsSyncedFunctionsCardOpen((prev) => !prev)}
+            >
+              <Button
+                className="group"
+                appearance="outlined"
+                icon={
+                  <ChevronDownIcon className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
+                }
+              />
+            </CollapsibleCardTrigger>
+          </CollapsibleCardHeader>
+          <CollapsibleCardContentWrapper>
+            {isSyncedFunctionsCardOpen && (
+              <CollapsibleCardContent>
+                {syncedFunctions.map((fn, i) => {
+                  const isLast = i === syncedFunctions.length - 1;
 
-      <div className="border-r border-slate-300">
-        {syncedFunctions.map((fn, i) => {
-          const isLast = i === syncedFunctions.length - 1;
+                  return (
+                    <Link
+                      href={`/env/${env.slug}/functions/${encodeURIComponent(fn.slug)}`}
+                      key={fn.id}
+                    >
+                      <div
+                        className={classNames(
+                          'group flex w-full items-center gap-2 border-slate-200 py-3 pl-6 pr-2 text-sm font-medium text-slate-700 hover:bg-indigo-50  hover:text-indigo-600',
+                          !isLast && 'border-b'
+                        )}
+                      >
+                        {fn.name}
+                        <ArrowRightIcon className="h-3 w-3 -translate-x-3 text-indigo-600 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+                      </div>
+                    </Link>
+                  );
+                })}
+              </CollapsibleCardContent>
+            )}
+          </CollapsibleCardContentWrapper>
+        </CollapsibleCardItem>
+      </CollapsibleCardRoot>
+      <CollapsibleCardRoot
+        type="single"
+        defaultValue={isRemovedFunctionsCardOpen ? 'RemovedFunctions' : undefined}
+        collapsible
+      >
+        <CollapsibleCardItem value="RemovedFunctions">
+          <CollapsibleCardHeader className="flex items-center justify-between border-slate-300 px-6 py-3 text-sm font-medium text-slate-600 data-[state=open]:border-b">
+            <p>Removed Functions ({removedFunctions.length})</p>
+            <CollapsibleCardTrigger
+              asChild
+              onClick={() => setIsRemovedFunctionsCardOpen((prev) => !prev)}
+            >
+              <Button
+                className="group"
+                appearance="outlined"
+                icon={
+                  <ChevronDownIcon className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
+                }
+              />
+            </CollapsibleCardTrigger>
+          </CollapsibleCardHeader>
+          {isRemovedFunctionsCardOpen && (
+            <CollapsibleCardContent>
+              {removedFunctions.map((fn, i) => {
+                const isLast = i === removedFunctions.length - 1;
 
-          return (
-            <Link href={`/env/${env.slug}/functions/${encodeURIComponent(fn.slug)}`} key={fn.id}>
-              <div
-                className={classNames(
-                  'border-slate-200 p-2 hover:bg-indigo-50',
-                  !isLast && 'border-b'
-                )}
-              >
-                {fn.name}
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+                return (
+                  <Link
+                    href={`/env/${env.slug}/functions/${encodeURIComponent(fn.slug)}`}
+                    key={fn.id}
+                  >
+                    <div
+                      className={classNames(
+                        'group flex w-full items-center gap-2 border-slate-200 py-3 pl-6 pr-2 text-sm font-medium text-slate-700 hover:bg-indigo-50  hover:text-indigo-600',
+                        !isLast && 'border-b'
+                      )}
+                    >
+                      {fn.name}
+                      <ArrowRightIcon className="h-3 w-3 -translate-x-3 text-indigo-600 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+                    </div>
+                  </Link>
+                );
+              })}
 
-      <div>
-        {removedFunctions.map((fn, i) => {
-          const isLast = i === removedFunctions.length - 1;
-
-          return (
-            <Link href={`/env/${env.slug}/functions/${encodeURIComponent(fn.slug)}`} key={fn.id}>
-              <div
-                className={classNames(
-                  'border-slate-200 p-2 hover:bg-indigo-50',
-                  !isLast && 'border-b'
-                )}
-              >
-                {fn.name}
-              </div>
-            </Link>
-          );
-        })}
-
-        {removedFunctions.length === 0 && (
-          <div className="p-2 text-center text-slate-600">No removed functions</div>
-        )}
-      </div>
-    </div>
+              {removedFunctions.length === 0 && (
+                <div className="p-2 text-center text-sm text-slate-600">No synced functions</div>
+              )}
+            </CollapsibleCardContent>
+          )}
+        </CollapsibleCardItem>
+      </CollapsibleCardRoot>
+    </>
   );
 }
