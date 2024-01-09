@@ -54,6 +54,9 @@ SELECT * FROM functions WHERE app_id = ?;
 -- name: GetFunctionByID :one
 SELECT * FROM functions WHERE id = ?;
 
+-- name: GetFunctionBySlug :one
+SELECT * FROM functions WHERE slug = ?;
+
 -- name: UpdateFunctionConfig :one
 UPDATE functions SET config = ? WHERE id = ? RETURNING *;
 
@@ -75,7 +78,7 @@ INSERT INTO function_runs
 
 -- name: InsertFunctionFinish :exec
 INSERT INTO function_finishes
-	(run_id, status, output, completed_step_count, created_at) VALUES 
+	(run_id, status, output, completed_step_count, created_at) VALUES
 	(?, ?, ?, ?, ?);
 
 -- name: GetFunctionRun :one

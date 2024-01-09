@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/publicerr"
 )
 
@@ -55,13 +56,19 @@ func (a api) GetFunction(w http.ResponseWriter, r *http.Request) {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, err.Error()))
 	}
 
-	WriteCachedResponse(w, resp, 0) // no caching
+	_ = WriteCachedResponse(w, resp, 0) // no caching
 }
 
 func (a api) findFnByID(ctx context.Context, accountID uuid.UUID, id string) (*cqrs.Function, error) {
 	fnID, err := uuid.Parse(id)
 	if err != nil {
-		// Invalid UUID, assume it's a slug
+		// If not parsable as UUID, assume it is a slug so it's not an error
+		// NOTE: should this be logged or reported?
+		log.From(ctx).
+			Error().
+			Str("ID", id).
+			Err(err).
+			Msg("could not parse ID as UUID")
 	}
 
 	var fn *cqrs.Function
