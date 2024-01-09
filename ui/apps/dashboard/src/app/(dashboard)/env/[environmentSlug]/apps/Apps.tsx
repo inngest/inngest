@@ -23,7 +23,7 @@ export function Apps({ isArchived = false }: Props) {
   }
   if (res.isLoading) {
     return (
-      <div className="mt-4 flex items-center justify-center">
+      <div className="my-4 flex items-center justify-center">
         <div className="w-full max-w-[1200px]">
           <SkeletonCard />
         </div>
@@ -34,7 +34,7 @@ export function Apps({ isArchived = false }: Props) {
   const hasApps = res.data.length > 0;
 
   return (
-    <div className="mt-4 flex items-center justify-center">
+    <div className="my-4 flex items-center justify-center">
       <div className="w-full max-w-[1200px]">
         {!hasApps && !isArchived && (
           <EmptyAppCard>

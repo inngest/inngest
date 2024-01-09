@@ -35,7 +35,7 @@ export function SyncList({ className, onClick, selectedSyncID, syncs }: Props) {
           }
 
           return (
-            <div
+            <li
               className={classNames(
                 'table-row cursor-pointer border border-r-0 border-slate-300 text-slate-800 hover:bg-slate-100',
                 bgColor
@@ -52,7 +52,7 @@ export function SyncList({ className, onClick, selectedSyncID, syncs }: Props) {
               <div className="table-cell whitespace-nowrap p-4 pl-0 align-middle">
                 {sync.syncedFunctions.length} functions
               </div>
-            </div>
+            </li>
           );
         })}
       </ul>
