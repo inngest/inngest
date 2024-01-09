@@ -78,8 +78,8 @@ func (a *api) setup() {
 		r.Get("/runs/{runID}", a.GetFunctionRun)
 		r.Delete("/runs/{runID}", a.CancelFunctionRun)
 		r.Get("/runs/{runID}/jobs", a.GetFunctionRunJobs)
-		r.Get("/functions", a.GetFunctions)
-		r.Get("/functions/{id}", a.GetFunction)
+		// TODO: retrieve list of functions
+		r.Get("/apps/{app_id}/functions/{id}", a.GetFunction)
 	})
 }
 
