@@ -1,0 +1,42 @@
+package cqrs
+
+import (
+	"context"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/oklog/ulid/v2"
+)
+
+type CancellationReadWriter interface {
+	CancellationReader
+	CancellationWriter
+}
+
+// CancellationReader loads cancellations from a backing store.
+//
+// Note that this is intended for non-critical-path reads, eg. for dashboards
+// and management.  Critical path reader interfaces are defined within the
+// cancellation package.
+type CancellationReader interface {
+	// Cancellations returns all cancellations for a given workspace.
+	Cancellations(ctx context.Context, wsID uuid.UUID) ([]Cancellation, error)
+	CancellationsByFunction(ctx context.Context, wsID uuid.UUID, fnID uuid.UUID) ([]Cancellation, error)
+}
+
+type CancellationWriter interface {
+	// CreateCancellation writes a cancellation to the backing store.
+	CreateCancellation(ctx context.Context, c Cancellation) error
+}
+
+// Cancellation represents a cancellation of many function runs during the time specified.
+type Cancellation struct {
+	ID          ulid.ULID  `json:"id"`
+	WorkspaceID uuid.UUID  `json:"workspaceID"`
+	FunctionID  uuid.UUID  `json:"functionID"`
+	From        *time.Time `json:"from"`
+	To          time.Time  `json:"to"`
+	If          *string    `json:"if,omitempty"`
+	// XXX (tonyhb): We can eventually add a  "kind" field: an enum allowing
+	// you to cancel only the backlog of unstarted functions or every function.
+}
