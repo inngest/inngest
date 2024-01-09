@@ -104,6 +104,11 @@ func (i Item) GetMaxAttempts() int {
 	return *i.MaxAttempts
 }
 
+// IsStepKind determines if the item is considered a step
+func (i Item) IsStepKind() bool {
+	return i.Kind == KindStart || i.Kind == KindEdge || i.Kind == KindSleep
+}
+
 func (i *Item) UnmarshalJSON(b []byte) error {
 	type kind struct {
 		GroupID     string            `json:"groupID"`
