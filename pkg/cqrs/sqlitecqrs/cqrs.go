@@ -218,7 +218,15 @@ func (w wrapper) InsertFunction(ctx context.Context, params cqrs.InsertFunctionP
 }
 
 func (w wrapper) GetFunctionBySlug(ctx context.Context, slug string) (*cqrs.Function, error) {
-	return nil, nil
+	f := func(ctx context.Context) (*sqlc.Function, error) {
+		return w.q.GetFunctionBySlug(ctx, slug)
+	}
+
+	return copyInto(
+		ctx,
+		f,
+		&cqrs.Function{},
+	)
 }
 
 func (w wrapper) DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) error {
