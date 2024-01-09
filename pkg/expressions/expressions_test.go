@@ -27,6 +27,13 @@ func TestParse(t *testing.T) {
 				{"async", "email"},
 				{"async", "next_visit"},
 				{"async", "source"},
+				// Using the lifted expression filter, we should get extra variables as the strings are removed.
+				{"vars", "a"},
+				{"vars", "b"},
+				{"vars", "c"},
+				{"vars", "d"},
+				{"vars", "e"},
+				{"vars", "f"},
 			},
 		},
 		// nested
@@ -34,6 +41,8 @@ func TestParse(t *testing.T) {
 			expr: `event.data.action == 'opened'`,
 			expected: [][]string{
 				{"event", "data", "action"},
+				// Using the lifted expression filter, we should get extra variables as the strings are removed.
+				{"vars", "a"},
 			},
 		},
 	}
@@ -43,7 +52,7 @@ func TestParse(t *testing.T) {
 		require.NoError(t, err, test.expr)
 		attrs := expr.UsedAttributes(context.Background()).FullPaths()
 		require.Equal(t, err == nil, !test.shouldErr, "unexpected err result %s for '%s'", err, test.expr)
-		require.Equal(t, len(test.expected), len(attrs), test.expr)
+		require.Equal(t, len(test.expected), len(attrs), test.expr, attrs)
 		require.ElementsMatch(t, test.expected, attrs, test.expr)
 	}
 }
@@ -632,7 +641,7 @@ func TestEvaluateExpression(t *testing.T) {
 			"",
 		},
 		{
-			`event.data.title.matches('\\w')`,
+			`event.data.title.matches('\w')`,
 			map[string]interface{}{
 				"event": event.Event{
 					Data: map[string]interface{}{

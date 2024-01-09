@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -182,6 +183,9 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	debouncer := debounce.NewRedisDebouncer(rc, queueKG, queue)
 
+	// Create a new expression aggregator, using Redis to load evaluables.
+	agg := expressions.NewAggregator(ctx, 100, sm.(expressions.EvaluableLoader), nil)
+
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver()
@@ -199,6 +203,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithRuntimeDrivers(
 			drivers...,
 		),
+		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(queue),
 		executor.WithLogger(logger.From(ctx)),
 		executor.WithFunctionLoader(loader),

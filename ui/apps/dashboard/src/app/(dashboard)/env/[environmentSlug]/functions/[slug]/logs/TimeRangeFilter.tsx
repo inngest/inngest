@@ -107,13 +107,13 @@ export default function TimeRangeFilter({
   // Since "features" is a map, we can't be 100% sure that there's a log
   // retention value. So default to 7 days.
   let logRetention = 7;
-  if (typeof data?.account.plan?.features?.log_retention === 'number') {
-    logRetention = data?.account.plan?.features?.log_retention;
+  if (typeof data?.account.plan?.features.log_retention === 'number') {
+    logRetention = data.account.plan.features.log_retention;
   }
 
   let plans: Plan[] | undefined;
   if (data?.plans) {
-    plans = transformPlans(data?.plans);
+    plans = transformPlans(data.plans);
   }
 
   const selectedTimeRangeOption = timeRangeOptions.find(
@@ -232,7 +232,7 @@ export function transformPlans(plans: GetBillingPlanQuery['plans']): Plan[] {
   const newPlans: Plan[] = [];
 
   for (const plan of plans) {
-    if (!plan || typeof plan.features?.log_retention !== 'number') {
+    if (!plan || typeof plan.features.log_retention !== 'number') {
       continue;
     }
 

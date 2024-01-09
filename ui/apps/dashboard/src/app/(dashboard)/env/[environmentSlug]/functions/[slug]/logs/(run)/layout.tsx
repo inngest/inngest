@@ -40,7 +40,7 @@ export default function RunLayout({ children, params }: RunLayoutProps) {
     },
   });
 
-  const triggers = data?.environment?.function?.current?.triggers;
+  const triggers = data?.environment.function?.current?.triggers;
   const hasCron =
     Array.isArray(triggers) && triggers.length > 0 && triggers.some((trigger) => trigger.schedule);
 

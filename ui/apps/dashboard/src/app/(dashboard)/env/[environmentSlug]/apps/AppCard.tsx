@@ -53,7 +53,7 @@ export function AppCard({ app, className, envSlug }: Props) {
         {app.latestSync?.url && (
           <dl>
             <dt className="hidden">URL</dt>
-            <dd className="text-slate-400">{app.latestSync?.url}</dd>
+            <dd className="text-slate-400">{app.latestSync.url}</dd>
           </dl>
         )}
       </div>
@@ -65,12 +65,12 @@ export function AppCard({ app, className, envSlug }: Props) {
             detail={
               app.latestSync && (
                 <div className="flex gap-2">
-                  <SyncStatus status={app.latestSync?.status} />
+                  <SyncStatus status={app.latestSync.status} />
                   <Link
                     className="transition-color flex cursor-pointer items-center gap-1 text-indigo-400 underline decoration-transparent decoration-2 underline-offset-4 duration-300  hover:decoration-indigo-400"
                     href={`/env/${envSlug}/apps/${encodeURIComponent(app.externalID)}/syncs`}
                   >
-                    <Time value={app.latestSync?.createdAt} />
+                    <Time value={app.latestSync.createdAt} />
                     <ChevronRightIcon className="h-4 w-4" />
                   </Link>
                 </div>

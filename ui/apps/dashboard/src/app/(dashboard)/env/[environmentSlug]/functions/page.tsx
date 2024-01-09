@@ -42,7 +42,7 @@ export default function FunctionListPage() {
   }
 
   const isLoadingInitialData = functionList.latestLoadedPage === 0;
-  const environmentHasFunctions = environment ? environment.functionCount > 0 : undefined;
+  const environmentHasFunctions = environment.functionCount > 0;
 
   let content: JSX.Element;
   if (isLoadingInitialData) {

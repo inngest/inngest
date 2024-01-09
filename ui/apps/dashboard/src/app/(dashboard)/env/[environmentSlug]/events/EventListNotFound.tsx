@@ -45,7 +45,6 @@ export default function EventListNotFound() {
     variables: {
       environmentID: environment.id,
     },
-    pause: !environment?.id,
   });
   const ingestKey = getDefaultEventKey(data?.environment.ingestKeys || []);
   const key = ingestKey?.presharedKey;
@@ -58,7 +57,7 @@ export default function EventListNotFound() {
             <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 text-indigo-700" />
             <span>
               No Events <span className="font-medium text-indigo-900">received in</span>{' '}
-              {environment?.name}
+              {environment.name}
             </span>
           </h3>
         </div>

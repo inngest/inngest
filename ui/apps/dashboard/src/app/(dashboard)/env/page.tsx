@@ -14,12 +14,12 @@ export default async function Envs() {
   const environments = await getAllEnvironments();
 
   // Break the environments into different groups
-  const legacyTestMode = environments?.find(
+  const legacyTestMode = environments.find(
     (env) => env.type === EnvironmentType.Test && env.name === LEGACY_TEST_MODE_NAME
   );
-  const branchParent = environments?.find((env) => env.type === EnvironmentType.BranchParent);
-  const branches = environments?.filter((env) => env.type === EnvironmentType.BranchChild);
-  const otherTestEnvs = environments?.filter(
+  const branchParent = environments.find((env) => env.type === EnvironmentType.BranchParent);
+  const branches = environments.filter((env) => env.type === EnvironmentType.BranchChild);
+  const otherTestEnvs = environments.filter(
     (env) => env.type === EnvironmentType.Test && env.name !== LEGACY_TEST_MODE_NAME
   );
 
@@ -121,7 +121,7 @@ export default async function Envs() {
               </div>
             )}
 
-            {otherTestEnvs?.length > 0 &&
+            {otherTestEnvs.length > 0 &&
               otherTestEnvs.map((env) => (
                 <div key={env.id} className="mt-12 border-t border-slate-100 pt-8">
                   <div className="mb-4 flex w-full items-center  justify-between">

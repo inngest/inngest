@@ -101,13 +101,13 @@ export default function DashboardTimeRangeFilter({
   // Since "features" is a map, we can't be 100% sure that there's a log
   // retention value. So default to 7 days.
   let logRetention = 7;
-  if (typeof data?.account.plan?.features?.log_retention === 'number') {
-    logRetention = data?.account.plan?.features?.log_retention;
+  if (typeof data?.account.plan?.features.log_retention === 'number') {
+    logRetention = data.account.plan.features.log_retention;
   }
 
   let plans: ReturnType<typeof transformPlans> | undefined;
   if (data?.plans) {
-    plans = transformPlans(data?.plans);
+    plans = transformPlans(data.plans);
   }
 
   return (
@@ -117,7 +117,7 @@ export default function DashboardTimeRangeFilter({
           <Listbox.Label className="sr-only">Filter by time</Listbox.Label>
           <div className="relative">
             <Listbox.Button className="shadow-outline-secondary-light group inline-flex items-center gap-1 rounded-[6px] bg-slate-50 px-3 py-[5px] text-sm font-medium capitalize text-slate-800 hover:bg-slate-100 focus:outline-indigo-500">
-              <p>Last {selectedTimeRange ? getTimeRangeLabel(selectedTimeRange) : '...'}</p>
+              <p>Last {getTimeRangeLabel(selectedTimeRange)}</p>
               <ChevronDownIcon className="h-4 w-4" aria-hidden="true" />
             </Listbox.Button>
 
