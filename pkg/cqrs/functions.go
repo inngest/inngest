@@ -36,6 +36,7 @@ type FunctionReader interface {
 	GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*Function, error)
 	GetFunctions(ctx context.Context) ([]*Function, error)
 	GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function, error)
+	GetFunctionBySlug(ctx context.Context, slug string) (*Function, error)
 }
 
 type FunctionWriter interface {

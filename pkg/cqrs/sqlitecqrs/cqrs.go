@@ -203,6 +203,10 @@ func (w wrapper) GetFunctionByID(ctx context.Context, id uuid.UUID) (*cqrs.Funct
 	return copyInto(ctx, f, &cqrs.Function{})
 }
 
+func (w wrapper) GetFunctionBySlug(ctx context.Context, slug string) (*cqrs.Function, error) {
+	return nil, nil
+}
+
 func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
 	return copyInto(ctx, w.q.GetFunctions, []*cqrs.Function{})
 }
