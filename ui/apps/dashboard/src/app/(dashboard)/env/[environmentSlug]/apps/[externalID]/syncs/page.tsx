@@ -1,5 +1,7 @@
 'use client';
 
+import ExclamationTriangleIcon from '@heroicons/react/20/solid/ExclamationTriangleIcon';
+
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { useSearchParam } from '@/utils/useSearchParam';
 import { Sync } from './Sync';
@@ -22,12 +24,23 @@ export default function Page({ params }: Props) {
     throw syncsRes.error;
   }
   if (syncsRes.isLoading) {
-    return null;
+    return (
+      <div className="flex h-full min-h-0">
+        <SyncList onClick={setSelectedSyncID} loading />
+      </div>
+    );
   }
   const firstSync = syncsRes.data[0];
   if (!firstSync) {
-    // TODO: Make pretty
-    return 'No syncs found';
+    return (
+      <div className="h-full w-full overflow-y-auto">
+        <div className="mx-auto mt-16 w-full max-w-[1200px] p-4">
+          <div className="flex items-center justify-center gap-1.5 rounded-lg bg-slate-500 p-4 text-white">
+            <ExclamationTriangleIcon className="h-5 w-5 text-slate-300" /> No Syncs Found
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
