@@ -63,14 +63,13 @@ export default async function AppNavigation({ environmentSlug }: AppNavigationPr
   if (await getBooleanFlag('apps-page')) {
     // Insert the "Apps" item after the 1st item.
     items = [
-      ...items.slice(0, 1),
       {
         href: `/env/${environmentSlug}/apps`,
         text: 'Apps',
         hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
         icon: <Squares2X2Icon className="w-3.5" />,
       },
-      ...items.slice(1),
+      ...items,
     ];
   }
 

@@ -28,8 +28,13 @@ export function FunctionList({ envSlug, functions }: Props) {
       ref={tableContainerRef}
     >
       <Table
-        blankState={<></>}
-        options={{ columns, data: sortedFunctions, getCoreRowModel: getCoreRowModel() }}
+        blankState={<p>No functions.</p>}
+        options={{
+          columns,
+          data: sortedFunctions,
+          getCoreRowModel: getCoreRowModel(),
+          enableSorting: false,
+        }}
         tableContainerRef={tableContainerRef}
       />
     </main>

@@ -25,12 +25,18 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
     throw appRes.error;
   }
   if (appRes.isLoading) {
-    return null;
+    return (
+      <div className="h-full overflow-y-auto">
+        <div className="mx-auto w-full max-w-[1200px] py-4">
+          <AppInfoCard className="mb-4" loading />
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="flex items-center justify-center pt-4">
-      <div className="w-full max-w-[1200px]">
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto w-full max-w-[1200px] py-4">
         <AppInfoCard app={appRes.data} className="mb-4" sync={appRes.data.latestSync} />
 
         {appRes.data.latestSync && <AppGitCard className="mb-4" sync={appRes.data.latestSync} />}

@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import ArchiveBoxArrowDownIcon from '@heroicons/react/20/solid/ArchiveBoxArrowDownIcon';
 import ChevronRightIcon from '@heroicons/react/20/solid/ChevronRightIcon';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { classNames } from '@inngest/components/utils/classNames';
@@ -14,6 +15,7 @@ type Props = {
   app: App;
   className?: string;
   envSlug: string;
+  isArchived?: boolean;
 };
 
 type App = {
@@ -37,7 +39,7 @@ const cardWrapperStyles =
   'flex h-56 w-full min-w-[800px] max-w-[1200px] overflow-hidden rounded-lg border border-slate-300 bg-white';
 const cardLeftPanelStyles = 'bg-slate-910 flex w-[410px] flex-col justify-center gap-2 px-10';
 
-export function AppCard({ app, className, envSlug }: Props) {
+export function AppCard({ app, className, envSlug, isArchived }: Props) {
   return (
     <div className={classNames(cardWrapperStyles, className)}>
       <div className={cardLeftPanelStyles}>
@@ -46,6 +48,7 @@ export function AppCard({ app, className, envSlug }: Props) {
             className="transition-color flex cursor-pointer items-center gap-1 text-white underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-400 hover:decoration-indigo-400"
             href={`/env/${envSlug}/apps/${encodeURIComponent(app.externalID)}`}
           >
+            {isArchived && <ArchiveBoxArrowDownIcon className="h-4 w-4" />}
             {app.name}
             <ChevronRightIcon className="h-4 w-4" />
           </Link>

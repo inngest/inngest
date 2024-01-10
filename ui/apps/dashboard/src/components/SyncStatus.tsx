@@ -1,4 +1,5 @@
-import { ArrowPathIcon, CheckIcon, MinusIcon, XMarkIcon } from '@heroicons/react/20/solid';
+import { CheckIcon, ExclamationTriangleIcon, MinusIcon } from '@heroicons/react/20/solid';
+import { IconHourglass } from '@inngest/components/icons/Hourglass';
 import { classNames } from '@inngest/components/utils/classNames';
 
 const syncStatuses = ['error', 'pending', 'success'] as const;
@@ -8,21 +9,27 @@ function isSyncStatus(status: string): status is SyncStatus {
 }
 
 const syncStatusIcons = {
-  error: XMarkIcon,
-  pending: ArrowPathIcon,
+  error: ExclamationTriangleIcon,
+  pending: IconHourglass,
   success: CheckIcon,
 } as const satisfies { [key in SyncStatus]: React.ComponentType };
 
 const syncStatusText = {
   error: 'Error',
-  pending: 'Pending',
+  pending: 'Syncing',
   success: 'Success',
 } as const satisfies { [key in SyncStatus]: string };
 
 const syncStatusColor = {
-  error: 'text-red-300',
-  pending: 'text-sky-300',
-  success: 'text-emerald-300',
+  error: 'bg-red-100 text-red-800 border-red-500',
+  pending: 'bg-sky-100 text-sky-800 border-sky-500',
+  success: 'bg-teal-100 text-teal-800 border-teal-500',
+} as const satisfies { [key in SyncStatus]: string };
+
+const syncStatusIconColor = {
+  error: 'text-red-500',
+  pending: 'text-sky-500',
+  success: 'text-teal-500',
 } as const satisfies { [key in SyncStatus]: string };
 
 type Props = {
@@ -33,24 +40,27 @@ export function SyncStatus({ status }: Props) {
   let Icon;
   let text: string;
   let color: string;
+  let iconColor: string;
   if (isSyncStatus(status)) {
     Icon = syncStatusIcons[status];
     text = syncStatusText[status];
     color = syncStatusColor[status];
+    iconColor = syncStatusIconColor[status];
   } else {
     Icon = MinusIcon;
     text = 'Unknown';
-    color = 'text-slate-100';
+    color = 'bg-slate-100 text-slate-800 border-slate-500';
+    iconColor = 'text-slate-500';
   }
 
   return (
     <div
       className={classNames(
         color,
-        'py-.5 flex items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-800 px-2'
+        'flex items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1'
       )}
     >
-      <Icon className="h-4 w-4" />
+      <Icon className={classNames(iconColor, 'h-4 w-4')} />
       {text}
     </div>
   );

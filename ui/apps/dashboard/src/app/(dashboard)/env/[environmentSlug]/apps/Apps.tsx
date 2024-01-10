@@ -23,7 +23,7 @@ export function Apps({ isArchived = false }: Props) {
   }
   if (res.isLoading) {
     return (
-      <div className="mt-4 flex items-center justify-center">
+      <div className="mb-4 mt-16 flex items-center justify-center">
         <div className="w-full max-w-[1200px]">
           <SkeletonCard />
         </div>
@@ -34,7 +34,7 @@ export function Apps({ isArchived = false }: Props) {
   const hasApps = res.data.length > 0;
 
   return (
-    <div className="mt-4 flex items-center justify-center">
+    <div className="mb-4 mt-16 flex items-center justify-center">
       <div className="w-full max-w-[1200px]">
         {!hasApps && !isArchived && (
           <EmptyAppCard>
@@ -49,8 +49,19 @@ export function Apps({ isArchived = false }: Props) {
             </div>
           </EmptyAppCard>
         )}
+        {!hasApps && isArchived && (
+          <p className="rounded-lg bg-slate-500 p-4 text-center text-white">No archived apps</p>
+        )}
         {res.data.map((app) => {
-          return <AppCard app={app} className="mb-4" envSlug={env.slug} key={app.id} />;
+          return (
+            <AppCard
+              app={app}
+              className="mb-4"
+              envSlug={env.slug}
+              key={app.id}
+              isArchived={isArchived}
+            />
+          );
         })}
         {!isArchived && hasApps && (
           <Button
