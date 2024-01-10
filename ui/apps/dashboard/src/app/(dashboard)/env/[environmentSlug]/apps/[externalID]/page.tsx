@@ -28,8 +28,6 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
     return null;
   }
 
-  const { syncedFunctions } = appRes.data.latestSync ?? {};
-
   return (
     <div className="flex items-center justify-center pt-4">
       <div className="w-full max-w-[1200px]">
@@ -37,7 +35,7 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
 
         {appRes.data.latestSync && <AppGitCard className="mb-4" sync={appRes.data.latestSync} />}
 
-        {syncedFunctions && <FunctionList envSlug={environmentSlug} functions={syncedFunctions} />}
+        <FunctionList envSlug={environmentSlug} functions={appRes.data.functions} />
       </div>
     </div>
   );

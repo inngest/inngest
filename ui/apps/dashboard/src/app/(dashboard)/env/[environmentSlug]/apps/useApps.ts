@@ -7,6 +7,7 @@ const query = graphql(`
       apps {
         id
         externalID
+        functionCount
         name
         latestSync {
           createdAt
@@ -16,10 +17,6 @@ const query = graphql(`
           sdkLanguage
           sdkVersion
           status
-          syncedFunctions: deployedFunctions {
-            id
-            isArchived
-          }
           url
         }
       }
@@ -45,20 +42,14 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
           };
         }
 
-        const functionCount =
-          latestSync?.syncedFunctions.filter((fn) => {
-            return !fn.isArchived;
-          }).length || 0;
-
         return {
           ...app,
           latestSync,
-          functionCount,
 
           // This is a hack to get around the fact that app archival is not a
           // first-class feature yet. We'll infer that an app is archived if all
           // of its functions are archived.
-          isArchived: functionCount === 0,
+          isArchived: app.functionCount === 0,
         };
       })
       .filter((app) => {

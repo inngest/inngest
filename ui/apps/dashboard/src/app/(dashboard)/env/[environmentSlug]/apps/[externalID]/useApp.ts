@@ -9,6 +9,17 @@ const query = graphql(`
       app: appByExternalID(externalID: $externalAppID) {
         id
         externalID
+        functions {
+          id
+          latestVersion {
+            triggers {
+              eventName
+              schedule
+            }
+          }
+          name
+          slug
+        }
         name
         latestSync {
           commitAuthor
@@ -23,17 +34,6 @@ const query = graphql(`
           sdkLanguage
           sdkVersion
           status
-          syncedFunctions: deployedFunctions {
-            id
-            latestVersion {
-              triggers {
-                eventName
-                schedule
-              }
-            }
-            name
-            slug
-          }
           url
           vercelDeploymentID
           vercelDeploymentURL
@@ -59,12 +59,6 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
       latestSync = {
         ...app.latestSync,
         createdAt: new Date(app.latestSync.createdAt),
-        syncedFunctions: app.latestSync.syncedFunctions.map((fn) => {
-          return {
-            ...fn,
-            triggers: transformTriggers(fn.latestVersion.triggers),
-          };
-        }),
       };
     }
 
@@ -72,6 +66,12 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
       ...res,
       data: {
         ...app,
+        functions: app.functions.map((fn) => {
+          return {
+            ...fn,
+            triggers: transformTriggers(fn.latestVersion.triggers),
+          };
+        }),
         latestSync,
       },
     };
