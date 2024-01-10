@@ -33,7 +33,7 @@ export default function Page({ params }: Props) {
     return (
       <div className="h-full w-full overflow-y-auto">
         <div className="mx-auto mt-16 w-full max-w-[1200px] p-4">
-          <p className="rounded-lg bg-slate-500 p-4 text-center text-white">No Syncs Found</p>
+          <p className="rounded-lg bg-slate-500 p-4 text-center text-white">No syncs found</p>
         </div>
       </div>
     );
