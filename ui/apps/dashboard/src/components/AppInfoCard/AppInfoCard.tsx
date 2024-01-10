@@ -16,7 +16,7 @@ type Props = {
   app: App;
   className?: string;
   sync: Sync | null;
-  isIndividualSync?: boolean;
+  isInAppsSyncsPage?: boolean;
   loading?: false;
 };
 
@@ -24,7 +24,7 @@ type LoadingProps = {
   app?: undefined;
   className?: string;
   sync?: undefined;
-  isIndividualSync?: boolean;
+  isInAppsSyncsPage?: boolean;
   loading: true;
 };
 
@@ -46,7 +46,7 @@ export function AppInfoCard({
   app,
   className,
   sync,
-  isIndividualSync,
+  isInAppsSyncsPage,
   loading,
 }: Props | LoadingProps) {
   const env = useEnvironment();
@@ -55,8 +55,8 @@ export function AppInfoCard({
     lastSyncValue = (
       <div className="flex items-center gap-2">
         <SyncStatus status={sync.status} />
-        {isIndividualSync && <Time value={sync.createdAt} />}
-        {!isIndividualSync && (
+        {isInAppsSyncsPage && <Time value={sync.createdAt} />}
+        {!isInAppsSyncsPage && (
           <Link
             className="transition-color flex cursor-pointer items-center gap-1 text-indigo-400 underline decoration-transparent decoration-2 underline-offset-4 duration-300  hover:decoration-indigo-400"
             href={`/env/${env.slug}/apps/${encodeURIComponent(app.externalID)}/syncs`}

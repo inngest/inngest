@@ -2,7 +2,6 @@
 
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import ExclamationTriangleIcon from '@heroicons/react/20/solid/ExclamationTriangleIcon';
 import PlusIcon from '@heroicons/react/20/solid/PlusIcon';
 import { Button } from '@inngest/components/Button';
 
@@ -51,9 +50,7 @@ export function Apps({ isArchived = false }: Props) {
           </EmptyAppCard>
         )}
         {!hasApps && isArchived && (
-          <div className="flex items-center justify-center gap-1.5 rounded-lg bg-slate-500 p-4 text-white">
-            <ExclamationTriangleIcon className="h-5 w-5 text-slate-300" /> No Archived Apps
-          </div>
+          <p className="rounded-lg bg-slate-500 p-4 text-center text-white">No archived apps</p>
         )}
         {res.data.map((app) => {
           return (
