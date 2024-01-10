@@ -256,6 +256,8 @@ func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (interfa
 	}
 
 	if len(e.liftedVars) > 0 {
+		// Clone the data to remove concurrent writes.
+		data = data.Clone()
 		data.Add(map[string]any{
 			"vars": e.liftedVars,
 		})
