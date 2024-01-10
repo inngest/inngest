@@ -66,7 +66,7 @@ func (e EventTrigger) Validate(ctx context.Context) error {
 	}
 
 	if e.Expression != nil {
-		if _, err := expressions.NewExpressionEvaluator(ctx, *e.Expression); err != nil {
+		if err := expressions.Validate(ctx, *e.Expression); err != nil {
 			return fmt.Errorf("invalid trigger expression on '%s': %w", e.Event, err)
 		}
 	}

@@ -440,7 +440,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		JobID:       &queueKey,
 		GroupID:     uuid.New().String(),
 		WorkspaceID: req.WorkspaceID,
-		Kind:        queue.KindEdge,
+		Kind:        queue.KindStart,
 		Identifier:  id,
 		Attempt:     0,
 		MaxAttempts: &sourceEdgeRetries,
@@ -1479,6 +1479,10 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	// in the expression.
 	data := map[string]any{}
 	if opts.If != nil {
+		if err := expressions.Validate(ctx, *opts.If); err != nil {
+			return execError{err, true}
+		}
+
 		expr, err := e.newExpressionEvaluator(ctx, *opts.If)
 		if err != nil {
 			return execError{err, true}
