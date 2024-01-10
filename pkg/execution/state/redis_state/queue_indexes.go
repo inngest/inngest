@@ -48,11 +48,6 @@ func QueueItemIndexerFunc(ctx context.Context, i QueueItem, kg QueueKeyGenerator
 		// Pause jobs are an implementation detail and are not indexed.  Instead,
 		// we should store indexes for each pause <> run separately.  Consuming
 		// or deleting pauses should delete the index.
-		return QueueItemIndex{
-			kg.Status("pause", i.WorkflowID),
-		}
-
-	default:
-		return QueueItemIndex{}
 	}
+	return QueueItemIndex{}
 }
