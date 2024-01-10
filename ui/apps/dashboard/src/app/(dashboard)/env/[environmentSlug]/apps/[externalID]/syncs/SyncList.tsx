@@ -39,7 +39,7 @@ export function SyncList({
   return (
     <div
       className={classNames(
-        'w-[442px] flex-shrink-0 overflow-y-auto border-r border-slate-300 bg-white',
+        'w-[460px] flex-shrink-0 overflow-y-auto border-r border-slate-300 bg-white',
         className
       )}
     >
