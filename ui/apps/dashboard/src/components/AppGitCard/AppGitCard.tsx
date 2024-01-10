@@ -73,15 +73,7 @@ export function AppGitCard({ className, sync }: Props) {
 
       <dl className="grid grow grid-cols-4 gap-4 px-6 py-4">
         {/* Row 1 */}
-        <Description
-          className="col-span-4"
-          detail={
-            <div>
-              <code className="whitespace-pre-line text-sm">{commitMessage}</code>
-            </div>
-          }
-          term="Commit Message"
-        />
+        <Description className="col-span-4" detail={commitMessage} term="Commit Message" />
 
         {/* Row 2 */}
         <Description className="truncate" detail={commitAuthor} term="Commit Author" />
