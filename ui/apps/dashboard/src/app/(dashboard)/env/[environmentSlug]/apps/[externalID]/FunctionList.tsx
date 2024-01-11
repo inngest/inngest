@@ -36,7 +36,7 @@ export function FunctionList({ envSlug, functions }: Props) {
           enableSorting: false,
         }}
         tableContainerRef={tableContainerRef}
-        disableVirtualizer
+        isVirtualized={false}
       />
     </main>
   );

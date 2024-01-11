@@ -10,7 +10,7 @@ type TableProps = {
   blankState: React.ReactNode;
   customRowProps?: (row: Row<any>) => void;
   tableContainerRef: React.RefObject<HTMLDivElement>;
-  disableVirtualizer?: boolean;
+  isVirtualized?: boolean;
 };
 
 export function Table({
@@ -18,7 +18,7 @@ export function Table({
   blankState,
   customRowProps,
   tableContainerRef,
-  disableVirtualizer,
+  isVirtualized = true,
 }: TableProps) {
   const table = useReactTable(options);
   const { rows } = table.getRowModel();
@@ -89,12 +89,12 @@ export function Table({
             </td>
           </tr>
         )}
-        {!disableVirtualizer && paddingTop > 0 && (
+        {isVirtualized && paddingTop > 0 && (
           <tr>
             <td style={{ height: `${paddingTop}px` }} />
           </tr>
         )}
-        {!disableVirtualizer &&
+        {isVirtualized &&
           virtualRows &&
           virtualRows.map((virtualRow) => {
             const row = table.getRowModel().rows[virtualRow.index];
@@ -125,12 +125,12 @@ export function Table({
               </tr>
             );
           })}
-        {!disableVirtualizer && paddingBottom > 0 && (
+        {isVirtualized && paddingBottom > 0 && (
           <tr>
             <td style={{ height: `${paddingBottom}px` }} />
           </tr>
         )}
-        {disableVirtualizer &&
+        {!isVirtualized &&
           table.getRowModel().rows.map((row) => (
             <tr
               key={row.id}
