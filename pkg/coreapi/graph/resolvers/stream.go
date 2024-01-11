@@ -51,7 +51,7 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 	fnsByID := map[ulid.ULID][]*models.FunctionRun{}
 	for _, fn := range fns {
 		run := models.MakeFunctionRun(fn)
-		_, err := r.Data.GetFunctionByID(ctx, uuid.MustParse(run.FunctionID))
+		_, err := r.Data.GetFunctionByInternalUUID(ctx, uuid.UUID{}, uuid.MustParse(run.FunctionID))
 		if err == sql.ErrNoRows {
 			// Skip run since its function doesn't exist. This can happen when
 			// deleting a function or changing its ID.
@@ -92,7 +92,7 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 		}
 
 		runs := []*models.FunctionRun{models.MakeFunctionRun(i)}
-		_, err := r.Data.GetFunctionByID(ctx, uuid.MustParse(runs[0].FunctionID))
+		_, err := r.Data.GetFunctionByInternalUUID(ctx, uuid.UUID{}, uuid.MustParse(runs[0].FunctionID))
 		if err == sql.ErrNoRows {
 			// Skip run since its function doesn't exist. This can happen when
 			// deleting a function or changing its ID.

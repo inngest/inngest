@@ -120,7 +120,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithPollTick(150 * time.Millisecond),
 		redis_state.WithQueueKeyGenerator(queueKG),
 		redis_state.WithCustomConcurrencyKeyGenerator(func(ctx context.Context, i redis_state.QueueItem) []state.CustomConcurrency {
-			fn, err := dbcqrs.GetFunctionByID(ctx, i.Data.Identifier.WorkflowID)
+			fn, err := dbcqrs.GetFunctionByInternalUUID(ctx, i.Data.Identifier.WorkspaceID, i.Data.Identifier.WorkflowID)
 			if err != nil {
 				// Use what's stored in the state store.
 				return i.Data.Identifier.CustomConcurrencyKeys
