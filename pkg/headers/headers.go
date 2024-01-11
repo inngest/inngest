@@ -30,3 +30,13 @@ func StaticHeadersMiddleware(serverKind string) func(next http.Handler) http.Han
 		})
 	}
 }
+
+// ContentTypeJsonResponse sets the HTTP response's Content-Type header to JSON
+func ContentTypeJsonResponse() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			next.ServeHTTP(w, r)
+		})
+	}
+}
