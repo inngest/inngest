@@ -10,9 +10,16 @@ type TableProps = {
   blankState: React.ReactNode;
   customRowProps?: (row: Row<any>) => void;
   tableContainerRef: React.RefObject<HTMLDivElement>;
+  disableVirtualizer?: boolean;
 };
 
-export function Table({ options, blankState, customRowProps, tableContainerRef }: TableProps) {
+export function Table({
+  options,
+  blankState,
+  customRowProps,
+  tableContainerRef,
+  disableVirtualizer,
+}: TableProps) {
   const table = useReactTable(options);
   const { rows } = table.getRowModel();
 
@@ -82,12 +89,13 @@ export function Table({ options, blankState, customRowProps, tableContainerRef }
             </td>
           </tr>
         )}
-        {paddingTop > 0 && (
+        {!disableVirtualizer && paddingTop > 0 && (
           <tr>
             <td style={{ height: `${paddingTop}px` }} />
           </tr>
         )}
-        {virtualRows &&
+        {!disableVirtualizer &&
+          virtualRows &&
           virtualRows.map((virtualRow) => {
             const row = table.getRowModel().rows[virtualRow.index];
             if (!row) return;
@@ -117,11 +125,37 @@ export function Table({ options, blankState, customRowProps, tableContainerRef }
               </tr>
             );
           })}
-        {paddingBottom > 0 && (
+        {!disableVirtualizer && paddingBottom > 0 && (
           <tr>
             <td style={{ height: `${paddingBottom}px` }} />
           </tr>
         )}
+        {disableVirtualizer &&
+          table.getRowModel().rows.map((row) => (
+            <tr
+              key={row.id}
+              {...(customRowProps ? customRowProps(row) : {})}
+              className=" dark:bg-slate-910 bg-white hover:bg-slate-100 dark:hover:bg-slate-900"
+            >
+              {row.getVisibleCells().map((cell) => (
+                <td
+                  className={classNames(
+                    cellStyles,
+                    cell.column.getIsPinned() && 'sticky left-0 z-[2]'
+                  )}
+                  key={cell.id}
+                  style={{
+                    width:
+                      cell.column.getSize() === Number.MAX_SAFE_INTEGER
+                        ? 'auto'
+                        : cell.column.getSize(),
+                  }}
+                >
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </td>
+              ))}
+            </tr>
+          ))}
       </tbody>
     </table>
   );
