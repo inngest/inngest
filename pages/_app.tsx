@@ -138,8 +138,11 @@ function MyApp({ Component, pageProps }: AppProps<DefaultProps>) {
   const canonicalUrl = `https://www.inngest.com${
     router.asPath === "/" ? "" : router.asPath
   }`.split("?")[0];
-  const ogImage =
-    pageProps?.meta?.image || getOpenGraphImageURL({ title: title });
+  const ogImage = pageProps?.meta?.image
+    ? pageProps.meta.image.match(/^\//) // Prefix URLs starting with "/" with the host
+      ? `${process.env.NEXT_PUBLIC_HOST}${pageProps.meta.image}`
+      : pageProps.meta.image
+    : getOpenGraphImageURL({ title: title });
 
   return (
     <>

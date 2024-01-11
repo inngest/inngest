@@ -1,8 +1,25 @@
+import type { GetStaticPropsResult } from "next";
 import { useRef, useState } from "react";
 import Header from "src/shared/Header";
 import Logo from "src/shared/Icons/Logo";
 import Container from "src/shared/layout/Container";
 import Footer from "src/shared/Footer";
+import type { PageProps } from "src/shared/types";
+
+export async function getStaticProps(): Promise<
+  GetStaticPropsResult<PageProps>
+> {
+  return {
+    props: {
+      meta: {
+        title: "Inngest Launch Week",
+        description:
+          "A week of updates from Inngest starting January 22nd, 2024",
+        image: "/assets/launch-week/og.png",
+      },
+    },
+  };
+}
 
 export default function LaunchWeek() {
   return (
