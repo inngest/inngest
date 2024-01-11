@@ -34,3 +34,4 @@
 
 # Nix
 /.direnv/
+.env*.local

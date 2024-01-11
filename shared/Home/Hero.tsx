@@ -38,7 +38,7 @@ export default function Hero() {
                 "Zero-infrastructure to manage",
                 "Automatic retries for max reliability",
               ].map((r) => (
-                <li className="flex items-center gap-2">
+                <li className="flex items-center gap-2" key={r}>
                   <CheckIcon className="h-5 w-5 text-slate-400/80 shrink-0" />{" "}
                   {r}
                 </li>

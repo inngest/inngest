@@ -59,7 +59,6 @@ function DefaultLayout({ children }) {
           </span>
         </PageBanner>
       )}
-      <div className="bg-slate-1000 gradient h-screen w-full absolute top-0 right-0 -z-10 "></div>
       {children}
     </>
   );

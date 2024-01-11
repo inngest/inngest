@@ -7,15 +7,6 @@
 @tailwind components;
 @tailwind utilities;
 
-.gradient {
-  display: none;
-}
-
-.v1 .page-banner {
-  font-size: 14px;
-  padding: 6px 0;
-}
-
 /** Standard **/
 
 @supports (font-variation-settings: normal) {
@@ -86,11 +77,6 @@
   /* Default to dark theme */
   color: #fff;
   background-color: #080D19;
-  background-image: linear-gradient(
-    to bottom,
-    #121139 0%,
-    #080D19 100vh
-  );
 }
 
 /* Legacy base styles */

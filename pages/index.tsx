@@ -6,7 +6,6 @@ import Header from "../shared/Header";
 import Hero from "../shared/Home/Hero";
 import Logos from "src/shared/Home/Logos";
 
-// import SDKOverview from "src/shared/Home/SDKOverview";
 import UseCases from "src/shared/Home/UseCases";
 import Features from "src/shared/Home/Features";
 import LocalDev from "../shared/Home/LocalDev";
@@ -15,14 +14,11 @@ import Footer from "../shared/Footer";
 import Quote from "src/shared/Home/Quote";
 import SocialProof from "src/shared/Home/SocialProof";
 
-// import GetThingsShipped from "src/shared/Home/GetThingsShipped";
-// import RunAnywhere from "src/shared/Home/RunAnywhere";
-// import PlatformFeatures from "src/shared/Home/PlatformFeatures";
 import PlatformFeatures2 from "src/shared/Home/PlatformFeatures2";
-// import FeatureCallouts from "src/shared/Home/FeatureCallouts";
 import Flexibility from "src/shared/Home/Flexibility";
 import type { PageProps } from "src/shared/types";
-// import EnterpriseTrust from "src/shared/Home/EnterpriseTrust";
+import PageBanner from "../shared/legacy/PageBanner";
+import { RocketLaunchIcon } from "@heroicons/react/24/outline";
 
 export async function getStaticProps(): Promise<
   GetStaticPropsResult<PageProps>
@@ -51,6 +47,14 @@ export default function Home() {
       }}
     >
       <Header />
+
+      <PageBanner href="/launch-week?ref=homepage-banner" className="mt-px">
+        <RocketLaunchIcon className="inline-flex h-7 sm:h-5 mr-1" />
+        <span className="shrink">
+          Join Us for Launch Week!{" "}
+          <span className="font-normal inline-flex">Starts January 22nd</span>
+        </span>
+      </PageBanner>
 
       <Hero />
 
