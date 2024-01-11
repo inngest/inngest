@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import Header from "src/shared/Header";
+import Logo from "src/shared/Icons/Logo";
 import Container from "src/shared/layout/Container";
 import Footer from "src/shared/Footer";
 
@@ -10,8 +11,10 @@ export default function LaunchWeek() {
       <Container className="py-8">
         <div className="my-12 tracking-tight flex items-center justify-center">
           <div className="py-12 md:py-24 rounded-md">
-            <h1 className="font-bold text-5xl md:text-7xl leading-tight md:leading-tight text-white text-center">
-              inngest <br />
+            <div className="flex justify-center">
+              <Logo fill={"#ffffff"} width={260} />
+            </div>
+            <h1 className="font-bold text-5xl md:text-7xl leading-tight md:leading-tight text-white text-center mb-4">
               <span className="bg-clip-text text-transparent bg-gradient-to-br bg-gradient-to-r from-[#5EEAD4] via-[#A7F3D0] to-[#FDE68A]">
                 Launch Week
               </span>
