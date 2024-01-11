@@ -101,6 +101,10 @@ const sectionGuides = [
     title: "How to",
     links: [
       {
+        title: "Concurrency",
+        href: `/docs/guides/concurrency`,
+      },
+      {
         title: "Handling idempotency",
         href: `/docs/guides/handling-idempotency`,
       },
