@@ -71,6 +71,8 @@ export type App = {
   __typename?: 'App';
   createdAt: Scalars['Time'];
   externalID: Scalars['String'];
+  functionCount: Scalars['Int'];
+  functions: Array<Workflow>;
   id: Scalars['UUID'];
   latestSync: Maybe<Deploy>;
   name: Scalars['String'];
@@ -1170,6 +1172,7 @@ export type Workspace = {
   parentID: Maybe<Scalars['ID']>;
   test: Scalars['Boolean'];
   type: EnvironmentType;
+  unattachedSyncs: Array<Deploy>;
   vercelApps: Array<VercelApp>;
   webhookSigningKey: Scalars['String'];
   workflow: Maybe<Workflow>;
@@ -1217,6 +1220,12 @@ export type WorkspaceIngestKeyArgs = {
 
 export type WorkspaceIngestKeysArgs = {
   filter: InputMaybe<IngestKeyFilter>;
+};
+
+
+export type WorkspaceUnattachedSyncsArgs = {
+  after: InputMaybe<Scalars['Time']>;
+  first?: Scalars['Int'];
 };
 
 

@@ -28,7 +28,7 @@ export default function FunctionListPage() {
         {hasMore !== false && (
           <div className="flex w-full justify-center py-2.5">
             <Button
-              disabled={isLoading}
+              loading={isLoading}
               appearance="outlined"
               btnAction={loadMore}
               label={isLoading ? 'Loading' : 'Load More'}
