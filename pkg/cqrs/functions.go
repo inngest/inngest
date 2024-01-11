@@ -42,7 +42,7 @@ type FunctionReader interface {
 }
 
 // DevFunctionManager is a development-only function manager
-type DevFunctionManager interface {
+type FunctionManager interface {
 	// Embeds production & API related functionality.
 
 	FunctionReader
