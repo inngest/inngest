@@ -13,10 +13,13 @@ import { Time } from '@/components/Time';
 import { PlatformSection } from './PlatformSection';
 
 type Props = {
-  app: App;
+  // Optional because this card is used in the "unattached syncs" page, and
+  // unattached syncs are by definition app-less
+  app?: App;
+
   className?: string;
   sync: Sync | null;
-  isInAppsSyncsPage?: boolean;
+  linkToSyncs?: boolean;
   loading?: false;
 };
 
@@ -24,7 +27,7 @@ type LoadingProps = {
   app?: undefined;
   className?: string;
   sync?: undefined;
-  isInAppsSyncsPage?: boolean;
+  linkToSyncs?: boolean;
   loading: true;
 };
 
@@ -42,31 +45,34 @@ type Sync = {
   url: string | null;
 } & React.ComponentProps<typeof PlatformSection>['sync'];
 
-export function AppInfoCard({
-  app,
-  className,
-  sync,
-  isInAppsSyncsPage,
-  loading,
-}: Props | LoadingProps) {
+export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Props | LoadingProps) {
   const env = useEnvironment();
   let lastSyncValue;
   if (sync) {
-    lastSyncValue = (
-      <div className="flex items-center gap-2">
-        <SyncStatus status={sync.status} />
-        {isInAppsSyncsPage && <Time value={sync.createdAt} />}
-        {!isInAppsSyncsPage && (
-          <Link
-            className="transition-color flex cursor-pointer items-center gap-1 text-indigo-400 underline decoration-transparent decoration-2 underline-offset-4 duration-300  hover:decoration-indigo-400"
-            href={`/env/${env.slug}/apps/${encodeURIComponent(app.externalID)}/syncs`}
-          >
-            <Time value={sync.createdAt} />
-            <ChevronRightIcon className="h-4 w-4" />
-          </Link>
-        )}
-      </div>
-    );
+    if (app) {
+      lastSyncValue = (
+        <div className="flex items-center gap-2">
+          <SyncStatus status={sync.status} />
+          {linkToSyncs && <Time value={sync.createdAt} />}
+          {!linkToSyncs && (
+            <Link
+              className="transition-color flex cursor-pointer items-center gap-1 text-indigo-400 underline decoration-transparent decoration-2 underline-offset-4 duration-300  hover:decoration-indigo-400"
+              href={`/env/${env.slug}/apps/${encodeURIComponent(app.externalID)}/syncs`}
+            >
+              <Time value={sync.createdAt} />
+              <ChevronRightIcon className="h-4 w-4" />
+            </Link>
+          )}
+        </div>
+      );
+    } else {
+      lastSyncValue = (
+        <div className="flex items-center gap-2">
+          <SyncStatus status={sync.status} />
+          <Time value={sync.createdAt} />
+        </div>
+      );
+    }
   }
 
   return (
@@ -83,7 +89,12 @@ export function AppInfoCard({
 
         <dl className="grid grow grid-cols-4 gap-4 px-6 py-4">
           {/* Row 1 */}
-          <Description className="truncate" detail={app?.externalID} term="ID" loading={loading} />
+          <Description
+            className="truncate"
+            detail={app?.externalID ?? '-'}
+            term="ID"
+            loading={loading}
+          />
           <Description
             className="truncate"
             detail={sync?.sdkVersion ?? '-'}
