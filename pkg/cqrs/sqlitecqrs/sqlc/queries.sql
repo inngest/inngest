@@ -51,8 +51,15 @@ SELECT * FROM functions;
 -- name: GetAppFunctions :many
 SELECT * FROM functions WHERE app_id = ?;
 
+-- name: GetAppFunctionsBySlug :many
+SELECT functions.* FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ?;
+
 -- name: GetFunctionByID :one
 SELECT * FROM functions WHERE id = ?;
+
+-- name: GetFunctionBySlug :one
+SELECT * FROM functions WHERE slug = ?;
+
 
 -- name: UpdateFunctionConfig :one
 UPDATE functions SET config = ? WHERE id = ? RETURNING *;
