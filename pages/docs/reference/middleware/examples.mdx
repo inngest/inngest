@@ -2,6 +2,7 @@
 
 The following examples show how you might use middleware in some real-world scenarios.
 
+- [Cloudflare Workers AI](#cloudflare-workers-ai)
 - [Common actions for every function](#common-actions-for-every-function)
 - [E2E Encryption](#e2-e-encryption)
 - [Logging](#logging)
@@ -9,6 +10,58 @@ The following examples show how you might use middleware in some real-world scen
 - [Sentry error reporting and tracing](#sentry-error-reporting-and-tracing)
 
 ---
+
+## Cloudflare Workers AI
+
+[Workers AI](https://developers.cloudflare.com/workers-ai/) allows you to run machine learning models, on the Cloudflare network, from your own code, triggered by Inngest.
+
+To use the `@cloudflare/ai` package, you need access to the `env` object passed to a Workers route handler. This argument is usually abstracted away by a serve handler, but middleware can access arguments passed to the request.
+
+Use this along with [mutating function input](/docs/reference/middleware/typescript#mutating-input) to set a new `ai` property that you can use within functions, like in the following example:
+
+```ts
+import { Ai } from "@cloudflare/ai";
+import { InngestMiddleware } from "inngest";
+
+interface Env {
+  // If you set another name in wrangler.toml as the value for 'binding',
+  // replace "AI" with the variable name you defined.
+  AI: any;
+}
+
+export const cloudflareMiddleware = new InngestMiddleware({
+  name: "Inngest: Workers AI",
+  init: () => {
+    return {
+      onFunctionRun: ({ reqArgs }) => {
+        const [, env] = reqArgs as [Request, Env];
+        const ai = new Ai(env.AI);
+
+        return {
+          transformInput: () => {
+            return { ctx: { ai } };
+          },
+        };
+      },
+    };
+  },
+});
+```
+
+```ts
+import { inngest } from "./client";
+
+export default inngest.createFunction(
+  { id: "hello-world" },
+  { event: "demo/event.sent" },
+  async ({ ai }) => {
+    // `ai` is typed and can be used directly or within a step
+    const response = await ai.run("@cf/meta/llama-2-7b-chat-int8", {
+      prompt: "What is the origin of the phrase Hello, World",
+    });
+  }
+);
+```
 
 ## Common actions for every function
 

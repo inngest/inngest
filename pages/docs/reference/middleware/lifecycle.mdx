@@ -130,10 +130,13 @@ The `init()` function can return functions for two separate lifecycles to hook i
                <Property name="fn" type="InngestFunction">
                     The function that is about to be executed.
                </Property>
+               <Property name="reqArgs" type="array" version="v3.9.0+">
+                    Arguments passed to the framework's request handler, which are used by the SDK's `serve` handler.
+               </Property>
           </Properties>
 
           <Properties name="Returns" nested>
-               <Property name="input" type="function">
+               <Property name="transformInput" type="function">
                     Called once the input for the function has been set up. This is where you can modify the input before the function starts.
 
                     Has the same input as the containing `onFunctionRun()` lifecycle function, but with a complete `ctx` object, including `step` tooling.
@@ -159,7 +162,7 @@ The `init()` function can return functions for two separate lifecycles to hook i
                <Property name="afterExecution" type="function">
                     Called after the function has finished executing.
                </Property>
-               <Property name="output" type="function">
+               <Property name="transformOutput" type="function">
                     Called after the function has finished executing and before the response is sent back to Inngest. This is where you can modify the output.
 
                     <Properties name="Arguments" nested collapse>
