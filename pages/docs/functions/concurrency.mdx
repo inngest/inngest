@@ -75,7 +75,7 @@ Alternatively, if you want to limit the number of times that your function runs 
     
         * `fn` (default):  only the runs of this function affects the concurrency limit
         * `env`:  all runs within the same environment that share the same evaluated key value will affect the concurrency limit.  This requires setting a `key` which evaluates to a virtual queue name.
-        * `account`:  all runs in your account that share the same evaluated key value will affect the concurrency limit.  This requires setting a `key` which evaluates to a virtual queue name.
+        * `account`:  every run that shares the same evaluated key value will affect the concurrency limit, across every environment.  This requires setting a `key` which evaluates to a virtual queue name.
       </Property>
       <Property name="key" type="string">
         An expression which evaluates to a string given the triggering event.  The string returned from the expression is used as the concurrency queue name.  A key is required when setting an `env` or `account` level scope. 

@@ -73,6 +73,11 @@ In the second example, we define **two concurrency constraints that create two v
 
 Inngest manages concurrency for you within our scheduling system, and you do not need to provision queues, infrastructure, or manage concurrency limits within your own workers or services.
 
+Some additional information:
+
+- The order of keys does not matter.  Concurrency is limited by any key that reaches its limits.
+- You can specify multiple keys for the same scope, as long as the resulting `key` evaluates to a different string.
+
 ## Concurrency control across specific steps in a function
 
 You might need to set a different concurrency limit for a single step in a function. For example, within an AI flow you may have 10 pre-processing steps which can run with higher limits, and a single AI call with much lower limits.
@@ -149,7 +154,7 @@ Because functions are FIFO, function runs are more likely to be worked on the ol
 
     * `fn` (default):  only the runs of this function affects the concurrency limit
     * `env`:  all runs within the same environment that share the same evaluated key value will affect the concurrency limit.  This requires setting a `key` which evaluates to a virtual queue name.
-    * `account`:  all runs in your account that share the same evaluated key value will affect the concurrency limit.  This requires setting a `key` which evaluates to a virtual queue name.
+    * `account`:  every run that shares the same evaluated key value will affect the concurrency limit, across every environment.  This requires setting a `key` which evaluates to a virtual queue name.
 
     Each SDK exposes these enums in the idiomatic manner of a given language, though the meanings of the enums are the same across all languages.
   </Property>
