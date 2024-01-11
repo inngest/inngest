@@ -39,7 +39,7 @@ export function SyncList({
   return (
     <div
       className={classNames(
-        'w-[442px] flex-shrink-0 overflow-y-auto border-r border-slate-300 bg-white',
+        'w-[460px] flex-shrink-0 overflow-y-auto border-r border-slate-300 bg-white',
         className
       )}
     >
@@ -49,7 +49,7 @@ export function SyncList({
         </div>
       )}
       {!loading && (
-        <ul className="table border-collapse">
+        <ul className="table w-full border-collapse">
           {syncs.map((sync) => {
             let bgColor = 'bg-white';
             if (sync.id === selectedSyncID) {

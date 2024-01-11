@@ -57,7 +57,7 @@ export function SyncStatus({ status }: Props) {
     <div
       className={classNames(
         color,
-        'flex items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1'
+        'flex w-fit items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1'
       )}
     >
       <Icon className={classNames(iconColor, 'h-4 w-4')} />
