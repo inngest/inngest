@@ -48,7 +48,7 @@ export function Sync({ externalAppID, syncID }: Props) {
   return (
     <div className="h-full w-full overflow-y-auto">
       <div className="mx-auto w-full max-w-[1200px] p-4">
-        <AppInfoCard app={app} className="mb-4" sync={sync} isInAppsSyncsPage />
+        <AppInfoCard app={app} className="mb-4" sync={sync} linkToSyncs />
         <AppGitCard className="mb-4" sync={sync} />
 
         <FunctionList

@@ -74,7 +74,7 @@ export function useFunctionsPage({
   envID: string;
   page: number;
 }) {
-  const pageSize = 5;
+  const pageSize = 50;
   const res = useGraphQLQuery({
     query: GetFunctionsDocument,
     variables: {
@@ -241,7 +241,7 @@ export async function getFunctionUsagesPage(args: {
   envID: string;
   page: number;
 }) {
-  const pageSize = 2;
+  const pageSize = 50;
 
   const res = await args.client
     .query(GetFunctionsUsageDocument, {

@@ -7,6 +7,7 @@ import { Button } from '@inngest/components/Button';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { AppCard, EmptyAppCard, SkeletonCard } from './AppCard';
+import { UnattachedSyncsCard } from './UnattachedSyncsCard';
 import { useApps } from './useApps';
 
 type Props = {
@@ -31,7 +32,8 @@ export function Apps({ isArchived = false }: Props) {
     );
   }
 
-  const hasApps = res.data.length > 0;
+  const { apps, latestUnattachedSyncTime } = res.data;
+  const hasApps = apps.length > 0;
 
   return (
     <div className="mb-4 mt-16 flex items-center justify-center">
@@ -52,7 +54,7 @@ export function Apps({ isArchived = false }: Props) {
         {!hasApps && isArchived && (
           <p className="rounded-lg bg-slate-500 p-4 text-center text-white">No archived apps</p>
         )}
-        {res.data.map((app) => {
+        {apps.map((app) => {
           return (
             <AppCard
               app={app}
@@ -63,9 +65,14 @@ export function Apps({ isArchived = false }: Props) {
             />
           );
         })}
+
+        {latestUnattachedSyncTime && (
+          <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={latestUnattachedSyncTime} />
+        )}
+
         {!isArchived && hasApps && (
           <Button
-            className="mx-auto mt-12"
+            className="mx-auto my-12"
             kind="primary"
             label="Sync New App"
             btnAction={() => router.push(`/env/${env.slug}/apps/sync-new` as Route)}

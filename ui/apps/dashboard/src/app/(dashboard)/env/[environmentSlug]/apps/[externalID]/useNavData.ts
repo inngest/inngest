@@ -2,7 +2,7 @@ import { graphql } from '@/gql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const query = graphql(`
-  query AppName($envID: ID!, $externalAppID: String!) {
+  query AppNavData($envID: ID!, $externalAppID: String!) {
     environment: workspace(id: $envID) {
       app: appByExternalID(externalID: $externalAppID) {
         latestSync {
