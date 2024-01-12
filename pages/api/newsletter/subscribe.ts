@@ -43,8 +43,11 @@ export default async (req, res) => {
     );
 
     if (response.status >= 400) {
-      const text = await response.text();
-      console.log(text);
+      const text = await response.json();
+      if (text.title === "Member Exists") {
+        return res.status(201).json({ error: "" });
+      }
+
       return res.status(400).json({
         error: `There was an error subscribing to the newsletter. Please try again.`,
       });

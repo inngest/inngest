@@ -90,10 +90,17 @@ function NewsletterSignup({ tags = [] }: { tags: string[] }) {
     });
     setLoading(false);
     if (res.status === 201) {
-      alert("Success! 🎉 You are now subscribed to the newsletter.");
-      inputRef.current.value = "";
+      setResponse({ result: true, error: "" });
+    } else {
+      const { error } = await res.json();
+      console.log(error);
+      setResponse({ result: false, error });
     }
   };
+
+  const canSubmit = response.result !== true || response.error !== "";
+
+  console.log(response);
 
   return (
     <form onSubmit={subscribeUser}>
@@ -111,15 +118,28 @@ function NewsletterSignup({ tags = [] }: { tags: string[] }) {
           autoCapitalize="off"
           autoCorrect="off"
         />
-        <button
-          type="submit"
-          name="register"
-          disabled={loading || response.result === true}
-          className="whitespace-nowrap button group inline-flex items-center justify-center gap-0.5 rounded-md font-medium tracking-tight transition-all text-slate-950 placeholder:text-slate-300 bg-gradient-to-br bg-gradient-to-r from-[#5EEAD4] via-[#A7F3D0] to-[#FDE68A] text-sm px-3 py-2"
-        >
-          Register
-        </button>
+        {canSubmit && (
+          <button
+            type="submit"
+            name="register"
+            disabled={loading || response.result === true}
+            className={`whitespace-nowrap button group inline-flex items-center justify-center gap-0.5 rounded-md font-medium tracking-tight transition-all text-slate-950 placeholder:text-slate-300
+            bg-gradient-to-br bg-gradient-to-r from-[#5EEAD4] via-[#A7F3D0] to-[#FDE68A] text-sm px-3 py-2
+            ${loading ? "opacity-40 cursor-not-allowed" : ""}`}
+          >
+            Register
+          </button>
+        )}
+        <div></div>
       </div>
+      {response.error && (
+        <p className="mt-2 text-white text-sm">{response.error}</p>
+      )}
+      {response.result && (
+        <p className="mt-2 text-white text-sm">
+          Great! You're all set to receive updates on Inngest Launch Week!
+        </p>
+      )}
     </form>
   );
 }
