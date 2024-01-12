@@ -20,7 +20,7 @@ inngest.createFunction(
   {
     id: "another-function",
     concurrency: 10,
-  }
+  },
   { event: "ai/summary.requested" },
   async ({ event, step }) => {
   }
@@ -51,7 +51,7 @@ inngest.createFunction(
          limit: 1,
       },
     ],
-  }
+  },
   { event: "ai/summary.requested" },
   async ({ event, step }) => {
   }
@@ -96,14 +96,12 @@ You may write two functions that define different levels for an 'account' scoped
 inngest.createFunction(
   {
     id: "func-a",
-    concurrency: [
-      {
-         scope: "account",
-         key: `"openai"`,
-         limit: 5,
-      },
-    ],
-  }
+    concurrency: {
+      scope: "account",
+      key: `"openai"`,
+      limit: 5,
+    },
+  },
   { event: "ai/summary.requested" },
   async ({ event, step }) => {
   }
@@ -112,14 +110,12 @@ inngest.createFunction(
 inngest.createFunction(
   {
     id: "func-b",
-    concurrency: [
-      {
-         scope: "account",
-         key: `"openai"`,
-         limit: 50,
-      },
-    ],
-  }
+    concurrency: {
+      scope: "account",
+      key: `"openai"`,
+      limit: 50,
+    },
+  },
   { event: "ai/summary.requested" },
   async ({ event, step }) => {
   }
