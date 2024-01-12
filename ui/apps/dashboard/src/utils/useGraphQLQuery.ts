@@ -50,7 +50,7 @@ export function useGraphQLQuery<
     return () => clearTimeout(timeoutID);
   }, [res.fetching, pollIntervalInMilliseconds, executeQuery]);
 
-  if (res.fetching && !res.data) {
+  if (res.fetching) {
     return baseFetchLoading;
   }
 
