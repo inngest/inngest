@@ -20,6 +20,10 @@ const query = graphql(`
           url
         }
       }
+
+      unattachedSyncs(first: 1) {
+        createdAt
+      }
     }
   }
 `);
@@ -58,9 +62,17 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
         return app.latestSync && app.isArchived === isArchived;
       });
 
+    let latestUnattachedSyncTime;
+    if (res.data.environment.unattachedSyncs[0]) {
+      latestUnattachedSyncTime = new Date(res.data.environment.unattachedSyncs[0].createdAt);
+    }
+
     return {
       ...res,
-      data: apps,
+      data: {
+        apps,
+        latestUnattachedSyncTime,
+      },
     };
   }
 
