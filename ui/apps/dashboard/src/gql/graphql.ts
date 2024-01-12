@@ -69,7 +69,6 @@ export type AccountSearchArgs = {
 
 export type App = {
   __typename?: 'App';
-  canResync: Scalars['Boolean'];
   createdAt: Scalars['Time'];
   externalID: Scalars['String'];
   functionCount: Scalars['Int'];
