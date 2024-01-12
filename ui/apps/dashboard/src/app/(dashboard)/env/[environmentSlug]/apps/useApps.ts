@@ -64,5 +64,8 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
     };
   }
 
-  return res;
+  return {
+    ...res,
+    data: undefined,
+  };
 }

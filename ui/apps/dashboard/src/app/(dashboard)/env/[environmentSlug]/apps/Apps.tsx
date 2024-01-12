@@ -21,7 +21,7 @@ export function Apps({ isArchived = false }: Props) {
   if (res.error) {
     throw res.error;
   }
-  if (res.isLoading) {
+  if (res.isLoading && !res.data) {
     return (
       <div className="mb-4 mt-16 flex items-center justify-center">
         <div className="w-full max-w-[1200px]">

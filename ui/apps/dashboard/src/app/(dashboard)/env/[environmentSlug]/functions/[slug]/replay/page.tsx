@@ -110,7 +110,7 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <LoadingIcon />
