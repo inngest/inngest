@@ -48,7 +48,7 @@ const caseStudies: {
     snippet: (
       <>
         "The <strong>DX and visibility</strong> with Inngest is really{" "}
-        <em>incredible</em>."`
+        <em>incredible</em>."
       </>
     ),
     tags: ["Serverless"],
