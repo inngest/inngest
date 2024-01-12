@@ -15,12 +15,21 @@ export default function Page() {
     throw syncsRes.error;
   }
   if (syncsRes.isLoading) {
-    return null;
+    return (
+      <div className="flex h-full min-h-0">
+        <SyncList onClick={setSelectedSyncID} loading />
+      </div>
+    );
   }
   const firstSync = syncsRes.data[0];
   if (!firstSync) {
-    // TODO: Make pretty
-    return 'No syncs found';
+    return (
+      <div className="h-full w-full overflow-y-auto">
+        <div className="mx-auto mt-16 w-full max-w-[1200px] p-4">
+          <p className="rounded-lg bg-slate-500 p-4 text-center text-white">No syncs found</p>
+        </div>
+      </div>
+    );
   }
 
   return (
