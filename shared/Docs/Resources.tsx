@@ -13,6 +13,7 @@ import {
   ArrowsPointingOutIcon,
   Square3Stack3DIcon,
   ChevronDoubleRightIcon,
+  RectangleGroupIcon,
 } from "@heroicons/react/24/outline";
 import ParallelIcon from "src/shared/Icons/Parallel";
 
@@ -24,6 +25,7 @@ const icons = {
   "chevron-double-right": ChevronDoubleRightIcon,
   "square-3-stack-3d": Square3Stack3DIcon,
   parallel: ParallelIcon,
+  "rectangle-group": RectangleGroupIcon,
 } as const;
 
 type IconType = keyof typeof icons;

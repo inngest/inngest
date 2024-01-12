@@ -35,13 +35,72 @@ const mainFunction = inngest.createFunction(
 
 In the above example, our `mainFunction` calls `computeSquare` to retrieve the resulting value. `computeSquare` can now be called from here or any other process connected to Inngest.
 
+## Referencing another Inngest function
+
+If a function exists in another app, you can create a reference that can be invoked in the same manner as the local `computeSquare` function above.
+
+```ts
+// @/inngest/computeSquare.ts
+import { referenceFunction } from "inngest";
+import { z } from "zod";
+
+// Create a reference to a function in another application.
+export const computeSquare = referenceFunction({
+  appId: "my-python-app",
+  functionId: "compute-square",
+  // Schemas are optional, but provide types for your call if specified
+  schemas: {
+    data: z.object({
+      number: z.number(),
+    }),
+    return: z.object({
+      result: z.number(),
+    }),
+  },
+});
+```
+
+```ts
+import { computeSquare } from "@/inngest/computeSquare";
+
+// square.result is typed as a number
+const square = await step.invoke("compute-square-value", {
+  function: computeSquare,
+  data: { number: 4 }, // input data is typed, requiring input if it's needed
+});
+```
+
+References can also be used to invoke local functions without needing to import them (and their dependencies) directly. This can be useful for frameworks like Next.js where edge and serverless handlers can be mixed together and require different sets of dependencies.
+
+```ts
+import { inngest, referenceFunction } from "inngest";
+import { type computeSquare } from "@/inngest/computeSquare"; // Import only the type
+
+const mainFunction = inngest.createFunction(
+  { id: "main-function" },
+  { event: "main/event" },
+  async ({ step }) => {
+    const square = await step.invoke("compute-square-value", {
+      function: referenceFunction<typeof computeSquare>({
+        functionId: "compute-square",
+      }),
+      data: { number: 4 }, // input data is still typed
+    });
+
+    return `Square of 4 is ${square.result}.`; // square.result is typed as number
+  }
+);
+```
+
+For more information on referencing functions, see [TypeScript -> Referencing Functions](/docs/functions/references).
+
 ## Creating a distributed system
 
 The use of `step.invoke()` means that we can separate functions out into compositions of steps that can be reused by _any_ process connected to Inngest.
 
 By starting to define these blocks of functionality, you're creating a smart, distributed system with all of the benefits of event-driven architecture and without any of the hassle.
 
-## Similar patterns: Fan-Out
+## Similar pattern: Fan-Out
 
 A similar pattern to invoking functions directly is that of fan-out - [check out the guide here](/docs/guides/fan-out-jobs). Here are some key differences:
 

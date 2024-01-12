@@ -38,11 +38,11 @@ const mainFunction = inngest.createFunction(
       <Property name="options" type="object" required>
         Options for the invocation:
         <Properties nested={true}>
-          <Property name="function" type="string | InngestFunction" required>
-            Either the ID or the local instance of the function to invoke.
+          <Property name="function" type="InngestFunction | InngestFunctionReference" required>
+            A local instance of a function or a reference to a function to invoke.
           </Property>
           <Property name="data" type="object">
-            Optional data to pass to the invoked function.
+            Optional data to pass to the invoked function. Will be required and typed if it can be.
           </Property>
           <Property name="user" type="object">
             Optional user context for the invocation.
@@ -54,15 +54,15 @@ const mainFunction = inngest.createFunction(
   </Col>
   <Col>
     ```ts
-    // Invoke a function using its event identifier
-    const resultFromEvent = await step.invoke("invoke-by-id", {
-      function: "event-identifier",
-      data: { ... },
-    });
-
     // Invoke a function directly
     const resultFromDirectCall = await step.invoke("invoke-by-definition", {
       function: anotherFunction,
+      data: { ... },
+    });
+
+    // Invoke a function using a function reference
+    const resultFromReference = await step.invoke("invoke-by-reference", {
+      function: referenceFunction(...),
       data: { ... },
     });
     ```
@@ -90,7 +90,7 @@ step
 // Running multiple invocations in parallel
 Promise.all([
   step.invoke("invoke-first-function", {
-    function: "first-function-id",
+    function: firstFunctionReference,
     data: { ... },
   }),
   step.invoke("invoke-second-function", {
@@ -99,6 +99,34 @@ Promise.all([
   }),
 ]);
 ```
+
+## Using function references
+
+Instead of directly importing a local function to invoke, [`referenceFunction()`](/docs/functions/references) can be used to call an Inngest function located in another app, or to avoid importing the dependencies of a function within the same app.
+
+```ts
+import { referenceFunction } from "inngest";
+import { type computePi } from "@/inngest/computePi";
+
+// Create a local reference to a function without importing dependencies
+const computePi = referenceFunction<typeof computePi>({
+  functionId: "compute-pi",
+});
+
+// Create a reference to a function in another application
+const computeSquare = referenceFunction({
+  appId: "my-python-app",
+  functionId: "compute-square",
+});
+
+// square.result is typed as a number
+const square = await step.invoke("compute-square-value", {
+  function: computePi,
+  data: { number: 4 }, // input data is typed, requiring input if it's needed
+});
+```
+
+See [Referencing functions](/docs/functions/references) for more information.
 
 ## When to use `step.invoke()`
 
