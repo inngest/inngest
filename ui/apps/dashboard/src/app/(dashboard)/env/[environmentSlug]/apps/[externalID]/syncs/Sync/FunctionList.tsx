@@ -49,7 +49,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
   }, [syncedFunctions]);
 
   return (
-    <>
+    <div className="flex flex-col gap-4">
       <CollapsibleCardRoot
         type="single"
         defaultValue={isSyncedFunctionsCardOpen ? 'syncedFunctions' : undefined}
@@ -150,6 +150,6 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
           )}
         </CollapsibleCardItem>
       </CollapsibleCardRoot>
-    </>
+    </div>
   );
 }

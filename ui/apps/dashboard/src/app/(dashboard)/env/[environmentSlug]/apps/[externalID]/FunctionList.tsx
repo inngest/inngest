@@ -24,7 +24,7 @@ export function FunctionList({ envSlug, functions }: Props) {
 
   return (
     <main
-      className="max-h-96 min-h-0 overflow-y-auto rounded-lg border border-slate-300"
+      className="min-h-0 overflow-y-auto rounded-lg border border-slate-300"
       ref={tableContainerRef}
     >
       <Table
@@ -36,6 +36,7 @@ export function FunctionList({ envSlug, functions }: Props) {
           enableSorting: false,
         }}
         tableContainerRef={tableContainerRef}
+        isVirtualized={false}
       />
     </main>
   );
