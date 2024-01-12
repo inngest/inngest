@@ -270,3 +270,15 @@ import { inngest } from "@/inngest";
 type StepTools = GetStepTools<typeof inngest>;
 type StepToolsWithTrigger = GetStepTools<typeof inngest, "app/user.created">;
 ```
+
+### Inngest.Any / InngestFunction.Any <VersionBadge version="v3.10.0+" />
+
+Some exported classes have an `Any` type within their namespace that represents any instance of that class without inference or generics.
+
+This is useful for typing lists of functions or factories that create Inngest primitives.
+
+```ts
+import { type InngestFunction } from "inngest";
+
+const functionsToServe: InngestFunction.Any[] = [];
+```
