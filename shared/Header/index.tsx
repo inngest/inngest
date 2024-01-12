@@ -66,9 +66,17 @@ export default function Header() {
                 </li>
                 <li className="relative flex flex-col md:flex-row md:items-center group text-white font-medium md:px-5 md:py-8 text-sm">
                   <span className="hidden md:block md:group-hover:opacity-40 transition-opacity cursor-pointer">
-                    Learn
+                    Docs
                   </span>
                   <HeaderDropdown navLinks={learnLinks} />
+                </li>
+                <li>
+                  <a
+                    href="/customers?ref=nav"
+                    className="flex md:hidden lg:flex items-center text-white font-medium px-7 md:px-5 py-2 text-sm hover:opacity-60"
+                  >
+                    Case Studies
+                  </a>
                 </li>
                 <li>
                   <a
@@ -84,26 +92,6 @@ export default function Header() {
                     className="flex items-center text-white font-medium px-7 md:px-5 py-2 text-sm hover:opacity-60"
                   >
                     Blog
-                  </a>
-                </li>
-                {/*
-                <li>
-                  <a
-                    href="https://roadmap.inngest.com/roadmap?ref=nav"
-                    target="_blank"
-                    className="flex md:hidden lg:flex items-center text-white font-medium px-7 md:px-5 py-2 text-sm hover:opacity-60"
-                  >
-                    Roadmap
-                  </a>
-                </li>
-                */}
-                <li>
-                  <a
-                    href="https://roadmap.inngest.com/changelog?ref=nav"
-                    target="_blank"
-                    className="flex md:hidden lg:flex items-center text-white font-medium px-7 md:px-5 py-2 text-sm hover:opacity-60"
-                  >
-                    Changelog
                   </a>
                 </li>
               </ul>

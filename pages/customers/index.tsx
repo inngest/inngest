@@ -5,43 +5,90 @@ import clsx from "clsx";
 import Header from "src/shared/Header";
 import Container from "src/shared/layout/Container";
 import Footer from "src/shared/Footer";
-import CTACallout from "src/shared/CTACallout";
+import FooterCallout from "src/shared/Footer/FooterCallout";
 import { ArrowTopRightOnSquareIcon } from "@heroicons/react/20/solid";
-
-import Button from "src/shared/legacy/Button";
+import CaseStudyCard from "src/shared/CaseStudy/CaseStudyCard";
 
 export async function getStaticProps() {
   return {
     props: {
       designVersion: "2",
       meta: {
-        title: "Customers",
-        description: "Helping companies from startups to ",
+        title: "Customer Case Studies",
+        description:
+          "From startups to public companies, these customers chose Inngest to build reliable products.",
       },
     },
   };
 }
 
+const caseStudies: {
+  href: string;
+  logo: string;
+  name: string;
+  title: string;
+  snippet: React.ReactNode;
+  // The use cases or industry for this customer
+  tags?: string[];
+}[] = [
+  {
+    href: "/customers/aomni",
+    logo: "/assets/customers/aomni-logo.svg",
+    name: "Aomni",
+    title: "Productionizing AI-driven sales flows using serverless LLMs",
+    snippet:
+      "Leveraging Inngest for production-grade complex state management and LLM chaining.",
+    tags: ["AI"],
+  },
+  {
+    href: "/customers/resend",
+    logo: "/assets/customers/resend.svg",
+    name: "Resend",
+    title: "Scaling a developer email platform with serverless workflows",
+    snippet: (
+      <>
+        "The <strong>DX and visibility</strong> with Inngest is really{" "}
+        <em>incredible</em>."`
+      </>
+    ),
+    tags: ["Serverless"],
+  },
+  {
+    href: "/customers/ocoya",
+    logo: "/assets/customers/ocoya.svg",
+    name: "Ocoya",
+    title: "Shipping e-commerce import pipelines in record time",
+    snippet: (
+      <>
+        "We were able to <strong>simplify</strong> our development process,{" "}
+        <strong>speed up our time to market</strong>, and deliver a better
+        customer experience."
+      </>
+    ),
+    tags: ["Serverless"],
+  },
+  {
+    href: "/customers/florian-works",
+    logo: "/assets/customers/florian-works-logotype.svg",
+    name: "Florian Works",
+    title: "Building a mission-critical workflow engine on top of Inngest",
+    snippet: (
+      <>
+        Saved <strong>months of development time</strong> and effort building on
+        Inngest's primitives.
+      </>
+    ),
+    tags: ["Workflow Engine"],
+  },
+];
+
 const featuredCompanies = [
   {
     src: "/assets/customers/tripadvisor.svg",
     name: "TripAdvisor",
+    url: "https://www.tripadvisor.com/",
     scale: 1.1,
   },
-  {
-    src: "/assets/customers/resend.svg",
-    name: "Resend",
-    scale: 0.8,
-    href: "/customers/resend",
-  },
-  {
-    src: "/assets/customers/ocoya.svg",
-    name: "Ocoya",
-    href: "/customers/ocoya",
-  },
-];
-
-const grid = [
   {
     src: "/assets/customers/snaplet-dark.svg",
     name: "Snaplet",
@@ -50,43 +97,20 @@ const grid = [
     type: "company",
   },
   {
-    type: "quote",
-    name: "Resend",
-    quote: {
-      text: `The DX and visibility with Inngest is really incredible. We able to develop functions locally easier and faster that with our previous queue. Also, Inngest's tools give us the visibility to debug issues much quicker than before.`,
-      attribution: {
-        name: "Bu Kinoshita",
-        title: "Co-founder",
-      },
-      avatar: "/assets/customers/resend-bu-kinoshita.jpg",
-    },
+    src: "/assets/customers/zamp-logo.svg",
+    name: "Zamp",
+    url: "https://zamp.com/",
+    scale: 1,
+    type: "company",
   },
+];
+
+const grid = [
   {
     src: "/assets/customers/productlane.svg",
     name: "Productlane",
     url: "https://productlane.com/",
     scale: 1.4,
-    type: "company",
-  },
-  {
-    src: "/assets/customers/firstquadrant.svg",
-    name: "FirstQuadrant.ai",
-    url: "https://firstquadrant.ai/",
-    scale: 1.2,
-    type: "company",
-  },
-  {
-    src: "/assets/customers/aomni-logo.svg",
-    name: "Aomni",
-    url: "https://www.aomni.com/",
-    scale: 1,
-    type: "company",
-  },
-  {
-    src: "/assets/customers/zamp-logo.svg",
-    name: "Zamp",
-    url: "https://zamp.com/",
-    scale: 1,
     type: "company",
   },
   {
@@ -100,6 +124,13 @@ const grid = [
       },
       avatar: "/assets/customers/snaplet-peter-pistorius.png",
     },
+  },
+  {
+    src: "/assets/customers/firstquadrant.svg",
+    name: "FirstQuadrant.ai",
+    url: "https://firstquadrant.ai/",
+    scale: 1.2,
+    type: "company",
   },
   {
     src: "/assets/customers/finta-logo.png?v=1",
@@ -121,13 +152,6 @@ const grid = [
     type: "company",
   },
   {
-    src: "/assets/customers/niftykit.svg",
-    name: "NiftyKit",
-    url: "https://niftykit.com/",
-    scale: 1,
-    type: "company",
-  },
-  {
     type: "quote",
     name: "NiftyKit",
     quote: {
@@ -138,6 +162,13 @@ const grid = [
       },
       avatar: "/assets/customers/niftykit-robin-curbelo.jpg",
     },
+  },
+  {
+    src: "/assets/customers/niftykit.svg",
+    name: "NiftyKit",
+    url: "https://niftykit.com/",
+    scale: 1,
+    type: "company",
   },
   {
     src: "/assets/customers/lynq-logo.svg",
@@ -159,6 +190,18 @@ const grid = [
     type: "company",
   },
   {
+    type: "quote",
+    name: "Resend",
+    quote: {
+      text: `The DX and visibility with Inngest is really incredible. We able to develop functions locally easier and faster that with our previous queue. Also, Inngest's tools give us the visibility to debug issues much quicker than before.`,
+      attribution: {
+        name: "Bu Kinoshita",
+        title: "Co-founder",
+      },
+      avatar: "/assets/customers/resend-bu-kinoshita.jpg",
+    },
+  },
+  {
     src: "/assets/customers/tono-logo.png",
     name: "Tono Health",
     scale: 0.9,
@@ -169,17 +212,11 @@ const grid = [
     name: "Awaken.tax",
     type: "company",
   },
-  {
-    src: "/assets/customers/florian-works-logo.svg",
-    name: "Florian Works",
-    scale: 0.3,
-    type: "company",
-  },
 ];
 
 export default function Customers() {
   return (
-    <div className="pt-8 bg-slate-1000">
+    <div className="bg-slate-1000">
       <Header />
       <Container className="py-8">
         <div className="my-12 tracking-tight">
@@ -187,16 +224,22 @@ export default function Customers() {
             <em>Our</em> customers deliver reliable products <br />
             for <em>their</em> customers
           </h1>
-          <p className="max-w-lg mx-auto my-8 text-slate-400 text-center text-lg">
-            From startups to public companies, these customers chose Inngest to
+          <p className="mx-auto my-8 text-slate-300 text-center text-lg">
+            From startups to public companies, our customers chose Inngest to
             power their products.
           </p>
         </div>
         <div className="max-w-6xl mx-auto">
+          <div className="my-20 grid md:grid-cols-2 gap-6 md:gap-12">
+            {caseStudies.map((props, idx) => (
+              <CaseStudyCard {...props} key={idx} />
+            ))}
+          </div>
+
           <div className="my-20 grid md:grid-cols-3 gap-6 md:gap-12">
-            {featuredCompanies.map(({ src, name, href, scale = 1 }, idx) => (
-              <div className="p-6 flex flex-col justify-items-start items-center border border-slate-100/10 rounded-2xl bg-slate-800/10 bg-[url(/assets/textures/wave.svg)]">
-                <div className="mt-10 md:mt-20 h-20 md:h-24 flex items-center">
+            {featuredCompanies.map(({ src, name, scale = 1, url }, idx) => (
+              <div className="group relative p-6 flex flex-col justify-items-start items-center border border-slate-100/10 rounded-2xl bg-slate-800/10 bg-[url(/assets/textures/wave.svg)]">
+                <div className="my-10 md:my-20 h-20 md:h-24 flex items-center">
                   <Image
                     key={idx}
                     src={src}
@@ -205,21 +248,20 @@ export default function Customers() {
                     width={240 * 0.8 * scale}
                     height={120 * 0.8 * scale}
                     className={clsx(
-                      "text-white mx-auto width-auto transition-all grayscale hover:grayscale-0",
+                      "text-white mx-auto width-auto transition-all",
                       `max-h-[${36 * scale}px]`
                     )}
                   />
                 </div>
-                <div className="h-10 md:h-20 flex items-center">
-                  {!!href && (
-                    <Link
-                      href={href}
-                      className="rounded-md px-3 py-1.5 text-sm bg-transparent transition-all text-white border border-slate-800 hover:border-slate-600 hover:bg-slate-500/10 whitespace-nowrap"
-                    >
-                      Read the case study →
-                    </Link>
-                  )}
-                </div>
+                {!!url && (
+                  <a
+                    href={url}
+                    target="_blank"
+                    className="absolute hidden group-hover:flex flex-row gap-1 items-center bottom-2 right-2  px-3 py-1.5 text-xs bg-slate-400/10 hover:bg-slate-400/40 rounded-xl text-slate-50"
+                  >
+                    Visit website <ArrowTopRightOnSquareIcon className="h-3" />
+                  </a>
+                )}
               </div>
             ))}
           </div>
@@ -270,7 +312,7 @@ export default function Customers() {
                     width={120 * scale}
                     height={30 * scale}
                     className={clsx(
-                      "text-white m-auto width-auto transition-all grayscale hover:grayscale-0",
+                      "text-white m-auto width-auto transition-all",
                       `max-h-[${36 * scale}px]`
                     )}
                   />
@@ -289,16 +331,18 @@ export default function Customers() {
             })}
           </div>
         </div>
-
-        <CTACallout
-          text="Would your engineering team benefit from faster development time and a managed workflow execution solution?"
-          cta={{
-            href: "/contact?ref=customers",
-            text: "Get in touch",
-          }}
-        />
       </Container>
-      <Footer />
+
+      <FooterCallout
+        title="Talk to a product expert"
+        description="Chat with sales engineering to learn how Inngest can help your team ship more reliable products, faster"
+        ctaHref="/contact?ref=customers"
+        ctaText="Contact sales engineering"
+        ctaRef={"customers"}
+        showCliCmd={false}
+      />
+
+      <Footer disableCta={true} />
     </div>
   );
 }

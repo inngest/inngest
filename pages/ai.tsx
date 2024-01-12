@@ -11,6 +11,7 @@ import CopyBtn from "src/shared/Home/CopyBtn";
 import { ChevronRightIcon } from "@heroicons/react/20/solid";
 import CodeWindow from "src/shared/CodeWindow";
 import Footer from "src/shared/Footer";
+import CaseStudyCard from "src/shared/CaseStudy/CaseStudyCard";
 
 export const getStaticProps: GetStaticProps = async () => {
   return {
@@ -227,7 +228,7 @@ export default function AI() {
           w-2/3 m-auto
         "
         >
-          Scale-ready production AI in hours.
+          Scale-ready productionAI in hours.
           Zero&nbsp;infrastructure&nbsp;required.
         </h2>
 
@@ -241,7 +242,18 @@ export default function AI() {
 
       <ProductionCopy />
 
-      <p className="text-zinc-400 text-center opacity-70 pt-16 mb-[-30px]">
+      <div className="max-w-xl mx-auto">
+        <CaseStudyCard
+          href="/customers/aomni"
+          logo="/assets/customers/aomni-logo.svg"
+          name="Aomni"
+          title="Productionizing AI-driven sales flows using serverless LLMs"
+          snippet="Leveraging Inngest for production-grade complex state management and LLM chaining."
+          tags={["AI"]}
+        />
+      </div>
+
+      <p className="mt-8 text-zinc-400 text-center opacity-70 pt-16 mb-[-30px]">
         Use with any framework, on any cloud:
       </p>
       <Logos

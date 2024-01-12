@@ -60,7 +60,7 @@ export default function Logos({
                 className={clsx(
                   "group flex items-center justify-center h-16 w-40 max-w-[90%] px-6 py-6 m-auto rounded-lg border transition-all",
                   variant === "dark" &&
-                    "border-slate-900 hover:border-slate-700",
+                    "border-slate-700 hover:border-slate-600",
                   variant === "light" &&
                     "border-slate-200 hover:border-slate-300",
                   featured && "col-span-2",

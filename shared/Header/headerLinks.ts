@@ -25,13 +25,6 @@ const productLinks = {
       icon: IconSteps,
       iconBg: "bg-indigo-500",
     },
-    // {
-    //   title: "Step Functions",
-    //   desc: "Build complex conditional workflows",
-    //   url: "/features/step-functions?ref=nav",
-    //   icon: IconSteps,
-    //   iconBg: "bg-violet-500",
-    // },
   ],
   linksTitle: "Use Cases",
   linksTheme: "indigo",
@@ -70,7 +63,7 @@ const productLinks = {
 };
 
 const learnLinks = {
-  featuredTitle: "Learn",
+  featuredTitle: "Documentation",
   featured: [
     {
       title: "Docs",
@@ -79,15 +72,15 @@ const learnLinks = {
       icon: IconDocs,
       iconBg: "bg-blue-500",
     },
-    {
-      title: "Patterns: Async & event-driven",
-      desc: "How to build asynchronous functionality by example",
-      url: "/patterns?ref=nav",
-      icon: IconPatterns,
-      iconBg: "bg-sky-500",
-    },
+    // {
+    //   title: "Patterns: Async & event-driven",
+    //   desc: "How to build asynchronous functionality by example",
+    //   url: "/patterns?ref=nav",
+    //   icon: IconPatterns,
+    //   iconBg: "bg-sky-500",
+    // },
   ],
-  linksTitle: "Quick Starts",
+  linksTitle: "Guides",
   linksTheme: "blue",
   links: [
     {
@@ -96,17 +89,17 @@ const learnLinks = {
       icon: IconCompiling,
     },
     {
-      title: "Writing functions",
-      url: "/docs/functions?ref=nav",
+      title: "Concurrency",
+      url: "/docs/guides/concurrency?ref=nav",
       icon: IconWritingFns,
     },
     {
-      title: "Sending events",
-      url: "/docs/events?ref=nav",
+      title: "Handling Idempotency",
+      url: "/docs/guides/handling-idempotency?ref=nav",
       icon: IconSendEvents,
     },
     {
-      title: "Deploying",
+      title: "Going to production",
       url: "/docs/deploy?ref=nav",
       icon: IconDeploying,
     },

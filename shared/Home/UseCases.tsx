@@ -234,7 +234,7 @@ function UseCaseGrid() {
           <div className="p-8 md:rounded-bl-md bg-slate-1000">
             <Link
               href={`${selectedContent.href}?ref=homepage-use-cases}`}
-              className="mx-auto rounded-md font-medium px-6 py-2 bg-transparent transition-all text-white border border-slate-800 hover:border-slate-600 hover:bg-slate-500/10 whitespace-nowrap"
+              className="mx-auto rounded-md font-medium px-6 py-2 bg-slate-800 hover:bg-slate-600 transition-all text-white border border-slate-800 hover:border-slate-600 hover:bg-slate-500/10 whitespace-nowrap"
             >
               <span className="hidden md:inline">
                 Learn about {selectedContent.title} with Inngest

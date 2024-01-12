@@ -43,9 +43,9 @@ export default function LocalDev({ className }: { className?: string }) {
             </div>
             <Link
               href="/docs/quick-start?ref=homepage-dev-tools"
-              className="rounded-md px-3 py-1.5 text-sm bg-transparent transition-all text-white border border-slate-800 hover:border-slate-600 hover:bg-slate-500/10 whitespace-nowrap"
+              className="rounded-md px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-600 transition-all text-white border border-slate-800 hover:border-slate-600 hover:bg-slate-500/10 whitespace-nowrap"
             >
-              Get Started
+              Read the quick start guide
             </Link>
           </div>
         </div>

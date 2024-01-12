@@ -90,11 +90,11 @@ export default function workflowEngine() {
               Case study
             </span>
             <h2 className="text-3xl font-semibold my-4">
-              FlorianWorks: zero to building a mission-critical workflow engine
+              Florian Works: zero to building a mission-critical workflow engine
               for fire departments
             </h2>
             <p className="mb-3">
-              FlorianWorks develops custom-built software products for fire
+              Florian Works develops custom-built software products for fire
               departments, incorporating custom workflows built directly on top
               of Inngest to ship reliable products faster and easier than ever
               before.
@@ -120,6 +120,14 @@ export default function workflowEngine() {
                 infrastructure required
               </li>
             </ul>
+            <div className="mt-8">
+              <Link
+                href="/customers/florian-works"
+                className="mx-auto rounded-md font-medium px-6 py-2 bg-slate-800 hover:bg-slate-600 transition-all text-white border border-slate-800 hover:border-slate-600 hover:bg-slate-500/10 whitespace-nowrap"
+              >
+                Read customer case study
+              </Link>
+            </div>
           </div>
         </div>
       </Container>

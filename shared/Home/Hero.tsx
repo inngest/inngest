@@ -66,7 +66,7 @@ export default function Hero() {
               </div>
               <Link
                 href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=homepage-hero`}
-                className="rounded-md font-medium px-6 py-2 bg-transparent transition-all text-white border border-slate-800 hover:border-slate-600 hover:bg-slate-500/10 whitespace-nowrap"
+                className="rounded-md font-medium px-6 py-2 transition-all text-white bg-slate-800 hover:bg-slate-600 border border-slate-800 hover:border-slate-600 hover:bg-slate-500/10 whitespace-nowrap"
               >
                 Start Building For Free
               </Link>
