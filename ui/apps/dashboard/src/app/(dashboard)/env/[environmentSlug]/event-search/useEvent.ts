@@ -72,8 +72,11 @@ export function useEvent({ envID, eventID }: { envID: string; eventID: string | 
     };
   }, [res.data?.environment.event]);
 
-  if (res.error || res.isLoading || res.isSkipped) {
-    return res;
+  if (!res.data) {
+    return {
+      ...res,
+      data: undefined,
+    };
   }
 
   if (data instanceof Error) {

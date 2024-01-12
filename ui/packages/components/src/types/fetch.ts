@@ -1,5 +1,6 @@
 type FetchFailed = { error: Error; data: undefined; isLoading: false };
-type FetchLoading = { error: undefined; data: undefined; isLoading: true };
+// type FetchLoading = { error: undefined; data: undefined; isLoading: true }
+type FetchLoading<T = never> = { error: undefined; data: T | undefined; isLoading: true };
 type FetchSkipped = { error: undefined; data: undefined; isLoading: false; isSkipped: true };
 type FetchSucceeded<T = never> = { error: undefined; data: T; isLoading: false };
 
@@ -10,11 +11,10 @@ export const baseFetchFailed = {
 } as const satisfies Omit<FetchFailed, 'error'> & { isSkipped: false };
 
 export const baseFetchLoading = {
-  data: undefined,
   error: undefined,
   isLoading: true,
   isSkipped: false,
-} as const satisfies FetchLoading & { isSkipped: false };
+} as const satisfies Omit<FetchLoading, 'data'> & { isSkipped: false };
 
 export const baseFetchSkipped = {
   data: undefined,
@@ -46,7 +46,7 @@ type FetchResultWithSkip<
 type FetchResultWithoutSkip<
   // Required
   TData = never
-> = FetchFailed | FetchLoading | FetchSucceeded<TData>;
+> = FetchFailed | FetchLoading<TData> | FetchSucceeded<TData>;
 
 type Options = {
   skippable?: boolean;
