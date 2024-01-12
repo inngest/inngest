@@ -66,7 +66,7 @@ export function Apps({ isArchived = false }: Props) {
           );
         })}
 
-        {latestUnattachedSyncTime && (
+        {latestUnattachedSyncTime && !isArchived && (
           <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={latestUnattachedSyncTime} />
         )}
 
