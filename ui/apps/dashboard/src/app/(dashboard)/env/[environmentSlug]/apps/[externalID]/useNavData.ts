@@ -36,7 +36,7 @@ export function useNavData({ envID, externalAppID }: { envID: string; externalAp
     };
   }
 
-  return res;
+  return { ...res, data: undefined };
 }
 
 /**
