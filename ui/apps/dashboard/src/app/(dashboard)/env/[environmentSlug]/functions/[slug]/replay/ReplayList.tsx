@@ -107,7 +107,7 @@ export function ReplayList({ functionSlug }: Props) {
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <LoadingIcon />

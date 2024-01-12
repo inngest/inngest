@@ -126,8 +126,11 @@ export function useRun({
     };
   }, [res.data?.environment.function]);
 
-  if (res.error || res.isLoading || res.isSkipped) {
-    return res;
+  if (!res.data) {
+    return {
+      ...res,
+      data: undefined,
+    };
   }
 
   if (data instanceof Error) {

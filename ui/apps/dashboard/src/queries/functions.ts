@@ -84,8 +84,11 @@ export function useFunctionsPage({
       pageSize,
     },
   });
-  if (res.error || res.isLoading) {
-    return res;
+  if (!res.data) {
+    return {
+      ...res,
+      data: undefined,
+    };
   }
 
   return {
