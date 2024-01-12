@@ -7,6 +7,7 @@ import {
   Squares2X2Icon,
   WrenchIcon,
 } from '@heroicons/react/20/solid';
+import { Badge } from '@inngest/components/Badge';
 
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import InngestLogo from '@/icons/InngestLogo';
@@ -24,6 +25,7 @@ type NavItem = {
   href: string;
   text: string;
   icon?: React.ReactNode;
+  badge?: React.ReactNode;
   hide: string[];
 };
 
@@ -68,6 +70,11 @@ export default async function AppNavigation({ environmentSlug }: AppNavigationPr
         text: 'Apps',
         hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
         icon: <Squares2X2Icon className="w-3.5" />,
+        badge: (
+          <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
+            New
+          </Badge>
+        ),
       },
       ...items,
     ];
@@ -97,8 +104,8 @@ export default async function AppNavigation({ environmentSlug }: AppNavigationPr
         </Link>
         <EnvironmentSelectMenu environmentSlug={environmentSlug} />
         <Navigation>
-          {visibleItems.map(({ href, text, icon }) => (
-            <NavItem key={href} href={href as Route} icon={icon} text={text} />
+          {visibleItems.map(({ href, text, icon, badge }) => (
+            <NavItem key={href} href={href as Route} icon={icon} text={text} badge={badge} />
           ))}
         </Navigation>
       </div>
