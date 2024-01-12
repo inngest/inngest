@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import ArrowPathIcon from '@heroicons/react/20/solid/ArrowPathIcon';
 import { Button } from '@inngest/components/Button';
+import { Modal } from '@inngest/components/Modal';
 import { toast } from 'sonner';
 
-import Modal from '@/components/Modal';
 import { DeployFailure } from '../../deploys/DeployFailure';
 import { deployViaUrl, type RegistrationFailure } from '../../deploys/utils';
 
@@ -45,20 +45,17 @@ export default function ResyncModal({ isOpen, onClose, url }: Props) {
 
   return (
     <Modal
-      className="flex w-[800px] max-w-none flex-col p-0"
-      containerClassName="p-0"
+      className="w-[800px]"
+      description="Send a new sync request to your app"
       isOpen={isOpen}
       onClose={onClose}
-    >
-      <header className="bg-slate-940 p-6 text-white">
+      title={
         <div className="mb-4 flex flex-row items-center gap-3">
           <ArrowPathIcon className="h-6 w-6" />
           <h2 className="text-lg font-medium">Resync App</h2>
         </div>
-
-        <p className="font-light">Send a new sync request to your app</p>
-      </header>
-
+      }
+    >
       <div className="border-b border-slate-200 px-6">
         <p className="my-6">
           This will send a sync request to your app, telling it to sync itself with Inngest.
