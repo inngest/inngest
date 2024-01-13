@@ -1,3 +1,5 @@
+'use client';
+
 import { useMemo, useState } from 'react';
 import { type Route } from 'next';
 import Link from 'next/link';
@@ -8,6 +10,7 @@ import { useLocalStorage } from 'react-use';
 import { toast } from 'sonner';
 
 import Input from '@/components/Forms/Input';
+import { setSkipCacheSearchParam } from '@/utils/urls';
 import { DeployFailure } from '../../deploys/DeployFailure';
 import DeploySigningKey from '../../deploys/DeploySigningKey';
 import { deployViaUrl, type RegistrationFailure } from '../../deploys/utils';
@@ -30,7 +33,7 @@ export default function ManualSync({ appsURL }: Props) {
       setFailure(failure);
       if (!failure) {
         toast.success('App Successfuly Synced');
-        router.push(appsURL);
+        router.push(setSkipCacheSearchParam(appsURL));
       }
     } catch {
       setFailure({
