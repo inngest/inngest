@@ -33,7 +33,7 @@ export default function ManualSync({ appsURL }: Props) {
       setFailure(failure);
       if (!failure) {
         toast.success('App Successfuly Synced');
-        router.push(setSkipCacheSearchParam(appsURL));
+        router.push(appsURL);
       }
     } catch {
       setFailure({

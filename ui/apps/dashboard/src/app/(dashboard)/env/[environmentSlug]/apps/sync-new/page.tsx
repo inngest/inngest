@@ -11,6 +11,7 @@ import { Link as InngestLink, defaultLinkStyles } from '@inngest/components/Link
 import * as Tabs from '@radix-ui/react-tabs';
 
 import Header from '@/components/Header/Header';
+import { setSkipCacheSearchParam } from '@/utils/urls';
 import ManualSync from './ManualSync';
 
 type Props = {
@@ -21,7 +22,7 @@ type Props = {
 
 export default function Page({ params: { environmentSlug } }: Props) {
   const router = useRouter();
-  const APPS_URL = `/env/${environmentSlug}/apps` as Route;
+  const APPS_URL = setSkipCacheSearchParam(`/env/${environmentSlug}/apps`) as Route;
   return (
     <>
       <Header title="Apps" icon={<Squares2X2Icon className="h-5 w-5 text-white" />} />
