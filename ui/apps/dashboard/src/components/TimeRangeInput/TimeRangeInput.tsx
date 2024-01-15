@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import cn from '@/utils/cn';
 import { TimeInput } from './TimeInput';
 
 type TimeRange = {
@@ -24,7 +25,7 @@ export function TimeRangeInput({ onChange }: Props) {
     setStartDateTimeError(undefined);
     setEndDateTimeError(undefined);
     if (endDateTime && newStartDateTime > endDateTime) {
-      setStartDateTimeError('Start time must be before end time.');
+      setStartDateTimeError('Start time must be before end time');
       return;
     }
 
@@ -38,7 +39,7 @@ export function TimeRangeInput({ onChange }: Props) {
     setStartDateTimeError(undefined);
     setEndDateTimeError(undefined);
     if (startDateTime && newEndDateTime < startDateTime) {
-      setEndDateTimeError('End time must be after start time.');
+      setEndDateTimeError('End time must be after start time');
       return;
     }
 
@@ -49,13 +50,35 @@ export function TimeRangeInput({ onChange }: Props) {
 
   return (
     <div className="space-y-1">
-      <div className="flex items-center gap-2">
-        <TimeInput onChange={onStartDateTimeChange} placeholder="2 hours ago" required />
-        <span className="text-sm font-medium text-slate-400">to</span>
-        <TimeInput onChange={onEndDateTimeChange} placeholder="now" required />
+      <div className="flex items-start gap-2">
+        <div className="min-w-[190px]">
+          <TimeInput onChange={onStartDateTimeChange} placeholder="start time" required />
+          <p
+            className={cn(
+              'mt-1 pl-2 text-xs',
+              startDateTimeError ? 'text-red-500' : 'text-slate-400'
+            )}
+          >
+            {startDateTimeError
+              ? startDateTimeError
+              : startDateTime
+              ? startDateTime.toISOString()
+              : '-'}
+          </p>
+        </div>
+        <span className="mt-1.5 text-sm font-medium text-slate-400">to</span>
+        <div className="min-w-[190px]">
+          <TimeInput onChange={onEndDateTimeChange} placeholder="end time" required />
+          <p
+            className={cn(
+              'mt-1 pl-2 text-xs',
+              endDateTimeError ? 'text-red-500' : 'text-slate-400'
+            )}
+          >
+            {endDateTimeError ? endDateTimeError : endDateTime ? endDateTime.toISOString() : '-'}
+          </p>
+        </div>
       </div>
-      {startDateTimeError && <p className="text-sm text-red-500">{startDateTimeError}</p>}
-      {endDateTimeError && <p className="text-right text-sm text-red-500">{endDateTimeError}</p>}
     </div>
   );
 }
