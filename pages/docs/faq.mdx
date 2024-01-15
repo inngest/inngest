@@ -7,6 +7,7 @@
 - [What's the recommended way to redact data from step outputs?](#what-s-the-recommended-way-to-redact-data-from-step-outputs)
 - [Why am I getting a `FUNCTION_INVOCATION_TIMEOUT` error?](#why-am-i-getting-a-function-invocation-timeout-error)
 - [My app's serve endpoint requires authentication. What should I do?](#my-app-s-serve-endpoint-requires-authentication-what-should-i-do)
+- [Why am I getting a `NON_DETERMINISTIC_FUNCTION` error?](#why-am-i-getting-a-non-deterministic-function-error)
 
 ## How do I run crons only in production?
 
@@ -53,3 +54,10 @@ or, if you're on Vercel's Pro plan, [configure protection bypass](/docs/deploy/v
 
 ## Why am I getting a `killed` error when running the Dev Server?
 This is likely an npx issue, which can be solved by running `rm -rf ~/.npm/_npx`. If the error still persist, please reach out to us on [our Discord](https://www.inngest.com/discord).
+
+## Why am I getting a `NON_DETERMINISTIC_FUNCTION` error?
+This is an error present in v2.x.x of the TypeScript SDK that can be thrown when a deployment changes a function in the middle of a run.
+
+If you're seeing this error, we encourage you to upgrade to v3.x.x of the TypeScript SDK, which will recover and continue gracefully from this circumstance.
+
+For more information, see the [Upgrading from v2 to v3](/docs/sdk/migration) migration guide.
