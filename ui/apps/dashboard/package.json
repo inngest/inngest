@@ -13,7 +13,7 @@
     "dev": "pnpm install && concurrently --prefix-colors \"green.inverse,magenta.inverse,blue.inverse\" pnpm:dev:*",
     "dev:next": "next dev",
     "dev:graphql-codegen": "graphql-codegen -w",
-    "build": "pnpm graphql-codegen && next build",
+    "build": "if test \"$VERCEL_ENV\" = \"production\"; then pnpm graphql-codegen && next build; else next build; fi",
     "start": "next start",
     "lint": "next lint",
     "graphql-codegen": "graphql-codegen",
