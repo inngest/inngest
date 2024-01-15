@@ -54,7 +54,7 @@ const (
 	//
 	// This means that jobs not started because of concurrency limits incur up to this amount
 	// of additional latency.
-	PartitionConcurrencyLimitRequeueExtension = time.Second * 2
+	PartitionConcurrencyLimitRequeueExtension = time.Second
 
 	QueuePeekMax        int64 = 1000
 	QueuePeekDefault    int64 = 200
@@ -476,7 +476,7 @@ func (q *QueueItem) SetID(ctx context.Context, str string) {
 // are not sleeps (eg. immediate runs)
 func (q QueueItem) Score() int64 {
 	// If this is not an edge, we can ignore this.
-	if q.Data.Kind != osqueue.KindEdge || q.Data.Attempt > 0 {
+	if (q.Data.Kind != osqueue.KindStart && q.Data.Kind != osqueue.KindEdge) || q.Data.Attempt > 0 {
 		return q.AtMS
 	}
 
@@ -904,6 +904,12 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	case 2:
 		return nil, ErrQueueItemAlreadyLeased
 	case 3:
+		return nil, ErrConcurrencyLimit
+	case 4:
+		return nil, ErrConcurrencyLimit
+	case 5:
+		return nil, ErrConcurrencyLimit
+	case 6:
 		return nil, ErrConcurrencyLimit
 	default:
 		return nil, fmt.Errorf("unknown response enqueueing item: %d", status)

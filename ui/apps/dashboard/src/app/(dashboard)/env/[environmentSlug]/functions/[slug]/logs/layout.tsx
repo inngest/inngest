@@ -3,7 +3,6 @@ import RunsPage from './Runs';
 type RunLayoutProps = {
   children: React.ReactNode;
   params: {
-    environmentSlug: string;
     slug: string;
   };
 };

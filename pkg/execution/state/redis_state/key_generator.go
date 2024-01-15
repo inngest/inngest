@@ -62,6 +62,13 @@ type KeyGenerator interface {
 	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
 	PauseStep(context.Context, state.Identifier, string) string
 
+	// PauseIndex is a key that's used to index added/expired times for pauses.
+	//
+	// Added times are necessary to load pauses after a specific point in time,
+	// which is used when caching pauses in-memory to only load the subset of pauses
+	// added after the cache was last updated.
+	PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string
+
 	// History returns the key used to store a log entry for run hisotry
 	History(ctx context.Context, runID ulid.ULID) string
 
@@ -122,6 +129,13 @@ func (d DefaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step
 	return fmt.Sprintf("%s-%s", prefix, step)
 }
 
+func (d DefaultKeyFunc) PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string {
+	if event == "" {
+		return fmt.Sprintf("%s:pause-idx:%s:%s:-", d.Prefix, kind, wsID)
+	}
+	return fmt.Sprintf("%s:pause-idx:%s:%s:%s", d.Prefix, kind, wsID, event)
+}
+
 func (d DefaultKeyFunc) History(ctx context.Context, runID ulid.ULID) string {
 	return fmt.Sprintf("%s:history:%s", d.Prefix, runID)
 }
@@ -175,6 +189,9 @@ type QueueKeyGenerator interface {
 
 	// RunIndex returns the index for storing job IDs associated with run IDs.
 	RunIndex(runID ulid.ULID) string
+
+	// Status returns the key used for status queue for the provided function.
+	Status(status string, fnID uuid.UUID) string
 }
 
 type DebounceKeyGenerator interface {
@@ -262,4 +279,8 @@ func (d DefaultQueueKeyGenerator) Debounce(ctx context.Context) string {
 
 func (d DefaultQueueKeyGenerator) RunIndex(runID ulid.ULID) string {
 	return fmt.Sprintf("%s:idx:run:%s", d.Prefix, runID)
+}
+
+func (d DefaultQueueKeyGenerator) Status(status string, fnID uuid.UUID) string {
+	return fmt.Sprintf("%s:queue:status:%s:%s", d.Prefix, fnID, status)
 }

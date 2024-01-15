@@ -92,6 +92,8 @@ export default async function makeVM(timeout: number = -1) {
 
           target.forEach((item) => {
             const marshaledItem = marshal(item);
+
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- The type isn't falsy but it's unclear whether it can be falsy at run time.
             if (!marshaledItem) {
               return vm.undefined;
             }
@@ -139,6 +141,7 @@ export default async function makeVM(timeout: number = -1) {
             });
           })();
 
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- The type isn't falsy but it's unclear whether it can be falsy at run time.
           if (!marshaledKey || !marshaledValue) {
             continue;
           }
@@ -225,6 +228,7 @@ export default async function makeVM(timeout: number = -1) {
     vm.global,
     'fetch',
     newFunction('fetch', function (url: any, options: any) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- The type isn't falsy but it's unclear whether it can be falsy at run time.
       if (!vm) {
         return;
       }

@@ -94,6 +94,15 @@ func WithQueue(q queue.Queue) ExecutorOpt {
 	}
 }
 
+// WithExpressionAggregator sets the expression aggregator singleton to use
+// for matching events using our aggregate evaluator.
+func WithExpressionAggregator(agg expressions.Aggregator) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).exprAggregator = agg
+		return nil
+	}
+}
+
 func WithFunctionLoader(l state.FunctionLoader) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).fl = l
@@ -185,6 +194,10 @@ func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log *zerolog.Logger
+
+	// exprAggregator is an expression aggregator used to parse and aggregate expressions
+	// using trees.
+	exprAggregator expressions.Aggregator
 
 	sm                    state.Manager
 	queue                 queue.Queue
@@ -371,13 +384,29 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			// The triggering event ID should be the first ID in the batch.
 			triggeringID := req.Events[0].GetInternalID().String()
 
+			// Remove `event` data from the expression and replace with actual event
+			// data as values, now that we have the event.
+			//
+			// This improves performance in matching, as we can then use the values within
+			// aggregate trees.
+			interpolated, err := expressions.Interpolate(ctx, expr, map[string]any{
+				"event": mapped[0],
+			})
+			if err != nil {
+				logger.StdlibLogger(ctx).Warn(
+					"error interpolating cancellation expression",
+					"error", err,
+					"expression", expr,
+				)
+			}
+
 			pause := state.Pause{
 				WorkspaceID:       req.WorkspaceID,
 				Identifier:        id,
 				ID:                pauseID,
 				Expires:           state.Time(expires),
 				Event:             &c.Event,
-				Expression:        c.If,
+				Expression:        &interpolated,
 				ExpressionData:    data,
 				Cancel:            true,
 				TriggeringEventID: &triggeringID,
@@ -411,7 +440,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		JobID:       &queueKey,
 		GroupID:     uuid.New().String(),
 		WorkspaceID: req.WorkspaceID,
-		Kind:        queue.KindEdge,
+		Kind:        queue.KindStart,
 		Identifier:  id,
 		Attempt:     0,
 		MaxAttempts: &sourceEdgeRetries,
@@ -793,6 +822,24 @@ func (e *executor) executeDriverForStep(ctx context.Context, id state.Identifier
 
 // HandlePauses handles pauses loaded from an incoming event.
 func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
+	// TODO: Switch to aggregate pauses on release.
+	res, err := e.handlePausesAllNaively(ctx, iter, evt)
+	return res, err
+}
+
+//nolint:all
+func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
+	if e.exprAggregator == nil {
+		return execution.HandlePauseResult{}, nil
+	}
+
+	evals, count, err := e.exprAggregator.EvaluateAsyncEvent(ctx, evt)
+	// For each matching eval, consume the pause.
+	// TODO: Replicate what we had down in naive.
+	return execution.HandlePauseResult{count, int32(len(evals))}, err
+}
+
+func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseIterator, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
 	res := execution.HandlePauseResult{0, 0}
 
 	if e.queue == nil || e.sm == nil {
@@ -962,6 +1009,11 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 	}
 
 	wg.Wait()
+
+	if iter.Error() != context.Canceled {
+		goerr = errors.Join(goerr, fmt.Errorf("pause iteration error: %w", iter.Error()))
+	}
+
 	return res, goerr
 }
 
@@ -1029,6 +1081,16 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 
 	if err = e.sm.ConsumePause(ctx, pause.ID, r.With); err != nil {
 		return fmt.Errorf("error consuming pause via event: %w", err)
+	}
+
+	if e.log != nil {
+		e.log.Debug().
+			Str("pause_id", pause.ID.String()).
+			Str("run_id", pause.Identifier.RunID.String()).
+			Str("workflow_id", pause.Identifier.WorkflowID.String()).
+			Bool("timeout", pause.OnTimeout).
+			Bool("cancel", pause.Cancel).
+			Msg("resuming from pause")
 	}
 
 	// Schedule an execution from the pause's entrypoint.  We do this after
@@ -1358,6 +1420,16 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		Expression:  &strExpr,
 		DataKey:     gen.ID,
 	})
+	if err == state.ErrPauseAlreadyExists {
+		if e.log != nil {
+			e.log.Warn().
+				Str("pause_id", pauseID.String()).
+				Str("run_id", item.Identifier.RunID.String()).
+				Str("workflow_id", item.Identifier.WorkflowID.String()).
+				Msg("created duplicate pause")
+		}
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -1417,6 +1489,10 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	// in the expression.
 	data := map[string]any{}
 	if opts.If != nil {
+		if err := expressions.Validate(ctx, *opts.If); err != nil {
+			return execError{err, true}
+		}
+
 		expr, err := e.newExpressionEvaluator(ctx, *opts.If)
 		if err != nil {
 			return execError{err, true}
@@ -1437,6 +1513,34 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		[]byte(item.Identifier.RunID.String()+gen.ID),
 	)
 
+	expr := opts.If
+	if expr != nil && strings.Contains(*expr, "event.") {
+		// Remove `event` data from the expression and replace with actual event
+		// data as values, now that we have the event.
+		//
+		// This improves performance in matching, as we can then use the values within
+		// aggregate trees.
+		if state, err := e.sm.Load(ctx, item.Identifier.RunID); err != nil {
+			logger.StdlibLogger(ctx).Error(
+				"error loading state to interpolate waitForEvent",
+				"error", err,
+				"run_id", item.Identifier.RunID,
+			)
+		} else {
+			interpolated, err := expressions.Interpolate(ctx, *opts.If, map[string]any{
+				"event": state.Event(),
+			})
+			if err != nil {
+				logger.StdlibLogger(ctx).Warn(
+					"error interpolating waitForEvent expression",
+					"error", err,
+					"expression", *opts.If,
+				)
+			}
+			expr = &interpolated
+		}
+	}
+
 	opcode := gen.Op.String()
 	err = e.sm.SavePause(ctx, state.Pause{
 		ID:             pauseID,
@@ -1449,7 +1553,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		Opcode:         &opcode,
 		Expires:        state.Time(expires),
 		Event:          &opts.Event,
-		Expression:     opts.If,
+		Expression:     expr,
 		ExpressionData: data,
 		DataKey:        gen.ID,
 	})

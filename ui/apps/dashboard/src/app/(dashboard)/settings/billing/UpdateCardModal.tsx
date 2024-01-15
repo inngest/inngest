@@ -89,7 +89,7 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
           result.error.message || 'Sorry, there was an issue saving your payment information'
         );
       }
-      token = result?.token?.id;
+      token = result.token.id;
     } catch (err) {
       setError('Sorry, there was an issue confirming your payment');
       setLoading(false);

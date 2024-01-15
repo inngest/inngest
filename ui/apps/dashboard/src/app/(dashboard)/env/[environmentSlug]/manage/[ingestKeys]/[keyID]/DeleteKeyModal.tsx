@@ -6,6 +6,7 @@ import { AlertModal } from '@inngest/components/Modal';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { graphql } from '@/gql';
 import useManagePageTerminology from './../useManagePageTerminology';
 
@@ -18,25 +19,13 @@ const DeleteEventKey = graphql(`
 `);
 
 type DeleteKeyModalProps = {
-  environmentSlug: string;
-  environmentID: string;
   keyID: string;
   isOpen: boolean;
   onClose: () => void;
 };
 
-export default function DeleteKeyModal({
-  environmentID,
-  environmentSlug,
-  keyID,
-  isOpen,
-  onClose,
-}: DeleteKeyModalProps) {
-  const input = {
-    environmentID,
-    keyID,
-  };
-
+export default function DeleteKeyModal({ keyID, isOpen, onClose }: DeleteKeyModalProps) {
+  const env = useEnvironment();
   const [, deleteEventKey] = useMutation(DeleteEventKey);
   const router = useRouter();
   const currentContent = useManagePageTerminology();
@@ -45,15 +34,14 @@ export default function DeleteKeyModal({
     deleteEventKey({
       input: {
         id: keyID,
-        workspaceID: environmentID,
+        workspaceID: env.id,
       },
     }).then((result) => {
       if (result.error) {
         toast.error(`${currentContent?.name} could not be deleted`);
       } else {
         toast.success(`${currentContent?.name} was successfully deleted`);
-        router.refresh();
-        router.push(`/env/${environmentSlug}/manage/${currentContent?.param}` as Route);
+        router.push(`/env/${env.slug}/manage/${currentContent?.param}` as Route);
       }
     });
     onClose();
@@ -63,7 +51,7 @@ export default function DeleteKeyModal({
     <AlertModal
       isOpen={isOpen}
       onClose={onClose}
-      title={'Are you sure you want to delete this ' + currentContent?.name?.toLowerCase() + '?'}
+      title={'Are you sure you want to delete this ' + currentContent?.name.toLowerCase() + '?'}
       primaryAction={{ label: 'Yes', btnAction: () => handleDelete() }}
     />
   );

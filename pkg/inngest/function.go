@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/google/uuid"
@@ -86,8 +87,19 @@ type Priority struct {
 }
 
 type Debounce struct {
-	Key    *string `json:"key"`
-	Period string  `json:"period"`
+	Key     *string `json:"key,omitempty"`
+	Period  string  `json:"period"`
+	Timeout *string `json:"timeout,omitempty"`
+}
+
+func (d Debounce) TimeoutDuration() *time.Duration {
+	if d.Timeout == nil || *d.Timeout == "" {
+		return nil
+	}
+	if dur, err := str2duration.ParseDuration(*d.Timeout); err == nil {
+		return &dur
+	}
+	return nil
 }
 
 // Cancel represents a cancellation signal for a function.  When specified, this
@@ -215,7 +227,7 @@ func (f Function) Validate(ctx context.Context) error {
 	// Validate cancellation expressions
 	for _, c := range f.Cancel {
 		if c.If != nil {
-			if _, exprErr := expressions.NewExpressionEvaluator(ctx, *c.If); exprErr != nil {
+			if exprErr := expressions.Validate(ctx, *c.If); exprErr != nil {
 				err = multierror.Append(err, fmt.Errorf("Cancellation expression is invalid: %s", exprErr))
 			}
 		}
@@ -225,10 +237,18 @@ func (f Function) Validate(ctx context.Context) error {
 		err = multierror.Append(err, fmt.Errorf("This function exceeds the max number of cancellation events: %d", consts.MaxCancellations))
 	}
 
-	if f.Debounce != nil && f.Debounce.Key != nil {
-		if _, exprErr := expressions.NewExpressionEvaluator(ctx, *f.Debounce.Key); exprErr != nil {
-			err = multierror.Append(err, fmt.Errorf("Debounce expression is invalid: %s", exprErr))
+	if f.Debounce != nil {
+		if f.Debounce.Key != nil && *f.Debounce.Key == "" {
+			// Some clients may send an empty string.
+			f.Debounce.Key = nil
 		}
+		if f.Debounce.Key != nil {
+			// Ensure the expression is valid if present.
+			if exprErr := expressions.Validate(ctx, *f.Debounce.Key); exprErr != nil {
+				err = multierror.Append(err, fmt.Errorf("Debounce expression is invalid: %s", exprErr))
+			}
+		}
+
 		// NOTE: Debounce is not valid when batch is enabled.
 		if f.EventBatch != nil {
 			err = multierror.Append(err, fmt.Errorf("A function cannot specify batch and debounce"))
@@ -247,7 +267,7 @@ func (f Function) Validate(ctx context.Context) error {
 
 	// Validate rate limit expression
 	if f.RateLimit != nil && f.RateLimit.Key != nil {
-		if _, exprErr := expressions.NewExpressionEvaluator(ctx, *f.RateLimit.Key); exprErr != nil {
+		if exprErr := expressions.Validate(ctx, *f.RateLimit.Key); exprErr != nil {
 			err = multierror.Append(err, fmt.Errorf("Rate limit expression is invalid: %s", exprErr))
 		}
 	}
@@ -261,8 +281,14 @@ func (f Function) RunPriorityFactor(ctx context.Context, event map[string]any) (
 		return 0, nil
 	}
 
+	// Validate the expression first.
+	if err := expressions.Validate(ctx, *f.Priority.Run); err != nil {
+		return 0, fmt.Errorf("Priority.Run expression is invalid: %s", err)
+	}
+
 	expr, err := expressions.NewExpressionEvaluator(ctx, *f.Priority.Run)
 	if err != nil {
+		// This should never happen.
 		return 0, fmt.Errorf("Priority.Run expression is invalid: %s", err)
 	}
 

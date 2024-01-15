@@ -480,10 +480,15 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 	logger.From(ctx).Trace().Msg("querying for pauses")
 
+	if ok, err := s.state.EventHasPauses(ctx, uuid.UUID{}, evt.GetEvent().Name); err == nil && !ok {
+		return nil
+	}
+
 	iter, err := s.state.PausesByEvent(ctx, uuid.UUID{}, evt.GetEvent().Name)
 	if err != nil {
 		return fmt.Errorf("error finding event pauses: %w", err)
 	}
+
 	_, err = s.executor.HandlePauses(ctx, iter, evt)
 	return err
 }

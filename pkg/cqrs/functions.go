@@ -12,9 +12,9 @@ import (
 type Function struct {
 	ID        uuid.UUID
 	AppID     uuid.UUID
-	Config    string
-	Name      string
 	Slug      string
+	Name      string
+	Config    string
 	CreatedAt time.Time
 }
 
@@ -27,18 +27,38 @@ func (f Function) InngestFunction() (*inngest.Function, error) {
 	return &fn, nil
 }
 
-type FunctionManager interface {
-	FunctionReader
-	FunctionWriter
-}
-
+// FunctionReader finds functions for use across the API and dev server.
 type FunctionReader interface {
-	GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*Function, error)
-	GetFunctions(ctx context.Context) ([]*Function, error)
-	GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function, error)
+	// GetFunctionsByAppInternalID returns functions given the string ID of an app as defined
+	// by users in our SDKs.
+	GetFunctionsByAppExternalID(ctx context.Context, workspaceID uuid.UUID, app string) ([]*Function, error)
+	// GetFunctionsByAppInternalID returns functions given an internal app UUID.
+	GetFunctionsByAppInternalID(ctx context.Context, workspaceID uuid.UUID, appID uuid.UUID) ([]*Function, error)
+	// GetFunctionByExternalID returns a function given a workspace ID and the SDK's client ID / function ID,
+	// defined as a string.
+	GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, appID string, functionID string) (*Function, error)
+	// GetFunctionByInternalUUID returns a function given a worksapce ID and the internal ID.
+	GetFunctionByInternalUUID(ctx context.Context, wsID uuid.UUID, fnID uuid.UUID) (*Function, error)
 }
 
-type FunctionWriter interface {
+// DevFunctionManager is a development-only function manager
+type DevFunctionManager interface {
+	// Embeds production & API related functionality.
+
+	FunctionReader
+
+	// Also embeds the development functionality.
+
+	DevFunctionReader
+	DevFunctionWriter
+}
+
+// DevFunctionReader is a development-only function reader.
+type DevFunctionReader interface {
+	GetFunctions(ctx context.Context) ([]*Function, error)
+}
+
+type DevFunctionWriter interface {
 	InsertFunction(ctx context.Context, params InsertFunctionParams) (*Function, error)
 	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
 	// DeleteFunctionsByAppID deletes all functions for a specific app.

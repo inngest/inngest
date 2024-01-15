@@ -13,6 +13,8 @@ import (
 )
 
 var (
+	// ErrEventNotReceived is returned when a WaitForEvent call times out.  It indicates that a
+	// matching event was not received before the timeout.
 	ErrEventNotReceived = fmt.Errorf("event not received")
 )
 
@@ -27,19 +29,31 @@ type WaitForEventOpts struct {
 	If *string `json:"if"`
 }
 
-func WaitForEvent[T any](ctx context.Context, id string, opts WaitForEventOpts) (T, error) {
+// WaitForEvent pauses function execution until a specific event is received or the wait times
+// out.  You must pass in an event name within WaitForEventOpts.Event, and may pass an optional
+// expression to filter events based off of data.
+//
+// For example:
+//
+//	step.waitForEvent(ctx, "wait-for-open", opts.WaitForEventOpts{
+//		Event: "email/mail.opened",
+//		If:	inngestgo.StrPtr(fmt.Sprintf("async.data.id == %s", strconv.Quote("my-id"))),
+//		Timeout: 24 * time.Hour,
+//	})
+func WaitForEvent[T any](ctx context.Context, stepID string, opts WaitForEventOpts) (T, error) {
 	mgr := preflight(ctx)
 	args := map[string]any{
 		"timeout": str2duration.String(opts.Timeout),
+		"event":   opts.Event,
 	}
 	if opts.If != nil {
 		args["if"] = *opts.If
 	}
 	if opts.Name == "" {
-		opts.Name = id
+		opts.Name = stepID
 	}
 
-	op := mgr.NewOp(enums.OpcodeWaitForEvent, id, args)
+	op := mgr.NewOp(enums.OpcodeWaitForEvent, stepID, args)
 	if val, ok := mgr.Step(op); ok {
 		var output T
 		if val == nil || bytes.Equal(val, []byte{0x6e, 0x75, 0x6c, 0x6c}) {

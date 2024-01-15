@@ -8,7 +8,9 @@ import { Button } from '@inngest/components/Button';
 import { capitalCase } from 'change-case';
 import { useLocalStorage } from 'react-use';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import SyntaxHighlighter from '@/components/SyntaxHighlighter';
+import { EnvironmentType } from '@/gql/graphql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import VercelLogomark from '@/logos/vercel-logomark-dark.svg';
 import { useDeploys } from '@/queries/deploys';
@@ -16,22 +18,19 @@ import { DeployFailure } from './DeployFailure';
 import DeploySigningKey from './DeploySigningKey';
 import { deployViaUrl, type RegistrationFailure } from './utils';
 
-type DeploysOnboarding = {
-  environmentSlug: string;
-};
-
 const BRANCH_PARENT_ENV_SLUG = 'branch';
 
-export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding) {
+export default function DeploysOnboarding() {
   // We fetch deploys using the same hook at DeployList which enables URQL
   // to only send a single request from the client.
   // We load the deploys here to determine if we should show user onboarding
   // or redirect to the deployment
-  const [{ data, fetching }, refetch] = useDeploys({ environmentSlug });
+  const [{ data, fetching }, refetch] = useDeploys();
   const [failure, setFailure] = useState<RegistrationFailure>();
   const [input = '', setInput] = useLocalStorage('deploymentUrl', '');
   const [isDeploying, setIsDeploying] = useState(false);
   const router = useRouter();
+  const env = useEnvironment();
 
   const onClickDeploy = useCallback(async () => {
     setIsDeploying(true);
@@ -54,10 +53,7 @@ export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding
     }
   }, [input, refetch]);
 
-  const environment = environmentSlug.match(/(production|staging)/i)
-    ? capitalCase(environmentSlug)
-    : environmentSlug;
-  const isBranchParent = environmentSlug === BRANCH_PARENT_ENV_SLUG;
+  const isBranchParent = env.type === EnvironmentType.BranchParent;
 
   if (fetching) {
     return (
@@ -69,9 +65,9 @@ export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding
 
   // Redirect to the first deploy if there are any ONLY if it's not the branch parent
   // Branch parents should always show the empty state w/ deploy instructions
-  if (!fetching && data?.deploys?.length && !isBranchParent) {
-    const firstDeployId = data?.deploys?.[0]?.id;
-    router.push(`/env/${environmentSlug}/deploys/${firstDeployId}` as Route);
+  if (data?.deploys?.length && !isBranchParent) {
+    const firstDeployId = data.deploys[0]?.id;
+    router.push(`/env/${env.slug}/deploys/${firstDeployId}` as Route);
     return <></>;
   }
 
@@ -84,7 +80,7 @@ export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding
               <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 text-indigo-700" />
               <span>
                 No Functions <span className="font-medium text-indigo-900">registered in</span>{' '}
-                {environment}
+                {env.name}
               </span>
             </h3>
           </div>
@@ -170,7 +166,7 @@ export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding
               </code>{' '}
               environment variable in your application with the value below.
             </p>
-            <DeploySigningKey className="dark" environmentSlug={environmentSlug} />
+            <DeploySigningKey className="dark" />
             <h4 className="mt-6 text-base font-semibold text-white">Add your API URL</h4>
             <p className="mt-2 text-sm tracking-wide text-slate-300">
               After you&apos;ve set up the{' '}
@@ -233,15 +229,11 @@ export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding
           </p>
           <div className="mt-6 flex items-center gap-2 border-t border-slate-100 py-4">
             {isBranchParent ? (
-              <Button
-                kind="primary"
-                href={`/env/${environmentSlug}/manage/keys`}
-                label="Get Event Key"
-              />
+              <Button kind="primary" href={`/env/${env.slug}/manage/keys`} label="Get Event Key" />
             ) : (
               <Button
                 kind="primary"
-                href={`/env/${environmentSlug}/events` as Route}
+                href={`/env/${env.slug}/events` as Route}
                 label="Go To Events"
               />
             )}

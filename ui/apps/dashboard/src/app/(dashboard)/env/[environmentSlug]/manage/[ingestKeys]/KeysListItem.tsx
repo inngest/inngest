@@ -4,6 +4,7 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { Time } from '@/components/Time';
 import ClockIcon from '@/icons/ClockIcon';
 import cn from '@/utils/cn';
@@ -11,7 +12,6 @@ import { relativeTime } from '@/utils/date';
 import { getManageKey } from '@/utils/urls';
 
 type KeysListItemProps = {
-  environmentSlug: string;
   list: {
     id: string;
     name: string | null;
@@ -20,7 +20,8 @@ type KeysListItemProps = {
   }[];
 };
 
-export default function KeysListItem({ environmentSlug, list }: KeysListItemProps) {
+export default function KeysListItem({ list }: KeysListItemProps) {
+  const env = useEnvironment();
   const pathname = usePathname();
   const page = getManageKey(pathname);
 
@@ -38,7 +39,7 @@ export default function KeysListItem({ environmentSlug, list }: KeysListItemProp
   return (
     <>
       {filteredList.map((key) => {
-        const eventPathname = `/env/${environmentSlug}/manage/${page}/${key.id}`;
+        const eventPathname = `/env/${env.slug}/manage/${page}/${key.id}`;
         const isActive = pathname === eventPathname;
 
         return (

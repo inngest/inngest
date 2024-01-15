@@ -43,7 +43,6 @@ type FunctionDashboardProps = {
 export default function FunctionDashboardPage({ params }: FunctionDashboardProps) {
   const functionSlug = decodeURIComponent(params.slug);
   const [{ data, fetching: isFetchingFunction }] = useFunction({
-    environmentSlug: params.environmentSlug,
     functionSlug,
   });
   const function_ = data?.workspace.workflow;
@@ -53,7 +52,6 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     getTimeRangeByKey(timeRangeParam ?? '24h') ?? defaultTimeRange;
 
   const [{ data: usage }] = useFunctionUsage({
-    environmentSlug: params.environmentSlug,
     functionSlug,
     timeRange: selectedTimeRange,
   });
@@ -90,12 +88,12 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
 
   const failureRate = !usageMetrics?.totalRuns
     ? '0.00'
-    : (((usageMetrics?.totalFailures || 0) / (usageMetrics?.totalRuns || 0)) * 100).toFixed(2);
+    : (((usageMetrics.totalFailures || 0) / (usageMetrics.totalRuns || 0)) * 100).toFixed(2);
 
   const triggers = function_.current?.triggers || [];
 
   function handleTimeRangeChange(timeRange: TimeRange) {
-    if (timeRange?.key) {
+    if (timeRange.key) {
       setTimeRangeParam(timeRange.key);
     }
   }
@@ -133,21 +131,9 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               />
             </div>
           </div>
-          <FunctionRunsChart
-            environmentSlug={params.environmentSlug}
-            functionSlug={functionSlug}
-            timeRange={selectedTimeRange}
-          />
-          <FunctionThroughputChart
-            environmentSlug={params.environmentSlug}
-            functionSlug={functionSlug}
-            timeRange={selectedTimeRange}
-          />
-          <SDKRequestThroughputChart
-            environmentSlug={params.environmentSlug}
-            functionSlug={functionSlug}
-            timeRange={selectedTimeRange}
-          />
+          <FunctionRunsChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
+          <FunctionThroughputChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
+          <SDKRequestThroughputChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
           <div className="mt-4 px-6">
             <LatestFailedFunctionRuns
               environmentSlug={params.environmentSlug}
@@ -228,7 +214,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               </div>
             </Block>
             {function_.configuration?.cancellations &&
-              function_.configuration?.cancellations.length > 0 && (
+              function_.configuration.cancellations.length > 0 && (
                 <Block title="Cancellation">
                   <div className="space-y-3">
                     {function_.configuration.cancellations.map((cancellation) => {

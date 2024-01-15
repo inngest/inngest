@@ -4,7 +4,11 @@ Output:
   0: Successfully leased item
   1: Queue item not found
   2: Queue item already leased
-  3: No capacity
+
+  3: No function capacity
+  4: No account capacity
+  5: No custom capacity 1
+  6: No custom capacity 2
 
 ]]
 
@@ -45,17 +49,17 @@ if partitionConcurrency > 0 then
 end
 if accountConcurrency > 0 then
 	if check_concurrency(currentTime, accountConcurrencyKey, accountConcurrency) <= 0 then
-		return 3
+		return 4
 	end
 end
 if customConcurrencyA > 0 then
 	if check_concurrency(currentTime, customConcurrencyKeyA, customConcurrencyA) <= 0 then
-		return 3
+		return 5
 	end
 end
 if customConcurrencyB > 0 then
 	if check_concurrency(currentTime, customConcurrencyKeyB, customConcurrencyB) <= 0 then
-		return 3
+		return 6
 	end
 end
 

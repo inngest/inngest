@@ -9,9 +9,9 @@ import { Modal } from '@inngest/components/Modal';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import Input from '@/components/Forms/Input';
 import { graphql } from '@/gql';
-import { useEnvironment } from '@/queries';
 import useManagePageTerminology from './useManagePageTerminology';
 
 const CreateSourceKey = graphql(`
@@ -22,20 +22,13 @@ const CreateSourceKey = graphql(`
   }
 `);
 
-type NewKeyButtonProps = {
-  environmentSlug: string;
-};
-
-export default function CreateKeyButton({ environmentSlug }: NewKeyButtonProps) {
+export default function CreateKeyButton() {
   const [inputValue, setInputValue] = useState<string>('');
   const [isModalOpen, setModalOpen] = useState(false);
   const currentContent = useManagePageTerminology();
-  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
+  const environment = useEnvironment();
   const [{ fetching }, createSourceKey] = useMutation(CreateSourceKey);
   const router = useRouter();
-  const environmentID = environment?.id ?? '';
 
   if (!currentContent) {
     return null;
@@ -46,7 +39,7 @@ export default function CreateKeyButton({ environmentSlug }: NewKeyButtonProps) 
       createSourceKey({
         input: {
           filterList: null,
-          workspaceID: environmentID,
+          workspaceID: environment.id,
           name: inputValue,
           source: currentContent.type,
           metadata: {
@@ -60,10 +53,10 @@ export default function CreateKeyButton({ environmentSlug }: NewKeyButtonProps) 
           toast.success(`${currentContent.name} was successfully created`);
           router.refresh();
 
-          const newKeyID = result?.data?.key?.id;
+          const newKeyID = result.data?.key.id;
           if (newKeyID) {
             router.push(
-              `/env/${environmentSlug}/manage/${currentContent.param}/${newKeyID}` as Route
+              `/env/${environment.slug}/manage/${currentContent.param}/${newKeyID}` as Route
             );
           }
         }
@@ -76,15 +69,15 @@ export default function CreateKeyButton({ environmentSlug }: NewKeyButtonProps) 
       <Button
         icon={<PlusIcon />}
         btnAction={() => setModalOpen(true)}
-        disabled={!environment || isFetchingEnvironment || !currentContent}
+        disabled={!currentContent}
         kind="primary"
-        label={`Create ${currentContent?.name}`}
+        label={`Create ${currentContent.name}`}
       />
       <Modal
         isOpen={isModalOpen}
         className={'w-1/4'}
         onClose={() => setModalOpen(false)}
-        title={`Create a New ${currentContent?.name}`}
+        title={`Create a New ${currentContent.name}`}
         footer={
           <div className="flex justify-end gap-2">
             <Button
@@ -110,7 +103,7 @@ export default function CreateKeyButton({ environmentSlug }: NewKeyButtonProps) 
         <div className="p-6">
           <Input
             name="keyName"
-            placeholder={`${currentContent?.name} Name`}
+            placeholder={`${currentContent.name} Name`}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
           />

@@ -1,3 +1,5 @@
+'use client';
+
 import type { Route } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -9,16 +11,12 @@ import { toast } from 'sonner';
 import { type JsonValue } from 'type-fest';
 import { useQuery } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { Alert } from '@/components/Alert';
 import Modal from '@/components/Modal';
 import CodeEditor from '@/components/Textarea/CodeEditor';
 import { graphql } from '@/gql';
 import { EnvironmentType } from '@/gql/graphql';
-import { useEnvironment } from '@/queries';
-
-type UseDefaultEventKeyParams = {
-  environmentSlug: string;
-};
 
 const GetEventKeysDocument = graphql(/* GraphQL */ `
   query GetEventKeys($environmentID: ID!) {
@@ -32,29 +30,27 @@ const GetEventKeysDocument = graphql(/* GraphQL */ `
 `);
 
 type SendEventModalProps = {
-  environmentSlug: string;
   eventName?: string;
   isOpen: boolean;
   onClose: () => void;
 };
 
 export function SendEventModal({
-  environmentSlug,
   eventName = 'Your Event Name',
   isOpen,
   onClose,
 }: SendEventModalProps) {
   const router = useRouter();
-  const [{ data: environment }] = useEnvironment({ environmentSlug });
-  const eventKey = usePreferDefaultEventKey({ environmentSlug });
+  const environment = useEnvironment();
+  const eventKey = usePreferDefaultEventKey();
   const hasEventKey = Boolean(eventKey);
   const protocol = process.env.NODE_ENV === 'development' ? 'http://' : 'https://';
   const sendEventURL = `${protocol}${process.env.NEXT_PUBLIC_EVENT_API_HOST}/e/${
     eventKey || '<EVENT_KEY>'
   }`;
 
-  const isBranchChild = environment?.type === EnvironmentType.BranchChild;
-  const envName = environment?.name;
+  const isBranchChild = environment.type === EnvironmentType.BranchChild;
+  const envName = environment.name;
 
   async function sendEventAction(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -183,7 +179,7 @@ await inngest.send({
         {!hasEventKey && (
           <Alert severity="warning">
             There are no Event Keys for this environment. Please create an Event Key in{' '}
-            <Link href={`/env/${environmentSlug}/manage/keys` as Route} className="underline">
+            <Link href={`/env/${environment.slug}/manage/keys` as Route} className="underline">
               the Manage tab
             </Link>{' '}
             first.
@@ -233,18 +229,13 @@ await inngest.send({
   );
 }
 
-function usePreferDefaultEventKey({
-  environmentSlug,
-}: UseDefaultEventKeyParams): string | undefined {
-  const [{ data: environment }] = useEnvironment({
-    environmentSlug,
-  });
+function usePreferDefaultEventKey(): string | undefined {
+  const environment = useEnvironment();
   const [{ data }] = useQuery({
     query: GetEventKeysDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
     },
-    pause: !environment?.id,
   });
 
   const eventKeys = data?.environment.eventKeys;

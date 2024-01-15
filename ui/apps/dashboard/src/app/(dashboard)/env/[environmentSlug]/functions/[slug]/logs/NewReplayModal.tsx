@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
@@ -10,13 +12,13 @@ import { toast } from 'sonner';
 import { ulid } from 'ulid';
 import { useMutation } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { type TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import Input from '@/components/Forms/Input';
 import { TimeRangeInput } from '@/components/TimeRangeInput';
 import { graphql } from '@/gql';
 import { FunctionRunStatus } from '@/gql/graphql';
-import { useEnvironment } from '@/queries';
-import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const GetFunctionEndedRunsCountDocument = graphql(`
   query GetFunctionEndedRunsCount(
@@ -93,44 +95,35 @@ type FunctionRunEndStatus =
   | FunctionRunStatus.Completed;
 
 type NewReplayModalProps = {
-  environmentSlug: string;
   functionSlug: string;
   isOpen: boolean;
   onClose: () => void;
 };
 
-export default function NewReplayModal({
-  environmentSlug,
-  functionSlug,
-  isOpen,
-  onClose,
-}: NewReplayModalProps) {
+export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewReplayModalProps) {
   const router = useRouter();
   const [name, setName] = useState<string>('');
   const [timeRange, setTimeRange] = useState<TimeRange>();
   const [selectedStatuses, setSelectedStatuses] = useState<FunctionRunEndStatus[]>([
     FunctionRunStatus.Failed,
   ]);
-  const [{ data: environment }] = useEnvironment({
-    environmentSlug,
-  });
-  const { data, isLoading, error } = useSkippableGraphQLQuery({
+  const environment = useEnvironment();
+  const { data, isLoading, error } = useGraphQLQuery({
     query: GetFunctionEndedRunsCountDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
       functionSlug,
       timeRangeStart: timeRange?.start ? timeRange.start.toISOString() : '',
       timeRangeEnd: timeRange?.end ? timeRange.end.toISOString() : '',
     },
-    skip: !environment?.id || !timeRange?.start || !timeRange?.end,
   });
   const [{ fetching: isCreatingFunctionReplay }, createFunctionReplayMutation] = useMutation(
     CreateFunctionReplayDocument
   );
 
-  const failedRunsCount = data?.environment?.function?.failedRuns?.totalCount ?? 0;
-  const canceledRunsCount = data?.environment?.function?.canceledRuns?.totalCount ?? 0;
-  const succeededRunsCount = data?.environment?.function?.succeededRuns?.totalCount ?? 0;
+  const failedRunsCount = data?.environment.function?.failedRuns?.totalCount ?? 0;
+  const canceledRunsCount = data?.environment.function?.canceledRuns?.totalCount ?? 0;
+  const succeededRunsCount = data?.environment.function?.succeededRuns?.totalCount ?? 0;
 
   const statusCounts: Record<FunctionRunEndStatus, number> = {
     [FunctionRunStatus.Failed]: failedRunsCount,
@@ -152,12 +145,7 @@ export default function NewReplayModal({
       return;
     }
 
-    if (!environment?.id) {
-      toast.error('Could not find environment. Please try again later.');
-      return;
-    }
-
-    const functionID = data?.environment?.function?.id;
+    const functionID = data?.environment.function?.id;
 
     if (!functionID) {
       toast.error('Could not find function. Please try again later.');
@@ -177,7 +165,9 @@ export default function NewReplayModal({
       loading: 'Loading...',
       success: () => {
         onClose();
-        router.push(`/env/${environmentSlug}/functions/${encodeURIComponent(functionSlug)}/replay`);
+        router.push(
+          `/env/${environment.slug}/functions/${encodeURIComponent(functionSlug)}/replay`
+        );
         return 'Replay created!';
       },
       error: 'Could not replay function runs. Please try again later.',

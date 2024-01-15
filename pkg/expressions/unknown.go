@@ -30,6 +30,11 @@ func unknownDecorator(act interpreter.PartialActivation) interpreter.Interpretab
 			return i, nil
 		}
 
+		fnVal := call.OverloadID()
+		if fnVal == "" {
+			fnVal = call.Function()
+		}
+
 		argTypes := &argColl{}
 
 		args := call.Args()
@@ -56,7 +61,7 @@ func unknownDecorator(act interpreter.PartialActivation) interpreter.Interpretab
 				return staticCall{result: val, InterpretableCall: call}, nil
 			}
 
-			switch call.OverloadID() {
+			switch fnVal {
 			case operators.Add:
 				//
 				// This allows concatenation of distinct types, eg string + number.

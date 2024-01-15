@@ -1,6 +1,7 @@
 import { ClientFeatureFlagProvider } from '@/components/FeatureFlags/ClientFeatureFlagProvider';
 import PageViewTracker from '@/components/PageViewTracker';
 import URQLProvider from '@/queries/URQLProvider';
+import SentryUserIdentification from './SentryUserIdentification';
 import './globals.css';
 import React from 'react';
 import { type Metadata } from 'next';
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           },
         }}
       >
+        <SentryUserIdentification />
         <URQLProvider>
           <ClientFeatureFlagProvider>
             {children}

@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
+	"github.com/inngest/inngestgo/errors"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/inngest/inngestgo/step"
 	"golang.org/x/exp/slog"
@@ -290,6 +291,10 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 				Key:    &c.Debounce.Key,
 				Period: c.Debounce.Period.String(),
 			}
+			if c.Debounce.Timeout != nil {
+				str := c.Debounce.Timeout.String()
+				f.Debounce.Timeout = &str
+			}
 		}
 
 		if c.BatchEvents != nil {
@@ -481,8 +486,8 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 			return json.NewEncoder(w).Encode(StreamResponse{
 				StatusCode: 500,
 				Body:       fmt.Sprintf("error calling function: %s", err.Error()),
-				NoRetry:    isNoRetryError(err),
-				RetryAt:    getRetryAtTime(err),
+				NoRetry:    errors.IsNoRetryError(err),
+				RetryAt:    errors.GetRetryAtTime(err),
 			})
 		}
 		if len(ops) > 0 {
@@ -500,11 +505,11 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		l.Error("error calling function", "error", err)
 
-		if isNoRetryError(err) {
+		if errors.IsNoRetryError(err) {
 			w.Header().Add(HeaderKeyNoRetry, "true")
 		}
 
-		if at := getRetryAtTime(err); at != nil {
+		if at := errors.GetRetryAtTime(err); at != nil {
 			w.Header().Add(HeaderKeyRetryAfter, at.Format(time.RFC3339))
 		}
 

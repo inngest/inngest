@@ -58,7 +58,7 @@ type SearchModalProps = {
 function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const [isSearchResultsListOpened, setIsSearchResultsListOpened] = useState(false);
   const [search, setSearch] = useState('');
-  const resultRef = useRef(null);
+  const resultRef = useRef<HTMLLIElement>(null);
   const router = useRouter();
   const { user } = useUser();
   let searchResult = {
@@ -116,7 +116,7 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
     variables: {
       environmentID: globalResults?.env.id || '',
       functionID:
-        globalResults?.value.__typename === 'FunctionRun' ? globalResults?.value?.functionID : '',
+        globalResults?.value.__typename === 'FunctionRun' ? globalResults.value.functionID : '',
     },
     pause: !globalSearchData || globalResults?.value.__typename === 'ArchivedEvent',
   });
@@ -146,10 +146,10 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
   } else if (globalResults?.value.__typename === 'ArchivedEvent') {
     searchResult = {
       type: 'event',
-      href: `/env/${environmentSlug}/events/${encodeURIComponent(globalResults.value?.name)}/logs/${
+      href: `/env/${environmentSlug}/events/${encodeURIComponent(globalResults.value.name)}/logs/${
         globalResults.value.id
       }`,
-      name: globalResults.value?.name,
+      name: globalResults.value.name,
     };
   }
 
@@ -158,6 +158,7 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
    */
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.code === 'Enter' && resultRef.current && searchResult.href.length > 0) {
+      e.preventDefault();
       router.push(searchResult.href as Route);
       onClose();
     }

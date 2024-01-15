@@ -48,7 +48,7 @@ export default async function ManageLayout({ children, params }: ManageLayoutPro
             title="Manage Environment"
             icon={<WrenchIcon className="h-4 w-4 text-white" />}
             links={navLinks}
-            action={<CreateKeyButton environmentSlug={params.environmentSlug} />}
+            action={<CreateKeyButton />}
           />
           {children}
         </>

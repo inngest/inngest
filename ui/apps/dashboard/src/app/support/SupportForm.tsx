@@ -29,10 +29,15 @@ const instructions: { [K in Exclude<TicketType, null>]: string } = {
 type SupportFormProps = {
   isEnterprise: boolean;
   isPaid: boolean;
+  preselectedTicketType: TicketType;
 };
 
-export function SupportForm({ isEnterprise = false, isPaid = false }: SupportFormProps) {
-  const [ticketType, setTicketType] = useState<TicketType>(null);
+export function SupportForm({
+  isEnterprise = false,
+  isPaid = false,
+  preselectedTicketType = null,
+}: SupportFormProps) {
+  const [ticketType, setTicketType] = useState<TicketType>(preselectedTicketType);
   const [body, setBody] = useState<string>('');
 
   const [bugSeverity, setBugSeverityLevel] = useState<BugSeverity>(DEFAULT_BUG_SEVERITY_LEVEL);

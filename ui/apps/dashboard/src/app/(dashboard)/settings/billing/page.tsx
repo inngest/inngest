@@ -84,17 +84,16 @@ export default function Billing() {
 
   let includedStepCountLimit: number | undefined;
   if (typeof data.account.plan?.features.actions === 'number') {
-    includedStepCountLimit = data.account.plan?.features.actions;
+    includedStepCountLimit = data.account.plan.features.actions;
   }
 
   // TODO = remove this from the transform plan and components, it's unused in the UI
   const totalStepCount = 0;
 
   // Always sort enterprise plans (including trials) last no matter the amount
-  const plans =
-    basePlans
-      ?.map((plan) => (plan ? transformPlan({ plan, currentPlan, usage: totalStepCount }) : null))
-      .sort((a, b) => (a?.isPremium ? 1 : (a?.amount || 0) - (b?.amount || 0))) || [];
+  const plans = basePlans
+    .map((plan) => (plan ? transformPlan({ plan, currentPlan, usage: totalStepCount }) : null))
+    .sort((a, b) => (a?.isPremium ? 1 : (a?.amount || 0) - (b?.amount || 0)));
   const isCurrentPlanEnterprise = currentPlan != undefined && isEnterprisePlan(currentPlan);
   const freePlan = plans.find((p) => p?.isFreeTier);
 
@@ -124,8 +123,8 @@ export default function Billing() {
           </div>
           <div>
             <BillingInformation
-              billingEmail={data?.account?.billingEmail}
-              accountName={data?.account?.name}
+              billingEmail={data.account.billingEmail}
+              accountName={data.account.name}
             />
             <PaymentMethod paymentMethod={paymentMethod} />
           </div>

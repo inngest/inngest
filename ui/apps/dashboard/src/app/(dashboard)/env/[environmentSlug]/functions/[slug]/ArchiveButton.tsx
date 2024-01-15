@@ -8,10 +8,10 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
 import UnarchiveIcon from '@/icons/unarchive.svg';
-import { useEnvironment } from '@/queries';
 
 const ArchiveFunctionDocument = graphql(`
   mutation ArchiveFunction($input: ArchiveWorkflowInput!) {
@@ -101,27 +101,22 @@ function ArchiveFunctionModal({
 }
 
 type ArchiveFunctionProps = {
-  environmentSlug: string;
   functionSlug: string;
 };
 
-export default function ArchiveFunctionButton({
-  environmentSlug,
-  functionSlug,
-}: ArchiveFunctionProps) {
+export default function ArchiveFunctionButton({ functionSlug }: ArchiveFunctionProps) {
   const [isArchivedFunctionModalVisible, setIsArchivedFunctionModalVisible] = useState(false);
-  const [{ data: environment }] = useEnvironment({ environmentSlug });
+  const environment = useEnvironment();
 
   const [{ data: version, fetching: isFetchingVersions }] = useQuery({
     query: GetFunctionArchivalDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
       slug: functionSlug,
     },
-    pause: !environment?.id,
   });
 
-  const fn = version?.workspace?.workflow;
+  const fn = version?.workspace.workflow;
 
   if (!fn) {
     return null;
@@ -144,7 +139,7 @@ export default function ArchiveFunctionButton({
                   )
                 }
                 btnAction={() => setIsArchivedFunctionModalVisible(true)}
-                disabled={!version || isFetchingVersions}
+                disabled={isFetchingVersions}
                 label={isArchived ? 'Unarchive' : 'Archive'}
               />
             </span>
@@ -158,8 +153,8 @@ export default function ArchiveFunctionButton({
         </Tooltip.Root>
       </Tooltip.Provider>
       <ArchiveFunctionModal
-        functionID={fn?.id}
-        functionName={fn?.name ?? 'This function'}
+        functionID={fn.id}
+        functionName={fn.name || 'This function'}
         isOpen={isArchivedFunctionModalVisible}
         onClose={() => setIsArchivedFunctionModalVisible(false)}
         isArchived={isArchived}

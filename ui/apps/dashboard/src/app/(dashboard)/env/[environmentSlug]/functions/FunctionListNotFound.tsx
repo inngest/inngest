@@ -4,14 +4,15 @@ import type { Route } from 'next';
 import Image from 'next/image';
 import { ClipboardIcon, ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
-import { capitalCase } from 'change-case';
 import { useCopyToClipboard } from 'react-use';
 import { toast } from 'sonner';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import DevServerImage from '@/images/devserver.png';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
 
-export default function FunctionListNotFound({ environmentSlug }: { environmentSlug: string }) {
+export default function FunctionListNotFound() {
+  const env = useEnvironment();
   const [, copy] = useCopyToClipboard();
 
   const command = 'npx inngest-cli@latest dev';
@@ -24,10 +25,6 @@ export default function FunctionListNotFound({ environmentSlug }: { environmentS
     );
   }
 
-  const environment = environmentSlug.match(/(production|staging)/i)
-    ? capitalCase(environmentSlug)
-    : environmentSlug;
-
   return (
     <div className="h-full w-full overflow-y-scroll py-16">
       <div className="mx-auto flex w-[640px] flex-col gap-4">
@@ -36,7 +33,7 @@ export default function FunctionListNotFound({ environmentSlug }: { environmentS
             <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 text-indigo-700" />
             <span>
               No Functions <span className="font-medium text-indigo-900">registered in</span>{' '}
-              {environment}
+              {env.name}
             </span>
           </h3>
         </div>
@@ -94,7 +91,7 @@ export default function FunctionListNotFound({ environmentSlug }: { environmentS
           <div className="mt-6 flex items-center gap-2 border-t border-slate-100 py-4">
             <Button
               kind="primary"
-              href={`/env/${environmentSlug}/deploys` as Route}
+              href={`/env/${env.slug}/deploys` as Route}
               label="Go To Deploys"
             />
             <div className="flex gap-2 border-l border-slate-100 pl-2">
