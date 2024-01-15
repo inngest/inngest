@@ -6,6 +6,7 @@ import cn from '@/utils/cn';
 interface ModalProps {
   children?: React.ReactNode;
   backdropClassName?: string;
+  containerClassName?: string;
   className?: string;
   isOpen: boolean;
   onClose: () => void;
@@ -15,6 +16,7 @@ export default function Modal({
   children,
   className = '',
   backdropClassName = '',
+  containerClassName = '',
   isOpen,
   onClose,
 }: ModalProps) {
@@ -38,7 +40,9 @@ export default function Modal({
         </Transition.Child>
         {/* Full-screen container to center the panel */}
         <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-6">
+          <div
+            className={cn('flex min-h-full items-center justify-center p-6', containerClassName)}
+          >
             <Transition.Child
               as={Fragment}
               enter="ease-out duration-300"

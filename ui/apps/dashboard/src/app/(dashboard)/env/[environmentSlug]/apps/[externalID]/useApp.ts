@@ -77,7 +77,7 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
     };
   }
 
-  return res;
+  return { ...res, data: undefined };
 }
 
 function transformTriggers(
