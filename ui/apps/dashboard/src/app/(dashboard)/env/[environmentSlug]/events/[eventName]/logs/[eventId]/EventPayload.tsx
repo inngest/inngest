@@ -4,7 +4,6 @@ import { IconCloudArrowDown } from '@inngest/components/icons/CloudArrowDown';
 import { type JsonValue } from 'type-fest';
 
 import DashboardCodeBlock from '@/components/DashboardCodeBlock/DashboardCodeBlock';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { getFragmentData, graphql, type FragmentType } from '@/gql';
 import { devServerURL, useDevServer } from '@/utils/useDevServer';
 
@@ -21,7 +20,6 @@ type EventPayloadProps = {
 export default function EventPayload({ event }: EventPayloadProps) {
   const { payload } = getFragmentData(EventPayloadFragment, event);
   const { isRunning, send } = useDevServer();
-  const { value: isSendToDevServerEnabled } = useBooleanFlag('send-to-dev-server', false);
 
   let parsedPayload: string | JsonValue = '';
   if (typeof payload === 'string') {
@@ -45,21 +43,17 @@ export default function EventPayload({ event }: EventPayloadProps) {
           readOnly: true,
         },
       ]}
-      actions={
-        isSendToDevServerEnabled
-          ? [
-              {
-                label: 'Send to Dev Server',
-                title: isRunning
-                  ? 'Send event payload to running Dev Server'
-                  : `Dev Server is not running at ${devServerURL}`,
-                icon: <IconCloudArrowDown />,
-                onClick: () => send(payload),
-                disabled: !isRunning,
-              },
-            ]
-          : []
-      }
+      actions={[
+        {
+          label: 'Send to Dev Server',
+          title: isRunning
+            ? 'Send event payload to running Dev Server'
+            : `Dev Server is not running at ${devServerURL}`,
+          icon: <IconCloudArrowDown />,
+          onClick: () => send(payload),
+          disabled: !isRunning,
+        },
+      ]}
     />
   );
 }

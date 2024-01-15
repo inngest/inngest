@@ -444,7 +444,6 @@ export enum HistoryType {
 
 export type IngestKey = {
   __typename?: 'IngestKey';
-  author: User;
   createdAt: Scalars['Time'];
   filter: FilterList;
   id: Scalars['ID'];
