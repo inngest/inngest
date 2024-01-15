@@ -39,7 +39,7 @@ function getDefaultEventKey<T extends { createdAt: string; name: null | string }
 
 export default function EventListNotFound() {
   const router = useRouter();
-  const isAppsEnabled = useBooleanFlag('apps-page');
+  const { value: isAppsEnabled } = useBooleanFlag('apps-page');
   const [, copy] = useCopyToClipboard();
   const environment = useEnvironment();
   const [{ data, fetching: fetchingKey }] = useQuery({

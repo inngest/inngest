@@ -14,7 +14,7 @@ import VercelLogomark from '@/logos/vercel-logomark.svg';
 
 export default function FunctionListNotFound() {
   const env = useEnvironment();
-  const isAppsEnabled = useBooleanFlag('apps-page');
+  const { value: isAppsEnabled } = useBooleanFlag('apps-page');
   const [, copy] = useCopyToClipboard();
 
   const command = 'npx inngest-cli@latest dev';
