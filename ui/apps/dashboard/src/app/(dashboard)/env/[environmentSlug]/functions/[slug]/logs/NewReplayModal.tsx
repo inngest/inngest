@@ -15,6 +15,7 @@ import { useMutation } from 'urql';
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { type TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import Input from '@/components/Forms/Input';
+import Placeholder from '@/components/Placeholder';
 import { TimeRangeInput } from '@/components/TimeRangeInput';
 import { graphql } from '@/gql';
 import { FunctionRunStatus } from '@/gql/graphql';
@@ -245,10 +246,14 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
                   {label}
                 </ToggleGroup.Item>
                 <p aria-label={`Number of ${label} runs`} className="text-sm text-slate-500">
-                  {count.toLocaleString(undefined, {
-                    notation: 'compact',
-                    compactDisplay: 'short',
-                  })}{' '}
+                  {isLoading ? (
+                    <Placeholder className="top-px inline-flex h-3 w-3 bg-slate-200" />
+                  ) : (
+                    count.toLocaleString(undefined, {
+                      notation: 'compact',
+                      compactDisplay: 'short',
+                    })
+                  )}{' '}
                   Runs
                 </p>
               </div>
@@ -269,10 +274,14 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
             <p className="inline-flex gap-1.5 text-slate-500">
               Total runs to be replayed:{' '}
               <span className="font-medium text-slate-800">
-                {selectedRunsCount.toLocaleString(undefined, {
-                  notation: 'compact',
-                  compactDisplay: 'short',
-                })}
+                {isLoading ? (
+                  <Placeholder className="top-px inline-flex h-4 w-4 bg-slate-200" />
+                ) : (
+                  selectedRunsCount.toLocaleString(undefined, {
+                    notation: 'compact',
+                    compactDisplay: 'short',
+                  })
+                )}
               </span>
             </p>
           </div>
