@@ -193,7 +193,7 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
                   '3 days ago',
                   '15:30:24',
                   'Jan 14',
-                  '2020-01-01T10:00:00Z',
+                  '2024-01-01T10:00:00Z',
                 ].map((example) => (
                   <button
                     className="h-5 rounded bg-slate-200 px-1.5 text-xs text-black hover:bg-slate-300"
