@@ -57,8 +57,8 @@ export default function Page() {
             <HoverCardContent className="w-72 p-2.5 text-sm">
               <p>
                 Each endpoint where you serve functions is an app. Each time you update your
-                functions, you must sync your app to Inngest. When using our Vercel Integration,
-                your app will be synced automatically.
+                functions, you must sync your app to Inngest. When using our Vercel or Netlify
+                Integrations, your app will be synced automatically.
               </p>
               <br />
               <p>Deploys have been renamed to “Syncs.” Syncs are found within Apps.</p>
