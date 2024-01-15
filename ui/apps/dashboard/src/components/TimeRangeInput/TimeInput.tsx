@@ -79,11 +79,15 @@ function reducer(state: State, action: Action): State {
       };
     case 'stopped_typing':
       const parsedDateTime = chrono.parseDate(state.inputString);
-      return {
-        ...state,
-        suggestedDateTime: undefined,
-        status: 'idle',
-      };
+      // Chrono's types are wrong - parseData can return undefined
+      // eslint-disable-next-line
+      if (!parsedDateTime) {
+        return {
+          ...state,
+          suggestedDateTime: undefined,
+          status: 'idle',
+        };
+      }
       return {
         ...state,
         suggestedDateTime: parsedDateTime,
