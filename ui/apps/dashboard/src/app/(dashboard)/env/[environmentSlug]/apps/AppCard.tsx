@@ -125,7 +125,7 @@ export function EmptyAppCard({ children }: { children: React.ReactNode }) {
         <ol className="mt-3 hidden flex-col gap-3 md:flex">
           <li className="flex items-center gap-2">
             <span className="h-6 w-6 rounded-full bg-slate-400 text-center text-white">1</span>
-            <span className="flex-1">Deploy your app on your host environment of choices.</span>
+            <span className="flex-1">Deploy your app on your host environment of choice.</span>
           </li>
           <li className="flex items-center gap-2">
             <span className="h-6 w-6 rounded-full bg-slate-400 text-center text-white">2</span>
