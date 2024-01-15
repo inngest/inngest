@@ -21,7 +21,8 @@ const options = {
     "https://api-docs.inngest.com/docs/inngest-api",
     "http://localhost:8288",
     "http://localhost:",
-    "https://www.uber.com"
+    "https://www.uber.com",
+    "https://www.tripadvisor.com",
   ],
 };
 
