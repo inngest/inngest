@@ -103,9 +103,9 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
 
   let appRoute: Route;
   if (isAppsEnabled) {
-    appRoute = `/env/${params.environmentSlug}/apps/${function_.appName}`;
+    appRoute = `/env/${params.environmentSlug}/apps/${function_.appName}` as Route;
   } else {
-    appRoute = `/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}`;
+    appRoute = `/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}` as Route;
   }
 
   return (
