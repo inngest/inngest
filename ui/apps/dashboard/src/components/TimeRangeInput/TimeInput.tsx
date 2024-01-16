@@ -118,6 +118,7 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
       // stopped_typing action.
       if (state.status === 'suggestion_applied') return;
       dispatch({ type: 'stopped_typing' });
+      onChange(state.suggestedDateTime);
     },
     350,
     [state.inputString]
