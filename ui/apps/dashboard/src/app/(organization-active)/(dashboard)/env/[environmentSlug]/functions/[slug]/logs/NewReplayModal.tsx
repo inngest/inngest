@@ -136,9 +136,11 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
 
   const selectedRunsCount = selectedStatuses.reduce((acc, status) => acc + statusCounts[status], 0);
 
+  const isTimeRangeValid = timeRange?.start < timeRange?.end;
+
   async function createFunctionReplay(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!timeRange) {
+    if (!isTimeRangeValid) {
       toast.error('Please specify a valid time range.');
       return;
     }
@@ -250,11 +252,13 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
                 <p aria-label={`Number of ${label} runs`} className="text-sm text-slate-500">
                   {isLoading ? (
                     <Placeholder className="top-px inline-flex h-3 w-3 bg-slate-200" />
-                  ) : (
+                  ) : isTimeRangeValid ? (
                     count.toLocaleString(undefined, {
                       notation: 'compact',
                       compactDisplay: 'short',
                     })
+                  ) : (
+                    '-'
                   )}{' '}
                   Runs
                 </p>
@@ -278,11 +282,13 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
               <span className="font-medium text-slate-800">
                 {isLoading ? (
                   <Placeholder className="top-px inline-flex h-4 w-4 bg-slate-200" />
-                ) : (
+                ) : isTimeRangeValid ? (
                   selectedRunsCount.toLocaleString(undefined, {
                     notation: 'compact',
                     compactDisplay: 'short',
                   })
+                ) : (
+                  '-'
                 )}
               </span>
             </p>
