@@ -303,7 +303,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
               kind="primary"
               type="submit"
               icon={<IconReplay className="h-5 w-5 text-white" />}
-              disabled={isCreatingFunctionReplay}
+              disabled={!isTimeRangeValid || isCreatingFunctionReplay}
             />
           </div>
         </div>
