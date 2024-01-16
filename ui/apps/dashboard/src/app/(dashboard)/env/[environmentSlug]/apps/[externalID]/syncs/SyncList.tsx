@@ -23,8 +23,8 @@ type LoadingProps = {
 };
 
 type Sync = {
-  createdAt: Date;
   id: string;
+  lastSyncedAt: Date;
   status: string;
   syncedFunctions: unknown[];
 };
@@ -69,7 +69,7 @@ export function SyncList({
                   <SyncStatus status={sync.status} />
                 </div>
                 <div className="table-cell p-4 pl-0 pr-16 align-middle">
-                  <Time value={sync.createdAt} />
+                  <Time value={sync.lastSyncedAt} />
                 </div>
                 <div className="table-cell whitespace-nowrap p-4 pl-0 align-middle">
                   {sync.syncedFunctions.length} functions
