@@ -23,6 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/ierrors"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
@@ -1394,7 +1395,9 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	strExpr := fmt.Sprintf("async.data.%s == %s", consts.InvokeCorrelationId, strconv.Quote(correlationID))
 	_, err = e.newExpressionEvaluator(ctx, strExpr)
 	if err != nil {
-		return execError{err: fmt.Errorf("failed to create expression to wait for invoked function completion: %w", err)}
+		return ierrors.New(ierrors.InternalExecutionError{
+			Err: fmt.Errorf("failed to create expression to wait for invoked function completion: %w", err),
+		})
 	}
 
 	logger.From(ctx).Info().Interface("opts", opts).Time("expires", expires).Str("event", eventName).Str("expr", strExpr).Msg("parsed invoke function opts")
@@ -1489,17 +1492,24 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	data := map[string]any{}
 	if opts.If != nil {
 		if err := expressions.Validate(ctx, *opts.If); err != nil {
-			return execError{err, true}
+			return ierrors.New(ierrors.InternalExecutionError{
+				Err:   fmt.Errorf("failed to create expression to wait for invoked function completion: %w", err),
+				Final: true,
+			})
 		}
 
 		expr, err := e.newExpressionEvaluator(ctx, *opts.If)
 		if err != nil {
-			return execError{err, true}
+			return ierrors.New(ierrors.InternalExecutionError{
+				Err: fmt.Errorf("error creating expression evaluator: %w", err),
+			})
 		}
 
 		run, err := e.sm.Load(ctx, item.Identifier.RunID)
 		if err != nil {
-			return execError{err: fmt.Errorf("unable to load run after execution: %w", err)}
+			return ierrors.New(ierrors.InternalExecutionError{
+				Err: fmt.Errorf("unable to load run after execution: %w", err),
+			})
 		}
 
 		// Take the data for expressions based off of state.
@@ -1605,25 +1615,4 @@ func (e *executor) newExpressionEvaluator(ctx context.Context, expr string) (exp
 		return e.evalFactory(ctx, expr)
 	}
 	return expressions.NewExpressionEvaluator(ctx, expr)
-}
-
-type execError struct {
-	err   error
-	final bool
-}
-
-func (e execError) Unwrap() error {
-	return e.err
-}
-
-func (e execError) Error() string {
-	return e.err.Error()
-}
-
-func (e execError) Retryable() bool {
-	return !e.final
-}
-
-func newFinalError(err error) error {
-	return execError{err: err, final: true}
 }
