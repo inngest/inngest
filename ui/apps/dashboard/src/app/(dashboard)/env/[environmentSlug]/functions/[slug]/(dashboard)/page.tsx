@@ -1,5 +1,6 @@
 'use client';
 
+import type { Route } from 'next';
 import Link from 'next/link';
 import { ChartBarIcon, ChevronRightIcon, XCircleIcon } from '@heroicons/react/20/solid';
 import {
@@ -19,6 +20,7 @@ import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/function
 import { Alert } from '@/components/Alert';
 import { Badge as LegacyBadge } from '@/components/Badge/Badge';
 import Block from '@/components/Block';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { Time } from '@/components/Time';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
@@ -42,6 +44,7 @@ type FunctionDashboardProps = {
 
 export default function FunctionDashboardPage({ params }: FunctionDashboardProps) {
   const functionSlug = decodeURIComponent(params.slug);
+  const { value: isAppsEnabled } = useBooleanFlag('apps-page');
   const [{ data, fetching: isFetchingFunction }] = useFunction({
     functionSlug,
   });
@@ -98,6 +101,13 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     }
   }
 
+  let appRoute: Route;
+  if (isAppsEnabled) {
+    appRoute = `/env/${params.environmentSlug}/apps/${function_.appName}`;
+  } else {
+    appRoute = `/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}`;
+  }
+
   return (
     <>
       <div className="grid-cols-dashboard grid min-h-0 flex-1 bg-slate-100">
@@ -145,7 +155,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
           <div className="flex flex-col gap-10">
             <Block title="App">
               <Link
-                href={`/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}`}
+                href={appRoute}
                 className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
               >
                 <div className="flex min-w-0 items-center">
