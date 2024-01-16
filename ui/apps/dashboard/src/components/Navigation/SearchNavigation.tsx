@@ -179,7 +179,7 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
   return (
     <Modal
-      backdropClassName="bg-white/30 backdrop-blur-[2px]"
+      backdropClassName="bg-black/50 backdrop-blur-[2px]"
       className="ml-auto mr-auto flex max-w-2xl self-start p-0 shadow"
       isOpen={isOpen}
       onClose={onClose}
