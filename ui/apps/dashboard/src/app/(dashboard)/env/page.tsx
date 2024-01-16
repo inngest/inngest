@@ -4,6 +4,7 @@ import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 
 import AppLink from '@/components/AppLink';
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import AppNavigation from '@/components/Navigation/AppNavigation';
 import Toaster from '@/components/Toaster';
 import getAllEnvironments from '@/queries/server-only/getAllEnvironments';
@@ -12,6 +13,7 @@ import EnvironmentListTable from './EnvironmentListTable';
 
 export default async function Envs() {
   const environments = await getAllEnvironments();
+  const isAppsEnabled = await getBooleanFlag('apps-page');
 
   // Break the environments into different groups
   const legacyTestMode = environments.find(
@@ -34,9 +36,13 @@ export default async function Envs() {
               <div className="flex items-center gap-2">
                 <Button href="/env/production/manage" appearance="outlined" label="Manage" />
                 <Button
-                  href={'/env/production/deploys?intent=deploy-modal' as Route}
+                  href={
+                    `/env/production/${
+                      isAppsEnabled ? 'apps' : 'deploys?intent=deploy-modal'
+                    }` as Route
+                  }
                   kind="primary"
-                  label="Deploy"
+                  label={isAppsEnabled ? 'Go To Apps' : 'Deploy'}
                 />
               </div>
             </div>
@@ -51,46 +57,40 @@ export default async function Envs() {
                 <span className="block h-2 w-2 rounded-full bg-teal-400" />
                 Production
               </h3>
-              {/* <div className="flex items-center gap-2">
-          <span className="text-white text-sm font-regular tracking-wide">10 minutes ago</span>
-          <CheckCircleIcon className="w-4 h-4 text-teal-400" />
-        </div> */}
             </Link>
-
             {Boolean(legacyTestMode) && (
               <div className="mt-12 border-t border-slate-100 pt-8">
                 <div className="mb-4 flex w-full items-center  justify-between">
                   <h2 className="text-lg font-medium text-slate-800">Test Mode</h2>
                   <div className="flex items-center gap-2">
-                    <Button href="/env/test/manage" appearance="outlined" label="Manage" />
                     <Button
-                      href="/env/test/deploys?intent=deploy-modal"
+                      href={`/env/${legacyTestMode?.slug}/manage`}
+                      appearance="outlined"
+                      label="Manage"
+                    />
+                    <Button
+                      href={
+                        `/env/${legacyTestMode?.slug}/${
+                          isAppsEnabled ? 'apps' : 'deploys?intent=deploy-modal'
+                        }` as Route
+                      }
                       kind="primary"
-                      label="Deploy"
+                      label={isAppsEnabled ? 'Go To Apps' : 'Deploy'}
                     />
                   </div>
                 </div>
                 <Link
-                  href={'/env/test/functions' as Route}
+                  href={`/env/${legacyTestMode?.slug}/functions` as Route}
                   className="mt-8 flex cursor-pointer items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm hover:bg-slate-100/60"
                 >
                   <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
                     <span className="block h-2 w-2 rounded-full bg-teal-500" />
                     Test
                   </h3>
-                  {/* <div className="flex justify-end items-center gap-2">
-              <span className="text-slate-600 text-sm font-medium">Just now</span>
-              <CheckCircleIcon className="w-4 h-4 text-teal-500" />
-            </div> */}
                 </Link>
                 <p className="mt-4 text-sm text-amber-600">
                   <ExclamationTriangleIcon className="mr-1 inline-block h-4 w-4 text-amber-500" />
                   Test mode is a legacy environment
-                  {/*Read the{' '}
-          <Link className="font-semibold underline text-amber-500" href="/">
-            upgrade guide
-          </Link>{' '}
-  to learn how to migrate.*/}
                 </p>
               </div>
             )}
@@ -108,9 +108,13 @@ export default async function Envs() {
 
                     {/* Here we don't link to the modal since the /deploy empty state has more info on branch envs */}
                     <Button
-                      href={`/env/${branchParent?.slug || 'branch'}/deploys` as Route}
+                      href={
+                        `/env/${branchParent?.slug || 'branch'}/${
+                          isAppsEnabled ? 'apps' : 'deploys'
+                        }` as Route
+                      }
                       kind="primary"
-                      label="Deploy"
+                      label={isAppsEnabled ? 'Go To Apps' : 'Deploy'}
                     />
                   </div>
                 </div>
@@ -147,10 +151,6 @@ export default async function Envs() {
                       <span className="block h-2 w-2 rounded-full bg-teal-500" />
                       {env.name}
                     </h3>
-                    {/* <div className="flex justify-end items-center gap-2">
-                    <span className="text-slate-600 text-sm font-medium">Just now</span>
-                    <CheckCircleIcon className="w-4 h-4 text-teal-500" />
-                  </div> */}
                   </Link>
                 </div>
               ))}
