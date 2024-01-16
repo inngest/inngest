@@ -136,11 +136,11 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
 
   const selectedRunsCount = selectedStatuses.reduce((acc, status) => acc + statusCounts[status], 0);
 
-  const isTimeRangeValid = timeRange?.start < timeRange?.end;
+  const isTimeRangeValid = Boolean(timeRange && timeRange.start < timeRange.end);
 
   async function createFunctionReplay(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!isTimeRangeValid) {
+    if (!timeRange) {
       toast.error('Please specify a valid time range.');
       return;
     }

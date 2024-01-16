@@ -8,7 +8,7 @@ import { useDebounce } from 'react-use';
 import Input from '@/components/Forms/Input';
 
 type Props = {
-  onChange: (newDateTime: Date) => void;
+  onChange: (newDateTime: Date | undefined) => void;
   placeholder?: string;
   required?: boolean;
 };
@@ -156,7 +156,7 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
 
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
     // Check if this is a paste event. If so, we don't want to dispatch the typed action.
-    if (event.nativeEvent.inputType === 'insertFromPaste') return;
+    if ((event.nativeEvent as InputEvent).inputType === 'insertFromPaste') return;
     dispatch({ type: 'typed', value: event.target.value });
   }
 
