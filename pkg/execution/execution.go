@@ -138,9 +138,6 @@ type HandleSendingEvent func(context.Context, event.Event, queue.Item) error
 // ScheduleRequest represents all data necessary to schedule a new function.
 type ScheduleRequest struct {
 	Function inngest.Function
-	// StaticVersion represents the ability to pin this function to a specific version,
-	// disabling live migrations.
-	StaticVersion bool `json:"s,omitempty"`
 	// At allows functions to be scheduled in the future.
 	At *time.Time
 	// AccountID is the account that the request belongs to.

@@ -281,7 +281,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	id := state.Identifier{
 		WorkflowID:      req.Function.ID,
 		WorkflowVersion: req.Function.FunctionVersion,
-		StaticVersion:   req.StaticVersion,
 		RunID:           runID,
 		BatchID:         req.BatchID,
 		EventID:         req.Events[0].GetInternalID(),

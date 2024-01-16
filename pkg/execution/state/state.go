@@ -43,12 +43,6 @@ type Identifier struct {
 	// WorkflowVersion tracks the version of the function that was live
 	// at the time of the trigger.
 	WorkflowVersion int `json:"wv"`
-	// StaticVersion indicates whether the workflow is pinned to the
-	// given function definition over the life of the function.  If functions
-	// are deployed to their own URLs, this ensures that the endpoint we hit
-	// for the function (and therefore code) stays the same.  Note:  this is only
-	// important when we people use separate endpoints per function version.
-	StaticVersion bool `json:"s,omitempty"`
 	// EventID tracks the event ID that started the function.
 	EventID ulid.ULID `json:"evtID"`
 	// BatchID tracks the batch ID for the function, if the function uses batching.
@@ -280,6 +274,7 @@ type StateLoader interface {
 
 // FunctionLoader loads function definitions based off of an identifier.
 type FunctionLoader interface {
+	// LoadFunction should always return the latest live version of a function
 	LoadFunction(ctx context.Context, identifier Identifier) (*inngest.Function, error)
 }
 
