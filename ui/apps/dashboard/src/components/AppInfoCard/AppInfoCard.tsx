@@ -37,8 +37,8 @@ type App = {
 };
 
 type Sync = {
-  createdAt: Date;
   framework: string | null;
+  lastSyncedAt: Date;
   sdkLanguage: string | null;
   sdkVersion: string | null;
   status: string;
@@ -53,13 +53,13 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
       lastSyncValue = (
         <div className="flex items-center gap-2">
           <SyncStatus status={sync.status} />
-          {linkToSyncs && <Time value={sync.createdAt} />}
+          {linkToSyncs && <Time value={sync.lastSyncedAt} />}
           {!linkToSyncs && (
             <Link
               className="transition-color flex cursor-pointer items-center gap-1 text-indigo-400 underline decoration-transparent decoration-2 underline-offset-4 duration-300  hover:decoration-indigo-400"
               href={`/env/${env.slug}/apps/${encodeURIComponent(app.externalID)}/syncs`}
             >
-              <Time value={sync.createdAt} />
+              <Time value={sync.lastSyncedAt} />
               <ChevronRightIcon className="h-4 w-4" />
             </Link>
           )}
@@ -69,7 +69,7 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
       lastSyncValue = (
         <div className="flex items-center gap-2">
           <SyncStatus status={sync.status} />
-          <Time value={sync.createdAt} />
+          <Time value={sync.lastSyncedAt} />
         </div>
       );
     }

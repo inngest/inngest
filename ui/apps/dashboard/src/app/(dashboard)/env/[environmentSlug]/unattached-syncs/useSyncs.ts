@@ -9,9 +9,9 @@ const query = graphql(`
         commitHash
         commitMessage
         commitRef
-        createdAt
         framework
         id
+        lastSyncedAt
         platform
         repoURL
         sdkLanguage
@@ -37,7 +37,7 @@ export function useSyncs({ envID }: { envID: string }) {
     const syncs = res.data.environment.syncs.map((sync) => {
       return {
         ...sync,
-        createdAt: new Date(sync.createdAt),
+        lastSyncedAt: new Date(sync.lastSyncedAt),
         syncedFunctions: [],
       };
     });

@@ -26,8 +26,8 @@ type App = {
 };
 
 type Sync = {
-  createdAt: Date;
   framework: string | null;
+  lastSyncedAt: Date;
   platform: string | null;
   sdkLanguage: string | null;
   sdkVersion: string | null;
@@ -73,7 +73,7 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
                     className="transition-color flex cursor-pointer items-center gap-1 text-indigo-400 underline decoration-transparent decoration-2 underline-offset-4 duration-300  hover:decoration-indigo-400"
                     href={`/env/${envSlug}/apps/${encodeURIComponent(app.externalID)}/syncs`}
                   >
-                    <Time value={app.latestSync.createdAt} />
+                    <Time value={app.latestSync.lastSyncedAt} />
                     <ChevronRightIcon className="h-4 w-4" />
                   </Link>
                 </div>
