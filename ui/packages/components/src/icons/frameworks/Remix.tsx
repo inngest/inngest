@@ -16,7 +16,6 @@ export function IconRemix({ className, size = 18 }: { className?: string; size?:
         d="M194.5 636V636.5H195H355.878H356.378V636V588.994C356.378 583.988 355.152 577.26 351.063 571.77C346.955 566.255 340.004 562.053 328.697 562.053H195H194.5V562.553V636Z"
         fill="white"
         stroke="white"
-        stroke-opacity="0.8"
       />
     </svg>
   );
