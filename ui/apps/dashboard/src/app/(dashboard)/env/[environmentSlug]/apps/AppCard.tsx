@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import ArchiveBoxArrowDownIcon from '@heroicons/react/20/solid/ArchiveBoxArrowDownIcon';
 import ChevronRightIcon from '@heroicons/react/20/solid/ChevronRightIcon';
+import { Link as InngestLink } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { classNames } from '@inngest/components/utils/classNames';
 
@@ -69,13 +70,13 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
               app.latestSync && (
                 <div className="flex gap-2">
                   <SyncStatus status={app.latestSync.status} />
-                  <Link
-                    className="transition-color flex cursor-pointer items-center gap-1 text-indigo-400 underline decoration-transparent decoration-2 underline-offset-4 duration-300  hover:decoration-indigo-400"
+                  <InngestLink
+                    internalNavigation
+                    showIcon={false}
                     href={`/env/${envSlug}/apps/${encodeURIComponent(app.externalID)}/syncs`}
                   >
                     <Time value={app.latestSync.lastSyncedAt} />
-                    <ChevronRightIcon className="h-4 w-4" />
-                  </Link>
+                  </InngestLink>
                 </div>
               )
             }

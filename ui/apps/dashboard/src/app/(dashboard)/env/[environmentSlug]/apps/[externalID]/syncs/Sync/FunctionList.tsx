@@ -84,12 +84,12 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                     >
                       <div
                         className={classNames(
-                          'group flex w-full items-center gap-2 border-slate-200 py-3 pl-6 pr-2 text-sm font-medium text-slate-700 hover:bg-indigo-50  hover:text-indigo-600',
+                          'group flex w-full items-center gap-2 border-slate-200 py-3 pl-6 pr-2 text-sm font-medium text-indigo-500 hover:bg-slate-100  hover:text-indigo-800',
                           !isLast && 'border-b'
                         )}
                       >
                         {fn.name}
-                        <ArrowRightIcon className="h-3 w-3 -translate-x-3 text-indigo-600 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+                        <ArrowRightIcon className="h-3 w-3 -translate-x-3 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
                       </div>
                     </Link>
                   );
@@ -132,12 +132,12 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                   >
                     <div
                       className={classNames(
-                        'group flex w-full items-center gap-2 border-slate-200 py-3 pl-6 pr-2 text-sm font-medium text-slate-700 hover:bg-indigo-50  hover:text-indigo-600',
+                        'group flex w-full items-center gap-2 border-slate-200 py-3 pl-6 pr-2 text-sm font-medium text-indigo-500 hover:bg-slate-100  hover:text-indigo-800',
                         !isLast && 'border-b'
                       )}
                     >
                       {fn.name}
-                      <ArrowRightIcon className="h-3 w-3 -translate-x-3 text-indigo-600 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+                      <ArrowRightIcon className="h-3 w-3 -translate-x-3 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
                     </div>
                   </Link>
                 );

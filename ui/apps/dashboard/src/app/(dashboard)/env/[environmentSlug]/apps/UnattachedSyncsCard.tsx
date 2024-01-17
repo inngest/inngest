@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import ChevronRightIcon from '@heroicons/react/20/solid/ChevronRightIcon';
+import { Link as InngestLink } from '@inngest/components/Link';
 import { classNames } from '@inngest/components/utils/classNames';
 
 import { Time } from '@/components/Time';
@@ -38,13 +39,13 @@ export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Prop
             className="col-span-2"
             detail={
               <div className="flex gap-2">
-                <Link
-                  className="transition-color flex cursor-pointer items-center gap-1 text-indigo-400 underline decoration-transparent decoration-2 underline-offset-4 duration-300  hover:decoration-indigo-400"
+                <InngestLink
+                  internalNavigation
+                  showIcon={false}
                   href={`/env/${envSlug}/unattached-syncs`}
                 >
                   <Time value={latestSyncTime} />
-                  <ChevronRightIcon className="h-4 w-4" />
-                </Link>
+                </InngestLink>
               </div>
             }
             term="Last sync"

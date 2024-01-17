@@ -1,6 +1,5 @@
 import { useRef } from 'react';
-import Link from 'next/link';
-import ArrowRightIcon from '@heroicons/react/20/solid/ArrowRightIcon';
+import { Link } from '@inngest/components/Link';
 import { Table } from '@inngest/components/Table';
 import type { Function } from '@inngest/components/types/function';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
@@ -53,11 +52,11 @@ function useColumns({ envSlug }: { envSlug: string }) {
         return (
           <div className="flex items-center">
             <Link
-              className="group flex w-full items-center gap-2 text-sm font-medium text-slate-700  hover:text-indigo-600"
+              internalNavigation
+              className="w-full text-sm font-medium"
               href={`/env/${envSlug}/functions/${encodeURIComponent(info.row.original.slug)}`}
             >
               {name}
-              <ArrowRightIcon className="h-3 w-3 -translate-x-3 text-indigo-600 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
             </Link>
           </div>
         );
