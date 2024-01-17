@@ -276,6 +276,7 @@ export default function SearchNavigation() {
         type="button"
         className="mr-4 flex items-center rounded-lg bg-slate-800 py-1 text-sm text-slate-400 ring-inset ring-white/10 transition hover:text-white hover:ring-white/20"
         onClick={() => setIsSearchModalVisible(true)}
+        aria-label="Search by ID"
       >
         <div className="flex items-center gap-1 px-2">
           <MagnifyingGlassIcon className="h-4 w-4" />
