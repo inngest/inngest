@@ -928,6 +928,13 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	}
 }
 
+func isConcurrencyLimitError(err error) bool {
+	return err == ErrPartitionConcurrencyLimit ||
+		err == ErrAccountConcurrencyLimit ||
+		err == ErrConcurrencyLimitCustomKey0 ||
+		err == ErrConcurrencyLimitCustomKey1
+}
+
 // ExtendLease extens the lease for a given queue item, given the queue item is currently
 // leased with the given ID.  This returns a new lease ID if the lease is successfully ended.
 //
