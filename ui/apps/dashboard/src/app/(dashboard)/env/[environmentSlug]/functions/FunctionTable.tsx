@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { type Route } from 'next';
 import { ChartBarIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Link } from '@inngest/components/Link';
 import {
@@ -125,7 +126,7 @@ function createColumns(environmentSlug: string, isAppsPageEnabled: boolean) {
             />
             <Link
               key="name"
-              href={`/env/${environmentSlug}/functions/${encodeURIComponent(slug)}`}
+              href={`/env/${environmentSlug}/functions/${encodeURIComponent(slug)}` as Route}
               internalNavigation
               className="w-full px-2 py-3 text-sm font-medium"
             >
@@ -170,7 +171,7 @@ function createColumns(environmentSlug: string, isAppsPageEnabled: boolean) {
         return (
           <Link
             key="name"
-            href={`/env/${environmentSlug}/apps/${encodeURIComponent(appExternalID)}`}
+            href={`/env/${environmentSlug}/apps/${encodeURIComponent(appExternalID)}` as Route}
             internalNavigation
             showIcon={false}
             className="px-2 py-3 text-sm font-medium"

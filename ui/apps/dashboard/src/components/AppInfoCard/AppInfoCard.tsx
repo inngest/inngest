@@ -1,5 +1,6 @@
 'use client';
 
+import { type Route } from 'next';
 import { Link } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { classNames } from '@inngest/components/utils/classNames';
@@ -55,7 +56,7 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
           {linkToSyncs && <Time value={sync.lastSyncedAt} />}
           {!linkToSyncs && (
             <Link
-              href={`/env/${env.slug}/apps/${encodeURIComponent(app.externalID)}/syncs`}
+              href={`/env/${env.slug}/apps/${encodeURIComponent(app.externalID)}/syncs` as Route}
               showIcon={false}
               internalNavigation
             >

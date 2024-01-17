@@ -1,5 +1,6 @@
 'use client';
 
+import { type Route } from 'next';
 import Link from 'next/link';
 import ChevronRightIcon from '@heroicons/react/20/solid/ChevronRightIcon';
 import { Link as InngestLink } from '@inngest/components/Link';
@@ -42,7 +43,7 @@ export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Prop
                 <InngestLink
                   internalNavigation
                   showIcon={false}
-                  href={`/env/${envSlug}/unattached-syncs`}
+                  href={`/env/${envSlug}/unattached-syncs` as Route}
                 >
                   <Time value={latestSyncTime} />
                 </InngestLink>

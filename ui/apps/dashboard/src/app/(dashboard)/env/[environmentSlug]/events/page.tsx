@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { type Route } from 'next';
 import { ChartBarIcon, CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
@@ -129,7 +130,7 @@ function EventTypesListPaginationPage({
             <td className="w-96 whitespace-nowrap">
               <div className="flex items-center gap-2.5 pl-4">
                 <Link
-                  href={`/env/${env.slug}/events/${encodeURIComponent(event.name)}`}
+                  href={`/env/${env.slug}/events/${encodeURIComponent(event.name)}` as Route}
                   internalNavigation
                   className="w-full px-2 py-3 text-sm font-medium"
                 >

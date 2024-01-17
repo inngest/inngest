@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { type Route } from 'next';
 import { Link } from '@inngest/components/Link';
 import { Table } from '@inngest/components/Table';
 import type { Function } from '@inngest/components/types/function';
@@ -54,7 +55,9 @@ function useColumns({ envSlug }: { envSlug: string }) {
             <Link
               internalNavigation
               className="w-full text-sm font-medium"
-              href={`/env/${envSlug}/functions/${encodeURIComponent(info.row.original.slug)}`}
+              href={
+                `/env/${envSlug}/functions/${encodeURIComponent(info.row.original.slug)}` as Route
+              }
             >
               {name}
             </Link>
