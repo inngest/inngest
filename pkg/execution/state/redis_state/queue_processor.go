@@ -504,16 +504,38 @@ ProcessLoop:
 		}
 
 		switch err {
-		case ErrPartitionConcurrencyLimit, ErrConcurrencyLimit:
+		case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
 			q.scope.Counter(counterConcurrencyLimit).Inc(1)
 			// Since the queue is at capacity, return the error so that we
 			// don't keep hammering with "does the queue have room?" logic.
+			//
+			// We also want to break here;  even if we have capacity for the next
+			// job in the loop we do NOT want to claim the job, as this breaks
+			// ordering guarantees.  The only safe thing to do when we hit a
+			// FUNCTION level concurrency key.
 			processErr = err
 			break ProcessLoop
+		case ErrConcurrencyLimitCustomKey0, ErrConcurrencyLimitCustomKey1:
+			// TODO: In an ideal world we'd denylist each concurrency key that's been
+			// limited here, then ignore any other jobs from being leased as we continue
+			// to iterate through the loop.
+			//
+			// This maintains FIFO ordering amongst all custom concurrency keys.  For now,
+			// we move to the next job.  Note that capacity may be available for another job
+			// in the loop, meaning out of order jobs for now.
+
+			// TODO: Grab the key from the custom limit
+			//       Set key in denylist lookup table.
+			//       Modify above loop entrance:
+			//         Check lookup table for all concurrency keys
+			//         If present, skip item
+
+			processErr = nil
+			continue
 		case ErrQueueItemNotFound:
 			q.scope.Counter(counterQueueItemsGone).Inc(1)
-			processErr = nil
 			// This is an okay error.  Move to the next job item.
+			processErr = nil
 			continue
 		case ErrQueueItemAlreadyLeased:
 			q.scope.Counter(counterQueueItemsLeaseConflict).Inc(1)
@@ -521,6 +543,9 @@ ProcessLoop:
 				Warn().
 				Interface("item", item).
 				Msg("worker attempting to claim existing lease")
+			// This is an okay error.  Move to the next job item.
+			processErr = nil
+			continue
 		}
 
 		// Handle other errors.

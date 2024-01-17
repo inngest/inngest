@@ -92,7 +92,13 @@ var (
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
 	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
 	ErrPartitionConcurrencyLimit     = fmt.Errorf("At partition concurrency limit")
-	ErrConcurrencyLimit              = fmt.Errorf("At concurrency limit")
+	ErrAccountConcurrencyLimit       = fmt.Errorf("At account concurrency limit")
+
+	// ErrConcurrencyLimitCustomKeyN represents a concurrency limit being hit for *some*, but *not all*
+	// jobs in a queue, via custom concurrency keys which are evaluated to a specific string.
+
+	ErrConcurrencyLimitCustomKey0 = fmt.Errorf("At concurrency limit 0")
+	ErrConcurrencyLimitCustomKey1 = fmt.Errorf("At concurrency limit 1")
 )
 
 var (
@@ -840,7 +846,12 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	)
 
 	// required
+	//
+	// This should be found by calling function.ConcurrencyLimit() to return
+	// the lowest concurrency limit available.  It limits the capacity of all
+	// runs for the given function.
 	pk, pc = q.partitionConcurrencyGen(ctx, p)
+
 	// optional
 	if q.accountConcurrencyGen != nil {
 		ak, ac = q.accountConcurrencyGen(ctx, item)
@@ -904,13 +915,14 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	case 2:
 		return nil, ErrQueueItemAlreadyLeased
 	case 3:
-		return nil, ErrConcurrencyLimit
+		// fn limit relevant to all runs in the fn
+		return nil, ErrPartitionConcurrencyLimit
 	case 4:
-		return nil, ErrConcurrencyLimit
+		return nil, ErrAccountConcurrencyLimit
 	case 5:
-		return nil, ErrConcurrencyLimit
+		return nil, ErrConcurrencyLimitCustomKey0
 	case 6:
-		return nil, ErrConcurrencyLimit
+		return nil, ErrConcurrencyLimitCustomKey1
 	default:
 		return nil, fmt.Errorf("unknown response enqueueing item: %d", status)
 	}
