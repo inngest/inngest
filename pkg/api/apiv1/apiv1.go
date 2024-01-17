@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/headers"
 )
 
 // Opts represents options for the APIv1 router.
@@ -62,13 +63,7 @@ func (a *api) setup() {
 			r.Use(a.opts.CachingMiddleware.Middleware)
 		}
 
-		// Set all response type to JSON
-		r.Use(func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Add("Content-Type", "application/json")
-				next.ServeHTTP(w, r)
-			})
-		})
+		r.Use(headers.ContentTypeJsonResponse())
 
 		r.Get("/events", a.GetEvents)
 		r.Get("/events/{eventID}", a.GetEvent)
