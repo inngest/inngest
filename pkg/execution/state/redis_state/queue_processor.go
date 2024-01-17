@@ -573,11 +573,7 @@ ProcessLoop:
 			for _, l := range q.lifecycles {
 				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
 			}
-		}
 
-		// For global concurrency errors (fn + account), requeue the partition to be handled
-		// in the future to minimize churn.
-		if err == ErrPartitionConcurrencyLimit || err == ErrAccountConcurrencyLimit {
 			// Requeue this partition as we hit concurrency limits.
 			q.scope.Counter(counterConcurrencyLimit).Inc(1)
 			return q.PartitionRequeue(ctx, p.Queue(), time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
