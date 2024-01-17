@@ -460,6 +460,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition) error {
 	}
 
 	var processErr error
+	var concurrencyLimitReached bool
 
 ProcessLoop:
 	for _, qi := range queue {
@@ -503,21 +504,52 @@ ProcessLoop:
 			q.sem.Release(1)
 		}
 
+		if isConcurrencyLimitError(err) {
+			concurrencyLimitReached = true
+		}
+
 		switch err {
-		case ErrPartitionConcurrencyLimit, ErrConcurrencyLimit:
+		case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
 			q.scope.Counter(counterConcurrencyLimit).Inc(1)
 			// Since the queue is at capacity, return the error so that we
 			// don't keep hammering with "does the queue have room?" logic.
+			//
+			// We also want to break here;  even if we have capacity for the next
+			// job in the loop we do NOT want to claim the job, as this breaks
+			// ordering guarantees.  The only safe thing to do when we hit a
+			// FUNCTION level concurrency key.
 			processErr = err
 			break ProcessLoop
+		case ErrConcurrencyLimitCustomKey0, ErrConcurrencyLimitCustomKey1:
+			// TODO: In an ideal world we'd denylist each concurrency key that's been
+			// limited here, then ignore any other jobs from being leased as we continue
+			// to iterate through the loop.
+			//
+			// This maintains FIFO ordering amongst all custom concurrency keys.  For now,
+			// we move to the next job.  Note that capacity may be available for another job
+			// in the loop, meaning out of order jobs for now.
+
+			// TODO: Grab the key from the custom limit
+			//       Set key in denylist lookup table.
+			//       Modify above loop entrance:
+			//         Check lookup table for all concurrency keys
+			//         If present, skip item
+			processErr = nil
+			continue
 		case ErrQueueItemNotFound:
 			q.scope.Counter(counterQueueItemsGone).Inc(1)
+			// This is an okay error.  Move to the next job item.
+			processErr = nil
+			continue
 		case ErrQueueItemAlreadyLeased:
 			q.scope.Counter(counterQueueItemsLeaseConflict).Inc(1)
 			q.logger.
 				Warn().
 				Interface("item", item).
 				Msg("worker attempting to claim existing lease")
+			// This is an okay error.  Move to the next job item.
+			processErr = nil
+			continue
 		}
 
 		// Handle other errors.
@@ -537,17 +569,22 @@ ProcessLoop:
 	if processErr != nil {
 		// The lease for the partition will expire and we will be able to restart
 		// work in the future.
-		switch processErr {
-		case ErrPartitionConcurrencyLimit, ErrConcurrencyLimit:
+		if concurrencyLimitReached {
 			for _, l := range q.lifecycles {
 				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
 			}
+		}
+
+		// For global concurrency errors (fn + account), requeue the partition to be handled
+		// in the future to minimize churn.
+		if err == ErrPartitionConcurrencyLimit || err == ErrAccountConcurrencyLimit {
 			// Requeue this partition as we hit concurrency limits.
 			q.scope.Counter(counterConcurrencyLimit).Inc(1)
 			return q.PartitionRequeue(ctx, p.Queue(), time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
-		default:
-			return processErr
 		}
+
+		// This wasn't a concurrency error so handle things separately.
+		return processErr
 	}
 
 	// XXX: If we haven't been able to lease a single item, ensure we enqueue this
@@ -717,6 +754,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 		}
 
 		if _, ok := err.(osqueue.QuitError); ok {
+			q.logger.Warn().Err(err).Msg("received queue quit error")
 			q.quit <- err
 			return err
 		}
