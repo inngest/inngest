@@ -622,6 +622,17 @@ func (q *queue) OutstandingJobCount(ctx context.Context, workspaceID, workflowID
 	return int(count), nil
 }
 
+func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error) {
+	key := q.kg.Status(status, workflowID)
+	cmd := q.r.B().Zcount().Key(key).Min("-inf").Max("+inf").Build()
+	count, err := q.r.Do(ctx, cmd).AsInt64()
+	if err != nil {
+		return 0, fmt.Errorf("error inspecting function queue status: %w", err)
+	}
+
+	return count, nil
+}
+
 // EnqueueItem enqueues a QueueItem.  It creates a QueuePartition for the workspace
 // if a partition does not exist.
 //
