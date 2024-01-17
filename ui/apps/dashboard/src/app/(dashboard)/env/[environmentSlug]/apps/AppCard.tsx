@@ -1,5 +1,6 @@
 'use client';
 
+import { type Route } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import ArchiveBoxArrowDownIcon from '@heroicons/react/20/solid/ArchiveBoxArrowDownIcon';
@@ -73,7 +74,9 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
                   <InngestLink
                     internalNavigation
                     showIcon={false}
-                    href={`/env/${envSlug}/apps/${encodeURIComponent(app.externalID)}/syncs`}
+                    href={
+                      `/env/${envSlug}/apps/${encodeURIComponent(app.externalID)}/syncs` as Route
+                    }
                   >
                     <Time value={app.latestSync.lastSyncedAt} />
                   </InngestLink>
