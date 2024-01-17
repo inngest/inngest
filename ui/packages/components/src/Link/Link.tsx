@@ -7,15 +7,22 @@ import { classNames } from '@inngest/components/utils/classNames';
 
 type LinkProps = {
   internalNavigation?: boolean;
+  showIcon?: boolean;
   children: React.ReactNode;
   className?: string;
   href: Route | UrlObject;
 };
 
 export const defaultLinkStyles =
-  'text-indigo-400 hover:decoration-indigo-400 decoration-transparent decoration-2 underline underline-offset-4 cursor-pointer transition-color duration-300';
+  'text-indigo-500 hover:text-indigo-800 hover:decoration-indigo-800 dark:text-indigo-400 dark:hover:decoration-indigo-400 decoration-transparent decoration-2 underline underline-offset-4 cursor-pointer transition-color duration-300';
 
-export function Link({ href, children, className, internalNavigation = false }: LinkProps) {
+export function Link({
+  href,
+  children,
+  className,
+  internalNavigation = false,
+  showIcon = true,
+}: LinkProps) {
   if (internalNavigation) {
     return (
       <NextLink
@@ -23,7 +30,9 @@ export function Link({ href, children, className, internalNavigation = false }: 
         className={classNames(className, 'group flex items-center gap-1', defaultLinkStyles)}
       >
         {children}
-        <IconArrowRight className="h-3 w-3 -translate-x-3 text-indigo-400 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+        {showIcon && (
+          <IconArrowRight className="h-3 w-3 -translate-x-3 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+        )}
       </NextLink>
     );
   } else if (typeof href === 'string') {
@@ -35,7 +44,7 @@ export function Link({ href, children, className, internalNavigation = false }: 
         href={href}
       >
         {children}
-        {<IconArrowTopRightOnSquare />}
+        {showIcon && <IconArrowTopRightOnSquare />}
       </a>
     );
   }

@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
-import ChevronRightIcon from '@heroicons/react/20/solid/ChevronRightIcon';
+import { type Route } from 'next';
+import { Link } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { classNames } from '@inngest/components/utils/classNames';
 
@@ -56,11 +56,11 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
           {linkToSyncs && <Time value={sync.lastSyncedAt} />}
           {!linkToSyncs && (
             <Link
-              className="transition-color flex cursor-pointer items-center gap-1 text-indigo-400 underline decoration-transparent decoration-2 underline-offset-4 duration-300  hover:decoration-indigo-400"
-              href={`/env/${env.slug}/apps/${encodeURIComponent(app.externalID)}/syncs`}
+              href={`/env/${env.slug}/apps/${encodeURIComponent(app.externalID)}/syncs` as Route}
+              showIcon={false}
+              internalNavigation
             >
               <Time value={sync.lastSyncedAt} />
-              <ChevronRightIcon className="h-4 w-4" />
             </Link>
           )}
         </div>
