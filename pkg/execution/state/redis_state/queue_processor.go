@@ -512,6 +512,9 @@ ProcessLoop:
 			break ProcessLoop
 		case ErrQueueItemNotFound:
 			q.scope.Counter(counterQueueItemsGone).Inc(1)
+			processErr = nil
+			// This is an okay error.  Move to the next job item.
+			continue
 		case ErrQueueItemAlreadyLeased:
 			q.scope.Counter(counterQueueItemsLeaseConflict).Inc(1)
 			q.logger.
@@ -717,6 +720,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 		}
 
 		if _, ok := err.(osqueue.QuitError); ok {
+			q.logger.Warn().Err(err).Msg("received queue quit error")
 			q.quit <- err
 			return err
 		}
