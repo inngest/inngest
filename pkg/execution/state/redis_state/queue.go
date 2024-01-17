@@ -17,7 +17,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/execution/concurrency"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -272,12 +271,6 @@ func WithAccountConcurrencyKeyGenerator(f AccountConcurrencyKeyGenerator) func(q
 	}
 }
 
-func WithConcurrencyService(s concurrency.ConcurrencyService) func(q *queue) {
-	return func(q *queue) {
-		q.concurrencyService = s
-	}
-}
-
 func WithBackoffFunc(f backoff.BackoffFunc) func(q *queue) {
 	return func(q *queue) {
 		q.backoffFunc = f
@@ -348,10 +341,6 @@ type queue struct {
 	accountConcurrencyGen   AccountConcurrencyKeyGenerator
 	partitionConcurrencyGen PartitionConcurrencyKeyGenerator
 	customConcurrencyGen    QueueItemConcurrencyKeyGenerator
-	// concurrencyService is an external concurrency limiter used when pulling
-	// jobs off of the queue.  It is only invoked for jobs with a non-zero function ID,
-	// eg. for jobs that run a function.
-	concurrencyService concurrency.ConcurrencyService
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.
