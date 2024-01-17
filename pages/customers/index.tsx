@@ -126,6 +126,13 @@ const grid = [
     },
   },
   {
+    src: "/assets/customers/leap-logo-white.svg",
+    name: "Leap",
+    url: "https://tryleap.ai/",
+    scale: 1,
+    type: "company",
+  },
+  {
     src: "/assets/customers/firstquadrant.svg",
     name: "FirstQuadrant.ai",
     url: "https://firstquadrant.ai/",
@@ -145,13 +152,6 @@ const grid = [
     type: "company",
   },
   {
-    src: "/assets/customers/devjobs.svg",
-    name: "DevJobs.at",
-    url: "https://devjobs.at/",
-    scale: 1.2,
-    type: "company",
-  },
-  {
     type: "quote",
     name: "NiftyKit",
     quote: {
@@ -162,6 +162,13 @@ const grid = [
       },
       avatar: "/assets/customers/niftykit-robin-curbelo.jpg",
     },
+  },
+  {
+    src: "/assets/customers/devjobs.svg",
+    name: "DevJobs.at",
+    url: "https://devjobs.at/",
+    scale: 1.2,
+    type: "company",
   },
   {
     src: "/assets/customers/niftykit.svg",
@@ -184,12 +191,6 @@ const grid = [
     type: "company",
   },
   {
-    src: "/assets/customers/double-logo.svg",
-    name: "Double",
-    scale: 1,
-    type: "company",
-  },
-  {
     type: "quote",
     name: "Resend",
     quote: {
@@ -200,6 +201,12 @@ const grid = [
       },
       avatar: "/assets/customers/resend-bu-kinoshita.jpg",
     },
+  },
+  {
+    src: "/assets/customers/double-logo.svg",
+    name: "Double",
+    scale: 1,
+    type: "company",
   },
   {
     src: "/assets/customers/tono-logo.png",

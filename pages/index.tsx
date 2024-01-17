@@ -83,8 +83,8 @@ export default function Home() {
             name: "Productlane",
             scale: 1.3,
           },
+          { src: "/assets/customers/leap-logo-white.svg", name: "Leap" },
           { src: "/assets/customers/ocoya.svg", name: "Ocoya" },
-          { src: "/assets/customers/finta-logo.png?v=1", name: "Finta.io" },
         ]}
         footer={
           <div className="flex items-center">
