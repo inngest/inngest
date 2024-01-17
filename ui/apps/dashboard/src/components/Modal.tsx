@@ -34,7 +34,10 @@ export default function Modal({
         >
           {/* The backdrop, rendered as a fixed sibling to the panel container */}
           <div
-            className={cn('fixed inset-0 z-50 bg-black/50 transition-opacity', backdropClassName)}
+            className={cn(
+              'fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] transition-opacity',
+              backdropClassName
+            )}
             aria-hidden="true"
           />
         </Transition.Child>
