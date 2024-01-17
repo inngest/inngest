@@ -1,10 +1,4 @@
-import {
-  Cog6ToothIcon,
-  CreditCardIcon,
-  CubeIcon,
-  UserCircleIcon,
-  UserGroupIcon,
-} from '@heroicons/react/20/solid';
+import { Cog6ToothIcon } from '@heroicons/react/20/solid';
 
 import Header from '@/components/Header/Header';
 import AppNavigation from '@/components/Navigation/AppNavigation';
@@ -21,22 +15,18 @@ export default function SettingsLayout({ children }: SettingsLayoutProps) {
     {
       href: '/settings/account',
       text: 'Account',
-      icon: <UserCircleIcon className="h-4" />,
     },
     {
       href: '/settings/billing',
       text: 'Billing',
-      icon: <CreditCardIcon className="h-4" />,
     },
     {
       href: '/settings/integrations',
       text: 'Integrations',
-      icon: <CubeIcon className="h-4" />,
     },
     {
       href: '/settings/team',
       text: 'Team Management',
-      icon: <UserGroupIcon className="h-4" />,
     },
   ];
 
