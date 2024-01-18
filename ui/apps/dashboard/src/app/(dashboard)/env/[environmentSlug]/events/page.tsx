@@ -16,6 +16,7 @@ import LoadingIcon from '@/icons/LoadingIcon';
 import EventIcon from '@/icons/event.svg';
 import { useEventTypes } from '@/queries';
 import cn from '@/utils/cn';
+import { pathCreator } from '@/utils/urls';
 import EventListNotFound from './EventListNotFound';
 
 export const runtime = 'nodejs';
@@ -130,7 +131,7 @@ function EventTypesListPaginationPage({
             <td className="w-96 whitespace-nowrap">
               <div className="flex items-center gap-2.5 pl-4">
                 <Link
-                  href={`/env/${env.slug}/events/${encodeURIComponent(event.name)}` as Route}
+                  href={pathCreator.eventType({ envSlug: env.slug, eventName: event.name })}
                   internalNavigation
                   className="w-full px-2 py-3 text-sm font-medium"
                 >
@@ -143,7 +144,10 @@ function EventTypesListPaginationPage({
                 alwaysVisibleCount={2}
                 pills={event.functions.map((function_) => (
                   <Pill
-                    href={`/env/${env.slug}/functions/${encodeURIComponent(function_.slug)}`}
+                    href={pathCreator.function({
+                      envSlug: env.slug,
+                      functionSlug: function_.slug,
+                    })}
                     key={function_.name}
                     className="bg-white align-middle text-slate-600"
                   >

@@ -17,6 +17,11 @@ import Modal from '@/components/Modal';
 import CodeEditor from '@/components/Textarea/CodeEditor';
 import { graphql } from '@/gql';
 import { EnvironmentType } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
+
+type UseDefaultEventKeyParams = {
+  environmentSlug: string;
+};
 
 const GetEventKeysDocument = graphql(/* GraphQL */ `
   query GetEventKeys($environmentID: ID!) {
@@ -179,7 +184,7 @@ await inngest.send({
         {!hasEventKey && (
           <Alert severity="warning">
             There are no Event Keys for this environment. Please create an Event Key in{' '}
-            <Link href={`/env/${environment.slug}/manage/keys` as Route} className="underline">
+            <Link href={pathCreator.keys({ envSlug: environment.slug })} className="underline">
               the Manage tab
             </Link>{' '}
             first.

@@ -12,6 +12,7 @@ import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environm
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { graphql } from '@/gql';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
+import { pathCreator } from '@/utils/urls';
 
 const GetEventKeysForBlankSlateDocument = graphql(`
   query GetEventKeysForBlankSlate($environmentID: ID!) {
@@ -103,7 +104,11 @@ export default function EventListNotFound() {
           <div className="mt-6 flex items-center gap-2 border-t border-slate-800/50 py-4">
             <Button
               kind="primary"
-              href={`/env/${environment.slug}/${isAppsEnabled ? 'apps' : 'deploys'}` as Route}
+              href={
+                isAppsEnabled
+                  ? pathCreator.apps({ envSlug: environment.slug })
+                  : pathCreator.deploys({ envSlug: environment.slug })
+              }
               label={isAppsEnabled ? 'Sync Your App' : 'Deploy Your Functions'}
             />
             <div className="flex gap-2 border-l border-slate-800/50 pl-2">

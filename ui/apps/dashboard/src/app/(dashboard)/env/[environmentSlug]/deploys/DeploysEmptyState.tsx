@@ -14,6 +14,7 @@ import { EnvironmentType } from '@/gql/graphql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import VercelLogomark from '@/logos/vercel-logomark-dark.svg';
 import { useDeploys } from '@/queries/deploys';
+import { pathCreator } from '@/utils/urls';
 import { DeployFailure } from './DeployFailure';
 import DeploySigningKey from './DeploySigningKey';
 import { deployViaUrl, type RegistrationFailure } from './utils';
@@ -65,9 +66,9 @@ export default function DeploysOnboarding() {
 
   // Redirect to the first deploy if there are any ONLY if it's not the branch parent
   // Branch parents should always show the empty state w/ deploy instructions
-  if (data?.deploys?.length && !isBranchParent) {
-    const firstDeployId = data.deploys[0]?.id;
-    router.push(`/env/${env.slug}/deploys/${firstDeployId}` as Route);
+  if (data?.deploys?.[0] && !isBranchParent) {
+    const firstDeployId = data.deploys[0].id;
+    router.push(pathCreator.deploy({ deployID: firstDeployId, envSlug: env.slug }));
     return <></>;
   }
 
@@ -233,7 +234,7 @@ export default function DeploysOnboarding() {
             ) : (
               <Button
                 kind="primary"
-                href={`/env/${env.slug}/events` as Route}
+                href={pathCreator.events({ envSlug: env.slug })}
                 label="Go To Events"
               />
             )}
