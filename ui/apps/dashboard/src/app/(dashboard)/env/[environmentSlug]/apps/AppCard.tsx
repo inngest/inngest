@@ -28,6 +28,7 @@ type App = {
 };
 
 type Sync = {
+  error: string | null;
   framework: string | null;
   lastSyncedAt: Date;
   platform: string | null;
@@ -62,34 +63,40 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
           </dl>
         )}
       </div>
-      <div className="flex flex-1 items-center px-8">
-        <dl className="grid grow grid-cols-2 gap-4 md:grid-cols-3">
-          {/* Row 1 */}
-          <Description
-            className="col-span-2"
-            detail={
-              app.latestSync && (
-                <div className="flex gap-2">
-                  <SyncStatus status={app.latestSync.status} />
-                  <InngestLink
-                    internalNavigation
-                    showIcon={false}
-                    href={
-                      `/env/${envSlug}/apps/${encodeURIComponent(app.externalID)}/syncs` as Route
-                    }
-                  >
-                    <Time value={app.latestSync.lastSyncedAt} />
-                  </InngestLink>
-                </div>
-              )
-            }
-            term="Last sync"
-          />
-          <Description detail={app.latestSync?.sdkVersion} term="SDK Version" />
+      <div className="flex flex-1 flex-col">
+        {app.latestSync?.error && (
+          <div className="bg-red-100 px-8 py-2 text-red-800">{app.latestSync.error}</div>
+        )}
 
-          {/* Row 2 */}
-          <Description detail={`${app.functionCount} Functions`} term="Functions" />
-        </dl>
+        <div className="flex flex-1 items-center px-8">
+          <dl className="grid grow grid-cols-2 gap-4 md:grid-cols-3">
+            {/* Row 1 */}
+            <Description
+              className="col-span-2"
+              detail={
+                app.latestSync && (
+                  <div className="flex gap-2">
+                    <SyncStatus status={app.latestSync.status} />
+                    <InngestLink
+                      internalNavigation
+                      showIcon={false}
+                      href={
+                        `/env/${envSlug}/apps/${encodeURIComponent(app.externalID)}/syncs` as Route
+                      }
+                    >
+                      <Time value={app.latestSync.lastSyncedAt} />
+                    </InngestLink>
+                  </div>
+                )
+              }
+              term="Last sync"
+            />
+            <Description detail={app.latestSync?.sdkVersion} term="SDK Version" />
+
+            {/* Row 2 */}
+            <Description detail={`${app.functionCount} Functions`} term="Functions" />
+          </dl>
+        </div>
       </div>
     </div>
   );
