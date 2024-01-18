@@ -16,6 +16,7 @@ import {
   CollapsibleCardRoot,
   CollapsibleCardTrigger,
 } from '@/components/CollapsibleCard';
+import { pathCreator } from '@/utils/urls';
 
 type Fn = Pick<Function, 'id' | 'name' | 'slug'>;
 
@@ -79,7 +80,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
 
                   return (
                     <Link
-                      href={`/env/${env.slug}/functions/${encodeURIComponent(fn.slug)}`}
+                      href={pathCreator.function({ envSlug: env.slug, functionSlug: fn.slug })}
                       key={fn.id}
                     >
                       <div
@@ -127,7 +128,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
 
                 return (
                   <Link
-                    href={`/env/${env.slug}/functions/${encodeURIComponent(fn.slug)}`}
+                    href={pathCreator.function({ envSlug: env.slug, functionSlug: fn.slug })}
                     key={fn.id}
                   >
                     <div

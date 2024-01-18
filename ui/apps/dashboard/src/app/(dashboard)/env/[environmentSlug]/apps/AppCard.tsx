@@ -12,6 +12,7 @@ import { classNames } from '@inngest/components/utils/classNames';
 import { SyncStatus } from '@/components/SyncStatus';
 import { Time } from '@/components/Time';
 import AppDiagramImage from '@/images/app-diagram.png';
+import { pathCreator } from '@/utils/urls';
 
 type Props = {
   app: App;
@@ -48,7 +49,7 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
         <h2>
           <Link
             className="transition-color flex cursor-pointer items-center gap-1 text-white underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-400 hover:decoration-indigo-400"
-            href={`/env/${envSlug}/apps/${encodeURIComponent(app.externalID)}`}
+            href={pathCreator.app({ envSlug, externalAppID: app.externalID })}
           >
             {isArchived && <ArchiveBoxArrowDownIcon className="h-4 w-4" />}
             {app.name}
@@ -74,9 +75,7 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
                   <InngestLink
                     internalNavigation
                     showIcon={false}
-                    href={
-                      `/env/${envSlug}/apps/${encodeURIComponent(app.externalID)}/syncs` as Route
-                    }
+                    href={pathCreator.appSyncs({ envSlug, externalAppID: app.externalID })}
                   >
                     <Time value={app.latestSync.lastSyncedAt} />
                   </InngestLink>

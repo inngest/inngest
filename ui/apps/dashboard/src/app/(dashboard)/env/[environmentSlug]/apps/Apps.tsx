@@ -6,6 +6,7 @@ import PlusIcon from '@heroicons/react/20/solid/PlusIcon';
 import { Button } from '@inngest/components/Button';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
+import { pathCreator } from '@/utils/urls';
 import { AppCard, EmptyAppCard, SkeletonCard } from './AppCard';
 import { UnattachedSyncsCard } from './UnattachedSyncsCard';
 import { useApps } from './useApps';
@@ -45,7 +46,7 @@ export function Apps({ isArchived = false }: Props) {
                 className="mt-4"
                 kind="primary"
                 label="Sync App"
-                btnAction={() => router.push(`/env/${env.slug}/apps/sync-new` as Route)}
+                btnAction={() => router.push(pathCreator.createApp({ envSlug: env.slug }))}
                 icon={<PlusIcon />}
               />
             </div>
@@ -75,7 +76,7 @@ export function Apps({ isArchived = false }: Props) {
             className="mx-auto my-12"
             kind="primary"
             label="Sync New App"
-            btnAction={() => router.push(`/env/${env.slug}/apps/sync-new` as Route)}
+            btnAction={() => router.push(pathCreator.createApp({ envSlug: env.slug }))}
             icon={<PlusIcon />}
           />
         )}

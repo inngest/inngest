@@ -7,6 +7,7 @@ import { Link as InngestLink } from '@inngest/components/Link';
 import { classNames } from '@inngest/components/utils/classNames';
 
 import { Time } from '@/components/Time';
+import { pathCreator } from '@/utils/urls';
 import { Description } from './Description';
 
 type Props = {
@@ -27,7 +28,7 @@ export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Prop
         <h2>
           <Link
             className="transition-color flex cursor-pointer items-center gap-1 underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-400 hover:decoration-indigo-400"
-            href={`/env/${envSlug}/unattached-syncs`}
+            href={pathCreator.unattachedSyncs({ envSlug })}
           >
             Unattached Syncs
             <ChevronRightIcon className="h-4 w-4" />
@@ -43,7 +44,7 @@ export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Prop
                 <InngestLink
                   internalNavigation
                   showIcon={false}
-                  href={`/env/${envSlug}/unattached-syncs` as Route}
+                  href={pathCreator.unattachedSyncs({ envSlug })}
                 >
                   <Time value={latestSyncTime} />
                 </InngestLink>
