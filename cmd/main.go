@@ -11,7 +11,9 @@ import (
 func main() {
 	// Ensure that we use UTC everywhere. This is a fix for users getting
 	// invalid timestamps due to their specific `/etc/localtime` files.
-	os.Setenv("TZ", "UTC")
+	if err := os.Setenv("TZ", "UTC"); err != nil {
+		panic(err)
+	}
 	time.Local = time.UTC
 
 	commands.Execute()
