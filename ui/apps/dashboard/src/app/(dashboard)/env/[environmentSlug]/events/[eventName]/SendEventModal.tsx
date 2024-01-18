@@ -241,7 +241,6 @@ function usePreferDefaultEventKey(): string | undefined {
     variables: {
       environmentID: environment.id,
     },
-    pause: !environment?.id,
   });
 
   const eventKeys = data?.environment.eventKeys;

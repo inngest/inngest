@@ -1,12 +1,7 @@
 'use client';
 
-import {
-  ChartBarSquareIcon,
-  CodeBracketSquareIcon,
-  CommandLineIcon,
-} from '@heroicons/react/20/solid';
+import { CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { Badge } from '@inngest/components/Badge';
-import { IconReplay } from '@inngest/components/icons/Replay';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import Header, { type HeaderLink } from '@/components/Header/Header';
@@ -40,13 +35,11 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
     {
       href: `/env/${params.environmentSlug}/functions/${params.slug}`,
       text: 'Dashboard',
-      icon: <ChartBarSquareIcon className="w-3.5" />,
       active: 'exact',
     },
     {
       href: `/env/${params.environmentSlug}/functions/${params.slug}/logs`,
       text: 'Runs',
-      icon: <CommandLineIcon className="w-3.5" />,
     },
   ];
 
@@ -54,7 +47,6 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
     navLinks.push({
       href: `/env/${params.environmentSlug}/functions/${params.slug}/replay`,
       text: 'Replay',
-      icon: <IconReplay className="h-3.5 w-3.5" />,
       badge: (
         <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
           New

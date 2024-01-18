@@ -10,7 +10,7 @@ const contextButtonStyles = {
   light:
     'shadow-outline-secondary-light bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-[6px]',
   dark: 'shadow-outline-secondary-dark bg-slate-800 text-white  text-shadow hover:bg-slate-700 rounded-[6px]',
-  nav: 'text-white hover:bg-slate-800 pl-4 pr-6 h-full border-l border-slate-800',
+  nav: 'text-white hover:bg-slate-800 px-2 md:pl-4 md:pr-4 xl:pr-6 h-full border-l border-slate-800',
 };
 
 const contextSheetStyles = {

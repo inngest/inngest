@@ -79,6 +79,8 @@ function reducer(state: State, action: Action): State {
       };
     case 'stopped_typing':
       const parsedDateTime = chrono.parseDate(state.inputString);
+      // Chrono's types are wrong - parseData can return undefined
+      // eslint-disable-next-line
       if (!parsedDateTime) {
         return {
           ...state,
@@ -133,9 +135,6 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
 
   function handleExampleClick(example: string) {
     const exampleDate = chrono.parseDate(example);
-    if (!exampleDate) {
-      throw new Error('Could not parse clicked example');
-    }
     // Focus the input after applying the example so that the user can tab to the next element.
     inputRef.current?.focus();
 
@@ -194,7 +193,7 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
                   '3 days ago',
                   '15:30:24',
                   'Jan 14',
-                  '2020-01-01T10:00:00Z',
+                  '2024-01-01T10:00:00Z',
                 ].map((example) => (
                   <button
                     className="h-5 rounded bg-slate-200 px-1.5 text-xs text-black hover:bg-slate-300"
@@ -215,7 +214,7 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
               onOpenAutoFocus={(event) => event.preventDefault()}
               onClick={handleSuggestionClick}
             >
-              {state.suggestedDateTime?.toLocaleString()}
+              {state.suggestedDateTime.toLocaleString()}
               <kbd
                 className="ml-auto flex h-6 w-6 items-center justify-center rounded bg-slate-100 p-2 font-sans text-xs"
                 aria-label="Press Enter to apply the parsed date and time."

@@ -8,7 +8,7 @@ export type HeaderLink = {
   href: string;
   text: string;
   icon?: React.ReactNode;
-  active?: ActiveMatching;
+  active?: ActiveMatching | boolean;
   badge?: React.ReactNode;
 };
 
@@ -48,8 +48,8 @@ export default function Header({
           </div>
           {links && (
             <Navigation className="-ml-2 -mt-2">
-              {links.map(({ href, text, icon, ...props }) => (
-                <NavItem key={href} href={href as Route} text={text} icon={icon} {...props} />
+              {links.map(({ href, text, ...props }) => (
+                <NavItem key={href} href={href as Route} text={text} {...props} />
               ))}
             </Navigation>
           )}

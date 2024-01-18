@@ -27,6 +27,13 @@ func TestParse(t *testing.T) {
 				{"async", "email"},
 				{"async", "next_visit"},
 				{"async", "source"},
+				// Using the lifted expression filter, we should get extra variables as the strings are removed.
+				{"vars", "a"},
+				{"vars", "b"},
+				{"vars", "c"},
+				{"vars", "d"},
+				{"vars", "e"},
+				{"vars", "f"},
 			},
 		},
 		// nested
@@ -34,6 +41,8 @@ func TestParse(t *testing.T) {
 			expr: `event.data.action == 'opened'`,
 			expected: [][]string{
 				{"event", "data", "action"},
+				// Using the lifted expression filter, we should get extra variables as the strings are removed.
+				{"vars", "a"},
 			},
 		},
 	}
@@ -43,7 +52,7 @@ func TestParse(t *testing.T) {
 		require.NoError(t, err, test.expr)
 		attrs := expr.UsedAttributes(context.Background()).FullPaths()
 		require.Equal(t, err == nil, !test.shouldErr, "unexpected err result %s for '%s'", err, test.expr)
-		require.Equal(t, len(test.expected), len(attrs), test.expr)
+		require.Equal(t, len(test.expected), len(attrs), test.expr, attrs)
 		require.ElementsMatch(t, test.expected, attrs, test.expr)
 	}
 }
@@ -632,7 +641,7 @@ func TestEvaluateExpression(t *testing.T) {
 			"",
 		},
 		{
-			`event.data.title.matches('\\w')`,
+			`event.data.title.matches('\w')`,
 			map[string]interface{}{
 				"event": event.Event{
 					Data: map[string]interface{}{
@@ -989,8 +998,18 @@ func TestEvaluateExpression(t *testing.T) {
 		},
 	}
 
-	for n, test := range tests {
+	for n, item := range tests {
+		test := item
 		t.Run(test.expr, func(t *testing.T) {
+			for i := 0; i <= 100; i++ {
+				go func() {
+					// Test thread safety of evaluate and Validate().  We don't care about the results,
+					// as these are checked below.
+					_, _, _ = Evaluate(context.Background(), test.expr, test.data)
+					_ = Validate(context.Background(), test.expr)
+				}()
+			}
+
 			actual, earliest, err := Evaluate(context.Background(), test.expr, test.data)
 
 			require.Equal(t, err == nil, !test.shouldErr, "unexpected err result '%v' for '%s'", err, test.expr)

@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import Link from 'next/link';
-import { ArrowRightIcon, ChartBarIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
+import { type Route } from 'next';
+import { ChartBarIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
+import { Link } from '@inngest/components/Link';
 import {
   createColumnHelper,
   flexRender,
@@ -12,7 +13,7 @@ import {
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
-import { Pill } from '@/components/Pill/Pill';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import TriggerPill, { TRIGGER_TYPE, type Trigger } from '@/components/Pill/TriggerPill';
 import Placeholder from '@/components/Placeholder';
 import cn from '@/utils/cn';
@@ -39,10 +40,11 @@ type Props = {
 
 export function FunctionTable({ rows = [] }: Props) {
   const env = useEnvironment();
+  const { value: isAppsEnabled } = useBooleanFlag('apps-page');
 
   const columns = useMemo(() => {
-    return createColumns(env.slug);
-  }, [env.slug]);
+    return createColumns(env.slug, isAppsEnabled);
+  }, [env.slug, isAppsEnabled]);
 
   const table = useReactTable({
     data: rows,
@@ -107,7 +109,7 @@ function Shimmer() {
 
 const columnHelper = createColumnHelper<FunctionTableRow>();
 
-function createColumns(environmentSlug: string) {
+function createColumns(environmentSlug: string, isAppsPageEnabled: boolean) {
   const columns = [
     columnHelper.accessor('name', {
       cell: (info) => {
@@ -124,11 +126,11 @@ function createColumns(environmentSlug: string) {
             />
             <Link
               key="name"
-              href={`/env/${environmentSlug}/functions/${encodeURIComponent(slug)}`}
-              className="group flex w-full items-center gap-2 px-2 py-3 text-sm font-medium text-slate-700  hover:text-indigo-600"
+              href={`/env/${environmentSlug}/functions/${encodeURIComponent(slug)}` as Route}
+              internalNavigation
+              className="w-full px-2 py-3 text-sm font-medium"
             >
               {name}
-              <ArrowRightIcon className="h-3 w-3 -translate-x-3 text-indigo-600 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
             </Link>
           </div>
         );
@@ -155,8 +157,27 @@ function createColumns(environmentSlug: string) {
     }),
     columnHelper.accessor('appName', {
       cell: (info) => {
+        if (!isAppsPageEnabled) {
+          return (
+            <div className="px-2 py-3 text-sm font-medium text-slate-700">{info.getValue()}</div>
+          );
+        }
+
+        const appExternalID = info.getValue();
+        if (!appExternalID) {
+          return null;
+        }
+
         return (
-          <div className="px-2 py-3 text-sm font-medium text-slate-700">{info.getValue()}</div>
+          <Link
+            key="name"
+            href={`/env/${environmentSlug}/apps/${encodeURIComponent(appExternalID)}` as Route}
+            internalNavigation
+            showIcon={false}
+            className="px-2 py-3 text-sm font-medium"
+          >
+            {appExternalID}
+          </Link>
         );
       },
       header: 'App',
@@ -174,10 +195,10 @@ function createColumns(environmentSlug: string) {
         }
 
         return (
-          <Pill className="bg-white px-2.5 text-slate-600">
+          <div className="flex items-center gap-1 px-2.5 text-sm text-slate-600">
             {icon}
             {value}%
-          </Pill>
+          </div>
         );
       },
       header: 'Failure Rate (24hr)',
@@ -195,13 +216,13 @@ function createColumns(environmentSlug: string) {
               key="volume-count"
               className="overflow-hidden whitespace-nowrap text-xs text-slate-600"
             >
-              <Pill className="gap-1 bg-white align-middle text-slate-600">
+              <div className="flex items-center gap-1 align-middle text-sm text-slate-600">
                 <ChartBarIcon className="-ml-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
                 {value.total.toLocaleString(undefined, {
                   notation: 'compact',
                   compactDisplay: 'short',
                 })}
-              </Pill>
+              </div>
             </span>
 
             <MiniStackedBarChart key="volume-chart" className="shrink-0" data={value.slots} />

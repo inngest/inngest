@@ -60,13 +60,13 @@ type VercelDeploymentMetadata = {
 
 export function isIntegration(metadata: DeployMetadata): boolean {
   // There is only 1 integration right now so we only need to sniff out one payload
-  return metadata?.payload ? true : false;
+  return metadata.payload ? true : false;
 }
 
 type IntegrationName = 'vercel' | null;
 
 export function getIntegrationName(metadata: DeployMetadata): IntegrationName {
-  if (metadata?.payload?.links?.deployment.match(/^https:\/\/vercel.com/)) {
+  if (metadata.payload?.links.deployment.match(/^https:\/\/vercel.com/)) {
     return 'vercel';
   }
   return null;

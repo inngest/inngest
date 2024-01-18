@@ -6,6 +6,7 @@ import { EventDetails } from '@inngest/components/EventDetails';
 import { Link } from '@inngest/components/Link';
 import { RunDetails } from '@inngest/components/RunDetails';
 import { useParsedHistory } from '@inngest/components/hooks/useParsedHistory';
+import { IconCloudArrowDown } from '@inngest/components/icons/CloudArrowDown';
 import type { Environment } from '@inngest/components/types/environment';
 import type { Event } from '@inngest/components/types/event';
 import type { Function } from '@inngest/components/types/function';
@@ -16,6 +17,7 @@ import { type RawHistoryItem } from '@inngest/components/utils/historyParser';
 import type { NavigateToRunFn } from 'node_modules/@inngest/components/src/Timeline/Timeline';
 import { useClient } from 'urql';
 
+import { devServerURL, useDevServer } from '@/utils/useDevServer';
 import RerunButton from './RerunButton';
 import { getHistoryItemOutput } from './getHistoryItemOutput';
 
@@ -37,6 +39,7 @@ export function StreamDetails({
   run,
 }: Props) {
   const client = useClient();
+  const { isRunning, send } = useDevServer();
 
   const getOutput = useMemo(() => {
     return (historyItemID: string) => {
@@ -76,7 +79,22 @@ export function StreamDetails({
     <div
       className={classNames('dark grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}
     >
-      {event && <EventDetails event={event} />}
+      {event && (
+        <EventDetails
+          event={event}
+          codeBlockActions={[
+            {
+              label: 'Send to Dev Server',
+              title: isRunning
+                ? 'Send event payload to running Dev Server'
+                : `Dev Server is not running at ${devServerURL}`,
+              icon: <IconCloudArrowDown />,
+              onClick: () => send(event.payload),
+              disabled: !isRunning,
+            },
+          ]}
+        />
+      )}
       <RunDetails
         func={func}
         functionVersion={functionVersion}

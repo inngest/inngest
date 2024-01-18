@@ -79,12 +79,6 @@ export default function BillingPlanOption({
           {/* {usagePercentage >= 100 ? 'Exceeding plan limits' : 'Usage'} */}
         </div>
       </Row>
-      {/* Disable usage bar until API is ready */}
-      {false && !isPremium ? (
-        <FunctionUsageBar percentage={usagePercentage} />
-      ) : (
-        <span className="block h-1.5">{/* Spacer */}</span>
-      )}
 
       <FeatureRows featureRows={featureRows} features={features} isPremium={isPremium} />
 

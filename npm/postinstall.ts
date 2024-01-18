@@ -5,6 +5,7 @@ import fetch, { Response } from "node-fetch";
 import path from "path";
 import tar from "tar";
 import { URL } from "url";
+import packageJson from "./package.json";
 
 const rootDebug = Debug("inngest:cli");
 
@@ -52,12 +53,8 @@ async function getBinaryUrl(): Promise<URL> {
 
   debug({ arch, platform });
 
-  let version = process.env.npm_package_version?.trim();
-  debug("npm_package_version:", version);
-
-  if (!version) {
-    throw new Error("Could not find package version to install binary");
-  }
+  let version = packageJson.version.trim();
+  debug("package.json version:", version);
 
   const targetUrl = new URL(
     `https://cli.inngest.com/artifact/v${version}/inngest_${version}_${platform.platform}_${arch}${platform.extension}`

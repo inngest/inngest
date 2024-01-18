@@ -13,6 +13,7 @@ var (
 	defaultKeys = []string{
 		"event",
 		"async",
+		"vars",
 	}
 
 	envSingleton *cel.Env

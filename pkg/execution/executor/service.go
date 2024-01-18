@@ -160,7 +160,7 @@ func (s *svc) Run(ctx context.Context) error {
 
 		var err error
 		switch item.Kind {
-		case queue.KindEdge, queue.KindSleep:
+		case queue.KindStart, queue.KindEdge, queue.KindSleep:
 			err = s.handleQueueItem(ctx, item)
 		case queue.KindPause:
 			err = s.handlePauseTimeout(ctx, item)

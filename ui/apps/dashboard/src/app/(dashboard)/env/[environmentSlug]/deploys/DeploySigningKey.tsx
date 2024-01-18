@@ -16,8 +16,8 @@ export default function DeploySigningKey({ className }: DeploySigningKeyProps) {
     : '...';
 
   return (
-    <span className={className}>
+    <div className={className}>
       <CodeKey fullKey={signingKey} maskedKey={maskedSigningKey} />
-    </span>
+    </div>
   );
 }

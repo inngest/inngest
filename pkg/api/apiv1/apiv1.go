@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/headers"
 )
 
 // Opts represents options for the APIv1 router.
@@ -62,12 +63,16 @@ func (a *api) setup() {
 			r.Use(a.opts.CachingMiddleware.Middleware)
 		}
 
+		r.Use(headers.ContentTypeJsonResponse())
+
 		r.Get("/events", a.GetEvents)
 		r.Get("/events/{eventID}", a.GetEvent)
 		r.Get("/events/{eventID}/runs", a.GetEventRuns)
 		r.Get("/runs/{runID}", a.GetFunctionRun)
 		r.Delete("/runs/{runID}", a.CancelFunctionRun)
 		r.Get("/runs/{runID}/jobs", a.GetFunctionRunJobs)
+		// r.Get("/functions", a.GetFunctions)
+		// r.Get("/functions/{id}", a.GetFunction)
 	})
 }
 

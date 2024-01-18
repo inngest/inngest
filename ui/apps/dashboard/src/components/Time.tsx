@@ -1,8 +1,8 @@
 'use client';
 
-import dayjs from 'dayjs';
+import { classNames } from '@inngest/components/utils/classNames';
 
-import { duration, relativeTime } from '@/utils/date';
+import { relativeTime } from '@/utils/date';
 
 /**
  * Use this component instead of the builtin <time> element. Since server-side
@@ -29,7 +29,7 @@ export function Time({ className, format, value }: Props) {
   return (
     <time
       suppressHydrationWarning={true}
-      className={className}
+      className={classNames('whitespace-nowrap', className)}
       dateTime={value.toISOString()}
       title={title}
     >

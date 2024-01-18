@@ -271,7 +271,7 @@ func TestConcurrency_ScopeFunction_Key_Fn(t *testing.T) {
 
 	a := inngestgo.CreateFunction(
 		inngestgo.FunctionOpts{
-			Name: "fn concurrency",
+			Name: "multiple fn concurrency",
 			Concurrency: []inngest.Concurrency{
 				{
 					Limit: limit,

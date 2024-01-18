@@ -17,7 +17,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/execution/concurrency"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -93,7 +92,13 @@ var (
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
 	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
 	ErrPartitionConcurrencyLimit     = fmt.Errorf("At partition concurrency limit")
-	ErrConcurrencyLimit              = fmt.Errorf("At concurrency limit")
+	ErrAccountConcurrencyLimit       = fmt.Errorf("At account concurrency limit")
+
+	// ErrConcurrencyLimitCustomKeyN represents a concurrency limit being hit for *some*, but *not all*
+	// jobs in a queue, via custom concurrency keys which are evaluated to a specific string.
+
+	ErrConcurrencyLimitCustomKey0 = fmt.Errorf("At concurrency limit 0")
+	ErrConcurrencyLimitCustomKey1 = fmt.Errorf("At concurrency limit 1")
 )
 
 var (
@@ -272,12 +277,6 @@ func WithAccountConcurrencyKeyGenerator(f AccountConcurrencyKeyGenerator) func(q
 	}
 }
 
-func WithConcurrencyService(s concurrency.ConcurrencyService) func(q *queue) {
-	return func(q *queue) {
-		q.concurrencyService = s
-	}
-}
-
 func WithBackoffFunc(f backoff.BackoffFunc) func(q *queue) {
 	return func(q *queue) {
 		q.backoffFunc = f
@@ -348,10 +347,6 @@ type queue struct {
 	accountConcurrencyGen   AccountConcurrencyKeyGenerator
 	partitionConcurrencyGen PartitionConcurrencyKeyGenerator
 	customConcurrencyGen    QueueItemConcurrencyKeyGenerator
-	// concurrencyService is an external concurrency limiter used when pulling
-	// jobs off of the queue.  It is only invoked for jobs with a non-zero function ID,
-	// eg. for jobs that run a function.
-	concurrencyService concurrency.ConcurrencyService
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.
@@ -476,7 +471,7 @@ func (q *QueueItem) SetID(ctx context.Context, str string) {
 // are not sleeps (eg. immediate runs)
 func (q QueueItem) Score() int64 {
 	// If this is not an edge, we can ignore this.
-	if q.Data.Kind != osqueue.KindEdge || q.Data.Attempt > 0 {
+	if (q.Data.Kind != osqueue.KindStart && q.Data.Kind != osqueue.KindEdge) || q.Data.Attempt > 0 {
 		return q.AtMS
 	}
 
@@ -620,6 +615,17 @@ func (q *queue) OutstandingJobCount(ctx context.Context, workspaceID, workflowID
 		return 0, fmt.Errorf("error counting index cardinality: %w", err)
 	}
 	return int(count), nil
+}
+
+func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error) {
+	key := q.kg.Status(status, workflowID)
+	cmd := q.r.B().Zcount().Key(key).Min("-inf").Max("+inf").Build()
+	count, err := q.r.Do(ctx, cmd).AsInt64()
+	if err != nil {
+		return 0, fmt.Errorf("error inspecting function queue status: %w", err)
+	}
+
+	return count, nil
 }
 
 // EnqueueItem enqueues a QueueItem.  It creates a QueuePartition for the workspace
@@ -840,7 +846,12 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	)
 
 	// required
+	//
+	// This should be found by calling function.ConcurrencyLimit() to return
+	// the lowest concurrency limit available.  It limits the capacity of all
+	// runs for the given function.
 	pk, pc = q.partitionConcurrencyGen(ctx, p)
+
 	// optional
 	if q.accountConcurrencyGen != nil {
 		ak, ac = q.accountConcurrencyGen(ctx, item)
@@ -904,16 +915,24 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	case 2:
 		return nil, ErrQueueItemAlreadyLeased
 	case 3:
-		return nil, ErrConcurrencyLimit
+		// fn limit relevant to all runs in the fn
+		return nil, ErrPartitionConcurrencyLimit
 	case 4:
-		return nil, ErrConcurrencyLimit
+		return nil, ErrAccountConcurrencyLimit
 	case 5:
-		return nil, ErrConcurrencyLimit
+		return nil, ErrConcurrencyLimitCustomKey0
 	case 6:
-		return nil, ErrConcurrencyLimit
+		return nil, ErrConcurrencyLimitCustomKey1
 	default:
 		return nil, fmt.Errorf("unknown response enqueueing item: %d", status)
 	}
+}
+
+func isConcurrencyLimitError(err error) bool {
+	return err == ErrPartitionConcurrencyLimit ||
+		err == ErrAccountConcurrencyLimit ||
+		err == ErrConcurrencyLimitCustomKey0 ||
+		err == ErrConcurrencyLimitCustomKey1
 }
 
 // ExtendLease extens the lease for a given queue item, given the queue item is currently

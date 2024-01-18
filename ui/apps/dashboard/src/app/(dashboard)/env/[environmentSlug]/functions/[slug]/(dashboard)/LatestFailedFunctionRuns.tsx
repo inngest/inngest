@@ -114,8 +114,8 @@ export default function LatestFailedFunctionRuns({
                 </td>
               </tr>
             )}
-            {failedFunctionRuns && failedFunctionRuns?.length > 0
-              ? failedFunctionRuns?.map((functionRun, index) => {
+            {failedFunctionRuns && failedFunctionRuns.length > 0
+              ? failedFunctionRuns.map((functionRun, index) => {
                   if (!functionRun) {
                     return (
                       <tr key={index} className="opacity-50">

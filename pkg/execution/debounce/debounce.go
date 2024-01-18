@@ -72,6 +72,8 @@ type DebounceItem struct {
 	EventID ulid.ULID `json:"eID"`
 	// Event represents the event data which triggers the function.
 	Event event.Event `json:"e"`
+	// Timeout is the timeout for the debounce, in unix milliseconds.
+	Timeout int64 `json:"t,omitempty"`
 }
 
 func (d DebounceItem) QueuePayload() DebouncePayload {
@@ -89,6 +91,10 @@ func (d DebounceItem) GetInternalID() ulid.ULID {
 
 func (d DebounceItem) GetEvent() event.Event {
 	return d.Event
+}
+
+func (d DebounceItem) GetWorkspaceID() uuid.UUID {
+	return d.WorkspaceID
 }
 
 // DebouncePayload represents the data stored within the queue's payload.
@@ -227,6 +233,11 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 		return nil, err
 	}
 
+	// Ensure we set the debounce's max lifetime.
+	if timeout := fn.Debounce.TimeoutDuration(); timeout != nil {
+		di.Timeout = time.Now().Add(*timeout).UnixMilli()
+	}
+
 	keyPtr := d.k.DebouncePointer(ctx, fn.ID, key)
 	keyDbc := d.k.Debounce(ctx)
 
@@ -303,18 +314,29 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 			strconv.Itoa(int(ttl.Seconds())),
 			redis_state.HashID(ctx, debounceID.String()),
 			strconv.Itoa(int(time.Now().UnixMilli())),
+			strconv.Itoa(int(di.Event.Timestamp)),
 		},
 	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error creating debounce: %w", err)
 	}
 	switch out {
-	case 0:
+	case -1:
+		// The debounce is in progress or has just finished.  Requeue.
+		return ErrDebounceInProgress
+	case -2:
+		// The event is out-of-order and a newer event exists within the debounce.
+		// Do nothing.
+		return nil
+	default:
+		// Debounces should have a maximum timeout;  updating the debounce returns
+		// the timeout to use.
+		actualTTL := time.Second * time.Duration(out)
 		err = d.q.RequeueByJobID(
 			ctx,
 			fn.ID.String(),
 			debounceID.String(),
-			now.Add(ttl).Add(buffer).Add(time.Second),
+			now.Add(actualTTL).Add(buffer).Add(time.Second),
 		)
 		if err == redis_state.ErrQueueItemAlreadyLeased {
 			// This is in progress.
@@ -324,11 +346,6 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 			return fmt.Errorf("error requeueing debounce job '%s': %w", debounceID, err)
 		}
 		return nil
-	case -1:
-		// The debounce is in progress or has just finished.  Requeue.
-		return ErrDebounceInProgress
-	default:
-		return fmt.Errorf("unknown update debounce return value: %d", out)
 	}
 }
 

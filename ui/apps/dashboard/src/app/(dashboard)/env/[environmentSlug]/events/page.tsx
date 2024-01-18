@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { ArrowRightIcon, ChartBarIcon, CodeBracketSquareIcon } from '@heroicons/react/20/solid';
+import { type Route } from 'next';
+import { ChartBarIcon, CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { Link } from '@inngest/components/Link';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import SendEventButton from '@/app/(dashboard)/env/[environmentSlug]/events/[eventName]/SendEventButton';
@@ -131,14 +132,14 @@ function EventTypesListPaginationPage({
               <div className="flex items-center gap-2.5 pl-4">
                 <Link
                   href={pathCreator.eventType({ envSlug: env.slug, eventName: event.name })}
-                  className="group flex w-full items-center gap-2 px-2 py-3 text-sm font-medium text-slate-700  hover:text-indigo-600"
+                  internalNavigation
+                  className="w-full px-2 py-3 text-sm font-medium"
                 >
                   {event.name}
-                  <ArrowRightIcon className="h-3 w-3 -translate-x-3 text-indigo-600 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
                 </Link>
               </div>
             </td>
-            <td className="space-x-2 whitespace-nowrap px-2 py-3">
+            <td className="space-x-2 whitespace-nowrap px-2">
               <HorizontalPillList
                 alwaysVisibleCount={2}
                 pills={event.functions.map((function_) => (
@@ -158,15 +159,15 @@ function EventTypesListPaginationPage({
             </td>
             <td className="w-60 py-1 pl-2 pr-6">
               <div className="flex w-56 items-center justify-end gap-2">
-                <Pill className="gap-1 bg-white align-middle text-slate-600">
+                <div className="flex items-center gap-1 align-middle text-slate-600">
                   <ChartBarIcon className="-ml-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
-                  <span className="overflow-hidden whitespace-nowrap text-xs text-slate-600">
+                  <span className="overflow-hidden whitespace-nowrap text-sm text-slate-600">
                     {dailyVolume.toLocaleString(undefined, {
                       notation: 'compact',
                       compactDisplay: 'short',
                     })}
                   </span>
-                </Pill>
+                </div>
                 <MiniStackedBarChart className="shrink-0" data={dailyVolumeSlots} />
               </div>
             </td>

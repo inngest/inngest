@@ -45,7 +45,10 @@ export function useEvent(eventID: string | null): FetchResult<Data, { skippable:
   }, [query.data?.event]);
 
   if (query.isLoading) {
-    return baseFetchLoading;
+    return {
+      ...baseFetchLoading,
+      data,
+    };
   }
 
   if (skip) {

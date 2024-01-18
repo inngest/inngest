@@ -80,10 +80,10 @@ export default function FunctionThroughputChart({
     },
   });
 
-  const queued = data?.environment?.function?.queued?.data ?? [];
-  const started = data?.environment?.function?.started?.data ?? [];
-  const ended = data?.environment?.function?.ended?.data ?? [];
-  const concurrencyLimit = data?.environment?.function?.concurrencyLimit?.data ?? [];
+  const queued = data?.environment.function?.queued.data ?? [];
+  const started = data?.environment.function?.started.data ?? [];
+  const ended = data?.environment.function?.ended.data ?? [];
+  const concurrencyLimit = data?.environment.function?.concurrencyLimit.data ?? [];
 
   const maxLength = Math.max(queued.length, started.length, ended.length, concurrencyLimit.length);
 

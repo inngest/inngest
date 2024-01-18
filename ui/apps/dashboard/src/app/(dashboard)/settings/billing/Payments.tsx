@@ -70,7 +70,7 @@ export default function Payments() {
               target="_blank"
               className="font-semibold text-indigo-500 hover:text-indigo-800 hover:underline"
             >
-              View
+              {payment.status === 'requires_confirmation' ? 'Pay' : 'View'}
             </a>
           ) : null,
         })

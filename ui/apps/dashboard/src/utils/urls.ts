@@ -18,6 +18,9 @@ export function getManageKey(pathname: string) {
 }
 
 export const pathCreator = {
+  apps({ envSlug }: { envSlug: string }): Route {
+    return `/env/${envSlug}/apps` as Route;
+  },
   deploys({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/deploys` as Route;
   },

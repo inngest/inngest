@@ -47,7 +47,10 @@ export function useRun(runID: string | null): FetchResult<Data, { skippable: tru
   }, [query.data?.functionRun]);
 
   if (query.isLoading) {
-    return baseFetchLoading;
+    return {
+      ...baseFetchLoading,
+      data,
+    };
   }
 
   if (skip) {

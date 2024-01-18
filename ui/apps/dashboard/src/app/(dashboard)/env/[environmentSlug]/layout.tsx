@@ -9,15 +9,19 @@ type RootLayoutProps = {
   children: React.ReactNode;
 };
 
-export default function RootLayout({ params, children }: RootLayoutProps) {
-  const environmentSlug = params.environmentSlug ?? 'production';
+export default function RootLayout({ params: { environmentSlug }, children }: RootLayoutProps) {
   return (
     <EnvironmentProvider environmentSlug={environmentSlug}>
       <div className="isolate flex h-full flex-col">
         <AppNavigation environmentSlug={environmentSlug} />
         {children}
       </div>
-      <Toaster />
+      <Toaster
+        toastOptions={{
+          // Ensure that the toast is clickable when there are overlays/modals
+          className: 'pointer-events-auto',
+        }}
+      />
     </EnvironmentProvider>
   );
 }

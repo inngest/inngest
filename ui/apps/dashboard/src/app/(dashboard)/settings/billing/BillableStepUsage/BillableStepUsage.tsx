@@ -25,8 +25,8 @@ import { formatXAxis, formatYAxis, toLocaleUTCDateString } from './format';
 import { transformData } from './transformData';
 
 const GetBillableSteps = graphql(`
-  query GetBillableSteps($month: Int!) {
-    billableStepTimeSeries(timeOptions: { month: $month }) {
+  query GetBillableSteps($month: Int!, $year: Int!) {
+    billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {
       data {
         time
         value
@@ -54,15 +54,22 @@ type Props = {
 export function BillableStepUsage({ includedStepCountLimit }: Props) {
   const currentMonthIndex = new Date().getUTCMonth();
   const options = {
-    prevMonth: currentMonthIndex === 0 ? 11 : currentMonthIndex,
-    thisMonth: currentMonthIndex + 1,
+    previous: {
+      month: currentMonthIndex === 0 ? 12 : currentMonthIndex,
+      year: currentMonthIndex === 0 ? new Date().getUTCFullYear() - 1 : new Date().getUTCFullYear(),
+    },
+    current: {
+      month: currentMonthIndex + 1,
+      year: new Date().getUTCFullYear(),
+    },
   };
 
-  const [selectedMonth, setSelectedMonth] = useState<'prevMonth' | 'thisMonth'>('thisMonth');
+  const [selectedPeriod, setSelectedPeriod] = useState<'previous' | 'current'>('current');
   const [{ data, fetching }] = useQuery({
     query: GetBillableSteps,
     variables: {
-      month: options[selectedMonth],
+      month: options[selectedPeriod].month,
+      year: options[selectedPeriod].year,
     },
   });
 
@@ -87,7 +94,7 @@ export function BillableStepUsage({ includedStepCountLimit }: Props) {
     );
   }
 
-  const monthData = data?.billableStepTimeSeries?.[0]?.data || [];
+  const monthData = data.billableStepTimeSeries[0]?.data || [];
   const { additionalStepCount, series, totalStepCount } = transformData(
     monthData,
     includedStepCountLimit
@@ -142,17 +149,17 @@ export function BillableStepUsage({ includedStepCountLimit }: Props) {
                       className="font-regular shadow-outline-secondary-light inline-flex flex-shrink-0 items-center justify-center gap-1 overflow-hidden rounded-[6px] bg-white text-sm font-medium text-slate-700 transition-all"
                       onChange={(event) => {
                         const { value } = event.target;
-                        if (value !== 'thisMonth' && value !== 'prevMonth') {
+                        if (value !== 'previous' && value !== 'current') {
                           throw new Error(`invalid value: ${value}`);
                         }
 
-                        setSelectedMonth(value);
+                        setSelectedPeriod(value);
                       }}
-                      value={selectedMonth}
+                      value={selectedPeriod}
                     >
-                      <option value="thisMonth">This Month</option>
+                      <option value="current">This Month</option>
 
-                      <option value="prevMonth">Previous Month</option>
+                      <option value="previous">Previous Month</option>
                     </select>
 
                     <div className="flex-grow" />

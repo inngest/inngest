@@ -50,8 +50,11 @@ export function useGraphQLQuery<
     return () => clearTimeout(timeoutID);
   }, [res.fetching, pollIntervalInMilliseconds, executeQuery]);
 
-  if (res.fetching && !res.data) {
-    return baseFetchLoading;
+  if (res.fetching) {
+    return {
+      ...baseFetchLoading,
+      data: res.data,
+    };
   }
 
   if (res.error) {
@@ -109,8 +112,11 @@ export function useSkippableGraphQLQuery<
     return () => clearTimeout(timeoutID);
   }, [skip, res.fetching, pollIntervalInMilliseconds, executeQuery]);
 
-  if (res.fetching && !res.data) {
-    return baseFetchLoading;
+  if (res.fetching) {
+    return {
+      ...baseFetchLoading,
+      data: res.data,
+    };
   }
 
   if (skip) {

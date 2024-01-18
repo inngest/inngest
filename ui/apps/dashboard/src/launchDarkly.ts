@@ -1,18 +1,21 @@
 import { init, type LDClient } from '@launchdarkly/node-server-sdk';
 
-let launchDarklyClient: LDClient;
+let launchDarklyClient: LDClient | undefined;
 
-async function initialize() {
+function initialize() {
   const launchDarklySDKKey = process.env.LAUNCH_DARKLY_SDK_KEY;
   if (!launchDarklySDKKey) {
     throw new Error('LAUNCH_DARKLY_SDK_KEY environment variable is not set.');
   }
-  const client = init(launchDarklySDKKey, { stream: false });
-  await client.waitForInitialization();
-  return client;
+  launchDarklyClient = init(launchDarklySDKKey, { stream: false });
+  return launchDarklyClient;
 }
 
 export async function getLaunchDarklyClient(): Promise<LDClient> {
-  if (launchDarklyClient) return launchDarklyClient;
-  return (launchDarklyClient = await initialize());
+  if (!launchDarklyClient) {
+    return initialize();
+  }
+
+  await launchDarklyClient.waitForInitialization();
+  return launchDarklyClient;
 }

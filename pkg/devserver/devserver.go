@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -119,7 +120,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithPollTick(150 * time.Millisecond),
 		redis_state.WithQueueKeyGenerator(queueKG),
 		redis_state.WithCustomConcurrencyKeyGenerator(func(ctx context.Context, i redis_state.QueueItem) []state.CustomConcurrency {
-			fn, err := dbcqrs.GetFunctionByID(ctx, i.Data.Identifier.WorkflowID)
+			fn, err := dbcqrs.GetFunctionByInternalUUID(ctx, i.Data.Identifier.WorkspaceID, i.Data.Identifier.WorkflowID)
 			if err != nil {
 				// Use what's stored in the state store.
 				return i.Data.Identifier.CustomConcurrencyKeys
@@ -182,6 +183,9 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	debouncer := debounce.NewRedisDebouncer(rc, queueKG, queue)
 
+	// Create a new expression aggregator, using Redis to load evaluables.
+	agg := expressions.NewAggregator(ctx, 100, sm.(expressions.EvaluableLoader), nil)
+
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver()
@@ -199,6 +203,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithRuntimeDrivers(
 			drivers...,
 		),
+		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(queue),
 		executor.WithLogger(logger.From(ctx)),
 		executor.WithFunctionLoader(loader),

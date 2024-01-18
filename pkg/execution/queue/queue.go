@@ -111,6 +111,14 @@ type JobQueueReader interface {
 		runID ulid.ULID,
 	) (int, error)
 
+	// StatusCount returns the total number of items in the function
+	// status queue.
+	StatusCount(
+		ctx context.Context,
+		workflowID uuid.UUID,
+		status string,
+	) (int64, error)
+
 	RunJobs(
 		ctx context.Context,
 		workspaceID uuid.UUID,

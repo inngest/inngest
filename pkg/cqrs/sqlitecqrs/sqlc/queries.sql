@@ -51,8 +51,15 @@ SELECT * FROM functions;
 -- name: GetAppFunctions :many
 SELECT * FROM functions WHERE app_id = ?;
 
+-- name: GetAppFunctionsBySlug :many
+SELECT functions.* FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ?;
+
 -- name: GetFunctionByID :one
 SELECT * FROM functions WHERE id = ?;
+
+-- name: GetFunctionBySlug :one
+SELECT * FROM functions WHERE slug = ?;
+
 
 -- name: UpdateFunctionConfig :one
 UPDATE functions SET config = ? WHERE id = ? RETURNING *;
@@ -87,7 +94,9 @@ SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes)
 -- name: GetFunctionRunsTimebound :many
 SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
-WHERE function_runs.run_started_at > @after AND function_runs.run_started_at <= @before LIMIT ?;
+WHERE function_runs.run_started_at > @after AND function_runs.run_started_at <= @before
+ORDER BY function_runs.run_started_at DESC
+LIMIT ?;
 
 -- name: GetFunctionRunsFromEvents :many
 SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs

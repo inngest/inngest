@@ -10,13 +10,10 @@ import (
 	"time"
 
 	"github.com/VividCortex/ewma"
-	"github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngest/pkg/execution/concurrency"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
 	"github.com/uber-go/tally/v4"
-	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 
 	"go.opentelemetry.io/otel"
@@ -462,7 +459,10 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition) error {
 		return err
 	}
 
-	eg := errgroup.Group{}
+	var processErr error
+	var concurrencyLimitReached bool
+
+ProcessLoop:
 	for _, qi := range queue {
 		item := qi
 		if item.IsLeased(time.Now()) {
@@ -485,108 +485,102 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition) error {
 
 		capacity--
 
-		// Within a goroutine attempt to lease this item.  This lets us concurrently lease
-		// items within the partition to process as fast as possible.
-		eg.Go(func() error {
-			// NOTE: If this ends in an error, we must _always_ release an item from the
-			// semaphore to free capacity.  This will happen automatically when the worker
-			// finishes processing a queue item on success.
+		q.scope.Counter(counterPartitionProcessItems).Inc(1)
 
-			// Ensure there's room within the concurrency queue, first.  This is typically
-			// more constrained.
-			if q.concurrencyService != nil {
-				err := q.concurrencyService.Add(ctx, item.WorkflowID, item.Data)
-				if err == concurrency.ErrAtConcurrencyLimit {
-					// return this package-specific error.
-					q.sem.Release(1)
-					return ErrConcurrencyLimit
-				}
-				if err != nil {
-					q.sem.Release(1)
-					return fmt.Errorf("error checking concurrency service limits: %w", err)
-				}
-			}
+		// Attempt to lease this item before passing this to a worker.  We have to do this
+		// synchronously as we need to lease prior to requeueing the partition pointer. If
+		// we don't do this here, the workers may not lease the items before calling Peek
+		// to re-enqeueu the pointer, which then increases contention - as we requeue a
+		// pointer too early.
+		//
+		// This is safe:  only one process runs scan(), and we guard the total number of
+		// available workers with the above semaphore.
+		leaseID, err := q.Lease(ctx, *p, *item, QueueLeaseDuration)
 
-			q.scope.Counter(counterPartitionProcessItems).Inc(1)
-			// Attempt to lease this item before passing this to a worker.  We have to do this
-			// synchronously as we need to lease prior to requeueing the partition pointer. If
-			// we don't do this here, the workers may not lease the items before calling Peek
-			// to re-enqeueu the pointer, which then increases contention - as we requeue a
-			// pointer too early.
+		// NOTE: If this loop ends in an error, we must _always_ release an item from the
+		// semaphore to free capacity.  This will happen automatically when the worker
+		// finishes processing a queue item on success.
+		if err != nil {
+			q.sem.Release(1)
+		}
+
+		if isConcurrencyLimitError(err) {
+			concurrencyLimitReached = true
+		}
+
+		switch err {
+		case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
+			q.scope.Counter(counterConcurrencyLimit).Inc(1)
+			// Since the queue is at capacity, return the error so that we
+			// don't keep hammering with "does the queue have room?" logic.
 			//
-			// This is safe:  only one process runs scan(), and we guard the total number of
-			// available workers with the above semaphore.
-			leaseID, err := q.Lease(ctx, *p, *item, QueueLeaseDuration)
-			if err != nil && q.concurrencyService != nil && err != ErrQueueItemAlreadyLeased {
-				// NOTE: Always remove the concurrency key if leasing failed.
-				//
-				// There's a race condition here;  the key may not be found if
-				// there's contention on the worker item.
-				//
-				// w1: add to concurrency
-				// w1: lease
-				// w2: add to concurrency
-				// w1: remove concurrency key
-				// w2: attempt to lease; not found error
-				// w2: remove concurrency
-				// w2: concurrency key not found
-				doneErr := q.concurrencyService.Done(ctx, item.WorkflowID, item.Data)
-				if doneErr != nil && doneErr != concurrency.ErrKeyNotFound {
-					// Return both the lease error and the error for removing
-					// the concurrency key.
-					q.sem.Release(1)
-					return multierror.Append(err, doneErr)
-				}
-			}
+			// We also want to break here;  even if we have capacity for the next
+			// job in the loop we do NOT want to claim the job, as this breaks
+			// ordering guarantees.  The only safe thing to do when we hit a
+			// FUNCTION level concurrency key.
+			processErr = err
+			break ProcessLoop
+		case ErrConcurrencyLimitCustomKey0, ErrConcurrencyLimitCustomKey1:
+			// TODO: In an ideal world we'd denylist each concurrency key that's been
+			// limited here, then ignore any other jobs from being leased as we continue
+			// to iterate through the loop.
+			//
+			// This maintains FIFO ordering amongst all custom concurrency keys.  For now,
+			// we move to the next job.  Note that capacity may be available for another job
+			// in the loop, meaning out of order jobs for now.
 
-			switch err {
-			case ErrPartitionConcurrencyLimit, ErrConcurrencyLimit:
-				q.scope.Counter(counterConcurrencyLimit).Inc(1)
-				q.sem.Release(1)
-				// Since the queue is at capacity, return the error so that we
-				// don't keep hammering with "does the queue have room?" logic.
-				return err
-			case ErrQueueItemNotFound:
-				q.scope.Counter(counterQueueItemsGone).Inc(1)
-				q.sem.Release(1)
-				return nil
-			case ErrQueueItemAlreadyLeased:
-				q.scope.Counter(counterQueueItemsLeaseConflict).Inc(1)
-				q.sem.Release(1)
-				q.logger.
-					Warn().
-					Interface("item", item).
-					Msg("worker attempting to claim existing lease")
-				return nil
-			}
-			if err != nil {
-				q.sem.Release(1)
-				return fmt.Errorf("error leasing in process: %w", err)
-			}
+			// TODO: Grab the key from the custom limit
+			//       Set key in denylist lookup table.
+			//       Modify above loop entrance:
+			//         Check lookup table for all concurrency keys
+			//         If present, skip item
+			processErr = nil
+			continue
+		case ErrQueueItemNotFound:
+			q.scope.Counter(counterQueueItemsGone).Inc(1)
+			// This is an okay error.  Move to the next job item.
+			processErr = nil
+			continue
+		case ErrQueueItemAlreadyLeased:
+			q.scope.Counter(counterQueueItemsLeaseConflict).Inc(1)
+			q.logger.
+				Warn().
+				Interface("item", item).
+				Msg("worker attempting to claim existing lease")
+			// This is an okay error.  Move to the next job item.
+			processErr = nil
+			continue
+		}
 
-			// Assign the lease ID and pass this to be handled by the available worker.
-			// There should always be capacity on this queue as we track capacity via
-			// a semaphore.
-			item.LeaseID = leaseID
-			q.workers <- processItem{P: *p, I: *item}
-			return nil
-		})
+		// Handle other errors.
+		if err != nil {
+			processErr = fmt.Errorf("error leasing in process: %w", err)
+			break ProcessLoop
+		}
+
+		// Assign the lease ID and pass this to be handled by the available worker.
+		// There should always be capacity on this queue as we track capacity via
+		// a semaphore.
+		item.LeaseID = leaseID
+
+		q.workers <- processItem{P: *p, I: *item}
 	}
 
-	if err := eg.Wait(); err != nil {
+	if processErr != nil {
 		// The lease for the partition will expire and we will be able to restart
 		// work in the future.
-		switch err {
-		case ErrPartitionConcurrencyLimit, ErrConcurrencyLimit:
+		if concurrencyLimitReached {
 			for _, l := range q.lifecycles {
 				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
 			}
+
 			// Requeue this partition as we hit concurrency limits.
 			q.scope.Counter(counterConcurrencyLimit).Inc(1)
 			return q.PartitionRequeue(ctx, p.Queue(), time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
-		default:
-			return err
 		}
+
+		// This wasn't a concurrency error so handle things separately.
+		return processErr
 	}
 
 	// XXX: If we haven't been able to lease a single item, ensure we enqueue this
@@ -756,6 +750,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 		}
 
 		if _, ok := err.(osqueue.QuitError); ok {
+			q.logger.Warn().Err(err).Msg("received queue quit error")
 			q.quit <- err
 			return err
 		}

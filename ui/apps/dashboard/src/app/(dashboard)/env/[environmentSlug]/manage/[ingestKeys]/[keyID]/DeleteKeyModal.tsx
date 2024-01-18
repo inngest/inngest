@@ -41,7 +41,6 @@ export default function DeleteKeyModal({ keyID, isOpen, onClose }: DeleteKeyModa
         toast.error(`${currentContent?.name} could not be deleted`);
       } else {
         toast.success(`${currentContent?.name} was successfully deleted`);
-        router.refresh();
         router.push(`/env/${env.slug}/manage/${currentContent?.param}` as Route);
       }
     });
@@ -52,7 +51,7 @@ export default function DeleteKeyModal({ keyID, isOpen, onClose }: DeleteKeyModa
     <AlertModal
       isOpen={isOpen}
       onClose={onClose}
-      title={'Are you sure you want to delete this ' + currentContent?.name?.toLowerCase() + '?'}
+      title={'Are you sure you want to delete this ' + currentContent?.name.toLowerCase() + '?'}
       primaryAction={{ label: 'Yes', btnAction: () => handleDelete() }}
     />
   );

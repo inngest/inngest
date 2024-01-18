@@ -74,7 +74,7 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
   if (fetching || !environments || !isNonEmptyArray(environments)) {
     return (
       <div className="relative self-stretch border-x border-slate-800">
-        <div className="font-regular flex h-full w-[180px] items-center gap-0.5 py-1.5 pl-4 pr-4  text-sm tracking-wide text-white hover:bg-slate-800">
+        <div className="font-regular flex h-full  w-28 items-center gap-0.5 py-1.5 pl-4 pr-4 text-sm  tracking-wide text-white hover:bg-slate-800 lg:w-36 xl:w-[180px]">
           <span className="text-shadow pr-4 text-sm font-medium text-white">Loading...</span>
           <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
             <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
@@ -109,7 +109,7 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
     <Listbox value={selected} onChange={onSelect}>
       {({ open }) => (
         <div className="relative self-stretch border-x border-slate-800">
-          <Listbox.Button className="font-regular flex h-full w-[180px] items-center gap-0.5 py-1.5 pl-4 pr-4 text-sm  tracking-wide text-white transition-all hover:bg-slate-800">
+          <Listbox.Button className="font-regular flex h-full w-28 items-center gap-0.5 py-1.5 pl-4 pr-4 text-sm tracking-wide  text-white transition-all hover:bg-slate-800 lg:w-36 xl:w-[180px]">
             <span className="flex max-w-full items-center pr-4">
               {isBranchParentSelected ? (
                 <>
@@ -125,9 +125,9 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
                     )}
                   />
                   <span className="block truncate">
-                    {selected?.type === EnvironmentType.BranchParent
+                    {selected.type === EnvironmentType.BranchParent
                       ? 'Branch Environments'
-                      : selected?.name}
+                      : selected.name}
                   </span>
                 </>
               ) : (

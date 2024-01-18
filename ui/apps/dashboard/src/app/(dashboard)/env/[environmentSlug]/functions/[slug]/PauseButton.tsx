@@ -155,15 +155,15 @@ export default function PauseFunctionButton({ functionSlug, disabled }: PauseFun
     },
   });
 
-  const fn = version?.workspace?.workflow;
+  const fn = version?.workspace.workflow;
 
   if (!fn) {
     return null;
   }
 
-  const prevVersionObj = fn?.previous.sort((a, b) => b!.version - a!.version)[0];
+  const prevVersionObj = fn.previous.sort((a, b) => b!.version - a!.version)[0];
   const prevVersion = prevVersionObj?.version;
-  const isPaused = !fn.current && !fn?.archivedAt;
+  const isPaused = !fn.current && !fn.archivedAt;
 
   return (
     <>
@@ -180,7 +180,7 @@ export default function PauseFunctionButton({ functionSlug, disabled }: PauseFun
                   )
                 }
                 btnAction={() => setIsPauseFunctionModalVisible(true)}
-                disabled={disabled || !version || isFetchingVersions}
+                disabled={disabled || isFetchingVersions}
                 label={isPaused ? 'Resume' : 'Pause'}
               />
             </span>
@@ -194,9 +194,9 @@ export default function PauseFunctionButton({ functionSlug, disabled }: PauseFun
         </Tooltip.Root>
       </Tooltip.Provider>
       <PauseFunctionModal
-        functionID={fn?.id}
+        functionID={fn.id}
         functionName={functionSlug}
-        currentVersion={fn?.current?.version}
+        currentVersion={fn.current?.version}
         previousVersion={prevVersion}
         isPaused={isPaused}
         isOpen={isPauseFunctionModalVisible}
