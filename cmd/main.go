@@ -1,11 +1,18 @@
 package main
 
 import (
+	"os"
+	"time"
 	_ "time/tzdata" // bundles timezone data, required for Windows without Go
 
 	"github.com/inngest/inngest/cmd/commands"
 )
 
 func main() {
+	// Ensure that we use UTC everywhere. This is a fix for users getting
+	// invalid timestamps due to their specific `/etc/localtime` files.
+	os.Setenv("TZ", "UTC")
+	time.Local = time.UTC
+
 	commands.Execute()
 }
