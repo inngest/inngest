@@ -21,8 +21,12 @@ export const pathCreator = {
   apps({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/apps` as Route;
   },
-  deploys({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/deploys` as Route;
+  deploys({ envSlug, hasDeployIntent }: { envSlug: string; hasDeployIntent?: boolean }): Route {
+    let route = `/env/${envSlug}/deploys`;
+    if (hasDeployIntent) {
+      route += '?intent=deploy-modal';
+    }
+    return route as Route;
   },
   deploy({ deployID, envSlug }: { deployID: string; envSlug: string }): Route {
     return `/env/${envSlug}/deploys/${deployID}` as Route;
@@ -42,7 +46,13 @@ export const pathCreator = {
   functionRuns({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
     return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/logs` as Route;
   },
+  home(): Route {
+    return process.env.NEXT_PUBLIC_HOME_PATH as Route;
+  },
   keys({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/manage/keys` as Route;
+  },
+  manage({ envSlug }: { envSlug: string }): Route {
+    return `/env/${envSlug}/manage` as Route;
   },
 };
