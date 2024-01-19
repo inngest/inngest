@@ -18,7 +18,7 @@ export function Sync({ externalAppID, syncID }: Props) {
   const env = useEnvironment();
 
   const syncRes = useSync({ envID: env.id, externalAppID, syncID });
-  if (syncRes.error) {
+  if (syncRes.status === 'initial_failed') {
     if (syncRes.error.message.includes('no rows')) {
       return (
         <div className="h-full w-full overflow-y-auto">
@@ -33,7 +33,7 @@ export function Sync({ externalAppID, syncID }: Props) {
     }
     throw syncRes.error;
   }
-  if (syncRes.isLoading) {
+  if (syncRes.status === 'initial_loading') {
     return (
       <div className="h-full w-full overflow-y-auto">
         <div className="mx-auto w-full max-w-[1200px] p-4">

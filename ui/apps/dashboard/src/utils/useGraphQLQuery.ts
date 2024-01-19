@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
 import {
-  baseFetchFailed,
-  baseFetchLoading,
   baseFetchSkipped,
   baseFetchSucceeded,
+  baseInitialFetchFailed,
+  baseInitialFetchLoading,
+  baseRefetchFailed,
+  baseRefetchLoading,
   type FetchResult,
 } from '@inngest/components/types/fetch';
 import { useQuery, type TypedDocumentNode, type UseQueryArgs } from 'urql';
@@ -51,15 +53,27 @@ export function useGraphQLQuery<
   }, [res.fetching, pollIntervalInMilliseconds, executeQuery]);
 
   if (res.fetching) {
+    if (!res.data) {
+      return baseInitialFetchLoading;
+    }
+
     return {
-      ...baseFetchLoading,
+      ...baseRefetchLoading,
       data: res.data,
     };
   }
 
   if (res.error) {
+    if (!res.data) {
+      return {
+        ...baseInitialFetchFailed,
+        error: new Error(res.error.message),
+      };
+    }
+
     return {
-      ...baseFetchFailed,
+      ...baseRefetchFailed,
+      data: res.data,
       error: new Error(res.error.message),
     };
   }
@@ -67,7 +81,7 @@ export function useGraphQLQuery<
   if (!res.data) {
     // Should be unreachable.
     return {
-      ...baseFetchFailed,
+      ...baseInitialFetchFailed,
       error: new Error('finished loading but missing data'),
     };
   }
@@ -112,20 +126,32 @@ export function useSkippableGraphQLQuery<
     return () => clearTimeout(timeoutID);
   }, [skip, res.fetching, pollIntervalInMilliseconds, executeQuery]);
 
-  if (res.fetching) {
-    return {
-      ...baseFetchLoading,
-      data: res.data,
-    };
-  }
-
   if (skip) {
     return baseFetchSkipped;
   }
 
-  if (res.error) {
+  if (res.fetching) {
+    if (!res.data) {
+      return baseInitialFetchLoading;
+    }
+
     return {
-      ...baseFetchFailed,
+      ...baseRefetchLoading,
+      data: res.data,
+    };
+  }
+
+  if (res.error) {
+    if (!res.data) {
+      return {
+        ...baseInitialFetchFailed,
+        error: new Error(res.error.message),
+      };
+    }
+
+    return {
+      ...baseRefetchFailed,
+      data: res.data,
       error: new Error(res.error.message),
     };
   }
@@ -133,7 +159,7 @@ export function useSkippableGraphQLQuery<
   if (!res.data) {
     // Should be unreachable.
     return {
-      ...baseFetchFailed,
+      ...baseInitialFetchFailed,
       error: new Error('finished loading but missing data'),
     };
   }

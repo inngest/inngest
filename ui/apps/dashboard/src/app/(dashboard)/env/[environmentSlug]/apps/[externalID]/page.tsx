@@ -22,10 +22,10 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
     envID: env.id,
     externalAppID: externalID,
   });
-  if (appRes.error) {
+  if (appRes.status === 'initial_failed') {
     throw appRes.error;
   }
-  if (appRes.isLoading && !appRes.data) {
+  if (appRes.status === 'initial_loading') {
     return (
       <div className="h-full overflow-y-auto">
         <div className="mx-auto w-full max-w-[1200px] py-4">

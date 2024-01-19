@@ -19,10 +19,10 @@ export function Apps({ isArchived = false }: Props) {
   const router = useRouter();
 
   const res = useApps({ envID: env.id, isArchived });
-  if (res.error) {
+  if (res.status === 'initial_failed') {
     throw res.error;
   }
-  if (res.isLoading && !res.data) {
+  if (res.status === 'initial_loading') {
     return (
       <div className="mb-4 mt-16 flex items-center justify-center">
         <div className="w-full max-w-[1200px]">
