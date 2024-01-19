@@ -723,6 +723,9 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 
 		// Track the latency on average globally.  Do this in a goroutine so that it doesn't
 		// at all delay the job during concurrenty locking contention.
+		if qi.WallTimeMS == 0 {
+			qi.WallTimeMS = qi.AtMS // backcompat while WallTimeMS isn't valid.
+		}
 		latency := n.Sub(time.UnixMilli(qi.WallTimeMS)) - sojourn
 		jobCtx = context.WithValue(jobCtx, latencyKey, latency)
 
