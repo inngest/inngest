@@ -7,6 +7,7 @@ import slugify from '@sindresorhus/slugify';
 import { capitalCase } from 'change-case';
 import { useMutation } from 'urql';
 
+import Input from '@/components/Forms/Input';
 import { graphql } from '@/gql';
 import WebhookIcon from '@/icons/webhookIcon.svg';
 import { useEnvironments } from '@/queries';
@@ -34,6 +35,8 @@ export default function Page() {
   // TODO - handle failure to fetch environments
   const [{ data: environments }] = useEnvironments();
   const [loading, setLoading] = useState(false);
+  const [isEditing, setEditing] = useState(false);
+  const [customPrefix, setCustomPrefix] = useState<string>('');
   const [error, setError] = useState<string>('');
 
   const params = useSearchParams();
@@ -65,11 +68,15 @@ export default function Page() {
     name ?? domain !== null ? getNameFromDomain(domain) : 'Webhook integration'
   );
 
-  const prefix = slugify(displayName);
+  const slugifyOptions = { preserveCharacters: ['.'] };
+  const defaultPrefix = slugify(displayName, slugifyOptions);
+  const eventNamePrefix =
+    customPrefix !== '' ? slugify(customPrefix, slugifyOptions) : defaultPrefix;
+
   const transform = createTransform({
     // Svix webhooks do not have a standard schema, so we use fields that
     // are popular with a fallback
-    eventName: `\`${prefix}/\${evt.type || evt.name || evt.event_type || "webhook.received"}\``,
+    eventName: `\`${eventNamePrefix}/\${evt.type || evt.name || evt.event_type || "webhook.received"}\``,
     // Most webhooks have a data field, but not all, so we fallback to the entire event
     dataParam: 'evt.data || evt',
     commentBlock: `// This was created by the ${displayName} integration.
@@ -130,10 +137,33 @@ export default function Page() {
           <p className="my-6">
             Upon creation, the webhook will begin sending events with the following prefix:{' '}
           </p>
-          <pre>
-            {prefix}
-            {'/*'}
-          </pre>
+          <div className="flex min-h-[32px] items-center justify-center gap-2">
+            {isEditing ? (
+              <Input
+                type="text"
+                placeholder="Add a prefix"
+                value={customPrefix}
+                onChange={(e) => setCustomPrefix(e.target.value)}
+                className="block max-w-[192px]"
+              />
+            ) : (
+              <pre>
+                {eventNamePrefix}
+                {'/*'}
+              </pre>
+            )}
+            <button
+              className="text-sm text-indigo-500"
+              onClick={() => {
+                setEditing(!isEditing);
+                if (customPrefix === '') {
+                  setCustomPrefix(defaultPrefix);
+                }
+              }}
+            >
+              {isEditing ? 'Save' : 'Edit'}
+            </button>
+          </div>
         </>
       }
       graphic={
