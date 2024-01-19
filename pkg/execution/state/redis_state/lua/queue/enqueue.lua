@@ -59,7 +59,9 @@ if currentScore == false or tonumber(currentScore) > partitionScore then
 	-- Get the partition item, so that we can keep the last lease score.
 	local existing = get_partition_item(partitionKey, workflowID)
 	if existing ~= nil then
-		partitionItem.last = existing.last
+		local decoded = cjson.decode(partitionItem)
+		decoded.last = existing.last
+		partitionItem = cjson.encode(decoded)
 	end
 
 	-- Update the partition item too
