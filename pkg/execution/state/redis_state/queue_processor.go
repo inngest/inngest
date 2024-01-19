@@ -604,19 +604,18 @@ ProcessLoop:
 		q.workers <- processItem{P: *p, I: *item}
 	}
 
-	if processErr != nil {
-		// The lease for the partition will expire and we will be able to restart
-		// work in the future.
-		if concurrencyLimitReached {
-			for _, l := range q.lifecycles {
-				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
-			}
-
-			// Requeue this partition as we hit concurrency limits.
-			q.scope.Counter(counterConcurrencyLimit).Inc(1)
-			return q.PartitionRequeue(ctx, p.Queue(), time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+	// The lease for the partition will expire and we will be able to restart
+	// work in the future.
+	if concurrencyLimitReached {
+		for _, l := range q.lifecycles {
+			go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
 		}
+		// Requeue this partition as we hit concurrency limits.
+		q.scope.Counter(counterConcurrencyLimit).Inc(1)
+		return q.PartitionRequeue(ctx, p.Queue(), time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+	}
 
+	if processErr != nil {
 		// This wasn't a concurrency error so handle things separately.
 		return processErr
 	}
