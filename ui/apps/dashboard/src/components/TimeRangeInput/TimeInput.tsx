@@ -78,9 +78,9 @@ function reducer(state: State, action: Action): State {
         status: 'typing',
       };
     case 'stopped_typing':
-      const parsedDateTime = chrono.parseDate(state.inputString);
       // Chrono's types are wrong - parseData can return undefined
-      // eslint-disable-next-line
+      const parsedDateTime = chrono.parseDate(state.inputString) as unknown as Date | null;
+
       if (!parsedDateTime) {
         return {
           ...state,
