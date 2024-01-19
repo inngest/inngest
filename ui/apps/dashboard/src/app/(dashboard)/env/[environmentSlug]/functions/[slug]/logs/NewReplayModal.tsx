@@ -109,13 +109,14 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
     FunctionRunStatus.Failed,
   ]);
   const environment = useEnvironment();
+
   const { data, isLoading, error } = useSkippableGraphQLQuery({
     query: GetFunctionEndedRunsCountDocument,
     variables: {
       environmentID: environment.id,
       functionSlug,
-      timeRangeStart: timeRange?.start ? timeRange.start.toISOString() : '',
-      timeRangeEnd: timeRange?.end ? timeRange.end.toISOString() : '',
+      timeRangeStart: timeRange ? timeRange.start.toISOString() : '',
+      timeRangeEnd: timeRange ? timeRange.end.toISOString() : '',
     },
     skip: !timeRange,
   });
