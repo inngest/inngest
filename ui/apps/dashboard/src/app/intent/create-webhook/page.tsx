@@ -93,7 +93,7 @@ export default function Page() {
     createWebhook({
       input: {
         workspaceID: productionEnv.id,
-        name: name || '',
+        name: displayName,
         source: 'webhook',
         metadata: {
           transform,
