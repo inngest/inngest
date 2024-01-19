@@ -10,6 +10,7 @@ const query = graphql(`
         functionCount
         name
         latestSync {
+          error
           framework
           id
           lastSyncedAt
