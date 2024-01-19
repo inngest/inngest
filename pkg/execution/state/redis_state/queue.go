@@ -428,6 +428,11 @@ type QueueItem struct {
 	// unique string and will be hashed.  Using the same ID provides idempotency
 	// guarantees within the queue's IdempotencyTTL.
 	ID string `json:"id"`
+	// EarliestPeekTime stores the earliest time that the job was peeked as a
+	// millisecond epoch timestamp.
+	//
+	// This lets us easily track sojourn latency.
+	EarliestPeekTime int64 `json:"pt"`
 	// At represents the current time that this QueueItem needs to be executed at,
 	// as a millisecond epoch.  This is the millisecond-level granularity score of
 	// the item.  Note that the score in Redis is second-level, ie this field / 1000.
@@ -531,11 +536,12 @@ type QueuePartition struct {
 	// level granularity here as queue partitions work to the nearest second.
 	AtS int64 `json:"at"`
 
-	// Last represents the time that this QueueItem was last leased, as a unix
-	// epoch.
+	// Last represents the time that this partition was last leased, as a millisecond
+	// unix epoch.  In essence, we need this to track how frequently we're leasing and
+	// attempting to run items in the partition's queue.
 	//
-	// This lets us inspect the time a QueuePartition was last leased, and figure
-	// out whether we should garbage collect the partition index.
+	// Without this, we cannot track sojourn latency.
+	// garbage collection when the queue remains empty.
 	Last int64 `json:"last"`
 
 	// LeaseID represents a lease on this partition.  If the LeaseID is not nil,
@@ -1182,7 +1188,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 // NOTE: This does not check the queue/partition name against allow or denylists;  it assumes
 // that the worker always wants to lease the given queue.  Filtering must be done when peeking
 // when running a worker.
-func (q *queue) PartitionLease(ctx context.Context, p QueuePartition, duration time.Duration) (*ulid.ULID, int64, error) {
+func (q *queue) PartitionLease(ctx context.Context, p QueuePartition, duration time.Duration) (*ulid.ULID, error) {
 	var (
 		concurrencyKey string
 		concurrency    = defaultPartitionConcurrency
@@ -1198,7 +1204,7 @@ func (q *queue) PartitionLease(ctx context.Context, p QueuePartition, duration t
 	leaseExpires := now.Add(duration).UTC().Truncate(time.Millisecond)
 	leaseID, err := ulid.New(ulid.Timestamp(leaseExpires), rnd)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error generating id: %w", err)
+		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
 	keys := []string{
@@ -1215,7 +1221,7 @@ func (q *queue) PartitionLease(ctx context.Context, p QueuePartition, duration t
 		concurrency,
 	})
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	result, err := scripts["queue/partitionLease"].Exec(
 		ctx,
@@ -1226,24 +1232,24 @@ func (q *queue) PartitionLease(ctx context.Context, p QueuePartition, duration t
 
 	).AsInt64()
 	if err != nil {
-		return nil, 0, fmt.Errorf("error leasing partition: %w", err)
+		return nil, fmt.Errorf("error leasing partition: %w", err)
 	}
 	switch result {
 	case -1:
-		return nil, 0, ErrPartitionConcurrencyLimit
+		return nil, ErrPartitionConcurrencyLimit
 	case -2:
-		return nil, 0, ErrPartitionNotFound
+		return nil, ErrPartitionNotFound
 	case -3:
-		return nil, 0, ErrPartitionAlreadyLeased
+		return nil, ErrPartitionAlreadyLeased
 	default:
 		// If there's no concurrency limit for this partition, return a default
 		// amount so that processing the partition has reasonable limits.
 		if concurrency == 0 {
-			return &leaseID, QueuePeekDefault, nil
+			return &leaseID, nil
 		}
 
 		// result is the available concurrency within this partition
-		return &leaseID, result, nil
+		return &leaseID, nil
 	}
 }
 

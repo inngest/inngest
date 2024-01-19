@@ -65,6 +65,7 @@ var (
 	}
 
 	startedAtKey = startedAtCtxKey{}
+	sojournKey   = sojournCtxKey{}
 	latencyKey   = latencyCtxKey{}
 )
 
@@ -81,13 +82,22 @@ type startedAtCtxKey struct{}
 // available via context.
 type latencyCtxKey struct{}
 
+// sojournCtxKey is a context key which records when the queue item starts,
+// available via context.
+type sojournCtxKey struct{}
+
 func GetItemStart(ctx context.Context) (time.Time, bool) {
 	t, ok := ctx.Value(startedAtKey).(time.Time)
 	return t, ok
 }
 
-func GetItemLatency(ctx context.Context) (time.Duration, bool) {
+func GetItemSystemLatency(ctx context.Context) (time.Duration, bool) {
 	t, ok := ctx.Value(latencyKey).(time.Duration)
+	return t, ok
+}
+
+func GetItemConcurrencyLatency(ctx context.Context) (time.Duration, bool) {
+	t, ok := ctx.Value(sojournKey).(time.Duration)
 	return t, ok
 }
 
@@ -383,6 +393,10 @@ func (q *queue) scan(ctx context.Context) error {
 			q.scope.Counter("scan_no_capacity_total").Inc(1)
 			return nil
 		}
+		// This must happen in series, NOT in a goroutine, so that each worker can correctly
+		// take the available capacity in the worker and peek a correct, stable number of items.
+		//
+		// Without this, sojourn latency tracking is impossible.
 		if err := q.processPartition(ctx, p); err != nil {
 			if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
 				// Another worker grabbed the partition, or the partition was deleted
@@ -415,7 +429,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition) error {
 	// items are dynamic generators).  This means that we have to delay
 	// processing the partition by N seconds, meaning the latency is increased by
 	// up to this period for scheduled items behind the concurrency limits.
-	_, capacity, err := q.PartitionLease(ctx, *p, PartitionLeaseDuration)
+	_, err := q.PartitionLease(ctx, *p, PartitionLeaseDuration)
 	if err == ErrPartitionConcurrencyLimit {
 		for _, l := range q.lifecycles {
 			// Track lifecycles; this function hit a partition limit ahead of
@@ -470,20 +484,11 @@ ProcessLoop:
 			continue
 		}
 
-		// Check the local in-memory counters for partition-level concurrency
-		// limits here.  If we're at max from this local state, we can stop processing items.
-		if capacity == 0 {
-			q.scope.Counter(counterConcurrencyLimit).Inc(1)
-			break
-		}
-
 		// Cbeck if there's capacity from our local workers atomically prior to leasing our tiems.
 		if !q.sem.TryAcquire(1) {
 			q.scope.Counter(counterPartitionProcessNoCapacity).Inc(1)
 			break
 		}
-
-		capacity--
 
 		q.scope.Counter(counterPartitionProcessItems).Inc(1)
 
@@ -496,6 +501,35 @@ ProcessLoop:
 		// This is safe:  only one process runs scan(), and we guard the total number of
 		// available workers with the above semaphore.
 		leaseID, err := q.Lease(ctx, *p, *item, QueueLeaseDuration)
+
+		// Check the sojourn delay for this item in the queue. Tracking system latency vs
+		// sojourn latency from concurrency is important.
+		//
+		// Firstly, we check:  does the job store the first peek time?  If so, the
+		// delta between now and that time is the sojourn latency.  If not, this is either
+		// one of two cases:
+		//   - This is a new job in the queue, and we're peeking it for the first time.
+		//     Sojourn latency is 0.  Easy.
+		//   - We've peeked the queue since adding the job.  At this point, the only
+		//     conclusion is that the job wasn't peeked because of concurrency/capacity
+		//     issues, so the delta between now - job added is sojourn latency.
+		//
+		// NOTE: You might see that we use tracking semaphores and the worker itself has
+		// a maximum capacity.  We must ALWAYS peek the available capacity in our worker
+		// via the above Peek() call so that worker capacity doesn't prevent us from accessing
+		// all jobs in a peek.  This would break sojourn latency:  it only works if we know
+		// we're quitting early because of concurrency issues in a user's function, NOT because
+		// of capacity issues in our system.
+		//
+		// Anyway, here we set the first peek item to the item's start time if there was a
+		// peek since the job was added.
+
+		if p.Last > 0 && p.Last > item.AtMS {
+			// Fudge the earliest peek time because we know this wasn't peeked and so
+			// the peek time wasn't set;  but, as we were still processing jobs after
+			// the job was added this item was concurrency-limited.
+			item.EarliestPeekTime = item.AtMS
+		}
 
 		// NOTE: If this loop ends in an error, we must _always_ release an item from the
 		// semaphore to free capacity.  This will happen automatically when the worker
@@ -511,17 +545,21 @@ ProcessLoop:
 		switch err {
 		case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
 			q.scope.Counter(counterConcurrencyLimit).Inc(1)
-			// Since the queue is at capacity, return the error so that we
-			// don't keep hammering with "does the queue have room?" logic.
+			// Since the queue is at capacity on a fn or account level, no
+			// more jobs in this loop should be worked on - so break.
 			//
-			// We also want to break here;  even if we have capacity for the next
-			// job in the loop we do NOT want to claim the job, as this breaks
-			// ordering guarantees.  The only safe thing to do when we hit a
-			// FUNCTION level concurrency key.
-			processErr = err
+			// Even if we have capacity for the next job in the loop we do NOT
+			// want to claim the job, as this breaks ordering guarantees.  The
+			// only safe thing to do when we hit a function or account level
+			// concurrency key.
+			processErr = nil
 			break ProcessLoop
 		case ErrConcurrencyLimitCustomKey0, ErrConcurrencyLimitCustomKey1:
-			// TODO: In an ideal world we'd denylist each concurrency key that's been
+			// Custom concurrency keys are different.  Each job may have a different key,
+			// so we cannot break the loop in case the next job has a different key and
+			// has capacity.
+			//
+			// In an ideal world we'd denylist each concurrency key that's been
 			// limited here, then ignore any other jobs from being leased as we continue
 			// to iterate through the loop.
 			//
@@ -566,19 +604,18 @@ ProcessLoop:
 		q.workers <- processItem{P: *p, I: *item}
 	}
 
-	if processErr != nil {
-		// The lease for the partition will expire and we will be able to restart
-		// work in the future.
-		if concurrencyLimitReached {
-			for _, l := range q.lifecycles {
-				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
-			}
-
-			// Requeue this partition as we hit concurrency limits.
-			q.scope.Counter(counterConcurrencyLimit).Inc(1)
-			return q.PartitionRequeue(ctx, p.Queue(), time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+	// The lease for the partition will expire and we will be able to restart
+	// work in the future.
+	if concurrencyLimitReached {
+		for _, l := range q.lifecycles {
+			go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
 		}
+		// Requeue this partition as we hit concurrency limits.
+		q.scope.Counter(counterConcurrencyLimit).Inc(1)
+		return q.PartitionRequeue(ctx, p.Queue(), time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+	}
 
+	if processErr != nil {
 		// This wasn't a concurrency error so handle things separately.
 		return processErr
 	}
@@ -676,12 +713,21 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 		}
 
 		n := time.Now()
+
+		// Track the sojourn (concurrency) latency.
+		var sojourn time.Duration
+		if qi.EarliestPeekTime > 0 {
+			sojourn = n.Sub(time.UnixMilli(qi.EarliestPeekTime))
+		}
+		jobCtx = context.WithValue(jobCtx, sojournKey, sojourn)
+
 		// Track the latency on average globally.  Do this in a goroutine so that it doesn't
 		// at all delay the job during concurrenty locking contention.
-		latency := n.Sub(time.UnixMilli(qi.AtMS))
+		latency := n.Sub(time.UnixMilli(qi.AtMS)) - sojourn
+		jobCtx = context.WithValue(jobCtx, latencyKey, latency)
+
 		// store started at and latency in ctx
 		jobCtx = context.WithValue(jobCtx, startedAtKey, n)
-		jobCtx = context.WithValue(jobCtx, latencyKey, latency)
 
 		go func() {
 			// Update the ewma
