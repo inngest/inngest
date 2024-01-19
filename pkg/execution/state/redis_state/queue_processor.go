@@ -393,7 +393,7 @@ func (q *queue) scan(ctx context.Context) error {
 			q.scope.Counter("scan_no_capacity_total").Inc(1)
 			return nil
 		}
-		// This must happe in series, NOT in a goroutine, so that each worker can correctly
+		// This must happen in series, NOT in a goroutine, so that each worker can correctly
 		// take the available capacity in the worker and peek a correct, stable number of items.
 		//
 		// Without this, sojourn latency tracking is impossible.
