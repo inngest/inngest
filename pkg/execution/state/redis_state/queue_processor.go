@@ -545,13 +545,13 @@ ProcessLoop:
 		switch err {
 		case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
 			q.scope.Counter(counterConcurrencyLimit).Inc(1)
-			// Since the queue is at capacity, return the error so that we
-			// don't keep hammering with "does the queue have room?" logic.
+			// Since the queue is at capacity on a fn or account level, no
+			// more jobs in this loop should be worked on - so break.
 			//
-			// We also want to break here;  even if we have capacity for the next
-			// job in the loop we do NOT want to claim the job, as this breaks
-			// ordering guarantees.  The only safe thing to do when we hit a
-			// function or account level concurrency key.
+			// Even if we have capacity for the next job in the loop we do NOT
+			// want to claim the job, as this breaks ordering guarantees.  The
+			// only safe thing to do when we hit a function or account level
+			// concurrency key.
 			processErr = nil
 			break ProcessLoop
 		case ErrConcurrencyLimitCustomKey0, ErrConcurrencyLimitCustomKey1:
