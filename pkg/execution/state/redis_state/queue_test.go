@@ -220,6 +220,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.Equal(t, item.WallTimeMS, start.UnixMilli())
 
 		// Ensure that our data is set up correctly.
 		found := getQueueItem(t, r, item.ID)
@@ -494,6 +495,7 @@ func TestQueuePeek(t *testing.T) {
 			require.Greater(t, items[0].AtMS, ia.AtMS)
 			ia.LeaseID = nil
 			ia.AtMS = items[0].AtMS
+			ia.WallTimeMS = items[0].WallTimeMS
 			require.EqualValues(t, []*QueueItem{&ia, &ib, &ic, &id}, items)
 		})
 	})
@@ -1315,7 +1317,7 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 	})
 }
 
-func TestRequeueByJobID(t *testing.T) {
+func TestQueueRequeueByJobID(t *testing.T) {
 	ctx := context.Background()
 	r := miniredis.RunT(t)
 
@@ -1411,7 +1413,7 @@ func TestRequeueByJobID(t *testing.T) {
 		r.FlushDB()
 
 		jid := "requeue-plz"
-		at := time.Now().Add(time.Second)
+		at := time.Now().Add(time.Second).Truncate(time.Millisecond)
 		item := QueueItem{
 			ID:          jid,
 			WorkflowID:  wsA,
@@ -1419,6 +1421,7 @@ func TestRequeueByJobID(t *testing.T) {
 			AtMS:        at.UnixMilli(),
 		}
 		item, err := q.EnqueueItem(ctx, item, at)
+		require.Equal(t, time.UnixMilli(item.WallTimeMS), at)
 		require.NoError(t, err)
 
 		parts, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
@@ -1435,6 +1438,8 @@ func TestRequeueByJobID(t *testing.T) {
 			require.Equal(t, 1, len(found))
 			require.NotEqual(t, item.AtMS, found[0].AtMS)
 			require.Equal(t, next.UnixMilli(), found[0].AtMS)
+
+			require.Equal(t, time.UnixMilli(found[0].WallTimeMS), next)
 		})
 
 		t.Run("It updates the partition index", func(t *testing.T) {

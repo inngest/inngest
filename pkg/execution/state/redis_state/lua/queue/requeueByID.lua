@@ -51,6 +51,7 @@ redis.call("ZADD", keyQueueIndex, jobScore, jobID)
 
 -- Update the "at" time of the job
 item.at = jobScore
+item.wt = jobScore
 redis.call("HSET", keyQueueHash, jobID, cjson.encode(item))
 
 
