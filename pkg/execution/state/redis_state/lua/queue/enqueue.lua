@@ -21,6 +21,8 @@ local queueScore     = tonumber(ARGV[3]) -- vesting time, in milliseconds
 local workflowID     = ARGV[4] -- $workflowID
 local partitionItem  = ARGV[5] -- {workflow, priority, leasedAt, etc}
 
+-- $include(get_partition_item.lua)
+
 -- Check idempotency exists
 if redis.call("EXISTS", idempotencyKey) ~= 0 then
 	return 1
@@ -53,6 +55,13 @@ local partitionScore = math.floor(queueScore / 1000)
 local currentScore = redis.call("ZSCORE", partitionIndexKey, workflowID)
 if currentScore == false or tonumber(currentScore) > partitionScore then
 	redis.call("ZADD", partitionIndexKey, partitionScore, workflowID)
+
+	-- Get the partition item, so that we can keep the last lease score.
+	local existing = get_partition_item(partitionKey, workflowID)
+	if existing ~= nil then
+		partitionItem.last = existing.last
+	end
+
 	-- Update the partition item too
 	redis.call("HSET", partitionKey, workflowID, partitionItem)
 end
