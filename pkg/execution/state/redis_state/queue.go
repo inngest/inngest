@@ -433,12 +433,23 @@ type QueueItem struct {
 	//
 	// This lets us easily track sojourn latency.
 	EarliestPeekTime int64 `json:"pt"`
-	// At represents the current time that this QueueItem needs to be executed at,
-	// as a millisecond epoch.  This is the millisecond-level granularity score of
-	// the item.  Note that the score in Redis is second-level, ie this field / 1000.
+	// AtMS represents the score for the queue item - usually, the current time
+	// that this QueueItem needs to be executed at, as a millisecond epoch.
+	//
+	// Note that due to priority factors and function FIFO manipulation, if we're
+	// scheduling a job to run at `Now()` AtMS may be a time in the past to bump
+	// the item in the queue.
 	//
 	// This is necessary for rescoring partitions and checking latencies.
 	AtMS int64 `json:"at"`
+
+	// WallTimeMS represents the actual wall time in which the job should run, used to
+	// check latencies.  This is NOT used for scoring or ordering and is for internal
+	// accounting only.
+	//
+	// This is set when enqueueing or requeueing a job.
+	WallTimeMS int64 `json:"wt"`
+
 	// WorkflowID is the workflow ID that this job belongs to.
 	WorkflowID uuid.UUID `json:"wfID"`
 	// WorkspaceID is the workspace that this job belongs to.
@@ -663,6 +674,8 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	if priority < PriorityMax {
 		return i, ErrPriorityTooHigh
 	}
+
+	i.WallTimeMS = at.UnixMilli()
 
 	// Add the At timestamp, if not included.
 	if i.AtMS == 0 {
@@ -1128,7 +1141,11 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 	// Unset any lease ID as this is requeued.
 	i.LeaseID = nil
 	// Update the At timestamp.
+	// NOTE: This does no priority factorization or FIFO for function ordering,
+	// eg. adjusting AtMS based off of function run time.
 	i.AtMS = at.UnixMilli()
+	// Update the wall time that this should run at.
+	i.WallTimeMS = at.UnixMilli()
 
 	qn := i.Queue()
 
