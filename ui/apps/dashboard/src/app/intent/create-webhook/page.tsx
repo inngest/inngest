@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowRightIcon } from '@heroicons/react/20/solid';
 import slugify from '@sindresorhus/slugify';
+import { capitalCase } from 'change-case';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
@@ -22,6 +23,13 @@ const CreateWebhook = graphql(`
   }
 `);
 
+function getNameFromDomain(domain: string | null) {
+  if (!domain) return '';
+  const removeTLD = domain.replace(/\.com|\.io|\.org|\.net|\.co\..{2}|\.dev|\.app|\.ai|\.xyz$/, '');
+  const removeSubdomains = removeTLD.replace(/.*\./, '');
+  return removeSubdomains;
+}
+
 export default function Page() {
   // TODO - handle failure to fetch environments
   const [{ data: environments }] = useEnvironments();
@@ -33,15 +41,16 @@ export default function Page() {
 
   // Params and validation
   const name = params.get('name');
+  const domain = params.get('domain');
   const redirectURI = params.get('redirect_uri');
   useEffect(() => {
-    if (!name) {
-      setError('Malformed URL: Missing name parameter');
+    if (!name && !domain) {
+      setError('Malformed URL: Missing name or domain parameter');
     }
     if (!redirectURI) {
       setError('Malformed URL: Missing redirect_uri parameter');
     }
-  }, [name, redirectURI]);
+  }, [name, domain, redirectURI]);
   const redirectURL: URL | null = useMemo(() => {
     if (!redirectURI) return null;
     try {
@@ -52,14 +61,18 @@ export default function Page() {
     return null;
   }, [redirectURI]);
 
-  const prefix = slugify(name || '');
+  const displayName = capitalCase(
+    name ?? domain !== null ? getNameFromDomain(domain) : 'Webhook integration'
+  );
+
+  const prefix = slugify(displayName);
   const transform = createTransform({
     // Svix webhooks do not have a standard schema, so we use fields that
     // are popular with a fallback
     eventName: `\`${prefix}/\${evt.type || evt.name || evt.event_type || "webhook.received"}\``,
     // Most webhooks have a data field, but not all, so we fallback to the entire event
     dataParam: 'evt.data || evt',
-    commentBlock: `// This was created by the ${name} integration.
+    commentBlock: `// This was created by the ${displayName} integration.
     // Edit this to customize the event name and payload.`,
   });
 
@@ -107,7 +120,7 @@ export default function Page() {
 
   return (
     <ApprovalDialog
-      title={`${name} is requesting permission to create a new webhook URL`}
+      title={`${displayName} is requesting permission to create a new webhook URL`}
       description={
         <>
           <p className="my-6">
@@ -135,7 +148,8 @@ export default function Page() {
       error={error}
       secondaryInfo={
         <>
-          By approving this request, the created webhook URL will be shared with {name}. <br />
+          By approving this request, the created webhook URL will be shared with {displayName}.{' '}
+          <br />
           No other data from your Inngest account will be shared.
         </>
       }
