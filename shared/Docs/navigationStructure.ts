@@ -56,6 +56,7 @@ const sectionGettingStarted = [
         title: "Multi-step Functions",
         href: `/docs/functions/multi-step`,
       },
+      { title: "Inngest Apps", href: `/docs/apps` },
       {
         title: "Local Development",
         href: `/docs/local-development`,
@@ -156,6 +157,10 @@ const sectionPlatform = [
       {
         title: "Working with environments",
         href: `/docs/platform/environments`,
+      },
+      {
+        title: "Working with apps",
+        href: `/docs/apps/cloud`,
       },
       {
         title: "Creating an event key",
