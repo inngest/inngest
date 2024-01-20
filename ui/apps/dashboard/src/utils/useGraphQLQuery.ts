@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   baseFetchSkipped,
   baseFetchSucceeded,
@@ -34,12 +34,21 @@ export function useGraphQLQuery<
   context,
   pollIntervalInMilliseconds,
 }: Args<ResultT, VariablesT>): FetchResult<ResultT> {
+  // Store the result data in a ref because we don't want polling errors to
+  // clear that cached data. If urql has a first-class way of doing this then we
+  // should use that instead.
+  //
+  // Use useRef instead of useState because we don't want to trigger a
+  // re-render.
+  const dataRef = useRef<ResultT | undefined>(undefined);
+
   const [res, executeQuery] = useQuery({
     query,
     variables,
     context,
   });
 
+  // Polling hook
   useEffect(() => {
     if (res.fetching || !pollIntervalInMilliseconds) {
       return;
@@ -52,19 +61,26 @@ export function useGraphQLQuery<
     return () => clearTimeout(timeoutID);
   }, [res.fetching, pollIntervalInMilliseconds, executeQuery]);
 
+  if (res.data) {
+    dataRef.current = res.data;
+  }
+  const data = dataRef.current;
+
+  // Handle both fetching states (initial fetch and refetch)
   if (res.fetching) {
-    if (!res.data) {
+    if (!data) {
       return baseInitialFetchLoading;
     }
 
     return {
       ...baseRefetchLoading,
-      data: res.data,
+      data,
     };
   }
 
+  // Handle both error states (initial fetch and refetch)
   if (res.error) {
-    if (!res.data) {
+    if (!data) {
       return {
         ...baseInitialFetchFailed,
         error: new Error(res.error.message),
@@ -73,12 +89,12 @@ export function useGraphQLQuery<
 
     return {
       ...baseRefetchFailed,
-      data: res.data,
+      data,
       error: new Error(res.error.message),
     };
   }
 
-  if (!res.data) {
+  if (!data) {
     // Should be unreachable.
     return {
       ...baseInitialFetchFailed,
@@ -88,7 +104,7 @@ export function useGraphQLQuery<
 
   return {
     ...baseFetchSucceeded,
-    data: res.data,
+    data,
   };
 }
 

@@ -31,7 +31,7 @@ const query = graphql(`
 
 export function useApps({ envID, isArchived }: { envID: string; isArchived: boolean }) {
   const res = useGraphQLQuery({
-    pollIntervalInMilliseconds: 10_000,
+    pollIntervalInMilliseconds: 2_000,
     query,
     variables: { envID },
   });

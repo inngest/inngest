@@ -22,6 +22,9 @@ export function Apps({ isArchived = false }: Props) {
   if (res.status === 'initial_failed') {
     throw res.error;
   }
+  if (res.status === 'refetch_failed') {
+    console.error(res.error);
+  }
   if (res.status === 'initial_loading') {
     return (
       <div className="mb-4 mt-16 flex items-center justify-center">
