@@ -7,7 +7,7 @@ import { ArrowTopRightOnSquareIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 
 import cn from '@/utils/cn';
-import { WEBSITE_CONTACT_URL, WEBSITE_PRICING_URL } from '@/utils/urls';
+import { WEBSITE_PRICING_URL } from '@/utils/urls';
 import BillingPlanOption, { type ChangePlanArgs } from './BillingPlanOption';
 import CheckoutModal, { type CheckoutItem } from './CheckoutModal';
 import ConfirmPlanChangeModal from './ConfirmPlanChangeModal';

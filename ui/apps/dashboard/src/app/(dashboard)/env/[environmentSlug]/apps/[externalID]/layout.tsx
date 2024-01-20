@@ -4,7 +4,6 @@ import { Squares2X2Icon } from '@heroicons/react/20/solid';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import Header, { type HeaderLink } from '@/components/Header/Header';
-import { Time } from '@/components/Time';
 import { ResyncButton } from './ResyncButton';
 import { useNavData } from './useNavData';
 

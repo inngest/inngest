@@ -11,15 +11,7 @@ type FunctionCardTypes = {
   status: 'success' | 'error' | 'sleep' | 'running' | 'scheduled' | 'paused' | 'waiting';
 };
 
-export default function FunctionCard({
-  name,
-  trigger,
-  time,
-  version,
-  id,
-  status,
-  active = false,
-}: FunctionCardTypes) {
+export default function FunctionCard({ name, time, version, id }: FunctionCardTypes) {
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm">
       <div className="flex flex-col gap-1 bg-white px-5 py-4">

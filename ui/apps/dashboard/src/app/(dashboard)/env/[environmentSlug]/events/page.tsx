@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { type Route } from 'next';
 import { ChartBarIcon, CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';

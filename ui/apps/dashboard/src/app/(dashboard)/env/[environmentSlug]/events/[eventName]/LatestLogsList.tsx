@@ -8,7 +8,6 @@ import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environm
 import { Pill } from '@/components/Pill/Pill';
 import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
-import { defaultTime, relativeTime } from '@/utils/date';
 
 const GetLatestEventLogs = graphql(`
   query GetLatestEventLogs($name: String, $environmentID: ID!) {

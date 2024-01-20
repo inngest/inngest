@@ -17,10 +17,6 @@ import LoadingIcon from '@/icons/LoadingIcon';
 import cn from '@/utils/cn';
 import { minuteTime } from '@/utils/date';
 
-type NestedKeyOf<T> = {
-  [Values in keyof T]: T[Values];
-};
-
 type BarChartProps = {
   className?: string;
   height?: number;

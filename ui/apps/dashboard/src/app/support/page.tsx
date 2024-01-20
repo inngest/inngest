@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { type Route } from 'next';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
-import { ArrowLeftIcon, CheckIcon } from '@heroicons/react/20/solid';
+import { ArrowLeftIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { ThreadStatus, type ThreadPartsFragment } from '@team-plain/typescript-sdk';
 import { useQuery } from 'urql';
@@ -17,7 +17,7 @@ import cn from '@/utils/cn';
 import { isEnterprisePlan } from '../(dashboard)/settings/billing/utils';
 import { SupportForm } from './SupportForm';
 import { useSystemStatus } from './statusPage';
-import { getLabelTitleByTypeId, type TicketType } from './ticketOptions';
+import { type TicketType } from './ticketOptions';
 
 const GetAccountSupportInfoDocument = graphql(`
   query GetAccountSupportInfo {

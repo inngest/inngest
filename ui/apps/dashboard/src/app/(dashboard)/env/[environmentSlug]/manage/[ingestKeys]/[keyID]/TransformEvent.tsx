@@ -71,7 +71,7 @@ const defaultOutput = `{
   }
 }`;
 
-export default function TransformEvents({ keyID, metadata, keyName }: FilterEventsProps) {
+export default function TransformEvents({ keyID, metadata }: FilterEventsProps) {
   let rawTransform: string | undefined = undefined;
   if (typeof metadata?.transform === 'string') {
     rawTransform = metadata.transform;
