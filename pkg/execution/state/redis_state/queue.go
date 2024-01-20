@@ -675,7 +675,14 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		return i, ErrPriorityTooHigh
 	}
 
-	i.WallTimeMS = at.UnixMilli()
+	if i.WallTimeMS == 0 {
+		i.WallTimeMS = at.UnixMilli()
+	}
+
+	if at.Before(time.Now()) {
+		// Normalize to now to minimize latency.
+		i.WallTimeMS = time.Now().UnixMilli()
+	}
 
 	// Add the At timestamp, if not included.
 	if i.AtMS == 0 {

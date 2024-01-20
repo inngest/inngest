@@ -144,7 +144,8 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		Data:        item,
 		// Only use the queue name if provided by queueKindMapping.
 		// Otherwise, this defaults to WorkflowID.
-		QueueName: queueName,
+		QueueName:  queueName,
+		WallTimeMS: at.UnixMilli(),
 	}
 
 	span.SetAttributes(

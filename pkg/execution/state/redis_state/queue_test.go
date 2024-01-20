@@ -220,7 +220,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.ULID{})
-		require.Equal(t, item.WallTimeMS, start.UnixMilli())
+		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
 
 		// Ensure that our data is set up correctly.
 		found := getQueueItem(t, r, item.ID)
