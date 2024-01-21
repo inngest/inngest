@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { type Route } from 'next';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
-import { Link as InngestLink, defaultLinkStyles } from '@inngest/components/Link';
+import { Code } from '@inngest/components/Code';
+import { Link } from '@inngest/components/Link';
 import { useLocalStorage } from 'react-use';
 import { toast } from 'sonner';
 
@@ -59,27 +59,27 @@ export default function ManualSync({ appsURL }: Props) {
     <>
       <div className="border-b border-slate-200 p-8">
         <p>
-          Inngest allows you to host your app code on any platform then invokes your functions via
-          HTTP. To deploy functions to Inngest, all you need to do is tell Inngest where to find
-          them!
+          To integrate your code hosted on another platform with Inngest, you need to inform Inngest
+          about the location of your app and functions.
         </p>
         <br />
         <p>
-          Since your code is hosted on another platform, you need to register where your functions
-          are hosted with Inngest. For example, if you set up the serve handler (
+          For example, imagine that your <Code>serve()</Code> handler (
           <Link
-            className={defaultLinkStyles}
+            showIcon={false}
             href="https://www.inngest.com/docs/reference/serve#how-the-serve-api-handler-works"
           >
             see docs
           </Link>
-          ) at /api/inngest, and your domain is https://myapp.com, you&apos;ll need to inform
-          Inngest that your app is hosted at https://myapp.com/api/inngest.
+          ) is located at /api/inngest, and your domain is myapp.com. In this scenario, you&apos;ll
+          need to inform Inngest that your apps and functions are hosted at
+          https://myapp.com/api/inngest.
         </p>
         <br />
         <p>
-          After you&apos;ve set up the serve API and deployed your application, enter the URL of
-          your application&apos;s serve endpoint to register your functions with Inngest.
+          After you&apos;ve set up the serve API and deployed your code, enter the URL of your
+          project&apos;s serve endpoint to sync your app with Inngest. Verify that you assigned the
+          signing key below to the right <Code>INNGEST_SIGNING_KEY</Code> environment variable:
         </p>
         <DeploySigningKey className="py-6" />
         <div className="border-t border-slate-200">
@@ -100,8 +100,7 @@ export default function ManualSync({ appsURL }: Props) {
         </div>
       </div>
       <div className="flex items-center justify-between px-8 py-6">
-        {/* To do:  create apps docs and link them here */}
-        <InngestLink href="https://www.inngest.com/docs/">View Docs</InngestLink>
+        <Link href="https://www.inngest.com/docs/apps/cloud">View Docs</Link>
         <div className="flex items-center gap-3">
           <Button
             label="Cancel"
