@@ -85,10 +85,9 @@ export default function Page() {
               Inngest deploys have been renamed to “<b>Syncs</b>”. All of your syncs can be found
               within your apps.{' '}
             </p>
-            {/* To do: wire this to the docs */}
-            {/* <Link internalNavigation={false} href="">
-            Learn More
-          </Link> */}
+            <Link internalNavigation={false} href="https://www.inngest.com/docs/apps">
+              Learn More
+            </Link>
           </Banner>
         )}
 
