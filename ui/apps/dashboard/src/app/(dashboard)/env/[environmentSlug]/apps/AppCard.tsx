@@ -127,7 +127,8 @@ export function EmptyAppCard({ children }: { children: React.ReactNode }) {
       </div>
       <div className="flex flex-1 flex-col justify-center px-8">
         <p>
-          Apps on Inngest act as clients for serving your functions.{' '}
+          When you serve your functions using our serve API handler, you are hosting a new Inngest
+          app.{' '}
           <span className="hidden lg:inline">
             In order to have your functions invoked by Inngest, you must sync your app.
           </span>{' '}
@@ -136,7 +137,7 @@ export function EmptyAppCard({ children }: { children: React.ReactNode }) {
         <ol className="mt-3 hidden flex-col gap-3 md:flex">
           <li className="flex items-center gap-2">
             <span className="h-6 w-6 rounded-full bg-slate-400 text-center text-white">1</span>
-            <span className="flex-1">Deploy your app on your host environment of choice.</span>
+            <span className="flex-1">Deploy your code to your hosted platform of choice.</span>
           </li>
           <li className="flex items-center gap-2">
             <span className="h-6 w-6 rounded-full bg-slate-400 text-center text-white">2</span>

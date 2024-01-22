@@ -27,7 +27,11 @@ export function Link({
     return (
       <NextLink
         href={href}
-        className={classNames(className, 'group flex items-center gap-1', defaultLinkStyles)}
+        className={classNames(
+          className,
+          showIcon && 'group flex items-center gap-1',
+          defaultLinkStyles
+        )}
       >
         {children}
         {showIcon && (
@@ -38,7 +42,11 @@ export function Link({
   } else if (typeof href === 'string') {
     return (
       <a
-        className={classNames(className, 'group flex items-center gap-1', defaultLinkStyles)}
+        className={classNames(
+          className,
+          showIcon && 'group flex items-center gap-1',
+          defaultLinkStyles
+        )}
         target="_blank"
         rel="noopener noreferrer"
         href={href}
