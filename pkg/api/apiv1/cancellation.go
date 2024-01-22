@@ -33,10 +33,10 @@ type CreateCancellationBody struct {
 	// AppID is the client ID specified via the SDK in the app that defines the function.
 	AppID string `json:"app_id"`
 	// FunctionID is the function ID string specified in configuration via the SDK.
-	FunctionID string     `json:"function_id"`
-	From       *time.Time `json:"from"`
-	To         time.Time  `json:"to"`
-	If         *string    `json:"if,omitempty"`
+	FunctionID    string     `json:"function_id"`
+	StartedAfter  *time.Time `json:"started_after"`
+	StartedBefore time.Time  `json:"started_before"`
+	If            *string    `json:"if,omitempty"`
 }
 
 func (a api) CreateCancellation(w http.ResponseWriter, r *http.Request) {
@@ -66,12 +66,12 @@ func (a api) CreateCancellation(w http.ResponseWriter, r *http.Request) {
 
 	// Create a new cancellation for the given function ID
 	cancel := cqrs.Cancellation{
-		ID:          ulid.MustNew(ulid.Now(), rand.Reader),
-		WorkspaceID: auth.WorkspaceID(),
-		FunctionID:  fn.ID,
-		From:        opts.From,
-		To:          opts.To,
-		If:          opts.If,
+		ID:            ulid.MustNew(ulid.Now(), rand.Reader),
+		WorkspaceID:   auth.WorkspaceID(),
+		FunctionID:    fn.ID,
+		StartedAfter:  opts.StartedAfter,
+		StartedBefore: opts.StartedBefore,
+		If:            opts.If,
 	}
 	if err := a.opts.CancellationReadWriter.CreateCancellation(ctx, cancel); err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Error creating function"))

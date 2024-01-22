@@ -56,7 +56,7 @@ func (c checker) IsCancelled(ctx context.Context, wsID, fnID uuid.UUID, runID ul
 	for _, i := range all {
 		cancel := i
 
-		if cancel.To.Before(at) || (cancel.From != nil && cancel.From.After(at)) {
+		if at.After(cancel.StartedBefore) || (cancel.StartedAfter != nil && at.Before(*cancel.StartedAfter)) {
 			// The loader may have messed up times, so verify that the cancellation includes this
 			// run ID as within bounds.
 			continue

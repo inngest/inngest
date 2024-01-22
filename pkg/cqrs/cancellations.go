@@ -31,12 +31,16 @@ type CancellationWriter interface {
 
 // Cancellation represents a cancellation of many function runs during the time specified.
 type Cancellation struct {
-	ID          ulid.ULID  `json:"id"`
-	WorkspaceID uuid.UUID  `json:"environment_id"`
-	FunctionID  uuid.UUID  `json:"function_id"`
-	From        *time.Time `json:"from"`
-	To          time.Time  `json:"to"`
-	If          *string    `json:"if,omitempty"`
+	ID          ulid.ULID `json:"id"`
+	WorkspaceID uuid.UUID `json:"environment_id"`
+	AppID       string    `json:"app_id"`
+	// FunctionID represents the function's internal ID.
+	FunctionID uuid.UUID `json:"function_internal_id"`
+	// FunctionSlug represents the function's external ID as defined in the SDK.
+	FunctionSlug  string     `json:"function_id"`
+	StartedAfter  *time.Time `json:"started_after"`
+	StartedBefore time.Time  `json:"started_before"`
+	If            *string    `json:"if,omitempty"`
 	// XXX (tonyhb): We can eventually add a  "kind" field: an enum allowing
 	// you to cancel only the backlog of unstarted functions or every function.
 }

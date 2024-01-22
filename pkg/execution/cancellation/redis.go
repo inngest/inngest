@@ -100,12 +100,12 @@ func (r redisReadWriter) ReadAt(ctx context.Context, wsID uuid.UUID, fnID uuid.U
 		// XXX: Right now there's only one version of a cancellation stored in
 		// the state store, so we don't need to handle found.Version differently.
 		c := found.Cancellation
-		if c.To.Before(at) {
+		if at.After(c.StartedBefore) {
 			// This cancellation is only for functions prior to the given point
 			// in time, so ignore.
 			continue
 		}
-		if c.From != nil && c.From.After(at) {
+		if c.StartedAfter != nil && at.Before(*c.StartedAfter) {
 			continue
 		}
 		result = append(result, c)
