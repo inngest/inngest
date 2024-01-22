@@ -78,11 +78,10 @@ export default function LaunchWeek() {
         />
         <RowItem
           title="Bulk cancellation"
-          subtitle="Cancel functions using the REST API"
-          // TODO update image and buttonHref
-          image="/assets/blog/durable-workflow-engines.png"
+          subtitle="Cancel functions within a time range with the API"
+          image="/assets/blog/bulk-cancellation-api/featured-image.png"
           label="New"
-          buttonHref="#"
+          buttonHref="/blog/bulk-cancellation-api"
           docsHref="/docs/guides/cancel-running-functions"
           orientation="right"
         />
@@ -323,7 +322,7 @@ function RowItem({
       <div
         className={clsx(
           "flex",
-          orientation === "right" ? "md:order-2" : "text-right"
+          orientation === "right" ? "md:order-2" : "justify-end"
         )}
       >
         <a href={`${buttonHref}?ref=launch-week`}>
