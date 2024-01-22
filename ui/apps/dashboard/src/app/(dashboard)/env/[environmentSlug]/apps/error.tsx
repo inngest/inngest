@@ -19,11 +19,7 @@ export default function Page({ error, reset }: Props) {
       <div className="w-[600px] rounded border border-slate-300 p-4">
         <h2>Something went wrong!</h2>
 
-        <div className="my-6 overflow-scroll rounded bg-slate-200 p-2">
-          <pre>
-            <code>{error.message}</code>
-          </pre>
-        </div>
+        <div className="my-6 overflow-scroll rounded bg-slate-200 p-2">{error.message}</div>
 
         <Button
           btnAction={
