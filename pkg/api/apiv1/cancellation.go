@@ -69,6 +69,7 @@ func (a api) CreateCancellation(w http.ResponseWriter, r *http.Request) {
 		ID:            ulid.MustNew(ulid.Now(), rand.Reader),
 		WorkspaceID:   auth.WorkspaceID(),
 		FunctionID:    fn.ID,
+		FunctionSlug:  fn.Slug,
 		StartedAfter:  opts.StartedAfter,
 		StartedBefore: opts.StartedBefore,
 		If:            opts.If,

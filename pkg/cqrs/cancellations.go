@@ -33,7 +33,6 @@ type CancellationWriter interface {
 type Cancellation struct {
 	ID          ulid.ULID `json:"id"`
 	WorkspaceID uuid.UUID `json:"environment_id"`
-	AppID       string    `json:"app_id"`
 	// FunctionID represents the function's internal ID.
 	FunctionID uuid.UUID `json:"function_internal_id"`
 	// FunctionSlug represents the function's external ID as defined in the SDK.
