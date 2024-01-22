@@ -47,7 +47,7 @@ const scheduleReminder = inngest.createFunction(
 Let's break down how this works:
 
 1. Whenever the function is triggered, a cancelation listener is created which waits for an `"tasks/reminder.deleted"` event to be received.
-2. The `match` statement tells Inngest that both the triggering event (`"tasks/reminder.created"`) and the cancelation event (`"tasks/reminder.deleted"`) both have the same exact value for `data.reminderId` in each event payload. This makes sure that an event does not cancel a different reminder.
+2. The `match` statement tells Inngest that both the triggering event (`"tasks/reminder.created"`) and the cancelation event (`"tasks/reminder.deleted"`) have the same exact value for `data.reminderId` in each event payload. This makes sure that an event does not cancel a different reminder.
 
 Here is an example of these two events which will be matched on the `data.reminderId` field:
 
