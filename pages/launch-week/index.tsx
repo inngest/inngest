@@ -68,11 +68,11 @@ export default function LaunchWeek() {
           3. Building the Inngest queue pt 1
         */}
         <RowItem
-          title="Announcing Replay"
+          title="Inngest Replay"
           subtitle="The death of the dead-letter queue"
           image="/assets/blog/announcing-replay/featured-image.png"
           label="New"
-          buttonHref="/blog/accouning-replay-the-death-of-the-dead-letter-queue"
+          buttonHref="/blog/announcing-replay-the-death-of-the-dead-letter-queue"
           docsHref="/docs/platform/replay"
           orientation="left"
         />
