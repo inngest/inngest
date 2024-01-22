@@ -86,8 +86,8 @@ export default function LaunchWeek() {
           orientation="right"
         />
         <RowItem
-          title="Building the Inngest queue"
-          subtitle="Part I: Fairness and multi-tenancy"
+          title="How we built a fair multi-tenant queuing system"
+          subtitle="Building the Inngest queue - Part I"
           image="/assets/blog/inngest-queue-pt-i/featured-image.png"
           label="Technical post"
           buttonHref="/blog/building-the-inngest-queue-pt-i-fairness-multi-tenancy"
@@ -355,7 +355,12 @@ function RowItem({
           {label}
         </span>
         <div className="mt-4 mb-8">
-          <h3 className="mb-2 text-xl md:text-[32px] leading-snug font-extrabold">
+          <h3
+            className={clsx(
+              "mb-2 text-xl leading-snug font-extrabold",
+              title.length > 30 ? "md:text-2xl" : "md:text-[32px]"
+            )}
+          >
             {title}
           </h3>
           <p className="text-base md:text-lg">{subtitle}</p>
