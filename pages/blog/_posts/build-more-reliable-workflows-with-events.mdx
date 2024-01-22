@@ -39,7 +39,7 @@ Our goals were to enable developers to write complex jobs combining multiple ste
 
 We don't think writing step functions or workflows as a large JSON configuration is a great developer experience. Also, using a online GUI to design these isn't always ideal as the logic or [DAG](https://en.wikipedia.org/wiki/Directed_acyclic_graph) may be edited or managed outside of the actual code's version control.
 
-We also believe it should be simple to run, from local development, to production where code can be [deployed to any number of platforms](/docs/deploy?ref=blog-build-more-reliable-workflows-with-events).
+We also believe it should be simple to run, from local development, to production where code can be [deployed to any number of platforms](/docs/apps/cloud?ref=blog-build-more-reliable-workflows-with-events).
 
 Let's take a use case to demonstrate our approach. A product is a CRM tool that enables a user to upload a large CSV file with contacts information. The API triggers this to run with the event `api/contact_list.uploaded`. This advanced CRM tool validates the upload then uses third party APIs to enrich the data with information about the contact's business then waits for the user to review and filter this list down before inserting all data into the the CRM database. When the user approve or rejects and selects filers, the API will send another event: `api/contact_list.reviewed`. Here's what the code could look like:
 
