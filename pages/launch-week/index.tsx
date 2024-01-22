@@ -88,7 +88,7 @@ export default function LaunchWeek() {
         <RowItem
           title="How we built a fair multi-tenant queuing system"
           subtitle="Building the Inngest queue - Part I"
-          image="/assets/blog/inngest-queue-pt-i/featured-image.png"
+          image="/assets/blog/inngest-queue-pt-i/featured-image-v2.png"
           label="Technical post"
           buttonHref="/blog/building-the-inngest-queue-pt-i-fairness-multi-tenancy"
           orientation="left"
