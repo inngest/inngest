@@ -68,54 +68,22 @@ export default function LaunchWeek() {
           3. Building the Inngest queue pt 1
         */}
         <RowItem
-          title="..."
-          subtitle="Something is coming soon"
-          image="/assets/launch-week/placeholder-image.png"
-          label="New"
-          buttonHref="#"
-          docsHref=""
-          orientation="left"
-          blur={true}
-        />
-        <RowItem
-          title="..."
-          subtitle="Something is coming soon"
-          image="/assets/launch-week/placeholder-image.png"
-          label="New"
-          buttonHref="#"
-          docsHref=""
-          orientation="right"
-          blur={true}
-        />
-        <RowItem
-          title="..."
-          subtitle="Something is coming soon"
-          image="/assets/launch-week/placeholder-image.png"
-          label="New"
-          buttonHref="#"
-          docsHref=""
-          orientation="left"
-          blur={true}
-        />
-        {/* <RowItem
           title="Announcing Replay"
           subtitle="The death of the dead-letter queue"
-          image="/assets/blog/durable-workflow-engines.png"
+          image="/assets/blog/announcing-replay/featured-image.png"
           label="New"
-          buttonHref="#"
+          buttonHref="/blog/accouning-replay-the-death-of-the-dead-letter-queue"
           docsHref="/docs/platform/replay"
           orientation="left"
-          blur={true}
         />
         <RowItem
-          title="Cancellation features"
-          subtitle="The death of the dead-letter queue"
+          title="Bulk cancellation"
+          subtitle="Cancel functions using the REST API"
           image="/assets/blog/durable-workflow-engines.png"
           label="New"
           buttonHref="#"
           docsHref="/docs/platform/replay"
           orientation="right"
-          blur={true}
         />
         <RowItem
           title="Building the Inngest queue - Part I"
@@ -125,8 +93,7 @@ export default function LaunchWeek() {
           buttonHref="#"
           docsHref="/docs/platform/replay"
           orientation="left"
-          blur={true}
-        /> */}
+        />
 
         <Heading title="Tuesday" />
         {/*
@@ -359,17 +326,19 @@ function RowItem({
           orientation === "right" ? "md:order-2" : "text-right"
         )}
       >
-        <Image
-          src={image}
-          height={220}
-          width={440}
-          quality={95}
-          alt={`Blog featured image for ${title}`}
-          className={clsx(
-            "max-w-[440px] w-full shadow-2xl	rounded-lg",
-            orientation === "right" && "md:order-2"
-          )}
-        />
+        <a href={`${buttonHref}?ref=launch-week`}>
+          <Image
+            src={image}
+            height={220}
+            width={440}
+            quality={95}
+            alt={`Blog featured image for ${title}`}
+            className={clsx(
+              "max-w-[440px] w-full shadow-2xl	rounded-lg",
+              orientation === "right" && "md:order-2"
+            )}
+          />
+        </a>
       </div>
       <div
         className={clsx(
@@ -394,7 +363,7 @@ function RowItem({
         </div>
         <div className="flex flex-row gap-x-10 gap-y-4 items-center flex-wrap">
           <a
-            href={buttonHref}
+            href={`${buttonHref}?ref=launch-week`}
             className="px-3 py-2 text-slate-950 font-medium rounded-md shadow-sm bg-gradient-to-r from-[#5EEAD4] to-[#FDE68A] transition-all hover:from-[#B0F4E9] hover:to-[#FBEDB7]"
           >
             Read blog post

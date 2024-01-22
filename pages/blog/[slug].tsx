@@ -145,6 +145,11 @@ export default function BlogLayout(props) {
                 <h1 className="text-white font-medium text-2xl md:text-4xl xl:text-5xl mb-2 md:mb-4 tracking-tighter lg:leading-loose">
                   {scope.heading}
                 </h1>
+                {scope.showSubtitle && (
+                  <p className="text-slate-200 text-lg font-bold mb-6 flex gap-1 items-center">
+                    {scope.subtitle}
+                  </p>
+                )}
                 <p className="text-slate-300 text-sm mt-2 flex items-center gap-2">
                   {!!scope.author ? <>{scope.author} &middot; </> : ""}
                   <span className="flex items-center gap-1">
