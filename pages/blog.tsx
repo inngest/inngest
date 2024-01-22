@@ -17,6 +17,7 @@ import {
   loadMarkdownFilesMetadata,
   type MDXFileMetadata,
 } from "../utils/markdown";
+import { LaunchWeekBanner } from "./index";
 
 export default function BlogLayout(props) {
   const router = useRouter();
@@ -50,6 +51,9 @@ export default function BlogLayout(props) {
 
       <div className="font-sans">
         <Header />
+
+        <LaunchWeekBanner urlRef="blog-feed-banner" />
+
         <Container className="pt-8">
           <div className="flex flex-col lg:flex-row gap-2 lg:gap-4 items-start lg:items-center">
             <h2 className="font-bold text-base text-white lg:border-r border-slate-600/50 pr-4">

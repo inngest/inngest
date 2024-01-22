@@ -21,6 +21,7 @@ import Blockquote from "src/shared/Blog/Blockquote";
 import rehypeCodeTitles from "rehype-code-titles";
 import YouTube from "react-youtube-embed";
 import remarkGfm from "remark-gfm";
+import { LaunchWeekBanner } from "../index";
 
 const components = {
   DiscordCTA,
@@ -120,6 +121,7 @@ export default function BlogLayout(props) {
 
       <div className="font-sans">
         <Header />
+        <LaunchWeekBanner urlRef="blog-post-banner" />
         <Container>
           <article>
             <main className="m-auto max-w-3xl pt-16">
