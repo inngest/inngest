@@ -31,9 +31,9 @@ func (a api) GetCancellations(w http.ResponseWriter, r *http.Request) {
 
 type CreateCancellationBody struct {
 	// AppID is the client ID specified via the SDK in the app that defines the function.
-	AppID string `json:"appID"`
+	AppID string `json:"app_id"`
 	// FunctionID is the function ID string specified in configuration via the SDK.
-	FunctionID string     `json:"functionID"`
+	FunctionID string     `json:"function_id"`
 	From       *time.Time `json:"from"`
 	To         time.Time  `json:"to"`
 	If         *string    `json:"if,omitempty"`
