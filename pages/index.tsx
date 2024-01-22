@@ -51,8 +51,10 @@ export default function Home() {
       <PageBanner href="/launch-week?ref=homepage-banner" className="mt-px">
         <RocketLaunchIcon className="inline-flex h-7 sm:h-5 mr-1" />
         <span className="shrink">
-          Join Us for Launch Week!{" "}
-          <span className="font-normal inline-flex">Starts January 22nd</span>
+          It's Launch Week!{" "}
+          <span className="font-normal inline-flex">
+            New features and enhancements shipped daily.
+          </span>
         </span>
       </PageBanner>
 
