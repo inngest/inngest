@@ -1,5 +1,5 @@
 import { graphql } from '@/gql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useGraphQLQuery_TEMPORARY } from '@/utils/useGraphQLQuery';
 
 const query = graphql(`
   query Apps($envID: ID!) {
@@ -30,7 +30,7 @@ const query = graphql(`
 `);
 
 export function useApps({ envID, isArchived }: { envID: string; isArchived: boolean }) {
-  const res = useGraphQLQuery({
+  const res = useGraphQLQuery_TEMPORARY({
     pollIntervalInMilliseconds: 2_000,
     query,
     variables: { envID },

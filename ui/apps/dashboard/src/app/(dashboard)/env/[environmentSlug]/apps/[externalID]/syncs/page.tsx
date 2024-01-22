@@ -18,10 +18,10 @@ export default function Page({ params }: Props) {
   const [selectedSyncID, setSelectedSyncID] = useSearchParam('sync-id');
 
   const syncsRes = useSyncs({ envID: env.id, externalAppID });
-  if (syncsRes.status === 'initial_failed') {
+  if (syncsRes.error) {
     throw syncsRes.error;
   }
-  if (syncsRes.status === 'initial_loading') {
+  if (syncsRes.isLoading) {
     return (
       <div className="flex h-full min-h-0">
         <SyncList onClick={setSelectedSyncID} loading />

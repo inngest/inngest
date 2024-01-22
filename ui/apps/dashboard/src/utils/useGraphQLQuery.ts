@@ -34,6 +34,75 @@ export function useGraphQLQuery<
   context,
   pollIntervalInMilliseconds,
 }: Args<ResultT, VariablesT>): FetchResult<ResultT> {
+  const [res, executeQuery] = useQuery({
+    query,
+    variables,
+    context,
+  });
+
+  useEffect(() => {
+    if (res.fetching || !pollIntervalInMilliseconds) {
+      return;
+    }
+
+    const timeoutID = setTimeout(
+      () => executeQuery({ requestPolicy: 'network-only' }),
+      pollIntervalInMilliseconds
+    );
+    return () => clearTimeout(timeoutID);
+  }, [res.fetching, pollIntervalInMilliseconds, executeQuery]);
+
+  if (res.fetching) {
+    if (!res.data) {
+      return baseInitialFetchLoading;
+    }
+
+    return {
+      ...baseRefetchLoading,
+      data: res.data,
+    };
+  }
+
+  if (res.error) {
+    if (!res.data) {
+      return {
+        ...baseInitialFetchFailed,
+        error: new Error(res.error.message),
+      };
+    }
+
+    return {
+      ...baseRefetchFailed,
+      data: res.data,
+      error: new Error(res.error.message),
+    };
+  }
+
+  if (!res.data) {
+    // Should be unreachable.
+    return {
+      ...baseInitialFetchFailed,
+      error: new Error('finished loading but missing data'),
+    };
+  }
+
+  return {
+    ...baseFetchSucceeded,
+    data: res.data,
+  };
+}
+
+// TODO: Move this function's logic into useGraphQLQuery once we're confident in
+// it
+export function useGraphQLQuery_TEMPORARY<
+  ResultT extends { [key in string]: unknown },
+  VariablesT extends { [key in string]: unknown }
+>({
+  query,
+  variables,
+  context,
+  pollIntervalInMilliseconds,
+}: Args<ResultT, VariablesT>): FetchResult<ResultT> {
   // Store the result data in a ref because we don't want polling errors to
   // clear that cached data. If urql has a first-class way of doing this then we
   // should use that instead.
@@ -64,7 +133,8 @@ export function useGraphQLQuery<
   if (res.data) {
     dataRef.current = res.data;
   }
-  const data = dataRef.current;
+  const data = res.data ?? dataRef.current;
+  console.log(res);
 
   // Handle both fetching states (initial fetch and refetch)
   if (res.fetching) {
