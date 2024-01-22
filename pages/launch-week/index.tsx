@@ -30,7 +30,7 @@ export default function LaunchWeek() {
       <Header />
       <Container className="py-8">
         <div className="my-12 tracking-tight flex items-center justify-center">
-          <div className="py-12 md:py-24 rounded-md">
+          <div className="py-8 md:py-16 rounded-md">
             <div className="flex justify-center">
               <Logo fill={"#ffffff"} width={260} />
             </div>
