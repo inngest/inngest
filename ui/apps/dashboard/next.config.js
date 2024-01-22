@@ -19,7 +19,7 @@ const nextConfig = {
     return [
       {
         source: '/',
-        destination: '/env/production/functions',
+        destination: '/env/production/apps',
         permanent: true,
       },
       {
