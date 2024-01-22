@@ -9,6 +9,7 @@ export type Role = {
   title: string;
   location: string;
   date: string;
+  applicationURL: string;
 };
 type RoleMetadata = Role & MDXFileMetadata;
 

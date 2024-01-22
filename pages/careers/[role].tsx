@@ -111,15 +111,18 @@ export default function Careers(props) {
 
                 <h2>How to apply</h2>
                 <p>
-                  To apply, send an email to{" "}
-                  <a href="mailto:careers@inngest.com">careers@inngest.com</a>.
-                  Please include:
+                  To apply,{" "}
+                  <a href={role.metadata.applicationURL}>
+                    complete this application
+                  </a>
+                  . Please include:
                 </p>
                 <ul>
                   <li>Your resume</li>
                   <li>Why you'd like to join our team</li>
                   <li>
-                    Links to your: Github, Linkedin, Twitter (if applicable)
+                    Links to your: Github, Linkedin, Twitter, design portfolio,
+                    etc. (if applicable)
                   </li>
                   <li>
                     If applicable (i.e. for DevRel), provide samples of your

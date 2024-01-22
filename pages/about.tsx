@@ -1,4 +1,5 @@
 import classNames from "src/utils/classNames";
+import clsx from "clsx";
 
 import Header from "src/shared/Header";
 import Container from "src/shared/layout/Container";
@@ -41,6 +42,16 @@ const TEAM = [
     name: "Darwin Wu",
     role: "Engineer",
     avatar: "/assets/team/darwin-w-2023-06-26.jpg",
+  },
+  {
+    name: "John Bucta",
+    role: "Designer",
+    avatar: "/assets/team/john-b-2024-01-21.jpg",
+  },
+  {
+    name: "Sylwia Vargas",
+    role: "Dev Rel",
+    avatar: "/assets/team/sylwia-v-2024-01-21.jpg",
   },
 ];
 
@@ -162,8 +173,8 @@ export default function About() {
         <Container className="m-auto">
           <div className="mx-auto max-w-4xl">
             <header className="lg:my-24 mt-8 text-center">
-              <h1 className="mt-2 mb-6 pr-4 text-2xl md:text-5xl tracking-tighter font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#E2BEFF] via-white to-[#AFC1FF] drop-shadow">
-                Ship More Reliable Workflows. Faster.
+              <h1 className="mt-2 mb-6 pr-4 text-2xl md:text-5xl tracking-tighter font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#f2e3ff] via-white to-[#e3e9ff] drop-shadow">
+                About Inngest
               </h1>
               <p className="mt-8 mx-auto max-w-lg text-lg font-regular">
                 Inngest is the developer platform for easily building reliable
@@ -205,7 +216,13 @@ export default function About() {
               We've built and scaled systems for years and think that developers
               deserve something better.
             </p>
-            <div className="mt-20 mb-6 grid md:px-24 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-10 gap-y-16 items-center">
+            <div
+              className={clsx(
+                "mt-20 mb-6 grid md:px-24 grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-16 items-center",
+                TEAM.length % 3 === 0 && "xl:grid-cols-3",
+                TEAM.length % 2 === 0 && "xl:grid-cols-4"
+              )}
+            >
               {TEAM.map((person) => {
                 return (
                   <div key={person.name} className="flex flex-col items-center">
