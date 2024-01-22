@@ -146,7 +146,6 @@ const sectionPlatform = [
         title: "Working with apps",
         href: `/docs/apps/cloud`,
       },
-      { title: "How to Deploy", href: `/docs/deploy` },
       { title: "Deploy: Vercel", href: `/docs/deploy/vercel` },
       { title: "Deploy: Netlify", href: `/docs/deploy/netlify` },
       {

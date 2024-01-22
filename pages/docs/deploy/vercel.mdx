@@ -57,11 +57,11 @@ Installing [Inngest's official Vercel integration](https://vercel.com/integratio
 
 1. Automatically sets the required [`INNGEST_SIGNING_KEY`](/docs/sdk/environment-variables#inngest-signing-key) environment variable to securely communicate with Inngest's API
 2. Automatically sets the [`INNGEST_EVENT_KEY`](/docs/sdk/environment-variables#inngest-event-key) environment variable to enable your application to send events ([docs](/docs/events/creating-an-event-key))
-3. Automatically deploys new functions to Inngest every time you deploy updated code to Vercel - no need to change your existing workflow!
+3. Automatically syncs your app to Inngest every time you deploy updated code to Vercel - no need to change your existing workflow!
 
 <ButtonDeploy href="https://vercel.com/integrations/inngest" type="vercel" label="Install the Inngest Vercel integration" />
 
-To enable communication between Inngest and your app, you need to either [disable Deployment Protection](https://vercel.com/docs/security/deployment-protection#configuring-deployment-protection)
+To enable communication between Inngest and your code, you need to either [disable Deployment Protection](https://vercel.com/docs/security/deployment-protection#configuring-deployment-protection)
 or, if you're on Vercel's Pro plan, configure protection bypass:
 
 ## Bypassing Deployment Protection
@@ -84,7 +84,7 @@ To enable this, you will need to leverage Vercel's "[Protection Bypass for Autom
 2. Copy your secret
 3. Goto [the Vercel integration settings page in the Inngest dashboard](https://app.inngest.com/settings/integrations/vercel)
 4. For each project that you would like to enable this for, append the secret as a query string parameter to your Inngest serve route. e.g. `/api/inngest?x-vercel-protection-bypass=XYZ...` (see below). Inngest will now use this parameter to communicate with your application to bypass the deployment protection.
-5. Trigger a re-deploy of your preview environment(s) (this re-deploys the functions to Inngest)
+5. Trigger a re-deploy of your preview environment(s) (this resyncs your app to Inngest)
 
 <img
   src="/assets/docs/deploy/vercel-protection-bypass.png"
@@ -101,6 +101,6 @@ To enable this, you will need to leverage Vercel's "[Protection Bypass for Autom
 
 ---
 
-### Manually registering functions
+### Manually syncing apps
 
-While we strongly recommend our Vercel integration, you can still use Inngest by manually telling Inngest that you've deployed updated functions. You can register your app [via the Inngest UI](/docs/deploy#registering-via-the-ui) or [via our API with a curl request](/docs/deploy#registering-via-the-api).
+While we strongly recommend our Vercel integration, you can still use Inngest by manually telling Inngest that you've deployed updated functions. You can sync your app [via the Inngest UI](/docs/apps/cloud#sync-a-new-app-in-inngest-cloud) or [via our API with a curl request](/docs/apps/cloud#curl-command).
