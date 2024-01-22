@@ -32,8 +32,8 @@ type CancellationWriter interface {
 // Cancellation represents a cancellation of many function runs during the time specified.
 type Cancellation struct {
 	ID          ulid.ULID  `json:"id"`
-	WorkspaceID uuid.UUID  `json:"workspaceID"`
-	FunctionID  uuid.UUID  `json:"functionID"`
+	WorkspaceID uuid.UUID  `json:"environment_id"`
+	FunctionID  uuid.UUID  `json:"function_id"`
 	From        *time.Time `json:"from"`
 	To          time.Time  `json:"to"`
 	If          *string    `json:"if,omitempty"`
