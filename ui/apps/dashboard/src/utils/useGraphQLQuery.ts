@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   baseFetchFailed,
   baseFetchLoading,
@@ -7,6 +8,8 @@ import {
   type FetchResult,
 } from '@inngest/components/types/fetch';
 import { useQuery, type TypedDocumentNode, type UseQueryArgs } from 'urql';
+
+import { skipCacheSearchParam } from './urls';
 
 type Args<
   ResultT extends { [key in string]: unknown },
@@ -32,9 +35,13 @@ export function useGraphQLQuery<
   context,
   pollIntervalInMilliseconds,
 }: Args<ResultT, VariablesT>): FetchResult<ResultT> {
+  const searchParams = useSearchParams();
+  const skipCache = searchParams.get(skipCacheSearchParam.name) === skipCacheSearchParam.value;
+
   const [res, executeQuery] = useQuery({
     query,
     variables,
+    requestPolicy: skipCache ? 'network-only' : undefined,
     context,
   });
 

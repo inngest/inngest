@@ -1,3 +1,5 @@
+'use client';
+
 import { useMemo, useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
@@ -8,6 +10,7 @@ import { useLocalStorage } from 'react-use';
 import { toast } from 'sonner';
 
 import Input from '@/components/Forms/Input';
+import { setSkipCacheSearchParam } from '@/utils/urls';
 import { DeployFailure } from '../../deploys/DeployFailure';
 import DeploySigningKey from '../../deploys/DeploySigningKey';
 import { deployViaUrl, type RegistrationFailure } from '../../deploys/utils';
