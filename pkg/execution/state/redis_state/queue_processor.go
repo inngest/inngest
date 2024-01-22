@@ -144,7 +144,8 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		Data:        item,
 		// Only use the queue name if provided by queueKindMapping.
 		// Otherwise, this defaults to WorkflowID.
-		QueueName: queueName,
+		QueueName:  queueName,
+		WallTimeMS: at.UnixMilli(),
 	}
 
 	span.SetAttributes(
@@ -723,7 +724,10 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 
 		// Track the latency on average globally.  Do this in a goroutine so that it doesn't
 		// at all delay the job during concurrenty locking contention.
-		latency := n.Sub(time.UnixMilli(qi.AtMS)) - sojourn
+		if qi.WallTimeMS == 0 {
+			qi.WallTimeMS = qi.AtMS // backcompat while WallTimeMS isn't valid.
+		}
+		latency := n.Sub(time.UnixMilli(qi.WallTimeMS)) - sojourn
 		jobCtx = context.WithValue(jobCtx, latencyKey, latency)
 
 		// store started at and latency in ctx

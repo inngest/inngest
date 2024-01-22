@@ -168,9 +168,10 @@ type ScheduleRequest struct {
 // CancelRequest stores information about the incoming cancellation request within
 // history.
 type CancelRequest struct {
-	EventID    *ulid.ULID
-	Expression *string
-	UserID     *uuid.UUID
+	EventID        *ulid.ULID
+	Expression     *string
+	UserID         *uuid.UUID
+	CancellationID *ulid.ULID
 }
 
 type ResumeRequest struct {

@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/cancellation"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -77,6 +78,13 @@ func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 
 // ExecutorOpt modifies the built in executor on creation.
 type ExecutorOpt func(m execution.Executor) error
+
+func WithCancellationChecker(c cancellation.Checker) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).cancellationChecker = c
+		return nil
+	}
+}
 
 // WithStateManager sets which state manager to use when creating an executor.
 func WithStateManager(sm state.Manager) ExecutorOpt {
@@ -208,6 +216,7 @@ type executor struct {
 	finishHandler         execution.FinishHandler
 	invokeNotFoundHandler execution.InvokeNotFoundHandler
 	handleSendingEvent    execution.HandleSendingEvent
+	cancellationChecker   cancellation.Checker
 
 	lifecycles []execution.LifecycleListener
 
@@ -257,6 +266,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, ErrFunctionDebounced
 	}
 
+	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
+	// When running a cancellation, functions are cancelled at scheduling time based off of
+	// this run ID.
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	var key string
 	if req.IdempotencyKey != nil {
@@ -509,10 +521,39 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, state.ErrFunctionOverflowed
 	}
 
+	// Check if the function is cancelled.
+	if e.cancellationChecker != nil {
+		cancel, err := e.cancellationChecker.IsCancelled(
+			ctx,
+			md.Identifier.WorkspaceID,
+			md.Identifier.WorkflowID,
+			md.Identifier.RunID,
+			s.Event(),
+		)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error(
+				"error checking cancellation",
+				"error", err.Error(),
+				"run_id", md.Identifier.RunID,
+				"function_id", md.Identifier.WorkflowID,
+				"workspace_id", md.Identifier.WorkspaceID,
+			)
+		}
+		if cancel != nil {
+			return nil, e.Cancel(ctx, md.Identifier.RunID, execution.CancelRequest{
+				CancellationID: &cancel.ID,
+			})
+		}
+	}
+
 	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
 	// that child;  we don't need to handle the trigger individually.
 	//
 	// This cuts down on queue churn.
+	//
+	// NOTE: This is a holdover from treating functions as a *series* of DAG calls.  In that case,
+	// we automatically enqueue all children of the dag from the root node.
+	// This can be cleaned up.
 	if edge.Incoming == inngest.TriggerName {
 		f, err := e.fl.LoadFunction(ctx, id)
 		if err != nil {
