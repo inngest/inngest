@@ -96,7 +96,7 @@ Match expressions can be simple equalities or be more complex. Read [our guide t
       <Property name="if" type="string">
         An expression on which to conditionally match the original event trigger (`event`) and the wait event (`async`). Cannot be combined with `match`.**
 
-        Expressions are defined using the Common Expression Language (CEL) with the events accessible using dot-notation. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info. Examples:
+        Expressions are defined using the Common Expression Language (CEL) with the events accessible using dot-notation. Read our [guide to writing expressions](/docs/guides/writing-expressions) for more info. Examples:
 
         * `event.data.userId == async.data.userId && async.data.billing_plan == 'pro'`
       </Property>
