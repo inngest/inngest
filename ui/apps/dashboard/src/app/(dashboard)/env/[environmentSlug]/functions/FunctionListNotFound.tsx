@@ -111,7 +111,11 @@ export default function FunctionListNotFound() {
               <Button
                 appearance="outlined"
                 target="_blank"
-                href={'https://www.inngest.com/docs/deploy?ref=app-onboarding-functions' as Route}
+                href={
+                  isAppsEnabled
+                    ? 'https://www.inngest.com/docs/apps?ref=app-onboarding-functions'
+                    : ('https://www.inngest.com/docs/deploy?ref=app-onboarding-functions' as Route)
+                }
                 label="Read The Docs"
               />
             </div>
