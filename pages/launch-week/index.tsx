@@ -79,10 +79,11 @@ export default function LaunchWeek() {
         <RowItem
           title="Bulk cancellation"
           subtitle="Cancel functions using the REST API"
+          // TODO update image and buttonHref
           image="/assets/blog/durable-workflow-engines.png"
           label="New"
           buttonHref="#"
-          docsHref="/docs/platform/replay"
+          docsHref="/docs/guides/cancel-running-functions"
           orientation="right"
         />
         <RowItem
@@ -90,7 +91,7 @@ export default function LaunchWeek() {
           subtitle="Part I: Fairness and multi-tenancy"
           image="/assets/blog/inngest-queue-pt-i/featured-image.png"
           label="Technical post"
-          buttonHref="/blog/building-the-inngest-queue-pt-i-faireness-multi-tenancy"
+          buttonHref="/blog/building-the-inngest-queue-pt-i-fairness-multi-tenancy"
           orientation="left"
         />
 
