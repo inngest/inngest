@@ -49,7 +49,6 @@ export default function Layout({ children, params: { externalID } }: Props) {
   let action;
   if (res.data.latestSync?.url) {
     const canResync = res.data.latestSync.platform !== 'vercel';
-    console.log(res.data.latestSync.platform);
     if (canResync) {
       action = <ResyncButton latestSyncUrl={res.data.latestSync.url} />;
     }

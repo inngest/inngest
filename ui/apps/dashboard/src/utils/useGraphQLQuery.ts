@@ -134,7 +134,6 @@ export function useGraphQLQuery_TEMPORARY<
     dataRef.current = res.data;
   }
   const data = res.data ?? dataRef.current;
-  console.log(res);
 
   // Handle both fetching states (initial fetch and refetch)
   if (res.fetching) {
