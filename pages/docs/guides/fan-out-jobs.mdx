@@ -1,139 +1,104 @@
-# Fan-out jobs
+export const description = 'How to use the fan-out pattern with Inngest to trigger multiple functions from a single event.'
 
-Sometimes you might need to trigger new functions from existing functions, for example when you're developing a complex workflow or performing work for more than one object (eg. a group of users, products, orders).  You can achieve this via fan-out, which:
+# Fan-out (one-to-many)
 
-- Allows functions to call other functions, which run in parallel
-- Makes your workflows more reliable, as each function has its own retries and will fail individually on permanent errors
-- Provides insight and tracing, allowing you to see the relationships between functions
+The fan-out pattern enables you to send a single event and trigger multiple functions in parallel (one-to-many). The key benefits of this approach are:
 
-## How to fan-out and trigger new functions
+* **Reliability**: Logic from each function runs independently, meaning an issue with one function will not affect the other(s).
+* **Performance**: As functions area run in parallel, all of the work will execute faster than running in sequence.
 
-In order to trigger new functions you can send an event from any of your existing functions:
+<img
+  src="/assets/docs/guides/fan-out-diagram.png"
+  width="800"
+  height={224}
+  quality="95"
+  className="rounded-md"
+  alt="A diagram showing how to fan-out to multiple functions"
+/>
 
-<CodeGroup>
-```ts {{ title: "v3" }}
-import { GetEvents, Inngest } from "inngest";
+A use case for fan-out is, for example, when a user signs up for your product. In this scenario, you may want to:
+1. Send a welcome email
+2. Start a trial in Stripe
+3. Add the user to your CRM
+4. Add the user's email to your mailing list
 
-const inngest = new Inngest({ id: "signup-flow" });
-type Events = GetEvents<typeof inngest>;
+{/* TODO - Link to future distributed systems guide*/}
+The fan-out pattern is also useful in distributed systems where a single event is consumed by functions running in different applications.
 
-export const loadCron = inngest.createFunction(
-  { id: "weekly-activity-load-users" },
-  { cron: "0 12 * * 5" },
-  async ({ event, step }) => {
-    // Fetch all users
-    const users = await step.run("fetch-users", async () => {
-      return fetchUsers();
-    });
+## How to fan-out to multiple functions
 
-    // For each user, send us an event.  Inngest supports batches of events
-    // as long as the entire payload is less than 512KB.
-    const events = users.map<Events["app/weekly-email-activity.send"]>(
-      (user) => {
-        return {
-          name: "app/weekly-email-activity.send",
-          data: {
-            ...user,
-          },
-          user,
-        };
-      }
-    );
+Since Inngest is powered by events, implementing fan-out is as straightforward as defining multiple functions that use the same event trigger. Let's take the above example of user signup and implement it in Inngest.
 
-    // Send all events to Inngest, which triggers any functions listening to
-    // the given event names.
-    await step.sendEvent("fan-out-weekly-emails", events);
+First, set up a `/signup` route handler to send an event to Inngest when a user signs up:
 
-    // Return the number of users triggered.
-    return { count: users.length };
-  }
-);
+```ts {{ filename: "app/routes/signup/route.ts" }}
+import { inngest } from '../inngest/client';
 
-const sendReminder = inngest.createFunction(
-  { id: "weekly-activity-send-email" },
-  { event: "app/weekly-email-activity.send" },
-  async ({ event, step }) => {
-    const data = await step.run("load-user-data", async () => {
-      return loadUserData(event.data.user.id);
-    });
+export async function POST(request: Request) {
+  // NOTE - this code is simplified for the of the example:
+  const { email, password } = await request.json();
+  const user = await createUser({ email, password });
+  await createSession(user.id);
 
-    await step.run("email-user", async () => {
-      return sendEmail(event.data.user, data);
-    });
-  }
-);
+  // Send an event to Inngest
+  await inngest.send({
+    name: 'app/user.signup',
+    data: {
+      user: {
+        id: user.id,
+        email: user.email,
+      },
+    },
+  });
+
+  redirect('https://myapp.com/dashboard');
+}
 ```
-```ts {{ title: "v2" }}
-import { Inngest } from "inngest";
 
-const inngest = new Inngest({ name: "Signup flow" });
+Now, with this event, any function using `"app/user.signup"` as its event trigger will be automatically invoked.
 
-export const loadCron = inngest.createFunction(
-  { name: "Weekly activity: load users" },
-  { cron: "0 12 * * 5" },
+Next, define two functions: `sendWelcomeEmail` and `startStripeTrial`. As you can see below, both functions use the same event trigger, but perform different work.
+
+```ts {{ filename: "inngest/functions.ts" }}
+const sendWelcomeEmail = inngest.createFunction(
+  { id: 'send-welcome-email' },
+  { event: 'app/user.signup' },
   async ({ event, step }) => {
-    // Fetch all users
-    const users = await step.run("Fetch users", async () => {
-      return fetchUsers();
-    });
-
-    // For each user, send us an event.  Inngest supports batches of events
-    // as long as the entire payload is less than 512KB.
-    const events = users.map((user) => {
-      return {
-        name: "app/weekly-email-activity.send",
-        data: {
-          ...user,
-        },
-        user,
-      };
-    });
-
-    // Send all events to Inngest, which triggers any functions listening to
-    // the given event names.
-    await step.sendEvent(events);
-
-    // Return the number of users triggered.
-    return { count: users.length };
-  }
-);
-
-const sendReminder = inngest.createFunction(
-  { name: "Weekly activity: send email" },
-  { event: "app/weekly-email-activity.send" },
-  async ({ event, step }) => {
-    const data = await step.run("Load user data", async () => {
-      return loadUserData(event.data.user.id);
-    });
-
-    await step.run("Email user", async () => {
-      sendEmail(event.data.user, data);
+    await step.run('send-email', async () => {
+      await sendEmail({ email: event.data.user.email, template: 'welcome');
     });
   }
-);
+)
+
+const startStripeTrial = inngest.createFunction(
+  { id: 'start-stripe-trial' },
+  { event: 'app/user.signup' },
+  async ({ event }) => {
+    const customer = await step.run('create-customer', async () => {
+      return await stripe.customers.create({ email: event.data.user.email });
+    });
+    await step.run('create-subscription', async () => {
+      return await stripe.subscriptions.create({
+        customer: customer.id,
+        items: [{ price: 'price_1MowQULkdIwHu7ixraBm864M' }],
+        trial_period_days: 14,
+      });
+    });
+  }
+)
 ```
-</CodeGroup>
 
-In the above example, we fetch all users within a single step.  This step will retry on error.  Once that’s complete (via `await`), we create an *array of events* which are sent to Inngest via [`step.sendEvent()`](/docs/reference/functions/step-send-event).  Each of these events trigger new functions for specific users.
+You've now successfully implemented fan-out in our application. Each function will run independently and in parallel. If one function fails, the others will not be disrupted.
 
-### Why `step.sendEvent()` vs `inngest.send()`?
+Other benefits of fan-out include:
 
-By using [`step.sendEvent()`](/docs/reference/functions/step-send-event) Inngest's SDK can automatically add context and tracing which ties events to the current function run. If you use [`inngest.send()`](/docs/reference/events/send) the context around the function run is not present.
+* **Bulk Replay**: If a third-party API goes down for a period of time (for example, your email provider), you can use [Replay](/docs/platform/replay) to selectively re-run all functions that failed, without having to re-run all sign-up flow functions.
+* **Testing**: Each function can be tested in isolation, without having to run the entire sign-up flow.
+* **New features or refactors**: As each function is independent, you can add new functions or refactor existing ones without having to edit unrelated code.
+* **Trigger functions in different codebases**: If you have multiple codebases, even using different programming languages (for example [Python](/docs/reference/python) or [Go](https://pkg.go.dev/github.com/inngest/inngestgo)), you can trigger functions in both codebases from a single event.
 
-## Fan-out vs running steps in parallel
+## Further reading
 
-Another technique similar to fan-out is step parallelism ([read the guide here](/docs/guides/step-parallelism)):  when you run steps in parallel within the same function.  Here are the key differences:
-
-- Both patterns run jobs in parallel
-- You can access the output of steps ran in parallel within your function, whereas with fan-out you cannot
-- Parallelism has a limit of 1,000 steps, though you can trigger as many functions as you'd like using fan-out
-- You can replay events via fan-out, eg. to test functions locally
-- You can retry individual functions easily if they permanently fail, whereas if a step permanently fails (after retrying) the function itself will fail and terminate.
-
-## Fan-out vs invoking
-
-A related pattern is invoking external functions directly instead of just triggering them with an event. See the [Invoking functions directly](/docs/guides/invoking-functions-directly) guide. Here are some key differences:
-
-- Fan-out will trigger multiple functions simultaneously, whereas invocation will only trigger one
-- Unlike invocation, fan-out will not receive the result of the invoked function
-- Choose fan-out for parallel processing of independent tasks and invocation for coordinated, interdependent functions
+* [Sending events](/docs/events)
+* [Invoking functions from within functions](/docs/guides/invoking-functions-directly)
+* [Sending events from functions](/docs/guides/sending-events-from-functions)

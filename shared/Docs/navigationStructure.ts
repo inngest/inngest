@@ -80,12 +80,16 @@ const sectionGuides = [
         href: `/docs/guides/step-parallelism`,
       },
       {
-        title: "Fan-out jobs",
+        title: "Fan-out (one-to-many)",
         href: `/docs/guides/fan-out-jobs`,
       },
       {
         title: "Invoking functions directly",
         href: `/docs/guides/invoking-functions-directly`,
+      },
+      {
+        title: "Sending events from functions",
+        href: `/docs/guides/sending-events-from-functions`,
       },
       {
         title: "Batching events",
