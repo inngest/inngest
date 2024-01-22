@@ -109,6 +109,10 @@ const sectionGuides = [
         href: `/docs/guides/handling-idempotency`,
       },
       {
+        title: "Cancel running functions",
+        href: `/docs/guides/cancel-running-functions`,
+      },
+      {
         title: "Logging",
         href: `/docs/guides/logging`,
       },

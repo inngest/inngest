@@ -139,6 +139,13 @@ The `createFunction` method accepts a series of arguments to define your functio
       <Property name="match" type="string">
         The property to match the event trigger and the cancelling event, using dot-notation, for example, `data.userId`. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info.
       </Property>
+      <Property name="if" type="string">
+        An expression on which to conditionally match the original event trigger (`event`) and the wait event (`async`). Cannot be combined with `match`.**
+
+        Expressions are defined using the Common Expression Language (CEL) with the events accessible using dot-notation. Read [our guide to writing expressions](/docs/guides/writing-expressions) for more info. Examples:
+
+        * `event.data.userId == async.data.userId && async.data.billing_plan == 'pro'`
+      </Property>
       <Property name="timeout" type="string">
         The amount of time to wait to receive the cancelling event. A time string compatible with the [ms](https://npm.im/ms) package, e.g. `"30m"`, `"3 hours"`, or `"2.5d"`
       </Property>

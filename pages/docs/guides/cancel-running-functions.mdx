@@ -1,0 +1,100 @@
+export const description = 'Learn how to cancel long running functions with events, our API, or from the Inngest dashboard.'
+
+# Cancel running functions
+
+{/* TODO - Link the sleeps and waits to guides when we move those from references to guides */}
+With Inngest, your functions may be running or paused for long periods of time. You may have function with hundreds of steps, or you may be using [`step.sleep`](/docs/reference/functions/step-sleep), [`step.sleepUntil`](/docs/reference/functions/step-sleep-until), or [`step.waitForEvent`](/docs/reference/functions/step-wait-for-event). Sometimes, things happen in your system that makes it no longer necessary to complete running the function.
+
+{/* In this guide, you'll learn how to cancel running functions in one of three ways:
+
+- [Cancel with events](#cancel-with-events)
+- [Cancel in the Inngest dashboard](#cancel-in-the-inngest-dashboard)
+- [Cancel via the REST API](#cancel-via-the-rest-api)
+*/}
+
+## Cancel with events
+
+As you have learned that you can trigger functions to run using events, you can also cancel active functions by sending and event.
+
+For our example, we'll take a reminder app where a user can schedule to be reminded of something in the future at whatever time they want. The user can also delete the reminder if they change their mind and don't want to receive the reminder anymore.
+
+Delaying code to run for days or weeks is easy with `step.sleepUntil`, but we need a way to be able to stop the function if the user deletes the reminder while our function is "sleeping."
+
+When defining a function, you can also specify the `cancelOn` option which allows you to list one or more events that, when sent to Inngest, will cause the sleep to be terminated and function will be marked as "Canceled."
+
+Here is our schedule reminders function that leverages `cancelOn`:
+
+```ts {{ title: "inngest/syncContacts.ts" }}
+const scheduleReminder = inngest.createFunction(
+  {
+    id: "schedule-reminder",
+    cancelOn: [{
+      event: "tasks/reminder.deleted", // The event name that cancels this function
+      match: "data.reminderId", // The field that must match in both events received
+    }],
+  }
+  { event: "tasks/reminder.created" },
+  async ({ event, step }) => {
+    await step.sleepUntil('sleep-until-remind-at-time', event.data.remindAt);
+    await step.run('send-reminder-push', async ({}) => {
+      await pushNotificationService.push(event.data.userId, event.data.reminderBody)
+    })
+  }
+  // ...
+);
+```
+
+Let's break down how this works:
+
+1. Whenever the function is triggered, a cancelation listener is created which waits for an `"tasks/reminder.deleted"` event to be received.
+2. The `match` statement tells Inngest that both the triggering event (`"tasks/reminder.created"`) and the cancelation event (`"tasks/reminder.deleted"`) both have the same exact value for `data.reminderId` in each event payload. This makes sure that an event does not cancel a different reminder.
+
+Here is an example of these two events which will be matched on the `data.reminderId` field:
+
+<Row>
+  <Col>
+
+```json
+{
+  "name": "tasks/reminder.created",
+  "data": {
+    "userId": "user_123",
+    "reminderId": "reminder_0987654321",
+    "reminderBody": "Pick up Jane from the airport"
+  }
+}
+```
+
+  </Col>
+  <Col>
+
+```json
+{
+  "name": "tasks/reminder.deleted",
+  "data": {
+    "userId": "user_123",
+    "reminderId": "reminder_0987654321",
+  }
+}
+```
+
+  </Col>
+</Row>
+
+
+### Tips
+
+* You can also optionally specify a `timeout` to only enable cancelation for a period of time
+* You can configure multiple events to cancel a function, up to five.
+* You can write a more complex matching statement using the `if` field
+
+[Learn more in the full reference here](/docs/functions/cancellation).
+
+
+{/* TODO
+## Cancel in the Inngest dashboard
+*/}
+
+{/* TODO
+## Cancel via the REST API
+*/}
