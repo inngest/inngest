@@ -119,62 +119,6 @@ All data sent in the `user` object is fully encrypted at rest.
 
 In the future, this object will be used to support programmatic deletion via API endpoint to support certain right-to-be-forgotten flows in your system. This will use the `user.external_id` property for lookup.
 
-## Send Events via HTTP (Event API)
-
-You can send events from any system or programming language with our simple API and an Inngest Event Key. The API accepts a single event payload or an array of event payloads.
-
-To send an event to a specific [branch environment](/docs/platform/environments#branch-environments), set the `x-inngest-env` header to the name of your branch environment, e.g. `x-inngest-env: feature/my-branch`.
-
-<CodeGroup tag="POST" label="inn.gs/e/:eventKey">
-
-```bash {{ title: 'cURL' }}
-curl https://inn.gs/e/$INNGEST_EVENT_KEY \
-  --data '{
-    "name": "user.signup",
-    "data": {
-      "userId": "645ea8289ad09eac29230442"
-    }
-  }'
-```
-
-```php
-$url = "https://inn.gs/e/{$eventKey}";
-$content = json_encode([
-    "name" => "user.signup",
-    "data" => [
-      "userId" => "645ea8289ad09eac29230442",
-    ],
-]);
-
-$curl = curl_init($url);
-curl_setopt($curl, CURLOPT_HEADER, false);
-curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($curl, CURLOPT_HTTPHEADER, ["Content-type: application/json"]);
-curl_setopt($curl, CURLOPT_POST, true);
-curl_setopt($curl, CURLOPT_POSTFIELDS, $content);
-
-$json_response = curl_exec($curl);
-$status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-if ($status != 200) {
-    return [
-        'status' => $status,
-        'message' => "Error: call to URL $url failed with status $status, response $json_response, curl_error " . curl_error($curl) . ", curl_errno " . curl_errno($curl),
-    ];
-}
-
-curl_close($curl);
-$response = json_decode($json_response, true);
-```
-
-</CodeGroup>
-
-```json {{ title: 'Response' }}
-{
-  "ids": ["01H08W4TMBNKMEWFD0TYC532GG"],
-  "status": 200
-}
-```
-
 ## Usage limits
 
 See [usage limits][usage-limits] for more details.
