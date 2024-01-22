@@ -140,8 +140,12 @@ const sectionGuides = [
 
 const sectionPlatform = [
   {
-    title: "Deploying",
+    title: "Going to production",
     links: [
+      {
+        title: "Working with apps",
+        href: `/docs/apps/cloud`,
+      },
       { title: "How to Deploy", href: `/docs/deploy` },
       { title: "Deploy: Vercel", href: `/docs/deploy/vercel` },
       { title: "Deploy: Netlify", href: `/docs/deploy/netlify` },
@@ -157,10 +161,6 @@ const sectionPlatform = [
       {
         title: "Working with environments",
         href: `/docs/platform/environments`,
-      },
-      {
-        title: "Working with apps",
-        href: `/docs/apps/cloud`,
       },
       {
         title: "Creating an event key",

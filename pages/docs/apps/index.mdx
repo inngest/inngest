@@ -66,7 +66,15 @@ In the image below, you can see the apps page in Inngest Dev Server. For more in
 
 To integrate your code hosted on another platform with Inngest, you need to inform Inngest about the location of your app and functions. 
 
-For example, imagine that your `serve()` handler is located at `/api/inngest`, and your domain is `myapp.com`. In this scenario, you will need to inform Inngest that your apps and functions are hosted at `https://myapp.com/api/inngest`.
+For example, imagine that your `serve()` handler is located at `/api/inngest`, and your domain is `myapp.com`. In this scenario, you will need to sync your app to inform Inngest that your apps and functions are hosted at `https://myapp.com/api/inngest`.
+
+To ensure that your functions are up-to-date, you need to resync your app with Inngest whenever you deploy new function configurations to your hosted platform.
+
+<Callout>
+
+Inngest uses the [`INNGEST_SIGNING_KEY`](/docs/sdk/environment-variables#inngest-signing-key?ref=deploy) to securely communicate with your application and identify the correct environment to register your functions.
+
+</Callout>
 
 ## Next Steps
 To continue your exploration, feel free to check out:

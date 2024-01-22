@@ -1,7 +1,7 @@
-export const description ="Learn how to sync Inngest Apps after a deploy"
+export const description ="Learn how to sync Inngest Apps"
 
 # Working with Apps
-After deploying your code to your hosted platform, it is time to go to production and inform Inngest about your apps and functions. 
+After deploying your code to your hosted platform, it is time to go to production and inform Inngest about your apps and functions. Check what are [Inngest Apps](/docs/apps) if you haven't done it yet.
 
 ## Sync a new app in Inngest Cloud
 
@@ -12,7 +12,7 @@ You can synchronize your app with Inngest using three methods:
 
 ### Manually
 
-1. Navigate to the Apps page in Inngest Cloud. You’ll find a button named “Sync App” or “Sync New App”, depending on whether you already have synced apps or not.
+1. Select your environment (e.g. "Production") in Inngest Cloud and navigate to the Apps page. You’ll find a button named “Sync App” or “Sync New App”, depending on whether you already have synced apps or not.
 
 <img
   src="/assets/docs/apps/apps-cloud-empty-sync-button.png"
@@ -59,9 +59,17 @@ Send a PUT request to your application's serve endpoint using the following comm
 curl -X PUT https://<your-app>.com/api/inngest
 ```
 
+<Callout>
+
+You'll need to ensure that the latest version of your code is live on your platform before syncing with Inngest. Some platforms have rolling deploys that take seconds or minutes until the latest version of your code is live.
+
+This is especially important when setting up your own automated process.
+
+</Callout>
+
 ## How and when to resync an app
 
-To ensure that your functions are up-to-date, you need to resync your app with Inngest whenever you deploy new code to your hosted platform.
+To ensure that your functions are up-to-date, you need to resync your app with Inngest whenever you deploy new function configurations to your hosted platform.
 
 <Callout>
 If you are syncing your app through an integration, this process is seamlessly handled for you automatically.
