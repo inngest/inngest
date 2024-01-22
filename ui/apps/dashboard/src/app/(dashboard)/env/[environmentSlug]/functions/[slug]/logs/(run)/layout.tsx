@@ -7,6 +7,7 @@ import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { graphql } from '@/gql';
+import { pathCreator } from '@/utils/urls';
 
 type RunLayoutProps = {
   children: React.ReactNode;
@@ -51,7 +52,14 @@ export default function RunLayout({ children, params }: RunLayoutProps) {
   return (
     <SlideOver
       size={hasCron ? 'small' : 'large'}
-      onClose={() => router.push(`/env/${environment.slug}/functions/${params.slug}/logs` as Route)}
+      onClose={() =>
+        router.push(
+          pathCreator.functionRuns({
+            envSlug: environment.slug,
+            functionSlug: params.slug,
+          })
+        )
+      }
     >
       {children}
     </SlideOver>

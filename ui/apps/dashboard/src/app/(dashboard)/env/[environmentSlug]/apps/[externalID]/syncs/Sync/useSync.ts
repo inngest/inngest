@@ -15,9 +15,10 @@ const query = graphql(`
       commitHash
       commitMessage
       commitRef
-      createdAt
+      error
       framework
       id
+      lastSyncedAt
       platform
       repoURL
       sdkLanguage
@@ -59,7 +60,7 @@ export function useSync({
   if (res.data) {
     const sync = {
       ...res.data.sync,
-      createdAt: new Date(res.data.sync.createdAt),
+      lastSyncedAt: new Date(res.data.sync.lastSyncedAt),
     };
 
     return {

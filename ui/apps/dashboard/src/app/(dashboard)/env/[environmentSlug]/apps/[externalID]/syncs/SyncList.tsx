@@ -23,8 +23,8 @@ type LoadingProps = {
 };
 
 type Sync = {
-  createdAt: Date;
   id: string;
+  lastSyncedAt: Date;
   status: string;
   syncedFunctions: unknown[];
 };
@@ -49,7 +49,7 @@ export function SyncList({
         </div>
       )}
       {!loading && (
-        <ul className="table w-full border-collapse">
+        <ul className="w-full">
           {syncs.map((sync) => {
             let bgColor = 'bg-white';
             if (sync.id === selectedSyncID) {
@@ -59,19 +59,21 @@ export function SyncList({
             return (
               <li
                 className={classNames(
-                  'table-row cursor-pointer border border-r-0 border-slate-300 text-slate-800 hover:bg-slate-100',
+                  'flex cursor-pointer items-center justify-between border-b border-slate-300 text-slate-800 hover:bg-slate-100',
                   bgColor
                 )}
                 key={sync.id}
                 onClick={() => onClick(sync.id)}
               >
-                <div className="table-cell p-4 align-middle">
-                  <SyncStatus status={sync.status} />
+                <div className="flex items-center">
+                  <div className="w-36 p-4 align-middle">
+                    <SyncStatus status={sync.status} />
+                  </div>
+                  <div className="p-4 pl-0 align-middle">
+                    <Time value={sync.lastSyncedAt} />
+                  </div>
                 </div>
-                <div className="table-cell p-4 pl-0 pr-16 align-middle">
-                  <Time value={sync.createdAt} />
-                </div>
-                <div className="table-cell whitespace-nowrap p-4 pl-0 align-middle">
+                <div className="whitespace-nowrap p-4 pl-0 align-middle">
                   {sync.syncedFunctions.length} functions
                 </div>
               </li>

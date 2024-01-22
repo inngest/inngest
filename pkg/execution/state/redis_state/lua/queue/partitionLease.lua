@@ -1,8 +1,7 @@
 --[[
 
 Output:
- +1-N: Successfully leased item, with remaining partition capacity left
-    0: Success, no concurrency limits
+    0: Success
    -1: No capacity left, not leased
    -2: Partition item not found
    -3: Partition item already leased
@@ -44,16 +43,21 @@ if concurrency > 0 and #partitionConcurrencyKey > 0 then
 		-- There's no capacity available.  Increase the score for this partition so that
 		-- it's not immediately re-scanned.
 		redis.call("ZADD", partitionIndexKey, leaseTime, partitionID)
+
+		-- Update that we attempted to lease this partition, even if there was no capacity.
+		existing.last = currentTime -- in ms.
+		redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
+
 		return -1
 	end
 end
 
 existing.leaseID = leaseID
 existing.at = leaseTime
-existing.last = now_seconds
+existing.last = currentTime -- in ms.
 
 -- Update item and index score
 redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
 redis.call("ZADD", partitionIndexKey, leaseTime, partitionID) -- partition scored are in seconds.
 
-return capacity
+return 0

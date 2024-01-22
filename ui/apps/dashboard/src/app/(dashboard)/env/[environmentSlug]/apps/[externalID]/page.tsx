@@ -3,6 +3,7 @@
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
+import { SyncErrorCard } from '@/components/SyncErrorCard';
 import { FunctionList } from './FunctionList';
 import { useApp } from './useApp';
 
@@ -24,7 +25,7 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
   if (appRes.error) {
     throw appRes.error;
   }
-  if (appRes.isLoading) {
+  if (appRes.isLoading && !appRes.data) {
     return (
       <div className="h-full overflow-y-auto">
         <div className="mx-auto w-full max-w-[1200px] py-4">
@@ -37,6 +38,10 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto h-full w-full max-w-[1200px] py-4">
+        {appRes.data.latestSync?.error && (
+          <SyncErrorCard className="mb-4" error={appRes.data.latestSync.error} />
+        )}
+
         <AppInfoCard app={appRes.data} className="mb-4" sync={appRes.data.latestSync} />
 
         {appRes.data.latestSync && <AppGitCard className="mb-4" sync={appRes.data.latestSync} />}

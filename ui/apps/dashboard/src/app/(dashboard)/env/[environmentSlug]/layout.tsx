@@ -16,7 +16,12 @@ export default function RootLayout({ params: { environmentSlug }, children }: Ro
         <AppNavigation environmentSlug={environmentSlug} />
         {children}
       </div>
-      <Toaster />
+      <Toaster
+        toastOptions={{
+          // Ensure that the toast is clickable when there are overlays/modals
+          className: 'pointer-events-auto',
+        }}
+      />
     </EnvironmentProvider>
   );
 }

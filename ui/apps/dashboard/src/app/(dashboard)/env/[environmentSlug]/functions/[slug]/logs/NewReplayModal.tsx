@@ -15,10 +15,11 @@ import { useMutation } from 'urql';
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { type TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import Input from '@/components/Forms/Input';
+import Placeholder from '@/components/Placeholder';
 import { TimeRangeInput } from '@/components/TimeRangeInput';
 import { graphql } from '@/gql';
 import { FunctionRunStatus } from '@/gql/graphql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const GetFunctionEndedRunsCountDocument = graphql(`
   query GetFunctionEndedRunsCount(
@@ -108,14 +109,16 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
     FunctionRunStatus.Failed,
   ]);
   const environment = useEnvironment();
-  const { data, isLoading, error } = useGraphQLQuery({
+
+  const { data, isLoading, error } = useSkippableGraphQLQuery({
     query: GetFunctionEndedRunsCountDocument,
     variables: {
       environmentID: environment.id,
       functionSlug,
-      timeRangeStart: timeRange?.start ? timeRange.start.toISOString() : '',
-      timeRangeEnd: timeRange?.end ? timeRange.end.toISOString() : '',
+      timeRangeStart: timeRange ? timeRange.start.toISOString() : '',
+      timeRangeEnd: timeRange ? timeRange.end.toISOString() : '',
     },
+    skip: !timeRange,
   });
   const [{ fetching: isCreatingFunctionReplay }, createFunctionReplayMutation] = useMutation(
     CreateFunctionReplayDocument
@@ -182,7 +185,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
 
   return (
     <Modal
-      className="max-w-2xl p-0"
+      className="max-w-3xl p-0"
       title={
         <span className="inline-flex items-center gap-1">
           <IconReplay className="h-6 w-6" />
@@ -216,7 +219,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
           <div className="flex justify-between gap-7 px-6 py-4">
             <div className="space-y-0.5">
               <span className="text-sm font-semibold text-slate-800">Time Range</span>
-              <p className="text-xs text-slate-500">A time range to replay function runs from.</p>
+              <p className="text-xs text-slate-500">Select a specific range of function runs.</p>
             </div>
             <TimeRangeInput onChange={setTimeRange} />
           </div>
@@ -245,10 +248,14 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
                   {label}
                 </ToggleGroup.Item>
                 <p aria-label={`Number of ${label} runs`} className="text-sm text-slate-500">
-                  {count.toLocaleString(undefined, {
-                    notation: 'compact',
-                    compactDisplay: 'short',
-                  })}{' '}
+                  {isLoading ? (
+                    <Placeholder className="top-px inline-flex h-3 w-3 bg-slate-200" />
+                  ) : (
+                    count.toLocaleString(undefined, {
+                      notation: 'compact',
+                      compactDisplay: 'short',
+                    })
+                  )}{' '}
                   Runs
                 </p>
               </div>
@@ -269,10 +276,14 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
             <p className="inline-flex gap-1.5 text-slate-500">
               Total runs to be replayed:{' '}
               <span className="font-medium text-slate-800">
-                {selectedRunsCount.toLocaleString(undefined, {
-                  notation: 'compact',
-                  compactDisplay: 'short',
-                })}
+                {isLoading ? (
+                  <Placeholder className="top-px inline-flex h-4 w-4 bg-slate-200" />
+                ) : (
+                  selectedRunsCount.toLocaleString(undefined, {
+                    notation: 'compact',
+                    compactDisplay: 'short',
+                  })
+                )}
               </span>
             </p>
           </div>

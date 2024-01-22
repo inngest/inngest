@@ -1,6 +1,6 @@
 import { Badge } from '@inngest/components/Badge/Badge';
 import { Button } from '@inngest/components/Button';
-import { CodeBlock } from '@inngest/components/CodeBlock';
+import { CodeBlock, type CodeBlockAction } from '@inngest/components/CodeBlock';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { FuncCard } from '@inngest/components/FuncCard';
 import { FuncCardFooter } from '@inngest/components/FuncCardFooter';
@@ -29,6 +29,7 @@ type WithRunSelector = {
   SendEventButton?: React.ElementType;
 
   selectedRunID: string | undefined;
+  codeBlockActions?: CodeBlockAction[];
 };
 
 type WithoutRunSelector = {
@@ -37,6 +38,7 @@ type WithoutRunSelector = {
   onReplayEvent?: undefined;
   SendEventButton?: undefined;
   selectedRunID?: undefined;
+  codeBlockActions?: CodeBlockAction[];
 };
 
 type Props = (EventProps | LoadingEvent) & (WithoutRunSelector | WithRunSelector);
@@ -48,6 +50,7 @@ export function EventDetails({
   onReplayEvent,
   selectedRunID,
   SendEventButton,
+  codeBlockActions = [],
   loading = false,
 }: Props) {
   const prettyPayload = event?.payload && usePrettyJson(event.payload);
@@ -85,7 +88,10 @@ export function EventDetails({
     >
       {!loading && (
         <div className="px-5 pt-4">
-          <CodeBlock tabs={[{ label: 'Payload', content: prettyPayload ?? 'Unknown' }]} />
+          <CodeBlock
+            tabs={[{ label: 'Payload', content: prettyPayload ?? 'Unknown' }]}
+            actions={codeBlockActions}
+          />
         </div>
       )}
 

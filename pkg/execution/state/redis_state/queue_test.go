@@ -220,6 +220,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
 
 		// Ensure that our data is set up correctly.
 		found := getQueueItem(t, r, item.ID)
@@ -481,12 +482,20 @@ func TestQueuePeek(t *testing.T) {
 			require.NoError(t, err)
 			require.EqualValues(t, 4, len(items))
 
+			// Ignore items earlies peek time.
+			for _, i := range items {
+				if i.EarliestPeekTime != 0 {
+					i.EarliestPeekTime = 0
+				}
+			}
+
 			require.EqualValues(t, ia.ID, items[0].ID)
 			// NOTE: Scavenging requeues items, and so the time will have changed.
 			require.GreaterOrEqual(t, items[0].AtMS, scavengeAt)
 			require.Greater(t, items[0].AtMS, ia.AtMS)
 			ia.LeaseID = nil
 			ia.AtMS = items[0].AtMS
+			ia.WallTimeMS = items[0].WallTimeMS
 			require.EqualValues(t, []*QueueItem{&ia, &ib, &ic, &id}, items)
 		})
 	})
@@ -1006,10 +1015,14 @@ func TestQueuePartitionLease(t *testing.T) {
 	leaseUntil := now.Add(3 * time.Second)
 
 	t.Run("It leases a partition", func(t *testing.T) {
-		// Lease the first item
-		leaseID, _, err := q.PartitionLease(ctx, pA, time.Until(leaseUntil))
+		// Lease the first item now.
+		leasedAt := time.Now()
+		leaseID, err := q.PartitionLease(ctx, pA, time.Until(leaseUntil))
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
+
+		// Pause so that we can assert that the last lease time was set correctly.
+		<-time.After(50 * time.Millisecond)
 
 		t.Run("It updates the partition score", func(t *testing.T) {
 			items, err := q.PartitionPeek(ctx, true, now.Add(time.Hour), PartitionPeekMax)
@@ -1026,15 +1039,17 @@ func TestQueuePartitionLease(t *testing.T) {
 					WorkflowID: idA,
 					Priority:   testPriority,
 					AtS:        ulid.Time(leaseID.Time()).Unix(),
-					Last:       time.Now().Unix(),
+					Last:       items[2].Last, // Use the leased partition time.
 					LeaseID:    leaseID,
 				}, // idA is now last.
 			}, items)
 			requirePartitionScoreEquals(t, r, idA, leaseUntil)
+			// require that the last leased time is within 5ms for tests
+			require.WithinDuration(t, leasedAt, time.UnixMilli(items[2].Last), 5*time.Millisecond)
 		})
 
 		t.Run("It can't lease an existing partition lease", func(t *testing.T) {
-			id, _, err := q.PartitionLease(ctx, pA, time.Second*29)
+			id, err := q.PartitionLease(ctx, pA, time.Second*29)
 			require.Equal(t, ErrPartitionAlreadyLeased, err)
 			require.Nil(t, id)
 
@@ -1049,7 +1064,7 @@ func TestQueuePartitionLease(t *testing.T) {
 
 		requirePartitionScoreEquals(t, r, idA, leaseUntil)
 
-		id, _, err := q.PartitionLease(ctx, pA, time.Second*5)
+		id, err := q.PartitionLease(ctx, pA, time.Second*5)
 		require.Nil(t, err)
 		require.NotNil(t, id)
 
@@ -1221,7 +1236,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	next := now.Add(5 * time.Second)
 	t.Run("It removes any lease when requeueing", func(t *testing.T) {
 
-		_, _, err := q.PartitionLease(ctx, QueuePartition{WorkflowID: idA}, time.Minute)
+		_, err := q.PartitionLease(ctx, QueuePartition{WorkflowID: idA}, time.Minute)
 		require.NoError(t, err)
 
 		err = q.PartitionRequeue(ctx, idA.String(), next, true)
@@ -1302,7 +1317,7 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 	})
 }
 
-func TestRequeueByJobID(t *testing.T) {
+func TestQueueRequeueByJobID(t *testing.T) {
 	ctx := context.Background()
 	r := miniredis.RunT(t)
 
@@ -1398,7 +1413,7 @@ func TestRequeueByJobID(t *testing.T) {
 		r.FlushDB()
 
 		jid := "requeue-plz"
-		at := time.Now().Add(time.Second)
+		at := time.Now().Add(time.Second).Truncate(time.Millisecond)
 		item := QueueItem{
 			ID:          jid,
 			WorkflowID:  wsA,
@@ -1406,6 +1421,7 @@ func TestRequeueByJobID(t *testing.T) {
 			AtMS:        at.UnixMilli(),
 		}
 		item, err := q.EnqueueItem(ctx, item, at)
+		require.Equal(t, time.UnixMilli(item.WallTimeMS), at)
 		require.NoError(t, err)
 
 		parts, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
@@ -1422,6 +1438,8 @@ func TestRequeueByJobID(t *testing.T) {
 			require.Equal(t, 1, len(found))
 			require.NotEqual(t, item.AtMS, found[0].AtMS)
 			require.Equal(t, next.UnixMilli(), found[0].AtMS)
+
+			require.Equal(t, time.UnixMilli(found[0].WallTimeMS), next)
 		})
 
 		t.Run("It updates the partition index", func(t *testing.T) {

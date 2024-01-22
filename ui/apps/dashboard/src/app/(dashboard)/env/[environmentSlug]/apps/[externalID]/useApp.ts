@@ -26,9 +26,10 @@ const query = graphql(`
           commitHash
           commitMessage
           commitRef
-          createdAt
+          error
           framework
           id
+          lastSyncedAt
           platform
           repoURL
           sdkLanguage
@@ -58,7 +59,7 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
     if (app.latestSync) {
       latestSync = {
         ...app.latestSync,
-        createdAt: new Date(app.latestSync.createdAt),
+        lastSyncedAt: new Date(app.latestSync.lastSyncedAt),
       };
     }
 
@@ -77,7 +78,7 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
     };
   }
 
-  return res;
+  return { ...res, data: undefined };
 }
 
 function transformTriggers(

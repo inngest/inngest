@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.24.0] - 2024-01-17
+
+### Added
+- Added debounce timeouts
+- Added multiple concurrency keys
+- Added step invocation
+- Added improvements to apps, registration
+
+### Fixed
+- Removed goroutine handling of jobs, leading to FIFO guarantees within the job queue itself
+
 ## [v0.17.0] - 2023-09-26
 
 ### Added

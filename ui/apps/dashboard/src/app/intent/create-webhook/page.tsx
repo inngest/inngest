@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowRightIcon } from '@heroicons/react/20/solid';
 import slugify from '@sindresorhus/slugify';
+import { capitalCase } from 'change-case';
 import { useMutation } from 'urql';
 
+import Input from '@/components/Forms/Input';
 import { graphql } from '@/gql';
 import WebhookIcon from '@/icons/webhookIcon.svg';
 import { useEnvironments } from '@/queries';
@@ -22,10 +24,19 @@ const CreateWebhook = graphql(`
   }
 `);
 
+function getNameFromDomain(domain: string | null) {
+  if (!domain) return '';
+  const removeTLD = domain.replace(/\.com|\.io|\.org|\.net|\.co\..{2}|\.dev|\.app|\.ai|\.xyz$/, '');
+  const removeSubdomains = removeTLD.replace(/.*\./, '');
+  return removeSubdomains;
+}
+
 export default function Page() {
   // TODO - handle failure to fetch environments
   const [{ data: environments }] = useEnvironments();
   const [loading, setLoading] = useState(false);
+  const [isEditing, setEditing] = useState(false);
+  const [customPrefix, setCustomPrefix] = useState<string>('');
   const [error, setError] = useState<string>('');
 
   const params = useSearchParams();
@@ -33,15 +44,16 @@ export default function Page() {
 
   // Params and validation
   const name = params.get('name');
+  const domain = params.get('domain');
   const redirectURI = params.get('redirect_uri');
   useEffect(() => {
-    if (!name) {
-      setError('Malformed URL: Missing name parameter');
+    if (!name && !domain) {
+      setError('Malformed URL: Missing name or domain parameter');
     }
     if (!redirectURI) {
       setError('Malformed URL: Missing redirect_uri parameter');
     }
-  }, [name, redirectURI]);
+  }, [name, domain, redirectURI]);
   const redirectURL: URL | null = useMemo(() => {
     if (!redirectURI) return null;
     try {
@@ -52,14 +64,22 @@ export default function Page() {
     return null;
   }, [redirectURI]);
 
-  const prefix = slugify(name || '');
+  const displayName = capitalCase(
+    name ?? domain !== null ? getNameFromDomain(domain) : 'Webhook integration'
+  );
+
+  const slugifyOptions = { preserveCharacters: ['.'] };
+  const defaultPrefix = slugify(displayName, slugifyOptions);
+  const eventNamePrefix =
+    customPrefix !== '' ? slugify(customPrefix, slugifyOptions) : defaultPrefix;
+
   const transform = createTransform({
     // Svix webhooks do not have a standard schema, so we use fields that
     // are popular with a fallback
-    eventName: `\`${prefix}/\${evt.type || evt.name || evt.event_type || "webhook.received"}\``,
+    eventName: `\`${eventNamePrefix}/\${evt.type || evt.name || evt.event_type || "webhook.received"}\``,
     // Most webhooks have a data field, but not all, so we fallback to the entire event
     dataParam: 'evt.data || evt',
-    commentBlock: `// This was created by the ${name} integration.
+    commentBlock: `// This was created by the ${displayName} integration.
     // Edit this to customize the event name and payload.`,
   });
 
@@ -73,7 +93,7 @@ export default function Page() {
     createWebhook({
       input: {
         workspaceID: productionEnv.id,
-        name: name || '',
+        name: displayName,
         source: 'webhook',
         metadata: {
           transform,
@@ -107,7 +127,7 @@ export default function Page() {
 
   return (
     <ApprovalDialog
-      title={`${name} is requesting permission to create a new webhook URL`}
+      title={`${displayName} is requesting permission to create a new webhook URL`}
       description={
         <>
           <p className="my-6">
@@ -117,10 +137,33 @@ export default function Page() {
           <p className="my-6">
             Upon creation, the webhook will begin sending events with the following prefix:{' '}
           </p>
-          <pre>
-            {prefix}
-            {'/*'}
-          </pre>
+          <div className="flex min-h-[32px] items-center justify-center gap-2">
+            {isEditing ? (
+              <Input
+                type="text"
+                placeholder="Add a prefix"
+                value={customPrefix}
+                onChange={(e) => setCustomPrefix(e.target.value)}
+                className="block max-w-[192px]"
+              />
+            ) : (
+              <pre>
+                {eventNamePrefix}
+                {'/*'}
+              </pre>
+            )}
+            <button
+              className="text-sm text-indigo-500"
+              onClick={() => {
+                setEditing(!isEditing);
+                if (customPrefix === '') {
+                  setCustomPrefix(defaultPrefix);
+                }
+              }}
+            >
+              {isEditing ? 'Save' : 'Edit'}
+            </button>
+          </div>
         </>
       }
       graphic={
@@ -135,7 +178,8 @@ export default function Page() {
       error={error}
       secondaryInfo={
         <>
-          By approving this request, the created webhook URL will be shared with {name}. <br />
+          By approving this request, the created webhook URL will be shared with {displayName}.{' '}
+          <br />
           No other data from your Inngest account will be shared.
         </>
       }

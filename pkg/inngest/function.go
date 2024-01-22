@@ -54,6 +54,8 @@ type Function struct {
 
 	Priority *Priority `json:"priority,omitempty"`
 
+	TTL *time.Duration `json:"ttl"`
+
 	// ConcurrencyLimits allows limiting the concurrency of running functions, optionally constrained
 	// by individual concurrency keys.
 	//

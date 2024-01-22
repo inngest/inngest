@@ -108,7 +108,7 @@ func (l lifecycle) OnFunctionStarted(
 		)
 	}
 
-	latency, _ := redis_state.GetItemLatency(ctx)
+	latency, _ := redis_state.GetItemSystemLatency(ctx)
 	latencyMS := latency.Milliseconds()
 
 	h := History{
@@ -299,7 +299,7 @@ func (l lifecycle) OnStepStarted(
 		)
 	}
 
-	latency, _ := redis_state.GetItemLatency(ctx)
+	latency, _ := redis_state.GetItemSystemLatency(ctx)
 	latencyMS := latency.Milliseconds()
 
 	h := History{

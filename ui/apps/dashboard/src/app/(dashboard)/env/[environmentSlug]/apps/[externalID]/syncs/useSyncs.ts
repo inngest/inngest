@@ -11,9 +11,9 @@ const query = graphql(`
           commitHash
           commitMessage
           commitRef
-          createdAt
           framework
           id
+          lastSyncedAt
           platform
           removedFunctions {
             id
@@ -52,7 +52,7 @@ export function useSyncs({ envID, externalAppID }: { envID: string; externalAppI
     const syncs = app.syncs.map((sync) => {
       return {
         ...sync,
-        createdAt: new Date(sync.createdAt),
+        lastSyncedAt: new Date(sync.lastSyncedAt),
       };
     });
 

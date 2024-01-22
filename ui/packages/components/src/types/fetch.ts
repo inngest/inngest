@@ -1,5 +1,4 @@
 type FetchFailed = { error: Error; data: undefined; isLoading: false };
-// type FetchLoading = { error: undefined; data: undefined; isLoading: true }
 type FetchLoading<T = never> = { error: undefined; data: T | undefined; isLoading: true };
 type FetchSkipped = { error: undefined; data: undefined; isLoading: false; isSkipped: true };
 type FetchSucceeded<T = never> = { error: undefined; data: T; isLoading: false };

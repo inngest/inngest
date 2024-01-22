@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/headers"
 )
 
 // Opts represents options for the APIv1 router.
@@ -28,10 +29,14 @@ type Opts struct {
 	Executor execution.Executor
 	// EventReader allows reading of events from storage.
 	EventReader EventReader
+	// FunctionReader reads functions from a backing store.
+	FunctionReader cqrs.FunctionReader
 	// FunctionRunReader reads function runs, history, etc. from backing storage
 	FunctionRunReader cqrs.APIV1FunctionRunReader
 	// JobQueueReader reads information around a function run's job queues.
 	JobQueueReader queue.JobQueueReader
+	// CancellationReadWriter reads and writes cancellations to/from a backing store.
+	CancellationReadWriter cqrs.CancellationReadWriter
 }
 
 // AddRoutes adds a new API handler to the given router.
@@ -62,13 +67,7 @@ func (a *api) setup() {
 			r.Use(a.opts.CachingMiddleware.Middleware)
 		}
 
-		// Set all response type to JSON
-		r.Use(func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Add("Content-Type", "application/json")
-				next.ServeHTTP(w, r)
-			})
-		})
+		r.Use(headers.ContentTypeJsonResponse())
 
 		r.Get("/events", a.GetEvents)
 		r.Get("/events/{eventID}", a.GetEvent)
@@ -76,8 +75,11 @@ func (a *api) setup() {
 		r.Get("/runs/{runID}", a.GetFunctionRun)
 		r.Delete("/runs/{runID}", a.CancelFunctionRun)
 		r.Get("/runs/{runID}/jobs", a.GetFunctionRunJobs)
-		// r.Get("/functions", a.GetFunctions)
-		// r.Get("/functions/{id}", a.GetFunction)
+
+		r.Get("/apps/{appName}/functions", a.GetAppFunctions) // Returns an app and all of its functions.
+
+		r.Post("/cancellations", a.CreateCancellation)
+		r.Get("/cancellations", a.GetCancellations)
 	})
 }
 

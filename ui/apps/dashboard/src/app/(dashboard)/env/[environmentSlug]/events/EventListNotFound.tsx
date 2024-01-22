@@ -9,8 +9,10 @@ import { useCopyToClipboard } from 'react-use';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { graphql } from '@/gql';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
+import { pathCreator } from '@/utils/urls';
 
 const GetEventKeysForBlankSlateDocument = graphql(`
   query GetEventKeysForBlankSlate($environmentID: ID!) {
@@ -38,6 +40,7 @@ function getDefaultEventKey<T extends { createdAt: string; name: null | string }
 
 export default function EventListNotFound() {
   const router = useRouter();
+  const { value: isAppsEnabled } = useBooleanFlag('apps-page');
   const [, copy] = useCopyToClipboard();
   const environment = useEnvironment();
   const [{ data, fetching: fetchingKey }] = useQuery({
@@ -70,8 +73,9 @@ export default function EventListNotFound() {
               Send your events
             </h3>
             <p className="mt-2 text-sm tracking-wide text-slate-300">
-              After deploying your functions, you can start sending events to this environment. To
-              send events, your application needs to have an Event Key.
+              {isAppsEnabled ? 'After syncing your app' : 'After deploying your functions'}, you can
+              start sending events to this environment. To send events, your application needs to
+              have an Event Key.
             </p>
             <h4 className="mt-4 text-base font-semibold text-white">Event Key</h4>
             <p className="mt-2 text-sm tracking-wide text-slate-300">
@@ -100,8 +104,12 @@ export default function EventListNotFound() {
           <div className="mt-6 flex items-center gap-2 border-t border-slate-800/50 py-4">
             <Button
               kind="primary"
-              href={`/env/${environment.slug}/deploys` as Route}
-              label="Deploy Your Functions"
+              href={
+                isAppsEnabled
+                  ? pathCreator.apps({ envSlug: environment.slug })
+                  : pathCreator.deploys({ envSlug: environment.slug })
+              }
+              label={isAppsEnabled ? 'Sync Your App' : 'Deploy Your Functions'}
             />
             <div className="flex gap-2 border-l border-slate-800/50 pl-2">
               <Button

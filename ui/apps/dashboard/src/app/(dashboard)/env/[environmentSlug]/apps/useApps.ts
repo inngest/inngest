@@ -10,9 +10,10 @@ const query = graphql(`
         functionCount
         name
         latestSync {
-          createdAt
+          error
           framework
           id
+          lastSyncedAt
           platform
           sdkLanguage
           sdkVersion
@@ -22,7 +23,7 @@ const query = graphql(`
       }
 
       unattachedSyncs(first: 1) {
-        createdAt
+        lastSyncedAt
       }
     }
   }
@@ -42,7 +43,7 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
         if (app.latestSync) {
           latestSync = {
             ...app.latestSync,
-            createdAt: new Date(app.latestSync.createdAt),
+            lastSyncedAt: new Date(app.latestSync.lastSyncedAt),
           };
         }
 
@@ -64,7 +65,7 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
 
     let latestUnattachedSyncTime;
     if (res.data.environment.unattachedSyncs[0]) {
-      latestUnattachedSyncTime = new Date(res.data.environment.unattachedSyncs[0].createdAt);
+      latestUnattachedSyncTime = new Date(res.data.environment.unattachedSyncs[0].lastSyncedAt);
     }
 
     return {
