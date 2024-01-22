@@ -315,7 +315,7 @@ function RowItem({
   return (
     <div
       className={clsx(
-        "mx-auto md:px-8 my-16 max-w-[440px] md:max-w-[1072px] grid grid-cols-1 md:grid-cols-2 items-center gap-8 md:gap-16",
+        "mx-auto md:px-8 my-16 md:mb-28 max-w-[440px] md:max-w-[1072px] grid grid-cols-1 md:grid-cols-2 items-center gap-8 md:gap-16",
         blur === true && "blur-lg pointer-events-none"
       )}
     >
