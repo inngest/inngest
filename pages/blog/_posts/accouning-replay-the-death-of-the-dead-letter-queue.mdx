@@ -11,11 +11,11 @@ disableCTA: true
 
 Production systems will fail. Incidents are inevitable.
 
-An Incident can take different forms. It can be a simple bug introduced somewhere in your codebase. Or, perhaps, an outage with an external resource like a third party API or a hosted database. Most developers have experienced them all.
+An incident can take different forms. It can be a simple bug introduced somewhere in your codebase. Or, perhaps, an outage with an external resource like a third party API or a hosted database. Most developers have experienced them all.
 
 For systems that need to be reliable, automatic retries are necessary. Often, to handle intermittent errors while continuing to reliably execute code, developers add queues, event streams, or other forms of durable execution to their architecture.
 
-With these tools in hand, teams likely then implement automatic retries which help recover from temporary blips, but what about incidents that run for hours or days? Teams then need to implement a strategy for recovery themselves.
+With these tools in hand, teams likely then implement automatic retries which help recover from temporary blips. But what about incidents that run for hours or days? Teams then need to implement a strategy for recovery themselves.
 
 This is why we have built recovery tooling directly into our platform at Inngest. Today we announce **Replay**, the easiest way to recover from incidents with just a couple of clicks.
 
@@ -35,7 +35,7 @@ Messages that cannot be processed within a reasonable number of attempts need to
 - Log/archive these messages in a database or in a log store.
 - Drop the messages and do nothing. 🤷
 
-Each of these approaches poses more questions on how to properly implement this. Often teams cannot predict what types of failures will end up in these holding areas, so they don't set up any automated way to re-process these messages. The messages sit around, incidents happen and teams scramble to do something with the data (if they even have the data at all). Stress ensues. Over time you may have some halfway decent hacked-together scripts to recover; or maybe your team has an SRE that can do it properly, but most teams can't afford this luxury.
+Each of these approaches poses more questions on how to properly implement this. Often, teams cannot predict what types of failures will end up in these holding areas, so they don't set up any automated way to re-process these messages. The messages sit around, incidents happen and teams scramble to do something with the data (if they even have the data at all). Stress ensues. Over time you may have some halfway decent hacked-together scripts to recover; or maybe your team has an SRE that can do it properly, but most teams can't afford this luxury.
 
 {/* TODO - determine graphic? GRAPHIC: some sort of overly styled thing with ./scripts/recover.sh in the center */}
 
@@ -57,7 +57,7 @@ Similar to queues, event streams are awesome, but teams need to invest the time 
 
 Developers should not have to reimplement these approaches for every new system that they build - they deserve better - and that is why we built Inngest.
 
-Inngest architecture combines event streams and queues with durable execution to create a single reliably layer. In the past [we talked about the benefits of this approach](/blog/how-durable-workflow-engines-work) including declarative job scheduling with events, code that pauses for additional data, and flow control. Today let's look at how this approach enabled us to build recovery tools directly into the platform.
+Inngest architecture combines event streams and queues with durable execution to create a single reliability layer. In the past [we talked about the benefits of this approach](/blog/how-durable-workflow-engines-work) including declarative job scheduling with events, code that pauses for additional data, and flow control. Today let's look at how this approach enabled us to build recovery tools directly into the platform.
 
 ![A graphic showing the components of the Inngest platform](/assets/blog/announcing-replay/reliability-layer-diagram.png)
 
@@ -71,7 +71,7 @@ Combined together, we can easily query for all jobs between two timestamps and f
 
 ![A graphic of a selected group of failed functions and a button with the text Replay Functions written on it](/assets/blog/announcing-replay/button-graphic.png)
 
-We call this **Replay**. In other words, it's peace of mind that is included in every single Inngest plan, including the free tier. You can use Replay today in every Inngest account or learn how to use this feature in [our guide](https://www.inngest.com/docs/platform/replay).
+We call this **Replay**. In other words, it's peace of mind that comes with every single Inngest plan, including the free tier. You can use Replay today in every Inngest account or learn how to use this feature in [our guide](https://www.inngest.com/docs/platform/replay).
 
 Once you try it, we would love to hear what you think. [Share your feedback or](https://roadmap.inngest.com/) [reach out on Discord!](/discord)
 
