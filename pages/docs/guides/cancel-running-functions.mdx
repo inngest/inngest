@@ -5,12 +5,10 @@ export const description = 'Learn how to cancel long running functions with even
 {/* TODO - Link the sleeps and waits to guides when we move those from references to guides */}
 With Inngest, your functions can be running or paused for long periods of time. You may have function with hundreds of steps, or you may be using [`step.sleep`](/docs/reference/functions/step-sleep), [`step.sleepUntil`](/docs/reference/functions/step-sleep-until), or [`step.waitForEvent`](/docs/reference/functions/step-wait-for-event). Sometimes, things happen in your system that make it no longer necessary to complete running the function, which is when cancelling is necessary.
 
-{/* In this guide, you'll learn how to cancel running functions in one of three ways:
+In this guide, you'll learn how to cancel running functions in two ways: {/* TODO - Update when  we add the UI */}
 
-- [Cancel with events](#cancel-with-events)
-- [Cancel in the Inngest dashboard](#cancel-in-the-inngest-dashboard)
-- [Cancel via the REST API](#cancel-via-the-rest-api)
-*/}
+- [Cancel with events](#cancel-with-events) {/*- [Cancel in the Inngest dashboard](#cancel-in-the-inngest-dashboard)*/}
+- [Bulk cancel via the REST API](#bulk-cancel-via-the-rest-api)
 
 ## Cancel with events
 
@@ -95,6 +93,40 @@ Learn more in the full [reference](/docs/functions/cancellation).
 ## Cancel in the Inngest dashboard
 */}
 
-{/* TODO
-## Cancel via the REST API
-*/}
+## Bulk cancel via the REST API
+
+You can also cancel functions in bulk via the [REST API](https://api-docs.inngest.com/docs/inngest-api). This is useful if you have a large number of functions within a specific range that you need to cancel.
+
+With the `POST /cancellations` endpoint, you can cancel functions by specifying the `app_id`, `function_id`, and a `started_after` and `started_before` timestamp range. You can also optionally specify an `if` statement to only cancel functions that match a [given expression](/docs/guides/writing-expressions).
+
+<CodeGroup tag="POST" label="api.inngest.com/v1/cancellations">
+
+```bash {{ title: 'cURL' }}
+curl -X POST https://api.inngest.com/v1/cancellations \
+  -H 'Authorization: Bearer signkey-prod-<YOUR-SIGNING-KEY>' \
+  -H 'Content-Type: application/json' \
+  --data '{
+    "app_id": "acme-app",
+    "function_id": "schedule-reminder",
+    "started_after": "2024-01-21T18:23:12.000Z",
+    "started_before": "2024-01-22T14:22:42.130Z",
+    "if": "event.data.userId == 'user_o9235hf84hf'"
+  }'
+```
+
+</CodeGroup>
+
+When successful, the response will be returned with the cancellation ID and the cancellation job data:
+
+```json {{ title: 'Response' }}
+{
+  "id": "01HMRMPE5ZQ4AMNJ3S2N79QGRZ",
+  "environment_id": "e03843e1-d2df-419e-9b7b-678b03f7398f",
+  "function_id": "schedule-reminder",
+  "started_after": "2024-01-21T18:23:12.000Z",
+  "started_before": "2024-01-22T14:22:42.130Z",
+  "if": "event.data.userId == 'user_o9235hf84hf'"
+}
+```
+
+To learn more, read the full [REST API reference](https://api-docs.inngest.com/docs/inngest-api).

@@ -13,7 +13,7 @@ const variantStyle = (variant: string): string => {
 const colorStyle = (color: string, variant: string): string => {
   switch (variant) {
     case "small":
-      return `text-${color}-500 dark:text-${color}-400`;
+      return `text-${color}-200 dark:text-${color}-300`;
 
     case "medium":
       return `ring-${color}-300 dark:ring-${color}-400/30 bg-${color}-400/10 text-${color}-500 dark:text-${color}-400`;
