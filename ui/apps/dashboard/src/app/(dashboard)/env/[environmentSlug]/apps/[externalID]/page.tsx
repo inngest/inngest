@@ -23,7 +23,10 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
     externalAppID: externalID,
   });
   if (appRes.error) {
-    throw appRes.error;
+    if (!appRes.data) {
+      throw appRes.error;
+    }
+    console.error(appRes.error);
   }
   if (appRes.isLoading && !appRes.data) {
     return (

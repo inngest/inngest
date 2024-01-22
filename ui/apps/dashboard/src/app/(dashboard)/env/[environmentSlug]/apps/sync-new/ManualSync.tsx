@@ -84,8 +84,8 @@ export default function ManualSync({ appsURL }: Props) {
           <span className="font-semibold">
             enter the URL of your project&apos;s serve endpoint to sync your app with Inngest
           </span>
-          . Verify that you assigned the signing key below to the {' '}
-          <Code>INNGEST_SIGNING_KEY</Code> environment variable:
+          . Verify that you assigned the signing key below to the <Code>INNGEST_SIGNING_KEY</Code>{' '}
+          environment variable:
         </p>
         <DeploySigningKey className="py-6" />
         <div className="border-t border-slate-200">
