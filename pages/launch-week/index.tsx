@@ -86,12 +86,11 @@ export default function LaunchWeek() {
           orientation="right"
         />
         <RowItem
-          title="Building the Inngest queue - Part I"
-          subtitle="Fairness and multi-tenancy"
-          image="/assets/blog/durable-workflow-engines.png"
+          title="Building the Inngest queue"
+          subtitle="Part I: Fairness and multi-tenancy"
+          image="/assets/blog/inngest-queue-pt-i/featured-image.png"
           label="Technical post"
-          buttonHref="#"
-          docsHref="/docs/platform/replay"
+          buttonHref="/blog/building-the-inngest-queue-pt-i-faireness-multi-tenancy"
           orientation="left"
         />
 
@@ -308,7 +307,7 @@ function RowItem({
   subtitle,
   label,
   buttonHref,
-  docsHref,
+  docsHref = null,
   image,
   orientation = "left",
   blur = false,
