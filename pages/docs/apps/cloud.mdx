@@ -118,7 +118,14 @@ Upcoming releases include a manual archival feature, which will provide users wi
 <details>
   <summary><strong>Why is my app syncing to the wrong environment?</strong></summary>
 
-- Apps are synced to one environment. The [**`INNGEST_SIGNING_KEY`**](https://www.inngest.com/docs/sdk/environment-variables#inngest-signing-key) ensures that your app is synced within the correct Inngest environment. Verify that you assigned your signing key to the right `INNGEST_SIGNING_KEY` environment variable in your hosting provider or **`.env`** file locally.
+- Apps are synced to one environment. The [**`INNGEST_SIGNING_KEY`**](/docs/sdk/environment-variables#inngest-signing-key) ensures that your app is synced within the correct Inngest environment. Verify that you assigned your signing key to the right `INNGEST_SIGNING_KEY` environment variable in your hosting provider or **`.env`** file locally.
+
+</details>
+
+<details>
+  <summary><strong>Why do I have duplicated apps?</strong></summary>
+
+- Each app name is considered a persistent identifier. [Since the name of the app is determined by the ID passed to the serve handler from the Inngest client](/docs/apps#apps-in-sdk), changing that ID will result in Inngest not recognizing the app name during the next sync. As a result, Inngest will create a new app. 
 
 </details>
 
@@ -133,7 +140,7 @@ Upcoming releases include a manual archival feature, which will provide users wi
   - Solution: Check the latest sync time on the previous sync to verify if the update occurred as expected.
   
   2. **Different App ID:**
-  - If you resync the app after modifying the [app ID](https://www.inngest.com/docs/reference/client/create), a new app is created, not a new sync within the existing app.
+  - If you resync the app after modifying the [app ID](/docs/reference/client/create), a new app is created, not a new sync within the existing app.
   - Solution: Confirm the creation of a new app when changing the app ID.
   
   3. **Syncing Errors:**
