@@ -1,14 +1,12 @@
 'use client';
 
 import { type Route } from 'next';
-import Image from 'next/image';
 import Link from 'next/link';
 import ChevronRightIcon from '@heroicons/react/20/solid/ChevronRightIcon';
 import { Link as InngestLink } from '@inngest/components/Link';
 import { classNames } from '@inngest/components/utils/classNames';
 
 import { Time } from '@/components/Time';
-import AppUnattachedImage from '@/images/app-unattached.png';
 import { Description } from './Description';
 
 type Props = {
@@ -20,13 +18,12 @@ type Props = {
 const cardWrapperStyles =
   'flex w-full min-w-[800px] max-w-[1200px] overflow-hidden rounded-lg border border-slate-300 bg-white h-44';
 const cardLeftPanelStyles =
-  'bg-slate-500 flex w-[410px] flex-col justify-center gap-4 px-10 border-r border-slate-300';
+  'bg-slate-500 flex w-[410px] flex-col justify-center gap-2 px-10 border-r border-slate-300';
 
 export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Props) {
   return (
     <div className={classNames(cardWrapperStyles, className)}>
       <div className={cardLeftPanelStyles}>
-        <Image src={AppUnattachedImage} alt="App unattached diagram" />
         <h2>
           <Link
             className="transition-color flex cursor-pointer items-center gap-1 text-white underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-300 hover:decoration-indigo-300"
@@ -40,13 +37,7 @@ export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Prop
       <div className="flex flex-1 items-center px-8 py-4">
         <dl className="grid grow grid-cols-2 gap-4 md:grid-cols-3">
           <p className="col-span-2 md:col-span-3">
-            Unattached syncs are syncs without apps.{' '}
-            <InngestLink
-              className="inline-flex"
-              href="https://www.inngest.com/docs/apps/cloud/#unattached-sync"
-            >
-              Learn more
-            </InngestLink>
+            Unattached syncs are failed syncs that could not be associated with an app.
           </p>
           <Description
             className="col-span-2"
