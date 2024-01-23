@@ -56,6 +56,7 @@ const sectionGettingStarted = [
         title: "Multi-step Functions",
         href: `/docs/functions/multi-step`,
       },
+      { title: "Inngest Apps", href: `/docs/apps` },
       {
         title: "Local Development",
         href: `/docs/local-development`,
@@ -147,9 +148,12 @@ const sectionGuides = [
 
 const sectionPlatform = [
   {
-    title: "Deploying",
+    title: "Going to production",
     links: [
-      { title: "How to Deploy", href: `/docs/deploy` },
+      {
+        title: "Working with apps",
+        href: `/docs/apps/cloud`,
+      },
       { title: "Deploy: Vercel", href: `/docs/deploy/vercel` },
       { title: "Deploy: Netlify", href: `/docs/deploy/netlify` },
       {

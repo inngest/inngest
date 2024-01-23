@@ -15,7 +15,8 @@ const permanentRedirects = [
   ["/docs/writing-and-running-fuctions", "/docs/functions"], //typo
   ["/docs/cli/steps/", "/docs/functions/multi-step"],
   ["/docs/events/sources/sdks", "/docs/events"],
-  ["/docs/deploying-fuctions", "/docs/deploy"],
+  ["/docs/deploying-fuctions", "/docs/apps/cloud"],
+  ["/docs/deploy", "/docs/apps/cloud"],
   ["/docs/functions/introduction", "/docs/functions"],
   ["/docs/how-inngest-works", "/docs"], // TODO/DOCS redirect this to new concepts page
   ["/docs/frameworks/cloudflare-pages", "/docs/sdk/serve#framework-cloudflare"],
