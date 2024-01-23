@@ -29,7 +29,7 @@ These systems’ tight coupling can first feel like a productivity boost, but it
 
 What I described above, in its simplest form, is a function. Functions contain multiple discrete tasks (or *steps*) and state is retained in memory as part of the language. Inngest brings this simplicity to long running jobs.
 
-As I highlighted above how important job state is, Inngest’s durable execution engine manages state for your function. Job state is serialized and stored by Inngest and using [our SDKs](blog/cross-language-support-with-new-sdks), state is injected into your functions so they can continue where they left off. Basically this is [memoization](https://en.wikipedia.org/wiki/Memoization) with job state. Each “step” in your function can return data to build up state.
+As I highlighted above how important job state is, Inngest’s durable execution engine manages state for your function. Job state is serialized and stored by Inngest and using [our SDKs](/blog/cross-language-support-with-new-sdks), state is injected into your functions so they can continue where they left off. Basically this is [memoization](https://en.wikipedia.org/wiki/Memoization) with job state. Each “step” in your function can return data to build up state.
 
 This approach allows your functions to be *stateless*, which allows them to run on serverless platforms. Inngest SDKs take care of the complex bits of hashing step IDs, serializing each step’s output, [running steps in parallel](/docs/guides/step-parallelism), and inserting state for completed steps. (You can check out our [SDK spec](https://github.com/inngest/inngest/blob/main/docs/SDK_SPEC.md) if you are curious to go deeper)
 
@@ -63,7 +63,7 @@ Today we’ve made all of this easier. You can do this in a couple of clicks fro
 
 ## Cross-language migrations
 
-Today, we simultaneously [announced two new language SDKs](/blog/cross-language-support-with-new-sdks) that are now in beta. Every Inngest SDK follows the [same spec](/docs/sdk-spec.md) so each handles steps and state the exact same way.
+Today, we simultaneously [announced two new language SDKs](/blog/cross-language-support-with-new-sdks) that are now in beta. Every Inngest SDK follows the [same spec](https://github.com/inngest/inngest/blob/main/docs/SDK_SPEC.md) so each handles steps and state the exact same way.
 
 Thanks to how Inngest works, it’s possible for you to rewrite a function in another programming language, sync the app with a new URL, and state will still be preserved.
 
