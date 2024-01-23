@@ -36,6 +36,15 @@ export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Prop
       </div>
       <div className="flex flex-1 items-center px-8 py-4">
         <dl className="grid grow grid-cols-2 gap-4 md:grid-cols-3">
+          <p className="col-span-2 md:col-span-3">
+            Unattached syncs are syncs without an app.{' '}
+            <InngestLink
+              className="inline-flex"
+              href="https://www.inngest.com/docs/apps/cloud/#unattached-sync"
+            >
+              Learn more
+            </InngestLink>
+          </p>
           <Description
             className="col-span-2"
             detail={
