@@ -53,7 +53,7 @@ This function will send a user an email when they sign up. Nice and simple.
 
 We have a new requirement, though, that we should send the user another email if they haven't created a post on our platform within 24 hours of signing up. We have a `app/post.created` event that is fired when this happens, so we can use that (or here, the absence of that) to trigger the second email.
 
-First, let's convert out function to a multi-step function. To do this, we'll do a few things:
+First, let's convert our function to a multi-step function. To do this, we will:
 
 - Add a new `step` argument to your function
 - Wrap our `sendEmail()` call in a `step.run()` call
