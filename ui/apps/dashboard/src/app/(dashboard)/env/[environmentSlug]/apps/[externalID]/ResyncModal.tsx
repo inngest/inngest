@@ -19,11 +19,15 @@ type Props = {
 };
 
 export default function ResyncModal({ isOpen, onClose, url }: Props) {
-  const [input, setInput] = useState(url);
   const [overrideValue, setOverrideValue] = useState(url);
   const [isURLOverridden, setURLOverridden] = useState(false);
   const [failure, setFailure] = useState<RegistrationFailure>();
   const [isSyncing, setIsSyncing] = useState(false);
+
+  let input = url;
+  if (isURLOverridden) {
+    input = overrideValue;
+  }
 
   async function onSync() {
     setIsSyncing(true);
@@ -50,10 +54,6 @@ export default function ResyncModal({ isOpen, onClose, url }: Props) {
       setIsSyncing(false);
     }
   }
-
-  useEffect(() => {
-    setInput(isURLOverridden ? overrideValue : url);
-  }, [isURLOverridden]);
 
   return (
     <Modal
@@ -83,7 +83,6 @@ export default function ResyncModal({ isOpen, onClose, url }: Props) {
               value={input}
               onChange={(e) => {
                 setOverrideValue(e.target.value);
-                setInput(e.target.value);
               }}
               readonly={!isURLOverridden}
               className={classNames(!isURLOverridden && 'bg-slate-200')}
