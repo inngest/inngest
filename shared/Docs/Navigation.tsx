@@ -66,7 +66,7 @@ function NavLink({
     >
       <span className="truncate">{children}</span>
       {tag && (
-        <Tag variant="small" color="slate">
+        <Tag variant="small" color="slate" background="page">
           {tag}
         </Tag>
       )}
