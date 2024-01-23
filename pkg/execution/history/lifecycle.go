@@ -130,7 +130,7 @@ func (l lifecycle) OnFunctionStarted(
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
-			l.log.Error("execution lifecycle error", "lifecycle", "onStepFinished", "error", err)
+			l.log.Error("execution lifecycle error", "lifecycle", "onFunctionStarted", "error", err)
 		}
 	}
 }
@@ -769,7 +769,7 @@ func getStepType(opcode state.GeneratorOpcode) *enums.HistoryStepType {
 	switch opcode.Op {
 	case enums.OpcodeSleep:
 		out = enums.HistoryStepTypeSleep
-	case enums.OpcodeStep:
+	case enums.OpcodeStep, enums.OpcodeStepRun:
 		if opcode.Data == nil && opcode.Error == nil {
 			// Not a user-facing step.
 			return nil
