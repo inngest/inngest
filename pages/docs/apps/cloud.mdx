@@ -123,22 +123,28 @@ Upcoming releases include a manual archival feature, which will provide users wi
 ## Troubleshooting
 
 <details>
-  <summary><strong>Why is my app syncing to the wrong environment?</strong></summary>
+  <summary id="app-wrong-environment"><h3 className="inline-block my-2">Why is my app syncing to the wrong environment?</h3></summary>
 
 - Apps are synced to one environment. The [**`INNGEST_SIGNING_KEY`**](/docs/sdk/environment-variables#inngest-signing-key) ensures that your app is synced within the correct Inngest environment. Verify that you assigned your signing key to the right `INNGEST_SIGNING_KEY` environment variable in your hosting provider or **`.env`** file locally.
 
 </details>
 
 <details>
-  <summary><strong>Why do I have duplicated apps?</strong></summary>
+  <summary id="duplicated-apps"><h3 className="inline-block my-2">Why do I have duplicated apps?</h3></summary>
 
 - Each app ID is considered a persistent identifier. [Since the app ID is determined by the ID passed to the serve handler from the Inngest client](/docs/apps#apps-in-sdk), changing that ID will result in Inngest not recognizing the app ID during the next sync. As a result, Inngest will create a new app. 
 
 </details>
 
+<details>
+  <summary id="unattached-sync"><h3 className="inline-block my-2">Why is my sync inside unattached syncs?</h3></summary>
+
+- Failures in automatic syncs may not be immediately visible. In such cases, an unattached sync (a sync without an app) containing the failure message is created.
+
+</details>
 
 <details> 
-  <summary><strong>Why don’t I see my sync in the sync list?</strong></summary>
+  <summary id="syncing-issues"><h3 className="inline-block my-2">Why don’t I see my sync in the sync list?</h3></summary>
 
   If you're experiencing difficulties with syncing and cannot locate your sync in the sync list, consider the following scenarios:
 
@@ -159,7 +165,7 @@ Upcoming releases include a manual archival feature, which will provide users wi
         alt="Inngest Cloud screen with app error while syncing"
       />            
     - Solution: Review the displayed error message and address the syncing issue accordingly.
-  - *Automatic Syncs (such as Vercel Integration) and using Curl Command:*
+  - *Automatic Syncs (such as Vercel Integration):*
     - Failures in automatic syncs may not be immediately visible. In such cases, an unattached sync (a sync without an app) containing the failure message is created.
       <img
         src="/assets/docs/apps/apps-cloud-sync-info-error.png"
