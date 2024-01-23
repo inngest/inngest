@@ -23,7 +23,7 @@ The diagram below shows how each environment can have multiple apps which can ha
 ## Apps in SDK
 
 Each [`serve()` API handler](/docs/reference/serve) will generate an app in Inngest upon syncing. 
-The name of the app is determined by the ID passed to the serve handler from the [Inngest client](/docs/reference/client/create).
+The app ID is determined by the ID passed to the serve handler from the [Inngest client](/docs/reference/client/create).
 
 For example, the code below will create an Inngest app called “example-app” which contains one function:
 
@@ -43,7 +43,7 @@ serve({
 </CodeGroup>
 
 <Callout>
-Each app name is considered a persistent identifier. Changing your client ID will result in Inngest not recognizing the app name during the next sync. As a result, Inngest will create a new app. 
+Each app ID is considered a persistent identifier. Changing your client ID will result in Inngest not recognizing the app ID during the next sync. As a result, Inngest will create a new app. 
 </Callout>
 
 ## Apps in Inngest Cloud
