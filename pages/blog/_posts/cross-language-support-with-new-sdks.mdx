@@ -1,0 +1,106 @@
+---
+focus: true
+heading: "Cross-language support and new Inngest SDKs: Python, Go, with more to come"
+subtitle: "The Inngest SDKs provide a language- and cloud-agnostic way to create fault-tolerant, long-running functions with built-in flow control."
+showSubtitle: true
+image: /assets/blog/cross-language-support-with-new-sdks/featured-image.png
+date: 2024-01-23
+author: Sylwia Vargas
+disableCTA: true
+---
+
+In late 2022, we launched our [JavaScript/TypeScript SDK](/docs/reference/typescript) to improve the Developer Experience of our tools. This was just the first step towards becoming a truly language-agnostic reliability layer for everyone.
+
+Today, we are excited to announce next two milestones in this journey: new SDKs, and the ability to work with Inngest in cross-language projects.
+
+## New SDKs
+
+We have just official released our [Python](/docs/reference/python) and [Go](https://pkg.go.dev/github.com/inngest/inngestgo) SDK betas with already enough feature compatibility to be suitable for most use cases. This expansion aims to make it easier for everyone to build reliable applications, regardless of the language of your codebase.
+
+    <img
+      src="/assets/blog/cross-language-support-with-new-sdks/cross-language-support-python-go.png"
+      alt="TypeScript, Python, and Go logos"
+      className="rounded-sm"
+      style={{ marginBottom: "1rem", height:"160px", width:"auto", display: "block", marginLeft: "auto", marginRight: "auto"}}
+    />
+
+The Inngest SDKs provide a language- and cloud-agnostic way to create fault-tolerant, long-running functions with built-in flow control.
+
+👉 *Is your favorite language not included here? We want to hear from you! [Vote for your language of choice](https://roadmap.inngest.com/roadmap).*
+
+Because of how the Inngest architecture works, state is decoupled from your application using our SDKs. The state of your functions are stored within Inngest and the SDKs handle the communication with our APIs. This includes how state functions are triggered, results of steps are sent back to Inngest, and how state from previous steps is injected into your function (memoization). Because of this, the SDK logic does not need to be burdened by managing state — it’s just a chain of HTTP request and responses.
+
+This design makes the SDKs light weight and the communication layer is thin, only requiring HTTP. This makes it easier, and faster, to create new language SDKs. If you want to learn more about how state works in Inngest how it is enabled in the SDKs, read our [open source SDK spec](https://github.com/inngest/inngest/blob/main/docs/SDK_SPEC.md).
+
+We are fully committed to ensuring that developers can focus on writing code, without having to also think unnecessarily about the infrastructure necessary to power their apps. With this guiding principle, we built on the existing SDKs and made it easier to use Inngest in multi-language backends.
+
+## Cross-language support
+
+Two months ago we added [`step.invoke()`](/docs/guides/invoking-functions-directly), a new tool that allows you to compose workflows together and re-use functionality from any part of your system. It differs from traditional event-driven triggers, offering a more direct, RPC-like approach.
+
+With regards to the new SDKs, being able to call Inngest functions directly from within other Inngest functions means that you can use Inngest in a multi-language system.
+
+For example, you could create a Python function using the powerful [pandas](https://pandas.pydata.org/) library that runs within a Docker container, and then call that code from your JavaScript function which may be running on serverless.
+
+### Node-Python app
+
+Let’s look at an example of a Node and Python app.
+
+To make this example simple, let’s assume you have an Inngest function which returns a `sum` of the passed arguments. The code will look as follows:
+
+```python
+@inngest_client.create_function(
+    fn_id="total",
+    trigger=inngest.TriggerEvent(event="python-app/total"),
+)
+def fn(
+    ctx: inngest.Context,
+    step: inngest.StepSync,
+) -> int:
+    values = ctx.event.data.get("values")
+    if not isinstance(values, list):
+        raise inngest.NonRetriableError("values must be a list")
+
+    total = 0
+    for value in values:
+        if not isinstance(value, int):
+            raise inngest.NonRetriableError("values must be a list of integers")
+        total += value
+
+    return total
+```
+
+Now, the output of this function is needed in the JavaScript codebase. You can now use `step.invoke()` to call any Inngest function defined in another place of the system like so:
+
+```typescript
+export const hello = inngestClient.createFunction(
+  { id: "hello" },
+  { event: "node-app/hello" },
+  async ({ event, step }) => {
+    const values = [1, 2, 3];
+
+    const totalResult = await step.invoke("get-total", {
+      function: referenceFunction({
+        appId: "python-app", functionId: "total"
+      }),
+      data: { values },
+    });
+
+    return `The Python app says the sum of ${values.join(
+      " + "
+    )} is ${totalResult}`;
+  }
+);
+```
+
+[Explore this example further on GitHub](https://github.com/inngest/inngest-multi-lang).
+
+Invoking another Inngest function is as easy as calling a function within your codebase. Unlike a regular function call, where the caller is responsible for handling retries, the invoked function will be automatically retried as per the function’s retry policy. This allows Inngest to help ensure reliability.
+
+## What’s next?
+
+This is just the beginning of our journey towards becoming fully language-agnostic. As we are battle-testing our SDKs, we would love to hear from you about which SDK or features you’d like to see next. You can share your ideas and upvote existing plans on our roadmap.
+
+If you’re interested to chat with a solutions engineer about language SDKs, [contact us](/contact).
+
+PS - This post is part of a collection of updates and announcements for [Inngest Launch Week](https://inngest.com/launch-week). Come back every day this week for more from our team, or follow us on [Twitter](https://twitter.com/inngest) for the updates.

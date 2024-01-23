@@ -50,6 +50,7 @@ const authorURLs = {
   "Igor Gassmann": "https://twitter.com/i_gassmann",
   "Darwin Wu": "https://twitter.com/67darwin",
   "Joel Hooks": "https://twitter.com/jhooks",
+  "Sylwia Vargas": "https://twitter.com/sylwiavargas",
 };
 
 export default function BlogLayout(props) {

@@ -62,11 +62,6 @@ export default function LaunchWeek() {
         </div>
 
         <Heading title="Monday" />
-        {/*
-          1. Replay
-          2. Cancellation features
-          3. Building the Inngest queue pt 1
-        */}
         <RowItem
           title="Inngest Replay"
           subtitle="The death of the dead-letter queue"
@@ -95,30 +90,22 @@ export default function LaunchWeek() {
         />
 
         <Heading title="Tuesday" />
-        {/*
-          1. Per-step errors
-          2. Clerk partnership
-          3. Svix integration
-        */}
         <RowItem
-          title="..."
-          subtitle="Something is coming soon"
-          image="/assets/launch-week/placeholder-image.png"
+          title="Cross-language support and new Inngest SDKs"
+          subtitle="Python, Go, with more to come"
+          image="/assets/blog/cross-language-support-with-new-sdks/featured-image.png"
           label="New"
-          buttonHref="#"
-          docsHref=""
+          buttonHref="/blog/cross-language-support-with-new-sdks"
           orientation="right"
-          blur={true}
         />
         <RowItem
-          title="..."
-          subtitle="Something is coming soon"
-          image="/assets/launch-week/placeholder-image.png"
+          title="Migrating long running workflows across clouds with zero downtime"
+          subtitle="How the Inngest system is designed to help you migrate with minimal effort"
+          image="/assets/blog/migrating-across-clouds-with-zero-downtime/featured-image.png"
           label="New"
-          buttonHref="#"
-          docsHref=""
+          buttonHref="/blog/migrating-across-clouds-with-zero-downtime"
+          docsHref="/docs/apps/cloud"
           orientation="left"
-          blur={true}
         />
 
         <Heading title="Wednesday" />
