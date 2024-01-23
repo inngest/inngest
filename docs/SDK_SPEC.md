@@ -85,7 +85,7 @@ An Event always has the following structure:
 	id: string;
 
   /**
-   * A unique IDfor the type of event. We recommend using lowercase dot
+   * A unique ID for the type of event. We recommend using lowercase dot
    * notation for names, prepending `prefixes/` with a slash for organization.
    *
    * e.g. `cloudwatch/alarms/triggered`, `cart/session.created`
@@ -148,7 +148,7 @@ An SDK MAY support these optional variables, as well as specify any of their own
 - `INNGEST_LOG_LEVEL`
 Recommended as an environment variable to use when debugging issues with an SDK, allowing a Developer to control the log level of the SDK’s internals.
 - `INNGEST_DEV`
-Recommended as a way for the user to inform an SDK that it should connect to an Inngest Dev Server, either by providing a value of `1` or an origin to use. See Targetting an Inngest Server [4.2.1].
+Recommended as a way for the user to inform an SDK that it should connect to an Inngest Dev Server, either by providing a value of `1` or an origin to use. See Targeting an Inngest Server [4.2.1].
 - `INNGEST_API_ORIGIN`
 Can be used to allow a Developer to inform the SDK of where it can access the target Inngest Server’s API [4.2]. In most situations, use of `INNGEST_DEV` will suffice, but this environment variable provides more fine-grained control.
 - `INNGEST_EVENT_API_ORIGIN`
@@ -232,7 +232,7 @@ If this is checked and the timestamp is not within this time period, the SDK MUS
 
 Note that if the raw bytes of the request body are inaccessible, the body should first be parsed using the JSON Canonicalization Scheme (JCS) as specified in [RFC 8785](https://datatracker.ietf.org/doc/html/rfc8785).
 
-If the generated hash does not exactly match the `s` value in the `X-Inngest-Signature` header, the SDK MUST reject the requets with a `500 Internal Server Error`.
+If the generated hash does not exactly match the `s` value in the `X-Inngest-Signature` header, the SDK MUST reject the requests with a `500 Internal Server Error`.
 
 If these steps have been adhered to, the request is now deemed valid and can be used to trigger the flows that follow.
 
@@ -259,7 +259,7 @@ Authorization: Bearer signkey-prod-3c8335d113497a3a0b3e6bc18c12bf59e3db1c964c9f6
 
 Inngest provides both a hosted Cloud (production) service and a Dev Server which allows local development of Inngest Functions. We refer to both as an Inngest Server.
 
-### 4.2.1. Targetting an Inngest Server
+### 4.2.1. Targeting an Inngest Server
 
 Both kinds of an Inngest Server may be accessible by an application at the same time, so an SDK MUST provide the Developer with an explicit method of connecting to a particular one.
 
@@ -289,13 +289,13 @@ If the `INNGEST_DEV` value is a vcalid [RFC 6454](https://datatracker.ietf.org/d
 
 When receiving requests expected to be from an Inngest Server, an SDK MUST verify their integrity [4.1.3]. An Inngest Dev Server, however, MUST NOT require verification.
 
-If the recommendations when targetting an Inngest Server [4.2.1] are followed, then presence of the `INNGEST_DEV` environment variable (or equivalent runtime configuration option) MUST turn off signature verification.
+If the recommendations when targeting an Inngest Server [4.2.1] are followed, then presence of the `INNGEST_DEV` environment variable (or equivalent runtime configuration option) MUST turn off signature verification.
 
 ### 4.2.3. Proxies and routing
 
 The URL through which an SDK communicates with an Inngest Server may be indirect. In these cases, an SDK SHOULD provide the Developer with a method of setting the origin of API requests and Event ingestion.
 
-We RECOMMEND that a Developer an use the `INNGEST_API_ORIGIN` and `INNGEST_EVENT_API_ORIGIN` environment variables [3.2] for this.
+We RECOMMEND that a Developer can use the `INNGEST_API_ORIGIN` and `INNGEST_EVENT_API_ORIGIN` environment variables [3.2] for this.
 
 ## 4.3. Sync Requests
 
@@ -326,7 +326,7 @@ The numbered statements in the diagram above will be detailed in the following s
 
 ### 4.3.1. Receiving a Sync Request
 
-When an SDK receives a `PUT` request, it is treated as the first step of a Sync. This request can come from automatically from Inngest, from being triggered when using an Inngest UI, or from any `PUT` request, allowing a Developer to manually trigger a deploy by contacting their own service.
+When an SDK receives a `PUT` request, it is treated as the first step of a Sync. This request can come automatically from Inngest, from being triggered when using an Inngest UI, or from any `PUT` request, allowing a Developer to manually trigger a deploy by contacting their own service.
 
 The request is not expected to have any payload. When returning data in later sections, an SDK MUST adhere to the following JSON output:
 
@@ -339,7 +339,7 @@ The request is not expected to have any payload. When returning data in later se
 
 ### 4.3.2. Syncing
 
-Following the receipt of a sync request, an SDK MUST send a `POST` request to Inngest, targetting the Sync Endpoint of the particular Inngest service is it configured to target [4.2].
+Following the receipt of a sync request, an SDK MUST send a `POST` request to Inngest, targeting the Sync Endpoint of the particular Inngest service it is configured to target [4.2].
 
 **Method:** `POST`
 
@@ -479,7 +479,7 @@ A Sync’s payload MUST be the following JSON object:
 
     /**
      * batchEvents specifies the batch configuration on when this function
-     * should be invoked when one of the requirements are fulfilled.
+     * should be invoked when one of the requirements is fulfilled.
      */
     batchEvents?: {
       /**
@@ -517,7 +517,7 @@ A Sync’s payload MUST be the following JSON object:
        * specified, cancellation triggers are valid for up to a year or until the
        * function ends.
        *
-       * The time to wait can be specifed using a Time String or an ISO 8601
+       * The time to wait can be specified using a Time String or an ISO 8601
        * date.
        */
       timeout?: string;
@@ -550,7 +550,7 @@ A Sync’s payload MUST be the following JSON object:
      * the function will not run until at least `period` has elapsed.
      *
      * If any new events are received that match the same debounce `key`, the
-     * function is reshceduled for another `period` delay, and the triggering
+     * function is rescheduled for another `period` delay, and the triggering
      * event is replaced with the latest event received.
      */
     debounce?: {
@@ -641,7 +641,7 @@ If an `X-Inngest-Server-Kind` header was set on the sync request received by the
 
 If Inngest returns a non-`200 OK` status code, the Sync has failed.
 
-A `400 Bad Request` response indicates that either the App and Function configurations passed were invalid, or the Inngest service reaached was not the one that started the deployment, for example if the Inngest Dev Server starts the deployment, but the SDK reaches out to Inngest Cloud.
+A `400 Bad Request` response indicates that either the App and Function configurations passed were invalid, or the Inngest service reached was not the one that started the deployment, for example if the Inngest Dev Server starts the deployment, but the SDK reaches out to Inngest Cloud.
 
 In this case, the response body will be JSON with the following format:
 
@@ -688,7 +688,7 @@ An SDK MUST respond to the initial `PUT` request with either the `modified` valu
 
 A Call Request is a single request from Inngest to an SDK in order to discover work that must be queued or to run blocks of user code defined in Functions or Steps.
 
-Over the course of an executing a Function that makes no use of Steps, the happy path sees Inngest execute a Function only once, where the Function’s contents are run during that Execution and the result returned to Inngest. If this Function fails by user code throwing an error or some external issue such as network issues or out-of-memory errors, Inngest will retry the Function, by executing it again for each retry.
+Over the course of executing a Function that makes no use of Steps, the happy path sees Inngest execute a Function only once, where the Function’s contents are run during that Execution and the result returned to Inngest. If this Function fails by user code throwing an error or some external issue such as network issues or out-of-memory errors, Inngest will retry the Function, by executing it again for each retry.
 
 Steps see the introduction of more complex executions, but will be discussed in the later Steps [5] section.
 
@@ -702,7 +702,7 @@ Added to the URL will be a `fnId` query string parameter, which will contain the
 
 This MUST be used by an SDK to find the correct Function to call. If this Function could not be found, the SDK MUST return a `500 Internal Server Error`.
 
-The body of the reuqest will be a JSON payload with the following format:
+The body of the request will be a JSON payload with the following format:
 
 ```tsx
 {
@@ -814,14 +814,14 @@ When an SDK has now validated the request is from Inngest and has retrieved the 
 An SDK SHOULD provide the Developer’s code with select fields from the Call Request’s payload, ensuring that a Developer can utilize these fields to make appropriate decisions in code and change functionality based on the situation. We RECOMMEND that these values are provided, with casing changed to the most idiomatic casing used in a particular SDK:
 
 - `event` - The entire JSON object passed to the Execution.
-- `events` - The entire array os JSON objects passed to the Execution.
+- `events` - The entire array of JSON objects passed to the Execution.
 - `runId` - Accessed from `ctx.run_id`.
 - `attempt` - Accessed from `ctx.attempt`.
 - `step` - Step tooling as detailed in Steps [5].
 
 An SDK MUST then call the Function and return either the returned value as JSON or an error to Inngest. When responding, an SDK MUST adhere to the requirements of responding to a request from an Inngest Server [4.1.2].
 
-A successful response to Inngest MUST always return `200 OK` with a a JSON payload which is the return value of the function.
+A successful response to Inngest MUST always return `200 OK` with a JSON payload which is the return value of the function.
 
 If the called Function returns/throws/raises an error, the SDK MUST respond with the following JSON payload:
 
@@ -920,7 +920,7 @@ Each object in the array represents a separate step being reported to the Innges
 
 The `id` of each Step MUST be a hex-encoded SHA-1 hash such that the Step can be identified reliably during multiple Call Requests. Commonly, this is done by hashing a human-readable identifier provided by the Developer.
 
-For example, the human-readable identififer `my-step-id` would be hashed as `e7d8a2f140845095749d60246ff1110c9d01d76a`.
+For example, the human-readable identifier `my-step-id` would be hashed as `e7d8a2f140845095749d60246ff1110c9d01d76a`.
 
 IDs are hashed to ensure a consistent length and format across multiple SDKs, allowing cross-language, cross-cloud migrations of Functions mid-Run.
 
@@ -954,7 +954,7 @@ If an object with an `error` key is found, its value will be the final error ret
 }
 ```
 
-`null` can be also be found depending on the Step type [5.3], where the particular Step type being used indicates its meaning.
+`null` can also be found depending on the Step type [5.3], where the particular Step type being used indicates its meaning.
 
 ### 5.2.2. Memoizing a Step
 
@@ -966,7 +966,7 @@ If a Step’s hash is present in the `steps` object passed in the Call Request, 
 
 If a Step is found to have a memoized `error`, an SDK SHOULD create the equivalent of a `StepError` value, passed to the Developer such that they can use it to access the `name`, `message`, and optional `stack` property.
 
-The `StepError` value SHOULD aim to be used as a language-native error, e.g. JavaScript should extend `Error`, Python should extend `Exception`, and Go should implement the `error` interface. This ensures that the Developer can utilize language features such as `error.As()` r `except StepError as e` to appropriately catch and type the error.
+The `StepError` value SHOULD aim to be used as a language-native error, e.g. JavaScript should extend `Error`, Python should extend `Exception`, and Go should implement the `error` interface. This ensures that the Developer can utilize language features such as `error.As()` or `except StepError as e` to appropriately catch and type the error.
 
 ## 5.3. Available step types
 
@@ -1068,7 +1068,7 @@ The memoized result of the Step will be either a `{ data }` or an `{ error }` ob
 
 ### 5.3.2. Sleep
 
-A Sleep Step informs the Inngest Server that the Run wishes to be called again after the given amount of time, specified either as an ISO 8601 date as specified [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339), or a “time string.” The latter “time string” is a sequence of a decimal numbers, each with an optional fraction and unit suffix, such as `"300ms"`, or `"2h45m"`. Valid time units are `"ns"`, `"us"` (or `"µs"`), `"ms"`, `"s"`, `"m"`, `"h"`, `"d"`, and `"w"`.
+A Sleep Step informs the Inngest Server that the Run wishes to be called again after the given amount of time, specified either as an ISO 8601 date as specified [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339), or a “time string.” The latter “time string” is a sequence of decimal numbers, each with an optional fraction and unit suffix, such as `"300ms"`, or `"2h45m"`. Valid time units are `"ns"`, `"us"` (or `"µs"`), `"ms"`, `"s"`, `"m"`, `"h"`, `"d"`, and `"w"`.
 
 When reporting the Step, the SDK MUST use the following schema:
 
@@ -1110,7 +1110,7 @@ When the event is received by the Inngest Server, the Step will be memoized with
 
 - `InvokeFunction` - just `function_id` rn
 
-An Invocation Step informs the Inngest Server that the Run wishes to trigger another Inngest function and wait for the its response. This provides the Developer with a method of composing Functions together.
+An Invocation Step informs the Inngest Server that the Run wishes to trigger another Inngest function and wait for its response. This provides the Developer with a method of composing Functions together.
 
 - `opts.function_id` represents the Function to invoke, referenced by its Composite ID [1.3.3]
 - `opts.payload` is the Event that will be sent to the function to trigger it, omitting the `name`
