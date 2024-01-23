@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -160,7 +161,7 @@ func (s *svc) Run(ctx context.Context) error {
 
 		var err error
 		switch item.Kind {
-		case queue.KindStart, queue.KindEdge, queue.KindSleep:
+		case queue.KindStart, queue.KindEdge, queue.KindSleep, queue.KindEdgeError:
 			err = s.handleQueueItem(ctx, item)
 		case queue.KindPause:
 			err = s.handlePauseTimeout(ctx, item)
@@ -220,9 +221,11 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	// for `tools.sleep` within generator functions.
 	var stackIdx int
 	if item.Kind == queue.KindSleep && item.Attempt == 0 {
-		stackIdx, err = s.state.SaveResponse(ctx, item.Identifier, state.DriverResponse{
-			Step: inngest.Step{ID: edge.Outgoing}, // XXX: Save edge name here.
-		}, 0)
+		if err = s.state.SaveResponse(ctx, item.Identifier, edge.Outgoing, "null"); err != nil {
+			return err
+		}
+		// Load the position within the stack we just saved.
+		stackIdx, err = s.state.StackIndex(ctx, item.Identifier.RunID, edge.Outgoing)
 		if err != nil {
 			return err
 		}
@@ -239,12 +242,17 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	}
 
 	resp, err := s.exec.Execute(ctx, item.Identifier, item, edge, stackIdx)
-
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.
 	if err == state.ErrFunctionCancelled {
 		return nil
 	}
+
+	if errors.Is(err, ErrHandledStepError) {
+		// Retry any next steps.
+		return err
+	}
+
 	if err != nil || resp.Err != nil {
 		// Accordingly, we check if the driver's response is retryable here;
 		// this will let us know whether we can re-enqueue.

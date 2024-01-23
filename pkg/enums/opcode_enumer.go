@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _OpcodeName = "NoneStepStepPlannedSleepWaitForEventInvokeFunction"
+const _OpcodeName = "NoneStepStepRunStepErrorStepPlannedSleepWaitForEventInvokeFunction"
 
-var _OpcodeIndex = [...]uint8{0, 4, 8, 19, 24, 36, 50}
+var _OpcodeIndex = [...]uint8{0, 4, 8, 15, 24, 35, 40, 52, 66}
 
-const _OpcodeLowerName = "nonestepstepplannedsleepwaitforeventinvokefunction"
+const _OpcodeLowerName = "nonestepsteprunsteperrorstepplannedsleepwaitforeventinvokefunction"
 
 func (i Opcode) String() string {
 	if i < 0 || i >= Opcode(len(_OpcodeIndex)-1) {
@@ -27,36 +27,44 @@ func _OpcodeNoOp() {
 	var x [1]struct{}
 	_ = x[OpcodeNone-(0)]
 	_ = x[OpcodeStep-(1)]
-	_ = x[OpcodeStepPlanned-(2)]
-	_ = x[OpcodeSleep-(3)]
-	_ = x[OpcodeWaitForEvent-(4)]
-	_ = x[OpcodeInvokeFunction-(5)]
+	_ = x[OpcodeStepRun-(2)]
+	_ = x[OpcodeStepError-(3)]
+	_ = x[OpcodeStepPlanned-(4)]
+	_ = x[OpcodeSleep-(5)]
+	_ = x[OpcodeWaitForEvent-(6)]
+	_ = x[OpcodeInvokeFunction-(7)]
 }
 
-var _OpcodeValues = []Opcode{OpcodeNone, OpcodeStep, OpcodeStepPlanned, OpcodeSleep, OpcodeWaitForEvent, OpcodeInvokeFunction}
+var _OpcodeValues = []Opcode{OpcodeNone, OpcodeStep, OpcodeStepRun, OpcodeStepError, OpcodeStepPlanned, OpcodeSleep, OpcodeWaitForEvent, OpcodeInvokeFunction}
 
 var _OpcodeNameToValueMap = map[string]Opcode{
 	_OpcodeName[0:4]:        OpcodeNone,
 	_OpcodeLowerName[0:4]:   OpcodeNone,
 	_OpcodeName[4:8]:        OpcodeStep,
 	_OpcodeLowerName[4:8]:   OpcodeStep,
-	_OpcodeName[8:19]:       OpcodeStepPlanned,
-	_OpcodeLowerName[8:19]:  OpcodeStepPlanned,
-	_OpcodeName[19:24]:      OpcodeSleep,
-	_OpcodeLowerName[19:24]: OpcodeSleep,
-	_OpcodeName[24:36]:      OpcodeWaitForEvent,
-	_OpcodeLowerName[24:36]: OpcodeWaitForEvent,
-	_OpcodeName[36:50]:      OpcodeInvokeFunction,
-	_OpcodeLowerName[36:50]: OpcodeInvokeFunction,
+	_OpcodeName[8:15]:       OpcodeStepRun,
+	_OpcodeLowerName[8:15]:  OpcodeStepRun,
+	_OpcodeName[15:24]:      OpcodeStepError,
+	_OpcodeLowerName[15:24]: OpcodeStepError,
+	_OpcodeName[24:35]:      OpcodeStepPlanned,
+	_OpcodeLowerName[24:35]: OpcodeStepPlanned,
+	_OpcodeName[35:40]:      OpcodeSleep,
+	_OpcodeLowerName[35:40]: OpcodeSleep,
+	_OpcodeName[40:52]:      OpcodeWaitForEvent,
+	_OpcodeLowerName[40:52]: OpcodeWaitForEvent,
+	_OpcodeName[52:66]:      OpcodeInvokeFunction,
+	_OpcodeLowerName[52:66]: OpcodeInvokeFunction,
 }
 
 var _OpcodeNames = []string{
 	_OpcodeName[0:4],
 	_OpcodeName[4:8],
-	_OpcodeName[8:19],
-	_OpcodeName[19:24],
-	_OpcodeName[24:36],
-	_OpcodeName[36:50],
+	_OpcodeName[8:15],
+	_OpcodeName[15:24],
+	_OpcodeName[24:35],
+	_OpcodeName[35:40],
+	_OpcodeName[40:52],
+	_OpcodeName[52:66],
 }
 
 // OpcodeString retrieves an enum value from the enum constants string name.

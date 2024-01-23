@@ -33,7 +33,7 @@ func QueueItemIndexerFunc(ctx context.Context, i QueueItem, kg QueueKeyGenerator
 		return QueueItemIndex{
 			kg.Status("start", i.WorkflowID),
 		}
-	case osqueue.KindEdge:
+	case osqueue.KindEdge, osqueue.KindEdgeError:
 		// For edges and sleeps, store an index for the given run ID.
 		return QueueItemIndex{
 			kg.RunIndex(i.Data.Identifier.RunID),

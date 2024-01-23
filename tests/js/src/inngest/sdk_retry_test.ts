@@ -3,7 +3,7 @@ import { inngest } from "@/inngest/client";
 let attempt = 0;
 
 export const testRetry = inngest.createFunction(
-  { name: "SDK Retry Test" },
+  { id: "retry-test" },
   { event: "tests/retry.test" },
   async ({ event, step }) => {
 

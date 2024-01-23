@@ -1,13 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngestgo"
 )
 
@@ -21,13 +21,12 @@ func TestSDKCancelNotReceived(t *testing.T) {
 	}
 
 	hashes := map[string]string{
-		"Sleep 10s":       "af731ad68b75abe9679cc9fc324a4ad3cd8075a2",
-		"After the sleep": "425e4dc05acdef771b3b59a9ebbaae6377bebfc3",
+		"Sleep 10s":       "c3ca5f787365eae0dea86250e27d476406956478",
+		"After the sleep": "dcd448548befa33b66c7a4927d1eac75f6d18107",
 	}
 
-	retries := 10
-	fnID := "test-suite-cancel-test"
 	abstract := Test{
+		ID:   "test-suite-cancel-test",
 		Name: "Cancel test",
 		Description: `
 			This test asserts that steps works across the SDK.  This tests steps and sleeps
@@ -37,32 +36,6 @@ func TestSDKCancelNotReceived(t *testing.T) {
 			- step.sleep
 			- step.run
 		`,
-		Function: inngest.Function{
-			Name: "Cancel test",
-			Slug: fnID,
-			Triggers: []inngest.Trigger{
-				{
-					EventTrigger: &inngest.EventTrigger{
-						Event: "tests/cancel.test",
-					},
-				},
-			},
-			Steps: []inngest.Step{
-				{
-					Name:    "step",
-					ID:      "step",
-					URI:     stepURL(fnID, "step"),
-					Retries: &retries,
-				},
-			},
-			Cancel: []inngest.Cancel{
-				{
-					Event:   "cancel/please",
-					Timeout: strptr("1h"),
-					If:      strptr("async.data.request_id == event.data.request_id"),
-				},
-			},
-		},
 		EventTrigger: evt,
 		Timeout:      20 * time.Second,
 	}
@@ -73,22 +46,16 @@ func TestSDKCancelNotReceived(t *testing.T) {
 		test.SetAssertions(
 			// All executor requests should have this event.
 			test.SetRequestEvent(evt),
-			// And the executor should start its requests with this context.
-			test.SetRequestContext(driver.SDKRequestContext{
-				FunctionID: inngest.DeterministicUUID(abstract.Function),
-				StepID:     "step",
-				Stack: &driver.FunctionStack{
-					Current: 0,
-				},
-			}),
 			test.SendTrigger(),
 
 			// Execute the step again, get a wait
 			test.ExpectRequest("Wait step run", "step", time.Second),
 			test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-				Op:   enums.OpcodeSleep,
-				ID:   hashes["Sleep 10s"],
-				Name: "10s",
+				Op:          enums.OpcodeSleep,
+				ID:          hashes["Sleep 10s"],
+				Name:        "10s",
+				DisplayName: inngestgo.StrPtr("sleep"),
+				Data:        json.RawMessage("null"),
 			}}),
 
 			// Send an unrelated event.
@@ -115,10 +82,11 @@ func TestSDKCancelNotReceived(t *testing.T) {
 			// respond with a step.
 			test.ExpectRequest("After sleep step", "step", 10*time.Second),
 			test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-				Op:   enums.OpcodeStep,
-				ID:   hashes["After the sleep"],
-				Name: "After the sleep",
-				Data: []byte(`"This should be cancelled if a matching cancel event is received"`),
+				Op:          enums.OpcodeStepRun,
+				ID:          hashes["After the sleep"],
+				Name:        "After the sleep",
+				DisplayName: inngestgo.StrPtr("After the sleep"),
+				Data:        []byte(`"This should be cancelled if a matching cancel event is received"`),
 			}}),
 
 			// Update stack and state.  We should now have the step
@@ -128,7 +96,8 @@ func TestSDKCancelNotReceived(t *testing.T) {
 				Current: 2,
 			}),
 			test.AddRequestSteps(map[string]any{
-				hashes["After the sleep"]: "This should be cancelled if a matching cancel event is received",
+				// Data is wrapped.
+				hashes["After the sleep"]: map[string]any{"data": "This should be cancelled if a matching cancel event is received"},
 			}),
 
 			test.ExpectRequest("Final request as cancel didn't match", "step", 1*time.Second),
@@ -149,9 +118,8 @@ func TestSDKCancelReceived(t *testing.T) {
 		User: map[string]interface{}{},
 	}
 
-	retries := 10
-	fnID := "test-suite-cancel-test"
 	abstract := Test{
+		ID:   "test-suite-cancel-test",
 		Name: "Cancel test",
 		Description: `
 			This test asserts that steps works across the SDK.  This tests steps and sleeps
@@ -161,32 +129,6 @@ func TestSDKCancelReceived(t *testing.T) {
 			- step.sleep
 			- step.run
 		`,
-		Function: inngest.Function{
-			Name: "Cancel test",
-			Slug: fnID,
-			Triggers: []inngest.Trigger{
-				{
-					EventTrigger: &inngest.EventTrigger{
-						Event: "tests/cancel.test",
-					},
-				},
-			},
-			Steps: []inngest.Step{
-				{
-					ID:      "step",
-					Name:    "step",
-					URI:     stepURL(fnID, "step"),
-					Retries: &retries,
-				},
-			},
-			Cancel: []inngest.Cancel{
-				{
-					Event:   "cancel/please",
-					Timeout: strptr("1h"),
-					If:      strptr("async.data.request_id == event.data.request_id"),
-				},
-			},
-		},
 		EventTrigger: evt,
 		Timeout:      20 * time.Second,
 	}
@@ -201,8 +143,7 @@ func TestSDKCancelReceived(t *testing.T) {
 			test.SetRequestSteps(map[string]any{}),
 			// And the executor should start its requests with this context.
 			test.SetRequestContext(driver.SDKRequestContext{
-				FunctionID: inngest.DeterministicUUID(abstract.Function),
-				StepID:     "step",
+				StepID: "step",
 				Stack: &driver.FunctionStack{
 					Current: 0,
 				},
@@ -213,9 +154,11 @@ func TestSDKCancelReceived(t *testing.T) {
 			// Execute the step again, get a wait
 			test.ExpectRequest("Wait step run", "step", time.Second),
 			test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-				Op:   enums.OpcodeSleep,
-				ID:   "af731ad68b75abe9679cc9fc324a4ad3cd8075a2",
-				Name: "10s",
+				Op:          enums.OpcodeSleep,
+				ID:          "c3ca5f787365eae0dea86250e27d476406956478",
+				Name:        "10s",
+				DisplayName: inngestgo.StrPtr("sleep"),
+				Data:        json.RawMessage("null"),
 			}}),
 
 			test.After(time.Second),

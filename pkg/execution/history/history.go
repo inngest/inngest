@@ -86,15 +86,17 @@ type InvokeFunctionResult struct {
 }
 
 type Result struct {
-	DurationMS  int                 `json:"response_duration_ms"`
-	ErrorCode   *string             `json:"error_code"`
-	Framework   *string             `json:"framework"`
-	Headers     map[string][]string `json:"response_headers"`
-	Output      string              `json:"output"`
-	RawOutput   any                 `json:"raw_output"`
-	Platform    *string             `json:"platform"`
-	SDKLanguage string              `json:"sdk_language"`
-	SDKVersion  string              `json:"sdk_version"`
-	SizeBytes   int                 `json:"response_size_bytes"`
-	Stack       []map[string]any    `json:"stack"`
+	DurationMS int                 `json:"response_duration_ms"`
+	ErrorCode  *string             `json:"error_code"`
+	Framework  *string             `json:"framework"`
+	Headers    map[string][]string `json:"response_headers"`
+	// Output is either the data or error, depending on the
+	// history type.
+	Output      string           `json:"output"`
+	RawOutput   any              `json:"raw_output"`
+	Platform    *string          `json:"platform"`
+	SDKLanguage string           `json:"sdk_language"`
+	SDKVersion  string           `json:"sdk_version"`
+	SizeBytes   int              `json:"response_size_bytes"`
+	Stack       []map[string]any `json:"stack"`
 }
