@@ -119,9 +119,15 @@ function Description({
   );
 }
 
-export function EmptyAppCard({ children }: { children: React.ReactNode }) {
+export function EmptyAppCard({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className={cardWrapperStyles}>
+    <div className={classNames(cardWrapperStyles, className)}>
       <div className={classNames(cardLeftPanelStyles, 'overflow-hidden')}>
         <Image src={AppDiagramImage} alt="App diagram" />
       </div>
