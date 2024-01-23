@@ -430,7 +430,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition) error {
 	// items are dynamic generators).  This means that we have to delay
 	// processing the partition by N seconds, meaning the latency is increased by
 	// up to this period for scheduled items behind the concurrency limits.
-	_, err := q.PartitionLease(ctx, *p, PartitionLeaseDuration)
+	_, err := q.PartitionLease(ctx, p, PartitionLeaseDuration)
 	if err == ErrPartitionConcurrencyLimit {
 		for _, l := range q.lifecycles {
 			// Track lifecycles; this function hit a partition limit ahead of
@@ -460,6 +460,11 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition) error {
 	// reduce contention.
 	peekCtx, cancel := context.WithTimeout(ctx, PartitionLeaseDuration)
 	defer cancel()
+
+	q.logger.
+		Debug().
+		Interface("partition", p).
+		Msg("leased partition")
 
 	// We need to round ourselves up to the nearest second, then add another second
 	// to peek for jobs in the next <= 1999 milliseconds.
@@ -745,7 +750,15 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 		}()
 
 		go scope.Counter(counterQueueItemsStarted).Inc(1)
-		err := f(jobCtx, qi.Data)
+		err := f(
+			jobCtx,
+			osqueue.RunInfo{
+				Latency:      latency,
+				SojournDelay: sojourn,
+				Priority:     p.Priority,
+			},
+			qi.Data,
+		)
 		extendLeaseTick.Stop()
 		if err != nil {
 			go scope.Counter(counterQueueItemsErrored).Inc(1)

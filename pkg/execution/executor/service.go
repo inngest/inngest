@@ -153,7 +153,7 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 
 func (s *svc) Run(ctx context.Context) error {
 	logger.From(ctx).Info().Msg("subscribing to function queue")
-	return s.queue.Run(ctx, func(ctx context.Context, item queue.Item) error {
+	return s.queue.Run(ctx, func(ctx context.Context, _ queue.RunInfo, item queue.Item) error {
 		// Don't stop the service on errors.
 		s.wg.Add(1)
 		defer s.wg.Done()

@@ -267,7 +267,9 @@ func TestQueueEnqueueItem(t *testing.T) {
 	})
 
 	t.Run("Updates partition vesting time to earlier times", func(t *testing.T) {
-		at := time.Now().Add(-10 * time.Minute).Truncate(time.Second)
+
+		now := time.Now()
+		at := now.Add(-10 * time.Minute).Truncate(time.Second)
 		item, err := q.EnqueueItem(ctx, QueueItem{}, at)
 		require.NoError(t, err)
 
@@ -277,7 +279,8 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			WorkflowID: item.WorkflowID,
 			Priority:   testPriority,
-			AtS:        at.Unix(),
+			// AtS can never be lower than Now()
+			AtS: now.Unix(),
 		}, qp)
 
 		// Assert that the zscore was changed to this earliest timestamp.
@@ -286,7 +289,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, 1, len(keys))
 		score, err := r.ZScore(defaultQueueKey.PartitionIndex(), keys[0])
 		require.NoError(t, err)
-		require.EqualValues(t, at.Unix(), score)
+		require.EqualValues(t, now.Unix(), score)
 	})
 
 	t.Run("Adding another workflow ID increases partition set", func(t *testing.T) {
@@ -1017,7 +1020,7 @@ func TestQueuePartitionLease(t *testing.T) {
 	t.Run("It leases a partition", func(t *testing.T) {
 		// Lease the first item now.
 		leasedAt := time.Now()
-		leaseID, err := q.PartitionLease(ctx, pA, time.Until(leaseUntil))
+		leaseID, err := q.PartitionLease(ctx, &pA, time.Until(leaseUntil))
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
@@ -1049,7 +1052,7 @@ func TestQueuePartitionLease(t *testing.T) {
 		})
 
 		t.Run("It can't lease an existing partition lease", func(t *testing.T) {
-			id, err := q.PartitionLease(ctx, pA, time.Second*29)
+			id, err := q.PartitionLease(ctx, &pA, time.Second*29)
 			require.Equal(t, ErrPartitionAlreadyLeased, err)
 			require.Nil(t, id)
 
@@ -1064,7 +1067,7 @@ func TestQueuePartitionLease(t *testing.T) {
 
 		requirePartitionScoreEquals(t, r, idA, leaseUntil)
 
-		id, err := q.PartitionLease(ctx, pA, time.Second*5)
+		id, err := q.PartitionLease(ctx, &pA, time.Second*5)
 		require.Nil(t, err)
 		require.NotNil(t, id)
 
@@ -1236,7 +1239,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	next := now.Add(5 * time.Second)
 	t.Run("It removes any lease when requeueing", func(t *testing.T) {
 
-		_, err := q.PartitionLease(ctx, QueuePartition{WorkflowID: idA}, time.Minute)
+		_, err := q.PartitionLease(ctx, &QueuePartition{WorkflowID: idA}, time.Minute)
 		require.NoError(t, err)
 
 		err = q.PartitionRequeue(ctx, idA.String(), next, true)

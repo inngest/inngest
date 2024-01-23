@@ -35,6 +35,8 @@ end
 local now_seconds = math.floor(currentTime / 1000)
 local capacity = concurrency -- initialize as the default concurrency limit
 
+local existingTime = existing.last
+
 if concurrency > 0 and #partitionConcurrencyKey > 0 then
 	-- Check that there's capacity for this partition, based off of partition-level
 	-- concurrency keys.
@@ -60,4 +62,4 @@ existing.last = currentTime -- in ms.
 redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
 redis.call("ZADD", partitionIndexKey, leaseTime, partitionID) -- partition scored are in seconds.
 
-return 0
+return existingTime

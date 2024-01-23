@@ -15,7 +15,13 @@ type Queue interface {
 	JobQueueReader
 }
 
-type RunFunc func(context.Context, Item) error
+type RunInfo struct {
+	Latency      time.Duration
+	SojournDelay time.Duration
+	Priority     uint
+}
+
+type RunFunc func(context.Context, RunInfo, Item) error
 
 type Producer interface {
 	// Enqueue allows an item to be enqueued ton run at the given time.

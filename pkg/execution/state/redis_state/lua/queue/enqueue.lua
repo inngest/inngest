@@ -20,6 +20,7 @@ local queueID        = ARGV[2] -- id
 local queueScore     = tonumber(ARGV[3]) -- vesting time, in milliseconds
 local workflowID     = ARGV[4] -- $workflowID
 local partitionItem  = ARGV[5] -- {workflow, priority, leasedAt, etc}
+local partitionTime  = tonumber(ARGV[6]) -- score for partition, lower bounded to now in seconds
 
 -- $include(get_partition_item.lua)
 
@@ -47,14 +48,12 @@ redis.call("HSETNX", partitionKey, workflowID, partitionItem)
 redis.call("HSETNX", partitionCounterKey, "n", 0)   -- Atomic counter, currently leased (in progress) items.
 redis.call("HINCRBY", partitionCounterKey, "len", 1) -- Atomic counter, length of enqueued items, set to 1 or increased.
 
-local partitionScore = math.floor(queueScore / 1000)
-
 -- Get the current score of the partition;  if queueScore < currentScore update the
 -- partition's score so that we can work on this workflow when the earliest member
 -- is available.
 local currentScore = redis.call("ZSCORE", partitionIndexKey, workflowID)
-if currentScore == false or tonumber(currentScore) > partitionScore then
-	redis.call("ZADD", partitionIndexKey, partitionScore, workflowID)
+if currentScore == false or tonumber(currentScore) > partitionTime then
+	redis.call("ZADD", partitionIndexKey, partitionTime, workflowID)
 
 	-- Get the partition item, so that we can keep the last lease score.
 	local existing = get_partition_item(partitionKey, workflowID)
@@ -80,3 +79,5 @@ end
 -- etc:  this can be atomic in the redis queue as it combines state + queue.
 
 return 0
+
+
