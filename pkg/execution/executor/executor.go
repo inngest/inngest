@@ -612,6 +612,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge, resp *state.DriverResponse) error {
 	if resp.Err != nil {
 		// Ensure that we parse output and error messages correctly prior to handling.
+		// TODO: PER-STEP ERRORS
 		resp.Output = resp.UserError()
 	}
 
@@ -1256,7 +1257,7 @@ func (e *executor) HandleGenerator(ctx context.Context, gen state.GeneratorOpcod
 		// then need to coalesce back to a single thread after all 10 have finished.  We expect
 		// drivers/the SDK to return OpcodeNone for all but the last of parallel steps.
 		return nil
-	case enums.OpcodeStep:
+	case enums.OpcodeStep, enums.OpcodeStepRun:
 		return e.handleGeneratorStep(ctx, gen, item, edge)
 	case enums.OpcodeStepPlanned:
 		return e.handleGeneratorStepPlanned(ctx, gen, item, edge)
@@ -1271,6 +1272,8 @@ func (e *executor) HandleGenerator(ctx context.Context, gen state.GeneratorOpcod
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
 }
 
+// handleGeneratorStep handles OpcodeStep and OpcodeStepRun, both indicating that a function step
+// has finished
 func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
 	nextEdge := inngest.Edge{
 		Outgoing: gen.ID,             // Going from the current step
@@ -1283,10 +1286,20 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 			Name: gen.Name,
 		},
 	}
+
 	if gen.Data != nil {
 		if err := json.Unmarshal(gen.Data, &resp.Output); err != nil {
 			resp.Output = gen.Data
 		}
+	}
+
+	// If this is an OpcodeStepRun, we can guarantee that the data is unwrapped.
+	//
+	// We need to wrap the data in a "data" object in the state store so that the
+	// SDK can differentiate between "data" and "error";  per-step errors wraps the
+	// error with "error" and updates step state on the final failure.
+	if gen.Op == enums.OpcodeStepRun {
+		resp.Output = map[string]any{"data": resp.Output}
 	}
 
 	// Save the response to the state store.
@@ -1320,7 +1333,6 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 		// We can't specify step name here since that will result in the
 		// "followup discovery step" having the same name as its predecessor.
 		var stepName *string = nil
-
 		go l.OnStepScheduled(ctx, item.Identifier, nextItem, stepName)
 	}
 

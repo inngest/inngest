@@ -424,7 +424,7 @@ func (r *DriverResponse) HistoryVisibleStep() *GeneratorOpcode {
 	// The other opcodes should not have visible StepCompleted history items.
 	// For example OpcodeWaitForEvent should get a visible StepWaiting instead
 	// of a visible StepCompleted.
-	if op.Op != enums.OpcodeStep {
+	if op.Op != enums.OpcodeStep && op.Op != enums.OpcodeStepRun {
 		return nil
 	}
 
@@ -434,6 +434,7 @@ func (r *DriverResponse) HistoryVisibleStep() *GeneratorOpcode {
 // IsHistoryVisibleStepError returns whether this response is an error from running a
 // step.
 func (r *DriverResponse) IsHistoryVisibleStepError() bool {
+	// TODO: PER STEP ERRORS
 	if step := r.HistoryVisibleStep(); step != nil && isJsonNonNullish(step.Error) {
 		return true
 	}
@@ -459,6 +460,8 @@ func (r *DriverResponse) IsHistoryVisibleStepError() bool {
 //
 // NOTE: There are several required fields:  "name", "message".
 func (r DriverResponse) UserError() map[string]any {
+	// TODO: PER STEP ERRORS
+
 	// Catch step-specific errors first.
 	if r.IsHistoryVisibleStepError() {
 		defaultErrMsg := DefaultStepErrorMessage
