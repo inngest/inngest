@@ -24,9 +24,8 @@ export default function ResyncModal({ isOpen, onClose, url }: Props) {
   const [failure, setFailure] = useState<RegistrationFailure>();
   const [isSyncing, setIsSyncing] = useState(false);
 
-  let input = url;
   if (isURLOverridden) {
-    input = overrideValue;
+    url = overrideValue;
   }
 
   async function onSync() {
@@ -80,7 +79,7 @@ export default function ResyncModal({ isOpen, onClose, url }: Props) {
             <Input
               placeholder="https://example.com/api/inngest"
               name="url"
-              value={input}
+              value={url}
               onChange={(e) => {
                 setOverrideValue(e.target.value);
               }}
