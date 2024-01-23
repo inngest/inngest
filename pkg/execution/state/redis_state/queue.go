@@ -29,9 +29,12 @@ import (
 	"lukechampine.com/frand"
 )
 
-const (
-	PartitionSelectionMax int64 = 35
+var (
+	PartitionSelectionMax int64 = 100
 	PartitionPeekMax      int64 = PartitionSelectionMax * 3
+)
+
+const (
 
 	// PartitionLeaseDuration dictates how long a worker holds the lease for
 	// a partition.  This gives the worker a right to scan all queue items
@@ -693,6 +696,14 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		i.Data.JobID = &i.ID
 	}
 
+	partitionTime := at
+	if at.Before(time.Now()) {
+		// We don't want to enqueue partitions (pointers to fns) before now.
+		// Doing so allows users to stay at the front of the queue for
+		// leases.
+		partitionTime = time.Now()
+	}
+
 	// Get the queue name from the queue item.  This allows utilization of
 	// the partitioned queue for jobs with custom queue names, vs utilizing
 	// workflow IDs in every case.
@@ -702,8 +713,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		QueueName:  i.QueueName,
 		WorkflowID: i.WorkflowID,
 		Priority:   priority,
-		// TODO: REMOVE
-		AtS: at.Unix(),
+		AtS:        partitionTime.Unix(),
 	}
 
 	keys := []string{
@@ -727,6 +737,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		at.UnixMilli(),
 		qn,
 		qp,
+		partitionTime.Unix(),
 	})
 	if err != nil {
 		return i, err
@@ -1212,13 +1223,13 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 // NOTE: This does not check the queue/partition name against allow or denylists;  it assumes
 // that the worker always wants to lease the given queue.  Filtering must be done when peeking
 // when running a worker.
-func (q *queue) PartitionLease(ctx context.Context, p QueuePartition, duration time.Duration) (*ulid.ULID, error) {
+func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration) (*ulid.ULID, error) {
 	var (
 		concurrencyKey string
 		concurrency    = defaultPartitionConcurrency
 	)
 	if q.partitionConcurrencyGen != nil {
-		concurrencyKey, concurrency = q.partitionConcurrencyGen(ctx, p)
+		concurrencyKey, concurrency = q.partitionConcurrencyGen(ctx, *p)
 	}
 
 	// XXX: Check for function throttling prior to leasing;  if it's throttled we can requeue
@@ -1266,6 +1277,11 @@ func (q *queue) PartitionLease(ctx context.Context, p QueuePartition, duration t
 	case -3:
 		return nil, ErrPartitionAlreadyLeased
 	default:
+		// Update the partition's last indicator.
+		if result > p.Last {
+			p.Last = result
+		}
+
 		// If there's no concurrency limit for this partition, return a default
 		// amount so that processing the partition has reasonable limits.
 		if concurrency == 0 {
@@ -1275,11 +1291,6 @@ func (q *queue) PartitionLease(ctx context.Context, p QueuePartition, duration t
 		// result is the available concurrency within this partition
 		return &leaseID, nil
 	}
-}
-
-func (q *queue) PartitionLeaseByID(ctx context.Context, id string, duration time.Duration) (*ulid.ULID, int64, error) {
-	// Fetch the partition.
-	return nil, 0, nil
 }
 
 // PartitionPeek returns up to PartitionSelectionMax partition items from the queue. This
