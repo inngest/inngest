@@ -75,7 +75,7 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
               className="col-span-2"
               detail={
                 app.latestSync && (
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
                     <SyncStatus status={app.latestSync.status} />
                     <InngestLink
                       internalNavigation
@@ -117,7 +117,7 @@ function Description({
   return (
     <div className={className}>
       <dt className="pb-2 text-sm text-slate-400">{term}</dt>
-      <dd className="text-slate-800">{detail ?? ''}</dd>
+      <dd className="leading-8 text-slate-800">{detail ?? ''}</dd>
     </div>
   );
 }
