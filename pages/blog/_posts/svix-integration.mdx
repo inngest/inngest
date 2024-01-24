@@ -1,0 +1,62 @@
+---
+hide: true
+heading: "Svix + Inngest: Reliable Webhook Delivery and Execution"
+subtitle: A new integration enabling Svix customers to quickly integrate with Inngest
+showSubtitle: true
+image: /assets/blog/svix-integration/featured-image.png
+date: 2024-01-24
+author: Dan Farrelly
+disableCTA: true
+---
+
+As companies increasingly reach for third party services to handle key parts of their business, webhooks have become ever more important to keep everything in sync. Instead of periodically synchronizing data, webhooks enable developers to react to updates in other systems in real time, enabling them to build richer experiences for their customers.
+
+Becoming a webhook provider though, is non-trivial. Reliably sending events to thousands of endpoints is prone to lots of challenges around deliverability, retries, and security.
+
+[Svix](https://www.svix.com/) is the easiest way for engineering teams to reliably provide webhooks in their products. Developers from companies like Brex, Clerk, and Resend have used Svix to quickly and reliably allow their customers to subscribe to events in their systems.
+
+While Svix excels at sending webhooks, receiving webhook events is also non-trivial. While it may be simple to start handling events, [scaling webhooks has common pitfalls that can be avoided](/blog/building-webhooks-that-scale).
+
+## Reliable delivery meets reliable execution
+
+Inngest is designed to consume events from any webhook URL reliably. With Inngest, you can create a unique URL to receive events from any webhook, including Svix-powered webhooks. There are a few reasons why to consume webhooks with Inngest:
+
+* All webhook events are immediately matched with any corresponding Inngest functions' triggers and are executed with automatic retries
+* Inngest functions can individually customize the control flow of processing each event like setting max concurrency, adding rate limiting, debounce or prioritization.
+* Webhook payloads can be transformed to customize the shape of the event on receiving..
+* All webhook events are saved for future replay or reference
+
+This makes Svix's reliable delivery and Inngest's reliable execution a perfect match.
+
+![A diagram showing how Svix sends webhook events to Inngest which invokes functions with these events](/assets/blog/svix-integration/svix-inngest-functions.png)
+
+
+## Easily integrating providers and consumers
+
+With Svix's new Inngest _transformation template_, any webhook provider can easily allow their users to set up their Inngest account to start receiving webhook events in seconds. Let's break down what this does:
+
+* Svix customers can now create a new Inngest transform template which will be visible in their App portal
+* All of their users will now be able to select the Inngest transformation template from the embedded Svix app portal
+
+
+![The Svix mangement dashboard showing how to set up the Inngest transformation template](/assets/blog/svix-integration/svix-dashboard.png)
+
+
+_The Svix management dashboard, setting up a new Inngest transformation template_
+
+
+![The Svix app embedded portal dashboard showing the Inngest transformation template](/assets/blog/svix-integration/svix-portal.png)
+
+
+_The embedded Svix app portal (what the user sees) for setting up a new endpoint with Inngest_
+
+
+## Using this today
+
+We're launching this today with support in Clerk's webhook portal! Now all Clerk users can start sending all events to Inngest like `clerk/user.created` or `clerk/role.updated`. Check out more about how to use [Inngest and Clerk in the announcement](/blog/building-auth-workflows-with-clerk-integration).
+
+If you're a Svix customer, today you can set up the Inngest transformation template so your users can easily use your webhook events to trigger their own Inngest functions. It's easy to set up!
+
+If you're a user of one of the many product's whose webhooks are [powered by Svix](https://www.svix.com/), you can request they add the Inngest transformation template today.
+
+We're excited to see how more folks leverage Svix and Inngest together in the future to build amazing developer platforms! Please drop us [any feedback](https://roadmap.inngest.com/) that you have along the way :)
