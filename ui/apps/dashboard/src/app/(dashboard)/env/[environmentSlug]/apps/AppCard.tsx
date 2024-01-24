@@ -94,7 +94,10 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
             <Description detail={app.latestSync?.sdkVersion} term="SDK Version" />
 
             {/* Row 2 */}
-            <Description detail={`${app.functionCount} Functions`} term="Functions" />
+            <Description
+              detail={`${app.functionCount} ${app.functionCount === 1 ? 'Function' : 'Functions'}`}
+              term="Functions"
+            />
           </dl>
         </div>
       </div>
