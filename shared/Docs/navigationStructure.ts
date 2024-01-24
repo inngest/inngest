@@ -135,6 +135,10 @@ const sectionGuides = [
         href: `/docs/guides/user-defined-workflows`,
       },
       {
+        title: "Handling Clerk webhook events",
+        href: `/docs/guides/clerk-webhook-events`,
+      },
+      {
         title: "Trigger code from Retool",
         href: `/docs/guides/trigger-your-code-from-retool`,
       },

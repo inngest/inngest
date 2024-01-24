@@ -115,7 +115,7 @@ export default function LaunchWeek() {
           image="/assets/blog/building-auth-workflows-with-clerk-integration/featured-image.png"
           label="New"
           buttonHref="/blog/building-auth-workflows-with-clerk-integration"
-          // docsHref=""
+          docsHref="/docs/guides/clerk-webhook-events"
           orientation="right"
         />
         <RowItem
