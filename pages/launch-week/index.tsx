@@ -109,46 +109,27 @@ export default function LaunchWeek() {
         />
 
         <Heading title="Wednesday" />
-        {/*
-          1. Per-step errors
-          2. Clerk partnership
-          3. Svix integration
-        */}
         <RowItem
-          title="..."
-          subtitle="Something is coming soon"
-          image="/assets/launch-week/placeholder-image.png"
+          title="Building auth workflows with Clerk webhooks"
+          subtitle="A new webhook integration with Clerk"
+          image="/assets/blog/building-auth-workflows-with-clerk-integration/featured-image.png"
           label="New"
-          buttonHref="#"
-          docsHref=""
+          buttonHref="/blog/building-auth-workflows-with-clerk-integration"
+          // docsHref=""
           orientation="right"
-          blur={true}
         />
         <RowItem
-          title="..."
-          subtitle="Something is coming soon"
-          image="/assets/launch-week/placeholder-image.png"
+          title="Svix + Inngest: Reliable Webhook Delivery and Execution"
+          subtitle="A new integration for Svix customers"
+          image="/assets/blog/svix-integration/featured-image.png"
           label="New"
-          buttonHref="#"
-          docsHref=""
+          buttonHref="/blog/svix-integration"
           orientation="left"
-          blur={true}
-        />
-        <RowItem
-          title="..."
-          subtitle="Something is coming soon"
-          image="/assets/launch-week/placeholder-image.png"
-          label="New"
-          buttonHref="#"
-          docsHref=""
-          orientation="right"
-          blur={true}
         />
 
         <Heading title="Thursday" />
         {/*
-          1. Funding annoncement
-          2. Multi-account (stretch goal)
+          1. Per-step errors
         */}
         <RowItem
           title="..."
@@ -158,34 +139,13 @@ export default function LaunchWeek() {
           buttonHref="#"
           docsHref=""
           orientation="left"
-          blur={true}
-        />
-        <RowItem
-          title="..."
-          subtitle="Something is coming soon"
-          image="/assets/launch-week/placeholder-image.png"
-          label="New"
-          buttonHref="#"
-          docsHref=""
-          orientation="right"
           blur={true}
         />
 
         <Heading title="Friday" />
         {/*
           1. Event API v2 - globally deployed for speed
-          2. Multi-account (stretch goal)
         */}
-        <RowItem
-          title="..."
-          subtitle="Something is coming soon"
-          image="/assets/launch-week/placeholder-image.png"
-          label="New"
-          buttonHref="#"
-          docsHref=""
-          orientation="left"
-          blur={true}
-        />
         <RowItem
           title="..."
           subtitle="Something is coming soon"
@@ -347,6 +307,8 @@ function RowItem({
               "mb-2 text-xl leading-snug font-extrabold",
               title.length > 30 ? "md:text-2xl" : "md:text-[32px]"
             )}
+            // @ts-ignore
+            style={{ textWrap: "pretty" }}
           >
             {title}
           </h3>
