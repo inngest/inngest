@@ -1,7 +1,7 @@
 ---
 hide: true
 heading: Building auth workflows with Clerk and Inngest
-subtitle: How to use the new integration to use Clerk events to trigger Inngest functions
+subtitle: How to trigger Inngest functions with use Clerk events in the new integration 
 showSubtitle: true
 image: /assets/blog/building-auth-workflows-with-clerk-integration/featured-image.png
 date: 2024-01-24
@@ -54,7 +54,7 @@ You could write your own webhook handler for Clerk, but using Inngest for webhoo
 * Manage concurrency with configurable limits to the exact level of concurrent events processed to avoid overwhelming your database or APIs, enabling you to operate and scale webhooks.Inngest is designed to handle high load so you don't need to worry about [the pitfalls of operating and scaling webhooks](/blog/building-webhooks-that-scale).
 * [Fan-out events to multiple functions](/docs/guides/fan-out-jobs) to run work in parallel, each with automatic retries. You can have two jobs.
 * Create complex workflows that require multiple steps that are each automatically retried (a la transactions).
-* Delay certain tasks for hours or days with [step.sleep()](/docs/reference/functions/step-sleep) or [step.sleepUntil()](/docs/reference/functions/step-sleep-until).
+* Delay certain tasks for hours or days with [`step.sleep()`](/docs/reference/functions/step-sleep) or [`step.sleepUntil()`](/docs/reference/functions/step-sleep-until).
 
 
 ## See it in action
@@ -115,7 +115,7 @@ const createTrial = inngest.createFunction(
 )
 ```
 
-With these two functions, we might then extend one of them to, for example, send an email midway through the trial. This is as easy as adding step.sleep() and another step to send the email. You just created a drip campaign triggered from the original Clerk event in a few lines of code!
+With these two functions, we might then extend one of them to, for example, send an email midway through the trial. This is as easy as adding `step.sleep()` and another step to send the email. You just created a drip campaign triggered from the original Clerk event in a few lines of code!
 
 ```typescript
 await step.sleep('7d');
