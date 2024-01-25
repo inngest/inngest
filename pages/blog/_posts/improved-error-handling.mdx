@@ -70,22 +70,32 @@ This improvement is now also included in our Go SDK which uses idiomatic error h
 inngestgo.CreateFunction(
 	inngestgo.FunctionOpts{ID: "import-account-data"},
 	inngestgo.EventTrigger("app/account.connected", nil),
-	func (ctx context.Context, input inngestgo.Input[AccountConnectedEvent]) (any, error) {
-
-	  // Perform a step, and if it fails, ensure that we clean up any partially imported data
-	  data, err := step.Run(ctx, "import-data", func(ctx context.Context) (bool, error) {
-		  // omitted for the sake of brevity
-		  return result, err
-	  })
-	  if err != nil {
-		  _, cleanupErr := step.Run(ctx, "cleanup-failed-import", func(ctx context.Context) (bool, error) {
-			  // omitted for the sake of brevity
-			  return result, err
-		  })
-		  return nil, errors.Join(cleanupErr, err)
-	  }
-
-	  return nil, nil
+	func (
+		ctx context.Context,
+		input inngestgo.Input[AccountConnectedEvent]
+	) (any, error) {
+		// Attempt to import data
+		data, err := step.Run(
+			ctx,
+			"import-data",
+			func(ctx context.Context) (bool, error) {
+				// omitted for the sake of brevity
+				return result, err
+			}
+		)
+		// If it fails, ensure that we cleanup any partially imported data
+		if err != nil {
+			_, cleanupErr := step.Run(
+				ctx,
+				"cleanup-failed-import",
+				func(ctx context.Context) (bool, error) {
+					// omitted for the sake of brevity
+					return result, err
+				}
+			)
+			return nil, errors.Join(cleanupErr, err)
+		}
+		return nil, nil
 	}
 }
 ```
