@@ -43,6 +43,7 @@ const cardWrapperStyles =
 const cardLeftPanelStyles = 'bg-slate-910 flex w-[410px] flex-col justify-center gap-2 px-10';
 
 export function AppCard({ app, className, envSlug, isArchived }: Props) {
+  const latestSyncURL = app.latestSync?.url?.replace(/^https:\/\//, '').replace(/\?.+$/, '');
   return (
     <div className={classNames(cardWrapperStyles, className)}>
       <div className={cardLeftPanelStyles}>
@@ -56,10 +57,15 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
             <ChevronRightIcon className="h-4 w-4" />
           </Link>
         </h2>
-        {app.latestSync?.url && (
+        {latestSyncURL && (
           <dl>
             <dt className="hidden">URL</dt>
-            <dd className="text-slate-400">{app.latestSync.url}</dd>
+            <dd
+              className="overflow-hidden text-ellipsis whitespace-nowrap text-slate-400"
+              title={app.latestSync?.url || ''}
+            >
+              {latestSyncURL}
+            </dd>
           </dl>
         )}
       </div>
