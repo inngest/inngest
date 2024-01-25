@@ -1,6 +1,3 @@
-import { createElement } from 'react';
-import Link from 'next/link';
-
 const kindStyles = {
   solid: 'border-slate-600 bg-slate-600 text-white',
 };

@@ -6,10 +6,6 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import cn from '@/utils/cn';
 import { calendarTime, hourTime } from '@/utils/date';
 
-type NestedKeyOf<T> = {
-  [Values in keyof T]: T[Values];
-};
-
 type BarChartProps = {
   className?: string;
   height?: number;

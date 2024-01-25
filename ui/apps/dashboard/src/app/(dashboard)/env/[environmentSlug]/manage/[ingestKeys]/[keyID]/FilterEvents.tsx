@@ -20,7 +20,7 @@ type FilterEventsProps = {
   };
 };
 
-export default function FilterEvents({ keyID, filter, keyName }: FilterEventsProps) {
+export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
   const [newFilter, setNewFilter] = useState(filter);
   const [isDisabled, setDisabled] = useState(true);
   const { save } = useContext(Context);

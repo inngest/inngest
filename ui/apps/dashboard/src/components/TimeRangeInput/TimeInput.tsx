@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useReducer, useRef } from 'react';
+import { useReducer, useRef } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import * as chrono from 'chrono-node';
 import { useDebounce } from 'react-use';
@@ -123,7 +123,7 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
     [state.inputString]
   );
 
-  function handleInputFocus(event: React.FocusEvent<HTMLInputElement>) {
+  function handleInputFocus() {
     dispatch({ type: 'focused' });
   }
 

@@ -49,7 +49,7 @@ export default function ConfirmPlanChangeModal({
     if (!planID) {
       return setUiError('Unable to change your plan - Invalid Plan ID. Please contact support.');
     }
-    const res = await updatePlan({ planID });
+    await updatePlan({ planID });
     onSuccess();
   };
 
