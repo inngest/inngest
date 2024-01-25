@@ -41,6 +41,7 @@ type SimpleLineChartProps = {
     name: string;
     color: string;
     default?: boolean;
+    referenceArea?: boolean;
   }[];
   isLoading: boolean;
   error?: Error;
@@ -79,6 +80,12 @@ function CustomizedYAxisTick(props: AxisProps) {
   );
 }
 
+function omit(obj: Record<string, any>, props: string[]) {
+  obj = { ...obj };
+  props.forEach((prop) => delete obj[prop]);
+  return obj;
+}
+
 export default function SimpleLineChart({
   className = '',
   height = 200,
@@ -89,9 +96,14 @@ export default function SimpleLineChart({
   isLoading,
   error,
 }: SimpleLineChartProps) {
+  const referenceAreas = useMemo(() => legend.filter((k) => k.referenceArea), [legend]);
+  const referenceAreaKeys = referenceAreas.map((k) => k.dataKey);
   const flattenData = useMemo(() => {
-    return data.map((d) => ({ ...d.values, name: d.name }));
-  }, [data]);
+    return data.map((d) => {
+      const values = omit(d.values, referenceAreaKeys);
+      return { ...values, name: d.name };
+    });
+  }, [data, referenceAreaKeys]);
 
   return (
     <div className={cn('border-b border-slate-200 bg-white px-6 py-4', className)}>
@@ -160,18 +172,20 @@ export default function SimpleLineChart({
                 stroke="red"
                 fill="red"
               />
-              {data.map(({ name, values }, index) => {
-                if (!values.concurrencyLimit) return;
-                return (
-                  <ReferenceArea
-                    key={name}
-                    x1={name}
-                    x2={index < data.length - 1 ? data[index + 1]!.name : name}
-                    fill={colors.amber['500']}
-                    fillOpacity={0.15}
-                  />
-                );
-              })}
+              {referenceAreas.map((k) =>
+                data.map(({ name, values }, index) => {
+                  if (!values[k.dataKey]) return;
+                  return (
+                    <ReferenceArea
+                      key={`${name}+${k.dataKey}`}
+                      x1={name}
+                      x2={index < data.length - 1 ? data[index + 1]!.name : name}
+                      fill={k.color}
+                      fillOpacity={0.15}
+                    />
+                  );
+                })
+              )}
               <ChartTooltip
                 content={(props) => {
                   const { label, payload } = props;
