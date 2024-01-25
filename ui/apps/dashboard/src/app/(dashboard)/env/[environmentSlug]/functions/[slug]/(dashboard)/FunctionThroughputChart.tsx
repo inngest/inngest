@@ -108,7 +108,12 @@ export default function FunctionThroughputChart({
       desc="The number of function runs being processed over time."
       data={metrics}
       legend={[
-        { name: 'Concurrency Limit', dataKey: 'concurrencyLimit', color: colors.amber['500'] },
+        {
+          name: 'Concurrency Limit',
+          dataKey: 'concurrencyLimit',
+          color: colors.amber['500'],
+          referenceArea: true,
+        },
         { name: 'Queued', dataKey: 'queued', color: colors.slate['500'] },
         { name: 'Started', dataKey: 'started', color: colors.sky['500'] },
         { name: 'Ended', dataKey: 'ended', color: colors.teal['500'] },
