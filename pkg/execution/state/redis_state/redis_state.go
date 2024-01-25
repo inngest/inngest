@@ -223,14 +223,6 @@ func WithKeyGenerator(kf KeyGenerator) Opt {
 	}
 }
 
-// WithOnComplete supplies a callback which is triggered any time a function
-// run completes.
-func WithFunctionCallbacks(f ...state.FunctionCallback) Opt {
-	return func(m *mgr) {
-		m.callbacks = f
-	}
-}
-
 // WithFunctionLoader adds a function loader to the state interface.
 //
 // As of v0.13.0, function configuration is stored outside of the state store,
@@ -250,24 +242,6 @@ type mgr struct {
 	r rueidis.Client
 	// this is the redis client for managing pauses.
 	pauseR rueidis.Client
-
-	callbacks []state.FunctionCallback
-}
-
-// OnFunctionStatus adds a callback to be called whenever functions
-// transition status.
-func (m *mgr) OnFunctionStatus(f state.FunctionCallback) {
-	m.callbacks = append(m.callbacks, f)
-}
-
-func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {
-	// Replace the context so that this isn't cancelled by any parents.
-	callCtx := context.Background()
-	for _, f := range m.callbacks {
-		go func(fn state.FunctionCallback) {
-			fn(callCtx, id, status)
-		}(f)
-	}
 }
 
 func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
@@ -335,8 +309,6 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 	if status == 1 {
 		return nil, state.ErrIdentifierExists
 	}
-
-	go m.runCallbacks(ctx, input.Identifier, enums.RunStatusRunning)
 
 	return state.NewStateInstance(
 			*f,
@@ -419,7 +391,6 @@ func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 	}
 	switch status {
 	case 0:
-		go m.runCallbacks(ctx, id, enums.RunStatusCancelled)
 		return nil
 	case 1:
 		return state.ErrFunctionComplete
@@ -439,7 +410,7 @@ func (m mgr) SetStatus(ctx context.Context, id state.Identifier, status enums.Ru
 		return err
 	}
 
-	ret, err := scripts["setStatus"].Exec(
+	_, err = scripts["setStatus"].Exec(
 		ctx,
 		m.r,
 		[]string{m.kf.RunMetadata(ctx, id.RunID)},
@@ -448,11 +419,7 @@ func (m mgr) SetStatus(ctx context.Context, id state.Identifier, status enums.Ru
 	if err != nil {
 		return fmt.Errorf("error cancelling: %w", err)
 	}
-	if ret == 0 {
-		go m.runCallbacks(ctx, id, status)
-		return nil
-	}
-	return fmt.Errorf("unknown return value cancelling function: %d", status)
+	return nil
 }
 
 func (m mgr) Metadata(ctx context.Context, runID ulid.ULID) (*state.Metadata, error) {
@@ -568,58 +535,29 @@ func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (in
 	return 0, fmt.Errorf("step not found in stack: %s", stepID)
 }
 
-func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (int, error) {
-	var (
-		data any
-		err  error
-	)
+func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) error {
 
-	if r.Err == nil {
-		if data, err = json.Marshal(r.Output); err != nil {
-			return 0, fmt.Errorf("error marshalling step output: %w", err)
-		}
-	} else {
-		data = output(map[string]any{
-			"error":  r.Err,
-			"output": r.Output,
-		})
+	keys := []string{
+		m.kf.Actions(ctx, i),
+		m.kf.RunMetadata(ctx, i.RunID),
+		m.kf.Stack(ctx, i.RunID),
 	}
-
-	args, err := StrSlice([]any{
-		data,
-		r.Step.ID,
-		r.Err != nil,
-		r.Final(),
-	})
-	if err != nil {
-		return 0, err
-	}
+	args := []string{stepID, marshalledOuptut}
 
 	index, err := scripts["saveResponse"].Exec(
 		ctx,
 		m.r,
-		[]string{
-			m.kf.Actions(ctx, i),
-			m.kf.Errors(ctx, i),
-			m.kf.RunMetadata(ctx, i.RunID),
-			m.kf.Stack(ctx, i.RunID),
-		},
+		keys,
 		args,
 	).AsInt64()
 	if err != nil {
-		return 0, fmt.Errorf("error saving response: %w", err)
+		return fmt.Errorf("error saving response: %w", err)
 	}
 	if index == -1 {
 		// This is a duplicate response, so we don't need to do anything.
-		return 0, state.ErrDuplicateResponse
+		return state.ErrDuplicateResponse
 	}
-
-	if r.Err != nil && r.Final() {
-		// Trigger error callbacks
-		go m.runCallbacks(ctx, i, enums.RunStatusFailed)
-	}
-
-	return int(index), nil
+	return nil
 }
 
 func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
@@ -1295,14 +1233,6 @@ func (r runMetadata) Metadata() state.Metadata {
 		m.RunType = &r.RunType
 	}
 	return m
-}
-
-// output is a map which implements BinaryMarshaller, for inserting data within
-// history items.
-type output map[string]any
-
-func (o output) MarshalBinary() ([]byte, error) {
-	return json.Marshal(o)
 }
 
 func StrSlice(args []any) ([]string, error) {

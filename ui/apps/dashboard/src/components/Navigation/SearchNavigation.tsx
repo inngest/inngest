@@ -5,7 +5,7 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
-import { ArrowUturnRightIcon } from '@heroicons/react/20/solid';
+import { ArrowUturnRightIcon, MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
@@ -61,12 +61,11 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const resultRef = useRef<HTMLLIElement>(null);
   const router = useRouter();
   const { user } = useUser();
-
-  const [searchResult, setSearchResult] = useState({
+  let searchResult = {
     type: '',
     href: '',
     name: '',
-  });
+  };
 
   useEffect(() => {
     let debounce = setTimeout(() => {
@@ -137,21 +136,21 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
    * Generates the result to be displayed to the user
    */
   if (globalResults?.value.__typename === 'FunctionRun' && functionResults) {
-    setSearchResult({
+    searchResult = {
       type: 'function',
       href: `/env/${environmentSlug}/functions/${encodeURIComponent(functionResults.slug)}/logs/${
         globalResults.value.id
       }`,
       name: functionResults.name || '',
-    });
+    };
   } else if (globalResults?.value.__typename === 'ArchivedEvent') {
-    setSearchResult({
+    searchResult = {
       type: 'event',
       href: `/env/${environmentSlug}/events/${encodeURIComponent(globalResults.value.name)}/logs/${
         globalResults.value.id
       }`,
       name: globalResults.value.name,
-    });
+    };
   }
 
   /*
@@ -180,7 +179,7 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
   return (
     <Modal
-      backdropClassName="bg-white/30 backdrop-blur-[2px]"
+      backdropClassName="bg-black/50 backdrop-blur-[2px]"
       className="ml-auto mr-auto flex max-w-2xl self-start p-0 shadow"
       isOpen={isOpen}
       onClose={onClose}
@@ -273,23 +272,23 @@ export default function SearchNavigation() {
 
   return (
     <>
-      <div className="ml-auto mr-4 block max-w-xs flex-auto">
-        <button
-          type="button"
-          className="flex h-8 w-full items-center gap-2 rounded-lg bg-slate-800 pl-2 pr-3 text-sm text-slate-400 ring-inset ring-white/10 transition hover:text-white hover:ring-white/20"
-          onClick={() => setIsSearchModalVisible(true)}
-        >
-          Search by ID...
-          <kbd className="ml-auto flex items-center gap-1">
-            <kbd className="ml-auto flex h-6 w-6 items-center justify-center rounded bg-slate-600 font-sans text-xs text-white">
-              {modifierKey}
-            </kbd>
-            <kbd className="ml-auto flex h-6 w-6 items-center justify-center rounded bg-slate-600 font-sans text-xs text-white">
-              K
-            </kbd>
-          </kbd>
-        </button>
-      </div>
+      <button
+        type="button"
+        className="mr-4 flex items-center rounded-lg bg-slate-800 py-1 text-sm text-slate-400 ring-inset ring-white/10 transition hover:text-white hover:ring-white/20"
+        onClick={() => setIsSearchModalVisible(true)}
+        aria-label="Search by ID"
+      >
+        <div className="flex items-center gap-1 px-2">
+          <MagnifyingGlassIcon className="h-4 w-4" />
+          ID
+        </div>
+
+        <kbd className="flex items-center border-l border-slate-400 px-2">
+          <kbd className="font-sans">{modifierKey}</kbd>
+          <kbd className="font-sans">K</kbd>
+        </kbd>
+      </button>
+
       <SearchModal isOpen={isSearchModalVisible} onClose={() => setIsSearchModalVisible(false)} />
     </>
   );

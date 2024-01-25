@@ -118,7 +118,7 @@ export function FrameworkInfo({ framework }: Props) {
 
   return (
     <span className="flex">
-      {Icon && <Icon className="mr-1" size={20} />}
+      {Icon && <Icon className="mr-1 text-slate-500" size={20} />}
       {text}
     </span>
   );

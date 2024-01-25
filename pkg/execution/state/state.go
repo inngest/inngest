@@ -306,15 +306,14 @@ type Mutater interface {
 
 	// SaveResponse saves the driver response for the attempt to the backing state store.
 	//
-	// If the response is an error, this must store the error for the specific attempt, allowing
-	// visibility into each error when executing a step. If DriverResponse is final, this must push
-	// the step ID to the stack.
-	//
-	// Attempt is zero-indexed.
-	//
-	// This returns the position of this step in the stack, if the stack is modified.  For temporary
-	// errors the stack position is 0, ie. unmodified.
-	SaveResponse(ctx context.Context, i Identifier, r DriverResponse, attempt int) (int, error)
+	// SaveResponse must only be called to commit a steps data to state, eg. for final errors
+	// or for step output.
+	SaveResponse(
+		ctx context.Context,
+		i Identifier,
+		stepID string,
+		marshalledOutput string,
+	) error
 }
 
 // Input is the input for creating new state.  The required fields are Workflow,

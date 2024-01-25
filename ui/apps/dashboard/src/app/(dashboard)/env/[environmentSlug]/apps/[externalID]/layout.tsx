@@ -3,8 +3,11 @@
 import { Squares2X2Icon } from '@heroicons/react/20/solid';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
+import { Alert } from '@/components/Alert';
 import Header, { type HeaderLink } from '@/components/Header/Header';
-import { useAppName } from './useAppName';
+import { Time } from '@/components/Time';
+import { ResyncButton } from './ResyncButton';
+import { useNavData } from './useNavData';
 
 type Props = React.PropsWithChildren<{
   params: {
@@ -16,18 +19,21 @@ export default function Layout({ children, params: { externalID } }: Props) {
   externalID = decodeURIComponent(externalID);
   const env = useEnvironment();
 
-  const res = useAppName({
+  const res = useNavData({
     envID: env.id,
     externalAppID: externalID,
   });
   if (res.error) {
     if (res.error.message.includes('no rows')) {
-      // TODO: Make this look better.
-      return <span className="m-auto">App not found: {externalID}</span>;
+      return (
+        <div className="mt-4 flex place-content-center">
+          <Alert severity="warning">{externalID} app not found in this environment</Alert>
+        </div>
+      );
     }
     throw res.error;
   }
-  if (res.isLoading) {
+  if (res.isLoading && !res.data) {
     return null;
   }
 
@@ -44,14 +50,23 @@ export default function Layout({ children, params: { externalID } }: Props) {
     },
   ];
 
+  let action;
+  if (res.data.latestSync?.url) {
+    const canResync = res.data.latestSync.platform !== 'vercel';
+    if (canResync) {
+      action = <ResyncButton latestSyncUrl={res.data.latestSync.url} />;
+    }
+  }
+
   return (
     <>
       <Header
+        action={action}
         icon={<Squares2X2Icon className="h-5 w-5 text-white" />}
         links={navLinks}
-        title={res.data}
+        title={res.data.name}
       />
-      <div className="h-full overflow-y-auto bg-slate-100">{children}</div>
+      <div className="h-full overflow-hidden bg-slate-100">{children}</div>
     </>
   );
 }

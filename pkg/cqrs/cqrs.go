@@ -18,8 +18,10 @@ type DBWriter interface {
 type Manager interface {
 	ExecutionLoader
 
+	// Embed the development function manager for now.
+	DevFunctionManager
+
 	AppManager
-	FunctionManager
 	FunctionRunManager
 	EventManager
 	HistoryManager

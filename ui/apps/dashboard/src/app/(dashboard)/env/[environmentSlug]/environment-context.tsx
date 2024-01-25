@@ -6,7 +6,7 @@ import LoadingIcon from '@/icons/LoadingIcon';
 import { useEnvironments } from '@/queries';
 import type { Environment } from '@/utils/environments';
 
-const EnvironmentContext = createContext<Environment | undefined>(undefined);
+export const EnvironmentContext = createContext<Environment | undefined>(undefined);
 
 type EnvironmentProviderProps = {
   environmentSlug: string;

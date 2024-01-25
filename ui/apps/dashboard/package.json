@@ -13,7 +13,7 @@
     "dev": "pnpm install && concurrently --prefix-colors \"green.inverse,magenta.inverse,blue.inverse\" pnpm:dev:*",
     "dev:next": "next dev",
     "dev:graphql-codegen": "graphql-codegen -w",
-    "build": "pnpm graphql-codegen && next build",
+    "build": "if test \"$VERCEL_ENV\" = \"production\"; then pnpm graphql-codegen && next build; else next build; fi",
     "start": "next start",
     "lint": "next lint",
     "graphql-codegen": "graphql-codegen",
@@ -26,7 +26,7 @@
     "preinstall": "npx only-allow pnpm"
   },
   "dependencies": {
-    "@clerk/nextjs": "4.27.3",
+    "@clerk/nextjs": "4.29.3",
     "@graphql-typed-document-node/core": "3.2.0",
     "@headlessui/react": "1.7.17",
     "@headlessui/tailwindcss": "0.1.2",

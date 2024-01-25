@@ -12,7 +12,7 @@ const CollapsibleCardItem = forwardRef<
     <AccordionPrimitive.Item
       {...props}
       ref={forwardedRef}
-      className="mb-4 rounded-lg border border-slate-300 bg-white"
+      className="rounded-lg border border-slate-300 bg-white"
     >
       {children}
     </AccordionPrimitive.Item>
@@ -30,10 +30,10 @@ const CollapsibleCardContent = forwardRef<
   return (
     <AccordionPrimitive.Content {...props} ref={forwardedRef} forceMount>
       <motion.div
-        initial={{ y: -20, opacity: 0.2 }}
+        initial={{ y: 0, opacity: 0.2 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{
-          y: -20,
+          y: 0,
           opacity: 0.2,
           transition: { duration: 0.2, type: 'tween' },
         }}

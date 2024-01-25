@@ -27,6 +27,14 @@ const FONT = {
 
 type MonacoEditorType = editor.IStandaloneCodeEditor | null;
 
+export type CodeBlockAction = {
+  label: string;
+  title?: string;
+  icon?: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+};
+
 interface CodeBlockProps {
   header?: {
     title?: string;
@@ -40,13 +48,7 @@ interface CodeBlockProps {
     language?: string;
     handleChange?: (value: string) => void;
   }[];
-  actions?: {
-    label: string;
-    title?: string;
-    icon?: React.ReactNode;
-    onClick: () => void;
-    disabled?: boolean;
-  }[];
+  actions?: CodeBlockAction[];
 }
 
 export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {

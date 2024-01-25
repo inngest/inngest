@@ -23,9 +23,10 @@ export function renderOutput({
     if (!isSuccess && !isOutputTooLarge) {
       try {
         const jsonObject = JSON.parse(content);
-        errorName = jsonObject?.name;
-        message = jsonObject?.message;
-        output = jsonObject?.stack;
+        const error = jsonObject?.error ?? jsonObject;
+        errorName = error?.name;
+        message = error?.message;
+        output = error?.stack;
       } catch (error) {
         console.error("Error parsing 'jsonObject' JSON:", error);
       }

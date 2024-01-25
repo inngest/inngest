@@ -108,7 +108,7 @@ func (l lifecycle) OnFunctionStarted(
 		)
 	}
 
-	latency, _ := redis_state.GetItemLatency(ctx)
+	latency, _ := redis_state.GetItemSystemLatency(ctx)
 	latencyMS := latency.Milliseconds()
 
 	h := History{
@@ -130,7 +130,7 @@ func (l lifecycle) OnFunctionStarted(
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
-			l.log.Error("execution lifecycle error", "lifecycle", "onStepFinished", "error", err)
+			l.log.Error("execution lifecycle error", "lifecycle", "onFunctionStarted", "error", err)
 		}
 	}
 }
@@ -299,7 +299,7 @@ func (l lifecycle) OnStepStarted(
 		)
 	}
 
-	latency, _ := redis_state.GetItemLatency(ctx)
+	latency, _ := redis_state.GetItemSystemLatency(ctx)
 	latencyMS := latency.Milliseconds()
 
 	h := History{
@@ -396,13 +396,18 @@ func (l lifecycle) OnStepFinished(
 		}
 	}
 
-	// TODO: CompletedStepCount
-
 	if resp.Err != nil && resp.Retryable() {
 		h.Type = enums.HistoryTypeStepErrored.String()
 	}
 	if resp.Err != nil && !resp.Retryable() {
 		h.Type = enums.HistoryTypeStepFailed.String()
+	}
+
+	if len(resp.Generator) == 1 && resp.Generator[0].Op == enums.OpcodeStepError {
+		h.Type = enums.HistoryTypeStepErrored.String()
+		if resp.NoRetry {
+			h.Type = enums.HistoryTypeStepFailed.String()
+		}
 	}
 
 	for _, d := range l.drivers {
@@ -713,7 +718,7 @@ func applyResponse(
 		if op := resp.HistoryVisibleStep(); op != nil {
 			h.StepID = &op.ID
 			h.StepType = getStepType(*op)
-			h.Result.Output = op.Output()
+			h.Result.Output, _ = op.Output()
 			stepName := op.UserDefinedName()
 			h.StepName = &stepName
 		}
@@ -769,12 +774,14 @@ func getStepType(opcode state.GeneratorOpcode) *enums.HistoryStepType {
 	switch opcode.Op {
 	case enums.OpcodeSleep:
 		out = enums.HistoryStepTypeSleep
-	case enums.OpcodeStep:
+
+	case enums.OpcodeStep, enums.OpcodeStepRun, enums.OpcodeStepError:
+		// NOTE: enums.OpcodeStepError follows the same logic for determining
+		// step types.
 		if opcode.Data == nil && opcode.Error == nil {
 			// Not a user-facing step.
 			return nil
 		}
-
 		// This is a hacky way to detect `step.sendEvent()`, but it's all we
 		// have until we add an opcode for it.
 		if opcode.Name == "sendEvent" {

@@ -1,7 +1,7 @@
 import type { Function } from '@inngest/components/types/function';
 
 import { graphql } from '@/gql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useGraphQLQuery_TEMPORARY } from '@/utils/useGraphQLQuery';
 
 const query = graphql(`
   query App($envID: ID!, $externalAppID: String!) {
@@ -9,31 +9,32 @@ const query = graphql(`
       app: appByExternalID(externalID: $externalAppID) {
         id
         externalID
+        functions {
+          id
+          latestVersion {
+            triggers {
+              eventName
+              schedule
+            }
+          }
+          name
+          slug
+        }
         name
         latestSync {
           commitAuthor
           commitHash
           commitMessage
           commitRef
-          createdAt
+          error
           framework
           id
+          lastSyncedAt
           platform
           repoURL
           sdkLanguage
           sdkVersion
           status
-          syncedFunctions: deployedFunctions {
-            id
-            latestVersion {
-              triggers {
-                eventName
-                schedule
-              }
-            }
-            name
-            slug
-          }
           url
           vercelDeploymentID
           vercelDeploymentURL
@@ -46,7 +47,7 @@ const query = graphql(`
 `);
 
 export function useApp({ envID, externalAppID }: { envID: string; externalAppID: string }) {
-  const res = useGraphQLQuery({
+  const res = useGraphQLQuery_TEMPORARY({
     pollIntervalInMilliseconds: 10_000,
     query,
     variables: { envID, externalAppID },
@@ -58,13 +59,7 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
     if (app.latestSync) {
       latestSync = {
         ...app.latestSync,
-        createdAt: new Date(app.latestSync.createdAt),
-        syncedFunctions: app.latestSync.syncedFunctions.map((fn) => {
-          return {
-            ...fn,
-            triggers: transformTriggers(fn.latestVersion.triggers),
-          };
-        }),
+        lastSyncedAt: new Date(app.latestSync.lastSyncedAt),
       };
     }
 
@@ -72,12 +67,18 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
       ...res,
       data: {
         ...app,
+        functions: app.functions.map((fn) => {
+          return {
+            ...fn,
+            triggers: transformTriggers(fn.latestVersion.triggers),
+          };
+        }),
         latestSync,
       },
     };
   }
 
-  return res;
+  return { ...res, data: undefined };
 }
 
 function transformTriggers(

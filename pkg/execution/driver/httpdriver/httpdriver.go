@@ -138,16 +138,13 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 			SDK:            resp.sdk,
 			Header:         resp.header,
 		}
-		dr.Generator, err = ParseGenerator(ctx, resp.body)
+		dr.Generator, err = ParseGenerator(ctx, resp.body, resp.noRetry)
 		if err != nil {
 			return nil, err
 		}
-		if resp.noRetry {
-			// Ensure we return a NonRetriableError to indicate that
-			// we're not retrying when we store the error message.
-			err = errors.New("NonRetriableError")
-			dr.SetError(err)
-		}
+
+		// NOTE: Generator responses never set dr.Err, as we assume that the
+		// SDK finished processing successfully.  An empty array is OpcodeNone.
 
 		// If this was a generator response with a single op, set some
 		// relevant step data so that it's easier to identify this step in
@@ -155,16 +152,6 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 		if op := dr.HistoryVisibleStep(); op != nil {
 			dr.Step.ID = op.ID
 			dr.Step.Name = op.UserDefinedName()
-
-			if dr.IsHistoryVisibleStepError() {
-				defaultErrMsg := state.DefaultStepErrorMessage
-				userErr := state.UserErrorFromRaw(&defaultErrMsg, op.Error)
-				if mapped, ok := userErr["message"].(string); ok {
-					dr.Err = &mapped
-				} else {
-					dr.Err = &defaultErrMsg
-				}
-			}
 		}
 
 		return dr, nil
@@ -185,12 +172,24 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 	}
 	if resp.statusCode < 200 || resp.statusCode > 299 {
 		// Add an error to driver.Response if the status code isn't 2XX.
+		//
+		// This is IMPERATIVE, as dr.Err is used to indicate communication errors,
+		// SDK failures without graceful responses - each of which uses r.Err to
+		// handle retrying.
+		//
+		// Non 2xx errors are thrown when:
+		// - The SDK isn't invoked (proxy error, etc.)
+		// - The SDK has a catastrophic failure and does not respond gracefully.
+		// - The function fails or errors (these are not *yet* opcodes, but should be).
 		err = fmt.Errorf("invalid status code: %d", resp.statusCode)
 		dr.SetError(err)
 	}
 	if resp.noRetry {
 		// Ensure we return a NonRetriableError to indicate that
 		// we're not retrying when we store the error message.
+		//
+		// This ensures that errors are handled appropriately from non-SDK step
+		// errors.
 		err = errors.New("NonRetriableError")
 		dr.SetError(err)
 	}
@@ -361,6 +360,7 @@ type response struct {
 	//
 	// This adheres to the HTTP spec; we support both seconds and times in this header.
 	retryAt *time.Time
+	// noRetry indicates whether this is a non-retryable error
 	noRetry bool
 	// sdk represents the SDK language and version used for these
 	// functions, in the format: "js:v0.1.0"

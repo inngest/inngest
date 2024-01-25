@@ -14,7 +14,6 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs"
 	"github.com/inngest/inngest/pkg/deploy"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/debounce"
@@ -94,18 +93,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithKeyGenerator(redis_state.DefaultKeyFunc{
 			Prefix: "{state}",
 		}),
-		redis_state.WithFunctionCallbacks(func(ctx context.Context, i state.Identifier, rs enums.RunStatus) {
-			switch rs {
-			case enums.RunStatusRunning:
-				// Add this to the in-memory tracker.
-				// XXX: Switch to sqlite.
-				s, err := sm.Load(ctx, i.RunID)
-				if err != nil {
-					return
-				}
-				t.Add(s.Event()["id"].(string), i)
-			}
-		}),
 	)
 	if err != nil {
 		return err
@@ -120,7 +107,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithPollTick(150 * time.Millisecond),
 		redis_state.WithQueueKeyGenerator(queueKG),
 		redis_state.WithCustomConcurrencyKeyGenerator(func(ctx context.Context, i redis_state.QueueItem) []state.CustomConcurrency {
-			fn, err := dbcqrs.GetFunctionByID(ctx, i.Data.Identifier.WorkflowID)
+			fn, err := dbcqrs.GetFunctionByInternalUUID(ctx, i.Data.Identifier.WorkspaceID, i.Data.Identifier.WorkflowID)
 			if err != nil {
 				// Use what's stored in the state store.
 				return i.Data.Identifier.CustomConcurrencyKeys

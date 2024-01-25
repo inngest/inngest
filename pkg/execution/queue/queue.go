@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,7 +16,13 @@ type Queue interface {
 	JobQueueReader
 }
 
-type RunFunc func(context.Context, Item) error
+type RunInfo struct {
+	Latency      time.Duration
+	SojournDelay time.Duration
+	Priority     uint
+}
+
+type RunFunc func(context.Context, RunInfo, Item) error
 
 type Producer interface {
 	// Enqueue allows an item to be enqueued ton run at the given time.
@@ -59,27 +66,64 @@ type RetryAtSpecifier interface {
 	NextRetryAt() *time.Time
 }
 
+func RetryAtError(err error, at *time.Time) error {
+	return retryAtError{cause: err, at: at}
+}
+
+type retryAtError struct {
+	cause error
+	at    *time.Time
+}
+
+func (r retryAtError) Error() string {
+	return r.cause.Error()
+}
+
+func (r retryAtError) Unwrap() error {
+	return r.cause
+}
+
+func (r retryAtError) NextRetryAt() *time.Time {
+	return r.at
+}
+
 // ShouldRetry returns whether we need to retry an error.
 func ShouldRetry(err error, attempt int, max int) bool {
-	if _, ok := err.(AlwaysRetryableError); ok {
-		return true
-	}
+	unwrapped := err
+	for unwrapped != nil {
+		if _, ok := unwrapped.(AlwaysRetryableError); ok {
+			return true
+		}
 
-	// This error specifies internally whether it should be retried.
-	retryable, isRetry := err.(RetryableError)
-	if isRetry && !retryable.Retryable() {
-		// The error says no;  cannot be bypassed.
-		return false
+		// This error specifies internally whether it should be retried.
+		retryable, isRetry := unwrapped.(RetryableError)
+		if isRetry && !retryable.Retryable() {
+			// The error says no;  cannot be bypassed.
+			return false
+		}
+
+		unwrapped = errors.Unwrap(unwrapped)
 	}
 
 	// So, at this point we either have a basic, non-interface error OR
 	// a retryable error which returns Retryable() true.
-	// Note that attempt is 0-indexed, hence attempt+1
-	// Check max attempts.
+	//
+	// Note that attempt is 0-indexed, hence attempt+1.
 	return (attempt + 1) < max
 }
 
-func AlwaysRetry(err error) error {
+func NeverRetryError(err error) error {
+	return nonRetryable{error: err}
+}
+
+type nonRetryable struct {
+	error
+}
+
+func (nonRetryable) Retryable() bool { return false }
+
+// AlwaysRetryError always retries, ignoring max retry counts
+func AlwaysRetryError(err error) error {
 	return alwaysRetry{error: err}
 }
 
@@ -110,6 +154,14 @@ type JobQueueReader interface {
 		workflowID uuid.UUID,
 		runID ulid.ULID,
 	) (int, error)
+
+	// StatusCount returns the total number of items in the function
+	// status queue.
+	StatusCount(
+		ctx context.Context,
+		workflowID uuid.UUID,
+		status string,
+	) (int64, error)
 
 	RunJobs(
 		ctx context.Context,

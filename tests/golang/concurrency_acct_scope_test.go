@@ -14,7 +14,7 @@ import (
 )
 
 func TestConcurrency_ScopeAccount(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t)
+	h, server, registerFuncs := NewSDKHandler(t, "concurrency")
 	defer server.Close()
 
 	var (

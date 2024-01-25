@@ -13,7 +13,7 @@ export default function AccountSetupPage() {
   const secondsElapsed = useSecondsElapsed();
   const { user } = useUser();
 
-  const isAccountSetup = user && user.externalId;
+  const isAccountSetup = user && user.externalId && user.publicMetadata.accountID;
 
   // Reload the user until the account is set up
   useEffect(() => {

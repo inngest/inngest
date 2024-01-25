@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/inngest/inngest/pkg/dateutil"
@@ -12,7 +11,6 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/xhit/go-str2duration/v2"
-	"golang.org/x/exp/slog"
 )
 
 const DefaultErrorMessage = "Function execution error"
@@ -20,6 +18,20 @@ const DefaultStepErrorMessage = "Step execution error"
 
 type Retryable interface {
 	Retryable() bool
+}
+
+type UserError struct {
+	Name    string `json:"name"`
+	Message string `json:"message"`
+	Stack   string `json:"stack,omitempty"`
+
+	// Data allows for multiple return values in eg. Golang.  If provided,
+	// the SDK MAY choose to store additional data for its own purposes here.
+	Data json.RawMessage `json:"data,omitempty"`
+
+	// NoRetry is set when parsing the opcide via the retry header.
+	// It is NOT set via the SDK.
+	NoRetry bool `json:"noRetry,omitempty"`
 }
 
 type GeneratorOpcode struct {
@@ -39,8 +51,8 @@ type GeneratorOpcode struct {
 	// output.
 	Data json.RawMessage `json:"data"`
 	// Error is the failing result from the operation, e.g. an error thrown
-	// from a step.
-	Error json.RawMessage `json:"error"`
+	// from a step.  This MUST be in the shape of OpcodeError.
+	Error *UserError `json:"error"`
 	// SDK versions < 3.?.? don't respond with the display name.
 	DisplayName *string `json:"displayName"`
 }
@@ -58,16 +70,29 @@ func (g GeneratorOpcode) UserDefinedName() string {
 }
 
 // Get the stringified output of the step.
-func (g GeneratorOpcode) Output() string {
-	// Errors must always be non-null to be defined.
-	if isJsonNonNullish(g.Error) {
-		return string(g.Error)
+func (g GeneratorOpcode) Output() (string, error) {
+	// OpcodeStepError MUST always wrap the output in an "error"
+	// field, allowing the SDK to differentiate between an error and data.
+	if g.Op == enums.OpcodeStepError {
+		byt, err := json.Marshal(map[string]any{"error": g.Error})
+		return string(byt), err
 	}
+
+	// If this is an OpcodeStepRun, we can guarantee that the data is unwrapped.
+	//
+	// We MUST wrap the data in a "data" object in the state store so that the
+	// SDK can differentiate between "data" and "error";  per-step errors wraps the
+	// error with "error" and updates step state on the final failure.
+	if g.Op == enums.OpcodeStepRun {
+		byt, err := json.Marshal(map[string]any{"data": g.Data})
+		return string(byt), err
+	}
+
 	// Data is allowed to be `null` if no error is found and the op returned no data.
 	if g.Data != nil {
-		return string(g.Data)
+		return string(g.Data), nil
 	}
-	return ""
+	return "", nil
 }
 
 func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {
@@ -253,19 +278,22 @@ type DriverResponse struct {
 	//       with mutated state.  Each tool inside the function (step/wait)
 	//       returns a new opcode which we store in step state.
 	Generator []*GeneratorOpcode `json:"generator,omitempty"`
-	// Scheduled, if set to true, represents that the action has been
-	// scheduled and will run asynchronously.  The output is not available.
-	//
-	// Managing messaging and monitoring of asynchronous jobs is outside of
-	// the scope of this executor.  It's possible to store your own queues
-	// and state for managing asynchronous jobs in another manager.
-	Scheduled bool `json:"scheduled"`
 	// Output is the output from an action, as a JSON-marshalled value.
 	Output any `json:"output"`
 	// OutputSize is the size of the response payload, verbatim, in bytes.
 	OutputSize int `json:"size"`
-	// Err represents the error from the action, if the action errored.
-	// If the action terminated successfully this must be nil.
+
+	// UserError indicates that the SDK ran and the step or function errored.
+	//
+	// This will be the value returned from OpcodeStepError or,
+	// for older versions of the SDK or Function errors, a parsed
+	// error from the response output.
+	UserError *UserError `json:"userError,omitempty"`
+
+	// Err represents a failing function: that the SDK wasn't hit, the SDK
+	// catastrophically died (timeouts, OOM), or failed to execute top-level code.
+	//
+	// Step errors handled graceully always return OpcodeStepError and fill UserError.
 	Err *string `json:"err"`
 	// RetryAt is an optional retry at field, specifying when we should retry
 	// the step if the step errored.
@@ -327,7 +355,8 @@ func (r DriverResponse) Error() string {
 // Note that responses where Err is nil are not retryable, and if Final() is
 // set to true this response is also not retryable.
 func (r DriverResponse) Retryable() bool {
-	if r.Err == nil || r.final {
+	if r.Err == nil {
+		// There's no error, so no need to retry
 		return false
 	}
 
@@ -336,48 +365,13 @@ func (r DriverResponse) Retryable() bool {
 		return false
 	}
 
-	status := r.StatusCode
-	if status == 0 {
-		if mapped, ok := r.Output.(map[string]any); ok {
-			// Fall back to statusCode for AWS Lambda compatibility in
-			// an attempt to use this field.
-			v, ok := mapped["statusCode"]
-			if !ok {
-				// If actions don't return a status, we assume that they're
-				// always retryable.
-				return true
-			}
-
-			switch val := v.(type) {
-			case float64:
-				status = int(val)
-			case int64:
-				status = int(val)
-			case int:
-				status = val
-			default:
-				slog.Default().Error(
-					"unexpected status code type",
-					"type", fmt.Sprintf("%T", v),
-				)
-			}
-		}
+	if r.final {
+		// SetFinal has been called to ensure that this response is
+		// never retried.
+		return false
 	}
 
-	if status == 0 {
-		slog.Default().Error("missing status code")
-		return true
-	}
-
-	if status > 499 {
-		return true
-	}
-
-	if r.IsHistoryVisibleStepError() {
-		return true
-	}
-
-	return false
+	return true
 }
 
 // Final returns whether this response is final and the backing state store can
@@ -424,155 +418,9 @@ func (r *DriverResponse) HistoryVisibleStep() *GeneratorOpcode {
 	// The other opcodes should not have visible StepCompleted history items.
 	// For example OpcodeWaitForEvent should get a visible StepWaiting instead
 	// of a visible StepCompleted.
-	if op.Op != enums.OpcodeStep {
+	if op.Op != enums.OpcodeStep && op.Op != enums.OpcodeStepRun && op.Op != enums.OpcodeStepError {
 		return nil
 	}
 
 	return op
-}
-
-// IsHistoryVisibleStepError returns whether this response is an error from running a
-// step.
-func (r *DriverResponse) IsHistoryVisibleStepError() bool {
-	if step := r.HistoryVisibleStep(); step != nil && isJsonNonNullish(step.Error) {
-		return true
-	}
-	return false
-}
-
-// UserError returns the error that the user reported for this response. Can be
-// used to safely fetch the error from the response.
-//
-// Will return nil if there is no error.
-//
-// An ideal error is in the type:
-//
-//	type UserError struct {
-//	        Name    string      `json:"name"`
-//	        Message string      `json:"message"`
-//	        Stack   string      `json:"stack"`
-//	        Cause   string      `json:"cause,omitempty"`
-//	        Status  json.Number `json:"status,omitempty"`
-//	}
-//
-// However, no types are defined, and we use any error we can get our hands on!
-//
-// NOTE: There are several required fields:  "name", "message".
-func (r DriverResponse) UserError() map[string]any {
-	// Catch step-specific errors first.
-	if r.IsHistoryVisibleStepError() {
-		defaultErrMsg := DefaultStepErrorMessage
-		return UserErrorFromRaw(&defaultErrMsg, r.Generator[0].Error)
-	}
-
-	return UserErrorFromRaw(r.Err, r.Output)
-}
-
-// isJsonNonNullish returns a boolean indicating whether the JSON value is
-// defined and not `null`, the latter of which is not caught by `== nil` checks.
-func isJsonNonNullish(v json.RawMessage) bool {
-	if v == nil {
-		return false
-	}
-
-	var temp interface{}
-	err := json.Unmarshal(v, &temp)
-	isNull := err == nil && temp == nil
-
-	return !isNull
-}
-
-func UserErrorFromRaw(errstr *string, rawAny any) map[string]any {
-	var raw map[string]any
-
-	switch rawJson := rawAny.(type) {
-	case json.RawMessage:
-		// Try to unmarshal, but don't return on error, use raw map as fallback
-		_ = json.Unmarshal(rawJson, &raw)
-	case map[string]any:
-		raw = rawJson
-	default:
-		// Handle other types by setting their value directly as a message
-		switch v := rawAny.(type) {
-		case []byte:
-			if len(v) > 0 {
-				raw = map[string]any{"message": string(v)}
-			}
-		case string:
-			if len(v) > 0 {
-				raw = map[string]any{"message": v}
-			}
-		case interface{}:
-			if v != nil {
-				raw = map[string]any{"message": v}
-			}
-		}
-	}
-
-	// Process the raw map if it's not empty
-	if len(raw) > 0 {
-		processed, err := processErrorFields(raw)
-		if err == nil {
-			// Set default values if they don't exist
-			if _, ok := processed["name"]; !ok {
-				processed["name"] = "Error"
-			}
-			if _, ok := processed["message"]; !ok {
-				processed["message"] = DefaultErrorMessage
-			}
-			return processed
-		}
-	}
-
-	// Fallback error handling
-	err := DefaultErrorMessage
-	if errstr != nil {
-		err = *errstr
-	}
-	return map[string]any{
-		"error":   err,
-		"name":    "Error",
-		"message": err,
-	}
-}
-
-// processErrorFields looks for an error field then a body field to handle
-// error messages from step responses.
-func processErrorFields(input map[string]any) (map[string]any, error) {
-	fields := []string{"error", "body"}
-	for _, f := range fields {
-		// Attempt to fetch the JS/SDK error from the body.
-		switch v := input[f].(type) {
-		case map[string]any:
-			return v, nil
-		case json.RawMessage:
-			if mapped, err := processErrorString(string(v)); err == nil {
-				return mapped, nil
-			}
-		case []byte:
-			if mapped, err := processErrorString(string(v)); err == nil {
-				return mapped, nil
-			}
-		case string:
-			if mapped, err := processErrorString(v); err == nil {
-				return mapped, nil
-			}
-		}
-	}
-	return input, nil
-}
-
-// processErrorString attempts to unquote and unmarshal a JSON-encoded string
-func processErrorString(s string) (map[string]any, error) {
-	// Bound inner error fields to 32kb
-	if len(s) > 32*1024 {
-		return nil, fmt.Errorf("error field too large")
-	}
-
-	if unquote, err := strconv.Unquote(s); err == nil {
-		s = unquote
-	}
-	mapped := map[string]any{}
-	err := json.Unmarshal([]byte(s), &mapped)
-	return mapped, err
 }

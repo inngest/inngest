@@ -29,10 +29,20 @@ type QueueItemIndexer func(ctx context.Context, i QueueItem, kg QueueKeyGenerato
 // QueueItemIndexer is not provided, this function will be used with an "{queue}" predix.
 func QueueItemIndexerFunc(ctx context.Context, i QueueItem, kg QueueKeyGenerator) QueueItemIndex {
 	switch i.Data.Kind {
-	case osqueue.KindEdge, osqueue.KindSleep:
+	case osqueue.KindStart:
+		return QueueItemIndex{
+			kg.Status("start", i.WorkflowID),
+		}
+	case osqueue.KindEdge, osqueue.KindEdgeError:
 		// For edges and sleeps, store an index for the given run ID.
 		return QueueItemIndex{
 			kg.RunIndex(i.Data.Identifier.RunID),
+			kg.Status("in-progress", i.WorkflowID),
+		}
+	case osqueue.KindSleep:
+		return QueueItemIndex{
+			kg.RunIndex(i.Data.Identifier.RunID),
+			kg.Status("sleep", i.WorkflowID),
 		}
 	case osqueue.KindPause:
 		// Pause jobs are an implementation detail and are not indexed.  Instead,

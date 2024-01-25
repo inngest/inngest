@@ -54,6 +54,8 @@ type Function struct {
 
 	Priority *Priority `json:"priority,omitempty"`
 
+	TTL *time.Duration `json:"ttl"`
+
 	// ConcurrencyLimits allows limiting the concurrency of running functions, optionally constrained
 	// by individual concurrency keys.
 	//
@@ -227,7 +229,7 @@ func (f Function) Validate(ctx context.Context) error {
 	// Validate cancellation expressions
 	for _, c := range f.Cancel {
 		if c.If != nil {
-			if _, exprErr := expressions.NewExpressionEvaluator(ctx, *c.If); exprErr != nil {
+			if exprErr := expressions.Validate(ctx, *c.If); exprErr != nil {
 				err = multierror.Append(err, fmt.Errorf("Cancellation expression is invalid: %s", exprErr))
 			}
 		}
@@ -244,7 +246,7 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 		if f.Debounce.Key != nil {
 			// Ensure the expression is valid if present.
-			if _, exprErr := expressions.NewExpressionEvaluator(ctx, *f.Debounce.Key); exprErr != nil {
+			if exprErr := expressions.Validate(ctx, *f.Debounce.Key); exprErr != nil {
 				err = multierror.Append(err, fmt.Errorf("Debounce expression is invalid: %s", exprErr))
 			}
 		}
@@ -266,9 +268,9 @@ func (f Function) Validate(ctx context.Context) error {
 	}
 
 	// Validate rate limit expression
-	if f.RateLimit != nil && f.RateLimit.Key != nil {
-		if _, exprErr := expressions.NewExpressionEvaluator(ctx, *f.RateLimit.Key); exprErr != nil {
-			err = multierror.Append(err, fmt.Errorf("Rate limit expression is invalid: %s", exprErr))
+	if f.RateLimit != nil {
+		if rateLimitErr := f.RateLimit.IsValid(ctx); rateLimitErr != nil {
+			err = multierror.Append(err, rateLimitErr)
 		}
 	}
 
@@ -281,8 +283,14 @@ func (f Function) RunPriorityFactor(ctx context.Context, event map[string]any) (
 		return 0, nil
 	}
 
+	// Validate the expression first.
+	if err := expressions.Validate(ctx, *f.Priority.Run); err != nil {
+		return 0, fmt.Errorf("Priority.Run expression is invalid: %s", err)
+	}
+
 	expr, err := expressions.NewExpressionEvaluator(ctx, *f.Priority.Run)
 	if err != nil {
+		// This should never happen.
 		return 0, fmt.Errorf("Priority.Run expression is invalid: %s", err)
 	}
 

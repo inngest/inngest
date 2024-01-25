@@ -619,8 +619,8 @@ github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NH
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/inngest/expr v0.0.0-20240109020554-19e459e1e8d4 h1:BQBcRZSjbasKnIfY+6bcILvhjHbg1xAG0HCbi7/K6Xw=
 github.com/inngest/expr v0.0.0-20240109020554-19e459e1e8d4/go.mod h1:DTBHXcOdO3hWDTUylFeICDSgd5RbaG1xEnacfiN8V4M=
-github.com/inngest/inngestgo v0.5.5-0.20240108200533-4b598cb93ff5 h1:1RVDZ+HR+VbloAKWwtwHfI2A5Jrqhm0uoRSAD0QqSDE=
-github.com/inngest/inngestgo v0.5.5-0.20240108200533-4b598cb93ff5/go.mod h1:w+EVGVyvDd0o0Wli+vhzb2rrleuDCReKL/j9xyLtkU0=
+github.com/inngest/inngestgo v0.5.5-0.20240123232731-01cec59caf45 h1:95OygSKIaFRl5teNPajl8FONp/zLxRlxpN3muHjRKM0=
+github.com/inngest/inngestgo v0.5.5-0.20240123232731-01cec59caf45/go.mod h1:tFqW/HVtc+Qh0J5QfPSmU7//bTNe6WpuPVSUfxArfMc=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=
 github.com/jackc/chunkreader/v2 v2.0.0/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=
 github.com/jackc/chunkreader/v2 v2.0.1/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=

@@ -1,5 +1,5 @@
 import { graphql } from '@/gql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useGraphQLQuery_TEMPORARY } from '@/utils/useGraphQLQuery';
 
 const query = graphql(`
   query Apps($envID: ID!) {
@@ -7,29 +7,31 @@ const query = graphql(`
       apps {
         id
         externalID
+        functionCount
         name
         latestSync {
-          createdAt
+          error
           framework
           id
+          lastSyncedAt
           platform
           sdkLanguage
           sdkVersion
           status
-          syncedFunctions: deployedFunctions {
-            id
-            isArchived
-          }
           url
         }
+      }
+
+      unattachedSyncs(first: 1) {
+        lastSyncedAt
       }
     }
   }
 `);
 
 export function useApps({ envID, isArchived }: { envID: string; isArchived: boolean }) {
-  const res = useGraphQLQuery({
-    pollIntervalInMilliseconds: 10_000,
+  const res = useGraphQLQuery_TEMPORARY({
+    pollIntervalInMilliseconds: 2_000,
     query,
     variables: { envID },
   });
@@ -41,24 +43,18 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
         if (app.latestSync) {
           latestSync = {
             ...app.latestSync,
-            createdAt: new Date(app.latestSync.createdAt),
+            lastSyncedAt: new Date(app.latestSync.lastSyncedAt),
           };
         }
-
-        const functionCount =
-          latestSync?.syncedFunctions.filter((fn) => {
-            return !fn.isArchived;
-          }).length || 0;
 
         return {
           ...app,
           latestSync,
-          functionCount,
 
           // This is a hack to get around the fact that app archival is not a
           // first-class feature yet. We'll infer that an app is archived if all
           // of its functions are archived.
-          isArchived: functionCount === 0,
+          isArchived: app.functionCount === 0,
         };
       })
       .filter((app) => {
@@ -67,11 +63,22 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
         return app.latestSync && app.isArchived === isArchived;
       });
 
+    let latestUnattachedSyncTime;
+    if (res.data.environment.unattachedSyncs[0]) {
+      latestUnattachedSyncTime = new Date(res.data.environment.unattachedSyncs[0].lastSyncedAt);
+    }
+
     return {
       ...res,
-      data: apps,
+      data: {
+        apps,
+        latestUnattachedSyncTime,
+      },
     };
   }
 
-  return res;
+  return {
+    ...res,
+    data: undefined,
+  };
 }

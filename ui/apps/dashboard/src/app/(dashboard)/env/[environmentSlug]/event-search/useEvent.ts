@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { Event } from '@inngest/components/types/event';
-import { baseFetchFailed } from '@inngest/components/types/fetch';
+import { baseInitialFetchFailed } from '@inngest/components/types/fetch';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
 
 import { graphql } from '@/gql';
@@ -72,14 +72,17 @@ export function useEvent({ envID, eventID }: { envID: string; eventID: string | 
     };
   }, [res.data?.environment.event]);
 
-  if (res.error || res.isLoading || res.isSkipped) {
-    return res;
+  if (!res.data) {
+    return {
+      ...res,
+      data: undefined,
+    };
   }
 
   if (data instanceof Error) {
     // Should be unreachable
     return {
-      ...baseFetchFailed,
+      ...baseInitialFetchFailed,
       error: data,
     };
   }

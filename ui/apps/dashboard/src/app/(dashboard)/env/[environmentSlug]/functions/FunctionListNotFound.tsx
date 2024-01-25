@@ -8,11 +8,13 @@ import { useCopyToClipboard } from 'react-use';
 import { toast } from 'sonner';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import DevServerImage from '@/images/devserver.png';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
 
 export default function FunctionListNotFound() {
   const env = useEnvironment();
+  const { value: isAppsEnabled } = useBooleanFlag('apps-page');
   const [, copy] = useCopyToClipboard();
 
   const command = 'npx inngest-cli@latest dev';
@@ -83,16 +85,17 @@ export default function FunctionListNotFound() {
             Register Your Functions
           </h3>
           <p className="mt-2 text-sm font-medium text-slate-500">
-            Inngest functions get deployed along side your existing application wherever you already
-            host your app. For Inngest to remotely and securely invoke your functions via HTTP, you
-            need to register the URL. You can do this manually on the Deploys tab, or automatically
-            with our Vercel integration.
+            Inngest functions get {isAppsEnabled ? 'synced' : 'deployed'} along side your existing
+            application wherever you already host your app. For Inngest to remotely and securely
+            invoke your functions via HTTP, you need to register the URL. You can do this manually
+            on the {isAppsEnabled ? 'Apps' : 'Deploys'} tab, or automatically with our Vercel
+            integration.
           </p>
           <div className="mt-6 flex items-center gap-2 border-t border-slate-100 py-4">
             <Button
               kind="primary"
-              href={`/env/${env.slug}/deploys` as Route}
-              label="Go To Deploys"
+              href={`/env/${env.slug}/${isAppsEnabled ? 'apps' : 'deploys'}` as Route}
+              label={isAppsEnabled ? 'Go To Apps' : 'Go To Deploys'}
             />
             <div className="flex gap-2 border-l border-slate-100 pl-2">
               <Button
@@ -108,7 +111,11 @@ export default function FunctionListNotFound() {
               <Button
                 appearance="outlined"
                 target="_blank"
-                href={'https://www.inngest.com/docs/deploy?ref=app-onboarding-functions' as Route}
+                href={
+                  isAppsEnabled
+                    ? 'https://www.inngest.com/docs/apps?ref=app-onboarding-functions'
+                    : ('https://www.inngest.com/docs/deploy?ref=app-onboarding-functions' as Route)
+                }
                 label="Read The Docs"
               />
             </div>

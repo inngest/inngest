@@ -1,17 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngestgo"
 )
 
-func TestSDKWaitForEvent(t *testing.T) {
+func TestSDKWaitForEvent_WithEvent(t *testing.T) {
 	evt := inngestgo.Event{
 		Name: "tests/wait.test",
 		Data: map[string]any{
@@ -21,32 +21,13 @@ func TestSDKWaitForEvent(t *testing.T) {
 	}
 
 	hashes := map[string]string{
-		"wait": "f36cefdaa75e3285f4f5f20054d3f4f305d726a8",
+		"wait": "0b497c04bd704c3deceb0a004f6268167025dba2",
 	}
 
-	fnID := "test-suite-wait-for-event-test"
+	fnID := "test-suite-wait-for-event"
 	abstract := Test{
-		Name: "Wait for event test",
-		Description: `
-		`,
-		Function: inngest.Function{
-			Name: "Wait for event test",
-			Slug: fnID,
-			Triggers: []inngest.Trigger{
-				{
-					EventTrigger: &inngest.EventTrigger{
-						Event: evt.Name,
-					},
-				},
-			},
-			Steps: []inngest.Step{
-				{
-					Name: "step",
-					ID:   "step",
-					URI:  stepURL(fnID, "step"),
-				},
-			},
-		},
+		ID:           fnID,
+		Name:         "Wait for event test",
 		EventTrigger: evt,
 		Timeout:      30 * time.Second,
 	}
@@ -71,8 +52,7 @@ func TestSDKWaitForEvent(t *testing.T) {
 			test.SetRequestEvent(evt),
 			// And the executor should start its requests with this context.
 			test.SetRequestContext(driver.SDKRequestContext{
-				FunctionID: inngest.DeterministicUUID(abstract.Function),
-				StepID:     "step",
+				StepID: "step",
 				Stack: &driver.FunctionStack{
 					Current: 0,
 				},
@@ -82,9 +62,11 @@ func TestSDKWaitForEvent(t *testing.T) {
 			// Execute the step again, get a wait
 			test.ExpectRequest("Wait step run", "step", time.Second),
 			test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-				Op:   enums.OpcodeWaitForEvent,
-				ID:   hashes["wait"],
-				Name: "test/resume",
+				Op:          enums.OpcodeWaitForEvent,
+				ID:          hashes["wait"],
+				Name:        "test/resume",
+				DisplayName: inngestgo.StrPtr("test/resume"),
+				Data:        json.RawMessage("null"),
 				Opts: map[string]any{
 					"if":      "async.data.resume == true && async.data.id == event.data.id",
 					"timeout": "10s",
@@ -104,8 +86,7 @@ func TestSDKWaitForEvent(t *testing.T) {
 			test.After(time.Second),
 			test.Send(resume),
 
-			// Update stack and state.  We should now have the sleep
-			// item in our stack.
+			// We should have the resumed event in the stack.
 			test.AddRequestStack(driver.FunctionStack{
 				Stack:   []string{hashes["wait"]},
 				Current: 1,
@@ -134,31 +115,13 @@ func TestSDKWaitForEvent_NoEvent(t *testing.T) {
 	}
 
 	hashes := map[string]string{
-		"wait": "f36cefdaa75e3285f4f5f20054d3f4f305d726a8",
+		"wait": "0b497c04bd704c3deceb0a004f6268167025dba2",
 	}
 
-	fnID := "test-suite-wait-for-event-test"
+	fnID := "test-suite-wait-for-event"
 	abstract := Test{
-		Name: "Wait for event test",
-		Description: `
-		`,
-		Function: inngest.Function{
-			Name: "Wait for event test",
-			Slug: fnID,
-			Triggers: []inngest.Trigger{
-				{
-					EventTrigger: &inngest.EventTrigger{
-						Event: evt.Name,
-					},
-				}},
-			Steps: []inngest.Step{
-				{
-					Name: "step",
-					ID:   "step",
-					URI:  stepURL(fnID, "step"),
-				},
-			},
-		},
+		ID:           fnID,
+		Name:         "Wait for event test",
 		EventTrigger: evt,
 		Timeout:      30 * time.Second,
 	}
@@ -183,8 +146,7 @@ func TestSDKWaitForEvent_NoEvent(t *testing.T) {
 			test.SetRequestEvent(evt),
 			// And the executor should start its requests with this context.
 			test.SetRequestContext(driver.SDKRequestContext{
-				FunctionID: inngest.DeterministicUUID(abstract.Function),
-				StepID:     "step",
+				StepID: "step",
 				Stack: &driver.FunctionStack{
 					Current: 0,
 				},
@@ -194,9 +156,11 @@ func TestSDKWaitForEvent_NoEvent(t *testing.T) {
 			// Execute the step again, get a wait
 			test.ExpectRequest("Wait step run", "step", time.Second),
 			test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-				Op:   enums.OpcodeWaitForEvent,
-				ID:   hashes["wait"],
-				Name: "test/resume",
+				Op:          enums.OpcodeWaitForEvent,
+				ID:          hashes["wait"],
+				Name:        "test/resume",
+				DisplayName: inngestgo.StrPtr("test/resume"),
+				Data:        json.RawMessage("null"),
 				Opts: map[string]any{
 					"if":      "async.data.resume == true && async.data.id == event.data.id",
 					"timeout": "10s",

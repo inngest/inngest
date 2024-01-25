@@ -18,7 +18,7 @@ type RegisterFunc func()
 
 type opt func(h *inngestgo.HandlerOpts)
 
-func NewSDKHandler(t *testing.T, hopts ...opt) (inngestgo.Handler, *HTTPServer, RegisterFunc) {
+func NewSDKHandler(t *testing.T, appID string, hopts ...opt) (inngestgo.Handler, *HTTPServer, RegisterFunc) {
 	t.Helper()
 
 	key := "test"
@@ -38,7 +38,7 @@ func NewSDKHandler(t *testing.T, hopts ...opt) (inngestgo.Handler, *HTTPServer, 
 		o(&opts)
 	}
 
-	h := inngestgo.NewHandler("Billing", opts)
+	h := inngestgo.NewHandler(appID, opts)
 
 	server := NewHTTPServer(h)
 
