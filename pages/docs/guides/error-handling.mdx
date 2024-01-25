@@ -56,7 +56,7 @@ def record_click(ctx: inngest.Context) -> None:
 ```
 </CodeGroup>
 
-Notice that an `attempt` count is passed to the function, which is the current zero-based attempt number for this run. The first attempt will be `0`, the second `1`, and so on. It is incremented every time the function throws an error and is retried.
+Notice that an `attempt` count is passed to the function, which is the zero-based attempt number for the current step. The first attempt will be `0`, the second `1`, and so on.  It is incremented every time the function throws an error and is retried, and is reset when steps complete.
 
 You can configure the number of retries by specifying it in your function configuration, including setting it to `0` to disable them:
 
@@ -156,6 +156,10 @@ def sync_systems(ctx: inngest.Context, step: inngest.StepSync) -> None:
     step.run("Save data", lambda: db.syncs.insert_one(data))
 ```
 </CodeGroup>
+
+<Callout>
+You can configure the number of [`retries`](/docs/reference/functions/create#inngest-create-function-configuration-trigger-handler-inngest-function) for each function. This excludes the initial attempt.  A retry count of `4` means that each step will be attempted up to 5 times.
+</Callout>
 
 ### Handling a failing step
 
