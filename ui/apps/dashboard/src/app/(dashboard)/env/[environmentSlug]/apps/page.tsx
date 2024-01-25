@@ -81,13 +81,17 @@ export default function Page() {
             }}
             className="absolute"
           >
-            <p className="pr-2">
+            <p className="flex-1 pr-2">
               Inngest deploys have been renamed to “<b>Syncs</b>”. All of your syncs can be found
               within your apps.{' '}
+              <Link
+                className="inline-flex"
+                internalNavigation={false}
+                href="https://www.inngest.com/docs/apps"
+              >
+                Learn More
+              </Link>
             </p>
-            <Link internalNavigation={false} href="https://www.inngest.com/docs/apps">
-              Learn More
-            </Link>
           </Banner>
         )}
 

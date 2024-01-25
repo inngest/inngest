@@ -43,7 +43,7 @@ export function Apps({ isArchived = false }: Props) {
       <div className="w-full max-w-[1200px]">
         {!hasApps && !isArchived && (
           <EmptyAppCard className="mb-4">
-            <div>
+            <div className="items-center md:items-start">
               <Button
                 className="mt-4"
                 kind="primary"
