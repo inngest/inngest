@@ -14,7 +14,7 @@
     "@types/node": "18.13.0",
     "@types/react": "18.0.27",
     "@types/react-dom": "18.0.10",
-    "inngest": "~2.4.1",
+    "inngest": "3.11.1-pr-411.4",
     "next": "13.1.6",
     "react": "18.2.0",
     "react-dom": "18.2.0",

@@ -75,6 +75,7 @@ func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
 		mgr.SetErr(fmt.Errorf("error parsing invoke value for '%s'; unknown shape", opts.FunctionId))
 		panic(ControlHijack{})
 	}
+
 	mgr.AppendOp(state.GeneratorOpcode{
 		ID:   op.MustHash(),
 		Op:   op.Op,

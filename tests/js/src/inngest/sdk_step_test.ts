@@ -1,7 +1,7 @@
 import { inngest } from "@/inngest/client";
 
 export const testSdkSteps = inngest.createFunction(
-  { name: "SDK Step Test" },
+  { id: "step-test" },
   { event: "tests/step.test" },
   async ({ event, step }) => {
 
@@ -9,7 +9,7 @@ export const testSdkSteps = inngest.createFunction(
       return "first step";
     });
 
-    await step.sleep("2s");
+    await step.sleep("for 2s", "2s");
 
     await step.run("second step", async () => {
       return { first: data, second: true };

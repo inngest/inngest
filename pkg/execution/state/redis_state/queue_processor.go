@@ -702,7 +702,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 				// Always retry this job.
 				stack := debug.Stack()
 				q.logger.Error().Err(fmt.Errorf("%v", r)).Str("stack", string(stack)).Msg("job panicked")
-				errCh <- osqueue.AlwaysRetry(fmt.Errorf("job panicked: %v", r))
+				errCh <- osqueue.AlwaysRetryError(fmt.Errorf("job panicked: %v", r))
 			}
 		}()
 
@@ -779,13 +779,20 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 
 		if osqueue.ShouldRetry(err, qi.Data.Attempt, qi.Data.GetMaxAttempts()) {
 			at := q.backoffFunc(qi.Data.Attempt)
-			// If the error contains a NextRetryAt method, use that to indicate
-			// when we should retry.
-			if specifier, ok := err.(osqueue.RetryAtSpecifier); ok {
-				next := specifier.NextRetryAt()
-				if next != nil {
-					at = *next
+
+			// Attempt to find any RetryAtSpecifier in the error tree.
+			unwrapped := err
+			for unwrapped != nil {
+				// If the error contains a NextRetryAt method, use that to indicate
+				// when we should retry.
+				if specifier, ok := unwrapped.(osqueue.RetryAtSpecifier); ok {
+					next := specifier.NextRetryAt()
+					if next != nil {
+						at = *next
+					}
+					break
 				}
+				unwrapped = errors.Unwrap(unwrapped)
 			}
 
 			qi.Data.Attempt += 1

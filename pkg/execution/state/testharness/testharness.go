@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	mrand "math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -114,35 +113,33 @@ func CheckState(t *testing.T, gen Generator) {
 	t.Helper()
 
 	funcs := map[string]func(t *testing.T, m state.Manager){
-		"New":                                checkNew,
-		"Exists":                             checkExists,
-		"New/StepData":                       checkNew_stepdata,
-		"UpdateMetadata":                     checkUpdateMetadata,
-		"SaveResponse/Output":                checkSaveResponse_output,
-		"SaveResponse/Error":                 checkSaveResponse_error,
-		"SaveResponse/OutputOverwritesError": checkSaveResponse_outputOverwritesError,
-		"SaveResponse/Concurrent":            checkSaveResponse_concurrent,
-		"SaveResponse/Stack":                 checkSaveResponse_stack,
-		"SavePause":                          checkSavePause,
-		"LeasePause":                         checkLeasePause,
-		"ConsumePause":                       checkConsumePause,
-		"ConsumePause/WithData":              checkConsumePauseWithData,
-		"ConsumePause/WithData/StackIndex":   checkConsumePauseWithDataIndex,
-		"ConsumePause/WithEmptyData":         checkConsumePauseWithEmptyData,
-		"ConsumePause/WithEmptyDataKey":      checkConsumePauseWithEmptyDataKey,
-		"DeletePause":                        checkDeletePause,
-		"PausesByEvent/Empty":                checkPausesByEvent_empty,
-		"PausesByEvent/Single":               checkPausesByEvent_single,
-		"PausesByEvent/Multiple":             checkPausesByEvent_multi,
-		"PausesByEvent/ConcurrentCursors":    checkPausesByEvent_concurrent,
-		"PausesByEvent/Consumed":             checkPausesByEvent_consumed,
-		"PauseByStep":                        checkPausesByStep,
-		"PauseByID":                          checkPauseByID,
-		"Idempotency":                        checkIdempotency,
-		"SetStatus":                          checkSetStatus,
-		"Cancel":                             checkCancel,
-		"Cancel/AlreadyCompleted":            checkCancel_completed,
-		"Cancel/AlreadyCancelled":            checkCancel_cancelled,
+		"New":                              checkNew,
+		"Exists":                           checkExists,
+		"New/StepData":                     checkNew_stepdata,
+		"UpdateMetadata":                   checkUpdateMetadata,
+		"SaveResponse/Output":              checkSaveResponse_output,
+		"SaveResponse/Concurrent":          checkSaveResponse_concurrent,
+		"SaveResponse/Stack":               checkSaveResponse_stack,
+		"SavePause":                        checkSavePause,
+		"LeasePause":                       checkLeasePause,
+		"ConsumePause":                     checkConsumePause,
+		"ConsumePause/WithData":            checkConsumePauseWithData,
+		"ConsumePause/WithData/StackIndex": checkConsumePauseWithDataIndex,
+		"ConsumePause/WithEmptyData":       checkConsumePauseWithEmptyData,
+		"ConsumePause/WithEmptyDataKey":    checkConsumePauseWithEmptyDataKey,
+		"DeletePause":                      checkDeletePause,
+		"PausesByEvent/Empty":              checkPausesByEvent_empty,
+		"PausesByEvent/Single":             checkPausesByEvent_single,
+		"PausesByEvent/Multiple":           checkPausesByEvent_multi,
+		"PausesByEvent/ConcurrentCursors":  checkPausesByEvent_concurrent,
+		"PausesByEvent/Consumed":           checkPausesByEvent_consumed,
+		"PauseByStep":                      checkPausesByStep,
+		"PauseByID":                        checkPauseByID,
+		"Idempotency":                      checkIdempotency,
+		"SetStatus":                        checkSetStatus,
+		"Cancel":                           checkCancel,
+		"Cancel/AlreadyCompleted":          checkCancel_completed,
+		"Cancel/AlreadyCancelled":          checkCancel_cancelled,
 	}
 	for name, f := range funcs {
 		t.Run(name, func(t *testing.T) {
@@ -330,6 +327,11 @@ func checkUpdateMetadata(t *testing.T, m state.Manager) {
 	require.EqualValues(t, 2, found.RequestVersion)
 }
 
+func marshal(output any) string {
+	byt, _ := json.Marshal(output)
+	return string(byt)
+}
+
 // checkSaveResponse_output checks the basics of saving output from a response.
 //
 // This asserts that the state store records output for the given step, by saving
@@ -348,7 +350,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 		},
 	}
 
-	_, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
+	err := m.SaveResponse(ctx, s.Identifier(), r.Step.ID, marshal(r.Output))
 	require.NoError(t, err)
 
 	next, err := m.Load(ctx, s.Identifier().RunID)
@@ -389,7 +391,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 		},
 	}
 
-	_, err = m.SaveResponse(ctx, s.Identifier(), r2, 1)
+	err = m.SaveResponse(ctx, s.Identifier(), r2.Step.ID, marshal(r2.Output))
 	require.NoError(t, err)
 
 	next, err = m.Load(ctx, s.Identifier().RunID)
@@ -425,98 +427,6 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	require.EqualValues(t, next.Errors(), reloaded.Errors())
 }
 
-func checkSaveResponse_error(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	s := setup(t, m)
-	_, err := m.Load(ctx, s.RunID())
-	require.NoError(t, err)
-
-	r := state.DriverResponse{
-		Step: w.Steps[0],
-		Err:  strptr("an absolutely terrible yet intermittent, non-final, retryable error"),
-	}
-	require.True(t, r.Retryable())
-	require.False(t, r.Final())
-
-	_, err = m.SaveResponse(ctx, s.Identifier(), r, 0)
-	require.NoError(t, err)
-
-	next, err := m.Load(ctx, s.Identifier().RunID)
-	require.NoError(t, err)
-	require.NotNil(t, next)
-
-	require.Nil(t, next.Actions()[r.Step.ID])
-	require.NotNil(t, r.Err)
-	require.Contains(t, next.Errors()[r.Step.ID].Error(), *r.Err)
-
-	// Overwriting the error by setting as final should work and should
-	// finalize the error.
-	r.SetFinal()
-
-	require.False(t, r.Retryable())
-	require.True(t, r.Final())
-
-	_, err = m.SaveResponse(ctx, s.Identifier(), r, 1)
-	require.NoError(t, err)
-
-	finalized, err := m.Load(ctx, s.Identifier().RunID)
-	require.NoError(t, err)
-	require.NotNil(t, next)
-
-	require.Nil(t, finalized.Actions()[r.Step.ID])
-	require.NotNil(t, r.Err)
-	require.Contains(t, finalized.Errors()[r.Step.ID].Error(), *r.Err)
-
-	require.Equal(
-		t,
-		enums.RunStatusFailed,
-		finalized.Metadata().Status,
-		"finalized error does not set status to failed",
-	)
-}
-
-func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	s := setup(t, m)
-
-	stepErr := strptr("an absolutely terrible yet intermittent, non-final, retryable error")
-	r := state.DriverResponse{
-		Step: w.Steps[0],
-		Err:  stepErr,
-	}
-	require.True(t, r.Retryable())
-	require.False(t, r.Final())
-
-	_, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
-	require.NoError(t, err)
-
-	next, err := m.Load(ctx, s.Identifier().RunID)
-	require.NoError(t, err)
-	require.NotNil(t, next)
-
-	require.Nil(t, next.Actions()[r.Step.ID])
-	require.NotNil(t, r.Err)
-	require.Contains(t, next.Errors()[r.Step.ID].Error(), *r.Err)
-
-	r.Err = nil
-	r.Output = map[string]interface{}{
-		"u wot": "m8",
-	}
-	require.False(t, r.Final())
-
-	_, err = m.SaveResponse(ctx, s.Identifier(), r, 1)
-	require.NoError(t, err)
-
-	finalized, err := m.Load(ctx, s.Identifier().RunID)
-	require.NoError(t, err)
-	require.NotNil(t, finalized)
-
-	require.Equal(t, r.Output, finalized.Actions()[r.Step.ID])
-	// The error is still stored.
-	require.NotNil(t, stepErr)
-	require.Contains(t, next.Errors()[r.Step.ID].Error(), *stepErr)
-}
-
 func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
@@ -538,7 +448,7 @@ func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
 					},
 				},
 			}
-			_, err := m.SaveResponse(ctx, id, r, mrand.Intn(3))
+			err := m.SaveResponse(ctx, id, r.Step.ID, marshal(r.Output))
 			require.NoError(t, err)
 		}()
 
@@ -564,9 +474,8 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 				},
 			},
 		}
-		idx, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
+		err := m.SaveResponse(ctx, s.Identifier(), r.Step.ID, marshal(r.Output))
 		require.NoError(t, err)
-		require.EqualValues(t, 1, idx)
 
 		next, err := m.Load(ctx, s.Identifier().RunID)
 		require.NoError(t, err)
@@ -576,44 +485,42 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 		require.Equal(t, []string{w.Steps[0].ID}, stack)
 	})
 
-	t.Run("It doesn't amend the stack with temporary non-final errors", func(t *testing.T) {
+	t.Run("It amends the stack with a subsequent step save", func(t *testing.T) {
 		r := state.DriverResponse{
-			Step: w.Steps[1],
-			Err:  strptr("an absolutely terrible yet intermittent, non-final, retryable error"),
+			Step:   w.Steps[1],
+			Output: "this works",
 		}
-		require.True(t, r.Retryable())
-		require.False(t, r.Final())
-
-		idx, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
+		err := m.SaveResponse(ctx, s.Identifier(), r.Step.ID, marshal(r.Output))
 		require.NoError(t, err)
-		// The stack should still be 1 from the previous step.
-		require.EqualValues(t, 1, idx)
+
+		// The stack should change
 		next, err := m.Load(ctx, s.Identifier().RunID)
 		require.NoError(t, err)
 		stack := next.Stack()
-		require.EqualValues(t, 1, len(stack))
-		require.Equal(t, []string{w.Steps[0].ID}, stack)
+		require.EqualValues(t, 2, len(stack))
+		require.Equal(t, []string{w.Steps[0].ID, w.Steps[1].ID}, stack)
+		require.Equal(t, next.Actions()[r.Step.ID], "this works")
 	})
 
-	t.Run("It modifies the stack with a final error", func(t *testing.T) {
+	t.Run("It returns a duplicate error saving an ID twice", func(t *testing.T) {
 		r := state.DriverResponse{
-			Step: w.Steps[1],
-			Err:  strptr("a permanent error"),
+			Step:   w.Steps[1],
+			Output: "do not save",
 		}
-		r.SetFinal()
-		require.False(t, r.Retryable())
-		require.True(t, r.Final())
 
-		idx, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
-		require.NoError(t, err)
-		require.EqualValues(t, 2, idx)
+		err := m.SaveResponse(ctx, s.Identifier(), r.Step.ID, marshal(r.Output))
+		require.Error(t, state.ErrDuplicateResponse, err)
 
 		next, err := m.Load(ctx, s.Identifier().RunID)
+		fmt.Println(next.Actions(), r.Step.ID)
 		require.NoError(t, err)
 
 		stack := next.Stack()
 		require.EqualValues(t, 2, len(stack))
+
 		require.Equal(t, []string{w.Steps[0].ID, w.Steps[1].ID}, stack)
+		require.NotContains(t, next.Actions()[r.Step.ID], "do not save")
+		require.Equal(t, next.Actions()[r.Step.ID], "this works")
 	})
 }
 
@@ -1774,8 +1681,4 @@ func setup(t *testing.T, m state.Manager) state.State {
 	<-time.After(time.Millisecond)
 
 	return s
-}
-
-func strptr(s string) *string {
-	return &s
 }

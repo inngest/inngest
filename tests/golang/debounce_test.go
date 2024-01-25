@@ -21,7 +21,7 @@ type DebounceEventData struct {
 type DebounceEvent = inngestgo.GenericEvent[DebounceEventData, any]
 
 func TestDebounceWithSingleKey(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t)
+	h, server, registerFuncs := NewSDKHandler(t, "debounce")
 	defer server.Close()
 
 	var (
@@ -60,10 +60,11 @@ func TestDebounceWithSingleKey(t *testing.T) {
 				calledWith = input.Event
 			}
 
-			name := step.Run(ctx, "get name", func(ctx context.Context) (string, error) {
+			name, err := step.Run(ctx, "get name", func(ctx context.Context) (string, error) {
 				fmt.Printf("running debounce fn after %s: %s\n", delta, time.Now().Format(time.RFC3339Nano))
 				return input.Event.Data.Name, nil
 			})
+			require.NoError(t, err)
 
 			atomic.AddInt32(&counter, 1)
 
@@ -125,7 +126,7 @@ func TestDebounceWithSingleKey(t *testing.T) {
 
 // TestDebounecWithMultipleKeys
 func TestDebounecWithMultipleKeys(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t)
+	h, server, registerFuncs := NewSDKHandler(t, "debounce")
 	defer server.Close()
 
 	var counter int32
@@ -166,7 +167,7 @@ func TestDebounecWithMultipleKeys(t *testing.T) {
 }
 
 func TestDebounce_OutOfOrderTS(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t)
+	h, server, registerFuncs := NewSDKHandler(t, "debounce")
 	defer server.Close()
 
 	var counter int32
@@ -216,7 +217,7 @@ func TestDebounce_OutOfOrderTS(t *testing.T) {
 }
 
 func TestDebounce_Timeout(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t)
+	h, server, registerFuncs := NewSDKHandler(t, "debounce")
 	defer server.Close()
 
 	var counter int32

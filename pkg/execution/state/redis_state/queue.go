@@ -489,8 +489,10 @@ func (q *QueueItem) SetID(ctx context.Context, str string) {
 // We can ONLY do this for the first attempt, and we can ONLY do this for edges that
 // are not sleeps (eg. immediate runs)
 func (q QueueItem) Score() int64 {
-	// If this is not an edge, we can ignore this.
-	if (q.Data.Kind != osqueue.KindStart && q.Data.Kind != osqueue.KindEdge) || q.Data.Attempt > 0 {
+	// If this is not a start/simple edge/edge error, we can ignore this.
+	if (q.Data.Kind != osqueue.KindStart &&
+		q.Data.Kind != osqueue.KindEdge &&
+		q.Data.Kind != osqueue.KindEdgeError) || q.Data.Attempt > 0 {
 		return q.AtMS
 	}
 

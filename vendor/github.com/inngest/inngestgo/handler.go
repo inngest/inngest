@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/publicerr"
@@ -268,7 +269,7 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 
 		f := sdk.SDKFunction{
 			Name:        fn.Name(),
-			Slug:        fn.Slug(),
+			Slug:        h.appName + "-" + fn.Slug(),
 			Idempotency: c.Idempotency,
 			Priority:    fn.Config().Priority,
 			Triggers:    []inngest.Trigger{{}},
@@ -480,14 +481,40 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	resp, ops, err := invoke(r.Context(), fn, request)
 	streamCancel()
 
+	// NOTE: When triggering step errors, we should have an OpcodeStepError
+	// within ops alongside an error.  We can safely ignore that error, as its
+	// onyl used for checking wither the step used a NoRetryError or RetryAtError
+	//
+	// For that reason, we check those values first.
+	noRetry := errors.IsNoRetryError(err)
+	retryAt := errors.GetRetryAtTime(err)
+	if len(ops) == 1 && ops[0].Op == enums.OpcodeStepError {
+		// Now we've handled error types we can ignore step
+		// errors safely.
+		err = nil
+	}
+
+	// Now that we've handled the OpcodeStepError, if we *still* ahve
+	// a StepError kind returned from a function we must have an unhandled
+	// step error.  This is a NonRetryableError, as the most likely code is:
+	//
+	// 	_, err := step.Run(ctx, func() (any, error) { return fmt.Errorf("") })
+	// 	if err != nil {
+	// 	     return err
+	// 	}
+	if errors.IsStepError(err) {
+		err = fmt.Errorf("Unhandled step error: %s", err)
+		noRetry = true
+	}
+
 	if h.UseStreaming {
 		if err != nil {
 			// TODO: Add retry-at.
 			return json.NewEncoder(w).Encode(StreamResponse{
 				StatusCode: 500,
 				Body:       fmt.Sprintf("error calling function: %s", err.Error()),
-				NoRetry:    errors.IsNoRetryError(err),
-				RetryAt:    errors.GetRetryAtTime(err),
+				NoRetry:    noRetry,
+				RetryAt:    retryAt,
 			})
 		}
 		if len(ops) > 0 {
@@ -502,17 +529,16 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		})
 	}
 
+	// These may be added even for 2xx codes with step errors.
+	if noRetry {
+		w.Header().Add(HeaderKeyNoRetry, "true")
+	}
+	if retryAt != nil {
+		w.Header().Add(HeaderKeyRetryAfter, retryAt.Format(time.RFC3339))
+	}
+
 	if err != nil {
 		l.Error("error calling function", "error", err)
-
-		if errors.IsNoRetryError(err) {
-			w.Header().Add(HeaderKeyNoRetry, "true")
-		}
-
-		if at := errors.GetRetryAtTime(err); at != nil {
-			w.Header().Add(HeaderKeyRetryAfter, at.Format(time.RFC3339))
-		}
-
 		return publicerr.Error{
 			Message: fmt.Sprintf("error calling function: %s", err.Error()),
 			Status:  500,

@@ -1,7 +1,7 @@
 import { inngest } from "@/inngest/client";
 
 export const testParallelism = inngest.createFunction(
-  { name: "SDK Parallel Test" },
+  { id: "step-parallelism" },
   { event: "tests/parallel.test" },
   async ({ step }) => {
 
