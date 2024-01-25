@@ -61,82 +61,52 @@ If retries are caused by a step failing which then succeeds before retries are e
 
 ## Errors within steps
 
-Steps are individually retried. That means Inngest will handle the type of error, just as above, but on the per-step basis.
+Steps are individually retried. Inngest will handle the type of error, just as above, but on the per-step basis.
+
+When a step exhausts all retries, it will throw a `StepError`, which matches the shape of an `Error`.
 
 ```ts
-import { NonRetriableError } from "inngest";
+async ({ step, logger }) => {
+  // This is unhandled, so will fail the function
+  await step.run("Unhandled error", () => {
+    throw new Error("Oh no!");
+  });
 
-export default inngest.createFunction(
-  { id: "import-store-items" },
-  { event: "ecommerce/import.required" },
-  async ({ event, tools }) => {
-    const items = await step.run("get-items-from-api", async () => {
-      // Third party APIs can often fail (e.g. because of a network or rate limit issue),
-      // if this call fails, Inngest will attempt to retry this step
-      return await ecommerceAPI.getItems(event.data.itemIds);
+  // We can use a try/catch block to handle an error and recover
+  try {
+    await step.run("try/catch error", () => {
+      throw new Error("Oh no!");
     });
-
-    const store = await step.run("get-store-in-database", async () => {
-      try {
-        return await database.getStore(event.data.storeId);
-      } catch (err) {
-        // Store was not found - the step and function should not be retried
-        throw new NonRetriableError("Could not find store in database", {
-          cause: err,
-        });
-      }
-    });
-
-    // If either of the above steps
-    await step.run("import-items-for-store", () => {
-      /* ... */
+  } catch (err) {
+    await step.run("Recover with try/catch", () => {
+      // ...
     });
   }
-);
+
+  // Or do the same with promise chaining
+  await step
+    .run("Chain error", () => {
+      throw new Error("Oh no!");
+    })
+    .catch((err) => {
+      return step.run("Recover with chaining", () => {
+        // ...
+      });
+    });
+
+  // Non-critical steps can be performed by swallowing the error
+  await step
+    .run("Ignore the error", () => {
+      throw new Error("Oh no!");
+    })
+    .catch((err) => logger.error(err));
+
+  // A non-retriable error can still be thrown from within a step to cancel the function
+  await step.run("Cancel the function", () => {
+    throw new NonRetriableError("Stopping");
+  });
+};
 ```
-
-To illustrate how this logic might work, let's use the above code and explain how the two types of errors will be handled across the life of an entire function run:
-
-**Scenario**: The API has a major outage and all 3 attempts of the first step fail:
-
-```plaintext
-┌ Function: "Import store items" triggered by new "ecommerce/import.required" event
-├─┬ Step: "Get items from API" started
-│ ├ Attempt 1: ❌ Error thrown
-│ ├ Attempt 2: ❌ Error thrown
-│ └ Attempt 3: ❌ Error thrown
-├── Step: "Get store in database" skipped
-├── Step: "Import items for store" skipped
-└ ❌ Function run failed
-```
-
-**Scenario**: The API responds perfectly, but somehow the user has since deleted the "store" from the database:
-
-```plaintext
-┌ Function: "Import store items" triggered by new "ecommerce/import.required" event
-├─┬ Step: "Get items from API" started
-│ └ Attempt 1: ✅ Successful
-├─┬ Step: "Get store in database" started
-│ └ Attempt 1: ❌ NonRetriableError thrown
-├── Step: "Import items for store" skipped
-└ ❌ Function run failed
-```
-
-**Scenario**: The API has a minor blip, but it's retried and everything else runs smoothly:
-
-```plaintext
-┌ Function: "Import store items" triggered by new "ecommerce/import.required" event
-├─┬ Step: "Get items from API" started
-│ ├ Attempt 1: ❌ Error thrown
-│ ├ Attempt 2: ✅ Successful
-├─┬ Step: "Get store in database" started
-│ └ Attempt 1: ✅ Successful
-├─┬ Step: "Import items for store" skipped
-│ └ Attempt 1: ✅ Successful
-└ ✅ Function run successful
-```
-
-
 
 ## Retry policies
 
