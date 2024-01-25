@@ -773,7 +773,6 @@ func (e *executor) runFinishHandler(ctx context.Context, id state.Identifier, s 
 	if v, ok := output.(map[string]any); ok {
 		errorData = v
 		if resp.Err != nil {
-			errorData["message"] = *resp.Err
 			if _, ok := errorData["error"]; !ok && resp.Err != nil {
 				errorData["error"] = *resp.Err
 			}
