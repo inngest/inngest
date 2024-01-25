@@ -19,7 +19,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import colors from 'tailwindcss/colors';
 
 import LoadingIcon from '@/icons/LoadingIcon';
 import cn from '@/utils/cn';
