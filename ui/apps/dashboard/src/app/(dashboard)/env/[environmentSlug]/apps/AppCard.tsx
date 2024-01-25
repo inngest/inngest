@@ -55,7 +55,9 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
             href={`/env/${envSlug}/apps/${encodeURIComponent(app.externalID)}`}
           >
             {isArchived && <ArchiveBoxArrowDownIcon className="h-4 w-4" />}
-            {app.name}
+            <span className="truncate" title={app.name}>
+              {app.name}
+            </span>
             <ChevronRightIcon className="h-4 w-4" />
           </Link>
         </h2>
