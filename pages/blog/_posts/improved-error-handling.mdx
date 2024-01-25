@@ -1,0 +1,133 @@
+---
+heading: Improved error handling in Inngest SDKs
+subtitle: Using native language primitives to handle failed steps
+showSubtitle: true
+image: /assets/blog/improved-error-handling/featured-image.png
+date: 2024-01-25
+author: Dan Farrelly
+disableCTA: true
+---
+
+We built Inngest to help you build reliable products. Every Inngest function has automatic retries. Functions can be broken down into individual steps which are all individually executed and [retried on error](/docs/functions/retries). This makes your code durable. Inngest acts like a nice reliability layer on top of your code.
+
+Let's see how it's done. Inngest wraps your code within a [`step.run()`](/docs/reference/functions/step-run) to capture these errors and retry until attempts are exhausted, which marks that step as “failed.” With automatic retries, Inngest catches the error for you and retries the step, but sometimes errors are expected and you can, or _need_, to handle them gracefully.
+
+Today, you can handle errors with more flexibility with standard language primitives and patterns. In this way, you can combine the reliability of automatic retries with graceful error handling.
+
+This enables you to:
+
+* Perform rollbacks or cleanup data after a step fails
+* Create workflows that take different code paths based on the error
+* Handle rejected inputs (for example prompts) with step errors while not marking the function as “failed”
+* Leverage maximum retries while ensuring that you have more control over how your functions behave
+
+## Native error handling with retries
+
+You can gracefully handle errors in exactly the same way you would with [any language SDK](/blog/cross-language-support-with-new-sdks). With TypeScript, you can now wrap one or more steps within a try/catch block. Here is an example of a simple function which attempts to generate an image with DALL-E and if it fails, it will try to generate an image with Midjourney:
+
+
+```typescript
+const transcoding = inngest.createFunction(
+  { id: "generate-result" },
+  { event: "prompt.created" },
+  async ({ event, step }) => {
+    let imageURL: string | null = null
+    let via: "dall-e" | "midjourney"
+
+    // try one AI model, if it fails, try another
+    try {
+      // This step.run will get retried automatically
+      // If all retries fail, it will throw an error which can be caught
+      imageURL = await step.run("generate-image-dall-e", () => {
+        // open api call to generate image...
+      })
+      via = "dall-e"
+    } catch (err) {
+      imageURL = await step.run("generate-image-midjourney", () => {
+        // midjourney call to generate image...
+      })
+      via = "midjourney"
+    }
+
+    await step.run("notify-user", () => {
+      return pusher.trigger(event.data.channelID, "image-result", {
+        imageURL,
+        via,
+      })
+    })
+  }
+)
+```
+
+
+As AI APIs are known to often be slow, flaky, or fail for unclear reasons, the above example shows how to easily combine the retry-on-error functionality of `step.run()` with native `try/catch`.
+
+Before today's change, this was difficult as a failed step caused the entire function to fail. There were ways to work around this by checking the number of retry attempts then returning different results from the function, but that resulted in code that was more complex than it should be.
+
+This improvement is now also included in our Go SDK which uses idiomatic error handling language patterns. Here is an example that cleans up any partially imported data if the import fails:
+
+```go
+inngestgo.CreateFunction(
+	inngestgo.FunctionOpts{ID: "import-account-data"},
+	inngestgo.EventTrigger("app/account.connected", nil),
+	func (ctx context.Context, input inngestgo.Input[AccountConnectedEvent]) (any, error) {
+
+	  // Perform a step, and if it fails, ensure that we clean up any partially imported data
+	  data, err := step.Run(ctx, "import-data", func(ctx context.Context) (bool, error) {
+		  // omitted for the sake of brevity
+		  return result, err
+	  })
+	  if err != nil {
+		  _, cleanupErr := step.Run(ctx, "cleanup-failed-import", func(ctx context.Context) (bool, error) {
+			  // omitted for the sake of brevity
+			  return result, err
+		  })
+		  return nil, errors.Join(cleanupErr, err)
+	  }
+
+	  return nil, nil
+	}
+}
+```
+
+## Catching errors across multiple steps
+
+As with any JavaScript code, you can also use `try/catch` to catch errors across multiple steps. A `StepError` will be thrown which contains the `stepId` of the failed step. This allows you to determine what your code might need to do to properly handle the error. This can be useful in the case of rollbacks.
+
+```typescript
+const sync = inngest.createFunction(
+  { id: "provision-database" },
+  { event: "auto/sync.request" },
+  async ({ event, step }) => {
+    const { databaseID, seedDataSetID } = event.data;
+
+    try {
+      const databaseURL = await step.run("create-database", async () => {
+        return await infra.createDatabase(databaseID);
+      });
+
+      await step.run("seed-database", async () => {
+        const db = await postgres.connect(databaseURL)
+        const seedData = await db.seedDataSets.find(seedDataSetID)
+        return await infra.insertSeedData(db, seedData)
+      })
+    } catch (err) {
+      // If the seeding failed, let's remove the database
+      if (err.stepId === "seed-database") {
+        await step.run("remove-database", async () => {
+          return await infra.removeDatabase(databaseID);
+        })
+      }
+    }
+  }
+)
+
+```
+
+## Use this today
+
+Learn more about error handling and these changes in our [error handling guide](/docs/guides/error-handling) in our documentation.
+
+This change is available today in our [TypeScript](/docs/reference/sdk/typescript) (`v3.12.0`) and [Go](/docs/reference/sdk/go) (`v0.6.0`) SDKs. We will be rolling this out to the Python SDK in the coming days. You'll also need the latest version Inngest Dev Server ([`v0.25.0`](https://github.com/inngest/inngest)) which you can run using `@latest`, for example: `npx inngest-cli@latest dev`.
+
+We hope you enjoy this improvement and we look forward to seeing what you build with it. If you have any questions, please reach out to us on [Discord](/discord) or [Twitter](https://twitter.com/inngest).

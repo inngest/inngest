@@ -128,18 +128,14 @@ export default function LaunchWeek() {
         />
 
         <Heading title="Thursday" />
-        {/*
-          1. Per-step errors
-        */}
         <RowItem
-          title="..."
-          subtitle="Something is coming soon"
-          image="/assets/launch-week/placeholder-image.png"
+          title="Improved error handling in Inngest SDKs"
+          subtitle="Perform rollbacks, cleanups, and more"
+          image="/assets/blog/improved-error-handling/featured-image.png"
           label="New"
-          buttonHref="#"
-          docsHref=""
+          buttonHref="/blog/improved-error-handling"
+          docsHref="/docs/guides/error-handling"
           orientation="left"
-          blur={true}
         />
 
         <Heading title="Friday" />
