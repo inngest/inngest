@@ -37,6 +37,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const defaultTick = time.Millisecond * 150
+
 // StartOpts configures the dev server
 type StartOpts struct {
 	Config        config.Config `json:"-"`
@@ -44,6 +46,7 @@ type StartOpts struct {
 	URLs          []string      `json:"urls"`
 	Autodiscover  bool          `json:"autodiscover"`
 	Poll          bool          `json:"poll"`
+	Tick          time.Duration `json:"tick"`
 	RetryInterval int           `json:"retry_interval"`
 }
 
@@ -74,12 +77,16 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
+	if opts.Tick == 0 {
+		opts.Tick = defaultTick
+	}
+
 	// Initialize the devserver
 	dbcqrs := sqlitecqrs.NewCQRS(db)
 	hd := sqlitecqrs.NewHistoryDriver(db)
 	loader := dbcqrs.(state.FunctionLoader)
 
-	rc, err := createInmemoryRedis(ctx)
+	rc, err := createInmemoryRedis(ctx, opts.Tick)
 	if err != nil {
 		return err
 	}
@@ -104,7 +111,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	queueOpts := []redis_state.QueueOpt{
 		redis_state.WithIdempotencyTTL(time.Hour),
 		redis_state.WithNumWorkers(100),
-		redis_state.WithPollTick(150 * time.Millisecond),
+		redis_state.WithPollTick(opts.Tick),
 		redis_state.WithQueueKeyGenerator(queueKG),
 		redis_state.WithCustomConcurrencyKeyGenerator(func(ctx context.Context, i redis_state.QueueItem) []state.CustomConcurrency {
 			fn, err := dbcqrs.GetFunctionByInternalUUID(ctx, i.Data.Identifier.WorkspaceID, i.Data.Identifier.WorkflowID)
@@ -249,7 +256,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	return service.StartAll(ctx, ds, runner, executorSvc)
 }
 
-func createInmemoryRedis(ctx context.Context) (rueidis.Client, error) {
+func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, error) {
 	r := miniredis.NewMiniRedis()
 	_ = r.Start()
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -259,9 +266,17 @@ func createInmemoryRedis(ctx context.Context) (rueidis.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// If tick is lower than 250ms, tick every 100ms.  This lets us save
+	// CPU for standard dev-server testing.
+	poll := time.Second
+	if tick < defaultTick {
+		poll = time.Millisecond * 50
+	}
+
 	go func() {
-		for range time.Tick(time.Second) {
-			r.FastForward(time.Second)
+		for range time.Tick(poll) {
+			r.FastForward(poll)
 		}
 	}()
 	return rc, nil
