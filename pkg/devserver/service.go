@@ -88,6 +88,7 @@ func (d *devserver) Pre(ctx context.Context) error {
 		apiv1.AddRoutes(r, apiv1.Opts{
 			CachingMiddleware: caching,
 			EventReader:       d.data,
+			FunctionReader:    d.data,
 			FunctionRunReader: d.data,
 			JobQueueReader:    d.queue.(queue.JobQueueReader),
 			Executor:          d.executor,
@@ -101,6 +102,7 @@ func (d *devserver) Pre(ctx context.Context) error {
 		Runner:  d.runner,
 		Tracker: d.tracker,
 		State:   d.state,
+		Queue:   d.queue,
 	})
 	if err != nil {
 		return err
@@ -221,21 +223,13 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 
 				// Make a new PUT request to each app, indicating that the
 				// SDK should push functions to the dev server.
-				err := deploy.Ping(ctx, app.Url)
-				if err != nil {
+				res := deploy.Ping(ctx, app.Url)
+				if res.Err != nil {
 					_, _ = d.data.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
 						ID: app.ID,
 						Error: sql.NullString{
-							String: err.Error(),
+							String: res.Err.Error(),
 							Valid:  true,
-						},
-					})
-				} else {
-					_, _ = d.data.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
-						ID: app.ID,
-						Error: sql.NullString{
-							String: "",
-							Valid:  false,
 						},
 					})
 				}
@@ -249,7 +243,15 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 				if _, ok := urls[u]; ok {
 					continue
 				}
-				_ = deploy.Ping(ctx, u)
+
+				res := deploy.Ping(ctx, u)
+
+				// If there was an SDK error then we should still ensure the app
+				// exists. Otherwise, users will have a harder time figuring out
+				// why the Dev Server can't find their app.
+				if res.Err != nil && res.IsSDK {
+					upsertErroredApp(ctx, d.data, u, res.Err)
+				}
 			}
 		}
 		<-time.After(SDKPollInterval)
@@ -280,4 +282,75 @@ func localIPs() []*net.IPNet {
 	}
 
 	return ips
+}
+
+func upsertErroredApp(
+	ctx context.Context,
+	mgr cqrs.Manager,
+	appURL string,
+	pingError error,
+) {
+	tx, err := mgr.WithTx(ctx)
+	if err != nil {
+		logger.From(ctx).Error().Err(err).Msg("error creating transaction")
+		return
+	}
+
+	rollback := func(ctx context.Context) {
+		if err := tx.Rollback(ctx); err != nil {
+			logger.From(ctx).Error().Err(err).Msg("error rolling back transaction")
+		}
+	}
+
+	appID := uuid.NewSHA1(uuid.NameSpaceOID, []byte(appURL))
+	_, err = tx.GetAppByID(ctx, appID)
+	if err == sql.ErrNoRows {
+		// App doesn't exist so create it.
+
+		_, err = tx.InsertApp(ctx, cqrs.InsertAppParams{
+			Error: sql.NullString{
+				String: pingError.Error(),
+				Valid:  true,
+			},
+			ID:  appID,
+			Url: appURL,
+		})
+		if err != nil {
+			logger.From(ctx).Error().Err(err).Msg("error inserting app")
+			rollback(ctx)
+			return
+		}
+
+		if err = tx.Commit(ctx); err != nil {
+			logger.From(ctx).Error().Err(err).Msg("error inserting app")
+			rollback(ctx)
+			return
+		}
+
+		return
+	}
+
+	if err != nil {
+		logger.From(ctx).Error().Err(err).Msg("error getting app")
+		rollback(ctx)
+		return
+	}
+	_, err = tx.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
+		ID: appID,
+		Error: sql.NullString{
+			String: pingError.Error(),
+			Valid:  true,
+		},
+	})
+	if err != nil {
+		logger.From(ctx).Error().Err(err).Msg("error updating app")
+		rollback(ctx)
+		return
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		logger.From(ctx).Error().Err(err).Msg("error updating app")
+		rollback(ctx)
+		return
+	}
 }

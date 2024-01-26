@@ -15,44 +15,57 @@ const currentTime = new Date();
 
 const timeRanges: TimeRange[] = [
   {
+    key: '30m',
     start: new Date(currentTime.valueOf() - 30 * 60 * 1_000), // 30 Minutes
     end: currentTime,
   },
   {
+    key: '60m',
     start: new Date(currentTime.valueOf() - 60 * 60 * 1_000), // 60 Minutes
     end: currentTime,
   },
   {
+    key: '6h',
     start: new Date(currentTime.valueOf() - 6 * 60 * 60 * 1_000), // 6 Hours
     end: currentTime,
   },
   {
+    key: '12h',
     start: new Date(currentTime.valueOf() - 12 * 60 * 60 * 1_000), // 12 Hours
     end: currentTime,
   },
   {
+    key: '24h',
     start: new Date(currentTime.valueOf() - 24 * 60 * 60 * 1_000), // 24 Hours
     end: currentTime,
   },
   {
+    key: '3d',
     start: new Date(currentTime.valueOf() - 3 * 24 * 60 * 60 * 1_000), // 3 Days
     end: currentTime,
   },
   {
+    key: '7d',
     start: new Date(currentTime.valueOf() - 7 * 24 * 60 * 60 * 1_000), // 7 Days
     end: currentTime,
   },
   {
+    key: '14d',
     start: new Date(currentTime.valueOf() - 14 * 24 * 60 * 60 * 1_000), // 14 Days
     end: currentTime,
   },
   {
+    key: '30d',
     start: new Date(currentTime.valueOf() - 30 * 24 * 60 * 60 * 1_000), // 30 Days
     end: currentTime,
   },
 ];
 
 export const defaultTimeRange = timeRanges[4]!;
+
+export function getTimeRangeByKey(key: string): TimeRange | undefined {
+  return timeRanges.find((timeRange) => timeRange.key === key);
+}
 
 const GetBillingPlanDocument = graphql(`
   query GetBillingPlan {
@@ -88,13 +101,13 @@ export default function DashboardTimeRangeFilter({
   // Since "features" is a map, we can't be 100% sure that there's a log
   // retention value. So default to 7 days.
   let logRetention = 7;
-  if (typeof data?.account.plan?.features?.log_retention === 'number') {
-    logRetention = data?.account.plan?.features?.log_retention;
+  if (typeof data?.account.plan?.features.log_retention === 'number') {
+    logRetention = data.account.plan.features.log_retention;
   }
 
   let plans: ReturnType<typeof transformPlans> | undefined;
   if (data?.plans) {
-    plans = transformPlans(data?.plans);
+    plans = transformPlans(data.plans);
   }
 
   return (
@@ -104,7 +117,7 @@ export default function DashboardTimeRangeFilter({
           <Listbox.Label className="sr-only">Filter by time</Listbox.Label>
           <div className="relative">
             <Listbox.Button className="shadow-outline-secondary-light group inline-flex items-center gap-1 rounded-[6px] bg-slate-50 px-3 py-[5px] text-sm font-medium capitalize text-slate-800 hover:bg-slate-100 focus:outline-indigo-500">
-              <p>Last {selectedTimeRange ? getTimeRangeLabel(selectedTimeRange) : '...'}</p>
+              <p>Last {getTimeRangeLabel(selectedTimeRange)}</p>
               <ChevronDownIcon className="h-4 w-4" aria-hidden="true" />
             </Listbox.Button>
 

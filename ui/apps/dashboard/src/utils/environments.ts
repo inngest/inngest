@@ -36,12 +36,12 @@ export function getActiveEnvironment(
 export function getProductionEnvironment(
   environments: NonEmptyArray<Environment>
 ): Environment | null {
-  return environments?.find((e) => e.type === EnvironmentType.Production) || null;
+  return environments.find((e) => e.type === EnvironmentType.Production) || null;
 }
 
 export function getLegacyTestMode(environments: NonEmptyArray<Environment>): Environment | null {
   return (
-    environments?.find(
+    environments.find(
       (env) => env.type === EnvironmentType.Test && env.name === LEGACY_TEST_MODE_NAME
     ) || null
   );
@@ -55,7 +55,7 @@ export function getSortedBranchEnvironments(
   environments: NonEmptyArray<Environment>
 ): Environment[] {
   return environments
-    ?.filter((env) => env.type === EnvironmentType.BranchChild)
+    .filter((env) => env.type === EnvironmentType.BranchChild)
     .sort((a, b) => {
       // Active envs are always before archived envs.
       if (!a.isArchived && b.isArchived) {
@@ -86,7 +86,7 @@ export function getRecentBranchEnvironments(
   environments: NonEmptyArray<Environment>
 ): Environment[] {
   const cutOffDate = getRecentCutOffDate();
-  return getSortedBranchEnvironments(environments)?.filter(
+  return getSortedBranchEnvironments(environments).filter(
     (env) => new Date(env.createdAt) > cutOffDate
   );
 }
@@ -94,14 +94,14 @@ export function getNonRecentBranchEnvironments(
   environments: NonEmptyArray<Environment>
 ): Environment[] {
   const cutOffDate = getRecentCutOffDate();
-  return getSortedBranchEnvironments(environments)?.filter(
+  return getSortedBranchEnvironments(environments).filter(
     (env) => new Date(env.createdAt) < cutOffDate
   );
 }
 
 // Get parent test environments created by the user, not branch envs or legacy test mode
 export function getTestEnvironments(environments: NonEmptyArray<Environment>): Environment[] {
-  return environments?.filter(
+  return environments.filter(
     (env) => env.type === EnvironmentType.Test && env.name !== LEGACY_TEST_MODE_NAME
   );
 }

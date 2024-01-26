@@ -10,7 +10,6 @@ import SimpleBarChart from '@/components/Charts/SimpleBarChart';
 import Overlay from '@/components/Overlay';
 import { Time } from '@/components/Time';
 import { useEventType } from '@/queries';
-import { relativeTime } from '@/utils/date';
 import LatestLogsList from './LatestLogsList';
 
 type EventDashboardProps = {
@@ -24,7 +23,6 @@ export const runtime = 'nodejs';
 
 export default function EventDashboard({ params }: EventDashboardProps) {
   const [{ data, fetching }] = useEventType({
-    environmentSlug: params.environmentSlug,
     name: decodeURIComponent(params.eventName),
   });
 
@@ -59,7 +57,7 @@ export default function EventDashboard({ params }: EventDashboardProps) {
               default: true,
             },
           ]}
-          total={eventType?.usage?.total || 0}
+          total={eventType?.usage.total || 0}
           totalDescription="24 Hour Volume"
           loading={fetching}
         />
@@ -67,8 +65,8 @@ export default function EventDashboard({ params }: EventDashboardProps) {
       </main>
       <aside className="border border-slate-200 bg-white px-6 py-4">
         <Block title="Triggered Functions">
-          {eventType && eventType.workflows?.length > 0
-            ? eventType?.workflows.map((w) => (
+          {eventType && eventType.workflows.length > 0
+            ? eventType.workflows.map((w) => (
                 <Link
                   href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(w.slug)}`}
                   key={w.id}
@@ -85,7 +83,7 @@ export default function EventDashboard({ params }: EventDashboardProps) {
                         <Time
                           className="text-xs text-slate-500"
                           format="relative"
-                          value={new Date(w.current?.createdAt)}
+                          value={new Date(w.current.createdAt)}
                         />
                       )}
                     </div>

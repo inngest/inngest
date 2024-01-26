@@ -171,9 +171,24 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		return publicerr.Wrap(err, 400, "Invalid request")
 	}
 
-	if _, err := a.devserver.data.GetAppByChecksum(ctx, sum); err == nil {
-		// Already registered.
-		return nil
+	if app, err := a.devserver.data.GetAppByChecksum(ctx, sum); err == nil {
+		if !app.Error.Valid {
+			// Skip registration since the app was already successfully
+			// registered.
+			return nil
+		}
+
+		// Clear app error.
+		_, err = a.devserver.data.UpdateAppError(
+			ctx,
+			cqrs.UpdateAppErrorParams{
+				ID:    app.ID,
+				Error: sql.NullString{},
+			},
+		)
+		if err != nil {
+			return publicerr.Wrap(err, 500, "Error updating app error")
+		}
 	}
 
 	// Attempt to get the existing app by URL, and delete it if possible.
@@ -222,7 +237,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 	}()
 
 	// Get a list of all functions
-	existing, _ := tx.GetAppFunctions(ctx, appParams.ID)
+	existing, _ := tx.GetFunctionsByAppInternalID(ctx, uuid.UUID{}, appParams.ID)
 	// And get a list of functions that we've upserted.  We'll delete all existing functions not in
 	// this set.
 	seen := map[uuid.UUID]struct{}{}
@@ -247,7 +262,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 			return publicerr.Wrap(err, 500, "Error marshalling function")
 		}
 
-		if _, err := tx.GetFunctionByID(ctx, fn.ID); err == nil {
+		if _, err := tx.GetFunctionByInternalUUID(ctx, uuid.UUID{}, fn.ID); err == nil {
 			// Update the function config.
 			_, err = tx.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
 				ID:     fn.ID,

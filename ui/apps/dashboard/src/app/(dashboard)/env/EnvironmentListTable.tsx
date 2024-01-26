@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { type Route } from 'next';
 import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
@@ -11,6 +10,7 @@ import { graphql } from '@/gql';
 import cn from '@/utils/cn';
 import { type Environment } from '@/utils/environments';
 import { notNullish } from '@/utils/typeGuards';
+import { pathCreator } from '@/utils/urls';
 import { EnvironmentArchiveModal } from './EnvironmentArchiveModal';
 
 const ArchiveEnvironmentDocument = graphql(`
@@ -251,7 +251,7 @@ function TableRow(props: { env: Environment }) {
 
       <td className="px-4">
         <Button
-          href={`/env/${slug}/functions` as Route}
+          href={pathCreator.functions({ envSlug: slug })}
           kind="primary"
           appearance="outlined"
           label="View"

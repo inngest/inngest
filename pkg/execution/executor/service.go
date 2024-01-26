@@ -2,11 +2,10 @@ package executor
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
@@ -20,7 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
-	"github.com/oklog/ulid/v2"
+	"golang.org/x/sync/errgroup"
 )
 
 type Opt func(s *svc)
@@ -101,11 +100,11 @@ func (s *svc) Pre(ctx context.Context) error {
 		return fmt.Errorf("no queue provided")
 	}
 
-	failureHandler, err := s.getFailureHandler(ctx)
+	finishHandler, err := s.getFinishHandler(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create failure handler: %w", err)
+		return fmt.Errorf("failed to create finish handler: %w", err)
 	}
-	s.exec.SetFailureHandler(failureHandler)
+	s.exec.SetFinishHandler(finishHandler)
 
 	return nil
 }
@@ -114,7 +113,7 @@ func (s *svc) Executor() execution.Executor {
 	return s.exec
 }
 
-func (s *svc) getFailureHandler(ctx context.Context) (func(context.Context, state.Identifier, state.State, state.DriverResponse) error, error) {
+func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state.State, []event.Event) error, error) {
 	pb, err := pubsub.NewPublisher(ctx, s.config.EventStream.Service)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create publisher: %w", err)
@@ -122,52 +121,47 @@ func (s *svc) getFailureHandler(ctx context.Context) (func(context.Context, stat
 
 	topicName := s.config.EventStream.Service.Concrete.TopicName()
 
-	return func(ctx context.Context, id state.Identifier, s state.State, r state.DriverResponse) error {
-		now := time.Now()
-		evt := event.Event{
-			ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
-			Name:      event.FnFailedName,
-			Timestamp: now.UnixMilli(),
-			Data: map[string]interface{}{
-				"function_id": s.Function().Slug,
-				"run_id":      id.RunID.String(),
-				"error":       r.UserError(),
-				"event":       s.Event(),
-			},
+	return func(ctx context.Context, st state.State, events []event.Event) error {
+		eg := errgroup.Group{}
+
+		for _, e := range events {
+			evt := e
+			eg.Go(func() error {
+				byt, err := json.Marshal(evt)
+				if err != nil {
+					return fmt.Errorf("error marshalling event: %w", err)
+				}
+
+				err = pb.Publish(
+					ctx,
+					topicName,
+					pubsub.Message{
+						Name:      event.EventReceivedName,
+						Data:      string(byt),
+						Timestamp: evt.Time(),
+					},
+				)
+				if err != nil {
+					return fmt.Errorf("error publishing event: %w", err)
+				}
+				return nil
+			})
 		}
 
-		byt, err := json.Marshal(evt)
-		if err != nil {
-			return fmt.Errorf("error marshalling failure event: %w", err)
-		}
-
-		err = pb.Publish(
-			ctx,
-			topicName,
-			pubsub.Message{
-				Name:      event.EventReceivedName,
-				Data:      string(byt),
-				Timestamp: now,
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("error publishing failure event: %w", err)
-		}
-
-		return nil
+		return eg.Wait()
 	}, nil
 }
 
 func (s *svc) Run(ctx context.Context) error {
 	logger.From(ctx).Info().Msg("subscribing to function queue")
-	return s.queue.Run(ctx, func(ctx context.Context, item queue.Item) error {
+	return s.queue.Run(ctx, func(ctx context.Context, _ queue.RunInfo, item queue.Item) error {
 		// Don't stop the service on errors.
 		s.wg.Add(1)
 		defer s.wg.Done()
 
 		var err error
 		switch item.Kind {
-		case queue.KindEdge, queue.KindSleep:
+		case queue.KindStart, queue.KindEdge, queue.KindSleep, queue.KindEdgeError:
 			err = s.handleQueueItem(ctx, item)
 		case queue.KindPause:
 			err = s.handlePauseTimeout(ctx, item)
@@ -227,9 +221,11 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	// for `tools.sleep` within generator functions.
 	var stackIdx int
 	if item.Kind == queue.KindSleep && item.Attempt == 0 {
-		stackIdx, err = s.state.SaveResponse(ctx, item.Identifier, state.DriverResponse{
-			Step: inngest.Step{ID: edge.Outgoing}, // XXX: Save edge name here.
-		}, 0)
+		if err = s.state.SaveResponse(ctx, item.Identifier, edge.Outgoing, "null"); err != nil {
+			return err
+		}
+		// Load the position within the stack we just saved.
+		stackIdx, err = s.state.StackIndex(ctx, item.Identifier.RunID, edge.Outgoing)
 		if err != nil {
 			return err
 		}
@@ -246,12 +242,17 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	}
 
 	resp, err := s.exec.Execute(ctx, item.Identifier, item, edge, stackIdx)
-
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.
 	if err == state.ErrFunctionCancelled {
 		return nil
 	}
+
+	if errors.Is(err, ErrHandledStepError) {
+		// Retry any next steps.
+		return err
+	}
+
 	if err != nil || resp.Err != nil {
 		// Accordingly, we check if the driver's response is retryable here;
 		// this will let us know whether we can re-enqueue.

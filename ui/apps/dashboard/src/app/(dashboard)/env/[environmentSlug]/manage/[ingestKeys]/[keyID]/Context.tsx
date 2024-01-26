@@ -10,12 +10,13 @@ type IngestKey = Omit<GetIngestKeyQuery['environment']['ingestKey'], '__typename
 type PartialIngestKey = Partial<IngestKey>;
 
 type IngestKeyContext = {
+  fetching?: boolean;
   state?: IngestKey;
   save: (s: PartialIngestKey) => Promise<{ error: CombinedError | Error | undefined }>;
 };
 
 export const Context = createContext<IngestKeyContext>({
-  save: async (s: PartialIngestKey) => {
+  save: async () => {
     console.log('warning: must use provider');
     return { error: undefined };
   },
@@ -47,7 +48,7 @@ export function Provider({
   children: React.ReactNode;
 }) {
   const [state, setState] = useState<IngestKey>(initialState);
-  const [, updateIngestKey] = useMutation(UpdateIngestKeyDocument);
+  const [{ fetching }, updateIngestKey] = useMutation(UpdateIngestKeyDocument);
 
   async function save(updates: PartialIngestKey) {
     if (updates.id !== state.id) {
@@ -72,6 +73,7 @@ export function Provider({
       value={{
         state,
         save,
+        fetching,
       }}
     >
       {children}

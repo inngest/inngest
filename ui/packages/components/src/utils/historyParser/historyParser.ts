@@ -13,6 +13,7 @@ import { updateNode } from './updateNode';
  * changed in the future, but that increases complexity.
  */
 export class HistoryParser {
+  cancellation?: RawHistoryItem['cancel'];
   private groups: Record<string, HistoryNode> = {};
   runStartedAt?: Date;
 
@@ -43,9 +44,12 @@ export class HistoryParser {
       [node.groupID]: updateNode(node, rawItem),
     };
 
-    // Handle FunctionCancelled here because we need to do something that
-    // updateNode can't: mark all in-progress nodes as cancelled.
+    // Handle FunctionCancelled here because we need to do 2 things that
+    // updateNode can't:
+    // - Set the cancellation object for the whole HistoryParser object.
+    // - Mark all in-progress nodes as cancelled.
     if (rawItem.type === 'FunctionCancelled') {
+      this.cancellation = rawItem.cancel;
       this.cancelNodes(new Date(rawItem.createdAt));
     }
 
@@ -113,6 +117,8 @@ export class HistoryParser {
       status: 'scheduled',
       waitForEventConfig: undefined,
       waitForEventResult: undefined,
+      invokeFunctionConfig: undefined,
+      invokeFunctionResult: undefined,
     } as const;
 
     // If the node doesn't exist then create it.

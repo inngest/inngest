@@ -4,7 +4,10 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/oklog/ulid/v2"
 )
 
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
@@ -64,14 +67,24 @@ type PauseGetter interface {
 // PauseIterator allows the runner to iterate over all pauses returned by a PauseGetter.  This
 // ensures that, at scale, all pauses do not need to be loaded into memory.
 type PauseIterator interface {
-	// Next advances the iterator and returns whether the next call to Val will
-	// return a non-nil pause.
+	// Count returns the count of the pause iteration at the time of querying.
+	//
+	// Due to concurrent processing, the total number of iterated fields may not match
+	// this count;  the count is a snapshot in time.
+	Count() int
+
+	// Next advances the iterator, returning an erorr or context.Canceled if the iteration
+	// is complete.
 	//
 	// Next should be called prior to any call to the iterator's Val method, after
 	// the iterator has been created.
 	//
 	// The order of the iterator is unspecified.
 	Next(ctx context.Context) bool
+
+	// Error returns the error returned during iteration, if any.  Use this to check
+	// for errors during iteration when Next() returns false.
+	Error() error
 
 	// Val returns the current Pause from the iterator.
 	Val(context.Context) *Pause
@@ -99,11 +112,14 @@ type Pause struct {
 	Incoming string `json:"incoming"`
 	// StepName is the readable step name of the step to save within history.
 	StepName string `json:"stepName"`
+	// Opcode is the opcode of the step to save within history.  This is needed because
+	// a pause can belong to `WaitForEvent` or `Invoke`;  it's used in both methods.
+	Opcode *string `json:"opcode,omitempty"`
 	// Expires is a time at which the pause can no longer be consumed.  This
 	// gives each pause of a function a TTL.  This is required.
 	//
 	// NOTE: the pause should remain within the backing state store for
-	// some perioud after the expiry time for checking timeout branches:
+	// some period after the expiry time for checking timeout branches:
 	//
 	// If this pause has its OnTimeout flag set to true, we only traverse
 	// the edge if the event *has not* been received.  In order to check
@@ -154,9 +170,57 @@ type Pause struct {
 	TriggeringEventID *string `json:"tID,omitempty"`
 }
 
+func (p Pause) GetID() string {
+	return p.ID.String()
+}
+
+func (p Pause) GetExpression() string {
+	if p.Expression == nil {
+		return ""
+	}
+	return *p.Expression
+}
+
 func (p Pause) Edge() inngest.Edge {
 	return inngest.Edge{
 		Outgoing: p.Outgoing,
 		Incoming: p.Incoming,
 	}
+}
+
+type ResumeData struct {
+	// If non-nil, RunID is the ID of the run that completed to cause this
+	// resume.
+	RunID    *ulid.ULID
+	With     map[string]any
+	StepName string
+}
+
+// Given an event, this returns data used to resume an execution.
+func (p Pause) GetResumeData(evt event.Event) ResumeData {
+	ret := ResumeData{
+		With:     evt.Map(),
+		StepName: p.StepName,
+	}
+
+	// Function invocations are resumed using an event, but we want to unwrap the event from this
+	// data and return only what the function returned. We do this here by unpacking the function
+	// finished event to pull out the correct data to place in state.
+	isInvokeFunctionOpcode := p.Opcode != nil && *p.Opcode == enums.OpcodeInvokeFunction.String()
+	isFnFinishedEvent := evt.Name == event.FnFinishedName
+	if isInvokeFunctionOpcode && isFnFinishedEvent {
+		if retRunID, ok := evt.Data["run_id"].(string); ok {
+			if ulidRunID, _ := ulid.Parse(retRunID); ulidRunID != (ulid.ULID{}) {
+				ret.RunID = &ulidRunID
+			}
+		}
+
+		if errorData, errorExists := evt.Data["error"]; errorExists {
+			ret.With = map[string]any{"error": errorData}
+		} else if resultData, resultExists := evt.Data["result"]; resultExists {
+			ret.With = map[string]any{"data": resultData}
+		}
+	}
+
+	return ret
 }

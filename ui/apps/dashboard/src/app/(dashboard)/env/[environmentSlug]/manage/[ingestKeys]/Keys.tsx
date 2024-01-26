@@ -1,8 +1,11 @@
-import { notFound } from 'next/navigation';
+'use client';
 
+import { notFound } from 'next/navigation';
+import { Skeleton } from '@inngest/components/Skeleton';
+
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { graphql } from '@/gql';
-import graphqlAPI from '@/queries/graphqlAPI';
-import { getEnvironment } from '@/queries/server-only/getEnvironment';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import KeysListItem from './KeysListItem';
 
 const GetKeysDocument = graphql(`
@@ -18,24 +21,23 @@ const GetKeysDocument = graphql(`
   }
 `);
 
-type KeysProps = {
-  environmentSlug: string;
-};
+const LoadingSkeleton = () => (
+  <div className="border-b border-slate-100 px-4 py-3">
+    <Skeleton className="mb-1 block h-11 w-full" />
+  </div>
+);
 
-export default async function Keys({ environmentSlug }: KeysProps) {
-  const environment = await getEnvironment({
-    environmentSlug,
+export default function Keys() {
+  const environment = useEnvironment();
+
+  const { data, isLoading, error } = useGraphQLQuery({
+    query: GetKeysDocument,
+    variables: {
+      environmentID: environment.id,
+    },
   });
 
-  const response = await graphqlAPI.request(GetKeysDocument, {
-    environmentID: environment.id,
-  });
-
-  const keys = response?.environment?.ingestKeys;
-
-  if (!keys) {
-    notFound();
-  }
+  const keys = data?.environment.ingestKeys;
 
   function sortFunction(a: { createdAt: string }, b: { createdAt: string }) {
     const dateA = new Date(a.createdAt).getTime();
@@ -43,11 +45,24 @@ export default async function Keys({ environmentSlug }: KeysProps) {
     return dateA < dateB ? 1 : -1;
   }
 
+  if (isLoading) {
+    return (
+      <>
+        <LoadingSkeleton />
+        <LoadingSkeleton />
+      </>
+    );
+  }
+
+  if (error || !keys) {
+    notFound();
+  }
+
   const orderedKeys = keys.sort(sortFunction);
 
   return (
     <ul role="list" className="h-full overflow-y-auto">
-      <KeysListItem environmentSlug={environmentSlug} list={orderedKeys} />
+      <KeysListItem list={orderedKeys} />
     </ul>
   );
 }

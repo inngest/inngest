@@ -1,5 +1,4 @@
 import { IconEvent } from '@inngest/components/icons/Event';
-import { IconFunction } from '@inngest/components/icons/Function';
 import { classNames } from '@inngest/components/utils/classNames';
 
 interface ContentCardProps {
@@ -35,9 +34,8 @@ export function ContentCard({
           {title ? (
             <div className="flex flex-1 items-center gap-2">
               {type === 'event' && <IconEvent className="text-slate-300" />}
-              {type === 'run' && <IconFunction className="text-slate-400" />}
+              {type !== 'event' && icon}
               <h1 className="flex-1 text-base text-slate-50">{title}</h1>
-              {icon}
             </div>
           ) : null}
           {button}

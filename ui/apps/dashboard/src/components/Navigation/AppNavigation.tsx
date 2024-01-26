@@ -4,12 +4,16 @@ import {
   CodeBracketSquareIcon,
   MagnifyingGlassIcon,
   RocketLaunchIcon,
+  Squares2X2Icon,
   WrenchIcon,
 } from '@heroicons/react/20/solid';
+import { Badge } from '@inngest/components/Badge';
 
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import { graphql } from '@/gql';
 import InngestLogo from '@/icons/InngestLogo';
 import EventIcon from '@/icons/event.svg';
+import graphqlAPI from '@/queries/graphqlAPI';
 import AccountDropdown from './AccountDropdown';
 import EnvironmentSelectMenu from './EnvironmentSelectMenu';
 import NavItem from './NavItem';
@@ -23,11 +27,28 @@ type NavItem = {
   href: string;
   text: string;
   icon?: React.ReactNode;
+  badge?: React.ReactNode;
   hide: string[];
 };
 
 const ALL_ENVIRONMENTS_SLUG = 'all';
 const BRANCH_PARENT_SLUG = 'branch';
+
+const GetAccountCreationTimeDocument = graphql(`
+  query GetAccountCreationTime {
+    account {
+      createdAt
+    }
+  }
+`);
+
+// TODO: Delete this when the deploys page is fully deleted
+async function isDeploysVisible() {
+  const { account } = await graphqlAPI.request(GetAccountCreationTimeDocument);
+
+  const appsPageLaunchDate = new Date('2024-01-23T15:00:00.000Z');
+  return new Date(account.createdAt) < appsPageLaunchDate;
+}
 
 export default async function AppNavigation({ environmentSlug }: AppNavigationProps) {
   const isEventSearchEnabled = await getBooleanFlag('event-search');
@@ -46,12 +67,6 @@ export default async function AppNavigation({ environmentSlug }: AppNavigationPr
       icon: <EventIcon className="w-5" />,
     },
     {
-      href: `/env/${environmentSlug}/deploys`,
-      text: 'Deploys',
-      hide: [ALL_ENVIRONMENTS_SLUG],
-      icon: <RocketLaunchIcon className="w-3.5" />,
-    },
-    {
       href: `/env/${environmentSlug}/manage`,
       text: 'Manage',
       hide: [ALL_ENVIRONMENTS_SLUG],
@@ -59,17 +74,49 @@ export default async function AppNavigation({ environmentSlug }: AppNavigationPr
     },
   ];
 
-  if (isEventSearchEnabled) {
-    // Insert the "Event Search" item after the 2nd item.
+  if (await isDeploysVisible()) {
+    // Insert the "Deploys" item after the 2nd item.
     items = [
       ...items.slice(0, 2),
+      {
+        href: `/env/${environmentSlug}/deploys`,
+        text: 'Deploys',
+        hide: [ALL_ENVIRONMENTS_SLUG],
+        icon: <RocketLaunchIcon className="w-3.5" />,
+      },
+      ...items.slice(2),
+    ];
+  }
+
+  if (await getBooleanFlag('apps-page')) {
+    // Insert the "Apps" item after the 1st item.
+    items = [
+      {
+        href: `/env/${environmentSlug}/apps`,
+        text: 'Apps',
+        hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
+        icon: <Squares2X2Icon className="w-3.5" />,
+        badge: (
+          <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
+            New
+          </Badge>
+        ),
+      },
+      ...items,
+    ];
+  }
+
+  if (isEventSearchEnabled) {
+    // Insert the "Event Search" item after the 3rd item.
+    items = [
+      ...items.slice(0, 3),
       {
         href: `/env/${environmentSlug}/event-search`,
         text: 'Event Search',
         hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
         icon: <MagnifyingGlassIcon className="w-3.5" />,
       },
-      ...items.slice(2),
+      ...items.slice(3),
     ];
   }
 
@@ -83,13 +130,15 @@ export default async function AppNavigation({ environmentSlug }: AppNavigationPr
         </Link>
         <EnvironmentSelectMenu environmentSlug={environmentSlug} />
         <Navigation>
-          {visibleItems.map(({ href, text, icon }) => (
-            <NavItem key={href} href={href as Route} icon={icon} text={text} />
+          {visibleItems.map(({ href, text, icon, badge }) => (
+            <NavItem key={href} href={href as Route} icon={icon} text={text} badge={badge} />
           ))}
         </Navigation>
       </div>
-      <SearchNavigation />
-      <AccountDropdown />
+      <div className="flex items-center">
+        <SearchNavigation />
+        <AccountDropdown />
+      </div>
     </nav>
   );
 }

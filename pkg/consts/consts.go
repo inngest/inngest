@@ -4,7 +4,8 @@ import "time"
 
 const (
 	// DefaultRetryCount is used when no retry count for a step is specified.
-	DefaultRetryCount = 3
+	// Given 4 retries, each step or function is attempted 5 times by default.
+	DefaultRetryCount = 4
 
 	// DefaultMaxEventSize represents the maximum size of the event payload we process,
 	// currently 512KB.
@@ -64,12 +65,11 @@ const (
 	// MaxEvents is the maximum number of events we can parse in a single batch.
 	MaxEvents = 5_000
 
-	// InvokeEventName is the event name used to invoke specific functions via an
-	// API.  Note that invoking functions still sends an event in the usual manner.
-	InvokeEventName = "inngest/function.invoked"
+	InngestEventDataPrefix = "_inngest"
 	// InvokeSlugKey is the data key used to store the fn name when invoking a function
 	// via an RPC-like call, abstracting event-driven fanout.
-	InvokeSlugKey = "_inngest_fn"
+	InvokeFnID          = "fn_id"
+	InvokeCorrelationId = "correlation_id"
 
 	// CancelTimeout is the maximum time a cancellation can exist
 	CancelTimeout = time.Hour * 24 * 365
@@ -83,9 +83,10 @@ const (
 	RequestVersionUnknown = -1
 
 	// PriorityFactorMin is the minimum priority factor for any function run, in seconds.
-	PriorityFactorMin = int64(-600)
+	PriorityFactorMin = int64(-1 * 60 * 60 * 12)
 	// PriorityFactorMax is the maximum priority factor for any function run, in seconds.
-	PriorityFactorMax = int64(600)
+	// This is set to 12 hours.
+	PriorityFactorMax = int64(60 * 60 * 12)
 	// FutureQueeueFudgeLimit is the inclusive time range between [now, now() + FutureAtLimit]
 	// in which priority factors are taken into account.
 	FutureAtLimit = 2 * time.Second

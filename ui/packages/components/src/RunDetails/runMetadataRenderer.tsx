@@ -9,35 +9,35 @@ export function renderRunMetadata({
   functionVersion,
   history,
 }: {
-  functionRun: Pick<FunctionRun, 'endedAt' | 'id' | 'startedAt' | 'status'>;
+  functionRun?: Pick<FunctionRun, 'endedAt' | 'id' | 'startedAt' | 'status'>;
   functionVersion?: Pick<FunctionVersion, 'url' | 'version'>;
-  history: HistoryParser;
+  history?: HistoryParser;
 }) {
   // The current startedAt is in reality the queuedAt timestamp. We are getting the real startedAt from the first history item
-  const startedAt = history.runStartedAt;
+  const startedAt = history?.runStartedAt;
   const startedAtLabel = startedAt ? shortDate(new Date(startedAt)) : '-';
 
   let duration: number | undefined;
-  if (startedAt && functionRun.endedAt) {
-    duration = new Date(functionRun.endedAt).getTime() - new Date(startedAt).getTime();
+  if (startedAt && functionRun?.endedAt) {
+    duration = new Date(functionRun?.endedAt).getTime() - new Date(startedAt).getTime();
   }
 
   let endedAtLabel = 'Function Completed';
   let tootltipLabel = 'completed';
-  if (functionRun.status === 'CANCELLED') {
+  if (functionRun?.status === 'CANCELLED') {
     endedAtLabel = 'Function Cancelled';
     tootltipLabel = 'cancelled';
-  } else if (functionRun.status === 'FAILED') {
+  } else if (functionRun?.status === 'FAILED') {
     endedAtLabel = 'Function Failed';
     tootltipLabel = 'failed';
   }
 
   const metadataItems: MetadataItemProps[] = [
-    { label: 'Run ID', value: functionRun.id, size: 'large', type: 'code' },
+    { label: 'Run ID', value: functionRun?.id ?? '', size: 'large', type: 'code' },
     {
       label: 'Function Scheduled',
-      value: functionRun.startedAt ? shortDate(new Date(functionRun.startedAt)) : '-',
-      title: functionRun.startedAt?.toLocaleString(),
+      value: functionRun?.startedAt ? shortDate(new Date(functionRun?.startedAt)) : '-',
+      title: functionRun?.startedAt?.toLocaleString(),
     },
     {
       label: 'Function Started',
@@ -46,7 +46,7 @@ export function renderRunMetadata({
     },
     {
       label: endedAtLabel,
-      value: functionRun.endedAt ? shortDate(new Date(functionRun.endedAt)) : '-',
+      value: functionRun?.endedAt ? shortDate(new Date(functionRun?.endedAt)) : '-',
       title: functionRun?.endedAt?.toLocaleString(),
     },
     {

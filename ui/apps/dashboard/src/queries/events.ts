@@ -1,8 +1,8 @@
 import { useQuery, type UseQueryResponse } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { graphql } from '@/gql';
-import type { Event, GetEventTypesQuery } from '@/gql/graphql';
-import { useEnvironment } from '@/queries/environments';
+import type { GetEventTypesQuery } from '@/gql/graphql';
 
 const GetEventTypesDocument = graphql(`
   query GetEventTypes($environmentID: ID!, $page: Int) {
@@ -32,30 +32,21 @@ const GetEventTypesDocument = graphql(`
 `);
 
 type UseEventTypesParams = {
-  environmentSlug: string;
   page?: number;
 };
 
 export const useEventTypes = ({
-  environmentSlug,
   page = 0,
-}: UseEventTypesParams): UseQueryResponse<
-  GetEventTypesQuery,
-  { environmentID: string; page?: number }
-> => {
-  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
-
+}: UseEventTypesParams): UseQueryResponse<GetEventTypesQuery, { page?: number }> => {
+  const env = useEnvironment();
   const [result, refetch] = useQuery({
     query: GetEventTypesDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: env.id,
       page,
     },
-    pause: !environment?.id,
   });
-  return [{ ...result, fetching: isFetchingEnvironment || result.fetching }, refetch];
+  return [{ ...result, fetching: result.fetching }, refetch];
 };
 
 const GetEventTypeDocument = graphql(`
@@ -63,42 +54,19 @@ const GetEventTypeDocument = graphql(`
     events(query: { name: $eventName, workspaceID: $environmentID }) {
       data {
         name
-        description
-        schemaSource
-        integrationName
+        usage(opts: { period: "hour", range: "day" }) {
+          total
+          data {
+            slot
+            count
+          }
+        }
         workflows {
           id
           slug
           name
           current {
             createdAt
-          }
-        }
-        recent(count: 5) {
-          id
-          receivedAt
-          occurredAt
-          name
-          event
-          version
-          contactID
-          contact {
-            predefinedAttributes
-          }
-          ingestSourceID
-
-          source {
-            name
-          }
-        }
-
-        usage(opts: { period: "hour", range: "day" }) {
-          period
-          total
-          asOf
-          data {
-            slot
-            count
           }
         }
       }
@@ -115,31 +83,45 @@ type UsageItem = {
 };
 
 type UseEventTypeParams = {
-  environmentSlug: string;
   name: string;
 };
 
+type Event = {
+  name: string;
+  workflows: {
+    id: string;
+    slug: string;
+    name: string;
+    current: {
+      createdAt: string;
+    } | null;
+  }[];
+  usage: {
+    total: number;
+    data: {
+      slot: string;
+      count: number;
+    }[];
+  };
+};
+
 export const useEventType = ({
-  environmentSlug,
   name,
 }: UseEventTypeParams): UseQueryResponse<{
   eventType: Event | undefined;
   dailyUsage: UsageItem[] | undefined;
 }> => {
-  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
+  const environment = useEnvironment();
   const [{ data, ...rest }, refetch] = useQuery({
     query: GetEventTypeDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
       eventName: name,
     },
-    pause: !environment?.id,
   });
 
-  const eventType = data?.events?.data?.[0] as Event | undefined;
-  const dailyUsage: UsageItem[] | undefined = data?.events?.data?.[0]?.usage.data.map((d) => ({
+  const eventType = data?.events?.data[0];
+  const dailyUsage: UsageItem[] | undefined = data?.events?.data[0]?.usage.data.map((d) => ({
     name: d.slot,
     values: {
       count: d.count,
@@ -153,7 +135,7 @@ export const useEventType = ({
         dailyUsage,
       },
       ...rest,
-      fetching: isFetchingEnvironment || rest.fetching,
+      fetching: rest.fetching,
     },
     refetch,
   ];

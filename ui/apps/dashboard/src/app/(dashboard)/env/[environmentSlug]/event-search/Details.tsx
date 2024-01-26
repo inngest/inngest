@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { RunDetails } from '@inngest/components/RunDetails';
+import { SlideOver } from '@inngest/components/SlideOver';
+import type { NavigateToRunFn } from '@inngest/components/Timeline';
 import { HistoryParser } from '@inngest/components/utils/historyParser';
 import { useClient } from 'urql';
 
 import LoadingIcon from '@/icons/LoadingIcon';
-import { getHistoryItemOutput } from '../functions/[slug]/logs/[runId]/getHistoryItemOutput';
-import { SlideOver } from './SlideOver';
+import { getHistoryItemOutput } from '../functions/[slug]/logs/(run)/[runId]/getHistoryItemOutput';
 import { useEvent } from './useEvent';
 import { useRun } from './useRun';
 
@@ -14,9 +15,10 @@ type Props = {
   envID: string;
   eventID: string | undefined;
   onClose: () => void;
+  navigateToRun: NavigateToRunFn;
 };
 
-export function Details({ envID, eventID, onClose }: Props) {
+export function Details({ envID, eventID, onClose, navigateToRun }: Props) {
   const [selectedRun, setSelectedRun] = useState<{ functionID: string; runID: string } | undefined>(
     undefined
   );
@@ -107,17 +109,22 @@ export function Details({ envID, eventID, onClose }: Props) {
         getHistoryItemOutput={getOutput}
         history={new HistoryParser(runRes.data.run.history)}
         run={runRes.data.run}
+        navigateToRun={navigateToRun}
       />
     );
   }
 
   return (
-    <SlideOver isOpen={Boolean(eventID)} onClose={onClose} size="large">
-      <div className={'dark grid h-full grid-cols-2 text-white'}>
-        {eventDetails}
-        {runDetails}
-      </div>
-    </SlideOver>
+    <>
+      {eventID && (
+        <SlideOver onClose={onClose} size="large">
+          <div className={'dark grid h-full grid-cols-2 text-white'}>
+            {eventDetails}
+            {runDetails}
+          </div>
+        </SlideOver>
+      )}
+    </>
   );
 }
 

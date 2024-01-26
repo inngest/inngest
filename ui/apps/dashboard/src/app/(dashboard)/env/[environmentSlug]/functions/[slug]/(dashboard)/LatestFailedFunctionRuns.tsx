@@ -7,9 +7,9 @@ import { XCircleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { useQuery } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
-import { useEnvironment } from '@/queries';
 
 const GetFailedFunctionRunsDocument = graphql(`
   query GetFailedFunctionRuns(
@@ -63,18 +63,15 @@ export default function LatestFailedFunctionRuns({
     return new Date();
   }, []);
 
-  const [{ data: environment, fetching: fetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
+  const environment = useEnvironment();
   const [{ data: failedFunctionRunsResponse, fetching: isFetchingFailedFunctionRuns }] = useQuery({
     query: GetFailedFunctionRunsDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
       functionSlug,
       lowerTime: lowerTime.toISOString(),
       upperTime: upperTime.toISOString(),
     },
-    pause: !environment?.id,
   });
   const router = useRouter();
 
@@ -94,7 +91,7 @@ export default function LatestFailedFunctionRuns({
           href={
             `/env/${environmentSlug}/functions/${encodeURIComponent(functionSlug)}/logs` as Route
           }
-          label="View All Logs"
+          label="View All Runs"
         />
       </header>
       <div className="rounded-md border border-slate-200 text-sm text-slate-500">
@@ -110,15 +107,15 @@ export default function LatestFailedFunctionRuns({
             </tr>
           </thead>
           <tbody className="h-full divide-y divide-slate-200">
-            {!failedFunctionRuns && (fetchingEnvironment || isFetchingFailedFunctionRuns) && (
+            {!failedFunctionRuns && isFetchingFailedFunctionRuns && (
               <tr>
                 <td className="p-4 text-center" colSpan={3}>
                   Loading...
                 </td>
               </tr>
             )}
-            {failedFunctionRuns && failedFunctionRuns?.length > 0
-              ? failedFunctionRuns?.map((functionRun, index) => {
+            {failedFunctionRuns && failedFunctionRuns.length > 0
+              ? failedFunctionRuns.map((functionRun, index) => {
                   if (!functionRun) {
                     return (
                       <tr key={index} className="opacity-50">

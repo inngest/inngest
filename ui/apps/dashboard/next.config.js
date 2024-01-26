@@ -19,18 +19,18 @@ const nextConfig = {
     return [
       {
         source: '/',
-        destination: '/env/production/functions',
-        permanent: true,
+        destination: '/env/production/apps',
+        permanent: false,
       },
       {
         source: '/env/:slug/manage',
         destination: '/env/:slug/manage/keys',
-        permanent: true,
+        permanent: false,
       },
       {
         source: '/env/:slug/settings',
         destination: '/env/:slug/settings/team',
-        permanent: true,
+        permanent: false,
       },
       {
         source: '/integrations/vercel',
@@ -45,23 +45,23 @@ const nextConfig = {
       {
         source: '/login',
         destination: '/sign-in',
-        permanent: true,
+        permanent: false,
       },
       {
         source: '/reset-password/reset',
         destination: '/password-reset/complete',
-        permanent: true,
+        permanent: false,
       },
       // Legacy signing key locations
       {
         source: '/secrets',
         destination: '/env/production/manage/signing-key',
-        permanent: true,
+        permanent: false,
       },
       {
         source: '/test/secrets',
         destination: '/env/branch/manage/signing-key',
-        permanent: true,
+        permanent: false,
       },
     ];
   },

@@ -49,7 +49,6 @@ export default function BillingPlanOption({
   isActive,
   isPremium,
   isTrial,
-  usagePercentage,
   features,
   preventDowngrade,
   onClickChangePlan,
@@ -79,12 +78,6 @@ export default function BillingPlanOption({
           {/* {usagePercentage >= 100 ? 'Exceeding plan limits' : 'Usage'} */}
         </div>
       </Row>
-      {/* Disable usage bar until API is ready */}
-      {false && !isPremium ? (
-        <FunctionUsageBar percentage={usagePercentage} />
-      ) : (
-        <span className="block h-1.5">{/* Spacer */}</span>
-      )}
 
       <FeatureRows featureRows={featureRows} features={features} isPremium={isPremium} />
 
@@ -151,16 +144,4 @@ export function Row({
   className?: string;
 }) {
   return <div className={cn('flex items-center justify-between', className)}>{children}</div>;
-}
-
-function FunctionUsageBar({ percentage }: { percentage: number }) {
-  const className = cn(
-    'block bg-indigo-500 rounded-full',
-    percentage >= 99 ? 'bg-red-500' : percentage >= 80 ? 'bg-amber-400' : null
-  );
-  return (
-    <div className="flex h-1.5 rounded-full bg-slate-300">
-      <span style={{ flexBasis: `${percentage}%` }} className={className}></span>
-    </div>
-  );
 }

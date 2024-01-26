@@ -5,6 +5,9 @@ import (
 )
 
 const (
+	// SDK version (e.g. "js:v3.2.1")
+	HeaderKeySDK = "X-Inngest-SDK"
+
 	// Tells the consumers (e.g. SDKs) what kind of Inngest server they're
 	// communicating with (Cloud or Dev Server).
 	HeaderKeyServerKind = "X-Inngest-Server-Kind"
@@ -23,6 +26,16 @@ func StaticHeadersMiddleware(serverKind string) func(next http.Handler) http.Han
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set(HeaderKeyServerKind, serverKind)
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// ContentTypeJsonResponse sets the HTTP response's Content-Type header to JSON
+func ContentTypeJsonResponse() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
 			next.ServeHTTP(w, r)
 		})
 	}

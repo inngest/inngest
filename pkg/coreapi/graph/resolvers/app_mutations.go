@@ -29,8 +29,8 @@ func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateApp
 	}
 	app, _ := r.Data.InsertApp(ctx, params)
 
-	if err := deploy.Ping(ctx, input.URL); err != nil {
-		return app, err
+	if res := deploy.Ping(ctx, input.URL); res.Err != nil {
+		return app, res.Err
 	}
 
 	<-time.After(100 * time.Millisecond)

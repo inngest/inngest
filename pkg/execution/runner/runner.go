@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/config"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -40,7 +39,6 @@ type Runner interface {
 
 	StateManager() state.Manager
 	InitializeCrons(ctx context.Context) error
-	History(ctx context.Context, id state.Identifier) ([]state.History, error)
 	Runs(ctx context.Context, eventId string) ([]state.State, error)
 	Events(ctx context.Context, eventId string) ([]event.Event, error)
 }
@@ -245,10 +243,6 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 	return nil
 }
 
-func (s *svc) History(ctx context.Context, id state.Identifier) ([]state.History, error) {
-	return s.state.History(ctx, id.RunID)
-}
-
 func (s *svc) Runs(ctx context.Context, eventID string) ([]state.State, error) {
 	items, _ := s.tracker.Runs(ctx, eventID)
 	result := make([]state.State, len(items))
@@ -345,7 +339,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqrs.ExecutionLoader) (*inngest.Function, error) {
 	evt := tracked.GetEvent()
 
-	if evt.Name != consts.InvokeEventName {
+	if evt.Name != event.InvokeFnName {
 		return nil, nil
 	}
 
@@ -354,18 +348,22 @@ func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqr
 		return nil, err
 	}
 
-	name := evt.Data[consts.InvokeSlugKey]
-	if name == "" {
-		return nil, err
+	fnID := ""
+	metadata := evt.InngestMetadata()
+	if metadata != nil && metadata.InvokeFnID != "" {
+		fnID = metadata.InvokeFnID
+	}
+	if fnID == "" {
+		return nil, fmt.Errorf("could not extract function ID from event")
 	}
 
 	for _, fn := range fns {
-		if fn.GetSlug() == name {
+		if fn.GetSlug() == fnID {
 			return &fn, nil
 		}
 	}
 
-	return nil, nil
+	return nil, fmt.Errorf("could not find function with ID: %s", fnID)
 }
 
 // functions triggers all functions from the given event.
@@ -385,6 +383,22 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 		fn, err := FindInvokedFunction(ctx, tracked, s.data)
 		if err != nil {
 			errs = multierror.Append(errs, err)
+
+			// If this errored, then we were supposed to find a function to
+			// invoke. In this case, emit a completion event with the error.
+			perr := s.executor.InvokeNotFoundHandler(ctx, execution.InvokeNotFoundHandlerOpts{
+				OriginalEvent: tracked,
+				FunctionID:    "",
+				RunID:         "",
+				// TODO unify
+				Err: map[string]any{
+					"name":    "Error",
+					"message": err.Error(),
+				},
+			})
+			if perr != nil {
+				errs = multierror.Append(errs, perr)
+			}
 		}
 		if fn != nil {
 			// Initialize this function for this event only once;  we don't
@@ -466,11 +480,17 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 	logger.From(ctx).Trace().Msg("querying for pauses")
 
+	if ok, err := s.state.EventHasPauses(ctx, uuid.UUID{}, evt.GetEvent().Name); err == nil && !ok {
+		return nil
+	}
+
 	iter, err := s.state.PausesByEvent(ctx, uuid.UUID{}, evt.GetEvent().Name)
 	if err != nil {
 		return fmt.Errorf("error finding event pauses: %w", err)
 	}
-	return s.executor.HandlePauses(ctx, iter, evt)
+
+	_, err = s.executor.HandlePauses(ctx, iter, evt)
+	return err
 }
 
 func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.TrackedEvent) error {

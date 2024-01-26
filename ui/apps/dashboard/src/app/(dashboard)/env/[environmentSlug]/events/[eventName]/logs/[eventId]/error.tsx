@@ -1,14 +1,20 @@
 'use client';
 
+import { useEffect } from 'react';
 import { ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import * as Sentry from '@sentry/nextjs';
 
 type EventErrorPops = {
-  error: Error;
+  error: Error & { digest?: string };
   reset: () => void;
 };
 
-export default function EventError({ reset }: EventErrorPops) {
+export default function EventError({ error, reset }: EventErrorPops) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-5">
       <div className="inline-flex items-center gap-2 text-red-600">

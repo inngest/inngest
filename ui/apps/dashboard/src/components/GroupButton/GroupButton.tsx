@@ -27,7 +27,7 @@ export default function GroupButton<T extends Options>({
 
   return (
     <div className={groupStyles} role="radiogroup" aria-label={title}>
-      {options?.map((option) => {
+      {options.map((option) => {
         const isSelected = option.id === selectedOption;
         const classNames = cn(
           'text-slate-400 hover:bg-slate-100 hover:text-indigo-500 font-medium px-3 py-1 rounded text-sm cursor-pointer',

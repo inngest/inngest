@@ -97,7 +97,7 @@ type Executor interface {
 
 	// HandlePauses handles pauses loaded from an incoming event.  This delegates to Cancel and
 	// Resume where necessary, depending on pauses that have been loaded and matched.
-	HandlePauses(ctx context.Context, iter state.PauseIterator, event event.TrackedEvent) error
+	HandlePauses(ctx context.Context, iter state.PauseIterator, event event.TrackedEvent) (HandlePauseResult, error)
 	// Cancel cancels an in-progress function run, preventing any enqueued or future steps from running.
 	Cancel(ctx context.Context, runID ulid.ULID, r CancelRequest) error
 	// Resume resumes an in-progress function run from the given waitForEvent pause.
@@ -107,12 +107,33 @@ type Executor interface {
 	// always add to a list of listeners vs replace listeners.
 	AddLifecycleListener(l LifecycleListener)
 
-	// SetFailureHandler sets the failure handler, called when a function run permanently fails.
-	SetFailureHandler(f FailureHandler)
+	// SetFinishHandler sets the finish handler, called when a function run finishes.
+	SetFinishHandler(f FinishHandler)
+
+	// InvokeNotFoundHandler invokes the invoke not found handler.
+	InvokeNotFoundHandler(context.Context, InvokeNotFoundHandlerOpts) error
 }
 
-// FailureHandler is a function that handles failures in the executor.
-type FailureHandler func(context.Context, state.Identifier, state.State, state.DriverResponse) error
+// PublishFinishedEventOpts represents the options for publishing a finished event.
+type InvokeNotFoundHandlerOpts struct {
+	OriginalEvent event.TrackedEvent
+	FunctionID    string
+	RunID         string
+	Err           map[string]any
+	Result        any
+}
+
+// FinishHandler is a function that handles functions finishing in the executor.
+// It should be used to send the given events.
+type FinishHandler func(context.Context, state.State, []event.Event) error
+
+// InvokeNotFoundHandler is a function that handles invocations failing due to
+// the function not being found. It is passed a list of events to send.
+type InvokeNotFoundHandler func(context.Context, InvokeNotFoundHandlerOpts, []event.Event) error
+
+// HandleSendingEvent handles sending an event given an event and the queue
+// item.
+type HandleSendingEvent func(context.Context, event.Event, queue.Item) error
 
 // ScheduleRequest represents all data necessary to schedule a new function.
 type ScheduleRequest struct {
@@ -147,12 +168,31 @@ type ScheduleRequest struct {
 // CancelRequest stores information about the incoming cancellation request within
 // history.
 type CancelRequest struct {
-	EventID    *ulid.ULID
-	Expression *string
-	UserID     *uuid.UUID
+	EventID        *ulid.ULID
+	Expression     *string
+	UserID         *uuid.UUID
+	CancellationID *ulid.ULID
 }
 
 type ResumeRequest struct {
 	With    any
 	EventID *ulid.ULID
+	// RunID is the ID of the run that causes this resume, used for invoking
+	// functions directly.
+	RunID    *ulid.ULID
+	StepName string
+}
+
+// HandlePauseResult returns status information about pause handling.
+type HandlePauseResult [2]int32
+
+// Processed returns the number of pauses processed.
+func (h HandlePauseResult) Processed() int32 {
+	return h[0]
+}
+
+// Processed returns the number of pauses handled, eg. pauses that matched
+// and successfully impacted runs (either by cancellation or continuing).
+func (h HandlePauseResult) Handled() int32 {
+	return h[1]
 }

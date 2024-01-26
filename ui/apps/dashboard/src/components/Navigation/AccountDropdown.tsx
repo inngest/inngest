@@ -32,9 +32,9 @@ export default async function AccountDropdown() {
             width={128}
             height={128}
             alt="Your profile picture"
-            className="mr-2 h-5 w-5 rounded-full"
+            className="h-5 w-5 rounded-full"
           />
-          {getDisplayName(user)}
+          <span className="ml-2 hidden xl:block">{getDisplayName(user)}</span>
         </div>
       }
     >

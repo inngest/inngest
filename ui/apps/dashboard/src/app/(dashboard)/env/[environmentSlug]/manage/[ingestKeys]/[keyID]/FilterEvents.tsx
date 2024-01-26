@@ -20,10 +20,8 @@ type FilterEventsProps = {
   };
 };
 
-export default function FilterEvents({ keyID, filter, keyName }: FilterEventsProps) {
-  const [newFilter, setNewFilter] = useState(
-    filter || [{ type: 'allow', events: null, ips: null }]
-  );
+export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
+  const [newFilter, setNewFilter] = useState(filter);
   const [isDisabled, setDisabled] = useState(true);
   const { save } = useContext(Context);
   const router = useRouter();

@@ -7,12 +7,8 @@ import { useDeploys } from '@/queries/deploys';
 import cn from '@/utils/cn';
 import { DeployListItem } from './DeployListItem';
 
-type DeployListProps = {
-  environmentSlug: string;
-};
-
-export default function DeployList({ environmentSlug }: DeployListProps) {
-  const [{ data, fetching }] = useDeploys({ environmentSlug });
+export default function DeployList() {
+  const [{ data, fetching }] = useDeploys();
   const selectedId = useSelectedLayoutSegment();
 
   const deploys = data?.deploys || [];
@@ -38,17 +34,12 @@ export default function DeployList({ environmentSlug }: DeployListProps) {
 
   return (
     <ul className="h-full w-96 shrink-0 divide-y divide-slate-100 overflow-y-scroll bg-white shadow">
-      {deploys.map((deploy, index) => {
-        if (!deploy) {
-          return undefined;
-        }
-
+      {deploys.map((deploy) => {
         const isSelected = deploy.id === selectedId;
 
         return (
           <DeployListItem
             activeFunctionCount={deploy.deployedFunctions.length}
-            environmentSlug={environmentSlug}
             createdAt={deploy.createdAt}
             deployID={deploy.id}
             error={deploy.error}

@@ -1,7 +1,10 @@
+'use client';
+
 import type { Route } from 'next';
 import { Button } from '@inngest/components/Button';
 import { capitalCase } from 'change-case';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import DeployStatus from '@/components/Status/DeployStatus';
 import { Time } from '@/components/Time';
 import ClockIcon from '@/icons/ClockIcon';
@@ -26,7 +29,6 @@ export type DeployCardProps = {
   createdAt: string;
   deployedFunctions: { slug: string; name: string }[];
   removedFunctions: { slug: string; name: string }[];
-  environmentSlug: string;
   error?: string | null | undefined;
   framework?: string | null;
   metadata: DeployMetadata;
@@ -41,7 +43,6 @@ export default function DeployCard({
   appName,
   createdAt,
   deployedFunctions,
-  environmentSlug,
   framework,
   metadata,
   removedFunctions,
@@ -49,6 +50,8 @@ export default function DeployCard({
   status,
   url,
 }: DeployCardProps) {
+  const env = useEnvironment();
+
   return (
     <div className="w-full px-8 py-8">
       <div className="rounded-lg bg-white shadow">
@@ -88,12 +91,12 @@ export default function DeployCard({
       <div className="mt-4 grid-cols-2 items-start gap-4 xl:grid">
         <FunctionList
           functions={deployedFunctions}
-          baseHref={`/env/${environmentSlug}/functions`}
+          baseHref={`/env/${env.slug}/functions`}
           status="active"
         />
         <FunctionList
           functions={removedFunctions}
-          baseHref={`/env/${environmentSlug}/functions`}
+          baseHref={`/env/${env.slug}/functions`}
           status="removed"
         />
       </div>
@@ -106,17 +109,13 @@ function IntegrationCard({ metadata }: { metadata: DeployMetadata }): JSX.Elemen
   const IntegrationWordmark = integrationName ? integrationLogos[integrationName].wordmark : null;
   const IntegrationLogomark = integrationName ? integrationLogos[integrationName].logomark : null;
 
-  // We need to cast the following URLs to Route because they are all external links.
-  // See https://beta.nextjs.org/docs/configuring/typescript#statically-typed-links
-  const projectUrl = metadata?.payload?.links?.project as Route;
-  const deploymentUrl = metadata?.payload?.links?.deployment as Route;
-  const url = metadata?.payload?.deployment?.url
-    ? `https://${metadata.payload.deployment.url}`
-    : '';
+  const projectUrl = metadata.payload?.links.project;
+  const deploymentUrl = metadata.payload?.links.deployment;
+  const url = metadata.payload?.deployment.url ? `https://${metadata.payload.deployment.url}` : '';
 
   // TODO - Support Gitlab and Bitbucket URLs
-  const meta = metadata?.payload?.deployment?.meta;
-  const repo = meta?.githubOrg && meta?.githubRepo ? `${meta?.githubOrg}/${meta?.githubRepo}` : '';
+  const meta = metadata.payload?.deployment.meta;
+  const repo = meta?.githubOrg && meta.githubRepo ? `${meta.githubOrg}/${meta.githubRepo}` : '';
   // NOTE - This assumes it is public Github, not a privately hosted Github Enterprise
   const repoUrl = repo ? (`https://github.com/${repo}` as Route) : '';
 

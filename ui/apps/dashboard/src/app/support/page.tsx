@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { type Route } from 'next';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
-import { ArrowLeftIcon, CheckIcon } from '@heroicons/react/20/solid';
+import { ArrowLeftIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { ThreadStatus, type ThreadPartsFragment } from '@team-plain/typescript-sdk';
 import { useQuery } from 'urql';
@@ -16,7 +17,7 @@ import cn from '@/utils/cn';
 import { isEnterprisePlan } from '../(dashboard)/settings/billing/utils';
 import { SupportForm } from './SupportForm';
 import { useSystemStatus } from './statusPage';
-import { getLabelTitleByTypeId } from './ticketOptions';
+import { type TicketType } from './ticketOptions';
 
 const GetAccountSupportInfoDocument = graphql(`
   query GetAccountSupportInfo {
@@ -35,6 +36,7 @@ const GetAccountSupportInfoDocument = graphql(`
 export default function Page() {
   const status = useSystemStatus();
   const { isSignedIn } = useAuth();
+  const searchParams = useSearchParams();
   const [{ data, fetching }] = useQuery({
     query: GetAccountSupportInfoDocument,
   });
@@ -42,6 +44,7 @@ export default function Page() {
   const plan = data?.account.plan;
   const isPaid = (plan?.amount || 0) > 0;
   const isEnterprise = plan ? isEnterprisePlan(plan) : false;
+  const preselectedTicketType = searchParams.get('q') as TicketType;
 
   return (
     <div className="h-full overflow-y-scroll">
@@ -99,7 +102,11 @@ export default function Page() {
               </>
             ) : (
               <>
-                <SupportForm isEnterprise={isEnterprise} isPaid={isPaid} />
+                <SupportForm
+                  isEnterprise={isEnterprise}
+                  isPaid={isPaid}
+                  preselectedTicketType={preselectedTicketType}
+                />
                 <SupportTickets isSignedIn={isSignedIn} />
               </>
             )}

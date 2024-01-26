@@ -104,7 +104,7 @@ function CheckoutForm({ items, onSuccess }: { items: CheckoutItem[]; onSuccess: 
       );
     }
 
-    const clientSecret = data?.createStripeSubscription?.clientSecret || '';
+    const clientSecret = data?.createStripeSubscription.clientSecret || '';
     // If there is no client secret, the payment is already associated with the subscription,
     // we can return success early
     if (!clientSecret) {
@@ -112,7 +112,7 @@ function CheckoutForm({ items, onSuccess }: { items: CheckoutItem[]; onSuccess: 
     }
 
     // Confirm the PaymentIntent using the details collected by the Payment Element
-    const { paymentIntent, error: stripeConfirmPaymentError } = await stripe.confirmPayment({
+    const { error: stripeConfirmPaymentError } = await stripe.confirmPayment({
       elements,
       clientSecret,
       confirmParams: {

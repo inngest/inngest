@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httputil"
@@ -19,7 +18,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/stretchr/testify/require"
@@ -79,8 +77,6 @@ func parseEnvURL(env string) url.URL {
 func run(t *testing.T, test *Test) {
 	t.Helper()
 
-	rand.Seed(time.Now().UnixNano())
-
 	fmt.Println("")
 	fmt.Println("")
 	header := fmt.Sprintf("Running test: %s", t.Name())
@@ -119,7 +115,7 @@ func run(t *testing.T, test *Test) {
 
 		// Recreate reader to re-read in assertion, then pass to assertion.
 		r.Body.Close()
-		r.Body = ioutil.NopCloser(bytes.NewReader(byt))
+		r.Body = io.NopCloser(bytes.NewReader(byt))
 
 		select {
 		case test.requests <- *r:
@@ -146,8 +142,9 @@ func run(t *testing.T, test *Test) {
 		// Read the response.
 		byt, err = io.ReadAll(rdr)
 		require.NoError(t, err)
+
 		sdkResponse.Body.Close()
-		sdkResponse.Body = ioutil.NopCloser(bytes.NewReader(byt))
+		sdkResponse.Body = io.NopCloser(bytes.NewReader(byt))
 
 		fmt.Printf(" ==> Received SDK response:\n\t%s\n", string(byt))
 		fmt.Println("")
@@ -160,6 +157,12 @@ func run(t *testing.T, test *Test) {
 		}
 
 		// Forward the response from the SDK to the executor.
+
+		for header, values := range sdkResponse.Header {
+			// Multi-headers not supported
+			w.Header().Add(header, values[0])
+		}
+
 		w.WriteHeader(sdkResponse.StatusCode)
 		_, err = w.Write(byt)
 		require.NoError(t, err)
@@ -207,19 +210,12 @@ func run(t *testing.T, test *Test) {
 		resp.Body.Close()
 	}()
 
-	// Trigger the function by sending an event.
-	trigger := test.Function.Triggers[0]
-	if trigger.EventTrigger == nil {
-		t.Fatalf("Unable to trigger scheduled functions")
-		return
-	}
-
 	test.test = t
 	for _, f := range test.chain {
 		f()
 	}
 
-	fmt.Println(" ==> Waiting for extraneous requests")
+	fmt.Printf("\n===> Waiting for extraneous requests\n")
 	<-time.After(test.Timeout + buffer)
 	fmt.Printf("\n\n")
 }
@@ -228,8 +224,8 @@ func run(t *testing.T, test *Test) {
 // the introspect handler.
 func introspect(test *Test) (*sdk.RegisterRequest, error) {
 	url := sdkURL
-	url.Path = "/api/inngest"
-	url.RawQuery = "introspect"
+	// A custom URL
+	url.Path = "/api/introspect"
 
 	resp, err := http.Get(url.String())
 	if err != nil {
@@ -237,51 +233,37 @@ func introspect(test *Test) (*sdk.RegisterRequest, error) {
 	}
 	defer resp.Body.Close()
 
-	data := &sdk.RegisterRequest{}
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+	fns := []sdk.SDKFunction{}
+	if err := json.NewDecoder(resp.Body).Decode(&fns); err != nil {
 		return nil, fmt.Errorf("invalid introspect response: unable to decode introspect response: %w", err)
 	}
 
-	// Ensure we always have a slug.
-	test.Function.Slug = test.Function.GetSlug()
-
-	// Normalize URLs so that 127 <> localhost always matches.
-	for i := range test.Function.Steps {
-		test.Function.Steps[i].URI = util.NormalizeAppURL(test.Function.Steps[i].URI)
-	}
-	test.Function.ID = inngest.DeterministicUUID(test.Function)
-
-	expected, err := json.MarshalIndent(test.Function, "", "  ")
-	if err != nil {
-		return nil, err
+	rr := &sdk.RegisterRequest{
+		URL:       "http://127.0.0.1:3000/api/inngest",
+		Functions: fns,
 	}
 
-	funcs, err := data.Parse(context.Background())
+	funcs, err := rr.Parse(context.Background())
 	if err != nil {
 		return nil, err
 	}
 
 	found := false
 	for _, f := range funcs {
-		f.ID = inngest.DeterministicUUID(test.Function)
-
 		for i := range f.Steps {
 			f.Steps[i].URI = util.NormalizeAppURL(f.Steps[i].URI)
 		}
-
-		actual, _ := json.MarshalIndent(f, "", "  ")
-		if bytes.Equal(expected, actual) {
+		if f.Slug == test.ID {
 			found = true
-			break
 		}
 	}
 
 	response, _ := json.MarshalIndent(funcs, "", "  ")
 	if !found {
-		return nil, fmt.Errorf("Expected function not found:\n%s\n\nIntrospection:\n%s", string(expected), string(response))
+		return nil, fmt.Errorf("Expected function not found:\n%s\n\nIntrospection:\n%s", test.ID, string(response))
 	}
 
-	return data, nil
+	return rr, nil
 }
 
 func replaceURL(nodeURL, proxyURL string) string {
@@ -337,14 +319,4 @@ func register(serverURL url.URL, rr sdk.RegisterRequest) error {
 	}
 
 	return nil
-}
-
-func stepURL(fnID string, step string) string {
-	url := sdkURL
-	url.Path = "/api/inngest"
-	q := url.Query()
-	q.Add("fnId", fnID)
-	q.Add("stepId", step)
-	url.RawQuery = q.Encode()
-	return util.NormalizeAppURL(url.String())
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,7 +41,7 @@ type wrapper struct {
 // LoadFunction implements the state.FunctionLoader interface.
 func (w wrapper) LoadFunction(ctx context.Context, identifier state.Identifier) (*inngest.Function, error) {
 	// XXX: This doesn't store versions, as the dev server is currently ignorant to version.s
-	fn, err := w.GetFunctionByID(ctx, identifier.WorkflowID)
+	fn, err := w.GetFunctionByInternalUUID(ctx, identifier.WorkspaceID, identifier.WorkflowID)
 	if err != nil {
 		return nil, err
 	}
@@ -195,15 +196,38 @@ func (w wrapper) GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*cqrs.
 	return copyInto(ctx, f, []*cqrs.Function{})
 }
 
-func (w wrapper) GetFunctionByID(ctx context.Context, id uuid.UUID) (*cqrs.Function, error) {
+func (w wrapper) GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, appID, fnSlug string) (*cqrs.Function, error) {
 	f := func(ctx context.Context) (*sqlc.Function, error) {
-		return w.q.GetFunctionByID(ctx, id)
+		return w.q.GetFunctionBySlug(ctx, fnSlug)
+	}
+	return copyInto(ctx, f, &cqrs.Function{})
+}
+
+func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, wsID, fnID uuid.UUID) (*cqrs.Function, error) {
+	f := func(ctx context.Context) (*sqlc.Function, error) {
+		return w.q.GetFunctionByID(ctx, fnID)
 	}
 	return copyInto(ctx, f, &cqrs.Function{})
 }
 
 func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
 	return copyInto(ctx, w.q.GetFunctions, []*cqrs.Function{})
+}
+
+func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, workspaceID, appID uuid.UUID) ([]*cqrs.Function, error) {
+	f := func(ctx context.Context) ([]*sqlc.Function, error) {
+		// Ingore the workspace ID for now.
+		return w.q.GetAppFunctions(ctx, appID)
+	}
+	return copyInto(ctx, f, []*cqrs.Function{})
+}
+
+func (w wrapper) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uuid.UUID, appID string) ([]*cqrs.Function, error) {
+	f := func(ctx context.Context) ([]*sqlc.Function, error) {
+		// Ingore the workspace ID for now.
+		return w.q.GetAppFunctionsBySlug(ctx, appID)
+	}
+	return copyInto(ctx, f, []*cqrs.Function{})
 }
 
 func (w wrapper) InsertFunction(ctx context.Context, params cqrs.InsertFunctionParams) (*cqrs.Function, error) {
@@ -318,7 +342,12 @@ func (w wrapper) WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, opt
 	return out, nil
 }
 
-func (w wrapper) GetEventsTimebound(ctx context.Context, t cqrs.Timebound, limit int) ([]*cqrs.Event, error) {
+func (w wrapper) GetEventsTimebound(
+	ctx context.Context,
+	t cqrs.Timebound,
+	limit int,
+	includeInternal bool,
+) ([]*cqrs.Event, error) {
 	after := time.Time{}                           // after the beginning of time, eg all
 	before := time.Now().Add(time.Hour * 24 * 365) // before 1 year in the future, eg all
 	if t.After != nil {
@@ -329,9 +358,10 @@ func (w wrapper) GetEventsTimebound(ctx context.Context, t cqrs.Timebound, limit
 	}
 
 	evts, err := w.q.GetEventsTimebound(ctx, sqlc.GetEventsTimeboundParams{
-		After:  after,
-		Before: before,
-		Limit:  int64(limit),
+		After:           after,
+		Before:          before,
+		IncludeInternal: strconv.FormatBool(includeInternal),
+		Limit:           int64(limit),
 	})
 	if err != nil {
 		return []*cqrs.Event{}, err

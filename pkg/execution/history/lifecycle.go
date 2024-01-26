@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/exp/slog"
 )
@@ -106,7 +108,7 @@ func (l lifecycle) OnFunctionStarted(
 		)
 	}
 
-	latency, _ := redis_state.GetItemLatency(ctx)
+	latency, _ := redis_state.GetItemSystemLatency(ctx)
 	latencyMS := latency.Milliseconds()
 
 	h := History{
@@ -128,7 +130,7 @@ func (l lifecycle) OnFunctionStarted(
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
-			l.log.Error("execution lifecycle error", "lifecycle", "onStepFinished", "error", err)
+			l.log.Error("execution lifecycle error", "lifecycle", "onFunctionStarted", "error", err)
 		}
 	}
 }
@@ -297,7 +299,7 @@ func (l lifecycle) OnStepStarted(
 		)
 	}
 
-	latency, _ := redis_state.GetItemLatency(ctx)
+	latency, _ := redis_state.GetItemSystemLatency(ctx)
 	latencyMS := latency.Milliseconds()
 
 	h := History{
@@ -375,13 +377,37 @@ func (l lifecycle) OnStepFinished(
 		)
 	}
 
-	// TODO: CompletedStepCount
+	if h.Result != nil {
+		h.Result.Headers = resp.Header
+
+		if resp.SDK != "" {
+			parts := strings.Split(resp.SDK, ":")
+			if len(parts) == 2 {
+				// Trim prefix because the TS SDK sends "inngest-js:vX.X.X"
+				h.Result.SDKLanguage = strings.TrimPrefix(parts[0], "inngest-")
+
+				h.Result.SDKVersion = parts[1]
+			} else {
+				l.log.Warn(
+					"invalid SDK version",
+					"sdk", resp.SDK,
+				)
+			}
+		}
+	}
 
 	if resp.Err != nil && resp.Retryable() {
 		h.Type = enums.HistoryTypeStepErrored.String()
 	}
 	if resp.Err != nil && !resp.Retryable() {
 		h.Type = enums.HistoryTypeStepFailed.String()
+	}
+
+	if len(resp.Generator) == 1 && resp.Generator[0].Op == enums.OpcodeStepError {
+		h.Type = enums.HistoryTypeStepErrored.String()
+		if resp.NoRetry {
+			h.Type = enums.HistoryTypeStepFailed.String()
+		}
 	}
 
 	for _, d := range l.drivers {
@@ -409,6 +435,7 @@ func (l lifecycle) OnWaitForEvent(
 
 	opts, _ := op.WaitForEventOpts()
 	expires, _ := opts.Expires()
+	stepName := op.UserDefinedName()
 	// nothing right now.
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
@@ -424,7 +451,7 @@ func (l lifecycle) OnWaitForEvent(
 		IdempotencyKey:  id.IdempotencyKey(),
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
-		StepName:        &op.Name,
+		StepName:        &stepName,
 		StepID:          &op.ID,
 		WaitForEvent: &WaitForEvent{
 			EventName:  opts.Event,
@@ -461,6 +488,11 @@ func (l lifecycle) OnWaitForEventResumed(
 		groupIDUUID = val
 	}
 
+	var stepName *string
+	if req.StepName != "" {
+		stepName = &req.StepName
+	}
+
 	h := History{
 		AccountID:       id.AccountID,
 		WorkspaceID:     id.WorkspaceID,
@@ -478,10 +510,146 @@ func (l lifecycle) OnWaitForEventResumed(
 			EventID: req.EventID,
 			Timeout: req.EventID == nil,
 		},
+		StepName: stepName,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
 			l.log.Error("execution lifecycle error", "lifecycle", "onWaitForEventResumed", "error", err)
+		}
+	}
+}
+
+// OnInvokeFunction is called when a function is invoked from a step.
+func (l lifecycle) OnInvokeFunction(
+	ctx context.Context,
+	id state.Identifier,
+	item queue.Item,
+	op state.GeneratorOpcode,
+	eventID ulid.ULID,
+	corrID string,
+) {
+	logger.From(ctx).Debug().Interface("id", id).Msg("OnInvokeFunction")
+
+	groupID, err := toUUID(item.GroupID)
+	if err != nil {
+		l.log.Error(
+			"error parsing group ID",
+			"error", err,
+			"group_id", item.GroupID,
+			"run_id", id.RunID.String(),
+		)
+	}
+
+	fnID := ""
+	expiry := time.Time{}
+
+	opts, err := op.InvokeFunctionOpts()
+	if err != nil {
+		l.log.Error("error parsing invoke function options", "error", err)
+	}
+
+	if opts != nil {
+		fnID = opts.FunctionID
+		optsExp, err := opts.Expires()
+		if err != nil {
+			l.log.Error("error parsing invoke function options expiry", "error", err)
+		} else {
+			expiry = optsExp
+		}
+	} else {
+		l.log.Error("invoke function options are nil")
+	}
+
+	var invokeFunction *InvokeFunction
+	// Not having all of the required data here indicates that something is
+	// wrong; let's not add a partial history item for this. Either everything
+	// or nothing, to ensure the reader doesn't have to do too much work.
+	if corrID != "" && eventID.String() != "" && fnID != "" {
+		invokeFunction = &InvokeFunction{
+			CorrelationID: corrID,
+			EventID:       eventID,
+			FunctionID:    fnID,
+			Timeout:       expiry,
+		}
+	}
+
+	stepName := op.UserDefinedName()
+	h := History{
+		AccountID:       id.AccountID,
+		Attempt:         int64(item.Attempt),
+		BatchID:         id.BatchID,
+		CreatedAt:       time.Now(),
+		EventID:         id.EventID,
+		FunctionID:      id.WorkflowID,
+		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         groupID,
+		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		IdempotencyKey:  id.IdempotencyKey(),
+		InvokeFunction:  invokeFunction,
+		RunID:           id.RunID,
+		StepID:          &op.ID,
+		StepName:        &stepName,
+		Type:            enums.HistoryTypeStepInvoking.String(),
+		WorkspaceID:     id.WorkspaceID,
+	}
+	for _, d := range l.drivers {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
+			l.log.Error("execution lifecycle error", "lifecycle", "onInvokeFunction", "error", err)
+		}
+	}
+}
+
+// OnInvokeFunctionResumed is called when a function is resumed from an
+// invoke function step. This happens when the invoked function has
+// completed or the step timed out whilst waiting.
+func (l lifecycle) OnInvokeFunctionResumed(
+	ctx context.Context,
+	id state.Identifier,
+	req execution.ResumeRequest,
+	groupID string,
+) {
+	var groupIDUUID *uuid.UUID
+	if groupID != "" {
+		val, err := toUUID(groupID)
+		if err != nil {
+			l.log.Error(
+				"error parsing group ID",
+				"error", err,
+				"group_id", groupID,
+				"run_id", id.RunID.String(),
+			)
+		}
+		groupIDUUID = val
+	}
+
+	var stepName *string
+	if req.StepName != "" {
+		stepName = &req.StepName
+	}
+
+	h := History{
+		AccountID:       id.AccountID,
+		BatchID:         id.BatchID,
+		CreatedAt:       time.Now(),
+		EventID:         id.EventID,
+		FunctionID:      id.WorkflowID,
+		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         groupIDUUID,
+		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		IdempotencyKey:  id.IdempotencyKey(),
+		InvokeFunctionResult: &InvokeFunctionResult{
+			EventID: req.EventID,
+			RunID:   req.RunID,
+			Timeout: req.EventID == nil,
+		},
+		RunID:       id.RunID,
+		Type:        enums.HistoryTypeStepCompleted.String(),
+		WorkspaceID: id.WorkspaceID,
+		StepName:    stepName,
+	}
+	for _, d := range l.drivers {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
+			l.log.Error("execution lifecycle error", "lifecycle", "onInvokeFunctionResumed", "error", err)
 		}
 	}
 }
@@ -505,6 +673,7 @@ func (l lifecycle) OnSleep(
 		)
 	}
 
+	stepName := op.UserDefinedName()
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:       id.AccountID,
@@ -519,7 +688,7 @@ func (l lifecycle) OnSleep(
 		IdempotencyKey:  id.IdempotencyKey(),
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
-		StepName:        &op.Name,
+		StepName:        &stepName,
 		StepID:          &op.ID,
 		Sleep: &Sleep{
 			Until: until,
@@ -543,31 +712,25 @@ func applyResponse(
 		// XXX: Add more fields here
 	}
 
-	if outputStr, ok := resp.Output.(string); ok {
-		// If it's a completed generator step then some data is stored in the
-		// output. We'll try to extract it.
-		isGeneratorStep := len(resp.Generator) > 0
-		if isGeneratorStep {
-			var opcodes []state.GeneratorOpcode
-			if err := json.Unmarshal([]byte(outputStr), &opcodes); err == nil {
-				if len(opcodes) > 0 && opcodes[0].Op != enums.OpcodeStepPlanned {
-					h.StepID = &opcodes[0].ID
-					h.StepType = getStepType(opcodes[0])
-					h.Result.Output = string(opcodes[0].Data)
-
-					if opcodes[0].DisplayName != nil {
-						h.StepName = opcodes[0].DisplayName
-					} else {
-						// SDK versions < 3.?.? don't respond with the display
-						// name, so we we'll use the deprecated name field as a
-						// fallback.
-						h.StepName = &opcodes[0].Name
-					}
-				}
-				return nil
-			}
+	// If it's a completed generator step then some data is stored in the
+	// output. We'll try to extract it.
+	if len(resp.Generator) > 0 {
+		if op := resp.HistoryVisibleStep(); op != nil {
+			h.StepID = &op.ID
+			h.StepType = getStepType(*op)
+			h.Result.Output, _ = op.Output()
+			stepName := op.UserDefinedName()
+			h.StepName = &stepName
 		}
 
+		// If we're a generator, exit now to prevent attempting to parse
+		// generator response as an output; the generator response may be in
+		// relation to many parallel steps, not just the one we're currently
+		// writing history for.
+		return nil
+	}
+
+	if outputStr, ok := resp.Output.(string); ok {
 		// If it's a string and doesn't have extractable data, then
 		// assume it's already the stringified JSON for the data
 		// returned by the user's step. Some scenarios when that can
@@ -611,12 +774,14 @@ func getStepType(opcode state.GeneratorOpcode) *enums.HistoryStepType {
 	switch opcode.Op {
 	case enums.OpcodeSleep:
 		out = enums.HistoryStepTypeSleep
-	case enums.OpcodeStep:
-		if opcode.Data == nil {
+
+	case enums.OpcodeStep, enums.OpcodeStepRun, enums.OpcodeStepError:
+		// NOTE: enums.OpcodeStepError follows the same logic for determining
+		// step types.
+		if opcode.Data == nil && opcode.Error == nil {
 			// Not a user-facing step.
 			return nil
 		}
-
 		// This is a hacky way to detect `step.sendEvent()`, but it's all we
 		// have until we add an opcode for it.
 		if opcode.Name == "sendEvent" {

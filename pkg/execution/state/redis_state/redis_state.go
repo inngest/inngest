@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/expr"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -222,14 +223,6 @@ func WithKeyGenerator(kf KeyGenerator) Opt {
 	}
 }
 
-// WithOnComplete supplies a callback which is triggered any time a function
-// run completes.
-func WithFunctionCallbacks(f ...state.FunctionCallback) Opt {
-	return func(m *mgr) {
-		m.callbacks = f
-	}
-}
-
 // WithFunctionLoader adds a function loader to the state interface.
 //
 // As of v0.13.0, function configuration is stored outside of the state store,
@@ -249,14 +242,6 @@ type mgr struct {
 	r rueidis.Client
 	// this is the redis client for managing pauses.
 	pauseR rueidis.Client
-
-	callbacks []state.FunctionCallback
-}
-
-// OnFunctionStatus adds a callback to be called whenever functions
-// transition status.
-func (m *mgr) OnFunctionStatus(f state.FunctionCallback) {
-	m.callbacks = append(m.callbacks, f)
 }
 
 func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
@@ -274,7 +259,6 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 
 	metadata := runMetadata{
 		Identifier:     input.Identifier,
-		Pending:        1,
 		Debugger:       input.Debugger,
 		Version:        currentVersion,
 		RequestVersion: consts.RequestVersionUnknown, // Always use -1 to indicate unset hash version until first request.
@@ -297,17 +281,10 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		}
 	}
 
-	history := state.NewHistory()
-	history.Type = enums.HistoryTypeFunctionStarted
-	history.Identifier = input.Identifier
-	history.CreatedAt = time.UnixMilli(int64(input.Identifier.RunID.Time()))
-
 	args, err := StrSlice([]any{
 		events,
 		metadataByt,
 		stepsByt,
-		history,
-		history.CreatedAt.UnixMilli(),
 	})
 	if err != nil {
 		return nil, err
@@ -321,7 +298,6 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 			m.kf.Events(ctx, input.Identifier),
 			m.kf.RunMetadata(ctx, input.Identifier.RunID),
 			m.kf.Actions(ctx, input.Identifier),
-			m.kf.History(ctx, input.Identifier.RunID),
 		},
 		args,
 	).AsInt64()
@@ -333,8 +309,6 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 	if status == 1 {
 		return nil, state.ErrIdentifierExists
 	}
-
-	go m.runCallbacks(ctx, input.Identifier, enums.RunStatusRunning)
 
 	return state.NewStateInstance(
 			*f,
@@ -383,12 +357,12 @@ func (m mgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.Metad
 }
 
 func (m mgr) IsComplete(ctx context.Context, runID ulid.ULID) (bool, error) {
-	cmd := m.r.B().Hget().Key(m.kf.RunMetadata(ctx, runID)).Field("pending").Build()
+	cmd := m.r.B().Hget().Key(m.kf.RunMetadata(ctx, runID)).Field("status").Build()
 	val, err := m.r.Do(ctx, cmd).AsBytes()
 	if err != nil {
 		return false, err
 	}
-	return bytes.Equal(val, []byte("0")), nil
+	return !bytes.Equal(val, []byte("0")), nil
 }
 
 func (m mgr) Exists(ctx context.Context, runID ulid.ULID) (bool, error) {
@@ -406,34 +380,17 @@ func (m mgr) metadata(ctx context.Context, runID ulid.ULID) (*runMetadata, error
 }
 
 func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
-	now := time.Now()
-
-	args, err := StrSlice([]any{
-		state.History{
-			ID:         state.HistoryID(),
-			GroupID:    state.GroupIDFromContext(ctx),
-			Type:       enums.HistoryTypeFunctionCancelled,
-			Identifier: id,
-			CreatedAt:  now,
-		},
-		now.UnixMilli(),
-	})
-	if err != nil {
-		return err
-	}
-
 	status, err := scripts["cancel"].Exec(
 		ctx,
 		m.r,
-		[]string{m.kf.RunMetadata(ctx, id.RunID), m.kf.History(ctx, id.RunID)},
-		args,
+		[]string{m.kf.RunMetadata(ctx, id.RunID)},
+		[]string{},
 	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error cancelling: %w", err)
 	}
 	switch status {
 	case 0:
-		go m.runCallbacks(ctx, id, enums.RunStatusCancelled)
 		return nil
 	case 1:
 		return state.ErrFunctionComplete
@@ -446,40 +403,23 @@ func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 }
 
 func (m mgr) SetStatus(ctx context.Context, id state.Identifier, status enums.RunStatus) error {
-	now := time.Now()
-
 	args, err := StrSlice([]any{
 		int(status),
-		state.History{
-			ID:         state.HistoryID(),
-			GroupID:    state.GroupIDFromContext(ctx),
-			Type:       enums.HistoryTypeFunctionStatusUpdated,
-			Identifier: id,
-			CreatedAt:  now,
-			Data: map[string]any{
-				"status": status.String(),
-			},
-		},
-		now.UnixMilli(),
 	})
 	if err != nil {
 		return err
 	}
 
-	ret, err := scripts["setStatus"].Exec(
+	_, err = scripts["setStatus"].Exec(
 		ctx,
 		m.r,
-		[]string{m.kf.RunMetadata(ctx, id.RunID), m.kf.History(ctx, id.RunID)},
+		[]string{m.kf.RunMetadata(ctx, id.RunID)},
 		args,
 	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error cancelling: %w", err)
 	}
-	if ret == 0 {
-		go m.runCallbacks(ctx, id, status)
-		return nil
-	}
-	return fmt.Errorf("unknown return value cancelling function: %d", status)
+	return nil
 }
 
 func (m mgr) Metadata(ctx context.Context, runID ulid.ULID) (*state.Metadata, error) {
@@ -595,212 +535,27 @@ func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (in
 	return 0, fmt.Errorf("step not found in stack: %s", stepID)
 }
 
-func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (int, error) {
-	var (
-		data            any
-		result          any
-		err             error
-		typ             enums.HistoryType
-		funcFailHistory state.History
-	)
+func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) error {
 
-	now := time.Now()
-
-	if r.Err == nil {
-		result = r.Output
-		typ = enums.HistoryTypeStepCompleted
-		if data, err = json.Marshal(r.Output); err != nil {
-			return 0, fmt.Errorf("error marshalling step output: %w", err)
-		}
-	} else {
-		typ = enums.HistoryTypeStepErrored
-		data = output(map[string]any{
-			"error":  r.Err,
-			"output": r.Output,
-		})
-		result = data
-		if r.Final() {
-			typ = enums.HistoryTypeStepFailed
-			funcFailHistory = state.History{
-				ID:         state.HistoryID(),
-				Type:       enums.HistoryTypeFunctionFailed,
-				Identifier: i,
-				CreatedAt:  now,
-			}
-		}
+	keys := []string{
+		m.kf.Actions(ctx, i),
+		m.kf.RunMetadata(ctx, i.RunID),
+		m.kf.Stack(ctx, i.RunID),
 	}
-
-	stepOutput := false
-	if len(r.Generator) == 0 && (typ == enums.HistoryTypeStepCompleted || typ == enums.HistoryTypeStepFailed) {
-		// This is only the step output if the step is complete and this
-		// isn't a generator response.
-		stepOutput = true
-	}
-
-	stepHistory := state.History{
-		ID:         state.HistoryID(),
-		GroupID:    state.GroupIDFromContext(ctx),
-		Type:       typ,
-		Identifier: i,
-		CreatedAt:  now,
-		Data: state.HistoryStep{
-			ID:         r.Step.ID,
-			Name:       r.Step.Name,
-			Attempt:    attempt,
-			Data:       result,
-			StepOutput: stepOutput,
-		},
-	}
-
-	args, err := StrSlice([]any{
-		data,
-		r.Step.ID,
-		r.Err != nil,
-		r.Final(),
-		stepHistory,
-		funcFailHistory,
-		now.UnixMilli(),
-	})
-	if err != nil {
-		return 0, err
-	}
+	args := []string{stepID, marshalledOuptut}
 
 	index, err := scripts["saveResponse"].Exec(
 		ctx,
 		m.r,
-		[]string{
-			m.kf.Actions(ctx, i),
-			m.kf.Errors(ctx, i),
-			m.kf.RunMetadata(ctx, i.RunID),
-			m.kf.History(ctx, i.RunID),
-			m.kf.Stack(ctx, i.RunID),
-		},
+		keys,
 		args,
 	).AsInt64()
 	if err != nil {
-		return 0, fmt.Errorf("error saving response: %w", err)
+		return fmt.Errorf("error saving response: %w", err)
 	}
 	if index == -1 {
 		// This is a duplicate response, so we don't need to do anything.
-		return 0, state.ErrDuplicateResponse
-	}
-
-	if r.Err != nil && r.Final() {
-		// Trigger error callbacks
-		go m.runCallbacks(ctx, i, enums.RunStatusFailed)
-	}
-
-	return int(index), nil
-}
-
-func (m mgr) Started(ctx context.Context, id state.Identifier, stepID string, attempt int) error {
-	now := time.Now()
-	byt, err := json.Marshal(state.History{
-		ID:         state.HistoryID(),
-		GroupID:    state.GroupIDFromContext(ctx),
-		Type:       enums.HistoryTypeStepStarted,
-		Identifier: id,
-		CreatedAt:  now,
-		Data: state.HistoryStep{
-			ID:      stepID,
-			Attempt: attempt,
-		},
-	})
-	if err != nil {
-		return err
-	}
-	cmd := m.r.B().Zadd().
-		Key(m.kf.History(ctx, id.RunID)).
-		ScoreMember().
-		ScoreMember(float64(now.UnixMilli()), string(byt)).
-		Build()
-	return m.r.Do(ctx, cmd).Error()
-}
-
-func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int, at *time.Time) error {
-	now := time.Now()
-
-	if at != nil && at.Before(time.Now()) {
-		// No need to save time if it's before now.
-		at = nil
-	}
-
-	args, err := StrSlice([]any{
-		state.History{
-			ID:         state.HistoryID(),
-			GroupID:    state.GroupIDFromContext(ctx),
-			Type:       enums.HistoryTypeStepScheduled,
-			Identifier: i,
-			CreatedAt:  now,
-			Data: state.HistoryStep{
-				ID:      stepID,
-				Attempt: attempt,
-				Data:    at,
-			},
-		},
-		now.UnixMilli(),
-	})
-	if err != nil {
-		return err
-	}
-
-	err = scripts["scheduled"].Exec(
-		ctx,
-		m.r,
-		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
-		args,
-	).Error()
-	if err != nil {
-		return fmt.Errorf("error updating scheduled state: %w", err)
-	}
-	return nil
-}
-
-func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, attempt int, withStatus ...enums.RunStatus) error {
-	now := time.Now()
-
-	// Don't set status by default.
-	finalStatus := -1
-	if len(withStatus) >= 1 {
-		finalStatus = int(withStatus[0])
-	}
-
-	history := enums.HistoryTypeFunctionCompleted
-	switch finalStatus {
-	case int(enums.RunStatusFailed):
-		history = enums.HistoryTypeFunctionFailed
-	}
-
-	args, err := StrSlice([]any{
-		state.History{
-			ID: state.HistoryID(),
-			// Function completions have no group ID.
-			Type:       history,
-			Identifier: i,
-			CreatedAt:  now,
-		},
-		now.UnixMilli(),
-		int(finalStatus),
-	})
-	if err != nil {
-		return err
-	}
-
-	status, err := scripts["finalize"].Exec(
-		ctx,
-		m.r,
-		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
-		args,
-	).AsInt64()
-	if err != nil {
-		return fmt.Errorf("error finalizing: %w", err)
-	}
-	if status == 1 && len(withStatus) == 1 {
-		go m.runCallbacks(ctx, i, withStatus[0])
-		return nil
-	}
-	if status == 1 {
-		go m.runCallbacks(ctx, i, enums.RunStatusCompleted)
+		return state.ErrDuplicateResponse
 	}
 	return nil
 }
@@ -820,30 +575,8 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		m.kf.PauseID(ctx, p.ID),
 		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 		m.kf.PauseEvent(ctx, p.WorkspaceID, evt),
-		m.kf.History(ctx, p.Identifier.RunID),
-	}
-
-	stepID := p.Incoming
-	if p.DataKey != "" {
-		stepID = p.DataKey
-	}
-	now := time.Now()
-	log := state.History{
-		ID:         state.HistoryID(),
-		GroupID:    state.GroupIDFromContext(ctx),
-		Type:       enums.HistoryTypeStepWaiting,
-		Identifier: p.Identifier,
-		CreatedAt:  now,
-		Data: state.HistoryStep{
-			ID:      stepID,
-			Name:    p.StepName,
-			Attempt: p.Attempt,
-			Data: state.HistoryStepWaitingData{
-				EventName:  p.Event,
-				Expression: p.Expression,
-				ExpiryTime: time.Time(p.Expires),
-			},
-		},
+		m.kf.PauseIndex(ctx, "add", p.WorkspaceID, evt),
+		m.kf.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 	}
 
 	// Add 1 second because int will truncate the float. Otherwise, timeouts
@@ -865,8 +598,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		// Add at least 10 minutes to this pause, allowing us to process the
 		// pause by ID for 10 minutes past expiry.
 		int(time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()),
-		log,
-		now.UnixMilli(),
+		time.Now().Unix(),
 	})
 	if err != nil {
 		return err
@@ -973,34 +705,12 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		eventKey,
 		m.kf.Actions(ctx, p.Identifier),
 		m.kf.Stack(ctx, p.Identifier.RunID),
-		m.kf.History(ctx, p.Identifier.RunID),
-	}
-
-	stepID := p.Incoming
-	if p.DataKey != "" {
-		stepID = p.DataKey
-	}
-	now := time.Now()
-	log := state.History{
-		ID:         state.HistoryID(),
-		GroupID:    state.GroupIDFromContext(ctx),
-		Type:       enums.HistoryTypeStepCompleted,
-		Identifier: p.Identifier,
-		CreatedAt:  now,
-		Data: state.HistoryStep{
-			ID:      stepID,
-			Name:    p.StepName,
-			Attempt: p.Attempt,
-			Data:    data,
-		},
 	}
 
 	args, err := StrSlice([]any{
 		id.String(),
 		p.DataKey,
 		string(marshalledData),
-		log,
-		now.UnixMilli(),
 	})
 	if err != nil {
 		return err
@@ -1023,39 +733,6 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 	default:
 		return fmt.Errorf("unknown response leasing pause: %d", status)
 	}
-}
-
-// PausesByEvent returns all pauses for a given event within a workspace.
-func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
-	key := m.kf.PauseEvent(ctx, workspaceID, event)
-	// If there are > 1000 keys in the hmap, use scanning
-
-	cntCmd := m.pauseR.B().Hlen().Key(key).Build()
-	cnt, err := m.pauseR.Do(ctx, cntCmd).AsInt64()
-	if err != nil || cnt > 1000 {
-		key := m.kf.PauseEvent(ctx, workspaceID, event)
-		cmd := m.pauseR.B().Hscan().Key(key).Cursor(0).Count(500).Build()
-		scan, err := m.pauseR.Do(ctx, cmd).AsScanEntry()
-		if err != nil {
-			return nil, err
-		}
-		return &scanIter{
-			r:      m.pauseR,
-			key:    key,
-			i:      -1,
-			vals:   scan,
-			cursor: int(scan.Cursor),
-		}, nil
-	}
-
-	cmd := m.pauseR.B().Hkeys().Key(key).Cache()
-	// Cache this for a second
-	keys, err := m.pauseR.DoCache(ctx, cmd, time.Second).AsStrSlice()
-	if err != nil {
-		return nil, err
-	}
-
-	return &keyIter{i: 0, keys: keys, r: m.pauseR, key: key}, nil
 }
 
 func (m mgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID, event string) (bool, error) {
@@ -1114,192 +791,220 @@ func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID strin
 	return pause, err
 }
 
-func (m mgr) History(ctx context.Context, runID ulid.ULID) ([]state.History, error) {
-	cmd := m.r.B().Zrange().Key(m.kf.History(ctx, runID)).Min("-inf").Max("+inf").Byscore().Build()
-	items, err := m.r.Do(ctx, cmd).AsStrSlice()
+// PausesByEvent returns all pauses for a given event within a workspace.
+func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
+	key := m.kf.PauseEvent(ctx, workspaceID, event)
+	// If there are > 1000 keys in the hmap, use scanning
+
+	cntCmd := m.pauseR.B().Hlen().Key(key).Build()
+	cnt, err := m.pauseR.Do(ctx, cntCmd).AsInt64()
+
+	if err != nil || cnt > 1000 {
+		key := m.kf.PauseEvent(ctx, workspaceID, event)
+		iter := &scanIter{
+			count: cnt,
+			r:     m.pauseR,
+		}
+		err := iter.init(ctx, key, 1000)
+		return iter, err
+	}
+
+	// If there are less than a thousand items, query the keys
+	// for iteration.
+	iter := &bufIter{r: m.pauseR}
+	err = iter.init(ctx, key)
+	return iter, err
+}
+
+func (m mgr) PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time) (state.PauseIterator, error) {
+	if since.IsZero() {
+		return m.PausesByEvent(ctx, workspaceID, event)
+	}
+
+	// Load all items in the set.
+	cmd := m.r.B().
+		Zrangebyscore().
+		Key(m.kf.PauseIndex(ctx, "add", workspaceID, event)).
+		Min(strconv.Itoa(int(since.Unix()))).
+		Max("+inf").
+		Build()
+	ids, err := m.r.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return nil, err
 	}
 
-	history := make([]state.History, len(items))
-	for n, i := range items {
-		var h state.History
-		err := h.UnmarshalBinary([]byte(i))
-		if err != nil {
-			return nil, err
-		}
-		history[n] = h
+	iter := &keyIter{
+		r:  m.r,
+		kf: m.kf,
 	}
-
-	return history, nil
+	err = iter.init(ctx, ids, 100)
+	return iter, err
 }
 
-func (m mgr) DeleteHistory(ctx context.Context, runID ulid.ULID, historyID ulid.ULID) error {
-	// Fetch the items from the zset, and remove if the ID matches.
-	//
-	// XXX: We can make this more efficient by recording a map and zset as separate
-	// keys.
-	key := m.kf.History(ctx, runID)
+func (m mgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {
 
-	cmd := m.r.B().Zrange().Key(key).Min("-inf").Max("+inf").Byscore().Build()
-	items, err := m.r.Do(ctx, cmd).AsStrSlice()
+	it, err := m.PausesByEventSince(ctx, workspaceID, eventName, since)
 	if err != nil {
 		return err
 	}
-
-	for _, i := range items {
-		var h state.History
-		err := h.UnmarshalBinary([]byte(i))
-		if err != nil {
+	for it.Next(ctx) {
+		pause := it.Val(ctx)
+		if err := do(ctx, pause); err != nil {
 			return err
-		}
-		if h.ID == historyID {
-			cmd = m.r.B().Zrem().Key(key).Member(i).Build()
-			if err := m.r.Do(ctx, cmd).Error(); err != nil {
-				return err
-			}
-			return nil
 		}
 	}
 
+	if it.Error() != context.Canceled {
+		return it.Error()
+	}
 	return nil
 }
 
-func (m mgr) SaveHistory(ctx context.Context, i state.Identifier, h state.History) error {
-	hkey := m.kf.History(ctx, i.RunID)
+type bufIter struct {
+	r     rueidis.Client
+	items []string
 
-	byt, err := json.Marshal(h)
-	if err != nil {
-		return err
-	}
-
-	cmd := m.r.B().Zadd().
-		Key(hkey).
-		ScoreMember().
-		ScoreMember(float64(h.CreatedAt.UnixMilli()), string(byt)).
-		Build()
-	return m.r.Do(ctx, cmd).Error()
-}
-
-func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {
-	// Replace the context so that this isn't cancelled by any parents.
-	callCtx := context.Background()
-	for _, f := range m.callbacks {
-		go func(fn state.FunctionCallback) {
-			fn(callCtx, id, status)
-		}(f)
-	}
-}
-
-type keyIter struct {
-	l sync.Mutex
-
-	i    int
-	keys []string
-
-	// buffer stores items returned from HMGet temporarily.
-	buffer []string
-
-	// val stores the next val
 	val *state.Pause
-
-	r   rueidis.Client
-	key string
 	err error
+
+	l sync.Mutex
 }
 
-func (i *keyIter) Err() error {
-	return i.err
+func (i *bufIter) init(ctx context.Context, key string) error {
+	var err error
+	// If there are less than a thousand items, query the keys
+	// for iteration.
+	cmd := i.r.B().Hvals().Key(key).Build()
+	i.items, err = i.r.Do(ctx, cmd).AsStrSlice()
+	i.l = sync.Mutex{}
+	return err
 }
 
-func (i *keyIter) Next(ctx context.Context) bool {
+func (i *bufIter) Count() int {
+	return len(i.items)
+}
+
+func (i *bufIter) Next(ctx context.Context) bool {
 	i.l.Lock()
 	defer i.l.Unlock()
 
-	if len(i.buffer) > 0 {
-		i.getNext(ctx)
-		return i.err == nil
-	}
-
-	if len(i.keys) == 0 || i.i == len(i.keys) {
+	if len(i.items) == 0 {
+		i.err = context.Canceled
 		return false
 	}
 
-	amt := 100
-	if 100 > len(i.keys) {
-		// Fetch all remaining keys.
-		amt = len(i.keys)
-	}
-
-	// Take a buffer from the keys
-	buffer := i.keys[:amt]
-
-	cmd := i.r.B().Hmget().Key(i.key).Field(buffer...).Build()
-	vals, err := i.r.Do(ctx, cmd).AsStrSlice()
-	if err != nil {
-		i.err = err
-		return false
-	}
-	// Remove the fetched keys from remaining list
-	i.keys = i.keys[amt:]
-	// Update our buffer.
-	i.buffer = vals
-
-	// get the next item into Val
-	i.getNext(ctx)
-
+	pause := &state.Pause{}
+	i.err = json.Unmarshal([]byte(i.items[0]), pause)
+	i.val = pause
+	// Remove one from the slice.
+	i.items = i.items[1:]
 	return i.err == nil
 }
 
 // Buffer by running an MGET to get the values of the pauses.
-func (i *keyIter) Val(ctx context.Context) *state.Pause {
+func (i *bufIter) Val(ctx context.Context) *state.Pause {
 	return i.val
 }
 
-func (i *keyIter) getNext(ctx context.Context) {
-	if len(i.buffer) == 0 {
-		return
-	}
-	str := i.buffer[0]
-	i.buffer = i.buffer[1:]
-
-	pause := &state.Pause{}
-	i.err = json.Unmarshal([]byte(str), pause)
-	i.val = pause
+func (i *bufIter) Error() error {
+	return i.err
 }
 
-type scanIter struct {
-	r rueidis.Client
+var scanDoneErr = fmt.Errorf("scan done")
 
-	key    string
+type scanIter struct {
+	r   rueidis.Client
+	key string
+	// chunk is the size of scans to load in one.
+	chunk int64
+
+	// count is the cached number of items to return in Count(),
+	// ie the hlen result when creating the iterator.
+	count int64
+
+	// iterator fields
 	i      int
 	cursor int
 	vals   rueidis.ScanEntry
+	err    error
+
+	l sync.Mutex
 }
 
-func (i *scanIter) fetch(ctx context.Context) error {
-	cmd := i.r.B().Hscan().Key(i.key).Cursor(uint64(i.cursor)).Count(500).Build()
+func (i *scanIter) Error() error {
+	return i.err
+}
+
+func (i *scanIter) init(ctx context.Context, key string, chunk int64) error {
+	i.key = key
+	i.chunk = chunk
+	cmd := i.r.B().Hscan().Key(key).Cursor(0).Count(i.chunk).Build()
 	scan, err := i.r.Do(ctx, cmd).AsScanEntry()
 	if err != nil {
+		i.err = err
 		return err
 	}
 	i.cursor = int(scan.Cursor)
 	i.vals = scan
 	i.i = -1
+	i.l = sync.Mutex{}
 	return nil
 }
 
-func (i *scanIter) Next(ctx context.Context) bool {
-	if i.i >= (len(i.vals.Elements)-1) && i.cursor != 0 {
-		if err := i.fetch(ctx); err != nil {
-			return false
+func (i *scanIter) Count() int {
+	return int(i.count)
+}
+
+func (i *scanIter) fetch(ctx context.Context) error {
+	// Reset the index.
+	i.i = -1
+
+	if i.cursor == 0 {
+		// We're done, no need to fetch.
+		return scanDoneErr
+	}
+
+	// Scan 100 times up until there are values
+	for scans := 0; scans < 100; scans++ {
+		cmd := i.r.B().Hscan().
+			Key(i.key).
+			Cursor(uint64(i.cursor)).
+			Count(i.chunk).
+			Build()
+
+		scan, err := i.r.Do(ctx, cmd).AsScanEntry()
+		if err != nil {
+			return err
+		}
+
+		i.cursor = int(scan.Cursor)
+		i.vals = scan
+
+		if len(i.vals.Elements) > 0 {
+			return nil
 		}
 	}
 
-	if len(i.vals.Elements) == 0 || i.i >= (len(i.vals.Elements)-1) {
-		return false
-	}
+	return fmt.Errorf("Scanned max times without finding pause values")
+}
 
+func (i *scanIter) Next(ctx context.Context) bool {
+	i.l.Lock()
+	defer i.l.Unlock()
+
+	if i.i >= (len(i.vals.Elements) - 1) {
+		err := i.fetch(ctx)
+		if err == scanDoneErr {
+			// No more present.
+			i.err = context.Canceled
+			return false
+		}
+		if err != nil {
+			i.err = err
+			// Stop iterating, set error.
+			return false
+		}
+	}
 	// Skip the ID
 	i.i++
 	// Get the value.
@@ -1397,6 +1102,91 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 	return m, nil
 }
 
+// keyIter loads all pauses in batches given a list of IDs
+type keyIter struct {
+	r  rueidis.Client
+	kf KeyGenerator
+	// chunk is the size of scans to load in one.
+	chunk int64
+	// keys stores pause IDs to fetch in batches
+	keys []string
+	// vals stores pauses as strings from MGET
+	vals []string
+	err  error
+}
+
+func (i *keyIter) Error() error {
+	return i.err
+}
+
+func (i *keyIter) init(ctx context.Context, keys []string, chunk int64) error {
+	i.keys = keys
+	i.chunk = chunk
+	return i.fetch(ctx)
+}
+
+func (i *keyIter) Count() int {
+	return len(i.keys)
+}
+
+func (i *keyIter) fetch(ctx context.Context) error {
+	if len(i.keys) == 0 {
+		// No more present.
+		i.err = context.Canceled
+		return scanDoneErr
+	}
+
+	var load []string
+	if len(i.keys) > int(i.chunk) {
+		load = i.keys[:]
+		i.keys = []string{}
+	} else {
+		load = i.keys[0:i.chunk]
+		i.keys = i.keys[i.chunk:]
+	}
+
+	for n, id := range load {
+		load[n] = i.kf.PauseID(ctx, uuid.MustParse(id))
+	}
+
+	cmd := i.r.B().Mget().Key(load...).Build()
+	i.vals, i.err = i.r.Do(ctx, cmd).AsStrSlice()
+	if rueidis.IsRedisNil(i.err) {
+		// Somehow none of these pauses no longer exist, which is okay:
+		// another concurrent thread may have already consumed it.
+		i.err = nil
+	}
+	return i.err
+}
+
+func (i *keyIter) Next(ctx context.Context) bool {
+	if len(i.vals) > 0 {
+		return true
+	}
+
+	err := i.fetch(ctx)
+	return err == nil
+}
+
+func (i *keyIter) Val(ctx context.Context) *state.Pause {
+	if len(i.vals) == 0 {
+		return nil
+	}
+
+	val := i.vals[0]
+	i.vals = i.vals[1:]
+	if val == "" {
+		return nil
+	}
+
+	pause := &state.Pause{}
+	err := json.Unmarshal([]byte(val), pause)
+	if err != nil {
+		return nil
+	}
+	return pause
+}
+
 // runMetadata is stored for each invocation of a function.  This is inserted when
 // creating a new run, and stores the triggering event as well as workflow-specific
 // metadata for the invocation.
@@ -1431,7 +1221,6 @@ func (r runMetadata) Map() map[string]any {
 func (r runMetadata) Metadata() state.Metadata {
 	m := state.Metadata{
 		Identifier:                r.Identifier,
-		Pending:                   r.Pending,
 		Debugger:                  r.Debugger,
 		Status:                    r.Status,
 		Version:                   r.Version,
@@ -1444,14 +1233,6 @@ func (r runMetadata) Metadata() state.Metadata {
 		m.RunType = &r.RunType
 	}
 	return m
-}
-
-// output is a map which implements BinaryMarshaller, for inserting data within
-// history items.
-type output map[string]any
-
-func (o output) MarshalBinary() ([]byte, error) {
-	return json.Marshal(o)
 }
 
 func StrSlice(args []any) ([]string, error) {

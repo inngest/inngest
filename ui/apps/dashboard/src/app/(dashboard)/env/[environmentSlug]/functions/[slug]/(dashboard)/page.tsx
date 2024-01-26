@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import type { Route } from 'next';
 import Link from 'next/link';
 import { ChartBarIcon, ChevronRightIcon, XCircleIcon } from '@heroicons/react/20/solid';
 import {
@@ -20,12 +20,16 @@ import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/function
 import { Alert } from '@/components/Alert';
 import { Badge as LegacyBadge } from '@/components/Badge/Badge';
 import Block from '@/components/Block';
-import { ClientFeatureFlag } from '@/components/FeatureFlags/ClientFeatureFlag';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { Time } from '@/components/Time';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
 import { relativeTime } from '@/utils/date';
-import DashboardTimeRangeFilter, { defaultTimeRange } from './DashboardTimeRangeFilter';
+import { useSearchParam } from '@/utils/useSearchParam';
+import DashboardTimeRangeFilter, {
+  defaultTimeRange,
+  getTimeRangeByKey,
+} from './DashboardTimeRangeFilter';
 import FunctionRunsChart, { type UsageMetrics } from './FunctionRunsChart';
 import FunctionThroughputChart from './FunctionThroughputChart';
 import LatestFailedFunctionRuns from './LatestFailedFunctionRuns';
@@ -40,16 +44,17 @@ type FunctionDashboardProps = {
 
 export default function FunctionDashboardPage({ params }: FunctionDashboardProps) {
   const functionSlug = decodeURIComponent(params.slug);
+  const { value: isAppsEnabled } = useBooleanFlag('apps-page');
   const [{ data, fetching: isFetchingFunction }] = useFunction({
-    environmentSlug: params.environmentSlug,
     functionSlug,
   });
   const function_ = data?.workspace.workflow;
 
-  const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(defaultTimeRange);
+  const [timeRangeParam, setTimeRangeParam] = useSearchParam('timeRange');
+  const selectedTimeRange: TimeRange =
+    getTimeRangeByKey(timeRangeParam ?? '24h') ?? defaultTimeRange;
 
   const [{ data: usage }] = useFunctionUsage({
-    environmentSlug: params.environmentSlug,
     functionSlug,
     timeRange: selectedTimeRange,
   });
@@ -86,12 +91,21 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
 
   const failureRate = !usageMetrics?.totalRuns
     ? '0.00'
-    : (((usageMetrics?.totalFailures || 0) / (usageMetrics?.totalRuns || 0)) * 100).toFixed(2);
+    : (((usageMetrics.totalFailures || 0) / (usageMetrics.totalRuns || 0)) * 100).toFixed(2);
 
   const triggers = function_.current?.triggers || [];
 
   function handleTimeRangeChange(timeRange: TimeRange) {
-    setSelectedTimeRange(timeRange);
+    if (timeRange.key) {
+      setTimeRangeParam(timeRange.key);
+    }
+  }
+
+  let appRoute: Route;
+  if (isAppsEnabled) {
+    appRoute = `/env/${params.environmentSlug}/apps/${function_.appName}` as Route;
+  } else {
+    appRoute = `/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}` as Route;
   }
 
   return (
@@ -127,21 +141,9 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               />
             </div>
           </div>
-          <FunctionRunsChart
-            environmentSlug={params.environmentSlug}
-            functionSlug={functionSlug}
-            timeRange={selectedTimeRange}
-          />
-          <FunctionThroughputChart
-            environmentSlug={params.environmentSlug}
-            functionSlug={functionSlug}
-            timeRange={selectedTimeRange}
-          />
-          <SDKRequestThroughputChart
-            environmentSlug={params.environmentSlug}
-            functionSlug={functionSlug}
-            timeRange={selectedTimeRange}
-          />
+          <FunctionRunsChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
+          <FunctionThroughputChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
+          <SDKRequestThroughputChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
           <div className="mt-4 px-6">
             <LatestFailedFunctionRuns
               environmentSlug={params.environmentSlug}
@@ -153,7 +155,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
           <div className="flex flex-col gap-10">
             <Block title="App">
               <Link
-                href={`/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}`}
+                href={appRoute}
                 className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
               >
                 <div className="flex min-w-0 items-center">
@@ -221,86 +223,84 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                 )}
               </div>
             </Block>
-            <ClientFeatureFlag flag="function-config">
-              {function_.configuration?.cancellations &&
-                function_.configuration?.cancellations.length > 0 && (
-                  <Block title="Cancellation">
-                    <div className="space-y-3">
-                      {function_.configuration.cancellations.map((cancellation) => {
-                        return (
-                          <Link
-                            key={cancellation.event}
-                            href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
-                              cancellation.event
-                            )}`}
-                            className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
-                          >
-                            <div className="flex min-w-0 items-center">
-                              <div className="min-w-0 flex-1 space-y-1">
-                                <div className="flex min-w-0 items-center">
-                                  <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
-                                  <p className="truncate font-medium">{cancellation.event}</p>
-                                </div>
-                                <dl className="text-xs">
-                                  {cancellation.condition && (
-                                    <div className="flex gap-1">
-                                      <dt className="text-slate-500">If</dt>
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <dd className="truncate font-mono text-slate-800">
-                                              {cancellation.condition}
-                                            </dd>
-                                          </TooltipTrigger>
-                                          <TooltipContent className="font-mono text-xs">
-                                            {cancellation.condition}
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    </div>
-                                  )}
-                                  {cancellation.timeout && (
-                                    <div className="flex gap-1">
-                                      <dt className="text-slate-500">Timeout</dt>
-                                      <dd className="text-slate-800">{cancellation.timeout}</dd>
-                                    </div>
-                                  )}
-                                </dl>
-                              </div>
-                              <ChevronRightIcon className="h-5" />
-                            </div>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </Block>
-                )}
-              {function_.failureHandler && (
-                <Block title="Failure Handler">
+            {function_.configuration?.cancellations &&
+              function_.configuration.cancellations.length > 0 && (
+                <Block title="Cancellation">
                   <div className="space-y-3">
-                    <Link
-                      href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(
-                        function_.failureHandler.slug
-                      )}`}
-                      className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
-                    >
-                      <div className="flex min-w-0 items-center">
-                        <div className="min-w-0 flex-1">
+                    {function_.configuration.cancellations.map((cancellation) => {
+                      return (
+                        <Link
+                          key={cancellation.event}
+                          href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
+                            cancellation.event
+                          )}`}
+                          className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
+                        >
                           <div className="flex min-w-0 items-center">
-                            <IconFunction className="w-8 shrink-0 pr-2 text-indigo-500" />
-                            <p className="truncate font-medium">{function_.failureHandler.name}</p>
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex min-w-0 items-center">
+                                <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
+                                <p className="truncate font-medium">{cancellation.event}</p>
+                              </div>
+                              <dl className="text-xs">
+                                {cancellation.condition && (
+                                  <div className="flex gap-1">
+                                    <dt className="text-slate-500">If</dt>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <dd className="truncate font-mono text-slate-800">
+                                            {cancellation.condition}
+                                          </dd>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="font-mono text-xs">
+                                          {cancellation.condition}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </div>
+                                )}
+                                {cancellation.timeout && (
+                                  <div className="flex gap-1">
+                                    <dt className="text-slate-500">Timeout</dt>
+                                    <dd className="text-slate-800">{cancellation.timeout}</dd>
+                                  </div>
+                                )}
+                              </dl>
+                            </div>
+                            <ChevronRightIcon className="h-5" />
                           </div>
-                        </div>
-                        <ChevronRightIcon className="h-5" />
-                      </div>
-                    </Link>
+                        </Link>
+                      );
+                    })}
                   </div>
                 </Block>
               )}
-              {function_.configuration && (
-                <FunctionConfiguration configuration={function_.configuration} />
-              )}
-            </ClientFeatureFlag>
+            {function_.failureHandler && (
+              <Block title="Failure Handler">
+                <div className="space-y-3">
+                  <Link
+                    href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(
+                      function_.failureHandler.slug
+                    )}`}
+                    className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
+                  >
+                    <div className="flex min-w-0 items-center">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center">
+                          <IconFunction className="w-8 shrink-0 pr-2 text-indigo-500" />
+                          <p className="truncate font-medium">{function_.failureHandler.name}</p>
+                        </div>
+                      </div>
+                      <ChevronRightIcon className="h-5" />
+                    </div>
+                  </Link>
+                </div>
+              </Block>
+            )}
+            {function_.configuration && (
+              <FunctionConfiguration configuration={function_.configuration} />
+            )}
           </div>
         </aside>
       </div>

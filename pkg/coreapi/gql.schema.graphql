@@ -191,7 +191,6 @@ type FunctionRun {
   finishedAt: Time
   output: String # JSON encoded output of the function, or JSON encoded error if this is a failure.
 
-  timeline: [FunctionRunEvent!] @deprecated
   history: [RunHistoryItem!]!
   historyItemOutput(id: ULID!): String
   name: String @deprecated # use the embedded function field instead.
@@ -237,6 +236,8 @@ type RunHistoryItem {
   url: String
   waitForEvent: RunHistoryWaitForEvent
   waitResult: RunHistoryWaitResult
+  invokeFunction: RunHistoryInvokeFunction
+  invokeFunctionResult: RunHistoryInvokeFunctionResult
 }
 
 type RunHistoryCancel {
@@ -268,4 +269,17 @@ type RunHistoryWaitForEvent {
 type RunHistoryWaitResult {
   eventID: ULID
   timeout: Boolean!
+}
+
+type RunHistoryInvokeFunction {
+  eventID: ULID!
+  functionID: String!
+  correlationID: String!
+  timeout: Time!
+}
+
+type RunHistoryInvokeFunctionResult {
+  eventID: ULID
+  timeout: Boolean!
+  runID: ULID
 }

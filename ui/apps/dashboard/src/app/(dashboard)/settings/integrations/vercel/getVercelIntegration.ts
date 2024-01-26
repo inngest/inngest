@@ -1,21 +1,14 @@
 import restAPI, { HTTPError } from '@/queries/restAPI';
-import { getEnvironment } from '@/queries/server-only/getEnvironment';
-import type VercelIntegration from './VercelIntegration';
+import { getProductionEnvironment } from '@/queries/server-only/getEnvironment';
+import { type VercelIntegration, type VercelProjectAPIResponse } from './VercelIntegration';
 import enrichVercelProjects from './enrichVercelProjects';
 
-type VercelProjectsAPIResponse = {
-  projects: { id: string; name: string }[];
-};
-
 export default async function getVercelIntegration(): Promise<VercelIntegration> {
-  const environment = await getEnvironment({
-    environmentSlug: 'production',
-  });
-
+  const environment = await getProductionEnvironment();
   const url = new URL('/v1/integrations/vercel/projects', process.env.NEXT_PUBLIC_API_URL);
   url.searchParams.set('workspaceID', environment.id);
 
-  let response: VercelProjectsAPIResponse;
+  let response: VercelProjectAPIResponse;
   try {
     response = await restAPI(url).json<{
       projects: { id: string; name: string }[];

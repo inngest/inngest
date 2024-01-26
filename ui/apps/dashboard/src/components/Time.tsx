@@ -1,5 +1,7 @@
 'use client';
 
+import { classNames } from '@inngest/components/utils/classNames';
+
 import { relativeTime } from '@/utils/date';
 
 /**
@@ -25,7 +27,12 @@ export function Time({ className, format, value }: Props) {
   }
 
   return (
-    <time className={className} dateTime={value.toISOString()} title={title}>
+    <time
+      suppressHydrationWarning={true}
+      className={classNames('whitespace-nowrap', className)}
+      dateTime={value.toISOString()}
+      title={title}
+    >
       {dateString}
     </time>
   );

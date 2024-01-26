@@ -51,8 +51,15 @@ SELECT * FROM functions;
 -- name: GetAppFunctions :many
 SELECT * FROM functions WHERE app_id = ?;
 
+-- name: GetAppFunctionsBySlug :many
+SELECT functions.* FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ?;
+
 -- name: GetFunctionByID :one
 SELECT * FROM functions WHERE id = ?;
+
+-- name: GetFunctionBySlug :one
+SELECT * FROM functions WHERE slug = ?;
+
 
 -- name: UpdateFunctionConfig :one
 UPDATE functions SET config = ? WHERE id = ? RETURNING *;
@@ -87,7 +94,9 @@ SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes)
 -- name: GetFunctionRunsTimebound :many
 SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
-WHERE function_runs.run_started_at > @after AND function_runs.run_started_at <= @before LIMIT ?;
+WHERE function_runs.run_started_at > @after AND function_runs.run_started_at <= @before
+ORDER BY function_runs.run_started_at DESC
+LIMIT ?;
 
 -- name: GetFunctionRunsFromEvents :many
 SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs
@@ -110,7 +119,24 @@ INSERT INTO events
 SELECT * FROM events WHERE internal_id = ?;
 
 -- name: GetEventsTimebound :many
-SELECT * FROM events WHERE received_at > @after AND received_at <= @before ORDER BY received_at DESC LIMIT ?;
+SELECT DISTINCT e.*
+FROM events AS e
+LEFT OUTER JOIN function_runs AS r ON r.event_id = e.internal_id
+WHERE
+	e.received_at > @after
+	AND e.received_at <= @before
+	AND (
+		-- Include internal events that triggered a run (e.g. an onFailure
+		-- handler)
+		r.run_id IS NOT NULL
+
+		-- Optionally include internal events that did not trigger a run. It'd
+		-- be better to use a boolean param instead of a string param but sqlc
+		-- keeps making @include_internal a string.
+		OR CASE WHEN e.event_name LIKE 'inngest/%' THEN 'true' ELSE 'false' END = @include_internal
+	)
+ORDER BY e.received_at DESC
+LIMIT ?;
 
 -- name: WorkspaceEvents :many
 SELECT * FROM events WHERE internal_id < @cursor AND received_at <= @before AND received_at >= @after ORDER BY internal_id DESC LIMIT ?;
@@ -124,8 +150,8 @@ SELECT * FROM events WHERE internal_id < @cursor AND received_at <= @before AND 
 
 -- name: InsertHistory :exec
 INSERT INTO history
-	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, result) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetFunctionRunHistory :many
 SELECT * FROM history WHERE run_id = ? ORDER BY created_at ASC;

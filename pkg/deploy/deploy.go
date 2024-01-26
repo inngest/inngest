@@ -32,46 +32,68 @@ var (
 	}
 )
 
-func Ping(ctx context.Context, url string) error {
+type pingResult struct {
+	Err error
+
+	// If ping response came from the SDK.
+	IsSDK bool
+}
+
+func Ping(ctx context.Context, url string) pingResult {
+	isSDK := false
+
 	req, err := http.NewRequest(http.MethodPut, url, nil)
 	if err != nil {
-		return publicerr.WrapWithData(
-			err,
-			400,
-			fmt.Sprintf("There was an error registering your app: %s", err.Error()),
-			map[string]any{
-				"error_code": err.Error(),
-			},
-		)
+		return pingResult{
+			Err: publicerr.WrapWithData(
+				err,
+				400,
+				fmt.Sprintf("There was an error registering your app: %s", err.Error()),
+				map[string]any{
+					"error_code": err.Error(),
+				},
+			),
+			IsSDK: isSDK,
+		}
 	}
 	req.Header.Set(headers.HeaderKeyServerKind, headers.ServerKindDev)
 	resp, err := Client.Do(req)
 	if err != nil {
 		err = handlePingError(err)
-		return publicerr.WrapWithData(
-			err,
-			400,
-			"There was an error registering your app",
-			map[string]any{
-				"error_code": err.Error(),
-			},
-		)
+		return pingResult{
+			Err: publicerr.WrapWithData(
+				err,
+				400,
+				"There was an error registering your app",
+				map[string]any{
+					"error_code": err.Error(),
+				},
+			),
+			IsSDK: isSDK,
+		}
 	}
+
+	// Assume that the response came from the SDK if it has the SDK header.
+	isSDK = resp.Header.Get(headers.HeaderKeySDK) != ""
+
 	// If there was no client error, attempt to get any errors
 	// from the SDK response
 	if err = GetDeployError(resp); err != nil {
-		return publicerr.WrapWithData(
-			err,
-			400,
-			"There was an error registering your app",
-			map[string]any{
-				"error_code":           err.Error(),
-				"response_headers":     resp.Header,
-				"response_status_code": resp.StatusCode,
-			},
-		)
+		return pingResult{
+			Err: publicerr.WrapWithData(
+				err,
+				400,
+				"There was an error registering your app",
+				map[string]any{
+					"error_code":           err.Error(),
+					"response_headers":     resp.Header,
+					"response_status_code": resp.StatusCode,
+				},
+			),
+			IsSDK: isSDK,
+		}
 	}
-	return nil
+	return pingResult{IsSDK: isSDK}
 }
 
 func handlePingError(err error) error {

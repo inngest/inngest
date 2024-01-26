@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { ArrowRightIcon, ChartBarIcon, CodeBracketSquareIcon } from '@heroicons/react/20/solid';
+import { ChartBarIcon, CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { Link } from '@inngest/components/Link';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import SendEventButton from '@/app/(dashboard)/env/[environmentSlug]/events/[eventName]/SendEventButton';
 import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
 import Header from '@/components/Header/Header';
@@ -14,17 +15,12 @@ import LoadingIcon from '@/icons/LoadingIcon';
 import EventIcon from '@/icons/event.svg';
 import { useEventTypes } from '@/queries';
 import cn from '@/utils/cn';
+import { pathCreator } from '@/utils/urls';
 import EventListNotFound from './EventListNotFound';
-
-type EventTypesPageProps = {
-  params: {
-    environmentSlug: string;
-  };
-};
 
 export const runtime = 'nodejs';
 
-export default function EventTypesPage({ params }: EventTypesPageProps) {
+export default function EventTypesPage() {
   const [pages, setPages] = useState([1]);
 
   function appendPage() {
@@ -39,7 +35,7 @@ export default function EventTypesPage({ params }: EventTypesPageProps) {
       <Header
         title="Events"
         icon={<EventIcon className="h-4 w-4 text-white" />}
-        action={<SendEventButton environmentSlug={params.environmentSlug} />}
+        action={<SendEventButton />}
       />
 
       <main className="min-h-0 flex-1 overflow-y-auto bg-slate-100">
@@ -64,7 +60,6 @@ export default function EventTypesPage({ params }: EventTypesPageProps) {
             {pages.map((page) => (
               <EventTypesListPaginationPage
                 key={page}
-                environmentSlug={params.environmentSlug}
                 isLastLoadedPage={page === pages[pages.length - 1]}
                 page={page}
                 onLoadMore={appendPage}
@@ -78,20 +73,18 @@ export default function EventTypesPage({ params }: EventTypesPageProps) {
 }
 
 type EventListPaginationPageProps = {
-  environmentSlug: string;
   isLastLoadedPage: boolean;
   page: number;
   onLoadMore: () => void;
 };
 
 function EventTypesListPaginationPage({
-  environmentSlug,
   isLastLoadedPage,
   page,
   onLoadMore,
 }: EventListPaginationPageProps) {
+  const env = useEnvironment();
   const [{ data, fetching: isFetchingEvents }] = useEventTypes({
-    environmentSlug,
     page,
   });
 
@@ -116,7 +109,7 @@ function EventTypesListPaginationPage({
     return (
       <tr>
         <td colSpan={3}>
-          <EventListNotFound environmentSlug={environmentSlug} />
+          <EventListNotFound />
         </td>
       </tr>
     );
@@ -137,20 +130,23 @@ function EventTypesListPaginationPage({
             <td className="w-96 whitespace-nowrap">
               <div className="flex items-center gap-2.5 pl-4">
                 <Link
-                  href={`/env/${environmentSlug}/events/${encodeURIComponent(event.name)}`}
-                  className="group flex w-full items-center gap-2 px-2 py-3 text-sm font-medium text-slate-700  hover:text-indigo-600"
+                  href={pathCreator.eventType({ envSlug: env.slug, eventName: event.name })}
+                  internalNavigation
+                  className="w-full px-2 py-3 text-sm font-medium"
                 >
                   {event.name}
-                  <ArrowRightIcon className="h-3 w-3 -translate-x-3 text-indigo-600 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
                 </Link>
               </div>
             </td>
-            <td className="space-x-2 whitespace-nowrap px-2 py-3">
+            <td className="space-x-2 whitespace-nowrap px-2">
               <HorizontalPillList
                 alwaysVisibleCount={2}
                 pills={event.functions.map((function_) => (
                   <Pill
-                    href={`/env/${environmentSlug}/functions/${encodeURIComponent(function_.slug)}`}
+                    href={pathCreator.function({
+                      envSlug: env.slug,
+                      functionSlug: function_.slug,
+                    })}
                     key={function_.name}
                     className="bg-white align-middle text-slate-600"
                   >
@@ -162,15 +158,15 @@ function EventTypesListPaginationPage({
             </td>
             <td className="w-60 py-1 pl-2 pr-6">
               <div className="flex w-56 items-center justify-end gap-2">
-                <Pill className="gap-1 bg-white align-middle text-slate-600">
+                <div className="flex items-center gap-1 align-middle text-slate-600">
                   <ChartBarIcon className="-ml-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
-                  <span className="overflow-hidden whitespace-nowrap text-xs text-slate-600">
+                  <span className="overflow-hidden whitespace-nowrap text-sm text-slate-600">
                     {dailyVolume.toLocaleString(undefined, {
                       notation: 'compact',
                       compactDisplay: 'short',
                     })}
                   </span>
-                </Pill>
+                </div>
                 <MiniStackedBarChart className="shrink-0" data={dailyVolumeSlots} />
               </div>
             </td>

@@ -4,7 +4,11 @@ Output:
   0: Successfully leased item
   1: Queue item not found
   2: Queue item already leased
-  3: No capacity
+
+  3: No function capacity
+  4: No account capacity
+  5: No custom capacity 1
+  6: No custom capacity 2
 
 ]]
 
@@ -34,6 +38,26 @@ local partitionName        = ARGV[8]
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
 -- $include(check_concurrency.lua)
+-- $include(get_queue_item.lua)
+-- $include(set_item_peek_time.lua)
+
+-- first, get the queue item.  we must do this and bail early if the queue item
+-- was not found.
+local item = get_queue_item(queueKey, queueID)
+if item == nil then
+	return 1
+end
+
+-- Grab the current time from the new lease key.
+local nextTime = decode_ulid_time(newLeaseKey)
+-- check if the item is leased. 
+if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
+	-- This is already leased;  don't let this requester lease the item.
+	return 2
+end
+
+-- Track the earliest time this job was attempted in the queue.
+item = set_item_peek_time(queueKey, queueID, item, currentTime)
 
 -- Check the concurrency limits for the account and custom key;  partition keys are checked when
 -- leasing the partition and do not need to be checked again (only one worker can run a partition at
@@ -45,37 +69,18 @@ if partitionConcurrency > 0 then
 end
 if accountConcurrency > 0 then
 	if check_concurrency(currentTime, accountConcurrencyKey, accountConcurrency) <= 0 then
-		return 3
+		return 4
 	end
 end
 if customConcurrencyA > 0 then
 	if check_concurrency(currentTime, customConcurrencyKeyA, customConcurrencyA) <= 0 then
-		return 3
+		return 5
 	end
 end
 if customConcurrencyB > 0 then
 	if check_concurrency(currentTime, customConcurrencyKeyB, customConcurrencyB) <= 0 then
-		return 3
+		return 6
 	end
-end
-
--- Grab the current time from the new lease key.
-local nextTime = decode_ulid_time(newLeaseKey)
-
--- Look up the current queue item.  We need to see if the queue item is already leased.
-local encoded = redis.call("HGET", queueKey, queueID)
-if encoded == false then
-	return 1
-end
-
-local item = cjson.decode(encoded)
-if item == nil then
-	return 1
-end
-
-if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
-	-- This is already leased;  don't let this requester lease the item.
-	return 2
 end
 
 -- Update the item's lease key.

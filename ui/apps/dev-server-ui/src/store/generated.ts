@@ -125,8 +125,6 @@ export type FunctionRun = {
   pendingSteps: Maybe<Scalars['Int']>;
   startedAt: Maybe<Scalars['Time']>;
   status: Maybe<FunctionRunStatus>;
-  /** @deprecated Field no longer supported */
-  timeline: Maybe<Array<FunctionRunEvent>>;
   waitingFor: Maybe<StepEventWait>;
   workspace: Maybe<Workspace>;
 };
@@ -278,6 +276,21 @@ export type RunHistoryCancel = {
   userID: Maybe<Scalars['UUID']>;
 };
 
+export type RunHistoryInvokeFunction = {
+  __typename?: 'RunHistoryInvokeFunction';
+  correlationID: Scalars['String'];
+  eventID: Scalars['ULID'];
+  functionID: Scalars['String'];
+  timeout: Scalars['Time'];
+};
+
+export type RunHistoryInvokeFunctionResult = {
+  __typename?: 'RunHistoryInvokeFunctionResult';
+  eventID: Maybe<Scalars['ULID']>;
+  runID: Maybe<Scalars['ULID']>;
+  timeout: Scalars['Boolean'];
+};
+
 export type RunHistoryItem = {
   __typename?: 'RunHistoryItem';
   attempt: Scalars['Int'];
@@ -286,6 +299,8 @@ export type RunHistoryItem = {
   functionVersion: Scalars['Int'];
   groupID: Maybe<Scalars['UUID']>;
   id: Scalars['ULID'];
+  invokeFunction: Maybe<RunHistoryInvokeFunction>;
+  invokeFunctionResult: Maybe<RunHistoryInvokeFunctionResult>;
   result: Maybe<RunHistoryResult>;
   sleep: Maybe<RunHistorySleep>;
   stepName: Maybe<Scalars['String']>;
@@ -365,6 +380,7 @@ export type StreamItem = {
 export type StreamQuery = {
   after?: InputMaybe<Scalars['Time']>;
   before?: InputMaybe<Scalars['Time']>;
+  includeInternalEvents?: InputMaybe<Scalars['Boolean']>;
   limit?: Scalars['Int'];
 };
 
@@ -405,7 +421,7 @@ export type GetFunctionRunQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', id: string, name: string | null, status: FunctionRunStatus | null, startedAt: any | null, finishedAt: any | null, output: string | null, pendingSteps: number | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null, function: { __typename?: 'Function', triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null } | null, event: { __typename?: 'Event', id: string, raw: string | null } | null, timeline: Array<{ __typename: 'FunctionEvent', createdAt: any | null, output: string | null, functionType: FunctionEventType | null } | { __typename: 'StepEvent', createdAt: any | null, output: string | null, name: string | null, stepType: StepEventType | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null }> | null, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: any, functionVersion: number, groupID: any | null, id: any, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: any | null, expression: string | null, userID: any | null } | null, sleep: { __typename?: 'RunHistorySleep', until: any } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: any } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: any | null, timeout: boolean } | null }> } | null };
+export type GetFunctionRunQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', id: string, name: string | null, status: FunctionRunStatus | null, startedAt: any | null, finishedAt: any | null, output: string | null, pendingSteps: number | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null, function: { __typename?: 'Function', triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null } | null, event: { __typename?: 'Event', id: string, raw: string | null } | null, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: any, functionVersion: number, groupID: any | null, id: any, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: any | null, expression: string | null, userID: any | null } | null, sleep: { __typename?: 'RunHistorySleep', until: any } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: any } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: any | null, timeout: boolean } | null, invokeFunction: { __typename?: 'RunHistoryInvokeFunction', eventID: any, functionID: string, correlationID: string, timeout: any } | null, invokeFunctionResult: { __typename?: 'RunHistoryInvokeFunctionResult', eventID: any | null, timeout: boolean, runID: any | null } | null }> } | null };
 
 export type GetFunctionsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -442,6 +458,7 @@ export type GetTriggersStreamQueryVariables = Exact<{
   limit: Scalars['Int'];
   after: InputMaybe<Scalars['Time']>;
   before: InputMaybe<Scalars['Time']>;
+  includeInternalEvents: Scalars['Boolean'];
 }>;
 
 
@@ -545,25 +562,6 @@ export const GetFunctionRunDocument = `
       id
       raw
     }
-    timeline {
-      __typename
-      ... on StepEvent {
-        stepType: type
-        createdAt
-        output
-        name
-        waitingFor {
-          expiryTime
-          eventName
-          expression
-        }
-      }
-      ... on FunctionEvent {
-        functionType: type
-        createdAt
-        output
-      }
-    }
     history {
       attempt
       cancel {
@@ -589,6 +587,17 @@ export const GetFunctionRunDocument = `
       waitResult {
         eventID
         timeout
+      }
+      invokeFunction {
+        eventID
+        functionID
+        correlationID
+        timeout
+      }
+      invokeFunctionResult {
+        eventID
+        timeout
+        runID
       }
     }
   }
@@ -656,8 +665,10 @@ export const DeleteAppDocument = `
 }
     `;
 export const GetTriggersStreamDocument = `
-    query GetTriggersStream($limit: Int!, $after: Time, $before: Time) {
-  stream(query: {limit: $limit, after: $after, before: $before}) {
+    query GetTriggersStream($limit: Int!, $after: Time, $before: Time, $includeInternalEvents: Boolean!) {
+  stream(
+    query: {limit: $limit, after: $after, before: $before, includeInternalEvents: $includeInternalEvents}
+  ) {
     createdAt
     id
     trigger

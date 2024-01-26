@@ -1,7 +1,7 @@
 import type VercelIntegration from '@/app/(dashboard)/settings/integrations/vercel/VercelIntegration';
 import enrichVercelProjects from '@/app/(dashboard)/settings/integrations/vercel/enrichVercelProjects';
 import restAPI from '@/queries/restAPI';
-import { getEnvironment } from '@/queries/server-only/getEnvironment';
+import { getProductionEnvironment } from '@/queries/server-only/getEnvironment';
 
 type CreateVercelIntegrationParams = {
   vercelAuthorizationCode: string;
@@ -10,9 +10,7 @@ type CreateVercelIntegrationParams = {
 export default async function createVercelIntegration({
   vercelAuthorizationCode,
 }: CreateVercelIntegrationParams): Promise<VercelIntegration> {
-  const environment = await getEnvironment({
-    environmentSlug: 'production',
-  });
+  const environment = await getProductionEnvironment();
 
   const url = new URL('/v1/integrations/vercel/projects', process.env.NEXT_PUBLIC_API_URL);
   url.searchParams.set('workspaceID', environment.id);

@@ -6,12 +6,19 @@ import * as AccordionPrimitive from '@radix-ui/react-accordion';
 
 import { TimelineNode } from './TimelineNode/TimelineNode';
 
+export type NavigateToRunFn = (options: {
+  eventID: string;
+  runID: string;
+  fnID: string;
+}) => React.ReactNode;
+
 type Props = {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
   history: HistoryParser;
+  navigateToRun: NavigateToRunFn;
 };
 
-export function Timeline({ getOutput, history }: Props) {
+export function Timeline({ getOutput, history, navigateToRun }: Props) {
   const nodes = history.getGroups({ sort: true });
 
   return (
@@ -40,6 +47,7 @@ export function Timeline({ getOutput, history }: Props) {
                 position={position}
                 getOutput={getOutput}
                 node={node}
+                navigateToRun={navigateToRun}
               >
                 {Object.values(node.attempts).length > 0 && (
                   <>
@@ -55,6 +63,7 @@ export function Timeline({ getOutput, history }: Props) {
                         getOutput={getOutput}
                         node={attempt}
                         isAttempt
+                        navigateToRun={navigateToRun}
                       />
                     ))}
                   </>
@@ -100,6 +109,11 @@ function isVisible(node: HistoryNode) {
 
   if (node.waitForEventResult) {
     // Waits may not have a name but we still want to see it.
+    return true;
+  }
+
+  if (node.invokeFunctionResult) {
+    // Invokes don't return a step name, but the group overall gives information
     return true;
   }
 

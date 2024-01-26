@@ -78,25 +78,6 @@ export const FUNCTION_RUN = gql`
         id
         raw
       }
-      timeline {
-        __typename
-        ... on StepEvent {
-          stepType: type
-          createdAt
-          output
-          name
-          waitingFor {
-            expiryTime
-            eventName
-            expression
-          }
-        }
-        ... on FunctionEvent {
-          functionType: type
-          createdAt
-          output
-        }
-      }
       history {
         attempt
         cancel {
@@ -122,6 +103,17 @@ export const FUNCTION_RUN = gql`
         waitResult {
           eventID
           timeout
+        }
+        invokeFunction {
+          eventID
+          functionID
+          correlationID
+          timeout
+        }
+        invokeFunctionResult {
+          eventID
+          timeout
+          runID
         }
       }
     }
@@ -195,8 +187,20 @@ export const DELETE_APP = gql`
 `;
 
 export const TRIGGERS_STREAM = gql`
-  query GetTriggersStream($limit: Int!, $after: Time, $before: Time) {
-    stream(query: { limit: $limit, after: $after, before: $before }) {
+  query GetTriggersStream(
+    $limit: Int!
+    $after: Time
+    $before: Time
+    $includeInternalEvents: Boolean!
+  ) {
+    stream(
+      query: {
+        limit: $limit
+        after: $after
+        before: $before
+        includeInternalEvents: $includeInternalEvents
+      }
+    ) {
       createdAt
       id
       trigger

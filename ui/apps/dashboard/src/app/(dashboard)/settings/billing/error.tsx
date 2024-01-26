@@ -1,14 +1,20 @@
 'use client';
 
+import { useEffect } from 'react';
 import { ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import * as Sentry from '@sentry/nextjs';
 
 type BillingErrorProps = {
-  error: Error;
+  error: Error & { digest?: string };
   reset: () => void;
 };
 
 export default function BillingError({ error, reset }: BillingErrorProps) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-5 bg-slate-100">
       <div className="max-w-4xl rounded-md border border-slate-200 bg-white p-4 text-slate-500">

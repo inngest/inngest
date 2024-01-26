@@ -40,11 +40,11 @@ export function UserCreator() {
     event.preventDefault();
 
     const newErrors: typeof errors = {};
-    const email = event.currentTarget?.email?.value;
+    const email = event.currentTarget.email?.value;
 
     // @ts-expect-error "name" is a reserved property that we're overriding, so
     // TS thinks it's a string instead of an HTML element.
-    const name = event.currentTarget?.name?.value;
+    const name = event.currentTarget.name.value;
 
     if (!email) {
       newErrors.email = 'Required';
@@ -68,7 +68,7 @@ export function UserCreator() {
     const res = await createUser({ input });
     if (res.error) {
       toast.error('Failed to create user', {
-        description: res.error.graphQLErrors?.[0]?.message,
+        description: res.error.graphQLErrors[0]?.message,
         action: {
           label: 'Contact Support',
           onClick: () => router.push('/support'),

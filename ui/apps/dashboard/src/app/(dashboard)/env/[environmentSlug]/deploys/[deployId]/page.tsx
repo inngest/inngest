@@ -33,7 +33,6 @@ const GetDeployDocument = graphql(`
 
 type DeployDetailProps = {
   params: {
-    environmentSlug: string;
     deployId: string;
   };
 };
@@ -45,13 +44,9 @@ export default async function DeployDetail({ params }: DeployDetailProps) {
     deployID: params.deployId,
   });
 
-  if (!deploy) {
-    return <div className="flex h-full grow items-stretch overflow-y-scroll">Deploy not found</div>;
-  }
-
   return (
     <div className="flex h-full grow items-stretch overflow-y-scroll">
-      <DeployCard {...deploy} environmentSlug={params.environmentSlug} />
+      <DeployCard {...deploy} />
     </div>
   );
 }

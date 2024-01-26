@@ -4,11 +4,10 @@ import { KeyIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { useQuery } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { Pill } from '@/components/Pill/Pill';
 import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
-import { useEnvironment } from '@/queries';
-import { defaultTime, relativeTime } from '@/utils/date';
 
 const GetLatestEventLogs = graphql(`
   query GetLatestEventLogs($name: String, $environmentID: ID!) {
@@ -33,17 +32,14 @@ type LatestLogsListProps = {
 };
 
 export default function LatestLogsList({ environmentSlug, eventName }: LatestLogsListProps) {
-  const [{ data: environment, fetching: fetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
+  const environment = useEnvironment();
 
   const [{ data: LatestLogsResponse, fetching: fetchingLatestLogs }] = useQuery({
     query: GetLatestEventLogs,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
       name: eventName,
     },
-    pause: !environment?.id,
   });
 
   const list = LatestLogsResponse?.events?.data[0]?.recent;
@@ -81,15 +77,15 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
               </tr>
             </thead>
             <tbody className="h-full divide-y divide-slate-200">
-              {!orderedList && (fetchingEnvironment || fetchingLatestLogs) && (
+              {!orderedList && fetchingLatestLogs && (
                 <tr>
                   <td className="p-4 text-center" colSpan={3}>
                     Loading...
                   </td>
                 </tr>
               )}
-              {orderedList && orderedList?.length > 0
-                ? orderedList?.map((e) => (
+              {orderedList && orderedList.length > 0
+                ? orderedList.map((e) => (
                     <tr className="truncate" key={e.id}>
                       <td className="p-4">
                         <Time
@@ -119,8 +115,7 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
                       </td>
                     </tr>
                   ))
-                : !fetchingEnvironment &&
-                  !fetchingLatestLogs && (
+                : !fetchingLatestLogs && (
                     <tr>
                       <td className="p-4 text-center" colSpan={3}>
                         No events were stored yet.

@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import {
-  baseFetchFailed,
-  baseFetchLoading,
   baseFetchSkipped,
   baseFetchSucceeded,
+  baseInitialFetchFailed,
+  baseInitialFetchLoading,
+  baseRefetchLoading,
   type FetchResult,
 } from '@inngest/components/types/fetch';
 import type { Function } from '@inngest/components/types/function';
@@ -47,7 +48,14 @@ export function useRun(runID: string | null): FetchResult<Data, { skippable: tru
   }, [query.data?.functionRun]);
 
   if (query.isLoading) {
-    return baseFetchLoading;
+    if (!data) {
+      return baseInitialFetchLoading;
+    }
+
+    return {
+      ...baseRefetchLoading,
+      data,
+    };
   }
 
   if (skip) {
@@ -56,7 +64,7 @@ export function useRun(runID: string | null): FetchResult<Data, { skippable: tru
 
   if (query.error) {
     return {
-      ...baseFetchFailed,
+      ...baseInitialFetchFailed,
       error: new Error(query.error.message),
     };
   }
@@ -64,7 +72,7 @@ export function useRun(runID: string | null): FetchResult<Data, { skippable: tru
   if (!data) {
     // Should be unreachable.
     return {
-      ...baseFetchFailed,
+      ...baseInitialFetchFailed,
       error: new Error('finished loading but missing data'),
     };
   }

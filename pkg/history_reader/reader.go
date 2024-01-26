@@ -252,21 +252,23 @@ func (r Run) ToCQRS() *cqrs.FunctionRun {
 }
 
 type RunHistory struct {
-	Attempt         int64                   `json:"attempt"`
-	Cancel          *RunHistoryCancel       `json:"cancel"`
-	CreatedAt       time.Time               `json:"createdAt"`
-	FunctionVersion int64                   `json:"functionVersion"`
-	GroupID         *uuid.UUID              `json:"groupID"`
-	ID              ulid.ULID               `json:"id"`
-	Result          *RunHistoryResult       `json:"result"`
-	RunID           ulid.ULID               `json:"runID"`
-	Sleep           *RunHistorySleep        `json:"sleep"`
-	StepName        *string                 `json:"stepName"`
-	StepType        *enums.HistoryStepType  `json:"stepType"`
-	Type            enums.HistoryType       `json:"type"`
-	URL             *string                 `json:"url"`
-	WaitForEvent    *RunHistoryWaitForEvent `json:"waitForEvent"`
-	WaitResult      *RunHistoryWaitResult   `json:"waitResult"`
+	Attempt              int64                           `json:"attempt"`
+	Cancel               *RunHistoryCancel               `json:"cancel"`
+	CreatedAt            time.Time                       `json:"createdAt"`
+	FunctionVersion      int64                           `json:"functionVersion"`
+	GroupID              *uuid.UUID                      `json:"groupID"`
+	ID                   ulid.ULID                       `json:"id"`
+	InvokeFunction       *RunHistoryInvokeFunction       `json:"invokeFunction"`
+	InvokeFunctionResult *RunHistoryInvokeFunctionResult `json:"invokeFunctionResult"`
+	Result               *RunHistoryResult               `json:"result"`
+	RunID                ulid.ULID                       `json:"runID"`
+	Sleep                *RunHistorySleep                `json:"sleep"`
+	StepName             *string                         `json:"stepName"`
+	StepType             *enums.HistoryStepType          `json:"stepType"`
+	Type                 enums.HistoryType               `json:"type"`
+	URL                  *string                         `json:"url"`
+	WaitForEvent         *RunHistoryWaitForEvent         `json:"waitForEvent"`
+	WaitResult           *RunHistoryWaitResult           `json:"waitResult"`
 }
 
 type RunHistoryCancel struct {
@@ -297,5 +299,18 @@ type RunHistoryWaitForEvent struct {
 
 type RunHistoryWaitResult struct {
 	EventID *ulid.ULID `json:"eventID"`
+	Timeout bool       `json:"timeout"`
+}
+
+type RunHistoryInvokeFunction struct {
+	CorrelationID string    `json:"correlationID"`
+	EventID       ulid.ULID `json:"eventID"`
+	FunctionID    string    `json:"functionID"`
+	Timeout       time.Time `json:"timeout"`
+}
+
+type RunHistoryInvokeFunctionResult struct {
+	EventID *ulid.ULID `json:"eventID"`
+	RunID   *ulid.ULID `json:"runID"`
 	Timeout bool       `json:"timeout"`
 }

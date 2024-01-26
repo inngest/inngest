@@ -12,6 +12,7 @@
     "./next-env.d.ts",
     ".next/types/**/*.ts",
     "./next.config.js",
+    "./graphql.config.js",
     "./tailwind.config.ts",
     "./svgo.config.js",
     "./sentry.client.config.ts",

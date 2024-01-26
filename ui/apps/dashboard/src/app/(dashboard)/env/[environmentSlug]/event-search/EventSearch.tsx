@@ -1,17 +1,18 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import { useClient } from 'urql';
-import { z } from 'zod';
-
-import Input from '@/components/Forms/Input';
 import {
-  EventSearchFilterFieldDataType,
-  EventSearchFilterOperator,
-  type EventSearchFilterField,
-} from '@/gql/graphql';
-import { useEnvironment } from '@/queries';
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip';
+import { IconInfo } from '@inngest/components/icons/Info';
+import { useClient } from 'urql';
+
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
+import Input from '@/components/Forms/Input';
 import { useSearchParam } from '@/utils/useSearchParam';
 import { Details } from './Details';
 import { EventTable } from './EventTable';
@@ -20,26 +21,14 @@ import type { Event } from './types';
 
 const day = 1000 * 60 * 60 * 24;
 
-const fieldSchema = z.object({
-  dataType: z.nativeEnum(EventSearchFilterFieldDataType),
-  operator: z.nativeEnum(EventSearchFilterOperator),
-  path: z.string(),
-  value: z.string(),
-});
-
-type Props = {
-  environmentSlug: string;
-};
-
-export function EventSearch({ environmentSlug }: Props) {
+export function EventSearch() {
   const [events, setEvents] = useState<Event[]>([]);
   const [fetching, setFetching] = useState(false);
   const [selectedEventID, setSelectedEventID] = useState<string | undefined>(undefined);
-  const [{ data: environment }] = useEnvironment({ environmentSlug });
-  const envID = environment?.id;
+  const environment = useEnvironment();
   const client = useClient();
 
-  const [fields, setFields] = useFields();
+  const [query, setQuery] = useSearchParam('query');
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -48,37 +37,19 @@ export function EventSearch({ environmentSlug }: Props) {
     // TODO: Find a better way to extract form data.
     try {
       const form = new FormData(event.currentTarget);
-      const path = form.get('path');
-      if (typeof path !== 'string') {
+      const newQuery = form.get('query');
+      if (typeof newQuery !== 'string') {
         // Should be unreachable
-        throw new Error('path must be a string');
-      }
-      const value = form.get('value');
-      if (typeof value !== 'string') {
-        // Should be unreachable
-        throw new Error('value must be a string');
-      }
-      if (!environment) {
-        // Should be unreachable
-        throw new Error('missing environment');
+        throw new Error('query must be a string');
       }
 
-      const newFields = [
-        {
-          dataType: EventSearchFilterFieldDataType.Str,
-          operator: EventSearchFilterOperator.Eq,
-          path,
-          value,
-        },
-      ];
-
-      setFields(newFields);
+      setQuery(newQuery);
 
       setEvents(
         await searchEvents({
           client,
           environmentID: environment.id,
-          fields: newFields,
+          query: newQuery,
           lowerTime: new Date(Date.now() - 3 * day),
           upperTime: new Date(),
         })
@@ -88,71 +59,70 @@ export function EventSearch({ environmentSlug }: Props) {
     }
   }
 
-  return (
-    <>
-      <form onSubmit={onSubmit} className="m-4 flex gap-4">
-        {fields.map((field, index) => {
-          return (
-            // TODO: Don't use index as key.
-            <div className="flex gap-4" key={index}>
-              <Input
-                className="min-w-[300px]"
-                defaultValue={field.path}
-                name="path"
-                placeholder="Path"
-                required
-                type="text"
-              />
-              <Input
-                className="min-w-[300px]"
-                defaultValue={field.value}
-                name="value"
-                placeholder="Value"
-                required
-                type="text"
-              />
-              <Button kind="primary" type="submit" disabled={fetching} label="Search" />
-            </div>
-          );
-        })}
-      </form>
-
-      <EventTable events={events} onSelect={setSelectedEventID} />
-
-      {envID && (
-        <Details
-          envID={envID}
-          eventID={selectedEventID}
-          onClose={() => setSelectedEventID(undefined)}
-        />
-      )}
-    </>
-  );
-}
-
-function useFields(): [EventSearchFilterField[], (fields: EventSearchFilterField[]) => void] {
-  const [fieldsParam, setFieldsParam] = useSearchParam('fields');
-
-  const setFields = useCallback(
-    (fields: EventSearchFilterField[]) => {
-      setFieldsParam(JSON.stringify(fields));
-    },
-    [setFieldsParam]
-  );
-
-  let fields: EventSearchFilterField[] = [
-    {
-      dataType: EventSearchFilterFieldDataType.Str,
-      operator: EventSearchFilterOperator.Eq,
-      path: '',
-      value: '',
-    },
-  ];
-  if (fieldsParam) {
-    fields = JSON.parse(fieldsParam).map((field: unknown) => {
-      return fieldSchema.parse(field);
-    });
+  function getEmptyTableMessage({
+    fetching,
+    query,
+    events,
+  }: {
+    fetching: boolean;
+    query?: string;
+    events: Event[];
+  }) {
+    if (fetching) {
+      return <p>Searching for events...</p>;
+    } else if (query && events.length < 1) {
+      return <p>No events found. Try adjusting your search.</p>;
+    } else {
+      return <p>Search to see events.</p>;
+    }
   }
 
-  return [fields, setFields];
+  return (
+    <>
+      <div className="block items-center justify-between lg:flex">
+        <form onSubmit={onSubmit} className="m-4 flex gap-4">
+          <div className="flex gap-4">
+            <Input
+              className="min-w-[800px]"
+              defaultValue={query}
+              name="query"
+              placeholder="CEL query"
+              required
+              type="text"
+            />
+            <Button kind="primary" type="submit" loading={fetching} label="Search" />
+          </div>
+        </form>
+        <div className="m-4 flex gap-1">
+          <p className="text-sm">Experimental feature</p>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <IconInfo className="h-4 w-4 text-slate-400" />
+              </TooltipTrigger>
+              <TooltipContent className="whitespace-pre-line">
+                This is an experimental feature, with a few limitations:
+                <ul>
+                  <li> - Filter is only returning the last 3 days</li>
+                </ul>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
+
+      <EventTable
+        events={events}
+        onSelect={setSelectedEventID}
+        blankState={getEmptyTableMessage({ fetching, query, events })}
+      />
+
+      <Details
+        envID={environment.id}
+        eventID={selectedEventID}
+        onClose={() => setSelectedEventID(undefined)}
+        navigateToRun={() => <></>}
+      />
+    </>
+  );
 }

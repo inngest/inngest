@@ -1,13 +1,9 @@
 'use client';
 
-import {
-  ArchiveBoxIcon,
-  ChartBarSquareIcon,
-  CodeBracketSquareIcon,
-  CommandLineIcon,
-  FolderIcon,
-} from '@heroicons/react/20/solid';
+import { CodeBracketSquareIcon } from '@heroicons/react/20/solid';
+import { Badge } from '@inngest/components/Badge';
 
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { Tag } from '@/components/Tag/Tag';
 import { useFunction } from '@/queries';
@@ -25,7 +21,6 @@ type FunctionLayoutProps = {
 export default function FunctionLayout({ children, params }: FunctionLayoutProps) {
   const functionSlug = decodeURIComponent(params.slug);
   const [{ data, fetching }] = useFunction({
-    environmentSlug: params.environmentSlug,
     functionSlug,
   });
 
@@ -33,20 +28,33 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
   const { isArchived = false } = fn ?? {};
   const isPaused = !isArchived && !data?.workspace.workflow?.current;
 
+  const isReplayEnabled = useBooleanFlag('function-replay');
+
   const emptyData = !data || fetching || !fn;
   const navLinks: HeaderLink[] = [
     {
       href: `/env/${params.environmentSlug}/functions/${params.slug}`,
       text: 'Dashboard',
-      icon: <ChartBarSquareIcon className="w-3.5" />,
       active: 'exact',
     },
     {
       href: `/env/${params.environmentSlug}/functions/${params.slug}/logs`,
-      text: 'Logs',
-      icon: <CommandLineIcon className="w-3.5" />,
+      text: 'Runs',
     },
   ];
+
+  if (isReplayEnabled.value) {
+    navLinks.push({
+      href: `/env/${params.environmentSlug}/functions/${params.slug}/replay`,
+      text: 'Replay',
+      badge: (
+        <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
+          New
+        </Badge>
+      ),
+    });
+  }
+
   return (
     <>
       <Header
@@ -58,15 +66,8 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
             <div className="flex items-center gap-2">
               {/* Disable buttons that do not yet work */}
               <div className="flex items-center gap-2 pr-2">
-                <PauseFunctionButton
-                  environmentSlug={params.environmentSlug}
-                  functionSlug={functionSlug}
-                  disabled={isArchived}
-                />
-                <ArchiveFunctionButton
-                  environmentSlug={params.environmentSlug}
-                  functionSlug={functionSlug}
-                />
+                <PauseFunctionButton functionSlug={functionSlug} disabled={isArchived} />
+                <ArchiveFunctionButton functionSlug={functionSlug} />
               </div>
               {/* <Button context="dark">
               <RocketLaunchIcon className="h-3" />

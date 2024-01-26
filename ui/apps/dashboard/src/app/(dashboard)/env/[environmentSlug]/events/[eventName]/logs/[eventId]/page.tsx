@@ -4,7 +4,6 @@ import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getEnvironment } from '@/queries/server-only/getEnvironment';
-import { relativeTime, weekDayAndUTCTime } from '@/utils/date';
 import EventPayload from './EventPayload';
 import TriggeredFunctionCard from './TriggeredFunctionCard';
 
@@ -49,7 +48,7 @@ export default async function EventPage({ params }: EventPageProps) {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-y-scroll">
       <header className="space-y-1 bg-white p-5 shadow">
         <h2 className="font-medium capitalize text-slate-800">
           <Time format="relative" value={new Date(event.receivedAt)} />

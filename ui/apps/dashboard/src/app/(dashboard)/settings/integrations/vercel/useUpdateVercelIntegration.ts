@@ -1,7 +1,7 @@
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
-import { useEnvironment } from '@/queries';
+import { useProductionEnvironment } from '@/queries';
 import type VercelIntegration from './VercelIntegration';
 
 const CreateVercelAppDocument = graphql(`
@@ -29,7 +29,7 @@ const RemoveVercelAppDocument = graphql(`
 `);
 
 export default function useUpdateVercelIntegration(initialVercelIntegration: VercelIntegration) {
-  const [{ data: environment }] = useEnvironment({ environmentSlug: 'production' });
+  const [{ data: environment }] = useProductionEnvironment();
 
   const [, createVercelApp] = useMutation(CreateVercelAppDocument);
   const [, updateVercelApp] = useMutation(UpdateVercelAppDocument);

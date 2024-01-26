@@ -1,10 +1,12 @@
+'use client';
+
 import colors from 'tailwindcss/colors';
 import { useQuery } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import StackedBarChart from '@/components/Charts/StackedBarChart';
 import { graphql } from '@/gql';
-import { useEnvironment } from '@/queries';
 
 export type UsageMetrics = { totalRuns: number; totalFailures: number };
 
@@ -20,7 +22,6 @@ const GetFunctionRunsMetricsDocument = graphql(`
         completed: usage(opts: { from: $startTime, to: $endTime }, event: "completed") {
           period
           total
-          asOf
           data {
             slot
             count
@@ -29,7 +30,6 @@ const GetFunctionRunsMetricsDocument = graphql(`
         canceled: usage(opts: { from: $startTime, to: $endTime }, event: "cancelled") {
           period
           total
-          asOf
           data {
             slot
             count
@@ -38,7 +38,6 @@ const GetFunctionRunsMetricsDocument = graphql(`
         failed: usage(opts: { from: $startTime, to: $endTime }, event: "errored") {
           period
           total
-          asOf
           data {
             slot
             count
@@ -50,31 +49,22 @@ const GetFunctionRunsMetricsDocument = graphql(`
 `);
 
 type FunctionRunsChartProps = {
-  environmentSlug: string;
   functionSlug: string;
   timeRange: TimeRange;
 };
 
-export default function FunctionRunsChart({
-  environmentSlug,
-  functionSlug,
-  timeRange,
-}: FunctionRunsChartProps) {
-  const [{ data: environment, error: environmentError, fetching: isFetchingEnvironment }] =
-    useEnvironment({
-      environmentSlug,
-    });
+export default function FunctionRunsChart({ functionSlug, timeRange }: FunctionRunsChartProps) {
+  const environment = useEnvironment();
 
   const [{ data, error: functionRunsMetricsError, fetching: isFetchingFunctionRunsMetrics }] =
     useQuery({
       query: GetFunctionRunsMetricsDocument,
       variables: {
-        environmentID: environment?.id!,
+        environmentID: environment.id,
         functionSlug,
         startTime: timeRange.start.toISOString(),
         endTime: timeRange.end.toISOString(),
       },
-      pause: !environment?.id,
     });
 
   let metrics: {
@@ -109,8 +99,8 @@ export default function FunctionRunsChart({
         { name: 'Failed', dataKey: 'failed', color: colors.red['500'] },
         { name: 'Canceled', dataKey: 'canceled', color: colors.slate['500'] },
       ]}
-      isLoading={isFetchingEnvironment || isFetchingFunctionRunsMetrics}
-      error={environmentError || functionRunsMetricsError}
+      isLoading={isFetchingFunctionRunsMetrics}
+      error={functionRunsMetricsError}
     />
   );
 }

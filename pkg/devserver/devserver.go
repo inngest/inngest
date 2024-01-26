@@ -2,6 +2,8 @@ package devserver
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
@@ -12,23 +14,27 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs"
 	"github.com/inngest/inngest/pkg/deploy"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/history"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/redis/rueidis"
+	"golang.org/x/sync/errgroup"
 )
 
 // StartOpts configures the dev server
@@ -52,6 +58,7 @@ func New(ctx context.Context, opts StartOpts) error {
 		opts.Config.Execution.LogOutput = true
 	}
 
+	// NOTE: looks deprecated?
 	// Before running the development service, ensure that we change the http
 	// driver in development to use our AWS Gateway http client, attempting to
 	// automatically transform dev requests to lambda invocations.
@@ -86,18 +93,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithKeyGenerator(redis_state.DefaultKeyFunc{
 			Prefix: "{state}",
 		}),
-		redis_state.WithFunctionCallbacks(func(ctx context.Context, i state.Identifier, rs enums.RunStatus) {
-			switch rs {
-			case enums.RunStatusRunning:
-				// Add this to the in-memory tracker.
-				// XXX: Switch to sqlite.
-				s, err := sm.Load(ctx, i.RunID)
-				if err != nil {
-					return
-				}
-				t.Add(s.Event()["id"].(string), i)
-			}
-		}),
 	)
 	if err != nil {
 		return err
@@ -112,7 +107,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithPollTick(150 * time.Millisecond),
 		redis_state.WithQueueKeyGenerator(queueKG),
 		redis_state.WithCustomConcurrencyKeyGenerator(func(ctx context.Context, i redis_state.QueueItem) []state.CustomConcurrency {
-			fn, err := dbcqrs.GetFunctionByID(ctx, i.Data.Identifier.WorkflowID)
+			fn, err := dbcqrs.GetFunctionByInternalUUID(ctx, i.Data.Identifier.WorkspaceID, i.Data.Identifier.WorkflowID)
 			if err != nil {
 				// Use what's stored in the state store.
 				return i.Data.Identifier.CustomConcurrencyKeys
@@ -175,6 +170,9 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	debouncer := debounce.NewRedisDebouncer(rc, queueKG, queue)
 
+	// Create a new expression aggregator, using Redis to load evaluables.
+	agg := expressions.NewAggregator(ctx, 100, sm.(expressions.EvaluableLoader), nil)
+
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver()
@@ -183,11 +181,16 @@ func start(ctx context.Context, opts StartOpts) error {
 		}
 		drivers = append(drivers, d)
 	}
+	pb, err := pubsub.NewPublisher(ctx, opts.Config.EventStream.Service)
+	if err != nil {
+		return fmt.Errorf("failed to create publisher: %w", err)
+	}
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(sm),
 		executor.WithRuntimeDrivers(
 			drivers...,
 		),
+		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(queue),
 		executor.WithLogger(logger.From(ctx)),
 		executor.WithFunctionLoader(loader),
@@ -198,11 +201,15 @@ func start(ctx context.Context, opts StartOpts) error {
 				memory_writer.NewWriter(),
 			),
 			lifecycle{
-				sm:   sm,
-				cqrs: dbcqrs,
+				sm:         sm,
+				cqrs:       dbcqrs,
+				pb:         pb,
+				eventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
 			},
 		),
 		executor.WithStepLimits(consts.DefaultMaxStepLimit),
+		executor.WithInvokeNotFoundHandler(getInvokeNotFoundHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
+		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
 	)
 	if err != nil {
@@ -258,4 +265,61 @@ func createInmemoryRedis(ctx context.Context) (rueidis.Client, error) {
 		}
 	}()
 	return rc, nil
+}
+
+func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
+	return func(ctx context.Context, evt event.Event, item queue.Item) error {
+		byt, err := json.Marshal(evt)
+		if err != nil {
+			return fmt.Errorf("error marshalling invocation event: %w", err)
+		}
+
+		err = pb.Publish(
+			ctx,
+			topic,
+			pubsub.Message{
+				Name:      event.EventReceivedName,
+				Data:      string(byt),
+				Timestamp: time.Now(),
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("error publishing invocation event: %w", err)
+		}
+
+		return nil
+	}
+}
+
+func getInvokeNotFoundHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.InvokeNotFoundHandler {
+	return func(ctx context.Context, opts execution.InvokeNotFoundHandlerOpts, evts []event.Event) error {
+		eg := errgroup.Group{}
+
+		for _, e := range evts {
+			evt := e
+			eg.Go(func() error {
+				byt, err := json.Marshal(evt)
+				if err != nil {
+					return fmt.Errorf("error marshalling function finished event: %w", err)
+				}
+
+				err = pb.Publish(
+					ctx,
+					topic,
+					pubsub.Message{
+						Name:      event.EventReceivedName,
+						Data:      string(byt),
+						Timestamp: evt.Time(),
+					},
+				)
+				if err != nil {
+					return fmt.Errorf("error publishing function finished event: %w", err)
+				}
+
+				return nil
+			})
+		}
+
+		return eg.Wait()
+	}
 }

@@ -1,14 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
-	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngestgo"
-	"github.com/stretchr/testify/require"
 )
 
 func TestSDKNoRetry(t *testing.T) {
@@ -22,28 +21,11 @@ func TestSDKNoRetry(t *testing.T) {
 		User: map[string]any{},
 	}
 
-	fnID := "test-suite-sdk-no-retry"
+	fnID := "test-suite-no-retry"
 	test := &Test{
-		Name:        "SDK No Retry",
-		Description: ``,
-		Function: inngest.Function{
-			Name: "SDK No Retry",
-			Slug: fnID,
-			Triggers: []inngest.Trigger{
-				{
-					EventTrigger: &inngest.EventTrigger{
-						Event: evt.Name,
-					},
-				},
-			},
-			Steps: []inngest.Step{
-				{
-					ID:   "step",
-					Name: "step",
-					URI:  stepURL(fnID, "step"),
-				},
-			},
-		},
+		ID:           fnID,
+		Name:         "SDK No Retry",
+		Description:  ``,
 		EventTrigger: evt,
 		Timeout:      45 * time.Second,
 	}
@@ -51,34 +33,47 @@ func TestSDKNoRetry(t *testing.T) {
 	test.SetAssertions(
 		// All executor requests should have this event.
 		test.SetRequestEvent(evt),
-		// And the executor should start its requests with this context.
-		test.SetRequestContext(driver.SDKRequestContext{
-			FunctionID: inngest.DeterministicUUID(test.Function),
-			StepID:     "step",
-			Stack: &driver.FunctionStack{
-				Current: 0,
+		test.SendTrigger(),
+
+		test.Printf("Expecting StepError opcode"),
+
+		test.ExpectRequest("Initial request", "step", time.Second),
+		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
+			Op:          enums.OpcodeStepError,
+			ID:          "98bf98df193bcce7c33e6bc50927cf2ac21206cb",
+			Name:        "first step",
+			DisplayName: inngestgo.StrPtr(`first step`),
+			Error: &state.UserError{
+				Name:    "NonRetriableError",
+				Message: "no retry plz",
+			},
+			Data: []byte(`null`),
+		}}),
+
+		test.Printf("Expecting Try/Catch request"),
+
+		// We should get ANOTHER request which captures this error,
+		// allowing for try-catch outside of the function.
+		//
+		// In this case, the above step is added to the stack with an error type.
+		test.AddRequestStack(driver.FunctionStack{
+			Stack:   []string{"98bf98df193bcce7c33e6bc50927cf2ac21206cb"},
+			Current: 1,
+		}),
+		test.AddRequestSteps(map[string]any{
+			// Data is wrapped.
+			"98bf98df193bcce7c33e6bc50927cf2ac21206cb": map[string]any{
+				"error": map[string]any{
+					"message": "no retry plz",
+					"name":    "NonRetriableError",
+					"noRetry": true,
+					// stack is ignored for now, as it has absolute paths.
+				},
 			},
 		}),
 
-		test.SendTrigger(),
-
-		test.ExpectRequest("Initial request", "step", time.Second),
-		// Expect a 500
-		test.ExpectResponseFunc(400, func(byt []byte) error {
-			// This should be a string, because the SDK double-serializes
-			// step errors (right now)
-			var str string
-			err := json.Unmarshal(byt, &str)
-			require.NoError(t, err)
-
-			e := map[string]any{}
-			err = json.Unmarshal([]byte(str), &e)
-			require.NoError(t, err)
-
-			require.Equal(t, "Error", e["name"])
-			require.Equal(t, "no retry plz", e["message"])
-			return nil
-		}),
+		test.ExpectRequest("Try-catch request", "step", time.Second),
+		test.ExpectResponse(200, []byte(`"ok"`)),
 	)
 
 	run(t, test)

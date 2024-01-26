@@ -7,14 +7,17 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/oklog/ulid/v2"
 )
 
 type lifecycle struct {
 	execution.NoopLifecyceListener
 
-	sm   state.Manager
-	cqrs cqrs.Manager
+	sm         state.Manager
+	cqrs       cqrs.Manager
+	pb         pubsub.Publisher
+	eventTopic string
 }
 
 func (l lifecycle) OnFunctionScheduled(

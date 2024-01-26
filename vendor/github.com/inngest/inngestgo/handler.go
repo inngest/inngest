@@ -13,10 +13,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
+	"github.com/inngest/inngestgo/errors"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/inngest/inngestgo/step"
 	"golang.org/x/exp/slog"
@@ -206,6 +208,7 @@ func (h *handler) Register(funcs ...ServableFunction) {
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.Logger.Debug("received http request", "method", r.Method)
+	SetBasicResponseHeaders(w)
 
 	switch r.Method {
 	case http.MethodPost:
@@ -239,7 +242,7 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 		URL:        fmt.Sprintf("%s://%s%s", scheme, host, path),
 		V:          "1",
 		DeployType: "ping",
-		SDK:        "go:v0.0.1",
+		SDK:        HeaderValueSDK,
 		AppName:    h.appName,
 		Headers: sdk.Headers{
 			Env:      h.GetEnv(),
@@ -266,7 +269,7 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 
 		f := sdk.SDKFunction{
 			Name:        fn.Name(),
-			Slug:        fn.Slug(),
+			Slug:        h.appName + "-" + fn.Slug(),
 			Idempotency: c.Idempotency,
 			Priority:    fn.Config().Priority,
 			Triggers:    []inngest.Trigger{{}},
@@ -288,6 +291,10 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 			f.Debounce = &inngest.Debounce{
 				Key:    &c.Debounce.Key,
 				Period: c.Debounce.Period.String(),
+			}
+			if c.Debounce.Timeout != nil {
+				str := c.Debounce.Timeout.String()
+				f.Debounce.Timeout = &str
 			}
 		}
 
@@ -340,10 +347,11 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return fmt.Errorf("error creating signing key: %w", err)
 	}
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", string(key)))
+	req.Header.Add(HeaderKeyAuthorization, fmt.Sprintf("Bearer %s", string(key)))
 	if h.GetEnv() != "" {
-		req.Header.Add("X-Inngest-Env", h.GetEnv())
+		req.Header.Add(HeaderKeyEnv, h.GetEnv())
 	}
+	SetBasicRequestHeaders(req)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -381,7 +389,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	defer r.Body.Close()
 
 	if !IsDev() {
-		if sig = r.Header.Get("X-Inngest-Signature"); sig == "" {
+		if sig = r.Header.Get(HeaderKeySignature); sig == "" {
 			return publicerr.Error{
 				Message: "unauthorized",
 				Status:  401,
@@ -473,14 +481,40 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	resp, ops, err := invoke(r.Context(), fn, request)
 	streamCancel()
 
+	// NOTE: When triggering step errors, we should have an OpcodeStepError
+	// within ops alongside an error.  We can safely ignore that error, as its
+	// onyl used for checking wither the step used a NoRetryError or RetryAtError
+	//
+	// For that reason, we check those values first.
+	noRetry := errors.IsNoRetryError(err)
+	retryAt := errors.GetRetryAtTime(err)
+	if len(ops) == 1 && ops[0].Op == enums.OpcodeStepError {
+		// Now we've handled error types we can ignore step
+		// errors safely.
+		err = nil
+	}
+
+	// Now that we've handled the OpcodeStepError, if we *still* ahve
+	// a StepError kind returned from a function we must have an unhandled
+	// step error.  This is a NonRetryableError, as the most likely code is:
+	//
+	// 	_, err := step.Run(ctx, func() (any, error) { return fmt.Errorf("") })
+	// 	if err != nil {
+	// 	     return err
+	// 	}
+	if errors.IsStepError(err) {
+		err = fmt.Errorf("Unhandled step error: %s", err)
+		noRetry = true
+	}
+
 	if h.UseStreaming {
 		if err != nil {
 			// TODO: Add retry-at.
 			return json.NewEncoder(w).Encode(StreamResponse{
 				StatusCode: 500,
 				Body:       fmt.Sprintf("error calling function: %s", err.Error()),
-				NoRetry:    isNoRetryError(err),
-				RetryAt:    getRetryAtTime(err),
+				NoRetry:    noRetry,
+				RetryAt:    retryAt,
 			})
 		}
 		if len(ops) > 0 {
@@ -495,17 +529,16 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		})
 	}
 
+	// These may be added even for 2xx codes with step errors.
+	if noRetry {
+		w.Header().Add(HeaderKeyNoRetry, "true")
+	}
+	if retryAt != nil {
+		w.Header().Add(HeaderKeyRetryAfter, retryAt.Format(time.RFC3339))
+	}
+
 	if err != nil {
 		l.Error("error calling function", "error", err)
-
-		if isNoRetryError(err) {
-			w.Header().Add("x-inngest-no-retry", "true")
-		}
-
-		if at := getRetryAtTime(err); at != nil {
-			w.Header().Add("retry-after", at.Format(time.RFC3339))
-		}
-
 		return publicerr.Error{
 			Message: fmt.Sprintf("error calling function: %s", err.Error()),
 			Status:  500,

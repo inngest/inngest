@@ -8,9 +8,9 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
 
+import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
-import { useEnvironment } from '@/queries';
 
 const FunctionVersionNumberDocument = graphql(`
   query GetFunctionVersionNumber($slug: String!, $environmentID: ID!) {
@@ -139,37 +139,31 @@ function PauseFunctionModal({
 }
 
 type PauseFunctionProps = {
-  environmentSlug: string;
   functionSlug: string;
   disabled: boolean;
 };
 
-export default function PauseFunctionButton({
-  environmentSlug,
-  functionSlug,
-  disabled,
-}: PauseFunctionProps) {
+export default function PauseFunctionButton({ functionSlug, disabled }: PauseFunctionProps) {
   const [isPauseFunctionModalVisible, setIsPauseFunctionModalVisible] = useState<boolean>(false);
-  const [{ data: environment }] = useEnvironment({ environmentSlug });
+  const environment = useEnvironment();
 
   const [{ data: version, fetching: isFetchingVersions }] = useQuery({
     query: FunctionVersionNumberDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
       slug: functionSlug,
     },
-    pause: !environment?.id,
   });
 
-  const fn = version?.workspace?.workflow;
+  const fn = version?.workspace.workflow;
 
   if (!fn) {
     return null;
   }
 
-  const prevVersionObj = fn?.previous.sort((a, b) => b!.version - a!.version)[0];
+  const prevVersionObj = fn.previous.sort((a, b) => b!.version - a!.version)[0];
   const prevVersion = prevVersionObj?.version;
-  const isPaused = !fn.current && !fn?.archivedAt;
+  const isPaused = !fn.current && !fn.archivedAt;
 
   return (
     <>
@@ -186,7 +180,7 @@ export default function PauseFunctionButton({
                   )
                 }
                 btnAction={() => setIsPauseFunctionModalVisible(true)}
-                disabled={disabled || !version || isFetchingVersions}
+                disabled={disabled || isFetchingVersions}
                 label={isPaused ? 'Resume' : 'Pause'}
               />
             </span>
@@ -200,9 +194,9 @@ export default function PauseFunctionButton({
         </Tooltip.Root>
       </Tooltip.Provider>
       <PauseFunctionModal
-        functionID={fn?.id}
+        functionID={fn.id}
         functionName={functionSlug}
-        currentVersion={fn?.current?.version}
+        currentVersion={fn.current?.version}
         previousVersion={prevVersion}
         isPaused={isPaused}
         isOpen={isPauseFunctionModalVisible}

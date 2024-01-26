@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BlankSlate } from '@inngest/components/BlankSlate';
 import { Button } from '@inngest/components/Button';
@@ -73,6 +73,7 @@ const columns = [
 export default function Stream() {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [freezeStream, setFreezeStream] = useState(false);
+  const [showInternalEvents, setShowInternalEvents] = useState(false);
   const [tableScrollTopPosition, setTableScrollTopPosition] = useState(0);
 
   useEffect(() => {
@@ -97,6 +98,7 @@ export default function Stream() {
     const variables = {
       limit: 40, // Page size
       before: tableScrollTopPosition > 0 ? pageParam : null,
+      includeInternalEvents: showInternalEvents,
     };
 
     const data = await client.request(GetTriggersStreamDocument, variables);
@@ -120,9 +122,11 @@ export default function Stream() {
   });
 
   // We must flatten the array of arrays from the useInfiniteQuery hook
-  const triggers = data?.pages.reduce((acc, page) => {
-    return [...acc, ...page];
-  });
+  const triggers = useMemo(() => {
+    return data?.pages.reduce((acc, page) => {
+      return [...acc, ...page];
+    });
+  }, [data?.pages]);
 
   const fetchMoreOnScroll = useCallback(
     (containerRefElement?: HTMLDivElement | null) => {
@@ -209,8 +213,12 @@ export default function Stream() {
     <div className="flex min-h-0 min-w-0 flex-col">
       <div className="flex justify-end gap-1 px-5 py-2">
         <Button
+          label={`${showInternalEvents ? 'Hide' : 'Show'} Internal Events`}
+          btnAction={() => setShowInternalEvents((prev) => !prev)}
+        />
+        <Button
           label={freezeStream ? 'Resume Stream' : 'Freeze Stream'}
-          btnAction={() => setFreezeStream(!freezeStream)}
+          btnAction={() => setFreezeStream((prev) => !prev)}
         />
         <SendEventButton
           label="Test Event"

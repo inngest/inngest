@@ -1,6 +1,6 @@
 import { Badge } from '@inngest/components/Badge/Badge';
 import { Button } from '@inngest/components/Button';
-import { CodeBlock } from '@inngest/components/CodeBlock';
+import { CodeBlock, type CodeBlockAction } from '@inngest/components/CodeBlock';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { FuncCard } from '@inngest/components/FuncCard';
 import { FuncCardFooter } from '@inngest/components/FuncCardFooter';
@@ -10,8 +10,14 @@ import type { Event } from '@inngest/components/types/event';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
 import { shortDate } from '@inngest/components/utils/date';
 
-type BaseProps = {
+type EventProps = {
   event: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>;
+  loading?: false;
+};
+
+type LoadingEvent = {
+  event?: Partial<Event>;
+  loading: true;
 };
 
 type WithRunSelector = {
@@ -23,6 +29,7 @@ type WithRunSelector = {
   SendEventButton?: React.ElementType;
 
   selectedRunID: string | undefined;
+  codeBlockActions?: CodeBlockAction[];
 };
 
 type WithoutRunSelector = {
@@ -31,9 +38,10 @@ type WithoutRunSelector = {
   onReplayEvent?: undefined;
   SendEventButton?: undefined;
   selectedRunID?: undefined;
+  codeBlockActions?: CodeBlockAction[];
 };
 
-type Props = BaseProps & (WithoutRunSelector | WithRunSelector);
+type Props = (EventProps | LoadingEvent) & (WithoutRunSelector | WithRunSelector);
 
 export function EventDetails({
   event,
@@ -42,20 +50,26 @@ export function EventDetails({
   onReplayEvent,
   selectedRunID,
   SendEventButton,
+  codeBlockActions = [],
+  loading = false,
 }: Props) {
-  const prettyPayload = usePrettyJson(event.payload);
+  const prettyPayload = event?.payload && usePrettyJson(event.payload);
 
   return (
     <ContentCard
-      title={event.name || 'unknown'}
+      title={event?.name || 'unknown'}
       type="event"
       metadata={
         <div className="pt-8">
           <MetadataGrid
             metadataItems={[
-              { label: 'Event ID', value: event.id, size: 'large', type: 'code' },
-              { label: 'Received At', value: shortDate(event.receivedAt) },
+              { label: 'Event ID', value: event?.id || '', size: 'large', type: 'code' },
+              {
+                label: 'Received At',
+                value: (event?.receivedAt && shortDate(event.receivedAt)) || '',
+              },
             ]}
+            loading={loading}
           />
         </div>
       }
@@ -72,9 +86,14 @@ export function EventDetails({
       }
       active
     >
-      <div className="px-5 pt-4">
-        <CodeBlock tabs={[{ label: 'Payload', content: prettyPayload ?? 'Unknown' }]} />
-      </div>
+      {!loading && (
+        <div className="px-5 pt-4">
+          <CodeBlock
+            tabs={[{ label: 'Payload', content: prettyPayload ?? 'Unknown' }]}
+            actions={codeBlockActions}
+          />
+        </div>
+      )}
 
       {functionRuns && onFunctionRunClick && (
         <>

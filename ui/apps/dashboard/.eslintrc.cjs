@@ -7,6 +7,9 @@ module.exports = {
   plugins: ['@typescript-eslint'],
   root: true,
   rules: {
+    '@typescript-eslint/no-unnecessary-condition': 'error',
     '@typescript-eslint/no-unnecessary-type-assertion': 'error',
+    '@typescript-eslint/no-unused-vars': 'error',
   },
+  ignorePatterns: ['src/gql/*.ts'],
 };

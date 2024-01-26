@@ -7,7 +7,7 @@ import { ArrowTopRightOnSquareIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 
 import cn from '@/utils/cn';
-import { WEBSITE_CONTACT_URL, WEBSITE_PRICING_URL } from '@/utils/urls';
+import { WEBSITE_PRICING_URL } from '@/utils/urls';
 import BillingPlanOption, { type ChangePlanArgs } from './BillingPlanOption';
 import CheckoutModal, { type CheckoutItem } from './CheckoutModal';
 import ConfirmPlanChangeModal from './ConfirmPlanChangeModal';
@@ -71,7 +71,7 @@ export default function BillingPlanSelector({
               <div className="my-1 border-l border-slate-200 px-6">
                 <p className="mb-6 text-sm text-slate-500">
                   Additional function steps are billed at the rate of{' '}
-                  <strong>${plan.additionalSteps?.cost / 100}</strong> per{' '}
+                  <strong>${plan.additionalSteps.cost / 100}</strong> per{' '}
                   <strong>{plan.additionalSteps.quantity}</strong> on the first of every month.
                 </p>
               </div>

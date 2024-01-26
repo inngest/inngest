@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 
 import cn from '@/utils/cn';
@@ -6,6 +6,7 @@ import cn from '@/utils/cn';
 interface ModalProps {
   children?: React.ReactNode;
   backdropClassName?: string;
+  containerClassName?: string;
   className?: string;
   isOpen: boolean;
   onClose: () => void;
@@ -15,6 +16,7 @@ export default function Modal({
   children,
   className = '',
   backdropClassName = '',
+  containerClassName = '',
   isOpen,
   onClose,
 }: ModalProps) {
@@ -32,13 +34,18 @@ export default function Modal({
         >
           {/* The backdrop, rendered as a fixed sibling to the panel container */}
           <div
-            className={cn('fixed inset-0 z-50 bg-black/50 transition-opacity', backdropClassName)}
+            className={cn(
+              'fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] transition-opacity',
+              backdropClassName
+            )}
             aria-hidden="true"
           />
         </Transition.Child>
         {/* Full-screen container to center the panel */}
         <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-6">
+          <div
+            className={cn('flex min-h-full items-center justify-center p-6', containerClassName)}
+          >
             <Transition.Child
               as={Fragment}
               enter="ease-out duration-300"

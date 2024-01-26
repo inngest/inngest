@@ -34,7 +34,7 @@ var (
 )
 
 var (
-	buffer = 2 * time.Second
+	buffer = 1 * time.Second
 	// scripts stores all embedded lua scripts on initialization
 	scripts = map[string]*rueidis.Lua{}
 	include = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
@@ -72,6 +72,8 @@ type DebounceItem struct {
 	EventID ulid.ULID `json:"eID"`
 	// Event represents the event data which triggers the function.
 	Event event.Event `json:"e"`
+	// Timeout is the timeout for the debounce, in unix milliseconds.
+	Timeout int64 `json:"t,omitempty"`
 }
 
 func (d DebounceItem) QueuePayload() DebouncePayload {
@@ -89,6 +91,10 @@ func (d DebounceItem) GetInternalID() ulid.ULID {
 
 func (d DebounceItem) GetEvent() event.Event {
 	return d.Event
+}
+
+func (d DebounceItem) GetWorkspaceID() uuid.UUID {
+	return d.WorkspaceID
 }
 
 // DebouncePayload represents the data stored within the queue's payload.
@@ -188,11 +194,16 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 	// A debounce must already exist for this fn.  Update it.
 	err = d.updateDebounce(ctx, di, fn, ttl, *debounceID)
 	if err == context.DeadlineExceeded || err == ErrDebounceInProgress {
-		if n == 4 {
+		if n == 5 {
 			// Only recurse 5 times.
 			return fmt.Errorf("unable to update debounce: %w", err)
 		}
 		// Re-invoke this to see if we need to extend the debounce or continue.
+		// Wait 50 milliseconds for the current lock and job to have evaluated.
+		//
+		// TODO: Instead of this, make debounce creation and updating atomic within the queue.
+		// This needs to modify queue items and partitions directly.
+		<-time.After(50 * time.Millisecond)
 		return d.debounce(ctx, di, fn, ttl, n+1)
 	}
 
@@ -223,6 +234,11 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 	key, err := d.debounceKey(ctx, di, fn)
 	if err != nil {
 		return nil, err
+	}
+
+	// Ensure we set the debounce's max lifetime.
+	if timeout := fn.Debounce.TimeoutDuration(); timeout != nil {
+		di.Timeout = time.Now().Add(*timeout).UnixMilli()
 	}
 
 	keyPtr := d.k.DebouncePointer(ctx, fn.ID, key)
@@ -301,18 +317,29 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 			strconv.Itoa(int(ttl.Seconds())),
 			redis_state.HashID(ctx, debounceID.String()),
 			strconv.Itoa(int(time.Now().UnixMilli())),
+			strconv.Itoa(int(di.Event.Timestamp)),
 		},
 	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error creating debounce: %w", err)
 	}
 	switch out {
-	case 0:
+	case -1:
+		// The debounce is in progress or has just finished.  Requeue.
+		return ErrDebounceInProgress
+	case -2:
+		// The event is out-of-order and a newer event exists within the debounce.
+		// Do nothing.
+		return nil
+	default:
+		// Debounces should have a maximum timeout;  updating the debounce returns
+		// the timeout to use.
+		actualTTL := time.Second * time.Duration(out)
 		err = d.q.RequeueByJobID(
 			ctx,
 			fn.ID.String(),
 			debounceID.String(),
-			now.Add(ttl).Add(buffer).Add(time.Second),
+			now.Add(actualTTL).Add(buffer).Add(time.Second),
 		)
 		if err == redis_state.ErrQueueItemAlreadyLeased {
 			// This is in progress.
@@ -322,11 +349,6 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 			return fmt.Errorf("error requeueing debounce job '%s': %w", debounceID, err)
 		}
 		return nil
-	case -1:
-		// The debounce is in progress or has just finished.  Requeue.
-		return ErrDebounceInProgress
-	default:
-		return fmt.Errorf("unknown update debounce return value: %d", out)
 	}
 }
 

@@ -1,26 +1,38 @@
 import { RocketLaunchIcon } from '@heroicons/react/20/solid';
+import { Link } from '@inngest/components/Link';
 
+import { Banner } from '@/components/Banner';
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import Header from '@/components/Header/Header';
 import DeployButton from './DeployButton';
 import DeployList from './DeployList';
 
 type DeploysLayoutProps = {
   children: React.ReactNode;
-  params: {
-    environmentSlug: string;
-  };
 };
 
-export default async function DeploysLayout({ children, params }: DeploysLayoutProps) {
+export default async function DeploysLayout({ children }: DeploysLayoutProps) {
+  const isAppsEnabled = await getBooleanFlag('apps-page');
   return (
     <>
       <Header
         title="Deploys"
         icon={<RocketLaunchIcon className="h-3.5 w-3.5 text-white" />}
-        action={<DeployButton environmentSlug={params.environmentSlug} />}
+        action={<DeployButton />}
       />
+      {isAppsEnabled && (
+        <Banner kind="error">
+          <p className="pr-2 text-red-800">
+            The deploys page is getting deprecated. We&apos;ve moved all this information and
+            functionality over to the <b>Apps</b> tab.
+          </p>
+          <Link internalNavigation={false} href="https://www.inngest.com/docs/apps/cloud">
+            Learn More
+          </Link>
+        </Banner>
+      )}
       <div className="flex flex-grow overflow-hidden bg-slate-50">
-        <DeployList environmentSlug={params.environmentSlug} />
+        <DeployList />
         {children}
       </div>
     </>
