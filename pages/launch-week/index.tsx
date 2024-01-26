@@ -135,7 +135,7 @@ export default function LaunchWeek() {
           label="New"
           buttonHref="/blog/improved-error-handling"
           docsHref="/docs/guides/error-handling"
-          orientation="left"
+          orientation="right"
         />
 
         <Heading title="Friday" />
@@ -145,7 +145,7 @@ export default function LaunchWeek() {
           image="/assets/blog/edge-event-api-beta/featured-image.png"
           label="Beta Release"
           buttonHref="/blog/edge-event-api-beta"
-          orientation="right"
+          orientation="left"
         />
         <RowItem
           title="Launch week recap"
@@ -153,7 +153,7 @@ export default function LaunchWeek() {
           image="/assets/launch-week/og.png"
           label="Recap"
           buttonHref="/blog/launch-week-recap"
-          orientation="left"
+          orientation="right"
         />
       </Container>
 
