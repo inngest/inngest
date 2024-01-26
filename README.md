@@ -28,7 +28,7 @@
 
 Build and ship durable functions and workflows **in your current codebase** without any additional infrastructure. Using Inngest, your entire team can ship reliable products.
 
-- Write durable functions in your existing codebase using an **Inngest SDK**
+- Write durable functions in your existing codebase using an [**Inngest SDK**](#sdks)
 - Run the open source [**Inngest Dev Server**](#the-inngest-dev-server) for a complete local development experience, with production parity.
 - The **Inngest Platform** invokes your code wherever you host it, via HTTPS. Deploy to your existing setup, and deliver products faster without managing infrastructure.
 
@@ -37,6 +37,7 @@ Build and ship durable functions and workflows **in your current codebase** with
 ---
 
 - [Overview](#overview)
+- [SDKs](#sdks)
 - [Quick Start](#quick-start)
 - [Project Architecture](#project-architecture)
 - [Community](#community)
@@ -57,60 +58,58 @@ npx inngest-cli@latest dev
 
 Inngest makes it easy to develop durable functions and workflows in your existing codebase, without any new infrastructure. Inngest Functions are triggered via events &mdash; decoupling your code within your application.
 
-1. You define your Inngest functions using the [Inngest SDK](https://github.com/inngest/inngest-js) and serve them through a [simple API endpoint](https://www.inngest.com/docs/sdk/serve?ref=github-inngest-readme).
+1. You define your Inngest functions using the [Inngest SDK](#sdks) and serve them through a [simple API endpoint](https://www.inngest.com/docs/sdk/serve?ref=github-inngest-readme).
 2. Inngest automatically invokes your functions via HTTPS whenever you send events from your application.
 
 Inngest abstracts the complex parts of building a robust, reliable, and scalable architecture away from you, so you can focus on building applications for your users.
 
 - **Run your code anywhere** - We call you via HTTPS so you can deploy your code to serverless, servers or the edge.
 - **Zero-infrastructure required** - No queues or workers to configure or manage &mdash; just write code and Inngest does the rest.
-- **Build complex workflows with simple primitives** - Our [#SDKs] provides easy to learn `step` tools like [`run`](https://www.inngest.com/docs/reference/functions/step-run?ref=github-inngest-readme), [`sleep`](https://www.inngest.com/docs/reference/functions/step-sleep?ref=github-inngest-readme), [`sleepUntil`](https://www.inngest.com/docs/reference/functions/step-sleep-until?ref=github-inngest-readme), and [`waitForEvent`](https://www.inngest.com/docs/reference/functions/step-wait-for-event?ref=github-inngest-readme) that you can combine using code and patterns that you're used to create complex and robust workflows.
+- **Build complex workflows with simple primitives** - Our [SDKs](#sdks) provides easy to learn `step` tools like [`run`](https://www.inngest.com/docs/reference/functions/step-run?ref=github-inngest-readme), [`sleep`](https://www.inngest.com/docs/reference/functions/step-sleep?ref=github-inngest-readme), [`sleepUntil`](https://www.inngest.com/docs/reference/functions/step-sleep-until?ref=github-inngest-readme), and [`waitForEvent`](https://www.inngest.com/docs/reference/functions/step-wait-for-event?ref=github-inngest-readme) that you can combine using code and patterns that you're used to create complex and robust workflows.
 
 [Read more about our vision and why Inngest exists](https://www.inngest.com/blog/inngest-add-super-powers-to-serverless-functions)
 
+---
+
 ## SDKs
 
-- [**TypeScript / JavaScript**](https://github.com/inngest/inngest-js)
-  [![inngest on npm](https://img.shields.io/npm/v/inngest)](https://www.npmjs.com/package/inngest) - [Reference](https://www.inngest.com/docs/reference/typescript)
-- [**Python**](https://github.com/inngest/inngest-py) - [Reference](https://www.inngest.com/docs/reference/python)
-- [**Go**](https://github.com/inngest/inngestgo) - [Reference](https://pkg.go.dev/github.com/inngest/inngestgo)
+- **TypeScript / JavaScript** ([inngest-js](<(https://github.com/inngest/inngest-js)>)) - [Reference](https://www.inngest.com/docs/reference/typescript)
+- **Python** ([inngest-py](https://github.com/inngest/inngest-py)) - [Reference](https://www.inngest.com/docs/reference/python)
+- **Go** ([inngestgo](https://github.com/inngest/inngestgo)) - [Reference](https://pkg.go.dev/github.com/inngest/inngestgo)
 
-<br />
+## Getting started
 
-## Quick Start
+👉 [**Read the full quick start guide here**](https://www.inngest.com/docs/quick-start?ref=github-inngest-readme)
 
-👉 [Read the full quick start guide here](https://www.inngest.com/docs/quick-start?ref=github-inngest-readme)
+### A brief example
 
-1. [NPM install our SDK for your typescript project](https://github.com/inngest/inngest-js): `npm install inngest`
-2. Run the Inngest dev server: `npx inngest-cli@latest dev` (This repo's CLI)
-3. [Integrate Inngest with your framework in one line](https://www.inngest.com/docs/sdk/serve?ref=github-inngest-readme) via the `serve()` handler
-4. [Write and run functions in your existing framework or project](https://www.inngest.com/docs/functions?ref=github-inngest-readme)
-
-Here's an example:
+Here is an example of an Inngest function that sends a welcome email when a user signs up to an application. The function sleeps for 4 days and sends a second product tips email:
 
 ```ts
 import { Inngest } from 'inngest';
 
 const inngest = new Inngest({ id: 'my-app' });
 
-// This function will be invoked by Inngest via HTTP any time the "app/user.signup"
-// event is sent to to Inngest
+// This function will be invoked by Inngest via HTTP any time
+// the "app/user.signup" event is sent to to Inngest
 export default inngest.createFunction(
-  { name: 'User onboarding communication' },
+  { id: 'user-onboarding-emails' },
   { event: 'app/user.signup' },
   async ({ event, step }) => {
-    await step.run('Send welcome email', async () => {
-      await sendEmail({
-        email: event.data.email,
-        template: 'welcome',
-      });
+    await step.run('send-welcome-email', async () => {
+      await sendEmail({ email: event.data.email, template: 'welcome' });
+    });
+
+    await step.sleep('delay-follow-up-email', '7 days');
+
+    await step.run('send-tips-email', async () => {
+      await sendEmail({ email: event.data.email, template: 'product-tips' });
     });
   }
 );
 
 // Elsewhere in your code (e.g. in your sign up handler):
-
-inngest.send({
+await inngest.send({
   name: 'app/user.signup',
   data: {
     email: 'test@example.com',
@@ -118,7 +117,15 @@ inngest.send({
 });
 ```
 
-That's it - your function is set up!
+Some things to highlight about the above code:
+
+- Code within each `step.run` is automatically retried on error.
+- Each `step.run` is individually executed via HTTPS ensuring errors do not result in lost work from previous steps.
+- State from previous steps is memoized so code within steps is not re-executed on retries.
+- Functions can `sleep` for hours, days or months. Inngest stops execution and continues at the exactly the right time.
+- Events can trigger one or more functions via [fan-out](https://www.inngest.com/docs/guides/fan-out-jobs)
+
+Learn more about writing Inngest functions in [our documentation](https://www.inngest.com/docs).
 
 <br />
 
