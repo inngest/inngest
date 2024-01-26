@@ -70,7 +70,8 @@ Inngest abstracts the complex parts of building a robust, reliable, and scalable
 
 ## SDKs
 
-- [**TypeScript / JavaScript**](https://github.com/inngest/inngest-js) - [Reference](https://www.inngest.com/docs/reference/typescript)
+- [**TypeScript / JavaScript**](https://github.com/inngest/inngest-js)
+  [![inngest on npm](https://img.shields.io/npm/v/inngest)](https://www.npmjs.com/package/inngest) - [Reference](https://www.inngest.com/docs/reference/typescript)
 - [**Python**](https://github.com/inngest/inngest-py) - [Reference](https://www.inngest.com/docs/reference/python)
 - [**Go**](https://github.com/inngest/inngestgo) - [Reference](https://pkg.go.dev/github.com/inngest/inngestgo)
 
