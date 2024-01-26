@@ -40,7 +40,7 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto h-full w-full max-w-[1200px] py-4">
+      <div className="mx-auto w-full max-w-[1200px] py-4">
         {appRes.data.latestSync?.error && (
           <SyncErrorCard className="mb-4" error={appRes.data.latestSync.error} />
         )}
