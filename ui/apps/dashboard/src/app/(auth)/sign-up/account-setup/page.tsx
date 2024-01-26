@@ -13,7 +13,7 @@ export default function AccountSetupPage() {
   const secondsElapsed = useSecondsElapsed();
   const { user } = useUser();
 
-  const isAccountSetup = user && user.externalId;
+  const isAccountSetup = user && user.externalId && user.publicMetadata.accountID;
 
   // Reload the user until the account is set up
   useEffect(() => {
@@ -28,12 +28,17 @@ export default function AccountSetupPage() {
     };
   }, [isAccountSetup, user]);
 
-  if (isAccountSetup) {
-    // We replace so that the user doesn't get stuck on this page if they hit the back button
-    router.replace(process.env.NEXT_PUBLIC_HOME_PATH as Route);
-  }
+  // Redirect to the home page once the account is set up
+  useEffect(() => {
+    if (!isAccountSetup) return;
 
-  if (secondsElapsed === 10) {
+    // We use `replace` so that the user doesn't get redirected back to this page if they click the back button
+    router.replace(process.env.NEXT_PUBLIC_HOME_PATH as Route);
+  }, [isAccountSetup, router]);
+
+  useEffect(() => {
+    if (secondsElapsed !== 10) return;
+
     window.inngest.send({
       name: 'app/account.setup.delayed',
       data: {
@@ -43,7 +48,7 @@ export default function AccountSetupPage() {
       user,
       v: '2023-08-31.1',
     });
-  }
+  }, [secondsElapsed, user]);
 
   if (secondsElapsed > 30) {
     return (

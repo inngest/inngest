@@ -1,6 +1,5 @@
 'use client';
 
-import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { SlideOver } from '@inngest/components/SlideOver';
 import { useQuery } from 'urql';

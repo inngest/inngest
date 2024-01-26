@@ -3,7 +3,7 @@ import { Client, useQuery, type UseQueryResponse } from 'urql';
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import { graphql } from '@/gql';
-import type { GetFunctionQuery, WorkflowVersion } from '@/gql/graphql';
+import type { GetFunctionQuery } from '@/gql/graphql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const GetFunctionsUsageDocument = graphql(`

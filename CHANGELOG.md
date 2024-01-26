@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.24.0] - 2024-01-25
+
+### Added
+- Added support for per-step errors
+- Added support for StepRun opcode
+
 ## [v0.24.0] - 2024-01-17
 
 ### Added

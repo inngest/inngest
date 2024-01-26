@@ -1,6 +1,6 @@
 'use client';
 
-import { useContext, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import {
   Tooltip,
