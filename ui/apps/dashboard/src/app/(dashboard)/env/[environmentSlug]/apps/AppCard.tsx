@@ -38,9 +38,11 @@ type Sync = {
   url: string | null;
 };
 
-const cardWrapperStyles =
-  'flex h-56 w-full min-w-[800px] max-w-[1200px] overflow-hidden rounded-lg border border-slate-300 bg-white';
-const cardLeftPanelStyles = 'bg-slate-910 flex w-[410px] flex-col justify-center gap-2 px-10';
+export const cardWrapperStyles =
+  'md:flex w-full lg:min-w-[800px] max-w-[1200px] overflow-hidden rounded-lg border border-slate-300 bg-white';
+const cardLeftPanelStyles =
+  'h-36 md:h-56 bg-slate-910 flex md:w-[410px] flex-col justify-center gap-2 px-10';
+const cardRightPanelStyles = 'h-56 flex flex-col justify-center px-8';
 
 export function AppCard({ app, className, envSlug, isArchived }: Props) {
   const latestSyncURL = app.latestSync?.url?.replace(/^https:\/\//, '').replace(/\?.+$/, '');
@@ -53,29 +55,28 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
             href={`/env/${envSlug}/apps/${encodeURIComponent(app.externalID)}`}
           >
             {isArchived && <ArchiveBoxArrowDownIcon className="h-4 w-4" />}
-            {app.name}
+            <span className="truncate" title={app.name}>
+              {app.name}
+            </span>
             <ChevronRightIcon className="h-4 w-4" />
           </Link>
         </h2>
         {latestSyncURL && (
           <dl>
             <dt className="hidden">URL</dt>
-            <dd
-              className="overflow-hidden text-ellipsis whitespace-nowrap text-slate-400"
-              title={app.latestSync?.url || ''}
-            >
+            <dd className="truncate text-slate-400" title={app.latestSync?.url || ''}>
               {latestSyncURL}
             </dd>
           </dl>
         )}
       </div>
-      <div className="flex flex-1 flex-col">
+      <div className="flex h-56 flex-1 flex-col">
         {app.latestSync?.error && (
           <div className="bg-red-100 px-8 py-2 text-red-800">{app.latestSync.error}</div>
         )}
 
-        <div className="flex flex-1 items-center px-8">
-          <dl className="grid grow grid-cols-2 gap-4 md:grid-cols-3">
+        <div className={classNames(cardRightPanelStyles, 'h-full')}>
+          <dl className="grid grid-cols-2 gap-4 min-[900px]:grid-cols-3">
             {/* Row 1 */}
             <Description
               className="col-span-2"
@@ -137,10 +138,10 @@ export function EmptyAppCard({
 }) {
   return (
     <div className={classNames(cardWrapperStyles, className)}>
-      <div className={classNames(cardLeftPanelStyles, 'overflow-hidden')}>
-        <Image src={AppDiagramImage} alt="App diagram" />
+      <div className={classNames(cardLeftPanelStyles, 'items-center overflow-hidden')}>
+        <Image src={AppDiagramImage} alt="App diagram" className="object-none md:object-fill" />
       </div>
-      <div className="flex flex-1 flex-col justify-center px-8">
+      <div className={classNames(cardRightPanelStyles, 'flex-1')}>
         <p>
           When you serve your functions using our serve API handler, you are hosting a new Inngest
           app.{' '}
@@ -149,7 +150,7 @@ export function EmptyAppCard({
           </span>{' '}
           Syncing is easy!
         </p>
-        <ol className="mt-3 hidden flex-col gap-3 md:flex">
+        <ol className="mt-3 flex flex-col gap-3">
           <li className="flex items-center gap-2">
             <span className="h-6 w-6 rounded-full bg-slate-400 text-center text-white">1</span>
             <span className="flex-1">Deploy your code to your hosted platform of choice.</span>
@@ -169,7 +170,7 @@ export function SkeletonCard() {
   return (
     <div className={cardWrapperStyles}>
       <div className={cardLeftPanelStyles} />
-      <div className="flex flex-1 flex-col justify-center px-8">
+      <div className={classNames(cardRightPanelStyles, 'flex-1')}>
         <Skeleton className="mb-2 block h-8 w-full" />
         <Skeleton className="mb-2 block h-8 w-full" />
         <Skeleton className="mb-2 block h-8 w-full" />
