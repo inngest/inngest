@@ -47,8 +47,8 @@ export function PlatformInfo({ platform }: Props) {
 
   return (
     <span className="flex items-center">
-      {Icon && <Icon className="mr-1 text-slate-500" size={20} />}
-      <span>{text}</span>
+      {Icon && <Icon className="mr-1 shrink-0 text-slate-500" size={20} />}
+      <span className="truncate">{text}</span>
     </span>
   );
 }

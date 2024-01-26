@@ -44,11 +44,7 @@ export function PlatformSection({ sync }: Props) {
 
   return (
     <>
-      <Description
-        className="truncate"
-        detail={<PlatformInfo platform={platform} />}
-        term="Platform"
-      />
+      <Description detail={<PlatformInfo platform={platform} />} term="Platform" />
       <Description detail={projectValue} term="Vercel Project" />
       <Description detail={deploymentValue} term="Vercel Deployment" />
     </>
