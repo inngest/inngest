@@ -990,11 +990,11 @@ The process of memoizing Step results is receiving data or errors that the Innge
 
 ### 5.2.1. Finding memoized Step data
 
-When a Call Request is made to an SDK, it can contain memoized data from previously-run Steps in the `steps` object passed, which is an object where the keys are hashed Step IDs and the value is either `null` or an object with either a `data` key representing success and the returned data, or an `error` key representing a failed step.
+When a Call Request is made to an SDK, it can contain memoized data from previously-run Steps in the `steps` object passed, which is an object where the keys are hashed Step IDs and the value memoized data that changes shape based on the op code being used.
 
-If an object with a `data` key is found, its value will be the result of that particular Step type [5.3], serialized as JSON. An SDK SHOULD make a Developer aware of this serialization process, as first-class entities such as class instances may be lost.
+If an object with ONLY a `data` key is found, its value will be the result of that particular Step type [5.3], serialized as JSON. An SDK SHOULD make a Developer aware of this serialization process, as first-class entities such as class instances may be lost.
 
-If an object with an `error` key is found, its value will be the final error returned when attempting to run the Step, in the same error format used for reporting function failures:
+If an object with ONLY an `error` key is found, its value will be the final error returned when attempting to run the Step, in the same error format used for reporting function failures:
 
 ```tsx
 {
@@ -1004,13 +1004,13 @@ If an object with an `error` key is found, its value will be the final error ret
 }
 ```
 
-`null` can also be found depending on the Step type [5.3], where the particular Step type being used indicates its meaning.
+Other values such as `null` can also be found depending on the Step type [5.3], where the particular Step type being used indicates its meaning.
 
 ### 5.2.2. Memoizing a Step
 
-As Steps are found by an SDK during a Call Request, it MUST try to find the `data` or `error` already returned for that Step by matching the hashed Step ID with a key in the `steps` object. If this is found, the SDK MUST either return the relevant `data` to the Developer’s call or return/throw/raise the `error`.
+As Steps are found by an SDK during a Call Request, it MUST try to find either the successful data already returned for that Step or the error that caused it to fail by matching the hashed Step ID with a key in the `steps` object. If this is found, the SDK MUST either return the relevant data to the Developer’s call or return/throw/raise the error.
 
-If an `error` is returned/thrown/raised and the Developer has not either swallowed the error or returned/thrown/raised a new error, the SDK MUST mark the request as non-retriable [4.4.3].
+If an `error` is returned/thrown/raised and the Developer has not either swallowed the error or returned/thrown/raised a new error, the SDK MUST mark the request as non-retriable [4.4.3]. When this error is being serialized to be sent back to an Inngest Server, it SHOULD be the original serialized error that was returned/thrown/raised.
 
 If a Step’s hash is present in the `steps` object passed in the Call Request, it MUST NOT be reported when responding to that Call Request; only new Steps without a memoized `data` or `error` can be reported.
 
@@ -1034,18 +1034,15 @@ The Run Step is the simplest Step type. The Developer specifies a block of code 
 
 This Step type encapsulates multiple “op codes”, used by both the SDK and the Inngest Server to express the intent and status of the Run Step.
 
-When finding the Step, an SDK can choose to either always report the Step [5.1] or to immediately execute it. Immediate execution MUST only be allowed if `ctx.disable_immediate_execution` is `false` in the Call Request body, the query string parameter `stepId` is NOT `"step"` in the Call Request, and the SDK only found a single Step to report which is a Run Step.
+When finding the Step, an SDK can choose to either always report the Step [5.1] or to immediately execute it. Immediate execution MUST only be allowed if `ctx.disable_immediate_execution` is `false` in the Call Request body, the query string parameter `stepId` is `"step"` in the Call Request, and the SDK only found a single Step to report which is a Run Step.
 
 If these conditions are satisfied, an SDK can either run the Developer’s code within the same Call Request and then return a `Step` operation.
 
 ```tsx
 {
 	id: string;
-	op: "Step";
-	data: {
-		// the serialized JSON returned from the Developer's code
-		data: any;
-	};
+	op: "StepRun";
+	data: any; // the serialized JSON returned from the Developer's code.
 	displayName?: string;
 }
 ```
@@ -1060,32 +1057,17 @@ Or the SDK can choose to first *plan* the Step by returning a `StepPlanned` oper
 }
 ```
 
-Note that if returning a `"Step"` operation, `data.data` MUST be a nested object. For example, if the Developer’s code returns `true`, the reported Step would be:
-
-```tsx
-{
-	id: "[some_hash]";
-	op: "Step";
-	data: {
-		data: true;
-	};
-}
-```
-
 If an SDK sends a `"StepPlanned"` operation, the Inngest Server will send a separate Call Request to run the Developer’s code represented within this Step. To do this, the Inngest Server will send a `stepId` query string parameter, which is the hashed ID of the Step to run.
 
-If this parameter is present and NOT `"step"`, the SDK MUST NOT immediately execute or report any other Steps, and instead MUST search for the Step to be run while memoizing previous Steps.
+If this query parameter is present and NOT `"step"`, the SDK MUST NOT immediately execute or report any other Steps, and instead MUST search for the Step to be run while memoizing previous Steps.
 
-If this Step is found, the SDK MUST run the Developer’s code represented by this Step and return either the resulting serialized JSON in the `data.data` key:
+If this Step is found, the SDK MUST run the Developer’s code represented by this Step and return either the resulting serialized JSON in the `data` key:
 
 ```tsx
 {
 	id: string;
-	op: "Step";
-	data: {
-		// the serialized JSON returned from the Developer's code
-		data: any;
-	};
+	op: "StepRun";
+	data: any; // the serialized JSON returned from the Developer's code
 	displayName?: string;
 }
 ```
@@ -1114,7 +1096,7 @@ It is possible that the Step could not be found due to the underlying code chang
 }
 ```
 
-The memoized result of the Step will be either a `{ data }` or an `{ error }` object, depending on what was passed by the SDK.
+The memoized result of the Step will be either a `{ data }` or an `{ error }` object, depending on if the Step succeeded or failed.
 
 ### 5.3.2. Sleep
 
@@ -1175,7 +1157,7 @@ An Invocation Step informs the Inngest Server that the Run wishes to trigger ano
 }
 ```
 
-When the invoked Function has run to completion and returned a value, the Inngest Server will memoize the Step with either a `{ data }` or an `{ error }` object depending on whether the invoked Function succeeded.
+When the invoked Function has run to completion and returned a value, the Inngest Server will memoize the Step with either a `{ data }` or an `{ error }` object depending on whether the invoked Function succeeded or failed.
 
 ## 5.4. Recovery and the stack
 
