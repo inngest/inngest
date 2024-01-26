@@ -1,10 +1,4 @@
-export default function ClockIcon({
-  size = 14,
-  className = '',
-}: {
-  size?: number;
-  className?: string;
-}) {
+export default function ClockIcon({ className = '' }: { size?: number; className?: string }) {
   return (
     <svg width="14" height="14" xmlns="http://www.w3.org/2000/svg" className={className}>
       <path

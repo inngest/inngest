@@ -4,7 +4,6 @@ import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getEnvironment } from '@/queries/server-only/getEnvironment';
-import { relativeTime, weekDayAndUTCTime } from '@/utils/date';
 import EventPayload from './EventPayload';
 import TriggeredFunctionCard from './TriggeredFunctionCard';
 

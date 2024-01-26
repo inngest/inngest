@@ -110,7 +110,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
   ]);
   const environment = useEnvironment();
 
-  const { data, isLoading, error } = useSkippableGraphQLQuery({
+  const { data, isLoading } = useSkippableGraphQLQuery({
     query: GetFunctionEndedRunsCountDocument,
     variables: {
       environmentID: environment.id,

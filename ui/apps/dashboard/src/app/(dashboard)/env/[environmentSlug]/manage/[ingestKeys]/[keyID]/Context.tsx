@@ -16,7 +16,7 @@ type IngestKeyContext = {
 };
 
 export const Context = createContext<IngestKeyContext>({
-  save: async (s: PartialIngestKey) => {
+  save: async () => {
     console.log('warning: must use provider');
     return { error: undefined };
   },

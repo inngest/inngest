@@ -1,5 +1,3 @@
-import Link from 'next/link';
-
 import cn from '@/utils/cn';
 
 const kindStyles = {

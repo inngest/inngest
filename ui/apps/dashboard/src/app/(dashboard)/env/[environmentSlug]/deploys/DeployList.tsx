@@ -34,7 +34,7 @@ export default function DeployList() {
 
   return (
     <ul className="h-full w-96 shrink-0 divide-y divide-slate-100 overflow-y-scroll bg-white shadow">
-      {deploys.map((deploy, index) => {
+      {deploys.map((deploy) => {
         const isSelected = deploy.id === selectedId;
 
         return (

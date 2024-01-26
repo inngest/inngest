@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArchiveBoxIcon, PlayIcon } from '@heroicons/react/20/solid';
+import { ArchiveBoxIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { toast } from 'sonner';

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Switch } from '@headlessui/react';
 import ArrowPathIcon from '@heroicons/react/20/solid/ArrowPathIcon';
 import { Button } from '@inngest/components/Button';

@@ -6,7 +6,7 @@ import { useMutation } from 'urql';
 
 import AppLink from '@/components/AppLink';
 import { graphql } from '@/gql';
-import { type AwsMarketplaceSetupInput, type MakeMaybe } from '@/gql/graphql';
+import { type AwsMarketplaceSetupInput } from '@/gql/graphql';
 import AWSLogo from '@/icons/aws-logo.svg';
 import ApprovalDialog from '../ApprovalDialog';
 

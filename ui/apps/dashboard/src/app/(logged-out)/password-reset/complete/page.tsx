@@ -3,7 +3,7 @@
 import * as process from 'process';
 import { useState } from 'react';
 import { type Route } from 'next';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 
@@ -16,7 +16,6 @@ const minPasswordLength = 8;
 
 export default function PasswordResetComplete() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const [isLoading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<boolean>(false);
