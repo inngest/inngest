@@ -24,7 +24,7 @@ export function PlatformSection({ sync }: Props) {
   if (vercelDeploymentID && vercelDeploymentURL) {
     deploymentValue = (
       <Link href={vercelDeploymentURL as Route} internalNavigation={false}>
-        <span className="flex-1 truncate">{vercelDeploymentID}</span>
+        <span className="truncate">{vercelDeploymentID}</span>
       </Link>
     );
   } else {
@@ -35,7 +35,7 @@ export function PlatformSection({ sync }: Props) {
   if (vercelProjectID && vercelProjectURL) {
     projectValue = (
       <Link href={vercelProjectURL as Route} internalNavigation={false}>
-        <span className="flex-1 truncate">{vercelProjectID}</span>
+        <span className="truncate">{vercelProjectID}</span>
       </Link>
     );
   } else {
