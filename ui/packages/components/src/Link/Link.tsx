@@ -52,7 +52,7 @@ export function Link({
         href={href}
       >
         {children}
-        {showIcon && <IconArrowTopRightOnSquare />}
+        {showIcon && <IconArrowTopRightOnSquare className="h-4 w-4 shrink-0" />}
       </a>
     );
   }
