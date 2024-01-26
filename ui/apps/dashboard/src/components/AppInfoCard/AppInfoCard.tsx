@@ -150,8 +150,8 @@ function Description({
   return (
     <div className={className}>
       <dt className="pb-2 text-sm text-slate-400">{term}</dt>
-      {!loading && <dd className="text-slate-800">{detail}</dd>}
-      {loading && <Skeleton className="mb-3.5 block h-6 w-full" />}
+      {!loading && <dd className="leading-8 text-slate-800">{detail}</dd>}
+      {loading && <Skeleton className="mb-2 block h-6 w-full" />}
     </div>
   );
 }
