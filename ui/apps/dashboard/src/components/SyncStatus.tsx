@@ -34,9 +34,10 @@ const syncStatusIconColor = {
 
 type Props = {
   status: string;
+  iconOnly?: boolean;
 };
 
-export function SyncStatus({ status }: Props) {
+export function SyncStatus({ status, iconOnly = false }: Props) {
   let Icon;
   let text: string;
   let color: string;
@@ -57,11 +58,12 @@ export function SyncStatus({ status }: Props) {
     <div
       className={classNames(
         color,
-        'flex h-8 w-fit items-center gap-2 whitespace-nowrap rounded-full border px-3'
+        iconOnly ? 'px-1.5' : 'px-3',
+        'flex h-8 w-fit items-center gap-2 whitespace-nowrap rounded-full border'
       )}
     >
-      <Icon className={classNames(iconColor, 'h-4 w-4')} />
-      {text}
+      <Icon className={classNames(iconColor, 'h-4 w-4')} title={text} />
+      {!iconOnly && text}
     </div>
   );
 }
