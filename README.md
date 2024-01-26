@@ -38,7 +38,7 @@ Build and ship durable functions and workflows **in your current codebase** with
 
 - [Overview](#overview)
 - [SDKs](#sdks)
-- [Quick Start](#quick-start)
+- [Getting started](#getting-started)
 - [Project Architecture](#project-architecture)
 - [Community](#community)
 
