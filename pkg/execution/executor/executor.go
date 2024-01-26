@@ -1277,40 +1277,45 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, resp *state.Driv
 		}
 	}
 
-	// Ensure that we process waitForEvents first, as these are highest priority.
-	isParallel := len(resp.Generator) > 1
-	groups := opGroups(resp.Generator)
+	groups := opGroups(resp.Generator).All()
 	for _, group := range groups {
-		eg := errgroup.Group{}
-		for _, op := range group {
-			if op == nil {
-				// This is clearly an error.
-				if e.log != nil {
-					e.log.Error().Err(fmt.Errorf("nil generator returned")).Msg("error handling generator")
-				}
-				continue
-			}
-			copied := *op
-
-			newItem := item
-			if isParallel {
-				// Give each opcode its own group ID, since we want to track each
-				// parellel step individually.
-				newItem.GroupID = uuid.New().String()
-			}
-
-			eg.Go(func() error { return e.HandleGenerator(ctx, copied, newItem) })
-		}
-		err = eg.Wait()
-		if err := eg.Wait(); err != nil {
-			if resp.NoRetry {
-				return queue.NeverRetryError(err)
-			}
-			if resp.RetryAt != nil {
-				return queue.RetryAtError(err, resp.RetryAt)
-			}
+		if err := e.handleGeneratorGroup(ctx, group, resp, item); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (e *executor) handleGeneratorGroup(ctx context.Context, group OpcodeGroup, resp *state.DriverResponse, item queue.Item) error {
+	eg := errgroup.Group{}
+	for _, op := range group.Opcodes {
+		if op == nil {
+			// This is clearly an error.
+			if e.log != nil {
+				e.log.Error().Err(fmt.Errorf("nil generator returned")).Msg("error handling generator")
+			}
+			continue
+		}
+		copied := *op
+
+		newItem := item
+		if group.ShouldStartHistoryGroup {
+			// Give each opcode its own group ID, since we want to track each
+			// parellel step individually.
+			newItem.GroupID = uuid.New().String()
+		}
+
+		eg.Go(func() error { return e.HandleGenerator(ctx, copied, newItem) })
+	}
+	if err := eg.Wait(); err != nil {
+		if resp.NoRetry {
+			return queue.NeverRetryError(err)
+		}
+		if resp.RetryAt != nil {
+			return queue.RetryAtError(err, resp.RetryAt)
+		}
+		return err
 	}
 
 	return nil
