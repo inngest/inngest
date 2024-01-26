@@ -1,0 +1,149 @@
+---
+heading: "Launch Week Recap"
+subtitle: "A look at all the releases of the past week: from Replay and per-step error handling to new SKDs and integrations."
+showSubtitle: true
+image: /assets/launch-week/og.png
+date: 2024-01-26
+author: Sylwia Vargas
+disableCTA: true
+---
+
+Today marks the end of our first Launch Week. We shipped numerous features that significantly improve Inngest DX such as Replay, bulk cancellation, cross-language support, per-step error handling in our SDKs, and two new SDK betas (Python and Go).
+
+These were much-requested features from our Community. We hear your feedback and ideas, and they inform our [roadmap](https://roadmap.inngest.com/). Thank you 💜
+
+But that's not all. This week, we also launched a partnership with Clerk to make auth workflows easier, and Svix to simplify Inngest integrations for webhook providers.
+
+The response of our Community was thrilling. Beyond the interest on Twitter, LinkedIn, and Discord, our post on how we built the [Inngest queuing system](/blog/building-the-inngest-queue-pt-i-fairness-multi-tenancy) stayed at the top of the Hacker News for a while 🔥 The [discussion](https://news.ycombinator.com/item?id=39092849) raised a few interesting points, too.
+
+Let’s look at each of the major milestones we achieved this week.
+
+## Release: Inngest Replay
+
+<a href="/blog/announcing-replay-the-death-of-the-dead-letter-queue">
+    <img src="/assets/blog/announcing-replay/featured-image.png" alt=""/>
+</a>
+
+Inngest Replay is the easiest way to recover from incidents with just a couple of clicks. Within our team, we also call it the death of the dead-letter queue ☠️
+
+With Replay, you can easily query for all jobs between two timestamps and filter only jobs that failed (or were canceled). It is as simple as selecting a function, the time range, and filter by the result of the job and clicking a button – no scripts needed!
+
+➡️ Read ["Inngest Replay"](/blog/announcing-replay-the-death-of-the-dead-letter-queue) blog post.
+
+## Deep Dive: Building Inngest Queueing System
+
+<a href="/assets/blog/inngest-queue-pt-i">
+    <img src="/assets/blog/inngest-queue-pt-i/featured-image-v2.png" alt=""/>
+</a>
+
+In this blog post Tony Holdstock-Brown, our CEO, explains what challenges we faced when building our own distributed queuing system, why we needed to build it, and how it works.
+
+The post was met with a lot of interest online. You can read (and contribute to) its [HackerNews discussion here](https://news.ycombinator.com/item?id=39092849).
+
+➡️ Read ["How we built a fair multi-tenant queuing system"](/assets/blog/inngest-queue-pt-i) blog post.
+
+## Release: Bulk cancellation
+
+<a href="/blog/bulk-cancellation-api" >
+    <img src="/assets/blog/bulk-cancellation-api/featured-image.png" alt=""/>
+</a>
+
+Bulk cancellation helps you prune your backlog in a self-serve way.
+
+The API gives you a fine-grained control over your queue backlog, as opposed to the naive purge-all functionality provided by most clouds.
+
+The API comes with selective cancellation. You can define an expression directly on the event data of the function run. You can also specify date range for cancellation. Any function started within the range will be automatically cancelled without any work needed from you. It is immediate -- it only takes 🔥 milliseconds 🔥 to run.
+
+➡️ Read ["Bulk Cancellation"](/blog/bulk-cancellation-api) blog post.
+
+## Release: Cross-language support
+
+<a href="/blog/cross-language-support-with-new-sdks">
+    <img src="/assets/blog/cross-language-support-with-new-sdks/featured-image.png" alt=""/>
+</a>
+
+We have officially released our [Python](/docs/reference/python) and [Go](https://pkg.go.dev/github.com/inngest/inngestgo) SDK betas with enough feature compatibility to be ready for most use cases. We also published our [SDK spec](https://github.com/inngest/inngest/blob/main/docs/SDK_SPEC.md) so anyone could learn more about how it works, or even contribute.
+
+This is another step towards becoming a truly language-agnostic reliability layer for everyone. Two months ago we added [`step.invoke()`](/docs/guides/invoking-functions-directly), which allows you to invoke any Inngest function from within another function. With these two new SDKs, you can now use Inngest in multi-language systems -- if you're curious to see an example, check this [Node and Python app](https://github.com/inngest/inngest-multi-lang).
+
+➡️ Read ["Cross-Language support with new SDKs"](/blog/cross-language-support-with-new-sdks) blog post.
+
+
+## Release: Zero-downtime cloud migrations
+
+<a href="/blog/migrating-across-clouds-with-zero-downtime" >
+    <img src="/assets/blog/migrating-across-clouds-with-zero-downtime/featured-image.png" alt=""/>
+</a>
+
+We made it easier to migrate across clouds with zero downtime, and minimal effort. Inngest is agnostic to where your code is running, so after you deploy your code to a new cloud, all you need to do to complete the migration is to sync your app with a new URL. As your code should have the same app ID and function IDs, all of your functions will pick up where they left off without a hiccup.
+
+➡️ Read ["Migrating Across Clouds with zero Downtime"](/blog/migrating-across-clouds-with-zero-downtime) blog post.
+
+
+## Release: Inngest Apps
+
+<a href="/blog/migrating-across-clouds-with-zero-downtime">
+    <img src="/assets/blog/migrating-across-clouds-with-zero-downtime/apps-ui.png" alt=""/>
+</a>
+
+Inngest Apps map directly to your projects or services. When you serve your functions using our serve API handler, you are hosting a new Inngest App. With Inngest Apps, your dashboard reflects your code organization better.
+
+➡️ Read [Inngest App guide](/docs/apps) in our docs.
+
+
+## Integration with Clerk
+
+<a href="/blog/building-auth-workflows-with-clerk-integration">
+    <img src="/assets/blog/building-auth-workflows-with-clerk-integration/featured-image.png" alt=""/>
+</a>
+
+Clerk is the easiest way to add authentication and user management. When a new user is created, you may want to: sync user data to your database, kick off an account provisioning workflow, start a trial in Stripe, or send a welcome email. This is made way easier with Inngest and wow connecting your Clerk account with Inngest is possible in just a couple of clicks!
+
+➡️ Read ["Building Auth Workflows with Clerk Integration"](/blog/building-auth-workflows-with-clerk-integration) blog post.
+
+
+## Integration with Svix
+
+<a href="/blog/svix-integration" target="_blank" rel="noopener noreferrer">
+    <img src="/assets/blog/svix-integration/featured-image.png" alt=""/>
+</a>
+
+Svix is the easiest way for engineering teams to reliably provide webhooks in their products.
+With Svix's new Inngest transformation template, any webhook provider can easily allow their users to set up their Inngest account to start receiving webhook events in seconds.
+
+➡️ Read ["Svix Integration"](/blog/svix-integration) blog post.
+
+
+## Enhancement: Improved error handling in Inngest SDKs
+
+<a href="/blog/improved-error-handling" target="_blank" rel="noopener noreferrer">
+    <img src="/assets/blog/improved-error-handling/featured-image.png" alt=""/>
+</a>
+
+You can now use language-native features like try/catch to gracefully handler errors that occur across one or more steps. This much-requested enhancement brings more control over errors and failures. It provides a way to handle rollbacks, cleanups, and workflows that take different paths based on an error type.
+
+➡️ Read ["Improved Error Handling"](/blog/improved-error-handling) blog post.
+
+
+## Edge Event API Beta
+
+<a href="/blog/edge-event-api-beta">
+    <img src="/assets/blog/edge-event-api-beta/featured-image.png" alt=""/>
+</a>
+
+We are introducing a closed beta for our new Edge Event API Beta to reduce latency for users worldwide by implementing regional replication, caching, and payload validation, targeting response times below 100ms. Early testing reveals substantial improvements, with response times reduced by 46-85% in various regions.
+
+To try the new Event API upvote the project [directly on our roadmap](https://roadmap.inngest.com/roadmap?id=cddffcf8-47ba-44ac-a6c3-dd318f9eb132) with your Inngest account email and share any context on your application that you’d like to start using it for. Additionally, if you just want to be notified when the feature comes out of beta for wide usage, [add your email here](/newsletter?tag=beta-event-api).
+
+➡️ Read ["Edge Event API Beta: Lower latency from everywhere"](/blog/edge-event-api-beta) blog post.
+
+
+---
+
+## What's next?
+
+The Launch Week is over but we are not stopping here! We already have next announcements and releases lined up, starting next week.
+
+If you're curious what we are working on, please check (and comment on!) our [public roadmap](https://roadmap.inngest.com/).
+
+ We wouldn’t be where we are now without you, your questions, feedback, and feature requests. Join [our Discord](/discord) and help shape the future of Inngest 💜

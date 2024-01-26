@@ -139,18 +139,21 @@ export default function LaunchWeek() {
         />
 
         <Heading title="Friday" />
-        {/*
-          1. Event API v2 - globally deployed for speed
-        */}
         <RowItem
-          title="..."
-          subtitle="Something is coming soon"
-          image="/assets/launch-week/placeholder-image.png"
-          label="New"
-          buttonHref="#"
-          docsHref=""
+          title="Edge Event API Beta"
+          subtitle="Lower latency from everywhere"
+          image="/assets/blog/edge-event-api-beta/featured-image.png"
+          label="Beta Release"
+          buttonHref="/blog/edge-event-api-beta"
           orientation="right"
-          blur={true}
+        />
+        <RowItem
+          title="Launch week recap"
+          subtitle="The tl;dr of this week's updates"
+          image="/assets/launch-week/og.png"
+          label="Recap"
+          buttonHref="/blog/launch-week-recap"
+          orientation="left"
         />
       </Container>
 
