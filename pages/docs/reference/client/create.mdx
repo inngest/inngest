@@ -67,7 +67,7 @@ Click the toggles on the top left of the code block to see the different methods
 import { EventSchemas, Inngest, type LiteralZodEventSchema } from "inngest";
 import { z } from "zod";
 
-// Define each event indiviudally
+// Define each event individually
 const productPurchasedEvent = z.object({
   name: z.literal("shop/product.purchased"),
   data: z.object({ productId: z.string() }),
