@@ -79,7 +79,7 @@ Inngest abstracts the complex parts of building a robust, reliable, and scalable
 
 ## Getting started
 
-👉 [**Read the full quick start guide here**](https://www.inngest.com/docs/quick-start?ref=github-inngest-readme)
+👉 [**Follow the full quick start guide here**](https://www.inngest.com/docs/quick-start?ref=github-inngest-readme)
 
 ### A brief example
 
@@ -122,7 +122,7 @@ Some things to highlight about the above code:
 - Code within each `step.run` is automatically retried on error.
 - Each `step.run` is individually executed via HTTPS ensuring errors do not result in lost work from previous steps.
 - State from previous steps is memoized so code within steps is not re-executed on retries.
-- Functions can `sleep` for hours, days or months. Inngest stops execution and continues at the exactly the right time.
+- Functions can `sleep` for hours, days, or months. Inngest stops execution and continues at the exactly the right time.
 - Events can trigger one or more functions via [fan-out](https://www.inngest.com/docs/guides/fan-out-jobs)
 
 Learn more about writing Inngest functions in [our documentation](https://www.inngest.com/docs).
