@@ -16,7 +16,7 @@ import {
 } from 'urql';
 
 export default function URQLProvider({ children }: { children: React.ReactNode }) {
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn, orgId } = useAuth();
 
   const urqlClient = useMemo(() => {
     return createClient({
@@ -60,7 +60,8 @@ export default function URQLProvider({ children }: { children: React.ReactNode }
         fetchExchange,
       ],
     });
-  }, [getToken]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- we want to re-create the client whenever the user signs out or switches organizations
+  }, [getToken, isSignedIn, orgId]);
 
   return <Provider value={urqlClient}>{children}</Provider>;
 }
