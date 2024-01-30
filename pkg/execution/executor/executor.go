@@ -762,29 +762,7 @@ func (e *executor) runFinishHandler(ctx context.Context, id state.Identifier, s 
 	// Prepare events that we must send
 	var events []event.Event
 	now := time.Now()
-
-	var (
-		output    any
-		errorData map[string]any
-	)
-
-	// normalize repsonses :grimace:
-	output = resp.Output
-	if v, ok := output.(map[string]any); ok {
-		errorData = v
-		if resp.Err != nil {
-			if msg, ok := errorData["message"].(string); !ok || msg == "" {
-				errorData["message"] = *resp.Err
-			}
-			if _, ok := errorData["error"]; !ok && resp.Err != nil {
-				errorData["error"] = *resp.Err
-			}
-		}
-	} else {
-		errorData = map[string]any{
-			"error": resp.Err,
-		}
-	}
+	errorData := resp.StandardError()
 
 	// Legacy - send inngest/function.failed
 	if resp.Err != nil && !strings.Contains(*resp.Err, state.ErrFunctionCancelled.Error()) {

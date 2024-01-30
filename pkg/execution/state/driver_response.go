@@ -13,6 +13,7 @@ import (
 	"github.com/xhit/go-str2duration/v2"
 )
 
+const DefaultErrorName = "Error"
 const DefaultErrorMessage = "Function execution error"
 const DefaultStepErrorMessage = "Step execution error"
 
@@ -423,4 +424,47 @@ func (r *DriverResponse) HistoryVisibleStep() *GeneratorOpcode {
 	}
 
 	return op
+}
+
+type StandardError struct {
+	Error   string `json:"error"`
+	Name    string `json:"name"`
+	Message string `json:"message"`
+	Stack   string `json:"stack,omitempty"`
+}
+
+func (r *DriverResponse) StandardError() StandardError {
+	ret := StandardError{
+		Error:   DefaultErrorMessage,
+		Name:    DefaultErrorName,
+		Message: DefaultErrorMessage,
+	}
+
+	if v, ok := r.Output.(map[string]any); ok {
+		for _, key := range []string{"error", "name", "message", "stack"} {
+			if val, ok := v[key].(string); ok && val != "" {
+				switch key {
+				case "error":
+					ret.Error = val
+				case "name":
+					ret.Name = val
+				case "message":
+					ret.Message = val
+				case "stack":
+					ret.Stack = val
+				}
+			}
+		}
+	}
+
+	if r.Err != nil {
+		if ret.Error == DefaultErrorMessage {
+			ret.Error = *r.Err
+		}
+		if ret.Message == DefaultErrorMessage {
+			ret.Message = *r.Err
+		}
+	}
+
+	return ret
 }
