@@ -67,7 +67,7 @@ In this section, key terms and concepts relevant to Inngest and Inngest SDKs are
 Capitalized usage of these terms means that we are referring to these definitions.
 
 - **Inngest Server**
-Inngest provides both a hosted Cloud (production) service and a Dev Server which allows local development of Inngest Functions. We refer to both as an Inngest Server. This concept is explored more in Kinds of Inngest Server [4.2].
+Inngest provides both a hosted Cloud (production) service and a Dev Server which allows local development of Inngest Functions. We refer to both as an Inngest Server. This concept is explored more in Kinds of Inngest Server [[4.2](#42-kinds-of-inngest-server)].
 - **Developer**
 The user the SDK, using its APIs and interfaces to use Inngest’s platform.
 - **App**
@@ -79,7 +79,7 @@ A key used to sign requests to and from an Inngest Server to ensure secure commu
 - **Event Key**
 A key used to send events to an Inngest Server.
 - **Event**
-A standardized JSON object representing a single Event in your system. This concept is explored more in Event [1.3.4].
+A standardized JSON object representing a single Event in your system. This concept is explored more in Event [[1.3.4](#134-event)].
 - **Function**
 A block of code designed to be executed in response to chosen events from Inngest. When the event occurs, an Inngest Server triggers the corresponding Function through the SDK that exposes it.
 - **Step**
@@ -91,7 +91,7 @@ Any `PUT` request to an SDK that should trigger a Sync.
 - **Call Request**
 A request from an Inngest Server to an SDK to execute a Function or Step and return the result.
 - **Introspection Request**
-An optional `GET` request to an SDK from anywhere that can be used as a health check. This concept is explored more in Introspection Requests [4.5].
+An optional `GET` request to an SDK from anywhere that can be used as a health check. This concept is explored more in Introspection Requests [[4.5](#45-introspection-requests)].
 
 ## 1.2. Requirements
 
@@ -170,7 +170,7 @@ An Inngest SDK provides a Developer with tools to write code that can run reliab
 
 To be classified as an SDK, it MUST allow a Developer to expose an App containing Functions to an Inngest Server, which can then be executed by that server with relevant Events. The method by which these are exposed to and triggered by the Inngest Server MUST adhere to the expectations below.
 
-This means that an SDK MUST provide a Developer with the capability to satisfy the HTTP [4] and Steps [5] requirements, where the Developer SHOULD NOT have to be concerned with ensuring these are adhered to.
+This means that an SDK MUST provide a Developer with the capability to satisfy the HTTP [[4](#4-http)] and Steps [[5](#5-steps)] requirements, where the Developer SHOULD NOT have to be concerned with ensuring these are adhered to.
 
 It is also RECOMMENDED that an SDK use the native features of a language as much as is reasonable. For example, if introducing concurrency support, prefer utilizing a language’s native concurrency paradigms to ensure a Developer needs to learn as little Inngest-specific code as possible. This then also helps all future readers of the code who do not want to be concerned with how said code is being executed, but instead what it is performing.
 
@@ -189,7 +189,7 @@ Used to specify an Event Key to be used when sending Events to an Inngest Server
 - `INNGEST_SIGNING_KEY`
 Used to specify a Signing Key to be used when contacting the Inngest API and verifying the integrity of requests from an Inngest Server. Always recommend that a Developer specifies a Signing Key as an environment variable to avoid checking secrets into source control.
 - `INNGEST_ENV`
-MUST be used to set the `X-Inngest-Env` [4.1.1] header when making requests to an Inngest Server, which informs the Inngest Server which environment you’re wanting to send events to.
+MUST be used to set the `X-Inngest-Env` [[4.1.1](#411-definitions)] header when making requests to an Inngest Server, which informs the Inngest Server which environment you’re wanting to send events to.
 
 ## 3.2. Optional variables
 
@@ -198,11 +198,11 @@ An SDK MAY support these optional variables, as well as specify any of their own
 - `INNGEST_LOG_LEVEL`
 Recommended as an environment variable to use when debugging issues with an SDK, allowing a Developer to control the log level of the SDK’s internals.
 - `INNGEST_DEV`
-Recommended as a way for the user to inform an SDK that it should connect to an Inngest Dev Server, either by providing a value of `1` or an origin to use. See Targeting an Inngest Server [4.2.1].
+Recommended as a way for the user to inform an SDK that it should connect to an Inngest Dev Server, either by providing a value of `1` or an origin to use. See Targeting an Inngest Server [[4.2.1](#421-targeting-an-inngest-server)].
 - `INNGEST_API_ORIGIN`
-Can be used to allow a Developer to inform the SDK of where it can access the target Inngest Server’s API [4.2]. In most situations, use of `INNGEST_DEV` will suffice, but this environment variable provides more fine-grained control.
+Can be used to allow a Developer to inform the SDK of where it can access the target Inngest Server’s API [[4.2](#42-kinds-of-inngest-server)]. In most situations, use of `INNGEST_DEV` will suffice, but this environment variable provides more fine-grained control.
 - `INNGEST_EVENT_API_ORIGIN`
-Can be used to allow a Developer to inform the SDK of where it should send Events to [4.2]. In most situations, use of `INNGEST_DEV` will suffice, but this environment variable provides more fine-grained control.
+Can be used to allow a Developer to inform the SDK of where it should send Events to [[4.2](#42-kinds-of-inngest-server)]. In most situations, use of `INNGEST_DEV` will suffice, but this environment variable provides more fine-grained control.
 - `INNGEST_SERVE_ORIGIN`
 Because an SDK exposes an HTTP endpoint for Inngest to contact, the SDK needs to know the URL at which it exists. Sometimes this can be inferred, but it may also be useful to allow a Developer to set this manually. This environment variable sets the origin and appends the discovered path or `INNGEST_SERVE_PATH`.
 - `INNGEST_SERVE_PATH`
@@ -210,7 +210,7 @@ Because an SDK exposes an HTTP endpoint for Inngest to contact, the SDK needs to
 
 # 4. HTTP
 
-Inngest can use HTTP requests to communicate with an SDK in order to perform the Syncing [4.3] and Calling [4.4] of Functions.
+Inngest can use HTTP requests to communicate with an SDK in order to perform the Syncing [[4.3](#43-sync-requests)] and Calling [[4.4](#44-call-requests)] of Functions.
 
 The SDK MUST facilitate the Developer in exposing an HTTP endpoint for Inngest and the SDK to communicate. This endpoint MUST retain the same URL for all actions outlined below, where only the request method will change and query string parameters added.
 
@@ -229,7 +229,7 @@ This section outlines all headers used for this purpose across Inngest and SDKs.
 Here we detail all HTTP headers used by requests being made between SDKs and Inngest. Other sections will refer here if a header is required to fulfill their requirements.
 
 - `X-Inngest-Sdk`
-Represents the SDK and the version of that SDK being used for this request, in the format `[sdk_name]:v[semver_version]`, e.g. `inngest-js:v1.2.3`. It MUST be provided when sending [4.1.4] or responding [4.1.2] to requests.
+Represents the SDK and the version of that SDK being used for this request, in the format `[sdk_name]:v[semver_version]`, e.g. `inngest-js:v1.2.3`. It MUST be provided when sending [[4.1.4](#414-requirements-when-sending-a-request)] or responding [[4.1.2](#412-requirements-when-responding-to-requests)] to requests.
 
 The semver version is specified based on the [Semantic Versioning 2.0.0 specification](https://semver.org/spec/v2.0.0.html), and as such all semantic versions specified there (including pre-releases) are valid. It MUST contain only a single `:` character, used to separate the SDK’s name from the semver version.
 
@@ -239,7 +239,7 @@ A signature of the body of a request sent by Inngest in order to prove that requ
 
 The format of the signature is a query string (without the leading `?`) with two values: `t` and `s`, e.g. `t=1705586504&s=signkey-prod-02jd7ak2`. `t` is the timestamp for when the request was prepared by Inngest, ensuring old-but-valid requests cannot be repeated. `s` is the actual signature, which is an HMAC with SHA256 of the body of the request.
 
-When receiving any request that is expected to be from Inngest, an SDK MUST validate this signature. See Requirements when receiving requests [4.1.3].
+When receiving any request that is expected to be from Inngest, an SDK MUST validate this signature. See Requirements when receiving requests [[4.1.3](#413-requirements-when-receiving-requests)].
 - `X-Inngest-Env`
 Used when sending Events to an Inngest Server to indicate the Inngest Environment to send Events to. Defaults to whichever environment the Event Key being used is associated with.
 - `X-Inngest-Platform`
@@ -247,34 +247,34 @@ The platform being used to host the code being invoked by an Inngest Server. Use
 - `X-Inngest-Framework`
 The name of the framework being used to expose the SDK’s endpoint, such as `"lambda"` or `"nextjs"`.
 - `X-Inngest-No-Retry`
-MUST be set to either `true` or `false` when returning an error to an Inngest Server in response to a Call Request. See Executing the Function [4.4.3].
+MUST be set to either `true` or `false` when returning an error to an Inngest Server in response to a Call Request. See Executing the Function [[4.4.3](#443-executing-the-function)].
 - `X-Inngest-Req-Version`
-The execution version used when handling a Call Request. See requirements when responding to requests [4.1.2].
+The execution version used when handling a Call Request. See requirements when responding to requests [[4.1.2](#412-requirements-when-responding-to-requests)].
 - `Retry-After`
-The standard HTTP header `Retry-After` as defined in [RFC 9110](https://datatracker.ietf.org/doc/html/rfc9110#name-retry-after), with the exception of supporting an ISO 8601 date as specified [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339) instead of an [HTTP-date](https://datatracker.ietf.org/doc/html/rfc9110#http.date). Can be used when responding to a Call Request. See Executing the Function [4.4.3].
+The standard HTTP header `Retry-After` as defined in [RFC 9110](https://datatracker.ietf.org/doc/html/rfc9110#name-retry-after), with the exception of supporting an ISO 8601 date as specified [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339) instead of an [HTTP-date](https://datatracker.ietf.org/doc/html/rfc9110#http.date). Can be used when responding to a Call Request. See Executing the Function [[4.4.3](#443-executing-the-function)].
 - `X-Inngest-Server-Kind`
-A header received from an Inngest Server to indicate that type of Inngest Server the request came from, either `dev` or `cloud`. Note that this MUST NOT be used to decide whether to verify requests. See Kinds of Inngest Server [4.2].
+A header received from an Inngest Server to indicate that type of Inngest Server the request came from, either `dev` or `cloud`. Note that this MUST NOT be used to decide whether to verify requests. See Kinds of Inngest Server [[4.2](#42-kinds-of-inngest-server)].
 - `X-Inngest-Expected-Server-Kind`
-A header sent to an Inngest Server when Syncing to indicate which type of Inngest Server the SDK intends to contact. See Syncing [4.3.2].
+A header sent to an Inngest Server when Syncing to indicate which type of Inngest Server the SDK intends to contact. See Syncing [[4.3.2](#432-syncing)].
 
 ### 4.1.2. Requirements when responding to requests
 
 When responding to a Call Request from Inngest, an SDK MUST send the following headers:
 
-- `X-Inngest-Sdk` [4.1.1]
+- `X-Inngest-Sdk` [[4.1.1](#411-definitions)]
 Requests made or responses given to an Inngest Server without this header will be rejected.
-- `X-Inngest-Req-Version` [4.1.1]
+- `X-Inngest-Req-Version` [[4.1.1](#411-definitions)]
 The execution version used. MUST be `1`.
 
 ### 4.1.3. Requirements when receiving requests
 
 When receiving a request expected to be from Inngest, an SDK MUST validate that the request originated from Inngest and is not a bad actor.
 
-To achieve this, the `X-Inngest-Signature` [4.1.1] header is sent by Inngest, which an SDK MUST validate is correct by adhering to the following:
+To achieve this, the `X-Inngest-Signature` [[4.1.1](#411-definitions)] header is sent by Inngest, which an SDK MUST validate is correct by adhering to the following:
 
-1. If the SDK is intending to use the Inngest Dev Server [4.2], the SDK SHOULD NOT attempt to verify the signature or expect the `X-Inngest-Signature` [4.1.1] header. In this case, an SDK SHOULD warn the Developer if an `X-Inngest-Server-Kind: dev` is not received.
+1. If the SDK is intending to use the Inngest Dev Server [[4.2](#42-kinds-of-inngest-server)], the SDK SHOULD NOT attempt to verify the signature or expect the `X-Inngest-Signature` [[4.1.1](#411-definitions)] header. In this case, an SDK SHOULD warn the Developer if an `X-Inngest-Server-Kind: dev` is not received.
 2. If a Signing Key has not been provided by a Developer, the SDK MUST reject the request and return a `500 Internal Server Error` response.
-3. If the SDK is intending to use Inngest Cloud [4.2] and no `X-Inngest-Signature` header has been given, the SDK MUST reject the request and return a `500 Internal Server Error` response.
+3. If the SDK is intending to use Inngest Cloud [[4.2](#42-kinds-of-inngest-server)] and no `X-Inngest-Signature` header has been given, the SDK MUST reject the request and return a `500 Internal Server Error` response.
 4. The SDK SHOULD then extract the `t` timestamp from the `X-Inngest-Signature` header and ensure it is a time within the last 5 minutes according to the SDK’s known time.
 
 If this is checked and the timestamp is not within this time period, the SDK MUST reject the request and return a `500 Internal Server Error` response.
@@ -288,7 +288,7 @@ If these steps have been adhered to, the request is now deemed valid and can be 
 
 ### 4.1.4. Requirements when sending a request
 
-When sending any request to Inngest, an SDK MUST adhere to the requirements when responding to requests [4.1.2].
+When sending any request to Inngest, an SDK MUST adhere to the requirements when responding to requests [[4.1.2](#412-requirements-when-responding-to-requests)].
 
 The SDK also MUST send a bearer token authorization request header, as defined in [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750#section-2.1). The value of this bearer token should be the Signing Key, where the value following the `signkey-*-` prefix is a hex-encoded SHA256 hash of that value.
 
@@ -323,7 +323,7 @@ It is RECOMMENDED that an SDK does this by defaulting to connecting to Inngest C
 - API Origin: `https://api.inngest.com`
 - Event ingestion endpoint `https://inn.gs/e/:event_key`
 
-If this default is followed, the SDK MUST use the `INNGEST_DEV` [3.2] environment variable to allow the user to connect to a Dev Server, which can optionally also include a runtime configuration option.
+If this default is followed, the SDK MUST use the `INNGEST_DEV` [[3.2](#32-optional-variables)] environment variable to allow the user to connect to a Dev Server, which can optionally also include a runtime configuration option.
 
 The `INNGEST_DEV` environment variable may have a non-empty value, including an origin as defined in [RFC 6454](https://datatracker.ietf.org/doc/html/rfc6454), for example `http://example.com`.  If the `INNGEST_DEV` value is a valid host, the SDK should use this origin as the Dev Server URL.  Otherwise, for a non-zero `INNGEST_DEV` variable the SDK MUST attempt to connect to the following default URLs:
 
@@ -337,15 +337,15 @@ If the `INNGEST_DEV` value is a vcalid [RFC 6454](https://datatracker.ietf.org/d
 
 ### 4.2.2. Request verification
 
-When receiving requests expected to be from an Inngest Server, an SDK MUST verify their integrity [4.1.3]. An Inngest Dev Server, however, MUST NOT require verification.
+When receiving requests expected to be from an Inngest Server, an SDK MUST verify their integrity [[4.1.3](#413-requirements-when-receiving-requests)]. An Inngest Dev Server, however, MUST NOT require verification.
 
-If the recommendations when targeting an Inngest Server [4.2.1] are followed, then presence of the `INNGEST_DEV` environment variable (or equivalent runtime configuration option) MUST turn off signature verification.
+If the recommendations when targeting an Inngest Server [[4.2.1](#421-targeting-an-inngest-server)] are followed, then presence of the `INNGEST_DEV` environment variable (or equivalent runtime configuration option) MUST turn off signature verification.
 
 ### 4.2.3. Proxies and routing
 
 The URL through which an SDK communicates with an Inngest Server may be indirect. In these cases, an SDK SHOULD provide the Developer with a method of setting the origin of API requests and Event ingestion.
 
-We RECOMMEND that a Developer can use the `INNGEST_API_ORIGIN` and `INNGEST_EVENT_API_ORIGIN` environment variables [3.2] for this.
+We RECOMMEND that a Developer can use the `INNGEST_API_ORIGIN` and `INNGEST_EVENT_API_ORIGIN` environment variables [[3.2](#32-optional-variables)] for this.
 
 ## 4.3. Sync Requests
 
@@ -389,13 +389,13 @@ The request is not expected to have any payload. When returning data in later se
 
 ### 4.3.2. Syncing
 
-Following the receipt of a sync request, an SDK MUST send a `POST` request to Inngest, targeting the Sync Endpoint of the particular Inngest service it is configured to target [4.2].
+Following the receipt of a sync request, an SDK MUST send a `POST` request to Inngest, targeting the Sync Endpoint of the particular Inngest service it is configured to target [[4.2](#42-kinds-of-inngest-server)].
 
 **Method:** `POST`
 
 **URL**
 
-The request should be sent to the API origin [4.2.1], with a path of `/fn/register`, e.g. `https://api.inngest.com/fn/register`.
+The request should be sent to the API origin [[4.2.1](#421-targeting-an-inngest-server)], with a path of `/fn/register`, e.g. `https://api.inngest.com/fn/register`.
 
 If a `deployId` query string parameter is set on the sync request received by the SDK, the SDK MUST set the same key and value on the query string of the `POST` request to Inngest and MUST NOT include the `deployId` in the URL included in the Sync’s payload. The `deployId` is used to attribute various parts of a sync’s handshake with each other.
 
@@ -683,7 +683,7 @@ A Sync’s payload MUST be the following JSON object:
 
 **Headers**
 
-The SDK MUST adhere to the global header requirements when sending requests [4.1.4].
+The SDK MUST adhere to the global header requirements when sending requests [[4.1.4](#414-requirements-when-sending-a-request)].
 
 If an `X-Inngest-Server-Kind` header was set on the sync request received by the SDK, the SDK SHOULD forward the header’s value with a new name of `X-Inngest-Expected-Server-Kind`. This header is used to combat situations where services that a Developer understands to target Inngest Cloud can not be synced with an Inngest Dev Server and vice versa.
 
@@ -740,15 +740,15 @@ A Call Request is a single request from Inngest to an SDK in order to discover w
 
 Over the course of executing a Function that makes no use of Steps, the happy path sees Inngest execute a Function only once, where the Function’s contents are run during that Execution and the result returned to Inngest. If this Function fails by user code throwing an error or some external issue such as network issues or out-of-memory errors, Inngest will retry the Function, by executing it again for each retry.
 
-Steps see the introduction of more complex executions, but will be discussed in the later Steps [5] section.
+Steps see the introduction of more complex executions, but will be discussed in the later Steps [[5](#5-steps)] section.
 
 ### 4.4.1. Receiving a Call Request
 
 When Inngest wishes to execute a Function with an Event, it will use the URL provided to it during Syncing to contact an SDK and inform it that it wishes to run a particular Function with a given payload.
 
-This will come in the form of a `POST` request to this endpoint. An SDK MUST adhere to the requirements when receiving a request from Inngest [4.1.3].
+This will come in the form of a `POST` request to this endpoint. An SDK MUST adhere to the requirements when receiving a request from Inngest [[4.1.3](#413-requirements-when-receiving-requests)].
 
-Added to the URL will be a `fnId` query string parameter, which will contain the ID of the Function that Inngest wants to execute. Similar to a Sync, this ID will be a Composite ID [1.3.3].
+Added to the URL will be a `fnId` query string parameter, which will contain the ID of the Function that Inngest wants to execute. Similar to a Sync, this ID will be a Composite ID [[1.3.3](#133-composite-id)].
 
 This MUST be used by an SDK to find the correct Function to call. If this Function could not be found, the SDK MUST return a `500 Internal Server Error`.
 
@@ -831,7 +831,7 @@ The body of the request will be a JSON payload with the following format:
 }
 ```
 
-The `Event` type in the payload above refers to Inngest’s Event payload shape [1.3.4].
+The `Event` type in the payload above refers to Inngest’s Event payload shape [[1.3.4](#134-event)].
 
 ### 4.4.2. Retrieving the full payload
 
@@ -839,19 +839,19 @@ Many platforms limit the incoming payload size of the functions they host. For a
 
 To combat this, an Inngest Server will trim large requests and instead set `ctx.use_api` in the Call Request body to `true`.
 
-If this is set, an SDK MUST perform two requests to the Inngest API, retrieving batched Events and memoized Step data. Each request MUST adhere to the requirements when sending a request to an Inngest Server [4.1.4].
+If this is set, an SDK MUST perform two requests to the Inngest API, retrieving batched Events and memoized Step data. Each request MUST adhere to the requirements when sending a request to an Inngest Server [[4.1.4](#414-requirements-when-sending-a-request)].
 
 **Retrieving Events**
 
-Using the API origin [4.2.1], make a `GET` request to `[api_origin]/v0/runs/:run_id/batch`, where `run_id` can be accessed at `ctx.run_id` in the Call Request’s body.
+Using the API origin [[4.2.1](#421-targeting-an-inngest-server)], make a `GET` request to `[api_origin]/v0/runs/:run_id/batch`, where `run_id` can be accessed at `ctx.run_id` in the Call Request’s body.
 
-The API will respond with either a `200 OK` with the JSON body being an array of Events [1.3.4], or a non-`200 OK` response with an `{ error?: string }` JSON object.
+The API will respond with either a `200 OK` with the JSON body being an array of Events [[1.3.4](#134-event)], or a non-`200 OK` response with an `{ error?: string }` JSON object.
 
-If the request was successful, the `events` passed to the Developer’s code [4.4.3] MUST be the array returned from the endpoint, and `event` MUST be the first element of that array. If the request failed or returned a non-`200 OK` status code, the SDK MUST respond to the Call Request with a `500 Internal Server Error`.
+If the request was successful, the `events` passed to the Developer’s code [[4.4.3](#443-executing-the-function)] MUST be the array returned from the endpoint, and `event` MUST be the first element of that array. If the request failed or returned a non-`200 OK` status code, the SDK MUST respond to the Call Request with a `500 Internal Server Error`.
 
 **Retrieving memoized Step data**
 
-Using the API origin [4.2.1], make a `GET` request to `[api_origin]/v0/runs/:run_id/actions`, where `run_id` can be accessed at `ctx.run_id` in the Call Request’s body.
+Using the API origin [[4.2.1](#421-targeting-an-inngest-server)], make a `GET` request to `[api_origin]/v0/runs/:run_id/actions`, where `run_id` can be accessed at `ctx.run_id` in the Call Request’s body.
 
 The API will respond with either a `200 OK` and the JSON body being an object equivalent to the `steps` value in a Call Request body, or a non-`200 OK` response with an `{ error?: string }` JSON object.
 
@@ -867,9 +867,9 @@ An SDK SHOULD provide the Developer’s code with select fields from the Call Re
 - `events` - The entire array of JSON objects passed to the Execution.
 - `runId` - Accessed from `ctx.run_id`.
 - `attempt` - Accessed from `ctx.attempt`.
-- `step` - Step tooling as detailed in Steps [5].
+- `step` - Step tooling as detailed in Steps [[5](#5-steps)].
 
-An SDK MUST then call the Function and return either the returned value as JSON or an error to Inngest. When responding, an SDK MUST adhere to the requirements of responding to a request from an Inngest Server [4.1.2].
+An SDK MUST then call the Function and return either the returned value as JSON or an error to Inngest. When responding, an SDK MUST adhere to the requirements of responding to a request from an Inngest Server [[4.1.2](#412-requirements-when-responding-to-requests)].
 
 A successful response to Inngest MUST always return `200 OK` with a JSON payload which is the return value of the function.
 
@@ -893,7 +893,7 @@ An SDK MAY also provide the Developer with a method of indicating how long the I
 
 If `Retry-After` is set, an SDK MUST also set `X-Inngest-No-Retry: false`.
 
-The execution of a Function, the returned data, and the tooling available to a Developer changes if Steps are introduced. See Steps [5].
+The execution of a Function, the returned data, and the tooling available to a Developer changes if Steps are introduced. See Steps [[5](#5-steps)].
 
 ## 4.5. Introspection Requests
 
@@ -942,9 +942,9 @@ SDK -->>- I: 200<br/>"AB"
 
 ## 5.1. Reporting Steps
 
-When a Call Request is received and a Function is executed [4.4.3], Steps may be reported back to the Inngest Server to be separated into their own retriable Call Requests. Commonly this is done by an SDK providing a Developer with “step tooling,” which the Developer can utilize to report different step types by way of calling functions, where those function calls return data or errors based on the memoization process.
+When a Call Request is received and a Function is executed [[4.4.3](#443-executing-the-function)], Steps may be reported back to the Inngest Server to be separated into their own retriable Call Requests. Commonly this is done by an SDK providing a Developer with “step tooling,” which the Developer can utilize to report different step types by way of calling functions, where those function calls return data or errors based on the memoization process.
 
-When a step is reported, depending on the Step type [5.3], it will later be executed in its own Call Request or will be filled with data by an Inngest Server. As this is done, these results are then included in subsequent Call Requests, allowing the stateless SDK to memoize previous Steps and continue on to report and execute new ones. Steps that utilize these memoized results MUST NOT be reported in subsequent Call Requests.
+When a step is reported, depending on the Step type [[5.3](#53-available-step-types)], it will later be executed in its own Call Request or will be filled with data by an Inngest Server. As this is done, these results are then included in subsequent Call Requests, allowing the stateless SDK to memoize previous Steps and continue on to report and execute new ones. Steps that utilize these memoized results MUST NOT be reported in subsequent Call Requests.
 
 ### 5.1.1. Response shape
 
@@ -959,12 +959,12 @@ Array<{
 }>
 ```
 
-Each object in the array represents a separate step being reported to the Inngest Server that will be executed in its own Call Request. Note that an SDK MUST also adhere to the requirements when sending or responding to requests [4.1.2].
+Each object in the array represents a separate step being reported to the Inngest Server that will be executed in its own Call Request. Note that an SDK MUST also adhere to the requirements when sending or responding to requests [[4.1.2](#412-requirements-when-responding-to-requests)].
 
 - `id` is the hashed ID of the Step
-- `op` is the string “opcode” (an abbreviation of “operation code”) that specifies the type of Step being reported. The functionality and data expectations of each Step type is different. See Available Step types [5.3].
+- `op` is the string “opcode” (an abbreviation of “operation code”) that specifies the type of Step being reported. The functionality and data expectations of each Step type is different. See Available Step types [[5.3](#53-available-step-types)].
 - `displayName` is an optional string that can be given to provide a human-readable name to the Step in UIs and logging. If this is not specified by the user, it is RECOMMENDED that an SDK set this to the ID for the step that was provided instead.
-- `opts` is an object used across many Step types to fine tune their functionality. For information on the expectations of this object for each Step type, see Available Step types [5.3].
+- `opts` is an object used across many Step types to fine tune their functionality. For information on the expectations of this object for each Step type, see Available Step types [[5.3](#53-available-step-types)].
 
 ### 5.1.2. IDs and hashing
 
@@ -980,9 +980,9 @@ For example, if `my-step-id` is repeated 3 times, the pre-hash identifiers for t
 
 ### 5.1.3. Deciding when to report
 
-When running the Developer’s code within a Function, an SDK must decide when to halt execution and report Steps back by responding to the Call Request. Commonly, this is done by waiting until a new Step is found that has no memoized result [5.2].
+When running the Developer’s code within a Function, an SDK must decide when to halt execution and report Steps back by responding to the Call Request. Commonly, this is done by waiting until a new Step is found that has no memoized result [[5.2](#52-memoizing-step-results)].
 
-Parallelism [5.5] introduces more complexity to this.
+Parallelism [[5.5](#55-parallelism)] introduces more complexity to this.
 
 ## 5.2. Memoizing Step results
 
@@ -992,7 +992,7 @@ The process of memoizing Step results is receiving data or errors that the Innge
 
 When a Call Request is made to an SDK, it can contain memoized data from previously-run Steps in the `steps` object passed, which is an object where the keys are hashed Step IDs and the value memoized data that changes shape based on the op code being used.
 
-If an object with ONLY a `data` key is found, its value will be the result of that particular Step type [5.3], serialized as JSON. An SDK SHOULD make a Developer aware of this serialization process, as first-class entities such as class instances may be lost.
+If an object with ONLY a `data` key is found, its value will be the result of that particular Step type [[5.3](#53-available-step-types)], serialized as JSON. An SDK SHOULD make a Developer aware of this serialization process, as first-class entities such as class instances may be lost.
 
 If an object with ONLY an `error` key is found, its value will be the final error returned when attempting to run the Step, in the same error format used for reporting function failures:
 
@@ -1004,13 +1004,13 @@ If an object with ONLY an `error` key is found, its value will be the final erro
 }
 ```
 
-Other values such as `null` can also be found depending on the Step type [5.3], where the particular Step type being used indicates its meaning.
+Other values such as `null` can also be found depending on the Step type [[5.3](#53-available-step-types)], where the particular Step type being used indicates its meaning.
 
 ### 5.2.2. Memoizing a Step
 
 As Steps are found by an SDK during a Call Request, it MUST try to find either the successful data already returned for that Step or the error that caused it to fail by matching the hashed Step ID with a key in the `steps` object. If this is found, the SDK MUST either return the relevant data to the Developer’s call or return/throw/raise the error.
 
-If an `error` is returned/thrown/raised and the Developer has not either swallowed the error or returned/thrown/raised a new error, the SDK MUST mark the request as non-retriable [4.4.3]. When this error is being serialized to be sent back to an Inngest Server, it SHOULD be the original serialized error that was returned/thrown/raised.
+If an `error` is returned/thrown/raised and the Developer has not either swallowed the error or returned/thrown/raised a new error, the SDK MUST mark the request as non-retriable [[4.4.3](#443-executing-the-function)]. When this error is being serialized to be sent back to an Inngest Server, it SHOULD be the original serialized error that was returned/thrown/raised.
 
 If a Step’s hash is present in the `steps` object passed in the Call Request, it MUST NOT be reported when responding to that Call Request; only new Steps without a memoized `data` or `error` can be reported.
 
@@ -1034,7 +1034,7 @@ The Run Step is the simplest Step type. The Developer specifies a block of code 
 
 This Step type encapsulates multiple “op codes”, used by both the SDK and the Inngest Server to express the intent and status of the Run Step.
 
-When finding the Step, an SDK can choose to either always report the Step [5.1] or to immediately execute it. Immediate execution MUST only be allowed if `ctx.disable_immediate_execution` is `false` in the Call Request body, the query string parameter `stepId` is `"step"` in the Call Request, and the SDK only found a single Step to report which is a Run Step.
+When finding the Step, an SDK can choose to either always report the Step [[5.1](#51-reporting-steps)] or to immediately execute it. Immediate execution MUST only be allowed if `ctx.disable_immediate_execution` is `false` in the Call Request body, the query string parameter `stepId` is `"step"` in the Call Request, and the SDK only found a single Step to report which is a Run Step.
 
 If these conditions are satisfied, an SDK can either run the Developer’s code within the same Call Request and then return a `Step` operation.
 
@@ -1119,7 +1119,7 @@ When the given time has elapsed, the Inngest Server will memoize the Step with `
 
 ### 5.3.3. Wait for Event
 
-A Wait For Event Step informs the Inngest Server that the Run wishes to be called again once a given event has been received. This can be defined using the name of the event, as well as an Expression [1.3.1].
+A Wait For Event Step informs the Inngest Server that the Run wishes to be called again once a given event has been received. This can be defined using the name of the event, as well as an Expression [[1.3.1](#131-expression)].
 
 ```tsx
 {
@@ -1142,7 +1142,7 @@ When the event is received by the Inngest Server, the Step will be memoized with
 
 An Invocation Step informs the Inngest Server that the Run wishes to trigger another Inngest function and wait for its response. This provides the Developer with a method of composing Functions together.
 
-- `opts.function_id` represents the Function to invoke, referenced by its Composite ID [1.3.3]
+- `opts.function_id` represents the Function to invoke, referenced by its Composite ID [[1.3.3](#133-composite-id)]
 - `opts.payload` is the Event that will be sent to the function to trigger it, omitting the `name`
 
 ```tsx
@@ -1161,7 +1161,7 @@ When the invoked Function has run to completion and returned a value, the Innges
 
 ## 5.4. Recovery and the stack
 
-When memoizing Steps [5.2], the Call Request will provide an array of Step IDs at `ctx.stack.stack` which represents the order in which previous Steps were completed. Each ID present will exist as a key in the `steps` object with some memoized data. This ordering can be critical if code relies on assessing race conditions, as the order in which Steps are discovered dynamically by an SDK can differ from the order in which they should be memoized.
+When memoizing Steps [[5.2](#52-memoizing-step-results)], the Call Request will provide an array of Step IDs at `ctx.stack.stack` which represents the order in which previous Steps were completed. Each ID present will exist as a key in the `steps` object with some memoized data. This ordering can be critical if code relies on assessing race conditions, as the order in which Steps are discovered dynamically by an SDK can differ from the order in which they should be memoized.
 
 It is therefore RECOMMENDED that an SDK follows this order as they memoize Steps and makes an effort to not just immediately memoize Steps as they are discovered.
 
@@ -1175,4 +1175,4 @@ Next, the SDK MUST continue to memoize Steps, but no longer expect them to seque
 
 An SDK MAY support parallelism. Multiple steps can be reported in a single Call Request, where those Steps will be run in parallel in their own separate Call Requests.
 
-If an SDK supports parallelism, it MUST follow the `ctx.stack.stack` and recovery techniques [5.4]. When a Run reports >1 Step in response to a Call Request, `ctx.disable_immediate_execution` will be `true` for all subsequent Call Requests, meaning the SDK MUST then always report Steps with `StepPlanned` before executing them [5.3.1].
+If an SDK supports parallelism, it MUST follow the `ctx.stack.stack` and recovery techniques [[5.4](#54-recovery-and-the-stack)]. When a Run reports >1 Step in response to a Call Request, `ctx.disable_immediate_execution` will be `true` for all subsequent Call Requests, meaning the SDK MUST then always report Steps with `StepPlanned` before executing them [[5.3.1](#531-run)].
