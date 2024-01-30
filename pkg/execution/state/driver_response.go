@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/inngest/inngest/pkg/dateutil"
@@ -440,9 +441,38 @@ func (r *DriverResponse) StandardError() StandardError {
 		Message: DefaultErrorMessage,
 	}
 
-	if v, ok := r.Output.(map[string]any); ok {
+	var raw map[string]any
+
+	switch rawJson := r.Output.(type) {
+	case json.RawMessage:
+		// Try to unmarshal, but don't return on error, use raw map as fallback
+		_ = json.Unmarshal(rawJson, &raw)
+	case map[string]any:
+		raw = rawJson
+	default:
+		// Handle other types by setting their value directly as a message
+		switch v := r.Output.(type) {
+		case []byte:
+			if len(v) > 0 {
+				raw = map[string]any{"message": string(v)}
+			}
+		case string:
+			if len(v) > 0 {
+				raw = map[string]any{"message": v}
+			}
+		case interface{}:
+			if v != nil {
+				raw = map[string]any{"message": v}
+			}
+		}
+	}
+
+	// Process the raw map if it's not empty
+	if len(raw) > 0 {
+		processed, _ := processErrorFields(raw)
+
 		for _, key := range []string{"error", "name", "message", "stack"} {
-			if val, ok := v[key].(string); ok && val != "" {
+			if val, ok := processed[key].(string); ok && val != "" {
 				switch key {
 				case "error":
 					ret.Error = val
@@ -467,4 +497,45 @@ func (r *DriverResponse) StandardError() StandardError {
 	}
 
 	return ret
+}
+
+// processErrorFields looks for an error field then a body field to handle
+// error messages from step responses.
+func processErrorFields(input map[string]any) (map[string]any, error) {
+	fields := []string{"error", "body"}
+	for _, f := range fields {
+		// Attempt to fetch the JS/SDK error from the body.
+		switch v := input[f].(type) {
+		case map[string]any:
+			return v, nil
+		case json.RawMessage:
+			if mapped, err := processErrorString(string(v)); err == nil {
+				return mapped, nil
+			}
+		case []byte:
+			if mapped, err := processErrorString(string(v)); err == nil {
+				return mapped, nil
+			}
+		case string:
+			if mapped, err := processErrorString(v); err == nil {
+				return mapped, nil
+			}
+		}
+	}
+	return input, nil
+}
+
+// processErrorString attempts to unquote and unmarshal a JSON-encoded string
+func processErrorString(s string) (map[string]any, error) {
+	// Bound inner error fields to 32kb
+	if len(s) > 32*1024 {
+		return nil, fmt.Errorf("error field too large")
+	}
+
+	if unquote, err := strconv.Unquote(s); err == nil {
+		s = unquote
+	}
+	mapped := map[string]any{}
+	err := json.Unmarshal([]byte(s), &mapped)
+	return mapped, err
 }

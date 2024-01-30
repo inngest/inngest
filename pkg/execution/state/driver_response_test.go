@@ -53,24 +53,24 @@ func TestDriverResponseFormatError(t *testing.T) {
 	tests := []struct {
 		name     string
 		r        DriverResponse
-		expected map[string]any
+		expected StandardError
 	}{
 		{
 			name: "with no Output and Err",
 			r:    DriverResponse{Output: nil, Err: strptr("something went wrong")},
-			expected: map[string]any{
-				"error":   "something went wrong",
-				"name":    "Error",
-				"message": "something went wrong",
+			expected: StandardError{
+				Error:   "something went wrong",
+				Name:    "Error",
+				Message: "something went wrong",
 			},
 		},
 		{
 			name: "with no Output and no Err",
 			r:    DriverResponse{Output: nil},
-			expected: map[string]any{
-				"error":   DefaultErrorMessage,
-				"name":    "Error",
-				"message": DefaultErrorMessage,
+			expected: StandardError{
+				Error:   DefaultErrorMessage,
+				Name:    "Error",
+				Message: DefaultErrorMessage,
 			},
 		},
 		{
@@ -80,21 +80,10 @@ func TestDriverResponseFormatError(t *testing.T) {
 					"error": `{"name":"Error","message":"test"}`,
 				},
 			},
-			expected: map[string]any{
-				"name":    "Error",
-				"message": "test",
-			},
-		},
-		{
-			name: "with Output and no body",
-			r: DriverResponse{Output: map[string]any{
-				"data": "error response",
-			}},
-			expected: map[string]any{
-				// Auto-fill required fields
-				"name":    "Error",
-				"message": DefaultErrorMessage,
-				"data":    "error response",
+			expected: StandardError{
+				Error:   DefaultErrorMessage,
+				Name:    "Error",
+				Message: "test",
 			},
 		},
 		// encoded JS errors
@@ -103,11 +92,11 @@ func TestDriverResponseFormatError(t *testing.T) {
 			r: DriverResponse{Output: map[string]any{
 				"body": "{\"name\":\"Error\",\"message\":\"lolk\",\"stack\":\"stack\",\"__serialized\":true}",
 			}},
-			expected: map[string]any{
-				"name":         "Error",
-				"message":      "lolk",
-				"stack":        "stack",
-				"__serialized": true,
+			expected: StandardError{
+				Error:   DefaultErrorMessage,
+				Name:    "Error",
+				Message: "lolk",
+				Stack:   "stack",
 			},
 		},
 		{
@@ -115,11 +104,11 @@ func TestDriverResponseFormatError(t *testing.T) {
 			r: DriverResponse{Output: map[string]any{
 				"body": json.RawMessage("{\"name\":\"Error\",\"message\":\"lolk\",\"stack\":\"stack\",\"__serialized\":true}"),
 			}},
-			expected: map[string]any{
-				"name":         "Error",
-				"message":      "lolk",
-				"stack":        "stack",
-				"__serialized": true,
+			expected: StandardError{
+				Error:   DefaultErrorMessage,
+				Name:    "Error",
+				Message: "lolk",
+				Stack:   "stack",
 			},
 		},
 		{
@@ -127,36 +116,38 @@ func TestDriverResponseFormatError(t *testing.T) {
 			r: DriverResponse{Output: map[string]any{
 				"body": []byte("{\"name\":\"Error\",\"message\":\"lolk\",\"stack\":\"stack\",\"__serialized\":true}"),
 			}},
-			expected: map[string]any{
-				"name":         "Error",
-				"message":      "lolk",
-				"stack":        "stack",
-				"__serialized": true,
+			expected: StandardError{
+				Error:   DefaultErrorMessage,
+				Name:    "Error",
+				Message: "lolk",
+				Stack:   "stack",
 			},
 		},
 
 		{
 			name: "non map Output",
 			r:    DriverResponse{Output: "YOLO"},
-			expected: map[string]any{
-				"name":    "Error",
-				"message": "YOLO",
+			expected: StandardError{
+				Error:   DefaultErrorMessage,
+				Name:    "Error",
+				Message: "YOLO",
 			},
 		},
 
 		{
 			name: "non map Output with error",
 			r:    DriverResponse{Output: "YOLO", Err: strptr("502 broken")},
-			expected: map[string]any{
-				"name":    "Error",
-				"message": "YOLO",
+			expected: StandardError{
+				Error:   "502 broken",
+				Name:    "Error",
+				Message: "YOLO",
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// require.EqualValues(t, test.expected, test.r.UserError(), test.name)
+			require.EqualValues(t, test.expected, test.r.StandardError(), test.name)
 		})
 	}
 }
