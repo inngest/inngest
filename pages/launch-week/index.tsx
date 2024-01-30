@@ -39,25 +39,14 @@ export default function LaunchWeek() {
                 Launch Week
               </span>
             </h1>
-            <div className="mt-5 flex items-center justify-center">
-              <span
-                className="py-2 px-8 uppercase text-white font-extrabold text-lg md:text-xl border-2 border-transparent rounded-full"
-                style={{
-                  background: `linear-gradient(#292e23, #292e23) padding-box,
-                              linear-gradient(to right, #5EEAD4, #A7F3D0, #FDE68A) border-box`,
-                }}
-              >
-                January 22-25 2024
-              </span>
-            </div>
-            <p className="my-12 text-slate-200 text-lg md:text-xl">
-              A week of updates from Inngest starting{" "}
-              <span className="font-bold bg-clip-text text-transparent bg-gradient-to-br bg-gradient-to-r from-[#5EEAD4] via-[#A7F3D0] to-[#FDE68A]">
-                January 22nd, 2024
-              </span>
-            </p>
-
-            <NewsletterSignup tags={["launch-week-jan-2023"]} />
+            <RowItem
+              title="Launch week recap"
+              subtitle="The tl;dr of this week's updates"
+              image="/assets/launch-week/og.png"
+              label="Recap"
+              buttonHref="/blog/launch-week-recap"
+              orientation="right"
+            />
           </div>
         </div>
 

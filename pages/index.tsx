@@ -41,10 +41,8 @@ export function LaunchWeekBanner({ urlRef = "homepage-banner" }) {
     <PageBanner href={`/launch-week?ref=${urlRef}`} className="mt-px">
       <RocketLaunchIcon className="inline-flex h-7 sm:h-5 mr-1" />
       <span className="shrink">
-        It's Launch Week!{" "}
-        <span className="font-normal inline-flex">
-          New features and enhancements shipped daily.
-        </span>
+        We've just wrapped up a Launch Week.{" "}
+        <span className="font-normal inline-flex">See all we've shipped.</span>
       </span>
     </PageBanner>
   );
