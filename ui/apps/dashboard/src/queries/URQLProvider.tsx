@@ -2,9 +2,18 @@
 
 import { useMemo } from 'react';
 import { useAuth } from '@clerk/nextjs';
+import * as Sentry from '@sentry/nextjs';
 import { authExchange } from '@urql/exchange-auth';
 import { requestPolicyExchange } from '@urql/exchange-request-policy';
-import { Provider, cacheExchange, createClient, fetchExchange } from 'urql';
+import { retryExchange } from '@urql/exchange-retry';
+import {
+  CombinedError,
+  Provider,
+  cacheExchange,
+  createClient,
+  fetchExchange,
+  mapExchange,
+} from 'urql';
 
 export default function URQLProvider({ children }: { children: React.ReactNode }) {
   const { getToken } = useAuth();
@@ -20,6 +29,19 @@ export default function URQLProvider({ children }: { children: React.ReactNode }
           shouldUpgrade: (operation) => operation.context.requestPolicy !== 'cache-only',
         }),
         cacheExchange,
+        mapExchange({
+          onError(error) {
+            // Handle unauthenticated errors after (1) trying to refresh the token and (2) retrying the operation.
+            if (isUnauthenticatedError(error)) {
+              // Log to Sentry if it still fails after trying to refresh the token and retrying the operation.
+              Sentry.captureException(error);
+            }
+          },
+        }),
+        retryExchange({
+          maxNumberAttempts: 3,
+          retryIf: isUnauthenticatedError,
+        }),
         authExchange(async (utils) => {
           let sessionToken = await getToken();
           return {
@@ -29,9 +51,7 @@ export default function URQLProvider({ children }: { children: React.ReactNode }
                 Authorization: `Bearer ${sessionToken}`,
               });
             },
-            didAuthError: (error) =>
-              error.response.status === 401 ||
-              error.graphQLErrors.some((e) => e.extensions.code === 'UNAUTHENTICATED'),
+            didAuthError: isUnauthenticatedError,
             refreshAuth: async () => {
               sessionToken = await getToken({ skipCache: true });
             },
@@ -43,4 +63,11 @@ export default function URQLProvider({ children }: { children: React.ReactNode }
   }, [getToken]);
 
   return <Provider value={urqlClient}>{children}</Provider>;
+}
+
+function isUnauthenticatedError(error: CombinedError): boolean {
+  return (
+    error.response?.status === 401 ||
+    error.graphQLErrors.some((e) => e.extensions.code === 'UNAUTHENTICATED')
+  );
 }
