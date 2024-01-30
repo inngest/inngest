@@ -110,11 +110,12 @@ async ({ step, logger }) => {
 
 ## Retry policies
 
-By default, each function is retried 3 times using [backoff](https://github.com/inngest/inngest/blob/main/pkg/backoff/backoff.go#L10-L22) with jitter.
+By default, each function is retried 4 times using [backoff](https://github.com/inngest/inngest/blob/main/pkg/backoff/backoff.go#L10-L22) with jitter, for a total
+of 5 attempts per step.
 
 * **Successful** - No error thrown. This will not be retried.
 * **Non-retriable error** - A `NonRetriableError` was thrown (think: `404`). This will not be retried.
-* **Error** - Any error was thrown indicating a potentially temporary failure (think: `500`). **This will be retried according to the retry policy (3 times, by default)**.
+* **Error** - Any error was thrown indicating a potentially temporary failure (think: `500`). **This will be retried according to the retry policy (4 times, by default)**.
 
 You can customize the number of retries directly from your function configuration:
 
