@@ -646,7 +646,37 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 	if err != nil {
 		return 0, fmt.Errorf("error inspecting function queue status: %w", err)
 	}
+	return count, nil
+}
 
+func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error) {
+	// Load the partition for a given queue.  This allows us to generate the concurrency
+	// key properly via the given function.
+	//
+	// TODO: Remove the ability to change keys based off of initialized inputs.  It's more trouble than
+	// it's worth, and ends up meaning we have more queries to write (such as this) in order to load
+	// relevant data.
+	cmd := q.r.B().Hget().Key(q.kg.PartitionItem()).Field(workflowID.String()).Build()
+	enc, err := q.r.Do(ctx, cmd).AsBytes()
+	if rueidis.IsRedisNil(err) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("error fetching partition: %w", err)
+	}
+	item := &QueuePartition{}
+	if err = json.Unmarshal(enc, item); err != nil {
+		return 0, fmt.Errorf("error reading partition item: %w", err)
+	}
+
+	// Fetch the concurrency via the partition concurrency name.
+	pk, _ := q.partitionConcurrencyGen(ctx, *item)
+	key := q.kg.Concurrency("p", pk)
+	cmd = q.r.B().Zcard().Key(key).Build()
+	count, err := q.r.Do(ctx, cmd).AsInt64()
+	if err != nil {
+		return 0, fmt.Errorf("error inspecting running job count: %w", err)
+	}
 	return count, nil
 }
 
@@ -884,7 +914,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		customLimits = make([]int, 2)
 	)
 
-	// required
+	// Required.
 	//
 	// This should be found by calling function.ConcurrencyLimit() to return
 	// the lowest concurrency limit available.  It limits the capacity of all
