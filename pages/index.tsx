@@ -69,6 +69,12 @@ export default function Home() {
         heading="Helping these teams deliver reliable products"
         logos={[
           {
+            src: "/assets/customers/soundcloud-logo-white-horizontal.svg",
+            name: "SoundCloud",
+            scale: 1.1,
+            featured: true,
+          },
+          {
             src: "/assets/customers/tripadvisor.svg",
             name: "TripAdvisor",
             featured: true,
@@ -76,8 +82,7 @@ export default function Home() {
           {
             src: "/assets/customers/resend.svg",
             name: "Resend",
-            featured: true,
-            scale: 0.8,
+            scale: 1.1,
           },
 
           {
@@ -90,7 +95,6 @@ export default function Home() {
             scale: 1.3,
           },
           { src: "/assets/customers/leap-logo-white.svg", name: "Leap" },
-          { src: "/assets/customers/ocoya.svg", name: "Ocoya" },
         ]}
         footer={
           <div className="flex items-center">

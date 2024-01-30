@@ -32,6 +32,14 @@ const caseStudies: {
   tags?: string[];
 }[] = [
   {
+    href: "/customers/soundcloud",
+    logo: "/assets/customers/soundcloud-logo-white.svg",
+    name: "SoundCloud",
+    title: "Streamlining dynamic video generation",
+    snippet: "Building scalable video pipelines with Inngest.",
+    tags: ["Workflows"],
+  },
+  {
     href: "/customers/aomni",
     logo: "/assets/customers/aomni-logo.svg",
     name: "Aomni",

@@ -1,6 +1,7 @@
 import Head from "next/head";
 import Link from "next/link";
 import Image from "next/image";
+
 import Header from "src/shared/Header";
 import Container from "src/shared/layout/Container";
 import Footer from "src/shared/Footer";
@@ -16,6 +17,7 @@ export type Props = {
 
   /* Customer info */
   logo: string;
+  logoScale?: number;
   companyName: string;
   quote: {
     text: string;
@@ -34,6 +36,7 @@ export function Layout({
   children,
   title,
   logo,
+  logoScale = 1,
   companyName,
   quote,
   companyDescription,
@@ -119,6 +122,7 @@ export function Layout({
             <img
               src={logo}
               alt={`${companyName}'s logo`}
+              style={{ transform: `scale(${logoScale})` }}
               className="inline-flex min-w-[160px] max-h-[40px] mb-4"
             />
             <p>{companyDescription}</p>

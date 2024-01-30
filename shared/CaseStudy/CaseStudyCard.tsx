@@ -23,7 +23,7 @@ export default function CaseStudyCard({
           Case Study
         </div>
         <h2 className="font-bold text-2xl">{title}</h2>
-        <div className="my-10 grow lg:grow-0 min-h-20 lg:h-24 flex flex-row md:flex-col lg:flex-row items-center space-between gap-8">
+        <div className="my-10 grow min-h-20 lg:h-24 flex flex-row md:flex-col lg:flex-row items-center space-between gap-8">
           <p className="text-slate-300">{snippet}</p>
           <Image
             src={logo}

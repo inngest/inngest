@@ -171,7 +171,7 @@ export default function BlogLayout(props) {
                   }}
                 />
               )}
-              {!scope.disableCTA && !scope.introCallout && (
+              {/* {!scope.disableCTA && !scope.introCallout && (
                 <CTACallout
                   text={
                     <>
@@ -190,7 +190,7 @@ export default function BlogLayout(props) {
                     text: "Give it a try",
                   }}
                 />
-              )}
+              )} */}
               <div className="max-w-[70ch] prose m-auto mt-12 mb-20 prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert blog-content">
                 <MDXRemote
                   compiledSource={props.post.compiledSource}
