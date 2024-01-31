@@ -152,7 +152,6 @@ func (u UnhashedOp) Hash() (string, error) {
 		// We only suffix the counter if there's > 1 operation with the same ID.
 		input = fmt.Sprintf("%s:%d", u.ID, u.Pos)
 	}
-
 	sum := sha1.Sum([]byte(input))
 	return hex.EncodeToString(sum[:]), nil
 }

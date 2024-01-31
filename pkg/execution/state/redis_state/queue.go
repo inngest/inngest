@@ -934,12 +934,6 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 			}
 			customKeys[i] = item.Key
 			customLimits[i] = item.Limit
-
-			// If an account concurrency is provided, always bind custom keys
-			// to the maximum account limit.
-			if ac > 0 && item.Limit == 0 || item.Limit > ac {
-				item.Limit = ac
-			}
 		}
 	}
 

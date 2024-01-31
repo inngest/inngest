@@ -98,6 +98,10 @@ func (g GeneratorOpcode) Output() (string, error) {
 }
 
 func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {
+	if opts, ok := g.Opts.(*WaitForEventOpts); ok && opts != nil {
+		return opts, nil
+	}
+
 	opts := &WaitForEventOpts{}
 	if err := opts.UnmarshalAny(g.Opts); err != nil {
 		return nil, err

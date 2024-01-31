@@ -903,7 +903,6 @@ func (e *executor) executeDriverForStep(ctx context.Context, id state.Identifier
 
 // HandlePauses handles pauses loaded from an incoming event.
 func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
-	// TODO: Switch to aggregate pauses on release.
 	res, err := e.handlePausesAllNaively(ctx, iter, evt)
 	return res, err
 }
@@ -916,7 +915,6 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 
 	evals, count, err := e.exprAggregator.EvaluateAsyncEvent(ctx, evt)
 	// For each matching eval, consume the pause.
-	// TODO: Replicate what we had down in naive.
 	return execution.HandlePauseResult{count, int32(len(evals))}, err
 }
 
@@ -999,10 +997,6 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 				}
 			}
 
-			// Ensure that we store the group ID for this pause, letting us properly track cancellation
-			// or continuation history
-			ctx = state.WithGroupID(ctx, pause.GroupID)
-
 			// Run an expression if this exists.
 			if pause.Expression != nil {
 				// Precompute the expression data once, as a value (not pointer)
@@ -1034,6 +1028,10 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 					return
 				}
 			}
+
+			// Ensure that we store the group ID for this pause, letting us properly track cancellation
+			// or continuation history
+			ctx = state.WithGroupID(ctx, pause.GroupID)
 
 			// Cancelling a function can happen before a lease, as it's an atomic operation that will always happen.
 			if pause.Cancel {
@@ -1717,6 +1715,10 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 			}
 			expr = &interpolated
 		}
+
+		// Update the generator to use the interpolated data, ensuring history is updated.
+		opts.If = expr
+		gen.Opts = opts
 	}
 
 	opcode := gen.Op.String()
