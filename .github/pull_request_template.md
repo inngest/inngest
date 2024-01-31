@@ -1,7 +1,10 @@
 ## Description
 
-Please edit this to include a summary of the change (what and why).
+Please edit this to include a summary of the change (what).
 Include screenshots if you modify the UI.
+
+## Motivation
+Please edit this to include the reason why we are making this change.
 
 ## Type of change (choose one)
 - [ ] Chore (refactors, upgrades, etc.)
