@@ -3,38 +3,29 @@
 import { useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@clerk/nextjs';
+import { useAuth, useOrganization, useOrganizationList, useUser } from '@clerk/nextjs';
 import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import LoadingIcon from '@/icons/LoadingIcon';
 
 export default function AccountSetupPage() {
   const router = useRouter();
   const secondsElapsed = useSecondsElapsed();
+  const { getToken } = useAuth();
   const { user } = useUser();
-
-  const isAccountSetup = user && user.externalId && user.publicMetadata.accountID;
-
-  // Reload the user until the account is set up
-  useEffect(() => {
-    if (!user || isAccountSetup) return;
-
-    const intervalID = setInterval(() => {
-      user.reload();
-    }, 500);
-
-    return () => {
-      clearInterval(intervalID);
-    };
-  }, [isAccountSetup, user]);
+  useForceActiveOrganization();
+  const isAccountSetup = useIsAccountSetup();
 
   // Redirect to the home page once the account is set up
   useEffect(() => {
     if (!isAccountSetup) return;
 
-    // We use `replace` so that the user doesn't get redirected back to this page if they click the back button
-    router.replace(process.env.NEXT_PUBLIC_HOME_PATH as Route);
-  }, [isAccountSetup, router]);
+    // We need to refresh the token before redirecting so that the token contains the account ID
+    getToken({ skipCache: true }).then(() => {
+      router.replace(process.env.NEXT_PUBLIC_HOME_PATH as Route);
+    });
+  }, [getToken, isAccountSetup, router]);
 
   useEffect(() => {
     if (secondsElapsed !== 10) return;
@@ -66,6 +57,74 @@ export default function AccountSetupPage() {
       <LoadingIcon />
     </div>
   );
+}
+
+/**
+ * This forces the user to have an active organization when the organizations feature is not
+ * enabled. When the organizations feature is enabled, the user will already have an active
+ * organization set up by the `/organization-list` page.
+ */
+function useForceActiveOrganization() {
+  const { value: isOrganizationsEnabled } = useBooleanFlag('organizations');
+  const { isLoaded, userMemberships, setActive } = useOrganizationList({
+    userMemberships: {
+      infinite: true,
+    },
+  });
+  const { organization } = useOrganization();
+
+  useEffect(() => {
+    if (!isOrganizationsEnabled && isLoaded && userMemberships.data[0] && !organization) {
+      setActive({ organization: userMemberships.data[0].organization });
+    }
+  }, [isLoaded, isOrganizationsEnabled, organization, setActive, userMemberships.data]);
+
+  // Reload memberships if the user doesn't have an active organization
+  useEffect(() => {
+    if (isOrganizationsEnabled || !isLoaded || userMemberships.data[0] || organization) return;
+
+    const intervalID = setInterval(() => {
+      userMemberships.revalidate();
+    }, 500);
+
+    return () => {
+      clearInterval(intervalID);
+    };
+  }, [
+    isLoaded,
+    isOrganizationsEnabled,
+    organization,
+    setActive,
+    userMemberships,
+    userMemberships.data,
+  ]);
+}
+
+/**
+ * This hook returns true if the user's account is set up. It will reload the organization until
+ * the account is set up.
+ *
+ * @returns {boolean}
+ */
+function useIsAccountSetup(): boolean {
+  const { organization } = useOrganization();
+
+  const isAccountSetup = Boolean(organization?.publicMetadata.accountID);
+
+  // Reload the organization until the account is set up
+  useEffect(() => {
+    if (!organization || isAccountSetup) return;
+
+    const intervalID = setInterval(() => {
+      organization.reload();
+    }, 500);
+
+    return () => {
+      clearInterval(intervalID);
+    };
+  }, [isAccountSetup, organization]);
+
+  return isAccountSetup;
 }
 
 function useSecondsElapsed() {
