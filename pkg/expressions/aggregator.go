@@ -27,7 +27,7 @@ func NewAggregator(
 	}
 	return aggregator{
 		log:     log,
-		records: ccache.New(ccache.Configure().MaxSize(size).ItemsToPrune(200)),
+		records: ccache.New(ccache.Configure().MaxSize(size).ItemsToPrune(uint32(size) / 4)),
 		loader:  loader,
 		parser:  parser,
 		// use the package's exprEvaluator function as the actual logic which evaluates
@@ -179,6 +179,9 @@ type bookkeeper struct {
 func (b *bookkeeper) update(ctx context.Context, l EvaluableLoader) error {
 	at := time.Now()
 	err := l.LoadEvaluablesSince(ctx, b.wsID, b.event, b.updatedAt, func(ctx context.Context, eval expr.Evaluable) error {
+		if eval == nil {
+			return fmt.Errorf("adding nil pause")
+		}
 		_, err := b.ae.Add(ctx, eval)
 		return err
 	})

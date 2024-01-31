@@ -8,17 +8,17 @@ import (
 	"sync/atomic"
 
 	"github.com/google/cel-go/common/operators"
-	"github.com/ohler55/ojg/jp"
-	"golang.org/x/sync/errgroup"
 )
 
 var (
-	ErrEvaluableNotFound = fmt.Errorf("Evaluable instance not found in aggregator")
+	ErrEvaluableNotFound      = fmt.Errorf("Evaluable instance not found in aggregator")
+	ErrInvalidType            = fmt.Errorf("invalid type for tree")
+	ErrExpressionPartNotFound = fmt.Errorf("expression part not found")
 )
 
-// errTreeUnimplemented is used while we develop the aggregate tree library when trees
+// errEngineUnimplemented is used while we develop the aggregate tree library when trees
 // are not yet implemented.
-var errTreeUnimplemented = fmt.Errorf("tree type unimplemented")
+var errEngineUnimplemented = fmt.Errorf("tree type unimplemented")
 
 // ExpressionEvaluator is a function which evalues an expression given input data, returning
 // a boolean and error.
@@ -48,7 +48,7 @@ type AggregateEvaluator interface {
 	Evaluate(ctx context.Context, data map[string]any) ([]Evaluable, int32, error)
 
 	// AggregateMatch returns all expression parts which are evaluable given the input data.
-	AggregateMatch(ctx context.Context, data map[string]any) ([]ExpressionPart, error)
+	AggregateMatch(ctx context.Context, data map[string]any) ([]*ExpressionPart, error)
 
 	// Len returns the total number of aggregateable and constantly matched expressions
 	// stored in the evaluator.
@@ -67,11 +67,13 @@ func NewAggregateEvaluator(
 	eval ExpressionEvaluator,
 ) AggregateEvaluator {
 	return &aggregator{
-		eval:        eval,
-		parser:      parser,
-		artIdents:   map[string]PredicateTree{},
-		nullLookups: map[string]PredicateTree{},
-		lock:        &sync.RWMutex{},
+		eval:   eval,
+		parser: parser,
+		engines: map[EngineType]MatchingEngine{
+			EngineTypeStringHash: newStringEqualityMatcher(),
+			EngineTypeNullMatch:  newNullMatcher(),
+		},
+		lock: &sync.RWMutex{},
 	}
 }
 
@@ -79,12 +81,13 @@ type aggregator struct {
 	eval   ExpressionEvaluator
 	parser TreeParser
 
-	artIdents   map[string]PredicateTree
-	nullLookups map[string]PredicateTree
-	lock        *sync.RWMutex
+	// engines records all engines
+	engines map[EngineType]MatchingEngine
 
+	// lock prevents concurrent updates of data
+	lock *sync.RWMutex
+	// len stores the current len of aggregable expressions.
 	len int32
-
 	// constants tracks evaluable instances that must always be evaluated, due to
 	// the expression containing non-aggregateable clauses.
 	constants []*ParsedExpression
@@ -174,8 +177,8 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 
 // AggregateMatch attempts to match incoming data to all PredicateTrees, resulting in a selection
 // of parts of an expression that have matched.
-func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([]ExpressionPart, error) {
-	result := []ExpressionPart{}
+func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([]*ExpressionPart, error) {
+	result := []*ExpressionPart{}
 
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -188,82 +191,29 @@ func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([
 	// Note that having a count >= the group ID value does not guarantee that the expression is valid.
 	counts := map[groupID]int{}
 	// Store all expression parts per group ID for returning.
-	found := map[groupID][]ExpressionPart{}
+	found := map[groupID][]*ExpressionPart{}
 	// protect the above locks with a map.
 	lock := &sync.Mutex{}
-	// run lookups concurrently.
-	eg := errgroup.Group{}
 
-	add := func(all []ExpressionPart) {
-		// This is called concurrently, so don't mess with maps in goroutines
+	for _, engine := range a.engines {
+		matched, err := engine.Match(ctx, data)
+		if err != nil {
+			return nil, err
+		}
+
+		// Add all found items from the engine to the above list.
 		lock.Lock()
-		defer lock.Unlock()
-
-		for _, eval := range all {
+		for _, eval := range matched {
 			counts[eval.GroupID] += 1
 			if _, ok := found[eval.GroupID]; !ok {
-				found[eval.GroupID] = []ExpressionPart{}
+				found[eval.GroupID] = []*ExpressionPart{}
 			}
 			found[eval.GroupID] = append(found[eval.GroupID], eval)
 		}
+		lock.Unlock()
 	}
 
-	// Iterate through all known variables/idents in the aggregate tree to see if
-	// the data has those keys set.  If so, we can immediately evaluate the data with
-	// the tree.
-	//
-	// TODO: we should iterate through the expression in a top-down order, ensuring that if
-	// any of the top groups fail to match we quit early.
-	for n, item := range a.artIdents {
-		tree := item
-		path := n
-		eg.Go(func() error {
-			x, err := jp.ParseString(path)
-			if err != nil {
-				return err
-			}
-			res := x.Get(data)
-			if len(res) != 1 {
-				return nil
-			}
-
-			cast, ok := res[0].(string)
-			if !ok {
-				// This isn't a string, so we can't compare within the radix tree.
-				return nil
-			}
-
-			add(tree.Search(ctx, path, cast))
-			return nil
-		})
-	}
-
-	// Match on nulls.
-	for n, item := range a.nullLookups {
-		tree := item
-		path := n
-		eg.Go(func() error {
-			x, err := jp.ParseString(path)
-			if err != nil {
-				return err
-			}
-
-			res := x.Get(data)
-			if len(res) == 0 {
-				// This isn't present, which matches null in our overloads.  Set the
-				// value to nil.
-				res = []any{nil}
-			}
-			// This matches null, nil (as null), and any non-null items.
-			add(tree.Search(ctx, path, res[0]))
-			return nil
-		})
-	}
-
-	if err := eg.Wait(); err != nil {
-		return nil, err
-	}
-
+	// Validate that groups meet the minimum size.
 	for k, count := range counts {
 		if int(k.Size()) > count {
 			// The GroupID required more comparisons to equate to true than
@@ -296,6 +246,7 @@ func (a *aggregator) Add(ctx context.Context, eval Evaluable) (bool, error) {
 
 	aggregateable := true
 	for _, g := range parsed.RootGroups() {
+		// TODO: Within IterGroup, add recursive parsing of groups.
 		ok, err := a.iterGroup(ctx, g, parsed, a.addNode)
 		if err != nil {
 			return false, err
@@ -413,7 +364,7 @@ func (a *aggregator) iterGroup(ctx context.Context, node *Node, parsed *ParsedEx
 	// items from the same identifier.  If so, the evaluation is true.
 	for _, n := range all {
 		err := op(ctx, n, parsed)
-		if err == errTreeUnimplemented {
+		if err == errEngineUnimplemented {
 			return false, nil
 		}
 		if err != nil {
@@ -424,110 +375,106 @@ func (a *aggregator) iterGroup(ctx context.Context, node *Node, parsed *ParsedEx
 	return true, nil
 }
 
-func treeType(p Predicate) TreeType {
+func engineType(p Predicate) EngineType {
 	// switch on type of literal AND operator type.  int64/float64 literals require
-	// btrees, texts require ARTs.
+	// btrees, texts require ARTs, and so on.
 	switch p.Literal.(type) {
 	case string:
-		return TreeTypeART
-	case int64, float64:
-		return TreeTypeBTree
+		if p.Operator == operators.Equals {
+			// StringHash is only used for matching on equality.
+			return EngineTypeStringHash
+		}
 	case nil:
 		// Only allow this if we're not comparing two idents.
 		if p.LiteralIdent != nil {
-			return TreeTypeNone
+			return EngineTypeNone
 		}
-		return TreeTypeNullMatch
-	default:
-		return TreeTypeNone
+		return EngineTypeNullMatch
 	}
+	// case int64, float64:
+	// 	return EngineTypeBTree
+
+	return EngineTypeNone
 }
 
 // nodeOp represents an op eg. addNode or removeNode
 type nodeOp func(ctx context.Context, n *Node, parsed *ParsedExpression) error
 
 func (a *aggregator) addNode(ctx context.Context, n *Node, parsed *ParsedExpression) error {
-	// Don't allow anything to update in parallel.  This enrues that Add() can be called
+	if n.Predicate == nil {
+		return nil
+	}
+
+	// Don't allow anything to update in parallel.  This ensures that Add() can be called
 	// concurrently.
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	// Each node is aggregateable, so add this to the map for fast filtering.
-	switch treeType(*n.Predicate) {
-	case TreeTypeART:
-		tree, ok := a.artIdents[n.Predicate.Ident]
-		if !ok {
-			tree = newArtTree()
-		}
-		err := tree.Add(ctx, ExpressionPart{
-			GroupID:   n.GroupID,
-			Predicate: *n.Predicate,
-			Parsed:    parsed,
-		})
-		if err != nil {
-			return err
-		}
-		a.artIdents[n.Predicate.Ident] = tree
-		return nil
-	case TreeTypeNullMatch:
-		tree, ok := a.nullLookups[n.Predicate.Ident]
-		if !ok {
-			tree = newNullMatcher()
-		}
-		err := tree.Add(ctx, ExpressionPart{
-			GroupID:   n.GroupID,
-			Predicate: *n.Predicate,
-			Parsed:    parsed,
-		})
-		if err != nil {
-			return err
-		}
-		a.nullLookups[n.Predicate.Ident] = tree
-		return nil
+	requiredEngine := engineType(*n.Predicate)
+
+	if requiredEngine == EngineTypeNone {
+		return errEngineUnimplemented
 	}
-	return errTreeUnimplemented
+
+	for _, engine := range a.engines {
+		if engine.Type() != requiredEngine {
+			continue
+		}
+		return engine.Add(ctx, ExpressionPart{
+			GroupID:   n.GroupID,
+			Predicate: *n.Predicate,
+			Parsed:    parsed,
+		})
+	}
+	return errEngineUnimplemented
+
+	/*
+		switch engineType(*n.Predicate) {
+		case EngineTypeNullMatch:
+			tree, ok := a.nullLookups[n.Predicate.Ident]
+			if !ok {
+				tree = newNullMatcher()
+			}
+			err := tree.Add(ctx, ExpressionPart{
+				GroupID:   n.GroupID,
+				Predicate: *n.Predicate,
+				Parsed:    parsed,
+			})
+			if err != nil {
+				return err
+			}
+			a.nullLookups[n.Predicate.Ident] = tree
+			return nil
+		}
+		return errEngineUnimplemented
+	*/
 }
 
 func (a *aggregator) removeNode(ctx context.Context, n *Node, parsed *ParsedExpression) error {
+	if n.Predicate == nil {
+		return nil
+	}
+
 	// Don't allow anything to update in parallel.  This enrues that Add() can be called
 	// concurrently.
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	// Each node is aggregateable, so add this to the map for fast filtering.
-	switch treeType(*n.Predicate) {
-	case TreeTypeART:
-		tree, ok := a.artIdents[n.Predicate.Ident]
-		if !ok {
-			return ErrExpressionPartNotFound
-		}
-		err := tree.Remove(ctx, ExpressionPart{
-			GroupID:   n.GroupID,
-			Predicate: *n.Predicate,
-			Parsed:    parsed,
-		})
-		if err != nil {
-			return err
-		}
-		a.artIdents[n.Predicate.Ident] = tree
-		return nil
-	case TreeTypeNullMatch:
-		tree, ok := a.nullLookups[n.Predicate.Ident]
-		if !ok {
-			return ErrExpressionPartNotFound
-		}
-		err := tree.Remove(ctx, ExpressionPart{
-			GroupID:   n.GroupID,
-			Predicate: *n.Predicate,
-			Parsed:    parsed,
-		})
-		if err != nil {
-			return err
-		}
-		a.nullLookups[n.Predicate.Ident] = tree
-		return nil
+	requiredEngine := engineType(*n.Predicate)
+	if requiredEngine == EngineTypeNone {
+		return errEngineUnimplemented
 	}
-	return errTreeUnimplemented
+	for _, engine := range a.engines {
+		if engine.Type() != requiredEngine {
+			continue
+		}
+		return engine.Remove(ctx, ExpressionPart{
+			GroupID:   n.GroupID,
+			Predicate: *n.Predicate,
+			Parsed:    parsed,
+		})
+	}
+	return errEngineUnimplemented
 }
 
 func isAggregateable(n *Node) bool {

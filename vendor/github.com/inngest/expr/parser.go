@@ -340,21 +340,6 @@ func (p Predicate) LiteralAsString() string {
 	return str
 }
 
-func (p Predicate) TreeType() TreeType {
-	// switch on type of literal AND operator type.  int64/float64 literals require
-	// btrees, texts require ARTs.
-	switch p.Literal.(type) {
-	case string:
-		return TreeTypeART
-	case int64, float64:
-		return TreeTypeBTree
-	case nil:
-		return TreeTypeNullMatch
-	default:
-		return TreeTypeNone
-	}
-}
-
 // expr is wrapper around the CEL AST which stores parsing-related data.
 type expr struct {
 	ast celast.Expr

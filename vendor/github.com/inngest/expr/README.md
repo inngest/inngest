@@ -1,0 +1,5 @@
+TODO:
+
+- Bool
+- Ints
+- Floats

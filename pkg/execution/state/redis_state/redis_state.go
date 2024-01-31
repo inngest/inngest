@@ -849,6 +849,9 @@ func (m mgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eve
 	}
 	for it.Next(ctx) {
 		pause := it.Val(ctx)
+		if pause == nil {
+			continue
+		}
 		if err := do(ctx, pause); err != nil {
 			return err
 		}
@@ -1138,11 +1141,11 @@ func (i *keyIter) fetch(ctx context.Context) error {
 
 	var load []string
 	if len(i.keys) > int(i.chunk) {
-		load = i.keys[:]
-		i.keys = []string{}
-	} else {
 		load = i.keys[0:i.chunk]
 		i.keys = i.keys[i.chunk:]
+	} else {
+		load = i.keys[:]
+		i.keys = []string{}
 	}
 
 	for n, id := range load {

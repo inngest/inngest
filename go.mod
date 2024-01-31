@@ -29,7 +29,7 @@ require (
 	github.com/gowebpki/jcs v1.0.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/terraform v0.15.3
-	github.com/inngest/expr v0.0.0-20240109020554-19e459e1e8d4
+	github.com/inngest/expr v0.0.0-20240131182319-5b1160f58203
 	github.com/inngest/inngestgo v0.5.5-0.20240123232731-01cec59caf45
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5
@@ -145,7 +145,6 @@ require (
 	github.com/ohler55/ojg v1.21.0 // indirect
 	github.com/pascaldekloe/name v1.0.1 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
-	github.com/plar/go-adaptive-radix-tree v1.0.5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.17.0 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
