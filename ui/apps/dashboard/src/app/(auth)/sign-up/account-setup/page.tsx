@@ -17,6 +17,32 @@ export default function AccountSetupPage() {
   useForceActiveOrganization();
   const isAccountSetup = useIsAccountSetup();
 
+  // Reload memberships if the user doesn't have an active organization
+  useEffect(() => {
+    if (!isLoaded || userMemberships.data[0] || organization) return;
+
+    const intervalID = setInterval(() => {
+      userMemberships.revalidate();
+    }, 500);
+
+    return () => {
+      clearInterval(intervalID);
+    };
+  }, [isLoaded, organization, setActive, userMemberships, userMemberships.data]);
+
+  // Reload the organization while it isn't yet set up
+  useEffect(() => {
+    if (!organization || organization.publicMetadata.accountID) return;
+
+    const intervalID = setInterval(() => {
+      organization.reload();
+    }, 500);
+
+    return () => {
+      clearInterval(intervalID);
+    };
+  }, [isAccountSetup, organization]);
+
   // Redirect to the home page once the account is set up
   useEffect(() => {
     if (!isAccountSetup) return;
