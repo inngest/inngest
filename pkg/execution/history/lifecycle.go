@@ -647,6 +647,18 @@ func (l lifecycle) OnInvokeFunctionResumed(
 		WorkspaceID: id.WorkspaceID,
 		StepName:    stepName,
 	}
+
+	if withErr := req.Error(); withErr != "" {
+		h.Type = enums.HistoryTypeStepFailed.String()
+		h.Result = &Result{
+			Output: withErr,
+		}
+	} else if withData := req.Data(); withData != "" {
+		h.Result = &Result{
+			Output: withData,
+		}
+	}
+
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
 			l.log.Error("execution lifecycle error", "lifecycle", "onInvokeFunctionResumed", "error", err)

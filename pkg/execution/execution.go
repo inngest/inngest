@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -181,6 +182,26 @@ type ResumeRequest struct {
 	// functions directly.
 	RunID    *ulid.ULID
 	StepName string
+}
+
+func (r *ResumeRequest) Error() string {
+	return r.withKey("error")
+}
+
+func (r *ResumeRequest) Data() string {
+	return r.withKey("data")
+}
+
+func (r *ResumeRequest) withKey(key string) string {
+	if withData, ok := r.With.(map[string]any)[key]; ok {
+		byt, err := json.Marshal(withData)
+		if err == nil {
+			return string(byt)
+		}
+		return ""
+	}
+
+	return ""
 }
 
 // HandlePauseResult returns status information about pause handling.
