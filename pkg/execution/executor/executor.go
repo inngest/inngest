@@ -260,6 +260,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
 			AccountID:       req.AccountID,
 			WorkspaceID:     req.WorkspaceID,
+			AppID:           req.AppID,
 			FunctionID:      req.Function.ID,
 			FunctionVersion: req.Function.FunctionVersion,
 			EventID:         req.Events[0].GetInternalID(),
@@ -305,6 +306,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Key:             key,
 		AccountID:       req.AccountID,
 		WorkspaceID:     req.WorkspaceID,
+		AppID:           req.AppID,
 		OriginalRunID:   req.OriginalRunID,
 		ReplayID:        req.ReplayID,
 	}

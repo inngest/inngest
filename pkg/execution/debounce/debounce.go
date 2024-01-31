@@ -62,8 +62,10 @@ func init() {
 type DebounceItem struct {
 	// AccountID represents the account for the debounce item
 	AccountID uuid.UUID `json:"aID"`
-	// WorkspaceID represents the account for the debounce item
+	// WorkspaceID represents the workspace for the debounce item
 	WorkspaceID uuid.UUID `json:"wsID"`
+	// AppID represents the app for the debounce item
+	AppID uuid.UUID `json:"appID"`
 	// FunctionID represents the function ID that this debounce is for.
 	FunctionID uuid.UUID `json:"fnID"`
 	// FunctionVersion represents the version of the function that was debounced.
@@ -80,6 +82,7 @@ func (d DebounceItem) QueuePayload() DebouncePayload {
 	return DebouncePayload{
 		AccountID:       d.AccountID,
 		WorkspaceID:     d.WorkspaceID,
+		AppID:           d.AppID,
 		FunctionID:      d.FunctionID,
 		FunctionVersion: d.FunctionVersion,
 	}
@@ -102,8 +105,10 @@ type DebouncePayload struct {
 	DebounceID ulid.ULID `json:"debounceID"`
 	// AccountID represents the account for the debounce item
 	AccountID uuid.UUID `json:"aID"`
-	// WorkspaceID represents the account for the debounce item
+	// WorkspaceID represents the workspace for the debounce item
 	WorkspaceID uuid.UUID `json:"wsID"`
+	// AppID represents the app for the debounce item
+	AppID uuid.UUID `json:"appID"`
 	// FunctionID represents the function ID that this debounce is for.
 	FunctionID uuid.UUID `json:"fnID"`
 	// FunctionVersion represents the version of the function that was debounced.
@@ -220,6 +225,7 @@ func (d debouncer) queueItem(ctx context.Context, di DebounceItem, debounceID ul
 		Identifier: state.Identifier{
 			AccountID:   di.AccountID,
 			WorkspaceID: di.WorkspaceID,
+			AppID:       di.AppID,
 			WorkflowID:  di.FunctionID,
 		},
 		Kind:    queue.KindDebounce,
