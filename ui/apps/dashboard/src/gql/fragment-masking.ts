@@ -43,6 +43,6 @@ export function getFragmentData<TType>(
 export function makeFragmentData<
   F extends DocumentNode,
   FT extends ResultOf<F>
->(data: FT): FragmentType<F> {
+>(data: FT, _fragment: F): FragmentType<F> {
   return data as FragmentType<F>;
 }

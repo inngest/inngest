@@ -15,10 +15,23 @@ import {
   mapExchange,
 } from 'urql';
 
-export default function URQLProvider({ children }: { children: React.ReactNode }) {
-  const { getToken, isSignedIn, orgId } = useAuth();
+/**
+ * This is used to ensure that the URQL client is re-created (cache reset) whenever the user signs
+ * out or switches organizations.
+ * @param {React.ReactNode} children
+ * @returns {JSX.Element}
+ * @constructor
+ */
+export default function URQLProviderWrapper({ children }: { children: React.ReactNode }) {
+  const { isSignedIn, orgId } = useAuth();
 
-  const urqlClient = useMemo(() => {
+  return <URQLProvider key={`${isSignedIn}-${orgId}`}>{children}</URQLProvider>;
+}
+
+export function URQLProvider({ children }: { children: React.ReactNode }) {
+  const { getToken } = useAuth();
+
+  const client = useMemo(() => {
     return createClient({
       url: `${process.env.NEXT_PUBLIC_API_URL}/gql`,
       exchanges: [
@@ -60,10 +73,9 @@ export default function URQLProvider({ children }: { children: React.ReactNode }
         fetchExchange,
       ],
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- we want to re-create the client whenever the user signs out or switches organizations
-  }, [getToken, isSignedIn, orgId]);
+  }, [getToken]);
 
-  return <Provider value={urqlClient}>{children}</Provider>;
+  return <Provider value={client}>{children}</Provider>;
 }
 
 function isUnauthenticatedError(error: CombinedError): boolean {
