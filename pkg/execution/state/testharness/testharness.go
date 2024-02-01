@@ -1483,7 +1483,6 @@ func checkPausesByID(t *testing.T, m state.Manager) {
 
 	found, err = m.PausesByID(ctx, a.ID)
 	require.Empty(t, found, "PausesByID should not return consumed pauses")
-	require.NotNil(t, err)
 	require.Error(t, state.ErrPauseNotFound, err)
 	require.Equal(t, 0, len(found))
 }
