@@ -135,6 +135,7 @@ func CheckState(t *testing.T, gen Generator) {
 		"PausesByEvent/Consumed":           checkPausesByEvent_consumed,
 		"PauseByStep":                      checkPausesByStep,
 		"PauseByID":                        checkPauseByID,
+		"PausesByID":                       checkPausesByID,
 		"Idempotency":                      checkIdempotency,
 		"SetStatus":                        checkSetStatus,
 		"Cancel":                           checkCancel,
@@ -1438,6 +1439,52 @@ func checkPauseByID(t *testing.T, m state.Manager) {
 	require.Nil(t, found, "PauseByID should not return random IDs")
 	require.NotNil(t, err)
 	require.Error(t, state.ErrPauseNotFound, err)
+}
+
+func checkPausesByID(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	// Save a pause.
+	a := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    state.Time(time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC()),
+	}
+	b := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    state.Time(time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC()),
+	}
+	err := m.SavePause(ctx, a)
+	require.NoError(t, err)
+	err = m.SavePause(ctx, b)
+	require.NoError(t, err)
+
+	found, err := m.PausesByID(ctx, a.ID)
+	require.Nil(t, err)
+	require.EqualValues(t, 1, len(found))
+	require.EqualValues(t, a, *found[0])
+
+	<-time.After(time.Second * 3)
+
+	// Finds two
+	found, err = m.PausesByID(ctx, a.ID, b.ID)
+	require.Nil(t, err)
+	require.EqualValues(t, 2, len(found))
+
+	// Consume.
+	err = m.ConsumePause(ctx, a.ID, nil)
+	require.Nil(t, err, "Consuming an expired pause should work")
+
+	found, err = m.PausesByID(ctx, a.ID)
+	require.Empty(t, found, "PausesByID should not return consumed pauses")
+	require.Error(t, state.ErrPauseNotFound, err)
+	require.Equal(t, 0, len(found))
 }
 
 func checkIdempotency(t *testing.T, m state.Manager) {

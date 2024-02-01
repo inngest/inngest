@@ -5,6 +5,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"regexp"
@@ -755,6 +756,45 @@ func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) 
 	return pause, err
 }
 
+func (m mgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	keys := make([]string, len(ids))
+	for n, id := range ids {
+		keys[n] = m.kf.PauseID(ctx, id)
+	}
+
+	cmd := m.pauseR.B().Mget().Key(keys...).Build()
+	strings, err := m.pauseR.Do(ctx, cmd).AsStrSlice()
+	if err == rueidis.Nil {
+		return nil, state.ErrPauseNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var merr error
+
+	pauses := []*state.Pause{}
+	for _, item := range strings {
+		if len(item) == 0 {
+			continue
+		}
+
+		pause := &state.Pause{}
+		err = json.Unmarshal([]byte(item), pause)
+		if err != nil {
+			merr = errors.Join(merr, err)
+			continue
+		}
+		pauses = append(pauses, pause)
+	}
+
+	return pauses, merr
+}
+
 // PauseByStep returns a specific pause for a given workflow run, from a given step.
 //
 // This is required when continuing a step function from an async step, ie. one that
@@ -841,6 +881,18 @@ func (m mgr) PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, even
 	return iter, err
 }
 
+func (m mgr) EvaluablesByID(ctx context.Context, ids ...uuid.UUID) ([]expr.Evaluable, error) {
+	items, err := m.PausesByID(ctx, ids...)
+	if err != nil {
+		return nil, err
+	}
+	evaluables := make([]expr.Evaluable, len(items))
+	for n, i := range items {
+		evaluables[n] = i
+	}
+	return evaluables, nil
+}
+
 func (m mgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {
 
 	it, err := m.PausesByEventSince(ctx, workspaceID, eventName, since)
@@ -857,7 +909,7 @@ func (m mgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eve
 		}
 	}
 
-	if it.Error() != context.Canceled {
+	if it.Error() != context.Canceled && it.Error() != scanDoneErr {
 		return it.Error()
 	}
 	return nil
@@ -1125,7 +1177,11 @@ func (i *keyIter) Error() error {
 func (i *keyIter) init(ctx context.Context, keys []string, chunk int64) error {
 	i.keys = keys
 	i.chunk = chunk
-	return i.fetch(ctx)
+	err := i.fetch(ctx)
+	if err == scanDoneErr {
+		return nil
+	}
+	return err
 }
 
 func (i *keyIter) Count() int {
@@ -1168,6 +1224,9 @@ func (i *keyIter) Next(ctx context.Context) bool {
 	}
 
 	err := i.fetch(ctx)
+	if err == scanDoneErr {
+		return false
+	}
 	return err == nil
 }
 

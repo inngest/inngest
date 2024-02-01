@@ -520,8 +520,8 @@ github.com/google/uuid v1.1.1/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+
 github.com/google/uuid v1.1.2/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/google/uuid v1.2.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/google/uuid v1.4.0 h1:MtMxsa51/r9yyhkyLsVeVt0B+BGQZzpQiTQ4eHZ8bc4=
-github.com/google/uuid v1.4.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
+github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/google/wire v0.5.0 h1:I7ELFeVBr3yfPIcc8+MWvrjk+3VjbcSzoXm3JVa+jD8=
 github.com/google/wire v0.5.0/go.mod h1:ngWDr9Qvq3yZA10YrxfyGELY/AFWGVpy9c1LTRi1EoU=
 github.com/googleapis/enterprise-certificate-proxy v0.3.2 h1:Vie5ybvEvT75RniqhfFxPRy3Bf7vr3h0cechB90XaQs=
@@ -619,8 +619,8 @@ github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:
 github.com/imdario/mergo v0.3.11/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
 github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
-github.com/inngest/expr v0.0.0-20240131182319-5b1160f58203 h1:/s2NEHO69f2F/3pt1zviaDn9U2Hw9n5DvfGDTrL2vZ4=
-github.com/inngest/expr v0.0.0-20240131182319-5b1160f58203/go.mod h1:c/iFCafUmKEIByJMb6Djz/0WnQ+6+Fs4g4x5izbcatM=
+github.com/inngest/expr v0.0.0-20240201152704-a643bc6ace48 h1:32YlbLIeO8HOMzYF3DfRLNX8hKeDb8omccWf03PHyh4=
+github.com/inngest/expr v0.0.0-20240201152704-a643bc6ace48/go.mod h1:Evn0nMuDe2NghjynoNzNwwc8ONXuFVzVr1H93tCwPyE=
 github.com/inngest/inngestgo v0.5.5-0.20240123232731-01cec59caf45 h1:95OygSKIaFRl5teNPajl8FONp/zLxRlxpN3muHjRKM0=
 github.com/inngest/inngestgo v0.5.5-0.20240123232731-01cec59caf45/go.mod h1:tFqW/HVtc+Qh0J5QfPSmU7//bTNe6WpuPVSUfxArfMc=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=

@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/google/cel-go/common/operators"
+	"github.com/google/uuid"
 )
 
 var (
@@ -23,6 +24,9 @@ var errEngineUnimplemented = fmt.Errorf("tree type unimplemented")
 // ExpressionEvaluator is a function which evalues an expression given input data, returning
 // a boolean and error.
 type ExpressionEvaluator func(ctx context.Context, e Evaluable, input map[string]any) (bool, error)
+
+// EvaluableLoader returns one or more evaluable items given IDs.
+type EvaluableLoader func(ctx context.Context, evaluableIDs ...uuid.UUID) ([]Evaluable, error)
 
 // AggregateEvaluator represents a group of expressions that must be evaluated for a single
 // event received.
@@ -48,7 +52,7 @@ type AggregateEvaluator interface {
 	Evaluate(ctx context.Context, data map[string]any) ([]Evaluable, int32, error)
 
 	// AggregateMatch returns all expression parts which are evaluable given the input data.
-	AggregateMatch(ctx context.Context, data map[string]any) ([]*ExpressionPart, error)
+	AggregateMatch(ctx context.Context, data map[string]any) ([]*StoredExpressionPart, error)
 
 	// Len returns the total number of aggregateable and constantly matched expressions
 	// stored in the evaluator.
@@ -65,10 +69,12 @@ type AggregateEvaluator interface {
 func NewAggregateEvaluator(
 	parser TreeParser,
 	eval ExpressionEvaluator,
+	evalLoader EvaluableLoader,
 ) AggregateEvaluator {
 	return &aggregator{
 		eval:   eval,
 		parser: parser,
+		loader: evalLoader,
 		engines: map[EngineType]MatchingEngine{
 			EngineTypeStringHash: newStringEqualityMatcher(),
 			EngineTypeNullMatch:  newNullMatcher(),
@@ -80,6 +86,7 @@ func NewAggregateEvaluator(
 type aggregator struct {
 	eval   ExpressionEvaluator
 	parser TreeParser
+	loader EvaluableLoader
 
 	// engines records all engines
 	engines map[EngineType]MatchingEngine
@@ -88,9 +95,9 @@ type aggregator struct {
 	lock *sync.RWMutex
 	// len stores the current len of aggregable expressions.
 	len int32
-	// constants tracks evaluable instances that must always be evaluated, due to
+	// constants tracks evaluable IDs that must always be evaluated, due to
 	// the expression containing non-aggregateable clauses.
-	constants []*ParsedExpression
+	constants []uuid.UUID
 }
 
 // Len returns the total number of aggregateable and constantly matched expressions
@@ -118,24 +125,29 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 	)
 
 	// TODO: Concurrently match constant expressions using a semaphore for capacity.
-	for _, expr := range a.constants {
+	// Match constant expressions always.
+	constantEvals, err := a.loader(ctx, a.constants...)
+	if err != nil {
+		return nil, 0, err
+	}
+	for _, expr := range constantEvals {
 		atomic.AddInt32(&matched, 1)
 
-		if expr.Evaluable.GetExpression() == "" {
-			result = append(result, expr.Evaluable)
+		if expr.GetExpression() == "" {
+			result = append(result, expr)
 			continue
 		}
 
 		// NOTE: We don't need to add lifted expression variables,
 		// because match.Parsed.Evaluable() returns the original expression
 		// string.
-		ok, evalerr := a.eval(ctx, expr.Evaluable, data)
+		ok, evalerr := a.eval(ctx, expr, data)
 		if evalerr != nil {
 			err = errors.Join(err, evalerr)
 			continue
 		}
 		if ok {
-			result = append(result, expr.Evaluable)
+			result = append(result, expr)
 		}
 	}
 
@@ -144,14 +156,24 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 		err = errors.Join(err, merr)
 	}
 
+	// Load all evaluable instances directly.
+	uuids := make([]uuid.UUID, len(matches))
+	for n, m := range matches {
+		uuids[n] = m.Parsed.EvaluableID
+	}
+	evaluables, lerr := a.loader(ctx, uuids...)
+	if err != nil {
+		err = errors.Join(err, lerr)
+	}
+
 	// Each match here is a potential success.  When other trees and operators which are walkable
 	// are added (eg. >= operators on strings), ensure that we find the correct number of matches
 	// for each group ID and then skip evaluating expressions if the number of matches is <= the group
 	// ID's length.
-	seen := map[groupID]struct{}{}
+	seen := map[uuid.UUID]struct{}{}
 
-	for _, match := range matches {
-		if _, ok := seen[match.GroupID]; ok {
+	for _, match := range evaluables {
+		if _, ok := seen[match.GetID()]; ok {
 			continue
 		}
 
@@ -159,26 +181,26 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 		// NOTE: We don't need to add lifted expression variables,
 		// because match.Parsed.Evaluable() returns the original expression
 		// string.
-		ok, evalerr := a.eval(ctx, match.Parsed.Evaluable, data)
+		ok, evalerr := a.eval(ctx, match, data)
 
-		seen[match.GroupID] = struct{}{}
+		seen[match.GetID()] = struct{}{}
 
 		if evalerr != nil {
 			err = errors.Join(err, evalerr)
 			continue
 		}
 		if ok {
-			result = append(result, match.Parsed.Evaluable)
+			result = append(result, match)
 		}
 	}
 
-	return result, matched, nil
+	return result, matched, err
 }
 
 // AggregateMatch attempts to match incoming data to all PredicateTrees, resulting in a selection
 // of parts of an expression that have matched.
-func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([]*ExpressionPart, error) {
-	result := []*ExpressionPart{}
+func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([]*StoredExpressionPart, error) {
+	result := []*StoredExpressionPart{}
 
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -191,7 +213,7 @@ func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([
 	// Note that having a count >= the group ID value does not guarantee that the expression is valid.
 	counts := map[groupID]int{}
 	// Store all expression parts per group ID for returning.
-	found := map[groupID][]*ExpressionPart{}
+	found := map[groupID][]*StoredExpressionPart{}
 	// protect the above locks with a map.
 	lock := &sync.Mutex{}
 
@@ -206,7 +228,7 @@ func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([
 		for _, eval := range matched {
 			counts[eval.GroupID] += 1
 			if _, ok := found[eval.GroupID]; !ok {
-				found[eval.GroupID] = []*ExpressionPart{}
+				found[eval.GroupID] = []*StoredExpressionPart{}
 			}
 			found[eval.GroupID] = append(found[eval.GroupID], eval)
 		}
@@ -239,7 +261,7 @@ func (a *aggregator) Add(ctx context.Context, eval Evaluable) (bool, error) {
 	if eval.GetExpression() == "" {
 		// This is an empty expression which always matches.
 		a.lock.Lock()
-		a.constants = append(a.constants, parsed)
+		a.constants = append(a.constants, parsed.EvaluableID)
 		a.lock.Unlock()
 		return false, nil
 	}
@@ -255,7 +277,7 @@ func (a *aggregator) Add(ctx context.Context, eval Evaluable) (bool, error) {
 			// This is the first time we're seeing a non-aggregateable
 			// group, so add it to the constants list.
 			a.lock.Lock()
-			a.constants = append(a.constants, parsed)
+			a.constants = append(a.constants, parsed.EvaluableID)
 			a.lock.Unlock()
 			aggregateable = false
 		}
@@ -307,7 +329,7 @@ func (a *aggregator) removeConstantEvaluable(ctx context.Context, eval Evaluable
 	// Find the index of the evaluable in constants and yank out.
 	idx := -1
 	for n, item := range a.constants {
-		if item.Evaluable.GetID() == eval.GetID() {
+		if item == eval.GetID() {
 			idx = n
 			break
 		}
@@ -422,7 +444,7 @@ func (a *aggregator) addNode(ctx context.Context, n *Node, parsed *ParsedExpress
 		}
 		return engine.Add(ctx, ExpressionPart{
 			GroupID:   n.GroupID,
-			Predicate: *n.Predicate,
+			Predicate: n.Predicate,
 			Parsed:    parsed,
 		})
 	}
@@ -470,7 +492,7 @@ func (a *aggregator) removeNode(ctx context.Context, n *Node, parsed *ParsedExpr
 		}
 		return engine.Remove(ctx, ExpressionPart{
 			GroupID:   n.GroupID,
-			Predicate: *n.Predicate,
+			Predicate: n.Predicate,
 			Parsed:    parsed,
 		})
 	}
