@@ -1131,6 +1131,8 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 
 //nolint:all
 func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
+	res := execution.HandlePauseResult{0, 0}
+
 	if e.exprAggregator == nil {
 		return execution.HandlePauseResult{}, fmt.Errorf("no expression evaluator found")
 	}
@@ -1145,9 +1147,8 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 	}
 
 	var (
-		goerr   error
-		wg      sync.WaitGroup
-		counter int32
+		goerr error
+		wg    sync.WaitGroup
 	)
 
 	base.Debug().
@@ -1160,10 +1161,14 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 		if !ok || found == nil {
 			continue
 		}
+
 		// Copy pause into function
 		pause := *found
 		wg.Add(1)
 		go func() {
+			atomic.AddInt32(&res[0], 1)
+
+			defer wg.Done()
 
 			l := base.With().
 				Str("pause_id", pause.ID.String()).
@@ -1234,7 +1239,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 				err = e.sm.ConsumePause(ctx, pause.ID, nil)
 				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
 					// Done. Add to the counter.
-					atomic.AddInt32(&counter, 1)
+					atomic.AddInt32(&res[1], 1)
 					_ = e.exprAggregator.RemovePause(ctx, pause)
 					return
 				}
@@ -1254,7 +1259,8 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
 				return
 			}
-
+			// Add to the counter.
+			atomic.AddInt32(&res[1], 1)
 			if err := e.exprAggregator.RemovePause(ctx, pause); err != nil {
 				l.Error().Err(err).Msg("error removing pause from aggregator")
 			}
@@ -1262,7 +1268,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 	}
 	wg.Wait()
 
-	return execution.HandlePauseResult{count, counter}, goerr
+	return res, goerr
 }
 
 // Cancel cancels an in-progress function.
