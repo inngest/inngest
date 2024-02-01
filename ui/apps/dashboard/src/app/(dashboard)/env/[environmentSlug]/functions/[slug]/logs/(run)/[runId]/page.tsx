@@ -19,6 +19,12 @@ const GetFunctionRunDetailsDocument = graphql(`
             payload: event
             receivedAt
           }
+          events {
+            id
+            name
+            payload: event
+            receivedAt
+          }
           history {
             attempt
             cancel {
