@@ -943,11 +943,20 @@ func (e *executor) executeDriverForStep(ctx context.Context, id state.Identifier
 
 // HandlePauses handles pauses loaded from an incoming event.
 func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
-	aggRes, err := e.handlePausesAllNaively(ctx, iter, evt)
+	// Use the aggregator for all funciton finished events.
+	if evt.GetEvent().Name == event.FnFinishedName {
+		aggRes, err := e.handleAggregatePauses(ctx, evt)
+		if err != nil {
+			log.From(ctx).Error().Err(err).Msg("error handling aggregate pauses")
+		}
+		return aggRes, err
+	}
+
+	res, err := e.handlePausesAllNaively(ctx, iter, evt)
 	if err != nil {
 		log.From(ctx).Error().Err(err).Msg("error handling aggregate pauses")
 	}
-	return aggRes, err
+	return res, nil
 }
 
 //nolint:all
@@ -1129,7 +1138,6 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 	return res, goerr
 }
 
-//nolint:all
 func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
 	res := execution.HandlePauseResult{0, 0}
 

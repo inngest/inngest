@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,7 +32,7 @@ func NewAggregator(
 	if log == nil {
 		log = logger.StdlibLogger(ctx)
 	}
-	return aggregator{
+	return &aggregator{
 		log:     log,
 		records: ccache.New(ccache.Configure().MaxSize(size).ItemsToPrune(uint32(size) / 4)),
 		loader:  loader,
@@ -39,6 +40,8 @@ func NewAggregator(
 		// use the package's exprEvaluator function as the actual logic which evaluates
 		// expressions after the aggregate evaluator does matching.
 		evaluator: exprEvaluator,
+		mapLock:   &sync.Mutex{},
+		locks:     map[string]*sync.Mutex{},
 	}
 }
 
@@ -74,7 +77,7 @@ type Aggregator interface {
 	//
 	// Finally, the Aggregator performs record-keeping, storing the size of AEs, usage statistics,
 	// and LRU semantics to evict non-recently-used AEs under memory pressure.
-	LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eventName string) (expr.AggregateEvaluator, error)
+	LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eventName string, eventTS time.Time) (expr.AggregateEvaluator, error)
 
 	// RemovePause is a shortcut to find an event evaluator _without_ refreshing new data, and to
 	// remove the pause's expressions from any aggregate trees.
@@ -94,11 +97,14 @@ type aggregator struct {
 	loader    EvaluableLoader
 	parser    expr.TreeParser
 	evaluator expr.ExpressionEvaluator
+
+	mapLock *sync.Mutex
+	locks   map[string]*sync.Mutex
 }
 
-func (a aggregator) EvaluateAsyncEvent(ctx context.Context, event event.TrackedEvent) ([]expr.Evaluable, int32, error) {
+func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.TrackedEvent) ([]expr.Evaluable, int32, error) {
 	name := event.GetEvent().Name
-	eval, err := a.LoadEventEvaluator(ctx, event.GetWorkspaceID(), name)
+	eval, err := a.LoadEventEvaluator(ctx, event.GetWorkspaceID(), name, event.GetEvent().Time())
 	if err != nil {
 		return nil, 0, fmt.Errorf("Could not load an event evaluator: %w", err)
 	}
@@ -121,14 +127,17 @@ func (a aggregator) EvaluateAsyncEvent(ctx context.Context, event event.TrackedE
 		"evaluated aggregate expressions",
 		"workspace_id", event.GetWorkspaceID(),
 		"event", name,
+		"event_data", event.GetEvent(),
 		"eval_count", evalCount,
 		"matched_count", len(found),
+		"total_count", eval.Len(),
+		"found", found,
 	)
 
 	return found, evalCount, err
 }
 
-func (a aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eventName string) (expr.AggregateEvaluator, error) {
+func (a *aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eventName string, eventTS time.Time) (expr.AggregateEvaluator, error) {
 	key := wsID.String() + ":" + eventName
 
 	var bk *bookkeeper
@@ -150,6 +159,22 @@ func (a aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, even
 		val.Extend(time.Hour * 3)
 	}
 
+	if bk.updatedAt.After(eventTS) {
+		// We can use a stale executor here, as the pauses were updated after the event
+		// was received.  This prevents spinning on locks.
+		return bk.ae, nil
+	}
+
+	a.mapLock.Lock()
+	lock, ok := a.locks[key]
+	if !ok {
+		a.locks[key] = &sync.Mutex{}
+		lock = a.locks[key]
+	}
+	a.mapLock.Unlock()
+
+	lock.Lock()
+	defer lock.Unlock()
 	if err := bk.update(ctx, a.loader); err != nil {
 		if bk.updatedAt.IsZero() {
 			return nil, fmt.Errorf("could not load evaluables for aggregate evaluator")
@@ -169,7 +194,7 @@ func (a aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, even
 	return bk.ae, nil
 }
 
-func (a aggregator) getBookkeeper(ctx context.Context, wsID uuid.UUID, eventName string) *bookkeeper {
+func (a *aggregator) getBookkeeper(ctx context.Context, wsID uuid.UUID, eventName string) *bookkeeper {
 	key := wsID.String() + ":" + eventName
 	var bk *bookkeeper
 	val := a.records.Get(key)
@@ -180,7 +205,7 @@ func (a aggregator) getBookkeeper(ctx context.Context, wsID uuid.UUID, eventName
 	return bk
 }
 
-func (a aggregator) RemovePause(ctx context.Context, pause EventEvaluable) error {
+func (a *aggregator) RemovePause(ctx context.Context, pause EventEvaluable) error {
 	if pause.GetEvent() == nil {
 		return fmt.Errorf("cannot remove non-pause evaluable")
 	}
