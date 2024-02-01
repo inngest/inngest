@@ -81,14 +81,6 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
           </th>
 
           <th scope="col" className="w-0 pr-4"></th>
-
-          {/* TODO - When we have this data bring back this column header here and in TableRow */}
-          {/* <th
-                    scope="col"
-                    className="font-medium py-3 px-4 text-slate-500 text-sm text-right"
-                  >
-                    Latest Deployment
-                  </th> */}
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-100 px-4 py-3">
@@ -108,21 +100,23 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
           </tr>
         )}
       </tbody>
-      <tfoot className="border-t border-slate-200">
-        <tr>
-          <td colSpan={5} className="px-4 py-1 text-center">
-            {pages.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setPage(idx)}
-                className="transition-color mx-1 cursor-pointer px-2 text-indigo-500 underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-800 hover:decoration-indigo-800 dark:text-indigo-400 dark:hover:decoration-indigo-400"
-              >
-                {idx + 1}
-              </button>
-            ))}
-          </td>
-        </tr>
-      </tfoot>
+      {pages.length > 1 && (
+        <tfoot className="border-t border-slate-200">
+          <tr>
+            <td colSpan={5} className="px-4 py-1 text-center">
+              {pages.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setPage(idx)}
+                  className="transition-color mx-1 cursor-pointer px-2 text-indigo-500 underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-800 hover:decoration-indigo-800 dark:text-indigo-400 dark:hover:decoration-indigo-400"
+                >
+                  {idx + 1}
+                </button>
+              ))}
+            </td>
+          </tr>
+        </tfoot>
+      )}
     </table>
   );
 }
