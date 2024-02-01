@@ -11,12 +11,14 @@ import type { FunctionRun } from '@inngest/components/types/functionRun';
 import { shortDate } from '@inngest/components/utils/date';
 
 type EventProps = {
-  event: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>;
+  // An array of length > 1 will be treated as a batch of events
+  events: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>[];
+
   loading?: false;
 };
 
 type LoadingEvent = {
-  event?: Partial<Event>;
+  events?: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>[];
   loading: true;
 };
 
@@ -44,7 +46,7 @@ type WithoutRunSelector = {
 type Props = (EventProps | LoadingEvent) & (WithoutRunSelector | WithRunSelector);
 
 export function EventDetails({
-  event,
+  events,
   functionRuns,
   onFunctionRunClick,
   onReplayEvent,
@@ -53,27 +55,45 @@ export function EventDetails({
   codeBlockActions = [],
   loading = false,
 }: Props) {
-  const prettyPayload = event?.payload && usePrettyJson(event.payload);
+  let singleEvent = undefined;
+  if (events?.length === 1) {
+    singleEvent = events[0];
+  }
+
+  let batch = undefined;
+  if (events && events.length > 1) {
+    batch = events;
+  }
+
+  let prettyPayload = undefined;
+  if (singleEvent && singleEvent.payload) {
+    prettyPayload = usePrettyJson(singleEvent.payload);
+  } else if (batch) {
+    prettyPayload = usePrettyJson(JSON.stringify(batch));
+  }
 
   return (
     <ContentCard
-      title={event?.name || 'unknown'}
+      title={events?.[0]?.name || 'unknown'}
       type="event"
       metadata={
-        <div className="pt-8">
-          <MetadataGrid
-            metadataItems={[
-              { label: 'Event ID', value: event?.id || '', size: 'large', type: 'code' },
-              {
-                label: 'Received At',
-                value: (event?.receivedAt && shortDate(event.receivedAt)) || '',
-              },
-            ]}
-            loading={loading}
-          />
-        </div>
+        singleEvent && (
+          <div className="pt-8">
+            <MetadataGrid
+              metadataItems={[
+                { label: 'Event ID', value: singleEvent.id, size: 'large', type: 'code' },
+                {
+                  label: 'Received At',
+                  value: shortDate(singleEvent.receivedAt),
+                },
+              ]}
+              loading={loading}
+            />
+          </div>
+        )
       }
       button={
+        singleEvent &&
         onReplayEvent &&
         SendEventButton && (
           <>
@@ -89,7 +109,7 @@ export function EventDetails({
       {!loading && (
         <div className="px-5 pt-4">
           <CodeBlock
-            tabs={[{ label: 'Payload', content: prettyPayload ?? 'Unknown' }]}
+            tabs={[{ label: batch ? 'Batch' : 'Payload', content: prettyPayload ?? 'Unknown' }]}
             actions={codeBlockActions}
           />
         </div>

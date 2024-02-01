@@ -23,7 +23,7 @@ import { getHistoryItemOutput } from './getHistoryItemOutput';
 
 type Props = {
   environment: Pick<Environment, 'id' | 'slug'>;
-  event?: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>;
+  events?: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>[];
   func: Pick<Function, 'id' | 'name' | 'slug' | 'triggers'>;
   functionVersion?: Pick<FunctionVersion, 'url' | 'version'>;
   rawHistory: RawHistoryItem[];
@@ -32,7 +32,7 @@ type Props = {
 
 export function StreamDetails({
   environment,
-  event,
+  events,
   func,
   functionVersion,
   rawHistory,
@@ -75,26 +75,27 @@ export function StreamDetails({
     );
   };
 
+  let codeBlockActions = undefined;
+  if (events?.[0] && events.length === 1) {
+    const { payload } = events[0];
+    codeBlockActions = [
+      {
+        label: 'Send to Dev Server',
+        title: isRunning
+          ? 'Send event payload to running Dev Server'
+          : `Dev Server is not running at ${devServerURL}`,
+        icon: <IconCloudArrowDown />,
+        onClick: () => send(payload),
+        disabled: !isRunning,
+      },
+    ];
+  }
+
   return (
     <div
       className={classNames('dark grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}
     >
-      {event && (
-        <EventDetails
-          event={event}
-          codeBlockActions={[
-            {
-              label: 'Send to Dev Server',
-              title: isRunning
-                ? 'Send event payload to running Dev Server'
-                : `Dev Server is not running at ${devServerURL}`,
-              icon: <IconCloudArrowDown />,
-              onClick: () => send(event.payload),
-              disabled: !isRunning,
-            },
-          ]}
-        />
-      )}
+      {events && <EventDetails events={events} codeBlockActions={codeBlockActions} />}
       <RunDetails
         func={func}
         functionVersion={functionVersion}

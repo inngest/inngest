@@ -88,7 +88,7 @@ export function Details({ envID, eventID, onClose, navigateToRun }: Props) {
   } else {
     eventDetails = (
       <EventDetails
-        event={eventRes.data.event}
+        events={[eventRes.data.event]}
         functionRuns={eventRes.data.runs}
         onFunctionRunClick={onFunctionRunClick}
         selectedRunID={selectedRun?.runID}
