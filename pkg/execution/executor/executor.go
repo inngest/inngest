@@ -1129,6 +1129,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 	return res, goerr
 }
 
+//nolint:all
 func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
 	if e.exprAggregator == nil {
 		return execution.HandlePauseResult{}, fmt.Errorf("no expression evaluator found")
