@@ -331,6 +331,9 @@ github.com/eko/gocache/store/rueidis/v4
 # github.com/emicklei/proto v1.6.15
 ## explicit; go 1.12
 github.com/emicklei/proto
+# github.com/fatih/structs v1.1.0
+## explicit
+github.com/fatih/structs
 # github.com/fsnotify/fsnotify v1.6.0
 ## explicit; go 1.16
 github.com/fsnotify/fsnotify
