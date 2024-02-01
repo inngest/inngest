@@ -115,7 +115,7 @@ export default async function FunctionRunDetailsLayout({ params }: FunctionRunDe
     } as const;
   });
 
-  const events = func?.run?.events.map((event) => {
+  const events = func?.run.events.map((event) => {
     return {
       ...event,
       receivedAt: new Date(event.receivedAt),
