@@ -12,6 +12,7 @@ const GetAllEnvironmentsDocument = graphql(`
       test
       type
       createdAt
+      lastDeployedAt
       isArchived
       isAutoArchiveEnabled
     }
