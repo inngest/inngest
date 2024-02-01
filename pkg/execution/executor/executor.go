@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -747,75 +748,105 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 	return nil
 }
 
+type functionFinishedData struct {
+	FunctionID          string           `json:"function_id"`
+	RunID               ulid.ULID        `json:"run_id"`
+	Event               map[string]any   `json:"event"`
+	Events              []map[string]any `json:"events"`
+	Error               any              `json:"error,omitempty"`
+	Result              any              `json:"result,omitempty"`
+	InvokeCorrelationID *string          `json:"correlation_id,omitempty"`
+}
+
+func (f *functionFinishedData) setResponse(r state.DriverResponse) {
+	if r.Err != nil {
+		f.Error = r.StandardError()
+	}
+	if r.UserError != nil {
+		f.Error = r.UserError
+	}
+	if r.Output != nil {
+		f.Result = r.Output
+	}
+}
+
+func (f functionFinishedData) Map() map[string]any {
+	s := structs.New(f)
+	s.TagName = "json"
+	return s.Map()
+}
+
 func (e *executor) runFinishHandler(ctx context.Context, id state.Identifier, s state.State, resp state.DriverResponse) error {
 	if e.finishHandler == nil {
 		return nil
 	}
 
-	triggerEvt := s.Event()
-	if name, ok := triggerEvt["name"].(string); ok && (name == event.FnFailedName || name == event.FnFinishedName) {
-		// Don't recursively trigger internal finish handlers.
-		logger.From(ctx).Debug().Str("name", name).Msg("not triggering finish handler for internal event")
-		return nil
-	}
-
 	// Prepare events that we must send
-	var events []event.Event
 	now := time.Now()
-	errorData := resp.StandardError()
+	base := &functionFinishedData{
+		FunctionID: s.Function().Slug,
+		RunID:      id.RunID,
+		Events:     s.Events(),
+	}
+	base.setResponse(resp)
 
-	// Legacy - send inngest/function.failed
-	if resp.Err != nil && !strings.Contains(*resp.Err, state.ErrFunctionCancelled.Error()) {
-		// TODO: Refactor inngest/function.failed.
+	// We'll send many events - some for each items in the batch.  This ensures that invoke works
+	// for batched functions.
+	var events []event.Event
+	for n, runEvt := range s.Events() {
+		if name, ok := runEvt["name"].(string); ok && (name == event.FnFailedName || name == event.FnFinishedName) {
+			// Don't recursively trigger internal finish handlers.
+			continue
+		}
+
+		invokeID := correlationID(runEvt)
+		if invokeID == nil && n > 0 {
+			// We only send function finish events for either the first event in a batch or for
+			// all events with a correlation ID.
+			continue
+		}
+
+		// Copy the base data to set the event.
+		copied := *base
+		copied.Event = runEvt
+		copied.InvokeCorrelationID = invokeID
+		data := copied.Map()
+
+		// Add an `inngest/function.finished` event.
 		events = append(events, event.Event{
 			ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
-			Name:      event.FnFailedName,
+			Name:      event.FnFinishedName,
 			Timestamp: now.UnixMilli(),
-			Data: map[string]interface{}{
-				"function_id": s.Function().Slug,
-				"run_id":      id.RunID.String(),
-				"error":       errorData,
-				"output":      resp.Output,
-				"event":       triggerEvt,
-			},
+			Data:      data,
 		})
-	}
 
-	// send inngest/function.finished
-	data := map[string]interface{}{
-		"function_id": s.Function().Slug,
-		"run_id":      id.RunID.String(),
-	}
-
-	if dataMap, ok := triggerEvt["data"].(map[string]interface{}); ok {
-		if inngestObj, ok := dataMap[consts.InngestEventDataPrefix].(map[string]interface{}); ok {
-			if dataValue, ok := inngestObj[consts.InvokeCorrelationId].(string); ok {
-				logger.From(ctx).Debug().Str("data_value_str", dataValue).Msg("data_value")
-				data[consts.InvokeCorrelationId] = dataValue
-			}
+		// Legacy - send inngest/function.failed, except for when the function has been cancelled.
+		if resp.Err != nil && !strings.Contains(*resp.Err, state.ErrFunctionCancelled.Error()) {
+			events = append(events, event.Event{
+				ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+				Name:      event.FnFailedName,
+				Timestamp: now.UnixMilli(),
+				Data:      data,
+			})
 		}
 	}
 
-	if resp.Err != nil {
-		// Some normalization to user error.
-		data["error"] = errorData
-	}
-	if resp.UserError != nil {
-		// Takes precedence
-		data["error"] = resp.UserError
-	}
-	if resp.Err == nil && resp.UserError == nil {
-		data["result"] = resp.Output
-	}
-
-	events = append(events, event.Event{
-		ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
-		Name:      event.FnFinishedName,
-		Timestamp: now.UnixMilli(),
-		Data:      data,
-	})
-
 	return e.finishHandler(ctx, s, events)
+}
+
+func correlationID(event map[string]any) *string {
+	dataMap, ok := event["data"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	container, ok := dataMap[consts.InngestEventDataPrefix].(map[string]any)
+	if !ok {
+		return nil
+	}
+	if correlationID, ok := container[consts.InvokeCorrelationId].(string); ok {
+		return &correlationID
+	}
+	return nil
 }
 
 // run executes the step with the given step ID.
