@@ -5,6 +5,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"regexp"
@@ -756,6 +757,10 @@ func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) 
 }
 
 func (m mgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
 	keys := make([]string, len(ids))
 	for n, id := range ids {
 		keys[n] = m.kf.PauseID(ctx, id)
@@ -770,17 +775,24 @@ func (m mgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, 
 		return nil, err
 	}
 
+	var merr error
+
 	pauses := []*state.Pause{}
 	for _, item := range strings {
+		if len(item) == 0 {
+			continue
+		}
+
 		pause := &state.Pause{}
 		err = json.Unmarshal([]byte(item), pause)
 		if err != nil {
-			return nil, err
+			merr = errors.Join(merr, err)
+			continue
 		}
 		pauses = append(pauses, pause)
 	}
 
-	return pauses, err
+	return pauses, merr
 }
 
 // PauseByStep returns a specific pause for a given workflow run, from a given step.
@@ -897,7 +909,7 @@ func (m mgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eve
 		}
 	}
 
-	if it.Error() != context.Canceled {
+	if it.Error() != context.Canceled && it.Error() != scanDoneErr {
 		return it.Error()
 	}
 	return nil
@@ -1165,7 +1177,11 @@ func (i *keyIter) Error() error {
 func (i *keyIter) init(ctx context.Context, keys []string, chunk int64) error {
 	i.keys = keys
 	i.chunk = chunk
-	return i.fetch(ctx)
+	err := i.fetch(ctx)
+	if err == scanDoneErr {
+		return nil
+	}
+	return err
 }
 
 func (i *keyIter) Count() int {
@@ -1208,6 +1224,9 @@ func (i *keyIter) Next(ctx context.Context) bool {
 	}
 
 	err := i.fetch(ctx)
+	if err == scanDoneErr {
+		return false
+	}
 	return err == nil
 }
 

@@ -13,6 +13,12 @@ import (
 	"github.com/karlseguin/ccache/v2"
 )
 
+type EventEvaluable interface {
+	expr.Evaluable
+	GetEvent() *string
+	GetWorkspaceID() uuid.UUID
+}
+
 func NewAggregator(
 	ctx context.Context,
 	size int64,
@@ -77,7 +83,7 @@ type Aggregator interface {
 	// memory pressure;  a pause is consumed once atomically.  If removal fails, a dangling false positive
 	// is left in the tree which increases the amount of work we have to do when matching but does NOT
 	// impact execution.
-	RemovePause(ctx context.Context, pause expr.Evaluable) error
+	RemovePause(ctx context.Context, pause EventEvaluable) error
 }
 
 type aggregator struct {
@@ -153,7 +159,7 @@ func (a aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, even
 		a.log.Warn(
 			"using stale evaluator",
 			"error", err,
-			"age", time.Since(bk.updatedAt),
+			"age_ms", time.Since(bk.updatedAt).Milliseconds(),
 			"workspace_id", wsID,
 			"event", eventName,
 		)
@@ -163,8 +169,28 @@ func (a aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, even
 	return bk.ae, nil
 }
 
-func (a aggregator) RemovePause(ctx context.Context, event expr.Evaluable) error {
-	return fmt.Errorf("not implemented")
+func (a aggregator) getBookkeeper(ctx context.Context, wsID uuid.UUID, eventName string) *bookkeeper {
+	key := wsID.String() + ":" + eventName
+	var bk *bookkeeper
+	val := a.records.Get(key)
+	if val == nil {
+		return nil
+	}
+	bk = val.Value().(*bookkeeper)
+	return bk
+}
+
+func (a aggregator) RemovePause(ctx context.Context, pause EventEvaluable) error {
+	if pause.GetEvent() == nil {
+		return fmt.Errorf("cannot remove non-pause evaluable")
+	}
+
+	bk := a.getBookkeeper(ctx, pause.GetWorkspaceID(), *pause.GetEvent())
+	if bk == nil {
+		return nil
+	}
+
+	return bk.ae.Remove(ctx, pause)
 }
 
 // bookkeeper manages an aggregator for an event name and records the time that the aggregator
@@ -179,13 +205,25 @@ type bookkeeper struct {
 
 func (b *bookkeeper) update(ctx context.Context, l EvaluableLoader) error {
 	at := time.Now()
+	count := 0
 	err := l.LoadEvaluablesSince(ctx, b.wsID, b.event, b.updatedAt, func(ctx context.Context, eval expr.Evaluable) error {
 		if eval == nil {
 			return fmt.Errorf("adding nil pause")
 		}
 		_, err := b.ae.Add(ctx, eval)
+		if err == nil {
+			count++
+		}
 		return err
 	})
+
+	logger.StdlibLogger(ctx).Debug(
+		"updated evaluator",
+		"delta_ms", at.Sub(b.updatedAt).Milliseconds(),
+		"count", count,
+		"error", err,
+	)
+
 	if err == nil {
 		b.updatedAt = at
 	}

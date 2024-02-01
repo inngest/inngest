@@ -187,6 +187,14 @@ func (p Pause) GetExpression() string {
 	return *p.Expression
 }
 
+func (p Pause) GetEvent() *string {
+	return p.Event
+}
+
+func (p Pause) GetWorkspaceID() uuid.UUID {
+	return p.WorkspaceID
+}
+
 func (p Pause) Edge() inngest.Edge {
 	return inngest.Edge{
 		Outgoing: p.Outgoing,
