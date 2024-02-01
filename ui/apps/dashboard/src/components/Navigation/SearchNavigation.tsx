@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { type Route } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@clerk/nextjs';
+import { useOrganization, useUser } from '@clerk/nextjs';
 import { ArrowUturnRightIcon, MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import { useQuery } from 'urql';
 
@@ -61,6 +61,7 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const resultRef = useRef<HTMLLIElement>(null);
   const router = useRouter();
   const { user } = useUser();
+  const { organization } = useOrganization();
   let searchResult = {
     type: '',
     href: '',
@@ -69,7 +70,7 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
   useEffect(() => {
     let debounce = setTimeout(() => {
-      if (search && user) {
+      if (search && user && organization) {
         window.inngest.send({
           name: 'app/global.id.searched',
           data: {
@@ -83,7 +84,7 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
             external_id: user.externalId,
             email: user.primaryEmailAddress?.emailAddress,
             name: user.fullName,
-            account_id: user.publicMetadata.accountID,
+            account_id: organization.publicMetadata.accountID,
           },
           v: '2023-05-17.1',
         });

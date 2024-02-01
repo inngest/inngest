@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useSearchParams, useSelectedLayoutSegments } from 'next/navigation';
 import Script from 'next/script';
-import { useUser } from '@clerk/nextjs';
+import { useOrganization, useUser } from '@clerk/nextjs';
 
 declare global {
   interface Window {
@@ -16,6 +16,7 @@ declare global {
 
 export default function PageViewTracker() {
   const { user, isSignedIn } = useUser();
+  const { organization } = useOrganization();
   const [lastUrl, setLastUrl] = useState<string>();
   const [isInitialized, setInitialized] = useState(false);
   const pathname = usePathname();
@@ -45,7 +46,9 @@ export default function PageViewTracker() {
           external_id: user.externalId,
           email: user.primaryEmailAddress?.emailAddress,
           name: user.fullName,
-          account_id: user.publicMetadata.accountID,
+          ...(!!organization?.publicMetadata.accountID && {
+            account_id: organization.publicMetadata.accountID,
+          }),
         },
         v: '2023-05-11.1',
       });
@@ -60,7 +63,7 @@ export default function PageViewTracker() {
       user?.externalId,
       user?.primaryEmailAddress?.emailAddress,
       user?.fullName,
-      user?.publicMetadata.accountID,
+      organization?.publicMetadata.accountID,
     ]
   );
 

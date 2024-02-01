@@ -1,6 +1,3 @@
-'use client';
-
-import { useSearchParams } from 'next/navigation';
 import { OrganizationList } from '@clerk/nextjs';
 
 import SplitView from '@/app/(logged-out)/SplitView';
