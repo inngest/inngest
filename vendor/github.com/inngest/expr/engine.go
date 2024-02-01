@@ -2,6 +2,8 @@ package expr
 
 import (
 	"context"
+
+	"github.com/cespare/xxhash/v2"
 )
 
 type EngineType int
@@ -27,7 +29,7 @@ type MatchingEngine interface {
 	// expression parts received.  Some may return false positives, but
 	// each MatchingEngine should NEVER omit ExpressionParts which match
 	// the given input.
-	Match(ctx context.Context, input map[string]any) ([]*ExpressionPart, error)
+	Match(ctx context.Context, input map[string]any) ([]*StoredExpressionPart, error)
 	// Add adds a new expression part to the matching engine for future matches.
 	Add(ctx context.Context, p ExpressionPart) error
 	// Remove removes an expression part from the matching engine, ensuring that the
@@ -42,7 +44,7 @@ type MatchingEngine interface {
 	// ignoring the variable name.  Note that each MatchingEngine should NEVER
 	// omit ExpressionParts which match the given input;  false positives are okay,
 	// but not returning valid matches must be impossible.
-	Search(ctx context.Context, variable string, input any) []*ExpressionPart
+	Search(ctx context.Context, variable string, input any) []*StoredExpressionPart
 }
 
 // Leaf represents the leaf within a tree.  This stores all expressions
@@ -70,8 +72,19 @@ type ExpressionPart struct {
 	//
 	// This lets us determine whether the entire group has been matched.
 	GroupID   groupID
-	Predicate Predicate
+	Predicate *Predicate
 	Parsed    *ParsedExpression
+}
+
+func (p ExpressionPart) Hash() uint64 {
+	return xxhash.Sum64String(p.Predicate.String())
+}
+
+func (p ExpressionPart) EqualsStored(n *StoredExpressionPart) bool {
+	if p.GroupID != n.GroupID {
+		return false
+	}
+	return p.Hash() == n.PredicateID
 }
 
 func (p ExpressionPart) Equals(n ExpressionPart) bool {
@@ -81,5 +94,21 @@ func (p ExpressionPart) Equals(n ExpressionPart) bool {
 	if p.Predicate.String() != n.Predicate.String() {
 		return false
 	}
-	return p.Parsed.Evaluable.GetExpression() == n.Parsed.Evaluable.GetExpression()
+	return p.Parsed.EvaluableID == n.Parsed.EvaluableID
+}
+
+func (p ExpressionPart) ToStored() *StoredExpressionPart {
+	return &StoredExpressionPart{
+		GroupID:     p.GroupID,
+		Parsed:      p.Parsed,
+		PredicateID: p.Hash(),
+	}
+}
+
+// StoredExpressionPart is a lightweight expression part which only stores
+// a hash of the predicate to reduce memory usage.
+type StoredExpressionPart struct {
+	GroupID     groupID
+	PredicateID uint64
+	Parsed      *ParsedExpression
 }

@@ -25,12 +25,12 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.16.2
 	github.com/golang/mock v1.6.0
 	github.com/google/cel-go v0.18.2
-	github.com/google/uuid v1.4.0
+	github.com/google/uuid v1.6.0
 	github.com/gosimple/slug v1.12.0
 	github.com/gowebpki/jcs v1.0.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/terraform v0.15.3
-	github.com/inngest/expr v0.0.0-20240131182319-5b1160f58203
+	github.com/inngest/expr v0.0.0-20240201152704-a643bc6ace48
 	github.com/inngest/inngestgo v0.5.5-0.20240123232731-01cec59caf45
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5

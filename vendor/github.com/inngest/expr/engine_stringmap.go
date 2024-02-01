@@ -16,7 +16,7 @@ func newStringEqualityMatcher() MatchingEngine {
 	return &stringLookup{
 		lock:    &sync.RWMutex{},
 		vars:    map[string]struct{}{},
-		strings: map[string][]*ExpressionPart{},
+		strings: map[string][]*StoredExpressionPart{},
 	}
 }
 
@@ -40,15 +40,15 @@ type stringLookup struct {
 	vars map[string]struct{}
 	// strings stores all strings referenced within expressions, mapped to the expression part.
 	// this performs string equality lookups.
-	strings map[string][]*ExpressionPart
+	strings map[string][]*StoredExpressionPart
 }
 
 func (s stringLookup) Type() EngineType {
 	return EngineTypeStringHash
 }
 
-func (n *stringLookup) Match(ctx context.Context, input map[string]any) ([]*ExpressionPart, error) {
-	found := []*ExpressionPart{}
+func (n *stringLookup) Match(ctx context.Context, input map[string]any) ([]*StoredExpressionPart, error) {
+	found := []*StoredExpressionPart{}
 	eg := errgroup.Group{}
 
 	for item := range n.vars {
@@ -78,7 +78,7 @@ func (n *stringLookup) Match(ctx context.Context, input map[string]any) ([]*Expr
 
 // Search returns all ExpressionParts which match the given input, ignoring the variable name
 // entirely.
-func (n *stringLookup) Search(ctx context.Context, variable string, input any) []*ExpressionPart {
+func (n *stringLookup) Search(ctx context.Context, variable string, input any) []*StoredExpressionPart {
 	n.lock.RLock()
 	defer n.lock.RUnlock()
 	str, ok := input.(string)
@@ -109,10 +109,10 @@ func (n *stringLookup) Add(ctx context.Context, p ExpressionPart) error {
 	n.vars[p.Predicate.Ident] = struct{}{}
 
 	if _, ok := n.strings[val]; !ok {
-		n.strings[val] = []*ExpressionPart{&p}
+		n.strings[val] = []*StoredExpressionPart{p.ToStored()}
 		return nil
 	}
-	n.strings[val] = append(n.strings[val], &p)
+	n.strings[val] = append(n.strings[val], p.ToStored())
 
 	return nil
 }
@@ -136,7 +136,7 @@ func (n *stringLookup) Remove(ctx context.Context, p ExpressionPart) error {
 
 	// Remove the expression part from the leaf.
 	for i, eval := range coll {
-		if p.Equals(*eval) {
+		if p.EqualsStored(eval) {
 			coll = append(coll[:i], coll[i+1:]...)
 			n.strings[val] = coll
 			return nil

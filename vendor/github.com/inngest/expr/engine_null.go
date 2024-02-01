@@ -13,8 +13,8 @@ func newNullMatcher() MatchingEngine {
 	return &nullLookup{
 		lock:  &sync.RWMutex{},
 		paths: map[string]struct{}{},
-		null:  map[string][]*ExpressionPart{},
-		not:   map[string][]*ExpressionPart{},
+		null:  map[string][]*StoredExpressionPart{},
+		not:   map[string][]*StoredExpressionPart{},
 	}
 }
 
@@ -24,16 +24,16 @@ type nullLookup struct {
 	// paths stores all variable names as JSON paths used within the engine.
 	paths map[string]struct{}
 
-	null map[string][]*ExpressionPart
-	not  map[string][]*ExpressionPart
+	null map[string][]*StoredExpressionPart
+	not  map[string][]*StoredExpressionPart
 }
 
 func (n *nullLookup) Type() EngineType {
 	return EngineTypeNullMatch
 }
 
-func (n *nullLookup) Match(ctx context.Context, data map[string]any) ([]*ExpressionPart, error) {
-	found := []*ExpressionPart{}
+func (n *nullLookup) Match(ctx context.Context, data map[string]any) ([]*StoredExpressionPart, error) {
+	found := []*StoredExpressionPart{}
 	eg := errgroup.Group{}
 
 	for item := range n.paths {
@@ -59,7 +59,7 @@ func (n *nullLookup) Match(ctx context.Context, data map[string]any) ([]*Express
 	return found, eg.Wait()
 }
 
-func (n *nullLookup) Search(ctx context.Context, variable string, input any) []*ExpressionPart {
+func (n *nullLookup) Search(ctx context.Context, variable string, input any) []*StoredExpressionPart {
 	if input == nil {
 		// The input data is null, so the only items that can match are equality
 		// comparisons to null.
@@ -85,18 +85,18 @@ func (n *nullLookup) Add(ctx context.Context, p ExpressionPart) error {
 	// Any other comparison is a not-null comparison.
 	if p.Predicate.Operator == operators.Equals {
 		if _, ok := n.null[varName]; !ok {
-			n.null[varName] = []*ExpressionPart{&p}
+			n.null[varName] = []*StoredExpressionPart{p.ToStored()}
 			return nil
 		}
-		n.null[varName] = append(n.null[varName], &p)
+		n.null[varName] = append(n.null[varName], p.ToStored())
 		return nil
 	}
 
 	if _, ok := n.not[varName]; !ok {
-		n.not[varName] = []*ExpressionPart{&p}
+		n.not[varName] = []*StoredExpressionPart{p.ToStored()}
 		return nil
 	}
-	n.not[varName] = append(n.not[varName], &p)
+	n.not[varName] = append(n.not[varName], p.ToStored())
 	return nil
 }
 
@@ -117,7 +117,7 @@ func (n *nullLookup) Remove(ctx context.Context, p ExpressionPart) error {
 
 	// Remove the expression part from the leaf.
 	for i, eval := range coll {
-		if p.Equals(*eval) {
+		if p.EqualsStored(eval) {
 			coll = append(coll[:i], coll[i+1:]...)
 			if p.Predicate.Operator == operators.Equals {
 				n.null[p.Predicate.Ident] = coll

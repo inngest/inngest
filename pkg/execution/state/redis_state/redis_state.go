@@ -755,6 +755,34 @@ func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) 
 	return pause, err
 }
 
+func (m mgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {
+	keys := make([]string, len(ids))
+	for n, id := range ids {
+		keys[n] = m.kf.PauseID(ctx, id)
+	}
+
+	cmd := m.pauseR.B().Mget().Key(keys...).Build()
+	strings, err := m.pauseR.Do(ctx, cmd).AsStrSlice()
+	if err == rueidis.Nil {
+		return nil, state.ErrPauseNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	pauses := []*state.Pause{}
+	for _, item := range strings {
+		pause := &state.Pause{}
+		err = json.Unmarshal([]byte(item), pause)
+		if err != nil {
+			return nil, err
+		}
+		pauses = append(pauses, pause)
+	}
+
+	return pauses, err
+}
+
 // PauseByStep returns a specific pause for a given workflow run, from a given step.
 //
 // This is required when continuing a step function from an async step, ie. one that
@@ -839,6 +867,18 @@ func (m mgr) PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, even
 	}
 	err = iter.init(ctx, ids, 100)
 	return iter, err
+}
+
+func (m mgr) EvaluablesByID(ctx context.Context, ids ...uuid.UUID) ([]expr.Evaluable, error) {
+	items, err := m.PausesByID(ctx, ids...)
+	if err != nil {
+		return nil, err
+	}
+	evaluables := make([]expr.Evaluable, len(items))
+	for n, i := range items {
+		evaluables[n] = i
+	}
+	return evaluables, nil
 }
 
 func (m mgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {

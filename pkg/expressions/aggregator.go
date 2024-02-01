@@ -43,6 +43,7 @@ func NewAggregator(
 // The types are different as we must use the open source expr.Evaluable interfaces with aggregate evaluation.
 type EvaluableLoader interface {
 	LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error
+	EvaluablesByID(ctx context.Context, evaluableIDs ...uuid.UUID) ([]expr.Evaluable, error)
 }
 
 // Aggregator manages a set of AggregateEvaluator instances to quickly evaluate expressions
@@ -131,7 +132,7 @@ func (a aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, even
 		bk = &bookkeeper{
 			wsID:  wsID,
 			event: eventName,
-			ae:    expr.NewAggregateEvaluator(a.parser, a.evaluator),
+			ae:    expr.NewAggregateEvaluator(a.parser, a.evaluator, a.loader.EvaluablesByID),
 			// updatedAt is a zero time.
 		}
 
