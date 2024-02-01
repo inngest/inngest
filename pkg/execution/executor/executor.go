@@ -749,12 +749,13 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 }
 
 type functionFinishedData struct {
-	FunctionID          string         `json:"function_id"`
-	RunID               ulid.ULID      `json:"run_id"`
-	Event               map[string]any `json:"event"`
-	Error               any            `json:"error,omitempty"`
-	Result              any            `json:"result,omitempty"`
-	InvokeCorrelationID *string        `json:"correlation_id,omitempty"`
+	FunctionID          string           `json:"function_id"`
+	RunID               ulid.ULID        `json:"run_id"`
+	Event               map[string]any   `json:"event"`
+	Events              []map[string]any `json:"events"`
+	Error               any              `json:"error,omitempty"`
+	Result              any              `json:"result,omitempty"`
+	InvokeCorrelationID *string          `json:"correlation_id,omitempty"`
 }
 
 func (f *functionFinishedData) setResponse(r state.DriverResponse) {
@@ -785,21 +786,30 @@ func (e *executor) runFinishHandler(ctx context.Context, id state.Identifier, s 
 	base := &functionFinishedData{
 		FunctionID: s.Function().Slug,
 		RunID:      id.RunID,
+		Events:     s.Events(),
 	}
 	base.setResponse(resp)
 
-	// We'll send many events - some for each items in the batch.
+	// We'll send many events - some for each items in the batch.  This ensures that invoke works
+	// for batched functions.
 	var events []event.Event
-	for _, runEvt := range s.Events() {
+	for n, runEvt := range s.Events() {
 		if name, ok := runEvt["name"].(string); ok && (name == event.FnFailedName || name == event.FnFinishedName) {
 			// Don't recursively trigger internal finish handlers.
+			continue
+		}
+
+		invokeID := correlationID(runEvt)
+		if invokeID == nil && n > 0 {
+			// We only send function finish events for either the first event in a batch or for
+			// all events with a correlation ID.
 			continue
 		}
 
 		// Copy the base data to set the event.
 		copied := *base
 		copied.Event = runEvt
-		copied.InvokeCorrelationID = correlationID(runEvt)
+		copied.InvokeCorrelationID = invokeID
 		data := copied.Map()
 
 		// Add an `inngest/function.finished` event.
