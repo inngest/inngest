@@ -53,6 +53,8 @@ type Identifier struct {
 	EventID ulid.ULID `json:"evtID"`
 	// BatchID tracks the batch ID for the function, if the function uses batching.
 	BatchID *ulid.ULID `json:"bID,omitempty"`
+	// EventIDs tracks all the events associated with the function run
+	EventIDs []ulid.ULID `json:"eventIDs"`
 	// Key represents a unique user-defined key to be used as part of the
 	// idempotency key.  This is appended to the workflow ID and workflow
 	// version to create a full idempotency key (via the IdempotencyKey() method).
@@ -63,6 +65,8 @@ type Identifier struct {
 	AccountID uuid.UUID `json:"aID"`
 	// WorkspaceID represents the ws ID for this run
 	WorkspaceID uuid.UUID `json:"wsID"`
+	// AppID represents the app ID for this run
+	AppID uuid.UUID `json:"appID"`
 	// If this is a rerun, the original run ID is stored here.
 	OriginalRunID *ulid.ULID `json:"oRunID,omitempty"`
 	// ReplayID stores the ID of the replay, if this identifier belongs to a replay.

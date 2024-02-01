@@ -186,6 +186,7 @@ func (s *svc) Run(ctx context.Context) error {
 						Function:        f,
 						AccountID:       di.AccountID,
 						WorkspaceID:     di.WorkspaceID,
+						AppID:           di.AppID,
 						Events:          []event.TrackedEvent{di},
 						PreventDebounce: true,
 					})

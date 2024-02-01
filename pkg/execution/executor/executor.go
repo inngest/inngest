@@ -261,6 +261,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
 			AccountID:       req.AccountID,
 			WorkspaceID:     req.WorkspaceID,
+			AppID:           req.AppID,
 			FunctionID:      req.Function.ID,
 			FunctionVersion: req.Function.FunctionVersion,
 			EventID:         req.Events[0].GetInternalID(),
@@ -296,6 +297,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		key = req.BatchID.String()
 	}
 
+	eventIDs := []ulid.ULID{}
+	for _, e := range req.Events {
+		eventIDs = append(eventIDs, e.GetInternalID())
+	}
+
 	id := state.Identifier{
 		WorkflowID:      req.Function.ID,
 		WorkflowVersion: req.Function.FunctionVersion,
@@ -303,9 +309,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		RunID:           runID,
 		BatchID:         req.BatchID,
 		EventID:         req.Events[0].GetInternalID(),
+		EventIDs:        eventIDs,
 		Key:             key,
 		AccountID:       req.AccountID,
 		WorkspaceID:     req.WorkspaceID,
+		AppID:           req.AppID,
 		OriginalRunID:   req.OriginalRunID,
 		ReplayID:        req.ReplayID,
 	}
