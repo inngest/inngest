@@ -53,6 +53,8 @@ type Identifier struct {
 	EventID ulid.ULID `json:"evtID"`
 	// BatchID tracks the batch ID for the function, if the function uses batching.
 	BatchID *ulid.ULID `json:"bID,omitempty"`
+	// EventIDs tracks all the events associated with the function run
+	EventIDs []ulid.ULID `json:"eventIDs"`
 	// Key represents a unique user-defined key to be used as part of the
 	// idempotency key.  This is appended to the workflow ID and workflow
 	// version to create a full idempotency key (via the IdempotencyKey() method).

@@ -296,6 +296,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		key = req.BatchID.String()
 	}
 
+	eventIDs := []ulid.ULID{}
+	for _, e := range req.Events {
+		eventIDs = append(eventIDs, e.GetInternalID())
+	}
+
 	id := state.Identifier{
 		WorkflowID:      req.Function.ID,
 		WorkflowVersion: req.Function.FunctionVersion,
@@ -303,6 +308,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		RunID:           runID,
 		BatchID:         req.BatchID,
 		EventID:         req.Events[0].GetInternalID(),
+		EventIDs:        eventIDs,
 		Key:             key,
 		AccountID:       req.AccountID,
 		WorkspaceID:     req.WorkspaceID,
