@@ -107,23 +107,49 @@ export default function Stream() {
     return data.stream;
   };
 
-  const { data, fetchNextPage, isFetching } = useInfiniteQuery({
+  const { data, fetchNextPage, isFetching, refetch } = useInfiniteQuery({
     queryKey: ['triggers-stream'],
     queryFn: fetchTriggersStream,
     refetchInterval: freezeStream || tableScrollTopPosition > 0 ? false : 2500,
     initialPageParam: null,
     getNextPageParam: (lastPage, pages) => {
-      const lastTrigger = lastPage[lastPage.length - 1];
-      if (lastTrigger) {
-        return lastTrigger.createdAt; // Use the createdAt of the last trigger as cursor
+      if (!lastPage) {
+        return undefined;
       }
-      return undefined;
+
+      const lastTrigger = lastPage[lastPage.length - 1];
+      if (!lastTrigger) {
+        return undefined;
+      }
+
+      return lastTrigger.createdAt; // Use the createdAt of the last trigger as cursor
     },
   });
 
+  useEffect(() => {
+    if (!data?.pages || data.pages.length === 0) {
+      return;
+    }
+
+    // Clear the cache due to internal event visibility toggling
+    queryClient.setQueryData(['triggers-stream'], () => ({
+      pages: [],
+      pageParams: [null],
+    }));
+
+    refetch();
+  }, [showInternalEvents]);
+
   // We must flatten the array of arrays from the useInfiniteQuery hook
   const triggers = useMemo(() => {
-    return data?.pages.reduce((acc, page) => {
+    if (!data?.pages) {
+      return undefined;
+    }
+    if (data.pages.length === 0) {
+      return [];
+    }
+
+    return data.pages.reduce((acc, page) => {
       return [...acc, ...page];
     });
   }, [data?.pages]);
