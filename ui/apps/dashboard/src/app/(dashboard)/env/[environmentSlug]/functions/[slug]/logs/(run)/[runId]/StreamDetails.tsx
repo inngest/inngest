@@ -93,7 +93,7 @@ export function StreamDetails({
 
   return (
     <div
-      className={classNames('dark grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}
+      className={classNames('dark grid h-full text-white', events ? 'grid-cols-2' : 'grid-cols-1')}
     >
       {events && <EventDetails events={events} codeBlockActions={codeBlockActions} />}
       <RunDetails
