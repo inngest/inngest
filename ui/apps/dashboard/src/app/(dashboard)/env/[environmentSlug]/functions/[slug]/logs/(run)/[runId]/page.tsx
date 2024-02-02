@@ -115,12 +115,14 @@ export default async function FunctionRunDetailsLayout({ params }: FunctionRunDe
     } as const;
   });
 
-  const events = func?.run.events.map((event) => {
-    return {
-      ...event,
-      receivedAt: new Date(event.receivedAt),
-    };
-  });
+  const events = func?.run.events
+    ? func.run.events.map((event) => {
+        return {
+          ...event,
+          receivedAt: new Date(event.receivedAt),
+        };
+      })
+    : undefined;
 
   if (!func) {
     throw new Error('missing function');
