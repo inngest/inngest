@@ -12,8 +12,7 @@ export default authMiddleware({
   afterAuth(auth, request) {
     const isSignedIn = !!auth.userId;
     const hasActiveOrganization = !!auth.orgId;
-    const isAccountSetup =
-      isSignedIn && auth.sessionClaims.externalID && auth.sessionClaims.accountID;
+    const isAccountSetup = isSignedIn && hasActiveOrganization && !!auth.sessionClaims.accountID;
 
     if (!isSignedIn && !auth.isPublicRoute) {
       return redirectToSignIn({ returnBackUrl: request.url });

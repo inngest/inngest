@@ -66,22 +66,44 @@ export default function AccountSetupPage() {
  */
 function useForceActiveOrganization() {
   const { value: isOrganizationsEnabled } = useBooleanFlag('organizations');
-  const { isLoaded, userMemberships, setActive } = useOrganizationList({
+  const { isLoaded, userMemberships } = useOrganizationList({
     userMemberships: {
       infinite: true,
     },
   });
-  const { organization } = useOrganization();
+
+  const { getToken } = useAuth();
+
+  const { isLoaded: isOrganizationLoaded, organization } = useOrganization();
+  const router = useRouter();
+
+  const newOrganizationID = userMemberships.data?.[0]?.organization.id;
 
   useEffect(() => {
-    if (!isOrganizationsEnabled && isLoaded && userMemberships.data[0] && !organization) {
-      setActive({ organization: userMemberships.data[0].organization });
+    if (
+      !isOrganizationsEnabled &&
+      isLoaded &&
+      isOrganizationLoaded &&
+      newOrganizationID &&
+      !organization
+    ) {
+      getToken({ skipCache: true }).then(() => {
+        router.replace('/organization-list' as Route);
+      });
     }
-  }, [isLoaded, isOrganizationsEnabled, organization, setActive, userMemberships.data]);
+  }, [
+    isLoaded,
+    isOrganizationLoaded,
+    isOrganizationsEnabled,
+    organization,
+    newOrganizationID,
+    router,
+    getToken,
+  ]);
 
   // Reload memberships if the user doesn't have an active organization
   useEffect(() => {
-    if (isOrganizationsEnabled || !isLoaded || userMemberships.data[0] || organization) return;
+    if (isOrganizationsEnabled || !isLoaded || newOrganizationID || organization) return;
 
     const intervalID = setInterval(() => {
       userMemberships.revalidate();
@@ -90,14 +112,7 @@ function useForceActiveOrganization() {
     return () => {
       clearInterval(intervalID);
     };
-  }, [
-    isLoaded,
-    isOrganizationsEnabled,
-    organization,
-    setActive,
-    userMemberships,
-    userMemberships.data,
-  ]);
+  }, [isLoaded, isOrganizationsEnabled, organization, userMemberships, newOrganizationID]);
 }
 
 /**
@@ -107,13 +122,13 @@ function useForceActiveOrganization() {
  * @returns {boolean}
  */
 function useIsAccountSetup(): boolean {
-  const { organization } = useOrganization();
+  const { isLoaded, organization } = useOrganization();
 
   const isAccountSetup = Boolean(organization?.publicMetadata.accountID);
 
   // Reload the organization until the account is set up
   useEffect(() => {
-    if (!organization || isAccountSetup) return;
+    if (!isLoaded || !organization || isAccountSetup) return;
 
     const intervalID = setInterval(() => {
       organization.reload();
@@ -122,7 +137,7 @@ function useIsAccountSetup(): boolean {
     return () => {
       clearInterval(intervalID);
     };
-  }, [isAccountSetup, organization]);
+  }, [isAccountSetup, isLoaded, organization]);
 
   return isAccountSetup;
 }
