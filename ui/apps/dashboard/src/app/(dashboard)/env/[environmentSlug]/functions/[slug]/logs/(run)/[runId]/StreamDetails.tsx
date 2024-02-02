@@ -90,12 +90,20 @@ export function StreamDetails({
       },
     ];
   }
+  const hasCron =
+    Array.isArray(func.triggers) &&
+    func.triggers.length > 0 &&
+    func.triggers.some((trigger) => trigger.type === 'CRON');
+  const hasEventDetails = events && !hasCron;
 
   return (
     <div
-      className={classNames('dark grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}
+      className={classNames(
+        'dark grid h-full text-white',
+        hasEventDetails ? 'grid-cols-2' : 'grid-cols-1'
+      )}
     >
-      {events && <EventDetails events={events} codeBlockActions={codeBlockActions} />}
+      {hasEventDetails && <EventDetails events={events} codeBlockActions={codeBlockActions} />}
       <RunDetails
         func={func}
         functionVersion={functionVersion}
