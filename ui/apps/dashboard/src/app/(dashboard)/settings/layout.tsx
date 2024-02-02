@@ -1,5 +1,6 @@
 import { Cog6ToothIcon } from '@heroicons/react/20/solid';
 
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import Header from '@/components/Header/Header';
 import AppNavigation from '@/components/Navigation/AppNavigation';
 import Toaster from '@/components/Toaster';
@@ -10,7 +11,9 @@ type SettingsLayoutProps = {
 
 const DEFAULT_ENV_SLUG = 'production';
 
-export default function SettingsLayout({ children }: SettingsLayoutProps) {
+export default async function SettingsLayout({ children }: SettingsLayoutProps) {
+  const isOrganizationsEnabled = await getBooleanFlag('organizations');
+
   const navLinks = [
     {
       href: '/settings/account',
@@ -29,6 +32,14 @@ export default function SettingsLayout({ children }: SettingsLayoutProps) {
       text: 'Team Management',
     },
   ];
+
+  if (isOrganizationsEnabled) {
+    navLinks.splice(1, 0, {
+      href: '/settings/organization',
+      text: 'Organization',
+    });
+    navLinks.pop();
+  }
 
   return (
     <div className="flex h-full flex-col">
