@@ -694,6 +694,8 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 		if serr := e.HandleGeneratorResponse(ctx, resp, item); serr != nil {
 			// If this is an error compiling async expressions, fail the function.
 			if strings.Contains(serr.Error(), "error compiling expression") {
+				resp.SetError(serr)
+				resp.SetFinal()
 				_ = e.sm.SaveResponse(ctx, id, resp.Step.ID, resp.Error())
 				// XXX: failureHandler is legacy.
 				if serr := e.sm.SetStatus(ctx, id, enums.RunStatusFailed); serr != nil {
@@ -1436,12 +1438,19 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, resp *state.Driv
 		}
 	}
 
-	// Ensure that we process waitForEvents first, as these are highest priority.
-	sortOps(resp.Generator)
+	groups := opGroups(resp.Generator).All()
+	for _, group := range groups {
+		if err := e.handleGeneratorGroup(ctx, group, resp, item); err != nil {
+			return err
+		}
+	}
 
-	isParallel := len(resp.Generator) > 1
+	return nil
+}
+
+func (e *executor) handleGeneratorGroup(ctx context.Context, group OpcodeGroup, resp *state.DriverResponse, item queue.Item) error {
 	eg := errgroup.Group{}
-	for _, op := range resp.Generator {
+	for _, op := range group.Opcodes {
 		if op == nil {
 			// This is clearly an error.
 			if e.log != nil {
@@ -1452,7 +1461,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, resp *state.Driv
 		copied := *op
 
 		newItem := item
-		if isParallel {
+		if group.ShouldStartHistoryGroup {
 			// Give each opcode its own group ID, since we want to track each
 			// parellel step individually.
 			newItem.GroupID = uuid.New().String()
@@ -1460,7 +1469,6 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, resp *state.Driv
 
 		eg.Go(func() error { return e.HandleGenerator(ctx, copied, newItem) })
 	}
-
 	if err := eg.Wait(); err != nil {
 		if resp.NoRetry {
 			return queue.NeverRetryError(err)
