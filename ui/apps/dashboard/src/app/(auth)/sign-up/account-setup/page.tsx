@@ -23,6 +23,7 @@ export default function AccountSetupPage() {
 
     // We need to refresh the token before redirecting so that the token contains the account ID
     getToken({ skipCache: true }).then(() => {
+      // We use `replace` so that the user doesn't get redirected back to this page if they click the back button
       router.replace(process.env.NEXT_PUBLIC_HOME_PATH as Route);
     });
   }, [getToken, isAccountSetup, router]);
