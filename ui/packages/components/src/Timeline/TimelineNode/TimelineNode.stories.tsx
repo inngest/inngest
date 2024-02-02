@@ -106,7 +106,10 @@ export const Errored: Story = {
     node: {
       ...defaultNode,
       status: 'errored',
+      outputItemID: '123',
+      attempts: {},
     },
+    getOutput: async () => 'error code: 524',
   },
 };
 
