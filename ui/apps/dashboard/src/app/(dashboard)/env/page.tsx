@@ -114,7 +114,7 @@ export default async function Envs() {
                         }` as Route
                       }
                       kind="primary"
-                      label={isAppsEnabled ? 'Go To Apps' : 'Deploy'}
+                      label={isAppsEnabled ? 'Sync New App' : 'Deploy'}
                     />
                   </div>
                 </div>

@@ -281,10 +281,10 @@ function TableRow(props: { env: Environment }) {
 
       <td className="px-4">
         <Button
-          href={pathCreator.functions({ envSlug: slug })}
+          href={pathCreator.apps({ envSlug: slug })}
           kind="primary"
           appearance="outlined"
-          label="View"
+          label="Apps"
         />
       </td>
       {/* <td>
