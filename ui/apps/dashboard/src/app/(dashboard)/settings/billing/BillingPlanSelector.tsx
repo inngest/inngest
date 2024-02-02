@@ -16,9 +16,11 @@ import { type ExtendedBillingPlan } from './utils';
 export default function BillingPlanSelector({
   plans,
   isCurrentPlanEnterprise,
+  onUpdate,
 }: {
   plans: (ExtendedBillingPlan | null)[];
   isCurrentPlanEnterprise: boolean;
+  onUpdate: () => void;
 }) {
   const router = useRouter();
   const [checkoutData, setCheckoutData] = useState<{
@@ -46,6 +48,7 @@ export default function BillingPlanSelector({
 
   const onChangePlanSuccess = () => {
     setCheckoutData(undefined);
+    onUpdate();
     router.refresh();
   };
 
