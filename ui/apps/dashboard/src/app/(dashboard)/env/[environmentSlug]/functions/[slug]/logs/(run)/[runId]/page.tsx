@@ -13,7 +13,7 @@ const GetFunctionRunDetailsDocument = graphql(`
         name
         run(id: $functionRunID) {
           canRerun
-          event {
+          events {
             id
             name
             payload: event
@@ -114,7 +114,13 @@ export default async function FunctionRunDetailsLayout({ params }: FunctionRunDe
       value: trigger.schedule ?? trigger.eventName ?? '',
     } as const;
   });
-  const { event } = func?.run ?? {};
+
+  const events = func?.run.events.map((event) => {
+    return {
+      ...event,
+      receivedAt: new Date(event.receivedAt),
+    };
+  });
 
   if (!func) {
     throw new Error('missing function');
@@ -126,14 +132,7 @@ export default async function FunctionRunDetailsLayout({ params }: FunctionRunDe
         id: environment.id,
         slug: params.environmentSlug,
       }}
-      event={
-        event
-          ? {
-              ...event,
-              receivedAt: new Date(event.receivedAt),
-            }
-          : undefined
-      }
+      events={events}
       func={{
         ...func,
         triggers,

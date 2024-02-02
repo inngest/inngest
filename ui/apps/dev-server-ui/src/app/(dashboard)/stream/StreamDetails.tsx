@@ -98,7 +98,7 @@ export default function StreamDetails() {
     >
       {eventResult.data && (
         <EventDetails
-          event={eventResult.data}
+          events={[eventResult.data]}
           functionRuns={eventResult.data.functionRuns}
           onFunctionRunClick={(runId) => {
             setSelectedRunID(runId);
