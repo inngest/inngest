@@ -87,7 +87,7 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
         {envs.length === 0 ? (
           <tr>
             <td colSpan={5} className="px-4 py-4 text-center text-sm font-semibold text-slate-500">
-              There are no actively synced branches
+              There are no branch environments
             </td>
           </tr>
         ) : visibleEnvs.length ? (
@@ -95,7 +95,7 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
         ) : (
           <tr>
             <td colSpan={5} className="px-4 py-4 text-center text-sm font-semibold text-slate-500">
-              There are no more synced branches
+              There are no more branch environments
             </td>
           </tr>
         )}
