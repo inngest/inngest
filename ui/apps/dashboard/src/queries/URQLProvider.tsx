@@ -17,6 +17,8 @@ import {
   mapExchange,
 } from 'urql';
 
+import SignInRedirectErrors from '@/app/(auth)/sign-in/[[...sign-in]]/SignInRedirectErrors';
+
 /**
  * This is used to ensure that the URQL client is re-created (cache reset) whenever the user signs
  * out or switches organizations.
@@ -53,9 +55,9 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
               Sentry.captureException(error);
               signOut(() => {
                 router.push(
-                  `${
-                    process.env.NEXT_PUBLIC_SIGN_IN_PATH || '/sign-in'
-                  }?error=unauthenticated` as Route
+                  `${process.env.NEXT_PUBLIC_SIGN_IN_PATH || '/sign-in'}?error=${
+                    SignInRedirectErrors.Unauthenticated
+                  }` as Route
                 );
               });
             }

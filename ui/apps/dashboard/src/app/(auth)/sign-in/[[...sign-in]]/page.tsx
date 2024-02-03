@@ -3,18 +3,19 @@ import { SignIn } from '@clerk/nextjs';
 
 import SplitView from '@/app/(logged-out)/SplitView';
 import { Alert } from '@/components/Alert';
+import signInRedirectErrors from './SignInRedirectErrors';
+
+const signInRedirectErrorMessages = {
+  [signInRedirectErrors.Unauthenticated]: 'Could not resume your session. Please sign in again.',
+} as const;
 
 type SignInPageProps = {
   searchParams: { [key: string]: string | string[] | undefined };
 };
 
 export default function SignInPage({ searchParams }: SignInPageProps) {
-  const errorMessages = {
-    unauthenticated: 'Could not resume your session. Please sign in again.',
-  } as const;
-
-  function hasErrorMessage(error: string): error is keyof typeof errorMessages {
-    return error in errorMessages;
+  function hasErrorMessage(error: string): error is keyof typeof signInRedirectErrorMessages {
+    return error in signInRedirectErrorMessages;
   }
 
   return (
@@ -25,7 +26,7 @@ export default function SignInPage({ searchParams }: SignInPageProps) {
           <Alert severity="error" className="mx-auto max-w-xs">
             <p className="text-balance">
               {hasErrorMessage(searchParams.error)
-                ? errorMessages[searchParams.error]
+                ? signInRedirectErrorMessages[searchParams.error]
                 : searchParams.error}
             </p>
             <p className="mt-2">
