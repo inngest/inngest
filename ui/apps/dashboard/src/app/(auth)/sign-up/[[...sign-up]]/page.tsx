@@ -2,15 +2,19 @@ import { cookies } from 'next/headers';
 import { SignUp } from '@clerk/nextjs';
 
 import SplitView from '@/app/(logged-out)/SplitView';
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 
-export default function SignUpPage() {
+export default async function SignUpPage() {
   const cookieStore = cookies();
   const anonymousIDCookie = cookieStore.get('inngest_anonymous_id');
+
+  const isOrganizationsEnabled = await getBooleanFlag('organizations');
 
   return (
     <SplitView>
       <div className="mx-auto my-8 mt-auto text-center">
         <SignUp
+          afterSignUpUrl={isOrganizationsEnabled ? '/organization-list' : '/sign-up/account-setup'}
           unsafeMetadata={{
             ...(anonymousIDCookie?.value && { anonymousID: anonymousIDCookie.value }),
           }}

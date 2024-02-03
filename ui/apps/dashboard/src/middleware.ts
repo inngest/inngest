@@ -11,14 +11,30 @@ export default authMiddleware({
   ignoredRoutes: '/(images|_next/static|_next/image|favicon)(.*)',
   afterAuth(auth, request) {
     const isSignedIn = !!auth.userId;
-    const isAccountSetup =
-      isSignedIn && auth.sessionClaims.externalID && auth.sessionClaims.accountID;
+    const hasActiveOrganization = !!auth.orgId;
+    const isAccountSetup = isSignedIn && hasActiveOrganization && !!auth.sessionClaims.accountID;
 
     if (!isSignedIn && !auth.isPublicRoute) {
       return redirectToSignIn({ returnBackUrl: request.url });
     }
 
-    if (isSignedIn && !isAccountSetup && request.nextUrl.pathname !== '/sign-up/account-setup') {
+    if (
+      isSignedIn &&
+      !hasActiveOrganization &&
+      request.nextUrl.pathname !== '/organization-list' &&
+      request.nextUrl.pathname !== '/sign-up/account-setup'
+    ) {
+      const organizationListURL = new URL('/organization-list', request.url);
+      organizationListURL.searchParams.append('redirect_url', request.url);
+      return NextResponse.redirect(organizationListURL);
+    }
+
+    if (
+      isSignedIn &&
+      !isAccountSetup &&
+      request.nextUrl.pathname !== '/sign-up/account-setup' &&
+      request.nextUrl.pathname !== '/organization-list'
+    ) {
       return NextResponse.redirect(new URL('/sign-up/account-setup', request.url));
     }
 
