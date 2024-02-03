@@ -10,7 +10,7 @@ type SignInPageProps = {
 
 export default function SignInPage({ searchParams }: SignInPageProps) {
   const errorMessages = {
-    unauthenticated: 'Could not successfully signed you in. Please sign in and try again.',
+    unauthenticated: 'Could not resume your session. Please sign in again.',
   } as const;
 
   function hasErrorMessage(error: string): error is keyof typeof errorMessages {
