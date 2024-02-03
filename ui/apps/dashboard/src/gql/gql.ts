@@ -78,7 +78,6 @@ const documents = {
     "\n  mutation CreateWebhook($input: NewIngestKey!) {\n    key: createIngestKey(input: $input) {\n      id\n      url\n    }\n  }\n": types.CreateWebhookDocument,
     "\n  mutation CompleteAWSMarketplaceSetup($input: AWSMarketplaceSetupInput!) {\n    completeAWSMarketplaceSetup(input: $input) {\n      message\n    }\n  }\n": types.CompleteAwsMarketplaceSetupDocument,
     "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n": types.GetAccountSupportInfoDocument,
-    "\n  query GetAccountName {\n    account {\n      name\n    }\n  }\n": types.GetAccountNameDocument,
     "\n  query GetAccountCreationTime {\n    account {\n      createdAt\n    }\n  }\n": types.GetAccountCreationTimeDocument,
     "\n  query GetGlobalSearch($opts: SearchInput!) {\n    account {\n      search(opts: $opts) {\n        results {\n          env {\n            name\n            id\n            type\n          }\n          kind\n          value {\n            ... on ArchivedEvent {\n              id\n              name\n            }\n            ... on FunctionRun {\n              id\n              functionID: workflowID\n            }\n          }\n        }\n      }\n    }\n  }\n": types.GetGlobalSearchDocument,
     "\n  query GetFunctionSlug($environmentID: ID!, $functionID: ID!) {\n    environment: workspace(id: $environmentID) {\n      function: workflow(id: $functionID) {\n        slug\n        name\n      }\n    }\n  }\n": types.GetFunctionSlugDocument,
@@ -367,10 +366,6 @@ export function graphql(source: "\n  mutation CompleteAWSMarketplaceSetup($input
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query GetAccountName {\n    account {\n      name\n    }\n  }\n"): (typeof documents)["\n  query GetAccountName {\n    account {\n      name\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
