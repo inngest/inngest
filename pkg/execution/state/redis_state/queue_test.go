@@ -717,6 +717,7 @@ func TestQueueLease(t *testing.T) {
 			atB := atA.Add(time.Minute)
 
 			itemA, err := q.EnqueueItem(ctx, QueueItem{}, atA)
+			require.NoError(t, err)
 			itemB, err := q.EnqueueItem(ctx, QueueItem{}, atB)
 			require.NoError(t, err)
 			p := QueuePartition{WorkflowID: itemA.WorkflowID} // same for A+B
@@ -1842,9 +1843,11 @@ func TestSharding(t *testing.T) {
 			require.EqualValues(t, at.Unix(), shardTime.Unix())
 
 			// Lease the function queue for a minute
-			q.PartitionLease(ctx, &p, time.Minute)
+			_, err = q.PartitionLease(ctx, &p, time.Minute)
+			require.NoError(t, err)
 
 			leasedShardScore, err := r.ZScore(q.kg.ShardPartitionIndex(shard.Name), p.Queue())
+			require.NoError(t, err)
 			leasedShardTime := time.Unix(int64(leasedShardScore), 0)
 
 			require.NoError(t, err)
