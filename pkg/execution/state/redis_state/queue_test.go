@@ -231,7 +231,6 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			WorkflowID: item.WorkflowID,
 			Priority:   testPriority,
-			AtS:        start.Unix(),
 		}, qp)
 	})
 
@@ -254,14 +253,13 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			WorkflowID: item.WorkflowID,
 			Priority:   testPriority,
-			AtS:        start.Unix(),
 		}, qp)
 
 		// Ensure that the zscore did not change.
-		keys, err := r.ZMembers(defaultQueueKey.PartitionIndex())
+		keys, err := r.ZMembers(defaultQueueKey.GlobalPartitionIndex())
 		require.NoError(t, err)
 		require.Equal(t, 1, len(keys))
-		score, err := r.ZScore(defaultQueueKey.PartitionIndex(), keys[0])
+		score, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), keys[0])
 		require.NoError(t, err)
 		require.EqualValues(t, start.Unix(), score)
 	})
@@ -279,15 +277,13 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			WorkflowID: item.WorkflowID,
 			Priority:   testPriority,
-			// AtS can never be lower than Now()
-			AtS: now.Unix(),
 		}, qp)
 
 		// Assert that the zscore was changed to this earliest timestamp.
-		keys, err := r.ZMembers(defaultQueueKey.PartitionIndex())
+		keys, err := r.ZMembers(defaultQueueKey.GlobalPartitionIndex())
 		require.NoError(t, err)
 		require.Equal(t, 1, len(keys))
-		score, err := r.ZScore(defaultQueueKey.PartitionIndex(), keys[0])
+		score, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), keys[0])
 		require.NoError(t, err)
 		require.EqualValues(t, now.Unix(), score)
 	})
@@ -300,7 +296,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.NoError(t, err)
 
 		// Assert that we have two zscores in partition:sorted.
-		keys, err := r.ZMembers(defaultQueueKey.PartitionIndex())
+		keys, err := r.ZMembers(defaultQueueKey.GlobalPartitionIndex())
 		require.NoError(t, err)
 		require.Equal(t, 2, len(keys))
 
@@ -310,7 +306,6 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			WorkflowID: item.WorkflowID,
 			Priority:   testPriority,
-			AtS:        at.Unix(),
 		}, qp)
 	})
 
@@ -689,6 +684,57 @@ func TestQueueLease(t *testing.T) {
 			require.Error(t, err)
 		})
 	})
+
+	t.Run("It should update the global partition index", func(t *testing.T) {
+		r.FlushAll()
+
+		// NOTE: We need two items to ensure that this updates.  Leasing an
+		// item removes it from the fn queue.
+		t.Run("With a single item in the queue hwen leasing, nothing updates", func(t *testing.T) {
+			at := time.Now().Truncate(time.Second).Add(time.Second)
+			item, err := q.EnqueueItem(ctx, QueueItem{}, at)
+			require.NoError(t, err)
+			p := QueuePartition{WorkflowID: item.WorkflowID}
+
+			score, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), p.Queue())
+			require.NoError(t, err)
+			require.EqualValues(t, at.Unix(), score)
+
+			// Nothing should update here, as there's nothing left in the fn queue
+			// so nothing happens.
+			_, err = q.Lease(ctx, p, item, 10*time.Second)
+			require.NoError(t, err)
+
+			nextScore, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), p.Queue())
+			require.NoError(t, err)
+			require.EqualValues(t, int(score), int(nextScore), "score should not equal previous score")
+		})
+
+		r.FlushAll()
+
+		t.Run("With more than one item in the fn queue, it uses the next val", func(t *testing.T) {
+			atA := time.Now().Truncate(time.Second).Add(time.Second)
+			atB := atA.Add(time.Minute)
+
+			itemA, err := q.EnqueueItem(ctx, QueueItem{}, atA)
+			itemB, err := q.EnqueueItem(ctx, QueueItem{}, atB)
+			require.NoError(t, err)
+			p := QueuePartition{WorkflowID: itemA.WorkflowID} // same for A+B
+
+			score, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), p.Queue())
+			require.NoError(t, err)
+			require.EqualValues(t, atA.Unix(), score)
+
+			// Leasing the item should update the score.
+			_, err = q.Lease(ctx, p, itemA, 10*time.Second)
+			require.NoError(t, err)
+
+			nextScore, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), p.Queue())
+			require.NoError(t, err)
+			require.EqualValues(t, itemB.AtMS/1000, nextScore)
+			require.NotEqualValues(t, int(score), int(nextScore), "score should not equal previous score")
+		})
+	})
 }
 
 func TestQueueExtendLease(t *testing.T) {
@@ -1009,9 +1055,9 @@ func TestQueuePartitionLease(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{WorkflowID: idA, Priority: testPriority, AtS: atA.Unix()},
-			{WorkflowID: idB, Priority: testPriority, AtS: atB.Unix()},
-			{WorkflowID: idC, Priority: testPriority, AtS: atC.Unix()},
+			{WorkflowID: idA, Priority: testPriority},
+			{WorkflowID: idB, Priority: testPriority},
+			{WorkflowID: idC, Priority: testPriority},
 		}, items)
 	})
 
@@ -1036,12 +1082,11 @@ func TestQueuePartitionLease(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, items, 3)
 			require.EqualValues(t, []*QueuePartition{
-				{WorkflowID: idB, Priority: testPriority, AtS: atB.Unix()},
-				{WorkflowID: idC, Priority: testPriority, AtS: atC.Unix()},
+				{WorkflowID: idB, Priority: testPriority},
+				{WorkflowID: idC, Priority: testPriority},
 				{
 					WorkflowID: idA,
 					Priority:   testPriority,
-					AtS:        ulid.Time(leaseID.Time()).Unix(),
 					Last:       items[2].Last, // Use the leased partition time.
 					LeaseID:    leaseID,
 				}, // idA is now last.
@@ -1133,9 +1178,9 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{WorkflowID: idA, Priority: PriorityMin, AtS: atA.Unix()},
-			{WorkflowID: idB, Priority: PriorityMax, AtS: atB.Unix()},
-			{WorkflowID: idC, Priority: PriorityMax, AtS: atC.Unix()},
+			{WorkflowID: idA, Priority: PriorityMin},
+			{WorkflowID: idB, Priority: PriorityMax},
+			{WorkflowID: idC, Priority: PriorityMax},
 		}, items)
 	})
 
@@ -1197,8 +1242,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		require.EqualValues(t, []*QueuePartition{
-			{WorkflowID: idB, Priority: PriorityMin, AtS: atB.Unix()},
-			{WorkflowID: idC, Priority: PriorityMin, AtS: atC.Unix()},
+			{WorkflowID: idB, Priority: PriorityMin},
+			{WorkflowID: idC, Priority: PriorityMin},
 		}, items)
 
 		// Try without sequential scans
@@ -1226,12 +1271,12 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	qi, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, now)
 	require.NoError(t, err)
 
-	p := QueuePartition{WorkflowID: qi.WorkflowID}
+	p := QueuePartition{WorkflowID: qi.WorkflowID, WorkspaceID: qi.WorkspaceID}
 
 	t.Run("Uses the next job item's time when requeueing with another job", func(t *testing.T) {
 		requirePartitionScoreEquals(t, r, idA, now)
 		next := now.Add(time.Hour)
-		err := q.PartitionRequeue(ctx, idA.String(), next, false)
+		err := q.PartitionRequeue(ctx, &p, next, false)
 		require.NoError(t, err)
 		requirePartitionScoreEquals(t, r, idA, now)
 	})
@@ -1242,7 +1287,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		_, err := q.PartitionLease(ctx, &QueuePartition{WorkflowID: idA}, time.Minute)
 		require.NoError(t, err)
 
-		err = q.PartitionRequeue(ctx, idA.String(), next, true)
+		err = q.PartitionRequeue(ctx, &p, next, true)
 		require.NoError(t, err)
 		requirePartitionScoreEquals(t, r, idA, next)
 
@@ -1251,8 +1296,6 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	})
 
 	t.Run("Deletes the partition with an empty queue and a leased job", func(t *testing.T) {
-		p := QueuePartition{WorkflowID: qi.WorkflowID}
-
 		requirePartitionScoreEquals(t, r, idA, next)
 
 		// Leasing the only job available moves the job into the concurrency queue,
@@ -1263,16 +1306,16 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		requirePartitionScoreEquals(t, r, idA, next)
 
 		next := now.Add(time.Hour)
-		err = q.PartitionRequeue(ctx, idA.String(), next, false)
+		err = q.PartitionRequeue(ctx, &p, next, false)
 		require.Error(t, ErrPartitionGarbageCollected, err)
 	})
 
 	t.Run("It returns a partition not found error if deleted", func(t *testing.T) {
 		err := q.Dequeue(ctx, p, qi)
 		require.NoError(t, err)
-		err = q.PartitionRequeue(ctx, idA.String(), time.Now().Add(time.Minute), false)
+		err = q.PartitionRequeue(ctx, &p, time.Now().Add(time.Minute), false)
 		require.Equal(t, ErrPartitionGarbageCollected, err)
-		err = q.PartitionRequeue(ctx, idA.String(), time.Now().Add(time.Minute), false)
+		err = q.PartitionRequeue(ctx, &p, time.Now().Add(time.Minute), false)
 		require.Equal(t, ErrPartitionNotFound, err)
 	})
 }
@@ -1450,7 +1493,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 1, len(partsAfter))
 
-			score, err := r.ZScore(q.kg.PartitionIndex(), wsA.String())
+			score, err := r.ZScore(q.kg.GlobalPartitionIndex(), wsA.String())
 			require.NoError(t, err)
 			require.EqualValues(t, next.Unix(), int64(score), r.Dump())
 			require.NotEqualValues(t, parts[0], partsAfter[0])
@@ -1488,7 +1531,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		require.Equal(t, 1, len(parts))
 
 		t.Run("The earliest time is 'at' for the partition", func(t *testing.T) {
-			score, err := r.ZScore(q.kg.PartitionIndex(), wsA.String())
+			score, err := r.ZScore(q.kg.GlobalPartitionIndex(), wsA.String())
 			require.NoError(t, err)
 			require.EqualValues(t, at.Unix(), int64(score), r.Dump())
 		})
@@ -1498,7 +1541,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		require.Nil(t, err, r.Dump())
 
 		t.Run("The earliest time is still 'at' for the partition after requeueing", func(t *testing.T) {
-			score, err := r.ZScore(q.kg.PartitionIndex(), wsA.String())
+			score, err := r.ZScore(q.kg.GlobalPartitionIndex(), wsA.String())
 			require.NoError(t, err)
 			require.EqualValues(t, at.Unix(), int64(score), r.Dump())
 		})
@@ -1543,7 +1586,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		require.Equal(t, 1, len(parts))
 
 		t.Run("The earliest time is 'target' for the partition", func(t *testing.T) {
-			score, err := r.ZScore(q.kg.PartitionIndex(), wsA.String())
+			score, err := r.ZScore(q.kg.GlobalPartitionIndex(), wsA.String())
 			require.NoError(t, err)
 			require.EqualValues(t, target.Unix(), int64(score), r.Dump())
 		})
@@ -1553,7 +1596,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		require.Nil(t, err, r.Dump())
 
 		t.Run("The earliest time is 'next' for the partition after requeueing", func(t *testing.T) {
-			score, err := r.ZScore(q.kg.PartitionIndex(), wsA.String())
+			score, err := r.ZScore(q.kg.GlobalPartitionIndex(), wsA.String())
 			require.NoError(t, err)
 			require.EqualValues(t, next.Unix(), int64(score), r.Dump())
 		})
@@ -1628,6 +1671,232 @@ func TestQueueLeaseSequential(t *testing.T) {
 	})
 }
 
+// TestSharding covers the basics of shards;  we assert that function enqueues/dequeues/leasing
+// modify shards appropriately, and that partition opeartions also modify the shards.
+func TestSharding(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+	ctx := context.Background()
+
+	shouldShard := true // indicate whether to shard in tests
+	shard := &QueueShard{
+		Name:               "sharded",
+		Priority:           0,
+		GuaranteedCapacity: 1,
+	}
+	sf := func(ctx context.Context, wsID uuid.UUID) *QueueShard {
+		if !shouldShard {
+			return nil
+		}
+		return shard
+	}
+	q := NewQueue(rc, WithShardFinder(sf))
+	require.NotNil(t, sf(ctx, uuid.UUID{}))
+
+	t.Run("QueueItem which shards", func(t *testing.T) {
+
+		// NOTE: Times for shards or global pointers cannot be <= now.
+		// Because of this, tests start with the earliest item 1 hour ahead of now so that
+		// we can appropriately test enqueueing earlier items adjust pointer times.
+
+		t.Run("Basic enqueue lease dequeue operations", func(t *testing.T) {
+			at := time.Now().Truncate(time.Second).Add(time.Hour)
+			item, err := q.EnqueueItem(ctx, QueueItem{
+				ID: "foo",
+			}, at)
+			require.NoError(t, err, "sharded enqueue should succeed")
+			// The partition, or function queue, for the just-enqueued item.
+			p := QueuePartition{WorkflowID: item.WorkflowID, WorkspaceID: item.WorkspaceID}
+
+			t.Run("Enqueueing creates a shard in the shard map", func(t *testing.T) {
+				keys, err := r.HKeys(q.kg.Shards())
+				require.NoError(t, err)
+				require.Equal(t, 1, len(keys))
+
+				shardJSON := r.HGet(q.kg.Shards(), shard.Name)
+				actual := &QueueShard{}
+				err = json.Unmarshal([]byte(shardJSON), actual)
+				require.NoError(t, err)
+				require.EqualValues(t, *shard, *actual)
+			})
+
+			t.Run("items exist in the shard partition", func(t *testing.T) {
+				ptrs, err := r.ZMembers(q.kg.ShardPartitionIndex(shard.Name))
+				require.NoError(t, err)
+				require.EqualValues(t, 1, len(ptrs))
+				// TODO: Ensure ID matches
+			})
+
+			t.Run("enqueueing another item in the same shard doesn't duplicate shards or items", func(t *testing.T) {
+				_, err := q.EnqueueItem(ctx, QueueItem{}, at.Add(time.Minute))
+				require.NoError(t, err)
+
+				keys, err := r.HKeys(q.kg.Shards())
+				require.NoError(t, err)
+				require.Equal(t, 1, len(keys))
+
+				shardJSON := r.HGet(q.kg.Shards(), "sharded")
+				actual := &QueueShard{}
+				err = json.Unmarshal([]byte(shardJSON), actual)
+				require.NoError(t, err)
+				require.EqualValues(t, *shard, *actual)
+
+				ptrs, err := r.ZMembers(q.kg.ShardPartitionIndex(shard.Name))
+				require.NoError(t, err)
+				require.EqualValues(t, 1, len(ptrs))
+			})
+
+			t.Run("leasing the earliest queue item modifies the shard partition", func(t *testing.T) {
+				// Check shard partition score changed in the ptr.
+				score, err := r.ZScore(q.kg.ShardPartitionIndex(shard.Name), p.Queue())
+				require.NoError(t, err)
+				require.EqualValues(t, at.Unix(), score, "starting score should be enqueue time")
+
+				_, err = q.Lease(ctx, p, item, 5*time.Second)
+				require.NoError(t, err)
+
+				// Check shard partition score changed in the ptr.
+				nextScore, err := r.ZScore(q.kg.ShardPartitionIndex(shard.Name), p.Queue())
+				require.NoError(t, err)
+				// This is the score of the second item in the queue
+				require.EqualValues(t, at.Add(time.Minute).Unix(), int(nextScore), "leasing should use next queue item's score in shard ptr")
+			})
+
+			t.Run("requeue modifies the shard partition", func(t *testing.T) {
+				err := q.Requeue(ctx, p, item, at.Add(30*time.Second))
+				require.NoError(t, err)
+
+				// Check shard partition score changed in the ptr.
+				nextScore, err := r.ZScore(q.kg.ShardPartitionIndex(shard.Name), p.Queue())
+				require.NoError(t, err)
+				require.EqualValues(t, at.Add(30*time.Second).Unix(), nextScore, "requeued score should increase")
+			})
+
+			t.Run("requeue by job ID modifies the shard partition", func(t *testing.T) {
+				err := q.RequeueByJobID(ctx, p.Queue(), "foo", at.Add(45*time.Second))
+				require.NoError(t, err)
+
+				// Check shard partition score changed in the ptr.
+				nextScore, err := r.ZScore(q.kg.ShardPartitionIndex(shard.Name), p.Queue())
+				require.NoError(t, err)
+				require.EqualValues(t, at.Add(45*time.Second).Unix(), nextScore, "requeued score should increase")
+			})
+
+			// NOTE: Dequeue doesn't need to do anything:  a leased job already removes the
+			// item from the fn queue and updates the shard pointer;  dequeueing operates on in-progress
+			// queues only.
+
+			t.Run("enqueueing earlier items changes the pointer in the shard partition", func(t *testing.T) {
+				// enqueue a new item an hour ago
+				earlier := at.Add(-1 * time.Hour)
+				_, err := q.EnqueueItem(ctx, QueueItem{}, earlier)
+				require.NoError(t, err)
+
+				// Check shard partition score changed in the ptr.
+				nextScore, err := r.ZScore(q.kg.ShardPartitionIndex(shard.Name), p.Queue())
+				nextTime := time.Unix(int64(nextScore), 0)
+				require.NoError(t, err)
+				require.EqualValues(t, earlier.Unix(), nextTime.Unix(), "enqueueing earlier score should rescore")
+			})
+		})
+
+		t.Run("shards are updated when enqueueing, if already exists", func(t *testing.T) {
+			shardJSON := r.HGet(q.kg.Shards(), shard.Name)
+			first := &QueueShard{}
+			err = json.Unmarshal([]byte(shardJSON), first)
+			require.NoError(t, err)
+			require.EqualValues(t, *shard, *first)
+
+			// Enqueue again with a capacity of 1
+			shard.GuaranteedCapacity = shard.GuaranteedCapacity + 1
+			_, err = q.EnqueueItem(ctx, QueueItem{}, time.Now())
+
+			shardJSON = r.HGet(q.kg.Shards(), shard.Name)
+			updated := &QueueShard{}
+			err = json.Unmarshal([]byte(shardJSON), updated)
+			require.NoError(t, err)
+			require.NotEqualValues(t, *first, *updated)
+			require.EqualValues(t, *shard, *updated)
+		})
+	})
+
+	r.FlushAll() // Reset queue.
+
+	t.Run("partitions/function queues", func(t *testing.T) {
+		at := time.Now().Truncate(time.Second).Add(time.Second)
+		item, err := q.EnqueueItem(ctx, QueueItem{}, at)
+		require.NoError(t, err, "sharded enqueue should succeed")
+		// The partition, or function queue, for the just-enqueued item.
+		p := QueuePartition{WorkflowID: item.WorkflowID, WorkspaceID: item.WorkspaceID}
+
+		t.Run("leasing a partition changes the partition's shard pointer", func(t *testing.T) {
+			// The score should be "At" to begin with.
+			shardScore, err := r.ZScore(q.kg.ShardPartitionIndex(shard.Name), p.Queue())
+			shardTime := time.Unix(int64(shardScore), 0)
+			require.NoError(t, err)
+			require.EqualValues(t, at.Unix(), shardTime.Unix())
+
+			// Lease the function queue for a minute
+			q.PartitionLease(ctx, &p, time.Minute)
+
+			leasedShardScore, err := r.ZScore(q.kg.ShardPartitionIndex(shard.Name), p.Queue())
+			leasedShardTime := time.Unix(int64(leasedShardScore), 0)
+
+			require.NoError(t, err)
+			require.NotEqualValues(t, at.Unix(), leasedShardTime.Unix(), "leasing should update partition score")
+			require.WithinDuration(t, at.Add(time.Minute), leasedShardTime, time.Second, "leasing should update partition score")
+		})
+
+		t.Run("requeueing a partition changes the partition's shard pointer", func(t *testing.T) {
+			// The score not be at - sanity check
+			shardScore, err := r.ZScore(q.kg.ShardPartitionIndex(shard.Name), p.Queue())
+			shardTime := time.Unix(int64(shardScore), 0)
+			require.NoError(t, err)
+			require.NotEqualValues(t, at.Unix(), shardTime.Unix())
+
+			// Lease the function queue for a minute
+			err = q.PartitionRequeue(ctx, &p, at, false)
+			require.NoError(t, err)
+
+			// The score should reset to "At"
+			shardScore, err = r.ZScore(q.kg.ShardPartitionIndex(shard.Name), p.Queue())
+			shardTime = time.Unix(int64(shardScore), 0)
+			require.NoError(t, err)
+			require.EqualValues(t, at.Unix(), shardTime.Unix())
+
+			t.Run("partitions with no items are GCd from the shard during requeue", func(t *testing.T) {
+				err := q.Dequeue(ctx, p, item)
+				require.NoError(t, err)
+
+				// Lease the function queue for a minute
+				err = q.PartitionRequeue(ctx, &p, at, false)
+				require.EqualError(t, err, ErrPartitionGarbageCollected.Error())
+			})
+		})
+	})
+
+	r.FlushAll() // Reset queue.
+
+	t.Run("QueueItem which does not shard", func(t *testing.T) {
+		t.Run("enqueueing does not modify shards", func(t *testing.T) {
+			shouldShard = false
+
+			at := time.Now().Truncate(time.Second).Add(time.Hour)
+			_, err := q.EnqueueItem(ctx, QueueItem{}, at)
+			require.NoError(t, err, "sharded enqueue should succeed")
+
+			keys, err := r.HKeys(q.kg.Shards())
+			require.Equal(t, miniredis.ErrKeyNotFound, err)
+			require.Equal(t, 0, len(keys))
+		})
+	})
+}
+
 func getQueueItem(t *testing.T, r *miniredis.Miniredis, id string) QueueItem {
 	t.Helper()
 	// Ensure that our data is set up correctly.
@@ -1666,7 +1935,7 @@ func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item QueueItem
 
 func requirePartitionScoreEquals(t *testing.T, r *miniredis.Miniredis, wid uuid.UUID, expected time.Time) {
 	t.Helper()
-	score, err := r.ZScore(defaultQueueKey.PartitionIndex(), wid.String())
+	score, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), wid.String())
 	parsed := time.Unix(int64(score), 0)
 	require.NoError(t, err)
 	require.WithinDuration(t, expected.Truncate(time.Second), parsed, time.Millisecond)

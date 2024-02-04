@@ -439,7 +439,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition) error {
 			go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
 		}
 		q.scope.Counter(counterPartitionConcurrencyLimitReached).Inc(1)
-		return q.PartitionRequeue(ctx, p.Queue(), time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+		return q.PartitionRequeue(ctx, p, time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 	if err == ErrPartitionAlreadyLeased {
 		q.scope.Counter(counterPartitionLeaseConflict).Inc(1)
@@ -618,7 +618,7 @@ ProcessLoop:
 		}
 		// Requeue this partition as we hit concurrency limits.
 		q.scope.Counter(counterConcurrencyLimit).Inc(1)
-		return q.PartitionRequeue(ctx, p.Queue(), time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+		return q.PartitionRequeue(ctx, p, time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 
 	if processErr != nil {
@@ -632,7 +632,7 @@ ProcessLoop:
 	// Requeue the partition, which reads the next unleased job or sets a time of
 	// 30 seconds.  This is why we have to lease items above, else this may return an item that is
 	// about to be leased and processed by the worker.
-	err = q.PartitionRequeue(ctx, p.Queue(), time.Now().Add(PartitionRequeueExtension), false)
+	err = q.PartitionRequeue(ctx, p, time.Now().Add(PartitionRequeueExtension), false)
 	if err == ErrPartitionGarbageCollected {
 		// Safe;  we're preventing this from wasting cycles in the future.
 		return nil
