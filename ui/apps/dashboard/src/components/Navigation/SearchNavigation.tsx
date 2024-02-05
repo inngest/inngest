@@ -63,6 +63,8 @@ type SearchModalProps = {
 
 function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [isDebouncing, setIsDebouncing] = useState(false);
   const router = useRouter();
   const { user } = useUser();
   let searchResult = {
@@ -73,31 +75,39 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
   };
 
   useEffect(() => {
-    let debounce = setTimeout(() => {
-      if (search && user) {
-        window.inngest.send({
-          name: 'app/global.id.searched',
-          data: {
-            word: search,
-            result: {
-              type: searchResult.type,
-              name: searchResult.name,
-            },
-          },
-          user: {
-            external_id: user.externalId,
-            email: user.primaryEmailAddress?.emailAddress,
-            name: user.fullName,
-            account_id: user.publicMetadata.accountID,
-          },
-          v: '2023-05-17.1',
-        });
-      }
+    const debounce = setTimeout(() => {
+      setIsDebouncing(false);
+      setDebouncedSearch(search);
     }, 1000);
+
+    setIsDebouncing(true);
+
     return () => {
       clearTimeout(debounce);
     };
-  }, [search, searchResult, user]);
+  }, [search]);
+
+  useEffect(() => {
+    if (debouncedSearch && user) {
+      window.inngest.send({
+        name: 'app/global.id.searched',
+        data: {
+          word: search,
+          result: {
+            type: searchResult.type,
+            name: searchResult.name,
+          },
+        },
+        user: {
+          external_id: user.externalId,
+          email: user.primaryEmailAddress?.emailAddress,
+          name: user.fullName,
+          account_id: user.publicMetadata.accountID,
+        },
+        v: '2023-05-17.1',
+      });
+    }
+  }, [debouncedSearch, user]);
 
   /*
    * Collects the search data based on either the FunctionRunID or EventID
@@ -106,10 +116,10 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
     query: GetGlobalSearchDocument,
     variables: {
       opts: {
-        term: search,
+        term: debouncedSearch,
       },
     },
-    pause: !search,
+    pause: !debouncedSearch,
   });
   const globalResults = globalSearchData?.account.search.results[0];
 
@@ -160,6 +170,8 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
     };
   }
 
+  const isLoading = isFetching || isDebouncing;
+
   return (
     <Modal alignTop isOpen={isOpen} onClose={onOpenChange} className="max-w-2xl align-baseline">
       <Command label="Search by ID menu" shouldFilter={false} className="p-2">
@@ -174,8 +186,8 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
         />
         {search && (
           <Command.List className="px-3 py-3 text-slate-600">
-            {isFetching && <Command.Loading>Searching...</Command.Loading>}
-            {!isFetching && globalResults && (
+            {isLoading && <Command.Loading>Searching...</Command.Loading>}
+            {!isLoading && globalResults && (
               <Command.Group
                 heading={<div className="pb-2 text-xs text-slate-500">Navigate To</div>}
               >
@@ -201,7 +213,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
                 </Command.Item>
               </Command.Group>
             )}
-            <Command.Empty className={classNames(isFetching && 'hidden')}>
+            <Command.Empty className={classNames(isLoading && 'hidden')}>
               No results found. Make sure you are typing the full ID.
             </Command.Empty>
           </Command.List>
