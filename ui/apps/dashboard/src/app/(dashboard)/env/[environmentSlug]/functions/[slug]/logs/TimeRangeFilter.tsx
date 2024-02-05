@@ -150,7 +150,7 @@ export default function TimeRangeFilter({
                   title="Select the time field to filter"
                 />
 
-                {timeRangeOptions.map((timeRange, index) => {
+                {timeRangeOptions.map((timeRange) => {
                   const isPlanSufficient = timeRange.daysAgo <= logRetention;
                   const label = getTimeRangeLabel(timeRange);
 

@@ -45,6 +45,7 @@ const meta = {
           externalID: 'app-id',
           functionCount: 1,
           latestSync: {
+            error: null,
             framework,
             lastSyncedAt: now,
             platform,

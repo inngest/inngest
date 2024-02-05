@@ -65,7 +65,7 @@ const GetBillingInfoDocument = graphql(`
 `);
 
 export default function Billing() {
-  const [{ data, fetching }] = useQuery({
+  const [{ data, fetching }, refetch] = useQuery({
     query: GetBillingInfoDocument,
   });
 
@@ -111,7 +111,11 @@ export default function Billing() {
         </div>
       </div>
 
-      <BillingPlanSelector plans={plans} isCurrentPlanEnterprise={isCurrentPlanEnterprise} />
+      <BillingPlanSelector
+        plans={plans}
+        isCurrentPlanEnterprise={isCurrentPlanEnterprise}
+        onUpdate={() => refetch()}
+      />
 
       <section>
         <h2 id="payments" className="py-6 text-2xl font-semibold">

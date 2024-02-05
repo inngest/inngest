@@ -13,7 +13,7 @@ import (
 )
 
 func TestFunctionSteps(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t)
+	h, server, registerFuncs := NewSDKHandler(t, "my-app")
 	defer server.Close()
 
 	var (
@@ -24,21 +24,23 @@ func TestFunctionSteps(t *testing.T) {
 		inngestgo.FunctionOpts{Name: "test sdk"},
 		inngestgo.EventTrigger("test/sdk", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-			step.Run(ctx, "1", func(ctx context.Context) (any, error) {
+			_, err := step.Run(ctx, "1", func(ctx context.Context) (any, error) {
 				fmt.Println("1")
 				atomic.AddInt32(&counter, 1)
 				return input.Event, nil
 			})
+			require.NoError(t, err)
 
-			step.Run(ctx, "2", func(ctx context.Context) (string, error) {
+			_, err = step.Run(ctx, "2", func(ctx context.Context) (string, error) {
 				fmt.Println("2")
 				atomic.AddInt32(&counter, 1)
 				return "test", nil
 			})
+			require.NoError(t, err)
 
 			step.Sleep(ctx, "delay", 2*time.Second)
 
-			_, err := step.WaitForEvent[any](ctx, "wait", step.WaitForEventOpts{
+			_, err = step.WaitForEvent[any](ctx, "wait", step.WaitForEventOpts{
 				Name:    "step name",
 				Event:   "api/new.event",
 				Timeout: time.Minute,

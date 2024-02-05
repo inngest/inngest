@@ -1,19 +1,8 @@
 'use client';
 
 import { createContext, useEffect, useState } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useOrganization, useUser } from '@clerk/nextjs';
 import { useLDClient, withLDProvider } from 'launchdarkly-react-client-sdk';
-import { useQuery } from 'urql';
-
-import { graphql } from '@/gql';
-
-const GetAccountNameDocument = graphql(`
-  query GetAccountName {
-    account {
-      name
-    }
-  }
-`);
 
 export const IdentificationContext = createContext({ isIdentified: false });
 
@@ -22,27 +11,23 @@ function LaunchDarkly({ children }: { children: React.ReactNode }) {
   const client = useLDClient();
 
   const { user } = useUser();
+  const { organization } = useOrganization();
 
-  const accountID = user?.publicMetadata.accountID;
+  const accountID = organization?.publicMetadata.accountID;
   const externalID = user?.externalId;
   const userName = user?.fullName;
-
-  const [{ data }] = useQuery({ query: GetAccountNameDocument, pause: !accountID });
-  const accountName = data?.account.name;
 
   useEffect(() => {
     if (!client || !accountID || !externalID) {
       return;
     }
 
-    console.debug('Identify user', { accountID, externalID, userName });
-
     client
       .identify({
         kind: 'multi',
         account: {
           key: accountID,
-          name: accountName ?? 'Unknown', // TODO: replace this with organization name whenever we have adopted Clerk Organizations
+          name: organization.name,
         },
         user: {
           anonymous: false,
@@ -55,7 +40,7 @@ function LaunchDarkly({ children }: { children: React.ReactNode }) {
         // re-render for the useLDClient hook.
         setIsIdentified(true);
       });
-  }, [accountID, accountName, client, externalID, userName]);
+  }, [accountID, client, externalID, organization?.name, userName]);
 
   return (
     <IdentificationContext.Provider value={{ isIdentified }}>

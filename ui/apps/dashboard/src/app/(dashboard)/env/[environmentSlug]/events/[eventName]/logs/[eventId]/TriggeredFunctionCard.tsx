@@ -11,7 +11,6 @@ import CompletedIcon from '@/icons/status-icons/completed.svg';
 import FailedIcon from '@/icons/status-icons/failed.svg';
 import RunningIcon from '@/icons/status-icons/running.svg';
 import graphqlAPI from '@/queries/graphqlAPI';
-import { relativeTime } from '@/utils/date';
 
 const functionRunStatusIcons = {
   [FunctionRunStatus.Cancelled]: CancelledIcon,

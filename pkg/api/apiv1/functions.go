@@ -1,11 +1,31 @@
 package apiv1
 
-import "net/http"
+import (
+	"encoding/json"
+	"net/http"
 
-// TODO: implement this
-// GetFunctions retrieves a list of functions
-func (a api) GetFunctions(w http.ResponseWriter, r *http.Request) {}
+	"github.com/go-chi/chi/v5"
+	"github.com/inngest/inngest/pkg/publicerr"
+)
 
-// TODO: implement this
-// GetFunction retrieves a function based on the app_id and function_id
-func (a api) GetFunction(w http.ResponseWriter, r *http.Request) {}
+// GetAppFunctions retrieves functions for a given app name, as defined in the SDK.
+func (a api) GetAppFunctions(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	auth, err := a.opts.AuthFinder(ctx)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No auth found"))
+		return
+	}
+
+	fns, err := a.opts.FunctionReader.GetFunctionsByAppExternalID(
+		ctx,
+		auth.WorkspaceID(),
+		chi.URLParam(r, "appName"),
+	)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No auth found"))
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(fns)
+}

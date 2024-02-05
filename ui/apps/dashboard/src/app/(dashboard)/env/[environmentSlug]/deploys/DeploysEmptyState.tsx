@@ -5,7 +5,6 @@ import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
-import { capitalCase } from 'change-case';
 import { useLocalStorage } from 'react-use';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
@@ -18,8 +17,6 @@ import { pathCreator } from '@/utils/urls';
 import { DeployFailure } from './DeployFailure';
 import DeploySigningKey from './DeploySigningKey';
 import { deployViaUrl, type RegistrationFailure } from './utils';
-
-const BRANCH_PARENT_ENV_SLUG = 'branch';
 
 export default function DeploysOnboarding() {
   // We fetch deploys using the same hook at DeployList which enables URQL

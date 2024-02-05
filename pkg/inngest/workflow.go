@@ -1,8 +1,14 @@
 package inngest
 
 import (
+	"context"
+	"errors"
+	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/xhit/go-str2duration/v2"
 )
 
 const (
@@ -90,6 +96,31 @@ type RateLimit struct {
 	// ID in an event you can use the following key: "{{ event.user.id }}".  This ensures
 	// that we throttle functions for each user independently.
 	Key *string `json:"key,omitempty"`
+}
+
+func (r RateLimit) IsValid(ctx context.Context) error {
+	if r.Limit <= 0 {
+		return errors.New("limit must be greater than 0")
+	}
+
+	if r.Key != nil {
+		if err := expressions.Validate(ctx, *r.Key); err != nil {
+			return fmt.Errorf("key is invalid: %w", err)
+		}
+	}
+
+	if r.Period == "" {
+		return errors.New("period must be specified")
+	}
+	dur, err := str2duration.ParseDuration(r.Period)
+	if err != nil {
+		return fmt.Errorf("failed to parse time duration: %w", err)
+	}
+	if dur > consts.FunctionIdempotencyPeriod {
+		return fmt.Errorf("period must be less than %s", consts.FunctionIdempotencyPeriod)
+	}
+
+	return nil
 }
 
 type Edge struct {

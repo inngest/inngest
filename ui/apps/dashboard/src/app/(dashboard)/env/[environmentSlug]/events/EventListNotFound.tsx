@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { CodeKey } from '@inngest/components/CodeKey';
-import { useCopyToClipboard } from 'react-use';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
@@ -41,9 +40,8 @@ function getDefaultEventKey<T extends { createdAt: string; name: null | string }
 export default function EventListNotFound() {
   const router = useRouter();
   const { value: isAppsEnabled } = useBooleanFlag('apps-page');
-  const [, copy] = useCopyToClipboard();
   const environment = useEnvironment();
-  const [{ data, fetching: fetchingKey }] = useQuery({
+  const [{ data }] = useQuery({
     query: GetEventKeysForBlankSlateDocument,
     variables: {
       environmentID: environment.id,

@@ -15,6 +15,7 @@ const query = graphql(`
       commitHash
       commitMessage
       commitRef
+      error
       framework
       id
       lastSyncedAt

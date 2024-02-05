@@ -1,5 +1,3 @@
-import cn from '@/utils/cn';
-
 type BlockProps = {
   title?: string;
   className?: string;

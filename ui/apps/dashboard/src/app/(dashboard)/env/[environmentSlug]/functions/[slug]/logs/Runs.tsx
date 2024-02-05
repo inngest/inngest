@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useOrganization, useUser } from '@clerk/nextjs';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
@@ -70,6 +70,7 @@ export default function RunsPage({ params }: RunsPageProps) {
     },
   });
   const { user } = useUser();
+  const { organization } = useOrganization();
 
   const functionRunsCount = data?.environment.function?.runs?.totalCount;
 
@@ -82,14 +83,15 @@ export default function RunsPage({ params }: RunsPageProps) {
         type: 'status',
         value: statuses,
       },
-      ...(user && {
-        user: {
-          external_id: user.externalId,
-          email: user.primaryEmailAddress?.emailAddress,
-          name: user.fullName,
-          account_id: user.publicMetadata.accountID,
-        },
-      }),
+      ...(user &&
+        organization && {
+          user: {
+            external_id: user.externalId,
+            email: user.primaryEmailAddress?.emailAddress,
+            name: user.fullName,
+            account_id: organization.publicMetadata.accountID,
+          },
+        }),
       v: '2023-06-02.1',
     });
   }
@@ -103,14 +105,15 @@ export default function RunsPage({ params }: RunsPageProps) {
         type: 'time-range',
         value: timeRange,
       },
-      ...(user && {
-        user: {
-          external_id: user.externalId,
-          email: user.primaryEmailAddress?.emailAddress,
-          name: user.fullName,
-          account_id: user.publicMetadata.accountID,
-        },
-      }),
+      ...(user &&
+        organization && {
+          user: {
+            external_id: user.externalId,
+            email: user.primaryEmailAddress?.emailAddress,
+            name: user.fullName,
+            account_id: organization.publicMetadata.accountID,
+          },
+        }),
       v: '2023-06-05.1',
     });
   }

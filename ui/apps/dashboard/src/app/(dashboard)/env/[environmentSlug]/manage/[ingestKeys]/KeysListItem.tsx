@@ -2,13 +2,12 @@
 
 import { type Route } from 'next';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { Time } from '@/components/Time';
 import ClockIcon from '@/icons/ClockIcon';
 import cn from '@/utils/cn';
-import { relativeTime } from '@/utils/date';
 import { getManageKey } from '@/utils/urls';
 
 type KeysListItemProps = {

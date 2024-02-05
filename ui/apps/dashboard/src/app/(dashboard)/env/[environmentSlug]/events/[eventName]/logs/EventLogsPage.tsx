@@ -10,7 +10,6 @@ import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import cn from '@/utils/cn';
-import { relativeTime, weekDayAndUTCTime } from '@/utils/date';
 
 const perPage = 50;
 

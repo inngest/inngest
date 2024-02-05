@@ -1,6 +1,7 @@
 'use client';
 
 import { Skeleton } from '@inngest/components/Skeleton';
+import { IconFunction } from '@inngest/components/icons/Function';
 import { classNames } from '@inngest/components/utils/classNames';
 
 import { SyncStatus } from '@/components/SyncStatus';
@@ -39,7 +40,7 @@ export function SyncList({
   return (
     <div
       className={classNames(
-        'w-[460px] flex-shrink-0 overflow-y-auto border-r border-slate-300 bg-white',
+        'w-2/5 max-w-2xl flex-shrink-0 overflow-y-auto border-r border-slate-300 bg-white sm:w-1/3',
         className
       )}
     >
@@ -66,15 +67,24 @@ export function SyncList({
                 onClick={() => onClick(sync.id)}
               >
                 <div className="flex items-center">
-                  <div className="w-36 p-4 align-middle">
+                  <div className="hidden w-36 p-4 align-middle lg:block">
                     <SyncStatus status={sync.status} />
                   </div>
-                  <div className="p-4 pl-0 align-middle">
+                  <div className="px-2 py-4 align-middle lg:hidden">
+                    <SyncStatus status={sync.status} iconOnly />
+                  </div>
+                  <div className="py-4 align-middle">
                     <Time value={sync.lastSyncedAt} />
                   </div>
                 </div>
-                <div className="whitespace-nowrap p-4 pl-0 align-middle">
-                  {sync.syncedFunctions.length} functions
+                <div
+                  className="hidden items-center gap-1 align-middle md:p-2 lg:p-4 min-[1120px]:flex"
+                  title={`${sync.syncedFunctions.length} ${
+                    sync.syncedFunctions.length === 1 ? 'function' : 'functions'
+                  }`}
+                >
+                  <IconFunction className="text-slate-500" />
+                  {sync.syncedFunctions.length}
                 </div>
               </li>
             );

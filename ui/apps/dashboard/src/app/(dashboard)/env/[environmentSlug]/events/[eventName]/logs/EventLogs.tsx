@@ -1,6 +1,6 @@
 'use client';
 
-import { useContext, useState } from 'react';
+import { useState } from 'react';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { EventLogsPage } from './EventLogsPage';
@@ -13,17 +13,6 @@ export default function EventLogs({ eventName }: EventLogsProps) {
   const [cursors, setCursors] = useState(['']);
   const environment = useEnvironment();
   const pathPrefix = `/env/${environment.slug}/events/${encodeURIComponent(eventName)}/logs`;
-
-  function loadNextPage(cursor: string) {
-    setCursors((cursors) => {
-      if (cursors.includes(cursor)) {
-        return cursors;
-      }
-      return [...cursors, cursor];
-    });
-
-    cursors.push(cursor);
-  }
 
   return (
     <ul role="list" className="h-full divide-y divide-slate-100">

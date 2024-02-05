@@ -61,7 +61,7 @@ export function useRows({ archived }: { archived: boolean }): Output {
         }).then((res) => {
           setFunctionsData((prev) => {
             // Merge function
-            const rows = prev.rows.map((row, i) => {
+            const rows = prev.rows.map((row) => {
               const usage = res.data.functions.find((usageItem) => {
                 return usageItem.slug === row.slug;
               });

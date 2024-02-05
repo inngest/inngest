@@ -1,23 +1,42 @@
 'use client';
 
 import { useMemo } from 'react';
+import type { Route } from 'next';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
+import * as Sentry from '@sentry/nextjs';
+import { authExchange } from '@urql/exchange-auth';
 import { requestPolicyExchange } from '@urql/exchange-request-policy';
 import { retryExchange } from '@urql/exchange-retry';
 import {
+  CombinedError,
   Provider,
   cacheExchange,
   createClient,
   fetchExchange,
-  makeOperation,
   mapExchange,
-  type Operation,
 } from 'urql';
 
-export default function URQLProvider({ children }: { children: React.ReactNode }) {
-  const { getToken, isLoaded } = useAuth();
+import SignInRedirectErrors from '@/app/(auth)/sign-in/[[...sign-in]]/SignInRedirectErrors';
 
-  const urqlClient = useMemo(() => {
+/**
+ * This is used to ensure that the URQL client is re-created (cache reset) whenever the user signs
+ * out or switches organizations.
+ * @param {React.ReactNode} children
+ * @returns {JSX.Element}
+ * @constructor
+ */
+export default function URQLProviderWrapper({ children }: { children: React.ReactNode }) {
+  const { isSignedIn, orgId } = useAuth();
+
+  return <URQLProvider key={`${isSignedIn}-${orgId}`}>{children}</URQLProvider>;
+}
+
+export function URQLProvider({ children }: { children: React.ReactNode }) {
+  const { getToken, signOut } = useAuth();
+  const router = useRouter();
+
+  const client = useMemo(() => {
     return createClient({
       url: `${process.env.NEXT_PUBLIC_API_URL}/gql`,
       exchanges: [
@@ -28,52 +47,52 @@ export default function URQLProvider({ children }: { children: React.ReactNode }
           shouldUpgrade: (operation) => operation.context.requestPolicy !== 'cache-only',
         }),
         cacheExchange,
-        retryExchange({
-          maxNumberAttempts: 3,
-          retryIf: (error) => {
-            // TODO: Remove the legacy check once https://github.com/inngest/monorepo/pull/2133 has been released
-            const legacyCheck = error.graphQLErrors.some((e) => e.message.includes('unauthorized'));
-            // Retry the operation if Clerk is not loaded yet and we got an UNAUTHENTICATED error
-            return (
-              !isLoaded &&
-              (legacyCheck ||
-                error.graphQLErrors.some((e) => e.extensions.code === 'UNAUTHENTICATED'))
-            );
+        mapExchange({
+          onError(error) {
+            // Handle unauthenticated errors after (1) trying to refresh the token and (2) retrying the operation.
+            if (isUnauthenticatedError(error)) {
+              // Log to Sentry if it still fails after trying to refresh the token and retrying the operation.
+              Sentry.captureException(error);
+              signOut(() => {
+                router.push(
+                  `${process.env.NEXT_PUBLIC_SIGN_IN_PATH || '/sign-in'}?error=${
+                    SignInRedirectErrors.Unauthenticated
+                  }` as Route
+                );
+              });
+            }
           },
         }),
-        mapExchange({
-          // Append the Clerk session token to all operations (subscriptions, queries, mutations, teardowns)
-          async onOperation(operation) {
-            const sessionToken = await getToken();
-            if (!sessionToken) return operation;
-            return appendHeaders(operation, {
-              Authorization: `Bearer ${sessionToken}`,
-            });
-          },
+        retryExchange({
+          maxNumberAttempts: 3,
+          retryIf: isUnauthenticatedError,
+        }),
+        authExchange(async (utils) => {
+          let sessionToken = await getToken();
+          return {
+            addAuthToOperation: (operation) => {
+              if (!sessionToken) return operation;
+              return utils.appendHeaders(operation, {
+                Authorization: `Bearer ${sessionToken}`,
+              });
+            },
+            didAuthError: isUnauthenticatedError,
+            refreshAuth: async () => {
+              sessionToken = await getToken({ skipCache: true });
+            },
+          };
         }),
         fetchExchange,
       ],
-      // TODO: Remove the following line once we have fully migrated to Clerk-based authentication
-      fetchOptions: () => ({ credentials: 'include' }),
     });
-  }, [getToken, isLoaded]);
+  }, [getToken, router, signOut]);
 
-  return <Provider value={urqlClient}>{children}</Provider>;
+  return <Provider value={client}>{children}</Provider>;
 }
 
-function appendHeaders(operation: Operation, headers: Record<string, string>): Operation {
-  const fetchOptions =
-    typeof operation.context.fetchOptions === 'function'
-      ? operation.context.fetchOptions()
-      : operation.context.fetchOptions || {};
-  return makeOperation(operation.kind, operation, {
-    ...operation.context,
-    fetchOptions: {
-      ...fetchOptions,
-      headers: {
-        ...fetchOptions.headers,
-        ...headers,
-      },
-    },
-  });
+function isUnauthenticatedError(error: CombinedError): boolean {
+  return (
+    error.response?.status === 401 ||
+    error.graphQLErrors.some((e) => e.extensions.code === 'UNAUTHENTICATED')
+  );
 }

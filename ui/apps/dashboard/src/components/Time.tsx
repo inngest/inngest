@@ -21,9 +21,10 @@ export function Time({ className, format, value }: Props) {
   let title: string | undefined;
   if (format === 'relative') {
     dateString = relativeTime(value);
-    title = value.toLocaleString();
+    title = value.toString();
   } else {
     dateString = value.toLocaleString();
+    title = value.toString();
   }
 
   return (

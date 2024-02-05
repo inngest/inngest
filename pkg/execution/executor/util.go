@@ -3,7 +3,6 @@ package executor
 import (
 	"context"
 	"crypto/rand"
-	"sort"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
@@ -40,15 +39,57 @@ func GetFunctionRunMetadata(ctx context.Context, sm state.Manager, runID ulid.UL
 	return sm.Metadata(ctx, runID)
 }
 
-func sortOps(opcodes []*state.GeneratorOpcode) {
-	sort.SliceStable(opcodes, func(i, j int) bool {
-		// Ensure that we process waitForEvents first, as these are highest priority:
-		// it ensures that wait triggers are saved as soon as possible.
-		if opcodes[i].Op == enums.OpcodeWaitForEvent {
-			return true
+// OpcodeGroup is a group of opcodes that can be processed in parallel.
+type OpcodeGroup struct {
+	// Opcodes is the list of opcodes in the group.
+	Opcodes []*state.GeneratorOpcode
+	// ShouldStartHistoryGroup indicates whether each item in the group should
+	// start a new history group. This is true if the overall list of opcodes
+	// received from an SDK Call Request contains more than one opcode.
+	ShouldStartHistoryGroup bool
+}
+
+// OpcodeGroups are groups opcodes by their type, helping to run `waitForEvent`
+// opcodes first. This is used to ensure that we save wait triggers as soon as
+// possible, as well as capturing expression errors early.
+type OpcodeGroups struct {
+	// PriorityGroup is a group of opcodes that should be processed first.
+	PriorityGroup OpcodeGroup
+
+	// OtherGroup is a group of opcodes that should be processed after the
+	// priority group.
+	OtherGroup OpcodeGroup
+}
+
+// opGroups groups opcodes by their type.
+func opGroups(opcodes []*state.GeneratorOpcode) OpcodeGroups {
+	shouldStartHistoryGroup := len(opcodes) > 1
+
+	groups := OpcodeGroups{
+		PriorityGroup: OpcodeGroup{
+			Opcodes:                 []*state.GeneratorOpcode{},
+			ShouldStartHistoryGroup: shouldStartHistoryGroup,
+		},
+		OtherGroup: OpcodeGroup{
+			Opcodes:                 []*state.GeneratorOpcode{},
+			ShouldStartHistoryGroup: shouldStartHistoryGroup,
+		},
+	}
+
+	for _, op := range opcodes {
+		if op.Op == enums.OpcodeWaitForEvent {
+			groups.PriorityGroup.Opcodes = append(groups.PriorityGroup.Opcodes, op)
+		} else {
+			groups.OtherGroup.Opcodes = append(groups.OtherGroup.Opcodes, op)
 		}
-		return opcodes[i].Op < opcodes[j].Op
-	})
+	}
+
+	return groups
+}
+
+// All returns a list of all groups in the order they should be processed.
+func (g OpcodeGroups) All() []OpcodeGroup {
+	return []OpcodeGroup{g.PriorityGroup, g.OtherGroup}
 }
 
 func CreateInvokeNotFoundEvent(ctx context.Context, opts execution.InvokeNotFoundHandlerOpts) event.Event {

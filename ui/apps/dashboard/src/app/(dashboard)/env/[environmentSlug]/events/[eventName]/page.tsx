@@ -10,7 +10,6 @@ import SimpleBarChart from '@/components/Charts/SimpleBarChart';
 import Overlay from '@/components/Overlay';
 import { Time } from '@/components/Time';
 import { useEventType } from '@/queries';
-import { relativeTime } from '@/utils/date';
 import LatestLogsList from './LatestLogsList';
 
 type EventDashboardProps = {

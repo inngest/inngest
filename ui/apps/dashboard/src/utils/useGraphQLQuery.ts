@@ -1,12 +1,17 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
-  baseFetchFailed,
-  baseFetchLoading,
   baseFetchSkipped,
   baseFetchSucceeded,
+  baseInitialFetchFailed,
+  baseInitialFetchLoading,
+  baseRefetchFailed,
+  baseRefetchLoading,
   type FetchResult,
 } from '@inngest/components/types/fetch';
 import { useQuery, type TypedDocumentNode, type UseQueryArgs } from 'urql';
+
+import { skipCacheSearchParam } from './urls';
 
 type Args<
   ResultT extends { [key in string]: unknown },
@@ -32,9 +37,13 @@ export function useGraphQLQuery<
   context,
   pollIntervalInMilliseconds,
 }: Args<ResultT, VariablesT>): FetchResult<ResultT> {
+  const searchParams = useSearchParams();
+  const skipCache = searchParams.get(skipCacheSearchParam.name) === skipCacheSearchParam.value;
+
   const [res, executeQuery] = useQuery({
     query,
     variables,
+    requestPolicy: skipCache ? 'network-only' : undefined,
     context,
   });
 
@@ -51,15 +60,27 @@ export function useGraphQLQuery<
   }, [res.fetching, pollIntervalInMilliseconds, executeQuery]);
 
   if (res.fetching) {
+    if (!res.data) {
+      return baseInitialFetchLoading;
+    }
+
     return {
-      ...baseFetchLoading,
+      ...baseRefetchLoading,
       data: res.data,
     };
   }
 
   if (res.error) {
+    if (!res.data) {
+      return {
+        ...baseInitialFetchFailed,
+        error: new Error(res.error.message),
+      };
+    }
+
     return {
-      ...baseFetchFailed,
+      ...baseRefetchFailed,
+      data: res.data,
       error: new Error(res.error.message),
     };
   }
@@ -67,7 +88,7 @@ export function useGraphQLQuery<
   if (!res.data) {
     // Should be unreachable.
     return {
-      ...baseFetchFailed,
+      ...baseInitialFetchFailed,
       error: new Error('finished loading but missing data'),
     };
   }
@@ -75,6 +96,91 @@ export function useGraphQLQuery<
   return {
     ...baseFetchSucceeded,
     data: res.data,
+  };
+}
+
+// TODO: Move this function's logic into useGraphQLQuery once we're confident in
+// it
+export function useGraphQLQuery_TEMPORARY<
+  ResultT extends { [key in string]: unknown },
+  VariablesT extends { [key in string]: unknown }
+>({
+  query,
+  variables,
+  context,
+  pollIntervalInMilliseconds,
+}: Args<ResultT, VariablesT>): FetchResult<ResultT> {
+  // Store the result data in a ref because we don't want polling errors to
+  // clear that cached data. If urql has a first-class way of doing this then we
+  // should use that instead.
+  //
+  // Use useRef instead of useState because we don't want to trigger a
+  // re-render.
+  const dataRef = useRef<ResultT | undefined>(undefined);
+
+  const [res, executeQuery] = useQuery({
+    query,
+    variables,
+    context,
+  });
+
+  // Polling hook
+  useEffect(() => {
+    if (res.fetching || !pollIntervalInMilliseconds) {
+      return;
+    }
+
+    const timeoutID = setTimeout(
+      () => executeQuery({ requestPolicy: 'network-only' }),
+      pollIntervalInMilliseconds
+    );
+    return () => clearTimeout(timeoutID);
+  }, [res.fetching, pollIntervalInMilliseconds, executeQuery]);
+
+  if (res.data) {
+    dataRef.current = res.data;
+  }
+  const data = res.data ?? dataRef.current;
+
+  // Handle both fetching states (initial fetch and refetch)
+  if (res.fetching) {
+    if (!data) {
+      return baseInitialFetchLoading;
+    }
+
+    return {
+      ...baseRefetchLoading,
+      data,
+    };
+  }
+
+  // Handle both error states (initial fetch and refetch)
+  if (res.error) {
+    if (!data) {
+      return {
+        ...baseInitialFetchFailed,
+        error: new Error(res.error.message),
+      };
+    }
+
+    return {
+      ...baseRefetchFailed,
+      data,
+      error: new Error(res.error.message),
+    };
+  }
+
+  if (!data) {
+    // Should be unreachable.
+    return {
+      ...baseInitialFetchFailed,
+      error: new Error('finished loading but missing data'),
+    };
+  }
+
+  return {
+    ...baseFetchSucceeded,
+    data,
   };
 }
 
@@ -112,20 +218,32 @@ export function useSkippableGraphQLQuery<
     return () => clearTimeout(timeoutID);
   }, [skip, res.fetching, pollIntervalInMilliseconds, executeQuery]);
 
-  if (res.fetching) {
-    return {
-      ...baseFetchLoading,
-      data: res.data,
-    };
-  }
-
   if (skip) {
     return baseFetchSkipped;
   }
 
-  if (res.error) {
+  if (res.fetching) {
+    if (!res.data) {
+      return baseInitialFetchLoading;
+    }
+
     return {
-      ...baseFetchFailed,
+      ...baseRefetchLoading,
+      data: res.data,
+    };
+  }
+
+  if (res.error) {
+    if (!res.data) {
+      return {
+        ...baseInitialFetchFailed,
+        error: new Error(res.error.message),
+      };
+    }
+
+    return {
+      ...baseRefetchFailed,
+      data: res.data,
       error: new Error(res.error.message),
     };
   }
@@ -133,7 +251,7 @@ export function useSkippableGraphQLQuery<
   if (!res.data) {
     // Should be unreachable.
     return {
-      ...baseFetchFailed,
+      ...baseInitialFetchFailed,
       error: new Error('finished loading but missing data'),
     };
   }

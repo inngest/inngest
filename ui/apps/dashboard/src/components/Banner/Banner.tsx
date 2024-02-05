@@ -26,7 +26,13 @@ export function Banner({
   }
 
   return (
-    <div className={classNames(className, color, 'flex w-full justify-between border-y px-8 py-2')}>
+    <div
+      className={classNames(
+        className,
+        color,
+        'flex w-full items-center justify-between border-y px-2 py-2 md:px-4 lg:px-8'
+      )}
+    >
       <div className="flex items-center gap-1 text-sm">
         {Icon}
         {children}

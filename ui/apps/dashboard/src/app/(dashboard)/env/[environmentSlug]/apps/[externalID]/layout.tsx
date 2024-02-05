@@ -3,8 +3,8 @@
 import { Squares2X2Icon } from '@heroicons/react/20/solid';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
+import { Alert } from '@/components/Alert';
 import Header, { type HeaderLink } from '@/components/Header/Header';
-import { Time } from '@/components/Time';
 import { ResyncButton } from './ResyncButton';
 import { useNavData } from './useNavData';
 
@@ -24,8 +24,11 @@ export default function Layout({ children, params: { externalID } }: Props) {
   });
   if (res.error) {
     if (res.error.message.includes('no rows')) {
-      // TODO: Make this look better.
-      return <span className="m-auto">App not found: {externalID}</span>;
+      return (
+        <div className="mt-4 flex place-content-center">
+          <Alert severity="warning">{externalID} app not found in this environment</Alert>
+        </div>
+      );
     }
     throw res.error;
   }
@@ -49,7 +52,6 @@ export default function Layout({ children, params: { externalID } }: Props) {
   let action;
   if (res.data.latestSync?.url) {
     const canResync = res.data.latestSync.platform !== 'vercel';
-    console.log(res.data.latestSync.platform);
     if (canResync) {
       action = <ResyncButton latestSyncUrl={res.data.latestSync.url} />;
     }

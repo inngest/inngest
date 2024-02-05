@@ -1,4 +1,5 @@
 import { RocketLaunchIcon } from '@heroicons/react/20/solid';
+import { Link } from '@inngest/components/Link';
 
 import { Banner } from '@/components/Banner';
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
@@ -25,10 +26,9 @@ export default async function DeploysLayout({ children }: DeploysLayoutProps) {
             The deploys page is getting deprecated. We&apos;ve moved all this information and
             functionality over to the <b>Apps</b> tab.
           </p>
-          {/* To do: wire this to the docs */}
-          {/* <Link internalNavigation={false} href="">
+          <Link internalNavigation={false} href="https://www.inngest.com/docs/apps/cloud">
             Learn More
-          </Link> */}
+          </Link>
         </Banner>
       )}
       <div className="flex flex-grow overflow-hidden bg-slate-50">

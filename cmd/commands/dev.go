@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
@@ -28,6 +29,8 @@ func NewCmdDev() *cobra.Command {
 	cmd.Flags().Bool("no-discovery", false, "Disable autodiscovery")
 	cmd.Flags().Bool("no-poll", false, "Disable polling of apps for updates")
 	cmd.Flags().Int("retry-interval", 0, "Retry interval in seconds for linear backoff when retrying functions - must be 1 or above")
+
+	cmd.Flags().Int("tick", 150, "The interval (in milliseconds) at which the executor checks for new work, during local development")
 
 	return cmd
 }
@@ -72,6 +75,7 @@ func doDev(cmd *cobra.Command, args []string) {
 	noDiscovery, _ := cmd.Flags().GetBool("no-discovery")
 	noPoll, _ := cmd.Flags().GetBool("no-poll")
 	retryInterval, _ := cmd.Flags().GetInt("retry-interval")
+	tick, _ := cmd.Flags().GetInt("tick")
 
 	opts := devserver.StartOpts{
 		Config:        *conf,
@@ -79,6 +83,7 @@ func doDev(cmd *cobra.Command, args []string) {
 		Autodiscover:  !noDiscovery,
 		Poll:          !noPoll,
 		RetryInterval: retryInterval,
+		Tick:          time.Duration(tick) * time.Millisecond,
 	}
 
 	close, err := telemetry.TracerSetup("devserver", telemetry.TracerTypeNoop)

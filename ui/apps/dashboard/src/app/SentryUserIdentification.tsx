@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useOrganization, useUser } from '@clerk/nextjs';
 import * as Sentry from '@sentry/nextjs';
 
 export default function SentryUserIdentification() {
   const { user, isSignedIn } = useUser();
+  const { organization } = useOrganization();
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -16,11 +17,12 @@ export default function SentryUserIdentification() {
       email: user.primaryEmailAddress?.emailAddress,
     };
 
-    const accountID = user.publicMetadata.accountID;
+    const accountID = organization?.publicMetadata.accountID;
+
     if (typeof accountID !== 'undefined' && typeof accountID !== 'string') {
       Sentry.setUser(baseUser);
       Sentry.captureException(
-        new Error('Expected user.publicMetadata.accountID to be a string when defined.')
+        new Error('Expected organization.publicMetadata.accountID to be a string when defined.')
       );
       return;
     }
@@ -34,7 +36,7 @@ export default function SentryUserIdentification() {
     user?.id,
     user?.externalId,
     user?.primaryEmailAddress?.emailAddress,
-    user?.publicMetadata.accountID,
+    organization?.publicMetadata.accountID,
   ]);
 
   return null;

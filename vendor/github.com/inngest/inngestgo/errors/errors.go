@@ -1,9 +1,37 @@
 package errors
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 )
+
+// StepError is an error returned when a step permanently fails
+type StepError struct {
+	Name    string `json:"name"`
+	Message string `json:"message"`
+	// Data is the data from state.UserError, used to store
+	// the resulting value when step errors occur with an additional
+	// response type.
+	Data json.RawMessage `json:"data,omitempty"`
+}
+
+func (e StepError) Error() string {
+	return e.Message
+}
+
+func (e StepError) Is(err error) bool {
+	switch err.(type) {
+	case *StepError, StepError:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsStepError(err error) bool {
+	return errors.Is(err, StepError{})
+}
 
 // NoRetryError wraps an error, preventing retries in the SDK.  This permanently
 // fails a step and function.

@@ -1,4 +1,3 @@
-import { type Route } from 'next';
 import Link from 'next/link';
 import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
@@ -35,7 +34,11 @@ export default async function Envs() {
             <div className="mb-4 flex w-full items-center  justify-between">
               <h2 className="text-lg font-medium text-slate-800">Production Environment</h2>
               <div className="flex items-center gap-2">
-                <Button href="/env/production/manage" appearance="outlined" label="Manage" />
+                <Button
+                  href={pathCreator.manage({ envSlug: 'production' })}
+                  appearance="outlined"
+                  label="Manage"
+                />
                 <Button
                   href={
                     isAppsEnabled
@@ -121,7 +124,7 @@ export default async function Envs() {
                           : pathCreator.deploys({ envSlug: branchParent.slug })
                       }
                       kind="primary"
-                      label={isAppsEnabled ? 'Go To Apps' : 'Deploy'}
+                      label={isAppsEnabled ? 'Sync New App' : 'Deploy'}
                     />
                   </div>
                 </div>
@@ -169,7 +172,11 @@ export default async function Envs() {
               <div className="mb-4 flex w-full items-center  justify-between">
                 <h2 className="text-lg font-medium text-slate-800">Create an environment</h2>
                 <div className="flex items-center gap-2">
-                  <Button href="create-environment" kind="primary" label="Create environment" />
+                  <Button
+                    href={pathCreator.createEnv()}
+                    kind="primary"
+                    label="Create environment"
+                  />
                 </div>
               </div>
               <p className="mt-2 text-sm font-medium text-slate-600">

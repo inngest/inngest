@@ -2,7 +2,7 @@ export function IconRender({ className, size = 18 }: { className?: string; size?
   return (
     <svg
       className={className}
-      fill="#46e3b7"
+      fill="currentColor"
       height={size}
       viewBox="0 0 171 171"
       width={size}

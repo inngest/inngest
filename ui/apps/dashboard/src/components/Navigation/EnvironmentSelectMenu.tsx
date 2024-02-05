@@ -188,7 +188,7 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
                     className="flex items-center gap-2.5 px-3.5 py-3 font-medium text-slate-300 transition-all hover:bg-slate-800 hover:text-white"
                   >
                     <RocketLaunchIcon className="h-3" />
-                    Deploy a branch
+                    Sync a branch
                   </Link>
                 )}
               </div>
