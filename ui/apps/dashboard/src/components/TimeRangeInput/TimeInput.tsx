@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useReducer, useRef } from 'react';
+import { useReducer, useRef } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import * as chrono from 'chrono-node';
 import { useDebounce } from 'react-use';
@@ -78,9 +78,9 @@ function reducer(state: State, action: Action): State {
         status: 'typing',
       };
     case 'stopped_typing':
-      const parsedDateTime = chrono.parseDate(state.inputString);
       // Chrono's types are wrong - parseData can return undefined
-      // eslint-disable-next-line
+      const parsedDateTime = chrono.parseDate(state.inputString) as unknown as Date | null;
+
       if (!parsedDateTime) {
         return {
           ...state,
@@ -123,7 +123,7 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
     [state.inputString]
   );
 
-  function handleInputFocus(event: React.FocusEvent<HTMLInputElement>) {
+  function handleInputFocus() {
     dispatch({ type: 'focused' });
   }
 

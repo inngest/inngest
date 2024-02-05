@@ -1,6 +1,5 @@
 'use client';
 
-import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import PlusIcon from '@heroicons/react/20/solid/PlusIcon';
 import { Button } from '@inngest/components/Button';
@@ -21,7 +20,10 @@ export function Apps({ isArchived = false }: Props) {
 
   const res = useApps({ envID: env.id, isArchived });
   if (res.error) {
-    throw res.error;
+    if (!res.data) {
+      throw res.error;
+    }
+    console.error(res.error);
   }
   if (res.isLoading && !res.data) {
     return (
@@ -40,8 +42,8 @@ export function Apps({ isArchived = false }: Props) {
     <div className="mb-4 mt-16 flex items-center justify-center">
       <div className="w-full max-w-[1200px]">
         {!hasApps && !isArchived && (
-          <EmptyAppCard>
-            <div>
+          <EmptyAppCard className="mb-4">
+            <div className="items-center md:items-start">
               <Button
                 className="mt-4"
                 kind="primary"

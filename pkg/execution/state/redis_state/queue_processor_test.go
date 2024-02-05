@@ -51,7 +51,7 @@ func TestQueueRunSequential(t *testing.T) {
 
 	// Run the queue.  After running this worker should claim the sequential lease.
 	go func() {
-		_ = q1.Run(q1ctx, func(ctx context.Context, item osqueue.Item) error {
+		_ = q1.Run(q1ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
 			time, ok := GetItemStart(ctx)
 			require.True(t, ok)
 			require.NotZero(t, time)
@@ -60,7 +60,7 @@ func TestQueueRunSequential(t *testing.T) {
 	}()
 	go func() {
 		<-time.After(100 * time.Millisecond)
-		_ = q2.Run(q2ctx, func(ctx context.Context, item osqueue.Item) error {
+		_ = q2.Run(q2ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
 			return nil
 		})
 	}()
@@ -158,7 +158,7 @@ func TestQueueRunBasic(t *testing.T) {
 
 	var handled int32
 	go func() {
-		_ = q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
 			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
 			atomic.AddInt32(&handled, 1)
 			id := osqueue.JobIDFromContext(ctx)
@@ -224,7 +224,7 @@ func TestQueueRunRetry(t *testing.T) {
 
 	var counter int32
 	go func() {
-		_ = q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
 			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
 			atomic.AddInt32(&counter, 1)
 			if atomic.LoadInt32(&counter) == 1 {
@@ -312,7 +312,7 @@ func TestQueueRunExtended(t *testing.T) {
 				)
 
 				go func() {
-					_ = q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
+					_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
 						// Wait up to N seconds to complete.
 						<-time.After(time.Duration(mrand.Int31n(atomic.LoadInt32(&jobCompleteMax))) * time.Millisecond)
 						// Increase handled when job is done.
@@ -343,7 +343,7 @@ func TestQueueRunExtended(t *testing.T) {
 	}
 
 	go func() {
-		_ = q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
 			// Wait up to N seconds to complete.
 			<-time.After(time.Duration(mrand.Int31n(atomic.LoadInt32(&jobCompleteMax))) * time.Millisecond)
 			// Increase handled when job is done.
@@ -479,7 +479,7 @@ func TestRunPriorityFactor(t *testing.T) {
 
 	var handled int32
 	go func() {
-		_ = q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
 			atomic.AddInt32(&handled, 1)
 			return nil
 		})

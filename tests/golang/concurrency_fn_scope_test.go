@@ -14,7 +14,7 @@ import (
 )
 
 func TestConcurrency_ScopeFunction(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t)
+	h, server, registerFuncs := NewSDKHandler(t, "concurrency")
 	defer server.Close()
 
 	var (
@@ -82,7 +82,7 @@ func TestConcurrency_ScopeFunction(t *testing.T) {
 // TestConcurrency_ScopeFunction_FanOut tests function limits with two functions,
 // both of which should run.
 func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t)
+	h, server, registerFuncs := NewSDKHandler(t, "concurrency")
 	defer server.Close()
 
 	var (
@@ -170,7 +170,7 @@ func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
 
 // TestConcurrency_ScopeFunction_Key asserts that keys in function concurrency work as expected.
 func TestConcurrency_ScopeFunction_Key(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t)
+	h, server, registerFuncs := NewSDKHandler(t, "concurrency")
 	defer server.Close()
 
 	var (
@@ -255,7 +255,7 @@ func TestConcurrency_ScopeFunction_Key(t *testing.T) {
 // TestConcurrency_ScopeFunction_Key_Fn asserts that keys in function concurrency work as expected,
 // when mixed with function concurrency overall.
 func TestConcurrency_ScopeFunction_Key_Fn(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t)
+	h, server, registerFuncs := NewSDKHandler(t, "concurrency")
 	defer server.Close()
 
 	var (

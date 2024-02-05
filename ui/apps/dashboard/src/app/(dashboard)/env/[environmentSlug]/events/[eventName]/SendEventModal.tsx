@@ -1,6 +1,5 @@
 'use client';
 
-import type { Route } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Tab } from '@headlessui/react';
@@ -18,10 +17,6 @@ import CodeEditor from '@/components/Textarea/CodeEditor';
 import { graphql } from '@/gql';
 import { EnvironmentType } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
-
-type UseDefaultEventKeyParams = {
-  environmentSlug: string;
-};
 
 const GetEventKeysDocument = graphql(/* GraphQL */ `
   query GetEventKeys($environmentID: ID!) {

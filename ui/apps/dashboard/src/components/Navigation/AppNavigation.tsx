@@ -10,8 +10,10 @@ import {
 import { Badge } from '@inngest/components/Badge';
 
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import { graphql } from '@/gql';
 import InngestLogo from '@/icons/InngestLogo';
 import EventIcon from '@/icons/event.svg';
+import graphqlAPI from '@/queries/graphqlAPI';
 import AccountDropdown from './AccountDropdown';
 import EnvironmentSelectMenu from './EnvironmentSelectMenu';
 import NavItem from './NavItem';
@@ -32,6 +34,22 @@ type NavItem = {
 const ALL_ENVIRONMENTS_SLUG = 'all';
 const BRANCH_PARENT_SLUG = 'branch';
 
+const GetAccountCreationTimeDocument = graphql(`
+  query GetAccountCreationTime {
+    account {
+      createdAt
+    }
+  }
+`);
+
+// TODO: Delete this when the deploys page is fully deleted
+async function isDeploysVisible() {
+  const { account } = await graphqlAPI.request(GetAccountCreationTimeDocument);
+
+  const appsPageLaunchDate = new Date('2024-01-23T15:00:00.000Z');
+  return new Date(account.createdAt) < appsPageLaunchDate;
+}
+
 export default async function AppNavigation({ environmentSlug }: AppNavigationProps) {
   const isEventSearchEnabled = await getBooleanFlag('event-search');
 
@@ -49,18 +67,26 @@ export default async function AppNavigation({ environmentSlug }: AppNavigationPr
       icon: <EventIcon className="w-5" />,
     },
     {
-      href: `/env/${environmentSlug}/deploys`,
-      text: 'Deploys',
-      hide: [ALL_ENVIRONMENTS_SLUG],
-      icon: <RocketLaunchIcon className="w-3.5" />,
-    },
-    {
       href: `/env/${environmentSlug}/manage`,
       text: 'Manage',
       hide: [ALL_ENVIRONMENTS_SLUG],
       icon: <WrenchIcon className="w-3.5" />,
     },
   ];
+
+  if (await isDeploysVisible()) {
+    // Insert the "Deploys" item after the 2nd item.
+    items = [
+      ...items.slice(0, 2),
+      {
+        href: `/env/${environmentSlug}/deploys`,
+        text: 'Deploys',
+        hide: [ALL_ENVIRONMENTS_SLUG],
+        icon: <RocketLaunchIcon className="w-3.5" />,
+      },
+      ...items.slice(2),
+    ];
+  }
 
   if (await getBooleanFlag('apps-page')) {
     // Insert the "Apps" item after the 1st item.

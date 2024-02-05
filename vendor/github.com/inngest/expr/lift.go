@@ -87,7 +87,7 @@ func (l *liftParser) lift() (string, LiftedArgs) {
 		}
 	}
 
-	return l.rewritten.String(), l.vars
+	return l.rewritten.String(), &l.vars
 }
 
 func (l *liftParser) addLiftedVar(val argMapValue) {

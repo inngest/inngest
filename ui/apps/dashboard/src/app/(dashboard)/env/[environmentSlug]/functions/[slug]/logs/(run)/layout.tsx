@@ -1,6 +1,5 @@
 'use client';
 
-import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { SlideOver } from '@inngest/components/SlideOver';
 import { useQuery } from 'urql';
@@ -31,13 +30,15 @@ const GetFunctionRunTriggersDocument = graphql(`
 `);
 
 export default function RunLayout({ children, params }: RunLayoutProps) {
+  const functionSlug = decodeURIComponent(params.slug);
+
   const router = useRouter();
   const environment = useEnvironment();
   const [{ data, fetching: fetchingRunTriggers }] = useQuery({
     query: GetFunctionRunTriggersDocument,
     variables: {
       environmentID: environment.id,
-      functionSlug: params.slug,
+      functionSlug,
     },
   });
 
@@ -56,7 +57,7 @@ export default function RunLayout({ children, params }: RunLayoutProps) {
         router.push(
           pathCreator.functionRuns({
             envSlug: environment.slug,
-            functionSlug: params.slug,
+            functionSlug,
           })
         )
       }

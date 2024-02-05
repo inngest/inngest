@@ -14,7 +14,7 @@ import (
 )
 
 func TestFunctionPriorityRun(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t)
+	h, server, registerFuncs := NewSDKHandler(t, "priority")
 	defer server.Close()
 
 	var (

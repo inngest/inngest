@@ -1,7 +1,7 @@
 import type { Function } from '@inngest/components/types/function';
 
 import { graphql } from '@/gql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useGraphQLQuery_TEMPORARY } from '@/utils/useGraphQLQuery';
 
 const query = graphql(`
   query App($envID: ID!, $externalAppID: String!) {
@@ -26,6 +26,7 @@ const query = graphql(`
           commitHash
           commitMessage
           commitRef
+          error
           framework
           id
           lastSyncedAt
@@ -46,7 +47,7 @@ const query = graphql(`
 `);
 
 export function useApp({ envID, externalAppID }: { envID: string; externalAppID: string }) {
-  const res = useGraphQLQuery({
+  const res = useGraphQLQuery_TEMPORARY({
     pollIntervalInMilliseconds: 10_000,
     query,
     variables: { envID, externalAppID },

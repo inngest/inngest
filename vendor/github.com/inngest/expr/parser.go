@@ -12,6 +12,7 @@ import (
 	"github.com/google/cel-go/cel"
 	celast "github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/operators"
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -77,7 +78,7 @@ func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, 
 	expression := eval.GetExpression() // "event.data.id == '1'"
 	if expression == "" {
 		return &ParsedExpression{
-			Evaluable: eval,
+			EvaluableID: eval.GetID(),
 		}, nil
 	}
 
@@ -93,7 +94,8 @@ func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, 
 		// group IDs will be deterministic as the randomness is sourced from the ID.
 		//
 		// We only overwrite this if rander is not nil so that we can inject rander during tests.
-		digest := sha256.Sum256([]byte(eval.GetID()))
+		id := eval.GetID()
+		digest := sha256.Sum256(id[:])
 		seed := int64(binary.NativeEndian.Uint64(digest[:8]))
 		r = rand.New(rand.NewSource(seed)).Read
 	}
@@ -113,9 +115,9 @@ func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, 
 
 	node.normalize()
 	return &ParsedExpression{
-		Root:      *node,
-		Vars:      vars,
-		Evaluable: eval,
+		Root:        *node,
+		Vars:        vars,
+		EvaluableID: eval.GetID(),
 	}, nil
 }
 
@@ -136,16 +138,7 @@ type ParsedExpression struct {
 	Vars LiftedArgs
 
 	// Evaluable stores the original evaluable interface that was parsed.
-	Evaluable Evaluable
-
-	// Exhaustive represents whether the parsing is exhaustive, or whether
-	// specific CEL macros or functions were used which are not supported during
-	// parsing.
-	//
-	// TODO: Allow parsing of all macros/overloads/functions and filter during
-	// traversal.
-	//
-	// Exhaustive bool
+	EvaluableID uuid.UUID
 }
 
 // RootGroups returns the top-level matching groups within an expression.  This is a small
@@ -338,21 +331,6 @@ func (p Predicate) String() string {
 func (p Predicate) LiteralAsString() string {
 	str, _ := p.Literal.(string)
 	return str
-}
-
-func (p Predicate) TreeType() TreeType {
-	// switch on type of literal AND operator type.  int64/float64 literals require
-	// btrees, texts require ARTs.
-	switch p.Literal.(type) {
-	case string:
-		return TreeTypeART
-	case int64, float64:
-		return TreeTypeBTree
-	case nil:
-		return TreeTypeNullMatch
-	default:
-		return TreeTypeNone
-	}
 }
 
 // expr is wrapper around the CEL AST which stores parsing-related data.

@@ -43,10 +43,9 @@ export default function Page() {
         action={
           <HoverCardRoot>
             <HoverCardTrigger asChild>
-              {/* To do: wire this to the docs */}
               <NextLink
                 className="flex cursor-pointer items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-slate-200 hover:border-white hover:text-white"
-                href="/"
+                href="https://www.inngest.com/docs/apps"
                 target="_blank"
                 rel="noreferrer noopener"
               >
@@ -56,15 +55,19 @@ export default function Page() {
             </HoverCardTrigger>
             <HoverCardContent className="w-72 p-2.5 text-sm">
               <p>
-                Each endpoint where you serve functions is an app. Each time you update your
-                functions, you must sync your app to Inngest. When using our Vercel or Netlify
-                Integrations, your app will be synced automatically.
+                When you serve your functions using Inngest&apos;s serve API handler, you are
+                hosting a new Inngest app.
+              </p>
+              <br />
+              <p>
+                Each time you deploy new code to your hosted platform, you must sync your app to
+                Inngest. When using our Vercel or Netlify integrations, your app will be synced
+                automatically.
               </p>
               <br />
               <p>Deploys have been renamed to “Syncs.” Syncs are found within Apps.</p>
               <br />
-              {/* To do: wire this to the docs */}
-              <Link href="/">Read Docs</Link>
+              <Link href="https://www.inngest.com/docs/apps/cloud">Read Docs</Link>
             </HoverCardContent>
           </HoverCardRoot>
         }
@@ -78,14 +81,17 @@ export default function Page() {
             }}
             className="absolute"
           >
-            <p className="pr-2">
+            <p className="flex-1 pr-2">
               Inngest deploys have been renamed to “<b>Syncs</b>”. All of your syncs can be found
               within your apps.{' '}
+              <Link
+                className="inline-flex"
+                internalNavigation={false}
+                href="https://www.inngest.com/docs/apps"
+              >
+                Learn More
+              </Link>
             </p>
-            {/* To do: wire this to the docs */}
-            {/* <Link internalNavigation={false} href="">
-            Learn More
-          </Link> */}
           </Banner>
         )}
 

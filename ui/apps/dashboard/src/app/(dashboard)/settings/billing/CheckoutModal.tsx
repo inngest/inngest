@@ -112,7 +112,7 @@ function CheckoutForm({ items, onSuccess }: { items: CheckoutItem[]; onSuccess: 
     }
 
     // Confirm the PaymentIntent using the details collected by the Payment Element
-    const { paymentIntent, error: stripeConfirmPaymentError } = await stripe.confirmPayment({
+    const { error: stripeConfirmPaymentError } = await stripe.confirmPayment({
       elements,
       clientSecret,
       confirmParams: {

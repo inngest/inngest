@@ -54,7 +54,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
         className={cn(
           'border border-slate-300 text-sm leading-none placeholder-slate-500 shadow outline-2 outline-offset-2 outline-indigo-500 transition-all focus:outline',
           sizeStyles[size],
-          props.readonly && 'border-transparent shadow-transparent outline-transparent',
+          props.readonly &&
+            'cursor-not-allowed border-transparent shadow-transparent outline-transparent	',
           className
         )}
         onChange={props.onChange}

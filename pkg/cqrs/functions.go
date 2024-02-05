@@ -10,12 +10,12 @@ import (
 )
 
 type Function struct {
-	ID        uuid.UUID
-	AppID     uuid.UUID
-	Slug      string
-	Name      string
-	Config    string
-	CreatedAt time.Time
+	ID        uuid.UUID       `json:"internal_id"`
+	AppID     uuid.UUID       `json:"app_id"`
+	Slug      string          `json:"id"`
+	Name      string          `json:"name"`
+	Config    json.RawMessage `json:"config"`
+	CreatedAt time.Time       `json:"created_at"`
 }
 
 func (f Function) InngestFunction() (*inngest.Function, error) {

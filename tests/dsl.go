@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -10,25 +11,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
 )
 
 type Test struct {
-	// Name is the human name of the test.
+	// ID is the ID of the test.
+	ID   string
 	Name string
 	// Description is a description of the test.
 	Description string
-	// Function is the function to search for, expected to be registered during the SDK handshake.
-	//
-	// While tests can only check one function at a time, the SDK may register many functions
-	// at once.
-	Function inngest.Function
 	// The event to send when testing this function.
 	EventTrigger inngestgo.Event
 	// Timeout is how long the tests take to run.
@@ -98,20 +94,22 @@ func (t *Test) Send(evt inngestgo.Event) func() {
 func (t *Test) SetRequestEvent(event inngestgo.Event) func() {
 	return func() {
 		t.requestEvent = event
+		// Also reset context, as this happens at the start of tests.
+		t.requestCtx = driver.SDKRequestContext{
+			StepID: "step",
+			Stack: &driver.FunctionStack{
+				Current: 0,
+			},
+		}
+		if t.requestCtx.Stack.Stack == nil {
+			// Normalize to a non-nil slice
+			t.requestCtx.Stack.Stack = []string{}
+		}
 	}
 }
 
 func (t *Test) SetRequestContext(ctx driver.SDKRequestContext) func() {
 	return func() {
-		// Ensure we set the ID here, which is deterministic but we use random ports within
-		// the test server, breaking determinism.
-		t.Function.Steps[0].URI = replaceURL(t.Function.Steps[0].URI, t.localURL.String())
-		for i := range t.Function.Steps {
-			t.Function.Steps[i].URI = util.NormalizeAppURL(t.Function.Steps[i].URI)
-		}
-		t.Function.ID = inngest.DeterministicUUID(t.Function)
-		ctx.FunctionID = t.Function.ID
-
 		t.requestCtx = ctx
 		if t.requestCtx.Stack.Stack == nil {
 			// Normalize to a non-nil slice
@@ -150,6 +148,12 @@ func (t *Test) AddRequestSteps(s map[string]any) func() {
 	}
 }
 
+func (t *Test) Printf(name string, args ...any) func() {
+	return func() {
+		fmt.Printf("\n\n===> "+name+"\n\n\n", args...)
+	}
+}
+
 func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Duration, modifiers ...func(r *driver.SDKRequestContext)) func() {
 	return func() {
 		select {
@@ -179,10 +183,26 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			for _, m := range modifiers {
 				m(&t.requestCtx)
 			}
+
 			// Unset the run ID so that our unique run ID doesn't cause issues.
 			t.requestCtx.RunID = er.Ctx.RunID
+			t.requestCtx.FunctionID = uuid.UUID{}
+			er.Ctx.FunctionID = uuid.UUID{}
+
+			// For each error, remove the stack from our tests.
+			for _, v := range er.Steps {
+				data, ok := v.(map[string]any)
+				if !ok {
+					continue
+				}
+				if err, ok := data["error"].(map[string]any); ok {
+					delete(err, "stack")
+				}
+			}
+
 			require.EqualValues(t.test, t.requestCtx, er.Ctx, "Request ctx is incorrect")
 			require.EqualValues(t.test, t.requestSteps, er.Steps, "Request steps are incorrect")
+			// XXX: Assert req v
 
 		case <-time.After(timeout):
 			require.Failf(t.test, "Expected executor request but timed out", name)
@@ -239,6 +259,20 @@ func (t *Test) ExpectGeneratorResponse(expected []state.GeneratorOpcode) func() 
 			actual := []state.GeneratorOpcode{}
 			err = json.Unmarshal(byt, &actual)
 			require.NoError(t.test, err)
+
+			// If this is of type OpcodeError, we ignore the Stack field for now.
+			// The Stack field contains absolute paths, which means the content
+			// changes depending on the machine that runs the tests.
+			//
+			// NOTE: This obviously also changes the opcode ID, so we also
+			// recreate the ID after clearing the stack.
+			if len(actual) == 1 && actual[0].Op == enums.OpcodeStepError {
+				actual[0].Error.Stack = "[proxy-redact]"
+				if len(expected) == 1 && expected[0].Error != nil {
+					expected[0].Error.Stack = "[proxy-redact]"
+				}
+			}
+
 			require.EqualValues(t.test, expected, actual)
 		case <-time.After(time.Second):
 			require.Fail(t.test, "Expected SDK generator response but timed out")
@@ -345,11 +379,8 @@ func (t *Test) After(d time.Duration) func() {
 }
 
 type ExecutorRequest struct {
-	Event inngestgo.Event          `json:"event"`
-	Steps map[string]any           `json:"steps"`
-	Ctx   driver.SDKRequestContext `json:"ctx"`
-}
-
-func strptr(s string) *string {
-	return &s
+	Event   inngestgo.Event          `json:"event"`
+	Steps   map[string]any           `json:"steps"`
+	Ctx     driver.SDKRequestContext `json:"ctx"`
+	Version int                      `json:"version"`
 }

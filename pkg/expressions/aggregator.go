@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,6 +13,12 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/karlseguin/ccache/v2"
 )
+
+type EventEvaluable interface {
+	expr.Evaluable
+	GetEvent() *string
+	GetWorkspaceID() uuid.UUID
+}
 
 func NewAggregator(
 	ctx context.Context,
@@ -25,14 +32,16 @@ func NewAggregator(
 	if log == nil {
 		log = logger.StdlibLogger(ctx)
 	}
-	return aggregator{
+	return &aggregator{
 		log:     log,
-		records: ccache.New(ccache.Configure().MaxSize(size).ItemsToPrune(200)),
+		records: ccache.New(ccache.Configure().MaxSize(size).ItemsToPrune(uint32(size) / 4)),
 		loader:  loader,
 		parser:  parser,
 		// use the package's exprEvaluator function as the actual logic which evaluates
 		// expressions after the aggregate evaluator does matching.
 		evaluator: exprEvaluator,
+		mapLock:   &sync.Mutex{},
+		locks:     map[string]*sync.Mutex{},
 	}
 }
 
@@ -43,6 +52,7 @@ func NewAggregator(
 // The types are different as we must use the open source expr.Evaluable interfaces with aggregate evaluation.
 type EvaluableLoader interface {
 	LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error
+	EvaluablesByID(ctx context.Context, evaluableIDs ...uuid.UUID) ([]expr.Evaluable, error)
 }
 
 // Aggregator manages a set of AggregateEvaluator instances to quickly evaluate expressions
@@ -67,7 +77,7 @@ type Aggregator interface {
 	//
 	// Finally, the Aggregator performs record-keeping, storing the size of AEs, usage statistics,
 	// and LRU semantics to evict non-recently-used AEs under memory pressure.
-	LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eventName string) (expr.AggregateEvaluator, error)
+	LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eventName string, eventTS time.Time) (expr.AggregateEvaluator, error)
 
 	// RemovePause is a shortcut to find an event evaluator _without_ refreshing new data, and to
 	// remove the pause's expressions from any aggregate trees.
@@ -76,7 +86,7 @@ type Aggregator interface {
 	// memory pressure;  a pause is consumed once atomically.  If removal fails, a dangling false positive
 	// is left in the tree which increases the amount of work we have to do when matching but does NOT
 	// impact execution.
-	RemovePause(ctx context.Context, pause expr.Evaluable) error
+	RemovePause(ctx context.Context, pause EventEvaluable) error
 }
 
 type aggregator struct {
@@ -87,11 +97,14 @@ type aggregator struct {
 	loader    EvaluableLoader
 	parser    expr.TreeParser
 	evaluator expr.ExpressionEvaluator
+
+	mapLock *sync.Mutex
+	locks   map[string]*sync.Mutex
 }
 
-func (a aggregator) EvaluateAsyncEvent(ctx context.Context, event event.TrackedEvent) ([]expr.Evaluable, int32, error) {
+func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.TrackedEvent) ([]expr.Evaluable, int32, error) {
 	name := event.GetEvent().Name
-	eval, err := a.LoadEventEvaluator(ctx, event.GetWorkspaceID(), name)
+	eval, err := a.LoadEventEvaluator(ctx, event.GetWorkspaceID(), name, event.GetEvent().Time())
 	if err != nil {
 		return nil, 0, fmt.Errorf("Could not load an event evaluator: %w", err)
 	}
@@ -114,14 +127,17 @@ func (a aggregator) EvaluateAsyncEvent(ctx context.Context, event event.TrackedE
 		"evaluated aggregate expressions",
 		"workspace_id", event.GetWorkspaceID(),
 		"event", name,
+		"event_data", event.GetEvent(),
 		"eval_count", evalCount,
 		"matched_count", len(found),
+		"total_count", eval.Len(),
+		"found", found,
 	)
 
 	return found, evalCount, err
 }
 
-func (a aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eventName string) (expr.AggregateEvaluator, error) {
+func (a *aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eventName string, eventTS time.Time) (expr.AggregateEvaluator, error) {
 	key := wsID.String() + ":" + eventName
 
 	var bk *bookkeeper
@@ -131,7 +147,7 @@ func (a aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, even
 		bk = &bookkeeper{
 			wsID:  wsID,
 			event: eventName,
-			ae:    expr.NewAggregateEvaluator(a.parser, a.evaluator),
+			ae:    expr.NewAggregateEvaluator(a.parser, a.evaluator, a.loader.EvaluablesByID),
 			// updatedAt is a zero time.
 		}
 
@@ -143,6 +159,22 @@ func (a aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, even
 		val.Extend(time.Hour * 3)
 	}
 
+	if bk.updatedAt.After(eventTS) {
+		// We can use a stale executor here, as the pauses were updated after the event
+		// was received.  This prevents spinning on locks.
+		return bk.ae, nil
+	}
+
+	a.mapLock.Lock()
+	lock, ok := a.locks[key]
+	if !ok {
+		a.locks[key] = &sync.Mutex{}
+		lock = a.locks[key]
+	}
+	a.mapLock.Unlock()
+
+	lock.Lock()
+	defer lock.Unlock()
 	if err := bk.update(ctx, a.loader); err != nil {
 		if bk.updatedAt.IsZero() {
 			return nil, fmt.Errorf("could not load evaluables for aggregate evaluator")
@@ -152,7 +184,7 @@ func (a aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, even
 		a.log.Warn(
 			"using stale evaluator",
 			"error", err,
-			"age", time.Since(bk.updatedAt),
+			"age_ms", time.Since(bk.updatedAt).Milliseconds(),
 			"workspace_id", wsID,
 			"event", eventName,
 		)
@@ -162,8 +194,28 @@ func (a aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, even
 	return bk.ae, nil
 }
 
-func (a aggregator) RemovePause(ctx context.Context, event expr.Evaluable) error {
-	return fmt.Errorf("not implemented")
+func (a *aggregator) getBookkeeper(ctx context.Context, wsID uuid.UUID, eventName string) *bookkeeper {
+	key := wsID.String() + ":" + eventName
+	var bk *bookkeeper
+	val := a.records.Get(key)
+	if val == nil {
+		return nil
+	}
+	bk = val.Value().(*bookkeeper)
+	return bk
+}
+
+func (a *aggregator) RemovePause(ctx context.Context, pause EventEvaluable) error {
+	if pause.GetEvent() == nil {
+		return fmt.Errorf("cannot remove non-pause evaluable")
+	}
+
+	bk := a.getBookkeeper(ctx, pause.GetWorkspaceID(), *pause.GetEvent())
+	if bk == nil {
+		return nil
+	}
+
+	return bk.ae.Remove(ctx, pause)
 }
 
 // bookkeeper manages an aggregator for an event name and records the time that the aggregator
@@ -178,10 +230,25 @@ type bookkeeper struct {
 
 func (b *bookkeeper) update(ctx context.Context, l EvaluableLoader) error {
 	at := time.Now()
+	count := 0
 	err := l.LoadEvaluablesSince(ctx, b.wsID, b.event, b.updatedAt, func(ctx context.Context, eval expr.Evaluable) error {
+		if eval == nil {
+			return fmt.Errorf("adding nil pause")
+		}
 		_, err := b.ae.Add(ctx, eval)
+		if err == nil {
+			count++
+		}
 		return err
 	})
+
+	logger.StdlibLogger(ctx).Debug(
+		"updated evaluator",
+		"delta_ms", at.Sub(b.updatedAt).Milliseconds(),
+		"count", count,
+		"error", err,
+	)
+
 	if err == nil {
 		b.updatedAt = at
 	}

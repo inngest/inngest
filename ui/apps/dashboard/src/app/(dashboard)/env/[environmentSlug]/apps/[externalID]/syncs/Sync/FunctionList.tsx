@@ -145,7 +145,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
               })}
 
               {removedFunctions.length === 0 && (
-                <div className="p-2 text-center text-sm text-slate-600">No synced functions</div>
+                <div className="p-2 text-center text-sm text-slate-600">No removed functions</div>
               )}
             </CollapsibleCardContent>
           )}

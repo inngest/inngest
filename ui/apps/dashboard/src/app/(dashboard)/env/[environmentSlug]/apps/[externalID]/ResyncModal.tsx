@@ -1,9 +1,14 @@
 import { useState } from 'react';
+import { Switch } from '@headlessui/react';
 import ArrowPathIcon from '@heroicons/react/20/solid/ArrowPathIcon';
 import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
+import { classNames } from '@inngest/components/utils/classNames';
 import { toast } from 'sonner';
 
+import { Alert } from '@/components/Alert';
+import Input from '@/components/Forms/Input';
+import { Toggle } from '@/components/Toggle';
 import { DeployFailure } from '../../deploys/DeployFailure';
 import { deployViaUrl, type RegistrationFailure } from '../../deploys/utils';
 
@@ -14,8 +19,14 @@ type Props = {
 };
 
 export default function ResyncModal({ isOpen, onClose, url }: Props) {
+  const [overrideValue, setOverrideValue] = useState(url);
+  const [isURLOverridden, setURLOverridden] = useState(false);
   const [failure, setFailure] = useState<RegistrationFailure>();
   const [isSyncing, setIsSyncing] = useState(false);
+
+  if (isURLOverridden) {
+    url = overrideValue;
+  }
 
   async function onSync() {
     setIsSyncing(true);
@@ -63,11 +74,39 @@ export default function ResyncModal({ isOpen, onClose, url }: Props) {
 
         <p className="my-6">{"We'll"} send a request to the following URL:</p>
 
-        <div className="my-6 overflow-scroll rounded bg-slate-200 p-2">
-          <pre>
-            <code className="">{url}</code>
-          </pre>
+        <div className="my-6 flex items-center rounded p-1">
+          <div className="flex-1">
+            <Input
+              placeholder="https://example.com/api/inngest"
+              name="url"
+              value={url}
+              onChange={(e) => {
+                setOverrideValue(e.target.value);
+              }}
+              readonly={!isURLOverridden}
+              className={classNames(!isURLOverridden && 'bg-slate-200')}
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <Switch.Group>
+              <Switch.Label className="mx-2">Override</Switch.Label>
+              <Toggle
+                checked={isURLOverridden}
+                disabled={isSyncing}
+                onClick={() => {
+                  setURLOverridden((prev) => !prev);
+                }}
+                title="Override"
+              />
+            </Switch.Group>
+          </div>
         </div>
+        {isURLOverridden && (
+          <Alert className="my-2" severity="warning">
+            Ensure your app ID in the new endpoint is the same, otherwise Inngest will consider it a
+            new app while syncing.
+          </Alert>
+        )}
 
         {failure && !isSyncing && <DeployFailure {...failure} />}
       </div>

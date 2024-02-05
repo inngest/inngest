@@ -22,6 +22,11 @@ func parseURL(s string) url.URL {
 	return *u
 }
 
+// TODO:
+//
+// Test returning a Step opcode with NonRetriableHeader semantics does NOT fill
+// .err in DriverResponse.
+
 func TestRedirect(t *testing.T) {
 	input := []byte(`{"event":{"name":"hi","data":{}}}`)
 

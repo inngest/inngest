@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { type Route } from 'next';
 import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
@@ -46,7 +45,22 @@ const EnableEnvironmentAutoArchiveDocument = graphql(`
   }
 `);
 
+const PER_PAGE = 10;
+
 export default function EnvironmentListTable({ envs }: { envs: Environment[] }) {
+  const [page, setPage] = useState(0);
+  const numPages = Math.ceil(envs.length / PER_PAGE);
+  const pages = Array(numPages)
+    .fill(null)
+    .map((_, i) => i);
+
+  const sortedEnvs = envs.sort(
+    (a, b) =>
+      new Date(b.lastDeployedAt || b.createdAt).valueOf() -
+      new Date(a.lastDeployedAt || a.createdAt).valueOf()
+  );
+  const visibleEnvs = sortedEnvs.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
+
   return (
     <table className="w-full">
       <thead className="border-b border-slate-200 text-left shadow-sm">
@@ -67,27 +81,42 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
           </th>
 
           <th scope="col" className="w-0 pr-4"></th>
-
-          {/* TODO - When we have this data bring back this column header here and in TableRow */}
-          {/* <th
-                    scope="col"
-                    className="font-medium py-3 px-4 text-slate-500 text-sm text-right"
-                  >
-                    Latest Deployment
-                  </th> */}
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-100 px-4 py-3">
-        {envs.length ? (
-          envs.map((env, i) => <TableRow env={env} key={i} />)
+        {envs.length === 0 ? (
+          <tr>
+            <td colSpan={5} className="px-4 py-4 text-center text-sm font-semibold text-slate-500">
+              There are no branch environments
+            </td>
+          </tr>
+        ) : visibleEnvs.length ? (
+          visibleEnvs.map((env, i) => <TableRow env={env} key={i} />)
         ) : (
           <tr>
             <td colSpan={5} className="px-4 py-4 text-center text-sm font-semibold text-slate-500">
-              There are no actively deployed branches
+              There are no more branch environments
             </td>
           </tr>
         )}
       </tbody>
+      {pages.length > 1 && (
+        <tfoot className="border-t border-slate-200">
+          <tr>
+            <td colSpan={5} className="px-4 py-1 text-center">
+              {pages.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setPage(idx)}
+                  className="transition-color mx-1 cursor-pointer px-2 text-indigo-500 underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-800 hover:decoration-indigo-800 dark:text-indigo-400 dark:hover:decoration-indigo-400"
+                >
+                  {idx + 1}
+                </button>
+              ))}
+            </td>
+          </tr>
+        </tfoot>
+      )}
     </table>
   );
 }
@@ -192,7 +221,7 @@ function TableRow(props: { env: Environment }) {
     [archive, env, unarchive]
   );
 
-  const { id, isArchived, isAutoArchiveEnabled, name, slug } = env;
+  const { id, isArchived, isAutoArchiveEnabled, name, slug, lastDeployedAt } = env;
 
   let statusColorClass: string;
   let statusText: string;
@@ -210,7 +239,7 @@ function TableRow(props: { env: Environment }) {
         <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">{name}</h3>
       </td>
       <td>
-        <div className="flex items-center gap-2 px-4">
+        <div className="flex items-center gap-2 px-4" title={`Last synced at ${lastDeployedAt}`}>
           <span className={cn('block h-2 w-2 rounded-full', statusColorClass)} />
           <span className="text-sm font-medium text-slate-600">{statusText}</span>
         </div>
@@ -252,10 +281,10 @@ function TableRow(props: { env: Environment }) {
 
       <td className="px-4">
         <Button
-          href={pathCreator.functions({ envSlug: slug })}
+          href={pathCreator.apps({ envSlug: slug })}
           kind="primary"
           appearance="outlined"
-          label="View"
+          label="Apps"
         />
       </td>
       {/* <td>

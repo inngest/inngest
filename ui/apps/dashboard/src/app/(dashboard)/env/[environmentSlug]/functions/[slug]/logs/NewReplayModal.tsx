@@ -19,7 +19,7 @@ import Placeholder from '@/components/Placeholder';
 import { TimeRangeInput } from '@/components/TimeRangeInput';
 import { graphql } from '@/gql';
 import { FunctionRunStatus } from '@/gql/graphql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const GetFunctionEndedRunsCountDocument = graphql(`
   query GetFunctionEndedRunsCount(
@@ -109,14 +109,16 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
     FunctionRunStatus.Failed,
   ]);
   const environment = useEnvironment();
-  const { data, isLoading, error } = useGraphQLQuery({
+
+  const { data, isLoading } = useSkippableGraphQLQuery({
     query: GetFunctionEndedRunsCountDocument,
     variables: {
       environmentID: environment.id,
       functionSlug,
-      timeRangeStart: timeRange?.start ? timeRange.start.toISOString() : '',
-      timeRangeEnd: timeRange?.end ? timeRange.end.toISOString() : '',
+      timeRangeStart: timeRange ? timeRange.start.toISOString() : '',
+      timeRangeEnd: timeRange ? timeRange.end.toISOString() : '',
     },
+    skip: !timeRange,
   });
   const [{ fetching: isCreatingFunctionReplay }, createFunctionReplayMutation] = useMutation(
     CreateFunctionReplayDocument

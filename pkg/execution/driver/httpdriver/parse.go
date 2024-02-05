@@ -14,7 +14,27 @@ import (
 )
 
 // ParseGenerator parses generator responses from a JSON response.
-func ParseGenerator(ctx context.Context, byt []byte) ([]*state.GeneratorOpcode, error) {
+//
+// noRetry is passed via the no retry header, allowing us to indicate that
+// an OpcodeStepError was raised with a NonRetriableError.
+func ParseGenerator(ctx context.Context, byt []byte, noRetry bool) ([]*state.GeneratorOpcode, error) {
+	generators, err := parseGenerator(ctx, byt, noRetry)
+	for n, item := range generators {
+		// Ensure that we set no retries on the opcode error directly.
+		// This is needed for the executor to check how to handle the error.
+		if item.Op == enums.OpcodeStepError {
+			if item.Error == nil {
+				return generators, fmt.Errorf("OpcodeStepError received without Error field set: %+v", item)
+			}
+
+			item.Error.NoRetry = noRetry
+			generators[n] = item
+		}
+	}
+	return generators, err
+}
+
+func parseGenerator(ctx context.Context, byt []byte, noRetry bool) ([]*state.GeneratorOpcode, error) {
 	// When we return a 206, we always expect that this is
 	// a generator function.  Users SHOULD NOT return a 206
 	// in any other circumstance.

@@ -5,6 +5,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"regexp"
@@ -223,14 +224,6 @@ func WithKeyGenerator(kf KeyGenerator) Opt {
 	}
 }
 
-// WithOnComplete supplies a callback which is triggered any time a function
-// run completes.
-func WithFunctionCallbacks(f ...state.FunctionCallback) Opt {
-	return func(m *mgr) {
-		m.callbacks = f
-	}
-}
-
 // WithFunctionLoader adds a function loader to the state interface.
 //
 // As of v0.13.0, function configuration is stored outside of the state store,
@@ -250,24 +243,6 @@ type mgr struct {
 	r rueidis.Client
 	// this is the redis client for managing pauses.
 	pauseR rueidis.Client
-
-	callbacks []state.FunctionCallback
-}
-
-// OnFunctionStatus adds a callback to be called whenever functions
-// transition status.
-func (m *mgr) OnFunctionStatus(f state.FunctionCallback) {
-	m.callbacks = append(m.callbacks, f)
-}
-
-func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {
-	// Replace the context so that this isn't cancelled by any parents.
-	callCtx := context.Background()
-	for _, f := range m.callbacks {
-		go func(fn state.FunctionCallback) {
-			fn(callCtx, id, status)
-		}(f)
-	}
 }
 
 func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
@@ -335,8 +310,6 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 	if status == 1 {
 		return nil, state.ErrIdentifierExists
 	}
-
-	go m.runCallbacks(ctx, input.Identifier, enums.RunStatusRunning)
 
 	return state.NewStateInstance(
 			*f,
@@ -419,7 +392,6 @@ func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 	}
 	switch status {
 	case 0:
-		go m.runCallbacks(ctx, id, enums.RunStatusCancelled)
 		return nil
 	case 1:
 		return state.ErrFunctionComplete
@@ -439,7 +411,7 @@ func (m mgr) SetStatus(ctx context.Context, id state.Identifier, status enums.Ru
 		return err
 	}
 
-	ret, err := scripts["setStatus"].Exec(
+	_, err = scripts["setStatus"].Exec(
 		ctx,
 		m.r,
 		[]string{m.kf.RunMetadata(ctx, id.RunID)},
@@ -448,11 +420,7 @@ func (m mgr) SetStatus(ctx context.Context, id state.Identifier, status enums.Ru
 	if err != nil {
 		return fmt.Errorf("error cancelling: %w", err)
 	}
-	if ret == 0 {
-		go m.runCallbacks(ctx, id, status)
-		return nil
-	}
-	return fmt.Errorf("unknown return value cancelling function: %d", status)
+	return nil
 }
 
 func (m mgr) Metadata(ctx context.Context, runID ulid.ULID) (*state.Metadata, error) {
@@ -568,58 +536,29 @@ func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (in
 	return 0, fmt.Errorf("step not found in stack: %s", stepID)
 }
 
-func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (int, error) {
-	var (
-		data any
-		err  error
-	)
+func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) error {
 
-	if r.Err == nil {
-		if data, err = json.Marshal(r.Output); err != nil {
-			return 0, fmt.Errorf("error marshalling step output: %w", err)
-		}
-	} else {
-		data = output(map[string]any{
-			"error":  r.Err,
-			"output": r.Output,
-		})
+	keys := []string{
+		m.kf.Actions(ctx, i),
+		m.kf.RunMetadata(ctx, i.RunID),
+		m.kf.Stack(ctx, i.RunID),
 	}
-
-	args, err := StrSlice([]any{
-		data,
-		r.Step.ID,
-		r.Err != nil,
-		r.Final(),
-	})
-	if err != nil {
-		return 0, err
-	}
+	args := []string{stepID, marshalledOuptut}
 
 	index, err := scripts["saveResponse"].Exec(
 		ctx,
 		m.r,
-		[]string{
-			m.kf.Actions(ctx, i),
-			m.kf.Errors(ctx, i),
-			m.kf.RunMetadata(ctx, i.RunID),
-			m.kf.Stack(ctx, i.RunID),
-		},
+		keys,
 		args,
 	).AsInt64()
 	if err != nil {
-		return 0, fmt.Errorf("error saving response: %w", err)
+		return fmt.Errorf("error saving response: %w", err)
 	}
 	if index == -1 {
 		// This is a duplicate response, so we don't need to do anything.
-		return 0, state.ErrDuplicateResponse
+		return state.ErrDuplicateResponse
 	}
-
-	if r.Err != nil && r.Final() {
-		// Trigger error callbacks
-		go m.runCallbacks(ctx, i, enums.RunStatusFailed)
-	}
-
-	return int(index), nil
+	return nil
 }
 
 func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
@@ -817,6 +756,45 @@ func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) 
 	return pause, err
 }
 
+func (m mgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	keys := make([]string, len(ids))
+	for n, id := range ids {
+		keys[n] = m.kf.PauseID(ctx, id)
+	}
+
+	cmd := m.pauseR.B().Mget().Key(keys...).Build()
+	strings, err := m.pauseR.Do(ctx, cmd).AsStrSlice()
+	if err == rueidis.Nil {
+		return nil, state.ErrPauseNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var merr error
+
+	pauses := []*state.Pause{}
+	for _, item := range strings {
+		if len(item) == 0 {
+			continue
+		}
+
+		pause := &state.Pause{}
+		err = json.Unmarshal([]byte(item), pause)
+		if err != nil {
+			merr = errors.Join(merr, err)
+			continue
+		}
+		pauses = append(pauses, pause)
+	}
+
+	return pauses, merr
+}
+
 // PauseByStep returns a specific pause for a given workflow run, from a given step.
 //
 // This is required when continuing a step function from an async step, ie. one that
@@ -903,6 +881,18 @@ func (m mgr) PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, even
 	return iter, err
 }
 
+func (m mgr) EvaluablesByID(ctx context.Context, ids ...uuid.UUID) ([]expr.Evaluable, error) {
+	items, err := m.PausesByID(ctx, ids...)
+	if err != nil {
+		return nil, err
+	}
+	evaluables := make([]expr.Evaluable, len(items))
+	for n, i := range items {
+		evaluables[n] = i
+	}
+	return evaluables, nil
+}
+
 func (m mgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {
 
 	it, err := m.PausesByEventSince(ctx, workspaceID, eventName, since)
@@ -911,12 +901,15 @@ func (m mgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eve
 	}
 	for it.Next(ctx) {
 		pause := it.Val(ctx)
+		if pause == nil {
+			continue
+		}
 		if err := do(ctx, pause); err != nil {
 			return err
 		}
 	}
 
-	if it.Error() != context.Canceled {
+	if it.Error() != context.Canceled && it.Error() != scanDoneErr {
 		return it.Error()
 	}
 	return nil
@@ -1184,7 +1177,11 @@ func (i *keyIter) Error() error {
 func (i *keyIter) init(ctx context.Context, keys []string, chunk int64) error {
 	i.keys = keys
 	i.chunk = chunk
-	return i.fetch(ctx)
+	err := i.fetch(ctx)
+	if err == scanDoneErr {
+		return nil
+	}
+	return err
 }
 
 func (i *keyIter) Count() int {
@@ -1200,11 +1197,11 @@ func (i *keyIter) fetch(ctx context.Context) error {
 
 	var load []string
 	if len(i.keys) > int(i.chunk) {
-		load = i.keys[:]
-		i.keys = []string{}
-	} else {
 		load = i.keys[0:i.chunk]
 		i.keys = i.keys[i.chunk:]
+	} else {
+		load = i.keys[:]
+		i.keys = []string{}
 	}
 
 	for n, id := range load {
@@ -1227,6 +1224,9 @@ func (i *keyIter) Next(ctx context.Context) bool {
 	}
 
 	err := i.fetch(ctx)
+	if err == scanDoneErr {
+		return false
+	}
 	return err == nil
 }
 
@@ -1295,14 +1295,6 @@ func (r runMetadata) Metadata() state.Metadata {
 		m.RunType = &r.RunType
 	}
 	return m
-}
-
-// output is a map which implements BinaryMarshaller, for inserting data within
-// history items.
-type output map[string]any
-
-func (o output) MarshalBinary() ([]byte, error) {
-	return json.Marshal(o)
 }
 
 func StrSlice(args []any) ([]string, error) {

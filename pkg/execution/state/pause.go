@@ -62,6 +62,12 @@ type PauseGetter interface {
 	//
 	// This should not return consumed pauses.
 	PauseByID(ctx context.Context, pauseID uuid.UUID) (*Pause, error)
+
+	// PauseByID returns a given pause by pause ID.  This must return expired pauses
+	// that have not yet been consumed in order to properly handle timeouts.
+	//
+	// This should not return consumed pauses.
+	PausesByID(ctx context.Context, pauseID ...uuid.UUID) ([]*Pause, error)
 }
 
 // PauseIterator allows the runner to iterate over all pauses returned by a PauseGetter.  This
@@ -170,8 +176,8 @@ type Pause struct {
 	TriggeringEventID *string `json:"tID,omitempty"`
 }
 
-func (p Pause) GetID() string {
-	return p.ID.String()
+func (p Pause) GetID() uuid.UUID {
+	return p.ID
 }
 
 func (p Pause) GetExpression() string {
@@ -179,6 +185,14 @@ func (p Pause) GetExpression() string {
 		return ""
 	}
 	return *p.Expression
+}
+
+func (p Pause) GetEvent() *string {
+	return p.Event
+}
+
+func (p Pause) GetWorkspaceID() uuid.UUID {
+	return p.WorkspaceID
 }
 
 func (p Pause) Edge() inngest.Edge {

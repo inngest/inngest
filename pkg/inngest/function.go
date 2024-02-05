@@ -54,6 +54,8 @@ type Function struct {
 
 	Priority *Priority `json:"priority,omitempty"`
 
+	TTL *time.Duration `json:"ttl"`
+
 	// ConcurrencyLimits allows limiting the concurrency of running functions, optionally constrained
 	// by individual concurrency keys.
 	//
@@ -266,9 +268,9 @@ func (f Function) Validate(ctx context.Context) error {
 	}
 
 	// Validate rate limit expression
-	if f.RateLimit != nil && f.RateLimit.Key != nil {
-		if exprErr := expressions.Validate(ctx, *f.RateLimit.Key); exprErr != nil {
-			err = multierror.Append(err, fmt.Errorf("Rate limit expression is invalid: %s", exprErr))
+	if f.RateLimit != nil {
+		if rateLimitErr := f.RateLimit.IsValid(ctx); rateLimitErr != nil {
+			err = multierror.Append(err, rateLimitErr)
 		}
 	}
 

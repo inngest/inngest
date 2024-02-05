@@ -7,7 +7,7 @@ import { ArrowTopRightOnSquareIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 
 import cn from '@/utils/cn';
-import { WEBSITE_CONTACT_URL, WEBSITE_PRICING_URL } from '@/utils/urls';
+import { WEBSITE_PRICING_URL } from '@/utils/urls';
 import BillingPlanOption, { type ChangePlanArgs } from './BillingPlanOption';
 import CheckoutModal, { type CheckoutItem } from './CheckoutModal';
 import ConfirmPlanChangeModal from './ConfirmPlanChangeModal';
@@ -16,9 +16,11 @@ import { type ExtendedBillingPlan } from './utils';
 export default function BillingPlanSelector({
   plans,
   isCurrentPlanEnterprise,
+  onUpdate,
 }: {
   plans: (ExtendedBillingPlan | null)[];
   isCurrentPlanEnterprise: boolean;
+  onUpdate: () => void;
 }) {
   const router = useRouter();
   const [checkoutData, setCheckoutData] = useState<{
@@ -46,6 +48,7 @@ export default function BillingPlanSelector({
 
   const onChangePlanSuccess = () => {
     setCheckoutData(undefined);
+    onUpdate();
     router.refresh();
   };
 

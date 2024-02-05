@@ -4,7 +4,8 @@ import "time"
 
 const (
 	// DefaultRetryCount is used when no retry count for a step is specified.
-	DefaultRetryCount = 3
+	// Given 4 retries, each step or function is attempted 5 times by default.
+	DefaultRetryCount = 4
 
 	// DefaultMaxEventSize represents the maximum size of the event payload we process,
 	// currently 512KB.

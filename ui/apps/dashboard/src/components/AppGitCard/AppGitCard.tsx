@@ -24,7 +24,7 @@ export function AppGitCard({ className, sync }: Props) {
     if (repoURL) {
       commitHashValue = (
         <Link href={`${repoURL}/commit/${commitHash}` as Route} internalNavigation={false}>
-          {commitHash.substring(0, 7)}
+          <span className="truncate">{commitHash.substring(0, 7)}</span>
         </Link>
       );
     } else {
@@ -39,7 +39,7 @@ export function AppGitCard({ className, sync }: Props) {
     if (repoURL) {
       commitRefValue = (
         <Link href={`${repoURL}/tree/${commitRef}` as Route} internalNavigation={false}>
-          {commitRef}
+          <span className="truncate">{commitRef}</span>
         </Link>
       );
     } else {
@@ -53,7 +53,7 @@ export function AppGitCard({ className, sync }: Props) {
   if (repoURL) {
     repositoryValue = (
       <Link href={repoURL as Route} internalNavigation={false}>
-        {repoURL}
+        <span className="truncate">{repoURL}</span>
       </Link>
     );
   } else {
@@ -71,7 +71,7 @@ export function AppGitCard({ className, sync }: Props) {
         Commit Information
       </div>
 
-      <dl className="grid grow grid-cols-4 gap-4 px-6 py-4">
+      <dl className="flex flex-col gap-4 px-6 py-4 md:grid md:grid-cols-4">
         {/* Row 1 */}
         <Description className="col-span-4" detail={commitMessage} term="Commit Message" />
 

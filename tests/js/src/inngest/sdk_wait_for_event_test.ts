@@ -2,7 +2,7 @@ import { inngest } from "@/inngest/client";
 
 export const testWaitForEvent = inngest.createFunction(
   {
-    name: "Wait for event test",
+    id: "wait-for-event",
   },
   { event: "tests/wait.test" },
   async ({ event, step }) => {
@@ -12,6 +12,7 @@ export const testWaitForEvent = inngest.createFunction(
     const result = await step.waitForEvent(
       "test/resume",
       {
+        event: "test/resume",
         if: "async.data.resume == true && async.data.id == event.data.id",
         timeout: "10s",
       },

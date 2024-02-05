@@ -62,8 +62,10 @@ func init() {
 type DebounceItem struct {
 	// AccountID represents the account for the debounce item
 	AccountID uuid.UUID `json:"aID"`
-	// WorkspaceID represents the account for the debounce item
+	// WorkspaceID represents the workspace for the debounce item
 	WorkspaceID uuid.UUID `json:"wsID"`
+	// AppID represents the app for the debounce item
+	AppID uuid.UUID `json:"appID"`
 	// FunctionID represents the function ID that this debounce is for.
 	FunctionID uuid.UUID `json:"fnID"`
 	// FunctionVersion represents the version of the function that was debounced.
@@ -80,6 +82,7 @@ func (d DebounceItem) QueuePayload() DebouncePayload {
 	return DebouncePayload{
 		AccountID:       d.AccountID,
 		WorkspaceID:     d.WorkspaceID,
+		AppID:           d.AppID,
 		FunctionID:      d.FunctionID,
 		FunctionVersion: d.FunctionVersion,
 	}
@@ -102,8 +105,10 @@ type DebouncePayload struct {
 	DebounceID ulid.ULID `json:"debounceID"`
 	// AccountID represents the account for the debounce item
 	AccountID uuid.UUID `json:"aID"`
-	// WorkspaceID represents the account for the debounce item
+	// WorkspaceID represents the workspace for the debounce item
 	WorkspaceID uuid.UUID `json:"wsID"`
+	// AppID represents the app for the debounce item
+	AppID uuid.UUID `json:"appID"`
 	// FunctionID represents the function ID that this debounce is for.
 	FunctionID uuid.UUID `json:"fnID"`
 	// FunctionVersion represents the version of the function that was debounced.
@@ -194,13 +199,16 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 	// A debounce must already exist for this fn.  Update it.
 	err = d.updateDebounce(ctx, di, fn, ttl, *debounceID)
 	if err == context.DeadlineExceeded || err == ErrDebounceInProgress {
-		if n == 4 {
+		if n == 5 {
 			// Only recurse 5 times.
 			return fmt.Errorf("unable to update debounce: %w", err)
 		}
 		// Re-invoke this to see if we need to extend the debounce or continue.
-		// Wait 5 milliseconds for the current lock and job to have evaluated.
-		<-time.After(5 * time.Millisecond)
+		// Wait 50 milliseconds for the current lock and job to have evaluated.
+		//
+		// TODO: Instead of this, make debounce creation and updating atomic within the queue.
+		// This needs to modify queue items and partitions directly.
+		<-time.After(50 * time.Millisecond)
 		return d.debounce(ctx, di, fn, ttl, n+1)
 	}
 
@@ -217,6 +225,7 @@ func (d debouncer) queueItem(ctx context.Context, di DebounceItem, debounceID ul
 		Identifier: state.Identifier{
 			AccountID:   di.AccountID,
 			WorkspaceID: di.WorkspaceID,
+			AppID:       di.AppID,
 			WorkflowID:  di.FunctionID,
 		},
 		Kind:    queue.KindDebounce,

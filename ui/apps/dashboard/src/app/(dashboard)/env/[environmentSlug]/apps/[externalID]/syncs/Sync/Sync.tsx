@@ -5,6 +5,7 @@ import ExclamationTriangleIcon from '@heroicons/react/20/solid/ExclamationTriang
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
+import { SyncErrorCard } from '@/components/SyncErrorCard';
 import { FunctionList } from './FunctionList';
 import { useSync } from './useSync';
 
@@ -48,6 +49,8 @@ export function Sync({ externalAppID, syncID }: Props) {
   return (
     <div className="h-full w-full overflow-y-auto">
       <div className="mx-auto w-full max-w-[1200px] p-4">
+        {sync.error && <SyncErrorCard className="mb-4" error={sync.error} />}
+
         <AppInfoCard app={app} className="mb-4" sync={sync} linkToSyncs />
         <AppGitCard className="mb-4" sync={sync} />
 

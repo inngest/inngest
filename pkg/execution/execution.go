@@ -147,6 +147,8 @@ type ScheduleRequest struct {
 	AccountID uuid.UUID
 	// WorkspaceID is the workspace that this request belongs to.
 	WorkspaceID uuid.UUID
+	// AppID is the app that this request belongs to.
+	AppID uuid.UUID
 	// OriginalRunID is the ID of the ID of the original run, if this a replay.
 	OriginalRunID *ulid.ULID
 	// ReplayID is the ID of the ID of the replay, if this a replay.
@@ -168,9 +170,10 @@ type ScheduleRequest struct {
 // CancelRequest stores information about the incoming cancellation request within
 // history.
 type CancelRequest struct {
-	EventID    *ulid.ULID
-	Expression *string
-	UserID     *uuid.UUID
+	EventID        *ulid.ULID
+	Expression     *string
+	UserID         *uuid.UUID
+	CancellationID *ulid.ULID
 }
 
 type ResumeRequest struct {
