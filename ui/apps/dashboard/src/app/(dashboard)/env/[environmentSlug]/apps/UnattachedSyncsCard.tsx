@@ -1,12 +1,12 @@
 'use client';
 
-import { type Route } from 'next';
 import Link from 'next/link';
 import ChevronRightIcon from '@heroicons/react/20/solid/ChevronRightIcon';
 import { Link as InngestLink } from '@inngest/components/Link';
 import { classNames } from '@inngest/components/utils/classNames';
 
 import { Time } from '@/components/Time';
+import { pathCreator } from '@/utils/urls';
 import { cardWrapperStyles } from './AppCard';
 import { Description } from './Description';
 
@@ -27,7 +27,7 @@ export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Prop
         <h2>
           <Link
             className="transition-color flex cursor-pointer items-center gap-1 text-white underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-300 hover:decoration-indigo-300"
-            href={`/env/${envSlug}/unattached-syncs`}
+            href={pathCreator.unattachedSyncs({ envSlug })}
           >
             Unattached Syncs
             <ChevronRightIcon className="h-4 w-4" />
@@ -46,7 +46,7 @@ export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Prop
                 <InngestLink
                   internalNavigation
                   showIcon={false}
-                  href={`/env/${envSlug}/unattached-syncs` as Route}
+                  href={pathCreator.unattachedSyncs({ envSlug })}
                 >
                   <Time value={latestSyncTime} />
                 </InngestLink>
