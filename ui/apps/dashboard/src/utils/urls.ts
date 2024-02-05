@@ -39,6 +39,15 @@ export const pathCreator = {
   apps({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/apps` as Route;
   },
+  app({ envSlug, externalAppID }: { envSlug: string; externalAppID: string }): Route {
+    return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}` as Route;
+  },
+  appSyncs({ envSlug, externalAppID }: { envSlug: string; externalAppID: string }): Route {
+    return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}/syncs` as Route;
+  },
+  createApp({ envSlug }: { envSlug: string }): Route {
+    return `/env/${envSlug}/apps/sync-new` as Route;
+  },
   createEnv(): Route {
     return '/create-environment';
   },
@@ -75,5 +84,8 @@ export const pathCreator = {
   },
   manage({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/manage` as Route;
+  },
+  unattachedSyncs({ envSlug }: { envSlug: string }): Route {
+    return `/env/${envSlug}/unattached-syncs` as Route;
   },
 };
