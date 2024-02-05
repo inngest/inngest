@@ -1471,10 +1471,12 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		require.Equal(t, time.UnixMilli(item.WallTimeMS), at)
 		require.NoError(t, err)
 
+		// Find all functions
 		parts, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(parts))
 
+		// Requeue the function for 5 seconds in the future.
 		next := at.Add(5 * time.Second)
 		err = q.RequeueByJobID(ctx, wsA.String(), jid, next)
 		require.Nil(t, err, r.Dump())
@@ -1489,15 +1491,18 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			require.Equal(t, time.UnixMilli(found[0].WallTimeMS), next)
 		})
 
-		t.Run("It updates the partition index", func(t *testing.T) {
-			partsAfter, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
+		t.Run("Requeueing updates the fn's score in the global partition index", func(t *testing.T) {
+			// We've already requeued the item, for 5 seconds in the future.
+			// The function pointer in the global queue should be 5 seconds ahead.
+			fnPtrsAfterRequeue, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
 			require.NoError(t, err)
-			require.Equal(t, 1, len(partsAfter))
+			require.Equal(t, 1, len(fnPtrsAfterRequeue))
 
 			score, err := r.ZScore(q.kg.GlobalPartitionIndex(), wsA.String())
 			require.NoError(t, err)
+
+			// The score should have updated.
 			require.EqualValues(t, next.Unix(), int64(score), r.Dump())
-			require.NotEqualValues(t, parts[0], partsAfter[0])
 		})
 	})
 

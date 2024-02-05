@@ -927,7 +927,7 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID string, at time.Time) error {
 	jobID = HashID(ctx, jobID)
 
-	// TODO: Find the queue item.
+	// Find the queue item so that we can fetch the shard info.
 	qi := &QueueItem{}
 	if err := q.r.Do(ctx, q.r.B().Hget().Key(q.kg.QueueItem()).Field(jobID).Build()).DecodeJSON(qi); err != nil {
 		return err

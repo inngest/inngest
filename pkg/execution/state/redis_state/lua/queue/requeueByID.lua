@@ -14,16 +14,16 @@ Return values:
 ]]
 --
 
-local keyQueueIndex     = KEYS[1]
-local keyQueueHash      = KEYS[2]
-local keyPartitionIndex = KEYS[3]           -- partition:sorted - zset
-local keyShardIndex     = KEYS[4]           -- shard zset
-local keyPartitionHash  = KEYS[5]           -- partition hash
+local keyQueueIndex    = KEYS[1]
+local keyQueueHash     = KEYS[2]
+local keyGlobalIndex   = KEYS[3]           -- partition:sorted - zset
+local keyShardIndex    = KEYS[4]           -- shard zset
+local keyPartitionHash = KEYS[5]           -- partition hash
 
-local jobID             = ARGV[1]           -- queue item ID
-local jobScore          = tonumber(ARGV[2]) -- enqueue at, in milliseconds
-local partitionID       = ARGV[3]           -- function ID
-local currentTime       = tonumber(ARGV[4]) -- in ms
+local jobID            = ARGV[1]           -- queue item ID
+local jobScore         = tonumber(ARGV[2]) -- enqueue at, in milliseconds
+local partitionID      = ARGV[3]           -- function ID
+local currentTime      = tonumber(ARGV[4]) -- in ms
 
 if redis.call("ZSCORE", keyQueueIndex, jobID) == false then
     -- This doesn't exist.
@@ -32,6 +32,7 @@ end
 
 -- $include(get_queue_item.lua)
 -- $include(update_pointer_score.lua)
+-- $include(get_partition_item.lua)
 
 local item = get_queue_item(keyQueueHash, jobID)
 if item == nil then
@@ -40,12 +41,10 @@ end
 
 -- Ensure that we're not requeueing a leased job.
 if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
-    -- This is already leased;  don't let this requester lease the item.
+    -- This is already leased, so don't requeue by ID.  Use the standard requeue operation.
     return -2
 end
 
-
--- $include(get_partition_item.lua)
 local existing = get_partition_item(keyPartitionHash, partitionID)
 if existing == nil then
     return -1
@@ -58,7 +57,6 @@ item.at = jobScore
 item.wt = jobScore
 redis.call("HSET", keyQueueHash, jobID, cjson.encode(item))
 
-
 -- Get the current score of the partition;  if queueScore < currentScore update the
 -- partition's score so that we can work on this workflow when the earliest member
 -- is available.
@@ -69,9 +67,9 @@ redis.call("HSET", keyQueueHash, jobID, cjson.encode(item))
 local minScore = redis.call("ZRANGEBYSCORE", keyQueueIndex, "-inf", "+inf", "WITHSCORES", "LIMIT", "0", "1")
 local partitionScore = math.floor(minScore[2] / 1000)
 
-local currentScore = redis.call("ZSCORE", keyPartitionIndex, partitionID)
+local currentScore = redis.call("ZSCORE", keyGlobalIndex, partitionID)
 if currentScore == false or tonumber(currentScore) ~= partitionScore then
-    redis.call("ZADD", keyPartitionIndex, partitionScore, partitionID)
+    redis.call("ZADD", keyGlobalIndex, partitionScore, partitionID)
     if string.sub(keyShardIndex, -2) ~= ":-" then
         update_pointer_score_to(partitionID, keyShardIndex, partitionScore)
     end
