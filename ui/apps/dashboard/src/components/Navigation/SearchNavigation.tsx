@@ -1,16 +1,22 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { type Route } from 'next';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
-import { ArrowUturnRightIcon, MagnifyingGlassIcon } from '@heroicons/react/20/solid';
+import {
+  ArrowUturnRightIcon,
+  CodeBracketSquareIcon,
+  MagnifyingGlassIcon,
+} from '@heroicons/react/20/solid';
+import { Modal } from '@inngest/components/Modal';
+import { classNames } from '@inngest/components/utils/classNames';
+import { Command } from 'cmdk';
 import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
+import EventIcon from '@/icons/event.svg';
 import { getEnvironmentSlug } from '@/utils/environments';
-import Modal from '../Modal';
 
 const GetGlobalSearchDocument = graphql(`
   query GetGlobalSearch($opts: SearchInput!) {
@@ -52,19 +58,18 @@ const GetFunctionSlugDocument = graphql(`
 
 type SearchModalProps = {
   isOpen: boolean;
-  onClose: () => void;
+  onOpenChange(open: boolean): void;
 };
 
-function SearchModal({ isOpen, onClose }: SearchModalProps) {
-  const [isSearchResultsListOpened, setIsSearchResultsListOpened] = useState(false);
+function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
   const [search, setSearch] = useState('');
-  const resultRef = useRef<HTMLLIElement>(null);
   const router = useRouter();
   const { user } = useUser();
   let searchResult = {
     type: '',
     href: '',
     name: '',
+    icon: <></>,
   };
 
   useEffect(() => {
@@ -142,6 +147,7 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
         globalResults.value.id
       }`,
       name: functionResults.name || '',
+      icon: <CodeBracketSquareIcon className="w-4" />,
     };
   } else if (globalResults?.value.__typename === 'ArchivedEvent') {
     searchResult = {
@@ -150,91 +156,57 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
         globalResults.value.id
       }`,
       name: globalResults.value.name,
+      icon: <EventIcon className="w-5" />,
     };
   }
 
-  /*
-   * Event handlers
-   */
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.code === 'Enter' && resultRef.current && searchResult.href.length > 0) {
-      e.preventDefault();
-      router.push(searchResult.href as Route);
-      onClose();
-    }
-  }
-
-  let debounce: NodeJS.Timeout;
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    clearTimeout(debounce);
-    if (e.target.value === '') {
-      setIsSearchResultsListOpened(false);
-      return setSearch('');
-    }
-    debounce = setTimeout(() => {
-      setIsSearchResultsListOpened(true);
-      setSearch(e.target.value);
-    }, 500);
-  }
-
   return (
-    <Modal
-      backdropClassName="bg-black/50 backdrop-blur-[2px]"
-      className="ml-auto mr-auto flex max-w-2xl self-start p-0 shadow"
-      isOpen={isOpen}
-      onClose={onClose}
-    >
-      <form className="w-full divide-y divide-slate-100 ">
-        <div className="flex items-center gap-2 px-4 py-3">
-          <input
-            className="w-[34rem] placeholder-slate-500 focus-visible:outline-none"
-            placeholder="Search by ID..."
-            autoFocus
-            onChange={handleChange}
-            defaultValue={search}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-        {isSearchResultsListOpened && (
-          <>
-            {!globalResults ? (
-              <div className="px-4 py-3 text-sm text-slate-600">
-                {!isFetching && 'Nothing found. Make sure you are typing the full ID.'}
-                {isFetching && 'Searching...'}
-              </div>
-            ) : (
-              <ul role="listbox">
-                <li
-                  role="option"
-                  aria-selected="true"
-                  className="group aria-selected:bg-slate-100"
-                  ref={resultRef}
+    <Modal alignTop isOpen={isOpen} onClose={onOpenChange} className="max-w-2xl align-baseline">
+      <Command label="Search by ID menu" shouldFilter={false} className="p-2">
+        <Command.Input
+          placeholder="Search by ID..."
+          value={search}
+          onValueChange={setSearch}
+          className={classNames(
+            search && 'border-b border-slate-200 focus:border-slate-200',
+            'w-[656px] border-0 px-3 py-3 placeholder-slate-500 outline-none focus:ring-0'
+          )}
+        />
+        {search && (
+          <Command.List className="px-3 py-3 text-slate-600">
+            {isFetching && <Command.Loading>Searching...</Command.Loading>}
+            {!isFetching && globalResults && (
+              <Command.Group
+                heading={<div className="pb-2 text-xs text-slate-500">Navigate To</div>}
+              >
+                <Command.Item
+                  onSelect={() => {
+                    router.push(searchResult.href as Route);
+                    onOpenChange(!isOpen);
+                  }}
+                  key={globalResults.env.id}
+                  value={globalResults.env.name}
+                  className="group flex cursor-pointer items-center rounded-md px-3 py-3 data-[selected]:bg-slate-100"
                 >
-                  <Link
-                    onClick={onClose}
-                    href={searchResult.href as Route}
-                    className="flex items-center px-4 py-3"
+                  <div className="flex items-center gap-2 truncate">
+                    {searchResult.icon}
+                    <p className="flex-1 truncate">{searchResult.name}</p>
+                  </div>
+                  <kbd
+                    aria-label="press enter to jump to page"
+                    className="ml-auto hidden rounded bg-slate-200 p-1.5 text-white group-data-[selected]:block"
                   >
-                    <div>
-                      <div>{searchResult.name}</div>
-                      <div className="mt-1 text-xs font-medium capitalize text-slate-400">
-                        {searchResult.type}
-                      </div>
-                    </div>
-
-                    <kbd
-                      aria-label="press enter to jump to page"
-                      className="ml-auto hidden rounded bg-slate-500 p-2 text-white group-aria-selected:block"
-                    >
-                      <ArrowUturnRightIcon className="h-3 w-3 rotate-180" />
-                    </kbd>
-                  </Link>
-                </li>
-              </ul>
+                    <ArrowUturnRightIcon className="h-3 w-3 rotate-180 text-slate-600" />
+                  </kbd>
+                </Command.Item>
+              </Command.Group>
             )}
-          </>
+            <Command.Empty className={classNames(isFetching && 'hidden')}>
+              No results found. Make sure you are typing the full ID.
+            </Command.Empty>
+          </Command.List>
         )}
-      </form>
+      </Command>
     </Modal>
   );
 }
@@ -248,27 +220,19 @@ export default function SearchNavigation() {
   }, []);
 
   useEffect(() => {
-    if (isSearchModalVisible) {
-      return;
-    }
-
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setIsSearchModalVisible(true);
-      }
-      if (e.key === 'escape') {
-        e.preventDefault();
-        setIsSearchModalVisible(false);
+        setIsSearchModalVisible((open) => !open);
       }
     }
 
-    window.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keydown', onKeyDown);
 
     return () => {
-      window.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keydown', onKeyDown);
     };
-  }, [isSearchModalVisible, setIsSearchModalVisible]);
+  }, []);
 
   return (
     <>
@@ -289,7 +253,7 @@ export default function SearchNavigation() {
         </kbd>
       </button>
 
-      <SearchModal isOpen={isSearchModalVisible} onClose={() => setIsSearchModalVisible(false)} />
+      <SearchModal isOpen={isSearchModalVisible} onOpenChange={setIsSearchModalVisible} />
     </>
   );
 }
