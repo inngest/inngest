@@ -3,6 +3,7 @@ import Link from 'next/link';
 import ArrowRightIcon from '@heroicons/react/20/solid/ArrowRightIcon';
 import ChevronDownIcon from '@heroicons/react/20/solid/ChevronDownIcon';
 import { Button } from '@inngest/components/Button';
+import { defaultLinkStyles } from '@inngest/components/Link';
 import type { Function } from '@inngest/components/types/function';
 import { classNames } from '@inngest/components/utils/classNames';
 import { useLocalStorage } from 'react-use';
@@ -84,7 +85,8 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                     >
                       <div
                         className={classNames(
-                          'group flex w-full items-center gap-2 border-slate-200 py-3 pl-6 pr-2 text-sm font-medium text-indigo-500 hover:bg-slate-100  hover:text-indigo-800',
+                          defaultLinkStyles,
+                          'group flex w-full items-center gap-2 border-slate-200 py-3 pl-6 pr-2 text-sm font-medium hover:bg-slate-100',
                           !isLast && 'border-b'
                         )}
                       >
@@ -132,7 +134,8 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                   >
                     <div
                       className={classNames(
-                        'group flex w-full items-center gap-2 border-slate-200 py-3 pl-6 pr-2 text-sm font-medium text-indigo-500 hover:bg-slate-100  hover:text-indigo-800',
+                        defaultLinkStyles,
+                        'group flex w-full items-center gap-2 border-slate-200 py-3 pl-6 pr-2 text-sm font-medium hover:bg-slate-100',
                         !isLast && 'border-b'
                       )}
                     >

@@ -100,18 +100,18 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
         <dl className="flex flex-col gap-4 px-6 py-4 md:grid md:grid-cols-4">
           {/* Row 1 */}
           <Description
-            detail={<span className="truncate">{app?.externalID ?? '-'}</span>}
+            detail={<div className="truncate">{app?.externalID ?? '-'}</div>}
             term="ID"
             loading={loading}
           />
           <Description
-            detail={<span className="truncate">{sync?.sdkVersion ?? '-'}</span>}
+            detail={<div className="truncate">{sync?.sdkVersion ?? '-'}</div>}
             term="SDK Version"
             loading={loading}
           />
           <Description
             className="col-span-2"
-            detail={<span className="truncate">{lastSyncValue ?? '-'}</span>}
+            detail={<div className="truncate">{lastSyncValue ?? '-'}</div>}
             term="Last Sync"
             loading={loading}
           />
@@ -129,7 +129,7 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
           />
           <Description
             className="col-span-2"
-            detail={<span className="truncate">{sync?.url ?? '-'}</span>}
+            detail={<div className="truncate">{sync?.url ?? '-'}</div>}
             term="URL"
             loading={loading}
           />
