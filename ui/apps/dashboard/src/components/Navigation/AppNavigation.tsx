@@ -94,7 +94,7 @@ export default async function AppNavigation({ environmentSlug }: AppNavigationPr
       {
         href: `/env/${environmentSlug}/apps`,
         text: 'Apps',
-        hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
+        hide: [ALL_ENVIRONMENTS_SLUG],
         icon: <Squares2X2Icon className="w-3.5" />,
         badge: (
           <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
