@@ -343,8 +343,10 @@ func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) (string, int) {
 			return p.Queue(), 10_000
 		},
-		itemIndexer: QueueItemIndexerFunc,
-		backoffFunc: backoff.DefaultBackoff,
+		itemIndexer:    QueueItemIndexerFunc,
+		backoffFunc:    backoff.DefaultBackoff,
+		shardLeases:    []leasedShard{},
+		shardLeaseLock: &sync.Mutex{},
 	}
 
 	for _, opt := range opts {
@@ -430,7 +432,8 @@ type queue struct {
 	scavengerLeaseLock *sync.RWMutex
 
 	// shardLeases represents shards that are leased by the current queue worker.
-	shardLeases []leasedShard
+	shardLeases    []leasedShard
+	shardLeaseLock *sync.Mutex
 
 	// metrics allows reporting of metrics
 	scope tally.Scope

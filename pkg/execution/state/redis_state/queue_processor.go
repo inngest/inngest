@@ -347,18 +347,22 @@ func (q *queue) addLeasedShard(ctx context.Context, shard *QueueShard, lease uli
 	for i, n := range q.shardLeases {
 		if n.Shard.Name == shard.Name {
 			// Updated in place.
+			q.shardLeaseLock.Lock()
 			q.shardLeases[i] = leasedShard{
 				Lease: lease,
 				Shard: *shard,
 			}
+			q.shardLeaseLock.Unlock()
 			return
 		}
 	}
 	// Not updated in place, so add to the list and return.
+	q.shardLeaseLock.Lock()
 	q.shardLeases = append(q.shardLeases, leasedShard{
 		Lease: lease,
 		Shard: *shard,
 	})
+	q.shardLeaseLock.Unlock()
 }
 
 // filterShards filters shards during assignment, removing any shards that this worker
