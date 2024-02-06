@@ -35,7 +35,7 @@ export function renderRunMetadata({
   const metadataItems: MetadataItemProps[] = [
     { label: 'Run ID', value: functionRun?.id ?? '', size: 'large', type: 'code' },
     {
-      label: 'Function Scheduled',
+      label: 'Function Queued',
       value: functionRun?.startedAt ? shortDate(new Date(functionRun?.startedAt)) : '-',
       title: functionRun?.startedAt?.toLocaleString(),
     },

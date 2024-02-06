@@ -80,6 +80,11 @@ export type App = {
 };
 
 
+export type AppLatestSyncArgs = {
+  status: InputMaybe<SyncStatus>;
+};
+
+
 export type AppSyncsArgs = {
   after: InputMaybe<Scalars['Time']>;
   first?: Scalars['Int'];
@@ -417,6 +422,8 @@ export enum FunctionRunStatus {
   Completed = 'COMPLETED',
   /** The function run has failed. */
   Failed = 'FAILED',
+  /** The function run has been scheduled. */
+  Queued = 'QUEUED',
   /** The function run is currently running. */
   Running = 'RUNNING'
 }
@@ -997,9 +1004,16 @@ export type StripeSubscriptionItemsInput = {
 
 export type SyncResponse = {
   __typename?: 'SyncResponse';
+  app: Maybe<App>;
   error: Maybe<CodedError>;
   sync: Maybe<Deploy>;
 };
+
+export enum SyncStatus {
+  Error = 'error',
+  Pending = 'pending',
+  Success = 'success'
+}
 
 export type TimeSeries = {
   __typename?: 'TimeSeries';

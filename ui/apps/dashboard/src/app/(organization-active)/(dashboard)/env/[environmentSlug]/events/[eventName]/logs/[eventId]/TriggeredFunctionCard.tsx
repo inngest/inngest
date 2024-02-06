@@ -17,6 +17,7 @@ const functionRunStatusIcons = {
   [FunctionRunStatus.Completed]: CompletedIcon,
   [FunctionRunStatus.Failed]: FailedIcon,
   [FunctionRunStatus.Running]: RunningIcon,
+  [FunctionRunStatus.Queued]: RunningIcon,
 } as const satisfies Record<FunctionRunStatus, SVGComponent>;
 
 const GetFunctionRunCardDocument = graphql(`

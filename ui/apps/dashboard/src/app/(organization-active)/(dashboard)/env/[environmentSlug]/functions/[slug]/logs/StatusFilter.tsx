@@ -11,6 +11,7 @@ import cn from '@/utils/cn';
 import getOrderedEnumValues from '@/utils/getOrderedEnumValues';
 
 const orderedStatuses = getOrderedEnumValues(FunctionRunStatus, [
+  FunctionRunStatus.Queued,
   FunctionRunStatus.Running,
   FunctionRunStatus.Cancelled,
   FunctionRunStatus.Completed,
@@ -18,6 +19,7 @@ const orderedStatuses = getOrderedEnumValues(FunctionRunStatus, [
 ]);
 
 const statusColors = {
+  [FunctionRunStatus.Queued]: 'bg-sky-500',
   [FunctionRunStatus.Running]: 'bg-sky-500',
   [FunctionRunStatus.Cancelled]: 'bg-slate-300',
   [FunctionRunStatus.Completed]: 'bg-teal-500',
