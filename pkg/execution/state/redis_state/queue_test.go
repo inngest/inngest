@@ -1905,6 +1905,129 @@ func TestSharding(t *testing.T) {
 	})
 }
 
+func TestShardLease(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+	ctx := context.Background()
+
+	sf := func(ctx context.Context, wsID uuid.UUID) *QueueShard {
+		return &QueueShard{
+			Name:               wsID.String(),
+			Priority:           0,
+			GuaranteedCapacity: 1,
+		}
+	}
+	q := NewQueue(rc, WithShardFinder(sf))
+
+	t.Run("Leasing a non-existent shard fails", func(t *testing.T) {
+		shard := sf(ctx, uuid.UUID{})
+		leaseID, err := q.leaseShard(ctx, shard, 2*time.Second, 1)
+		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
+		require.NotNil(t, err)
+		require.ErrorContains(t, err, "shard not found")
+	})
+
+	// Ensure shards exist
+	idA, idB := uuid.New(), uuid.New()
+	_, err = q.EnqueueItem(ctx, QueueItem{WorkspaceID: idA}, time.Now())
+	require.NoError(t, err)
+	_, err = q.EnqueueItem(ctx, QueueItem{WorkspaceID: idB}, time.Now())
+	require.NoError(t, err)
+
+	miniredis.DumpMaxLineLen = 1024
+
+	t.Run("Leasing out-of-bounds fails", func(t *testing.T) {
+		// At the beginning, no shards have been leased.  Leasing a shard
+		// with an index of >= 1 should fail.
+		shard := sf(ctx, idA)
+		leaseID, err := q.leaseShard(ctx, shard, 2*time.Second, 1)
+		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
+		require.NotNil(t, err)
+		require.ErrorContains(t, err, "lease index is too high")
+	})
+
+	t.Run("Leasing a shard works", func(t *testing.T) {
+		shard := sf(ctx, idA)
+
+		t.Run("Basic lease", func(t *testing.T) {
+			leaseID, err := q.leaseShard(ctx, shard, 1*time.Second, 0)
+			require.NotNil(t, leaseID, "Didn't get a lease ID for a basic lease")
+			require.Nil(t, err)
+		})
+
+		t.Run("Leasing a subsequent index works", func(t *testing.T) {
+			leaseID, err := q.leaseShard(ctx, shard, 8*time.Second, 1) // Same length as the lease below, after wait
+			require.NotNil(t, leaseID, "Didn't get a lease ID for a secondary lease")
+			require.Nil(t, err)
+		})
+
+		t.Run("Leasing an index with an expired lease works", func(t *testing.T) {
+			// In this test, we have two leases — but one expires with the wait.  This first lease
+			// is no longer valid, so leasing with an index of (1) should succeed.
+			<-time.After(2 * time.Second) // Wait a few seconds so that time.Now() in the call works.
+			r.FastForward(2 * time.Second)
+			leaseID, err := q.leaseShard(ctx, shard, 10*time.Second, 1)
+			require.NotNil(t, leaseID)
+			require.Nil(t, err)
+
+			// This leaves us with two valid leases.
+		})
+
+		t.Run("Leasing an already leased index fails", func(t *testing.T) {
+			leaseID, err := q.leaseShard(ctx, shard, 2*time.Second, 1)
+			require.Nil(t, leaseID, "got a lease ID for an existing lease")
+			require.NotNil(t, err)
+			require.ErrorContains(t, err, "index is already leased")
+		})
+
+		t.Run("Leasing a second shard works", func(t *testing.T) {
+			// Try another shard name with an index of 0.
+			leaseID, err := q.leaseShard(ctx, sf(ctx, idB), 2*time.Second, 0)
+			require.NotNil(t, leaseID)
+			require.Nil(t, err)
+		})
+	})
+
+	r.FlushAll()
+
+	t.Run("Renewing shard leases", func(t *testing.T) {
+		// Ensure that enqueueing succeeds to make the shard.
+		_, err = q.EnqueueItem(ctx, QueueItem{WorkspaceID: idA}, time.Now())
+		require.Nil(t, err)
+
+		shard := sf(ctx, idA)
+		leaseID, err := q.leaseShard(ctx, shard, 1*time.Second, 0)
+		require.NotNil(t, leaseID, "could not lease shard")
+		require.Nil(t, err)
+
+		t.Run("Current leases succeed", func(t *testing.T) {
+			leaseID, err = q.renewShardLease(ctx, shard, 2*time.Second, *leaseID)
+			require.NotNil(t, leaseID, "did not get a new lease when renewing")
+			require.Nil(t, err)
+		})
+
+		t.Run("Expired leases fail", func(t *testing.T) {
+			<-time.After(3 * time.Second)
+			r.FastForward(3 * time.Second)
+
+			leaseID, err := q.renewShardLease(ctx, shard, 2*time.Second, *leaseID)
+			require.ErrorContains(t, err, "lease not found")
+			require.Nil(t, leaseID)
+		})
+
+		t.Run("Invalid lease IDs fail", func(t *testing.T) {
+			leaseID, err := q.renewShardLease(ctx, shard, 2*time.Second, ulid.MustNew(ulid.Now(), rand.Reader))
+			require.ErrorContains(t, err, "lease not found")
+			require.Nil(t, leaseID)
+		})
+	})
+}
+
 func getQueueItem(t *testing.T, r *miniredis.Miniredis, id string) QueueItem {
 	t.Helper()
 	// Ensure that our data is set up correctly.

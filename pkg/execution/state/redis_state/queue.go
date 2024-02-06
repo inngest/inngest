@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -102,6 +103,11 @@ var (
 
 	ErrConcurrencyLimitCustomKey0 = fmt.Errorf("At concurrency limit 0")
 	ErrConcurrencyLimitCustomKey1 = fmt.Errorf("At concurrency limit 1")
+
+	// internal shard errors
+	errShardNotFound     = fmt.Errorf("shard not found")
+	errShardIndexLeased  = fmt.Errorf("shard index is already leased")
+	errShardIndexInvalid = fmt.Errorf("shard lease index is too high (a lease just expired)")
 )
 
 var (
@@ -423,6 +429,9 @@ type queue struct {
 	// or reading from scavengerLeaseID in parallel.
 	scavengerLeaseLock *sync.RWMutex
 
+	// shardLeases represents shards that are leased by the current queue worker.
+	shardLeases []leasedShard
+
 	// metrics allows reporting of metrics
 	scope tally.Scope
 	// tracer is the tracer to use for opentelemetry tracing.
@@ -457,6 +466,12 @@ type QueueShard struct {
 	// shard.  The workers currently leasing the shard are almost guaranteed to use
 	// the shard's partition queue as their source of work.
 	Leases []ulid.ULID `json:"leases"`
+}
+
+// leasedShard represents a shard leased by a queue.
+type leasedShard struct {
+	Shard QueueShard
+	Lease ulid.ULID
 }
 
 // Partition returns the partition name for use when managing the pointer queue to
@@ -789,6 +804,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		shard = q.sf(ctx, i.WorkspaceID)
 		if shard != nil {
 			shardName = shard.Name
+			shard.Leases = []ulid.ULID{}
 		}
 	}
 
@@ -1769,6 +1785,109 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 		return nil, ErrConfigAlreadyLeased
 	default:
 		return nil, fmt.Errorf("unknown response claiming config lease: %d", status)
+	}
+}
+
+func (q *queue) getShards(ctx context.Context) (map[string]*QueueShard, error) {
+	m, err := q.r.Do(ctx, q.r.B().Hgetall().Key(q.kg.Shards()).Build()).AsMap()
+	if rueidis.IsRedisNil(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("error fetching shards: %w", err)
+	}
+	shards := map[string]*QueueShard{}
+	for k, v := range m {
+		shard := &QueueShard{}
+		if err := v.DecodeJSON(shard); err != nil {
+			return nil, fmt.Errorf("error decoding shards: %w", err)
+		}
+		shards[k] = shard
+	}
+	return shards, nil
+}
+
+// leaseShard leases a shard for the given duration.  Shards can have more than one lease at a time;
+// you must provide an index to claim a lease. THe index This prevents multiple workers
+// from claiming the same lease index;  if workers A and B see a shard with 0 leases and both attempt
+// to claim lease "0", only one will succeed.
+func (q *queue) leaseShard(ctx context.Context, shard *QueueShard, duration time.Duration, n int) (*ulid.ULID, error) {
+	now := time.Now()
+	leaseID, err := ulid.New(uint64(now.Add(duration).UnixMilli()), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	keys := []string{q.kg.Shards()}
+	args, err := StrSlice([]any{
+		now.UnixMilli(),
+		shard.Name,
+		leaseID,
+		n,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	status, err := scripts["queue/shardLease"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error leasing item: %w", err)
+	}
+	switch status {
+	case int64(-1):
+		return nil, errShardNotFound
+	case int64(-2):
+		return nil, errShardIndexLeased
+	case int64(-3):
+		return nil, errShardIndexInvalid
+	case int64(0):
+		return &leaseID, nil
+	default:
+		return nil, fmt.Errorf("unknown lease return value: %T(%v)", status, status)
+	}
+}
+
+func (q *queue) renewShardLease(ctx context.Context, shard *QueueShard, duration time.Duration, leaseID ulid.ULID) (*ulid.ULID, error) {
+	now := time.Now()
+	newLeaseID, err := ulid.New(uint64(now.Add(duration).UnixMilli()), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	keys := []string{q.kg.Shards()}
+	args, err := StrSlice([]any{
+		now.UnixMilli(),
+		shard.Name,
+		leaseID,
+		newLeaseID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	status, err := scripts["queue/renewShardLease"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error leasing item: %w", err)
+	}
+	switch status {
+	case int64(-1):
+		return nil, fmt.Errorf("shard not found")
+	case int64(-2):
+		return nil, fmt.Errorf("lease not found")
+	case int64(0):
+		return &leaseID, nil
+	default:
+		return nil, fmt.Errorf("unknown lease renew return value: %T(%v)", status, status)
 	}
 }
 

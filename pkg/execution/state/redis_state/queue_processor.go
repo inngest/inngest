@@ -14,13 +14,13 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
 	"github.com/uber-go/tally/v4"
-	"golang.org/x/sync/semaphore"
-
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
 	"go.opentelemetry.io/otel/trace"
+	"golang.org/x/sync/semaphore"
+	"gonum.org/v1/gonum/stat/sampleuv"
 )
 
 const (
@@ -44,6 +44,14 @@ const (
 	counterPartitionGone                    = "partition_gone_total"
 	gaugeQueueItemLatencyEWMA               = "queue_item_latency_ewma"
 	histogramItemLatency                    = "queue_item_latency_duration"
+)
+
+var (
+	// ShardTickTime is the duration in which we periodically check shards for
+	// lease information, etc.
+	ShardTickTime = 15 * time.Second
+	// ShardLeaseTime is how long shards are leased.
+	ShardLeaseTime = 10 * time.Second
 )
 
 var (
@@ -176,6 +184,7 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		go q.worker(ctx, f)
 	}
 
+	go q.claimShards(ctx)
 	go q.claimSequentialLease(ctx)
 	go q.runScavenger(ctx)
 
@@ -226,6 +235,171 @@ LOOP:
 	q.wg.Wait()
 
 	return nil
+}
+
+func (q *queue) claimShards(ctx context.Context) {
+	// TODO: Inspect denylists and whehter this worker is capable of leasing
+	// shards.  Note that shards should only be created for SDK-based workers;
+	// if you use the queue for anything else other than step jobs, the worker
+	// cannot lease jobs.  To this point, we should make this opt-in instead of
+	// opt-out to prevent errors.
+
+	scanTick := time.NewTicker(ShardTickTime)
+	leaseTick := time.NewTicker(ShardLeaseTime / 2)
+
+	// records whether we're leasing
+	var leasing int32
+
+	for {
+		select {
+		case <-ctx.Done():
+			// TODO: Remove leases immediately from backing store.
+			scanTick.Stop()
+			leaseTick.Stop()
+			return
+		case <-scanTick.C:
+			go func() {
+				if !atomic.CompareAndSwapInt32(&leasing, 0, 1) {
+					// Only one lease can occur at once.
+					return
+				}
+
+				// Always reset the leasing op to zero, allowing us to lease again.
+				defer func() { atomic.StoreInt32(&leasing, 0) }()
+
+				// Retry claiming leases until all shards have been taken.  All operations
+				// must succeed, even if it leaves us spinning.  Note that scanShards filters
+				// out unnecessary leases and shards that have already been leased.
+				retry := true
+				for retry {
+					var err error
+					retry, err = q.scanShards(ctx)
+					if err != nil {
+						q.logger.Error().Err(err).Msg("error scanning and leasing shards")
+						return
+					}
+				}
+			}()
+		case <-leaseTick.C:
+			for _, s := range q.shardLeases {
+				// Attempt to lease all ASAP, even if the backing store is single threaded.
+				go func(ls leasedShard) {
+					nextLeaseID, err := q.renewShardLease(ctx, &ls.Shard, ShardLeaseTime, ls.Lease)
+					if err != nil {
+						q.logger.Error().Err(err).Msg("error renewing shard lease")
+						return
+					}
+					// Update the lease ID so that we have this stored appropriately for
+					// the next renewal.
+					q.addLeasedShard(ctx, &ls.Shard, *nextLeaseID)
+				}(s)
+			}
+		}
+	}
+}
+
+func (q *queue) scanShards(ctx context.Context) (retry bool, err error) {
+	// TODO: Make instances of *queue register worker information when calling
+	//       Run().
+	//       Fetch this information, and correctly assign workers to shard maps
+	//       based on the distribution of items in the queue here.  This lets
+	//       us oversubscribe appropriately.
+
+	shardMap, err := q.getShards(ctx)
+	if err != nil {
+		q.logger.Error().Err(err).Msg("error fetching shards")
+		return
+	}
+	shards, err := q.filterShards(ctx, shardMap)
+	if err != nil {
+		q.logger.Error().Err(err).Msg("error filtering shards")
+		return
+	}
+	if len(shards) == 0 {
+		return
+	}
+
+	for _, shard := range shards {
+		leaseID, err := q.leaseShard(ctx, shard, ShardLeaseTime, len(shard.Leases))
+		if err == nil {
+			q.addLeasedShard(ctx, shard, *leaseID)
+		}
+		switch err {
+		case errShardNotFound:
+			// This is okay;  the shard was removed when trying to lease
+			continue
+		case errShardIndexLeased:
+			// This is okay;  another worker grabbed the lease.  No need to retry
+			// as another worker grabbed this.
+			continue
+		case errShardIndexInvalid:
+			// A lease expired while trying to lease — try again.
+			retry = true
+		default:
+			return true, err
+		}
+	}
+
+	return retry, nil
+}
+
+func (q *queue) addLeasedShard(ctx context.Context, shard *QueueShard, lease ulid.ULID) {
+	for i, n := range q.shardLeases {
+		if n.Shard.Name == shard.Name {
+			// Updated in place.
+			q.shardLeases[i] = leasedShard{
+				Lease: lease,
+				Shard: *shard,
+			}
+			return
+		}
+	}
+	// Not updated in place, so add to the list and return.
+	q.shardLeases = append(q.shardLeases, leasedShard{
+		Lease: lease,
+		Shard: *shard,
+	})
+}
+
+// filterShards filters shards during assignment, removing any shards that this worker
+// has already leased;  any shards that have already had their leasing requirements met;
+// and priority shuffles shards to lease in a non-deterministic (but prioritized) order.
+//
+// The returned shards are safe to be leased, and should be attempted in-order.
+func (q *queue) filterShards(ctx context.Context, shards map[string]*QueueShard) ([]*QueueShard, error) {
+	if len(shards) == 0 {
+		return nil, nil
+	}
+
+	for _, v := range q.shardLeases {
+		delete(shards, v.Shard.Name)
+	}
+
+	weights := []float64{}
+	shuffleIdx := []*QueueShard{}
+	for _, v := range shards {
+		// XXX: Here we can add latency targets, etc.
+		if len(v.Leases) >= int(v.GuaranteedCapacity) {
+			continue
+		}
+		weights = append(weights, float64(v.Priority))
+		shuffleIdx = append(shuffleIdx, v)
+	}
+
+	// Reduce the likelihood of all workers attempting to claim shards by
+	// randomly shuffling.  Note that high priority shards will still be
+	// likely to come first with some contention.
+	w := sampleuv.NewWeighted(weights, rnd)
+	result := make([]*QueueShard, len(weights))
+	for n := range result {
+		idx, ok := w.Take()
+		if !ok {
+			return nil, ErrWeightedSampleRead
+		}
+		result[n] = shuffleIdx[idx]
+	}
+
+	return result, nil
 }
 
 // claimSequentialLease is a process which continually runs while listening to the queue,
