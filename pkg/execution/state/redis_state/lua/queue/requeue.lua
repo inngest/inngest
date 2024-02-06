@@ -32,6 +32,7 @@ local partitionItem           = ARGV[5]           -- {workflow, priority, leased
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
 -- $include(update_pointer_score.lua)
+-- $include(has_shard_key.lua)
 
 local item                    = get_queue_item(queueKey, queueID)
 if item == nil then
@@ -74,7 +75,7 @@ local earliestTime = get_fn_partition_score(queueIndexKey)
 if currentScore == false or tonumber(currentScore) ~= earliestTime or tonumber(currentScore) == nil then
     redis.call("ZADD", partitionIndexKey, earliestTime, functionID)
     -- And the same for any shards, as long as the shard name exists.
-    if string.sub(shardPointerKey, -2) ~= ":-" then
+    if has_shard_key(shardPointerKey, -2) then
         update_pointer_score_to(functionID, shardPointerKey, earliestTime)
     end
 end

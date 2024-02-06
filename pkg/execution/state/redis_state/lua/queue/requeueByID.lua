@@ -33,6 +33,7 @@ end
 -- $include(get_queue_item.lua)
 -- $include(update_pointer_score.lua)
 -- $include(get_partition_item.lua)
+-- $include(has_shard_key.lua)
 
 local item = get_queue_item(keyQueueHash, jobID)
 if item == nil then
@@ -70,7 +71,7 @@ local partitionScore = math.floor(minScore[2] / 1000)
 local currentScore = redis.call("ZSCORE", keyGlobalIndex, partitionID)
 if currentScore == false or tonumber(currentScore) ~= partitionScore then
     redis.call("ZADD", keyGlobalIndex, partitionScore, partitionID)
-    if string.sub(keyShardIndex, -2) ~= ":-" then
+    if has_shard_key(keyShardIndex) then
         update_pointer_score_to(partitionID, keyShardIndex, partitionScore)
     end
 end

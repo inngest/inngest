@@ -43,6 +43,7 @@ local partitionName          = ARGV[8] -- Same as fn queue name/workflow ID
 -- $include(get_queue_item.lua)
 -- $include(set_item_peek_time.lua)
 -- $include(update_pointer_score.lua)
+-- $include(has_shard_key.lua)
 
 -- first, get the queue item.  we must do this and bail early if the queue item
 -- was not found.
@@ -101,7 +102,7 @@ redis.call("ZREM", queueIndexKey, item.id)
 local score = get_fn_partition_score(queueIndexKey)
 update_pointer_score_to(partitionName, globalPointerKey, score)
 -- And the same for any shards, as long as the shard name exists.
-if string.sub(shardPointerKey, -2) ~= ":-" then
+if has_shard_key(shardPointerKey) then
     update_pointer_score_to(partitionName, shardPointerKey, score)
 end
 

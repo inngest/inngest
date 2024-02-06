@@ -23,6 +23,7 @@ local concurrency             = tonumber(ARGV[5]) -- concurrency limit for this 
 -- $include(get_partition_item.lua)
 -- $include(decode_ulid_time.lua)
 -- $include(update_pointer_score.lua)
+-- $include(has_shard_key.lua)
 
 local existing                = get_partition_item(partitionKey, partitionID)
 if existing == nil or existing == false then
@@ -62,7 +63,7 @@ existing.last = currentTime -- in ms.
 -- Update item and index score
 redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
 redis.call("ZADD", keyGlobalPartitionPtr, leaseTime, partitionID) -- partition scored are in seconds.
-if string.sub(keyShardPartitionPtr, -2) ~= ":-" then
+if has_shard_key(keyShardPartitionPtr) then
     update_pointer_score_to(partitionID, keyShardPartitionPtr, leaseTime)
 end
 

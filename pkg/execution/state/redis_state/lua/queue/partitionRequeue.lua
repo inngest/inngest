@@ -24,6 +24,8 @@ local at                      = tonumber(ARGV[2]) -- time in seconds
 local forceAt                 = tonumber(ARGV[3])
 
 -- $include(get_partition_item.lua)
+-- $include(has_shard_key.lua)
+--
 local existing                = get_partition_item(partitionKey, workflowID)
 if existing == nil then
     return 1
@@ -35,7 +37,7 @@ if tonumber(redis.call("ZCARD", queueIndex)) == 0 and tonumber(redis.call("ZCARD
     redis.call("HDEL", partitionKey, workflowID)             -- Remove the item
     redis.call("DEL", partitionMeta)                         -- Remove the meta
     redis.call("ZREM", keyGlobalPartitionPtr, workflowID)    -- Remove the index
-    if string.sub(keyShardPartitionPtr, -2) ~= ":-" then
+    if has_shard_key(keyShardPartitionPtr) then
         redis.call("ZREM", keyShardPartitionPtr, workflowID) -- Remove the shard index
     end
     return 2
@@ -62,7 +64,7 @@ existing.at = at
 existing.leaseID = nil
 redis.call("HSET", partitionKey, workflowID, cjson.encode(existing))
 redis.call("ZADD", keyGlobalPartitionPtr, at, workflowID)
-if string.sub(keyShardPartitionPtr, -2) ~= ":-" then
+if has_shard_key(keyShardPartitionPtr) then
     redis.call("ZADD", keyShardPartitionPtr, at, workflowID) -- Update any index
 end
 
