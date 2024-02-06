@@ -124,6 +124,14 @@ type QueueManager interface {
 // PriorityFinder returns the priority for a given queue item.
 type PriorityFinder func(ctx context.Context, item QueueItem) uint
 
+// ShardFinder returns the given shard for a workspace ID, or nil if we should
+// not shard for the workspace.  We use a workspace ID because each individual
+// job AND partition/function lease requires this to be called.
+//
+// NOTE: This is called frequently:  for every enqueue, lease, partition lease, and so on.
+// Expect this to be called tens of thousands of times per second.
+type ShardFinder func(ctx context.Context, workspaceID uuid.UUID) *QueueShard
+
 type QueueOpt func(q *queue)
 
 func WithName(name string) func(q *queue) {
@@ -147,6 +155,12 @@ func WithMetricsScope(scope tally.Scope) func(q *queue) {
 func WithPriorityFinder(pf PriorityFinder) func(q *queue) {
 	return func(q *queue) {
 		q.pf = pf
+	}
+}
+
+func WithShardFinder(sf ShardFinder) func(q *queue) {
+	return func(q *queue) {
+		q.sf = sf
 	}
 }
 
@@ -343,6 +357,7 @@ type queue struct {
 	// redis stores the redis connection to use.
 	r  rueidis.Client
 	pf PriorityFinder
+	sf ShardFinder
 	kg QueueKeyGenerator
 
 	lifecycles []QueueLifecycleListener
@@ -422,6 +437,70 @@ type queue struct {
 type processItem struct {
 	P QueuePartition
 	I QueueItem
+}
+
+// QueueShard represents a sub-partition for a group of functions.  Shards maintain their
+// own partition queues for the functions within the shard.  Note that functions also
+// exist within the global partition queue.
+type QueueShard struct {
+	// Shard name, eg. the company name for isolated execution
+	Name string `json:"n"`
+	// Priority represents the priority for this shard.
+	Priority uint `json:"p"`
+	// Kind is the shard kind (below, but would be an enum.ShardKind in real life)
+	Kind string `json:"kind"`
+	// GuaranteedCapacity represents the minimum number of workers that must
+	// always scan this shard.  If zero, there is no guaranteed capacity for
+	// the shard.
+	GuaranteedCapacity uint `json:"gc"`
+	// Leases stores the lease IDs from the workers which are currently leasing the
+	// shard.  The workers currently leasing the shard are almost guaranteed to use
+	// the shard's partition queue as their source of work.
+	Leases []ulid.ULID `json:"leases"`
+}
+
+// Partition returns the partition name for use when managing the pointer queue to
+// individual queues within the shard
+func (q QueueShard) Partition() string {
+	return q.Name
+}
+
+// QueuePartition represents an individual queue for a workflow.  It stores the
+// time of the earliest job within the workflow.
+type QueuePartition struct {
+	QueueName *string `json:"queue,omitempty"`
+
+	WorkflowID  uuid.UUID `json:"wid"`
+	WorkspaceID uuid.UUID `json:"wsID"`
+
+	Priority uint `json:"p"`
+
+	// Last represents the time that this partition was last leased, as a millisecond
+	// unix epoch.  In essence, we need this to track how frequently we're leasing and
+	// attempting to run items in the partition's queue.
+	//
+	// Without this, we cannot track sojourn latency.
+	// garbage collection when the queue remains empty.
+	Last int64 `json:"last"`
+
+	// LeaseID represents a lease on this partition.  If the LeaseID is not nil,
+	// this partition can be claimed by a shared-nothing worker to work on the
+	// queue items within this partition.
+	//
+	// A lease is shortly held (eg seconds).  It should last long enough for
+	// workers to claim QueueItems only.
+	LeaseID *ulid.ULID `json:"leaseID"`
+}
+
+func (q QueuePartition) Queue() string {
+	if q.QueueName == nil {
+		return q.WorkflowID.String()
+	}
+	return *q.QueueName
+}
+
+func (q QueuePartition) MarshalBinary() ([]byte, error) {
+	return json.Marshal(q)
 }
 
 // QueueItem represents an individually queued work scheduled for some time in the
@@ -532,52 +611,6 @@ func (q QueueItem) Queue() string {
 // based on the time passed in.
 func (q QueueItem) IsLeased(time time.Time) bool {
 	return q.LeaseID != nil && ulid.Time(q.LeaseID.Time()).After(time)
-}
-
-// QueuePartition represents an individual queue for a workflow.  It stores the
-// time of the earliest job within the workflow.
-type QueuePartition struct {
-	QueueName *string `json:"queue,omitempty"`
-
-	WorkflowID uuid.UUID `json:"wid"`
-
-	Priority uint `json:"p"`
-
-	// AtS refers to the earliest QueueItem time within this partition, in
-	// seconds as a unix epoch.
-	//
-	// This is updated when taking a lease, requeuing items, etc.
-	//
-	// The S suffix differentiates between a QueueItem;  we only need second-
-	// level granularity here as queue partitions work to the nearest second.
-	AtS int64 `json:"at"`
-
-	// Last represents the time that this partition was last leased, as a millisecond
-	// unix epoch.  In essence, we need this to track how frequently we're leasing and
-	// attempting to run items in the partition's queue.
-	//
-	// Without this, we cannot track sojourn latency.
-	// garbage collection when the queue remains empty.
-	Last int64 `json:"last"`
-
-	// LeaseID represents a lease on this partition.  If the LeaseID is not nil,
-	// this partition can be claimed by a shared-nothing worker to work on the
-	// queue items within this partition.
-	//
-	// A lease is shortly held (eg seconds).  It should last long enough for
-	// workers to claim QueueItems only.
-	LeaseID *ulid.ULID `json:"leaseID"`
-}
-
-func (q QueuePartition) Queue() string {
-	if q.QueueName == nil {
-		return q.WorkflowID.String()
-	}
-	return *q.QueueName
-}
-
-func (q QueuePartition) MarshalBinary() ([]byte, error) {
-	return json.Marshal(q)
 }
 
 func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
@@ -742,18 +775,31 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	qn := i.Queue()
 
 	qp := QueuePartition{
-		QueueName:  i.QueueName,
-		WorkflowID: i.WorkflowID,
-		Priority:   priority,
-		AtS:        partitionTime.Unix(),
+		QueueName:   i.QueueName,
+		WorkflowID:  i.WorkflowID,
+		WorkspaceID: i.WorkspaceID,
+		Priority:    priority,
+	}
+
+	var (
+		shard     *QueueShard
+		shardName string
+	)
+	if q.sf != nil {
+		shard = q.sf(ctx, i.WorkspaceID)
+		if shard != nil {
+			shardName = shard.Name
+		}
 	}
 
 	keys := []string{
-		q.kg.QueueItem(),       // Queue item
-		q.kg.QueueIndex(qn),    // Queue sorted set
-		q.kg.PartitionItem(),   // Partition item, map
-		q.kg.PartitionMeta(qn), // Partition item
-		q.kg.PartitionIndex(),  // Global partition queue
+		q.kg.QueueItem(),                    // Queue item
+		q.kg.QueueIndex(qn),                 // Queue sorted set
+		q.kg.PartitionItem(),                // Partition item, map
+		q.kg.PartitionMeta(qn),              // Partition item
+		q.kg.GlobalPartitionIndex(),         // Global partition queue
+		q.kg.ShardPartitionIndex(shardName), // Shard queue
+		q.kg.Shards(),
 		q.kg.Idempotency(i.ID),
 	}
 	// Append indexes
@@ -770,6 +816,8 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		qn,
 		qp,
 		partitionTime.Unix(),
+		shard,
+		shardName,
 	})
 	if err != nil {
 		return i, err
@@ -867,11 +915,25 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID string, at time.Time) error {
 	jobID = HashID(ctx, jobID)
 
+	// Find the queue item so that we can fetch the shard info.
+	qi := &QueueItem{}
+	if err := q.r.Do(ctx, q.r.B().Hget().Key(q.kg.QueueItem()).Field(jobID).Build()).DecodeJSON(qi); err != nil {
+		return err
+	}
+
+	var shardName string
+	if q.sf != nil {
+		if shard := q.sf(ctx, qi.WorkspaceID); shard != nil {
+			shardName = shard.Name
+		}
+	}
+
 	keys := []string{
 		q.kg.QueueIndex(partitionName),
 		q.kg.QueueItem(),
-		q.kg.PartitionIndex(), // Global partition queue
-		q.kg.PartitionItem(),  // Partition hash
+		q.kg.GlobalPartitionIndex(),         // Global partition queue
+		q.kg.ShardPartitionIndex(shardName), // Shard partition queue
+		q.kg.PartitionItem(),                // Partition hash
 	}
 	status, err := scripts["queue/requeueByID"].Exec(
 		ctx,
@@ -942,17 +1004,24 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
+	var shardName string
+	if q.sf != nil {
+		if shard := q.sf(ctx, item.WorkspaceID); shard != nil {
+			shardName = shard.Name
+		}
+	}
+
 	keys := []string{
 		q.kg.QueueItem(),
 		q.kg.QueueIndex(item.Queue()),
 		q.kg.PartitionMeta(item.Queue()),
 		q.kg.Concurrency("account", ak),
 		q.kg.Concurrency("p", pk),
-
 		q.kg.Concurrency("custom", customKeys[0]),
 		q.kg.Concurrency("custom", customKeys[1]),
-
 		q.kg.ConcurrencyIndex(),
+		q.kg.GlobalPartitionIndex(),
+		q.kg.ShardPartitionIndex(shardName),
 	}
 	args, err := StrSlice([]any{
 		item.ID,
@@ -1042,7 +1111,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 	keys := []string{
 		q.kg.QueueItem(),
 		q.kg.QueueIndex(i.Queue()),
-		q.kg.PartitionIndex(),
+		q.kg.GlobalPartitionIndex(),
 		q.kg.Concurrency("account", ak),
 		q.kg.Concurrency("p", pk),
 		q.kg.Concurrency("custom", customKeys[0]),
@@ -1197,24 +1266,24 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 	// Update the wall time that this should run at.
 	i.WallTimeMS = at.UnixMilli()
 
-	qn := i.Queue()
-
-	qp := QueuePartition{
-		QueueName:  i.QueueName,
-		WorkflowID: i.WorkflowID,
-		Priority:   priority,
-		AtS:        at.Unix(),
+	var shardName string
+	if q.sf != nil {
+		if shard := q.sf(ctx, i.WorkspaceID); shard != nil {
+			shardName = shard.Name
+		}
 	}
+
 	keys := []string{
 		q.kg.QueueItem(),
-		q.kg.QueueIndex(qn),
-		q.kg.PartitionMeta(qn),
-		q.kg.PartitionIndex(),
+		q.kg.QueueIndex(i.Queue()),
+		q.kg.PartitionMeta(i.Queue()),
+		q.kg.GlobalPartitionIndex(),
 		q.kg.Concurrency("account", ak),
 		q.kg.Concurrency("p", pk),
 		q.kg.Concurrency("custom", customKeys[0]),
 		q.kg.Concurrency("custom", customKeys[1]),
 		q.kg.ConcurrencyIndex(),
+		q.kg.ShardPartitionIndex(shardName),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.kg) {
@@ -1227,8 +1296,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		i,
 		i.ID,
 		at.UnixMilli(),
-		qn,
-		qp,
+		i.Queue(),
 	})
 	if err != nil {
 		return err
@@ -1274,9 +1342,17 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
+	var shardName string
+	if q.sf != nil {
+		if shard := q.sf(ctx, p.WorkspaceID); shard != nil {
+			shardName = shard.Name
+		}
+	}
+
 	keys := []string{
 		q.kg.PartitionItem(),
-		q.kg.PartitionIndex(),
+		q.kg.GlobalPartitionIndex(),
+		q.kg.ShardPartitionIndex(shardName),
 		q.kg.Concurrency("p", concurrencyKey),
 	}
 
@@ -1358,7 +1434,7 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 		ctx,
 		q.r,
 		[]string{
-			q.kg.PartitionIndex(),
+			q.kg.GlobalPartitionIndex(),
 			q.kg.PartitionItem(),
 		},
 		args,
@@ -1453,22 +1529,29 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 // forceAt is used to enforce the given queue time.  This is used when partitions are at a
 // concurrency limit;  we don't want to scan the partition next time, so we force the partition
 // to be at a specific time instead of taking the earliest available queue item time
-func (q *queue) PartitionRequeue(ctx context.Context, queueName string, at time.Time, forceAt bool) error {
+func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error {
+	var shardName string
+	if q.sf != nil {
+		if shard := q.sf(ctx, p.WorkspaceID); shard != nil {
+			shardName = shard.Name
+		}
+	}
+
 	keys := []string{
 		q.kg.PartitionItem(),
-		q.kg.PartitionIndex(),
-		q.kg.PartitionMeta(queueName),
-		q.kg.QueueIndex(queueName),
+		q.kg.GlobalPartitionIndex(),
+		q.kg.ShardPartitionIndex(shardName),
+		q.kg.PartitionMeta(p.Queue()),
+		q.kg.QueueIndex(p.Queue()),
 		q.kg.QueueItem(),
-		q.kg.Concurrency("p", queueName),
+		q.kg.Concurrency("p", p.Queue()),
 	}
 	force := 0
 	if forceAt {
 		force = 1
 	}
 	args, err := StrSlice([]any{
-
-		queueName,
+		p.Queue(),
 		at.Unix(),
 		force,
 	})
