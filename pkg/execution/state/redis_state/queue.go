@@ -444,19 +444,19 @@ type processItem struct {
 // exist within the global partition queue.
 type QueueShard struct {
 	// Shard name, eg. the company name for isolated execution
-	Name string
+	Name string `json:"n"`
 	// Priority represents the priority for this shard.
-	Priority uint
+	Priority uint `json:"p"`
 	// Kind is the shard kind (below, but would be an enum.ShardKind in real life)
-	Kind string
+	Kind string `json:"kind"`
 	// GuaranteedCapacity represents the minimum number of workers that must
 	// always scan this shard.  If zero, there is no guaranteed capacity for
 	// the shard.
-	GuaranteedCapacity uint
+	GuaranteedCapacity uint `json:"gc"`
 	// Leases stores the lease IDs from the workers which are currently leasing the
 	// shard.  The workers currently leasing the shard are almost guaranteed to use
 	// the shard's partition queue as their source of work.
-	Leases []ulid.ULID
+	Leases []ulid.ULID `json:"leases"`
 }
 
 // Partition returns the partition name for use when managing the pointer queue to
@@ -464,18 +464,6 @@ type QueueShard struct {
 func (q QueueShard) Partition() string {
 	return q.Name
 }
-
-const (
-	ShardKindIsolated   = "isolated-prod"   // single customer's guaranteed capacity
-	ShardKindEnterprise = "enterprise-prod" // enterprise users
-	ShardKindPaid       = "paid-prod"
-	ShardKindFree       = "free-prod"
-
-	ShardKindIsolatedTest   = "isolated-test"   // single customer's guaranteed capacity
-	ShardKindEnterpriseTest = "enterprise-test" // enterprise users
-	ShardKindPaidTest       = "paid-test"
-	ShardKindFreeTest       = "free-test"
-)
 
 // QueuePartition represents an individual queue for a workflow.  It stores the
 // time of the earliest job within the workflow.
