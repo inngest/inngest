@@ -22,6 +22,8 @@ const (
 	// RunStatusOverflowed indicates that the function had too many steps ran.
 	// Deprecated.  This must be RunStatusFailed with an appropriate error code.
 	RunStatusOverflowed
+
+	RunStatusScheduled
 )
 
 // RunStatusEnded returns whether the function has ended based off of the
