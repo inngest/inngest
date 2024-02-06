@@ -1281,6 +1281,48 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 	return res, goerr
 }
 
+func (e *executor) Fail(ctx context.Context, runID ulid.ULID, with error) error {
+	s, err := e.sm.Load(ctx, runID)
+	if err != nil {
+		return fmt.Errorf("unable to load run: %w", err)
+	}
+	md := s.Metadata()
+
+	switch md.Status {
+	case enums.RunStatusFailed, enums.RunStatusCompleted, enums.RunStatusOverflowed:
+		return ErrFunctionEnded
+	case enums.RunStatusCancelled:
+		return nil
+	}
+
+	if err := e.sm.SetStatus(ctx, md.Identifier, enums.RunStatusFailed); err != nil {
+		return fmt.Errorf("error cancelling function: %w", err)
+	}
+
+	msg := with.Error()
+	if err := e.runFinishHandler(ctx, s.Identifier(), s, state.DriverResponse{
+		Err: &msg,
+	}); err != nil {
+		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+	}
+
+	for _, e := range e.lifecycles {
+		go e.OnFunctionFinished(
+			context.WithoutCancel(ctx),
+			md.Identifier,
+			queue.Item{
+				Identifier: s.Identifier(),
+			},
+			state.DriverResponse{
+				Err: &msg,
+			},
+			s,
+		)
+	}
+
+	return nil
+}
+
 // Cancel cancels an in-progress function.
 func (e *executor) Cancel(ctx context.Context, runID ulid.ULID, r execution.CancelRequest) error {
 	s, err := e.sm.Load(ctx, runID)

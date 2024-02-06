@@ -102,6 +102,8 @@ type Executor interface {
 	Cancel(ctx context.Context, runID ulid.ULID, r CancelRequest) error
 	// Resume resumes an in-progress function run from the given waitForEvent pause.
 	Resume(ctx context.Context, p state.Pause, r ResumeRequest) error
+	// Fail fails a functin with the given error.
+	Fail(ctx context.Context, runID ulid.ULID, err error) error
 
 	// AddLifecycleListener adds a lifecycle listener to run on hooks.  This must
 	// always add to a list of listeners vs replace listeners.
