@@ -234,9 +234,8 @@ const sectionTypeScriptReference = [
         href: `/docs/reference/functions/create`,
       },
       {
-        title: "Error handling & retries",
-        href: `/docs/functions/retries`,
-        // href: `/docs/reference/functions/error-handling`,
+        title: "Errors",
+        href: `/docs/reference/typescript/functions/errors`,
       },
       {
         title: "Handling failures",

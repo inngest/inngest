@@ -25,6 +25,7 @@ const permanentRedirects = [
   ["/docs/frameworks/redwoodjs", "/docs/sdk/serve#framework-redwood"],
   ["/docs/sdk/reference/serve", "/docs/reference/serve"],
   ["/docs/events/webhooks", "/docs/platform/webhooks"],
+  ["/docs/functions/retries", "/docs/reference/typescript/functions/errors"],
 
   // Other pages
   ["/uses/zero-infra-llm-ai", "/ai"],

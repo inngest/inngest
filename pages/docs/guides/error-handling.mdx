@@ -25,7 +25,9 @@ Let's look at how to use and configure these retries.
 
 ## Retries
 
-In a basic Inngest function, a default configuration of 4 retries will be set. For the function below, if the database write fails then it'll be retried up to 4 times until it succeeds or runs out of attempts.
+By default, in _addition_ to the **initial attempt**, Inngest will retry a function or a step up to 4 times until it succeeds. This means that for a function with a default configuration, it will be attempted 5 times in total.
+
+For the function below, if the database write fails then it'll be retried up to 4 times until it succeeds:
 
 <CodeGroup>
 ```ts {{ title: "TypeScript" }}
@@ -56,9 +58,7 @@ def record_click(ctx: inngest.Context) -> None:
 ```
 </CodeGroup>
 
-Notice that an `attempt` count is passed to the function, which is the zero-based attempt number for the current step. The first attempt will be `0`, the second `1`, and so on.  It is incremented every time the function throws an error and is retried, and is reset when steps complete.
-
-You can configure the number of retries by specifying it in your function configuration, including setting it to `0` to disable them:
+You can configure the number of `retries` by specifying it in your function configuration. Setting the value to `0` will disable retries.
 
 <CodeGroup>
 ```ts {{ title: "TypeScript" }}
@@ -68,7 +68,7 @@ inngest.createFunction(
     retries: 10, // choose how many retries you'd like
   },
   { event: "app/button.clicked" },
-  async () => { /* ... */ },
+  async ({ event, step, attempt }) => { /* ... */ },
 );
 ```
 ```go {{ title: "Go" }}
@@ -93,6 +93,10 @@ def click_recorder(ctx: inngest.Context) -> None:
     # ...
 ```
 </CodeGroup>
+
+You can customize the behavior of your function based on the number of retries using the `attempt` argument. `attempt` is passed in the function handler's context and is zero-indexed, meaning the first attempt is `0`, the second is `1`, and so on. The `attempt` is incremented every time the function throws an error and is retried, and is reset when steps complete. This allows you to handle attempt numbers differently in each step.
+
+Retries will be performed with backoff according to [the default schedule](https://github.com/inngest/inngest/blob/main/pkg/backoff/backoff.go#L10-L22).
 
 ## Steps
 
@@ -381,14 +385,16 @@ inngest.createFunction(
 ```
 </CodeGroup>
 
-## Non-retriable errors
+## Preventing retries with Non-retriable errors
 
-You can throw a non-retriable error from a step or a function, which will bypass any remaining retries and fail the step or function it was thrown from.
+You can throw a [non-retriable error](/docs/reference/typescript/functions/errors#non-retriable-error) from a step or a function, which will bypass any remaining retries and fail the step or function it was thrown from.
 
 This is useful for when you know an error is permanent and want to stop all execution. In this example, the user doesn't exist, so there's no need to continue to email them.
 
 <CodeGroup>
 ```ts {{ title: "TypeScript" }}
+import { NonRetriableError } from "inngest";
+
 inngest.createFunction(
   { id: "user-weekly-digest" },
   { event: "user/weekly-digest-requested" },
@@ -465,9 +471,11 @@ In this example, an external API provided `Retry-After` header with information 
 
 <CodeGroup>
 ```ts
+import { RetryAfterError } from 'inngest';
+
 inngest.createFunction(
   { id: "send-welcome-notification" },
-  { event: "user/signed-up" },
+  { event: "app/user.created" },
   async ({ event, step }) => {
     const { success, retryAfter } = await twilio.messages.create({
       to: event.data.user.phoneNumber,
@@ -507,4 +515,5 @@ inngestgo.CreateFunction(
 
 Check out some related resources to learn more about error handling in Inngest:
 
+* TypeScript SDK Reference: [Errors](/docs/reference/typescript/functions/errors)
 * TypeScript SDK Reference: [`onFailure`](/docs/reference/functions/handling-failures)
