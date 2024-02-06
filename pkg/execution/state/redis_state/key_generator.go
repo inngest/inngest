@@ -195,6 +195,9 @@ type QueueKeyGenerator interface {
 	// RunIndex returns the index for storing job IDs associated with run IDs.
 	RunIndex(runID ulid.ULID) string
 
+	// Status returns the key used for status queue for the provided function.
+	Status(status string, fnID uuid.UUID) string
+
 	// ***************** Deprecated ************************
 	BatchPointer(context.Context, uuid.UUID) string
 	Batch(context.Context, ulid.ULID) string
