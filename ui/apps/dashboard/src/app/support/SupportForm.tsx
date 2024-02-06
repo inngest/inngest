@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useOrganization, useUser } from '@clerk/nextjs';
 import { Button } from '@inngest/components/Button';
 import * as Sentry from '@sentry/nextjs';
 
@@ -44,6 +44,7 @@ export function SupportForm({
   const [isFetching, setIsFetching] = useState<boolean>(false);
   const [result, setResult] = useState<{ ok?: boolean; message?: string }>({});
   const { user, isSignedIn } = useUser();
+  const { organization } = useOrganization();
 
   const availableSeverityOptions = severityOptions.map((o) => ({
     ...o,
@@ -79,8 +80,11 @@ export function SupportForm({
       if (!isSignedIn) throw new Error('User must be signed in to create a support ticket.');
       if (!user.primaryEmailAddress) throw new Error('User must have a primary email address.');
       if (!user.externalId) throw new Error('User must have an external ID.');
-      if (!user.publicMetadata.accountID || typeof user.publicMetadata.accountID !== 'string') {
-        throw new Error('User is missing an account ID.');
+      if (
+        !organization?.publicMetadata.accountID ||
+        typeof organization.publicMetadata.accountID !== 'string'
+      ) {
+        throw new Error('Organization is missing an account ID.');
       }
 
       const reqBody: RequestBody = {
@@ -88,7 +92,7 @@ export function SupportForm({
           id: user.externalId,
           email: user.primaryEmailAddress.emailAddress,
           name: user.fullName ?? undefined,
-          accountId: user.publicMetadata.accountID,
+          accountId: organization.publicMetadata.accountID,
         },
         ticket: {
           type: ticketType,

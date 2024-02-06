@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
+import type { Route } from 'next';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import * as Sentry from '@sentry/nextjs';
 import { authExchange } from '@urql/exchange-auth';
@@ -14,6 +16,8 @@ import {
   fetchExchange,
   mapExchange,
 } from 'urql';
+
+import SignInRedirectErrors from '@/app/(auth)/sign-in/[[...sign-in]]/SignInRedirectErrors';
 
 /**
  * This is used to ensure that the URQL client is re-created (cache reset) whenever the user signs
@@ -29,7 +33,8 @@ export default function URQLProviderWrapper({ children }: { children: React.Reac
 }
 
 export function URQLProvider({ children }: { children: React.ReactNode }) {
-  const { getToken } = useAuth();
+  const { getToken, signOut } = useAuth();
+  const router = useRouter();
 
   const client = useMemo(() => {
     return createClient({
@@ -48,6 +53,13 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
             if (isUnauthenticatedError(error)) {
               // Log to Sentry if it still fails after trying to refresh the token and retrying the operation.
               Sentry.captureException(error);
+              signOut(() => {
+                router.push(
+                  `${process.env.NEXT_PUBLIC_SIGN_IN_PATH || '/sign-in'}?error=${
+                    SignInRedirectErrors.Unauthenticated
+                  }` as Route
+                );
+              });
             }
           },
         }),
@@ -73,7 +85,7 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
         fetchExchange,
       ],
     });
-  }, [getToken]);
+  }, [getToken, router, signOut]);
 
   return <Provider value={client}>{children}</Provider>;
 }

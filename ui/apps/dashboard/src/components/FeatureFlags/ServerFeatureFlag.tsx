@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from 'react';
-import { currentUser } from '@clerk/nextjs';
+import { auth, currentUser } from '@clerk/nextjs';
 import * as Sentry from '@sentry/nextjs';
 
 import { getLaunchDarklyClient } from '@/launchDarkly';
@@ -24,19 +24,21 @@ export async function getBooleanFlag(
   { defaultValue = false }: { defaultValue?: boolean } = {}
 ): Promise<boolean> {
   const user = await currentUser();
+  const { organization } = auth();
 
   try {
     const client = await getLaunchDarklyClient();
 
     const accountID =
-      user?.publicMetadata.accountID && typeof user.publicMetadata.accountID === 'string'
-        ? user.publicMetadata.accountID
+      organization?.publicMetadata?.accountID &&
+      typeof organization.publicMetadata.accountID === 'string'
+        ? organization.publicMetadata.accountID
         : 'Unknown';
 
     const context = {
       account: {
         key: accountID,
-        name: 'Unknown', // TODO: Add account name whenever we have adopted Clerk Organizations
+        name: organization?.name ?? 'Unknown',
       },
       kind: 'multi',
       user: {

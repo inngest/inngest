@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@clerk/nextjs';
+import { useOrganization, useUser } from '@clerk/nextjs';
 import {
   ArrowUturnRightIcon,
   CodeBracketSquareIcon,
@@ -67,6 +67,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
   const [isDebouncing, setIsDebouncing] = useState(false);
   const router = useRouter();
   const { user } = useUser();
+  const { organization } = useOrganization();
   let searchResult = {
     type: '',
     href: '',
@@ -88,7 +89,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
   }, [search]);
 
   useEffect(() => {
-    if (debouncedSearch && user) {
+    if (debouncedSearch && user && organization) {
       window.inngest.send({
         name: 'app/global.id.searched',
         data: {
@@ -102,9 +103,9 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
           external_id: user.externalId,
           email: user.primaryEmailAddress?.emailAddress,
           name: user.fullName,
-          account_id: user.publicMetadata.accountID,
+          account_id: organization.publicMetadata.accountID,
         },
-        v: '2023-05-17.1',
+        v: '2024-02-06.1',
       });
     }
   }, [debouncedSearch, user]);

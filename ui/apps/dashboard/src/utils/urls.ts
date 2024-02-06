@@ -39,6 +39,15 @@ export const pathCreator = {
   apps({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/apps` as Route;
   },
+  app({ envSlug, externalAppID }: { envSlug: string; externalAppID: string }): Route {
+    return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}` as Route;
+  },
+  appSyncs({ envSlug, externalAppID }: { envSlug: string; externalAppID: string }): Route {
+    return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}/syncs` as Route;
+  },
+  createApp({ envSlug }: { envSlug: string }): Route {
+    return `/env/${envSlug}/apps/sync-new` as Route;
+  },
   deploys({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/deploys` as Route;
   },
@@ -62,5 +71,8 @@ export const pathCreator = {
   },
   keys({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/manage/keys` as Route;
+  },
+  unattachedSyncs({ envSlug }: { envSlug: string }): Route {
+    return `/env/${envSlug}/unattached-syncs` as Route;
   },
 };
