@@ -1908,6 +1908,14 @@ func (q *queue) renewShardLease(ctx context.Context, shard *QueueShard, duration
 	}
 }
 
+func (q *queue) getShardLeases() []leasedShard {
+	var existingLeases []leasedShard
+	q.shardLeaseLock.Lock()
+	_ = copy(q.shardLeases, existingLeases)
+	q.shardLeaseLock.Unlock()
+	return existingLeases
+}
+
 func HashID(ctx context.Context, id string) string {
 	ui := xxhash.Sum64String(id)
 	return strconv.FormatUint(ui, 36)

@@ -302,7 +302,10 @@ func (q *queue) claimShards(ctx context.Context) {
 				}
 			}()
 		case <-leaseTick.C:
-			for _, s := range q.shardLeases {
+			// Copy the slice to prevent locking/concurrent access.
+			existingLeases := q.getShardLeases()
+
+			for _, s := range existingLeases {
 				// Attempt to lease all ASAP, even if the backing store is single threaded.
 				go func(ls leasedShard) {
 					nextLeaseID, err := q.renewShardLease(ctx, &ls.Shard, ShardLeaseTime, ls.Lease)
@@ -403,7 +406,9 @@ func (q *queue) filterShards(ctx context.Context, shards map[string]*QueueShard)
 		return nil, nil
 	}
 
-	for _, v := range q.shardLeases {
+	// Copy the slice to prevent locking/concurrent access.
+
+	for _, v := range q.getShardLeases() {
 		delete(shards, v.Shard.Name)
 	}
 
@@ -600,12 +605,12 @@ func (q *queue) scan(ctx context.Context) error {
 
 	// If this worker has leased shards, those take priority 95% of the time.  There's a 5% chance that the
 	// worker still works on the global queue.
-	if len(q.shardLeases) > 0 && rand.Intn(100) >= 5 {
+	existingLeases := q.getShardLeases()
+
+	if len(existingLeases) > 0 && rand.Intn(100) >= 5 {
 		// Pick a random item between the shards.
-		q.shardLeaseLock.Lock()
-		i := rand.Intn(len(q.shardLeases))
-		shard = &q.shardLeases[i].Shard
-		q.shardLeaseLock.Unlock()
+		i := rand.Intn(len(existingLeases))
+		shard = &existingLeases[i].Shard
 		// Use the shard partition
 		partitionKey = q.kg.ShardPartitionIndex(shard.Name)
 	}
