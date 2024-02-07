@@ -67,7 +67,7 @@ type GaugeOpt struct {
 	Callback    GaugeCallback
 }
 
-type GaugeCallback func(context.Context, metric.Int64Observer) error
+type GaugeCallback func(ctx context.Context) (int64, error)
 
 // RecordGaugeMetric records the gauge value via a callback.
 // The callback needs to be passed in so it doesn't get captured as a closure when instrumenting the value
@@ -83,12 +83,22 @@ func RecordGaugeMetric(ctx context.Context, opts GaugeOpt) {
 		attrs = append(attrs, parseAttributes(opts.Attributes)...)
 	}
 
+	observe := func(ctx context.Context, o metric.Int64Observer) error {
+		value, err := opts.Callback(ctx)
+		if err != nil {
+			return err
+		}
+		o.Observe(value, metric.WithAttributes(attrs...))
+
+		return nil
+	}
+
 	if _, err := meter.
 		Int64ObservableGauge(
 			fmt.Sprintf("%s_%s", prefix, opts.MetricName),
 			metric.WithDescription(opts.Name),
 			metric.WithUnit(opts.Unit),
-			metric.WithInt64Callback(metric.Int64Callback(opts.Callback)),
+			metric.WithInt64Callback(observe),
 		); err != nil {
 		log.From(ctx).Error().Err(err).Msg(fmt.Sprintf("error for meter: %s", opts.MetricName))
 		return
