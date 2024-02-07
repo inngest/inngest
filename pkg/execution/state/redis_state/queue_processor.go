@@ -1149,7 +1149,7 @@ func (q *queue) shardGauges(ctx context.Context) {
 
 	// Report gauges to otel.
 	_, _ = q.meter.Int64ObservableGauge(
-		"queue_shards_count",
+		"inngest_queue_shards_count",
 		metric.WithDescription("Number of shards in the queue"),
 		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
 			o.Observe(int64(len(shards)))
@@ -1157,7 +1157,7 @@ func (q *queue) shardGauges(ctx context.Context) {
 		}),
 	)
 	_, _ = q.meter.Int64ObservableGauge(
-		"queue_shards_guaranteed_capacity_count",
+		"inngest_queue_shards_guaranteed_capacity_count",
 		metric.WithDescription("Shard guaranteed capacity, by shard name"),
 		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
 			for _, shard := range shards {
@@ -1169,7 +1169,7 @@ func (q *queue) shardGauges(ctx context.Context) {
 		}),
 	)
 	_, _ = q.meter.Int64ObservableGauge(
-		"queue_shards_lease_count",
+		"inngest_queue_shards_lease_count",
 		metric.WithDescription("Shard current lease count, by shard name"),
 		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
 			for _, shard := range shards {

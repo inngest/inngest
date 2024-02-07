@@ -58,8 +58,8 @@ if shard ~= "" and shard ~= "null" then
     -- item, then write the updated value.
     local existingShard = redis.call("HGET", shardMapKey, shardName)
     if existingShard ~= nil and existingShard ~= false then
-	local updatedShard = cjson.decode(shard)
-	existingShard = cjson.decode(existingShard)
+        local updatedShard = cjson.decode(shard)
+        existingShard = cjson.decode(existingShard)
         updatedShard.leases = existingShard.leases
         shard = cjson.encode(updatedShard)
     end
