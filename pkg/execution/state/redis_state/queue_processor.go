@@ -17,6 +17,7 @@ import (
 	"github.com/uber-go/tally/v4"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
 	"go.opentelemetry.io/otel/trace"
@@ -240,15 +241,19 @@ LOOP:
 
 func (q *queue) claimShards(ctx context.Context) {
 	if q.sf == nil {
+		// TODO: Inspect denylists and whether this worker is capable of leasing
+		// shards.  Note that shards should only be created for SDK-based workers;
+		// if you use the queue for anything else other than step jobs, the worker
+		// cannot lease jobs.  To this point, we should make this opt-in instead of
+		// opt-out to prevent errors.
+		//
+		// For now, you have to provide a shardFinder to lease shards.
 		q.logger.Info().Msg("no shard finder;  skipping shard claiming")
 		return
 	}
 
-	// TODO: Inspect denylists and whehter this worker is capable of leasing
-	// shards.  Note that shards should only be created for SDK-based workers;
-	// if you use the queue for anything else other than step jobs, the worker
-	// cannot lease jobs.  To this point, we should make this opt-in instead of
-	// opt-out to prevent errors.
+	// Report shard gauge metrics.
+	go q.shardGauges(ctx)
 
 	scanTick := time.NewTicker(ShardTickTime)
 	leaseTick := time.NewTicker(ShardLeaseTime / 2)
@@ -323,19 +328,6 @@ func (q *queue) scanShards(ctx context.Context) (retry bool, err error) {
 		q.logger.Error().Err(err).Msg("error filtering shards")
 		return
 	}
-
-	go func() {
-		// Add shard metrics.
-		q.meter.Int64ObservableGauge("queue_shards_total", len(shards), nil)
-		for _, shard := range shardMap {
-			q.gauge(ctx, "queue_shard_guaranteed_capacity_total", int(shard.GuaranteedCapacity), map[string]any{
-				"shard_name": shard.Name,
-			})
-			q.gauge(ctx, "queue_shard_leases_total", len(shard.Leases), map[string]any{
-				"shard_name": shard.Name,
-			})
-		}
-	}()
 
 	if len(shards) == 0 {
 		return
@@ -1112,6 +1104,61 @@ func (q *queue) isScavenger() bool {
 		return false
 	}
 	return ulid.Time(l.Time()).After(time.Now())
+}
+
+// shardGauges reports shard gauges via otel.
+func (q *queue) shardGauges(ctx context.Context) {
+	var (
+		shards map[string]*QueueShard
+		err    error
+	)
+	go func() {
+		tick := time.NewTicker(ShardTickTime)
+		for {
+			select {
+			case <-ctx.Done():
+				tick.Stop()
+				return
+			case <-tick.C:
+				// Reload shards.
+				shards, err = q.getShards(ctx)
+			}
+		}
+	}()
+
+	// Report gauges to otel.
+	_, _ = q.meter.Int64ObservableGauge(
+		"queue_shards_count",
+		metric.WithDescription("Number of shards in the queue"),
+		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
+			o.Observe(int64(len(shards)))
+			return err
+		}),
+	)
+	_, _ = q.meter.Int64ObservableGauge(
+		"queue_shards_guaranteed_capacity_count",
+		metric.WithDescription("Shard guaranteed capacity, by shard name"),
+		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
+			for _, shard := range shards {
+				o.Observe(int64(shard.GuaranteedCapacity), metric.WithAttributes(
+					attribute.KeyValue{Key: attribute.Key("shard_name"), Value: attribute.StringValue(shard.Name)},
+				))
+			}
+			return err
+		}),
+	)
+	_, _ = q.meter.Int64ObservableGauge(
+		"queue_shards_lease_count",
+		metric.WithDescription("Shard current lease count, by shard name"),
+		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
+			for _, shard := range shards {
+				o.Observe(int64(len(shard.Leases)), metric.WithAttributes(
+					attribute.KeyValue{Key: attribute.Key("shard_name"), Value: attribute.StringValue(shard.Name)},
+				))
+			}
+			return err
+		}),
+	)
 }
 
 // trackingSemaphore returns a semaphore that tracks closely - but not atomically -

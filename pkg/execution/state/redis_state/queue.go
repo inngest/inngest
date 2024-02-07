@@ -1907,10 +1907,6 @@ func (q *queue) renewShardLease(ctx context.Context, shard *QueueShard, duration
 	}
 }
 
-func (q *queue) gauge(ctx context.Context, name string, val int64, tags map[string]any) {
-	if gauge, err := q.meter.Int64ObservableGauge(name); err == nil {
-	}
-}
 func HashID(ctx context.Context, id string) string {
 	ui := xxhash.Sum64String(id)
 	return strconv.FormatUint(ui, 36)
