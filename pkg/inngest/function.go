@@ -139,6 +139,13 @@ func (f Function) IsScheduled() bool {
 	return false
 }
 
+func (f Function) IsBatchEnabled() bool {
+	if f.EventBatch == nil {
+		return false
+	}
+	return f.EventBatch.IsEnabled()
+}
+
 // Validate returns an error if the function definition is invalid.
 func (f Function) Validate(ctx context.Context) error {
 	var err error

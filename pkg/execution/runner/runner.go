@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
@@ -79,6 +80,12 @@ func WithRunnerQueue(q queue.Queue) func(s *svc) {
 	}
 }
 
+func WithBatchManager(b batch.BatchManager) func(s *svc) {
+	return func(s *svc) {
+		s.batcher = b
+	}
+}
+
 func WithRateLimiter(rl ratelimit.RateLimiter) func(s *svc) {
 	return func(s *svc) {
 		s.rl = rl
@@ -116,6 +123,8 @@ type svc struct {
 	state state.Manager
 	// queue allows the scheduling of new functions.
 	queue queue.Queue
+	// batcher handles batch operations
+	batcher batch.BatchManager
 	// rl rate-limits functions.
 	rl ratelimit.RateLimiter
 	// cronmanager allows the creation of new scheduled functions.
@@ -494,6 +503,76 @@ func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 }
 
 func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.TrackedEvent) error {
+	if fn.IsBatchEnabled() {
+		bi := batch.BatchItem{
+			WorkspaceID:     evt.GetWorkspaceID(),
+			FunctionID:      fn.ID,
+			FunctionVersion: fn.FunctionVersion,
+			EventID:         evt.GetInternalID(),
+			Event:           evt.GetEvent(),
+		}
+		result, err := s.batcher.Append(ctx, bi, fn)
+		if err != nil {
+			return err
+		}
+
+		switch result.Status {
+		case 0: // appended
+			// noop
+		case 1: // new batch
+			dur, err := time.ParseDuration(fn.EventBatch.Timeout)
+			if err != nil {
+				return err
+			}
+			at := time.Now().Add(dur)
+
+			if err := s.batcher.ScheduleExecution(ctx, batch.ScheduleBatchOpts{
+				BatchID:         ulid.MustParse(result.BatchID),
+				AccountID:       bi.AccountID,
+				WorkspaceID:     bi.WorkspaceID,
+				AppID:           bi.AppID,
+				FunctionID:      bi.FunctionID,
+				FunctionVersion: bi.FunctionVersion,
+				At:              at,
+			}); err != nil {
+				return err
+			}
+		case 2: // batch is full
+			// start execution immediately
+			batchID := ulid.MustParse(result.BatchID)
+			evtList, err := s.batcher.RetrieveItems(ctx, batchID)
+			if err != nil {
+				return err
+			}
+
+			events := []event.TrackedEvent{}
+			for _, e := range evtList {
+				events = append(events, e)
+			}
+
+			key := fmt.Sprintf("%s-%s", fn.ID, batchID)
+			if _, err := s.executor.Schedule(ctx, execution.ScheduleRequest{
+				AccountID:      bi.AccountID,
+				WorkspaceID:    bi.WorkspaceID,
+				AppID:          bi.AppID,
+				Function:       fn,
+				Events:         events,
+				BatchID:        &batchID,
+				IdempotencyKey: &key,
+			}); err != nil {
+				return err
+			}
+
+			if err := s.batcher.ExpireKeys(ctx, batchID); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("invalid status of batch append ops: %d", result.Status)
+		}
+
+		return nil
+	}
+
 	// Attempt to rate-limit the incoming function.
 	if s.rl != nil && fn.RateLimit != nil {
 		key, err := ratelimit.RateLimitKey(ctx, fn.ID, *fn.RateLimit, evt.GetEvent().Map())

@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/cancellation"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
@@ -179,6 +180,13 @@ func WithDebouncer(d debounce.Debouncer) ExecutorOpt {
 	}
 }
 
+func WithBatcher(b batch.BatchManager) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).batcher = b
+		return nil
+	}
+}
+
 // WithEvaluatorFactory allows customizing of the expression evaluator factory function.
 func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.Evaluator, error)) ExecutorOpt {
 	return func(e execution.Executor) error {
@@ -217,6 +225,7 @@ type executor struct {
 	sm                    state.Manager
 	queue                 queue.Queue
 	debouncer             debounce.Debouncer
+	batcher               batch.BatchManager
 	fl                    state.FunctionLoader
 	evalFactory           func(ctx context.Context, expr string) (expressions.Evaluator, error)
 	runtimeDrivers        map[string]driver.Driver
