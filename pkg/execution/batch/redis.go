@@ -46,8 +46,8 @@ type redisBatchManager struct {
 //  3. Neither #1 or #2
 //     No-op
 func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.Function) (*BatchAppendResult, error) {
-	batchConfig := fn.EventBatch
-	if batchConfig == nil {
+	config := fn.EventBatch
+	if config == nil {
 		// TODO: this should not happen, report this to sentry or logs
 		return nil, fmt.Errorf("no batch config found for for function: %s", fn.Slug)
 	}
@@ -60,7 +60,7 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 	// script args
 	newULID := ulid.MustNew(uint64(time.Now().UnixMilli()), rand.Reader)
 	args, err := redis_state.StrSlice([]any{
-		batchConfig.MaxSize,
+		config.MaxSize,
 		bi.GetEvent(), // NOTE
 		newULID,
 		b.k.QueuePrefix(),

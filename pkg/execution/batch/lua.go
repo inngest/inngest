@@ -54,7 +54,7 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 		if len(items) > 0 {
 			// Replace each include
 			for _, include := range items {
-				byt, err = embedded.ReadFile(fmt.Sprintf("lua/includes/%s", include[1]))
+				byt, err = embedded.ReadFile(fmt.Sprintf("lua/%s", include[1]))
 				if err != nil {
 					panic(fmt.Errorf("error reading redis lua include: %w", err))
 				}
@@ -63,6 +63,4 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 		}
 		scripts[name] = rueidis.NewLuaScript(val)
 	}
-
-	fmt.Printf("Script: %#v\n", scripts)
 }

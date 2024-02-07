@@ -247,6 +247,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithRunnerQueue(queue),
 		runner.WithTracker(t),
 		runner.WithRateLimiter(rl),
+		runner.WithBatchManager(batcher),
 	)
 
 	// The devserver embeds the event API.
