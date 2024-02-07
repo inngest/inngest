@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
@@ -238,6 +239,11 @@ LOOP:
 }
 
 func (q *queue) claimShards(ctx context.Context) {
+	if q.sf == nil {
+		q.logger.Info().Msg("no shard finder;  skipping shard claiming")
+		return
+	}
+
 	// TODO: Inspect denylists and whehter this worker is capable of leasing
 	// shards.  Note that shards should only be created for SDK-based workers;
 	// if you use the queue for anything else other than step jobs, the worker
@@ -278,6 +284,9 @@ func (q *queue) claimShards(ctx context.Context) {
 						q.logger.Error().Err(err).Msg("error scanning and leasing shards")
 						return
 					}
+					if retry {
+						<-time.After(time.Duration(rand.Intn(20)) * time.Millisecond)
+					}
 				}
 			}()
 		case <-leaseTick.C:
@@ -304,7 +313,6 @@ func (q *queue) scanShards(ctx context.Context) (retry bool, err error) {
 	//       Fetch this information, and correctly assign workers to shard maps
 	//       based on the distribution of items in the queue here.  This lets
 	//       us oversubscribe appropriately.
-
 	shardMap, err := q.getShards(ctx)
 	if err != nil {
 		q.logger.Error().Err(err).Msg("error fetching shards")
@@ -315,6 +323,20 @@ func (q *queue) scanShards(ctx context.Context) (retry bool, err error) {
 		q.logger.Error().Err(err).Msg("error filtering shards")
 		return
 	}
+
+	go func() {
+		// Add shard metrics.
+		q.meter.Int64ObservableGauge("queue_shards_total", len(shards), nil)
+		for _, shard := range shardMap {
+			q.gauge(ctx, "queue_shard_guaranteed_capacity_total", int(shard.GuaranteedCapacity), map[string]any{
+				"shard_name": shard.Name,
+			})
+			q.gauge(ctx, "queue_shard_leases_total", len(shard.Leases), map[string]any{
+				"shard_name": shard.Name,
+			})
+		}
+	}()
+
 	if len(shards) == 0 {
 		return
 	}
@@ -322,8 +344,15 @@ func (q *queue) scanShards(ctx context.Context) (retry bool, err error) {
 	for _, shard := range shards {
 		leaseID, err := q.leaseShard(ctx, shard, ShardLeaseTime, len(shard.Leases))
 		if err == nil {
+			// go q.counter(ctx, "queue_shard_lease_success_total", 1, map[string]any{
+			// 	"shard_name": shard.Name,
+			// })
 			q.addLeasedShard(ctx, shard, *leaseID)
 		}
+		// go q.counter(ctx, "queue_shard_lease_conflict_total", 1, map[string]any{
+		// 	"shard_name": shard.Name,
+		// })
+
 		switch err {
 		case errShardNotFound:
 			// This is okay;  the shard was removed when trying to lease
@@ -390,6 +419,10 @@ func (q *queue) filterShards(ctx context.Context, shards map[string]*QueueShard)
 		shuffleIdx = append(shuffleIdx, v)
 	}
 
+	if len(shuffleIdx) == 1 {
+		return shuffleIdx, nil
+	}
+
 	// Reduce the likelihood of all workers attempting to claim shards by
 	// randomly shuffling.  Note that high priority shards will still be
 	// likely to come first with some contention.
@@ -397,8 +430,8 @@ func (q *queue) filterShards(ctx context.Context, shards map[string]*QueueShard)
 	result := make([]*QueueShard, len(weights))
 	for n := range result {
 		idx, ok := w.Take()
-		if !ok {
-			return nil, ErrWeightedSampleRead
+		if !ok && len(result) < len(weights)-1 {
+			return result, ErrWeightedSampleRead
 		}
 		result[n] = shuffleIdx[idx]
 	}
@@ -559,8 +592,23 @@ func (q *queue) scan(ctx context.Context) error {
 		return nil
 	}
 
+	// By default, use the global partition
+	partitionKey := q.kg.GlobalPartitionIndex()
+
+	// If this worker has leased shards, those take priority 95% of the time.  There's a 5% chance that the
+	// worker still works on the global queue.
+	if len(q.shardLeases) > 0 && rand.Intn(100) >= 5 {
+		// Pick a random item between the shards.
+		i := rand.Intn(len(q.shardLeases))
+		q.shardLeaseLock.Lock()
+		leasedShard := q.shardLeases[i]
+		q.shardLeaseLock.Unlock()
+		// Use the shard partition
+		partitionKey = q.kg.ShardPartitionIndex(leasedShard.Shard.Name)
+	}
+
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
-	partitions, err := q.PartitionPeek(ctx, q.isSequential(), time.Now().Add(time.Second), PartitionPeekMax)
+	partitions, err := q.partitionPeek(ctx, partitionKey, q.isSequential(), time.Now().Add(time.Second), PartitionPeekMax)
 	if err != nil {
 		return err
 	}

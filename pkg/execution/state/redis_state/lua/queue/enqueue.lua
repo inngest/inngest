@@ -56,8 +56,13 @@ if shard ~= "" and shard ~= "null" then
     -- NOTE: We do not want to overwrite the shard leases, so here
     -- we fetch the shard item, set the lease values in the passed in shard
     -- item, then write the updated value.
-    --
-    -- TODO: LEASES ???
+    local existingShard = redis.call("HGET", shardMapKey, shardName)
+    if existingShard ~= nil and existingShard ~= false then
+	local updatedShard = cjson.decode(shard)
+	existingShard = cjson.decode(existingShard)
+        updatedShard.leases = existingShard.leases
+        shard = cjson.encode(updatedShard)
+    end
     redis.call("HSET", shardMapKey, shardName, shard)
 end
 
