@@ -136,7 +136,7 @@ export default async function AppNavigation({ environmentSlug }: AppNavigationPr
           ))}
         </Navigation>
       </div>
-      <div className="flex items-center">
+      <div className="flex h-full items-center">
         <SearchNavigation />
         <OrganizationDropdown />
         <AccountDropdown />
