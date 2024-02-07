@@ -23,15 +23,16 @@ func env() string {
 type CounterOpt struct {
 	Name        string
 	Description string
+	Meter       metric.Meter
 	MetricName  string
 	Attributes  map[string]any
-	Meter       metric.Meter
+	Unit        string
 }
 
 // RecordCounterMetric increments the counter by the provided value.
 // The meter used can either be passed in or is the global meter
 func RecordCounterMetric(ctx context.Context, incr int64, opts CounterOpt) {
-	attrs := make([]attribute.KeyValue, 0)
+	attrs := []attribute.KeyValue{}
 	if opts.Attributes != nil {
 		attrs = append(attrs, parseAttributes(opts.Attributes)...)
 	}
@@ -46,6 +47,7 @@ func RecordCounterMetric(ctx context.Context, incr int64, opts CounterOpt) {
 		Int64Counter(
 			fmt.Sprintf("%s_%s", prefix, opts.MetricName),
 			metric.WithDescription(opts.Description),
+			metric.WithUnit(opts.Unit),
 		)
 	if err != nil {
 		log.From(ctx).Error().Err(err).Msg(fmt.Sprintf("error for meter: %s", opts.MetricName))
@@ -55,19 +57,58 @@ func RecordCounterMetric(ctx context.Context, incr int64, opts CounterOpt) {
 	c.Add(ctx, incr, metric.WithAttributes(attrs...))
 }
 
+type GaugeOpt struct {
+	Name        string
+	Description string
+	MetricName  string
+	Meter       metric.Meter
+	Attributes  map[string]any
+	Unit        string
+	Callback    GaugeCallback
+}
+
+type GaugeCallback func(context.Context, metric.Int64Observer) error
+
+// RecordGaugeMetric records the gauge value via a callback.
+// The callback needs to be passed in so it doesn't get captured as a closure when instrumenting the value
+func RecordGaugeMetric(ctx context.Context, opts GaugeOpt) {
+	// use the global one by default
+	meter := otel.Meter(opts.Name)
+	if opts.Meter != nil {
+		meter = opts.Meter
+	}
+
+	attrs := []attribute.KeyValue{}
+	if opts.Attributes != nil {
+		attrs = append(attrs, parseAttributes(opts.Attributes)...)
+	}
+
+	if _, err := meter.
+		Int64ObservableGauge(
+			fmt.Sprintf("%s_%s", prefix, opts.MetricName),
+			metric.WithDescription(opts.Name),
+			metric.WithUnit(opts.Unit),
+			metric.WithInt64Callback(metric.Int64Callback(opts.Callback)),
+		); err != nil {
+		log.From(ctx).Error().Err(err).Msg(fmt.Sprintf("error for meter: %s", opts.MetricName))
+		return
+	}
+}
+
 type HistogramOpt struct {
 	Name        string
 	Description string
 	Meter       metric.Meter
 	MetricName  string
 	Attributes  map[string]any
-	Boundaries  []float64
 	Unit        string
+	Boundaries  []float64
 }
 
 // RecordIntHistogramMetric records the observed value for distributions.
 // Bucket can be provided
 func RecordIntHistogramMetric(ctx context.Context, value int64, opts HistogramOpt) {
+	// use the global one by default
 	meter := otel.Meter(opts.Name)
 	if opts.Meter != nil {
 		meter = opts.Meter
@@ -86,13 +127,14 @@ func RecordIntHistogramMetric(ctx context.Context, value int64, opts HistogramOp
 		return
 	}
 
-	attrs := make([]attribute.KeyValue, 0)
+	attrs := []attribute.KeyValue{}
 	if opts.Attributes != nil {
 		attrs = append(attrs, parseAttributes(opts.Attributes)...)
 	}
 	h.Record(ctx, value, metric.WithAttributes(attrs...))
 }
 
+// parseAttributes parses the attribute map into otel compatible attributes
 func parseAttributes(attrs map[string]any) []attribute.KeyValue {
 	result := make([]attribute.KeyValue, 0)
 
