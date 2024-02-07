@@ -10,6 +10,7 @@ import {
 import { Badge } from '@inngest/components/Badge';
 
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import OrganizationDropdown from '@/components/Navigation/OrganizationDropdown';
 import { graphql } from '@/gql';
 import InngestLogo from '@/icons/InngestLogo';
 import EventIcon from '@/icons/event.svg';
@@ -137,6 +138,7 @@ export default async function AppNavigation({ environmentSlug }: AppNavigationPr
       </div>
       <div className="flex items-center">
         <SearchNavigation />
+        <OrganizationDropdown />
         <AccountDropdown />
       </div>
     </nav>
