@@ -10,8 +10,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -60,6 +62,12 @@ func WithServiceDebouncer(d debounce.Debouncer) func(s *svc) {
 	}
 }
 
+func WithServiceBatcher(b batch.BatchManager) func(s *svc) {
+	return func(s *svc) {
+		s.batcher = b
+	}
+}
+
 func NewService(c config.Config, opts ...Opt) service.Service {
 	svc := &svc{config: c}
 	for _, o := range opts {
@@ -79,6 +87,7 @@ type svc struct {
 	// exec runs the specific actions.
 	exec      execution.Executor
 	debouncer debounce.Debouncer
+	batcher   batch.BatchManager
 
 	wg sync.WaitGroup
 
@@ -196,7 +205,8 @@ func (s *svc) Run(ctx context.Context) error {
 					_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID)
 				}
 			}
-
+		case queue.KindScheduleBatch:
+			err = s.handleScheduledBatch(ctx, item)
 		default:
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
@@ -296,4 +306,58 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	}
 
 	return s.exec.Resume(ctx, *pause, execution.ResumeRequest{})
+}
+
+// handleScheduledBatch checks for
+func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
+	opts := batch.ScheduleBatchOpts{}
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &opts); err != nil {
+		return err
+	}
+
+	batchID := opts.BatchID
+	status, err := s.batcher.StartExecution(ctx, opts.FunctionID, batchID)
+	if err != nil {
+		return err
+	}
+	if status == enums.BatchStatusStarted.String() {
+		// batch already started, abort
+		return nil
+	}
+
+	// convert batch items to tracked events
+	items, err := s.batcher.RetrieveItems(ctx, batchID)
+	if err != nil {
+		return err
+	}
+	events := make([]event.TrackedEvent, len(items))
+	for i, item := range items {
+		events[i] = item
+	}
+
+	// start execution
+	id := fmt.Sprintf("%s-%s", opts.FunctionID, batchID)
+	runID, err := s.exec.Schedule(ctx, execution.ScheduleRequest{
+		// TODO: Fn
+		AccountID:      opts.AccountID,
+		WorkspaceID:    opts.WorkspaceID,
+		AppID:          opts.AppID,
+		Events:         events,
+		BatchID:        &batchID,
+		IdempotencyKey: &id,
+		StaticVersion:  false,
+	})
+	if err != nil {
+		return err
+	}
+	if runID == nil {
+		// Throttled or exists
+		return nil
+	}
+
+	if err := s.batcher.ExpireKeys(ctx, batchID); err != nil {
+		return err
+	}
+
+	return nil
 }

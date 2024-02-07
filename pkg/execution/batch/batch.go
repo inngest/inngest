@@ -40,11 +40,16 @@ type BatchManager interface {
 type BatchItem struct {
 	AccountID       uuid.UUID   `json:"acctID"`
 	WorkspaceID     uuid.UUID   `json:"wsID"`
+	AppID           uuid.UUID   `json:"appID"`
 	FunctionID      uuid.UUID   `json:"fnID"`
 	FunctionVersion int         `json:"fnV"`
 	EventID         ulid.ULID   `json:"evtID"`
 	Event           event.Event `json:"evt"`
 	Version         int         `json:"v"`
+}
+
+func (b BatchItem) GetWorkspaceID() uuid.UUID {
+	return b.WorkspaceID
 }
 
 func (b BatchItem) GetInternalID() ulid.ULID {
@@ -69,6 +74,7 @@ type ScheduleBatchOpts struct {
 	BatchID         ulid.ULID `json:"batchID"`
 	AccountID       uuid.UUID `json:"acctID"`
 	WorkspaceID     uuid.UUID `json:"wsID"`
+	AppID           uuid.UUID `json:"appID"`
 	FunctionID      uuid.UUID `json:"fnID"`
 	FunctionVersion int       `json:"fnV"`
 	At              time.Time `json:"at"`
@@ -78,6 +84,7 @@ type ScheduleBatchPayload struct {
 	BatchID         ulid.ULID `json:"batchID"`
 	AccountID       uuid.UUID `json:"acctID"`
 	WorkspaceID     uuid.UUID `json:"wsID"`
+	AppID           uuid.UUID `json:"appID"`
 	FunctionID      uuid.UUID `json:"fnID"`
 	FunctionVersion int       `json:"fnV"`
 }
