@@ -61,7 +61,7 @@ export default function CreateEnvironment({}) {
             within each environment.
           </li>
           <li>
-            You can deploy multiple apps to the same environment to fully simulate your production
+            You can sync multiple apps to the same environment to fully simulate your production
             environment.
           </li>
           <li>You can create as many environments as you need.</li>
