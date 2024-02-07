@@ -55,6 +55,44 @@ func RecordCounterMetric(ctx context.Context, incr int64, opts CounterOpt) {
 	c.Add(ctx, incr, metric.WithAttributes(attrs...))
 }
 
+type HistogramOpt struct {
+	Name        string
+	Description string
+	Meter       metric.Meter
+	MetricName  string
+	Attributes  map[string]any
+	Boundaries  []float64
+	Unit        string
+}
+
+// RecordIntHistogramMetric records the observed value for distributions.
+// Bucket can be provided
+func RecordIntHistogramMetric(ctx context.Context, value int64, opts HistogramOpt) {
+	meter := otel.Meter(opts.Name)
+	if opts.Meter != nil {
+		meter = opts.Meter
+	}
+
+	h, err := meter.
+		Int64Histogram(
+			fmt.Sprintf("%s_%s", prefix, opts.MetricName),
+			metric.WithDescription(opts.Description),
+			metric.WithUnit(opts.Unit),
+			metric.WithExplicitBucketBoundaries(opts.Boundaries...),
+		)
+
+	if err != nil {
+		log.From(ctx).Err(err).Msg(fmt.Sprintf("error for meter: %s", opts.MetricName))
+		return
+	}
+
+	attrs := make([]attribute.KeyValue, 0)
+	if opts.Attributes != nil {
+		attrs = append(attrs, parseAttributes(opts.Attributes)...)
+	}
+	h.Record(ctx, value, metric.WithAttributes(attrs...))
+}
+
 func parseAttributes(attrs map[string]any) []attribute.KeyValue {
 	result := make([]attribute.KeyValue, 0)
 
