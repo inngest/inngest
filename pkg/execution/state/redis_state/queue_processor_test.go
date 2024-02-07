@@ -275,13 +275,29 @@ func TestQueueRunExtended(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	defer rc.Close()
+	// In this test, shards must be leased rapidly, as we randomly close and terminate workers
+	// after a minimum of 10 seconds.
+	ShardTickTime = 5 * time.Second
+	ShardLeaseTime = 5 * time.Second
+
+	sf := func(ctx context.Context, wsID uuid.UUID) *QueueShard {
+		// For nil UUIDs, return a shard.
+		if wsID == uuid.Nil {
+			return &QueueShard{
+				Name:               "test-shard",
+				GuaranteedCapacity: 1,
+			}
+		}
+		return nil
+	}
+
 	q := NewQueue(
 		rc,
 		// We can't add more than 8128 goroutines when detecting race conditions,
 		// so lower the number of workers.
 		WithNumWorkers(200),
 		WithLogger(&l),
+		WithShardFinder(sf),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -309,6 +325,7 @@ func TestQueueRunExtended(t *testing.T) {
 					// so lower the number of workers.
 					WithNumWorkers(200),
 					WithLogger(&l),
+					WithShardFinder(sf),
 				)
 
 				go func() {
@@ -321,7 +338,7 @@ func TestQueueRunExtended(t *testing.T) {
 					})
 				}()
 
-				<-time.After(time.Duration(mrand.Int31n(30)+5) * time.Second)
+				<-time.After(time.Duration(mrand.Int31n(30)+10) * time.Second)
 				fmt.Println("Cancelling worker")
 				cancel()
 				if mrand.Int31n(30) == 1 {
@@ -367,8 +384,15 @@ func TestQueueRunExtended(t *testing.T) {
 				// Enqueue 1-25 N jobs
 				n := mrand.Intn(24) + 1
 				for i := 0; i < n; i++ {
+					// Have a 1% chance of using a nil UUID, sharded.
+					id := funcs[mrand.Intn(len(funcs))]
+					if mrand.Intn(100) == 0 {
+						id = uuid.UUID{}
+					}
+
 					item := QueueItem{
-						WorkflowID: funcs[mrand.Intn(len(funcs))],
+						WorkflowID:  id,
+						WorkspaceID: id,
 					}
 
 					// Enqueue with a delay.

@@ -25,6 +25,8 @@ import (
 	"github.com/redis/rueidis"
 	"github.com/rs/zerolog"
 	"github.com/uber-go/tally/v4"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"gonum.org/v1/gonum/stat/sampleuv"
 	"lukechampine.com/frand"
@@ -179,6 +181,12 @@ func WithQueueKeyGenerator(kg QueueKeyGenerator) func(q *queue) {
 func WithIdempotencyTTL(t time.Duration) func(q *queue) {
 	return func(q *queue) {
 		q.idempotencyTTL = t
+	}
+}
+
+func WithOtelMeter(m metric.Meter) func(q *queue) {
+	return func(q *queue) {
+		q.meter = m
 	}
 }
 
@@ -338,6 +346,7 @@ func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 		idempotencyTTL:     defaultIdempotencyTTL,
 		queueKindMapping:   make(map[string]string),
 		scope:              tally.NoopScope,
+		meter:              otel.Meter("redis_state.queue"),
 		tracer:             trace.NewNoopTracerProvider().Tracer("redis_queue"),
 		logger:             logger.From(context.Background()),
 		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) (string, int) {
@@ -437,6 +446,8 @@ type queue struct {
 
 	// metrics allows reporting of metrics
 	scope tally.Scope
+	meter metric.Meter
+
 	// tracer is the tracer to use for opentelemetry tracing.
 	tracer trace.Tracer
 	// backoffFunc is the backoff function to use when retrying operations.
@@ -449,6 +460,7 @@ type queue struct {
 type processItem struct {
 	P QueuePartition
 	I QueueItem
+	S *QueueShard
 }
 
 // QueueShard represents a sub-partition for a group of functions.  Shards maintain their
@@ -459,8 +471,6 @@ type QueueShard struct {
 	Name string `json:"n"`
 	// Priority represents the priority for this shard.
 	Priority uint `json:"p"`
-	// Kind is the shard kind (below, but would be an enum.ShardKind in real life)
-	Kind string `json:"kind"`
 	// GuaranteedCapacity represents the minimum number of workers that must
 	// always scan this shard.  If zero, there is no guaranteed capacity for
 	// the shard.
@@ -1420,7 +1430,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	}
 }
 
-// PartitionPeek returns up to PartitionSelectionMax partition items from the queue. This
+// GlobalPartitionPeek returns up to PartitionSelectionMax partition items from the queue. This
 // returns the indexes of partitions.
 //
 // If sequential is set to true this returns partitions in order from earliest to latest
@@ -1428,6 +1438,10 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 // randomly, with higher priority partitions more likely to be selected.  This reduces
 // lease contention amongst multiple shared-nothing workers.
 func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
+	return q.partitionPeek(ctx, q.kg.GlobalPartitionIndex(), sequential, until, limit)
+}
+
+func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
 	if limit > PartitionPeekMax {
 		return nil, ErrPartitionPeekMaxExceedsLimits
 	}
@@ -1888,10 +1902,18 @@ func (q *queue) renewShardLease(ctx context.Context, shard *QueueShard, duration
 	case int64(-2):
 		return nil, fmt.Errorf("lease not found")
 	case int64(0):
-		return &leaseID, nil
+		return &newLeaseID, nil
 	default:
 		return nil, fmt.Errorf("unknown lease renew return value: %T(%v)", status, status)
 	}
+}
+
+func (q *queue) getShardLeases() []leasedShard {
+	var existingLeases []leasedShard
+	q.shardLeaseLock.Lock()
+	_ = copy(q.shardLeases, existingLeases)
+	q.shardLeaseLock.Unlock()
+	return existingLeases
 }
 
 func HashID(ctx context.Context, id string) string {
