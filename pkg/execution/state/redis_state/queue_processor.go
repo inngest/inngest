@@ -262,6 +262,13 @@ func (q *queue) claimShards(ctx context.Context) {
 	var leasing int32
 
 	for {
+		if q.isSequential() {
+			// Sequential workers never lease shards.  They always run in order
+			// on the global partition queue.
+			<-scanTick.C
+			continue
+		}
+
 		select {
 		case <-ctx.Done():
 			// TODO: Remove leases immediately from backing store.
