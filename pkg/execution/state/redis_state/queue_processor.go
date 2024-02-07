@@ -564,7 +564,7 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 			// XXX: When jobs can have their own cancellation signals, move this into
 			// process itself.
 			processCtx, cancel := context.WithCancel(context.Background())
-			err := q.process(processCtx, i.P, i.I, f)
+			err := q.process(processCtx, i.P, i.I, i.S, f)
 			q.sem.Release(1)
 			cancel()
 			if err == nil {
@@ -584,6 +584,10 @@ func (q *queue) scan(ctx context.Context) error {
 		return nil
 	}
 
+	// Store the shard that we processed, allowing us to eventually pass this
+	// down to the job for stat tracking.
+	var shard *QueueShard
+
 	// By default, use the global partition
 	partitionKey := q.kg.GlobalPartitionIndex()
 
@@ -591,12 +595,12 @@ func (q *queue) scan(ctx context.Context) error {
 	// worker still works on the global queue.
 	if len(q.shardLeases) > 0 && rand.Intn(100) >= 5 {
 		// Pick a random item between the shards.
-		i := rand.Intn(len(q.shardLeases))
 		q.shardLeaseLock.Lock()
-		leasedShard := q.shardLeases[i]
+		i := rand.Intn(len(q.shardLeases))
+		shard = &q.shardLeases[i].Shard
 		q.shardLeaseLock.Unlock()
 		// Use the shard partition
-		partitionKey = q.kg.ShardPartitionIndex(leasedShard.Shard.Name)
+		partitionKey = q.kg.ShardPartitionIndex(shard.Name)
 	}
 
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
@@ -616,7 +620,7 @@ func (q *queue) scan(ctx context.Context) error {
 		// take the available capacity in the worker and peek a correct, stable number of items.
 		//
 		// Without this, sojourn latency tracking is impossible.
-		if err := q.processPartition(ctx, p); err != nil {
+		if err := q.processPartition(ctx, p, shard); err != nil {
 			if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
 				// Another worker grabbed the partition, or the partition was deleted
 				// during the scan by an another worker.
@@ -633,7 +637,9 @@ func (q *queue) scan(ctx context.Context) error {
 	return nil
 }
 
-func (q *queue) processPartition(ctx context.Context, p *QueuePartition) error {
+// NOTE: Shard is only passed as a reference if the partition was peeked from
+// a shard.  It exists for accounting and tracking purposes only, eg. to report shard metrics.
+func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *QueueShard) error {
 	q.scope.Counter(counterPartitionProcess).Inc(1)
 
 	// Attempt to lease items.  This checks partition-level concurrency limits
@@ -825,7 +831,7 @@ ProcessLoop:
 		// a semaphore.
 		item.LeaseID = leaseID
 
-		q.workers <- processItem{P: *p, I: *item}
+		q.workers <- processItem{P: *p, I: *item, S: shard}
 	}
 
 	// The lease for the partition will expire and we will be able to restart
@@ -861,7 +867,7 @@ ProcessLoop:
 	return nil
 }
 
-func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f osqueue.RunFunc) error {
+func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *QueueShard, f osqueue.RunFunc) error {
 	var err error
 	leaseID := qi.LeaseID
 
@@ -968,15 +974,18 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 		}()
 
 		go scope.Counter(counterQueueItemsStarted).Inc(1)
-		err := f(
-			jobCtx,
-			osqueue.RunInfo{
-				Latency:      latency,
-				SojournDelay: sojourn,
-				Priority:     p.Priority,
-			},
-			qi.Data,
-		)
+
+		runInfo := osqueue.RunInfo{
+			Latency:      latency,
+			SojournDelay: sojourn,
+			Priority:     p.Priority,
+		}
+		if s != nil {
+			runInfo.ShardName = &s.Name
+		}
+
+		// Call the run func.
+		err := f(jobCtx, runInfo, qi.Data)
 		extendLeaseTick.Stop()
 		if err != nil {
 			go scope.Counter(counterQueueItemsErrored).Inc(1)

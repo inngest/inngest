@@ -460,6 +460,7 @@ type queue struct {
 type processItem struct {
 	P QueuePartition
 	I QueueItem
+	S *QueueShard
 }
 
 // QueueShard represents a sub-partition for a group of functions.  Shards maintain their
