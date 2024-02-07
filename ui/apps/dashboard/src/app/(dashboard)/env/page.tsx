@@ -137,9 +137,13 @@ export default async function Envs() {
                         label="Manage"
                       />
                       <Button
-                        href={`/env/${env.slug}/deploys?intent=deploy-modal` as Route}
+                        href={
+                          `/env/${env.slug}/${
+                            isAppsEnabled ? 'apps' : 'deploys?intent=deploy-modal'
+                          }` as Route
+                        }
                         kind="primary"
-                        label="Deploy"
+                        label={isAppsEnabled ? 'Go To Apps' : 'Deploy'}
                       />
                     </div>
                   </div>
