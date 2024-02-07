@@ -107,7 +107,7 @@ func (b redisBatchManager) RetrieveItems(ctx context.Context, batchID ulid.ULID)
 	for _, str := range itemStrList {
 		item := &BatchItem{}
 		if err := json.Unmarshal([]byte(str), &item); err != nil {
-			return empty, fmt.Errorf("failed to decode item '%s' from batch '%s': %v", item.GetInternalID(), batchID, err)
+			return empty, fmt.Errorf("failed to decode item for batch '%s': %v", batchID, err)
 		}
 		items = append(items, *item)
 	}

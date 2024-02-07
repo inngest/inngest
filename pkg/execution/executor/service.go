@@ -337,22 +337,32 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 
 	// start execution
 	id := fmt.Sprintf("%s-%s", opts.FunctionID, batchID)
-	runID, err := s.exec.Schedule(ctx, execution.ScheduleRequest{
-		// TODO: Fn
-		AccountID:      opts.AccountID,
-		WorkspaceID:    opts.WorkspaceID,
-		AppID:          opts.AppID,
-		Events:         events,
-		BatchID:        &batchID,
-		IdempotencyKey: &id,
-		StaticVersion:  false,
-	})
+
+	var fn *inngest.Function
+	fns, err := s.data.Functions(ctx)
 	if err != nil {
 		return err
 	}
-	if runID == nil {
-		// Throttled or exists
-		return nil
+	for _, f := range fns {
+		if f.ID == opts.FunctionID {
+			fn = &f
+		}
+	}
+	if fn == nil {
+		return fmt.Errorf("no function available to start batch function")
+	}
+
+	_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
+		AccountID:      opts.AccountID,
+		WorkspaceID:    opts.WorkspaceID,
+		AppID:          opts.AppID,
+		Function:       *fn,
+		Events:         events,
+		BatchID:        &batchID,
+		IdempotencyKey: &id,
+	})
+	if err != nil {
+		return err
 	}
 
 	if err := s.batcher.ExpireKeys(ctx, batchID); err != nil {
