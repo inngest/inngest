@@ -216,6 +216,9 @@ type DebounceKeyGenerator interface {
 }
 
 type BatchKeyGenerator interface {
+	// QueuePrefix returns the hash prefix used in the queue.
+	// This is likely going to be a redis specific requirement.
+	QueuePrefix() string
 	// QueueItem returns the key for the hash containing all items within a
 	// queue for a function.  This is used to check leases on debounce jobs.
 	QueueItem() string
@@ -295,6 +298,10 @@ func (d DefaultQueueKeyGenerator) Concurrency(prefix, key string) string {
 
 func (d DefaultQueueKeyGenerator) ConcurrencyIndex() string {
 	return fmt.Sprintf("%s:concurrency:sorted", d.Prefix)
+}
+
+func (d DefaultQueueKeyGenerator) QueuePrefix() string {
+	return d.Prefix
 }
 
 func (d DefaultQueueKeyGenerator) BatchPointer(ctx context.Context, workflowID uuid.UUID) string {

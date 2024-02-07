@@ -63,7 +63,7 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 		batchConfig.MaxSize,
 		bi.GetEvent(), // NOTE
 		newULID,
-		// TODO: queue prefix
+		b.k.QueuePrefix(),
 		enums.BatchStatusPending,
 		enums.BatchStatusStarted,
 	})
