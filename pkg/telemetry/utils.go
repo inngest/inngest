@@ -28,17 +28,18 @@ type CounterOpt struct {
 	Meter       metric.Meter
 }
 
+// RecordCounterMetric increments the counter by the provided value.
+// The meter used can either be passed in or is the global meter
 func RecordCounterMetric(ctx context.Context, incr int64, opts CounterOpt) {
 	attrs := make([]attribute.KeyValue, 0)
 	if opts.Attributes != nil {
 		attrs = append(attrs, parseAttributes(opts.Attributes)...)
 	}
 
-	var meter metric.Meter
+	// use the global one by default
+	meter := otel.Meter(opts.Name)
 	if opts.Meter != nil {
 		meter = opts.Meter
-	} else { // use global meter if it's not passed in
-		meter = otel.Meter(opts.Name)
 	}
 
 	c, err := meter.
