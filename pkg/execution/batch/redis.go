@@ -103,14 +103,13 @@ func (b redisBatchManager) RetrieveItems(ctx context.Context, batchID ulid.ULID)
 		return empty, fmt.Errorf("failed to retrieve list of events for batch '%s': %v", batchID, err)
 	}
 
-	items := make([]BatchItem, 0)
-	for i, str := range itemStrList {
+	items := []BatchItem{}
+	for _, str := range itemStrList {
 		item := &BatchItem{}
-		byt := []byte(str)
-		if err := json.Unmarshal(byt, &item); err != nil {
+		if err := json.Unmarshal([]byte(str), &item); err != nil {
 			return empty, fmt.Errorf("failed to decode item '%s' from batch '%s': %v", item.GetInternalID(), batchID, err)
 		}
-		items[i] = *item
+		items = append(items, *item)
 	}
 
 	return items, nil
