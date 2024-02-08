@@ -528,13 +528,15 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 			at := time.Now().Add(dur)
 
 			if err := s.batcher.ScheduleExecution(ctx, batch.ScheduleBatchOpts{
-				BatchID:         ulid.MustParse(result.BatchID),
-				AccountID:       bi.AccountID,
-				WorkspaceID:     bi.WorkspaceID,
-				AppID:           bi.AppID,
-				FunctionID:      bi.FunctionID,
-				FunctionVersion: bi.FunctionVersion,
-				At:              at,
+				ScheduleBatchPayload: batch.ScheduleBatchPayload{
+					BatchID:         ulid.MustParse(result.BatchID),
+					AccountID:       bi.AccountID,
+					WorkspaceID:     bi.WorkspaceID,
+					AppID:           bi.AppID,
+					FunctionID:      bi.FunctionID,
+					FunctionVersion: bi.FunctionVersion,
+				},
+				At: at,
 			}); err != nil {
 				return err
 			}

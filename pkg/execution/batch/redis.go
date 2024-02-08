@@ -166,13 +166,7 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 		},
 		Attempt:     0,
 		MaxAttempts: &maxAttempts,
-		Payload: ScheduleBatchPayload{
-			AccountID:       opts.AccountID,
-			WorkspaceID:     opts.WorkspaceID,
-			FunctionID:      opts.FunctionID,
-			FunctionVersion: opts.FunctionVersion,
-			BatchID:         opts.BatchID,
-		},
+		Payload:     opts.ScheduleBatchPayload,
 	}, opts.At)
 	if err == redis_state.ErrQueueItemExists {
 		log.From(ctx).

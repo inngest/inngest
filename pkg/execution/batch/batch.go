@@ -72,13 +72,9 @@ type BatchAppendResult struct {
 }
 
 type ScheduleBatchOpts struct {
-	BatchID         ulid.ULID `json:"batchID"`
-	AccountID       uuid.UUID `json:"acctID"`
-	WorkspaceID     uuid.UUID `json:"wsID"`
-	AppID           uuid.UUID `json:"appID"`
-	FunctionID      uuid.UUID `json:"fnID"`
-	FunctionVersion int       `json:"fnV"`
-	At              time.Time `json:"at"`
+	ScheduleBatchPayload
+
+	At time.Time `json:"at"`
 }
 
 type ScheduleBatchPayload struct {
