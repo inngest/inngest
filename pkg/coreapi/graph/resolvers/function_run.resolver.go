@@ -138,8 +138,17 @@ func (r *functionRunResolver) Event(ctx context.Context, obj *models.FunctionRun
 }
 
 func (r *functionRunResolver) Events(ctx context.Context, obj *models.FunctionRun) ([]*models.Event, error) {
+	runID := ulid.MustParse(obj.ID)
+
+	batch, err := r.Data.GetEventBatchByRunID(ctx, runID)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: retrieve events by IDs
+	fmt.Printf("Batch: %#v\n", batch.EventIDs())
 	events := []*models.Event{}
-	// TODO: retrieve events based on runID
+
 	return events, nil
 }
 

@@ -218,3 +218,19 @@ func (eb *EventBatch) StartedAt() time.Time {
 func (eb *EventBatch) ExecutedAt() time.Time {
 	return eb.Time
 }
+
+func (eb *EventBatch) EventID() *ulid.ULID {
+	if len(eb.Events) < 1 {
+		return nil
+	}
+	id := eb.Events[0].GetInternalID()
+	return &id
+}
+
+func (eb *EventBatch) EventIDs() []ulid.ULID {
+	ids := make([]ulid.ULID, len(eb.Events))
+	for i, evt := range eb.Events {
+		ids[i] = evt.GetInternalID()
+	}
+	return ids
+}
