@@ -2,6 +2,7 @@ package cqrs
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"time"
 
@@ -107,4 +108,88 @@ type EventReader interface {
 	WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, opts *WorkspaceEventsOpts) ([]Event, error)
 	// Find returns a specific event given an ID.
 	FindEvent(ctx context.Context, workspaceID uuid.UUID, id ulid.ULID) (*Event, error)
+}
+
+type EventBatchOpt func(eb *EventBatch)
+
+// EventBatch represents a event batch execution
+type EventBatch struct {
+	ID          ulid.ULID            `json:"id"`
+	AccountID   uuid.UUID            `json:"account_id"`
+	WorkspaceID uuid.UUID            `json:"workspace_id"`
+	AppID       uuid.UUID            `json:"app_id"`
+	FunctionID  uuid.UUID            `json:"workflow_id"`
+	RunID       ulid.ULID            `json:"run_id"`
+	Events      []event.TrackedEvent `json:"events"`
+	Time        time.Time            `json:"ts"`
+}
+
+func NewEventBatch(opts ...EventBatchOpt) *EventBatch {
+	eb := &EventBatch{
+		ID:   ulid.MustNew(ulid.Now(), rand.Reader),
+		Time: time.Now(),
+	}
+
+	for _, opt := range opts {
+		opt(eb)
+	}
+
+	return eb
+}
+
+// WithEventBatchID sets the new EventBatch ID with the provided ID
+func WithEventBatchID(id ulid.ULID) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.ID = id
+	}
+}
+
+func WithEventBatchAccountID(acctID uuid.UUID) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.AccountID = acctID
+	}
+}
+
+func WithEventBatchWorkspaceID(wsID uuid.UUID) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.WorkspaceID = wsID
+	}
+}
+
+func WithEventBatchAppID(appID uuid.UUID) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.AppID = appID
+	}
+}
+
+func WithEventBatchFunctionID(fnID uuid.UUID) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.FunctionID = fnID
+	}
+}
+
+func WithEventBatchEvent(evt event.TrackedEvent) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.Events = []event.TrackedEvent{evt}
+	}
+}
+
+func WithEventBatchRunID(runID ulid.ULID) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.RunID = runID
+	}
+}
+
+func WithEventBatchEvents(evts []event.TrackedEvent) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.Events = evts
+	}
+}
+
+func (eb *EventBatch) StartedAt() time.Time {
+	return ulid.Time(eb.ID.Time())
+}
+
+func (eb *EventBatch) ExecutedAt() time.Time {
+	return eb.Time
 }
