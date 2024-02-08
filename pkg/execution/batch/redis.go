@@ -61,7 +61,7 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 	newULID := ulid.MustNew(uint64(time.Now().UnixMilli()), rand.Reader)
 	args, err := redis_state.StrSlice([]any{
 		config.MaxSize,
-		bi.GetEvent(), // NOTE
+		bi,
 		newULID,
 		b.k.QueuePrefix(),
 		enums.BatchStatusPending,

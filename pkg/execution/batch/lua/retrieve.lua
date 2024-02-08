@@ -1,5 +1,5 @@
 --
---Retrieves the full batch from Redis
+-- Retrieves the full batch with batchID
 --
 
 local batchKey = KEYS[1]
