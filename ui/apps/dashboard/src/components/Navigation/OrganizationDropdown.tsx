@@ -9,6 +9,7 @@ import {
   ArrowsRightLeftIcon,
   Cog6ToothIcon,
   CreditCardIcon,
+  CubeIcon,
   PlusCircleIcon,
   UserGroupIcon,
 } from '@heroicons/react/20/solid';
@@ -63,6 +64,11 @@ export default function OrganizationDropdown() {
             icon={UserGroupIcon}
             href="/settings/organization"
             label="Members"
+          />
+          <OrganizationDropdownMenuItem
+            icon={CubeIcon}
+            href="/settings/integrations"
+            label="Integrations"
           />
           <OrganizationDropdownMenuItem
             icon={CreditCardIcon}
