@@ -117,8 +117,8 @@ INSERT INTO events
 
 -- name: InsertEventBatch :exec
 INSERT INTO event_batches
-	(id, run_id, started_at, executed_at, event_ids) VALUES
-	(?, ?, ?, ?, ?);
+	(id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetEventByInternalID :one
 SELECT * FROM events WHERE internal_id = ?;

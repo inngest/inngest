@@ -295,11 +295,15 @@ func (w wrapper) InsertEventBatch(ctx context.Context, eb cqrs.EventBatch) error
 	}
 
 	batch := sqlc.InsertEventBatchParams{
-		ID:         []byte(eb.ID.String()),
-		RunID:      []byte(eb.RunID.String()),
-		StartedAt:  eb.StartedAt(),
-		ExecutedAt: eb.ExecutedAt(),
-		EventIds:   []byte(strings.Join(evtIDs, ",")),
+		ID:          eb.ID,
+		AccountID:   eb.AccountID,
+		WorkspaceID: eb.WorkspaceID,
+		AppID:       eb.AppID,
+		WorkflowID:  eb.FunctionID,
+		RunID:       eb.RunID,
+		StartedAt:   eb.StartedAt(),
+		ExecutedAt:  eb.ExecutedAt(),
+		EventIds:    []byte(strings.Join(evtIDs, ",")),
 	}
 
 	return w.q.InsertEventBatch(ctx, batch)

@@ -297,14 +297,18 @@ func (q *Queries) GetApps(ctx context.Context) ([]*App, error) {
 }
 
 const getEventBatchByRunID = `-- name: GetEventBatchByRunID :one
-SELECT id, run_id, started_at, executed_at, event_ids FROM event_batches WHERE run_id = ?
+SELECT id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids FROM event_batches WHERE run_id = ?
 `
 
-func (q *Queries) GetEventBatchByRunID(ctx context.Context, runID []byte) (*EventBatch, error) {
+func (q *Queries) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*EventBatch, error) {
 	row := q.db.QueryRowContext(ctx, getEventBatchByRunID, runID)
 	var i EventBatch
 	err := row.Scan(
 		&i.ID,
+		&i.AccountID,
+		&i.WorkspaceID,
+		&i.AppID,
+		&i.WorkflowID,
 		&i.RunID,
 		&i.StartedAt,
 		&i.ExecutedAt,
@@ -814,21 +818,29 @@ func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) error 
 
 const insertEventBatch = `-- name: InsertEventBatch :exec
 INSERT INTO event_batches
-	(id, run_id, started_at, executed_at, event_ids) VALUES
-	(?, ?, ?, ?, ?)
+	(id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertEventBatchParams struct {
-	ID         []byte
-	RunID      []byte
-	StartedAt  time.Time
-	ExecutedAt time.Time
-	EventIds   []byte
+	ID          ulid.ULID
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	AppID       uuid.UUID
+	WorkflowID  uuid.UUID
+	RunID       ulid.ULID
+	StartedAt   time.Time
+	ExecutedAt  time.Time
+	EventIds    []byte
 }
 
 func (q *Queries) InsertEventBatch(ctx context.Context, arg InsertEventBatchParams) error {
 	_, err := q.db.ExecContext(ctx, insertEventBatch,
 		arg.ID,
+		arg.AccountID,
+		arg.WorkspaceID,
+		arg.AppID,
+		arg.WorkflowID,
 		arg.RunID,
 		arg.StartedAt,
 		arg.ExecutedAt,

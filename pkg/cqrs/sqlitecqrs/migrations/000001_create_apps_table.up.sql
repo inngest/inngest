@@ -88,8 +88,12 @@ CREATE TABLE history (
 );
 
 CREATE TABLE event_batches (
-	id BLOB NOT NULL,
-	run_id BLOB NOT NULL,
+	id CHAR(26) PRIMARY KEY,
+	account_id UUID,
+	workspace_id UUID,
+	app_id UUID,
+	workflow_id UUID,
+	run_id CHAR(26) NOT NULL,
 	started_at TIMESTAMP NOT NULL,
 	executed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	event_ids BLOB NOT NULL
