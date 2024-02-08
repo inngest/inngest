@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
@@ -66,8 +67,8 @@ type BatchAppendResult struct {
 	//   0: Appended to Batch
 	//   1: A new batch is created and appended to it
 	//   2: Appened to batch, and the batch is now full
-	Status  int    `json:"status"` // TODO: change this to use enums.Batch instead
-	BatchID string `json:"batchID,omitempty"`
+	Status  enums.Batch `json:"status"`
+	BatchID string      `json:"batchID,omitempty"`
 }
 
 type ScheduleBatchOpts struct {

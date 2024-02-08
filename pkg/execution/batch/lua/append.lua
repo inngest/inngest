@@ -1,11 +1,6 @@
 --
 --This script runs batch append ops in an atomic action
 --
---status values:
---  0: Appended event to batch
---  1: New batch, should enqueue a timer job
---  2: Batch is full
---
 
 local batchPointerKey = KEYS[1]      -- key to the batch pointer
 
@@ -35,7 +30,7 @@ end
 
 -- start execution
 local batchID = get_or_create_batch_key(batchPointerKey)
-local resp = { status = 0, batchID = batchID }
+local resp = { status = "append", batchID = batchID }
 
 -- NOTE: these need to be identical to the ones in the queue key generator
 --   * Batch
@@ -55,7 +50,7 @@ local len = redis.call("RPUSH", batchKey, event)
 
 if len == 1 then
   -- newly started batch
-  resp = { status = 1, batchID = batchID }
+  resp = { status = "new", batchID = batchID }
 end
 
 -- if batch is full
@@ -66,7 +61,7 @@ if len >= batchLimit then
 
   -- change poiner so following ops don't append to this batch anymore
   update_pointer(batchPointerKey, newULID)
-  resp = { status = 2, batchID = batchID }
+  resp = { status = "full", batchID = batchID }
 end
 
 return cjson.encode(resp)

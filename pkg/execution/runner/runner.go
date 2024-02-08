@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
@@ -517,9 +518,9 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 		}
 
 		switch result.Status {
-		case 0: // appended
+		case enums.BatchAppend:
 			// noop
-		case 1: // new batch
+		case enums.BatchNew:
 			dur, err := time.ParseDuration(fn.EventBatch.Timeout)
 			if err != nil {
 				return err
@@ -537,7 +538,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 			}); err != nil {
 				return err
 			}
-		case 2: // batch is full
+		case enums.BatchFull:
 			// start execution immediately
 			batchID := ulid.MustParse(result.BatchID)
 			evtList, err := s.batcher.RetrieveItems(ctx, batchID)
