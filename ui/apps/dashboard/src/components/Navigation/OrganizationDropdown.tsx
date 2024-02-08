@@ -51,7 +51,7 @@ export default function OrganizationDropdown() {
 
       <DropdownMenuContent
         sideOffset={4}
-        className="bg-slate-940/95 z-50 divide-y divide-dashed divide-slate-700 p-0 backdrop-blur"
+        className="bg-slate-940/95 z-50 min-w-[200px] divide-y divide-dashed divide-slate-700 p-0 backdrop-blur"
       >
         <DropdownMenuGroup className="p-2">
           <OrganizationDropdownMenuItem
