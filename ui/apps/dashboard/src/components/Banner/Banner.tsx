@@ -18,11 +18,11 @@ export function Banner({
   let Icon: React.ReactNode;
   let color: string = '';
   if (kind == 'info') {
-    Icon = <InformationCircleIcon className="h-6 w-6 text-sky-500" />;
-    color = 'border-sky-500 bg-sky-50';
+    Icon = <InformationCircleIcon className="h-6 w-6 text-blue-700" />;
+    color = 'bg-blue-100';
   } else if (kind == 'error') {
-    Icon = <ExclamationTriangleIcon className="h-6 w-6 text-red-800" />;
-    color = 'border-red-500 bg-red-50';
+    Icon = <ExclamationTriangleIcon className="h-6 w-6 text-rose-700" />;
+    color = 'bg-rose-100';
   }
 
   return (
@@ -30,7 +30,7 @@ export function Banner({
       className={classNames(
         className,
         color,
-        'flex w-full items-center justify-between border-y px-2 py-2 md:px-4 lg:px-8'
+        'flex w-full items-center justify-between px-2 py-2 md:px-4 lg:px-8'
       )}
     >
       <div className="flex items-center gap-1 text-sm">
