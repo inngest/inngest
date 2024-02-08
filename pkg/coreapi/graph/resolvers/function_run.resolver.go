@@ -139,6 +139,7 @@ func (r *functionRunResolver) Event(ctx context.Context, obj *models.FunctionRun
 
 func (r *functionRunResolver) Events(ctx context.Context, obj *models.FunctionRun) ([]*models.Event, error) {
 	events := []*models.Event{}
+	// TODO: retrieve events based on runID
 	return events, nil
 }
 
