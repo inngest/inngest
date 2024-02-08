@@ -86,3 +86,11 @@ CREATE TABLE history (
 	invoke_function_result VARCHAR,
 	result VARCHAR
 );
+
+CREATE TABLE event_batches (
+	id BLOB NOT NULL,
+	run_id BLOB NOT NULL,
+	started_at TIMESTAMP NOT NULL,
+	executed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	event_ids BLOB NOT NULL
+)

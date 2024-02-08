@@ -37,6 +37,9 @@ in pkgs.mkShell {
     pkgs.nodePackages.typescript-language-server
     pkgs.nodePackages.vscode-json-languageserver
     pkgs.nodePackages.yaml-language-server
+
+    # Tools
+    pkgs.sqlite
   ];
 
   packages = [ corepack ];

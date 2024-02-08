@@ -82,7 +82,7 @@ INSERT INTO function_runs
 
 -- name: InsertFunctionFinish :exec
 INSERT INTO function_finishes
-	(run_id, status, output, completed_step_count, created_at) VALUES 
+	(run_id, status, output, completed_step_count, created_at) VALUES
 	(?, ?, ?, ?, ?);
 
 -- name: GetFunctionRun :one
