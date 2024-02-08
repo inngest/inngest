@@ -1,6 +1,10 @@
+'use client';
+
 import { forwardRef } from 'react';
 import { CheckIcon, MinusIcon } from '@heroicons/react/16/solid';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
+
+import { cn } from '../utils/classNames';
 
 export const DropdownMenu = DropdownMenuPrimitive.Root;
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
@@ -16,8 +20,11 @@ export const DropdownMenuContent = forwardRef<
         ref={forwardedRef}
         onCloseAutoFocus={(event) => event.preventDefault()}
         align="start"
-        sideOffset={14}
-        className="shadow-outline-primary-light min-w-[220px] rounded-md bg-white p-2 dark:bg-slate-700"
+        sideOffset={props.sideOffset ?? 14}
+        className={cn(
+          'shadow-outline-primary-light min-w-[220px] rounded-md bg-white p-2 dark:bg-slate-700',
+          props.className
+        )}
       >
         {children}
       </DropdownMenuPrimitive.Content>
@@ -35,7 +42,10 @@ export const DropdownMenuItem = forwardRef<
     <DropdownMenuPrimitive.Item
       {...props}
       ref={forwardedRef}
-      className="flex select-none items-center gap-2 rounded-md p-2 text-sm text-slate-700 hover:bg-slate-100"
+      className={cn(
+        'flex select-none items-center gap-2 rounded-md p-2 text-sm text-slate-700 hover:bg-slate-100',
+        props.className
+      )}
     >
       {children}
     </DropdownMenuPrimitive.Item>
