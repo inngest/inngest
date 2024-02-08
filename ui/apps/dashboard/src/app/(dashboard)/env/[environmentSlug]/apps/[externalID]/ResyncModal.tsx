@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Switch } from '@headlessui/react';
 import ArrowPathIcon from '@heroicons/react/20/solid/ArrowPathIcon';
 import { Button } from '@inngest/components/Button';
+import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
 import { classNames } from '@inngest/components/utils/classNames';
 import { toast } from 'sonner';
@@ -16,9 +17,10 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   url: string;
+  platform: string;
 };
 
-export default function ResyncModal({ isOpen, onClose, url }: Props) {
+export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
   const [overrideValue, setOverrideValue] = useState(url);
   const [isURLOverridden, setURLOverridden] = useState(false);
   const [failure, setFailure] = useState<RegistrationFailure>();
@@ -68,6 +70,16 @@ export default function ResyncModal({ isOpen, onClose, url }: Props) {
       }
     >
       <div className="border-b border-slate-200 px-6">
+        {platform === 'vercel' && (
+          <Alert className="my-2" severity="info">
+            Vercel&apos; Generated URLs (
+            <Link showIcon={false} href="(https://vercel.com/docs/deployments/generated-urls">
+              see docs
+            </Link>
+            ) are unique to a particular deployment. Ensure you are using the right URL if you
+            choose to use a Generated URL instead of a static domain to locate the deployment.
+          </Alert>
+        )}
         <p className="my-6">
           This will send a sync request to your app, telling it to sync itself with Inngest.
         </p>
