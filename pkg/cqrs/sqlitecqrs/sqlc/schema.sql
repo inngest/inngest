@@ -85,7 +85,7 @@ CREATE TABLE history (
 );
 
 CREATE TABLE event_batches (
-  id BLOB NOT NULL,
+	id BLOB NOT NULL,
 	run_id BLOB NOT NULL,
 	started_at TIMESTAMP NOT NULL,
 	executed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

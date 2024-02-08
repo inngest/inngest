@@ -115,6 +115,11 @@ INSERT INTO events
 	(internal_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts) VALUES
 	(?, ?, ?, ?, ?, ?, ?, ?);
 
+-- name: InsertEventBatch :exec
+INSERT INTO event_batches
+	(id, run_id, started_at, executed_at, event_ids) VALUES
+	(?, ?, ?, ?, ?);
+
 -- name: GetEventByInternalID :one
 SELECT * FROM events WHERE internal_id = ?;
 

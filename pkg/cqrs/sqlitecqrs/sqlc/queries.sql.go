@@ -795,6 +795,31 @@ func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) error 
 	return err
 }
 
+const insertEventBatch = `-- name: InsertEventBatch :exec
+INSERT INTO event_batches
+	(id, run_id, started_at, executed_at, event_ids) VALUES
+	(?, ?, ?, ?, ?)
+`
+
+type InsertEventBatchParams struct {
+	ID         []byte
+	RunID      []byte
+	StartedAt  time.Time
+	ExecutedAt time.Time
+	EventIds   []byte
+}
+
+func (q *Queries) InsertEventBatch(ctx context.Context, arg InsertEventBatchParams) error {
+	_, err := q.db.ExecContext(ctx, insertEventBatch,
+		arg.ID,
+		arg.RunID,
+		arg.StartedAt,
+		arg.ExecutedAt,
+		arg.EventIds,
+	)
+	return err
+}
+
 const insertFunction = `-- name: InsertFunction :one
 
 
@@ -838,7 +863,7 @@ func (q *Queries) InsertFunction(ctx context.Context, arg InsertFunctionParams) 
 
 const insertFunctionFinish = `-- name: InsertFunctionFinish :exec
 INSERT INTO function_finishes
-	(run_id, status, output, completed_step_count, created_at) VALUES 
+	(run_id, status, output, completed_step_count, created_at) VALUES
 	(?, ?, ?, ?, ?)
 `
 
