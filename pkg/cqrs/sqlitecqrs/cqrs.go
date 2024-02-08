@@ -318,6 +318,16 @@ func (w wrapper) GetEventByInternalID(ctx context.Context, internalID ulid.ULID)
 	return &evt, nil
 }
 
+func (w wrapper) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.EventBatch, error) {
+	obj, err := w.q.GetEventBatchByRunID(ctx, runID)
+	if err != nil {
+		return nil, err
+	}
+
+	eb := convertEventBatch(obj)
+	return &eb, nil
+}
+
 // GetEventsByRunID returns the list of events associated with a runID.
 // This is expected to be reference for batched runs.
 func (w wrapper) GetEventsByRunID(ctx context.Context, runID ulid.ULID) ([]*cqrs.Event, error) {
@@ -418,6 +428,24 @@ func convertEvent(obj *sqlc.Event) cqrs.Event {
 	_ = json.Unmarshal([]byte(obj.EventData), &evt.EventData)
 	_ = json.Unmarshal([]byte(obj.EventUser), &evt.EventUser)
 	return *evt
+}
+
+func convertEventBatch(obj *sqlc.EventBatch) cqrs.EventBatch {
+	var evtIDs []ulid.ULID
+	if ids, err := obj.EventIDs(); err == nil {
+		evtIDs = ids
+	}
+
+	eb := cqrs.NewEventBatch(
+		cqrs.WithEventBatchID(obj.ID),
+		cqrs.WithEventBatchAccountID(obj.AccountID),
+		cqrs.WithEventBatchWorkspaceID(obj.WorkspaceID),
+		cqrs.WithEventBatchAppID(obj.AppID),
+		cqrs.WithEventBatchRunID(obj.RunID),
+		cqrs.WithEventBatchEventIDs(evtIDs),
+	)
+
+	return *eb
 }
 
 //

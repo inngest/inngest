@@ -56,6 +56,19 @@ func (e Event) Event() event.Event {
 	}
 }
 
+// -- event.TrackedEvent interfaces
+func (e Event) GetInternalID() ulid.ULID {
+	return e.InternalID()
+}
+
+func (e Event) GetWorkspaceID() uuid.UUID {
+	return e.WorkspaceID
+}
+
+func (e Event) GetEvent() event.Event {
+	return e.Event()
+}
+
 type EventManager interface {
 	EventWriter
 	EventReader
@@ -99,6 +112,7 @@ func (o *WorkspaceEventsOpts) Validate() error {
 
 type EventReader interface {
 	GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*Event, error)
+	GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*EventBatch, error)
 	GetEventsTimebound(
 		ctx context.Context,
 		t Timebound,
@@ -183,6 +197,16 @@ func WithEventBatchRunID(runID ulid.ULID) EventBatchOpt {
 
 func WithEventBatchEvents(evts []event.TrackedEvent) EventBatchOpt {
 	return func(eb *EventBatch) {
+		eb.Events = evts
+	}
+}
+
+func WithEventBatchEventIDs(evtIDs []ulid.ULID) EventBatchOpt {
+	return func(eb *EventBatch) {
+		evts := make([]event.TrackedEvent, len(evtIDs))
+		for i, id := range evtIDs {
+			evts[i] = Event{ID: id}
+		}
 		eb.Events = evts
 	}
 }
