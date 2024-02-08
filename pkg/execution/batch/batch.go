@@ -64,9 +64,9 @@ func (b BatchItem) GetEvent() event.Event {
 // BatchAppendResult represents the status of attempting to append to a batch
 type BatchAppendResult struct {
 	// Status represents the result of the operation
-	//   0: Appended to Batch
-	//   1: A new batch is created and appended to it
-	//   2: Appened to batch, and the batch is now full
+	//   append: An event successfully appended to an existing batch
+	//   new: A new batch was created with the passed in event
+	//   full: The batch is full and ready for execution
 	Status  enums.Batch `json:"status"`
 	BatchID string      `json:"batchID,omitempty"`
 }
