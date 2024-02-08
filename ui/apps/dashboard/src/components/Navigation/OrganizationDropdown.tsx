@@ -39,7 +39,7 @@ export default function OrganizationDropdown() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex h-full items-center gap-2 border-l border-slate-800 px-2 py-1.5 text-sm tracking-wide text-white hover:bg-slate-800 md:px-4">
+      <DropdownMenuTrigger className="flex h-full max-w-[12rem]	items-center gap-2 border-l border-slate-800 px-2 py-1.5 text-sm tracking-wide text-white hover:bg-slate-800 md:px-4">
         <Image
           alt={`${organization.name} profile picture`}
           src={organization.imageUrl}
@@ -47,7 +47,7 @@ export default function OrganizationDropdown() {
           height={20}
           className="size-5 rounded"
         />{' '}
-        {organization.name}
+        <span className="truncate">{organization.name}</span>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
