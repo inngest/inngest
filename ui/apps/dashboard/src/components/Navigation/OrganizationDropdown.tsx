@@ -28,12 +28,13 @@ export default function OrganizationDropdown() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>
+      <DropdownMenuTrigger className="flex h-full items-center gap-2 border-l border-slate-800 px-2 py-1.5 text-sm tracking-wide text-white hover:bg-slate-800 md:px-4">
         <Image
           alt={`${organization.name} profile picture`}
           src={organization.imageUrl}
-          width={128}
-          height={128}
+          width={20}
+          height={20}
+          className="h-5 w-5 rounded"
         />{' '}
         {organization.name}
       </DropdownMenuTrigger>
