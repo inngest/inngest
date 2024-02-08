@@ -18,18 +18,18 @@ type SeveritySpecific = {
 const severityStyles = {
   error: {
     icon: ExclamationCircleIcon,
-    iconClassName: 'text-red-500',
-    wrapperClassName: 'bg-red-50 border-red-200 text-red-800',
+    iconClassName: 'text-rose-700',
+    wrapperClassName: 'bg-rose-100 text-rose-700',
   },
   info: {
     icon: InformationCircleIcon,
-    iconClassName: '',
-    wrapperClassName: 'bg-indigo-50 border-indigo-100 text-indigo-600',
+    iconClassName: 'text-blue-700',
+    wrapperClassName: 'bg-blue-100 text-blue-700',
   },
   warning: {
     icon: ExclamationTriangleIcon,
-    iconClassName: 'text-amber-500',
-    wrapperClassName: 'bg-amber-50 border-amber-600/30 text-amber-900',
+    iconClassName: 'text-amber-700',
+    wrapperClassName: 'bg-amber-100 text-amber-700',
   },
 } as const satisfies { [key in Severity]: SeveritySpecific };
 
@@ -45,7 +45,7 @@ export function Alert({ children, className, severity }: Props) {
   return (
     <div
       className={cn(
-        'flex items-start gap-2 rounded-md border px-4 py-3 text-sm font-medium',
+        'flex items-start gap-2 rounded-md px-4 py-3',
         severityStyles[severity].wrapperClassName,
         className
       )}
