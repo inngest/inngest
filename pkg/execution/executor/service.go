@@ -335,23 +335,13 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 		events[i] = item
 	}
 
-	// start execution
-	id := fmt.Sprintf("%s-%s", opts.FunctionID, batchID)
-
-	var fn *inngest.Function
-	fns, err := s.data.Functions(ctx)
+	fn, err := s.findFunctionByID(ctx, opts.FunctionID)
 	if err != nil {
 		return err
 	}
-	for _, f := range fns {
-		if f.ID == opts.FunctionID {
-			fn = &f
-		}
-	}
-	if fn == nil {
-		return fmt.Errorf("no function available to start batch function")
-	}
 
+	// start execution
+	id := fmt.Sprintf("%s-%s", opts.FunctionID, batchID)
 	_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
 		AccountID:      opts.AccountID,
 		WorkspaceID:    opts.WorkspaceID,
@@ -370,4 +360,17 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 	}
 
 	return nil
+}
+
+func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {
+	fns, err := s.data.Functions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range fns {
+		if f.ID == fnID {
+			return &f, nil
+		}
+	}
+	return nil, fmt.Errorf("no function found with ID: %s", fnID)
 }
