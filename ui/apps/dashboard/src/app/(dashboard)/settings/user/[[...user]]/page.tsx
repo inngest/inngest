@@ -1,11 +1,11 @@
 import { UserProfile } from '@clerk/nextjs';
 
-export default function UserAccountSettingsPage() {
+export default function UserSettingsPage() {
   return (
     <div className="min-h-0 flex-1">
       <UserProfile
         routing="path"
-        path="/settings/account"
+        path="/settings/user"
         appearance={{
           elements: {
             rootBox: 'h-full',

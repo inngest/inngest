@@ -39,7 +39,7 @@ export default async function AccountDropdown() {
       }
     >
       <div className="p-2">
-        <DropdownItem context="dark" href={'/settings/account' as Route}>
+        <DropdownItem context="dark" href={'/settings/user' as Route}>
           <UserCircleIcon className="h-4" />
           Account
         </DropdownItem>
