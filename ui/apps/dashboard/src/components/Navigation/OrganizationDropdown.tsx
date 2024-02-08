@@ -1,5 +1,6 @@
 'use client';
 
+import type { ComponentType } from 'react';
 import type { Route } from 'next';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -14,17 +15,26 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
+import { Skeleton } from '@inngest/components/Skeleton';
 
 export default function OrganizationDropdown() {
   const { isLoaded, organization } = useOrganization();
   const { userMemberships } = useOrganizationList({ userMemberships: true });
-  const router = useRouter();
 
-  if (!isLoaded || !organization) return null;
+  if (!isLoaded) {
+    return (
+      <div className="flex h-full items-center gap-2 border-l border-slate-800 px-2 py-1.5 md:px-4">
+        <Skeleton className="block size-5 rounded" />
+        <Skeleton className="h-5 w-20" />
+      </div>
+    );
+  }
+
+  if (!organization) return null;
 
   return (
     <DropdownMenu>
@@ -34,36 +44,68 @@ export default function OrganizationDropdown() {
           src={organization.imageUrl}
           width={20}
           height={20}
-          className="h-5 w-5 rounded"
+          className="size-5 rounded"
         />{' '}
         {organization.name}
       </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        <DropdownMenuItem>
-          <Cog6ToothIcon />
-          Organization Settings
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <UserGroupIcon />
-          Members
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <CreditCardIcon />
-          Billing
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        {userMemberships.count && userMemberships.count > 1 ? (
-          <DropdownMenuItem onSelect={() => router.push('/organization-list' as Route)}>
-            <ArrowsRightLeftIcon />
-            Switch Organization
-          </DropdownMenuItem>
-        ) : (
-          <DropdownMenuItem onSelect={() => router.push('/create-organization' as Route)}>
-            <PlusCircleIcon />
-            Create Organization
-          </DropdownMenuItem>
-        )}
+
+      <DropdownMenuContent
+        sideOffset={4}
+        className="bg-slate-940/95 z-50 divide-y divide-dashed divide-slate-700 p-0 backdrop-blur"
+      >
+        <DropdownMenuGroup className="p-2">
+          <OrganizationDropdownMenuItem
+            icon={Cog6ToothIcon}
+            href="/settings/organization/organization-settings"
+            label="Organization Settings"
+          />
+          <OrganizationDropdownMenuItem
+            icon={UserGroupIcon}
+            href="/settings/organization"
+            label="Members"
+          />
+          <OrganizationDropdownMenuItem
+            icon={CreditCardIcon}
+            href="/settings/billing"
+            label="Billing"
+          />
+        </DropdownMenuGroup>
+        <DropdownMenuGroup className="p-2">
+          {userMemberships.count && userMemberships.count > 1 ? (
+            <OrganizationDropdownMenuItem
+              icon={ArrowsRightLeftIcon}
+              href="/organization-list"
+              label="Switch Organization"
+            />
+          ) : (
+            <OrganizationDropdownMenuItem
+              icon={PlusCircleIcon}
+              href="/create-organization"
+              label="Create Organization"
+            />
+          )}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function OrganizationDropdownMenuItem(props: {
+  icon: ComponentType<{
+    className?: string;
+  }>;
+  label: string;
+  href: string;
+}) {
+  const router = useRouter();
+
+  return (
+    <DropdownMenuItem
+      className="p-2 font-medium text-slate-400 hover:bg-transparent hover:text-white"
+      onSelect={() => router.push(props.href as Route)}
+    >
+      <props.icon className="size-4" />
+      {props.label}
+    </DropdownMenuItem>
   );
 }
