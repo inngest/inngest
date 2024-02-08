@@ -3,7 +3,7 @@
 import type { ComponentType } from 'react';
 import type { Route } from 'next';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useOrganization, useOrganizationList } from '@clerk/nextjs';
 import {
   ArrowsRightLeftIcon,
@@ -97,15 +97,15 @@ function OrganizationDropdownMenuItem(props: {
   label: string;
   href: string;
 }) {
-  const router = useRouter();
-
   return (
     <DropdownMenuItem
+      asChild
       className="p-2 font-medium text-slate-400 hover:bg-transparent hover:text-white"
-      onSelect={() => router.push(props.href as Route)}
     >
-      <props.icon className="size-4" />
-      {props.label}
+      <Link href={props.href as Route}>
+        <props.icon className="size-4" />
+        {props.label}
+      </Link>
     </DropdownMenuItem>
   );
 }
