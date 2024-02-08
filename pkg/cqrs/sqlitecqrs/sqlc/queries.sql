@@ -123,6 +123,9 @@ INSERT INTO event_batches
 -- name: GetEventByInternalID :one
 SELECT * FROM events WHERE internal_id = ?;
 
+-- name: GetEventsByInternalIDs :many
+SELECT * FROM events WHERE internal_id IN (sqlc.slice('ids'));
+
 -- name: GetEventBatchByRunID :one
 SELECT * FROM event_batches WHERE run_id = ?;
 

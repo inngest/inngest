@@ -328,11 +328,19 @@ func (w wrapper) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*cq
 	return &eb, nil
 }
 
-// GetEventsByRunID returns the list of events associated with a runID.
-// This is expected to be reference for batched runs.
-func (w wrapper) GetEventsByRunID(ctx context.Context, runID ulid.ULID) ([]*cqrs.Event, error) {
-	events := []*cqrs.Event{}
-	return events, nil
+func (w wrapper) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*cqrs.Event, error) {
+	objs, err := w.q.GetEventsByInternalIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	evts := make([]*cqrs.Event, len(objs))
+	for i, o := range objs {
+		evt := convertEvent(o)
+		evts[i] = &evt
+	}
+
+	return evts, nil
 }
 
 func (w wrapper) FindEvent(ctx context.Context, workspaceID uuid.UUID, internalID ulid.ULID) (*cqrs.Event, error) {

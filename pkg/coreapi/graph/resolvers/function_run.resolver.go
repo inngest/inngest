@@ -145,11 +145,28 @@ func (r *functionRunResolver) Events(ctx context.Context, obj *models.FunctionRu
 		return nil, err
 	}
 
-	// TODO: retrieve events by IDs
-	fmt.Printf("Batch: %#v\n", batch.EventIDs())
-	events := []*models.Event{}
+	// retrieve events by IDs
+	evts, err := r.Data.GetEventsByInternalIDs(ctx, batch.EventIDs())
+	if err != nil {
+		return nil, err
+	}
 
-	return events, nil
+	result := make([]*models.Event, len(evts))
+	for i, e := range evts {
+		payload, err := json.Marshal(e.EventData)
+		if err != nil {
+			return nil, err
+		}
+
+		result[i] = &models.Event{
+			ID:        e.ID.String(),
+			Name:      &e.EventName,
+			CreatedAt: &e.ReceivedAt,
+			Payload:   util.StrPtr(string(payload)),
+		}
+	}
+
+	return result, nil
 }
 
 func (r *functionRunResolver) WaitingFor(ctx context.Context, obj *models.FunctionRun) (*models.StepEventWait, error) {

@@ -341,6 +341,56 @@ func (q *Queries) GetEventByInternalID(ctx context.Context, internalID ulid.ULID
 	return &i, err
 }
 
+const getEventsByInternalIDs = `-- name: GetEventsByInternalIDs :many
+SELECT internal_id, account_id, workspace_id, source, source_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts FROM events WHERE internal_id IN (/*SLICE:ids*/?)
+`
+
+func (q *Queries) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*Event, error) {
+	query := getEventsByInternalIDs
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Event
+	for rows.Next() {
+		var i Event
+		if err := rows.Scan(
+			&i.InternalID,
+			&i.AccountID,
+			&i.WorkspaceID,
+			&i.Source,
+			&i.SourceID,
+			&i.ReceivedAt,
+			&i.EventID,
+			&i.EventName,
+			&i.EventData,
+			&i.EventUser,
+			&i.EventV,
+			&i.EventTs,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getEventsTimebound = `-- name: GetEventsTimebound :many
 SELECT DISTINCT e.internal_id, e.account_id, e.workspace_id, e.source, e.source_id, e.received_at, e.event_id, e.event_name, e.event_data, e.event_user, e.event_v, e.event_ts
 FROM events AS e
