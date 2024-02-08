@@ -56,6 +56,8 @@ models:
         resolver: true
       event:
         resolver: true
+      events:
+        resolver: true
       waitingFor:
         resolver: true
       pendingSteps:

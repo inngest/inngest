@@ -183,6 +183,8 @@ type FunctionRun {
   function: Function
   workspace: Workspace
   event: Event
+  events: [Event]!
+  batchID: ULID # if the run is a batched run
 
   status: FunctionRunStatus
   waitingFor: StepEventWait

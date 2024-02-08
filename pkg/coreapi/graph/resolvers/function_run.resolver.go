@@ -137,6 +137,11 @@ func (r *functionRunResolver) Event(ctx context.Context, obj *models.FunctionRun
 	}, nil
 }
 
+func (r *functionRunResolver) Events(ctx context.Context, obj *models.FunctionRun) ([]*models.Event, error) {
+	events := []*models.Event{}
+	return events, nil
+}
+
 func (r *functionRunResolver) WaitingFor(ctx context.Context, obj *models.FunctionRun) (*models.StepEventWait, error) {
 	return nil, nil
 }
