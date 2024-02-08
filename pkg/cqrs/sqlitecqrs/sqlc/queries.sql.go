@@ -296,6 +296,23 @@ func (q *Queries) GetApps(ctx context.Context) ([]*App, error) {
 	return items, nil
 }
 
+const getEventBatchByRunID = `-- name: GetEventBatchByRunID :one
+SELECT id, run_id, started_at, executed_at, event_ids FROM event_batches WHERE run_id = ?
+`
+
+func (q *Queries) GetEventBatchByRunID(ctx context.Context, runID []byte) (*EventBatch, error) {
+	row := q.db.QueryRowContext(ctx, getEventBatchByRunID, runID)
+	var i EventBatch
+	err := row.Scan(
+		&i.ID,
+		&i.RunID,
+		&i.StartedAt,
+		&i.ExecutedAt,
+		&i.EventIds,
+	)
+	return &i, err
+}
+
 const getEventByInternalID = `-- name: GetEventByInternalID :one
 SELECT internal_id, account_id, workspace_id, source, source_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts FROM events WHERE internal_id = ?
 `

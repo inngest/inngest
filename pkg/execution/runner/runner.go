@@ -564,7 +564,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 			)
 
 			key := fmt.Sprintf("%s-%s", fn.ID, batchID)
-			if _, err := s.executor.Schedule(ctx, execution.ScheduleRequest{
+			identifier, err := s.executor.Schedule(ctx, execution.ScheduleRequest{
 				AccountID:      bi.AccountID,
 				WorkspaceID:    bi.WorkspaceID,
 				AppID:          bi.AppID,
@@ -572,9 +572,11 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 				Events:         events,
 				BatchID:        &batchID,
 				IdempotencyKey: &key,
-			}); err != nil {
+			})
+			if err != nil {
 				return err
 			}
+			batch.RunID = identifier.RunID
 
 			go func() {
 				tx, err := s.data.WithTx(ctx)

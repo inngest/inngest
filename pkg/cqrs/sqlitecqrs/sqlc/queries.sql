@@ -123,6 +123,9 @@ INSERT INTO event_batches
 -- name: GetEventByInternalID :one
 SELECT * FROM events WHERE internal_id = ?;
 
+-- name: GetEventBatchByRunID :one
+SELECT * FROM event_batches WHERE run_id = ?;
+
 -- name: GetEventsTimebound :many
 SELECT DISTINCT e.*
 FROM events AS e

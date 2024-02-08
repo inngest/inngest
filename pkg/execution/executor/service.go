@@ -352,7 +352,7 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 
 	// start execution
 	id := fmt.Sprintf("%s-%s", opts.FunctionID, batchID)
-	_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
+	identifier, err := s.exec.Schedule(ctx, execution.ScheduleRequest{
 		AccountID:      opts.AccountID,
 		WorkspaceID:    opts.WorkspaceID,
 		AppID:          opts.AppID,
@@ -364,6 +364,7 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 	if err != nil {
 		return err
 	}
+	batch.RunID = identifier.RunID
 
 	go func() {
 		tx, err := s.data.WithTx(ctx)
