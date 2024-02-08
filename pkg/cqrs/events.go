@@ -63,6 +63,7 @@ type EventManager interface {
 
 type EventWriter interface {
 	InsertEvent(ctx context.Context, e Event) error
+	InsertEventBatch(ctx context.Context, eb EventBatch) error
 }
 
 type WorkspaceEventsOpts struct {

@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
@@ -26,7 +27,7 @@ import (
 
 type Opt func(s *svc)
 
-func WithExecutionLoader(l cqrs.ExecutionLoader) func(s *svc) {
+func WithExecutionLoader(l cqrs.Manager) func(s *svc) {
 	return func(s *svc) {
 		s.data = l
 	}
@@ -78,8 +79,8 @@ func NewService(c config.Config, opts ...Opt) service.Service {
 
 type svc struct {
 	config config.Config
-	// data provides the ability to load action versions when running steps.
-	data cqrs.ExecutionLoader
+	// data provides an interface for data access
+	data cqrs.Manager
 	// state allows us to record step results
 	state state.Manager
 	// queue allows us to enqueue next steps.
@@ -340,6 +341,15 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 		return err
 	}
 
+	batch := cqrs.NewEventBatch(
+		cqrs.WithEventBatchID(batchID),
+		cqrs.WithEventBatchAccountID(opts.AccountID),
+		cqrs.WithEventBatchWorkspaceID(opts.WorkspaceID),
+		cqrs.WithEventBatchAppID(opts.AppID),
+		cqrs.WithEventBatchFunctionID(fn.ID),
+		cqrs.WithEventBatchEvents(events),
+	)
+
 	// start execution
 	id := fmt.Sprintf("%s-%s", opts.FunctionID, batchID)
 	_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
@@ -354,6 +364,21 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 	if err != nil {
 		return err
 	}
+
+	go func() {
+		tx, err := s.data.WithTx(ctx)
+		if err != nil {
+			log.From(ctx).Error().Err(err).Msg("error creating transaction")
+			return
+		}
+		defer func() {
+			if err := tx.Commit(ctx); err != nil {
+				log.From(ctx).Error().Err(err).Msg("error committing transaction")
+			}
+		}()
+
+		_ = s.data.InsertEventBatch(ctx, *batch)
+	}()
 
 	if err := s.batcher.ExpireKeys(ctx, batchID); err != nil {
 		return err

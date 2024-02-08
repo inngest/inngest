@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -287,6 +288,23 @@ func (w wrapper) InsertEvent(ctx context.Context, e cqrs.Event) error {
 	return w.q.InsertEvent(ctx, evt)
 }
 
+func (w wrapper) InsertEventBatch(ctx context.Context, eb cqrs.EventBatch) error {
+	evtIDs := make([]string, len(eb.Events))
+	for i, evt := range eb.Events {
+		evtIDs[i] = evt.GetInternalID().String()
+	}
+
+	batch := sqlc.InsertEventBatchParams{
+		ID:         []byte(eb.ID.String()),
+		RunID:      []byte(eb.RunID.String()),
+		StartedAt:  eb.StartedAt(),
+		ExecutedAt: eb.ExecutedAt(),
+		EventIds:   []byte(strings.Join(evtIDs, ",")),
+	}
+
+	return w.q.InsertEventBatch(ctx, batch)
+}
+
 func (w wrapper) GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*cqrs.Event, error) {
 	obj, err := w.q.GetEventByInternalID(ctx, internalID)
 	if err != nil {
@@ -294,6 +312,13 @@ func (w wrapper) GetEventByInternalID(ctx context.Context, internalID ulid.ULID)
 	}
 	evt := convertEvent(obj)
 	return &evt, nil
+}
+
+// GetEventsByRunID returns the list of events associated with a runID.
+// This is expected to be reference for batched runs.
+func (w wrapper) GetEventsByRunID(ctx context.Context, runID ulid.ULID) ([]*cqrs.Event, error) {
+	events := []*cqrs.Event{}
+	return events, nil
 }
 
 func (w wrapper) FindEvent(ctx context.Context, workspaceID uuid.UUID, internalID ulid.ULID) (*cqrs.Event, error) {

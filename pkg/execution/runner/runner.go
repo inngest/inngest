@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
@@ -57,7 +58,7 @@ func WithExecutor(e execution.Executor) func(s *svc) {
 	}
 }
 
-func WithExecutionLoader(l cqrs.ExecutionLoader) func(s *svc) {
+func WithExecutionLoader(l cqrs.Manager) func(s *svc) {
 	return func(s *svc) {
 		s.data = l
 	}
@@ -119,7 +120,7 @@ type svc struct {
 	executor execution.Executor
 	// data provides the required loading capabilities to trigger functions
 	// from events.
-	data cqrs.ExecutionLoader
+	data cqrs.Manager
 	// state allows the creation of new function runs.
 	state state.Manager
 	// queue allows the scheduling of new functions.
@@ -548,10 +549,19 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 				return err
 			}
 
-			events := []event.TrackedEvent{}
-			for _, e := range evtList {
-				events = append(events, e)
+			events := make([]event.TrackedEvent, len(evtList))
+			for i, e := range evtList {
+				events[i] = e
 			}
+
+			batch := cqrs.NewEventBatch(
+				cqrs.WithEventBatchID(batchID),
+				cqrs.WithEventBatchAccountID(bi.AccountID),
+				cqrs.WithEventBatchWorkspaceID(bi.WorkspaceID),
+				cqrs.WithEventBatchAppID(bi.AppID),
+				cqrs.WithEventBatchFunctionID(fn.ID),
+				cqrs.WithEventBatchEvents(events),
+			)
 
 			key := fmt.Sprintf("%s-%s", fn.ID, batchID)
 			if _, err := s.executor.Schedule(ctx, execution.ScheduleRequest{
@@ -565,6 +575,22 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 			}); err != nil {
 				return err
 			}
+
+			go func() {
+				tx, err := s.data.WithTx(ctx)
+				if err != nil {
+					log.From(ctx).Error().Err(err).Msg("error creating transaction")
+					return
+				}
+
+				defer func() {
+					if err := tx.Commit(ctx); err != nil {
+						log.From(ctx).Error().Err(err).Msg("error committing transaction")
+					}
+				}()
+
+				_ = s.data.InsertEventBatch(ctx, *batch)
+			}()
 
 			if err := s.batcher.ExpireKeys(ctx, batchID); err != nil {
 				return err
