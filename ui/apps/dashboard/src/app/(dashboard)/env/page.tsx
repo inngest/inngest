@@ -1,4 +1,3 @@
-import { type Route } from 'next';
 import Link from 'next/link';
 import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
@@ -9,6 +8,7 @@ import AppNavigation from '@/components/Navigation/AppNavigation';
 import Toaster from '@/components/Toaster';
 import getAllEnvironments from '@/queries/server-only/getAllEnvironments';
 import { EnvironmentType, LEGACY_TEST_MODE_NAME } from '@/utils/environments';
+import { pathCreator } from '@/utils/urls';
 import EnvironmentListTable from './EnvironmentListTable';
 
 export default async function Envs() {
@@ -34,12 +34,19 @@ export default async function Envs() {
             <div className="mb-4 flex w-full items-center  justify-between">
               <h2 className="text-lg font-medium text-slate-800">Production Environment</h2>
               <div className="flex items-center gap-2">
-                <Button href="/env/production/manage" appearance="outlined" label="Manage" />
+                <Button
+                  href={pathCreator.manage({ envSlug: 'production' })}
+                  appearance="outlined"
+                  label="Manage"
+                />
                 <Button
                   href={
-                    `/env/production/${
-                      isAppsEnabled ? 'apps' : 'deploys?intent=deploy-modal'
-                    }` as Route
+                    isAppsEnabled
+                      ? pathCreator.apps({ envSlug: 'production' })
+                      : pathCreator.deploys({
+                          envSlug: 'production',
+                          hasDeployIntent: true,
+                        })
                   }
                   kind="primary"
                   label={isAppsEnabled ? 'Go To Apps' : 'Deploy'}
@@ -50,7 +57,7 @@ export default async function Envs() {
               This is where you&apos;ll deploy all of your production apps.
             </p>
             <Link
-              href={process.env.NEXT_PUBLIC_HOME_PATH as Route}
+              href={pathCreator.home()}
               className="to-slate-940 mt-4 flex items-center justify-between rounded-lg bg-slate-900 bg-gradient-to-br from-slate-800 px-4 py-4 hover:bg-slate-800 hover:from-slate-700 hover:to-slate-900"
             >
               <h3 className="flex items-center gap-2 text-sm font-medium tracking-wide text-white">
@@ -58,21 +65,24 @@ export default async function Envs() {
                 Production
               </h3>
             </Link>
-            {Boolean(legacyTestMode) && (
+            {legacyTestMode && (
               <div className="mt-12 border-t border-slate-100 pt-8">
                 <div className="mb-4 flex w-full items-center  justify-between">
                   <h2 className="text-lg font-medium text-slate-800">Test Mode</h2>
                   <div className="flex items-center gap-2">
                     <Button
-                      href={`/env/${legacyTestMode?.slug}/manage`}
+                      href={pathCreator.manage({ envSlug: legacyTestMode.slug })}
                       appearance="outlined"
                       label="Manage"
                     />
                     <Button
                       href={
-                        `/env/${legacyTestMode?.slug}/${
-                          isAppsEnabled ? 'apps' : 'deploys?intent=deploy-modal'
-                        }` as Route
+                        isAppsEnabled
+                          ? pathCreator.apps({ envSlug: legacyTestMode.slug })
+                          : pathCreator.deploys({
+                              envSlug: legacyTestMode.slug,
+                              hasDeployIntent: true,
+                            })
                       }
                       kind="primary"
                       label={isAppsEnabled ? 'Go To Apps' : 'Deploy'}
@@ -80,7 +90,7 @@ export default async function Envs() {
                   </div>
                 </div>
                 <Link
-                  href={`/env/${legacyTestMode?.slug}/functions` as Route}
+                  href={pathCreator.functions({ envSlug: legacyTestMode.slug })}
                   className="mt-8 flex cursor-pointer items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm hover:bg-slate-100/60"
                 >
                   <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
@@ -95,13 +105,13 @@ export default async function Envs() {
               </div>
             )}
 
-            {Boolean(branchParent) && (
+            {branchParent && (
               <div className="mt-12 border-t border-slate-100 pt-8">
                 <div className="mb-8 flex w-full items-center justify-between">
                   <h2 className="text-lg font-medium text-slate-800">Branch Environments</h2>
                   <div className="flex items-center gap-2">
                     <Button
-                      href={`/env/${branchParent?.slug}/manage`}
+                      href={pathCreator.manage({ envSlug: branchParent.slug })}
                       appearance="outlined"
                       label="Manage"
                     />
@@ -109,9 +119,9 @@ export default async function Envs() {
                     {/* Here we don't link to the modal since the /deploy empty state has more info on branch envs */}
                     <Button
                       href={
-                        `/env/${branchParent?.slug || 'branch'}/${
-                          isAppsEnabled ? 'apps' : 'deploys'
-                        }` as Route
+                        isAppsEnabled
+                          ? pathCreator.apps({ envSlug: branchParent.slug })
+                          : pathCreator.deploys({ envSlug: branchParent.slug })
                       }
                       kind="primary"
                       label={isAppsEnabled ? 'Sync New App' : 'Deploy'}
@@ -132,19 +142,22 @@ export default async function Envs() {
                     <h2 className="text-lg font-medium text-slate-800">{env.name}</h2>
                     <div className="flex items-center gap-2">
                       <Button
-                        href={`/env/${env.slug}/manage`}
+                        href={pathCreator.manage({ envSlug: env.slug })}
                         appearance="outlined"
                         label="Manage"
                       />
                       <Button
-                        href={`/env/${env.slug}/deploys?intent=deploy-modal` as Route}
+                        href={pathCreator.deploys({
+                          envSlug: env.slug,
+                          hasDeployIntent: true,
+                        })}
                         kind="primary"
                         label="Deploy"
                       />
                     </div>
                   </div>
                   <Link
-                    href={`/env/${env.slug}/functions` as Route}
+                    href={pathCreator.functions({ envSlug: env.slug })}
                     className="mt-8 flex cursor-pointer items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm hover:bg-slate-100/60"
                   >
                     <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
@@ -159,7 +172,11 @@ export default async function Envs() {
               <div className="mb-4 flex w-full items-center  justify-between">
                 <h2 className="text-lg font-medium text-slate-800">Create an environment</h2>
                 <div className="flex items-center gap-2">
-                  <Button href="create-environment" kind="primary" label="Create environment" />
+                  <Button
+                    href={pathCreator.createEnv()}
+                    kind="primary"
+                    label="Create environment"
+                  />
                 </div>
               </div>
               <p className="mt-2 text-sm font-medium text-slate-600">
