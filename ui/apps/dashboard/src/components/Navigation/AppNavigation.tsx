@@ -11,6 +11,7 @@ import { Badge } from '@inngest/components/Badge';
 
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import OrganizationDropdown from '@/components/Navigation/OrganizationDropdown';
+import UserDropdown from '@/components/Navigation/UserDropdown';
 import { graphql } from '@/gql';
 import InngestLogo from '@/icons/InngestLogo';
 import EventIcon from '@/icons/event.svg';
@@ -139,8 +140,14 @@ export default async function AppNavigation({ environmentSlug }: AppNavigationPr
       </div>
       <div className="flex h-full items-center">
         <SearchNavigation />
-        {isOrganizationsEnabled && <OrganizationDropdown />}
-        <AccountDropdown />
+        {isOrganizationsEnabled ? (
+          <>
+            <OrganizationDropdown />
+            <UserDropdown />
+          </>
+        ) : (
+          <AccountDropdown />
+        )}
       </div>
     </nav>
   );

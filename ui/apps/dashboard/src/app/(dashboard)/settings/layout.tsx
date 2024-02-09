@@ -16,8 +16,8 @@ export default async function SettingsLayout({ children }: SettingsLayoutProps) 
 
   const navLinks = [
     {
-      href: '/settings/account',
-      text: 'Account',
+      href: '/settings/user',
+      text: 'User',
     },
     {
       href: '/settings/billing',
