@@ -54,8 +54,8 @@ const nextConfig = {
       },
       // Legacy Pages
       {
-        source: '/deploys',
-        destination: '/apps',
+        source: '/env/:slug/deploys',
+        destination: '/env/:slug/apps',
         permanent: false,
       },
       // Legacy signing key locations
