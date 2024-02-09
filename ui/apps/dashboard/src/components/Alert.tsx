@@ -37,9 +37,10 @@ type Props = {
   children: React.ReactNode;
   className?: string;
   severity: Severity;
+  showIcon?: boolean;
 };
 
-export function Alert({ children, className, severity }: Props) {
+export function Alert({ children, className, severity, showIcon = true }: Props) {
   const Icon = severityStyles[severity].icon;
 
   return (
@@ -50,9 +51,7 @@ export function Alert({ children, className, severity }: Props) {
         className
       )}
     >
-      <div>
-        <Icon className={cn('w-5', severityStyles[severity].iconClassName)} />
-      </div>
+      {showIcon && <Icon className={cn('w-5 shrink-0', severityStyles[severity].iconClassName)} />}
 
       <div className="leading-5">{children}</div>
     </div>

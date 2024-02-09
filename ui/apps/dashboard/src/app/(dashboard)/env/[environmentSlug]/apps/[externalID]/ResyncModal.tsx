@@ -4,7 +4,7 @@ import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
 import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch';
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 import { toast } from 'sonner';
 
 import { Alert } from '@/components/Alert';
@@ -69,9 +69,9 @@ export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
       }
     >
       <div className="border-b border-slate-200 px-6">
-        {platform === 'vercel' && (
-          <Alert className="my-2" severity="info">
-            Vercel&apos; Generated URLs (
+        {platform === 'vercel' && !failure && (
+          <Alert className="my-2" severity="info" showIcon={false}>
+            Vercel&apos;s Generated URLs (
             <Link showIcon={false} href="(https://vercel.com/docs/deployments/generated-urls">
               see docs
             </Link>
@@ -94,7 +94,7 @@ export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
               setOverrideValue(e.target.value);
             }}
             readonly={!isURLOverridden}
-            className={classNames(!isURLOverridden && 'bg-slate-200')}
+            className={cn(!isURLOverridden && 'bg-slate-200')}
           />
         </div>
         <div className="mb-6">
@@ -109,7 +109,7 @@ export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
             />
             <SwitchLabel htmlFor="override">Override Input</SwitchLabel>
           </SwitchWrapper>
-          {isURLOverridden && (
+          {isURLOverridden && !failure && (
             <p className="pl-[50px] pt-1 font-semibold text-yellow-700">
               Ensure your app ID in the new endpoint is the same, otherwise Inngest will consider it
               a new app while syncing.
