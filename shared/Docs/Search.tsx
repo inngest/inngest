@@ -2,6 +2,7 @@ import {
   forwardRef,
   Fragment,
   MutableRefObject,
+  ReactElement,
   useEffect,
   useId,
   useRef,
@@ -16,6 +17,9 @@ import { getAlgoliaResults } from "@algolia/autocomplete-preset-algolia";
 import { Dialog, Transition } from "@headlessui/react";
 import algoliasearch from "algoliasearch/lite";
 import clsx from "clsx";
+
+import PythonIcon from "src/shared/Icons/Python";
+import TypeScriptIcon from "src/shared/Icons/TypeScript";
 
 const searchClient = algoliasearch(
   process.env.NEXT_PUBLIC_DOCSEARCH_APP_ID,
@@ -191,14 +195,38 @@ function LoadingIcon(props) {
   );
 }
 
+function getSDKLanguage(result): string | null {
+  switch (result.sdkLanguage) {
+    case "typescript":
+      return "TypeScript";
+    case "python":
+      return "Python";
+    default:
+      return null;
+  }
+}
+function getSDKLanguageIcon(result): React.ElementType | null {
+  switch (result.sdkLanguage) {
+    case "typescript":
+      return TypeScriptIcon;
+    case "python":
+      return PythonIcon;
+    default:
+      return null;
+  }
+}
+
 function SearchResult({ result, resultIndex, autocomplete, collection }) {
   let id = useId();
   let { titleHtml, hierarchyHtml } = resolveResult(result);
 
+  const sdkLanguage = getSDKLanguage(result);
+  const SdkLanguageIcon = getSDKLanguageIcon(result);
+
   return (
     <li
       className={clsx(
-        "group block cursor-default px-4 py-3 aria-selected:bg-slate-50 dark:aria-selected:bg-slate-800/50",
+        "group block relative cursor-default px-4 py-3 aria-selected:bg-slate-50 dark:aria-selected:bg-slate-800/50",
         resultIndex > 0 && "border-t border-slate-100 dark:border-slate-800"
       )}
       aria-labelledby={`${id}-hierarchy ${id}-title`}
@@ -213,6 +241,12 @@ function SearchResult({ result, resultIndex, autocomplete, collection }) {
         className="text-sm font-medium text-slate-900 group-aria-selected:text-indigo-500 dark:text-white"
         dangerouslySetInnerHTML={{ __html: titleHtml }}
       />
+      {SdkLanguageIcon && (
+        <span className="absolute px-1.5 top-3 right-2">
+          <SdkLanguageIcon className="w-5 h-5 text-slate-400" />
+        </span>
+      )}
+
       {hierarchyHtml.length > 0 && (
         <div
           id={`${id}-hierarchy`}

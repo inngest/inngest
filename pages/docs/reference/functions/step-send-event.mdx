@@ -1,4 +1,6 @@
-# Sending events from functions `step.sendEvent()`
+export const description = `Send one or more events reliably from within your function with step.sendEvent().`;
+
+# Send Event
 
 Use to send event(s) reliability within your function. Use this instead of [`inngest.send()`](/docs/reference/events/send) to ensure reliable event delivery from within functions. This is especially useful when [creating functions that fan-out](/docs/guides/fan-out-jobs).
 

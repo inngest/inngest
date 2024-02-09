@@ -130,7 +130,7 @@ new RetryAfterError(
   </Property>
 </Properties>
 
-## Step errors
+## Step errors <VersionBadge version="v3.12.0+" />
 
 After a step exhausts all of its retries, it will throw a `StepError` which can be caught and handled in the function handler if desired.
 
@@ -193,6 +193,10 @@ inngest.createFunction(
 );
 ```
 </CodeGroup>
+
+<Callout>
+  Support for handling step errors is available in the Inngest TypeScript SDK starting from version **3.12.0**. Prior to this version, wrapping a step in try/catch will not work correctly.
+</Callout>
 
 ## Attempt counter
 
