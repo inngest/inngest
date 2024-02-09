@@ -1,6 +1,5 @@
 import { ClientFeatureFlagProvider } from '@/components/FeatureFlags/ClientFeatureFlagProvider';
 import PageViewTracker from '@/components/PageViewTracker';
-import URQLProvider from '@/queries/URQLProvider';
 import SentryUserIdentification from './SentryUserIdentification';
 import './globals.css';
 import React from 'react';
