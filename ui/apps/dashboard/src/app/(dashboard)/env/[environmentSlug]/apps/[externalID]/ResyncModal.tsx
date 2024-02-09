@@ -71,15 +71,17 @@ export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
       <div className="border-b border-slate-200 px-6">
         {platform === 'vercel' && !failure && (
           <Alert className="my-6" severity="info" showIcon={false}>
-           Vercel generates a unique URL for each deployment (
-           <Link showIcon={false} href="https://vercel.com/docs/deployments/generated-urls">
+            Vercel generates a unique URL for each deployment (
+            <Link showIcon={false} href="https://vercel.com/docs/deployments/generated-urls">
               see docs
             </Link>
-            ). Please confirm that you are using the correct URL if you choose a deployment's generated URL instead of a static domain for your app.
+            ). Please confirm that you are using the correct URL if you choose a deployment&apos;s
+            generated URL instead of a static domain for your app.
           </Alert>
         )}
         <p className="my-6">
-          This initiates the sync request to your app which pushes the updated function configuration to Inngest.
+          This initiates the sync request to your app which pushes the updated function
+          configuration to Inngest.
         </p>
 
         <p className="my-6">The URL where you serve Inngest functions:</p>
@@ -111,8 +113,11 @@ export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
           {isURLOverridden && !failure && (
             <p className="pl-[50px] pt-1 font-semibold text-yellow-700">
               Please ensure that your app ID (
-              <Link showIcon={false} href="https://www.inngest.com/docs/apps#apps-in-sdk">docs</Link>
-              ) is not changed before resyncing. Changing the app ID will result in the creation of a new app in this environment.
+              <Link showIcon={false} href="https://www.inngest.com/docs/apps#apps-in-sdk">
+                docs
+              </Link>
+              ) is not changed before resyncing. Changing the app ID will result in the creation of
+              a new app in this environment.
             </p>
           )}
         </div>
