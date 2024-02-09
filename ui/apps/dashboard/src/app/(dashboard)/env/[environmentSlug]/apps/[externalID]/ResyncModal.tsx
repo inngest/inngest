@@ -71,19 +71,18 @@ export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
       <div className="border-b border-slate-200 px-6">
         {platform === 'vercel' && !failure && (
           <Alert className="my-6" severity="info" showIcon={false}>
-            Vercel&apos;s Generated URLs (
-            <Link showIcon={false} href="(https://vercel.com/docs/deployments/generated-urls">
+           Vercel generates a unique URL for each deployment (
+           <Link showIcon={false} href="https://vercel.com/docs/deployments/generated-urls">
               see docs
             </Link>
-            ) are unique to a particular deployment. Ensure you are using the right URL if you
-            choose to use a Generated URL instead of a static domain to locate the deployment.
+            ). Please confirm that you are using the correct URL if you choose a deployment's generated URL instead of a static domain for your app.
           </Alert>
         )}
         <p className="my-6">
-          This will send a sync request to your app, telling it to sync itself with Inngest.
+          This initiates the sync request to your app which pushes the updated function configuration to Inngest.
         </p>
 
-        <p className="my-6">{"We'll"} send a request to the following URL:</p>
+        <p className="my-6">The URL where you serve Inngest functions:</p>
 
         <div className="my-6 flex-1">
           <Input
@@ -111,8 +110,9 @@ export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
           </SwitchWrapper>
           {isURLOverridden && !failure && (
             <p className="pl-[50px] pt-1 font-semibold text-yellow-700">
-              Ensure your app ID in the new endpoint is the same, otherwise Inngest will consider it
-              a new app while syncing.
+              Please ensure that your app ID (
+              <Link showIcon={false} href="https://www.inngest.com/docs/apps#apps-in-sdk">docs</Link>
+              ) is not changed before resyncing. Changing the app ID will result in the creation of a new app in this environment.
             </p>
           )}
         </div>
