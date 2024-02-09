@@ -54,7 +54,7 @@ export function Alert({ children, className, severity }: Props) {
         <Icon className={cn('w-5', severityStyles[severity].iconClassName)} />
       </div>
 
-      <div>{children}</div>
+      <div className="leading-5">{children}</div>
     </div>
   );
 }
