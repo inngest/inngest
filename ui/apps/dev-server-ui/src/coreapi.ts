@@ -78,6 +78,10 @@ export const FUNCTION_RUN = gql`
         id
         raw
       }
+      events {
+        id
+        raw
+      }
       history {
         attempt
         cancel {
