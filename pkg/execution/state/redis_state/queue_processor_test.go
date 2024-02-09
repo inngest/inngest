@@ -280,7 +280,7 @@ func TestQueueRunExtended(t *testing.T) {
 	ShardTickTime = 5 * time.Second
 	ShardLeaseTime = 5 * time.Second
 
-	sf := func(ctx context.Context, wsID uuid.UUID) *QueueShard {
+	sf := func(ctx context.Context, queueName string, wsID uuid.UUID) *QueueShard {
 		// For nil UUIDs, return a shard.
 		if wsID == uuid.Nil {
 			return &QueueShard{

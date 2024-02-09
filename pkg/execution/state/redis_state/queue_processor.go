@@ -21,6 +21,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
 	"go.opentelemetry.io/otel/trace"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"gonum.org/v1/gonum/stat/sampleuv"
 )
@@ -54,6 +55,8 @@ var (
 	ShardTickTime = 15 * time.Second
 	// ShardLeaseTime is how long shards are leased.
 	ShardLeaseTime = 10 * time.Second
+
+	maxShardLeaseAttempts = 10
 )
 
 var (
@@ -186,6 +189,7 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		go q.worker(ctx, f)
 	}
 
+	go q.queueGauges(ctx)
 	go q.claimShards(ctx)
 	go q.claimSequentialLease(ctx)
 	go q.runScavenger(ctx)
@@ -279,6 +283,7 @@ func (q *queue) claimShards(ctx context.Context) {
 			go func() {
 				if !atomic.CompareAndSwapInt32(&leasing, 0, 1) {
 					// Only one lease can occur at once.
+					q.logger.Debug().Msg("already leasing shards")
 					return
 				}
 
@@ -289,7 +294,9 @@ func (q *queue) claimShards(ctx context.Context) {
 				// must succeed, even if it leaves us spinning.  Note that scanShards filters
 				// out unnecessary leases and shards that have already been leased.
 				retry := true
-				for retry {
+				n := 0
+				for retry && n < maxShardLeaseAttempts {
+					n++
 					var err error
 					retry, err = q.scanShards(ctx)
 					if err != nil {
@@ -297,7 +304,7 @@ func (q *queue) claimShards(ctx context.Context) {
 						return
 					}
 					if retry {
-						<-time.After(time.Duration(rand.Intn(20)) * time.Millisecond)
+						<-time.After(time.Duration(rand.Intn(50)) * time.Millisecond)
 					}
 				}
 			}()
@@ -313,6 +320,7 @@ func (q *queue) claimShards(ctx context.Context) {
 						q.logger.Error().Err(err).Msg("error renewing shard lease")
 						return
 					}
+					q.logger.Debug().Interface("shard", ls).Msg("renewed shard lease")
 					// Update the lease ID so that we have this stored appropriately for
 					// the next renewal.
 					q.addLeasedShard(ctx, &ls.Shard, *nextLeaseID)
@@ -350,7 +358,11 @@ func (q *queue) scanShards(ctx context.Context) (retry bool, err error) {
 			// 	"shard_name": shard.Name,
 			// })
 			q.addLeasedShard(ctx, shard, *leaseID)
+			q.logger.Debug().Interface("shard", shard).Str("lease_id", leaseID.String()).Msg("leased shard")
+		} else {
+			q.logger.Debug().Interface("shard", shard).Err(err).Msg("failed to lease shard")
 		}
+
 		// go q.counter(ctx, "queue_shard_lease_conflict_total", 1, map[string]any{
 		// 	"shard_name": shard.Name,
 		// })
@@ -407,7 +419,6 @@ func (q *queue) filterShards(ctx context.Context, shards map[string]*QueueShard)
 	}
 
 	// Copy the slice to prevent locking/concurrent access.
-
 	for _, v := range q.getShardLeases() {
 		delete(shards, v.Shard.Name)
 	}
@@ -416,9 +427,20 @@ func (q *queue) filterShards(ctx context.Context, shards map[string]*QueueShard)
 	shuffleIdx := []*QueueShard{}
 	for _, v := range shards {
 		// XXX: Here we can add latency targets, etc.
-		if len(v.Leases) >= int(v.GuaranteedCapacity) {
+
+		validLeases := []ulid.ULID{}
+		for _, l := range v.Leases {
+			if time.UnixMilli(int64(l.Time())).After(time.Now()) {
+				validLeases = append(validLeases, l)
+			}
+		}
+		// Replace leases with the # of valid leases.
+		v.Leases = validLeases
+
+		if len(validLeases) >= int(v.GuaranteedCapacity) {
 			continue
 		}
+
 		weights = append(weights, float64(v.Priority))
 		shuffleIdx = append(shuffleIdx, v)
 	}
@@ -598,7 +620,10 @@ func (q *queue) scan(ctx context.Context) error {
 
 	// Store the shard that we processed, allowing us to eventually pass this
 	// down to the job for stat tracking.
-	var shard *QueueShard
+	var (
+		shard           *QueueShard
+		metricShardName = "<global>" // default global name for metrics in this function
+	)
 
 	// By default, use the global partition
 	partitionKey := q.kg.GlobalPartitionIndex()
@@ -607,46 +632,54 @@ func (q *queue) scan(ctx context.Context) error {
 	// worker still works on the global queue.
 	existingLeases := q.getShardLeases()
 
-	if len(existingLeases) > 0 && rand.Intn(100) >= 5 {
+	if len(existingLeases) > 0 {
 		// Pick a random item between the shards.
 		i := rand.Intn(len(existingLeases))
 		shard = &existingLeases[i].Shard
 		// Use the shard partition
 		partitionKey = q.kg.ShardPartitionIndex(shard.Name)
+		metricShardName = "<shard>:" + shard.Name
 	}
 
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
-	partitions, err := q.partitionPeek(ctx, partitionKey, q.isSequential(), time.Now().Add(time.Second), PartitionPeekMax)
+	partitions, err := q.partitionPeek(ctx, partitionKey, q.isSequential(), time.Now().Add(PartitionLookahead), PartitionPeekMax)
 	if err != nil {
 		return err
 	}
 
-	for _, p := range partitions {
-		if q.capacity() == 0 {
-			// no longer any available workers for partition, so we can skip
-			// work
-			q.scope.Counter("scan_no_capacity_total").Inc(1)
+	eg := errgroup.Group{}
+
+	for _, ptr := range partitions {
+		p := *ptr
+		eg.Go(func() error {
+			if q.capacity() == 0 {
+				// no longer any available workers for partition, so we can skip
+				// work
+				q.int64counter(ctx, "inngest_queue_scan_no_capacity_total", 1)
+				return nil
+			}
+			if err := q.processPartition(ctx, &p, shard); err != nil {
+				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
+					// Another worker grabbed the partition, or the partition was deleted
+					// during the scan by an another worker.
+					// TODO: Increase internal metrics
+					return nil
+				}
+				if errors.Unwrap(err) != context.Canceled {
+					q.logger.Error().Err(err).Msg("error processing partition")
+				}
+				return err
+			}
+
+			q.int64counter(ctx, "inngest_queue_partition_processed_total", 1, attribute.KeyValue{
+				Key:   attribute.Key("shard"),
+				Value: attribute.StringValue(metricShardName),
+			})
 			return nil
-		}
-		// This must happen in series, NOT in a goroutine, so that each worker can correctly
-		// take the available capacity in the worker and peek a correct, stable number of items.
-		//
-		// Without this, sojourn latency tracking is impossible.
-		if err := q.processPartition(ctx, p, shard); err != nil {
-			if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
-				// Another worker grabbed the partition, or the partition was deleted
-				// during the scan by an another worker.
-				// TODO: Increase internal metrics
-				continue
-			}
-			if errors.Unwrap(err) != context.Canceled {
-				q.logger.Error().Err(err).Msg("error processing partition")
-			}
-			return err
-		}
+		})
 	}
 
-	return nil
+	return eg.Wait()
 }
 
 // NOTE: Shard is only passed as a reference if the partition was peeked from
@@ -697,11 +730,6 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	peekCtx, cancel := context.WithTimeout(ctx, PartitionLeaseDuration)
 	defer cancel()
 
-	q.logger.
-		Debug().
-		Interface("partition", p).
-		Msg("leased partition")
-
 	// We need to round ourselves up to the nearest second, then add another second
 	// to peek for jobs in the next <= 1999 milliseconds.
 	//
@@ -709,7 +737,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	// within 5ms of each other, we fetch them in order but we may process them out of
 	// order, depending on how long it takes for the item to pass through the channel
 	// to the worker, how long Redis takes to lease the item, etc.
-	fetch := time.Now().Truncate(time.Second).Add(2 * time.Second)
+	fetch := time.Now().Truncate(time.Second).Add(PartitionLookahead)
 	queue, err := q.Peek(peekCtx, p.Queue(), fetch, q.peekSize())
 	if err != nil {
 		return err
@@ -718,21 +746,29 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	var processErr error
 	var concurrencyLimitReached bool
 
+	// Record the number of partitions we're leasing.
+	q.int64counter(ctx, "inngest_queue_partition_lease_total", 1)
+
 ProcessLoop:
 	for _, qi := range queue {
+		if q.capacity() == 0 {
+			// no longer any available workers for partition, so we can skip
+			// work for now.
+			q.int64counter(ctx, "inngest_queue_process_no_capacity_total", 1)
+			break ProcessLoop
+		}
+
 		item := qi
 		if item.IsLeased(time.Now()) {
-			q.scope.Counter(counterQueueItemsProcessLeaseExists).Inc(1)
+			q.int64counter(ctx, "inngest_queue_partition_lease_contention_total", 1)
 			continue
 		}
 
 		// Cbeck if there's capacity from our local workers atomically prior to leasing our tiems.
 		if !q.sem.TryAcquire(1) {
-			q.scope.Counter(counterPartitionProcessNoCapacity).Inc(1)
+			q.int64counter(ctx, "inngest_queue_partition_process_no_capacity_total", 1)
 			break
 		}
-
-		q.scope.Counter(counterPartitionProcessItems).Inc(1)
 
 		// Attempt to lease this item before passing this to a worker.  We have to do this
 		// synchronously as we need to lease prior to requeueing the partition pointer. If
@@ -853,7 +889,7 @@ ProcessLoop:
 			go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
 		}
 		// Requeue this partition as we hit concurrency limits.
-		q.scope.Counter(counterConcurrencyLimit).Inc(1)
+		q.int64counter(ctx, "inngest_queue_partition_concurrency_limit_total", 1)
 		return q.PartitionRequeue(ctx, p, time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 
@@ -991,9 +1027,10 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 			Latency:      latency,
 			SojournDelay: sojourn,
 			Priority:     p.Priority,
+			ShardName:    "<global>",
 		}
 		if s != nil {
-			runInfo.ShardName = &s.Name
+			runInfo.ShardName = s.Name
 		}
 
 		// Call the run func.
@@ -1127,6 +1164,43 @@ func (q *queue) isScavenger() bool {
 	return ulid.Time(l.Time()).After(time.Now())
 }
 
+func (q *queue) queueGauges(ctx context.Context) {
+	// Report gauges to otel.
+	_, _ = q.meter.Int64ObservableGauge(
+		"inngest_queue_capacity_total",
+		metric.WithDescription("Capacity of current worker"),
+		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
+			o.Observe(q.capacity())
+			return nil
+		}),
+	)
+	_, _ = q.meter.Int64ObservableGauge(
+		"inngest_queue_global_partition_total_count",
+		metric.WithDescription("Number of total partitions in the global queue"),
+		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
+			cnt, err := q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), time.Now().Add(time.Hour*24*365))
+			if err != nil {
+				q.logger.Error().Err(err).Msg("error getting global partition total for gauge")
+			}
+			o.Observe(cnt)
+			return nil
+		}),
+	)
+	// Report gauges to otel.
+	_, _ = q.meter.Int64ObservableGauge(
+		"inngest_queue_global_partition_available_count",
+		metric.WithDescription("Number of available partitions in the global queue"),
+		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
+			cnt, err := q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), time.Now().Add(PartitionLookahead))
+			if err != nil {
+				q.logger.Error().Err(err).Msg("error getting global partition available for gauge")
+			}
+			o.Observe(cnt)
+			return nil
+		}),
+	)
+}
+
 // shardGauges reports shard gauges via otel.
 func (q *queue) shardGauges(ctx context.Context) {
 	var (
@@ -1180,6 +1254,28 @@ func (q *queue) shardGauges(ctx context.Context) {
 			return err
 		}),
 	)
+	_, _ = q.meter.Int64ObservableGauge(
+		"inngest_queue_shard_partition_available_count",
+		metric.WithDescription("The number of avaialble partitions by shard"),
+		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
+			for _, shard := range shards {
+				cnt, err := q.partitionSize(ctx, q.kg.ShardPartitionIndex(shard.Name), time.Now().Add(PartitionLookahead))
+				if err != nil {
+					q.logger.Error().Err(err).Msg("error getting shard partition size for gauge")
+				}
+				o.Observe(cnt, metric.WithAttributes(
+					attribute.KeyValue{Key: attribute.Key("shard_name"), Value: attribute.StringValue(shard.Name)},
+				))
+			}
+			return nil
+		}),
+	)
+}
+
+func (q *queue) int64counter(ctx context.Context, name string, value int64, attrs ...attribute.KeyValue) {
+	if c, err := q.meter.Int64Counter(name); err == nil {
+		c.Add(ctx, value, metric.WithAttributes(attrs...))
+	}
 }
 
 // trackingSemaphore returns a semaphore that tracks closely - but not atomically -
