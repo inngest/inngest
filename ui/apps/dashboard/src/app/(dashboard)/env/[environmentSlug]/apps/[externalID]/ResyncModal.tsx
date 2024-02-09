@@ -85,21 +85,20 @@ export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
 
         <p className="my-6">{"We'll"} send a request to the following URL:</p>
 
-        <div className="my-6 flex items-center rounded p-1">
-          <div className="flex-1">
-            <Input
-              placeholder="https://example.com/api/inngest"
-              name="url"
-              value={url}
-              onChange={(e) => {
-                setOverrideValue(e.target.value);
-              }}
-              readonly={!isURLOverridden}
-              className={classNames(!isURLOverridden && 'bg-slate-200')}
-            />
-          </div>
+        <div className="my-6 flex-1">
+          <Input
+            placeholder="https://example.com/api/inngest"
+            name="url"
+            value={url}
+            onChange={(e) => {
+              setOverrideValue(e.target.value);
+            }}
+            readonly={!isURLOverridden}
+            className={classNames(!isURLOverridden && 'bg-slate-200')}
+          />
+        </div>
+        <div className="mb-6">
           <SwitchWrapper>
-            <SwitchLabel htmlFor="override">Override Input</SwitchLabel>
             <Switch
               checked={isURLOverridden}
               disabled={isSyncing}
@@ -108,14 +107,15 @@ export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
               }}
               id="override"
             />
+            <SwitchLabel htmlFor="override">Override Input</SwitchLabel>
           </SwitchWrapper>
+          {isURLOverridden && (
+            <p className="pl-[50px] pt-1 font-semibold text-yellow-700">
+              Ensure your app ID in the new endpoint is the same, otherwise Inngest will consider it
+              a new app while syncing.
+            </p>
+          )}
         </div>
-        {isURLOverridden && (
-          <Alert className="my-2" severity="warning">
-            Ensure your app ID in the new endpoint is the same, otherwise Inngest will consider it a
-            new app while syncing.
-          </Alert>
-        )}
 
         {failure && !isSyncing && <DeployFailure {...failure} />}
       </div>
