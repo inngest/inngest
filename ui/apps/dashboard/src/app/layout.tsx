@@ -58,12 +58,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         }}
       >
         <SentryUserIdentification />
-        <URQLProvider>
-          <ClientFeatureFlagProvider>
-            {children}
-            <PageViewTracker />
-          </ClientFeatureFlagProvider>
-        </URQLProvider>
+        <ClientFeatureFlagProvider>
+          {children}
+          <PageViewTracker />
+        </ClientFeatureFlagProvider>
       </ClerkProvider>
     </BaseWrapper>
   );
