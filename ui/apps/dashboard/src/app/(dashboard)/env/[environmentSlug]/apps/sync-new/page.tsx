@@ -49,7 +49,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
                 className="px-4 hover:text-white data-[state=active]:text-white"
                 value="tab2"
               >
-                Vercel Sync
+                Vercel Integration
               </Tabs.Trigger>
               <Tabs.Trigger
                 className="px-4 hover:text-white data-[state=active]:text-white"
@@ -69,7 +69,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
                 </p>
                 <br />
                 <p>
-                  Inngest enables you to host your Apps on Vercel using their serverless functions
+                  Inngest enables you to host your apps on Vercel using their serverless functions
                   platform. By using Inngest&apos;s official Vercel integration, your apps will be
                   synced automatically.
                 </p>

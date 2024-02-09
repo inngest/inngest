@@ -1,14 +1,14 @@
 import { useState } from 'react';
-import { Switch } from '@headlessui/react';
 import ArrowPathIcon from '@heroicons/react/20/solid/ArrowPathIcon';
 import { Button } from '@inngest/components/Button';
+import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
-import { classNames } from '@inngest/components/utils/classNames';
+import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch';
+import { cn } from '@inngest/components/utils/classNames';
 import { toast } from 'sonner';
 
 import { Alert } from '@/components/Alert';
 import Input from '@/components/Forms/Input';
-import { Toggle } from '@/components/Toggle';
 import { DeployFailure } from '../../deploys/DeployFailure';
 import { deployViaUrl, type RegistrationFailure } from '../../deploys/utils';
 
@@ -16,9 +16,10 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   url: string;
+  platform: string;
 };
 
-export default function ResyncModal({ isOpen, onClose, url }: Props) {
+export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
   const [overrideValue, setOverrideValue] = useState(url);
   const [isURLOverridden, setURLOverridden] = useState(false);
   const [failure, setFailure] = useState<RegistrationFailure>();
@@ -68,45 +69,58 @@ export default function ResyncModal({ isOpen, onClose, url }: Props) {
       }
     >
       <div className="border-b border-slate-200 px-6">
-        <p className="my-6">
-          This will send a sync request to your app, telling it to sync itself with Inngest.
-        </p>
-
-        <p className="my-6">{"We'll"} send a request to the following URL:</p>
-
-        <div className="my-6 flex items-center rounded p-1">
-          <div className="flex-1">
-            <Input
-              placeholder="https://example.com/api/inngest"
-              name="url"
-              value={url}
-              onChange={(e) => {
-                setOverrideValue(e.target.value);
-              }}
-              readonly={!isURLOverridden}
-              className={classNames(!isURLOverridden && 'bg-slate-200')}
-            />
-          </div>
-          <div className="flex items-center gap-1">
-            <Switch.Group>
-              <Switch.Label className="mx-2">Override</Switch.Label>
-              <Toggle
-                checked={isURLOverridden}
-                disabled={isSyncing}
-                onClick={() => {
-                  setURLOverridden((prev) => !prev);
-                }}
-                title="Override"
-              />
-            </Switch.Group>
-          </div>
-        </div>
-        {isURLOverridden && (
-          <Alert className="my-2" severity="warning">
-            Ensure your app ID in the new endpoint is the same, otherwise Inngest will consider it a
-            new app while syncing.
+        {platform === 'vercel' && !failure && (
+          <Alert className="my-6" severity="info" showIcon={false}>
+            Vercel generates a unique URL for each deployment (
+            <Link showIcon={false} href="https://vercel.com/docs/deployments/generated-urls">
+              see docs
+            </Link>
+            ). Please confirm that you are using the correct URL if you choose a deployment&apos;s
+            generated URL instead of a static domain for your app.
           </Alert>
         )}
+        <p className="my-6">
+          This initiates the sync request to your app which pushes the updated function
+          configuration to Inngest.
+        </p>
+
+        <p className="my-6">The URL where you serve Inngest functions:</p>
+
+        <div className="my-6 flex-1">
+          <Input
+            placeholder="https://example.com/api/inngest"
+            name="url"
+            value={url}
+            onChange={(e) => {
+              setOverrideValue(e.target.value);
+            }}
+            readonly={!isURLOverridden}
+            className={cn(!isURLOverridden && 'bg-slate-200')}
+          />
+        </div>
+        <div className="mb-6">
+          <SwitchWrapper>
+            <Switch
+              checked={isURLOverridden}
+              disabled={isSyncing}
+              onCheckedChange={() => {
+                setURLOverridden((prev) => !prev);
+              }}
+              id="override"
+            />
+            <SwitchLabel htmlFor="override">Override Input</SwitchLabel>
+          </SwitchWrapper>
+          {isURLOverridden && !failure && (
+            <p className="pl-[50px] pt-1 font-semibold text-yellow-700">
+              Please ensure that your app ID (
+              <Link showIcon={false} href="https://www.inngest.com/docs/apps#apps-in-sdk">
+                docs
+              </Link>
+              ) is not changed before resyncing. Changing the app ID will result in the creation of
+              a new app in this environment.
+            </p>
+          )}
+        </div>
 
         {failure && !isSyncing && <DeployFailure {...failure} />}
       </div>

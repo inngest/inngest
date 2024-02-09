@@ -5,9 +5,10 @@ import ResyncModal from './ResyncModal';
 
 type Props = {
   latestSyncUrl: string;
+  platform: string;
 };
 
-export function ResyncButton({ latestSyncUrl }: Props) {
+export function ResyncButton({ latestSyncUrl, platform }: Props) {
   const [isModalVisible, setIsModalVisible] = useState(false);
 
   return (
@@ -18,6 +19,7 @@ export function ResyncButton({ latestSyncUrl }: Props) {
         isOpen={isModalVisible}
         onClose={() => setIsModalVisible(false)}
         url={latestSyncUrl}
+        platform={platform}
       />
     </>
   );
