@@ -21,7 +21,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
@@ -554,17 +553,8 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 				events[i] = e
 			}
 
-			batch := cqrs.NewEventBatch(
-				cqrs.WithEventBatchID(batchID),
-				cqrs.WithEventBatchAccountID(bi.AccountID),
-				cqrs.WithEventBatchWorkspaceID(bi.WorkspaceID),
-				cqrs.WithEventBatchAppID(bi.AppID),
-				cqrs.WithEventBatchFunctionID(fn.ID),
-				cqrs.WithEventBatchEvents(events),
-			)
-
 			key := fmt.Sprintf("%s-%s", fn.ID, batchID)
-			identifier, err := s.executor.Schedule(ctx, execution.ScheduleRequest{
+			_, err = s.executor.Schedule(ctx, execution.ScheduleRequest{
 				AccountID:      bi.AccountID,
 				WorkspaceID:    bi.WorkspaceID,
 				AppID:          bi.AppID,
@@ -576,23 +566,6 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 			if err != nil {
 				return err
 			}
-			batch.RunID = identifier.RunID
-
-			go func() {
-				tx, err := s.data.WithTx(ctx)
-				if err != nil {
-					log.From(ctx).Error().Err(err).Msg("error creating transaction")
-					return
-				}
-
-				defer func() {
-					if err := tx.Commit(ctx); err != nil {
-						log.From(ctx).Error().Err(err).Msg("error committing transaction")
-					}
-				}()
-
-				_ = s.data.InsertEventBatch(ctx, *batch)
-			}()
 
 			if err := s.batcher.ExpireKeys(ctx, batchID); err != nil {
 				return err

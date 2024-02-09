@@ -235,3 +235,7 @@ func (eb *EventBatch) EventIDs() []ulid.ULID {
 	}
 	return ids
 }
+
+func (eb *EventBatch) IsMulti() bool {
+	return len(eb.Events) > 1
+}

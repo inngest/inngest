@@ -18,7 +18,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
@@ -341,18 +340,9 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 		return err
 	}
 
-	batch := cqrs.NewEventBatch(
-		cqrs.WithEventBatchID(batchID),
-		cqrs.WithEventBatchAccountID(opts.AccountID),
-		cqrs.WithEventBatchWorkspaceID(opts.WorkspaceID),
-		cqrs.WithEventBatchAppID(opts.AppID),
-		cqrs.WithEventBatchFunctionID(fn.ID),
-		cqrs.WithEventBatchEvents(events),
-	)
-
 	// start execution
 	id := fmt.Sprintf("%s-%s", opts.FunctionID, batchID)
-	identifier, err := s.exec.Schedule(ctx, execution.ScheduleRequest{
+	_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
 		AccountID:      opts.AccountID,
 		WorkspaceID:    opts.WorkspaceID,
 		AppID:          opts.AppID,
@@ -364,22 +354,6 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 	if err != nil {
 		return err
 	}
-	batch.RunID = identifier.RunID
-
-	go func() {
-		tx, err := s.data.WithTx(ctx)
-		if err != nil {
-			log.From(ctx).Error().Err(err).Msg("error creating transaction")
-			return
-		}
-		defer func() {
-			if err := tx.Commit(ctx); err != nil {
-				log.From(ctx).Error().Err(err).Msg("error committing transaction")
-			}
-		}()
-
-		_ = s.data.InsertEventBatch(ctx, *batch)
-	}()
 
 	if err := s.batcher.ExpireKeys(ctx, batchID); err != nil {
 		return err
