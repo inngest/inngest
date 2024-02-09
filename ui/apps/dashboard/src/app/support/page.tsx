@@ -9,12 +9,12 @@ import { Button } from '@inngest/components/Button';
 import { ThreadStatus, type ThreadPartsFragment } from '@team-plain/typescript-sdk';
 import { useQuery } from 'urql';
 
+import { isEnterprisePlan } from '@/app/(organization-active)/(dashboard)/settings/billing/utils';
 import AppLink from '@/components/AppLink';
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import GitHubIcon from '@/icons/github.svg';
 import cn from '@/utils/cn';
-import { isEnterprisePlan } from '../(dashboard)/settings/billing/utils';
 import { SupportForm } from './SupportForm';
 import { useSystemStatus } from './statusPage';
 import { type TicketType } from './ticketOptions';
