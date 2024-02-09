@@ -70,7 +70,7 @@ export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
     >
       <div className="border-b border-slate-200 px-6">
         {platform === 'vercel' && !failure && (
-          <Alert className="my-2" severity="info" showIcon={false}>
+          <Alert className="my-6" severity="info" showIcon={false}>
             Vercel&apos;s Generated URLs (
             <Link showIcon={false} href="(https://vercel.com/docs/deployments/generated-urls">
               see docs
