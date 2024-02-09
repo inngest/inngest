@@ -116,6 +116,7 @@ func (b redisBatchManager) RetrieveItems(ctx context.Context, batchID ulid.ULID)
 }
 
 // StartExecution sets the status to `started`
+// If it has already started, don't do anything
 func (b redisBatchManager) StartExecution(ctx context.Context, fnID uuid.UUID, batchID ulid.ULID) (string, error) {
 	keys := []string{
 		b.k.BatchMetadata(ctx, batchID),
@@ -137,7 +138,7 @@ func (b redisBatchManager) StartExecution(ctx context.Context, fnID uuid.UUID, b
 	}
 
 	switch status {
-	case 0: // can start, and has mark it started
+	case 0: // haven't started, so mark mark it started
 		return enums.BatchStatusReady.String(), nil
 
 	case 1: // Already started

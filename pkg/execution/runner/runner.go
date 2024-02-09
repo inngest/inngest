@@ -543,6 +543,8 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 		case enums.BatchFull:
 			// start execution immediately
 			batchID := ulid.MustParse(result.BatchID)
+
+			// TODO: this logic is repeated in executor, consolidate it somewhere
 			evtList, err := s.batcher.RetrieveItems(ctx, batchID)
 			if err != nil {
 				return err

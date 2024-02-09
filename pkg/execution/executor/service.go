@@ -325,6 +325,12 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
+	fn, err := s.findFunctionByID(ctx, opts.FunctionID)
+	if err != nil {
+		return err
+	}
+
+	// TODO: this logic is repeated in runner, consolidate it somewhere
 	// convert batch items to tracked events
 	items, err := s.batcher.RetrieveItems(ctx, batchID)
 	if err != nil {
@@ -333,11 +339,6 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 	events := make([]event.TrackedEvent, len(items))
 	for i, item := range items {
 		events[i] = item
-	}
-
-	fn, err := s.findFunctionByID(ctx, opts.FunctionID)
-	if err != nil {
-		return err
 	}
 
 	// start execution
