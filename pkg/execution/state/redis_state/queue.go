@@ -59,7 +59,8 @@ const (
 	//
 	// This means that jobs not started because of concurrency limits incur up to this amount
 	// of additional latency.
-	PartitionConcurrencyLimitRequeueExtension = time.Second
+	PartitionConcurrencyLimitRequeueExtension = 2 * time.Second
+	PartitionLookahead                        = time.Second
 
 	QueuePeekMax        int64 = 1000
 	QueuePeekDefault    int64 = 200
@@ -138,7 +139,7 @@ type PriorityFinder func(ctx context.Context, item QueueItem) uint
 //
 // NOTE: This is called frequently:  for every enqueue, lease, partition lease, and so on.
 // Expect this to be called tens of thousands of times per second.
-type ShardFinder func(ctx context.Context, workspaceID uuid.UUID) *QueueShard
+type ShardFinder func(ctx context.Context, queueName string, workspaceID uuid.UUID) *QueueShard
 
 type QueueOpt func(q *queue)
 
@@ -814,7 +815,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		shardName string
 	)
 	if q.sf != nil {
-		shard = q.sf(ctx, i.WorkspaceID)
+		shard = q.sf(ctx, i.Queue(), i.WorkspaceID)
 		if shard != nil {
 			shardName = shard.Name
 			shard.Leases = []ulid.ULID{}
@@ -952,7 +953,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 
 	var shardName string
 	if q.sf != nil {
-		if shard := q.sf(ctx, qi.WorkspaceID); shard != nil {
+		if shard := q.sf(ctx, qi.Queue(), qi.WorkspaceID); shard != nil {
 			shardName = shard.Name
 		}
 	}
@@ -1035,7 +1036,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 
 	var shardName string
 	if q.sf != nil {
-		if shard := q.sf(ctx, item.WorkspaceID); shard != nil {
+		if shard := q.sf(ctx, item.Queue(), item.WorkspaceID); shard != nil {
 			shardName = shard.Name
 		}
 	}
@@ -1297,7 +1298,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 
 	var shardName string
 	if q.sf != nil {
-		if shard := q.sf(ctx, i.WorkspaceID); shard != nil {
+		if shard := q.sf(ctx, i.Queue(), i.WorkspaceID); shard != nil {
 			shardName = shard.Name
 		}
 	}
@@ -1373,7 +1374,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 
 	var shardName string
 	if q.sf != nil {
-		if shard := q.sf(ctx, p.WorkspaceID); shard != nil {
+		if shard := q.sf(ctx, p.Queue(), p.WorkspaceID); shard != nil {
 			shardName = shard.Name
 		}
 	}
@@ -1439,6 +1440,11 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 // lease contention amongst multiple shared-nothing workers.
 func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
 	return q.partitionPeek(ctx, q.kg.GlobalPartitionIndex(), sequential, until, limit)
+}
+
+func (q *queue) partitionSize(ctx context.Context, partitionKey string, until time.Time) (int64, error) {
+	cmd := q.r.B().Zcount().Key(partitionKey).Min("-inf").Max(strconv.Itoa(int(until.Unix()))).Build()
+	return q.r.Do(ctx, cmd).AsInt64()
 }
 
 func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
@@ -1565,7 +1571,7 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error {
 	var shardName string
 	if q.sf != nil {
-		if shard := q.sf(ctx, p.WorkspaceID); shard != nil {
+		if shard := q.sf(ctx, p.Queue(), p.WorkspaceID); shard != nil {
 			shardName = shard.Name
 		}
 	}
@@ -1908,10 +1914,13 @@ func (q *queue) renewShardLease(ctx context.Context, shard *QueueShard, duration
 	}
 }
 
+//nolint:all
 func (q *queue) getShardLeases() []leasedShard {
-	var existingLeases []leasedShard
 	q.shardLeaseLock.Lock()
-	_ = copy(q.shardLeases, existingLeases)
+	existingLeases := make([]leasedShard, len(q.shardLeases))
+	for n, i := range q.shardLeases {
+		existingLeases[n] = i
+	}
 	q.shardLeaseLock.Unlock()
 	return existingLeases
 }

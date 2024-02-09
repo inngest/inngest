@@ -1695,14 +1695,14 @@ func TestSharding(t *testing.T) {
 		Priority:           0,
 		GuaranteedCapacity: 1,
 	}
-	sf := func(ctx context.Context, wsID uuid.UUID) *QueueShard {
+	sf := func(ctx context.Context, queueName string, wsID uuid.UUID) *QueueShard {
 		if !shouldShard {
 			return nil
 		}
 		return shard
 	}
 	q := NewQueue(rc, WithShardFinder(sf))
-	require.NotNil(t, sf(ctx, uuid.UUID{}))
+	require.NotNil(t, sf(ctx, "", uuid.UUID{}))
 
 	t.Run("QueueItem which shards", func(t *testing.T) {
 
@@ -1915,7 +1915,7 @@ func TestShardLease(t *testing.T) {
 	defer rc.Close()
 	ctx := context.Background()
 
-	sf := func(ctx context.Context, wsID uuid.UUID) *QueueShard {
+	sf := func(ctx context.Context, queueName string, wsID uuid.UUID) *QueueShard {
 		return &QueueShard{
 			Name:               wsID.String(),
 			Priority:           0,
@@ -1925,7 +1925,7 @@ func TestShardLease(t *testing.T) {
 	q := NewQueue(rc, WithShardFinder(sf))
 
 	t.Run("Leasing a non-existent shard fails", func(t *testing.T) {
-		shard := sf(ctx, uuid.UUID{})
+		shard := sf(ctx, "", uuid.UUID{})
 		leaseID, err := q.leaseShard(ctx, shard, 2*time.Second, 1)
 		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
 		require.NotNil(t, err)
@@ -1944,7 +1944,7 @@ func TestShardLease(t *testing.T) {
 	t.Run("Leasing out-of-bounds fails", func(t *testing.T) {
 		// At the beginning, no shards have been leased.  Leasing a shard
 		// with an index of >= 1 should fail.
-		shard := sf(ctx, idA)
+		shard := sf(ctx, "", idA)
 		leaseID, err := q.leaseShard(ctx, shard, 2*time.Second, 1)
 		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
 		require.NotNil(t, err)
@@ -1952,7 +1952,7 @@ func TestShardLease(t *testing.T) {
 	})
 
 	t.Run("Leasing a shard works", func(t *testing.T) {
-		shard := sf(ctx, idA)
+		shard := sf(ctx, "", idA)
 
 		t.Run("Basic lease", func(t *testing.T) {
 			leaseID, err := q.leaseShard(ctx, shard, 1*time.Second, 0)
@@ -1987,7 +1987,7 @@ func TestShardLease(t *testing.T) {
 
 		t.Run("Leasing a second shard works", func(t *testing.T) {
 			// Try another shard name with an index of 0.
-			leaseID, err := q.leaseShard(ctx, sf(ctx, idB), 2*time.Second, 0)
+			leaseID, err := q.leaseShard(ctx, sf(ctx, "", idB), 2*time.Second, 0)
 			require.NotNil(t, leaseID)
 			require.Nil(t, err)
 		})
@@ -2000,7 +2000,7 @@ func TestShardLease(t *testing.T) {
 		_, err = q.EnqueueItem(ctx, QueueItem{WorkspaceID: idA}, time.Now())
 		require.Nil(t, err)
 
-		shard := sf(ctx, idA)
+		shard := sf(ctx, "", idA)
 		leaseID, err := q.leaseShard(ctx, shard, 1*time.Second, 0)
 		require.NotNil(t, leaseID, "could not lease shard")
 		require.Nil(t, err)
