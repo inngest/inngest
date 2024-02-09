@@ -1,15 +1,14 @@
 import { useState } from 'react';
-import { Switch } from '@headlessui/react';
 import ArrowPathIcon from '@heroicons/react/20/solid/ArrowPathIcon';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
+import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch';
 import { classNames } from '@inngest/components/utils/classNames';
 import { toast } from 'sonner';
 
 import { Alert } from '@/components/Alert';
 import Input from '@/components/Forms/Input';
-import { Toggle } from '@/components/Toggle';
 import { DeployFailure } from '../../deploys/DeployFailure';
 import { deployViaUrl, type RegistrationFailure } from '../../deploys/utils';
 
@@ -99,19 +98,17 @@ export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
               className={classNames(!isURLOverridden && 'bg-slate-200')}
             />
           </div>
-          <div className="flex items-center gap-1">
-            <Switch.Group>
-              <Switch.Label className="mx-2">Override</Switch.Label>
-              <Toggle
-                checked={isURLOverridden}
-                disabled={isSyncing}
-                onClick={() => {
-                  setURLOverridden((prev) => !prev);
-                }}
-                title="Override"
-              />
-            </Switch.Group>
-          </div>
+          <SwitchWrapper>
+            <SwitchLabel htmlFor="override">Override Input</SwitchLabel>
+            <Switch
+              checked={isURLOverridden}
+              disabled={isSyncing}
+              onCheckedChange={() => {
+                setURLOverridden((prev) => !prev);
+              }}
+              id="override"
+            />
+          </SwitchWrapper>
         </div>
         {isURLOverridden && (
           <Alert className="my-2" severity="warning">

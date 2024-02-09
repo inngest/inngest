@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import { forwardRef, type HTMLAttributes } from 'react';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
 
 export const Switch = forwardRef<
@@ -20,10 +20,14 @@ export const SwitchWrapper = ({ children }: { children: React.ReactNode }) => (
   <div className="flex items-center gap-2">{children}</div>
 );
 
-export const SwitchLabel = forwardRef<HTMLLabelElement, { children: string }>(
-  ({ children }, forwardedRef) => (
-    <label ref={forwardedRef} className="font-medium text-slate-900">
+interface SwitchLabelProps extends HTMLAttributes<HTMLLabelElement> {
+  htmlFor: string;
+}
+
+export const SwitchLabel = ({ htmlFor, children }: SwitchLabelProps) => {
+  return (
+    <label htmlFor={htmlFor} className="font-medium text-slate-900">
       {children}
     </label>
-  )
-);
+  );
+};
