@@ -52,6 +52,12 @@ const nextConfig = {
         destination: '/password-reset/complete',
         permanent: false,
       },
+      // Legacy Pages
+      {
+        source: '/deploys',
+        destination: '/apps',
+        permanent: false,
+      },
       // Legacy signing key locations
       {
         source: '/secrets',
