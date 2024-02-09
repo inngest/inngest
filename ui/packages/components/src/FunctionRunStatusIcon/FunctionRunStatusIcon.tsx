@@ -5,7 +5,10 @@ import { IconStatusCircleCross } from '@inngest/components/icons/StatusCircleCro
 import { IconStatusCircleMinus } from '@inngest/components/icons/StatusCircleMinus';
 import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 
-const icons = {
+// Explicitly assign the Record type but use satisfies to ensure:
+// - Accessing an unexpected status gives an undefined
+// - Keys must be exhaustive of all known statuses
+const icons: Record<string, React.ComponentType> = {
   CANCELLED: IconStatusCircleMinus,
   COMPLETED: IconStatusCircleCheck,
   FAILED: IconStatusCircleCross,
@@ -18,7 +21,7 @@ type Props = {
 };
 
 export function FunctionRunStatusIcon({ status, className }: Props) {
-  const Icon = icons[status];
+  const Icon = icons[status] ?? IconStatusCircleArrowPath;
 
   const title = 'Function ' + status.toLowerCase();
   return <Icon className={className} title={title} />;
