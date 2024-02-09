@@ -1613,7 +1613,7 @@ type FunctionRun {
   function: Function
   workspace: Workspace
   event: Event
-  events: [Event]!
+  events: [Event!]!
   batchID: ULID # if the run is a batched run
 
   status: FunctionRunStatus
@@ -3913,7 +3913,7 @@ func (ec *executionContext) _FunctionRun_events(ctx context.Context, field graph
 	}
 	res := resTmp.([]*models.Event)
 	fc.Result = res
-	return ec.marshalNEvent2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEvent(ctx, field.Selections, res)
+	return ec.marshalNEvent2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEventᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_FunctionRun_events(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -12395,7 +12395,7 @@ func (ec *executionContext) unmarshalNCreateAppInput2githubᚗcomᚋinngestᚋin
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNEvent2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEvent(ctx context.Context, sel ast.SelectionSet, v []*models.Event) graphql.Marshaler {
+func (ec *executionContext) marshalNEvent2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEventᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.Event) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -12419,7 +12419,7 @@ func (ec *executionContext) marshalNEvent2ᚕᚖgithubᚗcomᚋinngestᚋinngest
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalOEvent2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEvent(ctx, sel, v[i])
+			ret[i] = ec.marshalNEvent2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEvent(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -12429,6 +12429,12 @@ func (ec *executionContext) marshalNEvent2ᚕᚖgithubᚗcomᚋinngestᚋinngest
 
 	}
 	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
 
 	return ret
 }
