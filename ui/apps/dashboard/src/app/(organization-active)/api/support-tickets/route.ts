@@ -13,7 +13,7 @@ import {
   ticketTypeTitles,
   type BugSeverity,
   type TicketType,
-} from '../../../support/ticketOptions';
+} from '@/app/(organization-active)/support/ticketOptions';
 
 const apiKey = process.env.PLAIN_API_KEY;
 

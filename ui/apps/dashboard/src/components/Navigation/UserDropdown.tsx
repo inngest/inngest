@@ -22,7 +22,7 @@ import {
 } from '@inngest/components/DropdownMenu';
 import { Skeleton } from '@inngest/components/Skeleton';
 
-import { useSystemStatus } from '@/app/support/statusPage';
+import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
 import SystemStatusIcon from '@/components/Navigation/SystemStatusIcon';
 
 export default function UserDropdown() {
