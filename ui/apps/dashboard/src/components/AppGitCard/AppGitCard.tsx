@@ -99,7 +99,7 @@ function Description({
   return (
     <div className={className}>
       <dt className="pb-2 text-sm text-slate-400">{term}</dt>
-      <dd className="text-slate-800">{detail ?? ''}</dd>
+      <dd className="leading-8 text-slate-800">{detail ?? ''}</dd>
     </div>
   );
 }

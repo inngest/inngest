@@ -50,6 +50,9 @@ export function renderOutput({
         output = error.stack ?? '';
       } catch (error) {
         console.error("Error parsing 'jsonObject' JSON:", error);
+        message = 'Unable to parse error message';
+        errorName = 'Unknown Error';
+        output = content;
       }
     } else if (!isOutputTooLarge) {
       if (typeof content === 'string') {

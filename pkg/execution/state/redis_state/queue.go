@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -24,6 +25,8 @@ import (
 	"github.com/redis/rueidis"
 	"github.com/rs/zerolog"
 	"github.com/uber-go/tally/v4"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"gonum.org/v1/gonum/stat/sampleuv"
 	"lukechampine.com/frand"
@@ -56,7 +59,8 @@ const (
 	//
 	// This means that jobs not started because of concurrency limits incur up to this amount
 	// of additional latency.
-	PartitionConcurrencyLimitRequeueExtension = time.Second
+	PartitionConcurrencyLimitRequeueExtension = 2 * time.Second
+	PartitionLookahead                        = time.Second
 
 	QueuePeekMax        int64 = 1000
 	QueuePeekDefault    int64 = 200
@@ -102,6 +106,11 @@ var (
 
 	ErrConcurrencyLimitCustomKey0 = fmt.Errorf("At concurrency limit 0")
 	ErrConcurrencyLimitCustomKey1 = fmt.Errorf("At concurrency limit 1")
+
+	// internal shard errors
+	errShardNotFound     = fmt.Errorf("shard not found")
+	errShardIndexLeased  = fmt.Errorf("shard index is already leased")
+	errShardIndexInvalid = fmt.Errorf("shard lease index is too high (a lease just expired)")
 )
 
 var (
@@ -123,6 +132,14 @@ type QueueManager interface {
 
 // PriorityFinder returns the priority for a given queue item.
 type PriorityFinder func(ctx context.Context, item QueueItem) uint
+
+// ShardFinder returns the given shard for a workspace ID, or nil if we should
+// not shard for the workspace.  We use a workspace ID because each individual
+// job AND partition/function lease requires this to be called.
+//
+// NOTE: This is called frequently:  for every enqueue, lease, partition lease, and so on.
+// Expect this to be called tens of thousands of times per second.
+type ShardFinder func(ctx context.Context, queueName string, workspaceID uuid.UUID) *QueueShard
 
 type QueueOpt func(q *queue)
 
@@ -150,6 +167,12 @@ func WithPriorityFinder(pf PriorityFinder) func(q *queue) {
 	}
 }
 
+func WithShardFinder(sf ShardFinder) func(q *queue) {
+	return func(q *queue) {
+		q.sf = sf
+	}
+}
+
 func WithQueueKeyGenerator(kg QueueKeyGenerator) func(q *queue) {
 	return func(q *queue) {
 		q.kg = kg
@@ -159,6 +182,12 @@ func WithQueueKeyGenerator(kg QueueKeyGenerator) func(q *queue) {
 func WithIdempotencyTTL(t time.Duration) func(q *queue) {
 	return func(q *queue) {
 		q.idempotencyTTL = t
+	}
+}
+
+func WithOtelMeter(m metric.Meter) func(q *queue) {
+	return func(q *queue) {
+		q.meter = m
 	}
 }
 
@@ -318,13 +347,16 @@ func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 		idempotencyTTL:     defaultIdempotencyTTL,
 		queueKindMapping:   make(map[string]string),
 		scope:              tally.NoopScope,
+		meter:              otel.Meter("redis_state.queue"),
 		tracer:             trace.NewNoopTracerProvider().Tracer("redis_queue"),
 		logger:             logger.From(context.Background()),
 		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) (string, int) {
 			return p.Queue(), 10_000
 		},
-		itemIndexer: QueueItemIndexerFunc,
-		backoffFunc: backoff.DefaultBackoff,
+		itemIndexer:    QueueItemIndexerFunc,
+		backoffFunc:    backoff.DefaultBackoff,
+		shardLeases:    []leasedShard{},
+		shardLeaseLock: &sync.Mutex{},
 	}
 
 	for _, opt := range opts {
@@ -343,6 +375,7 @@ type queue struct {
 	// redis stores the redis connection to use.
 	r  rueidis.Client
 	pf PriorityFinder
+	sf ShardFinder
 	kg QueueKeyGenerator
 
 	lifecycles []QueueLifecycleListener
@@ -408,8 +441,14 @@ type queue struct {
 	// or reading from scavengerLeaseID in parallel.
 	scavengerLeaseLock *sync.RWMutex
 
+	// shardLeases represents shards that are leased by the current queue worker.
+	shardLeases    []leasedShard
+	shardLeaseLock *sync.Mutex
+
 	// metrics allows reporting of metrics
 	scope tally.Scope
+	meter metric.Meter
+
 	// tracer is the tracer to use for opentelemetry tracing.
 	tracer trace.Tracer
 	// backoffFunc is the backoff function to use when retrying operations.
@@ -422,6 +461,75 @@ type queue struct {
 type processItem struct {
 	P QueuePartition
 	I QueueItem
+	S *QueueShard
+}
+
+// QueueShard represents a sub-partition for a group of functions.  Shards maintain their
+// own partition queues for the functions within the shard.  Note that functions also
+// exist within the global partition queue.
+type QueueShard struct {
+	// Shard name, eg. the company name for isolated execution
+	Name string `json:"n"`
+	// Priority represents the priority for this shard.
+	Priority uint `json:"p"`
+	// GuaranteedCapacity represents the minimum number of workers that must
+	// always scan this shard.  If zero, there is no guaranteed capacity for
+	// the shard.
+	GuaranteedCapacity uint `json:"gc"`
+	// Leases stores the lease IDs from the workers which are currently leasing the
+	// shard.  The workers currently leasing the shard are almost guaranteed to use
+	// the shard's partition queue as their source of work.
+	Leases []ulid.ULID `json:"leases"`
+}
+
+// leasedShard represents a shard leased by a queue.
+type leasedShard struct {
+	Shard QueueShard
+	Lease ulid.ULID
+}
+
+// Partition returns the partition name for use when managing the pointer queue to
+// individual queues within the shard
+func (q QueueShard) Partition() string {
+	return q.Name
+}
+
+// QueuePartition represents an individual queue for a workflow.  It stores the
+// time of the earliest job within the workflow.
+type QueuePartition struct {
+	QueueName *string `json:"queue,omitempty"`
+
+	WorkflowID  uuid.UUID `json:"wid"`
+	WorkspaceID uuid.UUID `json:"wsID"`
+
+	Priority uint `json:"p"`
+
+	// Last represents the time that this partition was last leased, as a millisecond
+	// unix epoch.  In essence, we need this to track how frequently we're leasing and
+	// attempting to run items in the partition's queue.
+	//
+	// Without this, we cannot track sojourn latency.
+	// garbage collection when the queue remains empty.
+	Last int64 `json:"last"`
+
+	// LeaseID represents a lease on this partition.  If the LeaseID is not nil,
+	// this partition can be claimed by a shared-nothing worker to work on the
+	// queue items within this partition.
+	//
+	// A lease is shortly held (eg seconds).  It should last long enough for
+	// workers to claim QueueItems only.
+	LeaseID *ulid.ULID `json:"leaseID"`
+}
+
+func (q QueuePartition) Queue() string {
+	if q.QueueName == nil {
+		return q.WorkflowID.String()
+	}
+	return *q.QueueName
+}
+
+func (q QueuePartition) MarshalBinary() ([]byte, error) {
+	return json.Marshal(q)
 }
 
 // QueueItem represents an individually queued work scheduled for some time in the
@@ -532,52 +640,6 @@ func (q QueueItem) Queue() string {
 // based on the time passed in.
 func (q QueueItem) IsLeased(time time.Time) bool {
 	return q.LeaseID != nil && ulid.Time(q.LeaseID.Time()).After(time)
-}
-
-// QueuePartition represents an individual queue for a workflow.  It stores the
-// time of the earliest job within the workflow.
-type QueuePartition struct {
-	QueueName *string `json:"queue,omitempty"`
-
-	WorkflowID uuid.UUID `json:"wid"`
-
-	Priority uint `json:"p"`
-
-	// AtS refers to the earliest QueueItem time within this partition, in
-	// seconds as a unix epoch.
-	//
-	// This is updated when taking a lease, requeuing items, etc.
-	//
-	// The S suffix differentiates between a QueueItem;  we only need second-
-	// level granularity here as queue partitions work to the nearest second.
-	AtS int64 `json:"at"`
-
-	// Last represents the time that this partition was last leased, as a millisecond
-	// unix epoch.  In essence, we need this to track how frequently we're leasing and
-	// attempting to run items in the partition's queue.
-	//
-	// Without this, we cannot track sojourn latency.
-	// garbage collection when the queue remains empty.
-	Last int64 `json:"last"`
-
-	// LeaseID represents a lease on this partition.  If the LeaseID is not nil,
-	// this partition can be claimed by a shared-nothing worker to work on the
-	// queue items within this partition.
-	//
-	// A lease is shortly held (eg seconds).  It should last long enough for
-	// workers to claim QueueItems only.
-	LeaseID *ulid.ULID `json:"leaseID"`
-}
-
-func (q QueuePartition) Queue() string {
-	if q.QueueName == nil {
-		return q.WorkflowID.String()
-	}
-	return *q.QueueName
-}
-
-func (q QueuePartition) MarshalBinary() ([]byte, error) {
-	return json.Marshal(q)
 }
 
 func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
@@ -742,18 +804,32 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	qn := i.Queue()
 
 	qp := QueuePartition{
-		QueueName:  i.QueueName,
-		WorkflowID: i.WorkflowID,
-		Priority:   priority,
-		AtS:        partitionTime.Unix(),
+		QueueName:   i.QueueName,
+		WorkflowID:  i.WorkflowID,
+		WorkspaceID: i.WorkspaceID,
+		Priority:    priority,
+	}
+
+	var (
+		shard     *QueueShard
+		shardName string
+	)
+	if q.sf != nil {
+		shard = q.sf(ctx, i.Queue(), i.WorkspaceID)
+		if shard != nil {
+			shardName = shard.Name
+			shard.Leases = []ulid.ULID{}
+		}
 	}
 
 	keys := []string{
-		q.kg.QueueItem(),       // Queue item
-		q.kg.QueueIndex(qn),    // Queue sorted set
-		q.kg.PartitionItem(),   // Partition item, map
-		q.kg.PartitionMeta(qn), // Partition item
-		q.kg.PartitionIndex(),  // Global partition queue
+		q.kg.QueueItem(),                    // Queue item
+		q.kg.QueueIndex(qn),                 // Queue sorted set
+		q.kg.PartitionItem(),                // Partition item, map
+		q.kg.PartitionMeta(qn),              // Partition item
+		q.kg.GlobalPartitionIndex(),         // Global partition queue
+		q.kg.ShardPartitionIndex(shardName), // Shard queue
+		q.kg.Shards(),
 		q.kg.Idempotency(i.ID),
 	}
 	// Append indexes
@@ -770,6 +846,8 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		qn,
 		qp,
 		partitionTime.Unix(),
+		shard,
+		shardName,
 	})
 	if err != nil {
 		return i, err
@@ -867,11 +945,25 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID string, at time.Time) error {
 	jobID = HashID(ctx, jobID)
 
+	// Find the queue item so that we can fetch the shard info.
+	qi := &QueueItem{}
+	if err := q.r.Do(ctx, q.r.B().Hget().Key(q.kg.QueueItem()).Field(jobID).Build()).DecodeJSON(qi); err != nil {
+		return err
+	}
+
+	var shardName string
+	if q.sf != nil {
+		if shard := q.sf(ctx, qi.Queue(), qi.WorkspaceID); shard != nil {
+			shardName = shard.Name
+		}
+	}
+
 	keys := []string{
 		q.kg.QueueIndex(partitionName),
 		q.kg.QueueItem(),
-		q.kg.PartitionIndex(), // Global partition queue
-		q.kg.PartitionItem(),  // Partition hash
+		q.kg.GlobalPartitionIndex(),         // Global partition queue
+		q.kg.ShardPartitionIndex(shardName), // Shard partition queue
+		q.kg.PartitionItem(),                // Partition hash
 	}
 	status, err := scripts["queue/requeueByID"].Exec(
 		ctx,
@@ -942,17 +1034,24 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
+	var shardName string
+	if q.sf != nil {
+		if shard := q.sf(ctx, item.Queue(), item.WorkspaceID); shard != nil {
+			shardName = shard.Name
+		}
+	}
+
 	keys := []string{
 		q.kg.QueueItem(),
 		q.kg.QueueIndex(item.Queue()),
 		q.kg.PartitionMeta(item.Queue()),
 		q.kg.Concurrency("account", ak),
 		q.kg.Concurrency("p", pk),
-
 		q.kg.Concurrency("custom", customKeys[0]),
 		q.kg.Concurrency("custom", customKeys[1]),
-
 		q.kg.ConcurrencyIndex(),
+		q.kg.GlobalPartitionIndex(),
+		q.kg.ShardPartitionIndex(shardName),
 	}
 	args, err := StrSlice([]any{
 		item.ID,
@@ -1042,7 +1141,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 	keys := []string{
 		q.kg.QueueItem(),
 		q.kg.QueueIndex(i.Queue()),
-		q.kg.PartitionIndex(),
+		q.kg.GlobalPartitionIndex(),
 		q.kg.Concurrency("account", ak),
 		q.kg.Concurrency("p", pk),
 		q.kg.Concurrency("custom", customKeys[0]),
@@ -1197,24 +1296,24 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 	// Update the wall time that this should run at.
 	i.WallTimeMS = at.UnixMilli()
 
-	qn := i.Queue()
-
-	qp := QueuePartition{
-		QueueName:  i.QueueName,
-		WorkflowID: i.WorkflowID,
-		Priority:   priority,
-		AtS:        at.Unix(),
+	var shardName string
+	if q.sf != nil {
+		if shard := q.sf(ctx, i.Queue(), i.WorkspaceID); shard != nil {
+			shardName = shard.Name
+		}
 	}
+
 	keys := []string{
 		q.kg.QueueItem(),
-		q.kg.QueueIndex(qn),
-		q.kg.PartitionMeta(qn),
-		q.kg.PartitionIndex(),
+		q.kg.QueueIndex(i.Queue()),
+		q.kg.PartitionMeta(i.Queue()),
+		q.kg.GlobalPartitionIndex(),
 		q.kg.Concurrency("account", ak),
 		q.kg.Concurrency("p", pk),
 		q.kg.Concurrency("custom", customKeys[0]),
 		q.kg.Concurrency("custom", customKeys[1]),
 		q.kg.ConcurrencyIndex(),
+		q.kg.ShardPartitionIndex(shardName),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.kg) {
@@ -1227,8 +1326,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		i,
 		i.ID,
 		at.UnixMilli(),
-		qn,
-		qp,
+		i.Queue(),
 	})
 	if err != nil {
 		return err
@@ -1274,9 +1372,17 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
+	var shardName string
+	if q.sf != nil {
+		if shard := q.sf(ctx, p.Queue(), p.WorkspaceID); shard != nil {
+			shardName = shard.Name
+		}
+	}
+
 	keys := []string{
 		q.kg.PartitionItem(),
-		q.kg.PartitionIndex(),
+		q.kg.GlobalPartitionIndex(),
+		q.kg.ShardPartitionIndex(shardName),
 		q.kg.Concurrency("p", concurrencyKey),
 	}
 
@@ -1325,7 +1431,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	}
 }
 
-// PartitionPeek returns up to PartitionSelectionMax partition items from the queue. This
+// GlobalPartitionPeek returns up to PartitionSelectionMax partition items from the queue. This
 // returns the indexes of partitions.
 //
 // If sequential is set to true this returns partitions in order from earliest to latest
@@ -1333,6 +1439,15 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 // randomly, with higher priority partitions more likely to be selected.  This reduces
 // lease contention amongst multiple shared-nothing workers.
 func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
+	return q.partitionPeek(ctx, q.kg.GlobalPartitionIndex(), sequential, until, limit)
+}
+
+func (q *queue) partitionSize(ctx context.Context, partitionKey string, until time.Time) (int64, error) {
+	cmd := q.r.B().Zcount().Key(partitionKey).Min("-inf").Max(strconv.Itoa(int(until.Unix()))).Build()
+	return q.r.Do(ctx, cmd).AsInt64()
+}
+
+func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
 	if limit > PartitionPeekMax {
 		return nil, ErrPartitionPeekMaxExceedsLimits
 	}
@@ -1358,7 +1473,7 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 		ctx,
 		q.r,
 		[]string{
-			q.kg.PartitionIndex(),
+			q.kg.GlobalPartitionIndex(),
 			q.kg.PartitionItem(),
 		},
 		args,
@@ -1453,22 +1568,29 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 // forceAt is used to enforce the given queue time.  This is used when partitions are at a
 // concurrency limit;  we don't want to scan the partition next time, so we force the partition
 // to be at a specific time instead of taking the earliest available queue item time
-func (q *queue) PartitionRequeue(ctx context.Context, queueName string, at time.Time, forceAt bool) error {
+func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error {
+	var shardName string
+	if q.sf != nil {
+		if shard := q.sf(ctx, p.Queue(), p.WorkspaceID); shard != nil {
+			shardName = shard.Name
+		}
+	}
+
 	keys := []string{
 		q.kg.PartitionItem(),
-		q.kg.PartitionIndex(),
-		q.kg.PartitionMeta(queueName),
-		q.kg.QueueIndex(queueName),
+		q.kg.GlobalPartitionIndex(),
+		q.kg.ShardPartitionIndex(shardName),
+		q.kg.PartitionMeta(p.Queue()),
+		q.kg.QueueIndex(p.Queue()),
 		q.kg.QueueItem(),
-		q.kg.Concurrency("p", queueName),
+		q.kg.Concurrency("p", p.Queue()),
 	}
 	force := 0
 	if forceAt {
 		force = 1
 	}
 	args, err := StrSlice([]any{
-
-		queueName,
+		p.Queue(),
 		at.Unix(),
 		force,
 	})
@@ -1687,6 +1809,120 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 	default:
 		return nil, fmt.Errorf("unknown response claiming config lease: %d", status)
 	}
+}
+
+func (q *queue) getShards(ctx context.Context) (map[string]*QueueShard, error) {
+	m, err := q.r.Do(ctx, q.r.B().Hgetall().Key(q.kg.Shards()).Build()).AsMap()
+	if rueidis.IsRedisNil(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("error fetching shards: %w", err)
+	}
+	shards := map[string]*QueueShard{}
+	for k, v := range m {
+		shard := &QueueShard{}
+		if err := v.DecodeJSON(shard); err != nil {
+			return nil, fmt.Errorf("error decoding shards: %w", err)
+		}
+		shards[k] = shard
+	}
+	return shards, nil
+}
+
+// leaseShard leases a shard for the given duration.  Shards can have more than one lease at a time;
+// you must provide an index to claim a lease. THe index This prevents multiple workers
+// from claiming the same lease index;  if workers A and B see a shard with 0 leases and both attempt
+// to claim lease "0", only one will succeed.
+func (q *queue) leaseShard(ctx context.Context, shard *QueueShard, duration time.Duration, n int) (*ulid.ULID, error) {
+	now := time.Now()
+	leaseID, err := ulid.New(uint64(now.Add(duration).UnixMilli()), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	keys := []string{q.kg.Shards()}
+	args, err := StrSlice([]any{
+		now.UnixMilli(),
+		shard.Name,
+		leaseID,
+		n,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	status, err := scripts["queue/shardLease"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error leasing item: %w", err)
+	}
+	switch status {
+	case int64(-1):
+		return nil, errShardNotFound
+	case int64(-2):
+		return nil, errShardIndexLeased
+	case int64(-3):
+		return nil, errShardIndexInvalid
+	case int64(0):
+		return &leaseID, nil
+	default:
+		return nil, fmt.Errorf("unknown lease return value: %T(%v)", status, status)
+	}
+}
+
+func (q *queue) renewShardLease(ctx context.Context, shard *QueueShard, duration time.Duration, leaseID ulid.ULID) (*ulid.ULID, error) {
+	now := time.Now()
+	newLeaseID, err := ulid.New(uint64(now.Add(duration).UnixMilli()), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	keys := []string{q.kg.Shards()}
+	args, err := StrSlice([]any{
+		now.UnixMilli(),
+		shard.Name,
+		leaseID,
+		newLeaseID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	status, err := scripts["queue/renewShardLease"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error leasing item: %w", err)
+	}
+	switch status {
+	case int64(-1):
+		return nil, fmt.Errorf("shard not found")
+	case int64(-2):
+		return nil, fmt.Errorf("lease not found")
+	case int64(0):
+		return &newLeaseID, nil
+	default:
+		return nil, fmt.Errorf("unknown lease renew return value: %T(%v)", status, status)
+	}
+}
+
+//nolint:all
+func (q *queue) getShardLeases() []leasedShard {
+	q.shardLeaseLock.Lock()
+	existingLeases := make([]leasedShard, len(q.shardLeases))
+	for n, i := range q.shardLeases {
+		existingLeases[n] = i
+	}
+	q.shardLeaseLock.Unlock()
+	return existingLeases
 }
 
 func HashID(ctx context.Context, id string) string {

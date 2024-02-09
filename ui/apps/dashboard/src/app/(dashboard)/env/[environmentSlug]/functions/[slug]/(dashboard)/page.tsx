@@ -3,6 +3,7 @@
 import type { Route } from 'next';
 import Link from 'next/link';
 import { ChartBarIcon, ChevronRightIcon, XCircleIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 import {
   Tooltip,
   TooltipContent,
@@ -13,6 +14,7 @@ import { useCron } from '@inngest/components/hooks/useCron';
 import { IconClock } from '@inngest/components/icons/Clock';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
+import { ErrorBoundary } from '@sentry/nextjs';
 import { titleCase } from 'title-case';
 
 import FunctionConfiguration from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/(dashboard)/FunctionConfiguration';
@@ -152,156 +154,176 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
           </div>
         </main>
         <aside className="overflow-y-auto border-l border-slate-200 bg-white px-6 py-4">
-          <div className="flex flex-col gap-10">
-            <Block title="App">
-              <Link
-                href={appRoute}
-                className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
-              >
-                <div className="flex min-w-0 items-center">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{function_.appName}</p>
-                    {function_.current?.deploy?.createdAt && (
-                      <Time
-                        className="text-xs text-slate-500"
-                        format="relative"
-                        value={new Date(function_.current.deploy.createdAt)}
-                      />
-                    )}
+          <ErrorBoundary
+            fallback={({ error, resetError }) => (
+              <div className="flex items-center justify-center">
+                <div className="rounded p-4">
+                  <h2>Something went wrong!</h2>
+                  <div className="my-6 overflow-scroll rounded bg-slate-200 p-2">
+                    {error.toString()}
                   </div>
-                  <ChevronRightIcon className="h-5" />
+                  <Button
+                    btnAction={
+                      // Attempt to recover by trying to re-render the segment
+                      () => resetError()
+                    }
+                    label="Try again"
+                  />
                 </div>
-              </Link>
-            </Block>
-            <Block title="Triggers">
-              <div className="space-y-3">
-                {triggers.map((trigger) =>
-                  trigger.eventName ? (
+              </div>
+            )}
+          >
+            <div className="flex flex-col gap-10">
+              <Block title="App">
+                <Link
+                  href={appRoute}
+                  className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
+                >
+                  <div className="flex min-w-0 items-center">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{function_.appName}</p>
+                      {function_.current?.deploy?.createdAt && (
+                        <Time
+                          className="text-xs text-slate-500"
+                          format="relative"
+                          value={new Date(function_.current.deploy.createdAt)}
+                        />
+                      )}
+                    </div>
+                    <ChevronRightIcon className="h-5" />
+                  </div>
+                </Link>
+              </Block>
+              <Block title="Triggers">
+                <div className="space-y-3">
+                  {triggers.map((trigger) =>
+                    trigger.eventName ? (
+                      <Link
+                        key={trigger.eventName}
+                        href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
+                          trigger.eventName
+                        )}`}
+                        className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
+                      >
+                        <div className="flex min-w-0 items-center">
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex min-w-0 items-center">
+                              <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
+                              <p className="truncate font-medium">{trigger.eventName}</p>
+                            </div>
+                            <dl className="text-xs">
+                              {trigger.condition && (
+                                <div className="flex gap-1">
+                                  <dt className="text-slate-500">If</dt>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <dd className="truncate font-mono text-slate-800">
+                                          {trigger.condition}
+                                        </dd>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="font-mono text-xs">
+                                        {trigger.condition}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </div>
+                              )}
+                            </dl>
+                          </div>
+                          <ChevronRightIcon className="h-5" />
+                        </div>
+                      </Link>
+                    ) : trigger.schedule ? (
+                      <ScheduleTrigger
+                        key={trigger.schedule}
+                        schedule={trigger.schedule}
+                        condition={trigger.condition}
+                      />
+                    ) : null
+                  )}
+                </div>
+              </Block>
+              {function_.configuration?.cancellations &&
+                function_.configuration.cancellations.length > 0 && (
+                  <Block title="Cancellation">
+                    <div className="space-y-3">
+                      {function_.configuration.cancellations.map((cancellation) => {
+                        return (
+                          <Link
+                            key={cancellation.event}
+                            href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
+                              cancellation.event
+                            )}`}
+                            className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
+                          >
+                            <div className="flex min-w-0 items-center">
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <div className="flex min-w-0 items-center">
+                                  <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
+                                  <p className="truncate font-medium">{cancellation.event}</p>
+                                </div>
+                                <dl className="text-xs">
+                                  {cancellation.condition && (
+                                    <div className="flex gap-1">
+                                      <dt className="text-slate-500">If</dt>
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <dd className="truncate font-mono text-slate-800">
+                                              {cancellation.condition}
+                                            </dd>
+                                          </TooltipTrigger>
+                                          <TooltipContent className="font-mono text-xs">
+                                            {cancellation.condition}
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    </div>
+                                  )}
+                                  {cancellation.timeout && (
+                                    <div className="flex gap-1">
+                                      <dt className="text-slate-500">Timeout</dt>
+                                      <dd className="text-slate-800">{cancellation.timeout}</dd>
+                                    </div>
+                                  )}
+                                </dl>
+                              </div>
+                              <ChevronRightIcon className="h-5" />
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </Block>
+                )}
+              {function_.failureHandler && (
+                <Block title="Failure Handler">
+                  <div className="space-y-3">
                     <Link
-                      key={trigger.eventName}
-                      href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
-                        trigger.eventName
+                      href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(
+                        function_.failureHandler.slug
                       )}`}
                       className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
                     >
                       <div className="flex min-w-0 items-center">
-                        <div className="min-w-0 flex-1 space-y-1">
+                        <div className="min-w-0 flex-1">
                           <div className="flex min-w-0 items-center">
-                            <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
-                            <p className="truncate font-medium">{trigger.eventName}</p>
+                            <IconFunction className="w-8 shrink-0 pr-2 text-indigo-500" />
+                            <p className="truncate font-medium">{function_.failureHandler.name}</p>
                           </div>
-                          <dl className="text-xs">
-                            {trigger.condition && (
-                              <div className="flex gap-1">
-                                <dt className="text-slate-500">If</dt>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <dd className="truncate font-mono text-slate-800">
-                                        {trigger.condition}
-                                      </dd>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="font-mono text-xs">
-                                      {trigger.condition}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                            )}
-                          </dl>
                         </div>
                         <ChevronRightIcon className="h-5" />
                       </div>
                     </Link>
-                  ) : trigger.schedule ? (
-                    <ScheduleTrigger
-                      key={trigger.schedule}
-                      schedule={trigger.schedule}
-                      condition={trigger.condition}
-                    />
-                  ) : null
-                )}
-              </div>
-            </Block>
-            {function_.configuration?.cancellations &&
-              function_.configuration.cancellations.length > 0 && (
-                <Block title="Cancellation">
-                  <div className="space-y-3">
-                    {function_.configuration.cancellations.map((cancellation) => {
-                      return (
-                        <Link
-                          key={cancellation.event}
-                          href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
-                            cancellation.event
-                          )}`}
-                          className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
-                        >
-                          <div className="flex min-w-0 items-center">
-                            <div className="min-w-0 flex-1 space-y-1">
-                              <div className="flex min-w-0 items-center">
-                                <IconEvent className="w-8 shrink-0 pr-2 text-indigo-500" />
-                                <p className="truncate font-medium">{cancellation.event}</p>
-                              </div>
-                              <dl className="text-xs">
-                                {cancellation.condition && (
-                                  <div className="flex gap-1">
-                                    <dt className="text-slate-500">If</dt>
-                                    <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <dd className="truncate font-mono text-slate-800">
-                                            {cancellation.condition}
-                                          </dd>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="font-mono text-xs">
-                                          {cancellation.condition}
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
-                                  </div>
-                                )}
-                                {cancellation.timeout && (
-                                  <div className="flex gap-1">
-                                    <dt className="text-slate-500">Timeout</dt>
-                                    <dd className="text-slate-800">{cancellation.timeout}</dd>
-                                  </div>
-                                )}
-                              </dl>
-                            </div>
-                            <ChevronRightIcon className="h-5" />
-                          </div>
-                        </Link>
-                      );
-                    })}
                   </div>
                 </Block>
               )}
-            {function_.failureHandler && (
-              <Block title="Failure Handler">
-                <div className="space-y-3">
-                  <Link
-                    href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(
-                      function_.failureHandler.slug
-                    )}`}
-                    className="shadow-outline-secondary-light block rounded bg-white p-4 hover:bg-slate-50"
-                  >
-                    <div className="flex min-w-0 items-center">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex min-w-0 items-center">
-                          <IconFunction className="w-8 shrink-0 pr-2 text-indigo-500" />
-                          <p className="truncate font-medium">{function_.failureHandler.name}</p>
-                        </div>
-                      </div>
-                      <ChevronRightIcon className="h-5" />
-                    </div>
-                  </Link>
-                </div>
-              </Block>
-            )}
-            {function_.configuration && (
-              <FunctionConfiguration configuration={function_.configuration} />
-            )}
-          </div>
+              {function_.configuration && (
+                <FunctionConfiguration configuration={function_.configuration} />
+              )}
+            </div>
+          </ErrorBoundary>
         </aside>
       </div>
     </>

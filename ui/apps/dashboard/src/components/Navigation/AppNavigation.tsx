@@ -10,6 +10,8 @@ import {
 import { Badge } from '@inngest/components/Badge';
 
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import OrganizationDropdown from '@/components/Navigation/OrganizationDropdown';
+import UserDropdown from '@/components/Navigation/UserDropdown';
 import { graphql } from '@/gql';
 import InngestLogo from '@/icons/InngestLogo';
 import EventIcon from '@/icons/event.svg';
@@ -52,6 +54,7 @@ async function isDeploysVisible() {
 
 export default async function AppNavigation({ environmentSlug }: AppNavigationProps) {
   const isEventSearchEnabled = await getBooleanFlag('event-search');
+  const isOrganizationsEnabled = await getBooleanFlag('organizations');
 
   let items: NavItem[] = [
     {
@@ -94,7 +97,7 @@ export default async function AppNavigation({ environmentSlug }: AppNavigationPr
       {
         href: `/env/${environmentSlug}/apps`,
         text: 'Apps',
-        hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
+        hide: [ALL_ENVIRONMENTS_SLUG],
         icon: <Squares2X2Icon className="w-3.5" />,
         badge: (
           <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
@@ -135,9 +138,16 @@ export default async function AppNavigation({ environmentSlug }: AppNavigationPr
           ))}
         </Navigation>
       </div>
-      <div className="flex items-center">
+      <div className="flex h-full items-center">
         <SearchNavigation />
-        <AccountDropdown />
+        {isOrganizationsEnabled ? (
+          <>
+            <OrganizationDropdown />
+            <UserDropdown />
+          </>
+        ) : (
+          <AccountDropdown />
+        )}
       </div>
     </nav>
   );

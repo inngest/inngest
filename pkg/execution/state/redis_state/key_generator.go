@@ -151,13 +151,30 @@ type QueueKeyGenerator interface {
 	// QueueIndex returns the key containing the sorted zset for a function
 	// queue.
 	QueueIndex(id string) string
+
+	//
+	// Partition keys
+	//
+
+	// Shards is a key to a hashmap of shards available.  The values of this
+	// key are JSON-encoded shards.
+	Shards() string
 	// PartitionItem returns the key for the hash containing all partition items.
 	PartitionItem() string
-	// PartitionIndex returns the sorted set for the partition queue.
-	PartitionIndex() string
 	// PartitionMeta returns the key to store metadata for partitions, eg.
 	// the number of items enqueued, number in progress, etc.
 	PartitionMeta(id string) string
+	// GlobalPartitionIndex returns the sorted set for the partition queue;  the
+	// earliest time that each function is available.  This is a global queue of
+	// all functions across every partition, used for minimum latency.
+	GlobalPartitionIndex() string
+	// ShardPartitionIndex returns the sorted set for the shard's partition queue.
+	ShardPartitionIndex(shard string) string
+
+	//
+	// Queue metadata keys
+	//
+
 	// Sequential returns the key which allows a worker to claim sequential processing
 	// of the partitions.
 	Sequential() string
@@ -175,20 +192,18 @@ type QueueKeyGenerator interface {
 	// leases have expired (in the case of failed workers)
 	ConcurrencyIndex() string
 
+	// RunIndex returns the index for storing job IDs associated with run IDs.
+	RunIndex(runID ulid.ULID) string
+
 	// BatchPointer returns the key used as the pointer reference to the
 	// actual batch
 	BatchPointer(context.Context, uuid.UUID) string
-
 	// Batch returns the key used to store the specific batch of
 	// events, that is used to trigger a function run
 	Batch(context.Context, ulid.ULID) string
-
 	// BatchMetadata returns the key used to store the metadata related
 	// to a batch
 	BatchMetadata(context.Context, ulid.ULID) string
-
-	// RunIndex returns the index for storing job IDs associated with run IDs.
-	RunIndex(runID ulid.ULID) string
 
 	// Status returns the key used for status queue for the provided function.
 	Status(status string, fnID uuid.UUID) string
@@ -209,6 +224,10 @@ type DefaultQueueKeyGenerator struct {
 	Prefix string
 }
 
+func (d DefaultQueueKeyGenerator) Shards() string {
+	return fmt.Sprintf("%s:queue:shards", d.Prefix)
+}
+
 func (d DefaultQueueKeyGenerator) QueueItem() string {
 	return fmt.Sprintf("%s:queue:item", d.Prefix)
 }
@@ -221,8 +240,23 @@ func (d DefaultQueueKeyGenerator) PartitionItem() string {
 	return fmt.Sprintf("%s:partition:item", d.Prefix)
 }
 
-func (d DefaultQueueKeyGenerator) PartitionIndex() string {
+// GlobalPartitionIndex returns the sorted index for the partition group, which stores the earliest
+// time for each function/queue in the partition.
+//
+// This is grouped so that we can make N partitions independently.
+func (d DefaultQueueKeyGenerator) GlobalPartitionIndex() string {
 	return fmt.Sprintf("%s:partition:sorted", d.Prefix)
+}
+
+// GlobalPartitionIndex returns the sorted index for the partition group, which stores the earliest
+// time for each function/queue in the partition.
+//
+// This is grouped so that we can make N partitions independently.
+func (d DefaultQueueKeyGenerator) ShardPartitionIndex(shard string) string {
+	if shard == "" {
+		return fmt.Sprintf("%s:shard:-", d.Prefix)
+	}
+	return fmt.Sprintf("%s:shard:%s", d.Prefix, shard)
 }
 
 func (d DefaultQueueKeyGenerator) PartitionMeta(id string) string {
