@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { SignIn } from '@clerk/nextjs';
 
-import SplitView from '@/app/(logged-out)/SplitView';
+import SplitView from '@/app/(auth)/SplitView';
 import { Alert } from '@/components/Alert';
 import signInRedirectErrors from './SignInRedirectErrors';
 
