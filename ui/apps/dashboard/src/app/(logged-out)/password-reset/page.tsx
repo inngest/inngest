@@ -6,10 +6,10 @@ import { type Route } from 'next';
 import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 
+import SplitView from '@/app/(auth)/SplitView';
 import AppLink from '@/components/AppLink';
 import Input from '@/components/Forms/Input';
 import InngestLogo from '@/icons/InngestLogo';
-import SplitView from '../SplitView';
 
 export default function PasswordReset() {
   const [isLoading, setLoading] = useState<boolean>(false);
