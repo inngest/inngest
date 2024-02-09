@@ -41,8 +41,8 @@ const useSwitchablePathname = (): string => {
   }
 
   // Deploys should always move to the root resource level
-  if (segmentsWithoutRouteGroups[0] === 'deploys') {
-    return '/deploys';
+  if (segmentsWithoutRouteGroups[0] === 'apps') {
+    return '/apps';
   }
   // Manage paths, we drop the id at the end
   if (segmentsWithoutRouteGroups[0] === 'manage') {

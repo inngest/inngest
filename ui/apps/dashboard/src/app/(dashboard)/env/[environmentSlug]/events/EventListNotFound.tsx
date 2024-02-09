@@ -8,7 +8,6 @@ import { CodeKey } from '@inngest/components/CodeKey';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { graphql } from '@/gql';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
 import { pathCreator } from '@/utils/urls';
@@ -39,7 +38,6 @@ function getDefaultEventKey<T extends { createdAt: string; name: null | string }
 
 export default function EventListNotFound() {
   const router = useRouter();
-  const { value: isAppsEnabled } = useBooleanFlag('apps-page');
   const environment = useEnvironment();
   const [{ data }] = useQuery({
     query: GetEventKeysForBlankSlateDocument,
@@ -71,9 +69,8 @@ export default function EventListNotFound() {
               Send your events
             </h3>
             <p className="mt-2 text-sm tracking-wide text-slate-300">
-              {isAppsEnabled ? 'After syncing your app' : 'After deploying your functions'}, you can
-              start sending events to this environment. To send events, your application needs to
-              have an Event Key.
+              After syncing your app, you can start sending events to this environment. To send
+              events, your application needs to have an Event Key.
             </p>
             <h4 className="mt-4 text-base font-semibold text-white">Event Key</h4>
             <p className="mt-2 text-sm tracking-wide text-slate-300">
@@ -102,12 +99,8 @@ export default function EventListNotFound() {
           <div className="mt-6 flex items-center gap-2 border-t border-slate-800/50 py-4">
             <Button
               kind="primary"
-              href={
-                isAppsEnabled
-                  ? pathCreator.apps({ envSlug: environment.slug })
-                  : pathCreator.deploys({ envSlug: environment.slug })
-              }
-              label={isAppsEnabled ? 'Sync Your App' : 'Deploy Your Functions'}
+              href={pathCreator.apps({ envSlug: environment.slug })}
+              label="Sync Your App"
             />
             <div className="flex gap-2 border-l border-slate-800/50 pl-2">
               <Button

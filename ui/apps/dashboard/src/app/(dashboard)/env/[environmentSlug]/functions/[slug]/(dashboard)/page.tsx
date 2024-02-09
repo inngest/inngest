@@ -22,7 +22,6 @@ import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/function
 import { Alert } from '@/components/Alert';
 import { Badge as LegacyBadge } from '@/components/Badge/Badge';
 import Block from '@/components/Block';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { Time } from '@/components/Time';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
@@ -46,7 +45,6 @@ type FunctionDashboardProps = {
 
 export default function FunctionDashboardPage({ params }: FunctionDashboardProps) {
   const functionSlug = decodeURIComponent(params.slug);
-  const { value: isAppsEnabled } = useBooleanFlag('apps-page');
   const [{ data, fetching: isFetchingFunction }] = useFunction({
     functionSlug,
   });
@@ -103,12 +101,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     }
   }
 
-  let appRoute: Route;
-  if (isAppsEnabled) {
-    appRoute = `/env/${params.environmentSlug}/apps/${function_.appName}` as Route;
-  } else {
-    appRoute = `/env/${params.environmentSlug}/deploys/${function_.current?.deploy?.id}` as Route;
-  }
+  let appRoute = `/env/${params.environmentSlug}/apps/${function_.appName}` as Route;
 
   return (
     <>

@@ -13,7 +13,6 @@ import {
 
 import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
 import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import TriggerPill, { TRIGGER_TYPE, type Trigger } from '@/components/Pill/TriggerPill';
 import Placeholder from '@/components/Placeholder';
 import cn from '@/utils/cn';
@@ -40,11 +39,10 @@ type Props = {
 
 export function FunctionTable({ rows = [] }: Props) {
   const env = useEnvironment();
-  const { value: isAppsEnabled } = useBooleanFlag('apps-page');
 
   const columns = useMemo(() => {
-    return createColumns(env.slug, isAppsEnabled);
-  }, [env.slug, isAppsEnabled]);
+    return createColumns(env.slug);
+  }, [env.slug]);
 
   const table = useReactTable({
     data: rows,
@@ -109,7 +107,7 @@ function Shimmer() {
 
 const columnHelper = createColumnHelper<FunctionTableRow>();
 
-function createColumns(environmentSlug: string, isAppsPageEnabled: boolean) {
+function createColumns(environmentSlug: string) {
   const columns = [
     columnHelper.accessor('name', {
       cell: (info) => {
@@ -157,12 +155,6 @@ function createColumns(environmentSlug: string, isAppsPageEnabled: boolean) {
     }),
     columnHelper.accessor('appName', {
       cell: (info) => {
-        if (!isAppsPageEnabled) {
-          return (
-            <div className="px-2 py-3 text-sm font-medium text-slate-700">{info.getValue()}</div>
-          );
-        }
-
         const appExternalID = info.getValue();
         if (!appExternalID) {
           return null;
