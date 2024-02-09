@@ -39,6 +39,7 @@ export default function Page() {
   const searchParams = useSearchParams();
   const [{ data, fetching }] = useQuery({
     query: GetAccountSupportInfoDocument,
+    pause: !isSignedIn,
   });
 
   const plan = data?.account.plan;
