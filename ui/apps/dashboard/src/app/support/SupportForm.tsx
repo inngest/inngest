@@ -5,10 +5,10 @@ import { useOrganization, useUser } from '@clerk/nextjs';
 import { Button } from '@inngest/components/Button';
 import * as Sentry from '@sentry/nextjs';
 
+import { type RequestBody } from '@/app/(organization-active)/api/support-tickets/route';
 import { Alert } from '@/components/Alert';
 import { SelectInput } from '@/components/Forms/SelectInput';
 import { Textarea } from '@/components/Forms/Textarea';
-import { type RequestBody } from '../api/support-tickets/route';
 import {
   DEFAULT_BUG_SEVERITY_LEVEL,
   formOptions,

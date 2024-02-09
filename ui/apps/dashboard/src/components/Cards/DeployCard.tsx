@@ -4,7 +4,7 @@ import type { Route } from 'next';
 import { Button } from '@inngest/components/Button';
 import { capitalCase } from 'change-case';
 
-import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import DeployStatus from '@/components/Status/DeployStatus';
 import { Time } from '@/components/Time';
 import ClockIcon from '@/icons/ClockIcon';
