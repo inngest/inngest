@@ -27,7 +27,7 @@ import (
 
 type Opt func(s *svc)
 
-func WithExecutionLoader(l cqrs.Manager) func(s *svc) {
+func WithExecutionManager(l cqrs.Manager) func(s *svc) {
 	return func(s *svc) {
 		s.data = l
 	}

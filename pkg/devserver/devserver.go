@@ -229,7 +229,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create an executor.
 	executorSvc := executor.NewService(
 		opts.Config,
-		executor.WithExecutionLoader(dbcqrs),
+		executor.WithExecutionManager(dbcqrs),
 		executor.WithState(sm),
 		executor.WithServiceQueue(queue),
 		executor.WithServiceExecutor(exec),
@@ -241,7 +241,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		opts.Config,
 		runner.WithCQRS(dbcqrs),
 		runner.WithExecutor(exec),
-		runner.WithExecutionLoader(dbcqrs),
+		runner.WithExecutionManager(dbcqrs),
 		runner.WithEventManager(event.NewManager()),
 		runner.WithStateManager(sm),
 		runner.WithRunnerQueue(queue),
