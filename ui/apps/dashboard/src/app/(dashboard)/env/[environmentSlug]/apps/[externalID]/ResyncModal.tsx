@@ -16,7 +16,7 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   url: string;
-  platform: string;
+  platform: string | null;
 };
 
 export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
