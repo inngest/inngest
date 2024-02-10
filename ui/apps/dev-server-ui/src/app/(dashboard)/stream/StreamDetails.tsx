@@ -90,7 +90,7 @@ export default function StreamDetails() {
   };
 
   let events = [eventResult.data];
-  if (runResult.data.run.events.length > 1) {
+  if (runResult?.data?.run?.events && runResult.data.run.events.length > 1) {
     events = runResult.data.run.events.map((e) => JSON.parse(e.raw));
   }
 
