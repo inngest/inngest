@@ -78,6 +78,7 @@ export const FUNCTION_RUN = gql`
         id
         raw
       }
+      batchID
       events {
         id
         raw
