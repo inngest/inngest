@@ -82,7 +82,7 @@ INSERT INTO function_runs
 
 -- name: InsertFunctionFinish :exec
 INSERT INTO function_finishes
-	(run_id, status, output, completed_step_count, created_at) VALUES 
+	(run_id, status, output, completed_step_count, created_at) VALUES
 	(?, ?, ?, ?, ?);
 
 -- name: GetFunctionRun :one
@@ -115,8 +115,19 @@ INSERT INTO events
 	(internal_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts) VALUES
 	(?, ?, ?, ?, ?, ?, ?, ?);
 
+-- name: InsertEventBatch :exec
+INSERT INTO event_batches
+	(id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?);
+
 -- name: GetEventByInternalID :one
 SELECT * FROM events WHERE internal_id = ?;
+
+-- name: GetEventsByInternalIDs :many
+SELECT * FROM events WHERE internal_id IN (sqlc.slice('ids'));
+
+-- name: GetEventBatchByRunID :one
+SELECT * FROM event_batches WHERE run_id = ?;
 
 -- name: GetEventsTimebound :many
 SELECT DISTINCT e.*

@@ -106,8 +106,10 @@ type ComplexityRoot struct {
 	}
 
 	FunctionRun struct {
+		BatchID           func(childComplexity int) int
 		Event             func(childComplexity int) int
 		EventID           func(childComplexity int) int
+		Events            func(childComplexity int) int
 		FinishedAt        func(childComplexity int) int
 		Function          func(childComplexity int) int
 		FunctionID        func(childComplexity int) int
@@ -273,6 +275,8 @@ type FunctionRunResolver interface {
 	Function(ctx context.Context, obj *models.FunctionRun) (*models.Function, error)
 
 	Event(ctx context.Context, obj *models.FunctionRun) (*models.Event, error)
+	Events(ctx context.Context, obj *models.FunctionRun) ([]*models.Event, error)
+
 	Status(ctx context.Context, obj *models.FunctionRun) (*models.FunctionRunStatus, error)
 	WaitingFor(ctx context.Context, obj *models.FunctionRun) (*models.StepEventWait, error)
 	PendingSteps(ctx context.Context, obj *models.FunctionRun) (*int, error)
@@ -572,6 +576,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.FunctionEvent.Workspace(childComplexity), true
 
+	case "FunctionRun.batchID":
+		if e.complexity.FunctionRun.BatchID == nil {
+			break
+		}
+
+		return e.complexity.FunctionRun.BatchID(childComplexity), true
+
 	case "FunctionRun.event":
 		if e.complexity.FunctionRun.Event == nil {
 			break
@@ -585,6 +596,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FunctionRun.EventID(childComplexity), true
+
+	case "FunctionRun.events":
+		if e.complexity.FunctionRun.Events == nil {
+			break
+		}
+
+		return e.complexity.FunctionRun.Events(childComplexity), true
 
 	case "FunctionRun.finishedAt":
 		if e.complexity.FunctionRun.FinishedAt == nil {
@@ -1595,6 +1613,8 @@ type FunctionRun {
   function: Function
   workspace: Workspace
   event: Event
+  events: [Event!]!
+  batchID: ULID # if the run is a batched run
 
   status: FunctionRunStatus
   waitingFor: StepEventWait
@@ -2905,6 +2925,10 @@ func (ec *executionContext) fieldContext_Event_functionRuns(ctx context.Context,
 				return ec.fieldContext_FunctionRun_workspace(ctx, field)
 			case "event":
 				return ec.fieldContext_FunctionRun_event(ctx, field)
+			case "events":
+				return ec.fieldContext_FunctionRun_events(ctx, field)
+			case "batchID":
+				return ec.fieldContext_FunctionRun_batchID(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -3448,6 +3472,10 @@ func (ec *executionContext) fieldContext_FunctionEvent_functionRun(ctx context.C
 				return ec.fieldContext_FunctionRun_workspace(ctx, field)
 			case "event":
 				return ec.fieldContext_FunctionRun_event(ctx, field)
+			case "events":
+				return ec.fieldContext_FunctionRun_events(ctx, field)
+			case "batchID":
+				return ec.fieldContext_FunctionRun_batchID(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -3852,6 +3880,115 @@ func (ec *executionContext) fieldContext_FunctionRun_event(ctx context.Context, 
 				return ec.fieldContext_Event_functionRuns(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Event", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionRun_events(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRun) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionRun_events(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.FunctionRun().Events(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*models.Event)
+	fc.Result = res
+	return ec.marshalNEvent2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEventᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionRun_events(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionRun",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Event_id(ctx, field)
+			case "workspace":
+				return ec.fieldContext_Event_workspace(ctx, field)
+			case "name":
+				return ec.fieldContext_Event_name(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Event_createdAt(ctx, field)
+			case "payload":
+				return ec.fieldContext_Event_payload(ctx, field)
+			case "schema":
+				return ec.fieldContext_Event_schema(ctx, field)
+			case "status":
+				return ec.fieldContext_Event_status(ctx, field)
+			case "pendingRuns":
+				return ec.fieldContext_Event_pendingRuns(ctx, field)
+			case "totalRuns":
+				return ec.fieldContext_Event_totalRuns(ctx, field)
+			case "raw":
+				return ec.fieldContext_Event_raw(ctx, field)
+			case "functionRuns":
+				return ec.fieldContext_Event_functionRuns(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Event", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionRun_batchID(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRun) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionRun_batchID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.BatchID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*ulid.ULID)
+	fc.Result = res
+	return ec.marshalOULID2ᚖgithubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionRun_batchID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionRun",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ULID does not have child fields")
 		},
 	}
 	return fc, nil
@@ -5384,6 +5521,10 @@ func (ec *executionContext) fieldContext_Query_functionRun(ctx context.Context, 
 				return ec.fieldContext_FunctionRun_workspace(ctx, field)
 			case "event":
 				return ec.fieldContext_FunctionRun_event(ctx, field)
+			case "events":
+				return ec.fieldContext_FunctionRun_events(ctx, field)
+			case "batchID":
+				return ec.fieldContext_FunctionRun_batchID(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -5468,6 +5609,10 @@ func (ec *executionContext) fieldContext_Query_functionRuns(ctx context.Context,
 				return ec.fieldContext_FunctionRun_workspace(ctx, field)
 			case "event":
 				return ec.fieldContext_FunctionRun_event(ctx, field)
+			case "events":
+				return ec.fieldContext_FunctionRun_events(ctx, field)
+			case "batchID":
+				return ec.fieldContext_FunctionRun_batchID(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -7439,6 +7584,10 @@ func (ec *executionContext) fieldContext_StepEvent_functionRun(ctx context.Conte
 				return ec.fieldContext_FunctionRun_workspace(ctx, field)
 			case "event":
 				return ec.fieldContext_FunctionRun_event(ctx, field)
+			case "events":
+				return ec.fieldContext_FunctionRun_events(ctx, field)
+			case "batchID":
+				return ec.fieldContext_FunctionRun_batchID(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -8068,6 +8217,10 @@ func (ec *executionContext) fieldContext_StreamItem_runs(ctx context.Context, fi
 				return ec.fieldContext_FunctionRun_workspace(ctx, field)
 			case "event":
 				return ec.fieldContext_FunctionRun_event(ctx, field)
+			case "events":
+				return ec.fieldContext_FunctionRun_events(ctx, field)
+			case "batchID":
+				return ec.fieldContext_FunctionRun_batchID(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -10773,6 +10926,30 @@ func (ec *executionContext) _FunctionRun(ctx context.Context, sel ast.SelectionS
 				return innerFunc(ctx)
 
 			})
+		case "events":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FunctionRun_events(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "batchID":
+
+			out.Values[i] = ec._FunctionRun_batchID(ctx, field, obj)
+
 		case "status":
 			field := field
 
@@ -12216,6 +12393,50 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 func (ec *executionContext) unmarshalNCreateAppInput2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐCreateAppInput(ctx context.Context, v interface{}) (models.CreateAppInput, error) {
 	res, err := ec.unmarshalInputCreateAppInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNEvent2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEventᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.Event) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNEvent2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEvent(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalNEvent2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEvent(ctx context.Context, sel ast.SelectionSet, v *models.Event) graphql.Marshaler {

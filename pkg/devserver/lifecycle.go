@@ -33,4 +33,20 @@ func (l lifecycle) OnFunctionScheduled(
 		EventID:      id.EventID,
 		Cron:         s.CronSchedule(),
 	})
+
+	if id.BatchID != nil {
+		batch := cqrs.NewEventBatch(
+			cqrs.WithEventBatchID(*id.BatchID),
+			cqrs.WithEventBatchAccountID(id.AccountID),
+			cqrs.WithEventBatchWorkspaceID(id.WorkspaceID),
+			cqrs.WithEventBatchAppID(id.AppID),
+			cqrs.WithEventBatchFunctionID(id.WorkflowID),
+			cqrs.WithEventBatchRunID(id.RunID),
+			cqrs.WithEventBatchEventIDs(id.EventIDs),
+		)
+
+		if batch.IsMulti() {
+			_ = l.cqrs.InsertEventBatch(ctx, *batch)
+		}
+	}
 }
