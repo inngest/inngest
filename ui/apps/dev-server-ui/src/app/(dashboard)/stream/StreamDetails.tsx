@@ -89,6 +89,11 @@ export default function StreamDetails() {
     );
   };
 
+  let events = [eventResult.data];
+  if (runResult.data.run.events.length > 1) {
+    events = runResult.data.run.events.map((e) => JSON.parse(e.raw));
+  }
+
   return (
     <div
       className={classNames(
@@ -98,7 +103,7 @@ export default function StreamDetails() {
     >
       {eventResult.data && (
         <EventDetails
-          events={[eventResult.data]}
+          events={events}
           functionRuns={eventResult.data.functionRuns}
           onFunctionRunClick={(runId) => {
             setSelectedRunID(runId);
