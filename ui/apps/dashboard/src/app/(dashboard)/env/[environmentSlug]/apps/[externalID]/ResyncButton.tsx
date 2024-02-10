@@ -5,7 +5,7 @@ import ResyncModal from './ResyncModal';
 
 type Props = {
   latestSyncUrl: string;
-  platform: string;
+  platform: string | null;
 };
 
 export function ResyncButton({ latestSyncUrl, platform }: Props) {
