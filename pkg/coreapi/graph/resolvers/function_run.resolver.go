@@ -177,6 +177,16 @@ func (r *functionRunResolver) Events(ctx context.Context, obj *models.FunctionRu
 	return result, nil
 }
 
+func (r *functionRunResolver) BatchID(ctx context.Context, obj *models.FunctionRun) (*ulid.ULID, error) {
+	runID := ulid.MustParse(obj.ID)
+
+	if batch, err := r.Data.GetEventBatchByRunID(ctx, runID); err == nil {
+		return &batch.ID, nil
+	}
+
+	return nil, nil
+}
+
 func (r *functionRunResolver) WaitingFor(ctx context.Context, obj *models.FunctionRun) (*models.StepEventWait, error) {
 	return nil, nil
 }

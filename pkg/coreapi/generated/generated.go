@@ -276,7 +276,7 @@ type FunctionRunResolver interface {
 
 	Event(ctx context.Context, obj *models.FunctionRun) (*models.Event, error)
 	Events(ctx context.Context, obj *models.FunctionRun) ([]*models.Event, error)
-
+	BatchID(ctx context.Context, obj *models.FunctionRun) (*ulid.ULID, error)
 	Status(ctx context.Context, obj *models.FunctionRun) (*models.FunctionRunStatus, error)
 	WaitingFor(ctx context.Context, obj *models.FunctionRun) (*models.StepEventWait, error)
 	PendingSteps(ctx context.Context, obj *models.FunctionRun) (*int, error)
@@ -1614,7 +1614,7 @@ type FunctionRun {
   workspace: Workspace
   event: Event
   events: [Event!]!
-  batchID: ULID # if the run is a batched run
+  batchID: ULID
 
   status: FunctionRunStatus
   waitingFor: StepEventWait
@@ -3967,7 +3967,7 @@ func (ec *executionContext) _FunctionRun_batchID(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.BatchID, nil
+		return ec.resolvers.FunctionRun().BatchID(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3985,8 +3985,8 @@ func (ec *executionContext) fieldContext_FunctionRun_batchID(ctx context.Context
 	fc = &graphql.FieldContext{
 		Object:     "FunctionRun",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ULID does not have child fields")
 		},
@@ -10947,9 +10947,22 @@ func (ec *executionContext) _FunctionRun(ctx context.Context, sel ast.SelectionS
 
 			})
 		case "batchID":
+			field := field
 
-			out.Values[i] = ec._FunctionRun_batchID(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FunctionRun_batchID(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "status":
 			field := field
 
