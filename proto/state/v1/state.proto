@@ -1,0 +1,50 @@
+syntax = "proto3";
+package state.v1;
+
+import "google/protobuf/any.proto";
+
+option go_package = "github.com/inngest/inngest/gen/state/v1;statev1";
+
+
+message State {
+  // RunID is the primary identifier for the run's state 
+  string run_id = 1;
+  string function_id = 2;
+  repeated StateEvent events = 3;
+  map<string, google.protobuf.Any> steps = 4;
+  repeated string stack = 5;
+
+  string app_id = 6;
+  string env_id = 7;
+}
+
+message Config {
+  string idempotency = 1;
+}
+
+message StateEvent {
+  string internal_id = 1;
+  Event event = 2;
+}
+
+/* Event represents an event within Inngest */
+message Event {
+  string id = 1;
+  string name = 2;
+  map<string, google.protobuf.Any> data = 3;
+  map<string, google.protobuf.Any> user = 4;
+  int64 timestamp = 5;
+  optional string version = 6;
+}
+
+message CreateRequest {
+  State state = 1;
+}
+
+message CreateResponse {
+  State state = 1;
+}
+
+service StateService {
+  rpc Create(CreateRequest) returns (CreateResponse) {}
+}
