@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -512,11 +511,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	md := s.Metadata()
-
-	// Store the metadata in context for future use.  This can be used to reduce
-	// reads in the future.
-	ctx = WithContextMetadata(ctx, md)
-
 	if md.Status == enums.RunStatusCancelled {
 		return nil, state.ErrFunctionCancelled
 	}
@@ -627,10 +621,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	err = e.HandleResponse(ctx, id, item, edge, resp)
 	return resp, err
-}
-
-func init() {
-	spew.Config.DisableMethods = true
 }
 
 func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge, resp *state.DriverResponse) error {

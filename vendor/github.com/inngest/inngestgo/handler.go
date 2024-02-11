@@ -236,10 +236,19 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 		scheme = "https"
 	}
 	host := r.Host
-	path := r.URL.String()
+
+	// Get the sync ID from the URL and then remove it, since we don't want the
+	// sync ID to show in the function URLs (that would affect the checksum and
+	// is ugly in the UI)
+	qp := r.URL.Query()
+	syncID := qp.Get("deployId")
+	qp.Del("deployId")
+	r.URL.RawQuery = qp.Encode()
+
+	pathAndParams := r.URL.String()
 
 	config := sdk.RegisterRequest{
-		URL:        fmt.Sprintf("%s://%s%s", scheme, host, path),
+		URL:        fmt.Sprintf("%s://%s%s", scheme, host, pathAndParams),
 		V:          "1",
 		DeployType: "ping",
 		SDK:        HeaderValueSDK,
@@ -341,6 +350,11 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 	req, err := http.NewRequest(http.MethodPost, registerURL, bytes.NewReader(byt))
 	if err != nil {
 		return fmt.Errorf("error creating new request: %w", err)
+	}
+	if syncID != "" {
+		qp := req.URL.Query()
+		qp.Set("deployId", syncID)
+		req.URL.RawQuery = qp.Encode()
 	}
 
 	key, err := hashedSigningKey([]byte(h.GetSigningKey()))
