@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -287,6 +288,27 @@ func (w wrapper) InsertEvent(ctx context.Context, e cqrs.Event) error {
 	return w.q.InsertEvent(ctx, evt)
 }
 
+func (w wrapper) InsertEventBatch(ctx context.Context, eb cqrs.EventBatch) error {
+	evtIDs := make([]string, len(eb.Events))
+	for i, evt := range eb.Events {
+		evtIDs[i] = evt.GetInternalID().String()
+	}
+
+	batch := sqlc.InsertEventBatchParams{
+		ID:          eb.ID,
+		AccountID:   eb.AccountID,
+		WorkspaceID: eb.WorkspaceID,
+		AppID:       eb.AppID,
+		WorkflowID:  eb.FunctionID,
+		RunID:       eb.RunID,
+		StartedAt:   eb.StartedAt(),
+		ExecutedAt:  eb.ExecutedAt(),
+		EventIds:    []byte(strings.Join(evtIDs, ",")),
+	}
+
+	return w.q.InsertEventBatch(ctx, batch)
+}
+
 func (w wrapper) GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*cqrs.Event, error) {
 	obj, err := w.q.GetEventByInternalID(ctx, internalID)
 	if err != nil {
@@ -294,6 +316,31 @@ func (w wrapper) GetEventByInternalID(ctx context.Context, internalID ulid.ULID)
 	}
 	evt := convertEvent(obj)
 	return &evt, nil
+}
+
+func (w wrapper) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.EventBatch, error) {
+	obj, err := w.q.GetEventBatchByRunID(ctx, runID)
+	if err != nil {
+		return nil, err
+	}
+
+	eb := convertEventBatch(obj)
+	return &eb, nil
+}
+
+func (w wrapper) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*cqrs.Event, error) {
+	objs, err := w.q.GetEventsByInternalIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	evts := make([]*cqrs.Event, len(objs))
+	for i, o := range objs {
+		evt := convertEvent(o)
+		evts[i] = &evt
+	}
+
+	return evts, nil
 }
 
 func (w wrapper) FindEvent(ctx context.Context, workspaceID uuid.UUID, internalID ulid.ULID) (*cqrs.Event, error) {
@@ -389,6 +436,24 @@ func convertEvent(obj *sqlc.Event) cqrs.Event {
 	_ = json.Unmarshal([]byte(obj.EventData), &evt.EventData)
 	_ = json.Unmarshal([]byte(obj.EventUser), &evt.EventUser)
 	return *evt
+}
+
+func convertEventBatch(obj *sqlc.EventBatch) cqrs.EventBatch {
+	var evtIDs []ulid.ULID
+	if ids, err := obj.EventIDs(); err == nil {
+		evtIDs = ids
+	}
+
+	eb := cqrs.NewEventBatch(
+		cqrs.WithEventBatchID(obj.ID),
+		cqrs.WithEventBatchAccountID(obj.AccountID),
+		cqrs.WithEventBatchWorkspaceID(obj.WorkspaceID),
+		cqrs.WithEventBatchAppID(obj.AppID),
+		cqrs.WithEventBatchRunID(obj.RunID),
+		cqrs.WithEventBatchEventIDs(evtIDs),
+	)
+
+	return *eb
 }
 
 //

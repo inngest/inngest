@@ -1,4 +1,4 @@
-import { useSystemStatus } from '@/app/support/statusPage';
+import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
 import cn from '@/utils/cn';
 
 type SystemStatusIconProps = {

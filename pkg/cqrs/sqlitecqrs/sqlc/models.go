@@ -42,6 +42,18 @@ type Event struct {
 	EventTs     time.Time
 }
 
+type EventBatch struct {
+	ID          ulid.ULID
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	AppID       uuid.UUID
+	WorkflowID  uuid.UUID
+	RunID       ulid.ULID
+	StartedAt   time.Time
+	ExecutedAt  time.Time
+	EventIds    []byte
+}
+
 type Function struct {
 	ID        uuid.UUID
 	AppID     uuid.UUID

@@ -296,6 +296,27 @@ func (q *Queries) GetApps(ctx context.Context) ([]*App, error) {
 	return items, nil
 }
 
+const getEventBatchByRunID = `-- name: GetEventBatchByRunID :one
+SELECT id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids FROM event_batches WHERE run_id = ?
+`
+
+func (q *Queries) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*EventBatch, error) {
+	row := q.db.QueryRowContext(ctx, getEventBatchByRunID, runID)
+	var i EventBatch
+	err := row.Scan(
+		&i.ID,
+		&i.AccountID,
+		&i.WorkspaceID,
+		&i.AppID,
+		&i.WorkflowID,
+		&i.RunID,
+		&i.StartedAt,
+		&i.ExecutedAt,
+		&i.EventIds,
+	)
+	return &i, err
+}
+
 const getEventByInternalID = `-- name: GetEventByInternalID :one
 SELECT internal_id, account_id, workspace_id, source, source_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts FROM events WHERE internal_id = ?
 `
@@ -318,6 +339,56 @@ func (q *Queries) GetEventByInternalID(ctx context.Context, internalID ulid.ULID
 		&i.EventTs,
 	)
 	return &i, err
+}
+
+const getEventsByInternalIDs = `-- name: GetEventsByInternalIDs :many
+SELECT internal_id, account_id, workspace_id, source, source_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts FROM events WHERE internal_id IN (/*SLICE:ids*/?)
+`
+
+func (q *Queries) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*Event, error) {
+	query := getEventsByInternalIDs
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Event
+	for rows.Next() {
+		var i Event
+		if err := rows.Scan(
+			&i.InternalID,
+			&i.AccountID,
+			&i.WorkspaceID,
+			&i.Source,
+			&i.SourceID,
+			&i.ReceivedAt,
+			&i.EventID,
+			&i.EventName,
+			&i.EventData,
+			&i.EventUser,
+			&i.EventV,
+			&i.EventTs,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getEventsTimebound = `-- name: GetEventsTimebound :many
@@ -795,6 +866,39 @@ func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) error 
 	return err
 }
 
+const insertEventBatch = `-- name: InsertEventBatch :exec
+INSERT INTO event_batches
+	(id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?)
+`
+
+type InsertEventBatchParams struct {
+	ID          ulid.ULID
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	AppID       uuid.UUID
+	WorkflowID  uuid.UUID
+	RunID       ulid.ULID
+	StartedAt   time.Time
+	ExecutedAt  time.Time
+	EventIds    []byte
+}
+
+func (q *Queries) InsertEventBatch(ctx context.Context, arg InsertEventBatchParams) error {
+	_, err := q.db.ExecContext(ctx, insertEventBatch,
+		arg.ID,
+		arg.AccountID,
+		arg.WorkspaceID,
+		arg.AppID,
+		arg.WorkflowID,
+		arg.RunID,
+		arg.StartedAt,
+		arg.ExecutedAt,
+		arg.EventIds,
+	)
+	return err
+}
+
 const insertFunction = `-- name: InsertFunction :one
 
 
@@ -838,7 +942,7 @@ func (q *Queries) InsertFunction(ctx context.Context, arg InsertFunctionParams) 
 
 const insertFunctionFinish = `-- name: InsertFunctionFinish :exec
 INSERT INTO function_finishes
-	(run_id, status, output, completed_step_count, created_at) VALUES 
+	(run_id, status, output, completed_step_count, created_at) VALUES
 	(?, ?, ?, ?, ?)
 `
 

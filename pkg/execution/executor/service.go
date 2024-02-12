@@ -10,8 +10,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -24,7 +26,7 @@ import (
 
 type Opt func(s *svc)
 
-func WithExecutionLoader(l cqrs.ExecutionLoader) func(s *svc) {
+func WithExecutionManager(l cqrs.Manager) func(s *svc) {
 	return func(s *svc) {
 		s.data = l
 	}
@@ -60,6 +62,12 @@ func WithServiceDebouncer(d debounce.Debouncer) func(s *svc) {
 	}
 }
 
+func WithServiceBatcher(b batch.BatchManager) func(s *svc) {
+	return func(s *svc) {
+		s.batcher = b
+	}
+}
+
 func NewService(c config.Config, opts ...Opt) service.Service {
 	svc := &svc{config: c}
 	for _, o := range opts {
@@ -70,8 +78,8 @@ func NewService(c config.Config, opts ...Opt) service.Service {
 
 type svc struct {
 	config config.Config
-	// data provides the ability to load action versions when running steps.
-	data cqrs.ExecutionLoader
+	// data provides an interface for data access
+	data cqrs.Manager
 	// state allows us to record step results
 	state state.Manager
 	// queue allows us to enqueue next steps.
@@ -79,6 +87,7 @@ type svc struct {
 	// exec runs the specific actions.
 	exec      execution.Executor
 	debouncer debounce.Debouncer
+	batcher   batch.BatchManager
 
 	wg sync.WaitGroup
 
@@ -196,7 +205,8 @@ func (s *svc) Run(ctx context.Context) error {
 					_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID)
 				}
 			}
-
+		case queue.KindScheduleBatch:
+			err = s.handleScheduledBatch(ctx, item)
 		default:
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
@@ -296,4 +306,72 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	}
 
 	return s.exec.Resume(ctx, *pause, execution.ResumeRequest{})
+}
+
+// handleScheduledBatch checks for
+func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
+	opts := batch.ScheduleBatchOpts{}
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &opts); err != nil {
+		return err
+	}
+
+	batchID := opts.BatchID
+	status, err := s.batcher.StartExecution(ctx, opts.FunctionID, batchID)
+	if err != nil {
+		return err
+	}
+	if status == enums.BatchStatusStarted.String() {
+		// batch already started, abort
+		return nil
+	}
+
+	fn, err := s.findFunctionByID(ctx, opts.FunctionID)
+	if err != nil {
+		return err
+	}
+
+	// TODO: this logic is repeated in runner, consolidate it somewhere
+	// convert batch items to tracked events
+	items, err := s.batcher.RetrieveItems(ctx, batchID)
+	if err != nil {
+		return err
+	}
+	events := make([]event.TrackedEvent, len(items))
+	for i, item := range items {
+		events[i] = item
+	}
+
+	// start execution
+	id := fmt.Sprintf("%s-%s", opts.FunctionID, batchID)
+	_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
+		AccountID:      opts.AccountID,
+		WorkspaceID:    opts.WorkspaceID,
+		AppID:          opts.AppID,
+		Function:       *fn,
+		Events:         events,
+		BatchID:        &batchID,
+		IdempotencyKey: &id,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := s.batcher.ExpireKeys(ctx, batchID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {
+	fns, err := s.data.Functions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range fns {
+		if f.ID == fnID {
+			return &f, nil
+		}
+	}
+	return nil, fmt.Errorf("no function found with ID: %s", fnID)
 }

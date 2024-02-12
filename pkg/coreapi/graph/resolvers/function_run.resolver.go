@@ -137,6 +137,46 @@ func (r *functionRunResolver) Event(ctx context.Context, obj *models.FunctionRun
 	}, nil
 }
 
+func (r *functionRunResolver) Events(ctx context.Context, obj *models.FunctionRun) ([]*models.Event, error) {
+	empty := []*models.Event{}
+	runID := ulid.MustParse(obj.ID)
+
+	batch, err := r.Data.GetEventBatchByRunID(ctx, runID)
+	if err != nil {
+		// if an error occur, it likely means there are no batches for this runID
+		// attempt to just return a single event, that's similar to the Event resolver
+		evt, err := r.Event(ctx, obj)
+		if err != nil {
+			return empty, nil
+		}
+
+		return []*models.Event{evt}, nil
+	}
+
+	// retrieve events by IDs
+	evts, err := r.Data.GetEventsByInternalIDs(ctx, batch.EventIDs())
+	if err != nil {
+		return empty, err
+	}
+
+	result := make([]*models.Event, len(evts))
+	for i, e := range evts {
+		payload, err := json.Marshal(e.EventData)
+		if err != nil {
+			return empty, err
+		}
+
+		result[i] = &models.Event{
+			ID:        e.ID.String(),
+			Name:      &e.EventName,
+			CreatedAt: &e.ReceivedAt,
+			Payload:   util.StrPtr(string(payload)),
+		}
+	}
+
+	return result, nil
+}
+
 func (r *functionRunResolver) WaitingFor(ctx context.Context, obj *models.FunctionRun) (*models.StepEventWait, error) {
 	return nil, nil
 }

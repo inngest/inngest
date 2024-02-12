@@ -10,6 +10,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/history_reader"
+	ulid "github.com/oklog/ulid/v2"
 )
 
 type FunctionRunEvent interface {
@@ -78,6 +79,8 @@ type FunctionRun struct {
 	Function          *Function                    `json:"function,omitempty"`
 	Workspace         *Workspace                   `json:"workspace,omitempty"`
 	Event             *Event                       `json:"event,omitempty"`
+	Events            []*Event                     `json:"events"`
+	BatchID           *ulid.ULID                   `json:"batchID,omitempty"`
 	Status            *FunctionRunStatus           `json:"status,omitempty"`
 	WaitingFor        *StepEventWait               `json:"waitingFor,omitempty"`
 	PendingSteps      *int                         `json:"pendingSteps,omitempty"`

@@ -27,6 +27,25 @@ sql:
               package: "ulid"
               type: "ULID"
 
+          - column: "event_batches.id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "event_batches.account_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "event_batches.workspace_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "event_batches.app_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "event_batches.workflow_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "event_batches.run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+
           - column: "history.id"
             go_type:
               import: "github.com/oklog/ulid/v2"

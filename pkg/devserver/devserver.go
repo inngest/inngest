@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
@@ -175,6 +176,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	rl := ratelimit.New(ctx, rc, "{ratelimit}:")
 
+	batcher := batch.NewRedisBatchManager(rc, queueKG, queue)
 	debouncer := debounce.NewRedisDebouncer(rc, queueKG, queue)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
@@ -218,6 +220,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithInvokeNotFoundHandler(getInvokeNotFoundHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
+		executor.WithBatcher(batcher),
 	)
 	if err != nil {
 		return err
@@ -226,10 +229,11 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create an executor.
 	executorSvc := executor.NewService(
 		opts.Config,
-		executor.WithExecutionLoader(dbcqrs),
+		executor.WithExecutionManager(dbcqrs),
 		executor.WithState(sm),
 		executor.WithServiceQueue(queue),
 		executor.WithServiceExecutor(exec),
+		executor.WithServiceBatcher(batcher),
 		executor.WithServiceDebouncer(debouncer),
 	)
 
@@ -237,12 +241,13 @@ func start(ctx context.Context, opts StartOpts) error {
 		opts.Config,
 		runner.WithCQRS(dbcqrs),
 		runner.WithExecutor(exec),
-		runner.WithExecutionLoader(dbcqrs),
+		runner.WithExecutionManager(dbcqrs),
 		runner.WithEventManager(event.NewManager()),
 		runner.WithStateManager(sm),
 		runner.WithRunnerQueue(queue),
 		runner.WithTracker(t),
 		runner.WithRateLimiter(rl),
+		runner.WithBatchManager(batcher),
 	)
 
 	// The devserver embeds the event API.

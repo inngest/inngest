@@ -2,6 +2,7 @@ package cqrs
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"time"
 
@@ -55,6 +56,19 @@ func (e Event) Event() event.Event {
 	}
 }
 
+// -- event.TrackedEvent interfaces
+func (e Event) GetInternalID() ulid.ULID {
+	return e.InternalID()
+}
+
+func (e Event) GetWorkspaceID() uuid.UUID {
+	return e.WorkspaceID
+}
+
+func (e Event) GetEvent() event.Event {
+	return e.Event()
+}
+
 type EventManager interface {
 	EventWriter
 	EventReader
@@ -62,6 +76,7 @@ type EventManager interface {
 
 type EventWriter interface {
 	InsertEvent(ctx context.Context, e Event) error
+	InsertEventBatch(ctx context.Context, eb EventBatch) error
 }
 
 type WorkspaceEventsOpts struct {
@@ -97,6 +112,8 @@ func (o *WorkspaceEventsOpts) Validate() error {
 
 type EventReader interface {
 	GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*Event, error)
+	GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*Event, error)
+	GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*EventBatch, error)
 	GetEventsTimebound(
 		ctx context.Context,
 		t Timebound,
@@ -107,4 +124,118 @@ type EventReader interface {
 	WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, opts *WorkspaceEventsOpts) ([]Event, error)
 	// Find returns a specific event given an ID.
 	FindEvent(ctx context.Context, workspaceID uuid.UUID, id ulid.ULID) (*Event, error)
+}
+
+type EventBatchOpt func(eb *EventBatch)
+
+// EventBatch represents a event batch execution
+type EventBatch struct {
+	ID          ulid.ULID            `json:"id"`
+	AccountID   uuid.UUID            `json:"account_id"`
+	WorkspaceID uuid.UUID            `json:"workspace_id"`
+	AppID       uuid.UUID            `json:"app_id"`
+	FunctionID  uuid.UUID            `json:"workflow_id"`
+	RunID       ulid.ULID            `json:"run_id"`
+	Events      []event.TrackedEvent `json:"events"`
+	Time        time.Time            `json:"ts"`
+}
+
+func NewEventBatch(opts ...EventBatchOpt) *EventBatch {
+	eb := &EventBatch{
+		ID:   ulid.MustNew(ulid.Now(), rand.Reader),
+		Time: time.Now(),
+	}
+
+	for _, opt := range opts {
+		opt(eb)
+	}
+
+	return eb
+}
+
+// WithEventBatchID sets the new EventBatch ID with the provided ID
+func WithEventBatchID(id ulid.ULID) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.ID = id
+	}
+}
+
+func WithEventBatchAccountID(acctID uuid.UUID) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.AccountID = acctID
+	}
+}
+
+func WithEventBatchWorkspaceID(wsID uuid.UUID) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.WorkspaceID = wsID
+	}
+}
+
+func WithEventBatchAppID(appID uuid.UUID) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.AppID = appID
+	}
+}
+
+func WithEventBatchFunctionID(fnID uuid.UUID) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.FunctionID = fnID
+	}
+}
+
+func WithEventBatchEvent(evt event.TrackedEvent) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.Events = []event.TrackedEvent{evt}
+	}
+}
+
+func WithEventBatchRunID(runID ulid.ULID) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.RunID = runID
+	}
+}
+
+func WithEventBatchEvents(evts []event.TrackedEvent) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.Events = evts
+	}
+}
+
+func WithEventBatchEventIDs(evtIDs []ulid.ULID) EventBatchOpt {
+	return func(eb *EventBatch) {
+		evts := make([]event.TrackedEvent, len(evtIDs))
+		for i, id := range evtIDs {
+			evts[i] = Event{ID: id}
+		}
+		eb.Events = evts
+	}
+}
+
+func (eb *EventBatch) StartedAt() time.Time {
+	return ulid.Time(eb.ID.Time())
+}
+
+func (eb *EventBatch) ExecutedAt() time.Time {
+	return eb.Time
+}
+
+func (eb *EventBatch) EventID() *ulid.ULID {
+	if len(eb.Events) < 1 {
+		return nil
+	}
+	id := eb.Events[0].GetInternalID()
+	return &id
+}
+
+func (eb *EventBatch) EventIDs() []ulid.ULID {
+	ids := make([]ulid.ULID, len(eb.Events))
+	for i, evt := range eb.Events {
+		ids[i] = evt.GetInternalID()
+	}
+	return ids
+}
+
+func (eb *EventBatch) IsMulti() bool {
+	return len(eb.Events) > 1
 }

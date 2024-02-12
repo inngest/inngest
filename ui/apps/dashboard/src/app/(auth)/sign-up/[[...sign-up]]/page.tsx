@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { SignUp } from '@clerk/nextjs';
 
-import SplitView from '@/app/(logged-out)/SplitView';
+import SplitView from '@/app/(auth)/SplitView';
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 
 export default async function SignUpPage() {

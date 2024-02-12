@@ -110,8 +110,10 @@ export enum FunctionEventType {
 
 export type FunctionRun = {
   __typename?: 'FunctionRun';
+  batchID: Maybe<Scalars['ULID']>;
   event: Maybe<Event>;
   eventID: Scalars['ID'];
+  events: Array<Maybe<Event>>;
   finishedAt: Maybe<Scalars['Time']>;
   function: Maybe<Function>;
   functionID: Scalars['String'];
@@ -421,7 +423,7 @@ export type GetFunctionRunQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', id: string, name: string | null, status: FunctionRunStatus | null, startedAt: any | null, finishedAt: any | null, output: string | null, pendingSteps: number | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null, function: { __typename?: 'Function', triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null } | null, event: { __typename?: 'Event', id: string, raw: string | null } | null, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: any, functionVersion: number, groupID: any | null, id: any, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: any | null, expression: string | null, userID: any | null } | null, sleep: { __typename?: 'RunHistorySleep', until: any } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: any } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: any | null, timeout: boolean } | null, invokeFunction: { __typename?: 'RunHistoryInvokeFunction', eventID: any, functionID: string, correlationID: string, timeout: any } | null, invokeFunctionResult: { __typename?: 'RunHistoryInvokeFunctionResult', eventID: any | null, timeout: boolean, runID: any | null } | null }> } | null };
+export type GetFunctionRunQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', id: string, name: string | null, status: FunctionRunStatus | null, startedAt: any | null, finishedAt: any | null, output: string | null, pendingSteps: number | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null, function: { __typename?: 'Function', triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null } | null, event: { __typename?: 'Event', id: string, raw: string | null } | null, events: Array<{ __typename?: 'Event', id: string, raw: string | null } | null>, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: any, functionVersion: number, groupID: any | null, id: any, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: any | null, expression: string | null, userID: any | null } | null, sleep: { __typename?: 'RunHistorySleep', until: any } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: any } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: any | null, timeout: boolean } | null, invokeFunction: { __typename?: 'RunHistoryInvokeFunction', eventID: any, functionID: string, correlationID: string, timeout: any } | null, invokeFunctionResult: { __typename?: 'RunHistoryInvokeFunctionResult', eventID: any | null, timeout: boolean, runID: any | null } | null }> } | null };
 
 export type GetFunctionsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -559,6 +561,10 @@ export const GetFunctionRunDocument = `
       }
     }
     event {
+      id
+      raw
+    }
+    events {
       id
       raw
     }

@@ -126,6 +126,13 @@ export type CancellationConfiguration = {
   timeout: Maybe<Scalars['String']>;
 };
 
+export type CodedError = {
+  __typename?: 'CodedError';
+  code: Scalars['String'];
+  data: Maybe<Scalars['JSON']>;
+  message: Scalars['String'];
+};
+
 export type ConcurrencyConfiguration = {
   __typename?: 'ConcurrencyConfiguration';
   key: Maybe<Scalars['String']>;
@@ -499,7 +506,9 @@ export type Mutation = {
   editWorkflow: Maybe<WorkflowVersionResponse>;
   enableEnvironmentAutoArchive: Workspace;
   removeVercelApp: Maybe<RemoveVercelAppResponse>;
+  resyncApp: SyncResponse;
   retryWorkflowRun: Maybe<StartWorkflowResponse>;
+  syncNewApp: SyncResponse;
   unarchiveEnvironment: Workspace;
   updateAccount: Account;
   updateIngestKey: IngestKey;
@@ -590,9 +599,22 @@ export type MutationRemoveVercelAppArgs = {
 };
 
 
+export type MutationResyncAppArgs = {
+  appExternalID: Scalars['String'];
+  appURL: InputMaybe<Scalars['String']>;
+  envID: Scalars['UUID'];
+};
+
+
 export type MutationRetryWorkflowRunArgs = {
   input: StartWorkflowInput;
   workflowRunID: Scalars['ULID'];
+};
+
+
+export type MutationSyncNewAppArgs = {
+  appURL: Scalars['String'];
+  envID: Scalars['UUID'];
 };
 
 
@@ -971,6 +993,12 @@ export type StripeSubscriptionItemsInput = {
   amount: Scalars['Int'];
   planID: Scalars['ID'];
   quantity: Scalars['Int'];
+};
+
+export type SyncResponse = {
+  __typename?: 'SyncResponse';
+  error: Maybe<CodedError>;
+  sync: Maybe<Deploy>;
 };
 
 export type TimeSeries = {

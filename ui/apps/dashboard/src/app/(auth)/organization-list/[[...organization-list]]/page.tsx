@@ -1,6 +1,6 @@
 import { OrganizationList } from '@clerk/nextjs';
 
-import SplitView from '@/app/(logged-out)/SplitView';
+import SplitView from '@/app/(auth)/SplitView';
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 
 type OrganizationListPageProps = {
