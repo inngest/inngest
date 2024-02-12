@@ -14,7 +14,12 @@ import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-t
 import { queryClient } from '@/app/StoreProvider';
 import SendEventButton from '@/components/Event/SendEventButton';
 import { client } from '@/store/baseApi';
-import { GetTriggersStreamDocument, type FunctionRun, type StreamItem } from '@/store/generated';
+import {
+  GetTriggersStreamDocument,
+  type FunctionRun,
+  type GetTriggersStreamQuery,
+  type StreamItem,
+} from '@/store/generated';
 import FunctionRunList from './FunctionRunList';
 
 // import OutputList from './OutputList';
@@ -101,9 +106,8 @@ export default function Stream() {
       includeInternalEvents: showInternalEvents,
     };
 
-    const data = await client.request(GetTriggersStreamDocument, variables);
+    const data: GetTriggersStreamQuery = await client.request(GetTriggersStreamDocument, variables);
 
-    // @ts-expect-error
     return data.stream;
   };
 
@@ -156,7 +160,7 @@ export default function Stream() {
 
   const fetchMoreOnScroll = useCallback(
     (containerRefElement?: HTMLDivElement | null) => {
-      if (containerRefElement && triggers?.length > 0) {
+      if (containerRefElement && triggers && triggers.length > 0) {
         const { scrollHeight, scrollTop, clientHeight } = containerRefElement;
         // Check if scrolled to the bottom
         const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;

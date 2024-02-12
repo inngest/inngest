@@ -11,13 +11,13 @@ import type { FunctionRun } from '@inngest/components/types/functionRun';
 import { shortDate } from '@inngest/components/utils/date';
 
 type EventProps = {
-  // An array of length > 1 will be treated as a batch of events
+  batchID: string | undefined;
   events: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>[];
-
   loading?: false;
 };
 
 type LoadingEvent = {
+  batchID: string | undefined;
   events?: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>[];
   loading: true;
 };
@@ -46,6 +46,7 @@ type WithoutRunSelector = {
 type Props = (EventProps | LoadingEvent) & (WithoutRunSelector | WithRunSelector);
 
 export function EventDetails({
+  batchID,
   events,
   functionRuns,
   onFunctionRunClick,
@@ -56,12 +57,12 @@ export function EventDetails({
   loading = false,
 }: Props) {
   let singleEvent = undefined;
-  if (events?.length === 1) {
+  if (!batchID && events?.length === 1) {
     singleEvent = events[0];
   }
 
   let batch = undefined;
-  if (events && events.length > 1) {
+  if (batchID) {
     batch = events;
   }
 
@@ -69,7 +70,17 @@ export function EventDetails({
   if (singleEvent && singleEvent.payload) {
     prettyPayload = usePrettyJson(singleEvent.payload);
   } else if (batch) {
-    prettyPayload = usePrettyJson(JSON.stringify(batch));
+    prettyPayload = usePrettyJson(
+      JSON.stringify(
+        batch.map((e) => {
+          return JSON.parse(e.payload);
+        })
+      )
+    );
+  }
+
+  if (batch && functionRuns) {
+    functionRuns = functionRuns.filter((run) => run.id === selectedRunID);
   }
 
   return (

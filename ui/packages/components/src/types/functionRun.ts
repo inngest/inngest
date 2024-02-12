@@ -1,6 +1,6 @@
 import type { RawHistoryItem } from '@inngest/components/utils/historyParser';
 
-const functionRunStatuses = ['CANCELLED', 'COMPLETED', 'FAILED', 'RUNNING'] as const;
+const functionRunStatuses = ['CANCELLED', 'COMPLETED', 'FAILED', 'QUEUED', 'RUNNING'] as const;
 const FunctionRunEndedStatuses = ['CANCELLED', 'COMPLETED', 'FAILED'] as const;
 export type FunctionRunStatus = (typeof functionRunStatuses)[number];
 export type FunctionRunEndStatus = (typeof FunctionRunEndedStatuses)[number];
@@ -9,6 +9,7 @@ export function isFunctionRunStatus(s: string): s is FunctionRunStatus {
 }
 
 export type FunctionRun = {
+  batchID: string | null;
   canRerun: boolean | null;
   endedAt: Date | null;
   functionID: string;

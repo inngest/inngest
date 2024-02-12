@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { EventDetails } from '@inngest/components/EventDetails';
@@ -89,9 +89,11 @@ export default function StreamDetails() {
     );
   };
 
-  let events = [eventResult.data];
+  let events: React.ComponentProps<typeof EventDetails>['events'] = [];
   if (runResult?.data?.run?.events && runResult.data.run.events.length > 1) {
-    events = runResult.data.run.events.map((e) => JSON.parse(e.raw));
+    events = runResult.data.run.events;
+  } else if (eventResult.data) {
+    events = [eventResult.data];
   }
 
   return (
@@ -103,6 +105,7 @@ export default function StreamDetails() {
     >
       {eventResult.data && (
         <EventDetails
+          batchID={runResult.data?.run?.batchID ?? undefined}
           events={events}
           functionRuns={eventResult.data.functionRuns}
           onFunctionRunClick={(runId) => {
