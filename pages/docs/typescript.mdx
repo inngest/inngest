@@ -243,6 +243,16 @@ import { inngest } from "@/inngest";
 type Events = GetEvents<typeof inngest>;
 ```
 
+By default, the returned events do not include internal events prefixed with
+`inngest/`, such as `inngest/function.finished`.
+
+To include these events in
+<VersionBadge version="v3.13.1+" />, pass a second `true` generic:
+
+```ts
+type Events = GetEvents<typeof inngest, true>;
+```
+
 ### GetFunctionInput <VersionBadge version="v3.3.0+" />
 
 Get the argument passed to Inngest functions given an Inngest client and, optionally, an event trigger.
