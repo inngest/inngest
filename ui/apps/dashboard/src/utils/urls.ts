@@ -48,12 +48,6 @@ export const pathCreator = {
   createApp({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/apps/sync-new` as Route;
   },
-  deploys({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/deploys` as Route;
-  },
-  deploy({ deployID, envSlug }: { deployID: string; envSlug: string }): Route {
-    return `/env/${envSlug}/deploys/${deployID}` as Route;
-  },
   events({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/events` as Route;
   },

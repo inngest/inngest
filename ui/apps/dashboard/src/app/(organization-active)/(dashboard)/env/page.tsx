@@ -4,7 +4,6 @@ import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 
 import AppLink from '@/components/AppLink';
-import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import AppNavigation from '@/components/Navigation/AppNavigation';
 import Toaster from '@/components/Toaster';
 import getAllEnvironments from '@/queries/server-only/getAllEnvironments';
@@ -13,7 +12,6 @@ import EnvironmentListTable from './EnvironmentListTable';
 
 export default async function Envs() {
   const environments = await getAllEnvironments();
-  const isAppsEnabled = await getBooleanFlag('apps-page');
 
   // Break the environments into different groups
   const legacyTestMode = environments.find(
@@ -35,15 +33,7 @@ export default async function Envs() {
               <h2 className="text-lg font-medium text-slate-800">Production Environment</h2>
               <div className="flex items-center gap-2">
                 <Button href="/env/production/manage" appearance="outlined" label="Manage" />
-                <Button
-                  href={
-                    `/env/production/${
-                      isAppsEnabled ? 'apps' : 'deploys?intent=deploy-modal'
-                    }` as Route
-                  }
-                  kind="primary"
-                  label={isAppsEnabled ? 'Go To Apps' : 'Deploy'}
-                />
+                <Button href={`/env/production/apps` as Route} kind="primary" label="Go To Apps" />
               </div>
             </div>
             <p className="mt-2 max-w-[400px] text-sm font-medium text-slate-600">
@@ -69,13 +59,9 @@ export default async function Envs() {
                       label="Manage"
                     />
                     <Button
-                      href={
-                        `/env/${legacyTestMode?.slug}/${
-                          isAppsEnabled ? 'apps' : 'deploys?intent=deploy-modal'
-                        }` as Route
-                      }
+                      href={`/env/${legacyTestMode?.slug}/apps` as Route}
                       kind="primary"
-                      label={isAppsEnabled ? 'Go To Apps' : 'Deploy'}
+                      label="Go To Apps"
                     />
                   </div>
                 </div>
@@ -108,13 +94,9 @@ export default async function Envs() {
 
                     {/* Here we don't link to the modal since the /deploy empty state has more info on branch envs */}
                     <Button
-                      href={
-                        `/env/${branchParent?.slug || 'branch'}/${
-                          isAppsEnabled ? 'apps' : 'deploys'
-                        }` as Route
-                      }
+                      href={`/env/${branchParent?.slug || 'branch'}/apps` as Route}
                       kind="primary"
-                      label={isAppsEnabled ? 'Sync New App' : 'Deploy'}
+                      label="Sync New App"
                     />
                   </div>
                 </div>
@@ -137,13 +119,9 @@ export default async function Envs() {
                         label="Manage"
                       />
                       <Button
-                        href={
-                          `/env/${env.slug}/${
-                            isAppsEnabled ? 'apps' : 'deploys?intent=deploy-modal'
-                          }` as Route
-                        }
+                        href={`/env/${env.slug}/apps` as Route}
                         kind="primary"
-                        label={isAppsEnabled ? 'Go To Apps' : 'Deploy'}
+                        label="Go To Apps"
                       />
                     </div>
                   </div>
