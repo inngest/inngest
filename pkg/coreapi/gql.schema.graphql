@@ -19,6 +19,7 @@ type StreamItem {
   type: StreamType!
   createdAt: Time!
   runs: [FunctionRun]
+  inBatch: Boolean!
 }
 
 enum StreamType {

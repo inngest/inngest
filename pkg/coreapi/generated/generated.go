@@ -240,6 +240,7 @@ type ComplexityRoot struct {
 	StreamItem struct {
 		CreatedAt func(childComplexity int) int
 		ID        func(childComplexity int) int
+		InBatch   func(childComplexity int) int
 		Runs      func(childComplexity int) int
 		Trigger   func(childComplexity int) int
 		Type      func(childComplexity int) int
@@ -1249,6 +1250,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.StreamItem.ID(childComplexity), true
 
+	case "StreamItem.inBatch":
+		if e.complexity.StreamItem.InBatch == nil {
+			break
+		}
+
+		return e.complexity.StreamItem.InBatch(childComplexity), true
+
 	case "StreamItem.runs":
 		if e.complexity.StreamItem.Runs == nil {
 			break
@@ -1449,6 +1457,7 @@ type StreamItem {
   type: StreamType!
   createdAt: Time!
   runs: [FunctionRun]
+  inBatch: Boolean!
 }
 
 enum StreamType {
@@ -5244,6 +5253,8 @@ func (ec *executionContext) fieldContext_Query_stream(ctx context.Context, field
 				return ec.fieldContext_StreamItem_createdAt(ctx, field)
 			case "runs":
 				return ec.fieldContext_StreamItem_runs(ctx, field)
+			case "inBatch":
+				return ec.fieldContext_StreamItem_inBatch(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type StreamItem", field.Name)
 		},
@@ -8243,6 +8254,50 @@ func (ec *executionContext) fieldContext_StreamItem_runs(ctx context.Context, fi
 				return ec.fieldContext_FunctionRun_eventID(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRun", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StreamItem_inBatch(ctx context.Context, field graphql.CollectedField, obj *models.StreamItem) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StreamItem_inBatch(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.InBatch, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StreamItem_inBatch(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StreamItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -11960,6 +12015,13 @@ func (ec *executionContext) _StreamItem(ctx context.Context, sel ast.SelectionSe
 
 			out.Values[i] = ec._StreamItem_runs(ctx, field, obj)
 
+		case "inBatch":
+
+			out.Values[i] = ec._StreamItem_inBatch(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
