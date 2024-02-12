@@ -75,6 +75,18 @@ To ensure that your functions are up to date, you need to resync your app with I
 If you are syncing your app through an integration, this process is automatically handled for you.
 </Callout>
 
+### When to resync Vercel apps manually
+We recommend using our official Vercel integration, since the syncing process is automatic.
+You will want to resync a Vercel app manually if:
+- There was an error in the automatic syncing process (such as a network error)
+- You chose not to install the Vercel integration and synced the app manually
+
+If you have the Vercel integration and resync the app manually, the next time you deploy code to Vercel, the app will still be automatically resynced.
+
+<Callout>
+[Vercel generates a unique URL for each deployment](https://vercel.com/docs/deployments/generated-urls). Please confirm that you are using the correct URL if you choose a deployment's generated URL instead of a static domain for your app.
+</Callout>
+
 ### How to resync manually
 
 1. Navigate to the app you want to resync. You will find a “Resync” button at the top-right corner of the page.
