@@ -86,10 +86,12 @@ export function Details({ envID, eventID, onClose, navigateToRun }: Props) {
   } else if (eventRes.isSkipped) {
     eventDetails = null;
   } else {
+    // TODO: Do this for real
+    const batchID = undefined;
+
     eventDetails = (
       <EventDetails
-        // TODO: Do this for real
-        batchID={undefined}
+        batchID={batchID}
         events={[eventRes.data.event]}
         functionRuns={eventRes.data.runs}
         onFunctionRunClick={onFunctionRunClick}

@@ -17,7 +17,7 @@ type EventProps = {
 };
 
 type LoadingEvent = {
-  batchID: string | undefined;
+  batchID?: string | undefined;
   events?: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>[];
   loading: true;
 };
