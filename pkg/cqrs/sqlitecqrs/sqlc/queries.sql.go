@@ -317,6 +317,43 @@ func (q *Queries) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*E
 	return &i, err
 }
 
+const getEventBatchesByEventID = `-- name: GetEventBatchesByEventID :many
+SELECT id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids FROM event_batches WHERE INSTR(CAST(event_ids AS TEXT), ?) > 0
+`
+
+func (q *Queries) GetEventBatchesByEventID(ctx context.Context, instr string) ([]*EventBatch, error) {
+	rows, err := q.db.QueryContext(ctx, getEventBatchesByEventID, instr)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*EventBatch
+	for rows.Next() {
+		var i EventBatch
+		if err := rows.Scan(
+			&i.ID,
+			&i.AccountID,
+			&i.WorkspaceID,
+			&i.AppID,
+			&i.WorkflowID,
+			&i.RunID,
+			&i.StartedAt,
+			&i.ExecutedAt,
+			&i.EventIds,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getEventByInternalID = `-- name: GetEventByInternalID :one
 SELECT internal_id, account_id, workspace_id, source, source_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts FROM events WHERE internal_id = ?
 `

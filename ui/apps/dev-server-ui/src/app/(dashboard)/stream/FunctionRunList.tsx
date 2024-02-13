@@ -4,14 +4,15 @@ import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon
 import { useGetFunctionRunStatusQuery, type FunctionRun } from '@/store/generated';
 
 type FunctionRunList = {
+  inBatch: boolean;
   functionRuns: FunctionRun[];
 };
 
-export default function FunctionRunList({ functionRuns }: FunctionRunList) {
+export default function FunctionRunList({ inBatch, functionRuns }: FunctionRunList) {
   return (
     <>
       {!functionRuns || functionRuns.length < 1 ? (
-        <p className="text-slate-600">No functions called</p>
+        <p className="text-slate-600">{inBatch ? 'Added to batch' : 'No functions called'}</p>
       ) : (
         <ul className="flex flex-col space-y-4">
           {functionRuns &&

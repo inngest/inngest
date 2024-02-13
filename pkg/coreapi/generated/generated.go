@@ -50,6 +50,7 @@ type ResolverRoot interface {
 	FunctionRun() FunctionRunResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
+	StreamItem() StreamItemResolver
 }
 
 type DirectiveRoot struct {
@@ -301,6 +302,9 @@ type QueryResolver interface {
 	Functions(ctx context.Context) ([]*models.Function, error)
 	FunctionRun(ctx context.Context, query models.FunctionRunQuery) (*models.FunctionRun, error)
 	FunctionRuns(ctx context.Context, query models.FunctionRunsQuery) ([]*models.FunctionRun, error)
+}
+type StreamItemResolver interface {
+	InBatch(ctx context.Context, obj *models.StreamItem) (bool, error)
 }
 
 type executableSchema struct {
@@ -8273,7 +8277,7 @@ func (ec *executionContext) _StreamItem_inBatch(ctx context.Context, field graph
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.InBatch, nil
+		return ec.resolvers.StreamItem().InBatch(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8294,8 +8298,8 @@ func (ec *executionContext) fieldContext_StreamItem_inBatch(ctx context.Context,
 	fc = &graphql.FieldContext{
 		Object:     "StreamItem",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
 		},
@@ -12001,40 +12005,53 @@ func (ec *executionContext) _StreamItem(ctx context.Context, sel ast.SelectionSe
 			out.Values[i] = ec._StreamItem_id(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "trigger":
 
 			out.Values[i] = ec._StreamItem_trigger(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "type":
 
 			out.Values[i] = ec._StreamItem_type(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "createdAt":
 
 			out.Values[i] = ec._StreamItem_createdAt(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "runs":
 
 			out.Values[i] = ec._StreamItem_runs(ctx, field, obj)
 
 		case "inBatch":
+			field := field
 
-			out.Values[i] = ec._StreamItem_inBatch(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._StreamItem_inBatch(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
 			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

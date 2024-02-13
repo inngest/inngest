@@ -129,6 +129,9 @@ SELECT * FROM events WHERE internal_id IN (sqlc.slice('ids'));
 -- name: GetEventBatchByRunID :one
 SELECT * FROM event_batches WHERE run_id = ?;
 
+-- name: GetEventBatchesByEventID :many
+SELECT * FROM event_batches WHERE INSTR(CAST(event_ids AS TEXT), ?) > 0;
+
 -- name: GetEventsTimebound :many
 SELECT DISTINCT e.*
 FROM events AS e

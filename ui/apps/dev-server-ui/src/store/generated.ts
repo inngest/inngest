@@ -50,7 +50,6 @@ export type Event = {
   createdAt: Maybe<Scalars['Time']>;
   functionRuns: Maybe<Array<FunctionRun>>;
   id: Scalars['ID'];
-  isInBatch: Scalars['Boolean'];
   name: Maybe<Scalars['String']>;
   payload: Maybe<Scalars['String']>;
   pendingRuns: Maybe<Scalars['Int']>;
@@ -375,6 +374,7 @@ export type StreamItem = {
   __typename?: 'StreamItem';
   createdAt: Scalars['Time'];
   id: Scalars['ID'];
+  inBatch: Scalars['Boolean'];
   runs: Maybe<Array<Maybe<FunctionRun>>>;
   trigger: Scalars['String'];
   type: StreamType;
@@ -465,7 +465,7 @@ export type GetTriggersStreamQueryVariables = Exact<{
 }>;
 
 
-export type GetTriggersStreamQuery = { __typename?: 'Query', stream: Array<{ __typename?: 'StreamItem', createdAt: any, id: string, trigger: string, type: StreamType, runs: Array<{ __typename?: 'FunctionRun', batchID: any | null, id: string, events: Array<{ __typename?: 'Event', id: string }>, function: { __typename?: 'Function', name: string } | null } | null> | null }> };
+export type GetTriggersStreamQuery = { __typename?: 'Query', stream: Array<{ __typename?: 'StreamItem', createdAt: any, id: string, inBatch: boolean, trigger: string, type: StreamType, runs: Array<{ __typename?: 'FunctionRun', batchID: any | null, id: string, events: Array<{ __typename?: 'Event', id: string }>, function: { __typename?: 'Function', name: string } | null } | null> | null }> };
 
 export type GetFunctionRunStatusQueryVariables = Exact<{
   id: Scalars['ID'];
@@ -681,6 +681,7 @@ export const GetTriggersStreamDocument = `
   ) {
     createdAt
     id
+    inBatch
     trigger
     type
     runs {

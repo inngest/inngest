@@ -63,7 +63,9 @@ const columns = [
         }
       }
 
-      return <FunctionRunList functionRuns={validFunctionRuns} />;
+      return (
+        <FunctionRunList inBatch={props.row.original.inBatch} functionRuns={validFunctionRuns} />
+      );
     },
     size: 350,
     minSize: 350,

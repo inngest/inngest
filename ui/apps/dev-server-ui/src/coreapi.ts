@@ -210,6 +210,7 @@ export const TRIGGERS_STREAM = gql`
     ) {
       createdAt
       id
+      inBatch
       trigger
       type
       runs {
