@@ -212,6 +212,12 @@ func WithEventBatchEventIDs(evtIDs []ulid.ULID) EventBatchOpt {
 	}
 }
 
+func WithEventBatchExecutedTime(t time.Time) EventBatchOpt {
+	return func(eb *EventBatch) {
+		eb.Time = t
+	}
+}
+
 func (eb *EventBatch) StartedAt() time.Time {
 	return ulid.Time(eb.ID.Time())
 }
