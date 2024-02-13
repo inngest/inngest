@@ -88,6 +88,8 @@ export function Details({ envID, eventID, onClose, navigateToRun }: Props) {
   } else {
     eventDetails = (
       <EventDetails
+        // TODO: Do this for real
+        batchID={undefined}
         events={[eventRes.data.event]}
         functionRuns={eventRes.data.runs}
         onFunctionRunClick={onFunctionRunClick}
