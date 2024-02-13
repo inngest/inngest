@@ -97,7 +97,7 @@ function createColumns({
       minSize: 300,
     }),
     columnHelper.accessor('startedAt', {
-      header: () => <span>Scheduled At</span>,
+      header: () => <span>Queued At</span>,
       cell: (props) => <Time value={new Date(props.getValue())} />,
       size: 300,
       minSize: 300,
