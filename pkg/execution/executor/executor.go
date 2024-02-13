@@ -1326,7 +1326,7 @@ func (e *executor) Cancel(ctx context.Context, runID ulid.ULID, r execution.Canc
 	return nil
 }
 
-// Resume resumes an in-progress function from the given waitForEvent pause.
+// Resume resumes an in-progress function from the given pause.
 func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.ResumeRequest) error {
 	if e.queue == nil || e.sm == nil {
 		return fmt.Errorf("No queue or state manager specified")
