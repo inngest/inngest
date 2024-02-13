@@ -80,6 +80,8 @@ export function EventDetails({
   }
 
   if (batch && functionRuns) {
+    // For batches, we only want to show the selected run. This is because each
+    // run gets its own batch -- batches aren't shared between runs
     functionRuns = functionRuns.filter((run) => run.id === selectedRunID);
   }
 
