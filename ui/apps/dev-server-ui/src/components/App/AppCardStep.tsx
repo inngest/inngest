@@ -19,7 +19,7 @@ export default function AppCardStep({
       <span className="absolute w-px bg-slate-800" aria-hidden="true" />
       <Disclosure.Button
         as={'div'}
-        className="flex w-full cursor-pointer items-center justify-between p-4 pr-6 text-white"
+        className="flex w-full cursor-pointer items-center justify-between px-6 py-4 text-white"
       >
         {lineContent}
       </Disclosure.Button>
