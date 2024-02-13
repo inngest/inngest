@@ -139,7 +139,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
           <FunctionRunsChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
           <FunctionThroughputChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
           <SDKRequestThroughputChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
-          <div className="mt-4 px-6">
+          <div className="my-4 px-6">
             <LatestFailedFunctionRuns
               environmentSlug={params.environmentSlug}
               functionSlug={functionSlug}
