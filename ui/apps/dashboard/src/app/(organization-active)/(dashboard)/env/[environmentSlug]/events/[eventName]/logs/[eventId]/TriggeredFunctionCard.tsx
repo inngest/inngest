@@ -1,23 +1,24 @@
 import Link from 'next/link';
 import { ChevronRightIcon, CodeBracketSquareIcon } from '@heroicons/react/20/solid';
+import { IconStatusCanceled } from '@inngest/components/icons/status/Canceled';
+import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
+import { IconStatusFailed } from '@inngest/components/icons/status/Failed';
+import { IconStatusQueued } from '@inngest/components/icons/status/Queued';
+import { IconStatusRunning } from '@inngest/components/icons/status/Running';
 import { noCase } from 'change-case';
 import { titleCase } from 'title-case';
 
 import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import { FunctionRunStatus } from '@/gql/graphql';
-import CancelledIcon from '@/icons/status-icons/cancelled.svg';
-import CompletedIcon from '@/icons/status-icons/completed.svg';
-import FailedIcon from '@/icons/status-icons/failed.svg';
-import RunningIcon from '@/icons/status-icons/running.svg';
 import graphqlAPI from '@/queries/graphqlAPI';
 
 const functionRunStatusIcons = {
-  [FunctionRunStatus.Cancelled]: CancelledIcon,
-  [FunctionRunStatus.Completed]: CompletedIcon,
-  [FunctionRunStatus.Failed]: FailedIcon,
-  [FunctionRunStatus.Running]: RunningIcon,
-  [FunctionRunStatus.Queued]: RunningIcon,
+  [FunctionRunStatus.Cancelled]: IconStatusCanceled,
+  [FunctionRunStatus.Completed]: IconStatusCompleted,
+  [FunctionRunStatus.Failed]: IconStatusFailed,
+  [FunctionRunStatus.Running]: IconStatusRunning,
+  [FunctionRunStatus.Queued]: IconStatusQueued,
 } as const satisfies Record<FunctionRunStatus, SVGComponent>;
 
 const GetFunctionRunCardDocument = graphql(`
