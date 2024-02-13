@@ -1,6 +1,6 @@
 import { useQuery, type UseQueryResponse } from 'urql';
 
-import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { graphql } from '@/gql';
 import { type GetDeployssQuery } from '@/gql/graphql';
 

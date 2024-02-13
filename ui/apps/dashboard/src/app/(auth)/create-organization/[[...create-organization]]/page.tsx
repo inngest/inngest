@@ -1,6 +1,6 @@
 import { CreateOrganization } from '@clerk/nextjs';
 
-import SplitView from '@/app/(logged-out)/SplitView';
+import SplitView from '@/app/(auth)/SplitView';
 
 export default function CreateOrganizationPage() {
   return (

@@ -7,10 +7,10 @@ import { useSearchParams } from 'next/navigation';
 import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 
+import SplitView from '@/app/(auth)/SplitView';
 import AppLink from '@/components/AppLink';
 import Input from '@/components/Forms/Input';
 import InngestLogo from '@/icons/InngestLogo';
-import SplitView from '../../SplitView';
 
 const minPasswordLength = 8;
 

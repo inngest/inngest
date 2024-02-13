@@ -5,7 +5,7 @@ import { Link } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { classNames } from '@inngest/components/utils/classNames';
 
-import { useEnvironment } from '@/app/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { FrameworkInfo } from '@/components/FrameworkInfo';
 import { LanguageInfo } from '@/components/LanguageInfo';
 import { SyncStatus } from '@/components/SyncStatus';
