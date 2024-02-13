@@ -1,6 +1,6 @@
 import { cn } from '@inngest/components/utils/classNames';
 
-export function IconStatusSleep({ className, title }: { className?: string; title?: string }) {
+export function IconStatusSleeping({ className, title }: { className?: string; title?: string }) {
   return (
     <svg
       className={cn('text-sky-500', className)}
