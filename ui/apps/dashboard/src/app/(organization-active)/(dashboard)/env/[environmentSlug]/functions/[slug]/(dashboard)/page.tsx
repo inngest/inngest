@@ -123,7 +123,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               </div>
               <div className="inline-flex gap-3">
                 <h3 className="inline-flex items-center gap-2 font-medium text-slate-600">
-                  <XCircleIcon className="h-5 text-red-500" /> Failure rate
+                  <XCircleIcon className="h-5 text-rose-500" /> Failure rate
                 </h3>
                 <span className="text-xl font-medium text-slate-800">{`${failureRate}%`}</span>
               </div>

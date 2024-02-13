@@ -21,13 +21,13 @@ const syncStatusText = {
 } as const satisfies { [key in SyncStatus]: string };
 
 const syncStatusColor = {
-  error: 'bg-red-100 text-red-800 border-red-500',
+  error: 'bg-rose-100 text-rose-800 border-rose-500',
   pending: 'bg-sky-100 text-sky-800 border-sky-500',
   success: 'bg-teal-100 text-teal-800 border-teal-500',
 } as const satisfies { [key in SyncStatus]: string };
 
 const syncStatusIconColor = {
-  error: 'text-red-500',
+  error: 'text-rose-700',
   pending: 'text-sky-500',
   success: 'text-teal-500',
 } as const satisfies { [key in SyncStatus]: string };

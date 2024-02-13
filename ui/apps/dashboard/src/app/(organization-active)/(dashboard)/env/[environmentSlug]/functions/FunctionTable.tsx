@@ -183,7 +183,7 @@ function createColumns(environmentSlug: string) {
 
         let icon;
         if (value > 0) {
-          icon = <ExclamationCircleIcon className="-ml-1 mr-1 h-4 w-4 text-red-600" />;
+          icon = <ExclamationCircleIcon className="-ml-1 mr-1 h-4 w-4 text-rose-500" />;
         }
 
         return (
