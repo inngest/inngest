@@ -19,7 +19,7 @@ const orderedStatuses = getOrderedEnumValues(FunctionRunStatus, [
 ]);
 
 const statusColors = {
-  [FunctionRunStatus.Queued]: 'bg-sky-500',
+  [FunctionRunStatus.Queued]: 'bg-amber-500',
   [FunctionRunStatus.Running]: 'bg-sky-500',
   [FunctionRunStatus.Cancelled]: 'bg-slate-300',
   [FunctionRunStatus.Completed]: 'bg-teal-500',
