@@ -97,10 +97,10 @@ export function FunctionTable({ rows = [] }: Props) {
   );
 }
 
-function Shimmer() {
+function Shimmer({ className }: { className?: string }) {
   return (
-    <div className="flex">
-      <Placeholder className="mx-4 my-4 h-2.5 w-full bg-slate-200" />
+    <div className={`flex ${className}`}>
+      <Placeholder className="my-4 h-2.5 w-full bg-slate-200" />
     </div>
   );
 }
@@ -178,7 +178,7 @@ function createColumns(environmentSlug: string) {
       cell: (info) => {
         const value = info.getValue();
         if (value === undefined) {
-          return <Shimmer />;
+          return <Shimmer className="w-12 px-2.5" />;
         }
 
         let icon;
@@ -199,11 +199,11 @@ function createColumns(environmentSlug: string) {
       cell: (info) => {
         const value = info.getValue();
         if (value === undefined) {
-          return <Shimmer />;
+          return <Shimmer className="w-[212px] px-2.5" />;
         }
 
         return (
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex min-w-[212px] items-center justify-end gap-2">
             <span
               key="volume-count"
               className="overflow-hidden whitespace-nowrap text-xs text-slate-600"
