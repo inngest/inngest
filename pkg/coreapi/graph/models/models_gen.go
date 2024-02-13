@@ -132,6 +132,7 @@ type StreamItem struct {
 	Type      StreamType     `json:"type"`
 	CreatedAt time.Time      `json:"createdAt"`
 	Runs      []*FunctionRun `json:"runs,omitempty"`
+	InBatch   bool           `json:"inBatch"`
 }
 
 type StreamQuery struct {
