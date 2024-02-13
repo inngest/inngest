@@ -18,7 +18,7 @@ type StateService interface {
 	UpdateConfig(ctx context.Context, runID ulid.ULID, config StateConfig) error
 	// SaveStep saves step output for the given run ID and step ID.
 	// TODO: This should return updated stack/step state.
-	SaveStep(ctx context.Context, runID ulid.ULID, stepID string, data []byte) error
+	SaveStep(ctx context.Context, runID ulid.ULID, stepID StepID, data []byte) error
 }
 
 type PauseService interface {
@@ -27,7 +27,7 @@ type PauseService interface {
 	// consume a pause.  This allows for transactionality when conuming a
 	// pause, if consuming a pause, updating steps, and deleting the pause is
 	// not a single transaction.
-	// TODO: This might not be necessary any more.
+	// TODO: Remove if we make consuming atomic, etc.
 	LeasePause(ctx context.Context, id ulid.ULID) error
 	// ConsumePause consumes the pause with the given ID.  Each pause stores a
 	// run ID and step ID;  consuming a pause must update the run's state to save

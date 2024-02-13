@@ -5,6 +5,7 @@ go 1.21.0
 replace github.com/tencentcloud/tencentcloud-sdk-go v3.0.82+incompatible => github.com/tencentcloud/tencentcloud-sdk-go v1.0.191
 
 require (
+	connectrpc.com/connect v1.14.0
 	cuelang.org/go v0.4.2
 	github.com/99designs/gqlgen v0.17.27
 	github.com/VividCortex/ewma v1.2.0
@@ -71,6 +72,7 @@ require (
 	gonum.org/v1/gonum v0.12.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20231127180814-3a041ad873d4
 	google.golang.org/grpc v1.59.0
+	google.golang.org/protobuf v1.32.0
 	lukechampine.com/frand v1.4.2
 	modernc.org/sqlite v1.25.0
 )
@@ -184,7 +186,6 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20231120223509-83a465c0220f // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231127180814-3a041ad873d4 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
