@@ -13,7 +13,6 @@ import OrganizationDropdown from '@/components/Navigation/OrganizationDropdown';
 import UserDropdown from '@/components/Navigation/UserDropdown';
 import InngestLogo from '@/icons/InngestLogo';
 import EventIcon from '@/icons/event.svg';
-import AccountDropdown from './AccountDropdown';
 import EnvironmentSelectMenu from './EnvironmentSelectMenu';
 import NavItem from './NavItem';
 import Navigation from './Navigation';
@@ -35,7 +34,6 @@ const BRANCH_PARENT_SLUG = 'branch';
 
 export default async function AppNavigation({ environmentSlug }: AppNavigationProps) {
   const isEventSearchEnabled = await getBooleanFlag('event-search');
-  const isOrganizationsEnabled = await getBooleanFlag('organizations');
 
   let items: NavItem[] = [
     {
@@ -100,14 +98,8 @@ export default async function AppNavigation({ environmentSlug }: AppNavigationPr
       </div>
       <div className="flex h-full items-center">
         <SearchNavigation />
-        {isOrganizationsEnabled ? (
-          <>
-            <OrganizationDropdown />
-            <UserDropdown />
-          </>
-        ) : (
-          <AccountDropdown />
-        )}
+        <OrganizationDropdown />
+        <UserDropdown />
       </div>
     </nav>
   );

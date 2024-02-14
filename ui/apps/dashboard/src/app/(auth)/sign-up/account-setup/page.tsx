@@ -3,10 +3,9 @@
 import { useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { useAuth, useOrganization, useOrganizationList, useUser } from '@clerk/nextjs';
+import { useAuth, useOrganization, useUser } from '@clerk/nextjs';
 import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import LoadingIcon from '@/icons/LoadingIcon';
 
 export default function AccountSetupPage() {
@@ -14,7 +13,6 @@ export default function AccountSetupPage() {
   const secondsElapsed = useSecondsElapsed();
   const { getToken } = useAuth();
   const { user } = useUser();
-  useForceActiveOrganization();
   const isAccountSetup = useIsAccountSetup();
 
   // Redirect to the home page once the account is set up
@@ -58,62 +56,6 @@ export default function AccountSetupPage() {
       <LoadingIcon />
     </div>
   );
-}
-
-/**
- * This forces the user to have an active organization when the organizations feature is not
- * enabled. When the organizations feature is enabled, the user will already have an active
- * organization set up by the `/organization-list` page.
- */
-function useForceActiveOrganization() {
-  const { value: isOrganizationsEnabled } = useBooleanFlag('organizations');
-  const { isLoaded, userMemberships } = useOrganizationList({
-    userMemberships: {
-      infinite: true,
-    },
-  });
-
-  const { getToken } = useAuth();
-
-  const { isLoaded: isOrganizationLoaded, organization } = useOrganization();
-  const router = useRouter();
-
-  const newOrganizationID = userMemberships.data?.[0]?.organization.id;
-
-  useEffect(() => {
-    if (
-      !isOrganizationsEnabled &&
-      isLoaded &&
-      isOrganizationLoaded &&
-      newOrganizationID &&
-      !organization
-    ) {
-      getToken({ skipCache: true }).then(() => {
-        router.replace('/organization-list' as Route);
-      });
-    }
-  }, [
-    isLoaded,
-    isOrganizationLoaded,
-    isOrganizationsEnabled,
-    organization,
-    newOrganizationID,
-    router,
-    getToken,
-  ]);
-
-  // Reload memberships if the user doesn't have an active organization
-  useEffect(() => {
-    if (isOrganizationsEnabled || !isLoaded || newOrganizationID || organization) return;
-
-    const intervalID = setInterval(() => {
-      userMemberships.revalidate();
-    }, 500);
-
-    return () => {
-      clearInterval(intervalID);
-    };
-  }, [isLoaded, isOrganizationsEnabled, organization, userMemberships, newOrganizationID]);
 }
 
 /**

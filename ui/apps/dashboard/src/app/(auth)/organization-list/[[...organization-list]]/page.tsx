@@ -1,7 +1,6 @@
 import { OrganizationList } from '@clerk/nextjs';
 
 import SplitView from '@/app/(auth)/SplitView';
-import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 
 type OrganizationListPageProps = {
   searchParams: { [key: string]: string | string[] | undefined };
@@ -13,8 +12,6 @@ export default async function OrganizationListPage({ searchParams }: Organizatio
       ? searchParams.redirect_url
       : process.env.NEXT_PUBLIC_HOME_PATH;
 
-  const isOrganizationsEnabled = await getBooleanFlag('organizations');
-
   return (
     <SplitView>
       <div className="mx-auto my-auto text-center">
@@ -22,17 +19,6 @@ export default async function OrganizationListPage({ searchParams }: Organizatio
           hidePersonal={true}
           afterCreateOrganizationUrl="/sign-up/account-setup"
           afterSelectOrganizationUrl={redirectURL}
-          appearance={
-            isOrganizationsEnabled
-              ? undefined
-              : {
-                  elements: {
-                    // This hides the "Create Organization" button until this feature is ready.
-                    dividerRow: 'hidden',
-                    button: 'hidden',
-                  },
-                }
-          }
         />
       </div>
     </SplitView>
