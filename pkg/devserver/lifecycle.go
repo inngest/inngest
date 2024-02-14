@@ -35,6 +35,8 @@ func (l lifecycle) OnFunctionScheduled(
 	})
 
 	if id.BatchID != nil {
+		executedTime := ulid.Time(id.RunID.Time())
+
 		batch := cqrs.NewEventBatch(
 			cqrs.WithEventBatchID(*id.BatchID),
 			cqrs.WithEventBatchAccountID(id.AccountID),
@@ -43,6 +45,7 @@ func (l lifecycle) OnFunctionScheduled(
 			cqrs.WithEventBatchFunctionID(id.WorkflowID),
 			cqrs.WithEventBatchRunID(id.RunID),
 			cqrs.WithEventBatchEventIDs(id.EventIDs),
+			cqrs.WithEventBatchExecutedTime(executedTime),
 		)
 
 		if batch.IsMulti() {

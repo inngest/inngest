@@ -1,0 +1,34 @@
+export const title = 'Building a mission-critical workflow engine on top of Inngest'
+export const companyName = 'Florian Works'
+export const logo = '/assets/customers/florian-works-logotype.svg'
+// export const quote = {
+//   text: ``,
+//   attribution: {
+//     name: '',
+//     title: '',
+//   },
+//   avatar: '',
+// }
+export const companyURL = 'https://www.florianworks.com'
+export const companyDescription = 'Revolutionizing operational software for Fire Departments'
+export const ogImage = '/assets/customers/case-study/og-image-florian-works.png'
+
+Florian Works provides purpose-built HR software for fire departments including payroll and staffing management — mission critical for the safety and effectiveness of our community's fire service personnel.  Fire departments have a unique set of complex requirements in every domain, from staff management to rosters to payroll.  To meet these challenges, Florian Works needed a fully auditable custom workflow engine that could deliver reliability, high-performance, and a simple API.
+
+## Requirements of building a workflow engine
+
+Developing a robust workflow engine to handle the complexities of firefighter HR management is no easy feat.  Workflows must be versioned, and require complex event processing for human-in-the-loop management.  Building custom solutions requires months of planning, implementation, and testing prior to writing any business logic — and ensuring the correctness, reliability, and scalability of such a system requires significant extra investment.
+
+## Saving months of development time
+
+Florian Works chose to build their custom workflow engine on top of Inngest, a powerful platform for durable event-driven workflows. This decision proved to be a game-changer for several reasons:
+
+1. **Focus on Business Logic**: Florian Works developers could concentrate solely on the unique business logic required for firefighter HR management. They did not have to worry about writing custom flow control or dealing with the complexities of distributed systems.
+2. **Leverage Inngest's Capabilities**: Inngest provided out-of-the-box orchestration, retries, state management, and stream processing. This allowed Florian Works to save months of development time and effort, as they could rely on Inngest's battle-tested features.
+3. **Auditable Workflows**: Florian Works' HR software needed to be auditable for compliance and accountability. Inngest's workflow engine provided visibility into workflows at every step, with fully logged and audit-controlled processes readily available.
+4. **Effortless Development**: Inngest facilitated local development, enabling developers to replay workflows locally for testing, development, and iterative improvements. This streamlined the development process and reduced the chances of errors.
+5. **Zero to Production**: Florian Works was able to accelerate the development cycle and move from zero to production in a fraction of the time it would have taken with traditional methods, without provisioning new infrastructure.
+
+FlorianWorks were also able to leverage Inngest's advanced primitives for stream processing, such as `step.waitForEvent` to automatically continue their DAG-based workflows any time matching events are received.  For example, when requesting shift changes for human-in-the-loop workflows, `step.waitForEvent` provided all of the abstractions out of the box with zero extra development.
+
+Florian Works' decision to build their custom workflow engine on Inngest's platform both accelerated their development and allowed them to launch and iterate faster, helping keep communities in the US safer.

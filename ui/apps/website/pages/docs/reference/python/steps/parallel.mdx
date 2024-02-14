@@ -1,0 +1,36 @@
+# Parallel <VersionBadge version="v0.3.0+" />
+
+Run steps in parallel. Returns the parallel steps' result as a tuple.
+
+## Arguments
+
+<Properties>
+  <Property name="callables" type="tuple[Callable[[], object], ...]" required>
+    Accepts a tuple of callables. Each callable has no arguments and returns a JSON serializable value. Typically this is just a `lambda` around a `step` method.
+  </Property>
+</Properties>
+
+## Examples
+
+```py
+@inngest_client.create_function(
+    fn_id="my-function",
+    trigger=inngest.TriggerEvent(event="app/my-function"),
+)
+async def fn(
+    ctx: inngest.Context,
+    step: inngest.Step,
+) -> None:
+    def _step_1a() -> int:
+        return 1
+
+    def _step_1b() -> int:
+        return 2
+
+    (step_1_res, step_2_res) = await step.parallel(
+        (
+            lambda: step.run("1a", _step_1a),
+            lambda: step.run("1b", _step_1b),
+        )
+    )
+```

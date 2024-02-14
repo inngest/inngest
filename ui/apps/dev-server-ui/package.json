@@ -1,6 +1,7 @@
 {
   "name": "@inngest/dev-server-ui",
   "description": "Inngest Development Server UI",
+  "license": "UNLICENSED",
   "homepage": "https://github.com/inngest/inngest/tree/main/ui/apps/dev-server-ui#readme",
   "repository": {
     "type": "git",

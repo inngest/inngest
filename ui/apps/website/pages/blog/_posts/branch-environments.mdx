@@ -1,0 +1,58 @@
+---
+heading: "Introducing Branch Environments: Full-Stack Testing for Every Branch with Inngest"
+subtitle: Modern workflow for your business-critical code
+image: /assets/blog/branch-environments/featured-image.png
+date: 2023-05-17
+author: Dan Farrelly
+disableCTA: true
+---
+
+The modern developer workflow is centered around branching. Git is used to create branches, CI platforms run automated tests on each branch, and platforms like Vercel and Netlify have brought CD to branches with their deploy preview features. However, while deploy previews can help with front-end development, it can result in an awkward workflow when testing changes end-to-end using shared backing APIs, databases, caches, queues, and more.
+
+At Inngest, we've been inspired by companies like PlanetScale and Neon to bring this workflow to the database layer which starts to complete the full-stack picture:
+
+**Today, we're excited to announce that we're bringing Branch Environments to all Inngest users!** We're launching with built-in support for [our Vercel integration](https://vercel.com/integrations/inngest) and opt-in support for other platforms with branch-based workflows!
+
+## The Full-Stack Developer Workflow
+
+The dream end state is that each developer gets their own full-stack environment for every branch. Each branch can test their app end-to-end without worry of conflicts.
+
+With the platforms mentioned above, you can now set this up for your Webapp, API, and database layers. However, if you still share your queueing or reliable workflow layer, you're going to run into issues where environments use these shared resources.
+
+**Inngest makes this a reality with Branch Environments.**
+
+The Inngest platform enables you to run reliable code in the background without having to configure queues. Inngest will now create an environment for every branch that you deploy, allowing you to test your entire application in a fully isolated sandbox.
+
+![Inngest environments for your branch workflow](/assets/blog/branch-environments/branch-environments-sdlc.svg)
+
+## How It Works
+
+With Inngest, you send events via our SDK, and Inngest invokes your functions reliably and securely via HTTP. All Inngest needs to know is the URL where your functions are hosted, enabling your functions to be hosted on any platform.
+
+Our Vercel integration now creates a new Inngest *Branch Environment* whenever Vercel creates a deployment for a given Git branch. The Vercel integration sends your branch name and deployment preview's URL to Inngest, which is used to create the new environment and correctly route events and invoke functions in that environment.
+
+![Inngest Branch Environments aligning with Vercel Preview Environments](/assets/blog/inngest-announcement-april-2023/vercel-branch-envs.svg)
+
+### How You Can Use It Today
+
+To start using Branch Environments in your workflow, all you need to do is:
+
+1. Update your project to use Inngest SDK v1.7.0 or greater (`npm i inngest@latest`)
+2. Set up [the Inngest Vercel integration](https://vercel.com/integrations/inngest) (or [configure your SDK for your platform](/docs/platform/environments?ref=blog-branch-environments))
+3. Create a new branch and deploy your app as you normally do
+
+You should now see your new Branch Environment in the Inngest dashboard!
+
+![Inngest Branch Environments in the Inngest Cloud dashboard](/assets/blog/branch-environments/branch-dropdown.png)
+
+<a className="text-lg font-bold" href="/docs/platform/environments?ref=blog-branch-environments">
+  Learn more about Branch Environments in the Inngest documentation →
+</a>
+
+## What's next?
+
+The modern stack of developer tools should align with developer workflows, not against it. We're excited to announce this today with built-in support for Vercel and opt-in configuration options for any other platform.
+
+[Check out our documentation](/docs/platform/environments?ref=blog-branch-environments) to learn how to set this up for any of our supported platforms, from Netlify to AWS Lambda to a custom Kubernetes setup. Everyone can benefit from the advantages of this workflow!
+
+Give it a try and drop us a [line on Discord](https://www.inngest.com/discord) if you have any questions or share some feedback or feature requests on [our public roadmap here](http://roadmap.inngest.com/).

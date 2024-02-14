@@ -1,0 +1,231 @@
+---
+heading: Long-running background functions on Vercel
+subtitle: How to run business critical jobs for minutes, hours or days
+image: /assets/blog/vercel-long-running-background-functions/featured-image.png
+date: 2023-03-31
+author: Dan Farrelly
+disableCTA: true
+---
+
+Serverless functions can be a game changer for devs building applications who want to get into production fast and elastically scale with usage. Today, developers primarily use serverless functions on platforms like Vercel to build synchronous APIs, but what do you do if you need to run critical business logic on top of serverless functions?
+
+What happens when these critical workloads need to run longer than the typical short timeouts of platforms like Vercel (e.g. 10 to 60 seconds)?
+
+You have to make some choices. Some developers choose to move these jobs to another infrastructure provider (e.g. AWS Lambda), but there are trade-offs. You then have multiple deploy targets and you lose some of the simplicity of shipping your application - you have more overhead, but maybe more flexibility - how do you choose?
+
+You don't need to choose - you can keep everything in one app and platform.
+
+## What you need
+
+There are two solutions to this problem:
+
+- You find a way to run longer functions (e.g. [try Vercel's HTTP streaming support in Edge Functions](https://twitter.com/leeerob/status/1640837634053242885?s=20))
+- You break your functions into a series of smaller, coordinated functions that run independently
+
+HTTP streaming is very cool tech, but I'd say it's only appropriate when you have a client that keeps an open connection to the edge function. If the user navigates away and breaks the connection, it's a problem.
+
+When thinking about background jobs, one long script that runs for `n` minutes is often a bad idea anyway. Long-running jobs are prone to failure and if your job runs for 15 minutes and fails halfway through, most times, you need to restart them from the beginning resulting in loss or duplicated work.
+
+So in summary, to build long-running background jobs on Vercel, you need to:
+
+- Break up your functions into individually retried steps
+- Utilize something that orchestrates each of these steps, including persisting the output across multiple steps and individually retrying each step when failures occur.
+
+## How to break up a long-running job
+
+You may initially think it may be difficult or tedious to break your long-running background job into smaller pieces. At first, it may feel like overkill, but there are clear benefits after you've done the work:
+
+- Decoupled logic can be more easily isolated and tested
+- Decoupled logic can be better for error handling with individual retries that don't cause the entire job to fail.
+
+Let's take some typical background job business logic and see how we can decouple the parts:
+
+- Importing sets of data from a file into a database ➡️ _Split your function up to perform actions per row or for a batch of items_
+- Making external API call(s) ➡️ _Separate each external API call into a separate mini function which also helps to mitigate external API downtime_
+
+It's not hard to find the logical boundaries of your background job and the increased decoupling has clear benefits in terms of reliability and debugging.
+
+![A diagram highlighting distinct parts of a function](/assets/blog/vercel-long-running-background-functions/function-steps.png?v=2)
+
+## Connecting the pieces
+
+So you've mentally broken your function into logical parts. You now need something that can invoke and orchestrate each part in the correct order, passing data (state) from step to step, and retrying along the way as failures happen.
+
+Inngest is a platform built to run reliable functions. It is designed to handle complex workloads comprised of any number of steps.
+
+Inngest's SDK lets you do a few important things to accomplish this:
+
+- Define your business logic as a series of simple “steps” and connect them all using regular TypeScript or JavaScript.
+- Group all of your steps into a single, readable TS/JS function.
+- Define how your function will be called and with what data payload.
+
+With these basic concepts, Inngest's SDK enables you to build robust and reliable functions.
+
+## How does Inngest work with Vercel?
+
+At the most basic level, Inngest is a platform to manage and execute reliable functions. Inngest does not host your code - your functions continue to run on Vercel (or whatever platform that you're using).
+
+### Inngest remotely and *securely* invokes your functions via HTTP
+
+Your code all runs on Vercel - you keep the same repo, the same platform, and the same tooling. There is no need to set up another runtime for your functions and trust another platform to run your code (which likely has access to your database).
+
+![A diagram showing how Inngest works via HTTP](/assets/blog/vercel-long-running-background-functions/how-inngest-works.png)
+
+Your functions are “served” to Inngest using a `serve` handler for your particular framework. Inngest has several handlers including [Next.js, Remix, Nuxt, RedwoodJS](/docs/sdk/serve?ref=blog-long-running-functions-vercel), amongst others. Inngest also supports Vercel's edge runtime.
+
+Lastly, to trigger your functions, you send an event payload via the Inngest SDK's `inngest.send()` function. This then tells Inngest to invoke your function.
+
+### Inngest invokes *each step* independently via HTTP
+
+Since Inngest runs outside of your system, it can invoke each step independently via HTTP.  As Inngest invokes each separately, you only need to ensure that each step is less than the timeout of 10 or 60 seconds depending on your plan.
+
+In the example diagram below, we show how a function that would take approximately 500 seconds to run can be broken up into many shorter requests, each within the timeout limits of the platform. By decoupling your function into several HTTP requests, your functions can run for *minutes or hours*!
+
+![A diagram showing how long a function could run for](/assets/blog/vercel-long-running-background-functions/steps-timing.png)
+
+## An example
+
+We now know the concepts, let's check out some code. This example code fetches emails of people on a waiting list via an API over a given time period then creates an invite code and saves it in the database for each email then sends an invite email with this invite code.
+
+```typescript
+export default inngest.createFunction(
+  { name: "Invite waiting list" },
+  { event: "invite.users" },
+  async ({ event, step }) => {
+    const emails = await step.run("Fetch waiting list", async () => {
+      const data = await typeformAPI.responses.list({
+        after: event.data.from,
+        until: event.data.until,
+        pageSize: 1000,
+      });
+      return data.items.map(i => i.answers.find(a => a.email).email)
+    });
+
+    for (let email of emails) {
+      const inviteCode = await step.run("Create invite code", async () => {
+        return await createInviteCodeAndSaveInDatabase(email);
+      });
+      await step.run("Send invite email", async () => {
+        return await emails.sendInviteEmail({ email, inviteCode });
+      });
+    }
+
+    return { message: `Successfully invited ${emails.length} users` }
+  }
+)
+```
+
+As you can see - it's just JavaScript. The Inngest SDK's `[step.run](http://step.run)` allows you to encapsulate each part of your function. As mentioned above, each is invoked separately, so the sum of all the time can be greater than the normal HTTP timeouts.
+
+With automatic retries built-in, this enables you to run long background jobs reliably!
+
+You could trigger this function from any other part of your application:
+
+```typescript
+await inngest.send({
+  name: "invite.users",
+  data: { from: "2023-03-20T00:00:00", to: "2023-03-21T00:00:00" }
+})
+```
+
+This sends an event payload to Inngest. Inngest logs this event and then triggers the function that you configured to run when this event is received.
+
+### How to deploy your functions
+
+Since Inngest invokes your functions via HTTP, you need to tell Inngest where your code is running. You can easily do this by installing our Vercel integration!
+
+The Vercel integration automatically tells Inngest every time that you've deployed your application and Inngest does the rest. Inngest pings your application to check what functions you have set up and you're good to go. The whole process happens in milliseconds.
+
+[Official Inngest integration on Vercel.com](https://vercel.com/integrations/inngest)
+
+## What else can you do?
+
+Here are some other cool things that you can do with the Inngest SDK for long-running functions:
+
+### Run steps in parallel
+
+Use `Promise.all` to kick off any number of steps in parallel just like you would with any array of Promises.
+
+```typescript
+inngest.createFunction(
+  { name: "Shopify Product Import", concurrency: 10 },
+  { event: "shopify/import.requested" },
+  async ({ event, step }) => {
+    const products = await step.run("Fetch all products", async () => {
+      return await shopify.rest.Product.all()
+    })
+    // Use Promise.all to kick off all steps in parallel!
+    Promise.all(
+      products.map((product) =>
+        step.run("Import product", async () => {
+          await database.upsertProduct({
+            storeId: event.data.storeId,
+            product,
+          })
+        })
+      )
+    )
+  }
+)
+```
+
+### Put the function to sleep
+
+Use `step.sleep` to pause your function for hours, days, or weeks. Inngest will wait and then continues running your function steps after the sleep period you specify.
+
+```typescript
+inngest.createFunction(
+  { name: "New user email drip campaign" },
+  { event: "api/account.created" },
+  async ({ event, step }) => {
+    await step.run("Send welcome email", async () =>
+      await sendWelcomeEmail(event.user.email)
+    )
+
+    await step.sleep("2d")
+
+    await step.run("Send product tips email", async () =>
+      await sendTipsEmail(event.user.email)
+    )
+
+    await step.sleep("3d")
+
+    await step.run("Send how-to's email", async () =>
+      await sentHowTosEmail(event.user.email)
+    )
+  }
+)
+```
+
+### Schedule work in the future
+
+Use `step.sleepUntil` to tell schedule a step in the future at a specific time:
+
+```typescript
+inngest.createFunction(
+  { name: "Send reminder" },
+  { event: "dinner_reservation.created" },
+  async ({ event, step }) => {
+    const reservationAt = new Date(event.data.reservationTimestamp);
+    const dayBefore = new Date(reservationAt - 24 * 60 * 60 * 1000);
+    await step.sleepUntil(dayBefore)
+
+    await step.run("Send reminder text message", async () =>
+      await sendSMSReminder(event.user.phone, event.data)
+    )
+  }
+)
+```
+
+[Check out our docs to explore what else you can do →](/docs/functions/multi-step?ref=blog-long-running-functions-vercel)
+
+## What are you going to build?
+
+Now that you have learned how to create long-running background jobs on Vercel, what will you build?
+
+- [Third-party API imports](/blog/import-ecommerce-api-data-in-seconds?ref=blog-long-running-functions-vercel)
+- Data pipelines
+- OpenAI / GPT4 processing
+- Schedule emails or reminders
+
+[Get started with our quick start guide on how to start building locally →](/docs/quick-start?ref=blog-long-running-functions-vercel)

@@ -1,0 +1,118 @@
+---
+focus: false
+heading: "2023 Wrapped"
+subtitle: Over the past twelve months, we've shipped a lot and improved the DX across the board, our team has grown three-fold, and we were able to raise a seed round.
+image: /assets/blog/2023-wrapped-inngest/feature.png
+date: 2023-12-22
+author: Sylwia Vargas
+disableCTA: true
+---
+
+It’s been a busy year at Inngest.
+
+This time last year our TypeScript SDK was 3 months old and our Dev Server had just been released. Over the past twelve months, we've shipped a lot and improved the DX across the board, our team has grown three-fold, and we were able to raise a seed round investment. If we were to choose a single metric to show how much has changed, it would perhaps be that the weekly npm installs of the Inngest CLI grew from [876 to over 32,000](https://npmtrends.com/inngest-vs-inngest-cli).
+
+As 2023 comes to a close, we wanted to say a big “Thank you” to our community, partners, and team. We’ve reached major milestones, inspired by you and informed by your ideas, requests, and feedback. We are excited about what’s on the horizon 💜
+
+Meanwhile, we’d like to invite you to join us for our last retrospective.
+
+## Engineering
+
+We made tons of progress this year and each milestone was a testament of the work to our world-class team. Reading back the [changelog](https://roadmap.inngest.com/changelog) from the year makes it seem like every week we shipped new major features, tools, and improvements. But what if I told you that we actually did that, and that’s not even the full picture?
+
+The list of releases is quite long so let’s focus only on the milestones.
+
+### Product maturity
+
+We shipped key product features including [concurrency](https://www.inngest.com/docs/functions/concurrency), [rate limiting](https://www.inngest.com/docs/reference/functions/rate-limit), [debouncing](https://www.inngest.com/docs/reference/functions/debounce), [prioritization](https://www.inngest.com/docs/reference/functions/run-priority), [parallel steps](https://www.inngest.com/docs/guides/step-parallelism), and [batching](https://www.inngest.com/docs/guides/batching). But the special mentions go to the two from December:
+
+- [Invoking functions as steps](https://www.inngest.com/docs/guides/invoking-functions-directly?ref=changelog), which makes it easy to compose workflows and re-use functionality from any part of your system by allowing functions to call and receive the result of other functions.
+- [Function Replay](https://www.inngest.com/docs/platform/replay), which enables you to easily recover from failures or incidents by re-running functions in bulk.
+
+Over this year, Inngest has become an even more fully-featured and reliable tool and is now used in production for core business logic at many well-known companies.
+
+### SDKs
+
+This year we shipped major updates to our TypeScript SDK, [recently releasing v3](https://www.inngest.com/blog/releasing-ts-sdk-3). This year, we’ve added all these crucial features:
+
+- [Steps](https://www.inngest.com/docs/reference/functions/step-run),
+- [Cancelling running functions with events](https://www.inngest.com/docs/functions/cancellation),
+- [Custom failure handling](https://www.inngest.com/docs/reference/functions/handling-failures),
+- [Invoking functions from within a function](https://www.inngest.com/docs/reference/functions/step-invoke) to compose complex flows,
+- [Middleware](https://www.inngest.com/docs/reference/middleware/create) - enabling logging, encryption, tracing, and others,
+- [Streaming and edge support](https://www.inngest.com/docs/streaming).
+
+The current state of the SDK allows for multi-language support, and live-migrating functions across languages and clouds. This means that you can develop and ship a function using our TypeScript SDK, but as business and technology choices shift, you can rewrite it entirely in another language, redeploy, and long-running functions will continue where they left off.
+
+This of course goes hand in hand with other SDKs that we shipped, namely beta releases for **[Python](https://www.inngest.com/docs/reference/python)** and **[Go](https://pkg.go.dev/github.com/inngest/inngestgo)**. Stay tuned in for more updates on language SDKs in 2024!
+
+## Developer Experience
+
+We aim to create a product that allows you to only focus on your code. Developer Experience is the North Star of our roadmap, it underlies most of our product decisions.
+
+This year, we have redesigned our dashboard, wrote a massive number of docs pages, added [real-time observability metrics](https://www.inngest.com/blog/2023-10-27-fn-metrics-release), improved timeline UI, and shipped a number of key improvements to our dev server such as new timeline and stream as well as improved the initial setup and configuration.
+
+A special mention here goes to [branch environments](https://www.inngest.com/blog/branch-environments), which landed in May. Inngest will now create an environment for every branch that you deploy, allowing you to test your entire application in a fully isolated sandbox. This means that you can test your app end-to-end without worry of conflicts on each and ever branch.
+
+## Community growth
+
+When we started this year, it seemed inconceivable that by the end of it, our [Discord](https://www.inngest.com/discord) server would have over 1,000 active members, that our support inbox would be booming with requests, and that we would be guests on podcasts like [JAMStack Radio](https://www.heavybit.com/library/podcasts/jamstack-radio/ep-121-reliable-serverless-functions-with-tony-holdstock-brown-of-inngest), [Founder Real Talk](https://muckrack.com/podcast/founder-real-talk/episodes/8413820-tony-holdstock-brown-dan-farrelly-inngest-/), or [Yet Another Infra Deep Dive](https://podcasts.apple.com/si/podcast/transactions-dont-belong-to-databases-anymore-lets/id1689151910?i=1000622945394) and conferences like [Next.js Conf](https://www.youtube.com/watch?v=EoFI_Bmzb4g). We managed to build long-lasting and meaningful relationships with companies and organizations such as [Vercel](https://www.inngest.com/blog/vercel-integration), [Redwood](https://www.youtube.com/watch?v=Cp4jI9WcvZk&t=1455s), [Ocoya](https://www.inngest.com/customers/ocoya), [Resend](https://www.inngest.com/customers/resend), and more.
+
+We feel humbled by the attention from our community:
+
+<div style={{display: "grid", gridTemplateColumns: "repeat(8, minmax(0, 1fr))", gridTemplateRows: "repeat(3, 1fr)"}}
+class="gap-4">
+    <div style={{gridArea: "1 / 1 / 2 / 5"}}>
+        <a href="https://twitter.com/ozanmakes/status/1703413390243205487?s=46&t=d3DJo7FpMz4U-1o_kswaKQ" target="_blank" rel="noopener noreferrer">
+            <img src="/assets/blog/2023-wrapped-inngest/tweet-ozanmakes.png" alt="Tweet from @ozanmakes: Moved from random scripts to inngest for keeping track of all AI pipelines. This is actually a great platform to build reliability into your long running tasks without drowning in complexity. Although there's always a risk of hitting the OpenAI usage limit before you launch 😅"/>
+        </a>
+    </div>
+    <div style={{gridArea: "1 / 5 / 2 / 9"}}>
+        <a href="https://twitter.com/eclectic_dev/status/1717128211698504131" target="_blank" rel="noopener noreferrer">
+            <img src="/assets/blog/2023-wrapped-inngest/tweet-eclectic_dev.png" alt="Tweet from Gill Bates: I LOVED working with inngest, excellent DX™ and testing locally with great feedback in prod. I want to use it for all my projects now even though I find it a bit expensive."/>
+        </a>
+    </div>
+    <div style={{gridArea: "2 / 2 / 3 / 8"}}>
+        <a href="https://twitter.com/chribjel/status/1732600457812471960?s=46&t=d3DJo7FpMz4U-1o_kswaKQ" target="_blank" rel="noopener noreferrer">
+            <img src="/assets/blog/2023-wrapped-inngest/tweet-chribjel.png" alt="Tweet from Christoffer Bjelke: Tried inngest after the recommendations in the replies, and it is actual black magic. Highly recommend"/>
+        </a>
+    </div>
+    <div style={{gridArea: "3 / 1 / 4 / 5"}}>
+        <a href="https://twitter.com/codewithbhargav/status/1688079437911511042?s=46&t=uRyCCtjktRI5TQXbSKdTLw" target="_blank" rel="noopener noreferrer">
+            <img src="/assets/blog/2023-wrapped-inngest/tweet-codewithbhargav.png" alt="Tweet from @codewithbhargav: Inngest feels like a cheat code. Beautifully done!"/>
+        </a>
+    </div>
+    <div style={{gridArea: "3 / 5 / 4 / 9"}}>
+        <a href="https://twitter.com/vimtor_/status/1704752359396769837" target="_blank" rel="noopener noreferrer">
+            <img src="/assets/blog/2023-wrapped-inngest/tweet-vimtor.png" alt="Tweet from Victor Navarro: Inngest makes events and cron jobs fun. It seamlessly integrates with popular frameworks like Next.js, Remix, Express, and more, taking care of all the complex details behind the scenes. I could try to describe how incredible it is, but the code truly speaks for itself."/>
+        </a>
+    </div>
+</div>
+
+If you hang out at our [Discord](https://www.inngest.com/discord), you already know how deeply our team appreciates every question, insight, and idea raised there. We are building with the community in mind, and Inngest would not be as successful as it is now without your involvement. Thank you, thank you, thank you 💜
+
+## Company growth
+
+### Team growth
+
+All of the above was possible to our wonderful team, which grew from three in January to nine in December — and we will still be growing soon again 👀
+
+Here’s a picture of (still not the entire) team at our offsite in Montreal in September.
+
+![Eight happy people at a curling rink, standing arm to arm and laughing at a joke someone must have just told](/assets/blog/2023-wrapped-inngest/team.jpg)
+
+### Fundraising
+
+Given the economic landscape, we were extremely lucky to [have raised $3M](https://www.inngest.com/blog/announcing-inngest-seed-financing) in new funding led by Glenn Solomon of GGV Capital, Guillermo Rauch of Vercel, and Github founder, Tom Preston-Werner, with continued participation from Afore Capital and Comma Capital, plus other strategic partners. This amazing feat allowed us to reach more users and continuously deliver more value.
+
+### SOC 2 Certification
+
+Just as the year comes to an end, we became SOC2 Type I certified, which is a significant milestone for supporting B2B customers.
+
+SOC 2 is a security and compliance standard that offers guidelines for service organizations to protect sensitive data from unauthorized access, security incidents, and other vulnerabilities.
+
+## Be part of our journey
+
+If you’re curious what we have in store for 2024, please check (and comment on!) our public roadmap. We wouldn’t be where we are now without you, your questions, feedback, and feature requests. Join [our Discord](https://discord.gg/mPfcyDEdpx) and help shape the future of Inngest 💜
+
+Onto a new year of shipping!

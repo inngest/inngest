@@ -1,0 +1,37 @@
+export const title = 'Scaling a fast growing developer email platform with serverless workflows'
+export const companyName = 'Resend'
+export const logo = '/assets/customers/resend.svg'
+export const quote = {
+  text: `The DX and visibility with Inngest is really incredible. We are able to develop functions locally easier and faster that with our previous queue. Also, Inngest's tools give us the visibility to debug issues much quicker than before.`,
+  attribution: {
+    name: 'Bu Kinoshita',
+    title: 'Co-founder',
+  },
+  avatar: '/assets/customers/resend-bu-kinoshita.jpg',
+}
+export const companyURL = 'https://resend.com'
+export const companyDescription = 'The modern email sending platform'
+export const ogImage = '/assets/customers/case-study/og-image-resend.png'
+
+[Resend (YC W23)](https://resend.com/) is modern email sending platform that's raising the bar for developer experience. The team's early success building the popular React Email library helped drive early growth which the team has continued to build on to make Resend a goto for developers. Since their launch, Resend has been scaling quickly which led them to exploring Inngest, specifically for developer experience (DX), observability, and reliability. ~~Game recognize game~~. Great DX recognize great DX.
+
+## Verifying email domains with workflows
+
+Verifying the domain is the key first step in sending emails on behalf of a user. It's the first thing that anyone does when they set up Resend. Setting up the proper DNS records are fundamental to good deliverability. DNS record propagation can take time, so verification checks must happen periodically over a 72 hour period, about every 3-5 minutes.
+
+Domain verification is a key onboarding flow to getting someone set up with Resend, so it must be reliable and it has to scale. When problems do occur, the Resend team needs to be able to quickly debug what has happened. Enter Inngest.
+
+## Overcoming challenges with observability
+
+Resend's existing solution, a serverless queue, didn't provide any observability into their jobs. They would “*understand that a job failed, but not why it failed.*” There was no connection between messages in their queue, their logs, and what happened. For a fast growing product team, this was valuable time lost every day sifting through logs and debugging. They shifted this workflow to Inngest in just a few days and immediate saw the benefits:
+
+1. **Incredible developer experience enabling faster development velocity** - The Resend team was able to use the Inngest Dev Server to build the domain verification workflow very quickly with an easy setup and fast feedback loops. Their previous serverless queue required running ngrok and manually sending messages and with the Inngest Dev Server, iterating was as fast as seeing an error, fixing the code and clicking “Re-run.”
+2. **Faster debugging in production = better experience for customers** - With the Inngest dashboard's function run history and logs, the team is now finally able to connect the dots between customer issues and their code, helping get answers to customers and ship fixes faster than before.
+3. **No managing complex infrastructure** - Resend has chosen a mix of serverless services to focus on the business value of the product instead of managing infra and also to scale more easily. Inngest was an ideal match for them as a managed solution that scales automatically.
+4. **Reliability** - With such a fundamental part of onboarding, Inngest's reliability features helped Resend ship with confidence.
+
+### Expanding use cases and the future
+
+After moving their domain verification flow to Inngest in just a few days, the Resend team started work on a brand new high volume batch workflow and some awesome new features that are yet to be announced.
+
+Resend is continuing to leverage Inngest to bring new features to customers faster and help scale their product to thousands (and hopefully millions) of developers.

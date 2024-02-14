@@ -1,0 +1,138 @@
+---
+heading: How we built a fair multi-tenant queuing system
+subtitle: Building the Inngest queue - Part I
+showSubtitle: true
+image: /assets/blog/inngest-queue-pt-i/featured-image-v2.png
+date: 2024-01-22
+author: Tony Holdstock-Brown
+disableCTA: true
+---
+
+In software development, queueing systems are important for reliability, and they're hard to build.  There's lots of debate around *how* to build a queueing system — with [Postgres](https://news.ycombinator.com/item?id=35526846) and [SKIP LOCKED](https://news.ycombinator.com/item?id=37636841) *always* cropping up.
+
+We've spent a long time researching and building our own distributed queuing system, and in this post we'll explain what the challenges are, why we needed to build it, and how it works.
+
+## Challenges building queueing systems
+
+We built Inngest as a reliability layer for modern applications. It enables developers to write declarative  step functions in code by combining durable execution, event streams, and queues into a singe serverless platform.
+
+Inngest manages the event streams, queues and state all within the platform. Environments are created and functions are automatically deployed for [every branch of your codebase](/blog/branch-environments). Teams might deploy *hundreds* of functions to Inngest across tens of branches, leading to thousands of functions reacting to events in real time (within ~10-100ms).
+
+As we scaled to **thousands of users who have triggered billions of functions to run**, we learned a great deal about the challenges developing a platform built on queues.
+
+Attempting to build a system like this with any off-the-shelf queuing system is quickly going to become a struggle. Here are some of the key challenges that you will encounter:
+
+- **Fairness**.  You send 5,000 events per second. Not hard to manage, but in a single queue your jobs will block other users' work from running. That's not fair. One user should not be able to block another's work.
+- **Multi-tenancy**.  Most queues operate on a "worker" model: you specify which queues a worker should listen to, and the amount of jobs that worker can handle. Spinning up new workers for each function is tedious and cumbersome. It's made worse given that development branches are ephemeral and bursty.
+- **Contention**.  With thousands of customers running thousands of step functions containing parallel steps, at any given time there are millions jobs available for work. In typical queueing systems, workers will all contend for the earliest job available, leading to *lots* of spinning and wasted effort.
+- **Concurrency**.  Customizing concurrency at a function level across distributed workers is not possible in other queueing systems. Typically, concurrency management is implemented within the worker polling logic. Within Inngest, you can set multiple concurrency settings on a single function using one line of code. This creates virtual queues for managing runs.
+- **Read/write load**. Handling tens of thousands of jobs per second leads to hundreds of thousands of requests per second: enqueues, "locks" (we'll get to that), dequeues all lead to heavy load on the backing infrastructure that runs the queue.
+- **Infrastructure**. The queue needs to be reliable and fault-tolerant, which means we need distributed systems built in (which also impacts latency).
+- **Observability**. Most queues are opaque, with little or basic observability out of the box. It's hard to build in real-time observability for step functions beyond the backlog: eg. number of functions waiting for other events, or a histogram of wall time vs execution time.
+- **Customizability**. It's difficult and incredibly time intensive to extend basic queueing systems with advanced functionality. Customizations include: changing backoffs function-by-function, cancelling the backlog based off of job data, batching, debounce, smart indexing, and step function parallelism.
+
+To solve all of these problems, we developed a brand new queue from the ground up for Inngest. It's a fair, low-latency, multi-tenant queue which operates with multiple shared-nothing workers that claim jobs in an (almost) contention-free way.
+
+In this series of blog posts, we'll explain how the queueing system works and the design decisions that solve these problems.
+
+## How reliability layers use queues
+
+To set context, let's walk through how Inngest uses a queue, with an example function configuration using our [TS SDK](/docs/reference/typescript) ([Go](https://pkg.go.dev/github.com/inngest/inngestgo) and [Python](/docs/reference/python) SDKs are also available, with [more coming soon](https://roadmap.inngest.com/roadmap)):
+
+```tsx
+inngest.createFunction(
+  {
+    id: "update-user", // Unique function ID
+    concurrency: 15,   // Concurrency controls per function (https://innge.st/concurrency)
+    debounce: {        // Debounce management (https://innge.st/debounce)
+      period: "5s",
+      timeout: "20s",
+    }
+  },
+  { event: "clerk/user.created" },
+  async ({ event, step }) => {
+    const user = await step.run("Load user info", async () => {
+      return await clerk.users.getUser(event.data.userId);
+    });
+
+    return await step.run("Update DB", async () => {
+      const updates = userFields(user); // grab fields from clerk
+      return await db.users.where({ clerk_id: user.id }).update(updates);
+    });
+  }
+);
+```
+
+If you're familiar with step functions, you probably already see what's happening here.  This code creates a function which runs automatically when the `clerk/user.created` event is received via Clerk's webhooks.  It's a step function which uses [durable execution](/blog/how-durable-workflow-engines-work) to reliably run code.  This means that each step is a code-level transaction backed by its own job in the queue.  If the step fails, it retries automatically.  Any data returned from the step is automatically captured into the function run's state and injected on each step call.
+
+There are a few extra nuances.  The function specifies its own concurrency limits along with a debounce.  Concurrency limits prevent any more than 15 steps running at any one time.  The debounce schedules a function run for 5 seconds, and if any other matching events are received during that period, Inngest reschedules the function to run after another 5 seconds (until the maximum timeout has passed).
+
+All of this happens automatically, without provisioning queues or infrastructure, based off of our queueing system.  Here's what happens:
+
+- When an event is received, we *[idempotently](/docs/guides/handling-idempotency)* enqueue a job which calls the function handler. This has to be idempotent, as [event streams are *at least once*](/blog/message-bus-vs-queues), and we want a single function run for one event.
+- Debounce complicates running functions: the job is scheduled with a 5 second delay (or whatever's in the function config), and any additional events delay the job again.
+- When the job becomes "visible", we ensure functions aren't beyond their concurrency limits and begin work by calling the function with the incoming event data.
+- Once a function runs a step, we store the step's result inside the function run's state and (worst case) enqueue *another* job to for the next step. There's some nuance here for long-running servers, though we'll talk about that in an execution deep dive separately.
+
+Essentially, *everything* impacts the queue. Running a function reliably has to use a queue. Concurrency, debounce, and batching all have an impact how the queue works at an individual job level.
+
+With that context, let's talk about how this works in a multi-tenant environment, with thousands of users running millions of functions at the same time.
+
+## Unfairness in classic queues
+
+Most queues are **not** multi-tenant.
+
+Take SQS. Typically, you'll create a queue to handle a specific job in your code.  That queue is used across every user in your system.  If one of your users (say, Mallory) sends 5,000 messages at once and then Alice enqueues something, we have to work through Mallory's 5,000 jobs before we can handle Alice's single task.  That's *unfair*.
+
+With classic queueing systems, this is almost impossible to easily solve.  Randomly sharding amongst several queues will lower the chance that blocking happens, but it's guaranteed that eventually it happens anyway.   You could try do some bookkeeping yourself *outside* of the queue and manually requeue jobs as they come in, but that increases latency, costs, churn, and doesn't provide actual fairness (along with being hard, buggy, and annoying to write).
+
+In short, it's *really hard* to make something like SQS, BullMQ, or Graphile work well in a multi-tenant environment.  Hacking around fairness costs a lot, increases latency, and without *very complex infrastructure* to provision items for each tenant doesn't actually solve the problem.
+
+So, how do we solve fairness?
+
+## Building a fair multi-tenant queue
+
+In an ideal world, fairness happens at both a function level *and* an account level.  Let's say you have 100 functions running via Inngest, and you push a million jobs to a specific function.  These jobs should *not* block other functions in your account from running.
+
+**This leads to the first requirement:  each function you add must get its own queue to maximize fairness.**
+
+This raises a few questions.  How can we make queues cheap enough to create for every function, across every branch of your code?  And, how do workers subscribe to queues created at any point in time, without requiring restarts or new processes?  Almost every queue that exists today needs you to run workers that subscribe to specific queues:
+
+```ts
+// ❌ classic queue workers aren't compatible with multi-tenant queues,
+// or > 1 custom concurrency limits per function
+worker.concurrency = 100;
+worker.run(["queue:1", "queue:2"], () => {
+  // run jobs in queue 1 and 2
+})
+```
+
+If you add a new function to Inngest, we can't recreate workers on the fly.  It makes our code and infrastructure *far* too messy, and at worst could mean that workers cycle every second as new functions are added.
+
+**We have another requirement: latency must be as low as possible.**
+
+This adds a few more needs to the system.  We must have a pool of workers that auto-scale to make sure we're running jobs as fast as possible.  We can't reboot workers any time new queues are added.
+
+Taking all of these requirements into account, we need to:
+
+- Write workers which automatically discover available functions
+- Have workers automatically take work from each function
+- And do this *without contention*
+
+**Our third requirement: handling contention.**
+
+Contention is another key part to fairness:  two workers shouldn't compete for the same function.  But, at the same time, we can't assign functions to *specific* workers, because they might die at any time.  The solution is to create a tiered queuing system.
+
+1. Each function gets its own queue of outstanding work.
+2. We create *another* higher level queue, which records each function's earliest available job.
+3. All workers scan this queue to discover available work.
+
+This gives us a subset of work that's available: `[Function A, Function B, Function C]` and so on, ordered by *latency* with the oldest job first.  This solves *multi-tenancy*, but even with this list we still have fairness and contention to deal with.  100 separate workers scanning for jobs will all get the same list in the same order, leading to 100 workers trying to run jobs for function A.  This is both unfair and high contention.
+
+There are a few strategies we use to solve this.  One key part is that each worker priority shuffles the peeked jobs into a weighted random order, taking into account latency, capacity, free vs paid, etc.  Once shuffled, the worker claims the function's job queue to run work.  This ensures that every function runs independently and guarantees fairness.  It also minimizes latency, as priority shuffling still prioritizes older work.
+## Conclusion
+There's a ton more nuance to the queue, though at a high level this solves all key requirements:  contention, fairness, and latency.  A huge benefit to this model:  queues become incredibly cheap.  It's the magic that lets you create queues for each function, and it's *part* of the magic that lets us create virtual queues to add multiple concurrency levels to each function. This approach has allows us to create a queue with built-in flow control features to all users in a way that is reliable, performant, and scalable. We're *really* happy with this solution, and think it has a lot of legs.
+
+Even though queues are fundamental to how we work, we think that reliability layers like Inngest mean that you never actually need to implement queueing, or even think about how it works.  The system abstracts everything for you declaratively by code, so even the freshest of engineers can productively build reliable systems.
+
+If you found this interesting or you'd like to work on systems like this please reach out to us [by email](/contact), [Twitter](https://twitter.com/inngest), or on our [Discord](/discord). We'd love to hear your thoughts, and [we're hiring](/careers)!
