@@ -26,12 +26,12 @@ function Heading({
   );
 }
 
-export const h2: React.FC<any> = function H2(props) {
+export const h2 = function H2(props) {
   return <Heading level={2} {...props} />;
 };
-export const h3: React.FC<any> = function H2(props) {
+export const h3 = function H2(props) {
   return <Heading level={3} {...props} />;
 };
-export const h4: React.FC<any> = function H2(props) {
+export const h4 = function H2(props) {
   return <Heading level={3} {...props} />;
 };

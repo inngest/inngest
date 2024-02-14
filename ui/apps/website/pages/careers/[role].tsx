@@ -105,7 +105,11 @@ export default function Careers(props) {
                 <AboutInngest heading={false} />
 
                 <h2>The role</h2>
-                <MDXRemote compiledSource={role.compiledSource} />
+                <MDXRemote
+                  compiledSource={role.compiledSource}
+                  scope={{}}
+                  frontmatter={{}}
+                />
 
                 <Benefits />
 

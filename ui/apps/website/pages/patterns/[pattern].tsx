@@ -126,6 +126,8 @@ export default function Patterns({
             <MDXRemote
               compiledSource={compiledSource}
               components={MDXComponents}
+              frontmatter={{}}
+              scope={{}}
             />
           </article>
           {/* <div className="col-start-2 col-span-3 max-w-[65ch]">

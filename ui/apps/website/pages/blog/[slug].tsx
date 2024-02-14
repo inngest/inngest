@@ -19,16 +19,21 @@ import IconCalendar from "src/shared/Icons/Calendar";
 import CTACallout from "src/shared/CTACallout";
 import Blockquote from "src/shared/Blog/Blockquote";
 import rehypeCodeTitles from "rehype-code-titles";
-import YouTube from "react-youtube-embed";
+import YouTube, { type YouTubeEmbedProps } from "react-youtube-embed";
 import remarkGfm from "remark-gfm";
 import { LaunchWeekBanner } from "../index";
+
+// Hack to fix the YouTube component type. We probably want to migrate out of "react-youtube-embed"
+// since it's not maintained anymore.
+type ClassComponent<Props> = new (props: Props) => JSX.ElementClass;
+const FixedYouTube = YouTube as ClassComponent<YouTubeEmbedProps>;
 
 const components = {
   DiscordCTA,
   Button,
   CTACallout,
   Blockquote,
-  YouTube,
+  FixedYouTube,
 };
 
 type Props = {
@@ -196,6 +201,7 @@ export default function BlogLayout(props) {
                   compiledSource={props.post.compiledSource}
                   scope={scope}
                   components={components}
+                  frontmatter={{}}
                 />
               </div>
               <DiscordCTA />

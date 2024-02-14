@@ -1,12 +1,14 @@
-import React from "react";
+import React, { type PropsWithChildren } from "react";
 import styled from "@emotion/styled";
 
 import { Button } from "../Button";
 import DiscordLogo from "../Icons/Discord";
 
-const DiscordCTA: React.FC<{ size?: "default" | "small" }> = ({
-  size = "default",
-}) => {
+type DiscordCTAProps = {
+  size?: "default" | "small";
+};
+
+export default function DiscordCTA({ size = "default" }: DiscordCTAProps) {
   return (
     <div className="max-w-[70ch] border-t-[2px] border-slate-800 pt-16 m-auto text-indigo-500">
       <DiscordLogo size={32} />
@@ -25,5 +27,4 @@ const DiscordCTA: React.FC<{ size?: "default" | "small" }> = ({
       </Button>
     </div>
   );
-};
-export default DiscordCTA;
+}

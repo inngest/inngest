@@ -5,19 +5,31 @@ import { Heading } from "./Heading";
 import React, { useState } from "react";
 import { ChevronDown, ChevronUp } from "react-feather";
 
-export { default as YouTube } from "react-youtube-embed";
+import YouTube, { type YouTubeEmbedProps } from "react-youtube-embed";
+
+// Hack to fix the YouTube component type. We probably want to migrate out of "react-youtube-embed"
+// since it's not maintained anymore.
+type ClassComponent<Props> = new (props: Props) => JSX.ElementClass;
+const FixedYouTube = YouTube as ClassComponent<YouTubeEmbedProps>;
+export { FixedYouTube as YouTube };
 
 // export const a: React.FunctionComponent<LinkProps> = (props) => (
 //   <Link {...props} />
 // );
 
-export const a: React.FunctionComponent<
-  React.AnchorHTMLAttributes<HTMLAnchorElement>
-> = ({ children, href, target, rel, download }) => (
-  <Link href={href} target={target} rel={rel} download={download}>
-    {children}
-  </Link>
-);
+export function a({
+  children,
+  href,
+  target,
+  rel,
+  download,
+}: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
+  return (
+    <Link href={href} target={target} rel={rel} download={download}>
+      {children}
+    </Link>
+  );
+}
 
 export { Button } from "../Button";
 export {
@@ -28,18 +40,21 @@ export {
   GuideSection,
 } from "./Code";
 
-export const h1: React.FC<any> = function (props) {
+export function h1(props) {
   return <Heading level={1} {...props} />;
-};
-export const h2: React.FC<any> = function (props) {
+}
+
+export function h2(props) {
   return <Heading level={2} {...props} />;
-};
-export const h3: React.FC<any> = function (props) {
+}
+
+export function h3(props) {
   return <Heading level={3} {...props} />;
-};
-export const h4: React.FC<any> = function (props) {
+}
+
+export function h4(props) {
   return <Heading level={3} {...props} />;
-};
+}
 
 function InfoIcon(props) {
   return (
