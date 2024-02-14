@@ -82,20 +82,6 @@ type Executor interface {
 		stackIndex int,
 	) (*state.DriverResponse, error)
 
-	// HandleResponse handles the response from running a step.
-	HandleResponse(
-		ctx context.Context,
-		id state.Identifier,
-		item queue.Item,
-		edge inngest.Edge,
-		resp *state.DriverResponse,
-	) error
-
-	// HandleGeneratorResponse handles all generator responses.
-	HandleGeneratorResponse(ctx context.Context, resp *state.DriverResponse, item queue.Item) error
-	// HandleGenerator handles an individual generator response returned from the SDK.
-	HandleGenerator(ctx context.Context, gen state.GeneratorOpcode, item queue.Item) error
-
 	// HandlePauses handles pauses loaded from an incoming event.  This delegates to Cancel and
 	// Resume where necessary, depending on pauses that have been loaded and matched.
 	HandlePauses(ctx context.Context, iter state.PauseIterator, event event.TrackedEvent) (HandlePauseResult, error)
