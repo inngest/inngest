@@ -1,0 +1,20 @@
+<svg width="382" height="200" viewBox="0 0 382 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path opacity="0.3" d="M1 94.5H381" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path opacity="0.6" d="M1 94.5H307" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path opacity="0.3" d="M1 122.5H165.737C176.702 122.5 187.458 125.505 196.835 131.188L201.165 133.812C210.542 139.495 221.298 142.5 232.263 142.5H380.5" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path opacity="0.3" d="M1 72.5H59.3579C68.4129 72.5 77.0971 68.9029 83.5 62.5V62.5C89.9029 56.0971 98.5871 52.5 107.642 52.5H380.5" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path opacity="0.3" d="M1 138.5H51.1393C64.8434 138.5 77.3713 146.243 83.5 158.5V158.5C89.6287 170.757 102.157 178.5 115.861 178.5H380.5" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path opacity="0.7" d="M1 138.5H51.1393C64.8434 138.5 77.3713 146.243 83.5 158.5V158.5C89.6287 170.757 102.157 178.5 115.861 178.5H148" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path opacity="0.3" d="M1 53.5H8.5C24.2379 53.5 39.0573 46.0903 48.5 33.5V33.5C57.9427 20.9097 72.7621 13.5 88.5 13.5H380.5" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path opacity="0.6" d="M1 53.5H8.5C24.2379 53.5 39.2088 45.8883 48.6515 33.298V33.298C57.9054 20.9595 72.5769 13.5 88 13.5V13.5" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="101" cy="13" r="9" fill="#6366F1"/>
+<circle cx="161" cy="53" r="9" fill="#94A3B8"/>
+<circle cx="251" cy="141" r="9" fill="#94A3B8"/>
+<circle cx="321" cy="95" r="9" fill="#6366F1"/>
+<circle cx="161" cy="179" r="9" fill="#6366F1"/>
+<circle cx="101" cy="13" r="12.5" stroke="#818CF8"/>
+<circle opacity="0.4" cx="161" cy="53" r="12.5" stroke="#94A3B8"/>
+<circle opacity="0.4" cx="251" cy="141" r="12.5" stroke="#94A3B8"/>
+<circle cx="321" cy="95" r="12.5" stroke="#818CF8"/>
+<circle cx="161" cy="179" r="12.5" stroke="#818CF8"/>
+</svg>

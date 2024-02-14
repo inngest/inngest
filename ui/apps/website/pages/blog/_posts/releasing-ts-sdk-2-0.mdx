@@ -1,0 +1,119 @@
+---
+heading: Introducing Inngest TypeScript SDK v2.0
+subtitle: Learn about the exciting new features in v2.0 and how to upgrade.
+image: /assets/blog/releasing-ts-sdk-2-0/sdk-v-2.png
+date: 2023-06-09
+author: Jack Williams
+disableCTA: true
+---
+
+We're thrilled to announce the release of Inngest's TypeScript SDK v2.0, featuring some powerful new features alongside some housekeeping to keep the SDK a consistent, smooth experience.
+
+Check out the [v2 migration guide](/docs/sdk/migration?ref=blog-sdk-2-0) to learn how to upgrade today.
+
+## Better Event Typing
+
+Previously, types were defined using a verbose structure and could be passed as generics in several ways. Issues with this resulted in large, difficult to parse TypeScript errors which weren't helpful to the end developer.
+
+We've built some new foundation for this in v2, including support for [Zod](https://zod.dev/?ref=inngest).
+
+```ts
+export const inngest = new Inngest({
+  name: "Admin Panel",
+  schemas: new EventSchemas()
+    .fromRecord<Events>()
+    .fromUnion<Custom1 | Custom2>()
+    .fromZod(zodEventSchemas),
+});
+```
+
+This provides everyone with massive benefits:
+
+- Improves discoverability of each way to specify event payload types
+- You get specific, easy-to-fix errors for each method
+- Gives Inngest the ability to easily add support for new methods (including generated types in the future)
+- Gives Inngest space to add schema definition options in the future like `.allowUntyped()`
+
+Internally, this change also frees up the Inngest client from being passed a type, allowing us to perform even better type inference and build more powerful tooling, like middleware.
+
+Check out [Defining Event Payload Types](/docs/reference/client/create?ref=blog-sdk-2-0#defining-event-payload-types) to learn about specifying types in v2.
+
+## Middleware
+
+Following the schema change, we can now add middleware. Middleware allows you to hook into various lifecycles of an Inngest client to add custom functionality.
+
+Some everyday use cases for middleware include:
+
+- Error monitoring (check out our [Sentry example](/docs/reference/middleware/examples?ref=blog-sdk-2-0#sentry-error-reporting-and-tracing))
+- Data transformations
+- Logging support (check out our [logging example](/docs/reference/middleware/examples?ref=blog-sdk-2-0#logging))
+- Pre-run setup like connecting to databases
+- Adding tooling or patterns using Inngest's step tooling as building blocks
+
+It even hooks into the Inngest client's typing, meaning you can use middleware to enhance your client however you see fit.
+
+```ts
+import { Inngest, InngestMiddleware } from "inngest";
+
+const myMiddleware = new InngestMiddleware({
+  name: "My Middleware",
+  init() {
+    return {
+      onFunctionRun({ fn }) {
+        // This will be logged whenever a function is executed
+        console.log(`Function ${fn.name} is running!`);
+
+        // This is where you can optionally specify hooks for this particular run
+        return {
+          afterExecution() {
+            console.log(`Function ${fn.name} has finished running!`);
+          },
+        };
+      },
+    };
+  },
+});
+
+const inngest = new Inngest({
+  name: "My App",
+  middleware: [myMiddleware],
+});
+```
+
+One of our aims with middleware is to make sure it's powerful enough to use for some of our own internal code in the SDK itself; we can't wait to see what you do with it!
+
+Check out the [Advanced: Middleware](/docs/reference/middleware/overview/?ref=blog-sdk-2-0) documentation to get started with middleware and see some examples.
+
+## Logging
+
+Powered by middleware, Inngest functions now provide a `logger` that can be used to reliably push logs either to the `console` (by default) or using a logger of your choice ([Winston](https://github.com/winstonjs/winston), [Pino](https://github.com/pinojs/pino), or [Bunyan](https://github.com/trentm/node-bunyan), for example).
+
+```ts
+const fn = inngest.createFunction(
+  { name: "My awesome function" },
+  { event: "func/awesome" },
+  async ({ event, step, logger }) => {
+    logger.info("starting function", { metadataKey: "metadataValue" })
+
+    await step.run("do something", () => {
+      if (somethingBadHappens) logger.warn("something bad happened")
+    })
+
+    return { success: true, event }
+  }
+)
+```
+
+Logging in serverless environments is often tricky, and a common problem we see is that users lose logs when the runtime is cleaned up by the platform. In addition, Inngest's ability to pause and resume a function's execution days, weeks, or months later means that a regular logger could run multiple times, resulting in duplicated logs.
+
+This `logger` accounts for all that, meaning you can immediately ship logs with your favorite logger.
+
+Check out [Logging in Inngest](/docs/guides/logging/?ref=blog-sdk-2-0) to see how to get started specifying your own logger and see how we add helpful metadata to your logs, too!
+
+## What's next
+
+Version 2.0 of the Inngest TypeScript SDK has established a strong foundation for supporting a broad range of external tools and services, allowing seamless integration with your favorite existing tools, services, and platforms.
+
+With these new foundations in place, we can focus on further refining and expanding upon these concepts, ultimately providing you with even more powerful tools and features in the future.
+
+We're excited to see what you'll create with v2! Check out the [v2 migration guide](/docs/sdk/migration?ref=blog-sdk-2-0) to learn how to upgrade today.

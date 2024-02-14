@@ -1,0 +1,232 @@
+---
+heading: How to import 1000s of items from any E-commerce API in seconds with serverless functions
+subtitle: Import data from Shopify, WooCommerce or BigCommerce APIs reliably and quickly
+image: /assets/blog/import-ecommerce-data.png?v=2
+date: 2023-03-15
+author: Dan Farrelly
+---
+
+Reliably and efficiently importing thousands of products from e-commerce APIs is a non-trivial task. Most applications that leverage any e-commerce API like [Shopify](https://shopify.dev/docs/api), [WooCommerce](https://woocommerce.com/document/woocommerce-rest-api/), [BigCommerce](https://developer.bigcommerce.com/api-docs/overview), or similar will need to fetch entire lists of products, inventory, sales from your user's storefront. You may want to use that data to use [AI to create new product images](https://pebblely.com/?utm_source=inngest&utm_medium=blog&utm_campaign=ecommerce_api), provide analytics or create a catalog to use them for marketing.
+
+The challenge is that all of this data is paginated and storefronts might have thousands or tens of thousands of items to import and you have to deal with performance, rate limiting and failures. We're going to break down these challenges and learn how you can build a system that addresses all of them.
+
+## Importing 100s…or 1000s
+
+To start, you've already built the OAuth flow in your application and you have access tokens to make requests to an e-commerce API. You now have to import data from some paginated Shopify or WooCommerce API endpoint and then insert that data in some form into your database.
+
+This seems simple enough, but you do not know how many items someone might have in their storefront - it could be 100 or it could be 7,000. Your code needs to be able to reliably handle hugely varied amounts of data in this system. As with any sort of pipeline, you need to know what is unknown and then make a plan to mitigate that in your code.
+
+## The challenges
+
+### Challenge #1 - Synchronous is slow
+
+For your MVP you may just try to add this import logic within one of your app's own API endpoints. You might try to do this during OAuth or add some “Sync Products” button in your app that triggers a synchronous API request.
+
+This may work for trivial amounts of data, but it most definitely will fail due to timeouts, rate-limiting, or the user just navigating away and breaking the connection. Overall, it will just feel slow and unpredictable to the user waiting in the browser.
+
+This code should always run as a background job.
+
+### Challenge #2 - Third party API rate limiting and reliability
+
+It would be fantastic if you could hit any API as fast as you wanted to with no recourse, but as a developer, you have to deal with rate limiting. Also, you have to consider that a given API request might fail, either due to rate limiting, networking or downtime. API requests will fail and it's up to you to ensure that your code is resilient.
+
+### Challenge #3 - Long jobs are prone to failure
+
+Your code may have to handle thousands of items. This represents lots of paginated API calls and database inserts. You need to anticipate failures. With so much data, your job is also likely to run for a long period of time. With a basic background job, on failure, your job likely has to restart from the beginning, wasting effort, API calls and, of course, time.
+
+In addition to your code being [idempotent](https://developer.mozilla.org/en-US/docs/Glossary/Idempotent), it's ideal for your code to not have to re-do the work that's already been completed.
+
+## Reliable, controlled jobs with Inngest
+
+Inngest enables you to mitigate all of these challenges right in your existing codebase. Inngest addresses these issues in a few ways:
+
+-   **Trigger a background job via a single event** - It's just a couple of lines of code to trigger your job from anywhere else in your system. You can trigger an import right after the OAuth connection or periodically, or even based on a webhook event to update whenever a storefront is updated.
+-   **Break long running functions into steps** - By wrapping code within the SDK's `step.run()` function, each step is called individually. You can run steps in parallel or in sequence depending on your needs.
+-   **Automatic retries for each step** - Each step is retried automatically, so you get step-level reliability and fault tolerance which means your code can gracefully handle failed API calls, database inserts or whatever. If your code fails at a given step, Inngest resumes it from that exact point, ensuring your code doesn't need to start from the beginning. With retries on the step level, your overall function becomes highly reliable.
+-   **Concurrency controls** - You can set the max concurrency that Inngest will invoke your function. This enables you to control throughput to prevent hitting rate limits or overwhelming your database.
+
+## Writing a reliable product import job
+
+First, we're going to use the [Inngest SDK](/docs?ref=blog-import-ecommerce) to create a function that iterates through each page of products and combines them into a single list. Inngest functions are triggered by sending events via `inngest.send()` ([check out the docs for more info](/docs/events?ref=blog-import-ecommerce)):
+
+```typescript
+await inngest.send({
+  name: "shopify/import.requested",
+  data: { storeId: 1462924, userId: 9357925756 },
+})
+```
+
+Here's some example code of an Inngest function that runs whenever the above event is sent, with a max concurrency of `10`. This function iterates over all pages combining all products into a single array. Each API request is performed with retries within `step.run()`.
+
+```typescript
+export default inngest.createFunction(
+  { name: "Shopify Product Import", concurrency: 10 },
+  { event: "shopify/import.requested" },
+  async ({ event, step }) => {
+    const allProducts = []
+    let cursor = null
+    let hasMore = true
+
+    // Use the event's "data" to pass key info like IDs
+    const session = await database.getShopifySession(event.data.storeId)
+
+    while (hasMore) {
+      // step.run will be retried automatically if the request fails
+      const page = await step.run("Fetch products", async () => {
+        return await shopify.rest.Product.all({
+          session,
+          since_id: cursor,
+        })
+      })
+      // Combine all of the data into a single list
+      allProducts.push(...page.products)
+      if (page.products.length === 50) {
+        cursor = page.products[49].id
+      } else {
+        hasMore = false
+      }
+    }
+
+    // Now we have the entire list of products within allProducts!
+  }
+)
+
+```
+
+You now know the key concepts for Inngest:
+
+-   Use `inngest.send()` to send events from your system
+-   Write functions that run whenever these events are received using `inngest.createFunction()`
+-   Wrap key logic, like API calls or database writes, in `step.run()` for automatic retries.
+
+With these concepts you can now add a series of steps that writes to your database:
+
+```typescript
+inngest.createFunction(
+  { name: "Shopify Product Import", concurrency: 10 },
+  { event: "shopify/import.requested" },
+  async ({ event, step }) => {
+    // --- See first code snippet above for the setup ---
+
+    for (let product of allProducts) {
+      await step.run("Import product", async () => {
+        await database.upsertProduct({
+          storeId: event.data.storeId,
+          product,
+        })
+      })
+    }
+  }
+)
+
+```
+
+Even better, since `step.run()` returns a `Promise`, you can use `Promise.all()` here to kick off all steps in parallel and let Inngest manage the concurrency!
+
+```typescript
+inngest.createFunction(
+  { name: "Shopify Product Import", concurrency: 10 },
+  { event: "shopify/import.requested" },
+  async ({ event, step }) => {
+    // --- See first code snippet above for the setup ---
+
+    // Since step.run return a Promise, we iterate over all products
+    // creating an array of step.run Promises - Inngest can handle it all!
+    Promise.all(
+      allProducts.map((product) =>
+        step.run("Import product", async () => {
+          await database.upsertProduct({
+            storeId: event.data.storeId,
+            product,
+          })
+        })
+      )
+    )
+
+    // Tell the user the import has been completed
+    await step.run("Import completed notification", async () => {
+      const user = await database.getUser(event.data.userId)
+      await sentEmail(user.email, "import_completed")
+    })
+  }
+)
+
+```
+
+You can combine these step tools in any way that you want. For example, you may prefer to batch your database inserts or you may want an additional step for each product that fetches and imports [all product images](https://shopify.dev/docs/api/admin-rest/2023-01/resources/product-image#get-products-product-id-images) into your database or copies them to your image storage bucket.
+
+## Using fan-out for faster parallel processing
+
+We've learned that you can use [`step.run()`](/docs/functions/multi-step?ref=blog-import-ecommerce) to break your job into reliable steps, but what if you want to have different levels of concurrency for part of your code? You can send events from one function to “fan-out” work to another function and run that work in parallel, speeding up your pipeline.
+
+Let's look at an example that fetches all images and copies those images to our image storage bucket. First, we build on the above code to add fetching images for each product, mapping over the list of images to create `"shopify/copy.image"` events to send to Inngest. Then we use `step.sendEvent()` to send the events in bulk.
+
+```typescript
+inngest.createFunction(
+  { name: "Shopify Product Import", concurrency: 10 },
+  { event: "shopify/import.requested" },
+  async ({ event, step }) => {
+    // --- See first code snippet above for the setup ---
+
+    for (let product of allProducts) {
+      // Fetch all images from each product
+      const response = await step.run("Fetch images product", async () => {
+        return await shopify.rest.Image.all({
+          session: session,
+          product_id: product.id,
+        })
+      })
+      // Turn the image list into a series of events to send
+      const events = response.images.map((image) => ({
+        name: "shopify/copy.image",
+        data: {
+          imageId: image.id,
+          imageUrl: image.src,
+          storeId: event.data.storeId,
+          productId: product.id,
+        },
+      }))
+      // Now, we send events in bulk to Inngest
+      await step.sendEvent(events)
+    }
+  }
+)
+
+```
+
+Now that we have a `"shopify/copy.image"` event - we can write another function with higher concurrency (`50`) since our image bucket's API has much higher rate limits (S3 supports 3,500/sec).
+
+```typescript
+inngest.createFunction(
+  { name: "Shopify Copy Image to S3", concurrency: 20 },
+  { event: "shopify/copy.image" },
+  async ({ event, step }) => {
+    const { imageId, storeId, productId } = event.data
+    await step.run("Copy image", async () => {
+      const res = await fetch(event.data.imageUrl)
+      const blob = await res.blob()
+      const ext = path.extname(event.data.imageUrl)
+      const uploadedImage = await s3
+        .upload({
+          Bucket: process.env.AWS_S3_BUCKET_NAME,
+          Key: `/${storeId}/${productId}/${imageId}.${ext}`,
+          ContentType: res.headers.get("content-type"),
+          Body: blob,
+        })
+        .promise()
+      return uploadedImage.Location
+    })
+  }
+)
+
+```
+
+That's it! We successfully separated work into different jobs using fan-out. Since we decoupled the jobs, we can even trigger this `"shopify/copy.image"` event from other parts of our code allowing this logic to be re-used! Faster, more reliable and still simple!
+
+## Wrapping it up
+
+We've taken something that can fail in multiple ways and made it more robust and reliable using just a few lines of code. Inngest fully handles the complexity of managing steps and state so you don't have to. You also get function logs, event history, and debugging tools right out of the box.
+
+You can add Inngest to your project easily with [extensive framework support](/docs/sdk/serve?ref=blog-import-ecommerce) including Next.js, Express.js, and others. You then can run these jobs on serverless backends like [Vercel](/docs/deploy/vercel?ref=blog-import-ecommerce) or [Netlify](/docs/deploy/netlify?ref=blog-import-ecommerce) or on [Serverful platforms](/docs/deploy?ref=blog-import-ecommerce) like Railway, Render, Fly or even a container.
+
+Check out the Inngest quick start guide if you want a full primer into learning Inngest and how to use the Inngest dev server to easily and quickly test functions on your machine.

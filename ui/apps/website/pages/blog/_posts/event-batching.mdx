@@ -1,0 +1,64 @@
+---
+heading: "Introducing Event Batching: Handling data at scale"
+subtitle: Providing a way to handle high load events, and processing them in bulk
+image: /assets/blog/event-batching/main.png
+date: 2023-07-12
+author: Darwin Wu
+disableCTA: true
+---
+
+Are you tired of dealing with external systems that impose strict rate limits?
+
+Do you often find your database struggling under heavy load because of the constant opening and
+closing of connections or transactions?
+
+And let's not forget that midnight cron job that consistently overwhelms your system.
+
+As the volume of data to be processed continues to increase, individually processing each piece
+becomes extremely inefficient. It's far more cost-effective to handle them in batches, particularly
+when dealing with high-volume and repetitive data.
+
+**That's why we're excited to announce that Event Batching is now available in Inngest!**
+
+Take a look at our [Batching events guide](/docs/guides/batching) to get started with this powerful
+feature today.
+
+```ts
+inngest.createFunction(
+  // `batchEvents` is a new function configuration
+  { name: "Record API calls", batchEvents: { maxSize: 100, timeout: "5s" } },
+  { event: "log/api.call" },
+  // NOTE: Use the `events` instead of the `event` argument, which is an array of event payloads
+  async ({ events, step }) => {
+    const attrs = events.map(evt => {
+      return {
+        user_id: evt.data.user_id,
+        endpoint: evt.data.endpoint,
+        timestamp: toDateTime(evt.ts)
+      }
+    })
+
+    const result = await step.run("record data to DB", async () => {
+      return db.bulkWrite(attrs)
+    })
+
+    return { success: true, recorded: result.length }
+  }
+)
+```
+_Here's an example function from the documentation using batching._
+
+A screenshot of what it looks like on the UI, when a function accepts multiple events.
+![Event payloads on UI](/assets/blog/event-batching/event-batching.png)
+
+## What lies ahead?
+
+In today's technology landscape, event-driven systems are becoming increasingly prevalent, and the
+flow of data shows no signs of slowing down — it's only going to surge further. Consequently,
+the need to process data in bulk will continue to grow.
+
+At Inngest, our mission is to empower engineers like you to build more reliable systems without
+having to grapple with the complexity and maintenance burden of distributed systems.
+
+Event batching brings us one step closer to achieving that goal, and we can't wait to see what
+incredible things you'll create with it.
