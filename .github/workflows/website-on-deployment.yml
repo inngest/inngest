@@ -27,11 +27,14 @@ jobs:
     steps:
       - uses: actions/checkout@v2.1.0
 
-      - name: Install dependencies
-        working-directory: ui/apps/website
+      - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
-          run_install: true
+          version: 8.6.2
+
+      - name: Install dependencies
+        working-directory: ui/apps/website
+        run: pnpm install
 
       - name: Run broken-link-checker
         working-directory: ui/apps/website
@@ -44,7 +47,6 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Algolia crawler creation and crawl
-        working-directory: ui/apps/website
         if: ${{ success() }}
         uses: algolia/algoliasearch-crawler-github-actions@v1.0.10
         id: algolia_crawler
