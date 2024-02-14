@@ -751,7 +751,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 
 ProcessLoop:
 	for _, qi := range queue {
-		if q.capacity() == 0 {
+		if !q.sem.TryAcquire(1) {
 			// no longer any available workers for partition, so we can skip
 			// work for now.
 			q.int64counter(ctx, "inngest_queue_process_no_capacity_total", 1)
@@ -762,12 +762,6 @@ ProcessLoop:
 		if item.IsLeased(time.Now()) {
 			q.int64counter(ctx, "inngest_queue_partition_lease_contention_total", 1)
 			continue
-		}
-
-		// Cbeck if there's capacity from our local workers atomically prior to leasing our tiems.
-		if !q.sem.TryAcquire(1) {
-			q.int64counter(ctx, "inngest_queue_partition_process_no_capacity_total", 1)
-			break
 		}
 
 		// Attempt to lease this item before passing this to a worker.  We have to do this
