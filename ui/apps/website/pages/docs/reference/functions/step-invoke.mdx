@@ -49,25 +49,43 @@ const mainFunction = inngest.createFunction(
           <Property name="user" type="object">
             Optional user context for the invocation.
           </Property>
+          <Property name="timeout" type="string | number | Date" version="v3.14.0+">
+            {/* Purposefully not mentioning the default timeout of 1 year, as we expect to lower this very soon. */}
+            The amount of time to wait for the invoked function to complete. The time to wait can be specified using a `number` of milliseconds, an `ms`-compatible time string like `"1 hour"`, `"30 mins"`, or `"2.5d"`, or a `Date` object.
+
+            Note that the invoked function will continue to run even if this step times out.
+          </Property>
         </Properties>
         Throwing errors within the invoked function will be reflected in the invoking function.
       </Property>
     </Properties>
   </Col>
   <Col>
+    <CodeGroup title="Invoke a function directly">
     ```ts
-    // Invoke a function directly
     const resultFromDirectCall = await step.invoke("invoke-by-definition", {
       function: anotherFunction,
       data: { ... },
     });
-
-    // Invoke a function using a function reference
+    ```
+    </CodeGroup>
+    <CodeGroup title="Invoke a function using a function reference">
+    ```ts
     const resultFromReference = await step.invoke("invoke-by-reference", {
       function: referenceFunction(...),
       data: { ... },
     });
     ```
+    </CodeGroup>
+    <CodeGroup title="Invoke a function with a timeout">
+    ```ts
+    const resultFromDirectCall = await step.invoke("invoke-with-timeout", {
+      function: anotherFunction,
+      data: { ... },
+      timeout: "1h",
+    });
+    ```
+    </CodeGroup>
   </Col>
 </Row>
 
