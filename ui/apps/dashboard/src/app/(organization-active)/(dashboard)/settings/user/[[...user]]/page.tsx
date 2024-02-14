@@ -13,6 +13,8 @@ export default function UserSettingsPage() {
             navbar: 'p-8 border-none',
             scrollBox: 'bg-white',
             pageScrollBox: '[scrollbar-width:none]', // hides the Clerk's scrollbar
+            profileSectionTitle__danger: 'hidden',
+            profileSectionContent__danger: 'hidden',
           },
         }}
       />
