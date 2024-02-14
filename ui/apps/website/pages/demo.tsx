@@ -1,21 +1,20 @@
-import { useEffect } from "react";
-import styled from "@emotion/styled";
-import Head from "next/head";
-import Footer from "../shared/legacy/Footer";
-import Nav from "../shared/legacy/nav";
-import Content from "../shared/legacy/content";
+import { useEffect } from 'react';
+import Head from 'next/head';
+import styled from '@emotion/styled';
 
-import Block from "../shared/legacy/Block";
-import IconList from "../shared/legacy/IconList";
-import Button from "../shared/legacy/Button";
+import Block from '../shared/legacy/Block';
+import Button from '../shared/legacy/Button';
+import Footer from '../shared/legacy/Footer';
+import IconList from '../shared/legacy/IconList';
+import Content from '../shared/legacy/content';
+import Nav from '../shared/legacy/nav';
 
 export async function getStaticProps() {
   return {
     props: {
       meta: {
-        title: "Product Demo Video",
-        description:
-          "Learn how you can create, test and deploy functions in minutes",
+        title: 'Product Demo Video',
+        description: 'Learn how you can create, test and deploy functions in minutes',
       },
     },
   };

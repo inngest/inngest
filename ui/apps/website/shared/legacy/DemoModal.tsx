@@ -1,4 +1,4 @@
-import styled from "@emotion/styled";
+import styled from '@emotion/styled';
 
 export default function DemoModal({
   show,
@@ -10,12 +10,12 @@ export default function DemoModal({
   return (
     !!show && (
       <Demo
-        className="flex justify-center items-center"
+        className="flex items-center justify-center"
         onClick={() => {
           onClickClose();
         }}
       >
-        <div className="container aspect-video mx-auto max-w-2xl flex">
+        <div className="container mx-auto flex aspect-video max-w-2xl">
           <iframe
             src="https://www.youtube.com/embed/qVXzYBcJmGU?autoplay=1"
             title="Inngest Product Demo"

@@ -1,23 +1,20 @@
-import styled from "@emotion/styled";
-import Head from "next/head";
-import { useRouter } from "next/router";
-import Image from "next/image";
-import { Rss } from "react-feather";
+import Head from 'next/head';
+import Image from 'next/image';
+import { useRouter } from 'next/router';
+import styled from '@emotion/styled';
+import { Rss } from 'react-feather';
+import ArrowRight from 'src/shared/Icons/ArrowRight';
+import IconCalendar from 'src/shared/Icons/Calendar';
+import SectionHeader from 'src/shared/SectionHeader';
 
-import IconCalendar from "src/shared/Icons/Calendar";
-import ArrowRight from "src/shared/Icons/ArrowRight";
-import Footer from "../shared/Footer";
-import Header from "../shared/Header";
-import Nav from "../shared/legacy/nav";
-import ThemeToggleButton from "../shared/legacy/ThemeToggleButton";
-import Container from "../shared/layout/Container";
-import Tags from "../shared/Blog/Tags";
-import SectionHeader from "src/shared/SectionHeader";
-import {
-  loadMarkdownFilesMetadata,
-  type MDXFileMetadata,
-} from "../utils/markdown";
-import { LaunchWeekBanner } from "./index";
+import Tags from '../shared/Blog/Tags';
+import Footer from '../shared/Footer';
+import Header from '../shared/Header';
+import Container from '../shared/layout/Container';
+import ThemeToggleButton from '../shared/legacy/ThemeToggleButton';
+import Nav from '../shared/legacy/nav';
+import { loadMarkdownFilesMetadata, type MDXFileMetadata } from '../utils/markdown';
+import { LaunchWeekBanner } from './index';
 
 export default function BlogLayout(props) {
   const router = useRouter();
@@ -26,9 +23,7 @@ export default function BlogLayout(props) {
   const content: BlogPost[] = props.content.map(JSON.parse);
   const visiblePosts = showHidden
     ? content
-    : content
-        .filter((post) => !post.hide)
-        .sort((a, z) => z.date.localeCompare(a.date));
+    : content.filter((post) => !post.hide).sort((a, z) => z.date.localeCompare(a.date));
 
   const focus = visiblePosts.find((c) => c.focus) ?? visiblePosts[0];
   const rest = visiblePosts
@@ -42,10 +37,7 @@ export default function BlogLayout(props) {
       <Head>
         <title>Inngest → Product & Engineering blog</title>
         <meta name="description" content={description}></meta>
-        <meta
-          property="og:title"
-          content="Inngest → Product & Engineering blog"
-        />
+        <meta property="og:title" content="Inngest → Product & Engineering blog" />
         <meta property="og:description" content={description} />
       </Head>
 
@@ -55,14 +47,14 @@ export default function BlogLayout(props) {
         <LaunchWeekBanner urlRef="blog-feed-banner" />
 
         <Container className="pt-8">
-          <div className="flex flex-col lg:flex-row gap-2 lg:gap-4 items-start lg:items-center">
-            <h2 className="font-bold text-base text-white lg:border-r border-slate-600/50 pr-4">
+          <div className="flex flex-col items-start gap-2 lg:flex-row lg:items-center lg:gap-4">
+            <h2 className="border-slate-600/50 pr-4 text-base font-bold text-white lg:border-r">
               Blog
             </h2>
-            <p className="text-slate-200 text-sm">{description}</p>
+            <p className="text-sm text-slate-200">{description}</p>
             <a
               href="/api/rss.xml"
-              className="py-1 rounded-md transition-all text-slate-300 hover:text-white border border-transparent hover:border-slate-200/30"
+              className="rounded-md border border-transparent py-1 text-slate-300 transition-all hover:border-slate-200/30 hover:text-white"
             >
               <Rss className="h-4" />
             </a>
@@ -70,33 +62,33 @@ export default function BlogLayout(props) {
           <div className="pt-16">
             {focus && (
               <a
-                className="relative flex flex-col-reverse lg:flex-row xl:max-w-[1160px] bg-indigo-600 rounded-lg mb-32 group shadow-lg"
+                className="group relative mb-32 flex flex-col-reverse rounded-lg bg-indigo-600 shadow-lg lg:flex-row xl:max-w-[1160px]"
                 href={focus.redirect ?? `/blog/${focus.slug}`}
               >
-                <div className="absolute top-0 bottom-0 -left-[40px] -right-[40px] rounded-lg bg-indigo-500 opacity-20 rotate-1 -z-0 mx-5"></div>
-                <div className="lg:w-2/5 p-8 flex flex-col items-start justify-between relative z-10">
+                <div className="absolute -left-[40px] -right-[40px] bottom-0 top-0 -z-0 mx-5 rotate-1 rounded-lg bg-indigo-500 opacity-20"></div>
+                <div className="relative z-10 flex flex-col items-start justify-between p-8 lg:w-2/5">
                   <div>
-                    <span className="inline-flex text-indigo-50 mb-3 text-xs font-semibold bg-indigo-700/50 px-3 py-1.5 rounded">
+                    <span className="mb-3 inline-flex rounded bg-indigo-700/50 px-3 py-1.5 text-xs font-semibold text-indigo-50">
                       Latest Post
                     </span>
-                    <h2 className="text-xl md:text-2xl lg:text-xl xl:text-2xl text-white mb-1 font-medium">
+                    <h2 className="mb-1 text-xl font-medium text-white md:text-2xl lg:text-xl xl:text-2xl">
                       {focus.heading}
                     </h2>
-                    <p className="text-slate-200 text-sm font-medium mb-4 flex gap-1 items-center">
+                    <p className="mb-4 flex items-center gap-1 text-sm font-medium text-slate-200">
                       <IconCalendar />
                       {focus.humanDate} <Tags tags={focus.tags} />
                     </p>
                     <p className="text-slate-100">{focus.subtitle}</p>
                   </div>
-                  <span className="px-4 text-sm font-medium inline-flex mt-4 bg-slate-800 text-slate-50 py-1.5 rounded-full group-hover:bg-slate-700">
+                  <span className="mt-4 inline-flex rounded-full bg-slate-800 px-4 py-1.5 text-sm font-medium text-slate-50 group-hover:bg-slate-700">
                     Read article
-                    <ArrowRight className="group-hover:translate-x-1.5 relative top-px transition-transform duration-150 " />
+                    <ArrowRight className="relative top-px transition-transform duration-150 group-hover:translate-x-1.5 " />
                   </span>
                 </div>
                 {focus.image && (
-                  <div className="lg:w-3/5 flex rounded-t-lg lg:rounded-t-none lg:rounded-r-lg relative group-hover:scale-105 group-hover:rounded-lg overflow-hidden transition-all">
+                  <div className="relative flex overflow-hidden rounded-t-lg transition-all group-hover:scale-105 group-hover:rounded-lg lg:w-3/5 lg:rounded-r-lg lg:rounded-t-none">
                     <Image
-                      className="z-10 w-full m-auto rounded-t-lg lg:rounded-t-none lg:rounded-r-lg group-hover:rounded-lg"
+                      className="z-10 m-auto w-full rounded-t-lg group-hover:rounded-lg lg:rounded-r-lg lg:rounded-t-none"
                       src={focus.image}
                       alt={`Featured image for ${focus.heading} blog post`}
                       width={900}
@@ -104,7 +96,7 @@ export default function BlogLayout(props) {
                       quality={95}
                     />
                     <Image
-                      className="absolute h-[110%] w-[calc(100% + theme('spacing.4'))] max-w-none z-0 -top-2 -bottom-2 -left-2 -right-2 w-full m-auto blur-sm opacity-90 rounded-t-lg lg:rounded-t-none lg:rounded-r-lg"
+                      className="w-[calc(100% + theme('spacing.4'))] absolute -bottom-2 -left-2 -right-2 -top-2 z-0 m-auto h-[110%] w-full max-w-none rounded-t-lg opacity-90 blur-sm lg:rounded-r-lg lg:rounded-t-none"
                       src={focus.image}
                       alt={`Featured image for ${focus.heading} blog post`}
                       width={900}
@@ -116,15 +108,15 @@ export default function BlogLayout(props) {
               </a>
             )}
 
-            <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-8 lg:gap-x-4 xl:gap-x-8 lg:grid-cols-3  gap-y-20">
+            <ul className="grid grid-cols-1 gap-x-8 gap-y-20 md:grid-cols-2 lg:grid-cols-3 lg:gap-x-4  xl:gap-x-8">
               {rest.map((item) => (
                 <li key={item.slug}>
                   <a
                     href={item.redirect ?? `/blog/${item.slug}`}
-                    className="group flex flex-col rounded-lg ease-out transition-all "
+                    className="group flex flex-col rounded-lg transition-all ease-out "
                   >
                     {item.image && (
-                      <div className="flex rounded-lg shadow group-hover:scale-105 transition-all">
+                      <div className="flex rounded-lg shadow transition-all group-hover:scale-105">
                         {/* We use 720 as the responsive view goes full width at 720px viewport width */}
                         <Image
                           className="rounded-lg"
@@ -135,15 +127,15 @@ export default function BlogLayout(props) {
                         />
                       </div>
                     )}
-                    <div className="pt-4 xl:pt-6 xl:py-4">
-                      <h2 className="text-base xl:text-lg text-white mb-1 group-hover:text-indigo-400 transition-all">
+                    <div className="pt-4 xl:py-4 xl:pt-6">
+                      <h2 className="mb-1 text-base text-white transition-all group-hover:text-indigo-400 xl:text-lg">
                         {item.heading}
                       </h2>
-                      <p className="text-slate-400 text-sm font-medium mb-4 mt-2 flex items-center gap-1">
+                      <p className="mb-4 mt-2 flex items-center gap-1 text-sm font-medium text-slate-400">
                         <IconCalendar />
                         {item.humanDate} <Tags tags={item.tags} />
                       </p>
-                      <p className="text-slate-300 text-sm">{item.subtitle}</p>
+                      <p className="text-sm text-slate-300">{item.subtitle}</p>
                     </div>
                   </a>
                 </li>
@@ -170,16 +162,16 @@ export type BlogPost = {
 
 // This function also gets called at build time to generate specific content.
 export async function getStaticProps() {
-  const posts = await loadMarkdownFilesMetadata<BlogPost>("blog/_posts");
+  const posts = await loadMarkdownFilesMetadata<BlogPost>('blog/_posts');
   const content = posts.map((p) => JSON.stringify(p));
 
   return {
     props: {
       content,
-      designVersion: "2",
+      designVersion: '2',
       meta: {
         // TODO
-        title: "Product & Engineering Blog",
+        title: 'Product & Engineering Blog',
         description: `Updates from the Inngest team about our product, engineering, and community.`,
       },
     },

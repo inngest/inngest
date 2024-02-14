@@ -1,7 +1,7 @@
 ---
-heading: "5 Lessons Learned From Taking Next.js App Router to Production"
-subtitle: "What did we learn from building and shipping our new app with the Next.js 13 App Router?"
-image: "/assets/blog/5-lessons-learned-from-taking-next-js-app-router-to-production/featured-image.png"
+heading: '5 Lessons Learned From Taking Next.js App Router to Production'
+subtitle: 'What did we learn from building and shipping our new app with the Next.js 13 App Router?'
+image: '/assets/blog/5-lessons-learned-from-taking-next-js-app-router-to-production/featured-image.png'
 date: 2023-05-05
 author: Igor Gassmann
 ---

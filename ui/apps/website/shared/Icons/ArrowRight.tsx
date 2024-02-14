@@ -1,8 +1,4 @@
-export default function ArrowRight({
-  className,
-  width = "w-5",
-  height = "h-5",
-}) {
+export default function ArrowRight({ className, width = 'w-5', height = 'h-5' }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

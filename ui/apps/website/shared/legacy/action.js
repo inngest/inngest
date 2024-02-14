@@ -1,9 +1,10 @@
-import styled from "@emotion/styled";
-import Tag from "./tag";
+import styled from '@emotion/styled';
+
+import Tag from './tag';
 
 export default function Action({ name, subtitle, icon, className }) {
   return (
-    <Wrapper className={`action ${className || ""}`}>
+    <Wrapper className={`action ${className || ''}`}>
       <img src={icon} />
       <div>
         <p>{name}</p>
@@ -15,7 +16,7 @@ export default function Action({ name, subtitle, icon, className }) {
 
 export function Trigger({ name, icon, className }) {
   return (
-    <TriggerWrapper className={`action trigger ${className || ""}`}>
+    <TriggerWrapper className={`action trigger ${className || ''}`}>
       <Tag>EVENT TRIGGER</Tag>
       <img src={icon} />
       <div>
@@ -30,7 +31,7 @@ export function Trigger({ name, icon, className }) {
 
 export function If({ expression, className }) {
   return (
-    <IfWrapper className={`if expression ${className || ""}`}>
+    <IfWrapper className={`if expression ${className || ''}`}>
       <pre>
         <code>{expression}</code>
       </pre>

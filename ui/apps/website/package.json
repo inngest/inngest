@@ -15,7 +15,6 @@
     "build": "next build && next-sitemap",
     "start": "next start",
     "broken-link-checker": "pnpm dlx tsx ./scripts/brokenLinkChecker.ts",
-    "prettier": "prettier --write --trailing-comma es5 \"pages/**/*.tsx\" \"pages/**/*.js\" \"shared/*.tsx\" \"shared/*.js\"",
     "storybook": "start-storybook -p 6006",
     "build-storybook": "build-storybook",
     "preinstall": "npx only-allow pnpm"
@@ -115,7 +114,6 @@
     "eslint-config-next": "13.1.1",
     "postcss": "8.4.19",
     "postcss-focus-visible": "6.0.4",
-    "prettier": "2.8.1",
     "tailwindcss": "3.2.4",
     "typescript": "5.1.3"
   },

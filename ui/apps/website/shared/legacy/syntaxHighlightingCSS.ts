@@ -1,4 +1,4 @@
-import { css } from "@emotion/react";
+import { css } from '@emotion/react';
 
 const docsSyntaxHighlightingCSS = css`
   pre.shiki {
@@ -46,8 +46,7 @@ const docsSyntaxHighlightingCSS = css`
     text-align: left;
     padding: 5px 8px;
     border-radius: 2px;
-    font-family: "JetBrains Mono", Menlo, Monaco, Consolas, Courier New,
-      monospace;
+    font-family: 'JetBrains Mono', Menlo, Monaco, Consolas, Courier New, monospace;
     font-size: 14px;
     white-space: pre-wrap;
     z-index: 100;
@@ -86,8 +85,7 @@ const docsSyntaxHighlightingCSS = css`
 
   pre code {
     font-size: 14px;
-    font-family: "JetBrains Mono", Menlo, Monaco, Consolas, Courier New,
-      monospace;
+    font-family: 'JetBrains Mono', Menlo, Monaco, Consolas, Courier New, monospace;
     white-space: pre-wrap; // this fixes an issue of the code element not shrinking width and breaking layout
     -webkit-overflow-scrolling: touch;
   }
@@ -183,7 +181,7 @@ const docsSyntaxHighlightingCSS = css`
     position: absolute;
     top: -1.2rem;
     left: -3px;
-    content: " ";
+    content: ' ';
   }
   pre .inline-completions ul.dropdown li {
     overflow-x: hidden;
@@ -226,8 +224,7 @@ const docsSyntaxHighlightingCSS = css`
   }
   .tag-container .twoslash-annotation {
     position: absolute;
-    font-family: "JetBrains Mono", Menlo, Monaco, Consolas, Courier New,
-      monospace;
+    font-family: 'JetBrains Mono', Menlo, Monaco, Consolas, Courier New, monospace;
     right: -10px;
     /** Default annotation text to 200px */
     width: 200px;

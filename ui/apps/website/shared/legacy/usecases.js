@@ -1,4 +1,4 @@
-import styled from "@emotion/styled";
+import styled from '@emotion/styled';
 
 export default function UseCases() {
   return (
@@ -6,8 +6,8 @@ export default function UseCases() {
       <Title className="text-center">
         <h2>People use us to get stuff done</h2>
         <p>
-          Say goodbye to fickle integrations and long development cycles. Get
-          stuff done in minutes using our platform.
+          Say goodbye to fickle integrations and long development cycles. Get stuff done in minutes
+          using our platform.
           <br />
           Here's a few things that people use us for:
         </p>
@@ -19,8 +19,8 @@ export default function UseCases() {
           </div>
           <h3>Real-time sync</h3>
           <p>
-            Enable real-time sync between any platform you integrate, with full
-            support for anything custom.
+            Enable real-time sync between any platform you integrate, with full support for anything
+            custom.
           </p>
         </Item>
 
@@ -30,8 +30,8 @@ export default function UseCases() {
           </div>
           <h3>User flows</h3>
           <p>
-            Create targeted workflows which run when users do things or{" "}
-            <i>don't</i> - by monitoring for the <b>absence of events</b>.
+            Create targeted workflows which run when users do things or <i>don't</i> - by monitoring
+            for the <b>absence of events</b>.
           </p>
         </Item>
 
@@ -40,10 +40,7 @@ export default function UseCases() {
             <img src="/assets/lead.png" />
           </div>
           <h3>Lead &amp; sales automation</h3>
-          <p>
-            Run custom workflows to rank, score, manage, and close your leads
-            automatically.
-          </p>
+          <p>Run custom workflows to rank, score, manage, and close your leads automatically.</p>
         </Item>
 
         <Item>
@@ -52,8 +49,8 @@ export default function UseCases() {
           </div>
           <h3>Billing &amp; AR automation</h3>
           <p>
-            Run custom logic when subscriptions charge - or payments fail,
-            capturing outstanding AR easily.
+            Run custom logic when subscriptions charge - or payments fail, capturing outstanding AR
+            easily.
           </p>
         </Item>
       </Grid>

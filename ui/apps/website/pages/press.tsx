@@ -1,26 +1,27 @@
-import React from "react";
-import styles from "../styles/Press.module.css";
+import React from 'react';
+
+import styles from '../styles/Press.module.css';
 
 const ASSETS = [
   {
-    name: "Logo (svg)",
-    src: "/logo.svg",
+    name: 'Logo (svg)',
+    src: '/logo.svg',
   },
   {
-    name: "Logo (png)",
-    src: "/logo.png",
+    name: 'Logo (png)',
+    src: '/logo.png',
   },
   {
-    name: "Icon - dark (png)",
-    src: "/icon-dark.png",
+    name: 'Icon - dark (png)',
+    src: '/icon-dark.png',
   },
   {
-    name: "Icon - light (png)",
-    src: "/icon-light.png",
+    name: 'Icon - light (png)',
+    src: '/icon-light.png',
   },
   {
-    name: "Icon - transparent (png)",
-    src: "/icon-light-transparent.png",
+    name: 'Icon - transparent (png)',
+    src: '/icon-light-transparent.png',
   },
 ];
 

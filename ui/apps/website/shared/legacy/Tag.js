@@ -1,8 +1,8 @@
-import styled from "@emotion/styled";
+import styled from '@emotion/styled';
 
 export default function (props) {
   return (
-    <Wrapper {...props} className={`rounded-sm ${props.className || ""}`}>
+    <Wrapper {...props} className={`rounded-sm ${props.className || ''}`}>
       {props.children}
     </Wrapper>
   );

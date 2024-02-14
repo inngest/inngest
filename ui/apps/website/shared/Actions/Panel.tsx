@@ -1,9 +1,10 @@
-import React, { useEffect } from "react";
-import styled from "@emotion/styled";
+import React, { useEffect } from 'react';
+import styled from '@emotion/styled';
+import { Action } from 'src/types';
+
 // import { Filter } from "react-feather";
-import { categoryIcons, defaultIcon } from "./icons";
-import { useActionsWithCategory } from "./query";
-import { Action } from "src/types";
+import { categoryIcons, defaultIcon } from './icons';
+import { useActionsWithCategory } from './query';
 
 type Props = {
   // Preloaded actions.  If not specified, this component will query for actions.
@@ -50,8 +51,8 @@ const ActionItem: React.FC<{
   onDragStart?: (a: Action) => void;
 }> = ({ action, onDragStart }) => {
   const onDrag = (e: React.DragEvent<HTMLDivElement>) => {
-    (e.dataTransfer as DataTransfer).effectAllowed = "copy";
-    (e.dataTransfer as DataTransfer).setData("text", JSON.stringify(action));
+    (e.dataTransfer as DataTransfer).effectAllowed = 'copy';
+    (e.dataTransfer as DataTransfer).setData('text', JSON.stringify(action));
     onDragStart && onDragStart(action);
   };
 

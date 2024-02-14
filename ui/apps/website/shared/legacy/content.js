@@ -1,4 +1,4 @@
-import styled from "@emotion/styled";
+import styled from '@emotion/styled';
 
 const Content = styled.div`
   max-width: 1200px;
@@ -21,15 +21,11 @@ const Content = styled.div`
     display: block;
     width: 100%;
     min-height: 15vh;
-    content: "";
+    content: '';
     position: absolute;
     top: 12vh;
     opacity: 0.3;
-    background: radial-gradient(
-      52.28% 118.04% at 50% 1.76%,
-      #1b4074 0%,
-      rgba(34, 40, 102, 0) 100%
-    );
+    background: radial-gradient(52.28% 118.04% at 50% 1.76%, #1b4074 0%, rgba(34, 40, 102, 0) 100%);
     filter: drop-shadow(0px -30px 80px rgba(0, 0, 0, 0.25));
     border-radius: 50px;
   }

@@ -1,7 +1,8 @@
-import * as React from "react";
-import type { IconProps } from "./props";
+import * as React from 'react';
 
-const Hamburger = ({ size = "1em", fill = "currentColor" }: IconProps) => (
+import type { IconProps } from './props';
+
+const Hamburger = ({ size = '1em', fill = 'currentColor' }: IconProps) => (
   <svg
     width={size}
     height={size}

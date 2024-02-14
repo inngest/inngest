@@ -1,10 +1,6 @@
-import IconTheme from "./theme";
+import IconTheme from './theme';
 
-export function IconDeploying({
-  size = 20,
-  className = "",
-  color = "transparent",
-}) {
+export function IconDeploying({ size = 20, className = '', color = 'transparent' }) {
   const theme = IconTheme(color);
   return (
     <svg
@@ -25,15 +21,8 @@ export function IconDeploying({
           id="deploying-a"
         >
           <feOffset dy="2" in="SourceAlpha" result="shadowOffsetOuter1" />
-          <feGaussianBlur
-            stdDeviation="2"
-            in="shadowOffsetOuter1"
-            result="shadowBlurOuter1"
-          />
-          <feColorMatrix
-            values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.5 0"
-            in="shadowBlurOuter1"
-          />
+          <feGaussianBlur stdDeviation="2" in="shadowOffsetOuter1" result="shadowBlurOuter1" />
+          <feColorMatrix values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.5 0" in="shadowBlurOuter1" />
         </filter>
         <filter
           x="-64.2%"
@@ -44,11 +33,7 @@ export function IconDeploying({
           id="deploying-c"
         >
           <feOffset dy="1" in="SourceAlpha" result="shadowOffsetOuter1" />
-          <feGaussianBlur
-            stdDeviation="1"
-            in="shadowOffsetOuter1"
-            result="shadowBlurOuter1"
-          />
+          <feGaussianBlur stdDeviation="1" in="shadowOffsetOuter1" result="shadowBlurOuter1" />
           <feColorMatrix
             values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.268793706 0"
             in="shadowBlurOuter1"
@@ -65,17 +50,9 @@ export function IconDeploying({
       </defs>
       <g fill="none" fillRule="nonzero">
         <use fill="#000" filter="url(#deploying-a)" xlinkHref="#deploying-b" />
-        <use
-          fill={theme.color}
-          opacity={theme.opacity}
-          xlinkHref="#deploying-b"
-        />
+        <use fill={theme.color} opacity={theme.opacity} xlinkHref="#deploying-b" />
         <g transform="rotate(-90 10 13.8848)">
-          <use
-            fill="#000"
-            filter="url(#deploying-c)"
-            xlinkHref="#deploying-d"
-          />
+          <use fill="#000" filter="url(#deploying-c)" xlinkHref="#deploying-d" />
           <use fill="#FFF" xlinkHref="#deploying-d" />
         </g>
       </g>

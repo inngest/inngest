@@ -1,17 +1,17 @@
-import { useRef } from "react";
-import Link from "next/link";
-import { useRouter } from "next/router";
-import clsx from "clsx";
-import { AnimatePresence, motion, useIsPresent } from "framer-motion";
+import { useRef } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import clsx from 'clsx';
+import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
 
-import { Button } from "./Button";
-import { useIsInsideMobileNavigation } from "./MobileNavigation";
-import { useSectionStore } from "./SectionProvider";
-import { Tag } from "./Tag";
-import { remToPx } from "../../utils/remToPx";
-import { topLevelNav } from "./navigationStructure";
+import { remToPx } from '../../utils/remToPx';
+import { Button } from './Button';
+import { useIsInsideMobileNavigation } from './MobileNavigation';
+import { useSectionStore } from './SectionProvider';
+import { Tag } from './Tag';
+import { topLevelNav } from './navigationStructure';
 
-const BASE_DIR = "/docs";
+const BASE_DIR = '/docs';
 
 function useInitialValue(value, condition = true) {
   let initialValue = useRef(value).current;
@@ -37,7 +37,7 @@ function NavLink({
   active,
   isAnchorLink = false,
   isTopLevel = false,
-  className = "",
+  className = '',
   children,
   target,
 }: {
@@ -53,14 +53,14 @@ function NavLink({
   return (
     <LinkOrHref
       href={href}
-      aria-current={active ? "page" : undefined}
+      aria-current={active ? 'page' : undefined}
       target={target}
       className={clsx(
-        "flex justify-between items-center gap-2 py-1 pr-3 text-sm font-medium transition group", // group for nested hovers
-        isTopLevel ? "pl-0" : isAnchorLink ? "pl-7" : "pl-4",
+        'group flex items-center justify-between gap-2 py-1 pr-3 text-sm font-medium transition', // group for nested hovers
+        isTopLevel ? 'pl-0' : isAnchorLink ? 'pl-7' : 'pl-4',
         active
-          ? "text-slate-900 dark:text-white"
-          : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
+          ? 'text-slate-900 dark:text-white'
+          : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white',
         className
       )}
     >
@@ -77,7 +77,7 @@ function NavLink({
 // LinkOrHref returns a standard link with target="_blank" if we want to open a docs
 // link in a new tab.
 const LinkOrHref = (props: any) => {
-  if (props.target === "_blank") {
+  if (props.target === '_blank') {
     return <a {...props} />;
   }
   return <Link {...props} />;
@@ -85,24 +85,17 @@ const LinkOrHref = (props: any) => {
 
 function VisibleSectionHighlight({ group, pathname }) {
   let [sections, visibleSections] = useInitialValue(
-    [
-      useSectionStore((s) => s.sections),
-      useSectionStore((s) => s.visibleSections),
-    ],
+    [useSectionStore((s) => s.sections), useSectionStore((s) => s.visibleSections)],
     useIsInsideMobileNavigation()
   );
 
   let isPresent = useIsPresent();
   let firstVisibleSectionIndex = Math.max(
     0,
-    [{ id: "_top" }, ...sections].findIndex(
-      (section) => section.id === visibleSections[0]
-    )
+    [{ id: '_top' }, ...sections].findIndex((section) => section.id === visibleSections[0])
   );
   let itemHeight = remToPx(1.76);
-  let height = isPresent
-    ? Math.max(1, visibleSections.length) * itemHeight
-    : itemHeight;
+  let height = isPresent ? Math.max(1, visibleSections.length) * itemHeight : itemHeight;
   let top =
     group.links.findIndex((link) => link.href === pathname) * itemHeight +
     firstVisibleSectionIndex * itemHeight;
@@ -113,7 +106,7 @@ function VisibleSectionHighlight({ group, pathname }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1, transition: { delay: 0.2 } }}
       exit={{ opacity: 0 }}
-      className="absolute inset-x-0 top-0 bg-slate-800/2.5 will-change-transform dark:bg-white/2.5"
+      className="bg-slate-800/2.5 dark:bg-white/2.5 absolute inset-x-0 top-0 will-change-transform"
       style={{ borderRadius: 8, height, top }}
     />
   );
@@ -138,7 +131,7 @@ function ActivePageMarker({ group, pathname }) {
 }
 
 // A nested navigation group of links that expand and follow
-function NavigationGroup({ group, className = "" }) {
+function NavigationGroup({ group, className = '' }) {
   // If this is the mobile navigation then we always render the initial
   // state, so that the state does not change during the close animation.
   // The state will still update when we re-open (re-render) the navigation.
@@ -148,31 +141,26 @@ function NavigationGroup({ group, className = "" }) {
     isInsideMobileNavigation
   );
 
-  let isActiveGroup =
-    group.links.findIndex((link) => link.href === router.pathname) !== -1;
+  let isActiveGroup = group.links.findIndex((link) => link.href === router.pathname) !== -1;
 
   return (
-    <li className={clsx("relative mt-6", className)}>
+    <li className={clsx('relative mt-6', className)}>
       <motion.h2
         layout="position"
-        className="text-xs font-semibold text-slate-900 dark:text-white uppercase font-mono"
+        className="font-mono text-xs font-semibold uppercase text-slate-900 dark:text-white"
       >
         {group.title}
       </motion.h2>
       <div className="relative mt-3 pl-2">
         <AnimatePresence initial={!isInsideMobileNavigation}>
-          {isActiveGroup && (
-            <VisibleSectionHighlight group={group} pathname={router.pathname} />
-          )}
+          {isActiveGroup && <VisibleSectionHighlight group={group} pathname={router.pathname} />}
         </AnimatePresence>
         <motion.div
           layout
           className="absolute inset-y-0 left-2 w-px bg-slate-900/10 dark:bg-white/5"
         />
         <AnimatePresence initial={false}>
-          {isActiveGroup && (
-            <ActivePageMarker group={group} pathname={router.pathname} />
-          )}
+          {isActiveGroup && <ActivePageMarker group={group} pathname={router.pathname} />}
         </AnimatePresence>
         <ul role="list" className="border-l border-transparent">
           {group.links.map((link) => (
@@ -200,11 +188,7 @@ function NavigationGroup({ group, className = "" }) {
                   >
                     {sections.map((section) => (
                       <li key={section.id}>
-                        <NavLink
-                          href={`${link.href}#${section.id}`}
-                          tag={section.tag}
-                          isAnchorLink
-                        >
+                        <NavLink href={`${link.href}#${section.id}`} tag={section.tag} isAnchorLink>
                           {section.title}
                         </NavLink>
                       </li>
@@ -222,12 +206,12 @@ function NavigationGroup({ group, className = "" }) {
 
 export const headerLinks = [
   {
-    title: "Docs",
+    title: 'Docs',
     href: BASE_DIR,
   },
   {
-    title: "Patterns",
-    href: "/patterns?ref=docs",
+    title: 'Patterns',
+    href: '/patterns?ref=docs',
   },
 ];
 
@@ -260,7 +244,7 @@ function findRecursiveSectionLinkMatch(nav, pathname) {
 export function Navigation(props) {
   const router = useRouter();
   // Remove query params and hash from pathname
-  const pathname = router.asPath.replace(/(\?|#).+$/, "");
+  const pathname = router.asPath.replace(/(\?|#).+$/, '');
 
   const nestedSection = findRecursiveSectionLinkMatch(topLevelNav, pathname);
   const isNested = !!nestedSection;
@@ -269,16 +253,16 @@ export function Navigation(props) {
   return (
     <nav {...props}>
       {isNested && (
-        <NavLink href={BASE_DIR} className="pl-0 text-xs uppercase font-mono">
+        <NavLink href={BASE_DIR} className="pl-0 font-mono text-xs uppercase">
           ← Back to docs home
         </NavLink>
       )}
-      <ul role="list" className={!isNested ? "flex flex-col gap-2" : undefined}>
+      <ul role="list" className={!isNested ? 'flex flex-col gap-2' : undefined}>
         {nestedNavigation ? (
           <>
-            <li className="mt-6 mb-4 flex gap-2 items-center text-base font-semibold text-slate-900 dark:text-white">
+            <li className="mb-4 mt-6 flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-white">
               <span className="p-0.5">
-                <nestedNavigation.icon className="w-5 h-5 text-slate-400" />
+                <nestedNavigation.icon className="h-5 w-5 text-slate-400" />
               </span>
               {nestedNavigation.title}
             </li>
@@ -291,9 +275,9 @@ export function Navigation(props) {
             item.href ? (
               <li key={idx}>
                 <NavLink href={item.href} key={idx} isTopLevel={true}>
-                  <span className="flex flex-row gap-3 items-center">
+                  <span className="flex flex-row items-center gap-3">
                     {item.icon && (
-                      <item.icon className="w-5 h-5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200" />
+                      <item.icon className="h-5 w-5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200" />
                     )}
                     {item.title}
                   </span>
@@ -301,7 +285,7 @@ export function Navigation(props) {
               </li>
             ) : (
               <li className="mt-6" key={idx}>
-                <h2 className="text-xs font-semibold text-slate-900 dark:text-white uppercase">
+                <h2 className="text-xs font-semibold uppercase text-slate-900 dark:text-white">
                   {item.title}
                 </h2>
                 <ul role="list" className="mt-3 flex flex-col gap-2">
@@ -313,9 +297,9 @@ export function Navigation(props) {
                         tag={link.tag}
                         target={link.target}
                       >
-                        <span className="flex flex-row gap-3 items-center">
+                        <span className="flex flex-row items-center gap-3">
                           {link.icon && (
-                            <link.icon className="w-5 h-4 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200" />
+                            <link.icon className="h-4 w-5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200" />
                           )}
                           {link.title}
                         </span>
@@ -328,12 +312,8 @@ export function Navigation(props) {
           )
         )}
 
-        <li className="sticky bottom-0 z-10 mt-6 sm:hidden gap-2 flex dark:bg-slate-900">
-          <Button
-            href={process.env.NEXT_PUBLIC_SIGNIN_URL}
-            variant="secondary"
-            className="w-full"
-          >
+        <li className="sticky bottom-0 z-10 mt-6 flex gap-2 sm:hidden dark:bg-slate-900">
+          <Button href={process.env.NEXT_PUBLIC_SIGNIN_URL} variant="secondary" className="w-full">
             Sign In
           </Button>
           <Button

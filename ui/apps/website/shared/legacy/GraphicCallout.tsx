@@ -1,6 +1,6 @@
-import React, { ReactElement } from "react";
+import React, { ReactElement } from 'react';
 
-import Button from "./Button";
+import Button from './Button';
 
 type GraphicCalloutProps = {
   heading: ReactElement | string;
@@ -19,14 +19,14 @@ const GraphicCallout = ({
   image,
   cta,
   style = {
-    backgroundColor: "var(--color-almost-black)",
-    color: "var(--color-white)",
+    backgroundColor: 'var(--color-almost-black)',
+    color: 'var(--color-white)',
   },
 }: GraphicCalloutProps) => {
   return (
     <div style={style} className="bg-texture-gridlines-30 my-16">
-      <div className="flex flex-col md:flex-row justify-items-end gap-8">
-        <div className="basis-2/5 pt-12 md:pb-12 mx-12 lg:mx-0 lg:pl-10p flex flex-col justify-center">
+      <div className="flex flex-col justify-items-end gap-8 md:flex-row">
+        <div className="lg:pl-10p mx-12 flex basis-2/5 flex-col justify-center pt-12 md:pb-12 lg:mx-0">
           <h2 className="text-3xl font-normal">{heading}</h2>
           <p className="my-6">{description}</p>
           {cta && (
@@ -35,14 +35,14 @@ const GraphicCallout = ({
                 href={cta.href}
                 kind="outline"
                 size="medium"
-                style={{ display: "inline-flex" }}
+                style={{ display: 'inline-flex' }}
               >
                 {cta.text}
               </Button>
             </div>
           )}
         </div>
-        <div className="basis-3/5 flex flex-col justify-end">
+        <div className="flex basis-3/5 flex-col justify-end">
           <img src={image} />
         </div>
       </div>

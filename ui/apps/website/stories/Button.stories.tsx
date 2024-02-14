@@ -1,10 +1,10 @@
-import React from "react";
-import { ComponentStory, ComponentMeta } from "@storybook/react";
+import React from 'react';
+import { ComponentMeta, ComponentStory } from '@storybook/react';
 
-import Button from "../shared/legacy/Button";
+import Button from '../shared/legacy/Button';
 
 export default {
-  title: "Button",
+  title: 'Button',
   component: Button,
 } as ComponentMeta<typeof Button>;
 
@@ -14,19 +14,19 @@ const Template: ComponentStory<typeof Button> = (args) => <Button {...args} />;
 // More on args: https://storybook.js.org/docs/react/writing-stories/args
 export const Primary = Template.bind({});
 Primary.args = {
-  kind: "primary",
-  children: "Start building",
+  kind: 'primary',
+  children: 'Start building',
 };
 
 export const Outline = Template.bind({});
 Outline.args = {
-  children: "Explore docs →",
-  kind: "outline",
+  children: 'Explore docs →',
+  kind: 'outline',
 };
 
 export const OutlineLink = Template.bind({});
 OutlineLink.args = {
-  children: "Explore docs →",
-  href: "https://www.example.com",
-  kind: "outline",
+  children: 'Explore docs →',
+  href: 'https://www.example.com',
+  kind: 'outline',
 };

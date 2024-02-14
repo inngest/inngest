@@ -1,15 +1,15 @@
 import {
-  IconSDK,
-  IconDocs,
-  IconPatterns,
-  IconScheduled,
   IconBackgroundTasks,
+  IconDocs,
   IconJourney,
-} from "../Icons/duotone";
+  IconPatterns,
+  IconSDK,
+  IconScheduled,
+} from '../Icons/duotone';
 
 const footerLinks = [
   {
-    name: "Product",
+    name: 'Product',
     links: [
       // {
       //   label: "Function SDK",
@@ -22,76 +22,76 @@ const footerLinks = [
       //   icon: IconSteps,
       // },
       {
-        label: "Documentation",
-        url: "/docs?ref=footer",
+        label: 'Documentation',
+        url: '/docs?ref=footer',
         icon: IconDocs,
       },
       {
-        label: "Patterns: Async + Event-Driven",
-        url: "/patterns?ref=footer",
+        label: 'Patterns: Async + Event-Driven',
+        url: '/patterns?ref=footer',
         icon: IconPatterns,
       },
     ],
   },
   {
-    name: "Use Cases",
+    name: 'Use Cases',
     links: [
       {
-        label: "Serverless queues for TypeScript",
-        url: "/uses/serverless-queues?ref=footer",
+        label: 'Serverless queues for TypeScript',
+        url: '/uses/serverless-queues?ref=footer',
         icon: IconJourney,
       },
       {
-        label: "Scheduled & cron jobs",
-        url: "/uses/serverless-cron-jobs?ref=footer",
+        label: 'Scheduled & cron jobs',
+        url: '/uses/serverless-cron-jobs?ref=footer',
         icon: IconScheduled,
       },
       {
-        label: "AI + LLMs",
-        url: "/ai?ref=footer",
+        label: 'AI + LLMs',
+        url: '/ai?ref=footer',
         icon: IconSDK,
       },
       {
-        label: "Node.js background jobs",
-        url: "/uses/serverless-node-background-jobs?ref=footer",
+        label: 'Node.js background jobs',
+        url: '/uses/serverless-node-background-jobs?ref=footer',
         icon: IconBackgroundTasks,
       },
     ],
   },
   {
-    name: "Company",
+    name: 'Company',
     links: [
       {
-        label: "Roadmap",
-        url: "https://roadmap.inngest.com/roadmap?ref=footer",
+        label: 'Roadmap',
+        url: 'https://roadmap.inngest.com/roadmap?ref=footer',
       },
       {
-        label: "Changelog",
-        url: "https://roadmap.inngest.com/changelog?ref=footer",
+        label: 'Changelog',
+        url: 'https://roadmap.inngest.com/changelog?ref=footer',
       },
       {
-        label: "About",
-        url: "/about?ref=footer",
+        label: 'About',
+        url: '/about?ref=footer',
       },
       {
-        label: "Careers",
-        url: "/careers?ref=footer",
+        label: 'Careers',
+        url: '/careers?ref=footer',
       },
       {
-        label: "Blog",
-        url: "/blog?ref=footer",
+        label: 'Blog',
+        url: '/blog?ref=footer',
       },
       {
-        label: "Contact Us",
-        url: "/contact?ref=footer",
+        label: 'Contact Us',
+        url: '/contact?ref=footer',
       },
       {
-        label: "Support",
+        label: 'Support',
         url: process.env.NEXT_PUBLIC_SUPPORT_URL,
       },
       {
-        label: "Newsletter",
-        url: "/newsletter?ref=footer",
+        label: 'Newsletter',
+        url: '/newsletter?ref=footer',
       },
     ],
   },

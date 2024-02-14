@@ -1,22 +1,22 @@
-import { GetStaticProps } from "next";
-import Link from "next/link";
-import Marquee from "react-fast-marquee";
-import Check from "src/shared/Icons/Check";
-import Header from "src/shared/Header";
-import Container from "src/shared/layout/Container";
-import PageContainer from "src/shared/layout/PageContainer";
-import Logos from "src/shared/Home/Logos";
+import { GetStaticProps } from 'next';
+import Link from 'next/link';
+import { ChevronRightIcon } from '@heroicons/react/20/solid';
+import Marquee from 'react-fast-marquee';
+import CaseStudyCard from 'src/shared/CaseStudy/CaseStudyCard';
+import CodeWindow from 'src/shared/CodeWindow';
+import Footer from 'src/shared/Footer';
+import Header from 'src/shared/Header';
 // Icons
-import CopyBtn from "src/shared/Home/CopyBtn";
-import { ChevronRightIcon } from "@heroicons/react/20/solid";
-import CodeWindow from "src/shared/CodeWindow";
-import Footer from "src/shared/Footer";
-import CaseStudyCard from "src/shared/CaseStudy/CaseStudyCard";
+import CopyBtn from 'src/shared/Home/CopyBtn';
+import Logos from 'src/shared/Home/Logos';
+import Check from 'src/shared/Icons/Check';
+import Container from 'src/shared/layout/Container';
+import PageContainer from 'src/shared/layout/PageContainer';
 
 export const getStaticProps: GetStaticProps = async () => {
   return {
     props: {
-      designVersion: "2",
+      designVersion: '2',
     },
   };
 };
@@ -40,31 +40,31 @@ export default function AI() {
       <Container>
         <h2
           className="
-          text-4xl text-center font-bold mt-16 mb-2
+          mb-2 mt-16 text-center text-4xl font-bold
         "
         >
           Focus on what matters: <span className="font-extrabold">AI</span>.
         </h2>
-        <p className="text-center mb-20 opacity-60">
-          Spend time developing what's important. Scale from day 0 by leaving
-          the complex orchestration to us.
+        <p className="mb-20 text-center opacity-60">
+          Spend time developing what's important. Scale from day 0 by leaving the complex
+          orchestration to us.
         </p>
 
         <div
           className="
-          grid lg:grid-cols-3
-          bg-slate-800/50 border-slate-700/30 rounded-lg border
-          m-auto
-          mt-8 mb-24
-          hidden
+          m-auto mb-24
+          mt-8 grid hidden rounded-lg
+          border
+          border-slate-700/30 bg-slate-800/50
           lg:grid
           lg:w-2/3
+          lg:grid-cols-3
         "
         >
           <CodeWindow
             snippet={aiFlow}
             showLineNumbers={true}
-            className="col-span-2 bg-transparent border-none"
+            className="col-span-2 border-none bg-transparent"
           />
           {/*
           <div className="border-l border-slate-700/30 p-2">
@@ -79,19 +79,16 @@ export default function AI() {
       {/* Call out box:  rapid development */}
 
       <Container className="pt-6">
-        <GradientBox
-          className="my-24 shadow-[0_10px_100px_0_rgba(52,211,153,0.2)]"
-          border="2px"
-        >
+        <GradientBox className="my-24 shadow-[0_10px_100px_0_rgba(52,211,153,0.2)]" border="2px">
           <div
-            className={`flex items-center justify-center bg-[#0a0a12] back rounded-t-md flex-col`}
+            className={`back flex flex-col items-center justify-center rounded-t-md bg-[#0a0a12]`}
           >
-            <DevIcon className="mt-[-47px] mb-24" />
+            <DevIcon className="mb-24 mt-[-47px]" />
 
             <div className="flex flex-col items-center justify-center pb-24">
               <h2
                 className="
-                text-4xl text-center font-bold mb-8
+                mb-8 text-center text-4xl font-bold
               "
               >
                 Rapidly iterate on complex AI chains,
@@ -102,80 +99,79 @@ export default function AI() {
               <p
                 className="
                 px-6
-                lg:w-1/2
-                text-center text-lg
+                text-center
+                text-lg lg:w-1/2
               "
               >
-                A simple, powerful interface that lets you define reliable flow
-                control in your own code. Write AI workflows directly in your
-                API using our SDK, with local testing out of the box.
+                A simple, powerful interface that lets you define reliable flow control in your own
+                code. Write AI workflows directly in your API using our SDK, with local testing out
+                of the box.
               </p>
 
               <div
                 className="
                 flex
-                flex-col lg:flex-row
-                gap-8 pt-16 items-center justify-center
+                flex-col items-center
+                justify-center gap-8 pt-16 lg:flex-row
               "
               >
                 <Link
                   href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=ai-hero`}
-                  className="rounded-md font-medium px-11 pr-9 py-3.5 bg-indigo-500 hover:bg-indigo-400 transition-all text-white whitespace-nowrap flex flex-row items-center
-                  bg-emerald-400 text-[#050911]
+                  className="flex flex-row items-center whitespace-nowrap rounded-md bg-emerald-400 bg-indigo-500 px-11 py-3.5 pr-9 font-medium text-[#050911] text-white
+                  transition-all hover:bg-indigo-400
                   "
                 >
-                  Get started{" "}
-                  <ChevronRightIcon className="h-5 group-hover:translate-x-1 relative top-px transition-transform duration-150" />
+                  Get started{' '}
+                  <ChevronRightIcon className="relative top-px h-5 transition-transform duration-150 group-hover:translate-x-1" />
                 </Link>
               </div>
             </div>
           </div>
 
-          <div className="grid lg:grid-cols-2 mt-[1px]">
+          <div className="mt-[1px] grid lg:grid-cols-2">
             <div
               className="
-                pt-14 pb-10 px-10 bg-[#0a0a12] flex flex-col items-center
-                lg:rounded-bl-md lg:mr-[1px]
-                sm:m-0
+                flex flex-col items-center bg-[#0a0a12] px-10 pb-10 pt-14
+                sm:m-0 lg:mr-[1px]
+                lg:rounded-bl-md
               "
             >
               <h3
                 className="
-                text-xl font-bold
-                mb-4
-                w-full
+                mb-4 w-full
+                text-xl
+                font-bold
               "
               >
                 Your data, your environment
               </h3>
               <p className="text-lg">
-                Leverage data from your own database, vector store, or APIs
-                directly in code — without complex interfaces or adapters.
+                Leverage data from your own database, vector store, or APIs directly in code —
+                without complex interfaces or adapters.
               </p>
 
               <StoreLogos className="mt-12 opacity-90" />
             </div>
             <div
               className="
-              py-14 px-10 bg-[#0a0a12] flex flex-col items-center
-              mt-[1px]
+              mt-[1px] flex flex-col items-center bg-[#0a0a12] px-10
+              py-14
               lg:mt-0
               lg:rounded-br-md
             "
             >
               <h3
                 className="
-                text-xl font-bold
-                mb-4
-                w-full
+                mb-4 w-full
+                text-xl
+                font-bold
               "
               >
                 Any AI model, any AI pattern
               </h3>
               <p className="text-lg">
-                Easily implement any AI model as either a single call or using
-                patterns like RAG, tree of thoughts, chain of thoughts, or
-                safety rails, directly in code.
+                Easily implement any AI model as either a single call or using patterns like RAG,
+                tree of thoughts, chain of thoughts, or safety rails, directly in code.
               </p>
 
               <ProviderLogos className="mt-14 opacity-90" />
@@ -188,101 +184,97 @@ export default function AI() {
 
       <Container>
         <GradientBox
-          className="my-24 shadow-[0_10px_100px_0_rgba(52,211,153,0.2)] w-1/2 m-auto"
+          className="m-auto my-24 w-1/2 shadow-[0_10px_100px_0_rgba(52,211,153,0.2)]"
           border="0"
         >
           <div className="grid lg:grid-cols-2">
             <div
-              className={`flex items-center justify-center bg-[#0a0a12] back flex-col p-8 text-center
-              rounded
-              m-[1px]
+              className={`back m-[1px] flex flex-col items-center justify-center rounded bg-[#0a0a12]
+              p-8
+              text-center
               lg:rounded-none lg:rounded-l-md`}
             >
               <span className="text-4xl">12x</span>
               <span>development speedup</span>
-              <span className="text-xs opacity-40 mt-1">
+              <span className="mt-1 text-xs opacity-40">
                 compared to traditional infrastructure
               </span>
             </div>
             <div
-              className={`flex items-center justify-center bg-[#0a0a12] back flex-col m-[1px] p-8
-              rounded
-              lg:rounded-none lg:rounded-r-md lg:ml-0`}
+              className={`back m-[1px] flex flex-col items-center justify-center rounded bg-[#0a0a12]
+              p-8
+              lg:ml-0 lg:rounded-none lg:rounded-r-md`}
             >
               <span className="text-4xl">75%</span>
               <span>total cost reduction</span>
-              <span className="text-xs opacity-40 mt-1">
-                on infrastructure and time spent
-              </span>
+              <span className="mt-1 text-xs opacity-40">on infrastructure and time spent</span>
             </div>
           </div>
         </GradientBox>
       </Container>
 
-      <Container className="pt-28 pb-6">
+      <Container className="pb-6 pt-28">
         <ProdIcon className="m-auto" />
 
         <h2
           className="
-          text-4xl text-center font-bold pt-20 pb-8
-          w-2/3 m-auto
+          m-auto w-2/3 pb-8 pt-20 text-center
+          text-4xl font-bold
         "
         >
-          Scale-ready productionAI in hours.
-          Zero&nbsp;infrastructure&nbsp;required.
+          Scale-ready productionAI in hours. Zero&nbsp;infrastructure&nbsp;required.
         </h2>
 
-        <p className="text-lg text-slate-100 leading-8 w-1/2 text-center m-auto">
-          Move to production by deploying Inngest functions inside your existing
-          API, wherever it is — serverless, servers, or edge. Backed by rock
-          solid external orchestration, your workflows are ready to scale in
-          milliseconds.
+        <p className="m-auto w-1/2 text-center text-lg leading-8 text-slate-100">
+          Move to production by deploying Inngest functions inside your existing API, wherever it is
+          — serverless, servers, or edge. Backed by rock solid external orchestration, your
+          workflows are ready to scale in milliseconds.
         </p>
       </Container>
 
       <ProductionCopy />
 
-      <div className="max-w-xl mx-auto">
+      <div className="mx-auto max-w-xl">
         <CaseStudyCard
           href="/customers/aomni"
           logo="/assets/customers/aomni-logo.svg"
           name="Aomni"
           title="Productionizing AI-driven sales flows using serverless LLMs"
           snippet="Leveraging Inngest for production-grade complex state management and LLM chaining."
-          tags={["AI"]}
+          tags={['AI']}
         />
       </div>
 
-      <p className="mt-8 text-zinc-400 text-center opacity-70 pt-16 mb-[-30px]">
+      <p className="mb-[-30px] mt-8 pt-16 text-center text-zinc-400 opacity-70">
         Use with any framework, on any cloud:
       </p>
       <Logos
-        className="opacity-60 my-1 lg:my-1 pb-20"
+        className="my-1 pb-20 opacity-60 lg:my-1"
         logos={[
           {
-            src: "/assets/brand-logos/next-js-white.svg",
-            name: "Next.js",
-            href: "/docs/sdk/serve?ref=homepage-frameworks#framework-next-js",
+            src: '/assets/brand-logos/next-js-white.svg',
+            name: 'Next.js',
+            href: '/docs/sdk/serve?ref=homepage-frameworks#framework-next-js',
           },
           {
-            src: "/assets/brand-logos/express-js-white.svg",
-            name: "Express.js",
-            href: "/docs/sdk/serve?ref=homepage-frameworks#framework-express",
+            src: '/assets/brand-logos/express-js-white.svg',
+            name: 'Express.js',
+            href: '/docs/sdk/serve?ref=homepage-frameworks#framework-express',
           },
           {
-            src: "/assets/brand-logos/redwoodjs-white.svg",
-            name: "RedwoodJS",
-            href: "/docs/sdk/serve?ref=homepage-frameworks#framework-redwood",
+            src: '/assets/brand-logos/redwoodjs-white.svg',
+            name: 'RedwoodJS',
+            href: '/docs/sdk/serve?ref=homepage-frameworks#framework-redwood',
           },
           {
-            src: "/assets/brand-logos/remix-white.svg",
-            name: "Remix",
-            href: "/docs/sdk/serve?ref=homepage-frameworks#framework-remix",
+            src: '/assets/brand-logos/remix-white.svg',
+            name: 'Remix',
+            href: '/docs/sdk/serve?ref=homepage-frameworks#framework-remix',
           },
           {
-            src: "/assets/brand-logos/deno-white.svg",
-            name: "Deno",
-            href: "/docs/sdk/serve?ref=homepage-frameworks#framework-fresh-deno",
+            src: '/assets/brand-logos/deno-white.svg',
+            name: 'Deno',
+            href: '/docs/sdk/serve?ref=homepage-frameworks#framework-fresh-deno',
           },
         ]}
       />
@@ -295,52 +287,50 @@ export default function AI() {
 const AIHero = () => (
   <Container>
     <div
-      className="py-24 lg:py-48 gap-2 justify-between lg:items-center
-      flex flex-col align-center
+      className="align-center flex flex-col justify-between gap-2
+      py-24 lg:items-center lg:py-48
     "
     >
       <h1
         className="
-        text-4xl font-bold leading-[48px] text-center
-        sm:text-5xl sm:leading-[58px]
-        lg:text-6xl lg:leading-[68px]
+        mb-8 bg-gradient-to-r from-[#FFEAEA] to-[#D2CACF]
+        bg-clip-text text-center
+        text-4xl font-bold
+        leading-[48px]
         tracking-[-2px]
-        mb-8
-        bg-gradient-to-r from-[#FFEAEA] to-[#D2CACF] drop-shadow bg-clip-text
-        text-transparent
+        text-transparent drop-shadow sm:text-5xl sm:leading-[58px] lg:text-6xl
+        lg:leading-[68px]
       "
       >
-        Build powerful{" "}
-        <span className="font-extrabold hero-text-shadow">AI workflows</span> in
+        Build powerful <span className="hero-text-shadow font-extrabold">AI workflows</span> in
         code.
       </h1>
 
-      <p className="text-lg text-slate-100 leading-8 lg:w-1/2 text-center">
-        Develop, test, and deploy reliable AI workflows to production with zero
-        new infrastructure, in less than a day. Inngest’s event-driven workflows
-        handle queueing, state, scale, and observability, letting you focus on
-        what matters.
+      <p className="text-center text-lg leading-8 text-slate-100 lg:w-1/2">
+        Develop, test, and deploy reliable AI workflows to production with zero new infrastructure,
+        in less than a day. Inngest’s event-driven workflows handle queueing, state, scale, and
+        observability, letting you focus on what matters.
       </p>
 
       <div
         className="
         flex
-        flex-col lg:flex-row
-        gap-8 pt-16 items-center justify-center
+        flex-col items-center
+        justify-center gap-8 pt-16 lg:flex-row
       "
       >
         <Link
           href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=ai-hero`}
-          className="rounded-md font-medium px-11 py-3.5 bg-indigo-500 hover:bg-indigo-400 transition-all text-white whitespace-nowrap flex flex-row items-center
-          bg-emerald-400 text-[#050911]
+          className="flex flex-row items-center whitespace-nowrap rounded-md bg-emerald-400 bg-indigo-500 px-11 py-3.5 font-medium text-[#050911] text-white
+          transition-all hover:bg-indigo-400
           "
         >
-          Get started{" "}
-          <ChevronRightIcon className="h-5 group-hover:translate-x-1 relative top-px transition-transform duration-150" />
+          Get started{' '}
+          <ChevronRightIcon className="relative top-px h-5 transition-transform duration-150 group-hover:translate-x-1" />
         </Link>
         <Link
           href="/docs?ref=homepage-hero"
-          className="group flex items-center gap-1 rounded-md px-11 py-3.5 bg-transparent transition-all text-indigo-100 border border-slate-800 hover:border-slate-600 whitespace-nowrap"
+          className="group flex items-center gap-1 whitespace-nowrap rounded-md border border-slate-800 bg-transparent px-11 py-3.5 text-indigo-100 transition-all hover:border-slate-600"
         >
           Read the docs
         </Link>
@@ -351,19 +341,19 @@ const AIHero = () => (
 
 const AIScroll = () => {
   const list = [
-    "RAG (Retrieval-Augmented Generation)",
-    "Tree of Thoughts",
-    "Embeddings",
-    "Multi-model chains",
-    "Guardrails",
-    "Hallucination checking",
-    "Observability",
-    "Scoring",
-    "Cost monitoring",
+    'RAG (Retrieval-Augmented Generation)',
+    'Tree of Thoughts',
+    'Embeddings',
+    'Multi-model chains',
+    'Guardrails',
+    'Hallucination checking',
+    'Observability',
+    'Scoring',
+    'Cost monitoring',
   ];
   return (
     <Marquee>
-      <div className="font-mono text-sm text-zinc-500 py-8">
+      <div className="py-8 font-mono text-sm text-zinc-500">
         {list.map((item, n) => (
           <span className="mx-14" key={n}>
             {item}
@@ -374,7 +364,7 @@ const AIScroll = () => {
   );
 };
 
-const GradientBox = ({ children, className = "", border = "2px" }) => (
+const GradientBox = ({ children, className = '', border = '2px' }) => (
   <div className={`mx-auto flex items-center justify-center ${className}`}>
     <div
       className={`w-full rounded-md bg-gradient-to-tl from-[#596555] via-[#D4FF8D] to-[#814828]`}
@@ -391,7 +381,7 @@ const DevelopmentCopy = () => {
   };
   return (
     <Container className="pb-8">
-      <div className="grid lg:grid-cols-3 gap-20 pt-10 pb-20 px-10 opacity-80">
+      <div className="grid gap-20 px-10 pb-20 pt-10 opacity-80 lg:grid-cols-3">
         <div>
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -412,30 +402,26 @@ const DevelopmentCopy = () => {
 
           <h3
             className="
-              text-xl font-semibold
-              mb-4
-              w-full
+              mb-4 w-full
+              text-xl
+              font-semibold
             "
           >
             Full flow control
           </h3>
           <p>
-            Concurrency, rate limiting, debounce, automatic cancellation —
-            everything you need to scale, while respecting rate limits, built in
-            from the beginning.
+            Concurrency, rate limiting, debounce, automatic cancellation — everything you need to
+            scale, while respecting rate limits, built in from the beginning.
           </p>
-          <ul className="my-6 leading-8 opacity-70 leading-snug">
-            <li className="flex items-center mb-4">
-              <Check size={14} className="mr-2" /> Global and per-user
-              concurrency limits
+          <ul className="my-6 leading-8 leading-snug opacity-70">
+            <li className="mb-4 flex items-center">
+              <Check size={14} className="mr-2" /> Global and per-user concurrency limits
             </li>
-            <li className="flex items-center mb-4">
-              <Check size={14} className="mr-2" /> Per-user priorities with
-              fairness guarantees
+            <li className="mb-4 flex items-center">
+              <Check size={14} className="mr-2" /> Per-user priorities with fairness guarantees
             </li>
-            <li className="flex items-center mb-4">
-              <Check size={14} className="mr-2" /> Auto-cancellation via events
-              to save costs
+            <li className="mb-4 flex items-center">
+              <Check size={14} className="mr-2" /> Auto-cancellation via events to save costs
             </li>
           </ul>
         </div>
@@ -458,29 +444,26 @@ const DevelopmentCopy = () => {
           </svg>
           <h3
             className="
-              text-xl font-semibold
-              mb-4
-              w-full
+              mb-4 w-full
+              text-xl
+              font-semibold
             "
           >
             Local development
           </h3>
           <p>
-            Iterate on AI flows in your existing code base and test things
-            locally using our dev server, with full production parity.
+            Iterate on AI flows in your existing code base and test things locally using our dev
+            server, with full production parity.
           </p>
-          <ul className="my-6 leading-8 opacity-70 leading-snug">
-            <li className="flex items-center mb-4">
-              <Check size={14} className="mr-2" /> One-command setup for local
-              dev
+          <ul className="my-6 leading-8 leading-snug opacity-70">
+            <li className="mb-4 flex items-center">
+              <Check size={14} className="mr-2" /> One-command setup for local dev
             </li>
-            <li className="flex items-center mb-4">
-              <Check size={14} className="mr-2" /> Visual workflow debugging and
-              logs
+            <li className="mb-4 flex items-center">
+              <Check size={14} className="mr-2" /> Visual workflow debugging and logs
             </li>
-            <li className="flex items-center mb-4">
-              <Check size={14} className="mr-2" /> Production parity for
-              risk-free deploys
+            <li className="mb-4 flex items-center">
+              <Check size={14} className="mr-2" /> Production parity for risk-free deploys
             </li>
           </ul>
         </div>
@@ -503,55 +486,47 @@ const DevelopmentCopy = () => {
           </svg>
           <h3
             className="
-              text-xl font-semibold
-              mb-4
-              w-full
+              mb-4 w-full
+              text-xl
+              font-semibold
             "
           >
             No magic: write regular code
           </h3>
           <p>
-            Easily create AI workflows with regular code, using any library or
-            integrations you need without learning anything new.
+            Easily create AI workflows with regular code, using any library or integrations you need
+            without learning anything new.
           </p>
-          <ul className="my-6 leading-8 opacity-70 leading-snug">
-            <li className="flex items-center mb-4">
-              <Check size={14} className="mr-2" /> No constraints on what you
-              can use
+          <ul className="my-6 leading-8 leading-snug opacity-70">
+            <li className="mb-4 flex items-center">
+              <Check size={14} className="mr-2" /> No constraints on what you can use
             </li>
-            <li className="flex items-center mb-4">
-              <Check size={14} className="mr-2" /> Simple, retryable steps using
-              `step.run`
+            <li className="mb-4 flex items-center">
+              <Check size={14} className="mr-2" /> Simple, retryable steps using `step.run`
             </li>
-            <li className="flex items-center mb-4">
-              <Check size={14} className="mr-2" /> Use any library, integration,
-              or API
+            <li className="mb-4 flex items-center">
+              <Check size={14} className="mr-2" /> Use any library, integration, or API
             </li>
           </ul>
         </div>
       </div>
 
-      <p className="text-center mt-4 opacity-70">
-        Get started locally in one command:
-      </p>
+      <p className="mt-4 text-center opacity-70">Get started locally in one command:</p>
 
-      <div className="mt-4 mb-20 flex gap-4 flex-col md:flex-row items-center justify-center">
-        <div className="bg-white/10 backdrop-blur-md flex rounded text-sm text-slate-200 shadow-lg">
-          <pre className=" pl-4 pr-2 py-2">
+      <div className="mb-20 mt-4 flex flex-col items-center justify-center gap-4 md:flex-row">
+        <div className="flex rounded bg-white/10 text-sm text-slate-200 shadow-lg backdrop-blur-md">
+          <pre className=" py-2 pl-4 pr-2">
             <code className="bg-transparent text-slate-300">
               <span>npx</span> inngest-cli dev
             </code>
           </pre>
-          <div className="rounded-r flex items-center justify-center pl-2 pr-2.5">
-            <CopyBtn
-              btnAction={handleCopyClick}
-              copy="npx inngest-cli@latest dev"
-            />
+          <div className="flex items-center justify-center rounded-r pl-2 pr-2.5">
+            <CopyBtn btnAction={handleCopyClick} copy="npx inngest-cli@latest dev" />
           </div>
         </div>
         <Link
           href="/docs/quick-start?ref=homepage-dev-tools"
-          className="rounded-md px-3 py-1.5 text-sm bg-transparent transition-all text-white border border-slate-800 hover:border-slate-600 hover:bg-slate-500/10 whitespace-nowrap"
+          className="whitespace-nowrap rounded-md border border-slate-800 bg-transparent px-3 py-1.5 text-sm text-white transition-all hover:border-slate-600 hover:bg-slate-500/10"
         >
           Get Started
         </Link>
@@ -566,7 +541,7 @@ const ProductionCopy = () => {
   };
   return (
     <Container className="py-8">
-      <div className="grid lg:grid-cols-3 gap-20 pt-10 pb-20 px-10 opacity-80">
+      <div className="grid gap-20 px-10 pb-20 pt-10 opacity-80 lg:grid-cols-3">
         <div>
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -586,28 +561,26 @@ const ProductionCopy = () => {
           </svg>
           <h3
             className="
-              text-xl font-semibold
-              mb-4
-              w-full
+              mb-4 w-full
+              text-xl
+              font-semibold
             "
           >
             No infra or CD changes
           </h3>
           <p>
-            Deploy in your existing API, on your existing host, without spinning
-            up new infra or provisioning new services — whether you use servers
-            or serverless.
+            Deploy in your existing API, on your existing host, without spinning up new infra or
+            provisioning new services — whether you use servers or serverless.
           </p>
-          <ul className="my-6 leading-8 opacity-70 leading-snug">
-            <li className="flex items-center mb-4">
+          <ul className="my-6 leading-8 leading-snug opacity-70">
+            <li className="mb-4 flex items-center">
               <Check size={14} className="mr-2" /> Hosted in your existing API
             </li>
-            <li className="flex items-center mb-4">
+            <li className="mb-4 flex items-center">
               <Check size={14} className="mr-2" /> Serverless, servers, or edge
             </li>
-            <li className="flex items-center mb-4">
-              <Check size={14} className="mr-2" /> Zero additional infra or
-              provisioning
+            <li className="mb-4 flex items-center">
+              <Check size={14} className="mr-2" /> Zero additional infra or provisioning
             </li>
           </ul>
         </div>
@@ -631,26 +604,25 @@ const ProductionCopy = () => {
           </svg>
           <h3
             className="
-              text-xl font-semibold
-              mb-4
-              w-full
+              mb-4 w-full
+              text-xl
+              font-semibold
             "
           >
             Modern SDLC
           </h3>
           <p>
-            Hassle free development with preview environments, logging,
-            one-click replay, and error reporting built in.
+            Hassle free development with preview environments, logging, one-click replay, and error
+            reporting built in.
           </p>
-          <ul className="my-6 leading-8 opacity-70 leading-snug">
-            <li className="flex items-center mb-4">
-              <Check size={14} className="mr-2" /> Preview & branch envs built
-              in
+          <ul className="my-6 leading-8 leading-snug opacity-70">
+            <li className="mb-4 flex items-center">
+              <Check size={14} className="mr-2" /> Preview & branch envs built in
             </li>
-            <li className="flex items-center mb-4">
+            <li className="mb-4 flex items-center">
               <Check size={14} className="mr-2" /> Logging and error reporting
             </li>
-            <li className="flex items-center mb-4">
+            <li className="mb-4 flex items-center">
               <Check size={14} className="mr-2" /> E2E encryption available
             </li>
           </ul>
@@ -675,26 +647,25 @@ const ProductionCopy = () => {
           </svg>
           <h3
             className="
-              text-xl font-semibold
-              mb-4
-              w-full
+              mb-4 w-full
+              text-xl
+              font-semibold
             "
           >
             End-to-end observability
           </h3>
           <p>
-            Full insight without the fuss. Tag functions by user, account,
-            context length, prompt rating, and see any data on any metric.
+            Full insight without the fuss. Tag functions by user, account, context length, prompt
+            rating, and see any data on any metric.
           </p>
-          <ul className="my-6 leading-8 opacity-70 leading-snug">
-            <li className="flex items-center mb-4">
+          <ul className="my-6 leading-8 leading-snug opacity-70">
+            <li className="mb-4 flex items-center">
               <Check size={14} className="mr-2" /> Real-time metrics
             </li>
-            <li className="flex items-center mb-4">
-              <Check size={14} className="mr-2" /> Function tagging with
-              user-level cost basis
+            <li className="mb-4 flex items-center">
+              <Check size={14} className="mr-2" /> Function tagging with user-level cost basis
             </li>
-            <li className="flex items-center mb-4">
+            <li className="mb-4 flex items-center">
               <Check size={14} className="mr-2" /> One click replay
             </li>
           </ul>
@@ -736,13 +707,7 @@ export const userWorkflow = inngest.createFunction(
 `;
 
 const DevIcon = (props) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={146}
-    height={98}
-    fill="none"
-    {...props}
-  >
+  <svg xmlns="http://www.w3.org/2000/svg" width={146} height={98} fill="none" {...props}>
     <g stroke="#fff" strokeWidth={1.249} opacity={0.3}>
       <path d="M26.144 25.334C19.298.527 44.658-1.998 62.959 5.492c10.678 3.853 17.69-8.128 30.919-3.347 13.228 4.782-2.63 19.842 17.611 27.572 20.24 7.73 10.359 42.314-7.332 42.712-17.69.399-12.83 6.216-30.52 19.523-17.69 13.308-47.493-5.18-40.082-24.702 7.41-19.524 0-15.061-7.411-41.916Z" />
       <path d="M64.218 44.64c-.79-2.362 2.91-6.174 5.885-4.547 2.724 1.49 5.498.485 7.331 1.149 4.825 1.748 3.05 2.674 5.207 4.75 2.625 2.527 3.877 9.143-2.157 9.143-4.962 0-3.478 2.41-7.194 3.479-3.716 1.068-7.93-.75-7.93-5.537 0-1.797.174-4.501-1.142-8.436Z" />
@@ -766,13 +731,7 @@ const DevIcon = (props) => (
 );
 
 const ProdIcon = (props) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={146}
-    height={102}
-    fill="none"
-    {...props}
-  >
+  <svg xmlns="http://www.w3.org/2000/svg" width={146} height={102} fill="none" {...props}>
     <g stroke="#fff" strokeWidth={1.199} opacity={0.3}>
       <path d="M63.554 6.897c-2.596-6.755-15.44-10.09-13.32 3.36.347 2.205.382 6.002 0 10.624-.351 4.235-7.21 6.552-9.316 12.023-3.303 8.58 9.044 14.56 7.08 19.071-2.574 5.908-10.454 8.47-14.812 11.703-4.103 3.043-6.717 7.925-7.72 12.944C23.704 85.428 26.9 94.656 35.7 95.115c4.406.23 10.216-1.738 17.513-7.056 3.263-2.378 6.14-4.337 8.696-5.922 6.581-4.078 4.812 5.568 12.637 5.922 4.459.201 9.115-8.126 12.64-3.684 2.507 3.158 5.384 6.99 9.492 10.93 7.214 6.92 16.234 7.939 17.51-1.936.602-4.662-.522-11.752-4.375-21.794-2.466-6.427 3.668-6.2 4.375-14.435.706-8.236-5.073-12.034-.889-15.442l.083-.068c3.189-2.598 6.59-5.369 8.448-10.69 1.6-4.584 1.447-9.124 0-12.612-1.549-3.734-4.58-6.263-8.531-6.353-3.965-.09-8.856 2.276-14.106 8.346-3.461 4.002-5.805-5.31-12.006-4.358-6.201.952-7.063 9.936-10.778 7.33-6.453-4.526-9.815-8.484-12.855-16.396Z" />
       <path d="M76.08 43.745c-.395-1.037-2.237-.765-2.33.36-.106 1.279.54 2.946.466 4.229-.144 2.477-1.02 3.182-2.761 4.487-.625.467-1.023 1.217-1.175 1.987-.268 1.352.218 2.769 1.557 2.839.67.035 1.555-.267 2.666-1.083.496-.365.934-.666 1.323-.91 1.694-1.143 3.27-.247 3.847.344.381.485.82 1.073 1.444 1.678 1.098 1.063 2.76.923 2.665-.297-.135-1.724-3.079-8.16 0-9.282 1.43-.522 1.383-1.703 1.163-2.238-.236-.573-.697-.962-1.298-.975-.604-.014-1.603.975-2.147 1.28-2.007 1.13-3.798 1.714-5.42-2.419Z" />
@@ -823,12 +782,7 @@ const StoreLogos = (props) => (
           strokeWidth={1.77}
           d="m13.193 27.187-1.809-2.226-2.46 1.45"
         />
-        <path
-          stroke="#fff"
-          strokeLinecap="square"
-          strokeWidth={1.77}
-          d="m8.642 40.62.504-2.906"
-        />
+        <path stroke="#fff" strokeLinecap="square" strokeWidth={1.77} d="m8.642 40.62.504-2.906" />
         <path
           stroke="#fff"
           strokeLinecap="square"
@@ -836,12 +790,7 @@ const StoreLogos = (props) => (
           strokeWidth={1.77}
           d="m11.029 39.581-1.824-2.219-2.453 1.457"
         />
-        <path
-          stroke="#fff"
-          strokeLinecap="square"
-          strokeWidth={1.77}
-          d="m9.687 34.628.504-2.906"
-        />
+        <path stroke="#fff" strokeLinecap="square" strokeWidth={1.77} d="m9.687 34.628.504-2.906" />
         <path
           stroke="#fff"
           strokeLinecap="square"
@@ -905,12 +854,7 @@ const StoreLogos = (props) => (
           strokeWidth={1.72}
           d="m14.475 29.271 2.572 1.076-.482 2.757"
         />
-        <path
-          stroke="#fff"
-          strokeLinecap="square"
-          strokeWidth={1.72}
-          d="m3.684 35.24-2.72-.477"
-        />
+        <path stroke="#fff" strokeLinecap="square" strokeWidth={1.72} d="m3.684 35.24-2.72-.477" />
         <path
           stroke="#fff"
           strokeLinecap="square"
@@ -945,12 +889,7 @@ const StoreLogos = (props) => (
       <clipPath id="b">
         <path fill="#fff" d="M301.389 24.303h99.612V47.29h-99.612z" />
       </clipPath>
-      <pattern
-        id="c"
-        width={1}
-        height={1}
-        patternContentUnits="objectBoundingBox"
-      >
+      <pattern id="c" width={1} height={1} patternContentUnits="objectBoundingBox">
         <use xlinkHref="#d" transform="matrix(.0005 0 0 .00079 -.002 0)" />
       </pattern>
       <image
@@ -964,13 +903,7 @@ const StoreLogos = (props) => (
 );
 
 const ProviderLogos = (props) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={343}
-    height={37}
-    fill="none"
-    {...props}
-  >
+  <svg xmlns="http://www.w3.org/2000/svg" width={343} height={37} fill="none" {...props}>
     <g opacity={0.8}>
       <path
         fill="#fff"
@@ -984,7 +917,7 @@ const ProviderLogos = (props) => (
         y={14}
         maskUnits="userSpaceOnUse"
         style={{
-          maskType: "luminance",
+          maskType: 'luminance',
         }}
       >
         <path fill="#fff" d="M0 14.272h107.416v12.019H0V14.272Z" />
@@ -1003,16 +936,13 @@ const ProviderLogos = (props) => (
         y={14}
         maskUnits="userSpaceOnUse"
         style={{
-          maskType: "luminance",
+          maskType: 'luminance',
         }}
       >
         <path fill="#fff" d="M0 14.272h107.416v12.019H0V14.272Z" />
       </mask>
       <g mask="url(#b)">
-        <path
-          fill="#fff"
-          d="M26.193 16.716h3.9v9.38h2.49v-9.38h3.901v-2.24h-10.29v2.24Z"
-        />
+        <path fill="#fff" d="M26.193 16.716h3.9v9.38h2.49v-9.38h3.901v-2.24h-10.29v2.24Z" />
       </g>
       <mask
         id="c"
@@ -1022,7 +952,7 @@ const ProviderLogos = (props) => (
         y={14}
         maskUnits="userSpaceOnUse"
         style={{
-          maskType: "luminance",
+          maskType: 'luminance',
         }}
       >
         <path fill="#fff" d="M0 14.272h107.416v12.019H0V14.272Z" />
@@ -1041,7 +971,7 @@ const ProviderLogos = (props) => (
         y={14}
         maskUnits="userSpaceOnUse"
         style={{
-          maskType: "luminance",
+          maskType: 'luminance',
         }}
       >
         <path fill="#fff" d="M0 14.272h107.416v12.019H0V14.272Z" />
@@ -1060,7 +990,7 @@ const ProviderLogos = (props) => (
         y={14}
         maskUnits="userSpaceOnUse"
         style={{
-          maskType: "luminance",
+          maskType: 'luminance',
         }}
       >
         <path fill="#fff" d="M0 14.272h107.416v12.019H0V14.272Z" />
@@ -1079,7 +1009,7 @@ const ProviderLogos = (props) => (
         y={14}
         maskUnits="userSpaceOnUse"
         style={{
-          maskType: "luminance",
+          maskType: 'luminance',
         }}
       >
         <path fill="#fff" d="M0 14.272h107.416v12.019H0V14.272Z" />
@@ -1098,7 +1028,7 @@ const ProviderLogos = (props) => (
         y={14}
         maskUnits="userSpaceOnUse"
         style={{
-          maskType: "luminance",
+          maskType: 'luminance',
         }}
       >
         <path fill="#fff" d="M0 14.272h107.416v12.019H0V14.272Z" />
@@ -1117,16 +1047,13 @@ const ProviderLogos = (props) => (
         y={14}
         maskUnits="userSpaceOnUse"
         style={{
-          maskType: "luminance",
+          maskType: 'luminance',
         }}
       >
         <path fill="#fff" d="M0 14.272h107.416v12.019H0V14.272Z" />
       </mask>
       <g mask="url(#h)">
-        <path
-          fill="#fff"
-          d="m88.51 14.475 4.633 11.62h2.54l-4.633-11.62h-2.54Z"
-        />
+        <path fill="#fff" d="m88.51 14.475 4.633 11.62h2.54l-4.633-11.62h-2.54Z" />
       </g>
       <mask
         id="i"
@@ -1136,7 +1063,7 @@ const ProviderLogos = (props) => (
         y={14}
         maskUnits="userSpaceOnUse"
         style={{
-          maskType: "luminance",
+          maskType: 'luminance',
         }}
       >
         <path fill="#fff" d="M0 14.272h107.416v12.019H0V14.272Z" />

@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
-import styled from "@emotion/styled";
+import React, { useEffect, useRef, useState } from 'react';
+import styled from '@emotion/styled';
 
 type VideoPlayerProps = {
   className: string;
@@ -14,7 +14,7 @@ type VideoPlayerProps = {
 };
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({
-  className = "",
+  className = '',
   src,
   autoPlay = true,
   muted = true,
@@ -40,8 +40,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [video.current]);
 
   const onTimeUpdate = (e: React.SyntheticEvent) => {
-    const percentCompleted =
-      (video.current.currentTime / video.current.duration) * 100;
+    const percentCompleted = (video.current.currentTime / video.current.duration) * 100;
     setProgressPercentage(percentCompleted);
   };
   const onVideoClick = (e: React.MouseEvent) => {
@@ -80,9 +79,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
               ? 100
               : progressPercentage < startPercentage
               ? 0
-              : ((progressPercentage - startPercentage) /
-                  (endPercentage - startPercentage)) *
-                100;
+              : ((progressPercentage - startPercentage) / (endPercentage - startPercentage)) * 100;
           const isActive = completion > 0 && completion < 100;
           return (
             <Chapter
@@ -109,8 +106,7 @@ const Player = styled.div`
   cursor: pointer;
   background: #1e1f22;
   padding: 0 0 40px 0;
-  box-shadow: 0px 20px 350px rgba(70, 54, 245, 0.12),
-    0px 10px 30px rgba(0, 0, 0, 0.85);
+  box-shadow: 0px 20px 350px rgba(70, 54, 245, 0.12), 0px 10px 30px rgba(0, 0, 0, 0.85);
 `;
 const Controls = styled.div`
   position: absolute;
@@ -128,8 +124,7 @@ const Chapter = styled.div<{
   top: 0px;
   left: ${({ startPercentage }) => `${startPercentage}%`};
   width: calc(
-    ${({ startPercentage, endPercentage }) =>
-        `${endPercentage - startPercentage}%`} - 3px
+    ${({ startPercentage, endPercentage }) => `${endPercentage - startPercentage}%`} - 3px
   );
   height: 100%;
   background-color: var(--stroke-color);
@@ -137,7 +132,7 @@ const Chapter = styled.div<{
   &:hover {
     // Only highlight if it's clickable to jump to the chapter
     background-color: ${({ isActive }) =>
-      isActive ? "var(--stroke-color)" : "var(--stroke-color-light)"};
+      isActive ? 'var(--stroke-color)' : 'var(--stroke-color-light)'};
   }
 `;
 const ChapterName = styled.span`
@@ -163,8 +158,7 @@ const Progress = styled.div<{ completion: number }>`
 
   // When clicking on previous chapter, we want to hide the progress
   // instantly, not animate it backwards
-  /* visibility: ${({ completion }) =>
-    completion === 0 ? "hidden" : "block"}; */
+  /* visibility: ${({ completion }) => (completion === 0 ? 'hidden' : 'block')}; */
   /** Chrome seems to fire the onTimeUpdate event every 250ms
     * so we use that to try to keep the progress bar smooth */
   /* transition: width 250ms linear; */

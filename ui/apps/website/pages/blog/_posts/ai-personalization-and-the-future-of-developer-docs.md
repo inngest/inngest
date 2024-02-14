@@ -1,6 +1,6 @@
 ---
-heading: "AI Personalization and the Future of Developer Docs"
-subtitle: "Providing developer-specific examples to help developers learn how to use the Inngest SDK. The beginning of AI-personalized learning flows for users."
+heading: 'AI Personalization and the Future of Developer Docs'
+subtitle: 'Providing developer-specific examples to help developers learn how to use the Inngest SDK. The beginning of AI-personalized learning flows for users.'
 image: /assets/blog/openai-durable-functions-with-inngest/featured-image.png
 date: 2023-02-09
 author: Jack Williams
@@ -64,19 +64,19 @@ Slash commands for Discord bots still rely on long-lived, serverful connections,
 For this, we placed a tiny piece of Deno code on [Fly.io](http://Fly.io) using [Discordeno](https://deno.land/x/discordeno) that boots up a bot and emits an Inngest event whenever a request to create a function is received.
 
 ```ts
-import { createBot, Inngest } from "./deps.ts";
+import { Inngest, createBot } from './deps.ts';
 
 // Create the Discord bot
 const bot = createBot({
-  token: Deno.env.get("DISCORD_TOKEN"),
+  token: Deno.env.get('DISCORD_TOKEN'),
 });
 
 // Create an Inngest instance
-const inngest = new Inngest({ name: "Discord Bot" });
+const inngest = new Inngest({ name: 'Discord Bot' });
 
 bot.events.messageCreate = async (_b, message) => {
   // Check if the message is a request, then...
-  await inngest.send("inngestabot/message.received", {
+  await inngest.send('inngestabot/message.received', {
     data: {
       message: {
         channelId: message.channelId.toString(),
@@ -93,16 +93,16 @@ We then have a tiny Inngest function, again hosted on [Deno Deploy](https://deno
 
 ```ts
 inngest.createFunction(
-  { name: "Handle Inngestabot message" },
-  { event: "inngestabot/message.received" },
+  { name: 'Handle Inngestabot message' },
+  { event: 'inngestabot/message.received' },
   async ({ event, step }) => {
     const { message } = event.data;
 
     // Generate a reply using our OpenAI Codex endpoint
     // OpenAI can sometimes error — `step.run` automatically retries on errors
-    const reply = await step.run("Generate reply from OpenAI", async () => {
+    const reply = await step.run('Generate reply from OpenAI', async () => {
       const res = await fetch(OPENAI_ENDPOINT, {
-        method: "POST",
+        method: 'POST',
         body: JSON.stringify({ message: message.content }),
       });
 
@@ -110,11 +110,8 @@ inngest.createFunction(
     });
 
     // Parse and send the reply to Discord
-    await step.run("Send reply to Discord", async () => {
-      return await bot.sendMessage(
-        message.channelId,
-        createDiscordMessageFromReply(reply)
-      );
+    await step.run('Send reply to Discord', async () => {
+      return await bot.sendMessage(message.channelId, createDiscordMessageFromReply(reply));
     });
   }
 );

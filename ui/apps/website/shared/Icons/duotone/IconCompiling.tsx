@@ -1,10 +1,6 @@
-import IconTheme from "./theme";
+import IconTheme from './theme';
 
-export function IconCompiling({
-  size = 20,
-  className = "",
-  color = "transparent",
-}) {
+export function IconCompiling({ size = 20, className = '', color = 'transparent' }) {
   const theme = IconTheme(color);
 
   return (
@@ -29,12 +25,7 @@ export function IconCompiling({
           filterUnits="objectBoundingBox"
           id="filter-compiling-2"
         >
-          <feOffset
-            dx="0"
-            dy="1"
-            in="SourceAlpha"
-            result="shadowOffsetOuter1"
-          ></feOffset>
+          <feOffset dx="0" dy="1" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
           <feGaussianBlur
             stdDeviation="1"
             in="shadowOffsetOuter1"
@@ -47,13 +38,7 @@ export function IconCompiling({
           ></feColorMatrix>
         </filter>
       </defs>
-      <g
-        id="Compiling"
-        stroke="none"
-        strokeWidth="1"
-        fill="none"
-        fillRule="evenodd"
-      >
+      <g id="Compiling" stroke="none" strokeWidth="1" fill="none" fillRule="evenodd">
         <path
           d="M3.70710678,9.12132033 L5.12132035,7.70710678 C5.51184463,7.31658249 6.14500961,7.31658249 6.53553391,7.70710678 L7.94974747,9.12132033 C8.34027176,9.51184467 8.34027176,10.1450096 7.94974747,10.5355339 L6.53553391,11.9497475 C6.14500961,12.3402717 5.51184463,12.3402717 5.12132035,11.9497475 L3.70710678,10.5355339 C3.31658249,10.1450096 3.31658249,9.51184467 3.70710678,9.12132033 Z M11.7071068,9.12132033 L13.1213203,7.70710678 C13.5118447,7.31658249 14.1450096,7.31658249 14.5355339,7.70710678 L15.9497475,9.12132033 C16.3402717,9.51184467 16.3402717,10.1450096 15.9497475,10.5355339 L14.5355339,11.9497475 C14.1450096,12.3402717 13.5118447,12.3402717 13.1213203,11.9497475 L11.7071068,10.5355339 C11.3165825,10.1450096 11.3165825,9.51184467 11.7071068,9.12132033 Z"
           id="Combined-Shape"

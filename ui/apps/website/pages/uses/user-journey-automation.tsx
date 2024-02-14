@@ -1,22 +1,21 @@
-import React, { useState, useEffect } from "react";
-import styled from "@emotion/styled";
-
-import Hero from "src/shared/legacy/Hero";
-import Examples from "src/shared/legacy/Examples";
-import FeatureCallouts from "src/shared/legacy/FeatureCallouts";
-import Button from "src/shared/legacy/Button";
-import Nav from "src/shared/legacy/nav";
-import Footer from "src/shared/legacy/Footer";
-import DemoBlock from "src/shared/legacy/DemoBlock";
-import GraphicCallout from "src/shared/legacy/GraphicCallout";
+import React, { useEffect, useState } from 'react';
+import styled from '@emotion/styled';
+import Button from 'src/shared/legacy/Button';
+import DemoBlock from 'src/shared/legacy/DemoBlock';
+import Examples from 'src/shared/legacy/Examples';
+import FeatureCallouts from 'src/shared/legacy/FeatureCallouts';
+import Footer from 'src/shared/legacy/Footer';
+import GraphicCallout from 'src/shared/legacy/GraphicCallout';
+import Hero from 'src/shared/legacy/Hero';
+import Nav from 'src/shared/legacy/nav';
 
 export async function getStaticProps() {
   return {
     props: {
       meta: {
-        title: "Automate User Journeys in Minutes",
+        title: 'Automate User Journeys in Minutes',
         description:
-          "Build out user-behavior driven flows for your product that are triggered by events sent from your app or third party integrations.",
+          'Build out user-behavior driven flows for your product that are triggered by events sent from your app or third party integrations.',
       },
     },
   };
@@ -24,11 +23,11 @@ export async function getStaticProps() {
 
 const examples = [
   {
-    title: "Handle failed payments", // Alt: Handle involuntary churn
+    title: 'Handle failed payments', // Alt: Handle involuntary churn
     steps: [
       {
-        icon: "/icons/brands/stripe.jpg",
-        description: "Stripe Webhook Trigger",
+        icon: '/icons/brands/stripe.jpg',
+        description: 'Stripe Webhook Trigger',
         action: (
           <>
             When <code>charge.failed</code> is received
@@ -36,54 +35,54 @@ const examples = [
         ),
       },
       {
-        icon: "/icons/brands/mongodb.svg",
-        description: "Run custom code",
+        icon: '/icons/brands/mongodb.svg',
+        description: 'Run custom code',
         action: "Downgrade the user's plan in the database",
       },
       {
-        icon: "/icons/brands/intercom.png",
-        description: "Run custom code",
-        action: "Notify Customer Success team in Intercom",
+        icon: '/icons/brands/intercom.png',
+        description: 'Run custom code',
+        action: 'Notify Customer Success team in Intercom',
       },
     ],
   },
   {
-    title: "Intelligent activation drip campaign",
+    title: 'Intelligent activation drip campaign',
     steps: [
       {
-        icon: "/icons/webhook.svg",
-        description: "Custom Event",
-        action: "When a user signs up",
+        icon: '/icons/webhook.svg',
+        description: 'Custom Event',
+        action: 'When a user signs up',
       },
       {
-        icon: "/icons/delay.png",
-        description: "Delay",
-        action: "Wait 24 hours",
+        icon: '/icons/delay.png',
+        description: 'Delay',
+        action: 'Wait 24 hours',
       },
       {
-        icon: "/icons/conditional.webp",
-        description: "Conditional logic",
-        action: "If user does not activate",
+        icon: '/icons/conditional.webp',
+        description: 'Conditional logic',
+        action: 'If user does not activate',
       },
       {
-        icon: "/icons/brands/sendgrid.png",
-        description: "Run custom code",
-        action: "Send onboarding email",
+        icon: '/icons/brands/sendgrid.png',
+        description: 'Run custom code',
+        action: 'Send onboarding email',
       },
     ],
   },
   {
-    title: "Running scripts from internal tools",
+    title: 'Running scripts from internal tools',
     steps: [
       {
-        icon: "/icons/brands/retool.jpg",
-        description: "Retool Resource Request",
-        action: "When a form is submitted",
+        icon: '/icons/brands/retool.jpg',
+        description: 'Retool Resource Request',
+        action: 'When a form is submitted',
       },
       {
-        icon: "/icons/brands/javascript.png",
-        description: "Run custom code",
-        action: "Run a backfill of user data",
+        icon: '/icons/brands/javascript.png',
+        description: 'Run custom code',
+        action: 'Run a backfill of user data',
       },
     ],
   },
@@ -91,35 +90,35 @@ const examples = [
 
 const calloutFeatures = [
   {
-    topic: "Any Source",
-    title: "Connect Anything",
+    topic: 'Any Source',
+    title: 'Connect Anything',
     description:
       "Send data via Inngest's webhooks, from your code with our API, or use one of Inngest's built-in integrations, ",
-    image: "/assets/screenshots/sources.png",
+    image: '/assets/screenshots/sources.png',
     // TODO - Link to sources page (integrations, webhooks, api keys/SDKs)
   },
   {
-    topic: "Developer UX",
-    title: "Intuitive Developer Tooling",
+    topic: 'Developer UX',
+    title: 'Intuitive Developer Tooling',
     description:
-      "A CLI that gets out your way and makes the hard stuff easy. Create, test, and deploy functions in minutes.",
-    image: "/assets/homepage/cli-3-commands.png",
+      'A CLI that gets out your way and makes the hard stuff easy. Create, test, and deploy functions in minutes.',
+    image: '/assets/homepage/cli-3-commands.png',
     // TODO - Link to CLI or "for developers"/developer-ux page
   },
   {
-    topic: "Out-of-the-box Power",
-    title: "Conditional Logic, Delays, & Automate Retries",
+    topic: 'Out-of-the-box Power',
+    title: 'Conditional Logic, Delays, & Automate Retries',
     description:
-      "Use minimal declarative configuration to create complex flows that can delay for days, conditionally run based on data, and automatically retry failed functions.",
-    image: "/assets/use-cases/conditional-logic.png",
+      'Use minimal declarative configuration to create complex flows that can delay for days, conditionally run based on data, and automatically retry failed functions.',
+    image: '/assets/use-cases/conditional-logic.png',
     // TODO - Link to features page section
   },
   {
-    topic: "Step Functions",
-    title: "Chain Functions Together",
+    topic: 'Step Functions',
+    title: 'Chain Functions Together',
     description:
-      "Break your code into logical steps and run them in parallel, in sequence, or conditionally based on the output of previous steps.",
-    image: "/assets/use-cases/step-function.png",
+      'Break your code into logical steps and run them in parallel, in sequence, or conditionally based on the output of previous steps.',
+    image: '/assets/use-cases/step-function.png',
     // TODO - Link to features page section on step functions
   },
 ];
@@ -128,8 +127,8 @@ const page = {
   hero: {
     headline: (
       <>
-        Automate{" "}
-        <span className="md:whitespace-nowrap	gradient-text-ltr gradient-from-iris-60 gradient-to-cyan">
+        Automate{' '}
+        <span className="gradient-text-ltr	gradient-from-iris-60 gradient-to-cyan md:whitespace-nowrap">
           User Journeys
         </span>
         <br />
@@ -137,14 +136,14 @@ const page = {
       </>
     ),
     subheadline:
-      "Build out user-behavior driven flows for your product that are triggered by events sent from your app or third party integrations.",
+      'Build out user-behavior driven flows for your product that are triggered by events sent from your app or third party integrations.',
     primaryCTA: {
       href: `${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=user-journey`,
-      text: "Get started for free",
+      text: 'Get started for free',
     },
     secondaryCTA: {
-      href: "/contact?ref=user-journey",
-      text: "Request a demo",
+      href: '/contact?ref=user-journey',
+      text: 'Request a demo',
     },
   },
 };
@@ -159,33 +158,29 @@ export default function Template() {
       <Examples
         heading={
           <>
-            What some of our customers have{" "}
-            <span className="underline italic text-green-700 decoration-sky-500">
-              shipped
-            </span>
+            What some of our customers have{' '}
+            <span className="italic text-green-700 underline decoration-sky-500">shipped</span>
           </>
         }
         examples={examples}
       />
 
-      <div className="container mx-auto max-w-5xl my-24">
-        <div className="text-center px-6 max-w-2xl mx-auto">
-          <h2 className="text-4xl mb-6">
+      <div className="container mx-auto my-24 max-w-5xl">
+        <div className="mx-auto max-w-2xl px-6 text-center">
+          <h2 className="mb-6 text-4xl">
             <span className="gradient-text gradient-text-ltr gradient-from-pink gradient-to-orange">
               Why?
             </span>
           </h2>
           <p className="text-md">
-            User journey automation is high impact, but also high effort.
-            Delivering personalized, unique experiences for your customers
-            during onboarding, sales, or every billing period makes the
-            difference between a good and great product.
+            User journey automation is high impact, but also high effort. Delivering personalized,
+            unique experiences for your customers during onboarding, sales, or every billing period
+            makes the difference between a good and great product.
           </p>
           <p className="text-md">
-            Inngest takes out the complex part of tracking state, coordinating
-            between different events, conditionally triggering certain flows and
-            allows you to just focus on building an improved, tailored
-            experience for your customers.
+            Inngest takes out the complex part of tracking state, coordinating between different
+            events, conditionally triggering certain flows and allows you to just focus on building
+            an improved, tailored experience for your customers.
           </p>
         </div>
       </div>
@@ -195,19 +190,19 @@ export default function Template() {
         description="See how you can easily run existing code and scripts right from Retool with the power and flexibility of Inngest"
         image="/assets/use-cases/guide-retool-inngest.png"
         cta={{
-          href: "/docs/guides/trigger-your-code-from-retool?ref=user-journey-graphic-callout",
-          text: "Read the guide",
+          href: '/docs/guides/trigger-your-code-from-retool?ref=user-journey-graphic-callout',
+          text: 'Read the guide',
         }}
         style={{
           backgroundImage:
-            "linear-gradient(135deg, rgba(171, 220, 255, 0.5) 0%, rgba(3, 150, 255, 0.5) 100%)",
+            'linear-gradient(135deg, rgba(171, 220, 255, 0.5) 0%, rgba(3, 150, 255, 0.5) 100%)',
         }}
       />
 
       <FeatureCallouts
         heading={
           <>
-            Deliver{" "}
+            Deliver{' '}
             <span className="gradient-text gradient-text-ltr gradient-from-cyan gradient-to-pink">
               personalized,&nbsp;unique
             </span>
@@ -218,7 +213,7 @@ export default function Template() {
         features={calloutFeatures}
         cta={{
           href: `${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=user-journey-features`,
-          text: "Get started building now →",
+          text: 'Get started building now →',
         }}
       />
 

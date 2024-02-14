@@ -1,12 +1,11 @@
-import styled from "@emotion/styled";
+import styled from '@emotion/styled';
 
 export const IntegrationType = {
-  EVENTS: "Events",
-  FUNCTIONS: "Functions", // SDK?
+  EVENTS: 'Events',
+  FUNCTIONS: 'Functions', // SDK?
 };
 
-export type IntegrationType =
-  typeof IntegrationType[keyof typeof IntegrationType];
+export type IntegrationType = (typeof IntegrationType)[keyof typeof IntegrationType];
 
 type Props = {
   name: string;

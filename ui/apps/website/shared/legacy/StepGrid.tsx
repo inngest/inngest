@@ -1,7 +1,7 @@
-import React, { ReactElement } from "react";
-import styled from "@emotion/styled";
+import React, { ReactElement } from 'react';
+import styled from '@emotion/styled';
 
-import Button from "./Button";
+import Button from './Button';
 
 export type Step = {
   icon: ReactElement | string;
@@ -19,11 +19,7 @@ const StepGrid = ({ steps }: StepGridProps) => {
       {steps.map((s, j) => (
         <Step key={`step-${j}`}>
           <div className="icon">
-            {typeof s.icon === "string" ? (
-              <img src={s.icon || "x"} alt={s.description} />
-            ) : (
-              s.icon
-            )}
+            {typeof s.icon === 'string' ? <img src={s.icon || 'x'} alt={s.description} /> : s.icon}
           </div>
           <div className="text">
             <span className="description">{s.description}</span>
@@ -39,13 +35,13 @@ const Grid = styled.div<{ cols: number | string }>`
   position: relative;
   display: grid;
   grid-template-columns: repeat(${({ cols }) => cols}, 1fr);
-  grid-gap: ${({ cols }) => (Number(cols) > 3 ? "2rem" : "4rem")};
+  grid-gap: ${({ cols }) => (Number(cols) > 3 ? '2rem' : '4rem')};
 
   &::before {
     position: absolute;
     z-index: 1;
     border-top: 2px dotted #b1a7b7;
-    content: "";
+    content: '';
     width: 100%;
     top: 50%;
   }

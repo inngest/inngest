@@ -12,13 +12,13 @@ Understanding how your system works is key to keeping one’s sanity.
 
 As we have more users deploying their workloads on Inngest, a common set of questions start coming up more and more over time.
 
-* Have my functions started?
-* Are they delayed?
-* If not,
-  + Why are they not starting?
-  + Is something stuck?
-  + Am I getting throttled?
-  + Was there a misconfiguration?
+- Have my functions started?
+- Are they delayed?
+- If not,
+  - Why are they not starting?
+  - Is something stuck?
+  - Am I getting throttled?
+  - Was there a misconfiguration?
 
 Not being able to tell what’s going on was a common complaint/feedback, and on the flip side, our team was spending more time diving into our data stores to see what’s going on in order to provide the answers our users are asking.
 
@@ -30,17 +30,17 @@ We completely understand the need to answer these basic questions in order for u
 
 A lot of the questions falls into 2 buckets,
 
-* **Status** - What’s going on?
-* **Resolution** - What do I need to do to get out of this?
+- **Status** - What’s going on?
+- **Resolution** - What do I need to do to get out of this?
 
-It’s almost impossible to provide a solution if you don’t know what the current status is, and to properly assess an issue, we need to understand the *what* and the *why*.
+It’s almost impossible to provide a solution if you don’t know what the current status is, and to properly assess an issue, we need to understand the _what_ and the _why_.
 
-The metrics project was a focus to expose the ***What*** of the user’s workload as a starting point. The ***Why*** is usually trickier to address as there are always some kind of context behind it.
+The metrics project was a focus to expose the **_What_** of the user’s workload as a starting point. The **_Why_** is usually trickier to address as there are always some kind of context behind it.
 
 For example, a function with a concurrency setting could be throttled because
 
-* There was a burst of events, and it exceed the limit
-* External API that it was calling was having an outage, and all function runs has been failing, causing a lot of retries, and resulted in using up the limit
+- There was a burst of events, and it exceed the limit
+- External API that it was calling was having an outage, and all function runs has been failing, causing a lot of retries, and resulted in using up the limit
 
 We can go on and on, and it’s impossible for us as service providers to tell users why something went wrong. It’s up to the users to know, but we can still provide the indicators to help them form a theory and get to the root cause.
 
@@ -50,12 +50,12 @@ We can go on and on, and it’s impossible for us as service providers to tell u
 
 Choosing the right tool for the job is always important. We’ve looked into a couple of existing tools,
 
-* [InfluxDB](https://www.influxdata.com/)
-* [Prometheus](https://prometheus.io/)
-* [TimescaleDB](https://www.timescale.com/)
-* [Clickhouse](https://clickhouse.com/)
-* [M3](https://m3db.io/)
-* [Grafana Mimir](https://grafana.com/oss/mimir/)
+- [InfluxDB](https://www.influxdata.com/)
+- [Prometheus](https://prometheus.io/)
+- [TimescaleDB](https://www.timescale.com/)
+- [Clickhouse](https://clickhouse.com/)
+- [M3](https://m3db.io/)
+- [Grafana Mimir](https://grafana.com/oss/mimir/)
 
 We pretty much crossed off Prometheus related tools right off the bat. It’s generally a pain to maintain, and also scaling profile is questionable. You need a Thanos or some other tool like M3 or Mimir to use as a storage backend, or it’ll overflow very quickly.
 
@@ -67,9 +67,9 @@ It was now down to Timescale and Clickhouse. Due to prior jobs, I’d had a pret
 
 While there was a managed solution with Clickhouse now, we ultimately decided to go with TimescaleDB for the following reasons:
 
-* It is Postgres, and we do not need additional SQL drivers
-* We already run Postgres so we have a good idea of the scaling profile and what pitfalls there are
-* We already have some existing feature using TimescaleDB, and it was easier to expand the usage, instead of introducing a new database
+- It is Postgres, and we do not need additional SQL drivers
+- We already run Postgres so we have a good idea of the scaling profile and what pitfalls there are
+- We already have some existing feature using TimescaleDB, and it was easier to expand the usage, instead of introducing a new database
 
 ---
 
@@ -77,9 +77,9 @@ While there was a managed solution with Clickhouse now, we ultimately decided to
 
 It was pretty clear what we wanted to provide as the MVP release at this point.
 
-* Function throughput
-* SDK throughput
-* Throttle (Concurrent limit) indicators
+- Function throughput
+- SDK throughput
+- Throttle (Concurrent limit) indicators
 
 And the chart will give the user enough information for them to dive in more on their own to the problem.
 
@@ -100,10 +100,10 @@ However, at this iteration we went with option #2 instead.
 
 Mainly because,
 
-* Timescale is not a columnar database, querying massive amounts of data will incur penalties[^2]
-* A future possible feature to expose metrics endpoints for each account, and this format was easier
-* The Go tally library has a nice way of [extending it to work with custom storage](https://pkg.go.dev/github.com/uber-go/tally#StatsReporter), and saves us time to release
-* #3 requires more involved technical work, which unfortunately we do not have the capacity and time right now
+- Timescale is not a columnar database, querying massive amounts of data will incur penalties[^2]
+- A future possible feature to expose metrics endpoints for each account, and this format was easier
+- The Go tally library has a nice way of [extending it to work with custom storage](https://pkg.go.dev/github.com/uber-go/tally#StatsReporter), and saves us time to release
+- #3 requires more involved technical work, which unfortunately we do not have the capacity and time right now
 
 To give an idea what I’m talking about, here’s what a typical tally metric recording look like
 
@@ -114,6 +114,7 @@ metrics.Tagged(
 	metrics.WithFunctionID(id.FunctionID.String()),
 ).Counter(timescale.CounterFunctionRunStartedTotal).Inc(1)
 ```
+
 which will create a Counter for `FunctionRunStartedTotal` if it doesn't exist, and increment the Counter.
 
 We can leverage this easily by providing a [custom reporter](https://pkg.go.dev/github.com/uber-go/tally#StatsReporter) like this.
@@ -169,8 +170,8 @@ func (r metricsReporter) ReportCounter(name string, tags map[string]string, valu
 
 All we need to care about now is to make sure `recordCounter` can map the metrics correctly to the database tables when writing to it, instead of having to figure out all the details like,
 
-* handle mapping of metrics with tags
-* atomic operations for counters, gauages, etc
+- handle mapping of metrics with tags
+- atomic operations for counters, gauages, etc
 
 ### Architecture
 
@@ -285,7 +286,7 @@ The screenshot above shows an example when inspecting deltas with different meth
 The goal here is `calculate the difference between the last value of the current bucket and the previous bucket`. In other words,
 
 ```js
-diff = prev ? current - prev : current
+diff = prev ? current - prev : current;
 ```
 
 When attempting to calculating the difference using `delta` or `interpolated_delta` aggregate functions, both are off from the actual value by `+1` or `-1`.
@@ -362,11 +363,8 @@ The cloud offering also provides good indications of compression, and they have 
 
 While there were some challenges, those were more due to the technical choices we made. For what we’ve been trying to do, Timescale has been performing very well, and above all it has allowed us to get something out rather quickly.
 
-
 ---
 
 [^1]: Uber has a good [blog post](https://www.uber.com/blog/logging/) about this for their logging if you're interested. This can also apply to metrics as they're also just logs in a different format.
-
 [^2]: Although they do seem to have a [hybrid vectorization](https://www.timescale.com/blog/teaching-postgres-new-tricks-simd-vectorization-for-faster-analytical-queries/) as well if you're interested.
-
 [^3]: There are other ways to smooth the transition, including delete -> update to merge segments or create a new table and record to both at the same time, but truncate was the quickest and most bullet proof method for our need at the time.

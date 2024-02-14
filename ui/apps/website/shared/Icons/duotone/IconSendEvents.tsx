@@ -1,10 +1,6 @@
-import IconTheme from "./theme";
+import IconTheme from './theme';
 
-export function IconSendEvents({
-  size = 20,
-  className = "",
-  color = "transparent",
-}) {
+export function IconSendEvents({ size = 20, className = '', color = 'transparent' }) {
   const theme = IconTheme(color);
   return (
     <svg
@@ -25,11 +21,7 @@ export function IconSendEvents({
           id="send-events-a"
         >
           <feOffset dy="1" in="SourceAlpha" result="shadowOffsetOuter1" />
-          <feGaussianBlur
-            stdDeviation="1"
-            in="shadowOffsetOuter1"
-            result="shadowBlurOuter1"
-          />
+          <feGaussianBlur stdDeviation="1" in="shadowOffsetOuter1" result="shadowBlurOuter1" />
           <feColorMatrix
             values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.268793706 0"
             in="shadowBlurOuter1"
@@ -44,11 +36,7 @@ export function IconSendEvents({
           id="send-events-c"
         >
           <feOffset dy="1" in="SourceAlpha" result="shadowOffsetOuter1" />
-          <feGaussianBlur
-            stdDeviation="1"
-            in="shadowOffsetOuter1"
-            result="shadowBlurOuter1"
-          />
+          <feGaussianBlur stdDeviation="1" in="shadowOffsetOuter1" result="shadowBlurOuter1" />
           <feColorMatrix
             values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.268793706 0"
             in="shadowBlurOuter1"
@@ -64,21 +52,9 @@ export function IconSendEvents({
         />
       </defs>
       <g fill="none" fillRule="nonzero">
-        <use
-          fill="#000"
-          filter="url(#send-events-a)"
-          xlinkHref="#send-events-b"
-        />
-        <use
-          fill={theme.color}
-          opacity={theme.opacity}
-          xlinkHref="#send-events-b"
-        />
-        <use
-          fill="#000"
-          filter="url(#send-events-c)"
-          xlinkHref="#send-events-d"
-        />
+        <use fill="#000" filter="url(#send-events-a)" xlinkHref="#send-events-b" />
+        <use fill={theme.color} opacity={theme.opacity} xlinkHref="#send-events-b" />
+        <use fill="#000" filter="url(#send-events-c)" xlinkHref="#send-events-d" />
         <use fill="#FFF" xlinkHref="#send-events-d" />
       </g>
     </svg>

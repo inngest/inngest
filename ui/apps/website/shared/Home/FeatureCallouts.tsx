@@ -1,14 +1,15 @@
-import Link from "next/link";
-import Container from "../layout/Container";
-import { ChevronRightIcon } from "@heroicons/react/20/solid";
+import Link from 'next/link';
+import { ChevronRightIcon } from '@heroicons/react/20/solid';
+
+import Container from '../layout/Container';
 
 const features = [
   {
-    status: "New",
-    title: "Branch environments on every platform",
+    status: 'New',
+    title: 'Branch environments on every platform',
     description:
-      "Test your entire application end-to-end with an Inngest environment for every development branch that you deploy, without any extra work.",
-    href: "/blog/branch-environments?ref=homepage-feature-callouts",
+      'Test your entire application end-to-end with an Inngest environment for every development branch that you deploy, without any extra work.',
+    href: '/blog/branch-environments?ref=homepage-feature-callouts',
     icon: (
       <svg
         width="24"
@@ -27,10 +28,10 @@ const features = [
     ),
   },
   {
-    status: "Coming Soon",
-    title: "Replay",
+    status: 'Coming Soon',
+    title: 'Replay',
     description:
-      "Never deal with the hassle of dead-letter-queues. Replay one or millions of failed functions at any time with the click of a button.",
+      'Never deal with the hassle of dead-letter-queues. Replay one or millions of failed functions at any time with the click of a button.',
     href: null,
     icon: (
       <svg
@@ -54,32 +55,29 @@ const features = [
 export default function FeatureCallouts() {
   return (
     <Container className="-mt-36 tracking-tight">
-      <div className="mx-auto max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-5 md:grid-cols-2">
         {features.map(({ status, title, description, href, icon }, idx) => (
           <div
             key={idx}
-            className="flex flex-col justify-between items-start py-8 px-10 rounded-lg"
+            className="flex flex-col items-start justify-between rounded-lg px-10 py-8"
             style={{
-              backgroundImage:
-                "radial-gradient(114.31% 100% at 50% 0%, #131E38 0%, #0A1223 100%)",
+              backgroundImage: 'radial-gradient(114.31% 100% at 50% 0%, #131E38 0%, #0A1223 100%)',
             }}
           >
-            <span className="py-1 px-3 rounded-full text-teal-300 text-xs font-medium border border-teal-300/30 bg-teal-300/10 drop-shadow">
+            <span className="rounded-full border border-teal-300/30 bg-teal-300/10 px-3 py-1 text-xs font-medium text-teal-300 drop-shadow">
               {status}
             </span>
-            <div className="mt-6 mb-3 flex flex-row gap-3">
+            <div className="mb-3 mt-6 flex flex-row gap-3">
               {icon}
-              <h3 className="text-xl text-indigo-50 font-semibold">{title}</h3>
+              <h3 className="text-xl font-semibold text-indigo-50">{title}</h3>
             </div>
-            <p className="my-1.5 text-sm text-indigo-200 leading-relaxed">
-              {description}
-            </p>
+            <p className="my-1.5 text-sm leading-relaxed text-indigo-200">{description}</p>
 
             <Link
               href={href ? href : process.env.NEXT_PUBLIC_DISCORD_URL}
-              className="group mt-6 flex flex-row items-center text-sm text-indigo-100 transition-all hover:text-indigo-50 whitespace-nowrap"
+              className="group mt-6 flex flex-row items-center whitespace-nowrap text-sm text-indigo-100 transition-all hover:text-indigo-50"
             >
-              {href ? "Learn More" : "Join Our Community for First Access"}{" "}
+              {href ? 'Learn More' : 'Join Our Community for First Access'}{' '}
               <ChevronRightIcon className="h-4 transition-all group-hover:translate-x-1" />
             </Link>
           </div>

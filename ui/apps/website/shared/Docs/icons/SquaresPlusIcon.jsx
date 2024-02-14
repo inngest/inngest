@@ -13,5 +13,5 @@ export function SquaresPlusIcon(props) {
         d="M14.5 11.5v6M17.5 14.5h-6"
       />
     </svg>
-  )
+  );
 }

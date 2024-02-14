@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react';
 
 type Props = {
   width?: number;
@@ -12,13 +12,7 @@ const defaultWidth = 100;
 const defaultHeight = 30;
 const widthToHeight = 100 / 30;
 
-const Logo = ({
-  width,
-  height,
-  fill = "currentColor",
-  className = "brand-logo",
-  style,
-}: Props) => {
+const Logo = ({ width, height, fill = 'currentColor', className = 'brand-logo', style }: Props) => {
   let h = height,
     w = width;
 
@@ -35,13 +29,7 @@ const Logo = ({
 
   return (
     <div className={className} style={style}>
-      <svg
-        width={w}
-        height={h}
-        viewBox="0 0 100 30"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
+      <svg width={w} height={h} viewBox="0 0 100 30" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path
           fillRule="evenodd"
           clipRule="evenodd"

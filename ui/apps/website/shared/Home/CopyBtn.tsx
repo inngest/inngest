@@ -1,5 +1,5 @@
-import classNames from "src/utils/classNames";
-import { useState } from "react";
+import { useState } from 'react';
+import classNames from 'src/utils/classNames';
 
 export default function CopyBtn({ btnAction, copy }) {
   const [clickedState, setClickedState] = useState(false);
@@ -13,16 +13,14 @@ export default function CopyBtn({ btnAction, copy }) {
   };
 
   return (
-    <button className="ml-1 relative group" onClick={() => handleClick(copy)}>
+    <button className="group relative ml-1" onClick={() => handleClick(copy)}>
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 20 20"
         fill="currentColor"
         className={classNames(
-          clickedState
-            ? `text-indigo-400`
-            : `text-slate-400 group-hover:text-white`,
-          `transition-all duration-150 w-4 h-4`
+          clickedState ? `text-indigo-400` : `text-slate-400 group-hover:text-white`,
+          `h-4 w-4 transition-all duration-150`
         )}
       >
         <path
@@ -31,8 +29,8 @@ export default function CopyBtn({ btnAction, copy }) {
           clipRule="evenodd"
         />
       </svg>
-      <div className="absolute opacity-0 group-hover:opacity-100 transition-all duration-150 bg-slate-900/80 text-slate-300 font-semibold text-xs px-3 py-1.5 rounded bottom-[30px] -left-[20px]">
-        {clickedState ? "Copied" : "Copy"}
+      <div className="absolute -left-[20px] bottom-[30px] rounded bg-slate-900/80 px-3 py-1.5 text-xs font-semibold text-slate-300 opacity-0 transition-all duration-150 group-hover:opacity-100">
+        {clickedState ? 'Copied' : 'Copy'}
       </div>
     </button>
   );

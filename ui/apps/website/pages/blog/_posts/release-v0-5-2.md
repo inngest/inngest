@@ -1,8 +1,8 @@
 ---
-heading: "Inngest: OS v0.5.2 released"
+heading: 'Inngest: OS v0.5.2 released'
 subtitle: Our next release improving rollbacks and developer UX
 date: 2022-08-09
-image: "/assets/blog/release-v0.5.0.jpg"
+image: '/assets/blog/release-v0.5.0.jpg'
 tags: release-notes
 ---
 

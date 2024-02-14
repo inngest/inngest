@@ -5,5 +5,8 @@
 # Next.js build output
 .next/
 
+# MDX files
+*.mdx
+
 # pnpm lock file
 pnpm-lock.yaml

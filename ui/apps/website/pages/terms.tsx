@@ -1,13 +1,13 @@
-import styled from "@emotion/styled";
-import Header from "src/shared/Header";
-import Container from "src/shared/layout/Container";
-import Footer from "src/shared/Footer";
+import styled from '@emotion/styled';
+import Footer from 'src/shared/Footer';
+import Header from 'src/shared/Header';
+import Container from 'src/shared/layout/Container';
 
 export async function getStaticProps() {
   return {
     props: {
       meta: {
-        title: "Terms",
+        title: 'Terms',
         description: "Inngest's terms and conditions",
       },
     },

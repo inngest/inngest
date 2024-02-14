@@ -1,4 +1,4 @@
-import type monaco from "monaco-editor";
+import type monaco from 'monaco-editor';
 
 // eslint-disable-next-line
 declare const process: {
@@ -34,8 +34,8 @@ export type Typedef = {
   fields?: Shape;
 };
 
-export type Scalar = "unknown" | "int" | "float" | "string" | "boolean";
-export type Compound = "none" | "array" | "map";
+export type Scalar = 'unknown' | 'int' | 'float' | 'string' | 'boolean';
+export type Compound = 'none' | 'array' | 'map';
 
 export type Action = {
   dsn: string;
@@ -60,7 +60,7 @@ export type ActionVersion = {
   Settings: { [key: string]: any };
   WorkflowMetadata: WorkflowMetadata[];
   Response: {
-    [key: string]: { name: "string"; type: Scalar; optional: boolean };
+    [key: string]: { name: 'string'; type: Scalar; optional: boolean };
   };
   Edges: ActionEdge[];
 };
@@ -71,11 +71,11 @@ export type ActionEdge = {
 } & (EdgeTypeEdge | EdgeTypeAsync);
 
 export type EdgeTypeEdge = {
-  type: "edge";
+  type: 'edge';
 };
 
 export type EdgeTypeAsync = {
-  type: "async";
+  type: 'async';
   async: {
     ttl: string;
     event: string;
@@ -106,23 +106,23 @@ type BaseFormProps = {
 };
 
 export type WorkflowFormTextarea = BaseFormProps & {
-  type: "textarea";
+  type: 'textarea';
 };
 
 export type WorkflowFormInput = BaseFormProps & {
-  type: "input";
+  type: 'input';
 };
 
 export type WorkflowFormDatetime = BaseFormProps & {
-  type: "datetime";
+  type: 'datetime';
 };
 
 export type WorkflowFormToggle = BaseFormProps & {
-  type: "toggle";
+  type: 'toggle';
 };
 
 export type WorkflowFormSelect = BaseFormProps & {
-  type: "select";
+  type: 'select';
   formselect: {
     choices: Array<{ name: string; value: string }>;
     eval?: string;
@@ -206,7 +206,7 @@ export type ContactAttribute = {
 
 export type CommsUnsubscribe = {
   commType: string;
-  service: "sms" | "email";
+  service: 'sms' | 'email';
 };
 
 export type IntegrationEvent = {

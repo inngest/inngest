@@ -1,10 +1,10 @@
-import React, { ReactElement } from "react";
+import React, { ReactElement } from 'react';
 
-import Button from "./Button";
+import Button from './Button';
 
 type FeatureCalloutsProps = {
   heading: ReactElement | string;
-  backgrounds?: "alternating" | "gray";
+  backgrounds?: 'alternating' | 'gray';
   features: {
     topic: string;
     title: string;
@@ -23,26 +23,26 @@ type FeatureCalloutsProps = {
 
 const FeatureCallouts = ({
   heading,
-  backgrounds = "alternating",
+  backgrounds = 'alternating',
   features = [],
   cta,
 }: FeatureCalloutsProps) => {
   return (
-    <div className="container mx-auto max-w-5xl my-24">
-      <div className="text-center px-6 max-xl mx-auto pb-16">
+    <div className="container mx-auto my-24 max-w-5xl">
+      <div className="max-xl mx-auto px-6 pb-16 text-center">
         <h2 className="text-4xl">{heading}</h2>
       </div>
       {features.map((f, i) => (
         <div
           key={`feature-${i}`}
-          className="w-full flex flex-col lg:flex-row items-center py-4 px-8 lg:px-0"
+          className="flex w-full flex-col items-center px-8 py-4 lg:flex-row lg:px-0"
         >
           <div
-            className={`lg:w-1/2 px-6 lg:px-16 pt-8 pb-16 lg:py-0 order-2 lg:order-${
-              i % 2 === 0 ? "1" : "2"
+            className={`order-2 px-6 pb-16 pt-8 lg:w-1/2 lg:px-16 lg:py-0 lg:order-${
+              i % 2 === 0 ? '1' : '2'
             }`}
           >
-            <div className="uppercase text-color-iris-100 text-xs pb-2">
+            <div className="text-color-iris-100 pb-2 text-xs uppercase">
               <pre>{f.topic}</pre>
             </div>
             <h3 className="pb-2">{f.title}</h3>
@@ -50,12 +50,12 @@ const FeatureCallouts = ({
           </div>
           <div
             className={`${
-              backgrounds === "gray" ? "bg-light-gray" : `alt-bg-${i}`
-            } rounded-lg p-12 h-[350px] sm:h-[500px] lg:h-[400px] xl:h-[500px] w-full lg:w-1/2 bg-orange-50 order-1 lg:order-${
-              i % 2 === 0 ? "2" : "1"
+              backgrounds === 'gray' ? 'bg-light-gray' : `alt-bg-${i}`
+            } order-1 h-[350px] w-full rounded-lg bg-orange-50 p-12 sm:h-[500px] lg:h-[400px] lg:w-1/2 xl:h-[500px] lg:order-${
+              i % 2 === 0 ? '2' : '1'
             } flex items-center justify-center`}
           >
-            {typeof f.image === "string" ? (
+            {typeof f.image === 'string' ? (
               <img src={f.image} alt={`A graphic of ${f.title} feature`} />
             ) : (
               f.image
@@ -64,7 +64,7 @@ const FeatureCallouts = ({
         </div>
       ))}
       {cta && (
-        <div className="text-center px-6 max-xl mx-auto pt-16 flex flex justify-center">
+        <div className="max-xl mx-auto flex flex justify-center px-6 pt-16 text-center">
           <Button kind="outlinePrimary" href={cta.href}>
             {cta.text}
           </Button>

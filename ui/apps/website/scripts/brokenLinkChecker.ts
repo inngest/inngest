@@ -1,5 +1,5 @@
-import { URL } from "node:url";
-import blc from "broken-link-checker";
+import { URL } from 'node:url';
+import blc from 'broken-link-checker';
 
 const SITE_URL = process.argv.pop();
 
@@ -7,26 +7,26 @@ const options = {
   honorRobotExclusions: false,
   excludedKeywords: [
     `${SITE_URL}/test/`,
-    "https://www.iubenda.com",
-    "https://stripe.com/docs/api",
-    "https://docs.github.com",
-    "https://docs.retool.com",
-    "https://youtu.be",
-    "https://svelte.dev",
-    "https://deno.land",
-    "https://the-guild.dev/graphql/yoga-server",
-    "https://envelop.dev",
-    "https://twitter.com",
-    "https://postmarkapp.com",
-    "https://api-docs.inngest.com/docs/inngest-api",
-    "http://localhost:8288",
-    "http://localhost:",
-    "https://www.uber.com",
-    "https://www.tripadvisor.com",
+    'https://www.iubenda.com',
+    'https://stripe.com/docs/api',
+    'https://docs.github.com',
+    'https://docs.retool.com',
+    'https://youtu.be',
+    'https://svelte.dev',
+    'https://deno.land',
+    'https://the-guild.dev/graphql/yoga-server',
+    'https://envelop.dev',
+    'https://twitter.com',
+    'https://postmarkapp.com',
+    'https://api-docs.inngest.com/docs/inngest-api',
+    'http://localhost:8288',
+    'http://localhost:',
+    'https://www.uber.com',
+    'https://www.tripadvisor.com',
   ],
 };
 
-const brokenReasonsToIgnore = ["HTTP_308"];
+const brokenReasonsToIgnore = ['HTTP_308'];
 
 const seen = [];
 const uniqueURLs = {};
@@ -63,7 +63,7 @@ function logBrokenLink(result) {
 
 const siteChecker = new blc.SiteChecker(options, {
   error: function (error) {
-    console.log("ERROR: ", error);
+    console.log('ERROR: ', error);
   },
   robots: function (robots, customData) {},
   html: function (tree, robots, response, pageUrl, customData) {},

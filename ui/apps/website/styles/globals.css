@@ -1,7 +1,7 @@
-@import url("./reset.css");
-@import url("https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap");
-@import url("/assets/fonts.css");
-@import url("./codeBlockTheme.css");
+@import url('./reset.css');
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap');
+@import url('/assets/fonts.css');
+@import url('./codeBlockTheme.css');
 
 @tailwind base;
 @tailwind components;
@@ -11,20 +11,19 @@
 
 @supports (font-variation-settings: normal) {
   html {
-    font-family: "Inter var", sans-serif;
+    font-family: 'Inter var', sans-serif;
   }
 }
 
 :root {
   /* Used for text pages;  not the homepage */
-  --text-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-  --font: "Real Text", var(--text-font);
-  --font-mono: "Roboto Mono", "Fira Mono", monospace;
+  --text-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+    Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  --font: 'Real Text', var(--text-font);
+  --font-mono: 'Roboto Mono', 'Fira Mono', monospace;
   --font-heading: var(--font);
 
-
-  --black: #2E2E38;
+  --black: #2e2e38;
   --black-rgb: 4, 4, 8;
   --gray: #212121;
   --green: #16a973;
@@ -32,11 +31,11 @@
   --color-white: #fff;
   --color-almost-white: #fbfbff;
   --color-light-gray: #f8f7fa;
-  --color-iris-60: #A5A6F6;
-  --color-iris-100: #5D5FEF;
-  --color-fuschia-100: #EF5DA8;
-  --color-gray-purple: #8A8A9D;
-  --color-light-purple: #D1D1FA;
+  --color-iris-60: #a5a6f6;
+  --color-iris-100: #5d5fef;
+  --color-fuschia-100: #ef5da8;
+  --color-gray-purple: #8a8a9d;
+  --color-light-purple: #d1d1fa;
   --color-dark-purple: #525398;
 
   --bg-color-d: #0a0a12;
@@ -47,7 +46,7 @@
   --highlight-color: #ffffff;
   --primary-color: #4636f5;
   --primary-color-rgb: 70, 54, 245;
-  --stroke-color: #D3D3DF;
+  --stroke-color: #d3d3df;
   --stroke-color-light: #80848e;
   --font-color-primary: var(--color-almost-black);
   --font-color-secondary: rgb(71, 85, 105);
@@ -76,7 +75,7 @@
 
   /* Default to dark theme */
   color: #fff;
-  background-color: #080D19;
+  background-color: #080d19;
 }
 
 /* Legacy base styles */
@@ -85,11 +84,10 @@
 }
 
 /* Crutch until we can remove old page templates */
-.v1:not(.docs) body  {
+.v1:not(.docs) body {
   color: var(--font-color-primary);
   background: var(--color-almost-white);
 }
-
 
 html.docs {
   color: var(--font-color-primary);
@@ -98,7 +96,7 @@ html.docs {
 }
 
 * {
-  transition: box-shadow .3s;
+  transition: box-shadow 0.3s;
 }
 
 /** Themes - Light is default */
@@ -120,8 +118,6 @@ body.dark-theme {
 .home {
   font-family: var(--text-font);
 }
-
-
 
 a {
   color: var(--link-color);
@@ -184,11 +180,14 @@ a {
   letter-spacing: 1px;
 }
 
-:root.v1 p+p {
+:root.v1 p + p {
   margin-top: 1.5rem;
 }
 
-:root.v1 p, :root.v1 ol, :root.v1 ul, :root.v1 li {
+:root.v1 p,
+:root.v1 ol,
+:root.v1 ul,
+:root.v1 li {
   font-size: 0.9rem;
 }
 
@@ -206,11 +205,11 @@ a {
   margin: 1rem 0;
 }
 
-:root.v1 li+li {
+:root.v1 li + li {
   margin-top: 0.75rem;
 }
 
- /* Basic inline code highlighting */
+/* Basic inline code highlighting */
 :root.v1 p code,
 :root.v1 li code {
   background: var(--color-light-gray);
@@ -218,7 +217,7 @@ a {
 }
 p code,
 li code {
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   padding: 0.1em 0.3em 0.15em;
   border-radius: 3px;
 }
@@ -239,7 +238,7 @@ li code {
   /**
    * This ensures that pre-formatted code breaks so that there's no
    * horizontal scroll.  `code .line` is used for code formatting.
-   *//*
+   */ /*
   pre,
   code .line {
     white-space: pre-wrap !important;
@@ -328,8 +327,8 @@ kbd {
   color: transparent;
 }
 .gradient-text-ltr {
-  --from-color: #B565F3;
-  --to-color: #4636F5;
+  --from-color: #b565f3;
+  --to-color: #4636f5;
   background: linear-gradient(90deg, var(--from-color) 0%, var(--to-color) 100%);
 }
 .gradient-spotlight {
@@ -377,11 +376,14 @@ kbd {
 }
 
 .bg-dark-rainbow-gradient {
-  background:
-    url(/assets/texture-gridlines-10.svg),
-    linear-gradient(246.04deg, rgba(222, 224, 35, 0.12) 0%, rgba(159, 205, 83, 0) 50%, rgba(105, 255, 151, 0.12) 100%),
-    linear-gradient(113.96deg, rgba(93, 95, 239, 0.2) 0%, rgba(239, 95, 93, 0.2) 100%),
-    #000000;
+  background: url(/assets/texture-gridlines-10.svg),
+    linear-gradient(
+      246.04deg,
+      rgba(222, 224, 35, 0.12) 0%,
+      rgba(159, 205, 83, 0) 50%,
+      rgba(105, 255, 151, 0.12) 100%
+    ),
+    linear-gradient(113.96deg, rgba(93, 95, 239, 0.2) 0%, rgba(239, 95, 93, 0.2) 100%), #000000;
 }
 .bg-texture-gridlines,
 .bg-texture-gridlines-30 {
@@ -391,7 +393,6 @@ kbd {
 }
 .bg-texture-gridlines {
   background-image: url(/assets/texture-gridlines-10.svg);
-
 }
 .bg-texture-gridlines-30 {
   background-image: url(/assets/texture-gridlines-30.svg);
@@ -681,14 +682,14 @@ ul.check li {
 .center-dash-purple:before {
   z-index: 0;
   position: absolute;
-  content: "";
+  content: '';
   display: block;
   width: 100%;
   border-bottom: 2px dashed var(--color-light-purple);
   top: 50%;
   margin-top: 1px;
   width: 100%;
-  opacity: .5;
+  opacity: 0.5;
 }
 
 /** Blog code shift **/
@@ -710,7 +711,6 @@ ul.check li {
     margin-left: -50px;
   }
 }
-
 
 /** SDK Code snippet */
 .transform-iso,
@@ -736,19 +736,25 @@ ul.check li {
 
 /* Queue graphic animation */
 @keyframes queue-message-flash {
-  40% {background-color: #fff;}
-  50% {background-color: rgb(226 232 240); /* tailwind slate-200 */}
-  60% {background-color: #fff;}
+  40% {
+    background-color: #fff;
+  }
+  50% {
+    background-color: rgb(226 232 240); /* tailwind slate-200 */
+  }
+  60% {
+    background-color: #fff;
+  }
 }
 
 .code-title {
-    margin: 0 0 .75rem;
-    color: var(--color-gray-purple);
-    font-size: 14px;
-    opacity: 0.8;
+  margin: 0 0 0.75rem;
+  color: var(--color-gray-purple);
+  font-size: 14px;
+  opacity: 0.8;
 }
 .code-title:before {
-  content: "//";
+  content: '//';
   display: inline-block;
   margin: 0 0.25rem 0 0;
 }
@@ -760,13 +766,12 @@ ul.check li {
 .blog-image-container\:2 img {
   margin-bottom: 0.5rem;
 }
-@media (min-width:640px) {
+@media (min-width: 640px) {
   .blog-image-container\:2 {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-
 .hero-text-shadow {
-  text-shadow: 0 5px 30px rgba(224,198,210,0.2);
+  text-shadow: 0 5px 30px rgba(224, 198, 210, 0.2);
 }

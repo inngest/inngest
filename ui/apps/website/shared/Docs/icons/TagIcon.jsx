@@ -15,5 +15,5 @@ export function TagIcon(props) {
       />
       <circle cx="7" cy="7" r="1.5" fill="none" />
     </svg>
-  )
+  );
 }

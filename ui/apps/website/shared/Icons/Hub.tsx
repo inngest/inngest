@@ -1,4 +1,4 @@
-import * as React from "react"
+import * as React from 'react';
 
 const Hub: React.FC<{}> = (props) => {
   return (
@@ -16,7 +16,7 @@ const Hub: React.FC<{}> = (props) => {
         fill="#fff"
       />
     </svg>
-  )
-}
+  );
+};
 
-export default Hub
+export default Hub;

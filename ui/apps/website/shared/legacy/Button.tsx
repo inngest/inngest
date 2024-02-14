@@ -1,72 +1,70 @@
-import React from "react";
-import styled from "@emotion/styled";
-import { css, SerializedStyles } from "@emotion/react";
+import React from 'react';
+import { SerializedStyles, css } from '@emotion/react';
+import styled from '@emotion/styled';
 
 const Kinds = {
-  PRIMARY: "primary",
-  OUTLINE: "outline",
-  OUTLINE_HIGH_CONTRAST: "outlineHighContrast",
-  OUTLINE_PRIMARY: "outlinePrimary",
-  BLACK: "black",
+  PRIMARY: 'primary',
+  OUTLINE: 'outline',
+  OUTLINE_HIGH_CONTRAST: 'outlineHighContrast',
+  OUTLINE_PRIMARY: 'outlinePrimary',
+  BLACK: 'black',
 };
-export type Kinds = typeof Kinds[keyof typeof Kinds];
+export type Kinds = (typeof Kinds)[keyof typeof Kinds];
 
 // Button props
 type Props = React.HTMLAttributes<any> & {
   kind?: Kinds;
-  type?: "button" | "reset" | "submit" | undefined;
+  type?: 'button' | 'reset' | 'submit' | undefined;
   onClick?: (() => void) | ((e: React.SyntheticEvent) => any);
   disabled?: boolean;
   href?: string;
   target?: string;
   style?: object;
   className?: string;
-  size?: "small" | "medium" | "default";
+  size?: 'small' | 'medium' | 'default';
   children: React.ReactNode;
 };
 
-export default React.forwardRef<HTMLButtonElement, Props>(
-  (props: Props, ref) => {
-    const { kind, href, children, ...rest } = props;
-    let { onClick } = props;
+export default React.forwardRef<HTMLButtonElement, Props>((props: Props, ref) => {
+  const { kind, href, children, ...rest } = props;
+  let { onClick } = props;
 
-    let C: any = Button;
-    // lets us smartly apply "href" to link components
-    let cProps = {};
+  let C: any = Button;
+  // lets us smartly apply "href" to link components
+  let cProps = {};
 
-    if (href) {
-      C = Link;
-      cProps = { href: href };
-      onClick = (e: React.SyntheticEvent) => {
-        if (props.target !== undefined) {
-          // use a normal handler to open a tab if there's target="_blank" etc.
-          return;
-        }
-        if (href.indexOf("://") !== -1) {
-          window.location.href = href;
-          return;
-        }
-      };
-    }
-
-    return (
-      <C
-        {...cProps}
-        ref={ref}
-        css={[
-          kind && kindCSS[kind],
-          props.disabled && disabledCSS,
-          props.size !== "default" && sizeCSS[props.size],
-        ]}
-        {...rest}
-        onClick={onClick}
-        className={`button ${props.className || ""}`}
-      >
-        {children}
-      </C>
-    );
+  if (href) {
+    C = Link;
+    cProps = { href: href };
+    onClick = (e: React.SyntheticEvent) => {
+      if (props.target !== undefined) {
+        // use a normal handler to open a tab if there's target="_blank" etc.
+        return;
+      }
+      if (href.indexOf('://') !== -1) {
+        window.location.href = href;
+        return;
+      }
+    };
   }
-);
+
+  return (
+    <C
+      {...cProps}
+      ref={ref}
+      css={[
+        kind && kindCSS[kind],
+        props.disabled && disabledCSS,
+        props.size !== 'default' && sizeCSS[props.size],
+      ]}
+      {...rest}
+      onClick={onClick}
+      className={`button ${props.className || ''}`}
+    >
+      {children}
+    </C>
+  );
+});
 
 export const buttonCSS = css`
   border: var(--button-border-width) solid transparent;

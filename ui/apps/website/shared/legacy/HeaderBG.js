@@ -11,11 +11,11 @@ function getOppositeSide(angle, side) {
 function hexToRgb(hex) {
   let c;
   if (/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)) {
-    c = hex.substring(1).split("");
+    c = hex.substring(1).split('');
     if (c.length === 3) {
       c = [c[0], c[0], c[1], c[1], c[2], c[2]];
     }
-    c = "0x" + c.join("");
+    c = '0x' + c.join('');
     return {
       r: (c >> 16) & 255,
       g: (c >> 8) & 255,
@@ -107,35 +107,28 @@ class Particle {
       this.y -= 1;
     }
     ctx.beginPath();
-    if (this.o.blending && this.o.blending !== "none") {
+    if (this.o.blending && this.o.blending !== 'none') {
       ctx.globalCompositeOperation = this.o.blending;
     }
     const c1 = this.getRgba(this.r, this.o.opacity.center);
     const c2 = this.getRgba(this.r, this.o.opacity.edge);
     const gradientEndRadius =
-      this.h === "c"
+      this.h === 'c'
         ? this.s / 2
-        : this.h === "t"
+        : this.h === 't'
         ? this.s * 0.577
-        : this.h === "s"
+        : this.h === 's'
         ? this.s * 0.707
         : this.s;
-    const g = ctx.createRadialGradient(
-      this.x,
-      this.y,
-      0.01,
-      this.x,
-      this.y,
-      gradientEndRadius
-    );
+    const g = ctx.createRadialGradient(this.x, this.y, 0.01, this.x, this.y, gradientEndRadius);
     g.addColorStop(0, c1);
     g.addColorStop(1, c2);
     ctx.fillStyle = g;
     const halfSize = Math.abs(this.s / 2);
-    if (this.h === "c") {
+    if (this.h === 'c') {
       ctx.arc(this.x, this.y, halfSize, 0, 6.283185, false); // pi * 2
     }
-    if (this.h === "s") {
+    if (this.h === 's') {
       const l = this.x - halfSize;
       const r = this.x + halfSize;
       const t = this.y - halfSize;
@@ -145,7 +138,7 @@ class Particle {
       ctx.lineTo(r, t);
       ctx.lineTo(l, t);
     }
-    if (this.h === "t") {
+    if (this.h === 't') {
       const baseToCenter = getOppositeSide(30, halfSize);
       const baseY = this.y + baseToCenter;
       ctx.moveTo(this.x - halfSize, baseY);
@@ -160,16 +153,16 @@ class Particle {
 export class FinisherHeader {
   constructor(options, el) {
     this.el = el;
-    this.el.style.position = "relative";
-    this.c = document.createElement("canvas");
-    this.x = this.c.getContext("2d");
+    this.el.style.position = 'relative';
+    this.c = document.createElement('canvas');
+    this.x = this.c.getContext('2d');
     this.suffix = Math.floor(Math.random() * 100000).toString(16);
-    this.c.setAttribute("id", this.suffix);
+    this.c.setAttribute('id', this.suffix);
 
     el.appendChild(this.c);
     let tm;
     window.addEventListener(
-      "resize",
+      'resize',
       () => {
         clearTimeout(tm);
         tm = setTimeout(this.resize.bind(this), 150);
@@ -188,11 +181,9 @@ export class FinisherHeader {
     this.c.width = this.o.c.w;
     this.c.height = this.o.c.h;
     const offset = getOppositeSide(this.o.skew, this.o.c.w / 2);
-    const transform = `skewY(${this.o.skew || 0}deg) translateY(-${
-      offset || 0
-    }px)`;
+    const transform = `skewY(${this.o.skew || 0}deg) translateY(-${offset || 0}px)`;
     this.c.setAttribute(
-      "style",
+      'style',
       `position: absolute; top: 0; left: 0; right: 0; bottom: 0; -webkit-transform: ${transform}; transform: ${transform}; background: rgb(${this.bc.r}, ${this.bc.g}, ${this.bc.b});`
     );
   }
@@ -209,16 +200,10 @@ export class FinisherHeader {
     let curColor = 0;
     this.particles = [];
     this.o.ac =
-      window.innerWidth < 600 && this.o.count > 5
-        ? Math.round(this.o.count / 2)
-        : this.o.count;
+      window.innerWidth < 600 && this.o.count > 5 ? Math.round(this.o.count / 2) : this.o.count;
     for (let i = 0; i < this.o.ac; i++) {
       const quadrant = i % 4;
-      const item = new Particle(
-        this.o.colors.particles[curColor],
-        quadrant,
-        this.o
-      );
+      const item = new Particle(this.o.colors.particles[curColor], quadrant, this.o);
       if (++curColor >= this.o.colors.particles.length) {
         curColor = 0;
       }

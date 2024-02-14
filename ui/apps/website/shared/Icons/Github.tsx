@@ -1,11 +1,8 @@
-import React from "react";
-import type { IconProps } from "./props";
+import React from 'react';
 
-const Github = ({
-  size = "1em",
-  fill = "currentColor",
-  className = "",
-}: IconProps) => (
+import type { IconProps } from './props';
+
+const Github = ({ size = '1em', fill = 'currentColor', className = '' }: IconProps) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width={size}

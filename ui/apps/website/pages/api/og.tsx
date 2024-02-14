@@ -1,9 +1,9 @@
-import type { NextApiRequest } from "next";
-import { ImageResponse } from "@vercel/og";
-import Logo from "src/shared/Icons/Logo";
+import type { NextApiRequest } from 'next';
+import { ImageResponse } from '@vercel/og';
+import Logo from 'src/shared/Icons/Logo';
 
 export const config = {
-  runtime: "experimental-edge",
+  runtime: 'experimental-edge',
 };
 
 const SVGBackgroundGradient =
@@ -17,10 +17,10 @@ const SVGBackgroundGradient =
 </radialGradient>
 </defs>
 </svg>
-`.replace(/\n/g, "");
+`.replace(/\n/g, '');
 
 const font = fetch(
-  new URL("../../public/assets/fonts/Inter/Inter-Medium.ttf", import.meta.url)
+  new URL('../../public/assets/fonts/Inter/Inter-Medium.ttf', import.meta.url)
 ).then((res) => res.arrayBuffer());
 
 export default async function handler(req: NextApiRequest) {
@@ -29,10 +29,8 @@ export default async function handler(req: NextApiRequest) {
     const { searchParams } = new URL(req.url);
 
     // ?title=<title>
-    const hasTitle = searchParams.has("title");
-    const title = hasTitle
-      ? searchParams.get("title")?.slice(0, 100)
-      : "Inngest";
+    const hasTitle = searchParams.has('title');
+    const title = hasTitle ? searchParams.get('title')?.slice(0, 100) : 'Inngest';
     const isLongTitle = title.length > 40;
 
     return new ImageResponse(
@@ -40,37 +38,37 @@ export default async function handler(req: NextApiRequest) {
         <div
           tw="border-t-8 border[#5d5fef]"
           style={{
-            backgroundColor: "#0a0a12",
+            backgroundColor: '#0a0a12',
             backgroundImage: `url("data:image/svg+xml;utf8,${SVGBackgroundGradient}")`,
-            height: "100%",
-            width: "100%",
-            padding: "7% 6%",
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "flex-start",
-            flexDirection: "column",
-            flexWrap: "nowrap",
-            fontFamily: "Inter, sans-serif",
+            height: '100%',
+            width: '100%',
+            padding: '7% 6%',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'flex-start',
+            flexDirection: 'column',
+            flexWrap: 'nowrap',
+            fontFamily: 'Inter, sans-serif',
           }}
         >
           <Logo
             width={160}
-            fill={"#ffffff"}
+            fill={'#ffffff'}
             style={{
-              display: "flex",
+              display: 'flex',
             }}
           />
           <div
             style={{
               fontSize: isLongTitle ? 84 : 110,
-              fontStyle: "normal",
+              fontStyle: 'normal',
               fontWeight: 500,
-              letterSpacing: "-2.4px",
-              color: "white",
+              letterSpacing: '-2.4px',
+              color: 'white',
               marginTop: 48,
-              padding: "0",
+              padding: '0',
               lineHeight: 1.4,
-              whiteSpace: "normal",
+              whiteSpace: 'normal',
             }}
           >
             {title}
@@ -82,9 +80,9 @@ export default async function handler(req: NextApiRequest) {
         height: 630,
         fonts: [
           {
-            name: "Inter",
+            name: 'Inter',
             data: fontData,
-            style: "normal",
+            style: 'normal',
             weight: 500,
           },
         ],

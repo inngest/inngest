@@ -1,7 +1,8 @@
-import React from "react";
-import type { IconProps } from "./props";
+import React from 'react';
 
-export default ({ size = "1em", fill = "currentColor" }: IconProps) => (
+import type { IconProps } from './props';
+
+export default ({ size = '1em', fill = 'currentColor' }: IconProps) => (
   <svg
     width={size}
     height={size}

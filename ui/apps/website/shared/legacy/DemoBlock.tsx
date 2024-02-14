@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
-import styled from "@emotion/styled";
+import React, { useEffect, useState } from 'react';
+import styled from '@emotion/styled';
+import { trackDemoView } from 'src/utils/tracking';
 
-import { trackDemoView } from "src/utils/tracking";
-import Button from "./Button";
-import DemoModal from "./DemoModal";
-import Play from "../Icons/Play";
+import Play from '../Icons/Play';
+import Button from './Button';
+import DemoModal from './DemoModal';
 
 export default function DemoBlock({
   headline,
@@ -23,28 +23,29 @@ export default function DemoBlock({
 
   return (
     <div className="container mx-auto max-w-5xl px-12">
-      <div className="pt-8 px-2 flex flex-col md:flex-row gap-8 border-t-2">
-        <div className="basis-1/4" style={{ minWidth: "260px" }}>
-          <h2 className="text-lg font-normal mb-6">{headline}</h2>
-          <Button kind="primary" size="medium" href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=demo-section`}>
+      <div className="flex flex-col gap-8 border-t-2 px-2 pt-8 md:flex-row">
+        <div className="basis-1/4" style={{ minWidth: '260px' }}>
+          <h2 className="mb-6 text-lg font-normal">{headline}</h2>
+          <Button
+            kind="primary"
+            size="medium"
+            href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=demo-section`}
+          >
             Start building
           </Button>
         </div>
         <div className="basis-3/4">
-          <p className="text-md pb-6 text-color-gray-purple">{description}</p>
+          <p className="text-md text-color-gray-purple pb-6">{description}</p>
           <VidPlaceholder
-            className="flex items-center cursor-pointer"
+            className="flex cursor-pointer items-center"
             onClick={() => setDemo(true)}
           >
-            <button
-              className="flex items-center justify-center"
-              onClick={() => setDemo(true)}
-            >
+            <button className="flex items-center justify-center" onClick={() => setDemo(true)}>
               <Play outline={false} fill="var(--primary-color)" size={80} />
             </button>
             <img
               src="/assets/demo/twilio-sms-demo-preview.jpg"
-              className="rounded-md border-2 border-color-iris-60"
+              className="border-color-iris-60 rounded-md border-2"
             />
           </VidPlaceholder>
         </div>

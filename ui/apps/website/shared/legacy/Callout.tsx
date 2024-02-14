@@ -1,5 +1,6 @@
-import styled from "@emotion/styled";
-import Button from "./Button";
+import styled from '@emotion/styled';
+
+import Button from './Button';
 
 type Props = {
   small?: string;
@@ -10,27 +11,20 @@ type Props = {
   style?: any;
 };
 
-const Callout: React.FC<Props> = ({
-  small,
-  heading,
-  cta,
-  link,
-  ctaRef,
-  style,
-}) => {
+const Callout: React.FC<Props> = ({ small, heading, cta, link, ctaRef, style }) => {
   return (
     <div className="reg-grid" style={style}>
       <Content className="bg-primary">
         <div>
-          <span>{small || "Now with zero yaml ;-)"}</span>
-          <h2>{heading || "Deploy a serverless function in minutes."}</h2>
+          <span>{small || 'Now with zero yaml ;-)'}</span>
+          <h2>{heading || 'Deploy a serverless function in minutes.'}</h2>
         </div>
         <Button
           kind="black"
           size="medium"
-          href={`${link || process.env.NEXT_PUBLIC_SIGNUP_URL}${ctaRef ? "?ref=" + ctaRef : ""}`}
+          href={`${link || process.env.NEXT_PUBLIC_SIGNUP_URL}${ctaRef ? '?ref=' + ctaRef : ''}`}
         >
-          {cta || ">_ Start building"}
+          {cta || '>_ Start building'}
         </Button>
       </Content>
     </div>
@@ -79,7 +73,7 @@ const Content = styled.div`
 
   &:before {
     display: block;
-    content: "";
+    content: '';
     background: var(--primary-color);
     left: -100%;
     position: absolute;

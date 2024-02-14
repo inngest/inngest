@@ -1,7 +1,7 @@
 // @ts-nocheck
-import React, { useState, useEffect } from "react";
-import styled from "@emotion/styled";
-import { css } from "@emotion/react";
+import React, { useEffect, useState } from 'react';
+import { css } from '@emotion/react';
+import styled from '@emotion/styled';
 
 type Props = {
   onClose: () => void;

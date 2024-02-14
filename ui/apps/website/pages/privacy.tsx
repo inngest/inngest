@@ -1,15 +1,15 @@
-import styled from "@emotion/styled";
-import React from "react";
-import Header from "src/shared/Header";
-import Container from "src/shared/layout/Container";
-import Footer from "src/shared/Footer";
-import { Button } from "src/shared/Button";
+import React from 'react';
+import styled from '@emotion/styled';
+import { Button } from 'src/shared/Button';
+import Footer from 'src/shared/Footer';
+import Header from 'src/shared/Header';
+import Container from 'src/shared/layout/Container';
 
 export async function getStaticProps() {
   return {
     props: {
       meta: {
-        title: "Privacy",
+        title: 'Privacy',
         description: "Inngest's privacy policy",
       },
     },

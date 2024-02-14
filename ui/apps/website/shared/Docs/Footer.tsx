@@ -1,11 +1,11 @@
-import React, { forwardRef, Fragment, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/router";
-import { Transition } from "@headlessui/react";
+import React, { Fragment, forwardRef, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { Transition } from '@headlessui/react';
 
-import { Button } from "../Button";
-import { topLevelNav } from "./navigationStructure";
-import SocialBadges from "./SocialBadges";
+import { Button } from '../Button';
+import SocialBadges from './SocialBadges';
+import { topLevelNav } from './navigationStructure';
 
 function CheckIcon(props) {
   return (
@@ -26,44 +26,35 @@ function FeedbackButton(props) {
   return (
     <button
       type="submit"
-      className="px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-900/2.5 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white"
+      className="hover:bg-slate-900/2.5 px-3 text-sm font-medium text-slate-600 transition hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white"
       {...props}
     />
   );
 }
 
-const FeedbackForm = forwardRef<
-  HTMLFormElement,
-  { onSubmit: React.FormEventHandler }
->(function FeedbackForm({ onSubmit }, ref) {
-  return (
-    <form
-      ref={ref}
-      onSubmit={onSubmit}
-      className="absolute inset-0 flex items-center justify-center gap-6 md:justify-start"
-    >
-      <p className="text-sm text-slate-600 dark:text-slate-400">
-        Was this page helpful?
-      </p>
-      <div className="group grid h-8 grid-cols-[1fr,1px,1fr] overflow-hidden rounded-full border border-slate-900/10 dark:border-white/10">
-        <FeedbackButton data-response="yes">Yes</FeedbackButton>
-        <div className="bg-slate-900/10 dark:bg-white/10" />
-        <FeedbackButton data-response="no">No</FeedbackButton>
-      </div>
-    </form>
-  );
-});
+const FeedbackForm = forwardRef<HTMLFormElement, { onSubmit: React.FormEventHandler }>(
+  function FeedbackForm({ onSubmit }, ref) {
+    return (
+      <form
+        ref={ref}
+        onSubmit={onSubmit}
+        className="absolute inset-0 flex items-center justify-center gap-6 md:justify-start"
+      >
+        <p className="text-sm text-slate-600 dark:text-slate-400">Was this page helpful?</p>
+        <div className="group grid h-8 grid-cols-[1fr,1px,1fr] overflow-hidden rounded-full border border-slate-900/10 dark:border-white/10">
+          <FeedbackButton data-response="yes">Yes</FeedbackButton>
+          <div className="bg-slate-900/10 dark:bg-white/10" />
+          <FeedbackButton data-response="no">No</FeedbackButton>
+        </div>
+      </form>
+    );
+  }
+);
 
-const FeedbackThanks = forwardRef<HTMLDivElement, {}>(function FeedbackThanks(
-  _props,
-  ref
-) {
+const FeedbackThanks = forwardRef<HTMLDivElement, {}>(function FeedbackThanks(_props, ref) {
   return (
-    <div
-      ref={ref}
-      className="absolute inset-0 flex justify-center md:justify-start"
-    >
-      <div className="flex items-center gap-3 rounded-full bg-indigo-50/50 py-1 pr-3 pl-1.5 text-sm text-indigo-900 ring-1 ring-inset ring-indigo-500/20 dark:bg-indigo-500/5 dark:text-indigo-200 dark:ring-indigo-500/30">
+    <div ref={ref} className="absolute inset-0 flex justify-center md:justify-start">
+      <div className="flex items-center gap-3 rounded-full bg-indigo-50/50 py-1 pl-1.5 pr-3 text-sm text-indigo-900 ring-1 ring-inset ring-indigo-500/20 dark:bg-indigo-500/5 dark:text-indigo-200 dark:ring-indigo-500/30">
         <CheckIcon className="h-5 w-5 flex-none fill-indigo-500 stroke-white dark:fill-indigo-200/20 dark:stroke-indigo-200" />
         Thanks for your feedback!
       </div>
@@ -114,7 +105,7 @@ function PageLink({ label, page, previous = false }) {
         href={page.href}
         aria-label={`${label}: ${page.title}`}
         variant="secondary"
-        arrow={previous ? "left" : "right"}
+        arrow={previous ? 'left' : 'right'}
         size="sm"
       >
         {label}
@@ -144,9 +135,7 @@ function flattenNav(nav) {
 function PageNavigation() {
   let router = useRouter();
   let allPages = flattenNav(topLevelNav);
-  let currentPageIndex = allPages.findIndex(
-    (page) => page.href === router.pathname
-  );
+  let currentPageIndex = allPages.findIndex((page) => page.href === router.pathname);
 
   if (currentPageIndex === -1) {
     return null;
@@ -182,7 +171,7 @@ function PageNavigation() {
 
 function SmallPrint() {
   return (
-    <div className="flex flex-col items-center justify-between gap-5 border-t border-slate-900/5 pt-8 dark:border-white/5 sm:flex-row">
+    <div className="flex flex-col items-center justify-between gap-5 border-t border-slate-900/5 pt-8 sm:flex-row dark:border-white/5">
       <p className="text-xs text-slate-600 dark:text-slate-400">
         &copy; {new Date().getFullYear()} Inngest Inc. All rights reserved.
       </p>

@@ -28,7 +28,7 @@
  * ```
  */
 export const stripIndent = (str: string, greedy?: boolean) => {
-  const matchRe = new RegExp(`^[ \\t]${greedy ? "*" : "+"}(?=\\S)`, "gm");
+  const matchRe = new RegExp(`^[ \\t]${greedy ? '*' : '+'}(?=\\S)`, 'gm');
   const match = str.match(matchRe);
 
   if (!match) {
@@ -36,7 +36,7 @@ export const stripIndent = (str: string, greedy?: boolean) => {
   }
 
   const indent = Math.min(...match.map((x) => x.length));
-  const re = new RegExp(`^[ \\t]{${indent}}`, "gm");
+  const re = new RegExp(`^[ \\t]{${indent}}`, 'gm');
 
-  return indent > 0 ? str.replace(re, "") : str;
+  return indent > 0 ? str.replace(re, '') : str;
 };

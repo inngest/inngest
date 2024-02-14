@@ -1,17 +1,12 @@
-import React from "react";
-import type { IconProps } from "./props";
+import React from 'react';
 
-const CLIGradient = ({ size = "56" }: IconProps) => (
-  <svg
-    width={56}
-    height={56}
-    viewBox="0 0 56 56"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
+import type { IconProps } from './props';
+
+const CLIGradient = ({ size = '56' }: IconProps) => (
+  <svg width={56} height={56} viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
     <mask
       id="mask0_781_2830"
-      style={{ maskType: "alpha" }}
+      style={{ maskType: 'alpha' }}
       maskUnits="userSpaceOnUse"
       x="0"
       y="0"

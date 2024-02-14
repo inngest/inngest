@@ -1,11 +1,10 @@
-import Link, { LinkProps } from "next/link";
-import clsx from "clsx";
+import React, { useState } from 'react';
+import Link, { LinkProps } from 'next/link';
+import clsx from 'clsx';
+import { ChevronDown, ChevronUp } from 'react-feather';
+import YouTube, { type YouTubeEmbedProps } from 'react-youtube-embed';
 
-import { Heading } from "./Heading";
-import React, { useState } from "react";
-import { ChevronDown, ChevronUp } from "react-feather";
-
-import YouTube, { type YouTubeEmbedProps } from "react-youtube-embed";
+import { Heading } from './Heading';
 
 // Hack to fix the YouTube component type. We probably want to migrate out of "react-youtube-embed"
 // since it's not maintained anymore.
@@ -31,14 +30,8 @@ export function a({
   );
 }
 
-export { Button } from "../Button";
-export {
-  CodeGroup,
-  Code as code,
-  Pre as pre,
-  GuideSelector,
-  GuideSection,
-} from "./Code";
+export { Button } from '../Button';
+export { CodeGroup, Code as code, Pre as pre, GuideSelector, GuideSection } from './Code';
 
 export function h1(props) {
   return <Heading level={1} {...props} />;
@@ -78,7 +71,7 @@ function VercelLogo() {
       viewBox="0 0 4438 1000"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className="w-20 m-auto mb-3.5"
+      className="m-auto mb-3.5 w-20"
     >
       <path
         d="M2223.75 250C2051.25 250 1926.87 362.5 1926.87 531.25C1926.87 700 2066.72 812.5 2239.38 812.5C2343.59 812.5 2435.47 771.25 2492.34 701.719L2372.81 632.656C2341.25 667.188 2293.28 687.344 2239.38 687.344C2164.53 687.344 2100.94 648.281 2077.34 585.781H2515.16C2518.59 568.281 2520.63 550.156 2520.63 531.094C2520.63 362.5 2396.41 250 2223.75 250ZM2076.09 476.562C2095.62 414.219 2149.06 375 2223.75 375C2298.59 375 2352.03 414.219 2371.41 476.562H2076.09ZM2040.78 78.125L1607.81 828.125L1174.69 78.125H1337.03L1607.66 546.875L1878.28 78.125H2040.78ZM577.344 0L1154.69 1000H0L577.344 0ZM3148.75 531.25C3148.75 625 3210 687.5 3305 687.5C3369.38 687.5 3417.66 658.281 3442.5 610.625L3562.5 679.844C3512.81 762.656 3419.69 812.5 3305 812.5C3132.34 812.5 3008.13 700 3008.13 531.25C3008.13 362.5 3132.5 250 3305 250C3419.69 250 3512.66 299.844 3562.5 382.656L3442.5 451.875C3417.66 404.219 3369.38 375 3305 375C3210.16 375 3148.75 437.5 3148.75 531.25ZM4437.5 78.125V796.875H4296.88V78.125H4437.5ZM3906.25 250C3733.75 250 3609.38 362.5 3609.38 531.25C3609.38 700 3749.38 812.5 3921.88 812.5C4026.09 812.5 4117.97 771.25 4174.84 701.719L4055.31 632.656C4023.75 667.188 3975.78 687.344 3921.88 687.344C3847.03 687.344 3783.44 648.281 3759.84 585.781H4197.66C4201.09 568.281 4203.12 550.156 4203.12 531.094C4203.12 362.5 4078.91 250 3906.25 250ZM3758.59 476.562C3778.13 414.219 3831.41 375 3906.25 375C3981.09 375 4034.53 414.219 4053.91 476.562H3758.59ZM2961.25 265.625V417.031C2945.63 412.5 2929.06 409.375 2911.25 409.375C2820.47 409.375 2755 471.875 2755 565.625V796.875H2614.38V265.625H2755V409.375C2755 330 2847.34 265.625 2961.25 265.625Z"
@@ -90,11 +83,7 @@ function VercelLogo() {
 
 function NetlifyLogo() {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 147 40"
-      className="w-20 m-auto mb-3"
-    >
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 147 40" className="m-auto mb-3 w-20">
       <g fill="currentColor" fillRule="evenodd">
         <path d="M53.37 12.978l.123 2.198c1.403-1.7 3.245-2.55 5.525-2.55 3.951 0 5.962 2.268 6.032 6.804v12.568H60.79V19.676c0-1.207-.26-2.1-.78-2.681-.52-.58-1.371-.87-2.552-.87-1.719 0-3 .78-3.84 2.338v13.535h-4.262v-19.02h4.016zM77.748 32.35c-2.7 0-4.89-.852-6.567-2.557-1.678-1.705-2.517-3.976-2.517-6.812v-.527c0-1.898.365-3.595 1.096-5.089.73-1.494 1.757-2.657 3.078-3.49 1.321-.831 2.794-1.247 4.42-1.247 2.583 0 4.58.826 5.988 2.478 1.41 1.653 2.114 3.99 2.114 7.014v1.723h-12.4c.13 1.57.652 2.812 1.57 3.726.918.914 2.073 1.371 3.464 1.371 1.952 0 3.542-.79 4.77-2.373l2.297 2.198c-.76 1.136-1.774 2.018-3.042 2.645-1.269.627-2.692.94-4.27.94zm-.508-16.294c-1.17 0-2.113.41-2.832 1.23-.72.82-1.178 1.963-1.377 3.428h8.12v-.317c-.094-1.43-.474-2.51-1.14-3.243-.667-.732-1.59-1.098-2.771-1.098zm16.765-7.7v4.623h3.35v3.164h-3.35V26.76c0 .726.144 1.25.43 1.573.286.322.798.483 1.535.483a6.55 6.55 0 0 0 1.49-.176v3.305c-.97.27-1.905.404-2.806.404-3.273 0-4.91-1.81-4.91-5.431V16.142H86.62v-3.164h3.122V8.355h4.261zm11.137 23.643h-4.262v-27h4.262v27zm9.172 0h-4.262v-19.02h4.262v19.02zm-4.525-23.96c0-.655.207-1.2.622-1.634.416-.433 1.009-.65 1.78-.65.772 0 1.368.217 1.79.65.42.434.63.979.63 1.635 0 .644-.21 1.18-.63 1.608-.422.428-1.018.642-1.79.642-.771 0-1.364-.214-1.78-.642-.415-.427-.622-.964-.622-1.608zm10.663 23.96V16.142h-2.894v-3.164h2.894v-1.74c0-2.11.584-3.738 1.753-4.887 1.17-1.148 2.806-1.722 4.91-1.722.749 0 1.544.105 2.386.316l-.105 3.34a8.375 8.375 0 0 0-1.631-.14c-2.035 0-3.052 1.048-3.052 3.146v1.687h3.858v3.164h-3.858v15.856h-4.261zm17.87-6.117l3.858-12.903h4.542l-7.54 21.903c-1.158 3.199-3.122 4.799-5.893 4.799-.62 0-1.304-.106-2.052-.317v-3.305l.807.053c1.075 0 1.885-.196 2.429-.589.543-.392.973-1.051 1.289-1.977l.613-1.635-6.664-18.932h4.595l4.016 12.903z" />
         <path
@@ -108,44 +97,39 @@ function NetlifyLogo() {
 
 export function Note({ children }) {
   return (
-    <div className="my-6 flex gap-2.5 rounded-xl border border-indigo-500/20 bg-indigo-50/50 p-4 leading-6 text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/5 dark:text-indigo-200 dark:[--tw-prose-links:theme(colors.white)] dark:[--tw-prose-links-hover:theme(colors.indigo.300)]">
+    <div className="my-6 flex gap-2.5 rounded-xl border border-indigo-500/20 bg-indigo-50/50 p-4 leading-6 text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/5 dark:text-indigo-200 dark:[--tw-prose-links-hover:theme(colors.indigo.300)] dark:[--tw-prose-links:theme(colors.white)]">
       <InfoIcon className="mt-1 h-4 w-4 flex-none fill-indigo-500 stroke-white dark:fill-indigo-200/20 dark:stroke-indigo-200" />
-      <div className="[&>:first-child]:mt-0 [&>:last-child]:mb-0">
-        {children}
-      </div>
+      <div className="[&>:first-child]:mt-0 [&>:last-child]:mb-0">{children}</div>
     </div>
   );
 }
 
 export function Callout({
-  variant = "default",
+  variant = 'default',
   Icon = null,
   children,
 }: {
-  variant: "default" | "info" | "warning";
+  variant: 'default' | 'info' | 'warning';
   Icon?: typeof React.Component<any, any>;
   children: React.ReactNode;
 }) {
   return (
     <div
       className={clsx(
-        "my-6 border border-transparent rounded-lg p-6",
-        !Icon && "[&>:first-child]:mt-0 [&>:last-child]:mb-0",
-        variant === "default" &&
-          "dark:border-indigo-600/20 text-indigo-600 dark:text-indigo-200 bg-indigo-600/10",
-        variant === "info" &&
-          "dark:border-sky-600/20 text-sky-600 dark:text-sky-100 bg-sky-300/10",
-        variant === "warning" &&
-          "dark:border-amber-700/20 text-amber-900 dark:text-amber-50 bg-amber-300/10",
-        Icon && "flex gap-2.5"
+        'my-6 rounded-lg border border-transparent p-6',
+        !Icon && '[&>:first-child]:mt-0 [&>:last-child]:mb-0',
+        variant === 'default' &&
+          'bg-indigo-600/10 text-indigo-600 dark:border-indigo-600/20 dark:text-indigo-200',
+        variant === 'info' && 'bg-sky-300/10 text-sky-600 dark:border-sky-600/20 dark:text-sky-100',
+        variant === 'warning' &&
+          'bg-amber-300/10 text-amber-900 dark:border-amber-700/20 dark:text-amber-50',
+        Icon && 'flex gap-2.5'
       )}
     >
       {Icon ? (
         <>
-          <Icon className="block h-5 w-5 mt-1 shrink-0" />
-          <div className="[&>:first-child]:mt-0 [&>:last-child]:mb-0">
-            {children}
-          </div>
+          <Icon className="mt-1 block h-5 w-5 shrink-0" />
+          <div className="[&>:first-child]:mt-0 [&>:last-child]:mb-0">{children}</div>
         </>
       ) : (
         children
@@ -156,9 +140,7 @@ export function Callout({
 
 export function ButtonCol({ children }) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 w-full justify-between">
-      {children}
-    </div>
+    <div className="grid w-full grid-cols-1 justify-between gap-2 lg:grid-cols-2">{children}</div>
   );
 }
 
@@ -167,10 +149,10 @@ export function ButtonDeploy({ label, type, href }) {
 
   // change logo based on type
   switch (type) {
-    case "vercel":
+    case 'vercel':
       logoType = <VercelLogo />;
       break;
-    case "netlify":
+    case 'netlify':
       logoType = <NetlifyLogo />;
       break;
     default:
@@ -181,10 +163,10 @@ export function ButtonDeploy({ label, type, href }) {
     <a
       href={href}
       target="_blank"
-      className="block text-slate-800 dark:text-slate-200 cursor-pointer bg-slate-200 hover:bg-indigo-300/60 dark:bg-slate-800/40 rounded-lg py-8 px-6 group/deploy dark:hover:bg-indigo-800/40 no-underline transition-all"
+      className="group/deploy block cursor-pointer rounded-lg bg-slate-200 px-6 py-8 text-slate-800 no-underline transition-all hover:bg-indigo-300/60 dark:bg-slate-800/40 dark:text-slate-200 dark:hover:bg-indigo-800/40"
     >
       {logoType}
-      <span className="text-slate-700 dark:text-slate-100 text-sm text-center w-full block">
+      <span className="block w-full text-center text-sm text-slate-700 dark:text-slate-100">
         {label}
       </span>
     </a>
@@ -193,7 +175,7 @@ export function ButtonDeploy({ label, type, href }) {
 
 export function Row({ children }) {
   return (
-    <div className="grid grid-cols-1 items-start gap-x-16 gap-y-10 xl:max-w-none xl:grid-cols-2 my-6 [&>:first-child]:mt-0 [&>:last-child]:mb-0">
+    <div className="my-6 grid grid-cols-1 items-start gap-x-16 gap-y-10 xl:max-w-none xl:grid-cols-2 [&>:first-child]:mt-0 [&>:last-child]:mb-0">
       {children}
     </div>
   );
@@ -203,8 +185,8 @@ export function Col({ children, sticky = false }) {
   return (
     <div
       className={clsx(
-        "[&>:first-child]:mt-0 [&>:last-child]:mb-0",
-        sticky && "xl:sticky xl:top-24"
+        '[&>:first-child]:mt-0 [&>:last-child]:mb-0',
+        sticky && 'xl:sticky xl:top-24'
       )}
     >
       {children}
@@ -215,7 +197,7 @@ export function Col({ children, sticky = false }) {
 export function Properties({
   nested = false,
   collapse = false,
-  name = "Properties",
+  name = 'Properties',
   children,
 }: {
   nested?: boolean;
@@ -227,32 +209,27 @@ export function Properties({
   return (
     <div
       className={clsx(
-        "my-6",
-        nested &&
-          "-mt-3 pt-2 pb-3 border border-slate-900/5 dark:border-white/5 rounded-md",
-        collapse && isCollapsed && "pb-0"
+        'my-6',
+        nested && '-mt-3 rounded-md border border-slate-900/5 pb-3 pt-2 dark:border-white/5',
+        collapse && isCollapsed && 'pb-0'
       )}
     >
       {nested && (
         <div
           className={clsx(
-            "px-3 pb-2 mb-3 border-b border-slate-900/5 text-xs font-semibold",
-            collapse && isCollapsed && "mb-0 border-b-0"
+            'mb-3 border-b border-slate-900/5 px-3 pb-2 text-xs font-semibold',
+            collapse && isCollapsed && 'mb-0 border-b-0'
           )}
         >
           {collapse ? (
             <button
-              className="flex gap-1 items-center hover:text-indigo-800	"
+              className="flex items-center gap-1 hover:text-indigo-800	"
               onClick={() => {
                 setCollapsed(!isCollapsed);
               }}
             >
               {`Show nested ${name.toLowerCase()} `}
-              {isCollapsed ? (
-                <ChevronDown className="h-3" />
-              ) : (
-                <ChevronUp className="h-3" />
-              )}
+              {isCollapsed ? <ChevronDown className="h-3" /> : <ChevronUp className="h-3" />}
             </button>
           ) : (
             name
@@ -262,9 +239,9 @@ export function Properties({
       <ul
         role="list"
         className={clsx(
-          "m-0 max-w-[calc(theme(maxWidth.3xl)-theme(spacing.8))] list-none divide-y divide-slate-900/5 p-0 dark:divide-white/5",
-          nested && "px-3",
-          collapse && isCollapsed && "hidden"
+          'm-0 max-w-[calc(theme(maxWidth.3xl)-theme(spacing.8))] list-none divide-y divide-slate-900/5 p-0 dark:divide-white/5',
+          nested && 'px-3',
+          collapse && isCollapsed && 'hidden'
         )}
       >
         {children}
@@ -292,28 +269,26 @@ export function Property({
   children: React.ReactElement;
 }) {
   return (
-    <li id={name} className="m-0 px-0 py-4 first:pt-0 last:pb-0 scroll-mt-24">
+    <li id={name} className="m-0 scroll-mt-24 px-0 py-4 first:pt-0 last:pb-0">
       <dl className="m-0 flex flex-wrap items-center gap-x-3 gap-y-2">
         <dt className="sr-only">Name</dt>
         <dd>
           <code>{name}</code>
         </dd>
         <dt className="sr-only">Type</dt>
-        <dd className="font-mono font-medium text-xs text-slate-500 dark:text-slate-400">
-          {type}
-        </dd>
+        <dd className="font-mono text-xs font-medium text-slate-500 dark:text-slate-400">{type}</dd>
         {!attribute && (
           <>
             <dt className="sr-only">Required</dt>
             <dd
               className={clsx(
-                "font-mono font-medium text-xs",
+                'font-mono text-xs font-medium',
                 required
-                  ? "text-amber-600 dark:text-amber-400"
-                  : "text-slate-500 dark:text-slate-400"
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-slate-500 dark:text-slate-400'
               )}
             >
-              {required ? "required" : "optional"}
+              {required ? 'required' : 'optional'}
             </dd>
           </>
         )}
@@ -324,7 +299,7 @@ export function Property({
           </div>
         ) : null}
         <dt className="sr-only">Description</dt>
-        <dd className="w-full text-sm flex-none [&>:first-child]:mt-0 [&>:last-child]:mb-0">
+        <dd className="w-full flex-none text-sm [&>:first-child]:mt-0 [&>:last-child]:mb-0">
           {children}
         </dd>
       </dl>
@@ -334,7 +309,7 @@ export function Property({
 
 export function VersionBadge({ version }: { version: `v${string}` }) {
   return (
-    <div className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium leading-4 bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200">
+    <div className="inline-flex items-center rounded-full bg-slate-200 px-3 py-0.5 text-xs font-medium leading-4 text-slate-800 dark:bg-slate-800 dark:text-slate-200">
       <span>{version}</span>
     </div>
   );

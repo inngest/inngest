@@ -1,12 +1,10 @@
-import styled from "@emotion/styled";
+import styled from '@emotion/styled';
 
-const Section = styled.section<{ theme?: "dark" | "light" }>`
+const Section = styled.section<{ theme?: 'dark' | 'light' }>`
   margin: 0 auto;
   padding: 5rem 0;
-  background-color: ${({ theme }) =>
-    theme === "dark" ? "var(--black)" : "inherit"};
-  color: ${({ theme }) =>
-    theme === "dark" ? "var(--color-white)" : "inherit"};
+  background-color: ${({ theme }) => (theme === 'dark' ? 'var(--black)' : 'inherit')};
+  color: ${({ theme }) => (theme === 'dark' ? 'var(--color-white)' : 'inherit')};
 
   header {
     text-align: center;

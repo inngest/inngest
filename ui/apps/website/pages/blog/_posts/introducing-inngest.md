@@ -2,9 +2,9 @@
 # focus sets this blog post as the blog focus.  The latest post will be focused if there's
 # > 1 focus post.
 focus: false
-heading: "Introducing Inngest: an event workflow platform"
+heading: 'Introducing Inngest: an event workflow platform'
 subtitle: We’re launching Inngest, a platform designed to make building event-driven systems fast and easy.
-image: "/assets/blog/introducing-inngest/featured-image.jpg"
+image: '/assets/blog/introducing-inngest/featured-image.jpg'
 date: 2021-10-05
 ---
 

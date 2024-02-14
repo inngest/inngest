@@ -1,6 +1,6 @@
 ---
-heading: "New in observability: Function Metrics"
-subtitle: "Better observability into function runs"
+heading: 'New in observability: Function Metrics'
+subtitle: 'Better observability into function runs'
 image: /assets/blog/fn-metrics/feature-image.png
 date: 2023-10-30
 author: Darwin Wu
@@ -41,4 +41,3 @@ Metrics should be table stakes for any production system and we hope that as we 
 
 With function metrics available, it has unlocked additional future features (e.g. alerting).
 Metrics will continue to improve, and we hope to get your feedback to make it more useful for you!
-

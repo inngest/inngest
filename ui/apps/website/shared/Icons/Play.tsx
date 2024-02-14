@@ -1,7 +1,7 @@
 export default ({
   outline = true,
-  fill = "#222631",
-  size = "24",
+  fill = '#222631',
+  size = '24',
 }: {
   outline?: boolean;
   fill?: string;

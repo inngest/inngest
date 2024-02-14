@@ -7,4 +7,4 @@ declare global {
   }
 }
 
-declare module "deterministic-split";
+declare module 'deterministic-split';

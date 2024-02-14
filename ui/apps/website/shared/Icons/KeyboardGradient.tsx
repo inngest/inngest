@@ -1,7 +1,8 @@
-import React from "react";
-import type { IconProps } from "./props";
+import React from 'react';
 
-const KeyboardGradient = ({ size = "56" }: IconProps) => (
+import type { IconProps } from './props';
+
+const KeyboardGradient = ({ size = '56' }: IconProps) => (
   <svg
     width={size}
     height={size}
@@ -11,7 +12,7 @@ const KeyboardGradient = ({ size = "56" }: IconProps) => (
   >
     <mask
       id="mask0_781_2836"
-      style={{ maskType: "alpha" }}
+      style={{ maskType: 'alpha' }}
       maskUnits="userSpaceOnUse"
       x="0"
       y="0"

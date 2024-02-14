@@ -1,14 +1,14 @@
-import Link from "next/link";
-import clsx from "clsx";
+import Link from 'next/link';
+import clsx from 'clsx';
+import Logo from 'src/shared/Icons/Logo';
 
-import Logo from "src/shared/Icons/Logo";
-import Discord from "../Icons/Discord";
-import Github from "../Icons/Github";
-import XSocialIcon from "../Icons/XSocialIcon";
-import Container from "../layout/Container";
-import footerLinks from "./footerLinks";
-import StatusWidget from "../StatusWidget";
-import FooterCallout from "./FooterCallout";
+import Discord from '../Icons/Discord';
+import Github from '../Icons/Github';
+import XSocialIcon from '../Icons/XSocialIcon';
+import StatusWidget from '../StatusWidget';
+import Container from '../layout/Container';
+import FooterCallout from './FooterCallout';
+import footerLinks from './footerLinks';
 
 export default function Footer({
   ctaRef,
@@ -21,28 +21,25 @@ export default function Footer({
     <>
       {!disableCta && <FooterCallout ctaRef={ctaRef} />}
       <footer
-        className={clsx(
-          "border-t border-slate-800 bg-slate-1000",
-          disableCta ? "mt-36" : "mt-12"
-        )}
+        className={clsx('bg-slate-1000 border-t border-slate-800', disableCta ? 'mt-36' : 'mt-12')}
       >
         <Container className="pb-12 pt-12 lg:pt-24">
-          <div className="xl:flex xl:gap-12 w-full rounded-lg relative ">
-            <div className="mb-12 flex gap-6 items-start">
-              <Logo className="text-white w-20 relative top-[3px]" />
+          <div className="relative w-full rounded-lg xl:flex xl:gap-12 ">
+            <div className="mb-12 flex items-start gap-6">
+              <Logo className="relative top-[3px] w-20 text-white" />
               <StatusWidget />
             </div>
             <div className="flex flex-wrap gap-8 lg:gap-12 xl:gap-20">
               {footerLinks.map((footerLink, i) => (
-                <div className=" lg:w-auto  flex-shrink-0" key={i}>
-                  <h4 className="text-slate-400 text-xs uppercase font-semibold mb-6">
+                <div className=" flex-shrink-0  lg:w-auto" key={i}>
+                  <h4 className="mb-6 text-xs font-semibold uppercase text-slate-400">
                     {footerLink.name}
                   </h4>
                   <ul className="flex flex-col gap-4">
                     {footerLink.links.map((link, j) => (
                       <li key={j}>
                         <a
-                          className="text-white text-sm flex items-center group gap-1.5 hover:text-indigo-400 transition-all"
+                          className="group flex items-center gap-1.5 text-sm text-white transition-all hover:text-indigo-400"
                           href={link.url}
                         >
                           {link.icon && <link.icon size={22} color="indigo" />}
@@ -55,13 +52,11 @@ export default function Footer({
               ))}
 
               <div>
-                <h4 className="text-slate-400 text-xs uppercase font-semibold mb-6">
-                  Community
-                </h4>
+                <h4 className="mb-6 text-xs font-semibold uppercase text-slate-400">Community</h4>
                 <ul className="flex flex-col gap-4">
                   <li>
                     <a
-                      className="text-white text-sm flex items-center group gap-2 hover:text-indigo-400 transition-all"
+                      className="group flex items-center gap-2 text-sm text-white transition-all hover:text-indigo-400"
                       href="https://www.inngest.com/discord"
                     >
                       <Discord />
@@ -70,7 +65,7 @@ export default function Footer({
                   </li>
                   <li>
                     <a
-                      className="text-white text-sm flex items-center group gap-2 hover:text-indigo-400 transition-all"
+                      className="group flex items-center gap-2 text-sm text-white transition-all hover:text-indigo-400"
                       href="https://github.com/inngest/inngest-js"
                     >
                       <Github />
@@ -79,7 +74,7 @@ export default function Footer({
                   </li>
                   <li>
                     <a
-                      className="text-white text-sm flex items-center group gap-2 hover:text-indigo-400 transition-all"
+                      className="group flex items-center gap-2 text-sm text-white transition-all hover:text-indigo-400"
                       href="https://twitter.com/inngest"
                     >
                       <XSocialIcon />
@@ -90,30 +85,30 @@ export default function Footer({
               </div>
             </div>
           </div>
-          <ul className="flex mt-12 lg:gap-6 flex-col-reverse items-start lg:flex-row">
-            <li className=" text-sm text-center py-1.5 text-slate-300 font-medium">
+          <ul className="mt-12 flex flex-col-reverse items-start lg:flex-row lg:gap-6">
+            <li className=" py-1.5 text-center text-sm font-medium text-slate-300">
               &copy;
               {new Date().getFullYear()} Inngest Inc.
             </li>
-            <li className=" text-sm text-center">
+            <li className=" text-center text-sm">
               <a
-                className="text-slate-400 py-1.5 block hover:text-indigo-400 transition-colors"
+                className="block py-1.5 text-slate-400 transition-colors hover:text-indigo-400"
                 href="/privacy?ref=footer"
               >
                 Privacy
               </a>
             </li>
-            <li className=" text-sm text-center">
+            <li className=" text-center text-sm">
               <a
-                className="text-slate-400 py-1.5 block hover:text-indigo-400 transition-colors"
+                className="block py-1.5 text-slate-400 transition-colors hover:text-indigo-400"
                 href="/terms?ref=footer"
               >
                 Terms and Conditions
               </a>
             </li>
-            <li className=" text-sm text-center">
+            <li className=" text-center text-sm">
               <a
-                className="text-slate-400 py-1.5 block hover:text-indigo-400 transition-colors"
+                className="block py-1.5 text-slate-400 transition-colors hover:text-indigo-400"
                 href="/security?ref=footer"
               >
                 Security

@@ -1,5 +1,6 @@
-import React, { useEffect } from "react";
-import { abExperiments, useAbTest } from "./trackingHooks";
+import React, { useEffect } from 'react';
+
+import { abExperiments, useAbTest } from './trackingHooks';
 
 interface ExperimentProps<T extends keyof typeof abExperiments> {
   /**
@@ -11,7 +12,7 @@ interface ExperimentProps<T extends keyof typeof abExperiments> {
    * Children to render for each variant of the chosen experiment. All variants
    * must be accounted for.
    */
-  variants: Record<typeof abExperiments[T][number], React.ReactNode>;
+  variants: Record<(typeof abExperiments)[T][number], React.ReactNode>;
 
   /**
    * Images should not be rendered on the server as React won't update the attributes correctly
@@ -26,12 +27,10 @@ interface ExperimentProps<T extends keyof typeof abExperiments> {
  * see, so SSR will return `null` and the component will be rendered once the
  * view is hydrated on the client.
  */
-export const Experiment = <T extends keyof typeof abExperiments>(
-  props: ExperimentProps<T>
-) => {
+export const Experiment = <T extends keyof typeof abExperiments>(props: ExperimentProps<T>) => {
   const { variant } = useAbTest(props.experiment);
 
-  const isSsr = typeof window === "undefined";
+  const isSsr = typeof window === 'undefined';
   if (isSsr && props.isImage) return null;
 
   return <>{props.variants[variant]}</>;
@@ -54,7 +53,7 @@ export const FadeIn = ({ children }) => {
   return (
     <div
       style={{
-        transition: "opacity 100ms ease-in",
+        transition: 'opacity 100ms ease-in',
         opacity: isVisible ? 1 : 0,
       }}
     >

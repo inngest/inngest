@@ -1,5 +1,5 @@
-import fetch from "cross-fetch";
-import { z } from "zod";
+import fetch from 'cross-fetch';
+import { z } from 'zod';
 
 /**
  * Fetches a resource using `fetch` (via `cross-fetch`) and validates the output
@@ -34,9 +34,9 @@ export const reqWithSchema = async <T extends z.ZodTypeAny>(
   cache?: Record<string, any>
 ): Promise<z.output<T>> => {
   const url =
-    typeof req === "string"
+    typeof req === 'string'
       ? req
-      : Object.prototype.hasOwnProperty.call(req, "href")
+      : Object.prototype.hasOwnProperty.call(req, 'href')
       ? (req as unknown as URL).href
       : (req as Request).url;
 
@@ -44,7 +44,7 @@ export const reqWithSchema = async <T extends z.ZodTypeAny>(
     cache?.[url] ||
     (await fetch(req, {
       headers: {
-        "User-Agent": "inngest",
+        'User-Agent': 'inngest',
 
         /**
          * If a `GITHUB_TOKEN` env var is available, use it here in order to
@@ -61,9 +61,7 @@ export const reqWithSchema = async <T extends z.ZodTypeAny>(
          * we hit that limit, we can add a pre-build step to clone the repo and
          * change how this data is fetched.
          */
-        Authorization: process.env.GITHUB_TOKEN
-          ? `token ${process.env.GITHUB_TOKEN}`
-          : "",
+        Authorization: process.env.GITHUB_TOKEN ? `token ${process.env.GITHUB_TOKEN}` : '',
       },
     })
       .then((res) => res.json())
@@ -75,7 +73,7 @@ export const reqWithSchema = async <T extends z.ZodTypeAny>(
   try {
     return schema.parse(json);
   } catch (err) {
-    console.error("Error reading json:", json, err);
+    console.error('Error reading json:', json, err);
     throw err;
   }
 };

@@ -1,6 +1,6 @@
 export type PageProps = {
   htmlClassName?: string;
-  designVersion?: "2";
+  designVersion?: '2';
   meta?: {
     title?: string;
     description?: string;

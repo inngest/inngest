@@ -1,26 +1,22 @@
-import React, { useEffect } from "react";
-import Head from "next/head";
-import type { AppProps } from "next/app";
-import { useRouter } from "next/router";
-import Script from "next/script";
+import React, { useEffect } from 'react';
+import type { AppProps } from 'next/app';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
+import Script from 'next/script';
 
-import { trackPageView } from "../utils/tracking";
-import { getOpenGraphImageURL } from "../utils/social";
-import { useAnonymousID } from "../shared/legacy/trackingHooks";
-import "../styles/globals.css";
-import * as fullstory from "@fullstory/browser";
+import { useAnonymousID } from '../shared/legacy/trackingHooks';
+import { getOpenGraphImageURL } from '../utils/social';
+import { trackPageView } from '../utils/tracking';
+import '../styles/globals.css';
+import * as fullstory from '@fullstory/browser';
 
-import {
-  Layout as DocsLayout,
-  type Props as DocsLayoutProps,
-} from "../shared/Docs/Layout";
+import type { PageProps } from '@/shared/types';
 import {
   Layout as CaseStudyLayout,
   type Props as CaseStudyLayoutProps,
-} from "../shared/CaseStudy/Layout";
-
-import PageBanner from "../shared/legacy/PageBanner";
-import type { PageProps } from "@/shared/types";
+} from '../shared/CaseStudy/Layout';
+import { Layout as DocsLayout, type Props as DocsLayoutProps } from '../shared/Docs/Layout';
+import PageBanner from '../shared/legacy/PageBanner';
 
 const FireIcon = () => (
   <svg
@@ -29,7 +25,7 @@ const FireIcon = () => (
     viewBox="0 0 24 24"
     strokeWidth="1.5"
     stroke="currentColor"
-    className="w-4 h-4 inline -mt-0.5 mr-1.5 text-fuchsia-100"
+    className="-mt-0.5 mr-1.5 inline h-4 w-4 text-fuchsia-100"
   >
     <path
       strokeLinecap="round"
@@ -73,16 +69,12 @@ function MyApp({ Component, pageProps }: AppProps<DefaultProps>) {
   // Temp Layout swapping before we move to "app" dir
   const isDocs = !!router.asPath.match(/^\/docs/);
   const isCaseStudy = !!router.asPath.match(/^\/customers\//);
-  const Layout = isDocs
-    ? DocsLayout
-    : isCaseStudy
-    ? CaseStudyLayout
-    : DefaultLayout;
+  const Layout = isDocs ? DocsLayout : isCaseStudy ? CaseStudyLayout : DefaultLayout;
 
   useEffect(() => {
-    fullstory.init({ orgId: "o-1CVB8R-na1" });
+    fullstory.init({ orgId: 'o-1CVB8R-na1' });
 
-    const htmlEl = document.getElementsByTagName("html")[0];
+    const htmlEl = document.getElementsByTagName('html')[0];
     if (pageProps.htmlClassName) {
       htmlEl.className = pageProps.htmlClassName;
     }
@@ -102,30 +94,23 @@ function MyApp({ Component, pageProps }: AppProps<DefaultProps>) {
       // Track page views when using Next's Link component as it doesn't do a full refresh
       trackPageView(url);
     };
-    router.events.on("routeChangeComplete", handleRouteChange);
+    router.events.on('routeChangeComplete', handleRouteChange);
     return () => {
-      router.events.off("routeChangeComplete", handleRouteChange);
+      router.events.off('routeChangeComplete', handleRouteChange);
     };
   }, [router.events]);
 
   const title =
-    pageProps?.meta?.title ||
-    "Reliable serverless background functions on any platform";
+    pageProps?.meta?.title || 'Reliable serverless background functions on any platform';
   const metaTitle = `Inngest - ${title}`;
-  const disableMetadata = Boolean(
-    isDocs || isCaseStudy || pageProps?.meta?.disabled === true
-  );
+  const disableMetadata = Boolean(isDocs || isCaseStudy || pageProps?.meta?.disabled === true);
   // Warn during local dev
-  if (
-    !disableMetadata &&
-    !pageProps?.meta?.title &&
-    process.env.NODE_ENV !== "production"
-  ) {
+  if (!disableMetadata && !pageProps?.meta?.title && process.env.NODE_ENV !== 'production') {
     const INNGEST_SDK_URLS = [
-      "/api/inngest",
-      "/x/inngest",
-      "/.redwood/functions/inngest",
-      "/.netlify/functions/inngest",
+      '/api/inngest',
+      '/x/inngest',
+      '/.redwood/functions/inngest',
+      '/.netlify/functions/inngest',
     ];
     // Ignore the dev server polling for functions
     if (!INNGEST_SDK_URLS.includes(router.asPath)) {
@@ -135,9 +120,9 @@ function MyApp({ Component, pageProps }: AppProps<DefaultProps>) {
     }
   }
 
-  const canonicalUrl = `https://www.inngest.com${
-    router.asPath === "/" ? "" : router.asPath
-  }`.split("?")[0];
+  const canonicalUrl = `https://www.inngest.com${router.asPath === '/' ? '' : router.asPath}`.split(
+    '?'
+  )[0];
   const ogImage = pageProps?.meta?.image
     ? pageProps.meta.image.match(/^\//) // Prefix URLs starting with "/" with the host
       ? `${process.env.NEXT_PUBLIC_HOST}${pageProps.meta.image}`
@@ -158,10 +143,7 @@ function MyApp({ Component, pageProps }: AppProps<DefaultProps>) {
               <meta name="description" content={pageProps.meta.description} />
             )}
             {pageProps?.meta?.description && (
-              <meta
-                property="og:description"
-                content={pageProps.meta.description}
-              />
+              <meta property="og:description" content={pageProps.meta.description} />
             )}
             <meta property="og:image" content={ogImage} />
             <meta property="og:title" content={metaTitle} />
@@ -169,10 +151,7 @@ function MyApp({ Component, pageProps }: AppProps<DefaultProps>) {
             <meta name="twitter:site" content="@inngest" />
             <meta name="twitter:title" content={metaTitle} />
             {pageProps?.meta?.description && (
-              <meta
-                name="twitter:description"
-                content={pageProps?.meta?.description}
-              />
+              <meta name="twitter:description" content={pageProps?.meta?.description} />
             )}
             <meta name="twitter:image" content={ogImage} />
           </>
@@ -196,22 +175,22 @@ function MyApp({ Component, pageProps }: AppProps<DefaultProps>) {
           let ref = null;
           try {
             const urlParams = new URLSearchParams(window.location.search);
-            ref = urlParams.get("ref");
+            ref = urlParams.get('ref');
           } catch (e) {}
           // See tracking for next/link based transitions in tracking.ts
           window.Inngest.event({
-            name: "website/page.viewed",
+            name: 'website/page.viewed',
             data: {
               first_touch: firstTouch,
               ref: ref,
             },
-            v: "2022-12-27.1",
+            v: '2022-12-27.1',
           });
-          if (typeof window !== "undefined" && window._inngestQueue.length) {
+          if (typeof window !== 'undefined' && window._inngestQueue.length) {
             window._inngestQueue.forEach((p) => {
               // Prevent the double tracking of page views b/c routeChangeComplete
               // is unpredictable.
-              if (p.name === "website/page.viewed") return;
+              if (p.name === 'website/page.viewed') return;
               window.Inngest.event(p);
             });
           }

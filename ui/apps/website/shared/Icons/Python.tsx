@@ -1,11 +1,8 @@
-import React from "react";
-import type { IconProps } from "./props";
+import React from 'react';
 
-const Python = ({
-  size = "1em",
-  fill = "currentColor",
-  className,
-}: IconProps) => {
+import type { IconProps } from './props';
+
+const Python = ({ size = '1em', fill = 'currentColor', className }: IconProps) => {
   return (
     <svg
       viewBox="0 0 16 16"

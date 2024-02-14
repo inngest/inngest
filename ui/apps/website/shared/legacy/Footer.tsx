@@ -1,9 +1,9 @@
-import React from "react";
-import styled from "@emotion/styled";
+import React from 'react';
+import styled from '@emotion/styled';
 
-import Logo from "../Icons/Logo";
-import Discord from "../Icons/Discord";
-import Github from "../Icons/Github";
+import Discord from '../Icons/Discord';
+import Github from '../Icons/Github';
+import Logo from '../Icons/Logo';
 
 const Footer = () => {
   return (
@@ -21,22 +21,15 @@ const Footer = () => {
             <a href="/features/step-functions?ref=footer">Step Functions</a>
             <a href="/docs?ref=footer">Documentation</a>
             <a href="/patterns?ref=footer">Patterns: Async + Event-Driven</a>
-            <a
-              href="https://typedwebhook.tools?ref=inngest-footer"
-              className="typedwebhook-button"
-            >
+            <a href="https://typedwebhook.tools?ref=inngest-footer" className="typedwebhook-button">
               TypedWebhook.tools
             </a>
           </div>
           <div>
             <p>Use Cases</p>
-            <a href="/uses/serverless-node-background-jobs?ref=footer">
-              Node.js background jobs
-            </a>
+            <a href="/uses/serverless-node-background-jobs?ref=footer">Node.js background jobs</a>
             <a href="/uses/internal-tools?ref=footer">Internal tools</a>
-            <a href="/uses/user-journey-automation?ref=footer">
-              User Journey Automation
-            </a>
+            <a href="/uses/user-journey-automation?ref=footer">User Journey Automation</a>
           </div>
           <div>
             <p>Company</p>
@@ -60,7 +53,7 @@ const Footer = () => {
           </div>
           <div></div>
         </div>
-        <div className="footer-small-print flex flex-column gap-4">
+        <div className="footer-small-print flex-column flex gap-4">
           <div>© {new Date().getFullYear()} Inngest Inc</div>
           <a href="/privacy">Privacy</a>
           <a href="/terms">Terms and Conditions</a>

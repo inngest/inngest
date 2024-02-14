@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
-export type For = "events" | "actions";
+export type For = 'events' | 'actions';
 
 export type Method = {
-  method: "API" | "OAuth" | "Webhook";
+  method: 'API' | 'OAuth' | 'Webhook';
   secrets: string[];
   for: For[];
   automated: boolean;
@@ -22,25 +22,18 @@ export type Integration = {
 
 export const fetchIntegrations = async (setter: (a: any) => void) => {
   try {
-    const result = await fetch(
-      "https://api.inngest.com/v1/public/integrations"
-    );
+    const result = await fetch('https://api.inngest.com/v1/public/integrations');
     setter(await result.json());
   } catch (e) {}
 };
 
-export const useIntegration = async (
-  name: string,
-  setter: (a: any) => void
-) => {
+export const useIntegration = async (name: string, setter: (a: any) => void) => {
   const getter = async () => {
     if (!name) {
       return;
     }
     try {
-      const result = await fetch(
-        `https://api.inngest.com/v1/public/integrations/${name}`
-      );
+      const result = await fetch(`https://api.inngest.com/v1/public/integrations/${name}`);
       setter(await result.json());
     } catch (e) {}
   };

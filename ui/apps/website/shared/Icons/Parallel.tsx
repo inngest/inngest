@@ -1,11 +1,8 @@
-import React from "react";
-import type { IconProps } from "./props";
+import React from 'react';
 
-const Parallel = ({
-  size = "1em",
-  fill = "currentColor",
-  className,
-}: IconProps) => {
+import type { IconProps } from './props';
+
+const Parallel = ({ size = '1em', fill = 'currentColor', className }: IconProps) => {
   return (
     <svg
       width={size}

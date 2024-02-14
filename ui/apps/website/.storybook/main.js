@@ -1,22 +1,18 @@
-
 const path = require('path');
-const toPath = _path => path.join(process.cwd(), _path);
+const toPath = (_path) => path.join(process.cwd(), _path);
 
 module.exports = {
-  "stories": [
-    "../stories/**/*.stories.mdx",
-    "../stories/**/*.stories.@(js|jsx|ts|tsx)"
+  stories: ['../stories/**/*.stories.mdx', '../stories/**/*.stories.@(js|jsx|ts|tsx)'],
+  addons: [
+    '@storybook/addon-links',
+    '@storybook/addon-essentials',
+    '@storybook/addon-interactions',
   ],
-  "addons": [
-    "@storybook/addon-links",
-    "@storybook/addon-essentials",
-    "@storybook/addon-interactions"
-  ],
-  "framework": "@storybook/react",
-  staticDirs: ["../public"],
+  framework: '@storybook/react',
+  staticDirs: ['../public'],
   babel: async (options) => {
-    options.presets.push('@emotion/babel-preset-css-prop')
-    return options
+    options.presets.push('@emotion/babel-preset-css-prop');
+    return options;
   },
   webpackFinal: (config) => {
     return {
@@ -30,6 +26,6 @@ module.exports = {
           'emotion-theming': toPath('node_modules/@emotion/react'),
         },
       },
-    }
+    };
   },
-}
+};

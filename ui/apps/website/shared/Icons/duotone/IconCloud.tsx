@@ -1,9 +1,6 @@
-import IconTheme from "./theme";
-export function IconCloud({
-  size = 20,
-  className = "",
-  color = "transparent",
-}) {
+import IconTheme from './theme';
+
+export function IconCloud({ size = 20, className = '', color = 'transparent' }) {
   const theme = IconTheme(color);
   return (
     <svg

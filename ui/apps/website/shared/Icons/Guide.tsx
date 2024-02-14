@@ -1,10 +1,6 @@
-import type { IconProps } from "./props";
+import type { IconProps } from './props';
 
-export default function GuideIcon({
-  size = "1em",
-  className = "",
-  fill = "currentColor",
-}) {
+export default function GuideIcon({ size = '1em', className = '', fill = 'currentColor' }) {
   return (
     <svg
       width={size}
@@ -23,11 +19,7 @@ export default function GuideIcon({
           id="a"
         >
           <feOffset dy="1" in="SourceAlpha" result="shadowOffsetOuter1" />
-          <feGaussianBlur
-            stdDeviation="1"
-            in="shadowOffsetOuter1"
-            result="shadowBlurOuter1"
-          />
+          <feGaussianBlur stdDeviation="1" in="shadowOffsetOuter1" result="shadowBlurOuter1" />
           <feColorMatrix
             values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.268793706 0"
             in="shadowBlurOuter1"

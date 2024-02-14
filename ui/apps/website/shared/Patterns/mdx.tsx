@@ -7,15 +7,8 @@ type HeadingProps = {
   anchor?: boolean;
 };
 
-function Heading({
-  children,
-  level = 2,
-  id,
-  tag,
-  label,
-  anchor = true,
-}: HeadingProps) {
-  let Component: "h1" | "h2" | "h3" | "h4" | "h5" = `h${level}`;
+function Heading({ children, level = 2, id, tag, label, anchor = true }: HeadingProps) {
+  let Component: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' = `h${level}`;
 
   return (
     <>

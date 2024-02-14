@@ -1,11 +1,11 @@
-import React from "react";
-import styled from "@emotion/styled";
+import React from 'react';
+import styled from '@emotion/styled';
 
 type IconListProps = {
-  direction?: "horizontal" | "vertical";
+  direction?: 'horizontal' | 'vertical';
   collapseWidth?: number | string;
   circles?: boolean;
-  size?: "small" | "default";
+  size?: 'small' | 'default';
   items: Array<{
     icon: React.FC<any>;
     text: string | React.ReactFragment;
@@ -14,19 +14,14 @@ type IconListProps = {
 };
 
 const IconList: React.FC<IconListProps> = ({
-  direction = "horizontal",
+  direction = 'horizontal',
   collapseWidth,
   circles = true,
-  size = "default",
+  size = 'default',
   items = [],
 }) => {
   return (
-    <List
-      className="icon-list"
-      direction={direction}
-      collapseWidth={collapseWidth}
-      size={size}
-    >
+    <List className="icon-list" direction={direction} collapseWidth={collapseWidth} size={size}>
       {items.map((item, idx) => (
         <ListItem key={idx}>
           <span>
@@ -45,25 +40,23 @@ const IconList: React.FC<IconListProps> = ({
 };
 
 const List = styled.ul<{
-  direction: "horizontal" | "vertical";
+  direction: 'horizontal' | 'vertical';
   collapseWidth: number | string;
-  size: "small" | "default";
+  size: 'small' | 'default';
 }>`
   padding: 0;
   list-style: none;
   display: flex;
-  flex-direction: ${(props) =>
-    props.direction === "vertical" ? "column" : "row"};
+  flex-direction: ${(props) => (props.direction === 'vertical' ? 'column' : 'row')};
   /* font-family: var(--font-mono); */
-  font-size: ${(props) => (props.size === "small" ? "0.7rem" : "1rem")};
+  font-size: ${(props) => (props.size === 'small' ? '0.7rem' : '1rem')};
 
   li + li {
-    margin: ${(props) =>
-      props.direction === "vertical" ? "1rem 0 0" : "0 0 0 3em"};
+    margin: ${(props) => (props.direction === 'vertical' ? '1rem 0 0' : '0 0 0 3em')};
   }
 
   // Collapse the list at the given screen width
-  @media (max-width: ${(props) => props.collapseWidth || "0"}px) {
+  @media (max-width: ${(props) => props.collapseWidth || '0'}px) {
     flex-direction: column;
     li {
       margin-left: 0 !important;
@@ -87,7 +80,7 @@ const IconWrapper = styled.div<{ circle: boolean }>`
   height: 1.2em;
   width: 1.2em;
   margin-right: 0.8em;
-  background: ${(props) => (props.circle ? "var(--primary-color)" : "none")};
+  background: ${(props) => (props.circle ? 'var(--primary-color)' : 'none')};
   border-radius: 50%;
 `;
 

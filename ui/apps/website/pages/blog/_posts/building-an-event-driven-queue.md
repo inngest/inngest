@@ -1,8 +1,8 @@
 ---
 focus: false
-heading: "Building an event-driven queue based on common standards"
+heading: 'Building an event-driven queue based on common standards'
 subtitle: The design decisions and architecture for a next-gen queuing platform
-image: "/assets/blog/building-event-driven-queue.jpg"
+image: '/assets/blog/building-event-driven-queue.jpg'
 date: 2022-06-14
 ---
 

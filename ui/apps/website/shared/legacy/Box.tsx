@@ -1,8 +1,8 @@
 // @ts-nocheck
-import React from "react";
-import styled from "@emotion/styled";
-import Button, { ButtonGroup } from "src/shared/Button";
-import { css, SerializedStyles } from "@emotion/react";
+import React from 'react';
+import { SerializedStyles, css } from '@emotion/react';
+import styled from '@emotion/styled';
+import Button, { ButtonGroup } from 'src/shared/Button';
 
 type Props = {
   kind?: KindStrings;
@@ -66,7 +66,7 @@ const primary = css`
   &:after {
     position: absolute;
     display: block;
-    content: "";
+    content: '';
     z-index: 0;
     top: 0;
     left: 0;
@@ -165,7 +165,7 @@ export const Box = (props: Props) => {
   return (
     <BoxWrapper
       css={[props.nopadding && noPadding, props.kind && kinds[props.kind]]}
-      className={`${props.className || ""} box`}
+      className={`${props.className || ''} box`}
       style={props.style}
       onClick={props.onClick}
     >

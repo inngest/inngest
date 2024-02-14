@@ -1,18 +1,18 @@
-import styled from "@emotion/styled";
-import React, { useState } from "react";
-import Button from "src/shared/legacy/Button";
-import Nav from "src/shared/legacy/nav";
-import Footer from "src/shared/legacy/Footer";
-import GraphicCallout from "src/shared/legacy/GraphicCallout";
-import { Code, Eye, Activity } from "react-feather";
+import React, { useState } from 'react';
+import styled from '@emotion/styled';
+import { Activity, Code, Eye } from 'react-feather';
+import Button from 'src/shared/legacy/Button';
+import Footer from 'src/shared/legacy/Footer';
+import GraphicCallout from 'src/shared/legacy/GraphicCallout';
+import Nav from 'src/shared/legacy/nav';
 
 export async function getStaticProps() {
   return {
     props: {
       meta: {
-        title: "Internal tools, solved in seconds",
+        title: 'Internal tools, solved in seconds',
         description:
-          "Build and deploy internal apps using any language, with full audit trails, human in the loop tasks, and automated flows. Build and ship using the most advanced tooling platform available.",
+          'Build and deploy internal apps using any language, with full audit trails, human in the loop tasks, and automated flows. Build and ship using the most advanced tooling platform available.',
       },
     },
   };
@@ -24,20 +24,16 @@ export default function Template() {
   return (
     <div>
       <Nav sticky={true} nodemo />
-      <div className="container mx-auto py-32 flex flex-row">
-        <div className="text-center px-6 max-w-4xl mx-auto">
+      <div className="container mx-auto flex flex-row py-32">
+        <div className="mx-auto max-w-4xl px-6 text-center">
           <h1>Internal tools, solved in seconds.</h1>
-          <p className="pt-6 subheading">
-            Inngest allows you to{" "}
-            <b>build and deploy internal apps using any language</b>, with full
-            audit trails, human in the loop tasks, and automated flows. Build
-            and ship using the most advanced tooling platform available.
+          <p className="subheading pt-6">
+            Inngest allows you to <b>build and deploy internal apps using any language</b>, with
+            full audit trails, human in the loop tasks, and automated flows. Build and ship using
+            the most advanced tooling platform available.
           </p>
           <div className="flex flex-row justify-center pt-12">
-            <Button
-              kind="primary"
-              href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=tools`}
-            >
+            <Button kind="primary" href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=tools`}>
               Sign up
             </Button>
             <Button kind="outline" href="/contact?ref=tools">
@@ -51,17 +47,15 @@ export default function Template() {
         <div className="container mx-auto max-w-5xl py-24">
           <div className="max-w-2xl">
             <h2>
-              <span className="gradient-text">Take control</span> of your
-              tooling
+              <span className="gradient-text">Take control</span> of your tooling
             </h2>
-            <p className="pt-4 mb-0" style={{ fontSize: "1rem" }}>
-              Develop, test, and deploy internal apps and tools using a single
-              CLI and a standard, familiar SDLC with{" "}
-              <b>local testing, Git support, CI/CD</b>.
+            <p className="mb-0 pt-4" style={{ fontSize: '1rem' }}>
+              Develop, test, and deploy internal apps and tools using a single CLI and a standard,
+              familiar SDLC with <b>local testing, Git support, CI/CD</b>.
             </p>
-            <p className="pb-16 mt-2" style={{ fontSize: "1rem" }}>
-              Inngest allows you to turn serverless step functions into complex
-              internal tools to automate any process.
+            <p className="mt-2 pb-16" style={{ fontSize: '1rem' }}>
+              Inngest allows you to turn serverless step functions into complex internal tools to
+              automate any process.
             </p>
           </div>
           <div className="grid grid-cols-3 gap-16">
@@ -69,48 +63,43 @@ export default function Template() {
               <Code />
               <h3 className="py-2">World-class dev UX</h3>
               <p>
-                Locally build, test, and deploy functions using a single CLI,
-                then integrate CI/CD via Git as expected from modern tooling.
-                Plus, with full app versioning, immediate rollback, and historic
-                replay of production data your team can manage internal tools as
-                a first-class feature.
+                Locally build, test, and deploy functions using a single CLI, then integrate CI/CD
+                via Git as expected from modern tooling. Plus, with full app versioning, immediate
+                rollback, and historic replay of production data your team can manage internal tools
+                as a first-class feature.
               </p>
             </div>
             <div>
               <Eye />
               <h3 className="py-2">Fully audited</h3>
               <p>
-                Inngest stores every run of your function, who ran it, and, if
-                the function relates to customers, the customer of record
-                &mdash; allowing you to see every function run by employee,
-                customer, or team.
+                Inngest stores every run of your function, who ran it, and, if the function relates
+                to customers, the customer of record &mdash; allowing you to see every function run
+                by employee, customer, or team.
               </p>
             </div>
             <div>
               <Activity />
               <h3 className="py-2">One platform for everything</h3>
               <p>
-                Run internal apps manually or automate them with schedules or
-                incoming triggers, allowing you to create complex apps which run
-                whenever things happen in your product.
+                Run internal apps manually or automate them with schedules or incoming triggers,
+                allowing you to create complex apps which run whenever things happen in your
+                product.
               </p>
             </div>
           </div>
         </div>
       </Highlights>
 
-      <div className="container mx-auto flex py-24 justify-center">
-        <div className="flex flex-col justify-center align-center text-center pr-24">
+      <div className="container mx-auto flex justify-center py-24">
+        <div className="align-center flex flex-col justify-center pr-24 text-center">
           <p>
             <i>“Sooooo much easier than AWS”</i>
           </p>
           <small>Between</small>
         </div>
         <div>
-          <Button
-            kind="primary"
-            href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=tools`}
-          >
+          <Button kind="primary" href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=tools`}>
             Start building today
           </Button>
         </div>
@@ -121,42 +110,41 @@ export default function Template() {
         description="See how you can easily run existing code and scripts right from Retool with the power and flexibility of Inngest"
         image="/assets/use-cases/guide-retool-inngest.png"
         cta={{
-          href: "/docs/guides/trigger-your-code-from-retool?ref=user-journey-graphic-callout",
-          text: "Read the guide",
+          href: '/docs/guides/trigger-your-code-from-retool?ref=user-journey-graphic-callout',
+          text: 'Read the guide',
         }}
         style={{
           backgroundImage:
-            "linear-gradient(135deg, rgba(171, 220, 255, 0.5) 0%, rgba(3, 150, 255, 0.5) 100%)",
+            'linear-gradient(135deg, rgba(171, 220, 255, 0.5) 0%, rgba(3, 150, 255, 0.5) 100%)',
         }}
       />
 
-      <div className="container mx-auto text-center pt-6">
-        <h2 className="max-w-lg mx-auto pb-6">
+      <div className="container mx-auto pt-6 text-center">
+        <h2 className="mx-auto max-w-lg pb-6">
           Connect to anything,
           <br />
           automate everything
         </h2>
-        <p className="max-w-2xl mx-auto pb-24">
-          Craft step functions which connect multiple systems and database to
-          automate internal processes. Automate processes with triggers driven
-          by external systems.
+        <p className="mx-auto max-w-2xl pb-24">
+          Craft step functions which connect multiple systems and database to automate internal
+          processes. Automate processes with triggers driven by external systems.
         </p>
 
-        <div className="relative aspect-video max-w-4xl mx-auto">
+        <div className="relative mx-auto aspect-video max-w-4xl">
           <img
             src="/assets/escalation.jpg"
             alt="Dashboard"
-            className="drop-shadow-2xl rounded"
-            style={{ boxShadow: "0 0 40px rgba(0, 0, 0, 0.3)" }}
+            className="rounded drop-shadow-2xl"
+            style={{ boxShadow: '0 0 40px rgba(0, 0, 0, 0.3)' }}
           />
 
           <Logos>
-            <Slack className="rounded mx-auto">
+            <Slack className="mx-auto rounded">
               <img src="/assets/ui-assets/source-logos/slack.svg" width="96" />
               <img src="/assets/ui-assets/approve.png" className="approve" />
             </Slack>
             <div className="flex py-2">
-              <Stripe className="rounded mr-2">
+              <Stripe className="mr-2 rounded">
                 <img src="/assets/ui-assets/source-logos/stripe-color.svg" />
               </Stripe>
               <Mailchimp className="rounded">
@@ -167,10 +155,7 @@ export default function Template() {
         </div>
 
         <div className="flex justify-center pt-12">
-          <Button
-            kind="primary"
-            href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=tools`}
-          >
+          <Button kind="primary" href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=tools`}>
             Sign up
           </Button>
           <Button kind="outline" href="/docs?ref=tools">
@@ -179,7 +164,7 @@ export default function Template() {
         </div>
       </div>
 
-      <Quote className="container mx-auto max-w-xl pt-24 text-center space-y-3">
+      <Quote className="container mx-auto max-w-xl space-y-3 pt-24 text-center">
         <q>This is 100% the dev/prod parity that we’re lacking</q>
         <p>Staff Engineer at Buffer</p>
       </Quote>
@@ -188,12 +173,12 @@ export default function Template() {
 
       {demo && (
         <Demo
-          className="flex justify-center items-center"
+          className="flex items-center justify-center"
           onClick={() => {
             setDemo(false);
           }}
         >
-          <div className="container aspect-video mx-auto max-w-2xl flex">
+          <div className="container mx-auto flex aspect-video max-w-2xl">
             <iframe
               src="https://www.youtube.com/embed/qVXzYBcJmGU?autoplay=1"
               title="Inngest Product Demo"

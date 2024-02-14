@@ -1,25 +1,21 @@
 import {
-  forwardRef,
   Fragment,
   MutableRefObject,
   ReactElement,
+  forwardRef,
   useEffect,
   useId,
   useRef,
   useState,
-} from "react";
-import { useRouter } from "next/router";
-import {
-  createAutocomplete,
-  AutocompleteApi,
-} from "@algolia/autocomplete-core";
-import { getAlgoliaResults } from "@algolia/autocomplete-preset-algolia";
-import { Dialog, Transition } from "@headlessui/react";
-import algoliasearch from "algoliasearch/lite";
-import clsx from "clsx";
-
-import PythonIcon from "src/shared/Icons/Python";
-import TypeScriptIcon from "src/shared/Icons/TypeScript";
+} from 'react';
+import { useRouter } from 'next/router';
+import { AutocompleteApi, createAutocomplete } from '@algolia/autocomplete-core';
+import { getAlgoliaResults } from '@algolia/autocomplete-preset-algolia';
+import { Dialog, Transition } from '@headlessui/react';
+import algoliasearch from 'algoliasearch/lite';
+import clsx from 'clsx';
+import PythonIcon from 'src/shared/Icons/Python';
+import TypeScriptIcon from 'src/shared/Icons/TypeScript';
 
 const searchClient = algoliasearch(
   process.env.NEXT_PUBLIC_DOCSEARCH_APP_ID,
@@ -41,20 +37,18 @@ type AutocompleteState = {
 function useAutocomplete() {
   let id = useId();
   let router = useRouter();
-  let [autocompleteState, setAutocompleteState] = useState<AutocompleteState>(
-    {}
-  );
+  let [autocompleteState, setAutocompleteState] = useState<AutocompleteState>({});
 
   let [autocomplete] = useState(() =>
     createAutocomplete<AutocompleteItem>({
       id,
-      placeholder: "Find something...",
+      placeholder: 'Find something...',
       defaultActiveItemId: 0,
       onStateChange({ state }) {
         setAutocompleteState(state);
       },
       shouldPanelOpen({ state }) {
-        return state.query !== "";
+        return state.query !== '';
       },
       navigator: {
         navigate({ itemUrl }) {
@@ -65,7 +59,7 @@ function useAutocomplete() {
       getSources() {
         return [
           {
-            sourceId: "documentation",
+            sourceId: 'documentation',
             getItemInputValue({ item }) {
               return item.query;
             },
@@ -85,9 +79,8 @@ function useAutocomplete() {
                     indexName: process.env.NEXT_PUBLIC_DOCSEARCH_INDEX_NAME,
                     params: {
                       hitsPerPage: 5,
-                      highlightPreTag:
-                        '<mark class="underline bg-transparent text-indigo-500">',
-                      highlightPostTag: "</mark>",
+                      highlightPreTag: '<mark class="underline bg-transparent text-indigo-500">',
+                      highlightPostTag: '</mark>',
                     },
                   },
                 ],
@@ -119,26 +112,19 @@ function resolveResult(result: Result): {
   hierarchyHtml: string[];
 } {
   let allLevels = Object.keys(result.hierarchy);
-  let hierarchy = Object.entries(result._highlightResult.hierarchy).filter(
-    ([, { value }]) => Boolean(value)
+  let hierarchy = Object.entries(result._highlightResult.hierarchy).filter(([, { value }]) =>
+    Boolean(value)
   );
   let levels = hierarchy.map(([level]) => level);
 
   let level =
-    result.type === "content"
+    result.type === 'content'
       ? levels.pop()
-      : levels
-          .filter(
-            (level) =>
-              allLevels.indexOf(level) <= allLevels.indexOf(result.type)
-          )
-          .pop();
+      : levels.filter((level) => allLevels.indexOf(level) <= allLevels.indexOf(result.type)).pop();
 
   return {
     titleHtml: result._highlightResult.hierarchy[level].value,
-    hierarchyHtml: hierarchy
-      .slice(0, levels.indexOf(level))
-      .map(([, { value }]) => value),
+    hierarchyHtml: hierarchy.slice(0, levels.indexOf(level)).map(([, { value }]) => value),
   };
 }
 
@@ -179,14 +165,7 @@ function LoadingIcon(props) {
         d="M15.5 10a5.5 5.5 0 1 0-5.5 5.5"
       />
       <defs>
-        <linearGradient
-          id={id}
-          x1="13"
-          x2="9.5"
-          y1="9"
-          y2="15"
-          gradientUnits="userSpaceOnUse"
-        >
+        <linearGradient id={id} x1="13" x2="9.5" y1="9" y2="15" gradientUnits="userSpaceOnUse">
           <stop stopColor="currentColor" />
           <stop offset="1" stopColor="currentColor" stopOpacity="0" />
         </linearGradient>
@@ -197,19 +176,19 @@ function LoadingIcon(props) {
 
 function getSDKLanguage(result): string | null {
   switch (result.sdkLanguage) {
-    case "typescript":
-      return "TypeScript";
-    case "python":
-      return "Python";
+    case 'typescript':
+      return 'TypeScript';
+    case 'python':
+      return 'Python';
     default:
       return null;
   }
 }
 function getSDKLanguageIcon(result): React.ElementType | null {
   switch (result.sdkLanguage) {
-    case "typescript":
+    case 'typescript':
       return TypeScriptIcon;
-    case "python":
+    case 'python':
       return PythonIcon;
     default:
       return null;
@@ -226,8 +205,8 @@ function SearchResult({ result, resultIndex, autocomplete, collection }) {
   return (
     <li
       className={clsx(
-        "group block relative cursor-default px-4 py-3 aria-selected:bg-slate-50 dark:aria-selected:bg-slate-800/50",
-        resultIndex > 0 && "border-t border-slate-100 dark:border-slate-800"
+        'group relative block cursor-default px-4 py-3 aria-selected:bg-slate-50 dark:aria-selected:bg-slate-800/50',
+        resultIndex > 0 && 'border-t border-slate-100 dark:border-slate-800'
       )}
       aria-labelledby={`${id}-hierarchy ${id}-title`}
       {...autocomplete.getItemProps({
@@ -242,8 +221,8 @@ function SearchResult({ result, resultIndex, autocomplete, collection }) {
         dangerouslySetInnerHTML={{ __html: titleHtml }}
       />
       {SdkLanguageIcon && (
-        <span className="absolute px-1.5 top-3 right-2">
-          <SdkLanguageIcon className="w-5 h-5 text-slate-400" />
+        <span className="absolute right-2 top-3 px-1.5">
+          <SdkLanguageIcon className="h-5 w-5 text-slate-400" />
         </span>
       )}
 
@@ -251,7 +230,7 @@ function SearchResult({ result, resultIndex, autocomplete, collection }) {
         <div
           id={`${id}-hierarchy`}
           aria-hidden="true"
-          className="mt-1 truncate whitespace-nowrap text-2xs text-slate-500"
+          className="text-2xs mt-1 truncate whitespace-nowrap text-slate-500"
         >
           {hierarchyHtml.map((item, itemIndex, items) => (
             <Fragment key={itemIndex}>
@@ -259,8 +238,8 @@ function SearchResult({ result, resultIndex, autocomplete, collection }) {
               <span
                 className={
                   itemIndex === items.length - 1
-                    ? "sr-only"
-                    : "mx-2 text-slate-300 dark:text-slate-700"
+                    ? 'sr-only'
+                    : 'mx-2 text-slate-300 dark:text-slate-700'
                 }
               >
                 /
@@ -279,7 +258,7 @@ function SearchResults({ autocomplete, query, collection }) {
       <div className="p-6 text-center">
         <NoResultsIcon className="mx-auto h-5 w-5 stroke-slate-900 dark:stroke-slate-600" />
         <p className="mt-2 text-xs text-slate-700 dark:text-slate-400">
-          Nothing found for{" "}
+          Nothing found for{' '}
           <strong className="break-words font-semibold text-slate-900 dark:text-white">
             &lsquo;{query}&rsquo;
           </strong>
@@ -305,57 +284,50 @@ function SearchResults({ autocomplete, query, collection }) {
 }
 
 type SearchInputProps = {
-  autocomplete: AutocompleteApi<
-    AutocompleteItem,
-    Event,
-    MouseEvent,
-    KeyboardEvent
-  >;
+  autocomplete: AutocompleteApi<AutocompleteItem, Event, MouseEvent, KeyboardEvent>;
   autocompleteState: AutocompleteState;
   onClose: () => void;
 };
 
-const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
-  function SearchInput(
-    { autocomplete, autocompleteState, onClose }: SearchInputProps,
-    inputRef
-  ) {
-    // Modified to fix ts
-    let inputProps = autocomplete.getInputProps({} as any);
+const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(function SearchInput(
+  { autocomplete, autocompleteState, onClose }: SearchInputProps,
+  inputRef
+) {
+  // Modified to fix ts
+  let inputProps = autocomplete.getInputProps({} as any);
 
-    return (
-      <div className="group relative flex h-12">
-        <SearchIcon className="pointer-events-none absolute left-3 top-0 h-full w-5 stroke-slate-500" />
-        {/* @ts-ignore */}
-        <input
-          ref={inputRef}
-          className={clsx(
-            "flex-auto appearance-none bg-transparent pl-10 text-slate-900 outline-none placeholder:text-slate-500 focus:w-full focus:flex-none dark:text-white sm:text-sm [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden",
-            autocompleteState.status === "stalled" ? "pr-11" : "pr-4"
-          )}
-          {...inputProps}
-          onKeyDown={(event) => {
-            if (
-              event.key === "Escape" &&
-              !autocompleteState.isOpen &&
-              autocompleteState.query === ""
-            ) {
-              onClose();
-            } else {
-              // @ts-ignore
-              inputProps.onKeyDown(event);
-            }
-          }}
-        />
-        {autocompleteState.status === "stalled" && (
-          <div className="absolute inset-y-0 right-3 flex items-center">
-            <LoadingIcon className="h-5 w-5 animate-spin stroke-slate-200 text-slate-900 dark:stroke-slate-800 dark:text-indigo-400" />
-          </div>
+  return (
+    <div className="group relative flex h-12">
+      <SearchIcon className="pointer-events-none absolute left-3 top-0 h-full w-5 stroke-slate-500" />
+      {/* @ts-ignore */}
+      <input
+        ref={inputRef}
+        className={clsx(
+          'flex-auto appearance-none bg-transparent pl-10 text-slate-900 outline-none placeholder:text-slate-500 focus:w-full focus:flex-none sm:text-sm dark:text-white [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden',
+          autocompleteState.status === 'stalled' ? 'pr-11' : 'pr-4'
         )}
-      </div>
-    );
-  }
-);
+        {...inputProps}
+        onKeyDown={(event) => {
+          if (
+            event.key === 'Escape' &&
+            !autocompleteState.isOpen &&
+            autocompleteState.query === ''
+          ) {
+            onClose();
+          } else {
+            // @ts-ignore
+            inputProps.onKeyDown(event);
+          }
+        }}
+      />
+      {autocompleteState.status === 'stalled' && (
+        <div className="absolute inset-y-0 right-3 flex items-center">
+          <LoadingIcon className="h-5 w-5 animate-spin stroke-slate-200 text-slate-900 dark:stroke-slate-800 dark:text-indigo-400" />
+        </div>
+      )}
+    </div>
+  );
+});
 
 function SearchDialog({ open, setOpen, className }: SearchDialogProps) {
   let router = useRouter();
@@ -373,12 +345,12 @@ function SearchDialog({ open, setOpen, className }: SearchDialogProps) {
       setOpen(false);
     }
 
-    router.events.on("routeChangeStart", onRouteChange);
-    router.events.on("hashChangeStart", onRouteChange);
+    router.events.on('routeChangeStart', onRouteChange);
+    router.events.on('hashChangeStart', onRouteChange);
 
     return () => {
-      router.events.off("routeChangeStart", onRouteChange);
-      router.events.off("hashChangeStart", onRouteChange);
+      router.events.off('routeChangeStart', onRouteChange);
+      router.events.off('hashChangeStart', onRouteChange);
     };
   }, [open, setOpen, router]);
 
@@ -388,16 +360,16 @@ function SearchDialog({ open, setOpen, className }: SearchDialogProps) {
     }
 
     function onKeyDown(event) {
-      if (event.key === "k" && (event.metaKey || event.ctrlKey)) {
+      if (event.key === 'k' && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         setOpen(true);
       }
     }
 
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener('keydown', onKeyDown);
 
     return () => {
-      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener('keydown', onKeyDown);
     };
   }, [open, setOpen]);
 
@@ -406,15 +378,8 @@ function SearchDialog({ open, setOpen, className }: SearchDialogProps) {
   }
 
   return (
-    <Transition.Root
-      show={open}
-      as={Fragment}
-      afterLeave={() => autocomplete.setQuery("")}
-    >
-      <Dialog
-        onClose={onClose}
-        className={clsx("fixed inset-0 z-50", className)}
-      >
+    <Transition.Root show={open} as={Fragment} afterLeave={() => autocomplete.setQuery('')}>
+      <Dialog onClose={onClose} className={clsx('fixed inset-0 z-50', className)}>
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-300"
@@ -427,7 +392,7 @@ function SearchDialog({ open, setOpen, className }: SearchDialogProps) {
           <div className="fixed inset-0 bg-slate-400/25 backdrop-blur-sm dark:bg-black/40" />
         </Transition.Child>
 
-        <div className="fixed inset-0 overflow-y-auto px-4 py-4 sm:py-20 sm:px-6 md:py-32 lg:px-8 lg:py-[15vh]">
+        <div className="fixed inset-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-20 md:py-32 lg:px-8 lg:py-[15vh]">
           <Transition.Child
             as={Fragment}
             enter="ease-out duration-300"
@@ -437,7 +402,7 @@ function SearchDialog({ open, setOpen, className }: SearchDialogProps) {
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <Dialog.Panel className="mx-auto overflow-hidden rounded-lg bg-slate-50 shadow-xl ring-1 ring-slate-900/7.5 dark:bg-slate-900 dark:ring-slate-800 sm:max-w-xl">
+            <Dialog.Panel className="ring-slate-900/7.5 mx-auto overflow-hidden rounded-lg bg-slate-50 shadow-xl ring-1 sm:max-w-xl dark:bg-slate-900 dark:ring-slate-800">
               <div {...autocomplete.getRootProps({})}>
                 {/* @ts-ignore */}
                 <form
@@ -455,7 +420,7 @@ function SearchDialog({ open, setOpen, className }: SearchDialogProps) {
                   {/* @ts-ignore */}
                   <div
                     ref={panelRef}
-                    className="border-t border-slate-200 bg-white empty:hidden dark:border-slate-100/5 dark:bg-white/2.5"
+                    className="dark:bg-white/2.5 border-t border-slate-200 bg-white empty:hidden dark:border-slate-100/5"
                     {...autocomplete.getPanelProps({})}
                   >
                     {autocompleteState.isOpen && (
@@ -520,21 +485,19 @@ export function Search() {
   let { buttonProps, dialogProps } = useSearchProps();
 
   useEffect(() => {
-    setModifierKey(
-      /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform) ? "⌘" : "Ctrl "
-    );
+    setModifierKey(/(Mac|iPhone|iPod|iPad)/i.test(navigator.platform) ? '⌘' : 'Ctrl ');
   }, []);
 
   return (
     <div className="hidden lg:block lg:max-w-md lg:flex-auto">
       <button
         type="button"
-        className="hidden h-8 w-full items-center gap-2 rounded-full bg-white pl-2 pr-3 text-sm text-slate-500 ring-1 ring-slate-900/10 transition hover:ring-slate-900/20 dark:bg-white/5 dark:text-slate-400 dark:ring-inset dark:ring-white/10 dark:hover:ring-white/20 lg:flex focus:outline-none"
+        className="hidden h-8 w-full items-center gap-2 rounded-full bg-white pl-2 pr-3 text-sm text-slate-500 ring-1 ring-slate-900/10 transition hover:ring-slate-900/20 focus:outline-none lg:flex dark:bg-white/5 dark:text-slate-400 dark:ring-inset dark:ring-white/10 dark:hover:ring-white/20"
         {...buttonProps}
       >
         <SearchIcon className="h-5 w-5 stroke-current" />
         Search...
-        <kbd className="ml-auto text-xs font-sans text-slate-500 dark:text-slate-400">
+        <kbd className="ml-auto font-sans text-xs text-slate-500 dark:text-slate-400">
           {modifierKey}K
         </kbd>
       </button>
@@ -550,7 +513,7 @@ export function MobileSearch() {
     <div className="contents lg:hidden">
       <button
         type="button"
-        className="flex h-6 w-6 items-center justify-center rounded-md transition hover:bg-slate-900/5 dark:hover:bg-white/5 lg:hidden focus:[&:not(:focus-visible)]:outline-none"
+        className="flex h-6 w-6 items-center justify-center rounded-md transition hover:bg-slate-900/5 lg:hidden dark:hover:bg-white/5 focus:[&:not(:focus-visible)]:outline-none"
         aria-label="Find something..."
         {...buttonProps}
       >

@@ -1,7 +1,7 @@
 ---
-heading: "Rapidly building interactive CLIs in Go with Bubbletea"
+heading: 'Rapidly building interactive CLIs in Go with Bubbletea'
 subtitle: Our product is just different enough to make our CLI require really good interactivity.  We bundle an interactive event browser in our CLI.  Here's how it's built.
-image: "/assets/blog/interactive-clis-with-bubbletea.jpg?v=2022-04-28"
+image: '/assets/blog/interactive-clis-with-bubbletea.jpg?v=2022-04-28'
 date: 2022-04-15
 ---
 

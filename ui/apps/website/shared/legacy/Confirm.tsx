@@ -1,7 +1,8 @@
-import React from "react";
-import Modal from "./Modal";
-import Button, { Kinds } from "./Button";
-import styled from "@emotion/styled";
+import React from 'react';
+import styled from '@emotion/styled';
+
+import Button, { Kinds } from './Button';
+import Modal from './Modal';
 
 export type Confirm = {
   // prompt is the text to show on confirm
@@ -32,9 +33,7 @@ const ConfirmContext = React.createContext<Context>({
 });
 
 // Confirm renders the confirm component in the root of our app.
-export const ConfirmWrapper: React.FC<{ children: React.ReactNode }> = (
-  props
-) => {
+export const ConfirmWrapper: React.FC<{ children: React.ReactNode }> = (props) => {
   const resolve = React.useRef<() => void | null>(null);
   const reject = React.useRef<() => void | null>(null);
 
@@ -80,13 +79,13 @@ export const ConfirmWrapper: React.FC<{ children: React.ReactNode }> = (
             </div>
             <div style={{ padding: 20 }}>
               <Button onClick={() => reject.current && reject.current()}>
-                {confirm.cancel || "No"}
+                {confirm.cancel || 'No'}
               </Button>
               <Button
-                kind={confirm.kind || "danger"}
+                kind={confirm.kind || 'danger'}
                 onClick={() => resolve.current && resolve.current()}
               >
-                {confirm.confirm || "Yes"}
+                {confirm.confirm || 'Yes'}
               </Button>
             </div>
           </Wrapper>
@@ -116,11 +115,9 @@ export const ConfirmModal: React.FC<Confirm> = ({
           {detail && <p style={{ marginTop: 15, opacity: 0.8 }}>{detail}</p>}
         </div>
         <div style={{ padding: 20 }}>
-          <Button onClick={onCancel ? onCancel : onClose}>
-            {cancel || "No"}
-          </Button>
-          <Button kind={kind || "danger"} onClick={onConfirm}>
-            {confirm || "Yes"}
+          <Button onClick={onCancel ? onCancel : onClose}>{cancel || 'No'}</Button>
+          <Button kind={kind || 'danger'} onClick={onConfirm}>
+            {confirm || 'Yes'}
           </Button>
         </div>
       </Wrapper>

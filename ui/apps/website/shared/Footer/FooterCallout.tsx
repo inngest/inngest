@@ -1,6 +1,6 @@
-import Link from "next/link";
+import Link from 'next/link';
 
-import Container from "../layout/Container";
+import Container from '../layout/Container';
 
 const MeshGradient = `
 radial-gradient(at 35% 95%, hsla(258,82%,61%,1) 0px, transparent 50%),
@@ -10,10 +10,10 @@ url(/assets/textures/wave-large.svg)
 `;
 
 export default function FooterCallout({
-  title = "Ready to start building?",
-  description = "Ship background functions & workflows like never before",
+  title = 'Ready to start building?',
+  description = 'Ship background functions & workflows like never before',
   ctaHref = process.env.NEXT_PUBLIC_SIGNUP_URL,
-  ctaText = "Get started for free",
+  ctaText = 'Get started for free',
   ctaRef,
   showCliCmd = true,
 }: {
@@ -26,33 +26,31 @@ export default function FooterCallout({
 }) {
   return (
     <Container>
-      <div className="p-2.5 rounded-[14px] bg-slate-800/50 mt-28 mb-12">
+      <div className="mb-12 mt-28 rounded-[14px] bg-slate-800/50 p-2.5">
         <div
-          className="py-12 lg:py-16 text-center rounded-lg shadow"
+          className="rounded-lg py-12 text-center shadow lg:py-16"
           style={{
             backgroundColor: `hsla(222,79%,61%,1)`,
             backgroundImage: MeshGradient,
-            backgroundSize: "cover",
-            backgroundPosition: "100%",
+            backgroundSize: 'cover',
+            backgroundPosition: '100%',
           }}
         >
-          <h4 className="text-2xl lg:text-3xl tracking-tight mb-4 font-semibold drop-shadow">
+          <h4 className="mb-4 text-2xl font-semibold tracking-tight drop-shadow lg:text-3xl">
             {title}
           </h4>
-          <p className="mt-4 mb-6 text-sm lg:text-base text-indigo-100 drop-shadow">
+          <p className="mb-6 mt-4 text-sm text-indigo-100 drop-shadow lg:text-base">
             {description}
           </p>
-          <div className="flex flex-col gap-5 items-center">
+          <div className="flex flex-col items-center gap-5">
             {showCliCmd && (
-              <code className="mt-8 py-2.5 px-5 rounded-[6px] bg-white/10 text-sm text-white backdrop-blur-md font-medium">
+              <code className="mt-8 rounded-[6px] bg-white/10 px-5 py-2.5 text-sm font-medium text-white backdrop-blur-md">
                 <span className="">$</span> npx inngest-cli dev
               </code>
             )}
             <Link
-              href={`${ctaHref}?ref=${
-                ctaRef ? `${ctaRef}-callout` : "callout"
-              }`}
-              className="py-3 px-5 bg-slate-800 text-white rounded-[6px] text-sm transition-all hover:bg-slate-900"
+              href={`${ctaHref}?ref=${ctaRef ? `${ctaRef}-callout` : 'callout'}`}
+              className="rounded-[6px] bg-slate-800 px-5 py-3 text-sm text-white transition-all hover:bg-slate-900"
             >
               {ctaText}
             </Link>

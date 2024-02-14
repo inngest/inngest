@@ -1,6 +1,7 @@
-import { useQuery } from "urql";
-import { ActionCategory } from "./types";
-import { Action } from "src/types";
+import { Action } from 'src/types';
+import { useQuery } from 'urql';
+
+import { ActionCategory } from './types';
 
 const bothGQL = `
 query Actions {

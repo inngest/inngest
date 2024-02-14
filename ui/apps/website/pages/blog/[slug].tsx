@@ -1,27 +1,27 @@
-import styled from "@emotion/styled";
-import Head from "next/head";
-import Image from "next/image";
-import rehypeSlug from "rehype-slug";
-import rehypeRaw from "rehype-raw";
-import { serialize } from "next-mdx-remote/serialize";
-import { MDXRemote } from "next-mdx-remote";
-import Footer from "../../shared/Footer";
-import { rehypeRemoveTwoSlashMarkup, rehypeShiki } from "../../utils/code";
-import { rehypeParseCodeBlocks } from "../../mdx/rehype.mjs";
-import Tags from "../../shared/Blog/Tags";
+import Head from 'next/head';
+import Image from 'next/image';
+import styled from '@emotion/styled';
+import { MDXRemote } from 'next-mdx-remote';
+import { serialize } from 'next-mdx-remote/serialize';
+import YouTube, { type YouTubeEmbedProps } from 'react-youtube-embed';
+import rehypeCodeTitles from 'rehype-code-titles';
+import rehypeRaw from 'rehype-raw';
+import rehypeSlug from 'rehype-slug';
+import remarkGfm from 'remark-gfm';
+import Blockquote from 'src/shared/Blog/Blockquote';
+import { Button } from 'src/shared/Button';
+import CTACallout from 'src/shared/CTACallout';
+import Header from 'src/shared/Header';
+import IconCalendar from 'src/shared/Icons/Calendar';
+import Container from 'src/shared/layout/Container';
 
+import { rehypeParseCodeBlocks } from '../../mdx/rehype.mjs';
 // MDX Components
-import DiscordCTA from "../../shared/Blog/DiscordCTA";
-import Header from "src/shared/Header";
-import Container from "src/shared/layout/Container";
-import { Button } from "src/shared/Button";
-import IconCalendar from "src/shared/Icons/Calendar";
-import CTACallout from "src/shared/CTACallout";
-import Blockquote from "src/shared/Blog/Blockquote";
-import rehypeCodeTitles from "rehype-code-titles";
-import YouTube, { type YouTubeEmbedProps } from "react-youtube-embed";
-import remarkGfm from "remark-gfm";
-import { LaunchWeekBanner } from "../index";
+import DiscordCTA from '../../shared/Blog/DiscordCTA';
+import Tags from '../../shared/Blog/Tags';
+import Footer from '../../shared/Footer';
+import { rehypeRemoveTwoSlashMarkup, rehypeShiki } from '../../utils/code';
+import { LaunchWeekBanner } from '../index';
 
 // Hack to fix the YouTube component type. We probably want to migrate out of "react-youtube-embed"
 // since it's not maintained anymore.
@@ -49,21 +49,21 @@ type Props = {
 };
 
 const authorURLs = {
-  "Dan Farrelly": "https://twitter.com/djfarrelly",
-  "Tony Holdstock-Brown": "https://twitter.com/itstonyhb",
-  "Jack Williams": "https://twitter.com/atticjack",
-  "Igor Gassmann": "https://twitter.com/i_gassmann",
-  "Darwin Wu": "https://twitter.com/67darwin",
-  "Joel Hooks": "https://twitter.com/jhooks",
-  "Sylwia Vargas": "https://twitter.com/sylwiavargas",
+  'Dan Farrelly': 'https://twitter.com/djfarrelly',
+  'Tony Holdstock-Brown': 'https://twitter.com/itstonyhb',
+  'Jack Williams': 'https://twitter.com/atticjack',
+  'Igor Gassmann': 'https://twitter.com/i_gassmann',
+  'Darwin Wu': 'https://twitter.com/67darwin',
+  'Joel Hooks': 'https://twitter.com/jhooks',
+  'Sylwia Vargas': 'https://twitter.com/sylwiavargas',
 };
 
 export default function BlogLayout(props) {
   const scope = JSON.parse(props.post.scope.json);
 
   const structuredData = {
-    "@context": "https://schema.org",
-    "@type": "BlogPosting",
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
     headline: scope.heading,
     description: scope.subtitle,
     image: [`${process.env.NEXT_PUBLIC_HOST}${scope.image}`],
@@ -72,8 +72,8 @@ export default function BlogLayout(props) {
     introCallout: scope.introCallout,
     author: [
       {
-        "@type": scope.author ? "Person" : "Organization",
-        name: scope.author || "Inngest",
+        '@type': scope.author ? 'Person' : 'Organization',
+        name: scope.author || 'Inngest',
         url:
           scope.author && authorURLs.hasOwnProperty(scope.author)
             ? authorURLs[scope.author]
@@ -92,28 +92,16 @@ export default function BlogLayout(props) {
         <meta property="og:title" content={`${scope.heading} - Inngest Blog`} />
         <meta property="og:description" content={scope.subtitle} />
         <meta property="og:type" content="article" />
-        <meta
-          property="og:url"
-          content={`${process.env.NEXT_PUBLIC_HOST}${scope.path}`}
-        />
+        <meta property="og:url" content={`${process.env.NEXT_PUBLIC_HOST}${scope.path}`} />
         {!!scope.image && (
-          <meta
-            property="og:image"
-            content={`${process.env.NEXT_PUBLIC_HOST}${scope.image}`}
-          />
+          <meta property="og:image" content={`${process.env.NEXT_PUBLIC_HOST}${scope.image}`} />
         )}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:site" content="@inngest" />
-        <meta
-          name="twitter:title"
-          content={`${scope.heading} - Inngest Blog`}
-        />
+        <meta name="twitter:title" content={`${scope.heading} - Inngest Blog`} />
         <meta name="twitter:description" content={scope.subtitle} />
         {!!scope.image && (
-          <meta
-            name="twitter:image"
-            content={`${process.env.NEXT_PUBLIC_HOST}${scope.image}`}
-          />
+          <meta name="twitter:image" content={`${process.env.NEXT_PUBLIC_HOST}${scope.image}`} />
         )}
         <script
           type="application/ld+json"
@@ -132,7 +120,7 @@ export default function BlogLayout(props) {
           <article>
             <main className="m-auto max-w-3xl pt-16">
               {scope.image && (
-                <figure className="mx-auto flex flex-col items-end max-w-[768px]">
+                <figure className="mx-auto flex max-w-[768px] flex-col items-end">
                   <Image
                     className="rounded-lg shadow-lg"
                     src={scope.image}
@@ -143,26 +131,26 @@ export default function BlogLayout(props) {
                   />
                   {scope.imageCredits && (
                     <figcaption
-                      className="text-xs text-slate-400 mt-2"
+                      className="mt-2 text-xs text-slate-400"
                       dangerouslySetInnerHTML={{ __html: scope.imageCredits }}
                     ></figcaption>
                   )}
                 </figure>
               )}
-              <header className="pt-12 lg:pt-24 max-w-[70ch] m-auto">
-                <h1 className="text-white font-medium text-2xl md:text-4xl xl:text-5xl mb-2 md:mb-4 tracking-tighter lg:leading-loose">
+              <header className="m-auto max-w-[70ch] pt-12 lg:pt-24">
+                <h1 className="mb-2 text-2xl font-medium tracking-tighter text-white md:mb-4 md:text-4xl lg:leading-loose xl:text-5xl">
                   {scope.heading}
                 </h1>
                 {scope.showSubtitle && (
-                  <p className="text-slate-200 text-lg font-bold mb-6 flex gap-1 items-center">
+                  <p className="mb-6 flex items-center gap-1 text-lg font-bold text-slate-200">
                     {scope.subtitle}
                   </p>
                 )}
-                <p className="text-slate-300 text-sm mt-2 flex items-center gap-2">
-                  {!!scope.author ? <>{scope.author} &middot; </> : ""}
+                <p className="mt-2 flex items-center gap-2 text-sm text-slate-300">
+                  {!!scope.author ? <>{scope.author} &middot; </> : ''}
                   <span className="flex items-center gap-1">
                     <IconCalendar /> {scope.humanDate}
-                  </span>{" "}
+                  </span>{' '}
                   &middot; <span>{scope.reading.text}</span>
                   <Tags tags={scope.tags} />
                 </p>
@@ -171,8 +159,8 @@ export default function BlogLayout(props) {
                 <CTACallout
                   text={scope.introCallout}
                   cta={{
-                    href: "https://www.inngest.com?ref=blog-post",
-                    text: "Give it a try",
+                    href: 'https://www.inngest.com?ref=blog-post',
+                    text: 'Give it a try',
                   }}
                 />
               )}
@@ -196,7 +184,7 @@ export default function BlogLayout(props) {
                   }}
                 />
               )} */}
-              <div className="max-w-[70ch] prose m-auto mt-12 mb-20 prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert blog-content">
+              <div className="prose prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert blog-content m-auto mb-20 mt-12 max-w-[70ch] text-slate-300">
                 <MDXRemote
                   compiledSource={props.post.compiledSource}
                   scope={scope}
@@ -220,9 +208,9 @@ export default function BlogLayout(props) {
 // These URLs will be treated as individual pages. getStaticProps is
 // called for each URL with the slug in params.
 export async function getStaticPaths() {
-  const fs = require("fs");
-  const paths = fs.readdirSync("./pages/blog/_posts/").map((fname) => {
-    return `/blog/${fname.replace(/.mdx?/, "")}`;
+  const fs = require('fs');
+  const paths = fs.readdirSync('./pages/blog/_posts/').map((fname) => {
+    return `/blog/${fname.replace(/.mdx?/, '')}`;
   });
   return { paths, fallback: false };
 }
@@ -231,13 +219,13 @@ export async function getStaticPaths() {
 export async function getStaticProps({ params }) {
   // These are required here as this function is not included in frontend
   // browser builds.
-  const fs = require("fs");
-  const readingTime = require("reading-time");
-  const matter = require("gray-matter");
+  const fs = require('fs');
+  const readingTime = require('reading-time');
+  const matter = require('gray-matter');
 
   let filePath = `./pages/blog/_posts/${params.slug}.md`;
-  if (!fs.existsSync(filePath) && fs.existsSync(filePath + "x")) {
-    filePath += "x";
+  if (!fs.existsSync(filePath) && fs.existsSync(filePath + 'x')) {
+    filePath += 'x';
   }
 
   const source = fs.readFileSync(filePath);
@@ -249,8 +237,8 @@ export async function getStaticProps({ params }) {
   data.humanDate = data.date.toLocaleDateString();
 
   data.tags =
-    data.tags && typeof data.tags === "string"
-      ? data.tags.split(",").map((tag) => tag.trim())
+    data.tags && typeof data.tags === 'string'
+      ? data.tags.split(',').map((tag) => tag.trim())
       : data.tags;
 
   // type Post = {
@@ -258,11 +246,11 @@ export async function getStaticProps({ params }) {
   //   scope: string,
   // }
   const nodeTypes = [
-    "mdxFlowExpression",
-    "mdxJsxFlowElement",
-    "mdxJsxTextElement",
-    "mdxTextExpression",
-    "mdxjsEsm",
+    'mdxFlowExpression',
+    'mdxJsxFlowElement',
+    'mdxJsxTextElement',
+    'mdxTextExpression',
+    'mdxjsEsm',
   ];
   const post = await serialize(content, {
     scope: { json: JSON.stringify(data) },
@@ -284,7 +272,7 @@ export async function getStaticProps({ params }) {
       meta: {
         disabled: true,
       },
-      designVersion: "2",
+      designVersion: '2',
     },
   };
 }

@@ -1,10 +1,4 @@
-export default ({
-  fill = "#222631",
-  size = "24",
-}: {
-  fill?: string;
-  size?: string | number;
-}) => (
+export default ({ fill = '#222631', size = '24' }: { fill?: string; size?: string | number }) => (
   <svg
     width={size}
     height={size}

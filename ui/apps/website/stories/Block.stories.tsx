@@ -1,10 +1,10 @@
-import React from "react";
-import { ComponentStory, ComponentMeta } from "@storybook/react";
+import React from 'react';
+import { ComponentMeta, ComponentStory } from '@storybook/react';
 
-import Block from "../shared/legacy/Block";
+import Block from '../shared/legacy/Block';
 
 export default {
-  title: "Block",
+  title: 'Block',
   component: Block,
 } as ComponentMeta<typeof Block>;
 
@@ -17,6 +17,6 @@ Default.args = {
 
 export const Primary = Template.bind({});
 Primary.args = {
-  color: "primary",
+  color: 'primary',
   children: [<h3>Title</h3>, <p>Some description copy</p>],
 };

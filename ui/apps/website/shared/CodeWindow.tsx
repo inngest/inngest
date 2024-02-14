@@ -1,40 +1,40 @@
-import SyntaxHighlighter from "react-syntax-highlighter";
-import { atomOneDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { atomOneDark } from 'react-syntax-highlighter/dist/cjs/styles/hljs';
 
 export const removeLeadingSpaces = (snippet: string): string => {
-  const lines = snippet.split("\n");
-  if (!lines[0]?.replace(/^\s+/, "").length) {
+  const lines = snippet.split('\n');
+  if (!lines[0]?.replace(/^\s+/, '').length) {
     lines.shift();
   }
-  if (!lines[lines.length - 1]?.replace(/^\s+/, "").length) {
+  if (!lines[lines.length - 1]?.replace(/^\s+/, '').length) {
     lines.pop();
   }
   const leadingSpace = lines[0]?.match(/^\s+/)?.[0];
-  return lines.map((l) => l.replace(leadingSpace, "")).join("\n");
+  return lines.map((l) => l.replace(leadingSpace, '')).join('\n');
 };
 
 const colors = {
-  slate300: "rgb(203, 213, 225)",
-  slate500: "rgb(140, 149, 159)",
-  fuchsia300: "rgb(240, 171, 252)",
-  amber300: "rgb(252, 211, 77)",
-  amber400: "rgb(251, 191, 36)",
-  sky300: "rgb(125, 211, 252)",
-  emerald300: "rgb(110, 231, 183)",
+  slate300: 'rgb(203, 213, 225)',
+  slate500: 'rgb(140, 149, 159)',
+  fuchsia300: 'rgb(240, 171, 252)',
+  amber300: 'rgb(252, 211, 77)',
+  amber400: 'rgb(251, 191, 36)',
+  sky300: 'rgb(125, 211, 252)',
+  emerald300: 'rgb(110, 231, 183)',
 };
 
 const theme = {
   ...atomOneDark,
-  "hljs-keyword": { color: colors.fuchsia300 },
-  "hljs-attr": { color: colors.amber400 },
-  "hljs-string": { color: colors.emerald300 },
-  "hljs-number": { color: colors.sky300 },
-  "hljs-comment": { color: colors.slate500 },
+  'hljs-keyword': { color: colors.fuchsia300 },
+  'hljs-attr': { color: colors.amber400 },
+  'hljs-string': { color: colors.emerald300 },
+  'hljs-number': { color: colors.sky300 },
+  'hljs-comment': { color: colors.slate500 },
 };
 
 const CodeWindow = ({
   snippet,
-  className = "",
+  className = '',
   style = {},
   header,
   showLineNumbers = false,
@@ -49,13 +49,13 @@ const CodeWindow = ({
 }) => {
   return (
     <div
-      className={`rounded-lg border border-slate-700/30 text-xs leading-relaxed bg-slate-800/50 ${className}`}
+      className={`rounded-lg border border-slate-700/30 bg-slate-800/50 text-xs leading-relaxed ${className}`}
       style={style}
     >
       {header && <div className="mb-1 bg-slate-800/50">{header}</div>}
-      <div className="flex flex-row p-2 items-stretch">
+      <div className="flex flex-row items-stretch p-2">
         {Boolean(lineHighlights?.length) && (
-          <div className="h-full w-[2px] py-1 relative">
+          <div className="relative h-full w-[2px] py-1">
             {/* leading-relaxed is 1.625 */}
             {lineHighlights.map(([highlightStart, highlightEnd]) => {
               return (
@@ -74,18 +74,18 @@ const CodeWindow = ({
           language="javascript"
           showLineNumbers={showLineNumbers}
           lineNumberContainerStyle={{
-            borderRight: "1px solid pink",
-            background: "pink",
+            borderRight: '1px solid pink',
+            background: 'pink',
           }}
           lineNumberStyle={{
-            minWidth: "3em",
-            color: "rgba(42, 60, 85, 1)",
+            minWidth: '3em',
+            color: 'rgba(42, 60, 85, 1)',
           }}
           style={theme}
           customStyle={{
-            padding: "0.25rem",
+            padding: '0.25rem',
             color: colors.slate300,
-            background: "transparent",
+            background: 'transparent',
           }}
           className="!overflow-hidden"
         >

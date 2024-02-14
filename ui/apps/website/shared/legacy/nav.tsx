@@ -1,10 +1,11 @@
-import React, { useState } from "react";
-import styled from "@emotion/styled";
-import Logo from "../Icons/Logo";
-import Button from "./Button";
-import Hamburger from "../Icons/Hamburger";
-import Discord from "../Icons/Discord";
-import Github from "../Icons/Github";
+import React, { useState } from 'react';
+import styled from '@emotion/styled';
+
+import Discord from '../Icons/Discord';
+import Github from '../Icons/Github';
+import Hamburger from '../Icons/Hamburger';
+import Logo from '../Icons/Logo';
+import Button from './Button';
 
 type Props = {
   nolinks?: boolean;
@@ -24,7 +25,7 @@ const Nav: React.FC<Props> = (props) => {
 const NavContent: React.FC<Props> = (props: Props) => {
   const [show, setShow] = useState(false);
   return (
-    <Container className={`max-w-5xl mx-auto ${show && "show"}`}>
+    <Container className={`mx-auto max-w-5xl ${show && 'show'}`}>
       <div className="px-4 lg:px-0">
         {props.nolinks ? (
           <Logo width={115} className="logo" />
@@ -42,20 +43,15 @@ const NavContent: React.FC<Props> = (props: Props) => {
               Product
             </StyledLink>
             <div className="rounded-lg">
-              <div className="primary-links pt-6 pb-2 px-2">
-                <span className="text-slate-400 px-4">Product</span>
+              <div className="primary-links px-2 pb-2 pt-6">
+                <span className="px-4 text-slate-400">Product</span>
                 <a href="/features/sdk?ref=nav" className="rounded-lg p-4">
                   <p>TypeScript & JavaScript SDK</p>
-                  <p className="pt-1 mt-0 text-slate-400">
-                    <small>
-                      Event-driven and scheduled serverless functions
-                    </small>
+                  <p className="mt-0 pt-1 text-slate-400">
+                    <small>Event-driven and scheduled serverless functions</small>
                   </p>
                 </a>
-                <a
-                  href="/features/step-functions?ref=nav"
-                  className="rounded-lg p-4"
-                >
+                <a href="/features/step-functions?ref=nav" className="rounded-lg p-4">
                   <p>Step Functions</p>
                   <p className="pt-1 text-slate-400">
                     <small>Build complex conditional workflows</small>
@@ -63,12 +59,9 @@ const NavContent: React.FC<Props> = (props: Props) => {
                 </a>
               </div>
 
-              <div className="secondary-links bg-slate-100 pt-6 pb-3 px-2 text-xs rounded-r-lg">
-                <span className="text-slate-400 px-4">Use cases</span>
-                <a
-                  href="/uses/serverless-cron-jobs?ref=nav"
-                  className="rounded-lg px-4 py-3"
-                >
+              <div className="secondary-links rounded-r-lg bg-slate-100 px-2 pb-3 pt-6 text-xs">
+                <span className="px-4 text-slate-400">Use cases</span>
+                <a href="/uses/serverless-cron-jobs?ref=nav" className="rounded-lg px-4 py-3">
                   Scheduled & cron jobs
                 </a>
                 <a
@@ -77,16 +70,10 @@ const NavContent: React.FC<Props> = (props: Props) => {
                 >
                   Background tasks
                 </a>
-                <a
-                  href="/uses/internal-tools?ref=nav"
-                  className="rounded-lg px-4 py-3"
-                >
+                <a href="/uses/internal-tools?ref=nav" className="rounded-lg px-4 py-3">
                   Internal tools
                 </a>
-                <a
-                  href="/uses/user-journey-automation?ref=nav"
-                  className="rounded-lg px-4 py-3"
-                >
+                <a href="/uses/user-journey-automation?ref=nav" className="rounded-lg px-4 py-3">
                   User journey automation
                 </a>
               </div>
@@ -97,22 +84,17 @@ const NavContent: React.FC<Props> = (props: Props) => {
               Learn
             </StyledLink>
             <div className="rounded-lg">
-              <div className="primary-links py-2 px-2">
+              <div className="primary-links px-2 py-2">
                 <a href="/docs?ref=nav" className="rounded-lg p-4">
                   <p>Docs</p>
                   <p className="pt-1 text-slate-400">
-                    <small>
-                      Everything you need to know about our event-driven
-                      platform
-                    </small>
+                    <small>Everything you need to know about our event-driven platform</small>
                   </p>
                 </a>
                 <a href="/patterns?ref=nav" className="rounded-lg p-4">
                   <p>Patterns: Async + Event Driven</p>
                   <p className="pt-1 text-slate-400">
-                    <small>
-                      How to build asynchronous functionality by example
-                    </small>
+                    <small>How to build asynchronous functionality by example</small>
                   </p>
                 </a>
               </div>
@@ -121,11 +103,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
           <StyledLink key="blog" href="/blog?ref=nav">
             Blog
           </StyledLink>
-          <StyledLink
-            key="pricing"
-            className="links-secondary"
-            href="/pricing?ref=nav"
-          >
+          <StyledLink key="pricing" className="links-secondary" href="/pricing?ref=nav">
             Pricing
           </StyledLink>
           <StyledLink key="discord" href={process.env.NEXT_PUBLIC_DISCORD_URL}>
@@ -138,10 +116,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
       )}
 
       <div className="auth-options">
-        <StyledLink
-          className="auth-login"
-          href={`${process.env.NEXT_PUBLIC_SIGNIN_URL}?ref=nav`}
-        >
+        <StyledLink className="auth-login" href={`${process.env.NEXT_PUBLIC_SIGNIN_URL}?ref=nav`}>
           Sign In
         </StyledLink>
         {!props.nolinks && (
@@ -149,7 +124,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
             href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=nav`}
             className="button"
             kind="primary"
-            style={{ padding: "0.4rem 1rem" }}
+            style={{ padding: '0.4rem 1rem' }}
           >
             Start building →
           </Button>
@@ -173,9 +148,9 @@ const NavContent: React.FC<Props> = (props: Props) => {
 };
 
 const NavWrapper = styled.nav<{ sticky: boolean }>`
-  position: ${({ sticky }) => (sticky ? "sticky" : "relative")};
+  position: ${({ sticky }) => (sticky ? 'sticky' : 'relative')};
   z-index: 100;
-  top: ${({ sticky }) => (sticky ? "0" : "auto")};
+  top: ${({ sticky }) => (sticky ? '0' : 'auto')};
   margin: 0 auto 1.5rem;
   background-color: var(--bg-color);
   box-shadow: 0 0 100px rgba(0, 0, 0, 0.07);
@@ -354,7 +329,7 @@ const Hoverable = styled.div`
 
     /* This keeps the hover focus in between the original button and this menu */
     &:before {
-      content: "";
+      content: '';
       display: block;
       background: transparent;
       height: 30px;

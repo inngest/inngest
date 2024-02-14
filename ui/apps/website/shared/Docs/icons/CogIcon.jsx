@@ -15,5 +15,5 @@ export function CogIcon(props) {
       />
       <circle cx="10" cy="10" r="2.5" fill="none" />
     </svg>
-  )
+  );
 }

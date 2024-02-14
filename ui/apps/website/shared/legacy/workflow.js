@@ -1,5 +1,6 @@
-import styled from "@emotion/styled";
-import Action, { Trigger, Empty, If } from "./action";
+import styled from '@emotion/styled';
+
+import Action, { Empty, If, Trigger } from './action';
 
 export default function Workflow({ style, className }) {
   return (
@@ -22,11 +23,7 @@ export default function Workflow({ style, className }) {
             subtitle="In #new-payments"
             className="conn-top conn-bottom"
           />
-          <Action
-            name="Send a receipt"
-            subtitle="Via Mailchimp"
-            className="conn-top conn-bottom"
-          />
+          <Action name="Send a receipt" subtitle="Via Mailchimp" className="conn-top conn-bottom" />
         </Row>
         <Row className="expression">
           <If expression="Amount >= $500" className="conn-bottom conn-top" />
@@ -35,23 +32,12 @@ export default function Workflow({ style, className }) {
             subtitle="By running custom code"
             className="conn-top"
           />
-          <If
-            expression="If email bounces within 1 day"
-            className="conn-bottom conn-top"
-          />
+          <If expression="If email bounces within 1 day" className="conn-bottom conn-top" />
         </Row>
         <Row>
-          <Action
-            name="Add to VIP list"
-            subtitle="Via Mailchimp"
-            className="conn-top"
-          />
+          <Action name="Add to VIP list" subtitle="Via Mailchimp" className="conn-top" />
           <Empty />
-          <Action
-            name="Create support issue"
-            subtitle="Within Zendesk"
-            className="conn-top"
-          />
+          <Action name="Create support issue" subtitle="Within Zendesk" className="conn-top" />
         </Row>
       </Flow>
     </Wrapper>
@@ -107,13 +93,13 @@ const Flow = styled.div`
   left: 0;
 
   .action {
-    box-shadow: 8px 10px 30px rgb(0 0 0 / 25%), 1px 1px 0px 0px #fff,
-      2px 2px 0px 0px #fff, 3px 5px 0px 0px #fff;
+    box-shadow: 8px 10px 30px rgb(0 0 0 / 25%), 1px 1px 0px 0px #fff, 2px 2px 0px 0px #fff,
+      3px 5px 0px 0px #fff;
   }
 
   .conn-top:before {
     width: 1px;
-    content: "";
+    content: '';
     display: block;
     position: absolute;
     left: 50%;
@@ -124,7 +110,7 @@ const Flow = styled.div`
 
   .conn-bottom:after {
     width: 1px;
-    content: "";
+    content: '';
     display: block;
     position: absolute;
     left: 50%;

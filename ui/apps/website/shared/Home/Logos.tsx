@@ -1,14 +1,14 @@
-import Link from "next/link";
-import Image from "next/image";
-import clsx from "clsx";
+import Image from 'next/image';
+import Link from 'next/link';
+import clsx from 'clsx';
 
-import Container from "../layout/Container";
+import Container from '../layout/Container';
 
 export default function Logos({
   heading,
   logos,
   footer,
-  variant = "dark",
+  variant = 'dark',
   className,
 }: {
   heading?: string | React.ReactNode;
@@ -21,23 +21,23 @@ export default function Logos({
   }[];
   footer?: React.ReactNode;
   className?: string;
-  variant?: "dark" | "light";
+  variant?: 'dark' | 'light';
 }) {
   const hasLinks = !!logos.find((l) => !!l.href);
   const nonFeaturedCount = logos.filter((l) => !l.featured).length;
   return (
     <Container
       className={clsx(
-        "mx-auto max-w-4xl", // my-20 lg:my-36 mb-20 lg:mb-40 xl:mb-60
+        'mx-auto max-w-4xl', // my-20 lg:my-36 mb-20 lg:mb-40 xl:mb-60
         className
       )}
     >
       {!!heading && (
         <h2
           className={clsx(
-            "text-lg tracking-tight text-center",
-            variant === "dark" && "text-slate-400 drop-shadow",
-            variant === "light" && "text-slate-700"
+            'text-center text-lg tracking-tight',
+            variant === 'dark' && 'text-slate-400 drop-shadow',
+            variant === 'light' && 'text-slate-700'
           )}
         >
           {heading}
@@ -45,11 +45,11 @@ export default function Logos({
       )}
       <div
         className={clsx(
-          "mt-16 grid grid-cols-2 items-center justify-center max-w-[1200px] m-auto",
-          nonFeaturedCount === 4 && "sm:px-8 md:px-20 lg:grid-cols-4",
-          nonFeaturedCount === 5 && "sm:px-6 lg:grid-cols-5",
-          hasLinks ? "gap-x-4 gap-y-8" : "gap-x-16 gap-y-16",
-          footer && "mb-16"
+          'm-auto mt-16 grid max-w-[1200px] grid-cols-2 items-center justify-center',
+          nonFeaturedCount === 4 && 'sm:px-8 md:px-20 lg:grid-cols-4',
+          nonFeaturedCount === 5 && 'sm:px-6 lg:grid-cols-5',
+          hasLinks ? 'gap-x-4 gap-y-8' : 'gap-x-16 gap-y-16',
+          footer && 'mb-16'
         )}
       >
         {logos.map(({ src, name, href, featured, scale = 1 }, idx) => {
@@ -58,16 +58,14 @@ export default function Logos({
               <Link
                 href={href}
                 className={clsx(
-                  "group flex items-center justify-center h-16 w-40 max-w-[90%] px-6 py-6 m-auto rounded-lg border transition-all",
-                  variant === "dark" &&
-                    "border-slate-700 hover:border-slate-600",
-                  variant === "light" &&
-                    "border-slate-200 hover:border-slate-300",
-                  featured && "col-span-2",
+                  'group m-auto flex h-16 w-40 max-w-[90%] items-center justify-center rounded-lg border px-6 py-6 transition-all',
+                  variant === 'dark' && 'border-slate-700 hover:border-slate-600',
+                  variant === 'light' && 'border-slate-200 hover:border-slate-300',
+                  featured && 'col-span-2',
                   !featured &&
                     nonFeaturedCount % 2 == 1 &&
                     idx === logos.length - 1 &&
-                    "col-span-2 lg:col-span-1" // center the last item if there is an odd number
+                    'col-span-2 lg:col-span-1' // center the last item if there is an odd number
                 )}
               >
                 <Image
@@ -76,7 +74,7 @@ export default function Logos({
                   alt={name}
                   width={120}
                   height={30}
-                  className="text-white max-h-[40px] pointer-events-none opacity-80 transition-all group-hover:opacity-100"
+                  className="pointer-events-none max-h-[40px] text-white opacity-80 transition-all group-hover:opacity-100"
                 />
               </Link>
             );
@@ -90,9 +88,9 @@ export default function Logos({
               width={(featured ? 240 : 120) * scale}
               height={(featured ? 120 : 30) * scale}
               className={clsx(
-                "text-white m-auto width-auto transition-all grayscale hover:grayscale-0",
+                'width-auto m-auto text-white grayscale transition-all hover:grayscale-0',
                 `max-h-[${36 * scale}px]`,
-                featured && "col-span-2 max-h-[60px]"
+                featured && 'col-span-2 max-h-[60px]'
               )}
             />
           );

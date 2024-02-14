@@ -1,15 +1,16 @@
-import React from "react";
-import type { IconProps } from "./props";
+import React from 'react';
+
+import type { IconProps } from './props';
 
 const calc = (size: string | number, multiplier: number): string => {
-  if (typeof size === "string") {
+  if (typeof size === 'string') {
     const [_, int, unit] = size.match(/^(\d+)(px|em|rem|vh)$/);
     return `${multiplier * parseInt(int, 10)}${unit}`;
   }
   return `${size * multiplier}`;
 };
 
-const Discord = ({ size = "1em", fill = "currentColor" }: IconProps) => (
+const Discord = ({ size = '1em', fill = 'currentColor' }: IconProps) => (
   <svg
     width={size}
     height={calc(size, 55 / 71)}

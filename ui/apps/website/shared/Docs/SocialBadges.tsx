@@ -1,5 +1,6 @@
-import Link from "next/link";
-import XSocialIcon from "../Icons/XSocialIcon";
+import Link from 'next/link';
+
+import XSocialIcon from '../Icons/XSocialIcon';
 
 function TwitterIcon(props) {
   return <XSocialIcon aria-hidden="true" {...props} />;
@@ -29,7 +30,7 @@ function SocialLink({ href, icon: Icon, children }) {
   return (
     <Link href={href} className="group">
       <span className="sr-only">{children}</span>
-      <Icon className="h-5 w-5 text-slate-600 dark:text-slate-400 fill-slate-600 dark:fill-slate-400 transition group-hover:text-indigo-500 dark:group-hover:text-indigo-400 group-hover:fill-indigo-500 dark:group-hover:fill-indigo-400" />
+      <Icon className="h-5 w-5 fill-slate-600 text-slate-600 transition group-hover:fill-indigo-500 group-hover:text-indigo-500 dark:fill-slate-400 dark:text-slate-400 dark:group-hover:fill-indigo-400 dark:group-hover:text-indigo-400" />
     </Link>
   );
 }

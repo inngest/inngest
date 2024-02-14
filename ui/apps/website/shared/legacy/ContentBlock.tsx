@@ -1,55 +1,42 @@
-import React from "react";
-import styled from "@emotion/styled";
+import React from 'react';
+import styled from '@emotion/styled';
 
 const ContentBlock: React.FC<{
-  layout?: "default" | "reverse";
+  layout?: 'default' | 'reverse';
   preline?: string | React.ReactNode;
   heading: string | React.ReactNode;
   text: string | React.ReactNode;
   icon?: React.ReactNode;
   image?: string;
-  imageSize?: "default" | "full";
-}> = ({
-  layout = "default",
-  preline,
-  heading,
-  text,
-  icon,
-  image,
-  imageSize = "default",
-}) => {
-  const imageBox = (
-    <div className="image" style={{ backgroundImage: `url(${image})` }}></div>
-  );
+  imageSize?: 'default' | 'full';
+}> = ({ layout = 'default', preline, heading, text, icon, image, imageSize = 'default' }) => {
+  const imageBox = <div className="image" style={{ backgroundImage: `url(${image})` }}></div>;
   return (
     <Block layout={layout} imageSize={imageSize}>
       <img src={image} className="image-mobile" />
-      {layout === "reverse" && imageBox}
+      {layout === 'reverse' && imageBox}
       <div className="content">
-        {icon ? icon : ""}
-        {preline ? <div className="preline">{preline}</div> : ""}
+        {icon ? icon : ''}
+        {preline ? <div className="preline">{preline}</div> : ''}
         <h3>{heading}</h3>
         <p>{text}</p>
       </div>
-      {layout === "default" && imageBox}
+      {layout === 'default' && imageBox}
     </Block>
   );
 };
 
 const Block = styled.div<{
-  layout: "default" | "reverse";
-  imageSize: "default" | "full";
+  layout: 'default' | 'reverse';
+  imageSize: 'default' | 'full';
 }>`
   max-width: 1200px;
   display: grid;
-  grid-template-columns: repeat(
-    11,
-    1fr
-  ); // 11 so nothing is perfectly down the middle of the page
+  grid-template-columns: repeat(11, 1fr); // 11 so nothing is perfectly down the middle of the page
   margin: 4rem auto;
 
   .content {
-    grid-column: ${({ layout }) => (layout === "default" ? "2/6" : "6/10")};
+    grid-column: ${({ layout }) => (layout === 'default' ? '2/6' : '6/10')};
     padding: 2rem 0;
   }
 
@@ -81,17 +68,16 @@ const Block = styled.div<{
     grid-column: ${({ layout, imageSize }) => {
       const cols = {
         // layout imageSize
-        "default default": "7/10",
-        "default full": "7/12",
-        "reverse default": "2/5",
-        "reverse full": "1/5",
+        'default default': '7/10',
+        'default full': '7/12',
+        'reverse default': '2/5',
+        'reverse full': '1/5',
       };
       return cols[`${layout} ${imageSize}`];
     }};
     background-size: contain;
     background-repeat: no-repeat;
-    background-position: ${({ layout }) =>
-      layout === "default" ? "left center" : "right center"};
+    background-position: ${({ layout }) => (layout === 'default' ? 'left center' : 'right center')};
   }
 
   @media (max-width: 800px) {

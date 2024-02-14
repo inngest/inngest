@@ -1,8 +1,8 @@
 ---
-heading: "Programmable event platforms"
+heading: 'Programmable event platforms'
 subtitle: Programmable event platforms allow you to build serverless event-driven systems in minutes.  Here's an introduction to them.
 date: 2022-01-10
-image: "/assets/blog/programmable-event-platforms/featured-image.jpg"
+image: '/assets/blog/programmable-event-platforms/featured-image.jpg'
 ---
 
 Software architecture has undergone rapid changes in the last decade. “Table stakes” for products has advanced and with it our software has become increasingly complex. To make this work, we’re integrating more tools than ever, and we’re building more complex architectures encompassing (micro)services, serverless, and event-driven systems.

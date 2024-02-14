@@ -1,7 +1,7 @@
-import deterministicSplit from "deterministic-split";
-import { useEffect, useMemo } from "react";
-import { useCookie, useLocalStorage } from "react-use";
-import { v4 as uuid } from "uuid";
+import { useEffect, useMemo } from 'react';
+import deterministicSplit from 'deterministic-split';
+import { useCookie, useLocalStorage } from 'react-use';
+import { v4 as uuid } from 'uuid';
 
 /**
  * AB experiments with keys as experiment names and values as the variants.
@@ -14,21 +14,32 @@ export const abExperiments = {
  * Fetch and return the user's anonymous ID.
  */
 export const useAnonymousID = (): { anonymousID: string; existing: boolean } => {
-  const [anonymousID, setAnonymousID] = useCookie("inngest_anonymous_id");
+  const [anonymousID, setAnonymousID] = useCookie('inngest_anonymous_id');
 
   // TODO: remove this once sufficient time has passed for users to get the new cookie.
   // If the user has a legacy anonymous ID, migrate it to the new cookie.
-  const [legacyAnonymousID, _, deleteLegacyAnonymousID] = useLocalStorage<string>("inngest-anon-id");
+  const [legacyAnonymousID, _, deleteLegacyAnonymousID] =
+    useLocalStorage<string>('inngest-anon-id');
   if (!anonymousID && legacyAnonymousID) {
     const sixMonthsFromNow = new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000);
-    setAnonymousID(legacyAnonymousID, { domain: process.env.NEXT_PUBLIC_HOSTNAME, path: "/", expires: sixMonthsFromNow, sameSite: 'lax' });
+    setAnonymousID(legacyAnonymousID, {
+      domain: process.env.NEXT_PUBLIC_HOSTNAME,
+      path: '/',
+      expires: sixMonthsFromNow,
+      sameSite: 'lax',
+    });
     deleteLegacyAnonymousID();
   }
 
   if (!anonymousID) {
     const newAnonymousID = uuid();
     const sixMonthsFromNow = new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000);
-    setAnonymousID(newAnonymousID, { domain: process.env.NEXT_PUBLIC_HOSTNAME, path: "/", expires: sixMonthsFromNow, sameSite: 'lax' });
+    setAnonymousID(newAnonymousID, {
+      domain: process.env.NEXT_PUBLIC_HOSTNAME,
+      path: '/',
+      expires: sixMonthsFromNow,
+      sameSite: 'lax',
+    });
     return {
       anonymousID: newAnonymousID,
       existing: false,
@@ -43,12 +54,9 @@ export const useAnonymousID = (): { anonymousID: string; existing: boolean } => 
 
 // If we call useAbTest in multiple places in one page,
 // we should only track it once per experiment.
-const tracked: { [key: string]: boolean } = Object.keys(abExperiments).reduce(
-  (acc, key) => {
-    return { ...acc, [key]: false };
-  },
-  {}
-);
+const tracked: { [key: string]: boolean } = Object.keys(abExperiments).reduce((acc, key) => {
+  return { ...acc, [key]: false };
+}, {});
 
 /**
  * Fetch the user's current variant for a particular AB experiment.
@@ -63,13 +71,13 @@ export const useAbTest = <T extends keyof typeof abExperiments>(
 
   const variant = useMemo(() => {
     // for server side rendering, always render the first variant
-    if (typeof window === "undefined") {
+    if (typeof window === 'undefined') {
       return abExperiments[experimentName][0];
     }
     return deterministicSplit(
       `${anonymousID}_${experimentName}`,
       abExperiments[experimentName]
-    ) as typeof abExperiments[T][number];
+    ) as (typeof abExperiments)[T][number];
   }, [anonymousID, experimentName]);
 
   /**
@@ -80,7 +88,7 @@ export const useAbTest = <T extends keyof typeof abExperiments>(
     // Inngest is undefined on server side during local dev
     if (window?.Inngest && !tracked[experimentName]) {
       window.Inngest.event({
-        name: "website/experiment.viewed",
+        name: 'website/experiment.viewed',
         data: {
           anonymous_id: anonymousID,
           experiment: experimentName,

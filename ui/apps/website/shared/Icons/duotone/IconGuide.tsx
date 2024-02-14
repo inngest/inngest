@@ -1,10 +1,6 @@
-import IconTheme from "./theme";
+import IconTheme from './theme';
 
-export function IconGuide({
-  size = 20,
-  className = "",
-  color = "transparent",
-}) {
+export function IconGuide({ size = 20, className = '', color = 'transparent' }) {
   const theme = IconTheme(color);
   return (
     <svg
@@ -24,11 +20,7 @@ export function IconGuide({
           id="a"
         >
           <feOffset dy="1" in="SourceAlpha" result="shadowOffsetOuter1" />
-          <feGaussianBlur
-            stdDeviation="1"
-            in="shadowOffsetOuter1"
-            result="shadowBlurOuter1"
-          />
+          <feGaussianBlur stdDeviation="1" in="shadowOffsetOuter1" result="shadowBlurOuter1" />
           <feColorMatrix
             values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.268793706 0"
             in="shadowBlurOuter1"

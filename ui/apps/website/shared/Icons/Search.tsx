@@ -1,6 +1,6 @@
-import React from "react";
+import React from 'react';
 
-export default ({ fill = "#222631", size = 15, style = {} }) => (
+export default ({ fill = '#222631', size = 15, style = {} }) => (
   <svg
     width={size}
     height={size}

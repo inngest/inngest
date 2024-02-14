@@ -1,8 +1,8 @@
 ---
 focus: false
-heading: "Building a real-time websocket app using SvelteKit"
+heading: 'Building a real-time websocket app using SvelteKit'
 subtitle: Our experience building https://typedwebhook.tools in 2 days using SvelteKit.
-image: "/assets/blog/building-a-realtime-websocket-app-using-sveltekit.jpg"
+image: '/assets/blog/building-a-realtime-websocket-app-using-sveltekit.jpg'
 date: 2022-02-22
 ---
 
@@ -76,7 +76,7 @@ Here’s a distilled quick take on Svelte(Kit):
 Here's an example of how easy it is to create a reactive store that is updated on each websocket message:
 
 ```typescript
-import { writable } from "svelte/store";
+import { writable } from 'svelte/store';
 
 type State = {
   requests: Array<Request>;
@@ -89,9 +89,9 @@ export const state = writable<State>({
 
 export const connect = () => {
   // Create a new websocket
-  const ws = new WebSocket("ws://example.com");
+  const ws = new WebSocket('ws://example.com');
 
-  ws.addEventListener("message", (message: any) => {
+  ws.addEventListener('message', (message: any) => {
     // Parse the incoming message here
     const data: Request = JSON.parse(message.data);
     // Update the state.  That's literally it.  This can happen from anywhere:

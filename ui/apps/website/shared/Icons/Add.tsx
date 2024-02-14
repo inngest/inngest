@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react';
 
 type Props = {
   size?: string | number;
@@ -12,9 +12,9 @@ export default ({ size, width, height, fill }: Props) => (
     xmlns="http://www.w3.org/2000/svg"
     x="0px"
     y="0px"
-    width={size || width || "64"}
-    height={size || height || "64"}
-    stroke={fill || "#000"}
+    width={size || width || '64'}
+    height={size || height || '64'}
+    stroke={fill || '#000'}
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"

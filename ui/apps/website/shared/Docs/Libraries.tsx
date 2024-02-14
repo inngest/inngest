@@ -1,7 +1,8 @@
-import Image from "next/image";
+import Image from 'next/image';
 
-import { Button } from "./Button";
-import { Heading } from "./Heading";
+import { Button } from './Button';
+import { Heading } from './Heading';
+
 // import logoGo from '@/images/logos/go.svg'
 // import logoNode from '@/images/logos/node.svg'
 // import logoPhp from '@/images/logos/php.svg'
@@ -10,38 +11,37 @@ import { Heading } from "./Heading";
 
 const libraries = [
   {
-    href: "#",
-    name: "PHP",
+    href: '#',
+    name: 'PHP',
     description:
-      "A popular general-purpose scripting language that is especially suited to web development.",
+      'A popular general-purpose scripting language that is especially suited to web development.',
     // logo: logoPhp,
   },
   {
-    href: "#",
-    name: "Ruby",
+    href: '#',
+    name: 'Ruby',
     description:
-      "A dynamic, open source programming language with a focus on simplicity and productivity.",
+      'A dynamic, open source programming language with a focus on simplicity and productivity.',
     // logo: logoRuby,
   },
   {
-    href: "#",
-    name: "Node.js",
-    description:
-      "Node.js® is an open-source, cross-platform JavaScript runtime environment.",
+    href: '#',
+    name: 'Node.js',
+    description: 'Node.js® is an open-source, cross-platform JavaScript runtime environment.',
     // logo: logoNode,
   },
   {
-    href: "#",
-    name: "Python",
+    href: '#',
+    name: 'Python',
     description:
-      "Python is a programming language that lets you work quickly and integrate systems more effectively.",
+      'Python is a programming language that lets you work quickly and integrate systems more effectively.',
     // logo: logoPython,
   },
   {
-    href: "#",
-    name: "Go",
+    href: '#',
+    name: 'Go',
     description:
-      "An open-source programming language supported by Google with built-in concurrency.",
+      'An open-source programming language supported by Google with built-in concurrency.',
     // logo: logoGo,
   },
 ];
@@ -52,7 +52,7 @@ export function Libraries() {
       <Heading level={2} id="official-libraries">
         Official libraries
       </Heading>
-      <div className="not-prose mt-4 grid grid-cols-1 gap-x-6 gap-y-10 border-t border-slate-900/5 pt-10 dark:border-white/5 sm:grid-cols-2 xl:max-w-none xl:grid-cols-3">
+      <div className="not-prose mt-4 grid grid-cols-1 gap-x-6 gap-y-10 border-t border-slate-900/5 pt-10 sm:grid-cols-2 xl:max-w-none xl:grid-cols-3 dark:border-white/5">
         {libraries.map((library) => (
           <div key={library.name} className="flex flex-row-reverse gap-6">
             <div className="flex-auto">

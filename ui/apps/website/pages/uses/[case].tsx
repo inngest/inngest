@@ -1,31 +1,31 @@
-import { GetStaticProps, GetStaticPaths } from "next";
-import SyntaxHighlighter from "react-syntax-highlighter";
-import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
-import Footer from "src/shared/Footer";
-import Header from "src/shared/Header";
-import Container from "src/shared/layout/Container";
-import PageHeader from "src/shared/PageHeader";
-import SectionHeader from "src/shared/SectionHeader";
-import Learning from "src/shared/Cards/Learning";
-import PageContainer from "src/shared/layout/PageContainer";
-import Image from "next/image";
-import Quote from "src/shared/Home/Quote";
-import CodeWindow from "src/shared/CodeWindow";
+import { GetStaticPaths, GetStaticProps } from 'next';
+import Image from 'next/image';
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { atomOneDark as syntaxThemeDark } from 'react-syntax-highlighter/dist/cjs/styles/hljs';
+import Learning from 'src/shared/Cards/Learning';
+import CodeWindow from 'src/shared/CodeWindow';
+import Footer from 'src/shared/Footer';
+import Header from 'src/shared/Header';
+import Quote from 'src/shared/Home/Quote';
+import PageHeader from 'src/shared/PageHeader';
+import SectionHeader from 'src/shared/SectionHeader';
+import Container from 'src/shared/layout/Container';
+import PageContainer from 'src/shared/layout/PageContainer';
 
 import {
+  IconCompiling,
+  IconFiles,
+  IconPower,
+  IconProps,
   IconRetry,
+  IconSDK,
+  IconScheduled,
   IconServer,
+  IconSteps,
   IconTools,
   IconUnlock,
   IconWritingFns,
-  IconProps,
-  IconSDK,
-  IconScheduled,
-  IconSteps,
-  IconFiles,
-  IconCompiling,
-  IconPower,
-} from "../../shared/Icons/duotone";
+} from '../../shared/Icons/duotone';
 
 const Icons: { [key: string]: React.FC<IconProps> } = {
   Retry: IconRetry,
@@ -79,16 +79,14 @@ export type UseCase = {
     resources: {
       title: string;
       description: string;
-      type: "Docs" | "Tutorial" | "Guide" | "Pattern" | "Blog";
+      type: 'Docs' | 'Tutorial' | 'Guide' | 'Pattern' | 'Blog';
       href: string;
     }[];
   };
 };
 
 export const getStaticProps: GetStaticProps = async (ctx) => {
-  const {
-    data,
-  }: { data: UseCase } = require(`../../data/uses/${ctx.params.case}.tsx`);
+  const { data }: { data: UseCase } = require(`../../data/uses/${ctx.params.case}.tsx`);
   const stringData = JSON.stringify({ ...data, slug: ctx.params.case });
   return {
     props: {
@@ -97,19 +95,19 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
         title: data.title,
         description: data.lede,
       },
-      designVersion: "2",
+      designVersion: '2',
     },
   };
 };
 
 export const getStaticPaths: GetStaticPaths = async () => {
-  const fs = require("node:fs");
-  const fileNames = fs.readdirSync("./data/uses");
+  const fs = require('node:fs');
+  const fileNames = fs.readdirSync('./data/uses');
 
   const paths = fileNames.map((fileName) => {
     return {
       params: {
-        case: fileName.replace(/\.tsx$/, ""),
+        case: fileName.replace(/\.tsx$/, ''),
       },
     };
   });
@@ -135,23 +133,23 @@ export default function useCase({ stringData }) {
             {
               href: `${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=use-case-${data.slug}`,
               text: `Get started`,
-              arrow: "right",
+              arrow: 'right',
             },
           ]}
         />
       </Container>
 
       <Container>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 mt-8 gap-2">
+        <div className="mt-8 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
           {data.keyFeatures.map((feature, i) => (
             <div
               key={i}
-              className="max-w-[600px] m-auto md:m-0 bg-slate-950/80 overflow-hidden rounded-lg border-slate-900/10"
+              className="m-auto max-w-[600px] overflow-hidden rounded-lg border-slate-900/10 bg-slate-950/80 md:m-0"
             >
               {Boolean(feature.img) && (
                 <Image
                   alt={`Graphic of ${feature.title}`}
-                  className="rounded-t-lg lg:rounded-t-none lg:rounded-r-lg group-hover:rounded-lg"
+                  className="rounded-t-lg group-hover:rounded-lg lg:rounded-r-lg lg:rounded-t-none"
                   src={`/assets/use-cases/${feature.img}`}
                   width={600}
                   height={340}
@@ -159,11 +157,9 @@ export default function useCase({ stringData }) {
                 />
               )}
               <div className="p-6 lg:p-10">
-                <h3 className="text-lg lg:text-xl text-white mb-2.5">
-                  {feature.title}
-                </h3>
+                <h3 className="mb-2.5 text-lg text-white lg:text-xl">{feature.title}</h3>
                 <p
-                  className="text-sm text-indigo-100 leading-6"
+                  className="text-sm leading-6 text-indigo-100"
                   dangerouslySetInnerHTML={{ __html: feature.description }}
                 ></p>
               </div>
@@ -175,36 +171,28 @@ export default function useCase({ stringData }) {
       <Container className=" my-40">
         <SectionHeader title={data.codeSection.title} />
         {data.codeSection.examples.map((example) => (
-          <div className="mt-16 grid lg:grid-cols-5 md:grid-cols-1">
-            <div className="text-slate-200 mb-10 lg:mb-0 lg:pr-20 max-w-[480px] justify-center flex flex-col gap-3 col-span-2">
+          <div className="mt-16 grid md:grid-cols-1 lg:grid-cols-5">
+            <div className="col-span-2 mb-10 flex max-w-[480px] flex-col justify-center gap-3 text-slate-200 lg:mb-0 lg:pr-20">
               {!!example.title && (
-                <h3 className="mb-12 text-xl md:text-3xl font-semibold">
-                  {example.title}
-                </h3>
+                <h3 className="mb-12 text-xl font-semibold md:text-3xl">{example.title}</h3>
               )}
               {example.steps.map((step, idx) => (
                 <p className="flex items-start gap-3">
-                  <span className="bg-slate-800 rounded flex items-center justify-center w-6 h-6 text-xs font-bold shrink-0">
-                    {example?.steps?.length === 1 ? "→" : idx + 1}
-                  </span>{" "}
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-800 text-xs font-bold">
+                    {example?.steps?.length === 1 ? '→' : idx + 1}
+                  </span>{' '}
                   {step}
                 </p>
               ))}
-              <p className="text-sm text-slate-300 mt-4 ml-9">
-                {example.description}
-              </p>
+              <p className="ml-9 mt-4 text-sm text-slate-300">{example.description}</p>
             </div>
-            <CodeWindow
-              snippet={example.code}
-              showLineNumbers={true}
-              className="col-span-3"
-            />
+            <CodeWindow snippet={example.code} showLineNumbers={true} className="col-span-3" />
           </div>
         ))}
       </Container>
 
       {!!data.quote && (
-        <Container className="flex flex-col items-center gap-4 my-48">
+        <Container className="my-48 flex flex-col items-center gap-4">
           <Quote
             text={data.quote.text}
             attribution={{
@@ -218,21 +206,15 @@ export default function useCase({ stringData }) {
       )}
 
       <Container className="my-40">
-        <SectionHeader
-          title={data.featureOverflowTitle || "Everything you need to build"}
-        />
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 xl:gap-16 mt-20">
+        <SectionHeader title={data.featureOverflowTitle || 'Everything you need to build'} />
+        <div className="mt-20 grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3 xl:gap-16">
           {data.featureOverflow.map((feature, i) => (
             <div key={i}>
-              <h3 className="text-slate-50 text-lg lg:text-xl mb-2 flex items-center gap-1 -ml-2">
-                {feature.icon && (
-                  <Icon name={feature.icon} size={30} color="indigo" />
-                )}
+              <h3 className="-ml-2 mb-2 flex items-center gap-1 text-lg text-slate-50 lg:text-xl">
+                {feature.icon && <Icon name={feature.icon} size={30} color="indigo" />}
                 {feature.title}
               </h3>
-              <p className="text-indigo-200 text-sm leading-loose">
-                {feature.description}
-              </p>
+              <p className="text-sm leading-loose text-indigo-200">{feature.description}</p>
             </div>
           ))}
         </div>
@@ -240,7 +222,7 @@ export default function useCase({ stringData }) {
 
       <Container>
         <SectionHeader title="Learn more" lede={data.learnMore.description} />
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-16">
+        <div className="mt-16 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {data.learnMore.resources.map((learningItem, i) => (
             <Learning
               key={i}

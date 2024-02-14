@@ -1,21 +1,21 @@
-import shiki from "shiki";
-import { visit } from "unist-util-visit";
-import { u } from "unist-builder";
+import shiki from 'shiki';
+import { u } from 'unist-builder';
+import { visit } from 'unist-util-visit';
 
 // This function is used to hide twoslash code for the time being
 export function rehypeRemoveTwoSlashMarkup() {
   return async (tree) => {
-    visit(tree, "element", (node, _nodeIndex, parentNode) => {
+    visit(tree, 'element', (node, _nodeIndex, parentNode) => {
       // Get all the code blocks, not the inline <code> `` blocks
-      if (node.tagName === "pre" && node.children[0]?.tagName === "code") {
+      if (node.tagName === 'pre' && node.children[0]?.tagName === 'code') {
         let codeNode = node.children?.[0];
         let textNode = codeNode?.children?.[0];
 
         // Remove all code before the cut line
-        const cut = textNode.value.split("---cut---\n");
+        const cut = textNode.value.split('---cut---\n');
         const code = cut.length > 1 ? cut.pop() : cut[0];
         // Remove comment queries: "//   ^?"
-        const removeQueries = code.replace(/\/\/\s+\^\?\s/m, "");
+        const removeQueries = code.replace(/\/\/\s+\^\?\s/m, '');
 
         textNode.value = removeQueries;
       }
@@ -28,43 +28,39 @@ let highlighter;
 // Legacy visitor
 export function rehypeShiki() {
   return async (tree) => {
-    highlighter =
-      highlighter ?? (await shiki.getHighlighter({ theme: "css-variables" }));
+    highlighter = highlighter ?? (await shiki.getHighlighter({ theme: 'css-variables' }));
 
-    visit(tree, "element", (node) => {
-      if (node.tagName === "pre" && node.children[0]?.tagName === "code") {
+    visit(tree, 'element', (node) => {
+      if (node.tagName === 'pre' && node.children[0]?.tagName === 'code') {
         let codeNode = node.children[0];
         let textNode = codeNode.children[0];
 
         node.properties.code = textNode.value;
 
         // Match what twoslash did
-        node.properties.class = "shiki css-variables";
+        node.properties.class = 'shiki css-variables';
         node.properties.style =
-          "background-color:var(--shiki-color-background);color:var(--shiki-color-text)";
+          'background-color:var(--shiki-color-background);color:var(--shiki-color-text)';
 
         if (node.properties.language) {
-          let tokens = highlighter.codeToThemedTokens(
-            textNode.value,
-            node.properties.language
-          );
+          let tokens = highlighter.codeToThemedTokens(textNode.value, node.properties.language);
 
           // We modify this to replicate what twoslash used to do to the DOM structure
           const tree = tokensToHast(tokens);
           node.children = [
             u(
-              "element",
+              'element',
               {
-                tagName: "div",
-                properties: { class: "language-id" },
+                tagName: 'div',
+                properties: { class: 'language-id' },
               },
-              [u("text", node.properties.language)]
+              [u('text', node.properties.language)]
             ),
             u(
-              "element",
+              'element',
               {
-                tagName: "div",
-                properties: { class: "code-container" },
+                tagName: 'div',
+                properties: { class: 'code-container' },
               },
               tree
             ),
@@ -84,14 +80,14 @@ function tokensToHast(lines) {
     // Enable some custom error highlighting that matches Twoslash
     const ErrorLineRegex = /\/\/ Error: /;
     if (line?.[0]?.content.match(ErrorLineRegex)) {
-      const clean = line?.[0]?.content.replace(ErrorLineRegex, "");
+      const clean = line?.[0]?.content.replace(ErrorLineRegex, '');
       const errorNode = u(
-        "element",
+        'element',
         {
-          tagName: "div",
-          properties: { class: "error" },
+          tagName: 'div',
+          properties: { class: 'error' },
         },
-        [u("text", clean)]
+        [u('text', clean)]
       );
       tree.push(errorNode);
       continue;
@@ -100,22 +96,22 @@ function tokensToHast(lines) {
     for (const token of line) {
       children.push(
         u(
-          "element",
+          'element',
           {
-            tagName: "span",
-            properties: { style: "color: " + token.color },
+            tagName: 'span',
+            properties: { style: 'color: ' + token.color },
           },
-          [u("text", token.content)]
+          [u('text', token.content)]
         )
       );
     }
 
     // Twoslash used to nest things with a "line" div
     const lineNode = u(
-      "element",
+      'element',
       {
-        tagName: "div",
-        properties: { class: "line" },
+        tagName: 'div',
+        properties: { class: 'line' },
       },
       children
     );

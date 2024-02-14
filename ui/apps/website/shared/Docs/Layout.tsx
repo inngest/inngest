@@ -1,28 +1,28 @@
-import Link from "next/link";
-import Head from "next/head";
-import { Router } from "next/router";
-import { MDXProvider } from "@mdx-js/react";
-import { motion } from "framer-motion";
+import Head from 'next/head';
+import Link from 'next/link';
+import { Router } from 'next/router';
+import { MDXProvider } from '@mdx-js/react';
+import { motion } from 'framer-motion';
+import * as mdxComponents from 'src/shared/Docs/mdx';
 
-import * as mdxComponents from "src/shared/Docs/mdx";
-import { Footer } from "./Footer";
-import { Home } from "./Home";
-import { Header } from "./Header";
-import Logo from "../Icons/Logo";
-import { Navigation } from "./Navigation";
-import { Prose } from "./Prose";
-import { SectionProvider } from "./SectionProvider";
-import { useMobileNavigationStore } from "./MobileNavigation";
-import { getOpenGraphImageURL } from "../../utils/social";
+import { getOpenGraphImageURL } from '../../utils/social';
+import Logo from '../Icons/Logo';
+import { Footer } from './Footer';
+import { Header } from './Header';
+import { Home } from './Home';
+import { useMobileNavigationStore } from './MobileNavigation';
+import { Navigation } from './Navigation';
+import { Prose } from './Prose';
+import { SectionProvider } from './SectionProvider';
 
 // Unsure if this should be here or in the _app and conditionally run only on docs
 function onRouteChange() {
   useMobileNavigationStore.getState().close();
 }
 
-Router.events.on("hashChangeStart", onRouteChange);
-Router.events.on("routeChangeComplete", onRouteChange);
-Router.events.on("routeChangeError", onRouteChange);
+Router.events.on('hashChangeStart', onRouteChange);
+Router.events.on('routeChangeComplete', onRouteChange);
+Router.events.on('routeChangeError', onRouteChange);
 
 export type Props = {
   children: React.ReactNode;
@@ -35,21 +35,12 @@ export type Props = {
   description?: string;
 };
 
-export function Layout({
-  children,
-  sections = [],
-  title,
-  metaTitle,
-  description,
-}: Props) {
+export function Layout({ children, sections = [], title, metaTitle, description }: Props) {
   const siteTitle = `Inngest Documentation`;
   const preferredTitle: string = metaTitle || title || siteTitle;
   const pageTitle =
-    preferredTitle === siteTitle
-      ? preferredTitle
-      : `${preferredTitle} - ${siteTitle}`;
-  const metaDescription =
-    description || `Inngest documentation for ${preferredTitle}`;
+    preferredTitle === siteTitle ? preferredTitle : `${preferredTitle} - ${siteTitle}`;
+  const metaDescription = description || `Inngest documentation for ${preferredTitle}`;
   const metaImage = getOpenGraphImageURL({ title: preferredTitle });
 
   return (
@@ -73,12 +64,12 @@ export function Layout({
           <div className="lg:ml-72 xl:ml-80">
             <motion.header
               layoutScroll
-              className="fixed inset-y-0 left-0 z-40 contents w-72 overflow-y-auto border-r border-slate-900/10 px-6 pt-4 pb-8 dark:border-white/10 lg:block xl:w-80"
+              className="fixed inset-y-0 left-0 z-40 contents w-72 overflow-y-auto border-r border-slate-900/10 px-6 pb-8 pt-4 lg:block xl:w-80 dark:border-white/10"
             >
               <div className="hidden lg:flex">
-                <a href="/" className="flex gap-1.5 group/logo items-center">
+                <a href="/" className="group/logo flex items-center gap-1.5">
                   <Logo className="w-20 text-indigo-500 dark:text-white" />
-                  <span className="mb-0.5 text-slate-700 dark:text-indigo-400 text-base group-hover/logo:text-slate-500 dark:group-hover/logo:text-white transition-color font-semibold">
+                  <span className="transition-color mb-0.5 text-base font-semibold text-slate-700 group-hover/logo:text-slate-500 dark:text-indigo-400 dark:group-hover/logo:text-white">
                     Docs
                   </span>
                 </a>

@@ -1,30 +1,28 @@
-import React, { useEffect, useState } from "react";
-import styled from "@emotion/styled";
+import React, { useEffect, useState } from 'react';
+import styled from '@emotion/styled';
 
-import { titleCase } from "./util";
+import { titleCase } from './util';
 
-const ThemeToggleButton: React.FC<{ isFloating?: boolean }> = ({
-  isFloating = false,
-}) => {
+const ThemeToggleButton: React.FC<{ isFloating?: boolean }> = ({ isFloating = false }) => {
   const [isOpen, setOpen] = useState(false);
-  const [theme, setTheme] = useState("dark");
+  const [theme, setTheme] = useState('dark');
 
-  const getOppositeTheme = (theme: string): "light" | "dark" =>
-    theme === "light" ? "dark" : "light";
+  const getOppositeTheme = (theme: string): 'light' | 'dark' =>
+    theme === 'light' ? 'dark' : 'light';
 
-  const updateThemeAndSave = (newTheme: "light" | "dark") => {
+  const updateThemeAndSave = (newTheme: 'light' | 'dark') => {
     document.body.classList.remove(`${getOppositeTheme(newTheme)}-theme`);
     document.body.classList.add(`${newTheme}-theme`);
     setTheme(newTheme);
-    window.localStorage.setItem("theme", newTheme);
+    window.localStorage.setItem('theme', newTheme);
   };
   useEffect(() => {
-    const savedTheme = window.localStorage.getItem("theme");
+    const savedTheme = window.localStorage.getItem('theme');
     if (savedTheme) {
       setTheme(savedTheme);
     }
   });
-  const options = theme === "light" ? ["light", "dark"] : ["dark", "light"];
+  const options = theme === 'light' ? ['light', 'dark'] : ['dark', 'light'];
   return (
     <ToggleButton
       className="theme-button"
@@ -39,7 +37,7 @@ const ThemeToggleButton: React.FC<{ isFloating?: boolean }> = ({
           <span
             key={option}
             className={`theme-option ${option}`}
-            onClick={() => updateThemeAndSave(option as "light" | "dark")}
+            onClick={() => updateThemeAndSave(option as 'light' | 'dark')}
           >
             {titleCase(option)}
           </span>
@@ -56,9 +54,9 @@ const ToggleButton = styled.button<{
 }>`
   --padding: 0.1em 0.2em;
 
-  position: ${({ isFloating }) => (isFloating ? "fixed" : "relative")};
-  bottom: ${({ isFloating }) => (isFloating ? "0.5rem" : "auto")};
-  right: ${({ isFloating }) => (isFloating ? "0.5rem" : "auto")};
+  position: ${({ isFloating }) => (isFloating ? 'fixed' : 'relative')};
+  bottom: ${({ isFloating }) => (isFloating ? '0.5rem' : 'auto')};
+  right: ${({ isFloating }) => (isFloating ? '0.5rem' : 'auto')};
   z-index: 10;
   padding: var(--padding);
   min-width: 58px; // prevent wrapping of "Light" on mobile
@@ -70,17 +68,15 @@ const ToggleButton = styled.button<{
 
   /* &:hover {
     background-color: ${({ theme }) =>
-    theme === "dark" ? "var(--bg-color-l)" : "var(--bg-color-d)"};
+    theme === 'dark' ? 'var(--bg-color-l)' : 'var(--bg-color-d)'};
   } */
 
   .theme-options {
-    display: ${({ isOpen }) => (isOpen ? "block" : "none")};
+    display: ${({ isOpen }) => (isOpen ? 'block' : 'none')};
     position: absolute;
     z-index: 20;
-    top: ${({ isFloating }) =>
-      isFloating ? "auto" : "calc(-1 * var(--button-border-width))"};
-    bottom: ${({ isFloating }) =>
-      isFloating ? "calc(-1 * var(--button-border-width))" : "auto"};
+    top: ${({ isFloating }) => (isFloating ? 'auto' : 'calc(-1 * var(--button-border-width))')};
+    bottom: ${({ isFloating }) => (isFloating ? 'calc(-1 * var(--button-border-width))' : 'auto')};
     left: calc(-1 * var(--button-border-width));
     right: calc(-1 * var(--button-border-width));
     width: calc(100% + 2 * var(--button-border-width));

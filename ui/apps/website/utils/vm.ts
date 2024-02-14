@@ -1,4 +1,4 @@
-import { getQuickJS, shouldInterruptAfterDeadline } from "quickjs-emscripten";
+import { getQuickJS, shouldInterruptAfterDeadline } from 'quickjs-emscripten';
 
 type Disposable = { readonly alive: boolean; dispose(): void };
 
@@ -14,7 +14,7 @@ class DisposableComposer {
       if (disposable.alive) {
         disposable.dispose();
       } else {
-        console.warn("Warning: attempting to dispose already-freed lifetime");
+        console.warn('Warning: attempting to dispose already-freed lifetime');
       }
     });
   }
@@ -50,10 +50,10 @@ export default async function makeVM(timeout: number = -1) {
     vm.setInterruptHandler(shouldInterruptAfterDeadline(Date.now() + timeout));
   }
 
-  const trueHandle = vm.unwrapResult(vm.evalCode("true"));
-  const falseHandle = vm.unwrapResult(vm.evalCode("false"));
-  const nullHandle = vm.unwrapResult(vm.evalCode("null"));
-  const errorHandle = vm.getProp(vm.global, "Error");
+  const trueHandle = vm.unwrapResult(vm.evalCode('true'));
+  const falseHandle = vm.unwrapResult(vm.evalCode('false'));
+  const nullHandle = vm.unwrapResult(vm.evalCode('null'));
+  const errorHandle = vm.getProp(vm.global, 'Error');
   disposables.add(errorHandle);
 
   /**
@@ -66,23 +66,23 @@ export default async function makeVM(timeout: number = -1) {
    */
   function marshal(target: any) {
     switch (typeof target) {
-      case "number": {
+      case 'number': {
         const handle = vm.newNumber(target);
         disposables.add(handle);
         return handle;
       }
-      case "string": {
+      case 'string': {
         const handle = vm.newString(target);
         disposables.add(handle);
         return handle;
       }
-      case "undefined": {
+      case 'undefined': {
         return vm.undefined;
       }
-      case "boolean": {
+      case 'boolean': {
         return target ? trueHandle : falseHandle;
       }
-      case "object": {
+      case 'object': {
         if (target === null) {
           return nullHandle;
         }
@@ -97,7 +97,7 @@ export default async function makeVM(timeout: number = -1) {
             }
 
             disposables.add(marshaledItem);
-            const push = vm.getProp(array, "push");
+            const push = vm.getProp(array, 'push');
             vm.callFunction(push, array, marshaledItem);
           });
 
@@ -125,7 +125,7 @@ export default async function makeVM(timeout: number = -1) {
           const marshaledKey = marshal(key);
 
           const marshaledValue = (() => {
-            if (typeof value !== "function") {
+            if (typeof value !== 'function') {
               return marshal(value);
             }
 
@@ -148,33 +148,24 @@ export default async function makeVM(timeout: number = -1) {
 
         return obj;
       }
-      case "function": {
-        const handle = vm.newFunction(
-          target.name || "<anonymous function>",
-          (...handles) => {
-            const unmarshaledArgs = handles.map((handle) => vm.dump(handle));
-            let result = undefined;
-            try {
-              result = target(unmarshaledArgs);
-            } catch (err) {
-              const errResult = vm.callFunction(
-                errorHandle,
-                vm.undefined,
-                marshal(err.message)
-              );
-              if (errResult.error) {
-                const context = vm.dump(errResult.error);
-                throw new Error(
-                  "Failed to create error: " + JSON.stringify(context)
-                );
-              } else {
-                // @ts-ignore
-                throw errResult.value;
-              }
+      case 'function': {
+        const handle = vm.newFunction(target.name || '<anonymous function>', (...handles) => {
+          const unmarshaledArgs = handles.map((handle) => vm.dump(handle));
+          let result = undefined;
+          try {
+            result = target(unmarshaledArgs);
+          } catch (err) {
+            const errResult = vm.callFunction(errorHandle, vm.undefined, marshal(err.message));
+            if (errResult.error) {
+              const context = vm.dump(errResult.error);
+              throw new Error('Failed to create error: ' + JSON.stringify(context));
+            } else {
+              // @ts-ignore
+              throw errResult.value;
             }
-            return marshal(result);
           }
-        );
+          return marshal(result);
+        });
         disposables.add(handle);
         return handle;
       }
@@ -225,15 +216,15 @@ export default async function makeVM(timeout: number = -1) {
     });
   });
   const vmConsole = newObject();
-  vm.setProp(vmConsole, "log", log);
-  vm.setProp(vm.global, "console", vmConsole);
+  vm.setProp(vmConsole, 'log', log);
+  vm.setProp(vm.global, 'console', vmConsole);
 
   // Add fetch, but ensure we never include credentials.
   // Create a new 'fetch' function, which _always_ fetches without credentials.
   vm.setProp(
     vm.global,
-    "fetch",
-    newFunction("fetch", function (url: any, options: any) {
+    'fetch',
+    newFunction('fetch', function (url: any, options: any) {
       if (!vm) {
         return;
       }
@@ -242,7 +233,7 @@ export default async function makeVM(timeout: number = -1) {
         vm.getString(url),
         // NEVER include credentials, else the eval()ed JS may be able to request
         // any data from GQL as the current user.
-        Object.assign({}, opts, { credentials: "omit" })
+        Object.assign({}, opts, { credentials: 'omit' })
       );
       return marshal(result);
     })

@@ -1,10 +1,8 @@
-import React from "react";
-import type { IconProps } from "./props";
+import React from 'react';
 
-const CheckboxUnchecked = ({
-  size = "1em",
-  fill = "currentColor",
-}: IconProps) => (
+import type { IconProps } from './props';
+
+const CheckboxUnchecked = ({ size = '1em', fill = 'currentColor' }: IconProps) => (
   <svg
     width={size}
     height={size}

@@ -6,6 +6,4 @@ const openGraphImageVersion = 2;
  * @see: /pages/api/og.tsx
  */
 export const getOpenGraphImageURL = ({ title }: { title: string }) =>
-  `https://www.inngest.com/api/og?title=${encodeURIComponent(
-    title
-  )}&v=${openGraphImageVersion}`;
+  `https://www.inngest.com/api/og?title=${encodeURIComponent(title)}&v=${openGraphImageVersion}`;

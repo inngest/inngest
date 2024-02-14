@@ -1,11 +1,9 @@
-import React from "react";
-import type { IconProps } from "./props";
+import React from 'react';
+
+import type { IconProps } from './props';
 
 // This is used as the "Functions" icon in the app nav
-const ArrowCaretCircleRight = ({
-  size = "1em",
-  fill = "currentColor",
-}: IconProps) => (
+const ArrowCaretCircleRight = ({ size = '1em', fill = 'currentColor' }: IconProps) => (
   <svg
     width={size}
     height={size}

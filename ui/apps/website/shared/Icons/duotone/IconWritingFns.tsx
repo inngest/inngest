@@ -1,9 +1,6 @@
-import IconTheme, { IconProps } from "./theme";
-export function IconWritingFns({
-  size = 20,
-  className = "",
-  color = "transparent",
-}: IconProps) {
+import IconTheme, { IconProps } from './theme';
+
+export function IconWritingFns({ size = 20, className = '', color = 'transparent' }: IconProps) {
   const theme = IconTheme(color);
   return (
     <svg
@@ -24,11 +21,7 @@ export function IconWritingFns({
           id="writing-fn-a"
         >
           <feOffset dy="1" in="SourceAlpha" result="shadowOffsetOuter1" />
-          <feGaussianBlur
-            stdDeviation="1"
-            in="shadowOffsetOuter1"
-            result="shadowBlurOuter1"
-          />
+          <feGaussianBlur stdDeviation="1" in="shadowOffsetOuter1" result="shadowBlurOuter1" />
           <feColorMatrix
             values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.268793706 0"
             in="shadowBlurOuter1"
@@ -43,11 +36,7 @@ export function IconWritingFns({
           id="writing-fn-c"
         >
           <feOffset dy="1" in="SourceAlpha" result="shadowOffsetOuter1" />
-          <feGaussianBlur
-            stdDeviation="1"
-            in="shadowOffsetOuter1"
-            result="shadowBlurOuter1"
-          />
+          <feGaussianBlur stdDeviation="1" in="shadowOffsetOuter1" result="shadowBlurOuter1" />
           <feColorMatrix
             values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.268793706 0"
             in="shadowBlurOuter1"
@@ -63,25 +52,13 @@ export function IconWritingFns({
         />
       </defs>
       <g fill="none" fillRule="nonzero">
-        <use
-          fill="#000"
-          filter="url(#writing-fn-a)"
-          xlinkHref="#writing-fn-b"
-        />
-        <use
-          fill={theme.color}
-          opacity={theme.opacity}
-          xlinkHref="#writing-fn-b"
-        />
+        <use fill="#000" filter="url(#writing-fn-a)" xlinkHref="#writing-fn-b" />
+        <use fill={theme.color} opacity={theme.opacity} xlinkHref="#writing-fn-b" />
         <path
           d="M13.1063 15.4446h-1.7255v-2.2432h-2.761v2.2432H6.8944a.5177.5177 0 1 0 0 1.0353h6.212a.5177.5177 0 1 0 0-1.0353Z"
           fill="#FFF"
         />
-        <use
-          fill="#000"
-          filter="url(#writing-fn-c)"
-          xlinkHref="#writing-fn-d"
-        />
+        <use fill="#000" filter="url(#writing-fn-c)" xlinkHref="#writing-fn-d" />
         <use fill="#FFF" xlinkHref="#writing-fn-d" />
       </g>
     </svg>

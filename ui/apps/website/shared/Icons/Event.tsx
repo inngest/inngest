@@ -1,12 +1,8 @@
-import React from "react";
-import type { IconProps } from "./props";
+import React from 'react';
 
-const Event = ({
-  size = "1em",
-  fill = "currentColor",
-  className,
-  style,
-}: IconProps) => {
+import type { IconProps } from './props';
+
+const Event = ({ size = '1em', fill = 'currentColor', className, style }: IconProps) => {
   return (
     <svg
       height={size}

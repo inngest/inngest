@@ -1,10 +1,8 @@
-import React from "react";
-import type { IconProps } from "./props";
+import React from 'react';
 
-export default function InformationCircle({
-  size = "1em",
-  fill = "currentColor",
-}: IconProps) {
+import type { IconProps } from './props';
+
+export default function InformationCircle({ size = '1em', fill = 'currentColor' }: IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

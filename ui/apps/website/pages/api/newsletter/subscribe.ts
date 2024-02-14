@@ -1,7 +1,7 @@
-import crypto from "crypto";
+import crypto from 'crypto';
 
 const TAGS = {
-  MAILING_LIST: "mailing-list",
+  MAILING_LIST: 'mailing-list',
 };
 const LIST_ID = process.env.MAILCHIMP_LIST_ID;
 const API_KEY = process.env.MAILCHIMP_API_KEY;
@@ -10,21 +10,20 @@ const DATACENTER = process.env.MAILCHIMP_API_SERVER;
 class MemberExistsError extends Error {}
 
 export default async (req, res) => {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
-  const { email, tags = [] }: { email: string | null; tags: string[] | null } =
-    req.body;
+  const { email, tags = [] }: { email: string | null; tags: string[] | null } = req.body;
 
   if (!email) {
-    return res.status(400).json({ error: "Email is required" });
+    return res.status(400).json({ error: 'Email is required' });
   }
 
   // Skip in development so we don't add to the list
-  if (process.env.NODE_ENV === "development") {
-    console.log("Skipping newsletter subscription in development");
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Skipping newsletter subscription in development');
     console.log({ email, tags });
-    return res.status(201).json({ error: "" });
+    return res.status(201).json({ error: '' });
   }
 
   try {
@@ -41,14 +40,14 @@ export default async (req, res) => {
       if (err instanceof MemberExistsError) {
         // Update the user's tags
         const updateMemberRes = await addMemberTags(email, tags);
-        console.log("res?", JSON.stringify(updateMemberRes, null, 2));
-        return res.status(201).json({ error: "" });
+        console.log('res?', JSON.stringify(updateMemberRes, null, 2));
+        return res.status(201).json({ error: '' });
       }
       // If it's not an existing member error, throw it
       throw err;
     }
 
-    return res.status(201).json({ error: "" });
+    return res.status(201).json({ error: '' });
   } catch (error) {
     return res.status(500).json({ error: error.message || error.toString() });
   }
@@ -57,7 +56,7 @@ export default async (req, res) => {
 async function addMember(email: string, tags: string[]) {
   const data = {
     email_address: email,
-    status: "subscribed",
+    status: 'subscribed',
     tags,
   };
   const response = await fetch(
@@ -67,15 +66,15 @@ async function addMember(email: string, tags: string[]) {
       body: JSON.stringify(data),
       headers: {
         Authorization: `apikey ${API_KEY}`,
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
-      method: "POST",
+      method: 'POST',
     }
   );
   if (response.status >= 400) {
     const text = await response.json();
-    if (text.title === "Member Exists") {
-      throw new MemberExistsError("Member exists");
+    if (text.title === 'Member Exists') {
+      throw new MemberExistsError('Member exists');
     }
   }
   return response;
@@ -83,12 +82,9 @@ async function addMember(email: string, tags: string[]) {
 
 async function addMemberTags(email: string, tags: string[]) {
   const lowercaseEmail = email.toLowerCase();
-  const subscriberHash = crypto
-    .createHash("md5")
-    .update(lowercaseEmail)
-    .digest("hex");
+  const subscriberHash = crypto.createHash('md5').update(lowercaseEmail).digest('hex');
   const data = {
-    tags: tags.map((t) => ({ name: t, status: "active" })),
+    tags: tags.map((t) => ({ name: t, status: 'active' })),
   };
   return await fetch(
     `https://${DATACENTER}.api.mailchimp.com/3.0/lists/${LIST_ID}/members/${subscriberHash}/tags`,
@@ -97,9 +93,9 @@ async function addMemberTags(email: string, tags: string[]) {
       body: JSON.stringify(data),
       headers: {
         Authorization: `apikey ${API_KEY}`,
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
-      method: "POST",
+      method: 'POST',
     }
   );
 }

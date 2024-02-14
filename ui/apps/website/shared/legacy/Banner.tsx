@@ -1,4 +1,4 @@
-import styled from "@emotion/styled";
+import styled from '@emotion/styled';
 
 type Props = { className?: string; children: React.ReactNode };
 
@@ -6,9 +6,7 @@ const Banner: React.FC<Props> = (props) => {
   return <Wrapper className={props.className}>{props.children}</Wrapper>;
 };
 
-export const CheckBanner: React.FC<{ list: Array<String> } & Props> = (
-  props
-) => {
+export const CheckBanner: React.FC<{ list: Array<String> } & Props> = (props) => {
   return (
     <Banner className={props.className}>
       <CheckList>

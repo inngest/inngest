@@ -1,22 +1,22 @@
-import { useState } from "react";
-import SyntaxHighlighter from "react-syntax-highlighter";
-import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
-import classNames from "src/utils/classNames";
-import { stripIndent } from "src/utils/string";
+import { useState } from 'react';
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { atomOneDark as syntaxThemeDark } from 'react-syntax-highlighter/dist/cjs/styles/hljs';
+import classNames from 'src/utils/classNames';
+import { stripIndent } from 'src/utils/string';
 
 export default function SendEvents() {
   const [activeTab, setActiveTab] = useState(1);
 
   const tabs = [
     {
-      title: "Custom Event",
+      title: 'Custom Event',
       payload: stripIndent(`inngest.send({
         name: "app/user.signup",
         data: { userId: "...", email: "..." },
       });`),
-      fnName: "Create Function",
+      fnName: 'Create Function',
       fnVersion: 27,
-      fnID: "01GGG522ZATDGVQBCND4ZEAS6Z",
+      fnID: '01GGG522ZATDGVQBCND4ZEAS6Z',
       code: stripIndent(`inngest.createFunction(
         { name: "post-signup" },
         { event: "app/user.signup" },
@@ -29,14 +29,14 @@ export default function SendEvents() {
       );`),
     },
     {
-      title: "Webhook",
+      title: 'Webhook',
       payload: stripIndent(`{
         name: "stripe/charge.failed",
         data: { ... }
       }`),
-      fnName: "Payment failed handler",
+      fnName: 'Payment failed handler',
       fnVersion: 27,
-      fnID: "01GGG522ZATDGVQBCND4ZEAS6Z",
+      fnID: '01GGG522ZATDGVQBCND4ZEAS6Z',
       code: stripIndent(`import { downgradeAccount, findAccountByCustomerId } from "../accounts";
       import { sendFailedPaymentEmail } from "../emails";
       import { inngest } from "./client";
@@ -75,9 +75,9 @@ export default function SendEvents() {
   };
 
   return (
-    <div className="-mt-10 min-[1100px]:-mt-28 lg:absolute z-10 bottom-10 right-20 flex flex-col min-[1100px]:flex-row gap-2 lg:items-end md:justify-end">
-      <div className="w-full md:w-[400px] xl:w-[360px] xl:mr-10 bg-slate-800/50 backdrop-blur-md border border-slate-700/30 rounded-lg overflow-hidden shadow-lg">
-        <div className="flex bg-slate-800/50 items-stretch justify-start gap-2 px-2">
+    <div className="bottom-10 right-20 z-10 -mt-10 flex flex-col gap-2 md:justify-end lg:absolute lg:items-end min-[1100px]:-mt-28 min-[1100px]:flex-row">
+      <div className="w-full overflow-hidden rounded-lg border border-slate-700/30 bg-slate-800/50 shadow-lg backdrop-blur-md md:w-[400px] xl:mr-10 xl:w-[360px]">
+        <div className="flex items-stretch justify-start gap-2 bg-slate-800/50 px-2">
           {tabs.map((tab, i) => (
             <button
               key={i}
@@ -86,7 +86,7 @@ export default function SendEvents() {
                 activeTab === i
                   ? `border-indigo-400 text-white`
                   : `border-transparent text-slate-400`,
-                `font-medium text-center text-xs py-2.5 px-2 border-b-[2px]`
+                `border-b-[2px] px-2 py-2.5 text-center text-xs font-medium`
               )}
             >
               {tab.title}
@@ -100,11 +100,11 @@ export default function SendEvents() {
               language="javascript"
               showLineNumbers={false}
               style={syntaxThemeDark}
-              codeTagProps={{ className: "code-window" }}
+              codeTagProps={{ className: 'code-window' }}
               customStyle={{
-                backgroundColor: "transparent",
-                fontSize: "0.7rem",
-                padding: "1rem",
+                backgroundColor: 'transparent',
+                fontSize: '0.7rem',
+                padding: '1rem',
               }}
             >
               {tab.payload.trim()}
@@ -112,29 +112,23 @@ export default function SendEvents() {
           ) : null
         )}
       </div>
-      <div className="xl:w-[540px] bg-slate-800/50 backdrop-blur-md border border-slate-700/30 rounded-lg overflow-hidden shadow-lg">
+      <div className="overflow-hidden rounded-lg border border-slate-700/30 bg-slate-800/50 shadow-lg backdrop-blur-md xl:w-[540px]">
         {tabs.map((tab, i) =>
           activeTab === i ? (
             <div key={i}>
-              <div className="w-full py-3 px-4 bg-slate-800/50">
-                <div className="flex justify-between items-start">
+              <div className="w-full bg-slate-800/50 px-4 py-3">
+                <div className="flex items-start justify-between">
                   <div>
-                    <span className="text-slate-400 text-xs mb-1 block">
-                      30 seconds ago
-                    </span>
-                    <h6 className="text-sm text-slate-50 mb-0.5">
-                      {tab.fnName}
-                    </h6>
+                    <span className="mb-1 block text-xs text-slate-400">30 seconds ago</span>
+                    <h6 className="mb-0.5 text-sm text-slate-50">{tab.fnName}</h6>
                   </div>
-                  <span className=" bg-slate-900/50 rounded text-xs text-slate-300 font-bold px-2 py-1.5 leading-none">
+                  <span className=" rounded bg-slate-900/50 px-2 py-1.5 text-xs font-bold leading-none text-slate-300">
                     {tab.fnVersion}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-xs text-slate-400 hidden md:block">
-                    {tab.fnID}
-                  </span>
-                  <span className="text-xs text-slate-200 flex items-center">
+                  <span className="hidden text-xs text-slate-400 md:block">{tab.fnID}</span>
+                  <span className="flex items-center text-xs text-slate-200">
                     <svg width="11" height="10" className="mr-1.5">
                       <path
                         d="M.294 5.057a.9167.9167 0 0 1 1.2964 0l1.9869 1.9876L9.415 1.2069a.9167.9167 0 0 1 1.2964 1.2964l-6.482 6.4821a.9168.9168 0 0 1-1.2547.0393l-.0879-.0784L.294 6.3535a.9167.9167 0 0 1 0-1.2964Z"
@@ -150,12 +144,12 @@ export default function SendEvents() {
                 language="javascript"
                 showLineNumbers={false}
                 style={syntaxThemeDark}
-                codeTagProps={{ className: "code-window" }}
+                codeTagProps={{ className: 'code-window' }}
                 // className="hello"
                 customStyle={{
-                  backgroundColor: "transparent",
-                  fontSize: "0.7rem",
-                  padding: "1.5rem",
+                  backgroundColor: 'transparent',
+                  fontSize: '0.7rem',
+                  padding: '1.5rem',
                 }}
               >
                 {tab.code.trim()}

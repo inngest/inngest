@@ -1,24 +1,24 @@
-import { useRouter } from "next/router";
-import shiki from "shiki";
-import SyntaxHighlighter from "react-syntax-highlighter";
-import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
+import { useRouter } from 'next/router';
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { atomOneDark as syntaxThemeDark } from 'react-syntax-highlighter/dist/cjs/styles/hljs';
+import shiki from 'shiki';
+import PageHeader from 'src/shared/PageHeader';
+import Container from 'src/shared/layout/Container';
 
-import Header from "../shared/Header";
-import Container from "src/shared/layout/Container";
-import PageHeader from "src/shared/PageHeader";
-import Footer from "../shared/Footer";
+import Footer from '../shared/Footer';
+import Header from '../shared/Header';
 
-const REPLACE_PATHNAME = "%%PATHNAME%%";
+const REPLACE_PATHNAME = '%%PATHNAME%%';
 
 export async function getStaticProps() {
   // Matches mdx/rehyppe.mjs
-  const highlighter = await shiki.getHighlighter({ theme: "css-variables" });
+  const highlighter = await shiki.getHighlighter({ theme: 'css-variables' });
   // This can fail locally
-  let shikiCodeHtml = "";
+  let shikiCodeHtml = '';
   try {
     const shikiTokens = await highlighter.codeToThemedTokens(
       getCode({ pathname: REPLACE_PATHNAME }),
-      "typescript"
+      'typescript'
     );
     shikiCodeHtml = shiki.renderToHtml(shikiTokens, {
       elements: {
@@ -33,11 +33,11 @@ export async function getStaticProps() {
 
   return {
     props: {
-      designVersion: "2",
+      designVersion: '2',
       shikiCodeHtml,
       meta: {
-        title: "404 - Page Not Found",
-        description: "",
+        title: '404 - Page Not Found',
+        description: '',
       },
     },
   };
@@ -72,9 +72,9 @@ export default function Custom404({ shikiCodeHtml }) {
         <h1>{title}</h1>
         <p>{lede}</p>
         <div className="not-prose my-6 overflow-hidden rounded-lg bg-slate-900 shadow-md">
-          <div className="group dark:bg-white/2.5">
+          <div className="dark:bg-white/2.5 group">
             <div className="relative"></div>
-            <pre className="overflow-x-auto px-6 py-5 text-xs text-white leading-relaxed">
+            <pre className="overflow-x-auto px-6 py-5 text-xs leading-relaxed text-white">
               <code
                 className="language-typescript"
                 dangerouslySetInnerHTML={{ __html: html }}
@@ -93,9 +93,9 @@ export default function Custom404({ shikiCodeHtml }) {
       <Container className="my-48">
         <PageHeader title={title} lede={lede} />
         <div className="mt-8">
-          <div className="w-full md:w-[400px] xl:w-[360px] xl:mr-10 bg-slate-800/50 backdrop-blur-md border border-slate-700/30 rounded-lg overflow-hidden shadow-lg">
-            <div className="flex bg-slate-800/50 items-stretch justify-start gap-2 px-2">
-              <div className="border-indigo-400 text-white font-medium text-center text-xs py-2.5 px-2 border-b-[2px]">
+          <div className="w-full overflow-hidden rounded-lg border border-slate-700/30 bg-slate-800/50 shadow-lg backdrop-blur-md md:w-[400px] xl:mr-10 xl:w-[360px]">
+            <div className="flex items-stretch justify-start gap-2 bg-slate-800/50 px-2">
+              <div className="border-b-[2px] border-indigo-400 px-2 py-2.5 text-center text-xs font-medium text-white">
                 Send 404 Event
               </div>
             </div>
@@ -103,13 +103,13 @@ export default function Custom404({ shikiCodeHtml }) {
               language="typescript"
               showLineNumbers={false}
               style={syntaxThemeDark}
-              codeTagProps={{ className: "code-window" }}
+              codeTagProps={{ className: 'code-window' }}
               customStyle={{
-                width: "100%",
-                fontSize: "0.8rem",
-                padding: "1.5rem",
-                backgroundColor: "#0C1323",
-                display: "inline-flex",
+                width: '100%',
+                fontSize: '0.8rem',
+                padding: '1.5rem',
+                backgroundColor: '#0C1323',
+                display: 'inline-flex',
               }}
             >
               {getCode({ pathname })}

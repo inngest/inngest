@@ -1,8 +1,8 @@
 // @ts-nocheck
-import React, { useEffect, useState, useReducer, useContext } from "react";
-import styled from "@emotion/styled";
-import { css } from "@emotion/react";
-import uuid from "src/utils/uuid";
+import React, { useContext, useEffect, useReducer, useState } from 'react';
+import { css } from '@emotion/react';
+import styled from '@emotion/styled';
+import uuid from 'src/utils/uuid';
 
 export enum ToastTypes {
   success,
@@ -34,21 +34,19 @@ const ToastContext = React.createContext<Context>({
 
 type InternalToast = Toast & { id: string };
 
-type Action =
-  | { type: "add"; toast: InternalToast }
-  | { type: "remove"; id: string };
+type Action = { type: 'add'; toast: InternalToast } | { type: 'remove'; id: string };
 
 type State = InternalToast[];
 
 const reducer = (s: State, a: Action) => {
   switch (a.type) {
-    case "add":
+    case 'add':
       // don't duplicate if ID exists
       if (s.find((s) => s.id === a.toast.id)) {
         return s;
       }
       return s.concat([{ ...a.toast }]);
-    case "remove":
+    case 'remove':
       return s.filter((t) => t.id !== a.id);
   }
   return s;
@@ -59,10 +57,10 @@ const reducer = (s: State, a: Action) => {
 export const ToastWrapper = ({ children }: { children: React.ReactNode }) => {
   const [state, dispatch] = useReducer(reducer, []);
 
-  const remove = (id: string) => dispatch({ type: "remove", id });
+  const remove = (id: string) => dispatch({ type: 'remove', id });
   const push = (t: Toast) => {
     const id = uuid();
-    dispatch({ type: "add", toast: { ...t, id: t.id || id } });
+    dispatch({ type: 'add', toast: { ...t, id: t.id || id } });
     return () => remove(id);
   };
 
@@ -154,16 +152,10 @@ const ToastItem = ({ toast }: { toast: InternalToast }) => {
   return (
     <Item
       onClick={() => remove(toast.id)}
-      css={[
-        toast.type === "success" && success,
-        toast.type === "error" && error,
-        shown && visible,
-      ]}
+      css={[toast.type === 'success' && success, toast.type === 'error' && error, shown && visible]}
     >
       {I && <I size={22} style={{ marginRight: 10 }} />}
-      <span>
-        {toast.message.replace("[GraphQL] ", "").replace("[Network] ", "")}
-      </span>
+      <span>{toast.message.replace('[GraphQL] ', '').replace('[Network] ', '')}</span>
     </Item>
   );
 };

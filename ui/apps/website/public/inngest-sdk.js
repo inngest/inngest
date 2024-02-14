@@ -1,14 +1,14 @@
 (function () {
-  var CACHE_KEY = "inngest_user";
-  var VERSION = "0.2.0";
+  var CACHE_KEY = 'inngest_user';
+  var VERSION = '0.2.0';
 
   var defaults = {
-    host: "inn.gs",
+    host: 'inn.gs',
     await: true,
   };
 
   // store the key locally so as not to expose it to other JS code.
-  var key = "";
+  var key = '';
 
   // user stores user data after a call to identify().  this is mixed
   // in with events with calls to track().
@@ -34,7 +34,7 @@
   Inngest.event = async function (event, options) {
     var errors = validate(event, options);
     if (errors.length > 0) {
-      console.warn("inngest event is invalid: ", errors.join(", "));
+      console.warn('inngest event is invalid: ', errors.join(', '));
       return false;
     }
     event.data = event.data || {};
@@ -54,18 +54,14 @@
     }
 
     var body = JSON.stringify(event);
-    var scheme = this.options.host === "inn.gs" ? "https://" : "//";
-    var url = scheme + this.options.host + "/e/" + usedKey;
+    var scheme = this.options.host === 'inn.gs' ? 'https://' : '//';
+    var url = scheme + this.options.host + '/e/' + usedKey;
 
     if ((options && options.await) || this.options.await) {
-      const res = await reqAsync(
-        url,
-        { "content-type": "application/json" },
-        body
-      );
+      const res = await reqAsync(url, { 'content-type': 'application/json' }, body);
       return res;
     } else {
-      req(url, { "content-type": "application/json" }, body);
+      req(url, { 'content-type': 'application/json' }, body);
       return true;
     }
   };
@@ -81,10 +77,10 @@
 
   Inngest.identify = function (externalID, data) {
     var map = {};
-    if (typeof externalID === "string") {
+    if (typeof externalID === 'string') {
       map.external_id = externalID;
     }
-    if (typeof externalID === "object") {
+    if (typeof externalID === 'object') {
       data = externalID;
     }
 
@@ -110,7 +106,7 @@
 
   function get(key) {
     try {
-      return JSON.parse(window.localStorage.getItem(key) || "null");
+      return JSON.parse(window.localStorage.getItem(key) || 'null');
     } catch (e) {
       return null;
     }
@@ -123,7 +119,7 @@
   }
 
   function iter(obj, callback) {
-    if (typeof obj !== "object" || obj === null || obj === undefined) {
+    if (typeof obj !== 'object' || obj === null || obj === undefined) {
       return;
     }
     for (var o in obj) {
@@ -137,13 +133,11 @@
     var errors = [];
 
     if (!key && options && !options.key) {
-      errors.push(
-        "init() has not been called with an ingest key, or a key was not provided"
-      );
+      errors.push('init() has not been called with an ingest key, or a key was not provided');
     }
 
     if (!event.name) {
-      errors.push("event must have a name");
+      errors.push('event must have a name');
     }
     return errors;
   }
@@ -157,7 +151,7 @@
         search: window && window.location.search,
         referrer: document && document.referrer,
         user_agent: navigator && navigator.userAgent,
-        library: "js",
+        library: 'js',
         library_version: VERSION,
         // TODO Store utm params
       },
@@ -165,10 +159,8 @@
     if (window && window.location.search.length) {
       try {
         var params = new URLSearchParams(window.location.search);
-        ["source", "medium", "campaign", "content", "term"].forEach(function (
-          param
-        ) {
-          var key = "utm_" + param;
+        ['source', 'medium', 'campaign', 'content', 'term'].forEach(function (param) {
+          var key = 'utm_' + param;
           if (params.get(key)) {
             data.context[key] = params.get(key);
           }
@@ -182,7 +174,7 @@
 
   function req(url, headers, body) {
     var r = new XMLHttpRequest();
-    r.open("POST", url);
+    r.open('POST', url);
     r.withCredentials = false;
 
     headers = headers || {};
@@ -198,7 +190,7 @@
   function reqAsync(url, headers, body) {
     return new Promise(function (resolve, _reject) {
       var r = new XMLHttpRequest();
-      r.open("POST", url);
+      r.open('POST', url);
       r.withCredentials = false;
 
       headers = headers || {};
@@ -212,9 +204,7 @@
         if (r.readyState === XMLHttpRequest.DONE) {
           const status = r.status;
           const error =
-            status >= 200 && status < 400
-              ? null
-              : "There was an error with this request.";
+            status >= 200 && status < 400 ? null : 'There was an error with this request.';
           resolve({
             status,
             response: r.response,

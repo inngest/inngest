@@ -1,4 +1,4 @@
-import React, { ReactElement } from "react";
+import React, { ReactElement } from 'react';
 
 type SectionHeaderProps = {
   pre?: ReactElement | string;
@@ -7,42 +7,37 @@ type SectionHeaderProps = {
   center?: boolean;
 };
 
-const SectionHeader = ({
-  title,
-  lede = "",
-  center = false,
-  pre,
-}: SectionHeaderProps) => {
+const SectionHeader = ({ title, lede = '', center = false, pre }: SectionHeaderProps) => {
   return (
     <>
       {pre && (
         <p
-          className={`text-indigo-400 text-lg leading-5 md:leading-7 ${
-            center ? "text-center" : ""
+          className={`text-lg leading-5 text-indigo-400 md:leading-7 ${
+            center ? 'text-center' : ''
           }`}
         >
           {pre}
         </p>
       )}
       <h2
-        className={`text-slate-50 font-medium text-2xl md:text-4xl xl:text-5xl mb-2 md:mb-4 tracking-tighter ${
-          center ? "text-center" : ""
+        className={`mb-2 text-2xl font-medium tracking-tighter text-slate-50 md:mb-4 md:text-4xl xl:text-5xl ${
+          center ? 'text-center' : ''
         }`}
       >
         {title}
       </h2>
-      {typeof lede === "string" ? (
+      {typeof lede === 'string' ? (
         <p
-          className={`text-slate-200 max-w-md lg:max-w-xl text-sm md:text-base leading-5 md:leading-7 ${
-            center ? "text-center" : ""
+          className={`max-w-md text-sm leading-5 text-slate-200 md:text-base md:leading-7 lg:max-w-xl ${
+            center ? 'text-center' : ''
           }`}
         >
           {lede}
         </p>
       ) : (
         <div
-          className={`text-slate-200 max-w-md lg:max-w-xl text-sm md:text-base leading-5 md:leading-7 ${
-            center ? "text-center" : ""
+          className={`max-w-md text-sm leading-5 text-slate-200 md:text-base md:leading-7 lg:max-w-xl ${
+            center ? 'text-center' : ''
           }`}
         >
           {lede}

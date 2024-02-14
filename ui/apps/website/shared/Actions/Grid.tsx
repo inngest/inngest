@@ -1,7 +1,8 @@
-import React from "react";
-import styled from "@emotion/styled";
-import { categoryIcons, defaultIcon } from "./icons";
-import { Action } from "src/types";
+import React from 'react';
+import styled from '@emotion/styled';
+import { Action } from 'src/types';
+
+import { categoryIcons, defaultIcon } from './icons';
 
 type Props = {
   actions: Action[];
@@ -26,21 +27,17 @@ const ActionItem: React.FC<{
 }> = ({ action, onClick }) => {
   const Icon = categoryIcons[action.category.name] || defaultIcon;
 
-
   const onClickFn = () => onClick && onClick(action);
 
   return (
-    <div
-      style={{ color: "inherit", textDecoration: "none" }}
-      onClick={onClickFn}
-    >
+    <div style={{ color: 'inherit', textDecoration: 'none' }} onClick={onClickFn}>
       <Wrapper>
         <div>
           <Icon />
         </div>
         <div>
           <p>{action.latest.name}</p>
-          <small>{action.tagline || "-"}</small>
+          <small>{action.tagline || '-'}</small>
         </div>
       </Wrapper>
     </div>

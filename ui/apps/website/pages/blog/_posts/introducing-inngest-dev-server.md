@@ -1,7 +1,7 @@
 ---
-heading: "Introducing Inngest DevServer"
-subtitle: "The first tool purposely designed for event-driven asynchronous system local development"
-image: "/assets/blog/introducing-inngest-dev-server/featured-image.jpg"
+heading: 'Introducing Inngest DevServer'
+subtitle: 'The first tool purposely designed for event-driven asynchronous system local development'
+image: '/assets/blog/introducing-inngest-dev-server/featured-image.jpg'
 date: 2022-06-09
 ---
 
@@ -71,14 +71,14 @@ inngest dev
 4. Send an event to the dev server with any placeholder key (http://localhost:9999/e/KEY). In this example we'll use JavaScript's fetch:
 
 ```js
-await fetch("http://localhost:9999/e/KEY", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
+await fetch('http://localhost:9999/e/KEY', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     // replace this with your event name and the data you want to send
-    name: "my.event.name",
-    data: { hello: "there" },
-    user: { email: "test@example.com" },
+    name: 'my.event.name',
+    data: { hello: 'there' },
+    user: { email: 'test@example.com' },
   }),
 });
 ```

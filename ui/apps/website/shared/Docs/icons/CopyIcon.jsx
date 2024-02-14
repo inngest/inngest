@@ -13,5 +13,5 @@ export function CopyIcon(props) {
         d="M5.5 7.5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2v-8Z"
       />
     </svg>
-  )
+  );
 }

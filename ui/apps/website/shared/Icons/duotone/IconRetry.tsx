@@ -1,10 +1,6 @@
-import IconTheme, { IconProps } from "./theme";
+import IconTheme, { IconProps } from './theme';
 
-export function IconRetry({
-  size = 20,
-  className = "",
-  color = "transparent",
-}: IconProps) {
+export function IconRetry({ size = 20, className = '', color = 'transparent' }: IconProps) {
   const theme = IconTheme(color);
   return (
     <svg

@@ -1,10 +1,11 @@
-import React, { useMemo } from "react";
-import styled from "@emotion/styled";
-import { Action } from "src/types";
-import Box from "../legacy/Box";
-import { useIntegrations } from "../legacy/integrationHooks";
-import { PageTitle } from "../legacy/PageTitle";
-import { categoryIcons, defaultIcon } from "./icons";
+import React, { useMemo } from 'react';
+import styled from '@emotion/styled';
+import { Action } from 'src/types';
+
+import Box from '../legacy/Box';
+import { PageTitle } from '../legacy/PageTitle';
+import { useIntegrations } from '../legacy/integrationHooks';
+import { categoryIcons, defaultIcon } from './icons';
 
 type Props = {
   actions: Action[];
@@ -18,7 +19,7 @@ const Navigator: React.FC<Props> = ({ actions, onClick }) => {
 
   const actionIntegrations = useMemo(() => {
     return Object.values(integrations).filter((i) => {
-      return !!i.methods.find((m) => m.for.includes("actions"));
+      return !!i.methods.find((m) => m.for.includes('actions'));
     });
   }, [integrations]);
 
@@ -30,8 +31,7 @@ const Navigator: React.FC<Props> = ({ actions, onClick }) => {
 
   const builtin = useMemo(() => {
     return sorted.filter(
-      (a) =>
-        a.dsn.indexOf("com.inngest") === 0 || a.dsn.indexOf("inngest.com") === 0
+      (a) => a.dsn.indexOf('com.inngest') === 0 || a.dsn.indexOf('inngest.com') === 0
     );
   }, [sorted]);
 
@@ -62,27 +62,26 @@ const Navigator: React.FC<Props> = ({ actions, onClick }) => {
         </h2>
         <>
           <p>
-            You don't have any actions yet. You can run your own code, in any
-            language, as a workflow or an internal task.
+            You don't have any actions yet. You can run your own code, in any language, as a
+            workflow or an internal task.
           </p>
           <a
             href="https://docs.inngest.com/docs/actions/serverless/tutorial"
             target="_blank"
-            style={{ color: "inherit", textDecoration: "none" }}
+            style={{ color: 'inherit', textDecoration: 'none' }}
           >
             <Box
               kind="dashed"
               style={{
-                marginBottom: "3rem",
-                background: "#fff",
-                padding: "36px 48px",
-                boxShadow: "0 5px 20px rgba(0, 0, 0, 0.05)",
+                marginBottom: '3rem',
+                background: '#fff',
+                padding: '36px 48px',
+                boxShadow: '0 5px 20px rgba(0, 0, 0, 0.05)',
               }}
             >
               <h3>Create your own actions</h3>
               <p>
-                Read our getting started guide which walks through how to make
-                your own actions →
+                Read our getting started guide which walks through how to make your own actions →
               </p>
             </Box>
           </a>
@@ -93,16 +92,12 @@ const Navigator: React.FC<Props> = ({ actions, onClick }) => {
         </h2>
         <Items>
           {builtin.map((action) => {
-            return (
-              <ActionFC action={action} key={action.dsn} onClick={onClick} />
-            );
+            return <ActionFC action={action} key={action.dsn} onClick={onClick} />;
           })}
         </Items>
 
         {actionIntegrations.map((ai) => {
-          const available = sorted.filter(
-            (s) => s.dsn.indexOf(ai.service) === 0
-          );
+          const available = sorted.filter((s) => s.dsn.indexOf(ai.service) === 0);
 
           if (available.length === 0) {
             return null;
@@ -115,11 +110,7 @@ const Navigator: React.FC<Props> = ({ actions, onClick }) => {
               </h2>
               <Items>
                 {available.map((action) => (
-                  <ActionFC
-                    action={action}
-                    key={action.dsn}
-                    onClick={onClick}
-                  />
+                  <ActionFC action={action} key={action.dsn} onClick={onClick} />
                 ))}
               </Items>
             </div>
@@ -141,7 +132,7 @@ const ActionFC: React.FC<{
 
   return (
     <ActionBox
-      kind={onClick ? "hoverable" : kind || "plain"}
+      kind={onClick ? 'hoverable' : kind || 'plain'}
       onClick={() => onClick && onClick(action)}
     >
       <div>
@@ -149,7 +140,7 @@ const ActionFC: React.FC<{
       </div>
       <div>
         <h3>{action.latest.name}</h3>
-        <p>{action.tagline || "-"}</p>
+        <p>{action.tagline || '-'}</p>
       </div>
     </ActionBox>
   );

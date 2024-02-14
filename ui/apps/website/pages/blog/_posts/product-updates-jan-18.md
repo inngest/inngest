@@ -1,8 +1,8 @@
 ---
-heading: "Product updates:  Jan 18, 2022"
+heading: 'Product updates:  Jan 18, 2022'
 subtitle: What's fresh out of the oven recently, and what's cooking?  Here's our bi-weekly product deep dive.
 date: 2022-01-19
-image: "/assets/blog/product-updates.jpg"
+image: '/assets/blog/product-updates.jpg'
 ---
 
 Hello fellow Inngesters! We’re kicking off 2022 with a new process. We’re starting bi-weekly product updates, giving you insight into the development happening over at Inngest.

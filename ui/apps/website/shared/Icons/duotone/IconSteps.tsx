@@ -1,10 +1,6 @@
-import IconTheme from "./theme";
+import IconTheme from './theme';
 
-export function IconSteps({
-  size = 20,
-  className = "",
-  color = "transparent",
-}) {
+export function IconSteps({ size = 20, className = '', color = 'transparent' }) {
   const theme = IconTheme(color);
   return (
     <svg
