@@ -1,0 +1,519 @@
+export const description = 'Learn how to handle errors and failures in your Inngest functions.'
+
+# Error handling
+
+Inngest functions are designed to handle failures gracefully and will automatically retry after a failure. This adds an immediate layer of durability to your code, ensuring it survives transient issues like network timeouts, outages, or database locks.
+
+- **Automatic retries:** Functions are retried automatically upon failure
+- **Configurable retry policies:** Tailor the retry behavior to suit your specific use case
+- **Failure handlers:** Utilize `onFailure` to handle all retries failing
+- **Step-level retries:** Each step within a function can have its own retry logic and be handled individually
+
+## Types of failure
+
+Inngest helps you handle both **errors** and **failures**, which are defined differently.
+
+<Callout>
+A function that defines no steps is treated as a function with a single step, where that step is the entire function's code.
+</Callout>
+
+An **error** causes a step to retry. Exhausting all retry attempts will cause that step to **fail**, which means the step will never be attempted again this run.
+
+A **failed** step can be handled with native language features such as `try`/`catch`, but unhandled errors will cause the function to **fail**, meaning the run is marked as "Failed" in the Inngest UI and all future executions are canceled.
+
+Let's look at how to use and configure these retries.
+
+## Retries
+
+By default, in _addition_ to the **initial attempt**, Inngest will retry a function or a step up to 4 times until it succeeds. This means that for a function with a default configuration, it will be attempted 5 times in total.
+
+For the function below, if the database write fails then it'll be retried up to 4 times until it succeeds:
+
+<CodeGroup>
+```ts {{ title: "TypeScript" }}
+inngest.createFunction(
+  { id: "click-recorder" },
+  { event: "app/button.clicked" },
+  async ({ event, attempt }) => {
+    await db.clicks.insertOne(event.data); // this code now retries!
+  },
+);
+```
+```go {{ title: "Go" }}
+inngestgo.CreateFunction(
+	inngestgo.FunctionOpts{ID: "click-recorder"},
+	inngestgo.EventTrigger("app/button.clicked", nil),
+	func(ctx context.Context, input inngestgo.Input[ButtonClickedEvent]) (any, error) {
+		result, err := db.Clicks.InsertOne(input.Event["data"])
+	},
+)
+```
+```py {{ title: "Python" }}
+@inngest_client.create_function(
+    fn_id="click-recorder",
+    trigger=inngest.TriggerEvent(event="app/button.clicked"),
+)
+def record_click(ctx: inngest.Context) -> None:
+    db.clicks.insert_one(ctx.event.data)
+```
+</CodeGroup>
+
+You can configure the number of `retries` by specifying it in your function configuration. Setting the value to `0` will disable retries.
+
+<CodeGroup>
+```ts {{ title: "TypeScript" }}
+inngest.createFunction(
+  {
+    id: "click-recorder",
+    retries: 10, // choose how many retries you'd like
+  },
+  { event: "app/button.clicked" },
+  async ({ event, step, attempt }) => { /* ... */ },
+);
+```
+```go {{ title: "Go" }}
+inngestgo.CreateFunction(
+	inngestgo.FunctionOpts{
+		ID:      "click-recorder",
+		Retries: 10, // choose how many retries you'd like
+	},
+	inngestgo.EventTrigger("app/button.clicked", nil),
+	func(ctx context.Context, input inngestgo.Input[ButtonClickedEvent]) (any, error) {
+		// ...
+	},
+)
+```
+```py {{ title: "Python" }}
+@inngest_client.create_function(
+    fn_id="click-recorder",
+    retries=10,  # choose how many retries you'd like
+    trigger=inngest.TriggerEvent(event="app/button.clicked"),
+)
+def click_recorder(ctx: inngest.Context) -> None:
+    # ...
+```
+</CodeGroup>
+
+You can customize the behavior of your function based on the number of retries using the `attempt` argument. `attempt` is passed in the function handler's context and is zero-indexed, meaning the first attempt is `0`, the second is `1`, and so on. The `attempt` is incremented every time the function throws an error and is retried, and is reset when steps complete. This allows you to handle attempt numbers differently in each step.
+
+Retries will be performed with backoff according to [the default schedule](https://github.com/inngest/inngest/blob/main/pkg/backoff/backoff.go#L10-L22).
+
+## Steps
+
+A function can be broken down into multiple steps, where each step is individually executed and retried.
+
+Here, both the "_get-data_" and "_save-data_" steps have their own set of retries. If the "_save-data_" step has a failure, it's retried, alone, in a separate request.
+
+<CodeGroup>
+```ts {{ title: "TypeScript" }}
+inngest.createFunction(
+  { id: "sync-systems" },
+  { event: "auto/sync.request" },
+  async ({ step }) => {
+    // Can be retried up to 4 times
+    const data = await step.run("get-data", async () => {
+      return getDataFromExternalSource();
+    });
+
+    // Can also be retried up to 4 times
+    await step.run("save-data", async () => {
+      return db.syncs.insertOne(data);
+    });
+  },
+);
+```
+```go {{ title: "Go" }}
+inngestgo.CreateFunction(
+	inngestgo.FunctionOpts{ID: "sync-systems"},
+	inngestgo.EventTrigger("auto/sync.request", nil),
+	func(ctx context.Context, input inngestgo.Input[SyncRequestEvent]) (any, error) {
+		// can be retried up to 4 times
+		data, err := step.Run(ctx, "get-data", func(ctx context.Context) (any, error) {
+			return getDataFromExternalSource()
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		// can also be retried up to 4 times
+		_, err = step.Run(ctx, "save-data", func(ctx context.Context) (any, error) {
+			return db.Syncs.InsertOne(data.(DataType))
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	},
+)
+```
+```py {{ title: "Python" }}
+@inngest_client.create_function(
+    fn_id="sync-systems",
+    trigger=inngest.TriggerEvent(event="auto/sync.request"),
+)
+def sync_systems(ctx: inngest.Context, step: inngest.StepSync) -> None:
+    # Can be retried up to 4 times
+    data = step.run("Get data", lambda: get_data_from_external_source())
+
+    # Can also be retried up to 4 times
+    step.run("Save data", lambda: db.syncs.insert_one(data))
+```
+</CodeGroup>
+
+<Callout>
+You can configure the number of [`retries`](/docs/reference/functions/create#inngest-create-function-configuration-trigger-handler-inngest-function) for each function. This excludes the initial attempt.  A retry count of `4` means that each step will be attempted up to 5 times.
+</Callout>
+
+### Handling a failing step
+
+Unlike an error being thrown in the main function's body, a failing step (one that has exhausted all retries) will throw a `StepError`. This allows you to handle failures for each step individually, where you can recover from the error gracefully.
+
+If a step failure isn't handled, the error will bubble up to the function itself, which will then be marked as failed.
+
+Below is an attempt to use DALL-E to generate an image from a prompt, and to fall back to Midjourney if it fails. Remember that these calls are split over separate requests, making the code much more durable against timeouts, transient errors, and these dependencies on external APIs.
+
+<CodeGroup>
+```ts {{ title: "TypeScript" }}
+inngest.createFunction(
+  { id: "generate-result" },
+  { event: "prompt.created" },
+  async ({ event, step }) => {
+    // try one AI model, if it fails, try another
+    let imageURL: string | null = null;
+    let via: "dall-e" | "midjourney";
+
+    try {
+      imageURL = await step.run("generate-image-dall-e", () => {
+        // open api call to generate image...
+      });
+      via = "dall-e";
+    } catch (err) {
+      imageURL = await step.run("generate-image-midjourney", () => {
+        // midjourney call to generate image...
+      });
+      via = "midjourney";
+    }
+
+    await step.run("notify-user", () => {
+      return pusher.trigger(event.data.channelID, "image-result", {
+        imageURL,
+        via,
+      });
+    });
+  },
+);
+```
+```go {{ title: "Go" }}
+inngestgo.CreateFunction(
+	inngestgo.FunctionOpts{ID: "generate-result"},
+	inngestgo.EventTrigger("prompt.created", nil),
+	func(ctx context.Context, input inngestgo.Input[PromptCreatedEvent]) (any, error) {
+		var (
+			imageURL string
+			err      error
+		)
+
+		via := "dall-e"
+		imageURL, err = step.Run(ctx, "generate-image-dall-e", func(ctx context.Context) (string, error) {
+			// Open API call to generate image with Dall-E...
+		})
+		if err != nil {
+			// Update how we ran the code.  This could also have been a return from the step.
+			via = "midjourney"
+			imageURL, err = step.Run(ctx, "generate-image-midjourney", func(ctx context.Context) (string, error) {
+				// MidJourney call to generate image...
+			})
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = step.Run(ctx, "notify-user", func(ctx context.Context) (any, error) {
+			return pusher.Trigger(input.Event.Data.ChannelID, "image-result", map[string]string{
+				"imageURL": imageURL.(string),
+				"via":      via,
+			})
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	},
+)
+```
+{/* ```py {{ title: "Python" }}
+@inngest_client.create_function(
+    fn_id="generate-result",
+    trigger=inngest.TriggerEvent(event="prompt.created"),
+)
+def generate_result(ctx: inngest.Context, step: inngest.StepSync) -> None:
+    image_url = None
+    via = None
+
+    try:
+        image_url = step.run("generate-image-dall-e", lambda: open_api_call_to_generate_image())
+        via = "dall-e"
+    except Exception as err:
+        image_url = step.run("generate-image-midjourney", lambda: midjourney_call_to_generate_image())
+        via = "midjourney"
+
+    def _notify_user() -> None:
+        pusher.trigger(ctx.event.data["channelID"], "image-result", {"imageURL": image_url, "via": via})
+
+    step.run("notify-user", _notify_user)
+``` */}
+</CodeGroup>
+
+### Simple rollbacks
+
+With this pattern, it's possible to assign a small rollback for each step, making sure that every action is safe regardless of how many steps are being run.
+
+<CodeGroup>
+```ts {{ title: "TypeScript" }}
+inngest.createFunction(
+  { id: "add-data" },
+  { event: "app/row.data.added" },
+  async ({ event, step }) => {
+    // ignore the error - this step is fine if it fails
+    await step
+      .run("Non-critical step", () => {
+        return updateMetric();
+      })
+      .catch();
+
+    // Add a rollback to a step
+    await step
+      .run("Create row", async () => {
+        const row = await createRow(event.data.rowId);
+        await addDetail(event.data.entry);
+      })
+      .catch((err) =>
+        step.run("Rollback row creation", async () => {
+          await removeRow(event.data.rowId);
+        }),
+      );
+  },
+);
+```
+```go {{ title: "Go" }}
+inngestgo.CreateFunction(
+	inngestgo.FunctionOpts{ID: "add-data"},
+	inngestgo.EventTrigger("app/row.data.added", nil),
+	func(ctx context.Context, input inngestgo.Input[RowDataAddedEvent]) (any, error) {
+		_, _ = step.Run(ctx, "Non-critical step", func(ctx context.Context) (any, error) {
+			return updateMetric()
+		})
+
+		_, err := step.Run(ctx, "Create row", func(ctx context.Context) (any, error) {
+			_, err := createRow(input.Event.Data.RowID)
+			if err != nil {
+				return nil, err
+			}
+			return addDetail(input.Event.Data.Entry)
+		})
+		if err != nil {
+			_, err = step.Run(ctx, "Rollback row creation", func(ctx context.Context) (any, error) {
+				return removeRow(input.Event.Data.RowID)
+			})
+               if err != nil {
+               	return nil, err
+               }
+		}
+
+		return nil, nil
+	},
+)
+```
+{/* ```py {{ title: "Python" }}
+@inngest_client.create_function(
+    fn_id="add-data",
+    trigger=inngest.TriggerEvent(event="app/row.data.added"),
+)
+def add_data(ctx: inngest.Context, step: inngest.StepSync) -> None:
+    # ignore the error - this step is fine if it fails
+    try:
+        step.run("Non-critical step", lambda: update_metric())
+    except Exception:
+        pass
+
+    # Add a rollback to a step
+    try:
+        step.run("Create row", lambda: create_row_and_add_detail(ctx.event.data["rowId"], ctx.event.data["entry"]))
+    except Exception as err:
+        step.run("Rollback row creation", lambda: remove_row(ctx.event.data["rowId"]))
+
+def create_row_and_add_detail(row_id, entry):
+    create_row(row_id)
+    add_detail(entry)
+``` */}
+</CodeGroup>
+
+## Failure handlers
+
+If your function exhausts all of its retries, it will be marked as "Failed." You can handle this circumstance by providing an [`onFailure`](/docs/reference/functions/handling-failures) handler when defining your function.
+
+The example below checks if a user's subscription is valid a total of six times. If you can't check the subscription after all retries, you'll unsubscribe the user:
+
+<CodeGroup>
+```ts {{ title: "TypeScript" }}
+inngest.createFunction(
+  {
+    id: "update-subscription",
+    retries: 5,
+    onFailure: async ({ event, error }) => {
+      // if the susbcription check fails after all retries, unsubscribe the user
+      await unsubscribeUser(event.data.userId);
+    },
+  },
+  { event: "user/subscription.check" },
+  async ({ event }) => { /* ... */ },
+);
+```
+</CodeGroup>
+
+Internally, this handler creates a second function that listens for the [`inngest/function.failed`](/docs/reference/functions/handling-failures#the-inngest-function-failed-event) event, which you can listen to yourself to capture all failed runs across your system.
+
+<CodeGroup>
+```ts {{ title: "TypeScript" }}
+inngest.createFunction(
+  { id: "handle-any-fn-failure" },
+  { event: "inngest/function.failed" },
+  async ({ event }) => { /* ... */ },
+);
+```
+</CodeGroup>
+
+## Preventing retries with Non-retriable errors
+
+You can throw a [non-retriable error](/docs/reference/typescript/functions/errors#non-retriable-error) from a step or a function, which will bypass any remaining retries and fail the step or function it was thrown from.
+
+This is useful for when you know an error is permanent and want to stop all execution. In this example, the user doesn't exist, so there's no need to continue to email them.
+
+<CodeGroup>
+```ts {{ title: "TypeScript" }}
+import { NonRetriableError } from "inngest";
+
+inngest.createFunction(
+  { id: "user-weekly-digest" },
+  { event: "user/weekly-digest-requested" },
+  async ({ event, step }) => {
+    const user = await step
+      .run("Get user email", () => {
+        return db.users.findOne(event.data.userId);
+      })
+      .catch((err) => {
+        if (err.name === "UserNotFoundError") {
+          throw NonRetriableError("User no longer exists; stopping");
+        }
+
+        throw err;
+      });
+
+    await step.run("Send digest", () => {
+      return sendDigest(user.email);
+    });
+  },
+);
+```
+```go {{ title: "Go" }}
+inngestgo.CreateFunction(
+	inngestgo.FunctionOpts{ID: "user-weekly-digest"},
+	inngestgo.EventTrigger("user/weekly-digest-requested", nil),
+	func(ctx context.Context, input inngestgo.Input[WeeklyDigestRequestedEvent]) (any, error) {
+		user, err := step.Run(ctx, "Get user email", func(ctx context.Context) (any, error) {
+			return db.Users.FindOne(input.Event.Data.UserID)
+		})
+		if err != nil {
+			if stepErr, ok := err.(step.StepError); ok && stepErr.Name == "UserNotFoundError" {
+				return nil, inngestgo.NoRetryError(fmt.Errorf("User no longer exists; stopping"))
+			}
+			return nil, err
+		}
+
+		_, err = step.Run(ctx, "Send digest", func(ctx context.Context) (any, error) {
+			return sendDigest(user.(UserType).Email)
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	},
+)
+```
+```py {{ title: "Python" }}
+from inngest.errors import NonRetriableError
+
+@inngest_client.create_function(
+    fn_id="user-weekly-digest",
+    trigger=inngest.TriggerEvent(event="user/weekly-digest-requested"),
+)
+def user_weekly_digest(ctx: inngest.Context, step: inngest.StepSync) -> None:
+    try:
+        user = step.run("Get user email", lambda: db.users.find_one(ctx.event.data["userId"]))
+    except Exception as err:
+        if err.name == "UserNotFoundError":
+            raise NonRetriableError("User no longer exists; stopping")
+        raise
+
+    step.run("Send digest", lambda: send_digest(user["email"]))
+```
+</CodeGroup>
+
+## Customizing retry times
+
+Retries are executed with exponential back-off with some jitter, but it's also possible to specify exactly when you'd like a step or function to be retried.
+
+In this example, an external API provided `Retry-After` header with information on when requests can be made again, so you can tell Inngest to retry your function then.
+
+
+<CodeGroup>
+```ts
+import { RetryAfterError } from 'inngest';
+
+inngest.createFunction(
+  { id: "send-welcome-notification" },
+  { event: "app/user.created" },
+  async ({ event, step }) => {
+    const { success, retryAfter } = await twilio.messages.create({
+      to: event.data.user.phoneNumber,
+      body: "Welcome to our service!",
+    });
+
+    if (!success && retryAfter) {
+      throw new RetryAfterError("Hit Twilio rate limit", retryAfter);
+    }
+  },
+);
+```
+```go
+inngestgo.CreateFunction(
+	inngestgo.FunctionOpts{ID: "send-welcome-notification"},
+	inngestgo.EventTrigger("user/signed-up", nil),
+	func(ctx context.Context, input inngestgo.Input[SignedUpEvent]) (any, error) {
+		success, retryAfter, err := twilio.Messages.Create(twilio.MessageOpts{
+			To:   input.Event.Data.User.PhoneNumber,
+			Body: "Welcome to our service!",
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if !success && retryAfter != nil {
+			return nil, inngestgo.RetryAtError(fmt.Errorf("Hit Twilio rate limit"), *retryAfter)
+		}
+
+		return nil, nil
+	}
+)
+```
+</CodeGroup>
+
+## Learn more
+
+Check out some related resources to learn more about error handling in Inngest:
+
+* TypeScript SDK Reference: [Errors](/docs/reference/typescript/functions/errors)
+* TypeScript SDK Reference: [`onFailure`](/docs/reference/functions/handling-failures)

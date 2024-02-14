@@ -465,6 +465,7 @@ func convertEventBatch(obj *sqlc.EventBatch) cqrs.EventBatch {
 		cqrs.WithEventBatchAppID(obj.AppID),
 		cqrs.WithEventBatchRunID(obj.RunID),
 		cqrs.WithEventBatchEventIDs(evtIDs),
+		cqrs.WithEventBatchExecutedTime(obj.ExecutedAt),
 	)
 
 	return *eb

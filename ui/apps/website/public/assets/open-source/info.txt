@@ -1,0 +1,1 @@
+This directory is all assets that are used in READMEs and similar on our open source repos.

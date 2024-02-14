@@ -1,0 +1,132 @@
+---
+heading: "Migrating long running workflows across clouds with zero downtime"
+subtitle: "How the Inngest system is designed to help you migrate across clouds with minimal effort."
+showSubtitle: true
+image: /assets/blog/migrating-across-clouds-with-zero-downtime/featured-image.png
+date: 2024-01-23
+author: Dan Farrelly
+disableCTA: true
+---
+
+Long running jobs or workflows are challenging to operate in production. They are even harder to migrate when changing infrastructure, cloud providers, or programming languages. Key challenges include maintaining data consistency, adapting to platform limitations, security considerations, and minimizing downtime during the transition.
+
+In this post, we’re going to walk through how the Inngest system is designed to enable developers to migrate across clouds (or even… across languages!?) with zero downtime, and minimal effort.
+
+## State Management for Long Running Jobs
+
+To implement long running jobs and workflows in your own system, you would need to track the state of every job that is run. Imagine a job that must perform a series of tasks in a specific order, with each task depending on the result of the previous ones. This sounds basic enough, but let’s imagine a complex job that might run for minutes, or hours.
+
+A moderately complex job like this often becomes slow and prone to failures as its tasks get more involved. To make systems like this performant and fault-tolerant, tasks get split up to run in separate queues. Some data can be passed within the queued messages, but this can get unwieldy and failures can lead to dropped jobs.
+
+In order to make this simpler, the job’s state is externally saved in a database. A first obvious action is to save this in your existing database or use an in-memory option like Redis.
+
+Typically when teams start building these systems, the state logic is heavily intertwined with your business logic. This can get very messy and difficult to maintain, refactor or introduce significant changes.
+
+These systems’ tight coupling can first feel like a productivity boost, but it ends up becoming a technical debt bomb waiting to go off. Migrations from one database to another, changing cloud providers, or moving from servers to serverless (or vice versa) all become more complex. Teams then schedule downtime, drain one system and move to another - a heavily orchestrated change. What if it didn’t have to be this hard?
+
+## How Inngest executes functions
+
+What I described above, in its simplest form, is a function. Functions contain multiple discrete tasks (or *steps*) and state is retained in memory as part of the language. Inngest brings this simplicity to long running jobs.
+
+As I highlighted above how important job state is, Inngest’s durable execution engine manages state for your function. Job state is serialized and stored by Inngest and using [our SDKs](/blog/cross-language-support-with-new-sdks), state is injected into your functions so they can continue where they left off. Basically this is [memoization](https://en.wikipedia.org/wiki/Memoization) with job state. Each “step” in your function can return data to build up state.
+
+This approach allows your functions to be *stateless*, which allows them to run on serverless platforms. Inngest SDKs take care of the complex bits of hashing step IDs, serializing each step’s output, [running steps in parallel](/docs/guides/step-parallelism), and inserting state for completed steps. (You can check out our [SDK spec](https://github.com/inngest/inngest/blob/main/docs/SDK_SPEC.md) if you are curious to go deeper)
+
+There are major benefits to standardizing the way to serialize, store, and consume state. Long running functions can start running on one machine (or serverless isolate) and continue on another.
+
+Inngest executes functions via HTTP wherever you have your code hosted, so all it needs is a URL. This makes migrations as simple as telling Inngest to update your URL. Move from servers to serverless (or the opposite), AWS to GCP, or from cloud to on-prem if that’s your thing.
+
+<fig>
+    <img
+      src="/assets/blog/migrating-across-clouds-with-zero-downtime/apps-ui.png"
+      alt="Inngest cloud dashboard Apps page"
+      className="rounded-sm"
+      style={{ margin: "0 auto", maxWidth: "600px" }}
+    />
+    <figcaption className="text-xs text-center italic">
+      The Inngest dashboard Apps page
+    </figcaption>
+  </fig>
+
+## Zero-downtime migrations with Inngest
+
+On the Inngest dashboard, you can see all of your apps (a URL serving Inngest functions) at a glance along with the URL that they are served from. When you [“sync” your app](/docs/apps) with Inngest, functions are automatically created, updated, or removed from your Inngest account. To sync your app, all you need is the URL.
+
+Inngest is agnostic to where your code is running, so after you deploy your code to a new cloud, all you need to do to complete the migration is to sync your app with a new URL. As your code should have the same [app ID](/docs/apps#apps-in-sdk) and [function IDs](/docs/reference/functions/create#inngest-create-function-configuration-trigger-handler-inngest-function), all of your functions will pick up where they left off without a hiccup.
+
+<video controls autoPlay loop src="/assets/blog/migrating-across-clouds-with-zero-downtime/migration-via-ui.mp4" />
+
+Today we’ve made all of this easier. You can do this in a couple of clicks from the Inngest dashboard.
+
+*But, if we can migrate across clouds, can we migrate across languages?*
+
+## Cross-language migrations
+
+Today, we simultaneously [announced two new language SDKs](/blog/cross-language-support-with-new-sdks) that are now in beta. Every Inngest SDK follows the [same spec](https://github.com/inngest/inngest/blob/main/docs/SDK_SPEC.md) so each handles steps and state the exact same way.
+
+Thanks to how Inngest works, it’s possible for you to rewrite a function in another programming language, sync the app with a new URL, and state will still be preserved.
+
+How would you do this? For seamless migration, Inngest requires that your app ID and function ID remain the same. State is built up using the output of each [step that is run](/docs/reference/functions/step-run), which is stored using the hash of each step’s ID. If you rewrite your function in another language and ensure step IDs are the same, Inngest’s SDKs will be able to handle the memoization (aka state injection) and carry on where the function left off… in the previous language. It just works!
+
+Here’s an example of two functions in two languages that would be interoperable:
+
+```typescript
+import { inngest } from "./client";
+
+export const processAudio = inngest.createFunction(
+  { id: "process-audio" },
+  { event: "podcast/audio.uploaded" },
+  async ({ event, step }) => {
+    const newFileURL = await step.run('transcode-audio', async () => {
+      const filename = await download(event.data.url);
+      return await transcode(filename, 'aac');
+    });
+
+    const transcript = await step.run('generate-transcript', async () => {
+      // ... business logic omitted for sake of example ...
+    });
+    const summary = await step.run('summarize-with-ai', async () => {
+      // ...
+    });
+
+    await step.run('save-to-db', async () => {
+      // ...
+    })
+  }
+);
+```
+```python
+@inngest_client.create_function(
+    fn_id="process-audio",
+    trigger=inngest.TriggerEvent(event="podcast/audio.uploaded"),
+)
+async def fn(ctx: inngest.Context, step: inngest.Step) -> None:
+    async def transcode_audio() -> str:
+        filename = download(ctx.event.data["url"])
+        return await transcode(filename, 'aac')
+    new_file_url = await step.run("transcode-audio", transcode_audio)
+
+    async def generate_transcript():
+        return # ... business logic omitted ...
+    transcript = await step.run("generate-transcript", generate_transcript)
+
+    async def summarize():
+        return # ...
+    summary = await step.run("summarize-with-ai", summarize)
+
+    async def save_to_db():
+        return # ...
+    await step.run("save-to-db", save_to_db)
+```
+
+We, of course, don’t expect many developers to take this path, although it's fun to highlight what is possible with the architectural design of Inngest.
+
+For teams migrating from one language to another, we might first suggest that they explore using cross-language [`invoke()`](/docs/guides/invoking-functions-directly). This enables one Inngest function to call another function’s code, regardless of the language it’s written in or the cloud it’s running in. If you’d like to see this in action, check out [our multi-lang repo](https://github.com/inngest/inngest-multi-lang) which uses TypeScript and Python SDKs.
+
+## In closing
+
+We’ve had a number of engineering teams benefit from this feature in Inngest as they’ve moved from servers to serverless, or vice versa. As teams want to optimize their cloud spend or performance, this feature gives teams the flexibility and peace of mind to know they have that option with minimal overhead.
+
+Go forth and migrate!
+
+PS - This post is part of a collection of updates and announcements for [Inngest Launch Week](https://inngest.com/launch-week). Come back every day this week for more from our team, or follow us on [Twitter](https://twitter.com/inngest) for the updates.

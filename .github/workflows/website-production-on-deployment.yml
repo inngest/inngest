@@ -1,0 +1,60 @@
+name: Website - Production - On Deployment
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ui/apps/website/**"
+
+jobs:
+  wait_for_deploy_complete:
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.deployment.outputs.url }}
+    steps:
+      - id: deployment
+        uses: patrickedqvist/wait-for-vercel-preview@v1.3.1
+        with:
+          environment: "Production – website"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          max_timeout: 900
+
+      - name: Display deployment URL
+        run: "echo Preview URL: ${{steps.deployment.outputs.url}}"
+
+  check_links:
+    runs-on: ubuntu-latest
+    needs: wait_for_deploy_complete
+    steps:
+      - uses: actions/checkout@v2.1.0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8.6.2
+
+      - name: Install dependencies
+        working-directory: ui/apps/website
+        run: pnpm install
+
+      - name: Run broken-link-checker
+        working-directory: ui/apps/website
+        if: ${{ success() }}
+        run: pnpm broken-link-checker ${{needs.wait_for_deploy_complete.outputs.url}}
+
+  algolia_crawler:
+    runs-on: ubuntu-latest
+    needs: wait_for_deploy_complete
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Algolia crawler creation and crawl
+        if: ${{ success() }}
+        uses: algolia/algoliasearch-crawler-github-actions@v1.0.10
+        id: algolia_crawler
+        with:
+          crawler-user-id: ${{ vars.CRAWLER_USER_ID }}
+          crawler-api-key: ${{ secrets.CRAWLER_API_KEY }}
+          crawler-name: ${{ vars.CRAWLER_NAME }}
+          algolia-app-id: ${{ vars.ALGOLIA_APP_ID }}
+          algolia-api-key: ${{ secrets.ALGOLIA_WRITE_API_KEY }}
+          site-url: 'https://www.inngest.com/docs'
