@@ -311,7 +311,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	// step to fail.
 	if pause.Opcode != nil && *pause.Opcode == enums.OpcodeInvokeFunction.String() {
 		r.SetError(
-			"InvokeTimeoutError",
+			"InngestInvokeTimeoutError",
 			"Timed out waiting for invoked function to complete",
 		)
 	}
