@@ -74,7 +74,7 @@
     "type-fest": "3.7.2",
     "ulid": "2.3.0",
     "urql": "4.0.5",
-    "zod": "3.22.3"
+    "zod": "3.22.4"
   },
   "devDependencies": {
     "@graphql-codegen/cli": "3.2.2",

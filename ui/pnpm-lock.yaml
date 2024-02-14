@@ -168,8 +168,8 @@ importers:
         specifier: 4.0.5
         version: 4.0.5(graphql@16.8.1)(react@18.2.0)
       zod:
-        specifier: 3.22.3
-        version: 3.22.3
+        specifier: 3.22.4
+        version: 3.22.4
     devDependencies:
       '@graphql-codegen/cli':
         specifier: 3.2.2
@@ -647,8 +647,8 @@ importers:
         specifier: 8.3.2
         version: 8.3.2
       zod:
-        specifier: 3.19.1
-        version: 3.19.1
+        specifier: 3.22.4
+        version: 3.22.4
       zustand:
         specifier: 4.2.0
         version: 4.2.0(react@18.2.0)
@@ -13622,7 +13622,7 @@ packages:
     dependencies:
       '@graphql-typed-document-node/core': 3.2.0(graphql@16.8.1)
       graphql: 16.8.1
-      zod: 3.22.3
+      zod: 3.22.4
     dev: false
 
   /@testing-library/dom@8.20.1:
@@ -30750,14 +30750,6 @@ packages:
 
   /yoga-wasm-web@0.1.2:
     resolution: {integrity: sha512-8SkgawHcA0RUbMrnhxbaQkZDBi8rMed8pQHixkFF9w32zGhAwZ9/cOHWlpYfr6RCx42Yp3siV45/jPEkJxsk6w==}
-    dev: false
-
-  /zod@3.19.1:
-    resolution: {integrity: sha512-LYjZsEDhCdYET9ikFu6dVPGp2YH9DegXjdJToSzD9rO6fy4qiRYFoyEYwps88OseJlPyl2NOe2iJuhEhL7IpEA==}
-    dev: false
-
-  /zod@3.22.3:
-    resolution: {integrity: sha512-EjIevzuJRiRPbVH4mGc8nApb/lVLKVpmUhAaR5R5doKGfAnGJ6Gr3CViAVjP+4FWSxCsybeWQdcgCtbX+7oZug==}
     dev: false
 
   /zod@3.22.4:
