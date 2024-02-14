@@ -5,6 +5,7 @@ import './globals.css';
 import React from 'react';
 import { type Metadata } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
+import { TooltipProvider } from '@inngest/components/Tooltip';
 import colors from 'tailwindcss/colors';
 
 import { BaseWrapper } from './baseWrapper';
@@ -61,7 +62,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <SentryUserIdentification />
         <ClientFeatureFlagProvider>
-          {children}
+          <TooltipProvider>{children}</TooltipProvider>
           <PageViewTracker />
         </ClientFeatureFlagProvider>
       </ClerkProvider>
