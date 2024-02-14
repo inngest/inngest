@@ -105,6 +105,7 @@ export default function StreamDetails() {
     >
       {eventResult.data && (
         <EventDetails
+          batchCreatedAt={runResult.data?.run?.batchCreatedAt ?? undefined}
           batchID={runResult.data?.run?.batchID ?? undefined}
           events={events}
           functionRuns={eventResult.data.functionRuns}

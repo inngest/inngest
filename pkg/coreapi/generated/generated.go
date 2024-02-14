@@ -107,6 +107,7 @@ type ComplexityRoot struct {
 	}
 
 	FunctionRun struct {
+		BatchCreatedAt    func(childComplexity int) int
 		BatchID           func(childComplexity int) int
 		Event             func(childComplexity int) int
 		EventID           func(childComplexity int) int
@@ -279,6 +280,7 @@ type FunctionRunResolver interface {
 	Event(ctx context.Context, obj *models.FunctionRun) (*models.Event, error)
 	Events(ctx context.Context, obj *models.FunctionRun) ([]*models.Event, error)
 	BatchID(ctx context.Context, obj *models.FunctionRun) (*ulid.ULID, error)
+	BatchCreatedAt(ctx context.Context, obj *models.FunctionRun) (*time.Time, error)
 	Status(ctx context.Context, obj *models.FunctionRun) (*models.FunctionRunStatus, error)
 	WaitingFor(ctx context.Context, obj *models.FunctionRun) (*models.StepEventWait, error)
 	PendingSteps(ctx context.Context, obj *models.FunctionRun) (*int, error)
@@ -580,6 +582,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FunctionEvent.Workspace(childComplexity), true
+
+	case "FunctionRun.batchCreatedAt":
+		if e.complexity.FunctionRun.BatchCreatedAt == nil {
+			break
+		}
+
+		return e.complexity.FunctionRun.BatchCreatedAt(childComplexity), true
 
 	case "FunctionRun.batchID":
 		if e.complexity.FunctionRun.BatchID == nil {
@@ -1628,6 +1637,7 @@ type FunctionRun {
   event: Event
   events: [Event!]!
   batchID: ULID
+  batchCreatedAt: Time
 
   status: FunctionRunStatus
   waitingFor: StepEventWait
@@ -2942,6 +2952,8 @@ func (ec *executionContext) fieldContext_Event_functionRuns(ctx context.Context,
 				return ec.fieldContext_FunctionRun_events(ctx, field)
 			case "batchID":
 				return ec.fieldContext_FunctionRun_batchID(ctx, field)
+			case "batchCreatedAt":
+				return ec.fieldContext_FunctionRun_batchCreatedAt(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -3489,6 +3501,8 @@ func (ec *executionContext) fieldContext_FunctionEvent_functionRun(ctx context.C
 				return ec.fieldContext_FunctionRun_events(ctx, field)
 			case "batchID":
 				return ec.fieldContext_FunctionRun_batchID(ctx, field)
+			case "batchCreatedAt":
+				return ec.fieldContext_FunctionRun_batchCreatedAt(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -4002,6 +4016,47 @@ func (ec *executionContext) fieldContext_FunctionRun_batchID(ctx context.Context
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ULID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionRun_batchCreatedAt(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRun) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionRun_batchCreatedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.FunctionRun().BatchCreatedAt(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionRun_batchCreatedAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionRun",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
 		},
 	}
 	return fc, nil
@@ -5540,6 +5595,8 @@ func (ec *executionContext) fieldContext_Query_functionRun(ctx context.Context, 
 				return ec.fieldContext_FunctionRun_events(ctx, field)
 			case "batchID":
 				return ec.fieldContext_FunctionRun_batchID(ctx, field)
+			case "batchCreatedAt":
+				return ec.fieldContext_FunctionRun_batchCreatedAt(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -5628,6 +5685,8 @@ func (ec *executionContext) fieldContext_Query_functionRuns(ctx context.Context,
 				return ec.fieldContext_FunctionRun_events(ctx, field)
 			case "batchID":
 				return ec.fieldContext_FunctionRun_batchID(ctx, field)
+			case "batchCreatedAt":
+				return ec.fieldContext_FunctionRun_batchCreatedAt(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -7603,6 +7662,8 @@ func (ec *executionContext) fieldContext_StepEvent_functionRun(ctx context.Conte
 				return ec.fieldContext_FunctionRun_events(ctx, field)
 			case "batchID":
 				return ec.fieldContext_FunctionRun_batchID(ctx, field)
+			case "batchCreatedAt":
+				return ec.fieldContext_FunctionRun_batchCreatedAt(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -8236,6 +8297,8 @@ func (ec *executionContext) fieldContext_StreamItem_runs(ctx context.Context, fi
 				return ec.fieldContext_FunctionRun_events(ctx, field)
 			case "batchID":
 				return ec.fieldContext_FunctionRun_batchID(ctx, field)
+			case "batchCreatedAt":
+				return ec.fieldContext_FunctionRun_batchCreatedAt(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -11015,6 +11078,23 @@ func (ec *executionContext) _FunctionRun(ctx context.Context, sel ast.SelectionS
 					}
 				}()
 				res = ec._FunctionRun_batchID(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "batchCreatedAt":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FunctionRun_batchCreatedAt(ctx, field, obj)
 				return res
 			}
 

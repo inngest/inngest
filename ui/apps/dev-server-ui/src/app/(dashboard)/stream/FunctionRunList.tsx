@@ -1,5 +1,6 @@
 import { Badge } from '@inngest/components/Badge';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+import { BatchSize } from 'node_modules/@inngest/components/src/BatchSize';
 
 import { useGetFunctionRunStatusQuery, type FunctionRun } from '@/store/generated';
 
@@ -59,7 +60,7 @@ export function FunctionRunItem({
     <li key={functionRun?.id} data-key={functionRun?.id} className="flex items-center gap-2">
       <FunctionRunStatusIcon status={functionRun.status} className="h-5 w-5" />
       {functionRun?.function?.name}
-      {batchSize && <Badge>Batch size {batchSize}</Badge>}
+      {batchSize && <BatchSize eventCount={batchSize} />}
     </li>
   );
 }

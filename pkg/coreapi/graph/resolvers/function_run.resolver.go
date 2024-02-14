@@ -190,3 +190,13 @@ func (r *functionRunResolver) BatchID(ctx context.Context, obj *models.FunctionR
 func (r *functionRunResolver) WaitingFor(ctx context.Context, obj *models.FunctionRun) (*models.StepEventWait, error) {
 	return nil, nil
 }
+
+func (r *functionRunResolver) BatchCreatedAt(ctx context.Context, obj *models.FunctionRun) (*time.Time, error) {
+	batch, err := r.Data.GetEventBatchByRunID(ctx, ulid.MustParse(obj.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	out := ulid.Time(batch.ID.Time())
+	return &out, nil
+}

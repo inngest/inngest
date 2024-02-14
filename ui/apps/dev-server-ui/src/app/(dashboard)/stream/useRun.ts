@@ -17,7 +17,10 @@ import { useGetFunctionRunQuery } from '@/store/generated';
 type Data = {
   func: Pick<Function, 'name' | 'triggers'>;
   history: HistoryParser;
-  run: Pick<FunctionRun, 'batchID' | 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'> & {
+  run: Pick<
+    FunctionRun,
+    'batchCreatedAt' | 'batchID' | 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'
+  > & {
     events: Event[];
   };
 };
@@ -44,6 +47,7 @@ export function useRun(runID: string | null): FetchResult<Data, { skippable: tru
       history: new HistoryParser(rawRun.history ?? []),
       run: {
         ...rawRun,
+        batchCreatedAt: rawRun.batchCreatedAt ? new Date(rawRun.batchCreatedAt) : null,
         endedAt: rawRun.finishedAt,
         events: (rawRun.events ?? []).map((event) => {
           return {

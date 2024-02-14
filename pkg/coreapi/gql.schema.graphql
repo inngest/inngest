@@ -186,6 +186,7 @@ type FunctionRun {
   event: Event
   events: [Event!]!
   batchID: ULID
+  batchCreatedAt: Time
 
   status: FunctionRunStatus
   waitingFor: StepEventWait

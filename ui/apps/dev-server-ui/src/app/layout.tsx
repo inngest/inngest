@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AppRoot } from '@inngest/components/AppRoot';
+import { TooltipProvider } from '@inngest/components/Tooltip';
 
 import StoreProvider from '@/app/StoreProvider';
 
@@ -14,7 +15,9 @@ type RootLayoutProps = {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <AppRoot mode="dark">
-      <StoreProvider>{children}</StoreProvider>
+      <TooltipProvider>
+        <StoreProvider>{children}</StoreProvider>
+      </TooltipProvider>
     </AppRoot>
   );
 }

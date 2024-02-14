@@ -58,6 +58,8 @@ models:
         resolver: true
       events:
         resolver: true
+      batchCreatedAt:
+        resolver: true
       batchID:
         resolver: true
       waitingFor:

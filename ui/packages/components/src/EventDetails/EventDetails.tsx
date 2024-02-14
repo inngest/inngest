@@ -10,13 +10,17 @@ import type { Event } from '@inngest/components/types/event';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
 import { shortDate } from '@inngest/components/utils/date';
 
+import { BatchSize } from '../BatchSize';
+
 type EventProps = {
+  batchCreatedAt: Date | undefined;
   batchID: string | undefined;
   events: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>[];
   loading?: false;
 };
 
 type LoadingEvent = {
+  batchCreatedAt?: Date | undefined;
   batchID?: string | undefined;
   events?: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>[];
   loading: true;
@@ -46,6 +50,7 @@ type WithoutRunSelector = {
 type Props = (EventProps | LoadingEvent) & (WithoutRunSelector | WithRunSelector);
 
 export function EventDetails({
+  batchCreatedAt,
   batchID,
   events,
   functionRuns,
@@ -90,32 +95,49 @@ export function EventDetails({
       title={events?.[0]?.name || 'unknown'}
       type="event"
       metadata={
-        singleEvent && (
-          <div className="pt-8">
-            <MetadataGrid
-              metadataItems={[
-                { label: 'Event ID', value: singleEvent.id, size: 'large', type: 'code' },
-                {
-                  label: 'Received At',
-                  value: shortDate(singleEvent.receivedAt),
-                },
-              ]}
-              loading={loading}
-            />
-          </div>
-        )
+        <>
+          {singleEvent && (
+            <div className="pt-8">
+              <MetadataGrid
+                metadataItems={[
+                  { label: 'Event ID', value: singleEvent.id, size: 'large', type: 'code' },
+                  {
+                    label: 'Received At',
+                    value: shortDate(singleEvent.receivedAt),
+                  },
+                ]}
+                loading={loading}
+              />
+            </div>
+          )}
+          {batch && (
+            <div className="pt-8">
+              <MetadataGrid
+                metadataItems={[
+                  { label: 'Batch ID', value: batchID ?? '-', size: 'large', type: 'code' },
+                  {
+                    label: 'Created At',
+                    value: batchCreatedAt ? shortDate(batchCreatedAt) : '-',
+                  },
+                ]}
+                loading={loading}
+              />
+            </div>
+          )}
+        </>
       }
       button={
-        singleEvent &&
-        onReplayEvent &&
-        SendEventButton && (
-          <>
-            <div className="flex items-center gap-1">
-              <Button label="Replay" btnAction={onReplayEvent} />
-              <SendEventButton />
-            </div>
-          </>
-        )
+        <>
+          {singleEvent && onReplayEvent && SendEventButton && (
+            <>
+              <div className="flex items-center gap-1">
+                <Button label="Replay" btnAction={onReplayEvent} />
+                <SendEventButton />
+              </div>
+            </>
+          )}
+          {batch && events && <BatchSize eventCount={events.length} />}
+        </>
       }
       active
     >
