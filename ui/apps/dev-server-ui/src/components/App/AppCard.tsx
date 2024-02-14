@@ -5,10 +5,10 @@ import { CodeLine } from '@inngest/components/CodeLine';
 import { Link } from '@inngest/components/Link/Link';
 import { AlertModal } from '@inngest/components/Modal';
 import { IconChevron } from '@inngest/components/icons/Chevron';
-import { IconStatusCircleCheck } from '@inngest/components/icons/StatusCircleCheck';
-import { IconStatusCircleExclamation } from '@inngest/components/icons/StatusCircleExclamation';
-import { IconStatusCircleMinus } from '@inngest/components/icons/StatusCircleMinus';
-import { classNames } from '@inngest/components/utils/classNames';
+import { IconStatusCanceled } from '@inngest/components/icons/status/Canceled';
+import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
+import { IconStatusFailed } from '@inngest/components/icons/status/Failed';
+import { cn } from '@inngest/components/utils/classNames';
 import { toast } from 'sonner';
 
 import AppCardHeader from '@/components/App/AppCardHeader';
@@ -124,9 +124,9 @@ export default function AppCard({ app }: { app: App }) {
               <div className="">
                 <div className="flex items-center gap-3 text-base">
                   {app.connected ? (
-                    <>{<IconStatusCircleCheck />}Connected to App</>
+                    <>{<IconStatusCompleted />}Connected to App</>
                   ) : (
-                    <>{<IconStatusCircleExclamation />}No Connection to App</>
+                    <>{<IconStatusFailed />}No Connection to App</>
                   )}
                 </div>
                 <p className="ui-open:hidden pl-10 text-slate-300 xl:hidden">{app.url}</p>
@@ -161,7 +161,7 @@ export default function AppCard({ app }: { app: App }) {
                 <div className="relative flex-1 pt-2 xl:pl-10 xl:pt-0">
                   <input
                     id="editAppUrl"
-                    className={classNames(
+                    className={cn(
                       'w-full rounded-md bg-slate-800 px-4 py-2 text-slate-300 outline-2 outline-indigo-500 read-only:outline-transparent focus:outline',
                       isUrlInvalid && ' outline-rose-400',
                       isLoading && 'pr-6'
@@ -181,15 +181,15 @@ export default function AppCard({ app }: { app: App }) {
               </form>
               <div className="mb-4 grid grid-cols-3 border-y border-slate-700/30">
                 <div className="py-4">
-                  <p className="text-sm font-semibold text-white">{app.framework}</p>
+                  <p className="text-sm font-semibold text-white">{app.framework || '-'}</p>
                   <p className="text-sm text-slate-400">Framework</p>
                 </div>
                 <div className="py-4">
-                  <p className="text-sm font-semibold text-white">{app.sdkLanguage}</p>
+                  <p className="text-sm font-semibold text-white">{app.sdkLanguage || '-'}</p>
                   <p className="text-sm text-slate-400">Language</p>
                 </div>
                 <div className="py-4">
-                  <p className="text-sm font-semibold text-white">{app.sdkVersion}</p>
+                  <p className="text-sm font-semibold text-white">{app.sdkVersion || '-'}</p>
                   <p className="text-sm text-slate-400">SDK Version</p>
                 </div>
               </div>
@@ -202,24 +202,20 @@ export default function AppCard({ app }: { app: App }) {
           }
         />
         <AppCardStep
-          isEvenStep
           lineContent={
             <>
               <div className="flex items-center gap-3 text-base">
                 {app.functionCount > 0 && (
                   <>
-                    {app.connected && <IconStatusCircleCheck />}
-                    {!app.connected && <IconStatusCircleMinus />}
+                    {app.connected && <IconStatusCompleted />}
+                    {!app.connected && <IconStatusCanceled />}
                     {app.functionCount} Function
                     {app.functionCount === 1 ? '' : 's'} Registered
                   </>
                 )}
                 {app.functionCount < 1 && (
                   <>
-                    {app.connected && (
-                      <IconStatusCircleExclamation className="text-orange-400/70" />
-                    )}
-                    {!app.connected && <IconStatusCircleMinus />}
+                    <IconStatusCanceled />
                     No Functions Found
                   </>
                 )}

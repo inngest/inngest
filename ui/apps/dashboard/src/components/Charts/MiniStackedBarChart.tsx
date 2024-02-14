@@ -28,7 +28,7 @@ export default function MiniStackedBarChart({ data, className = '' }: MiniStacke
           barCategoryGap={2}
           margin={{ top: 4, right: 4, bottom: 4, left: 4 }}
         >
-          <Bar dataKey="failureCount" stackId="slot" fill="#EF4444" radius={1} barSize={4} />
+          <Bar dataKey="failureCount" stackId="slot" fill="#f43f5e" radius={1} barSize={4} />
           <Bar
             dataKey="nonFailureCount"
             stackId="slot"
