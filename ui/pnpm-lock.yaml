@@ -557,8 +557,8 @@ importers:
         specifier: 13.1.1
         version: 13.1.1(@babel/core@7.20.12)(react-dom@18.2.0)(react@18.2.0)
       next-mdx-remote:
-        specifier: 4.4.1
-        version: 4.4.1(react-dom@18.2.0)(react@18.2.0)
+        specifier: 4.2.1
+        version: 4.2.1(react-dom@18.2.0)(react@18.2.0)
       next-sitemap:
         specifier: 3.1.44
         version: 3.1.44(@next/env@14.0.3)(next@13.1.1)
@@ -6006,7 +6006,7 @@ packages:
     dependencies:
       '@babel/core': 7.23.2
       '@babel/helper-plugin-utils': 7.22.5
-      '@babel/helper-validator-option': 7.23.5
+      '@babel/helper-validator-option': 7.22.15
       '@babel/plugin-transform-flow-strip-types': 7.22.5(@babel/core@7.23.2)
     dev: true
 
@@ -15774,8 +15774,8 @@ packages:
     peerDependencies:
       postcss: ^8.1.0
     dependencies:
-      browserslist: 4.22.1
-      caniuse-lite: 1.0.30001547
+      browserslist: 4.22.3
+      caniuse-lite: 1.0.30001583
       fraction.js: 4.2.0
       normalize-range: 0.1.2
       picocolors: 1.0.0
@@ -24036,8 +24036,8 @@ packages:
     resolution: {integrity: sha512-9iN1ka/9zmX1ZvLV9ewJYEk9h7RyRRtqdK0woXcqohu8EWIerfPUjYJPg0ULy0UqP7cslmdGc8xKDJcojlKiaw==}
     dev: true
 
-  /next-mdx-remote@4.4.1(react-dom@18.2.0)(react@18.2.0):
-    resolution: {integrity: sha512-1BvyXaIou6xy3XoNF4yaMZUCb6vD2GTAa5ciOa6WoO+gAUTYsb1K4rI/HSC2ogAWLrb/7VSV52skz07vOzmqIQ==}
+  /next-mdx-remote@4.2.1(react-dom@18.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-PcVF1r5XTBjiNVXw0GyaIcOwQsklHo36+7ycfmtJb52TIkT0nM4Hzv4wgJwNg7+jvTbap99qWsMwdKUYR9WxAA==}
     engines: {node: '>=14', npm: '>=7'}
     peerDependencies:
       react: '>=16.x <=18.x'
