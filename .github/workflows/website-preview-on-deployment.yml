@@ -16,7 +16,7 @@ jobs:
         with:
           environment: "Preview – website"
           token: ${{ secrets.GITHUB_TOKEN }}
-          max_timeout: 480
+          max_timeout: 900
 
       - name: Display deployment URL
         run: "echo Preview URL: ${{steps.deployment.outputs.url}}"
@@ -51,9 +51,9 @@ jobs:
         uses: algolia/algoliasearch-crawler-github-actions@v1.0.10
         id: algolia_crawler
         with:
-          crawler-user-id: ${{ secrets.CRAWLER_USER_ID }}
+          crawler-user-id: ${{ vars.CRAWLER_USER_ID }}
           crawler-api-key: ${{ secrets.CRAWLER_API_KEY }}
-          crawler-name: ${{ secrets.CRAWLER_NAME }}
-          algolia-app-id: ${{ secrets.ALGOLIA_APP_ID }}
-          algolia-api-key: ${{ secrets.ALGOLIA_API_KEY }}
+          crawler-name: ${{ vars.CRAWLER_NAME }}
+          algolia-app-id: ${{ vars.ALGOLIA_APP_ID }}
+          algolia-api-key: ${{ secrets.ALGOLIA_WRITE_API_KEY }}
           site-url: 'https://www.inngest.com/docs'
