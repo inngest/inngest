@@ -1,6 +1,9 @@
-name: On Deployment
+name: Website - On Deployment
 
-on: push
+on:
+  push:
+    paths:
+      - "ui/apps/website/**"
 
 jobs:
   wait_for_deploy_complete:
@@ -9,8 +12,9 @@ jobs:
       url: ${{ steps.deployment.outputs.url }}
     steps:
       - id: deployment
-        uses: patrickedqvist/wait-for-vercel-preview@v1.2.0
+        uses: patrickedqvist/wait-for-vercel-preview@v1.3.1
         with:
+          environment: "Preview – website"
           token: ${{ secrets.GITHUB_TOKEN }}
           max_timeout: 480
 
@@ -24,11 +28,13 @@ jobs:
       - uses: actions/checkout@v2.1.0
 
       - name: Install dependencies
+        working-directory: ui/apps/website
         uses: pnpm/action-setup@v2
         with:
           run_install: true
 
       - name: Run broken-link-checker
+        working-directory: ui/apps/website
         if: ${{ success() }}
         run: pnpm broken-link-checker ${{needs.wait_for_deploy_complete.outputs.url}}
 
@@ -38,6 +44,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Algolia crawler creation and crawl
+        working-directory: ui/apps/website
         if: ${{ success() }}
         uses: algolia/algoliasearch-crawler-github-actions@v1.0.10
         id: algolia_crawler
