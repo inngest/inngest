@@ -14,7 +14,7 @@
     "dev": "next dev -p 3001",
     "build": "next build && next-sitemap",
     "start": "next start",
-    "broken-link-checker": "npx ts-node ./scripts/brokenLinkChecker.ts",
+    "broken-link-checker": "pnpm dlx tsx ./scripts/brokenLinkChecker.ts",
     "prettier": "prettier --write --trailing-comma es5 \"pages/**/*.tsx\" \"pages/**/*.js\" \"shared/*.tsx\" \"shared/*.js\"",
     "storybook": "start-storybook -p 6006",
     "build-storybook": "build-storybook",
