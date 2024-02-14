@@ -1,6 +1,6 @@
 import { CheckIcon, ExclamationTriangleIcon, MinusIcon } from '@heroicons/react/20/solid';
-import { IconHourglass } from '@inngest/components/icons/Hourglass';
-import { classNames } from '@inngest/components/utils/classNames';
+import { IconStatusRunning } from '@inngest/components/icons/status/Running';
+import { cn } from '@inngest/components/utils/classNames';
 
 const syncStatuses = ['error', 'pending', 'success'] as const;
 type SyncStatus = (typeof syncStatuses)[number];
@@ -10,7 +10,7 @@ function isSyncStatus(status: string): status is SyncStatus {
 
 const syncStatusIcons = {
   error: ExclamationTriangleIcon,
-  pending: IconHourglass,
+  pending: IconStatusRunning,
   success: CheckIcon,
 } as const satisfies { [key in SyncStatus]: React.ComponentType };
 
@@ -56,13 +56,13 @@ export function SyncStatus({ status, iconOnly = false }: Props) {
 
   return (
     <div
-      className={classNames(
+      className={cn(
         color,
         iconOnly ? 'px-1.5' : 'px-3',
         'flex h-8 w-fit items-center gap-2 whitespace-nowrap rounded-full border'
       )}
     >
-      <Icon className={classNames(iconColor, 'h-4 w-4')} title={text} />
+      <Icon className={cn(iconColor, 'h-4 w-4')} title={text} />
       {!iconOnly && text}
     </div>
   );
