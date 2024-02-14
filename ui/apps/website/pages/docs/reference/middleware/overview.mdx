@@ -25,10 +25,17 @@ const myMiddleware = new InngestMiddleware({
   },
 });
 
+// Apply to a client
 const inngest = new Inngest({
   id: "my-app",
   middleware: [myMiddleware],
 });
+
+// Or to individual functions
+inngest.createFunction({
+  id: "my-fn",
+  middleware: [myMiddleware],
+}, ...);
 ```
 ```ts {{ title: "v2" }}
 import { Inngest, InngestMiddleware } from "inngest";
@@ -52,10 +59,17 @@ const myMiddleware = new InngestMiddleware({
   },
 });
 
+// Apply to a client
 const inngest = new Inngest({
   name: "My App",
   middleware: [myMiddleware],
 });
+
+// Or to individual functions
+inngest.createFunction({
+  name: "My Fn",
+  middleware: [myMiddleware],
+}, ...);
 ```
 </CodeGroup>
 
