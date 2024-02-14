@@ -4,12 +4,7 @@ import type { Route } from 'next';
 import Link from 'next/link';
 import { ChartBarIcon, ChevronRightIcon, XCircleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@inngest/components/Tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { useCron } from '@inngest/components/hooks/useCron';
 import { IconClock } from '@inngest/components/icons/Clock';
 import { IconEvent } from '@inngest/components/icons/Event';
@@ -208,18 +203,16 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                               {trigger.condition && (
                                 <div className="flex gap-1">
                                   <dt className="text-slate-500">If</dt>
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <dd className="truncate font-mono text-slate-800">
-                                          {trigger.condition}
-                                        </dd>
-                                      </TooltipTrigger>
-                                      <TooltipContent className="font-mono text-xs">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <dd className="truncate font-mono text-slate-800">
                                         {trigger.condition}
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
+                                      </dd>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="font-mono text-xs">
+                                      {trigger.condition}
+                                    </TooltipContent>
+                                  </Tooltip>
                                 </div>
                               )}
                             </dl>
@@ -260,18 +253,16 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                                   {cancellation.condition && (
                                     <div className="flex gap-1">
                                       <dt className="text-slate-500">If</dt>
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <dd className="truncate font-mono text-slate-800">
-                                              {cancellation.condition}
-                                            </dd>
-                                          </TooltipTrigger>
-                                          <TooltipContent className="font-mono text-xs">
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <dd className="truncate font-mono text-slate-800">
                                             {cancellation.condition}
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
+                                          </dd>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="font-mono text-xs">
+                                          {cancellation.condition}
+                                        </TooltipContent>
+                                      </Tooltip>
                                     </div>
                                   )}
                                   {cancellation.timeout && (
@@ -343,31 +334,25 @@ function ScheduleTrigger({ schedule, condition }: ScheduleTriggerProps) {
             {condition && (
               <div className="flex gap-1">
                 <dt className="text-slate-500">If</dt>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <dd className="truncate font-mono text-slate-800">{condition}</dd>
-                    </TooltipTrigger>
-                    <TooltipContent className="font-mono text-xs">{condition}</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <dd className="truncate font-mono text-slate-800">{condition}</dd>
+                  </TooltipTrigger>
+                  <TooltipContent className="font-mono text-xs">{condition}</TooltipContent>
+                </Tooltip>
               </div>
             )}
             {nextRun && (
               <div className="flex gap-1">
                 <dt className="text-slate-500">Next Run</dt>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <dd className="truncate text-slate-800">
-                        {titleCase(relativeTime(nextRun))}
-                      </dd>
-                    </TooltipTrigger>
-                    <TooltipContent className="font-mono text-xs">
-                      {nextRun.toISOString()}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <dd className="truncate text-slate-800">{titleCase(relativeTime(nextRun))}</dd>
+                  </TooltipTrigger>
+                  <TooltipContent className="font-mono text-xs">
+                    {nextRun.toISOString()}
+                  </TooltipContent>
+                </Tooltip>
               </div>
             )}
           </dl>

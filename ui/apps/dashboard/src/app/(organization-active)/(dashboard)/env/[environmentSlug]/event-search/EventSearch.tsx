@@ -2,12 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@inngest/components/Tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { IconInfo } from '@inngest/components/icons/Info';
 import { useClient } from 'urql';
 
@@ -95,19 +90,17 @@ export function EventSearch() {
         </form>
         <div className="m-4 flex gap-1">
           <p className="text-sm">Experimental feature</p>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger>
-                <IconInfo className="h-4 w-4 text-slate-400" />
-              </TooltipTrigger>
-              <TooltipContent className="whitespace-pre-line">
-                This is an experimental feature, with a few limitations:
-                <ul>
-                  <li> - Filter is only returning the last 3 days</li>
-                </ul>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              <IconInfo className="h-4 w-4 text-slate-400" />
+            </TooltipTrigger>
+            <TooltipContent className="whitespace-pre-line">
+              This is an experimental feature, with a few limitations:
+              <ul>
+                <li> - Filter is only returning the last 3 days</li>
+              </ul>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
