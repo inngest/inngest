@@ -1,6 +1,5 @@
 import Head from 'next/head';
 import Image from 'next/image';
-import styled from '@emotion/styled';
 import { MDXRemote } from 'next-mdx-remote';
 import { serialize } from 'next-mdx-remote/serialize';
 import YouTube, { type YouTubeEmbedProps } from 'react-youtube-embed';
