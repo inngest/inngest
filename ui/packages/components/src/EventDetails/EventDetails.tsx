@@ -13,8 +13,8 @@ import { shortDate } from '@inngest/components/utils/date';
 import { BatchSize } from '../BatchSize';
 
 type EventProps = {
-  batchCreatedAt: Date | undefined;
-  batchID: string | undefined;
+  batchCreatedAt?: Date | undefined;
+  batchID?: string | undefined;
   events: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>[];
   loading?: false;
 };
