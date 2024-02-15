@@ -122,13 +122,13 @@ function PauseFunctionModal({
       className="w-1/3"
     >
       {isPaused && (
-        <p className="py-4">
+        <p className="pt-4">
           This function will resume normal functionality and will be invoked as new events are
           received. Events received during pause will not be automatically replayed.
         </p>
       )}
       {!isPaused && (
-        <ul className="list-disc p-4 leading-8">
+        <ul className="list-disc p-4 pb-0 leading-8">
           <li>Existing runs will continue to run to completion.</li>
           <li>No new runs will be queued or invoked.</li>
           <li>Events will continue to be received, but they will not trigger new runs.</li>

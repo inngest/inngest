@@ -88,13 +88,13 @@ function ArchiveFunctionModal({
       title={`Are you sure you want to ${isArchived ? 'unarchive' : 'archive'} this function?`}
     >
       {isArchived && (
-        <p className="py-4">
+        <p className="pt-4">
           Reactivate this function. This function will resume normal functionality and will be
           invoked as new events are received. Events received while archived will not be replayed.
         </p>
       )}
       {!isArchived && (
-        <ul className="list-disc p-4 leading-8">
+        <ul className="list-disc p-4 pb-0 leading-8">
           <li>Existing runs will continue to run to completion.</li>
           <li>No new runs will be queued or invoked.</li>
           <li>Events will continue to be received, but they will not trigger new runs.</li>
