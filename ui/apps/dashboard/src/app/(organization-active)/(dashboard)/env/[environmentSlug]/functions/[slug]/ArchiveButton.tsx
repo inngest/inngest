@@ -4,12 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArchiveBoxIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { AlertModal } from '@inngest/components/Modal';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
 import UnarchiveIcon from '@/icons/unarchive.svg';
 
@@ -77,26 +77,33 @@ function ArchiveFunctionModal({
   }
 
   return (
-    <Modal className="flex max-w-xl flex-col gap-4" isOpen={isOpen} onClose={onClose}>
-      <p>{`Are you sure you want to ${isArchived ? 'resume' : 'archive'} this function?`}</p>
+    <AlertModal
+      className="w-1/3"
+      isOpen={isOpen}
+      onClose={onClose}
+      primaryAction={{
+        label: isArchived ? 'Unarchive' : 'Archive',
+        btnAction: handleArchive,
+      }}
+      title={`Are you sure you want to ${isArchived ? 'unarchive' : 'archive'} this function?`}
+    >
       {isArchived && (
-        <p className="pb-4 text-sm">
+        <p className="py-4">
           Reactivate this function. This function will resume normal functionality and will be
           invoked as new events are received. Events received while archived will not be replayed.
         </p>
       )}
       {!isArchived && (
-        <p className="pb-4 text-sm">
-          Deactivate this function and prevent it from running again. Archived functions and their
-          logs can be viewed at anytime. Functions can be unarchived if desired.
-        </p>
+        <ul className="list-disc p-4 leading-8">
+          <li>Existing runs will continue to run to completion.</li>
+          <li>No new runs will be queued or invoked.</li>
+          <li>Events will continue to be received, but they will not trigger new runs.</li>
+          <li>Archived functions and their logs can be viewed at any time.</li>
+          <li>Archived functions will be unarchived when you resync your app.</li>
+          <li>Functions can be unarchived at any time.</li>
+        </ul>
       )}
-
-      <div className="flex content-center justify-end">
-        <Button appearance="outlined" btnAction={() => onClose()} label="No" />
-        <Button kind="danger" appearance="text" btnAction={handleArchive} label="Yes" />
-      </div>
-    </Modal>
+    </AlertModal>
   );
 }
 
