@@ -80,7 +80,7 @@ func (a *api) setup() {
 
 		r.Post("/cancellations", a.CreateCancellation)
 		r.Get("/cancellations", a.GetCancellations)
-		r.Get("/cancellations/{id}", a.DeleteCancellation)
+		r.Delete("/cancellations/{id}", a.DeleteCancellation)
 	})
 }
 
