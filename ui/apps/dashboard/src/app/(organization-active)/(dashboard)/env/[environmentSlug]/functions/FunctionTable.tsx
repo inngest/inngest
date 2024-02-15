@@ -22,6 +22,7 @@ export type FunctionTableRow = {
   name: string;
   isArchived: boolean;
   isActive: boolean;
+  isPaused: boolean;
   slug: string;
   triggers: Trigger[];
   failureRate: number | undefined;
@@ -112,14 +113,14 @@ function createColumns(environmentSlug: string) {
     columnHelper.accessor('name', {
       cell: (info) => {
         const name = info.getValue();
-        const { isActive, isArchived, slug } = info.row.original;
+        const { isPaused, isArchived, slug } = info.row.original;
 
         return (
           <div className="flex items-center pl-6">
             <div
               className={cn(
                 'h-2.5 w-2.5 rounded-full',
-                isArchived ? 'bg-slate-300' : isActive ? 'bg-teal-500' : 'bg-amber-500'
+                isArchived ? 'bg-slate-300' : isPaused ? 'bg-amber-500' : 'bg-teal-500'
               )}
             />
             <Link
