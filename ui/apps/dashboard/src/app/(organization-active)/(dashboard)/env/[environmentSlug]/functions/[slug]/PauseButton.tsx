@@ -4,12 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PauseIcon, PlayIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { AlertModal } from '@inngest/components/Modal';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
 
 const FunctionVersionNumberDocument = graphql(`
@@ -111,30 +111,32 @@ function PauseFunctionModal({
   }
 
   return (
-    <Modal className="flex max-w-xl flex-col gap-4" isOpen={isOpen} onClose={onClose}>
-      <p>{`Are you sure you want to ${isPaused ? 'resume' : 'pause'} this function?`}</p>
+    <AlertModal
+      isOpen={isOpen}
+      onClose={onClose}
+      primaryAction={{
+        label: isPaused ? 'Resume' : 'Pause',
+        btnAction: isPaused ? handleResume : handlePause,
+      }}
+      title={`Are you sure you want to ${isPaused ? 'resume' : 'pause'} this function?`}
+      className="w-1/3"
+    >
       {isPaused && (
-        <p className="pb-4 text-sm">
+        <p className="py-4">
           This function will resume normal functionality and will be invoked as new events are
           received. Events received during pause will not be automatically replayed.
         </p>
       )}
       {!isPaused && (
-        <p className="pb-4 text-sm">
-          Temporarily stop this function from being run. Events can still be sent, but this function
-          will not be invoked. You can resume it at any time.
-        </p>
+        <ul className="list-disc p-4 leading-8">
+          <li>Existing runs will continue to run to completion.</li>
+          <li>No new runs will be queued or invoked.</li>
+          <li>Events will continue to be received, but they will not trigger new runs.</li>
+          <li>Paused functions will be unpaused when you resync your app.</li>
+          <li>Functions can be resumed at any time.</li>
+        </ul>
       )}
-      <div className="flex content-center justify-end">
-        <Button appearance="outlined" btnAction={() => onClose()} label="No" />
-        <Button
-          kind="danger"
-          appearance="text"
-          btnAction={isPaused ? handleResume : handlePause}
-          label="Yes"
-        />
-      </div>
-    </Modal>
+    </AlertModal>
   );
 }
 
