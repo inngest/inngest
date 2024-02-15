@@ -13,7 +13,7 @@ export function IconStatusCanceled({ className, title }: { className?: string; t
       <title>{title}</title>
       <path
         d="M14.5 12.3333H9.5M21 12.3333C21 17.3039 16.9706 21.3333 12 21.3333C7.02944 21.3333 3 17.3039 3 12.3333C3 7.36277 7.02944 3.33333 12 3.33333C16.9706 3.33333 21 7.36277 21 12.3333Z"
-        stroke="#CBD5E1"
+        stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
