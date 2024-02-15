@@ -26,6 +26,13 @@ export default function AccountSetupPage() {
     });
   }, [getToken, isAccountSetup, router]);
 
+  // HACK: Full refresh the page every 5 seconds
+  useEffect(() => {
+    if (secondsElapsed % 5 !== 0) return;
+
+    window.location.reload();
+  }, [secondsElapsed]);
+
   useEffect(() => {
     if (secondsElapsed !== 10) return;
 
