@@ -18,12 +18,7 @@ export default authMiddleware({
       return redirectToSignIn({ returnBackUrl: request.url });
     }
 
-    if (
-      isSignedIn &&
-      !hasActiveOrganization &&
-      request.nextUrl.pathname !== '/organization-list' &&
-      request.nextUrl.pathname !== '/sign-up/account-setup'
-    ) {
+    if (isSignedIn && !hasActiveOrganization && request.nextUrl.pathname !== '/organization-list') {
       const organizationListURL = new URL('/organization-list', request.url);
       organizationListURL.searchParams.append('redirect_url', request.url);
       return NextResponse.redirect(organizationListURL);
