@@ -69,8 +69,18 @@ func (r redisReadWriter) CreateCancellation(ctx context.Context, c cqrs.Cancella
 	return r.r.Do(ctx, cmd).Error()
 }
 
+func (r redisReadWriter) DeleteCancellation(ctx context.Context, c cqrs.Cancellation) error {
+	key := r.key(c.WorkspaceID, c.FunctionID)
+	cmd := r.r.B().Hdel().Key(key).Field(c.ID.String()).Build()
+	err := r.r.Do(ctx, cmd).Error()
+	if rueidis.IsRedisNil(err) {
+		return nil
+	}
+	return fmt.Errorf("error deleting cancellation: %w", err)
+}
+
 func (r redisReadWriter) ReadAt(ctx context.Context, wsID uuid.UUID, fnID uuid.UUID, at time.Time) ([]cqrs.Cancellation, error) {
-	// TODO: Cancellations need to be fast.  They're loaded in the critical path on each step
+	// XXX: Cancellations need to be fast.  They're loaded in the critical path on each step
 	// execution so that cancellations are immedaite.
 	//
 	// Ideally, we'd store these in-memory for instant loading.  We'd need to notify
