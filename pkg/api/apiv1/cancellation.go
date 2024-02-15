@@ -11,6 +11,23 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+func (a api) DeleteCancellation(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	auth, err := a.opts.AuthFinder(ctx)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No auth found"))
+		return
+	}
+
+	all, err := a.opts.CancellationReadWriter.Cancellations(ctx, auth.WorkspaceID())
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Error deleting cancellation"))
+		return
+	}
+
+	_ = WriteResponse(w, all)
+}
+
 func (a api) GetCancellations(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	auth, err := a.opts.AuthFinder(ctx)
@@ -25,8 +42,7 @@ func (a api) GetCancellations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = json.NewEncoder(w).Encode(all)
-
+	_ = WriteResponse(w, all)
 }
 
 type CreateCancellationBody struct {
@@ -79,5 +95,5 @@ func (a api) CreateCancellation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = json.NewEncoder(w).Encode(cancel)
+	_ = WriteResponse(w, cancel)
 }

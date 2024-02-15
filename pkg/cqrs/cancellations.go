@@ -21,12 +21,16 @@ type CancellationReadWriter interface {
 type CancellationReader interface {
 	// Cancellations returns all cancellations for a given workspace.
 	Cancellations(ctx context.Context, wsID uuid.UUID) ([]Cancellation, error)
+	Cancellation(ctx context.Context, wsID uuid.UUID, id ulid.ULID) (*Cancellation, error)
 	CancellationsByFunction(ctx context.Context, wsID uuid.UUID, fnID uuid.UUID) ([]Cancellation, error)
 }
 
 type CancellationWriter interface {
 	// CreateCancellation writes a cancellation to the backing store.
 	CreateCancellation(ctx context.Context, c Cancellation) error
+	// DeleteCancellation deletes a cancellation, immediately preventing the cancellation
+	// from stopping functions.
+	DeleteCancellation(ctx context.Context, c Cancellation) error
 }
 
 // Cancellation represents a cancellation of many function runs during the time specified.
