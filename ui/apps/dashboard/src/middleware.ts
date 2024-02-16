@@ -18,12 +18,7 @@ export default authMiddleware({
       return redirectToSignIn({ returnBackUrl: request.url });
     }
 
-    if (
-      isSignedIn &&
-      !hasActiveOrganization &&
-      request.nextUrl.pathname !== '/organization-list' &&
-      request.nextUrl.pathname !== '/sign-up/account-setup'
-    ) {
+    if (isSignedIn && !hasActiveOrganization && request.nextUrl.pathname !== '/organization-list') {
       const organizationListURL = new URL('/organization-list', request.url);
       organizationListURL.searchParams.append('redirect_url', request.url);
       return NextResponse.redirect(organizationListURL);
@@ -31,9 +26,11 @@ export default authMiddleware({
 
     if (
       isSignedIn &&
+      hasActiveOrganization &&
       !isAccountSetup &&
-      request.nextUrl.pathname !== '/sign-up/account-setup' &&
-      request.nextUrl.pathname !== '/organization-list'
+      request.nextUrl.pathname !== '/organization-list' &&
+      request.nextUrl.pathname !== '/create-organization' &&
+      request.nextUrl.pathname !== '/sign-up/account-setup'
     ) {
       return NextResponse.redirect(new URL('/sign-up/account-setup', request.url));
     }

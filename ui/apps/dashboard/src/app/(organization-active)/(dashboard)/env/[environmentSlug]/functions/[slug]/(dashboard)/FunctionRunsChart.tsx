@@ -96,7 +96,7 @@ export default function FunctionRunsChart({ functionSlug, timeRange }: FunctionR
       data={metrics}
       legend={[
         { name: 'Completed', dataKey: 'completed', color: colors.teal['500'] },
-        { name: 'Failed', dataKey: 'failed', color: colors.red['500'] },
+        { name: 'Failed', dataKey: 'failed', color: colors.rose['500'] },
         { name: 'Canceled', dataKey: 'canceled', color: colors.slate['500'] },
       ]}
       isLoading={isFetchingFunctionRunsMetrics}

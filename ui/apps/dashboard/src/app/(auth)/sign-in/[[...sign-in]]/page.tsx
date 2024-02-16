@@ -1,9 +1,21 @@
+import { type Metadata } from 'next';
 import Link from 'next/link';
 import { SignIn } from '@clerk/nextjs';
 
 import SplitView from '@/app/(auth)/SplitView';
 import { Alert } from '@/components/Alert';
 import signInRedirectErrors from './SignInRedirectErrors';
+
+export const metadata: Metadata = {
+  title: 'Sign in - Inngest Cloud',
+  description: 'Sign into your account',
+  alternates: {
+    canonical: new URL(
+      '/sign-in',
+      process.env.NEXT_PUBLIC_APP_URL || 'https://app.inngest.com'
+    ).toString(),
+  },
+};
 
 const signInRedirectErrorMessages = {
   [signInRedirectErrors.Unauthenticated]: 'Could not resume your session. Please sign in again.',

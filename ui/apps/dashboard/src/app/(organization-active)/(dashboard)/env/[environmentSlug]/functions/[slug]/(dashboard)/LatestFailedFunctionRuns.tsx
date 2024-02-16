@@ -3,7 +3,6 @@
 import { useMemo } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { XCircleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { useQuery } from 'urql';
 
@@ -81,10 +80,7 @@ export default function LatestFailedFunctionRuns({
   return (
     <div>
       <header className="flex items-center gap-3 py-3">
-        <div className="flex items-center gap-2">
-          <XCircleIcon className="h-5 text-red-500" />
-          <h1 className="font-semibold text-slate-700">Latest Failed Runs</h1>
-        </div>
+        <h1 className="font-semibold text-slate-700">Latest Failed Runs</h1>
         <Button
           className="ml-auto"
           appearance="outlined"

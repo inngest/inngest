@@ -1,9 +1,9 @@
-import { IconStatusCircleArrowPath } from '@inngest/components/icons/StatusCircleArrowPath';
-import { IconStatusCircleCheck } from '@inngest/components/icons/StatusCircleCheck';
-import { IconStatusCircleCross } from '@inngest/components/icons/StatusCircleCross';
-import { IconStatusCircleExclamation } from '@inngest/components/icons/StatusCircleExclamation';
-import { IconStatusCircleMinus } from '@inngest/components/icons/StatusCircleMinus';
-import { IconStatusCircleMoon } from '@inngest/components/icons/StatusCircleMoon';
+import { IconStatusCanceled } from '@inngest/components/icons/status/Canceled';
+import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
+import { IconStatusErrored } from '@inngest/components/icons/status/Errored';
+import { IconStatusFailed } from '@inngest/components/icons/status/Failed';
+import { IconStatusRunning } from '@inngest/components/icons/status/Running';
+import { IconStatusSleeping } from '@inngest/components/icons/status/Sleeping';
 import type { HistoryNode } from '@inngest/components/utils/historyParser';
 
 import type { Timeline } from '..';
@@ -19,19 +19,19 @@ export type RenderedData = {
 function getIconForStatus(node: HistoryNode) {
   let icon: JSX.Element;
   if (node.scope === 'function' && node.status === 'started') {
-    icon = <IconStatusCircleCheck />;
+    icon = <IconStatusCompleted />;
   } else if (node.status === 'cancelled') {
-    icon = <IconStatusCircleMinus />;
+    icon = <IconStatusCanceled />;
   } else if (node.status === 'completed') {
-    icon = <IconStatusCircleCheck />;
+    icon = <IconStatusCompleted />;
   } else if (node.status === 'errored') {
-    icon = <IconStatusCircleExclamation />;
+    icon = <IconStatusErrored />;
   } else if (node.status === 'failed') {
-    icon = <IconStatusCircleCross />;
+    icon = <IconStatusFailed />;
   } else if (node.status === 'scheduled' || node.status === 'started') {
-    icon = <IconStatusCircleArrowPath />;
+    icon = <IconStatusRunning />;
   } else if (node.status === 'sleeping' || node.status === 'waiting') {
-    icon = <IconStatusCircleMoon />;
+    icon = <IconStatusSleeping />;
   } else {
     // TODO: Use a question mark icon or something.
     throw new Error(`unexpected status: ${node.status}`);
@@ -53,8 +53,8 @@ function getIconsForAttempts({
   return (
     <span className="flex items-center">
       {firstAttempt && <span className="z-0">{getIconForStatus(firstAttempt)}</span>}
-      <span className="bg-slate-940 z-10 -ml-[1.3rem] h-[1.3rem] w-[1.3rem] rounded-full" />
-      <span className="z-20 -ml-6">{icon}</span>
+      <span className="bg-slate-940 z-10 -ml-[1.2rem] h-[1.2rem] w-[1.2rem] rounded-full" />
+      <span className="z-20 -ml-5">{icon}</span>
     </span>
   );
 }

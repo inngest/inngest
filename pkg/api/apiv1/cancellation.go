@@ -1,15 +1,55 @@
 package apiv1
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/json"
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/oklog/ulid/v2"
 )
+
+func (a api) DeleteCancellation(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	auth, err := a.opts.AuthFinder(ctx)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No auth found"))
+		return
+	}
+
+	id, err := ulid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid cancellation ID"))
+		return
+	}
+
+	all, err := a.opts.CancellationReadWriter.Cancellations(ctx, auth.WorkspaceID())
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Error deleting cancellation"))
+		return
+	}
+
+	for _, c := range all {
+		if bytes.Equal(c.ID[:], id[:]) {
+			err := a.opts.CancellationReadWriter.DeleteCancellation(ctx, c)
+			if err == nil {
+				w.WriteHeader(200)
+				_ = WriteResponse(w, map[string]any{"ok": true})
+				return
+			}
+			if err != nil {
+				_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Error deleting cancellation"))
+				return
+			}
+		}
+	}
+
+	_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Cancellation not found"))
+}
 
 func (a api) GetCancellations(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -25,8 +65,7 @@ func (a api) GetCancellations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = json.NewEncoder(w).Encode(all)
-
+	_ = WriteResponse(w, all)
 }
 
 type CreateCancellationBody struct {
@@ -79,5 +118,5 @@ func (a api) CreateCancellation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = json.NewEncoder(w).Encode(cancel)
+	_ = WriteResponse(w, cancel)
 }

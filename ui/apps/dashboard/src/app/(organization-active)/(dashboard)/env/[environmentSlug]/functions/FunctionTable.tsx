@@ -22,6 +22,7 @@ export type FunctionTableRow = {
   name: string;
   isArchived: boolean;
   isActive: boolean;
+  isPaused: boolean;
   slug: string;
   triggers: Trigger[];
   failureRate: number | undefined;
@@ -97,10 +98,10 @@ export function FunctionTable({ rows = [] }: Props) {
   );
 }
 
-function Shimmer() {
+function Shimmer({ className }: { className?: string }) {
   return (
-    <div className="flex">
-      <Placeholder className="mx-4 my-4 h-2.5 w-full bg-slate-200" />
+    <div className={`flex ${className}`}>
+      <Placeholder className="my-4 h-2.5 w-full bg-slate-200" />
     </div>
   );
 }
@@ -112,14 +113,14 @@ function createColumns(environmentSlug: string) {
     columnHelper.accessor('name', {
       cell: (info) => {
         const name = info.getValue();
-        const { isActive, isArchived, slug } = info.row.original;
+        const { isPaused, isArchived, slug } = info.row.original;
 
         return (
           <div className="flex items-center pl-6">
             <div
               className={cn(
                 'h-2.5 w-2.5 rounded-full',
-                isArchived ? 'bg-slate-300' : isActive ? 'bg-teal-500' : 'bg-amber-500'
+                isArchived ? 'bg-slate-300' : isPaused ? 'bg-amber-500' : 'bg-teal-500'
               )}
             />
             <Link
@@ -178,12 +179,12 @@ function createColumns(environmentSlug: string) {
       cell: (info) => {
         const value = info.getValue();
         if (value === undefined) {
-          return <Shimmer />;
+          return <Shimmer className="w-12 px-2.5" />;
         }
 
         let icon;
         if (value > 0) {
-          icon = <ExclamationCircleIcon className="-ml-1 mr-1 h-4 w-4 text-red-600" />;
+          icon = <ExclamationCircleIcon className="-ml-1 mr-1 h-4 w-4 text-rose-500" />;
         }
 
         return (
@@ -199,11 +200,11 @@ function createColumns(environmentSlug: string) {
       cell: (info) => {
         const value = info.getValue();
         if (value === undefined) {
-          return <Shimmer />;
+          return <Shimmer className="w-[212px] px-2.5" />;
         }
 
         return (
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex min-w-[212px] items-center justify-end gap-2">
             <span
               key="volume-count"
               className="overflow-hidden whitespace-nowrap text-xs text-slate-600"

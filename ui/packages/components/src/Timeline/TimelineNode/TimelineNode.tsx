@@ -6,7 +6,6 @@ import { MetadataGrid } from '@inngest/components/Metadata';
 import { OutputCard } from '@inngest/components/OutputCard';
 import { renderStepMetadata } from '@inngest/components/RunDetails/stepMetadataRenderer';
 import { IconChevron } from '@inngest/components/icons/Chevron';
-import { classNames } from '@inngest/components/utils/classNames';
 import { type HistoryNode } from '@inngest/components/utils/historyParser';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -18,20 +17,12 @@ import { renderTimelineNode } from './TimelineNodeRenderer';
 type Props = {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
   node: HistoryNode;
-  position?: 'first' | 'last' | 'middle';
   children?: React.ReactNode;
   isAttempt?: boolean;
   navigateToRun: React.ComponentProps<typeof Timeline>['navigateToRun'];
 };
 
-export function TimelineNode({
-  position,
-  getOutput,
-  node,
-  children,
-  isAttempt,
-  navigateToRun,
-}: Props) {
+export function TimelineNode({ getOutput, node, children, isAttempt, navigateToRun }: Props) {
   const { icon, badge, name, metadata, runLink } = renderTimelineNode({ node, isAttempt });
   const isExpandable = node.scope === 'step';
   const [openItems, setOpenItems] = useState<string[]>([]);
@@ -55,19 +46,10 @@ export function TimelineNode({
 
   return (
     <AccordionPrimitive.Item
-      className="relative border-t border-slate-800/50"
+      className="border-t border-slate-800/50"
       disabled={!isExpandable}
       value={value}
     >
-      <span
-        className={classNames(
-          'absolute left-[0.85rem] top-0 w-px bg-slate-800',
-          position === 'first' && 'top-[1.9rem] h-[calc(100%-1.8rem)]',
-          position === 'last' && 'h-[1.9rem]',
-          position === 'middle' && 'h-[calc(100%+2px)]'
-        )}
-        aria-hidden="true"
-      />
       <AccordionPrimitive.Header className="flex items-start gap-2 py-6">
         <div className="z-10 flex-1">
           <TimelineNodeHeader icon={icon} badge={badge} title={name} metadata={metadata} />
@@ -86,7 +68,7 @@ export function TimelineNode({
       </AccordionPrimitive.Header>
       <AnimatePresence>
         {openItems.includes(value) && (
-          <AccordionPrimitive.Content className="ml-9" forceMount>
+          <AccordionPrimitive.Content className="ml-8" forceMount>
             <motion.div
               initial={{ y: -20, opacity: 0.2 }}
               animate={{ y: 0, opacity: 1 }}

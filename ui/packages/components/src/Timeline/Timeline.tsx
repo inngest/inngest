@@ -31,20 +31,13 @@ export function Timeline({ getOutput, history, navigateToRun }: Props) {
           className="w-full text-slate-100 last:border-b last:border-slate-800/50"
         >
           {nodes.map((node, i) => {
-            let position: 'first' | 'last' | 'middle' = 'middle';
             if (!isVisible(node)) {
               return null;
-            }
-            if (i === 0) {
-              position = 'first';
-            } else if (i === nodes.length - 1) {
-              position = 'last';
             }
 
             return (
               <TimelineNode
                 key={node.groupID}
-                position={position}
                 getOutput={getOutput}
                 node={node}
                 navigateToRun={navigateToRun}
@@ -75,14 +68,6 @@ export function Timeline({ getOutput, history, navigateToRun }: Props) {
       )}
     </div>
   );
-}
-
-function sortAscending(a: HistoryNode, b: HistoryNode) {
-  if (a.startedAt && b.startedAt) {
-    return a.startedAt.getTime() - b.startedAt.getTime();
-  } else {
-    return 0;
-  }
 }
 
 function isVisible(node: HistoryNode) {

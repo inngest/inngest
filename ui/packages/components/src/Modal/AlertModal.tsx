@@ -1,4 +1,4 @@
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -53,7 +53,7 @@ export function AlertModal({
               }}
             >
               <AlertDialog.Content
-                className={classNames(
+                className={cn(
                   className,
                   'dark:bg-slate-910 transform overflow-hidden rounded-lg bg-white shadow-xl transition-all'
                 )}

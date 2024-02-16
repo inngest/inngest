@@ -13,6 +13,11 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+const (
+	StateErrorKey = "error"
+	StateDataKey  = "data"
+)
+
 // Executor manages executing actions.  It interfaces over a state store to save
 // action and workflow data once an action finishes or fails.  Once a function
 // finishes, its children become available to execute.  This is not handled
@@ -184,11 +189,29 @@ type ResumeRequest struct {
 }
 
 func (r *ResumeRequest) Error() string {
-	return r.withKey("error")
+	return r.withKey(StateErrorKey)
+}
+
+// Set `r.With` to `error` given a `name` and `message`
+func (r *ResumeRequest) SetError(name string, message string) {
+	r.With = map[string]any{
+		StateErrorKey: state.StandardError{
+			Name:    name,
+			Message: message,
+			Error:   name + ": " + message,
+		},
+	}
 }
 
 func (r *ResumeRequest) Data() string {
-	return r.withKey("data")
+	return r.withKey(StateDataKey)
+}
+
+// Set `r.With` to `data` given any data to be set
+func (r *ResumeRequest) SetData(data any) {
+	r.With = map[string]any{
+		StateDataKey: data,
+	}
 }
 
 func (r *ResumeRequest) withKey(key string) string {

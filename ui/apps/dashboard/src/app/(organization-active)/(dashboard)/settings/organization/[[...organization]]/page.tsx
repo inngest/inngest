@@ -13,6 +13,7 @@ export default function OrganizationSettingsPage() {
             navbar: 'p-8 border-none',
             scrollBox: 'bg-white',
             pageScrollBox: '[scrollbar-width:none]', // hides the Clerk's scrollbar
+            profileSection__organizationDanger: 'hidden', // hides the "Danger Zone" section, i.e. leaving orgs
           },
         }}
       />

@@ -3,12 +3,7 @@
 import { useMemo } from 'react';
 import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@inngest/components/Tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import {
   CartesianGrid,
   Tooltip as ChartTooltip,
@@ -110,14 +105,12 @@ export default function SimpleLineChart({
         <div className="flex gap-2">
           <h3 className="flex flex-row items-center gap-1.5 font-medium">{title}</h3>
           {desc && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <InformationCircleIcon className="h-4 w-4 text-slate-400" />
-                </TooltipTrigger>
-                <TooltipContent>{desc}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <InformationCircleIcon className="h-4 w-4 text-slate-400" />
+              </TooltipTrigger>
+              <TooltipContent>{desc}</TooltipContent>
+            </Tooltip>
           )}
         </div>
         <div className="flex justify-end gap-4">
