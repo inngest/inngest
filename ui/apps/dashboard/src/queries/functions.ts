@@ -116,6 +116,7 @@ export function useFunctionsPage({
           ...fn,
           failureRate: undefined,
           isActive: !fn.isArchived,
+          isPaused: !fn.isArchived && !fn.current,
           triggers,
           usage: undefined,
         };
