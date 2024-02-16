@@ -53,14 +53,6 @@ var (
 	PauseHandleConcurrency = 100
 )
 
-var (
-	// SourceEdgeRetries represents the number of times we'll retry running a source edge.
-	// Each edge gets their own set of retries in our execution engine, embedded directly
-	// in the job.  The retry count is taken from function config for every step _but_
-	// initialization.
-	sourceEdgeRetries = 20
-)
-
 // NewExecutor returns a new executor, responsible for running the specific step of a
 // function (using the available drivers) and storing the step's output or error.
 //
@@ -471,6 +463,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	// This enures that we only ever enqueue the start job for this function once.
 	queueKey := fmt.Sprintf("%s:%s", req.Function.ID, key)
+	retries := req.Function.GetRetries() + 1
 	item := queue.Item{
 		JobID:       &queueKey,
 		GroupID:     uuid.New().String(),
@@ -478,7 +471,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Kind:        queue.KindStart,
 		Identifier:  id,
 		Attempt:     0,
-		MaxAttempts: &sourceEdgeRetries,
+		MaxAttempts: &retries,
 		Payload: queue.PayloadEdge{
 			Edge: inngest.SourceEdge,
 		},
@@ -578,26 +571,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// we automatically enqueue all children of the dag from the root node.
 	// This can be cleaned up.
 	if edge.Incoming == inngest.TriggerName {
-		f, err := e.fl.LoadFunction(ctx, id)
-		if err != nil {
-			return nil, fmt.Errorf("error loading function for run: %w", err)
-		}
-		// We only support functions with a single step, as we've removed the DAG based approach.
-		// This means that we always execute the first step.
-		if len(f.Steps) > 1 {
-			return nil, fmt.Errorf("DAG-based steps are no longer supported")
-		}
-		edge.Outgoing = inngest.TriggerName
-		edge.Incoming = f.Steps[0].ID
-		// Update the payload
-		payload := item.Payload.(queue.PayloadEdge)
-		payload.Edge = edge
-		item.Payload = payload
-		// Add retries from the step to our queue item.  Increase as retries is
-		// always one less than attempts.
-		retries := f.Steps[0].RetryCount() + 1
-		item.MaxAttempts = &retries
-
 		// Only just starting:  run lifecycles on first attempt.
 		if item.Attempt == 0 {
 			for _, e := range e.lifecycles {
@@ -878,17 +851,8 @@ func (e *executor) run(ctx context.Context, id state.Identifier, item queue.Item
 		return nil, fmt.Errorf("error loading function for run: %w", err)
 	}
 
-	var step *inngest.Step
-	for _, s := range f.Steps {
-		if s.ID == edge.Incoming {
-			step = &s
-			break
-		}
-	}
-	if step == nil {
-		// Sanity check we've enqueued the right step.
-		return nil, newFinalError(fmt.Errorf("unknown vertex: %s", edge.Incoming))
-	}
+	// Always use the first and only step.
+	step := &f.Steps[0]
 
 	for _, e := range e.lifecycles {
 		go e.OnStepStarted(context.WithoutCancel(ctx), id, item, edge, *step, s)

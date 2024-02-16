@@ -122,6 +122,15 @@ func (f Function) ConcurrencyLimit() int {
 	return 0
 }
 
+// GetRetries returns the number of retries for the function.
+func (f Function) GetRetries() int {
+	// This uses retries in steps; a holdover from when steps were used in our DAG based approach.
+	if len(f.Steps) == 0 || f.Steps[0].Retries == nil {
+		return consts.DefaultRetryCount
+	}
+	return *f.Steps[0].Retries
+}
+
 // GetSlug returns the function slug, defaulting to creating a slug of the function name.
 func (f Function) GetSlug() string {
 	if f.Slug != "" {
