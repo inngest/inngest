@@ -1,7 +1,19 @@
+import { type Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { SignUp } from '@clerk/nextjs';
 
 import SplitView from '@/app/(auth)/SplitView';
+
+export const metadata: Metadata = {
+  title: 'Sign up - Inngest Cloud',
+  description: 'Create a new account',
+  alternates: {
+    canonical: new URL(
+      '/sign-up',
+      process.env.NEXT_PUBLIC_APP_URL || 'https://app.inngest.com'
+    ).toString(),
+  },
+};
 
 export default async function SignUpPage() {
   const cookieStore = cookies();
