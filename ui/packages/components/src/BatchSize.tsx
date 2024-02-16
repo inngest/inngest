@@ -1,5 +1,4 @@
-import { Tooltip } from '@inngest/components/Tooltip';
-import { TooltipContent, TooltipTrigger } from '@radix-ui/react-tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 
 type Props = {
   eventCount: number;

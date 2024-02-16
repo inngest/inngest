@@ -15,9 +15,7 @@ type RootLayoutProps = {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <AppRoot mode="dark">
-      <TooltipProvider>
-        <StoreProvider>{children}</StoreProvider>
-      </TooltipProvider>
+      <StoreProvider>{children}</StoreProvider>
     </AppRoot>
   );
 }
