@@ -3,8 +3,8 @@ package resolvers
 import (
 	"context"
 	"encoding/json"
-	"sort"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
@@ -12,50 +12,33 @@ import (
 
 // TODO Duplicate code. Move to field-level resolvers and add dataloaders.
 func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]*models.FunctionRun, error) {
-	state, err := r.Runner.Runs(ctx, obj.ID)
+	accountID := uuid.UUID{}
+	workspaceID := uuid.UUID{}
+
+	eventID, err := ulid.Parse(obj.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	var runs []*models.FunctionRun
-
-	for _, s := range state {
-		status := models.FunctionRunStatusRunning
-
-		switch s.Metadata().Status {
-		case enums.RunStatusCompleted:
-			status = models.FunctionRunStatusCompleted
-		case enums.RunStatusFailed:
-			status = models.FunctionRunStatusFailed
-		case enums.RunStatusCancelled:
-			status = models.FunctionRunStatusCancelled
-		}
-
-		startedAt := ulid.Time(s.Metadata().Identifier.RunID.Time())
-
-		name := s.Function().Name
-
-		pending, _ := r.Queue.OutstandingJobCount(
-			ctx,
-			s.Identifier().WorkspaceID,
-			s.Identifier().WorkflowID,
-			s.Identifier().RunID,
-		)
-
-		runs = append(runs, &models.FunctionRun{
-			ID:           s.Metadata().Identifier.RunID.String(),
-			Name:         &name,
-			Status:       &status,
-			PendingSteps: &pending,
-			StartedAt:    &startedAt,
-		})
+	runs, err := r.Data.GetFunctionRunsFromEvents(ctx, accountID, workspaceID, []ulid.ULID{eventID})
+	if err != nil {
+		return nil, err
 	}
 
-	sort.Slice(runs, func(i, j int) bool {
-		return runs[i].ID > runs[j].ID
-	})
+	var out []*models.FunctionRun
 
-	return runs, nil
+	for _, run := range runs {
+		fn, err := r.Data.GetFunctionByInternalUUID(ctx, workspaceID, run.FunctionID)
+		if err != nil {
+			return nil, err
+		}
+
+		outRun := models.MakeFunctionRun(run)
+		outRun.Name = &fn.Name
+		out = append(out, outRun)
+	}
+
+	return out, nil
 }
 
 func (r *eventResolver) PendingRuns(ctx context.Context, obj *models.Event) (*int, error) {

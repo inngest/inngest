@@ -113,6 +113,7 @@ func (o *WorkspaceEventsOpts) Validate() error {
 type EventReader interface {
 	GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*Event, error)
 	GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*Event, error)
+	GetEventBatchesByEventID(ctx context.Context, eventID ulid.ULID) ([]*EventBatch, error)
 	GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*EventBatch, error)
 	GetEventsTimebound(
 		ctx context.Context,

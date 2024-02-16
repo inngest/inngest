@@ -12,6 +12,7 @@ const GetFunctionRunDetailsDocument = graphql(`
         id
         name
         run(id: $functionRunID) {
+          batchID
           canRerun
           events {
             id

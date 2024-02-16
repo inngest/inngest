@@ -9,6 +9,8 @@ export function isFunctionRunStatus(s: string): s is FunctionRunStatus {
 }
 
 export type FunctionRun = {
+  batchCreatedAt: Date | null;
+  batchID: string | null;
   canRerun: boolean | null;
   endedAt: Date | null;
   functionID: string;

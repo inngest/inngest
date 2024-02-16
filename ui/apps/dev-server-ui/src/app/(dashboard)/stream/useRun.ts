@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import type { Event } from '@inngest/components/types/event';
 import {
   baseFetchSkipped,
   baseFetchSucceeded,
@@ -16,7 +17,12 @@ import { useGetFunctionRunQuery } from '@/store/generated';
 type Data = {
   func: Pick<Function, 'name' | 'triggers'>;
   history: HistoryParser;
-  run: Pick<FunctionRun, 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'>;
+  run: Pick<
+    FunctionRun,
+    'batchCreatedAt' | 'batchID' | 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'
+  > & {
+    events: Event[];
+  };
 };
 
 export function useRun(runID: string | null): FetchResult<Data, { skippable: true }> {
@@ -26,7 +32,7 @@ export function useRun(runID: string | null): FetchResult<Data, { skippable: tru
     { pollingInterval: 1000, skip, refetchOnMountOrArgChange: true }
   );
 
-  const data = useMemo((): Data | undefined => {
+  const data = useMemo(() => {
     const rawRun = query.data?.functionRun;
     if (!rawRun || !rawRun.function) {
       return undefined;
@@ -41,7 +47,16 @@ export function useRun(runID: string | null): FetchResult<Data, { skippable: tru
       history: new HistoryParser(rawRun.history ?? []),
       run: {
         ...rawRun,
+        batchCreatedAt: rawRun.batchCreatedAt ? new Date(rawRun.batchCreatedAt) : null,
         endedAt: rawRun.finishedAt,
+        events: (rawRun.events ?? []).map((event) => {
+          return {
+            ...event,
+            name: event.name ?? 'Unknown',
+            payload: event.raw ?? 'null',
+            receivedAt: event.createdAt ? new Date(event.createdAt) : new Date(),
+          };
+        }),
         status: rawRun.status ?? 'RUNNING',
       },
     } as const;

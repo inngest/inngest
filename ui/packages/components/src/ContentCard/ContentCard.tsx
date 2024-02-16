@@ -3,7 +3,7 @@ import { classNames } from '@inngest/components/utils/classNames';
 
 interface ContentCardProps {
   children: React.ReactNode;
-  title?: string;
+  title?: React.ReactNode;
   icon?: React.ReactNode;
   badge?: React.ReactNode;
   type?: 'event' | 'run';

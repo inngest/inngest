@@ -318,6 +318,20 @@ func (w wrapper) GetEventByInternalID(ctx context.Context, internalID ulid.ULID)
 	return &evt, nil
 }
 
+func (w wrapper) GetEventBatchesByEventID(ctx context.Context, eventID ulid.ULID) ([]*cqrs.EventBatch, error) {
+	batches, err := w.q.GetEventBatchesByEventID(ctx, eventID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	var out = make([]*cqrs.EventBatch, len(batches))
+	for n, i := range batches {
+		eb := convertEventBatch(i)
+		out[n] = &eb
+	}
+
+	return out, nil
+}
 func (w wrapper) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.EventBatch, error) {
 	obj, err := w.q.GetEventBatchByRunID(ctx, runID)
 	if err != nil {

@@ -110,10 +110,11 @@ export enum FunctionEventType {
 
 export type FunctionRun = {
   __typename?: 'FunctionRun';
+  batchCreatedAt: Maybe<Scalars['Time']>;
   batchID: Maybe<Scalars['ULID']>;
   event: Maybe<Event>;
   eventID: Scalars['ID'];
-  events: Array<Maybe<Event>>;
+  events: Array<Event>;
   finishedAt: Maybe<Scalars['Time']>;
   function: Maybe<Function>;
   functionID: Scalars['String'];
@@ -374,6 +375,7 @@ export type StreamItem = {
   __typename?: 'StreamItem';
   createdAt: Scalars['Time'];
   id: Scalars['ID'];
+  inBatch: Scalars['Boolean'];
   runs: Maybe<Array<Maybe<FunctionRun>>>;
   trigger: Scalars['String'];
   type: StreamType;
@@ -423,7 +425,7 @@ export type GetFunctionRunQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', id: string, name: string | null, status: FunctionRunStatus | null, startedAt: any | null, finishedAt: any | null, output: string | null, pendingSteps: number | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null, function: { __typename?: 'Function', triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null } | null, event: { __typename?: 'Event', id: string, raw: string | null } | null, events: Array<{ __typename?: 'Event', id: string, raw: string | null } | null>, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: any, functionVersion: number, groupID: any | null, id: any, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: any | null, expression: string | null, userID: any | null } | null, sleep: { __typename?: 'RunHistorySleep', until: any } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: any } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: any | null, timeout: boolean } | null, invokeFunction: { __typename?: 'RunHistoryInvokeFunction', eventID: any, functionID: string, correlationID: string, timeout: any } | null, invokeFunctionResult: { __typename?: 'RunHistoryInvokeFunctionResult', eventID: any | null, timeout: boolean, runID: any | null } | null }> } | null };
+export type GetFunctionRunQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', id: string, name: string | null, status: FunctionRunStatus | null, startedAt: any | null, finishedAt: any | null, output: string | null, pendingSteps: number | null, batchID: any | null, batchCreatedAt: any | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null, function: { __typename?: 'Function', triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null } | null, event: { __typename?: 'Event', id: string, raw: string | null } | null, events: Array<{ __typename?: 'Event', createdAt: any | null, id: string, name: string | null, raw: string | null }>, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: any, functionVersion: number, groupID: any | null, id: any, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: any | null, expression: string | null, userID: any | null } | null, sleep: { __typename?: 'RunHistorySleep', until: any } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: any } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: any | null, timeout: boolean } | null, invokeFunction: { __typename?: 'RunHistoryInvokeFunction', eventID: any, functionID: string, correlationID: string, timeout: any } | null, invokeFunctionResult: { __typename?: 'RunHistoryInvokeFunctionResult', eventID: any | null, timeout: boolean, runID: any | null } | null }> } | null };
 
 export type GetFunctionsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -464,7 +466,7 @@ export type GetTriggersStreamQueryVariables = Exact<{
 }>;
 
 
-export type GetTriggersStreamQuery = { __typename?: 'Query', stream: Array<{ __typename?: 'StreamItem', createdAt: any, id: string, trigger: string, type: StreamType, runs: Array<{ __typename?: 'FunctionRun', id: string, function: { __typename?: 'Function', name: string } | null } | null> | null }> };
+export type GetTriggersStreamQuery = { __typename?: 'Query', stream: Array<{ __typename?: 'StreamItem', createdAt: any, id: string, inBatch: boolean, trigger: string, type: StreamType, runs: Array<{ __typename?: 'FunctionRun', batchID: any | null, id: string, events: Array<{ __typename?: 'Event', id: string }>, function: { __typename?: 'Function', name: string } | null } | null> | null }> };
 
 export type GetFunctionRunStatusQueryVariables = Exact<{
   id: Scalars['ID'];
@@ -564,8 +566,12 @@ export const GetFunctionRunDocument = `
       id
       raw
     }
+    batchID
+    batchCreatedAt
     events {
+      createdAt
       id
+      name
       raw
     }
     history {
@@ -677,9 +683,14 @@ export const GetTriggersStreamDocument = `
   ) {
     createdAt
     id
+    inBatch
     trigger
     type
     runs {
+      batchID
+      events {
+        id
+      }
       id
       function {
         name

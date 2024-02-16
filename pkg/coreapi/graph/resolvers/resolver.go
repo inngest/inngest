@@ -30,9 +30,12 @@ func (r *Resolver) App() generated.AppResolver { return &appResolver{r} }
 
 func (r *Resolver) Function() generated.FunctionResolver { return &functionResolver{r} }
 
+func (r *Resolver) StreamItem() generated.StreamItemResolver { return &streamItemResolver{r} }
+
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type eventResolver struct{ *Resolver }
 type appResolver struct{ *Resolver }
 type functionRunResolver struct{ *Resolver }
 type functionResolver struct{ *Resolver }
+type streamItemResolver struct{ *Resolver }
