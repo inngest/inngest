@@ -1,6 +1,7 @@
 'use client';
 
-import { classNames } from '@inngest/components/utils/classNames';
+import { TooltipProvider } from '@inngest/components/Tooltip';
+import { cn } from '@inngest/components/utils/classNames';
 import { Toaster } from 'sonner';
 import colors from 'tailwindcss/colors';
 
@@ -21,7 +22,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div
-      className={classNames(
+      className={cn(
         'relative grid h-screen w-screen overflow-hidden text-sm text-slate-400',
         'grid-cols-1 grid-rows-[50px_1fr]'
       )}
@@ -39,7 +40,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <NavbarLink icon={<IconFunction />} href="/functions" tabName="Functions" />
         </Navbar>
       </Header>
-      {children}
+      <TooltipProvider>{children}</TooltipProvider>
       <Toaster
         theme="dark"
         toastOptions={{
