@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { IconTriggerFunction } from '@inngest/components/icons/TriggerFunction';
-import * as Tooltip from '@radix-ui/react-tooltip';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
