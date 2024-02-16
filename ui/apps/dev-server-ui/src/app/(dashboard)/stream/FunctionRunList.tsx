@@ -1,6 +1,6 @@
 import { Badge } from '@inngest/components/Badge';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
-import { BatchSize } from 'node_modules/@inngest/components/src/BatchSize';
+import { BatchSize } from '@inngest/components/BatchSize';
 
 import { useGetFunctionRunStatusQuery, type FunctionRun } from '@/store/generated';
 
