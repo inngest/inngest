@@ -28,11 +28,6 @@ const nextConfig = {
         permanent: false,
       },
       {
-        source: '/env/:slug/settings',
-        destination: '/env/:slug/settings/organization',
-        permanent: false,
-      },
-      {
         source: '/integrations/vercel',
         destination: '/integrations/vercel/callback',
         permanent: false,
@@ -59,8 +54,8 @@ const nextConfig = {
         permanent: false,
       },
       {
-        source: '/env/:slug/settings/team',
-        destination: '/env/:slug/settings/organization',
+        source: '/settings/team',
+        destination: '/settings/organization',
         permanent: false,
       },
       // Legacy signing key locations
