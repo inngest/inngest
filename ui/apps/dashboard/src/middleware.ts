@@ -26,9 +26,11 @@ export default authMiddleware({
 
     if (
       isSignedIn &&
+      hasActiveOrganization &&
       !isAccountSetup &&
-      request.nextUrl.pathname !== '/sign-up/account-setup' &&
-      request.nextUrl.pathname !== '/organization-list'
+      request.nextUrl.pathname !== '/organization-list' &&
+      request.nextUrl.pathname !== '/create-organization' &&
+      request.nextUrl.pathname !== '/sign-up/account-setup'
     ) {
       return NextResponse.redirect(new URL('/sign-up/account-setup', request.url));
     }
