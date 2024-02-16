@@ -29,7 +29,7 @@ const nextConfig = {
       },
       {
         source: '/env/:slug/settings',
-        destination: '/env/:slug/settings/team',
+        destination: '/env/:slug/settings/organization',
         permanent: false,
       },
       {
@@ -56,6 +56,11 @@ const nextConfig = {
       {
         source: '/env/:slug/deploys',
         destination: '/env/:slug/apps',
+        permanent: false,
+      },
+      {
+        source: '/env/:slug/settings/team',
+        destination: '/env/:slug/settings/organization',
         permanent: false,
       },
       // Legacy signing key locations
