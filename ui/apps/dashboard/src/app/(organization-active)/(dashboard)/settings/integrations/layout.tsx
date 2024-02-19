@@ -6,7 +6,7 @@ type IntegrationsLayoutProps = {
 
 export default function IntegrationsLayout({ children }: IntegrationsLayoutProps) {
   return (
-    <div className="flex h-full divide-x divide-slate-100">
+    <div className="min-height-[300px] flex divide-x divide-slate-100">
       <nav className="w-60 shrink-0 p-8">
         <ul>
           <li>
