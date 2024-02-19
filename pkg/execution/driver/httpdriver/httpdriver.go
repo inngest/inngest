@@ -300,9 +300,6 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		headers[strings.ToLower(k)] = v[0]
 	}
 
-	// Check the retry status from the headers and versions.
-	noRetry = !shouldRetry(statusCode, headers[headerNoRetry], headers[headerSDK])
-
 	// Check if this was a streaming response.  If so, extract headers sent
 	// from _after_ the response started within the payload.
 	//
@@ -322,13 +319,15 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		// These are all contained within a single wrapper.
 		body = stream.Body
 		statusCode = stream.StatusCode
-		retryAtStr = stream.RetryAt
-		noRetry = stream.NoRetry
+
 		// Upsert headers from the stream.
 		for k, v := range stream.Headers {
 			headers[k] = v
 		}
 	}
+
+	// Check the retry status from the headers and versions.
+	noRetry = !shouldRetry(statusCode, headers[headerNoRetry], headers[headerSDK])
 
 	// Extract the retry at header if it hasn't been set explicitly in streaming.
 	if after := headers["retry-after"]; retryAtStr == nil && after != "" {

@@ -94,8 +94,6 @@ func ParseStream(resp []byte) (*StreamResponse, error) {
 type StreamResponse struct {
 	StatusCode int               `json:"status"`
 	Body       json.RawMessage   `json:"body"`
-	RetryAt    *string           `json:"retryAt"`
-	NoRetry    bool              `json:"noRetry"`
 	Headers    map[string]string `json:"headers"`
 }
 
