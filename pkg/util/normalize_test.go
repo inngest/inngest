@@ -11,6 +11,7 @@ func TestNormalizeAppURL(t *testing.T) {
 		name        string
 		inputURL    string
 		expectedURL string
+		forceHTTPS  bool
 	}{
 		{
 			name:        "valid URI should return without modification",
@@ -27,11 +28,23 @@ func TestNormalizeAppURL(t *testing.T) {
 			inputURL:    "https://api.example.com:80/api/inngest?fnId=hello&step=step",
 			expectedURL: "https://api.example.com/api/inngest?fnId=hello&step=step",
 		},
+		{
+			name:        "force https",
+			inputURL:    "http://api.example.com/api/inngest",
+			expectedURL: "https://api.example.com/api/inngest",
+			forceHTTPS:  true,
+		},
+		{
+			name:        "strip deployId query param",
+			inputURL:    "https://api.example.com/api/inngest?deployId=1234",
+			expectedURL: "https://api.example.com/api/inngest",
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result := NormalizeAppURL(test.inputURL)
+			result, err := NormalizeAppURL(test.inputURL, test.forceHTTPS)
+			require.NoError(t, err)
 			require.Equal(t, test.expectedURL, result)
 		})
 	}
