@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { ArchiveBoxIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { AlertModal } from '@inngest/components/Modal';
-import * as Tooltip from '@radix-ui/react-tooltip';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
 
@@ -133,32 +132,19 @@ export default function ArchiveFunctionButton({ functionSlug }: ArchiveFunctionP
 
   return (
     <>
-      <Tooltip.Provider>
-        <Tooltip.Root delayDuration={0}>
-          <Tooltip.Trigger asChild>
-            <span tabIndex={0}>
-              <Button
-                icon={
-                  isArchived ? (
-                    <UnarchiveIcon className=" text-slate-300" />
-                  ) : (
-                    <ArchiveBoxIcon className=" text-slate-300" />
-                  )
-                }
-                btnAction={() => setIsArchivedFunctionModalVisible(true)}
-                disabled={isFetchingVersions}
-                label={isArchived ? 'Unarchive' : 'Archive'}
-              />
-            </span>
-          </Tooltip.Trigger>
-          <Tooltip.Content className="align-center rounded-md bg-slate-800 px-2 text-xs text-slate-300">
-            {isArchived
-              ? 'Reactivate function'
-              : 'Deactivate this function and archive for historic purposes'}
-            <Tooltip.Arrow className="fill-slate-800" />
-          </Tooltip.Content>
-        </Tooltip.Root>
-      </Tooltip.Provider>
+      <Button
+        icon={
+          isArchived ? (
+            <UnarchiveIcon className=" text-slate-300" />
+          ) : (
+            <ArchiveBoxIcon className=" text-slate-300" />
+          )
+        }
+        btnAction={() => setIsArchivedFunctionModalVisible(true)}
+        disabled={isFetchingVersions}
+        label={isArchived ? 'Unarchive' : 'Archive'}
+      />
+
       <ArchiveFunctionModal
         functionID={fn.id}
         functionName={fn.name || 'This function'}

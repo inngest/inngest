@@ -1,7 +1,7 @@
 'use client';
 
 import { CheckIcon, ClockIcon, ExclamationCircleIcon, XMarkIcon } from '@heroicons/react/20/solid';
-import * as Tooltip from '@radix-ui/react-tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 
 type PaymentIconProps = {
   status: String;
@@ -37,15 +37,12 @@ export default function PaymentIcon({ status }: PaymentIconProps) {
   }
   if (icon) {
     return (
-      <Tooltip.Provider>
-        <Tooltip.Root delayDuration={0}>
-          <Tooltip.Trigger asChild>{icon}</Tooltip.Trigger>
-          <Tooltip.Content className="align-center rounded-md bg-slate-800 px-2 text-xs text-slate-300">
-            {label}
-            <Tooltip.Arrow className="fill-slate-800" />
-          </Tooltip.Content>
-        </Tooltip.Root>
-      </Tooltip.Provider>
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>{icon}</TooltipTrigger>
+        <TooltipContent className="align-center rounded-md bg-slate-800 px-2 text-xs text-slate-300">
+          {label}
+        </TooltipContent>
+      </Tooltip>
     );
   }
   return icon;

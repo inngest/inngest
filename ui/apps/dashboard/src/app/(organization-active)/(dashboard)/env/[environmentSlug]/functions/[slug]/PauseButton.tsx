@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { PauseIcon, PlayIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { AlertModal } from '@inngest/components/Modal';
-import * as Tooltip from '@radix-ui/react-tooltip';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
 
@@ -169,32 +168,19 @@ export default function PauseFunctionButton({ functionSlug, disabled }: PauseFun
 
   return (
     <>
-      <Tooltip.Provider>
-        <Tooltip.Root delayDuration={0}>
-          <Tooltip.Trigger asChild>
-            <span tabIndex={0}>
-              <Button
-                icon={
-                  isPaused ? (
-                    <PlayIcon className=" text-green-600" />
-                  ) : (
-                    <PauseIcon className=" text-amber-500" />
-                  )
-                }
-                btnAction={() => setIsPauseFunctionModalVisible(true)}
-                disabled={disabled || isFetchingVersions}
-                label={isPaused ? 'Resume' : 'Pause'}
-              />
-            </span>
-          </Tooltip.Trigger>
-          <Tooltip.Content className="align-center rounded-md bg-slate-800 px-2 text-xs text-slate-300">
-            {isPaused
-              ? 'Begin running this function after a temporary pause'
-              : 'Temporarily stop a function from being run'}
-            <Tooltip.Arrow className="fill-slate-800" />
-          </Tooltip.Content>
-        </Tooltip.Root>
-      </Tooltip.Provider>
+      <Button
+        icon={
+          isPaused ? (
+            <PlayIcon className=" text-green-600" />
+          ) : (
+            <PauseIcon className=" text-amber-500" />
+          )
+        }
+        btnAction={() => setIsPauseFunctionModalVisible(true)}
+        disabled={disabled || isFetchingVersions}
+        label={isPaused ? 'Resume' : 'Pause'}
+      />
+
       <PauseFunctionModal
         functionID={fn.id}
         functionName={functionSlug}
