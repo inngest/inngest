@@ -97,7 +97,11 @@ func (w wrapper) GetAppByID(ctx context.Context, id uuid.UUID) (*cqrs.App, error
 
 func (w wrapper) GetAppByURL(ctx context.Context, url string) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
-	url = util.NormalizeAppURL(url)
+	forceHTTPS := false
+	url, err := util.NormalizeAppURL(url, forceHTTPS)
+	if err != nil {
+		return nil, err
+	}
 
 	f := func(ctx context.Context) (*sqlc.App, error) {
 		return w.q.GetAppByURL(ctx, url)
@@ -112,8 +116,14 @@ func (w wrapper) GetAllApps(ctx context.Context) ([]*cqrs.App, error) {
 
 // InsertApp creates a new app.
 func (w wrapper) InsertApp(ctx context.Context, arg cqrs.InsertAppParams) (*cqrs.App, error) {
+	var err error
+
 	// Normalize the URL before inserting into the DB.
-	arg.Url = util.NormalizeAppURL(arg.Url)
+	forceHTTPS := false
+	arg.Url, err = util.NormalizeAppURL(arg.Url, forceHTTPS)
+	if err != nil {
+		return nil, err
+	}
 
 	return copyWriter(
 		ctx,
@@ -153,8 +163,14 @@ func (w wrapper) UpdateAppError(ctx context.Context, arg cqrs.UpdateAppErrorPara
 }
 
 func (w wrapper) UpdateAppURL(ctx context.Context, arg cqrs.UpdateAppURLParams) (*cqrs.App, error) {
+	var err error
+
 	// Normalize the URL before inserting into the DB.
-	arg.Url = util.NormalizeAppURL(arg.Url)
+	forceHTTPS := false
+	arg.Url, err = util.NormalizeAppURL(arg.Url, forceHTTPS)
+	if err != nil {
+		return nil, err
+	}
 
 	// https://duckdb.org/docs/sql/indexes.html
 	//

@@ -164,7 +164,11 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error) {
-	r.URL = util.NormalizeAppURL(r.URL)
+	forceHTTPS := false
+	r.URL, err = util.NormalizeAppURL(r.URL, forceHTTPS)
+	if err != nil {
+		return publicerr.Wrap(err, 400, "Invalid request")
+	}
 
 	sum, err := r.Checksum()
 	if err != nil {
