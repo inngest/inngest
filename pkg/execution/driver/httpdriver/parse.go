@@ -77,14 +77,12 @@ func parseGenerator(ctx context.Context, byt []byte, noRetry bool) ([]*state.Gen
 }
 
 func ParseStream(resp []byte) (*StreamResponse, error) {
-	fmt.Println(string(resp))
 	body := &StreamResponse{}
 	if err := json.Unmarshal(resp, &body); err != nil {
 		return nil, fmt.Errorf("error reading response body to check for status code: %w", err)
 	}
 	// Check to see if the body is double-encoded.
 	if len(body.Body) > 0 && body.Body[0] == '"' && body.Body[len(body.Body)-1] == '"' {
-		fmt.Println("double encoded")
 		var str string
 		if err := json.Unmarshal(body.Body, &str); err == nil {
 			body.Body = []byte(str)
