@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -193,6 +194,9 @@ func (r *functionRunResolver) WaitingFor(ctx context.Context, obj *models.Functi
 
 func (r *functionRunResolver) BatchCreatedAt(ctx context.Context, obj *models.FunctionRun) (*time.Time, error) {
 	batch, err := r.Data.GetEventBatchByRunID(ctx, ulid.MustParse(obj.ID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
