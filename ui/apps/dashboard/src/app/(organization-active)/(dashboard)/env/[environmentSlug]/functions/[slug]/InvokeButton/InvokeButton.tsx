@@ -9,9 +9,9 @@ import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[env
 import { graphql } from '@/gql';
 import { InvokeModal } from './InvokeModal';
 
-const TriggerFunctionDocument = graphql(`
-  mutation TriggerFunction($input: TriggerFunctionInput!) {
-    triggerFunction(input: $input)
+const InvokeFunctionDocument = graphql(`
+  mutation InvokeFunction($envID: UUID!, $data: Map, $functionSlug: String!) {
+    invokeFunction(envID: $envID, data: $data, functionSlug: $functionSlug)
   }
 `);
 
@@ -22,17 +22,15 @@ type Props = {
 
 export function InvokeButton({ disabled, functionSlug }: Props) {
   const env = useEnvironment();
-  const [, triggerFunction] = useMutation(TriggerFunctionDocument);
+  const [, invokeFunction] = useMutation(InvokeFunctionDocument);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   function onConfirm({ data }: { data: Record<string, unknown> }) {
     setIsModalOpen(false);
-    triggerFunction({
-      input: {
-        envID: env.id,
-        data,
-        functionSlug,
-      },
+    invokeFunction({
+      envID: env.id,
+      data,
+      functionSlug,
     });
   }
 
