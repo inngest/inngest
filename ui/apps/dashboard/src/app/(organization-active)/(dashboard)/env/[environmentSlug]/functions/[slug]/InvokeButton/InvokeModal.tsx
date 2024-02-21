@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
 
+import { Alert } from '@/components/Alert';
 import CodeEditor from '@/components/Textarea/CodeEditor';
 
 const initialCode = { data: {} };
@@ -35,14 +36,14 @@ export function InvokeModal({ isOpen, onCancel, onConfirm }: Props) {
 
   return (
     <Modal
-      className="w-[800px]"
+      className="w-full max-w-3xl"
       description="Invoke this function, triggering a function run"
       isOpen={isOpen}
       onClose={onCancel}
-      title={<h2 className="mb-4 text-lg font-medium">Invoke Function</h2>}
+      title="Invoke Function"
     >
       <form onSubmit={onSubmit}>
-        <div className="border-b border-slate-200 p-6">
+        <div className="m-6">
           <CodeEditor
             className="rounded-lg bg-slate-900 px-4"
             initialCode={JSON.stringify(initialCode, null, 2)}
@@ -50,12 +51,17 @@ export function InvokeModal({ isOpen, onCancel, onConfirm }: Props) {
             name="code"
           />
 
-          {error && <div className="pt-4 text-red-500">{error}</div>}
+          {error && (
+            <Alert className="mt-6" severity="error">
+              {error}
+            </Alert>
+          )}
         </div>
 
-        <div className="flex flex-row justify-end gap-4 p-6">
-          <Button appearance="outlined" btnAction={onCancel} label="Cancel" />
+        <div className="m-6 border-b border-slate-200"></div>
 
+        <div className="m-6 flex flex-row justify-end gap-4">
+          <Button appearance="outlined" btnAction={onCancel} label="Cancel" />
           <Button appearance="solid" kind="primary" label="Invoke Function" type="submit" />
         </div>
       </form>
