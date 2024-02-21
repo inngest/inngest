@@ -11,32 +11,40 @@ export default authMiddleware({
   ignoredRoutes: '/(images|_next/static|_next/image|favicon)(.*)',
   afterAuth(auth, request) {
     const isSignedIn = !!auth.userId;
+    const isUserSetup = isSignedIn && !!auth.sessionClaims.externalID;
     const hasActiveOrganization = !!auth.orgId;
-    const isAccountSetup = isSignedIn && hasActiveOrganization && !!auth.sessionClaims.accountID;
+    const isAccountSetup = isSignedIn && !!auth.sessionClaims.accountID;
 
-    if (!isSignedIn && !auth.isPublicRoute) {
+    if (auth.isPublicRoute) {
+      return NextResponse.next();
+    }
+
+    if (!isSignedIn) {
       return redirectToSignIn({ returnBackUrl: request.url });
     }
 
-    if (isSignedIn && !hasActiveOrganization && request.nextUrl.pathname !== '/organization-list') {
+    if (!isUserSetup && request.nextUrl.pathname !== '/sign-up/create-user') {
+      return NextResponse.redirect(new URL('/sign-up/create-user', request.url));
+    }
+
+    if (
+      isUserSetup &&
+      !hasActiveOrganization &&
+      request.nextUrl.pathname !== '/organization-list' &&
+      request.nextUrl.pathname !== '/create-organization'
+    ) {
       const organizationListURL = new URL('/organization-list', request.url);
       organizationListURL.searchParams.append('redirect_url', request.url);
       return NextResponse.redirect(organizationListURL);
     }
 
     if (
-      isSignedIn &&
+      isUserSetup &&
       hasActiveOrganization &&
       !isAccountSetup &&
-      request.nextUrl.pathname !== '/organization-list' &&
-      request.nextUrl.pathname !== '/create-organization' &&
-      request.nextUrl.pathname !== '/sign-up/account-setup'
+      request.nextUrl.pathname !== '/create-organization/create-account'
     ) {
-      return NextResponse.redirect(new URL('/sign-up/account-setup', request.url));
-    }
-
-    if (isAccountSetup && request.nextUrl.pathname === '/sign-up/account-setup') {
-      return NextResponse.redirect(new URL(homepagePath, request.url));
+      return NextResponse.redirect(new URL('/create-organization/create-account', request.url));
     }
 
     return NextResponse.next();

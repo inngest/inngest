@@ -23,7 +23,6 @@ export default async function SignUpPage() {
     <SplitView>
       <div className="mx-auto my-8 mt-auto text-center">
         <SignUp
-          afterSignUpUrl="/organization-list"
           unsafeMetadata={{
             ...(anonymousIDCookie?.value && { anonymousID: anonymousIDCookie.value }),
           }}
