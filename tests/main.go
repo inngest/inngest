@@ -251,7 +251,8 @@ func introspect(test *Test) (*sdk.RegisterRequest, error) {
 	found := false
 	for _, f := range funcs {
 		for i := range f.Steps {
-			f.Steps[i].URI = util.NormalizeAppURL(f.Steps[i].URI)
+			forceHTTPS := false
+			f.Steps[i].URI = util.NormalizeAppURL(f.Steps[i].URI, forceHTTPS)
 		}
 		if f.Slug == test.ID {
 			found = true
