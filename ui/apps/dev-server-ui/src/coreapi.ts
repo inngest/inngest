@@ -78,8 +78,12 @@ export const FUNCTION_RUN = gql`
         id
         raw
       }
+      batchID
+      batchCreatedAt
       events {
+        createdAt
         id
+        name
         raw
       }
       history {
@@ -207,9 +211,14 @@ export const TRIGGERS_STREAM = gql`
     ) {
       createdAt
       id
+      inBatch
       trigger
       type
       runs {
+        batchID
+        events {
+          id
+        }
         id
         function {
           name

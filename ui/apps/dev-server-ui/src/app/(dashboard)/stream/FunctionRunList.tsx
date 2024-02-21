@@ -1,16 +1,19 @@
+import { Badge } from '@inngest/components/Badge';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+import { BatchSize } from '@inngest/components/BatchSize';
 
 import { useGetFunctionRunStatusQuery, type FunctionRun } from '@/store/generated';
 
 type FunctionRunList = {
+  inBatch: boolean;
   functionRuns: FunctionRun[];
 };
 
-export default function FunctionRunList({ functionRuns }: FunctionRunList) {
+export default function FunctionRunList({ inBatch, functionRuns }: FunctionRunList) {
   return (
     <>
       {!functionRuns || functionRuns.length < 1 ? (
-        <p className="text-slate-600">No functions called</p>
+        <p className="text-slate-600">{inBatch ? 'Added to batch' : 'No functions called'}</p>
       ) : (
         <ul className="flex flex-col space-y-4">
           {functionRuns &&
@@ -18,7 +21,18 @@ export default function FunctionRunList({ functionRuns }: FunctionRunList) {
               ?.slice()
               .sort((a, b) => (a.function?.name || '').localeCompare(b.function?.name || ''))
               .map((functionRun) => {
-                return <FunctionRunItem key={functionRun.id} functionRunID={functionRun.id} />;
+                let batchSize;
+                if (functionRun.batchID) {
+                  batchSize = functionRun.events?.length;
+                }
+
+                return (
+                  <FunctionRunItem
+                    batchSize={batchSize}
+                    key={functionRun.id}
+                    functionRunID={functionRun.id}
+                  />
+                );
               })}
         </ul>
       )}
@@ -28,7 +42,13 @@ export default function FunctionRunList({ functionRuns }: FunctionRunList) {
 
 type FunctionRunStatusSubset = Pick<FunctionRun, 'id' | 'function' | 'status'>;
 
-export function FunctionRunItem({ functionRunID }: { functionRunID: string }) {
+export function FunctionRunItem({
+  batchSize,
+  functionRunID,
+}: {
+  batchSize: number | undefined;
+  functionRunID: string;
+}) {
   const { data } = useGetFunctionRunStatusQuery({ id: functionRunID }, { pollingInterval: 1500 });
   const functionRun = (data?.functionRun as FunctionRunStatusSubset) || {};
 
@@ -40,6 +60,7 @@ export function FunctionRunItem({ functionRunID }: { functionRunID: string }) {
     <li key={functionRun?.id} data-key={functionRun?.id} className="flex items-center gap-2">
       <FunctionRunStatusIcon status={functionRun.status} className="h-5 w-5" />
       {functionRun?.function?.name}
+      {batchSize && <BatchSize eventCount={batchSize} />}
     </li>
   );
 }

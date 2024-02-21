@@ -58,9 +58,6 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 			continue
 		}
 
-		if batch, err := r.Data.GetEventBatchByRunID(ctx, fn.RunID); err == nil && batch != nil {
-			run.BatchID = &batch.ID
-		}
 		fnsByID[fn.EventID] = append(fnsByID[fn.EventID], run)
 	}
 
@@ -74,14 +71,7 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 			Runs:      []*models.FunctionRun{},
 		}
 		if len(fnsByID[i.ID]) > 0 {
-			runs := fnsByID[i.ID]
-			items[n].Runs = runs
-
-			for _, run := range runs {
-				if !items[n].InBatch {
-					items[n].InBatch = run.BatchID != nil
-				}
-			}
+			items[n].Runs = fnsByID[i.ID]
 		}
 	}
 

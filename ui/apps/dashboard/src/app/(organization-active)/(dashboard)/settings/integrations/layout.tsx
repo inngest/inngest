@@ -6,7 +6,7 @@ type IntegrationsLayoutProps = {
 
 export default function IntegrationsLayout({ children }: IntegrationsLayoutProps) {
   return (
-    <div className="flex h-full divide-x divide-slate-100">
+    <div className="flex min-h-0 divide-x divide-slate-100">
       <nav className="w-60 shrink-0 p-8">
         <ul>
           <li>
@@ -19,7 +19,7 @@ export default function IntegrationsLayout({ children }: IntegrationsLayoutProps
           </li>
         </ul>
       </nav>
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 overflow-y-scroll">{children}</main>
     </div>
   );
 }

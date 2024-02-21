@@ -27,7 +27,10 @@ type Props = {
   func: Pick<Function, 'id' | 'name' | 'slug' | 'triggers'>;
   functionVersion?: Pick<FunctionVersion, 'url' | 'version'>;
   rawHistory: RawHistoryItem[];
-  run: Pick<FunctionRun, 'canRerun' | 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'>;
+  run: Pick<
+    FunctionRun,
+    'batchID' | 'canRerun' | 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'
+  >;
 };
 
 export function StreamDetails({
@@ -103,7 +106,13 @@ export function StreamDetails({
         hasEventDetails ? 'grid-cols-2' : 'grid-cols-1'
       )}
     >
-      {hasEventDetails && <EventDetails events={events} codeBlockActions={codeBlockActions} />}
+      {hasEventDetails && (
+        <EventDetails
+          batchID={run.batchID ?? undefined}
+          events={events}
+          codeBlockActions={codeBlockActions}
+        />
+      )}
       <RunDetails
         func={func}
         functionVersion={functionVersion}

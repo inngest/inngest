@@ -50,6 +50,7 @@ type ResolverRoot interface {
 	FunctionRun() FunctionRunResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
+	StreamItem() StreamItemResolver
 }
 
 type DirectiveRoot struct {
@@ -106,6 +107,7 @@ type ComplexityRoot struct {
 	}
 
 	FunctionRun struct {
+		BatchCreatedAt    func(childComplexity int) int
 		BatchID           func(childComplexity int) int
 		Event             func(childComplexity int) int
 		EventID           func(childComplexity int) int
@@ -277,7 +279,8 @@ type FunctionRunResolver interface {
 
 	Event(ctx context.Context, obj *models.FunctionRun) (*models.Event, error)
 	Events(ctx context.Context, obj *models.FunctionRun) ([]*models.Event, error)
-
+	BatchID(ctx context.Context, obj *models.FunctionRun) (*ulid.ULID, error)
+	BatchCreatedAt(ctx context.Context, obj *models.FunctionRun) (*time.Time, error)
 	Status(ctx context.Context, obj *models.FunctionRun) (*models.FunctionRunStatus, error)
 	WaitingFor(ctx context.Context, obj *models.FunctionRun) (*models.StepEventWait, error)
 	PendingSteps(ctx context.Context, obj *models.FunctionRun) (*int, error)
@@ -301,6 +304,9 @@ type QueryResolver interface {
 	Functions(ctx context.Context) ([]*models.Function, error)
 	FunctionRun(ctx context.Context, query models.FunctionRunQuery) (*models.FunctionRun, error)
 	FunctionRuns(ctx context.Context, query models.FunctionRunsQuery) ([]*models.FunctionRun, error)
+}
+type StreamItemResolver interface {
+	InBatch(ctx context.Context, obj *models.StreamItem) (bool, error)
 }
 
 type executableSchema struct {
@@ -576,6 +582,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FunctionEvent.Workspace(childComplexity), true
+
+	case "FunctionRun.batchCreatedAt":
+		if e.complexity.FunctionRun.BatchCreatedAt == nil {
+			break
+		}
+
+		return e.complexity.FunctionRun.BatchCreatedAt(childComplexity), true
 
 	case "FunctionRun.batchID":
 		if e.complexity.FunctionRun.BatchID == nil {
@@ -1623,7 +1636,8 @@ type FunctionRun {
   workspace: Workspace
   event: Event
   events: [Event!]!
-  batchID: ULID # if the run is a batched run
+  batchID: ULID
+  batchCreatedAt: Time
 
   status: FunctionRunStatus
   waitingFor: StepEventWait
@@ -2938,6 +2952,8 @@ func (ec *executionContext) fieldContext_Event_functionRuns(ctx context.Context,
 				return ec.fieldContext_FunctionRun_events(ctx, field)
 			case "batchID":
 				return ec.fieldContext_FunctionRun_batchID(ctx, field)
+			case "batchCreatedAt":
+				return ec.fieldContext_FunctionRun_batchCreatedAt(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -3485,6 +3501,8 @@ func (ec *executionContext) fieldContext_FunctionEvent_functionRun(ctx context.C
 				return ec.fieldContext_FunctionRun_events(ctx, field)
 			case "batchID":
 				return ec.fieldContext_FunctionRun_batchID(ctx, field)
+			case "batchCreatedAt":
+				return ec.fieldContext_FunctionRun_batchCreatedAt(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -3976,7 +3994,7 @@ func (ec *executionContext) _FunctionRun_batchID(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.BatchID, nil
+		return ec.resolvers.FunctionRun().BatchID(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3994,10 +4012,51 @@ func (ec *executionContext) fieldContext_FunctionRun_batchID(ctx context.Context
 	fc = &graphql.FieldContext{
 		Object:     "FunctionRun",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ULID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionRun_batchCreatedAt(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRun) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionRun_batchCreatedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.FunctionRun().BatchCreatedAt(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionRun_batchCreatedAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionRun",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
 		},
 	}
 	return fc, nil
@@ -5536,6 +5595,8 @@ func (ec *executionContext) fieldContext_Query_functionRun(ctx context.Context, 
 				return ec.fieldContext_FunctionRun_events(ctx, field)
 			case "batchID":
 				return ec.fieldContext_FunctionRun_batchID(ctx, field)
+			case "batchCreatedAt":
+				return ec.fieldContext_FunctionRun_batchCreatedAt(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -5624,6 +5685,8 @@ func (ec *executionContext) fieldContext_Query_functionRuns(ctx context.Context,
 				return ec.fieldContext_FunctionRun_events(ctx, field)
 			case "batchID":
 				return ec.fieldContext_FunctionRun_batchID(ctx, field)
+			case "batchCreatedAt":
+				return ec.fieldContext_FunctionRun_batchCreatedAt(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -7599,6 +7662,8 @@ func (ec *executionContext) fieldContext_StepEvent_functionRun(ctx context.Conte
 				return ec.fieldContext_FunctionRun_events(ctx, field)
 			case "batchID":
 				return ec.fieldContext_FunctionRun_batchID(ctx, field)
+			case "batchCreatedAt":
+				return ec.fieldContext_FunctionRun_batchCreatedAt(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -8232,6 +8297,8 @@ func (ec *executionContext) fieldContext_StreamItem_runs(ctx context.Context, fi
 				return ec.fieldContext_FunctionRun_events(ctx, field)
 			case "batchID":
 				return ec.fieldContext_FunctionRun_batchID(ctx, field)
+			case "batchCreatedAt":
+				return ec.fieldContext_FunctionRun_batchCreatedAt(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
 			case "waitingFor":
@@ -8273,7 +8340,7 @@ func (ec *executionContext) _StreamItem_inBatch(ctx context.Context, field graph
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.InBatch, nil
+		return ec.resolvers.StreamItem().InBatch(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8294,8 +8361,8 @@ func (ec *executionContext) fieldContext_StreamItem_inBatch(ctx context.Context,
 	fc = &graphql.FieldContext{
 		Object:     "StreamItem",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
 		},
@@ -11002,9 +11069,39 @@ func (ec *executionContext) _FunctionRun(ctx context.Context, sel ast.SelectionS
 
 			})
 		case "batchID":
+			field := field
 
-			out.Values[i] = ec._FunctionRun_batchID(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FunctionRun_batchID(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "batchCreatedAt":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FunctionRun_batchCreatedAt(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "status":
 			field := field
 
@@ -11988,40 +12085,53 @@ func (ec *executionContext) _StreamItem(ctx context.Context, sel ast.SelectionSe
 			out.Values[i] = ec._StreamItem_id(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "trigger":
 
 			out.Values[i] = ec._StreamItem_trigger(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "type":
 
 			out.Values[i] = ec._StreamItem_type(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "createdAt":
 
 			out.Values[i] = ec._StreamItem_createdAt(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "runs":
 
 			out.Values[i] = ec._StreamItem_runs(ctx, field, obj)
 
 		case "inBatch":
+			field := field
 
-			out.Values[i] = ec._StreamItem_inBatch(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._StreamItem_inBatch(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
 			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

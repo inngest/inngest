@@ -81,6 +81,7 @@ type FunctionRun struct {
 	Event             *Event                       `json:"event,omitempty"`
 	Events            []*Event                     `json:"events"`
 	BatchID           *ulid.ULID                   `json:"batchID,omitempty"`
+	BatchCreatedAt    *time.Time                   `json:"batchCreatedAt,omitempty"`
 	Status            *FunctionRunStatus           `json:"status,omitempty"`
 	WaitingFor        *StepEventWait               `json:"waitingFor,omitempty"`
 	PendingSteps      *int                         `json:"pendingSteps,omitempty"`

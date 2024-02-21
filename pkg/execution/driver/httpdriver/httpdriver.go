@@ -242,21 +242,24 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 	}
 
 	if err != nil && !errors.Is(err, io.EOF) {
-		if err != nil {
-			if urlErr, ok := err.(*url.Error); ok && urlErr.Err == context.DeadlineExceeded {
-				// This timed out.
-				return nil, context.DeadlineExceeded
-			}
-			if errors.Is(err, syscall.EPIPE) {
-				return nil, fmt.Errorf("Your server closed the request before finishing.")
-			}
-			if errors.Is(err, syscall.ECONNRESET) {
-				return nil, fmt.Errorf("Your server reset the request connection.")
-			}
+		if urlErr, ok := err.(*url.Error); ok && urlErr.Err == context.DeadlineExceeded {
+			// This timed out.
+			return nil, context.DeadlineExceeded
+		}
+		if errors.Is(err, syscall.EPIPE) {
+			return nil, fmt.Errorf("Your server closed the request before finishing.")
+		}
+		if errors.Is(err, syscall.ECONNRESET) {
+			return nil, fmt.Errorf("Your server reset the request connection.")
+		}
+		// Unexpected EOFs are valid and returned from servers when chunked encoding may
+		// be invalid.  Handle any other error by returning immediately.
+		if !errors.Is(err, io.ErrUnexpectedEOF) {
 			return nil, fmt.Errorf("Error performing request to SDK URL: %w", err)
 		}
-		if err != nil {
-			return nil, fmt.Errorf("error executing request: %w", err)
+		// If we get an unexpected EOF and the response is nil, error immediately.
+		if errors.Is(err, io.ErrUnexpectedEOF) && resp == nil {
+			return nil, fmt.Errorf("Invalid response from SDK server: Unexpected EOF ending response")
 		}
 	}
 
@@ -265,12 +268,14 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
-	if errors.Is(err, io.EOF) {
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 		err = nil
 		log.From(ctx).
 			Error().
+			Err(err).
 			Str("url", r.URL.String()).
 			Str("response", string(byt)).
+			Interface("headers", resp.Header).
 			Interface("step", r.Step).
 			Interface("edge	", r.Edge).
 			Msg("http eof reading response")
@@ -295,9 +300,6 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		headers[strings.ToLower(k)] = v[0]
 	}
 
-	// Check the retry status from the headers and versions.
-	noRetry = !shouldRetry(statusCode, headers[headerNoRetry], headers[headerSDK])
-
 	// Check if this was a streaming response.  If so, extract headers sent
 	// from _after_ the response started within the payload.
 	//
@@ -317,13 +319,15 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		// These are all contained within a single wrapper.
 		body = stream.Body
 		statusCode = stream.StatusCode
-		retryAtStr = stream.RetryAt
-		noRetry = stream.NoRetry
+
 		// Upsert headers from the stream.
 		for k, v := range stream.Headers {
 			headers[k] = v
 		}
 	}
+
+	// Check the retry status from the headers and versions.
+	noRetry = !shouldRetry(statusCode, headers[headerNoRetry], headers[headerSDK])
 
 	// Extract the retry at header if it hasn't been set explicitly in streaming.
 	if after := headers["retry-after"]; retryAtStr == nil && after != "" {

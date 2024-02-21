@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AppRoot } from '@inngest/components/AppRoot';
+import { TooltipProvider } from '@inngest/components/Tooltip';
 
 import StoreProvider from '@/app/StoreProvider';
 

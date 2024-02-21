@@ -10,14 +10,18 @@ import type { Event } from '@inngest/components/types/event';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
 import { shortDate } from '@inngest/components/utils/date';
 
-type EventProps = {
-  // An array of length > 1 will be treated as a batch of events
-  events: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>[];
+import { BatchSize } from '../BatchSize';
 
+type EventProps = {
+  batchCreatedAt?: Date | undefined;
+  batchID?: string | undefined;
+  events: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>[];
   loading?: false;
 };
 
 type LoadingEvent = {
+  batchCreatedAt?: Date | undefined;
+  batchID?: string | undefined;
   events?: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>[];
   loading: true;
 };
@@ -46,6 +50,8 @@ type WithoutRunSelector = {
 type Props = (EventProps | LoadingEvent) & (WithoutRunSelector | WithRunSelector);
 
 export function EventDetails({
+  batchCreatedAt,
+  batchID,
   events,
   functionRuns,
   onFunctionRunClick,
@@ -56,12 +62,12 @@ export function EventDetails({
   loading = false,
 }: Props) {
   let singleEvent = undefined;
-  if (events?.length === 1) {
+  if (!batchID && events?.length === 1) {
     singleEvent = events[0];
   }
 
   let batch = undefined;
-  if (events && events.length > 1) {
+  if (batchID) {
     batch = events;
   }
 
@@ -69,7 +75,19 @@ export function EventDetails({
   if (singleEvent && singleEvent.payload) {
     prettyPayload = usePrettyJson(singleEvent.payload);
   } else if (batch) {
-    prettyPayload = usePrettyJson(JSON.stringify(batch));
+    prettyPayload = usePrettyJson(
+      JSON.stringify(
+        batch.map((e) => {
+          return JSON.parse(e.payload);
+        })
+      )
+    );
+  }
+
+  if (batch && functionRuns) {
+    // For batches, we only want to show the selected run. This is because each
+    // run gets its own batch -- batches aren't shared between runs
+    functionRuns = functionRuns.filter((run) => run.id === selectedRunID);
   }
 
   return (
@@ -77,32 +95,49 @@ export function EventDetails({
       title={events?.[0]?.name || 'unknown'}
       type="event"
       metadata={
-        singleEvent && (
-          <div className="pt-8">
-            <MetadataGrid
-              metadataItems={[
-                { label: 'Event ID', value: singleEvent.id, size: 'large', type: 'code' },
-                {
-                  label: 'Received At',
-                  value: shortDate(singleEvent.receivedAt),
-                },
-              ]}
-              loading={loading}
-            />
-          </div>
-        )
+        <>
+          {singleEvent && (
+            <div className="pt-8">
+              <MetadataGrid
+                metadataItems={[
+                  { label: 'Event ID', value: singleEvent.id, size: 'large', type: 'code' },
+                  {
+                    label: 'Received At',
+                    value: shortDate(singleEvent.receivedAt),
+                  },
+                ]}
+                loading={loading}
+              />
+            </div>
+          )}
+          {batch && (
+            <div className="pt-8">
+              <MetadataGrid
+                metadataItems={[
+                  { label: 'Batch ID', value: batchID ?? '-', size: 'large', type: 'code' },
+                  {
+                    label: 'Created At',
+                    value: batchCreatedAt ? shortDate(batchCreatedAt) : '-',
+                  },
+                ]}
+                loading={loading}
+              />
+            </div>
+          )}
+        </>
       }
       button={
-        singleEvent &&
-        onReplayEvent &&
-        SendEventButton && (
-          <>
-            <div className="flex items-center gap-1">
-              <Button label="Replay" btnAction={onReplayEvent} />
-              <SendEventButton />
-            </div>
-          </>
-        )
+        <>
+          {singleEvent && onReplayEvent && SendEventButton && (
+            <>
+              <div className="flex items-center gap-1">
+                <Button label="Replay" btnAction={onReplayEvent} />
+                <SendEventButton />
+              </div>
+            </>
+          )}
+          {batch && events && <BatchSize eventCount={events.length} />}
+        </>
       }
       active
     >

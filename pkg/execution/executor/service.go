@@ -305,7 +305,18 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
-	return s.exec.Resume(ctx, *pause, execution.ResumeRequest{})
+	r := execution.ResumeRequest{}
+
+	// If the pause timeout is for an invocation, store an error to cause the
+	// step to fail.
+	if pause.Opcode != nil && *pause.Opcode == enums.OpcodeInvokeFunction.String() {
+		r.SetError(
+			"InngestInvokeTimeoutError",
+			"Timed out waiting for invoked function to complete",
+		)
+	}
+
+	return s.exec.Resume(ctx, *pause, r)
 }
 
 // handleScheduledBatch checks for
