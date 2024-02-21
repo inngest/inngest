@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"strings"
 
@@ -17,6 +18,32 @@ import (
 var (
 	ErrNoFunctions = fmt.Errorf("No functions registered within your app")
 )
+
+type FromReadCloserOpts struct {
+	Env        string
+	ForceHTTPS bool
+	Platform   string
+}
+
+// FromReadCloserOpts creates a new RegisterRequest from an io.ReadCloser (e.g.
+// an HTTP request body). It will also normalize the RegisterRequest.
+func FromReadCloser(r io.ReadCloser, opts FromReadCloserOpts) (RegisterRequest, error) {
+	fr := RegisterRequest{}
+	err := json.NewDecoder(r).Decode(&fr)
+	if err != nil {
+		return fr, err
+	}
+
+	fr.Headers.Env = opts.Env
+	fr.Headers.Platform = opts.Platform
+
+	err = fr.normalize(opts.ForceHTTPS)
+	if err != nil {
+		return fr, err
+	}
+
+	return fr, nil
+}
 
 // RegisterRequest represents a new deploy request from SDK-based functions.
 // This lets us know that a new deploy has started and that we need to
@@ -127,10 +154,25 @@ func (f RegisterRequest) Parse(ctx context.Context) ([]*inngest.Function, error)
 				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid driver. Only HTTP drivers may be used with SDK functions.", step.ID))
 				continue
 			}
-			step.URI = util.NormalizeAppURL(step.URI)
 			fn.Steps[n] = step
 		}
 	}
 
 	return funcs, err
+}
+
+func (f *RegisterRequest) normalize(forceHTTPS bool) error {
+	f.URL = util.NormalizeAppURL(f.URL, forceHTTPS)
+
+	for _, fn := range f.Functions {
+		for _, step := range fn.Steps {
+			if rawStepURL, ok := step.Runtime["url"]; ok {
+				if stepURL, ok := rawStepURL.(string); ok {
+					step.Runtime["url"] = util.NormalizeAppURL(stepURL, forceHTTPS)
+				}
+			}
+		}
+	}
+
+	return nil
 }
