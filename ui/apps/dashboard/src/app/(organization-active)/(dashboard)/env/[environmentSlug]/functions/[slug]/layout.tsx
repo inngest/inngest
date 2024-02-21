@@ -8,6 +8,7 @@ import Header, { type HeaderLink } from '@/components/Header/Header';
 import { Tag } from '@/components/Tag/Tag';
 import { useFunction } from '@/queries';
 import ArchiveFunctionButton from './ArchiveButton';
+import { InvokeButton } from './InvokeButton';
 import PauseFunctionButton from './PauseButton';
 
 type FunctionLayoutProps = {
@@ -66,13 +67,10 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
             <div className="flex items-center gap-2">
               {/* Disable buttons that do not yet work */}
               <div className="flex items-center gap-2 pr-2">
+                <InvokeButton functionSlug={functionSlug} disabled={isArchived} />
                 <PauseFunctionButton functionSlug={functionSlug} disabled={isArchived} />
                 <ArchiveFunctionButton functionSlug={functionSlug} />
               </div>
-              {/* <Button context="dark">
-              <RocketLaunchIcon className="h-3" />
-              Run Function
-            </Button> */}
             </div>
           )
         }
