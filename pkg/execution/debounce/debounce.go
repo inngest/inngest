@@ -332,7 +332,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 	}
 	switch out {
 	case -1:
-		log.From(ctx).Error().
+		log.From(ctx).Warn().
 			Int64("status", out).
 			Msg(ErrDebounceInProgress.Error())
 		// The debounce is in progress or has just finished.  Requeue.
@@ -352,7 +352,8 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 			now.Add(actualTTL).Add(buffer).Add(time.Second),
 		)
 		if err == redis_state.ErrQueueItemAlreadyLeased {
-			log.From(ctx).Error().Err(err).
+			log.From(ctx).Warn().
+				Str("err", err.Error()).
 				Int64("ttl", out).
 				Msg(ErrDebounceInProgress.Error())
 			// This is in progress.
