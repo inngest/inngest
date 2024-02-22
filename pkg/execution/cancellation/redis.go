@@ -73,7 +73,7 @@ func (r redisReadWriter) DeleteCancellation(ctx context.Context, c cqrs.Cancella
 	key := r.key(c.WorkspaceID, c.FunctionID)
 	cmd := r.r.B().Hdel().Key(key).Field(c.ID.String()).Build()
 	err := r.r.Do(ctx, cmd).Error()
-	if rueidis.IsRedisNil(err) {
+	if err == nil || rueidis.IsRedisNil(err) {
 		return nil
 	}
 	return fmt.Errorf("error deleting cancellation: %w", err)
