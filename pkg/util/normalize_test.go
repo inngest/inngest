@@ -24,11 +24,6 @@ func TestNormalizeAppURL(t *testing.T) {
 			expectedURL: "http://localhost:3000/api/inngest?fnId=hello&step=step",
 		},
 		{
-			name:        "host should not have port when using https scheme",
-			inputURL:    "https://api.example.com:80/api/inngest?fnId=hello&step=step",
-			expectedURL: "https://api.example.com/api/inngest?fnId=hello&step=step",
-		},
-		{
 			name:        "force https",
 			inputURL:    "http://api.example.com/api/inngest",
 			expectedURL: "https://api.example.com/api/inngest",

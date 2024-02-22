@@ -26,12 +26,6 @@ func NormalizeAppURL(u string, forceHTTPS bool) string {
 	if strings.Contains(parsed.Host, ":") {
 		host, port, err := net.SplitHostPort(parsed.Host)
 		if err != nil {
-			return u
-		}
-
-		// this shouldn't be valid: https://api.example.com:80/api/inngest
-		if parsed.Scheme == "https" && port != "" {
-			parsed.Host = host
 			return parsed.String()
 		}
 
@@ -40,7 +34,7 @@ func NormalizeAppURL(u string, forceHTTPS bool) string {
 			parsed.Host = fmt.Sprintf("localhost:%s", port)
 			return parsed.String()
 		default:
-			return u
+			return parsed.String()
 		}
 	}
 
