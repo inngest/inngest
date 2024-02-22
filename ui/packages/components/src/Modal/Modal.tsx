@@ -1,4 +1,4 @@
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 import * as Dialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -6,10 +6,17 @@ type ModalProps = {
   children?: React.ReactNode;
   isOpen: boolean;
   onClose: (open: boolean) => void;
+
+  /** @deprecated Use Modal.Title instead. */
   title?: string | React.ReactNode;
+
+  /** @deprecated Use description prop in Modal.Title instead. */
   description?: string;
   className?: string;
+
+  /** @deprecated Use Modal.Footer instead. */
   footer?: React.ReactNode;
+
   alignTop?: boolean;
 };
 
@@ -36,7 +43,7 @@ export function Modal({
           {/* Full-screen container to center the panel */}
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <motion.div
-              className={classNames(
+              className={cn(
                 alignTop ? 'items-baseline' : 'items-center',
                 'flex min-h-full w-full justify-center p-6'
               )}
@@ -53,27 +60,14 @@ export function Modal({
               }}
             >
               <Dialog.Content
-                className={classNames(
+                className={cn(
                   className,
                   'dark:bg-slate-910 transform overflow-hidden rounded-lg bg-white shadow-xl transition-all'
                 )}
               >
-                {(title || description) && (
-                  <div className="dark:bg-slate-910 border-b border-slate-200 bg-slate-900 p-6 dark:border-slate-800">
-                    <Dialog.Title className="text-xl font-semibold text-white">
-                      {title}
-                    </Dialog.Title>
-                    <Dialog.Description className="text-indigo-100 dark:font-medium dark:text-slate-400">
-                      {description}
-                    </Dialog.Description>
-                  </div>
-                )}
+                {(title || description) && <Title description={description}>{title}</Title>}
                 {children}
-                {footer && (
-                  <div className="border-t border-slate-200 p-6 dark:border-slate-800">
-                    {footer}
-                  </div>
-                )}
+                {footer && <Footer>{footer}</Footer>}
               </Dialog.Content>
             </motion.div>
           </div>
@@ -82,3 +76,38 @@ export function Modal({
     </Dialog.Root>
   );
 }
+
+function Content({ children }: React.PropsWithChildren<{}>) {
+  return <div className="m-6">{children}</div>;
+}
+
+function Footer({ children, className }: React.PropsWithChildren<{ className?: string }>) {
+  return (
+    <div className={cn('border-t border-slate-200 p-6 dark:border-slate-800', className)}>
+      {children}
+    </div>
+  );
+}
+
+function Title({
+  children,
+  description,
+}: React.PropsWithChildren<{ description?: React.ReactNode }>) {
+  return (
+    <div className="dark:bg-slate-910 border-b border-slate-200 bg-slate-900 p-6 dark:border-slate-800">
+      <Dialog.Title className="dark:bg-slate-910 bg-slate-900 text-xl font-semibold text-white">
+        {children}
+      </Dialog.Title>
+
+      {description && (
+        <Dialog.Description className="dark:bg-slate-910 mt-2 bg-slate-900 text-indigo-100 dark:font-medium dark:text-slate-400">
+          {description}
+        </Dialog.Description>
+      )}
+    </div>
+  );
+}
+
+Modal.Content = Content;
+Modal.Footer = Footer;
+Modal.Title = Title;
