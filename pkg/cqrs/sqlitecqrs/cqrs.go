@@ -20,6 +20,10 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+const (
+	forceHTTPS = false
+)
+
 var (
 	// end represents a ulid ending with 'Z', eg. a far out cursor.
 	endULID = ulid.ULID([16]byte{'Z'})
@@ -97,7 +101,7 @@ func (w wrapper) GetAppByID(ctx context.Context, id uuid.UUID) (*cqrs.App, error
 
 func (w wrapper) GetAppByURL(ctx context.Context, url string) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
-	url = util.NormalizeAppURL(url)
+	url = util.NormalizeAppURL(url, forceHTTPS)
 
 	f := func(ctx context.Context) (*sqlc.App, error) {
 		return w.q.GetAppByURL(ctx, url)
@@ -113,7 +117,7 @@ func (w wrapper) GetAllApps(ctx context.Context) ([]*cqrs.App, error) {
 // InsertApp creates a new app.
 func (w wrapper) InsertApp(ctx context.Context, arg cqrs.InsertAppParams) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
-	arg.Url = util.NormalizeAppURL(arg.Url)
+	arg.Url = util.NormalizeAppURL(arg.Url, forceHTTPS)
 
 	return copyWriter(
 		ctx,
@@ -154,7 +158,7 @@ func (w wrapper) UpdateAppError(ctx context.Context, arg cqrs.UpdateAppErrorPara
 
 func (w wrapper) UpdateAppURL(ctx context.Context, arg cqrs.UpdateAppURLParams) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
-	arg.Url = util.NormalizeAppURL(arg.Url)
+	arg.Url = util.NormalizeAppURL(arg.Url, forceHTTPS)
 
 	// https://duckdb.org/docs/sql/indexes.html
 	//
