@@ -50,10 +50,7 @@ export default function StepsRunningChart({ functionSlug, timeRange }: StepsRunn
   });
 
   const running = data?.environment.function?.running.data ?? [];
-
-  const maxLength = Math.max(running.length);
-
-  const metrics = Array.from({ length: maxLength }).map((_, idx) => ({
+  const metrics = Array.from({ length: running.length }).map((_, idx) => ({
     name: running[idx]?.bucket || '',
     values: {
       running: running[idx]?.value ?? 0,

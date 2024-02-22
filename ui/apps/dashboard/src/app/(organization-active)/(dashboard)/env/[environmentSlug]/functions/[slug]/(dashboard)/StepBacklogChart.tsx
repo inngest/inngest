@@ -74,12 +74,7 @@ export default function StepBacklogChart({ functionSlug, timeRange }: StepBacklo
   const maxLength = Math.max(scheduled.length, started.length, sleeping.length);
 
   const metrics = Array.from({ length: maxLength }).map((_, idx) => ({
-    name:
-      scheduled[idx]?.bucket ||
-      started[idx]?.bucket ||
-      sleeping[idx]?.bucket ||
-      running[idx]?.bucket ||
-      '',
+    name: scheduled[idx]?.bucket || started[idx]?.bucket || sleeping[idx]?.bucket || '',
     values: {
       scheduled: scheduled[idx]?.value ?? 0,
       started: started[idx]?.value ?? 0,
