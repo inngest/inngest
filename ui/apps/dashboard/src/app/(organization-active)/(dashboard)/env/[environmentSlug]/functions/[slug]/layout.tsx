@@ -56,7 +56,7 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
     });
   }
 
-  const hasEventTrigger =
+  const doesFunctionAcceptPayload =
     fn?.current?.triggers.some((trigger) => {
       return trigger.eventName;
     }) ?? false;
@@ -75,7 +75,7 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
                 <InvokeButton
                   functionSlug={functionSlug}
                   disabled={isArchived}
-                  hasEventTrigger={hasEventTrigger}
+                  doesFunctionAcceptPayload={doesFunctionAcceptPayload}
                 />
                 <PauseFunctionButton functionSlug={functionSlug} disabled={isArchived} />
                 <ArchiveFunctionButton functionSlug={functionSlug} />

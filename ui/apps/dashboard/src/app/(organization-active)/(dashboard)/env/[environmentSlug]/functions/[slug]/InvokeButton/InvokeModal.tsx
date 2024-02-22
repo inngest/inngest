@@ -8,13 +8,18 @@ import CodeEditor from '@/components/Textarea/CodeEditor';
 const initialCode = { data: {} };
 
 type Props = {
-  hasEventTrigger: boolean;
+  doesFunctionAcceptPayload: boolean;
   isOpen: boolean;
   onCancel: () => void;
   onConfirm: (payload: { data: Record<string, unknown> }) => void;
 };
 
-export function InvokeModal({ hasEventTrigger, isOpen, onCancel, onConfirm }: Props) {
+export function InvokeModal({
+  doesFunctionAcceptPayload: hasEventTrigger,
+  isOpen,
+  onCancel,
+  onConfirm,
+}: Props) {
   const [error, setError] = useState<string>();
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -46,7 +51,7 @@ export function InvokeModal({ hasEventTrigger, isOpen, onCancel, onConfirm }: Pr
       />
     );
   } else {
-    content = <p>This function does not have an event trigger so a payload cannot be specified.</p>;
+    content = <p>Cron functions without event triggers cannot include payload data.</p>;
   }
 
   return (
