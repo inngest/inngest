@@ -30,6 +30,7 @@ in pkgs.mkShell {
 
     # Node
     # pkgs.yarn
+    pkgs.typescript
     pkgs.nodejs-18_x
 
     # LSPs
