@@ -8,12 +8,13 @@ import CodeEditor from '@/components/Textarea/CodeEditor';
 const initialCode = { data: {} };
 
 type Props = {
+  hasEventTrigger: boolean;
   isOpen: boolean;
   onCancel: () => void;
   onConfirm: (payload: { data: Record<string, unknown> }) => void;
 };
 
-export function InvokeModal({ isOpen, onCancel, onConfirm }: Props) {
+export function InvokeModal({ hasEventTrigger, isOpen, onCancel, onConfirm }: Props) {
   const [error, setError] = useState<string>();
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -34,6 +35,20 @@ export function InvokeModal({ isOpen, onCancel, onConfirm }: Props) {
     }
   }
 
+  let content;
+  if (hasEventTrigger) {
+    content = (
+      <CodeEditor
+        className="rounded-lg bg-slate-900 px-4"
+        initialCode={JSON.stringify(initialCode, null, 2)}
+        language="json"
+        name="code"
+      />
+    );
+  } else {
+    content = <p>This function does not have an event trigger so a payload cannot be specified.</p>;
+  }
+
   return (
     <Modal
       className="w-full max-w-3xl"
@@ -44,12 +59,7 @@ export function InvokeModal({ isOpen, onCancel, onConfirm }: Props) {
     >
       <form onSubmit={onSubmit}>
         <div className="m-6">
-          <CodeEditor
-            className="rounded-lg bg-slate-900 px-4"
-            initialCode={JSON.stringify(initialCode, null, 2)}
-            language="json"
-            name="code"
-          />
+          {content}
 
           {error && (
             <Alert className="mt-6" severity="error">
