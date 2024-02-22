@@ -6,12 +6,12 @@ import ArrowPathIcon from '@heroicons/react/20/solid/ArrowPathIcon';
 import { Button } from '@inngest/components/Button';
 import * as Sentry from '@sentry/nextjs';
 
-type CreateUserErrorProps = {
+type OrganizationSetupErrorProps = {
   error: Error & { digest?: string };
   reset: () => void;
 };
 
-export default function CreateUserError({ error, reset }: CreateUserErrorProps) {
+export default function OrganizationSetupError({ error, reset }: OrganizationSetupErrorProps) {
   useEffect(() => {
     Sentry.captureException(error);
   }, [error]);
@@ -20,7 +20,7 @@ export default function CreateUserError({ error, reset }: CreateUserErrorProps) 
     <div className="flex h-full w-full flex-col items-center justify-center gap-5">
       <div className="inline-flex items-center gap-2 text-red-600">
         <ExclamationCircleIcon className="h-4 w-4" />
-        <h2 className="text-sm">Failed to create user</h2>
+        <h2 className="text-sm">Failed to set up your organization</h2>
       </div>
       <Button
         appearance="outlined"

@@ -22,7 +22,7 @@ export default async function OrganizationListPage({ searchParams }: Organizatio
       <div className="mx-auto my-auto text-center">
         <OrganizationList
           hidePersonal={true}
-          afterCreateOrganizationUrl="/create-organization/create-account"
+          afterCreateOrganizationUrl="/create-organization/setup"
           afterSelectOrganizationUrl={redirectURL}
         />
       </div>

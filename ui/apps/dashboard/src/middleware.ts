@@ -23,8 +23,8 @@ export default authMiddleware({
       return redirectToSignIn({ returnBackUrl: request.url });
     }
 
-    if (!isUserSetup && request.nextUrl.pathname !== '/sign-up/create-user') {
-      return NextResponse.redirect(new URL('/sign-up/create-user', request.url));
+    if (!isUserSetup && request.nextUrl.pathname !== '/sign-up/setup') {
+      return NextResponse.redirect(new URL('/sign-up/setup', request.url));
     }
 
     if (
@@ -42,9 +42,9 @@ export default authMiddleware({
       isUserSetup &&
       hasActiveOrganization &&
       !isAccountSetup &&
-      request.nextUrl.pathname !== '/create-organization/create-account'
+      request.nextUrl.pathname !== '/create-organization/setup'
     ) {
-      return NextResponse.redirect(new URL('/create-organization/create-account', request.url));
+      return NextResponse.redirect(new URL('/create-organization/setup', request.url));
     }
 
     return NextResponse.next();

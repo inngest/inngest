@@ -6,12 +6,12 @@ import ArrowPathIcon from '@heroicons/react/20/solid/ArrowPathIcon';
 import { Button } from '@inngest/components/Button';
 import * as Sentry from '@sentry/nextjs';
 
-type CreateAccountErrorProps = {
+type UserSetupErrorProps = {
   error: Error & { digest?: string };
   reset: () => void;
 };
 
-export default function CreateAccountError({ error, reset }: CreateAccountErrorProps) {
+export default function UserSetupError({ error, reset }: UserSetupErrorProps) {
   useEffect(() => {
     Sentry.captureException(error);
   }, [error]);
@@ -20,7 +20,7 @@ export default function CreateAccountError({ error, reset }: CreateAccountErrorP
     <div className="flex h-full w-full flex-col items-center justify-center gap-5">
       <div className="inline-flex items-center gap-2 text-red-600">
         <ExclamationCircleIcon className="h-4 w-4" />
-        <h2 className="text-sm">Failed to create account</h2>
+        <h2 className="text-sm">Failed to set up your user</h2>
       </div>
       <Button
         appearance="outlined"

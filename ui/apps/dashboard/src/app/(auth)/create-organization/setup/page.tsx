@@ -12,7 +12,7 @@ const CreateAccountDocument = graphql(`
   }
 `);
 
-export default async function CreateAccountPage() {
+export default async function OrganizationSetupPage() {
   await graphqlAPI.request(CreateAccountDocument);
   return <ReloadClerkAndRedirect redirectURL="/env/production/apps" />;
 }

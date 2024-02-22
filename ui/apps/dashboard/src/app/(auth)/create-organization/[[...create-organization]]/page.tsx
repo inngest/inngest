@@ -11,7 +11,7 @@ export default function CreateOrganizationPage() {
   return (
     <SplitView>
       <div className="mx-auto my-auto text-center">
-        <CreateOrganization afterCreateOrganizationUrl="/create-organization/create-account" />
+        <CreateOrganization afterCreateOrganizationUrl="/create-organization/setup" />
       </div>
     </SplitView>
   );

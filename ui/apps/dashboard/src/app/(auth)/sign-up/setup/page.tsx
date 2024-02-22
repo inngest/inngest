@@ -12,7 +12,7 @@ const CreateUserDocument = graphql(`
   }
 `);
 
-export default async function CreateUserPage() {
+export default async function UserSetupPage() {
   await graphqlAPI.request(CreateUserDocument);
   return <ReloadClerkAndRedirect redirectURL="/organization-list" />;
 }
