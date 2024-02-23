@@ -2,11 +2,14 @@ package golang
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
 	"github.com/stretchr/testify/require"
@@ -18,12 +21,15 @@ func TestFunctionSteps(t *testing.T) {
 
 	var (
 		counter int32
+		runID   string
 	)
 
 	a := inngestgo.CreateFunction(
 		inngestgo.FunctionOpts{Name: "test sdk"},
 		inngestgo.EventTrigger("test/sdk", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+			runID = input.InputCtx.RunID
+
 			_, err := step.Run(ctx, "1", func(ctx context.Context) (any, error) {
 				fmt.Println("1")
 				atomic.AddInt32(&counter, 1)
@@ -68,13 +74,14 @@ func TestFunctionSteps(t *testing.T) {
 	h.Register(a)
 	registerFuncs()
 
-	_, err := inngestgo.Send(context.Background(), inngestgo.Event{
+	evt := inngestgo.Event{
 		Name: "test/sdk",
 		Data: map[string]any{
 			"test": true,
 			"id":   "1",
 		},
-	})
+	}
+	_, err := inngestgo.Send(context.Background(), evt)
 	require.NoError(t, err)
 
 	<-time.After(3 * time.Second)
@@ -105,4 +112,34 @@ func TestFunctionSteps(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&counter) == 3
 	}, 15*time.Second, time.Second)
+
+	t.Run("Check batch API", func(t *testing.T) {
+		// Fetch event data and step data from the V0 APIs;  it should exist.
+		resp, err := http.Get(fmt.Sprintf("%s/v0/runs/%s/batch", DEV_URL, runID))
+		require.NoError(t, err)
+		require.EqualValues(t, 200, resp.StatusCode)
+
+		body := []event.Event{}
+		err = json.NewDecoder(resp.Body).Decode(&body)
+		_ = resp.Body.Close()
+		require.NoError(t, err)
+
+		require.Equal(t, 1, len(body))
+		require.EqualValues(t, evt.Data, body[0].Data)
+	})
+
+	t.Run("Check batch API", func(t *testing.T) {
+		// Fetch event data and step data from the V0 APIs;  it should exist.
+		resp, err := http.Get(fmt.Sprintf("%s/v0/runs/%s/actions", DEV_URL, runID))
+		require.NoError(t, err)
+		require.EqualValues(t, 200, resp.StatusCode)
+
+		body := map[string]any{}
+		err = json.NewDecoder(resp.Body).Decode(&body)
+		_ = resp.Body.Close()
+		require.NoError(t, err)
+
+		// 5 steps plus overall fn response
+		require.Equal(t, 6, len(body))
+	})
 }
