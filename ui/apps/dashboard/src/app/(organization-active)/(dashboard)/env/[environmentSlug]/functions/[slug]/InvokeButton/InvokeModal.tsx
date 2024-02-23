@@ -8,12 +8,18 @@ import CodeEditor from '@/components/Textarea/CodeEditor';
 const initialCode = { data: {} };
 
 type Props = {
+  doesFunctionAcceptPayload: boolean;
   isOpen: boolean;
   onCancel: () => void;
   onConfirm: (payload: { data: Record<string, unknown> }) => void;
 };
 
-export function InvokeModal({ isOpen, onCancel, onConfirm }: Props) {
+export function InvokeModal({
+  doesFunctionAcceptPayload: hasEventTrigger,
+  isOpen,
+  onCancel,
+  onConfirm,
+}: Props) {
   const [error, setError] = useState<string>();
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -34,6 +40,20 @@ export function InvokeModal({ isOpen, onCancel, onConfirm }: Props) {
     }
   }
 
+  let content;
+  if (hasEventTrigger) {
+    content = (
+      <CodeEditor
+        className="rounded-lg bg-slate-900 px-4"
+        initialCode={JSON.stringify(initialCode, null, 2)}
+        language="json"
+        name="code"
+      />
+    );
+  } else {
+    content = <p>Cron functions without event triggers cannot include payload data.</p>;
+  }
+
   return (
     <Modal className="w-full max-w-3xl" isOpen={isOpen} onClose={onCancel}>
       <Modal.Title description="Invoke this function, triggering a function run">
@@ -42,12 +62,7 @@ export function InvokeModal({ isOpen, onCancel, onConfirm }: Props) {
 
       <form onSubmit={onSubmit}>
         <Modal.Content>
-          <CodeEditor
-            className="rounded-lg bg-slate-900 px-4"
-            initialCode={JSON.stringify(initialCode, null, 2)}
-            language="json"
-            name="code"
-          />
+          {content}
 
           {error && (
             <Alert className="mt-6" severity="error">

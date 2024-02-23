@@ -18,9 +18,14 @@ const InvokeFunctionDocument = graphql(`
 type Props = {
   disabled: boolean;
   functionSlug: string;
+  doesFunctionAcceptPayload: boolean;
 };
 
-export function InvokeButton({ disabled, functionSlug }: Props) {
+export function InvokeButton({
+  disabled,
+  functionSlug,
+  doesFunctionAcceptPayload: hasEventTrigger,
+}: Props) {
   const env = useEnvironment();
   const [, invokeFunction] = useMutation(InvokeFunctionDocument);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -44,6 +49,7 @@ export function InvokeButton({ disabled, functionSlug }: Props) {
       />
 
       <InvokeModal
+        doesFunctionAcceptPayload={hasEventTrigger}
         isOpen={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         onConfirm={onConfirm}

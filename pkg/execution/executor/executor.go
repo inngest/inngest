@@ -1798,13 +1798,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		DataKey:     gen.ID,
 	})
 	if err == state.ErrPauseAlreadyExists {
-		if e.log != nil {
-			e.log.Warn().
-				Str("pause_id", pauseID.String()).
-				Str("run_id", item.Identifier.RunID.String()).
-				Str("workflow_id", item.Identifier.WorkflowID.String()).
-				Msg("created duplicate pause")
-		}
 		return nil
 	}
 	if err != nil {
@@ -1939,13 +1932,6 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		DataKey:        gen.ID,
 	})
 	if err == state.ErrPauseAlreadyExists {
-		if e.log != nil {
-			e.log.Warn().
-				Str("pause_id", pauseID.String()).
-				Str("run_id", item.Identifier.RunID.String()).
-				Str("workflow_id", item.Identifier.WorkflowID.String()).
-				Msg("created duplicate pause")
-		}
 		return nil
 	}
 	if err != nil {

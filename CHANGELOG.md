@@ -1,6 +1,15 @@
 # Changelog
 
-## [v0.24.0] - 2024-01-25
+## [v0.26.0] - 2024-02-22
+
+### Added
+- Added support for batching in the dev server
+
+### Fixed
+- Various dev server fixes, battery life improvements
+
+
+## [v0.25.0] - 2024-01-25
 
 ### Added
 - Added support for per-step errors

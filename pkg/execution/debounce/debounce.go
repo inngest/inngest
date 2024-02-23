@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/xhit/go-str2duration/v2"
@@ -331,6 +332,9 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 	}
 	switch out {
 	case -1:
+		log.From(ctx).Warn().
+			Int64("status", out).
+			Msg(ErrDebounceInProgress.Error())
 		// The debounce is in progress or has just finished.  Requeue.
 		return ErrDebounceInProgress
 	case -2:
@@ -348,6 +352,10 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 			now.Add(actualTTL).Add(buffer).Add(time.Second),
 		)
 		if err == redis_state.ErrQueueItemAlreadyLeased {
+			log.From(ctx).Warn().
+				Str("err", err.Error()).
+				Int64("ttl", out).
+				Msg(ErrDebounceInProgress.Error())
 			// This is in progress.
 			return ErrDebounceInProgress
 		}
