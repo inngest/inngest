@@ -52,7 +52,7 @@ function getIconsForAttempts({
 
   return (
     <span className="flex items-center">
-      {firstAttempt && <span className="z-0">{getIconForStatus(firstAttempt)}</span>}
+      {firstAttempt && <span className="z-0 -ml-1">{getIconForStatus(firstAttempt)}</span>}
       <span className="bg-slate-940 z-10 -ml-[1.2rem] h-[1.2rem] w-[1.2rem] rounded-full" />
       <span className="z-20 -ml-5">{icon}</span>
     </span>
