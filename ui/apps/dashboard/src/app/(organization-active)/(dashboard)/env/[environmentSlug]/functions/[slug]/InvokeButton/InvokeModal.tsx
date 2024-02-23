@@ -56,12 +56,12 @@ export function InvokeModal({
 
   return (
     <Modal className="w-full max-w-3xl" isOpen={isOpen} onClose={onCancel}>
-      <Modal.Title description="Invoke this function, triggering a function run">
+      <Modal.Header description="Invoke this function, triggering a function run">
         Invoke Function
-      </Modal.Title>
+      </Modal.Header>
 
       <form onSubmit={onSubmit}>
-        <Modal.Content>
+        <Modal.Body>
           {content}
 
           {error && (
@@ -69,7 +69,7 @@ export function InvokeModal({
               {error}
             </Alert>
           )}
-        </Modal.Content>
+        </Modal.Body>
 
         <Modal.Footer className="flex flex-row justify-end gap-4">
           <Button appearance="outlined" btnAction={onCancel} label="Cancel" />

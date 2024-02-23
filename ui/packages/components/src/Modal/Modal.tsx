@@ -7,10 +7,10 @@ type ModalProps = {
   isOpen: boolean;
   onClose: (open: boolean) => void;
 
-  /** @deprecated Use Modal.Title instead. */
+  /** @deprecated Use Modal.Header instead. */
   title?: string | React.ReactNode;
 
-  /** @deprecated Use description prop in Modal.Title instead. */
+  /** @deprecated Use description prop in Modal.Header instead. */
   description?: string;
   className?: string;
 
@@ -65,7 +65,7 @@ export function Modal({
                   'dark:bg-slate-910 transform overflow-hidden rounded-lg bg-white shadow-xl transition-all'
                 )}
               >
-                {(title || description) && <Title description={description}>{title}</Title>}
+                {(title || description) && <Header description={description}>{title}</Header>}
                 {children}
                 {footer && <Footer>{footer}</Footer>}
               </Dialog.Content>
@@ -77,7 +77,7 @@ export function Modal({
   );
 }
 
-function Content({ children }: React.PropsWithChildren<{}>) {
+function Body({ children }: React.PropsWithChildren<{}>) {
   return <div className="m-6">{children}</div>;
 }
 
@@ -89,7 +89,7 @@ function Footer({ children, className }: React.PropsWithChildren<{ className?: s
   );
 }
 
-function Title({
+function Header({
   children,
   description,
 }: React.PropsWithChildren<{ description?: React.ReactNode }>) {
@@ -108,6 +108,6 @@ function Title({
   );
 }
 
-Modal.Content = Content;
+Modal.Body = Body;
 Modal.Footer = Footer;
-Modal.Title = Title;
+Modal.Header = Header;
