@@ -21,19 +21,15 @@ export function EnvironmentArchiveModal(props: Props) {
     }
   }, [isOpen, props.isArchived]);
 
+  let content: string;
   let title: string;
   if (isArchived) {
-    title = 'Unarchive environment';
-  } else {
-    title = 'Archive environment';
-  }
-
-  let content: string;
-  if (isArchived) {
     content = 'Any active functions within this environment will become triggerable.';
+    title = 'Unarchive environment';
   } else {
     content =
       'Functions within this environment will no longer be triggerable. Nothing will be deleted and you can unarchive at any time.';
+    title = 'Archive environment';
   }
 
   return (
