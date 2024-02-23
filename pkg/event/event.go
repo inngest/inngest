@@ -111,7 +111,7 @@ func (e Event) Validate(ctx context.Context) error {
 
 type InngestMetadata struct {
 	InvokeFnID          string `json:"fn_id"`
-	InvokeCorrelationId string `json:"correlation_id"`
+	InvokeCorrelationId string `json:"correlation_id,omitempty"`
 }
 
 func (e Event) InngestMetadata() *InngestMetadata {
