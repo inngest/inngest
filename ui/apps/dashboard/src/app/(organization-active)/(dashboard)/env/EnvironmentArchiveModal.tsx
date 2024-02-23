@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
-
-import Modal from '@/components/Modal';
+import { Modal } from '@inngest/components/Modal';
 
 type Props = {
   isArchived: boolean;
@@ -22,24 +21,28 @@ export function EnvironmentArchiveModal(props: Props) {
     }
   }, [isOpen, props.isArchived]);
 
+  let title: string;
+  if (isArchived) {
+    title = 'Unarchive environment';
+  } else {
+    title = 'Archive environment';
+  }
+
+  let content: string;
+  if (isArchived) {
+    content = 'Any active functions within this environment will become triggerable.';
+  } else {
+    content =
+      'Functions within this environment will no longer be triggerable. Nothing will be deleted and you can unarchive at any time.';
+  }
+
   return (
     <Modal className="flex max-w-xl flex-col gap-4" isOpen={isOpen} onClose={onCancel}>
-      <p>{`Are you sure you want to ${isArchived ? 'unarchive' : 'archive'} this environment?`}</p>
+      <Modal.Header>{title}</Modal.Header>
 
-      {isArchived && (
-        <p className="pb-4 text-sm">
-          Any active functions within this environment will become triggerable.
-        </p>
-      )}
+      <Modal.Body className="text-sm">{content}</Modal.Body>
 
-      {!isArchived && (
-        <p className="pb-4 text-sm">
-          Functions within this environment will no longer be triggerable. Nothing will be deleted
-          and you can unarchive at any time.
-        </p>
-      )}
-
-      <div className="flex content-center justify-end">
+      <Modal.Footer className="flex content-center justify-end">
         <Button appearance="outlined" btnAction={onCancel} label="Cancel" />
 
         <Button
@@ -48,7 +51,7 @@ export function EnvironmentArchiveModal(props: Props) {
           btnAction={onConfirm}
           label={isArchived ? 'Unarchive' : 'Archive'}
         />
-      </div>
+      </Modal.Footer>
     </Modal>
   );
 }
