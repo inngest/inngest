@@ -3,6 +3,8 @@
 import { useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 
+import LoadingIcon from '@/icons/LoadingIcon';
+
 type ReloadClerkAndRedirectProps = {
   redirectURL: string;
 };
@@ -23,5 +25,9 @@ export default function ReloadClerkAndRedirect({ redirectURL }: ReloadClerkAndRe
     });
   }, [user, redirectURL]);
 
-  return null;
+  return (
+    <div className="flex h-full w-full items-center justify-center">
+      <LoadingIcon />
+    </div>
+  );
 }
