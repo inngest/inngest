@@ -7,6 +7,7 @@ import { OutputCard } from '@inngest/components/OutputCard';
 import { renderStepMetadata } from '@inngest/components/RunDetails/stepMetadataRenderer';
 import { IconChevron } from '@inngest/components/icons/Chevron';
 import { type HistoryNode } from '@inngest/components/utils/historyParser';
+import { isEndStatus, type Status } from '@inngest/components/utils/historyParser/types';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -111,7 +112,7 @@ function Content({
   const output = useOutput({
     getOutput,
     outputItemID: node.outputItemID,
-    isSuccess: node.status === 'completed',
+    nodeStatus: node.status,
   });
 
   const metadataItems = renderStepMetadata({ node, isAttempt });
@@ -132,16 +133,22 @@ function Content({
 function useOutput({
   getOutput,
   outputItemID,
-  isSuccess,
+  nodeStatus,
 }: {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
   outputItemID?: string;
-  isSuccess: boolean;
+  nodeStatus: Status;
 }): React.ReactNode | undefined {
   const [output, setOutput] = useState<React.ReactNode>(undefined);
 
   useEffect(() => {
     if (!outputItemID) {
+      return;
+    }
+
+    // We should only fetch output if the node has ended. There are some edge
+    // cases where a node can have an output item ID but not be in an end state
+    if (!isEndStatus(nodeStatus)) {
       return;
     }
 
@@ -155,7 +162,7 @@ function useOutput({
           return;
         }
 
-        setOutput(<OutputCard content={data} isSuccess={isSuccess} />);
+        setOutput(<OutputCard content={data} isSuccess={nodeStatus === 'completed'} />);
       } catch (e) {
         let text = 'Error loading';
         if (e instanceof Error) {
