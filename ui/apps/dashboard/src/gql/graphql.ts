@@ -157,11 +157,6 @@ export enum ConcurrencyScope {
   Function = 'FUNCTION'
 }
 
-export type CreateAccountPayload = {
-  __typename?: 'CreateAccountPayload';
-  account: Maybe<Account>;
-};
-
 export type CreateFunctionReplayInput = {
   fromRange: Scalars['ULID'];
   name: Scalars['String'];
@@ -511,7 +506,6 @@ export type Mutation = {
   archiveEvent: Maybe<Event>;
   archiveWorkflow: Maybe<WorkflowResponse>;
   completeAWSMarketplaceSetup: Maybe<AwsMarketplaceSetupResponse>;
-  createAccount: Maybe<CreateAccountPayload>;
   createFunctionReplay: Replay;
   createIngestKey: IngestKey;
   createStripeSubscription: CreateStripeSubscriptionResponse;
@@ -526,6 +520,7 @@ export type Mutation = {
   removeVercelApp: Maybe<RemoveVercelAppResponse>;
   resyncApp: SyncResponse;
   retryWorkflowRun: Maybe<StartWorkflowResponse>;
+  setUpAccount: Maybe<SetUpAccountPayload>;
   syncNewApp: SyncResponse;
   triggerFunction: Maybe<Scalars['Boolean']>;
   unarchiveEnvironment: Workspace;
@@ -989,6 +984,11 @@ export type Session = {
   user: User;
 };
 
+export type SetUpAccountPayload = {
+  __typename?: 'SetUpAccountPayload';
+  account: Maybe<Account>;
+};
+
 export type StartWorkflowInput = {
   workflowID: Scalars['ID'];
   workflowVersion?: InputMaybe<Scalars['Int']>;
@@ -1299,10 +1299,10 @@ export type WorkspaceWorkflowsArgs = {
   archived?: InputMaybe<Scalars['Boolean']>;
 };
 
-export type CreateAccountMutationVariables = Exact<{ [key: string]: never; }>;
+export type SetUpAccountMutationVariables = Exact<{ [key: string]: never; }>;
 
 
-export type CreateAccountMutation = { __typename?: 'Mutation', createAccount: { __typename?: 'CreateAccountPayload', account: { __typename?: 'Account', id: string } | null } | null };
+export type SetUpAccountMutation = { __typename?: 'Mutation', setUpAccount: { __typename?: 'SetUpAccountPayload', account: { __typename?: 'Account', id: string } | null } | null };
 
 export type CreateUserMutationVariables = Exact<{ [key: string]: never; }>;
 
@@ -1906,7 +1906,7 @@ export type GetAllEnvironmentsQueryVariables = Exact<{ [key: string]: never; }>;
 export type GetAllEnvironmentsQuery = { __typename?: 'Query', workspaces: Array<{ __typename?: 'Workspace', id: string, name: string, parentID: string | null, test: boolean, type: EnvironmentType, createdAt: string, lastDeployedAt: string | null, isArchived: boolean, isAutoArchiveEnabled: boolean }> | null };
 
 export const EventPayloadFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"EventPayload"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ArchivedEvent"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"payload"},"name":{"kind":"Name","value":"event"}}]}}]} as unknown as DocumentNode<EventPayloadFragment, unknown>;
-export const CreateAccountDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateAccount"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createAccount"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]}}]} as unknown as DocumentNode<CreateAccountMutation, CreateAccountMutationVariables>;
+export const SetUpAccountDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SetUpAccount"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"setUpAccount"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]}}]} as unknown as DocumentNode<SetUpAccountMutation, SetUpAccountMutationVariables>;
 export const CreateUserDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateUser"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createUser"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]}}]} as unknown as DocumentNode<CreateUserMutation, CreateUserMutationVariables>;
 export const CreateEnvironmentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateEnvironment"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"name"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createWorkspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"Variable","name":{"kind":"Name","value":"name"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<CreateEnvironmentMutation, CreateEnvironmentMutationVariables>;
 export const ArchiveEnvironmentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ArchiveEnvironment"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"archiveEnvironment"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<ArchiveEnvironmentMutation, ArchiveEnvironmentMutationVariables>;

@@ -13,7 +13,7 @@ import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-
  * Therefore it is highly recommended to use the babel or swc plugin for production.
  */
 const documents = {
-    "\n  mutation CreateAccount {\n    createAccount {\n      account {\n        id\n      }\n    }\n  }\n": types.CreateAccountDocument,
+    "\n  mutation SetUpAccount {\n    setUpAccount {\n      account {\n        id\n      }\n    }\n  }\n": types.SetUpAccountDocument,
     "\n  mutation CreateUser {\n    createUser {\n      user {\n        id\n      }\n    }\n  }\n": types.CreateUserDocument,
     "\n  mutation CreateEnvironment($name: String!) {\n    createWorkspace(input: { name: $name }) {\n      id\n    }\n  }\n": types.CreateEnvironmentDocument,
     "\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.ArchiveEnvironmentDocument,
@@ -109,7 +109,7 @@ export function graphql(source: string): unknown;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  mutation CreateAccount {\n    createAccount {\n      account {\n        id\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation CreateAccount {\n    createAccount {\n      account {\n        id\n      }\n    }\n  }\n"];
+export function graphql(source: "\n  mutation SetUpAccount {\n    setUpAccount {\n      account {\n        id\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation SetUpAccount {\n    setUpAccount {\n      account {\n        id\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
