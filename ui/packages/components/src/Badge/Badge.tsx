@@ -15,7 +15,7 @@ export function Badge({
   className?: string;
   kind?: 'outlined' | 'error' | 'solid';
 }) {
-  const classNames = `text-xs leading-3 border rounded-md box-border py-1.5 px-2 flex items-center gap-1 w-fit ${kindStyles[kind]} ${className}`;
+  const classNames = `text-xs leading-3 border rounded-full box-border py-1.5 px-3 flex items-center gap-1 w-fit ${kindStyles[kind]} ${className}`;
 
   return (
     <span className={classNames}>
