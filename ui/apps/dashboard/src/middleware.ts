@@ -13,7 +13,7 @@ export default authMiddleware({
     const isSignedIn = !!auth.userId;
     const isUserSetup = isSignedIn && !!auth.sessionClaims.externalID;
     const hasActiveOrganization = !!auth.orgId;
-    const isAccountSetup = isSignedIn && !!auth.sessionClaims.accountID;
+    const isOrganizationSetup = isSignedIn && !!auth.sessionClaims.accountID;
 
     if (auth.isPublicRoute) {
       return NextResponse.next();
@@ -23,8 +23,8 @@ export default authMiddleware({
       return redirectToSignIn({ returnBackUrl: request.url });
     }
 
-    if (!isUserSetup && request.nextUrl.pathname !== '/sign-up/setup') {
-      return NextResponse.redirect(new URL('/sign-up/setup', request.url));
+    if (!isUserSetup && request.nextUrl.pathname !== '/sign-up/set-up') {
+      return NextResponse.redirect(new URL('/sign-up/set-up', request.url));
     }
 
     if (
@@ -41,10 +41,10 @@ export default authMiddleware({
     if (
       isUserSetup &&
       hasActiveOrganization &&
-      !isAccountSetup &&
-      request.nextUrl.pathname !== '/create-organization/setup'
+      !isOrganizationSetup &&
+      request.nextUrl.pathname !== '/create-organization/set-up'
     ) {
-      return NextResponse.redirect(new URL('/create-organization/setup', request.url));
+      return NextResponse.redirect(new URL('/create-organization/set-up', request.url));
     }
 
     return NextResponse.next();

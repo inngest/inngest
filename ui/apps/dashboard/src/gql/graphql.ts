@@ -522,7 +522,6 @@ export type Mutation = {
   retryWorkflowRun: Maybe<StartWorkflowResponse>;
   setUpAccount: Maybe<SetUpAccountPayload>;
   syncNewApp: SyncResponse;
-  triggerFunction: Maybe<Scalars['Boolean']>;
   unarchiveEnvironment: Workspace;
   updateAccount: Account;
   updateIngestKey: IngestKey;
@@ -626,11 +625,6 @@ export type MutationRetryWorkflowRunArgs = {
 export type MutationSyncNewAppArgs = {
   appURL: Scalars['String'];
   envID: Scalars['UUID'];
-};
-
-
-export type MutationTriggerFunctionArgs = {
-  input: TriggerFunctionInput;
 };
 
 
@@ -1039,12 +1033,6 @@ export type TimeSeriesPoint = {
   __typename?: 'TimeSeriesPoint';
   time: Scalars['Time'];
   value: Maybe<Scalars['Float']>;
-};
-
-export type TriggerFunctionInput = {
-  data?: InputMaybe<Scalars['Map']>;
-  envID: Scalars['UUID'];
-  functionSlug: Scalars['String'];
 };
 
 export type UpdateAccount = {
