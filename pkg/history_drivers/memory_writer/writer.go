@@ -31,7 +31,8 @@ func (w *writer) Write(
 	w.store.Mu.Lock()
 	defer w.store.Mu.Unlock()
 
-	if item.Type == enums.HistoryTypeFunctionStarted.String() {
+	if item.Type == enums.HistoryTypeFunctionScheduled.String() ||
+		item.Type == enums.HistoryTypeFunctionStarted.String() {
 		w.writeWorkflowStart(ctx, item)
 	} else if item.Type == enums.HistoryTypeFunctionCancelled.String() ||
 		item.Type == enums.HistoryTypeFunctionCompleted.String() ||
@@ -90,8 +91,19 @@ func (w *writer) writeWorkflowStart(
 		run.Run.Output = &item.Result.Output
 	}
 
+	var status enums.RunStatus
+	switch item.Type {
+	case enums.HistoryTypeFunctionScheduled.String():
+		status = enums.RunStatusScheduled
+	case enums.HistoryTypeFunctionStarted.String():
+		status = enums.RunStatusRunning
+	default:
+		log.From(ctx).Error().Str("type", item.Type).
+			Msg("unknown history type")
+	}
+
 	run.Run.StartedAt = time.UnixMilli(int64(item.RunID.Time()))
-	run.Run.Status = enums.RunStatusRunning
+	run.Run.Status = status
 	run.Run.WorkflowID = item.FunctionID
 	run.Run.WorkspaceID = item.WorkspaceID
 	run.Run.WorkflowVersion = int(item.FunctionVersion)

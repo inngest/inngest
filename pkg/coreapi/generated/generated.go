@@ -1582,6 +1582,7 @@ enum FunctionRunStatus {
   FAILED
   CANCELLED
   RUNNING
+  QUEUED
 }
 
 enum FunctionEventType {

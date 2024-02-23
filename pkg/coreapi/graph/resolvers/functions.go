@@ -6,7 +6,6 @@ import (
 	"sort"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -40,16 +39,10 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 		return nil, fmt.Errorf("Run ID not found: %w", err)
 	}
 
-	status := models.FunctionRunStatusRunning
-
 	m := state.Metadata()
-	switch m.Status {
-	case enums.RunStatusCompleted:
-		status = models.FunctionRunStatusCompleted
-	case enums.RunStatusFailed:
-		status = models.FunctionRunStatusFailed
-	case enums.RunStatusCancelled:
-		status = models.FunctionRunStatusCancelled
+	status, err := models.ToFunctionRunStatus(m.Status)
+	if err != nil {
+		return nil, err
 	}
 
 	name := state.Function().Name
@@ -88,15 +81,9 @@ func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionR
 
 	for _, s := range state {
 		m := s.Metadata()
-		status := models.FunctionRunStatusRunning
-
-		switch m.Status {
-		case enums.RunStatusCompleted:
-			status = models.FunctionRunStatusCompleted
-		case enums.RunStatusFailed:
-			status = models.FunctionRunStatusFailed
-		case enums.RunStatusCancelled:
-			status = models.FunctionRunStatusCancelled
+		status, err := models.ToFunctionRunStatus(m.Status)
+		if err != nil {
+			return nil, err
 		}
 
 		startedAt := ulid.Time(m.Identifier.RunID.Time())

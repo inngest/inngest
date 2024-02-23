@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -21,16 +20,9 @@ func (r *functionRunResolver) Status(ctx context.Context, obj *models.FunctionRu
 	if err != nil {
 		return nil, fmt.Errorf("Run ID not found: %w", err)
 	}
-	status := models.FunctionRunStatusRunning
-	switch md.Status {
-	case enums.RunStatusCompleted:
-		status = models.FunctionRunStatusCompleted
-	case enums.RunStatusFailed:
-		status = models.FunctionRunStatusFailed
-	case enums.RunStatusCancelled:
-		status = models.FunctionRunStatusCancelled
-	}
-	return &status, nil
+
+	status, err := models.ToFunctionRunStatus(md.Status)
+	return &status, err
 }
 
 func (r *functionRunResolver) PendingSteps(ctx context.Context, obj *models.FunctionRun) (*int, error) {

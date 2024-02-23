@@ -148,6 +148,7 @@ export enum FunctionRunStatus {
   Cancelled = 'CANCELLED',
   Completed = 'COMPLETED',
   Failed = 'FAILED',
+  Queued = 'QUEUED',
   Running = 'RUNNING'
 }
 
