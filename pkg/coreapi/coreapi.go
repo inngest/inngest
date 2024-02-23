@@ -73,6 +73,9 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	// V0 APIs
 	a.Get("/events/{eventID}/runs", a.EventRuns)
 	a.Delete("/runs/{runID}", a.CancelRun)
+	// NOTE: These are present in the 2.x and 3.x SDKs to enable large payload sizes.
+	a.Get("/runs/{runID}/batch", a.GetEventBatch)
+	a.Get("/runs/{runID}/actions", a.GetActions)
 
 	return a, nil
 }
@@ -100,6 +103,72 @@ func (a *CoreAPI) Start(ctx context.Context) error {
 
 func (a CoreAPI) Stop(ctx context.Context) error {
 	return a.server.Shutdown(ctx)
+}
+
+func (a CoreAPI) GetActions(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var runID *ulid.ULID
+	if id := chi.URLParam(r, "runID"); id != "" {
+		if parsed, err := ulid.Parse(id); err == nil {
+			runID = &parsed
+		}
+	}
+	if runID == nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Error{
+			Message: apiutil.ErrRunIDInvalid.Error(),
+			Status:  400,
+			Err:     apiutil.ErrRunIDInvalid,
+		})
+		return
+	}
+
+	// Find this run
+	state, err := a.state.Load(ctx, *runID)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Error{
+			Status:  410,
+			Message: fmt.Sprintf("runtime state is no longer available for runID: %s", runID),
+			Err:     err,
+		})
+		return
+	}
+
+	actions := state.Actions()
+	_ = json.NewEncoder(w).Encode(actions)
+}
+
+func (a CoreAPI) GetEventBatch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var runID *ulid.ULID
+	if id := chi.URLParam(r, "runID"); id != "" {
+		if parsed, err := ulid.Parse(id); err == nil {
+			runID = &parsed
+		}
+	}
+
+	if runID == nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Error{
+			Message: apiutil.ErrRunIDInvalid.Error(),
+			Status:  400,
+			Err:     apiutil.ErrRunIDInvalid,
+		})
+		return
+	}
+
+	// Find this run
+	state, err := a.state.Load(ctx, *runID)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Error{
+			Status:  410,
+			Message: fmt.Sprintf("runtime state is no longer available for runID: %s", runID),
+			Err:     err,
+		})
+		return
+	}
+
+	events := state.Events()
+	_ = json.NewEncoder(w).Encode(events)
 }
 
 func (a CoreAPI) EventRuns(w http.ResponseWriter, r *http.Request) {

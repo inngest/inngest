@@ -14,6 +14,8 @@ import (
 	"golang.org/x/exp/slog"
 )
 
+const DEV_URL = "http://127.0.0.1:8288"
+
 type RegisterFunc func()
 
 type opt func(h *inngestgo.HandlerOpts)
@@ -26,10 +28,10 @@ func NewSDKHandler(t *testing.T, appID string, hopts ...opt) (inngestgo.Handler,
 		EventKey: &key,
 	})
 
-	os.Setenv("INNGEST_DEV", "http://127.0.0.1:8288")
+	os.Setenv("INNGEST_DEV", DEV_URL)
 
 	opts := inngestgo.HandlerOpts{
-		RegisterURL: inngestgo.StrPtr("http://127.0.0.1:8288/fn/register"),
+		RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
 		Logger:      slog.Default(),
 		// Env:         inngestgo.Str("test-env"),
 	}

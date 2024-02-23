@@ -1830,8 +1830,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		CorrelationID: &correlationID,
 	})
 
-	logger.From(ctx).Debug().Interface("evt", evt).Str("gen.ID", gen.ID).Msg("created invocation event")
-
 	err = e.handleSendingEvent(ctx, evt, item)
 	if err != nil {
 		// TODO Cancel pause/timeout?
