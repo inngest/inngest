@@ -1,7 +1,10 @@
 package models
 
 import (
+	"fmt"
+
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 )
 
 func MakeFunction(f *cqrs.Function) (*Function, error) {
@@ -62,4 +65,21 @@ func MakeFunctionRun(f *cqrs.FunctionRun) *FunctionRun {
 		r.Output = &str
 	}
 	return r
+}
+
+func ToFunctionRunStatus(s enums.RunStatus) (FunctionRunStatus, error) {
+	switch s {
+	case enums.RunStatusRunning:
+		return FunctionRunStatusRunning, nil
+	case enums.RunStatusCompleted:
+		return FunctionRunStatusCompleted, nil
+	case enums.RunStatusFailed:
+		return FunctionRunStatusFailed, nil
+	case enums.RunStatusCancelled:
+		return FunctionRunStatusCancelled, nil
+	case enums.RunStatusScheduled:
+		return FunctionRunStatusQueued, nil
+	default:
+		return FunctionRunStatusRunning, fmt.Errorf("unknown run status: %d", s)
+	}
 }

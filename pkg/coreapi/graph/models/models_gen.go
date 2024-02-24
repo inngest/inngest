@@ -253,6 +253,7 @@ const (
 	FunctionRunStatusFailed    FunctionRunStatus = "FAILED"
 	FunctionRunStatusCancelled FunctionRunStatus = "CANCELLED"
 	FunctionRunStatusRunning   FunctionRunStatus = "RUNNING"
+	FunctionRunStatusQueued    FunctionRunStatus = "QUEUED"
 )
 
 var AllFunctionRunStatus = []FunctionRunStatus{
@@ -260,11 +261,12 @@ var AllFunctionRunStatus = []FunctionRunStatus{
 	FunctionRunStatusFailed,
 	FunctionRunStatusCancelled,
 	FunctionRunStatusRunning,
+	FunctionRunStatusQueued,
 }
 
 func (e FunctionRunStatus) IsValid() bool {
 	switch e {
-	case FunctionRunStatusCompleted, FunctionRunStatusFailed, FunctionRunStatusCancelled, FunctionRunStatusRunning:
+	case FunctionRunStatusCompleted, FunctionRunStatusFailed, FunctionRunStatusCancelled, FunctionRunStatusRunning, FunctionRunStatusQueued:
 		return true
 	}
 	return false

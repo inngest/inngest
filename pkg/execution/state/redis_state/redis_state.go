@@ -264,6 +264,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		Version:        currentVersion,
 		RequestVersion: consts.RequestVersionUnknown, // Always use -1 to indicate unset hash version until first request.
 		Context:        input.Context,
+		Status:         enums.RunStatusScheduled,
 	}
 	if input.RunType != nil {
 		metadata.RunType = *input.RunType
