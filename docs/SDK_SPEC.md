@@ -69,7 +69,7 @@ Capitalized usage of these terms means that we are referring to these definition
 - **Inngest Server**
 Inngest provides both a hosted Cloud (production) service and a Dev Server which allows local development of Inngest Functions. We refer to both as an Inngest Server. This concept is explored more in Kinds of Inngest Server [[4.2](#42-kinds-of-inngest-server)].
 - **Developer**
-The user the SDK, using its APIs and interfaces to use Inngest’s platform.
+The user of the SDK, using its APIs and interfaces to use Inngest’s platform.
 - **App**
 A collection of Functions.
 - **Sync**
@@ -132,33 +132,33 @@ An Event always has the following structure:
    * only processed once; if an event with the same ID is sent again, it will
    * not trigger any functions.
    */
-	id: string;
+  id: string;
 
   /**
    * A unique ID for the type of event. We recommend using lowercase dot
    * notation for names, prepending `prefixes/` with a slash for organization.
    *
-   * e.g. `cloudwatch/alarms/triggered`, `cart/session.created`
+   * e.g. `cloudwatch/alarms.triggered`, `cart/session.created`
    */
-	name: string;
+  name: string;
 
   /**
    * Any data pertinent to the event.
-	 *
+   *
    * Must be an object, in order to encourage evolving data.
    */
-	data: { [key: string]: any };
+  data: { [key: string]: any };
 
   /**
    * Any user data associated with the event.
    */
   user?: { [key: string]: any };
 
-	/**
+  /**
    * An integer representing the milliseconds since the unix epoch at which this
    * event occurred.
    */
-	ts: number;
+  ts: number;
 }
 ```
 
@@ -277,7 +277,8 @@ To achieve this, the `X-Inngest-Signature` [[4.1.1](#411-definitions)] header is
 3. If the SDK is intending to use Inngest Cloud [[4.2](#42-kinds-of-inngest-server)] and no `X-Inngest-Signature` header has been given, the SDK MUST reject the request and return a `500 Internal Server Error` response.
 4. The SDK SHOULD then extract the `t` timestamp from the `X-Inngest-Signature` header and ensure it is a time within the last 5 minutes according to the SDK’s known time.
 
-If this is checked and the timestamp is not within this time period, the SDK MUST reject the request and return a `500 Internal Server Error` response.
+   If this is checked and the timestamp is not within this time period, the SDK MUST reject the request and return a `500 Internal Server Error` response.
+
 5. The SDK then MUST calculate an HMAC with SHA256 by specifying the key as the `s` value of the `X-Inngest-Signature` header with the `signkey-*-` prefix removed and hashing the body of the request followed by the timestamp `t` with hex encoding.
 
 Note that if the raw bytes of the request body are inaccessible, the body should first be parsed using the JSON Canonicalization Scheme (JCS) as specified in [RFC 8785](https://datatracker.ietf.org/doc/html/rfc8785).
@@ -330,7 +331,7 @@ The `INNGEST_DEV` environment variable may have a non-empty value, including an 
 - API Origin: `http://localhost:8288`
 - Event ingestion endpoint: `http://localhost:8288/e/:event_key`
 
-If the `INNGEST_DEV` value is a vcalid [RFC 6454](https://datatracker.ietf.org/doc/html/rfc6454) origin, for example `http://example.com`, the resulting endpoints will then be used:
+If the `INNGEST_DEV` value is a valid [RFC 6454](https://datatracker.ietf.org/doc/html/rfc6454) origin, for example `http://example.com`, the resulting endpoints will then be used:
 
 - API Origin: `http://example.com`
 - Event ingestion endpoint: `http://example.com/e/:event_key`
