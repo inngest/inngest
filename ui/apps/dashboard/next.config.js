@@ -44,7 +44,7 @@ const nextConfig = {
       },
       {
         source: '/reset-password/reset',
-        destination: '/password-reset/complete',
+        destination: '/sign-in',
         permanent: false,
       },
       // Legacy Pages
