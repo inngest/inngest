@@ -2,6 +2,7 @@ package golang
 
 import (
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slog"
 )
 
 const DEV_URL = "http://127.0.0.1:8288"

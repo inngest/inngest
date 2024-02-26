@@ -6,6 +6,7 @@ Return values:
 - >=0 (int): OK, and the new TTL from our debounce.
 - -1: Debounce is already in progress, as the queue item is leased.
 - -2: Event is out of order and has no effect
+- -3: Debounce queue item is not found.
 
 ]]--
 
@@ -37,8 +38,9 @@ end
 local item = get_queue_item(keyQueueHash, queueJobID)
 if item == nil then
 	-- The queue item was not found.  Return a new debounce.
-	return -1
+	return -3
 end
+
 if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
 	-- The debounce queue item is leased. 
 	return -1
