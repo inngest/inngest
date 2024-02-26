@@ -7,7 +7,7 @@ if (!homepagePath) {
 }
 
 export default authMiddleware({
-  publicRoutes: ['/password-reset', '/support', '/api/sentry'],
+  publicRoutes: ['/support', '/api/sentry'],
   ignoredRoutes: '/(images|_next/static|_next/image|favicon)(.*)',
   afterAuth(auth, request) {
     const isSignedIn = !!auth.userId;
