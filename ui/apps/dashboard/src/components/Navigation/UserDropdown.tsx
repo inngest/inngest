@@ -114,7 +114,7 @@ function OrganizationDropdownMenuItem(props: {
     <DropdownMenuItem
       onSelect={props.onSelect}
       asChild
-      className="p-2 font-medium text-slate-400 hover:bg-transparent hover:text-white"
+      className="p-2 font-medium text-slate-400 outline-none hover:bg-transparent focus:text-white"
     >
       {props.href ? (
         <Link href={props.href as Route}>
