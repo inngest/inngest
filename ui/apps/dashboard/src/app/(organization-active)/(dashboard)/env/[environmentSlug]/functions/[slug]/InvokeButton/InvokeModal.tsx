@@ -14,20 +14,21 @@ type Props = {
   onConfirm: (payload: { data: Record<string, unknown> }) => void;
 };
 
-export function InvokeModal({
-  doesFunctionAcceptPayload: hasEventTrigger,
-  isOpen,
-  onCancel,
-  onConfirm,
-}: Props) {
+export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onConfirm }: Props) {
   const [error, setError] = useState<string>();
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
 
     try {
-      const payload = parseCode(formData.get('code'));
+      let payload;
+      if (doesFunctionAcceptPayload) {
+        const formData = new FormData(event.currentTarget);
+        payload = parseCode(formData.get('code'));
+      } else {
+        payload = { data: {} };
+      }
+
       onConfirm(payload);
       setError(undefined);
     } catch (error) {
@@ -41,7 +42,7 @@ export function InvokeModal({
   }
 
   let content;
-  if (hasEventTrigger) {
+  if (doesFunctionAcceptPayload) {
     content = (
       <CodeEditor
         className="rounded-lg bg-slate-900 px-4"
