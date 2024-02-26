@@ -5,7 +5,7 @@ import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import type { TimeRange } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
-import StackedBarChart from '@/components/Charts/StackedBarChart';
+import SimpleLineChart from '@/components/Charts/SimpleLineChart';
 import { graphql } from '@/gql';
 
 const GetStepBacklogDocument = graphql(`
@@ -18,15 +18,6 @@ const GetStepBacklogDocument = graphql(`
     environment: workspace(id: $environmentID) {
       function: workflowBySlug(slug: $fnSlug) {
         scheduled: metrics(opts: { name: "steps_scheduled", from: $startTime, to: $endTime }) {
-          from
-          to
-          granularity
-          data {
-            bucket
-            value
-          }
-        }
-        started: metrics(opts: { name: "steps_started", from: $startTime, to: $endTime }) {
           from
           to
           granularity
@@ -68,28 +59,25 @@ export default function StepBacklogChart({ functionSlug, timeRange }: StepBacklo
   });
 
   const scheduled = data?.environment.function?.scheduled.data ?? [];
-  const started = data?.environment.function?.started.data ?? [];
   const sleeping = data?.environment.function?.sleeping.data ?? [];
 
-  const maxLength = Math.max(scheduled.length, started.length, sleeping.length);
+  const maxLength = Math.max(scheduled.length, sleeping.length);
 
   const metrics = Array.from({ length: maxLength }).map((_, idx) => ({
-    name: scheduled[idx]?.bucket || started[idx]?.bucket || sleeping[idx]?.bucket || '',
+    name: scheduled[idx]?.bucket || sleeping[idx]?.bucket || '',
     values: {
       scheduled: scheduled[idx]?.value ?? 0,
-      started: started[idx]?.value ?? 0,
       sleeping: sleeping[idx]?.value ?? 0,
     },
   }));
 
   return (
-    <StackedBarChart
+    <SimpleLineChart
       title="Step Backlog"
       desc="The backlog status of steps for this function"
       data={metrics}
       legend={[
         { name: 'Scheduled', dataKey: 'scheduled', color: colors.slate['500'] },
-        { name: 'Started', dataKey: 'started', color: colors.sky['500'] },
         { name: 'Sleeping', dataKey: 'sleeping', color: colors.teal['500'] },
       ]}
       isLoading={isFetchingMetrics}

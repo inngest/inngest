@@ -26,6 +26,18 @@ const GetStepsRunningDocument = graphql(`
             value
           }
         }
+
+        concurrencyLimit: metrics(
+          opts: { name: "concurrency_limit_reached_total", from: $startTime, to: $endTime }
+        ) {
+          from
+          to
+          granularity
+          data {
+            bucket
+            value
+          }
+        }
       }
     }
   }
@@ -50,10 +62,15 @@ export default function StepsRunningChart({ functionSlug, timeRange }: StepsRunn
   });
 
   const running = data?.environment.function?.running.data ?? [];
-  const metrics = Array.from({ length: running.length }).map((_, idx) => ({
-    name: running[idx]?.bucket || '',
+  const concurrencyLimit = data?.environment.function?.concurrencyLimit.data ?? [];
+
+  const maxLength = Math.max(running.length, concurrencyLimit.length);
+
+  const metrics = Array.from({ length: maxLength }).map((_, idx) => ({
+    name: running[idx]?.bucket || concurrencyLimit[idx]?.bucket || '',
     values: {
       running: running[idx]?.value ?? 0,
+      concurrencyLimit: Boolean(concurrencyLimit[idx]?.value),
     },
   }));
 
@@ -62,7 +79,15 @@ export default function StepsRunningChart({ functionSlug, timeRange }: StepsRunn
       title="Step Running"
       desc="The # of steps running for this function"
       data={metrics}
-      legend={[{ name: 'Running', dataKey: 'running', color: colors.blue['500'] }]}
+      legend={[
+        {
+          name: 'Concurrency Limit',
+          dataKey: 'concurrencyLimit',
+          color: colors.amber['500'],
+          referenceArea: true,
+        },
+        { name: 'Running', dataKey: 'running', color: colors.blue['500'] },
+      ]}
       isLoading={isFetchingMetrics}
       error={metricsError}
     />
