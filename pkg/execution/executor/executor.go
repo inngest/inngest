@@ -463,7 +463,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	// This enures that we only ever enqueue the start job for this function once.
 	queueKey := fmt.Sprintf("%s:%s", req.Function.ID, key)
-	retries := req.Function.GetRetries() + 1
+	attempts := req.Function.GetRetries() + 1
 	item := queue.Item{
 		JobID:       &queueKey,
 		GroupID:     uuid.New().String(),
