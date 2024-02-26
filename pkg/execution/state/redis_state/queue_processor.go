@@ -859,10 +859,6 @@ ProcessLoop:
 			continue
 		case ErrQueueItemAlreadyLeased:
 			q.scope.Counter(counterQueueItemsLeaseConflict).Inc(1)
-			q.logger.
-				Warn().
-				Interface("item", item).
-				Msg("worker attempting to claim existing lease")
 			// This is an okay error.  Move to the next job item.
 			processErr = nil
 			continue

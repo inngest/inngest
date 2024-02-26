@@ -977,7 +977,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 		},
 	).AsInt64()
 	if err != nil {
-		return fmt.Errorf("error leasing queue item: %w", err)
+		return fmt.Errorf("error requeueing item: %w", err)
 	}
 	switch status {
 	case 0:

@@ -35,7 +35,7 @@ var (
 )
 
 var (
-	buffer = 1 * time.Second
+	buffer = 50 * time.Millisecond
 	// scripts stores all embedded lua scripts on initialization
 	scripts = map[string]*rueidis.Lua{}
 	include = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
@@ -199,7 +199,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 
 	// A debounce must already exist for this fn.  Update it.
 	err = d.updateDebounce(ctx, di, fn, ttl, *debounceID)
-	if err == context.DeadlineExceeded || err == ErrDebounceInProgress {
+	if err == context.DeadlineExceeded || err == ErrDebounceInProgress || err == ErrDebounceNotFound {
 		if n == 5 {
 			// Only recurse 5 times.
 			return fmt.Errorf("unable to update debounce: %w", err)
@@ -209,7 +209,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 		//
 		// TODO: Instead of this, make debounce creation and updating atomic within the queue.
 		// This needs to modify queue items and partitions directly.
-		<-time.After(50 * time.Millisecond)
+		<-time.After(750 * time.Millisecond)
 		return d.debounce(ctx, di, fn, ttl, n+1)
 	}
 
@@ -267,7 +267,7 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 	}
 
 	if out == "0" {
-		// Enqueue the debounce job with extra buffer *plus* one second.  This ensures that we never
+		// Enqueue the debounce job with extra buffer.  This ensures that we never
 		// attempt to start a debounce during the debounce's expiry (race conditions), and the extra
 		// second lets an updateDebounce call on TTL 0 finish, as the buffer is the updateDebounce
 		// deadline.
@@ -300,7 +300,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 	// NOTE: This function has a deadline to complete.  If this fn doesn't complete within the deadline,
 	// eg, network issues, we must check if the debounce expired and re-attempt the entire thing, allowing
 	// us to either update or create a new debounce depending on the current time.
-	ctx, cancel := context.WithTimeout(ctx, buffer)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	keyPtr := d.k.DebouncePointer(ctx, fn.ID, key)
@@ -332,15 +332,17 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 	}
 	switch out {
 	case -1:
-		log.From(ctx).Warn().
-			Int64("status", out).
-			Msg(ErrDebounceInProgress.Error())
+		log.From(ctx).Warn().Msg(ErrDebounceInProgress.Error())
 		// The debounce is in progress or has just finished.  Requeue.
 		return ErrDebounceInProgress
 	case -2:
 		// The event is out-of-order and a newer event exists within the debounce.
 		// Do nothing.
 		return nil
+	case -3:
+		log.From(ctx).Warn().Msg(ErrDebounceNotFound.Error())
+		// The debounce is in progress or has just finished.  Requeue.
+		return ErrDebounceNotFound
 	default:
 		// Debounces should have a maximum timeout;  updating the debounce returns
 		// the timeout to use.
@@ -373,7 +375,11 @@ func (d debouncer) debounceKey(ctx context.Context, evt event.TrackedEvent, fn i
 
 	out, _, err := expressions.Evaluate(ctx, *fn.Debounce.Key, map[string]any{"event": evt.GetEvent().Map()})
 	if err != nil {
-		return "", fmt.Errorf("invalid debounce expression: %w", err)
+		log.From(ctx).Error().Err(err).
+			Str("expression", *fn.Debounce.Key).
+			Interface("event", evt.GetEvent().Map()).
+			Msg("error evaluating debounce expression")
+		return "<invalid>", nil
 	}
 	if str, ok := out.(string); ok {
 		return str, nil
