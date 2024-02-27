@@ -9,6 +9,7 @@ import (
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/coded_err"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/expressions"
@@ -36,7 +37,10 @@ func (c ConcurrencyLimits) PartitionConcurrency() int {
 
 func (c ConcurrencyLimits) Validate(ctx context.Context) error {
 	if len(c.Limits) > consts.MaxConcurrencyLimits {
-		return fmt.Errorf("There are more concurrency limits specified than the allowed max of: %d", consts.MaxConcurrencyLimits)
+		return coded_err.Error{
+			Code:    coded_err.CodeConcurrencyLimit,
+			Message: fmt.Sprintf("Each function cannot have more than %d concurrency limits", consts.MaxConcurrencyLimits),
+		}
 	}
 	for _, l := range c.Limits {
 		if err := l.Validate(ctx); err != nil {

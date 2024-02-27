@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/inngest/inngest/pkg/coded_err"
 	"github.com/inngest/inngest/pkg/consts"
 )
 
@@ -62,7 +63,10 @@ func (c EventBatchConfig) IsEnabled() bool {
 
 func (c EventBatchConfig) IsValid() error {
 	if c.MaxSize < 2 {
-		return fmt.Errorf("batch size cannot be smaller than 2: %d", c.MaxSize)
+		return coded_err.Error{
+			Code:    coded_err.CodeBatchSize,
+			Message: "Batch size must be greater than 1",
+		}
 	}
 
 	if _, err := time.ParseDuration(c.Timeout); err != nil {
