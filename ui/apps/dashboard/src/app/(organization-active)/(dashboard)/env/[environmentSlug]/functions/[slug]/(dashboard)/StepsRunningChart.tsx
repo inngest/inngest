@@ -76,8 +76,8 @@ export default function StepsRunningChart({ functionSlug, timeRange }: StepsRunn
 
   return (
     <SimpleLineChart
-      title="Step Running"
-      desc="The # of steps running for this function"
+      title="Step Running - Point in Time"
+      desc="The number of steps running for this function at point in time. This data shows the value at the time of instrumentation, and is different from throughput."
       data={metrics}
       legend={[
         {
