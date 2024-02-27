@@ -17,13 +17,16 @@ type ReloadClerkAndRedirectProps = {
  * @param {string} redirectURL - The URL to redirect to after reloading Clerk
  */
 export default function ReloadClerkAndRedirect({ redirectURL }: ReloadClerkAndRedirectProps) {
-  const { user } = useUser();
+  const { isLoaded, user } = useUser();
 
   useEffect(() => {
+    if (!isLoaded) return;
+
     user?.reload().then(() => {
       window.location.href = redirectURL;
     });
-  }, [user, redirectURL]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- We don't want to run this effect when the user changes as this would cause an infinite loop
+  }, [isLoaded, redirectURL]);
 
   return (
     <div className="flex h-full w-full items-center justify-center">
