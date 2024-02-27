@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-export function Tag({
+export function Pill({
   children,
   className = '',
   href,
