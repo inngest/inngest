@@ -73,8 +73,8 @@ export default function StepBacklogChart({ functionSlug, timeRange }: StepBacklo
 
   return (
     <SimpleLineChart
-      title="Step Backlog"
-      desc="The backlog status of steps for this function"
+      title="Step Backlog - Point in Time"
+      desc="The backlog status of steps for this function at point in time. This data shows the value at the time of instrumentation, and is different from throughput."
       data={metrics}
       legend={[
         { name: 'Queued', dataKey: 'scheduled', color: colors.slate['500'] },
