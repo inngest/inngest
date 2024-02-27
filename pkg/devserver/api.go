@@ -22,7 +22,6 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
-	"github.com/inngest/inngest/pkg/util"
 )
 
 type devapi struct {
@@ -140,14 +139,14 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	a.devserver.handlerLock.Lock()
 	defer a.devserver.handlerLock.Unlock()
 
-	req := &sdk.RegisterRequest{}
-	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+	req, err := sdk.FromReadCloser(r.Body, sdk.FromReadCloserOpts{})
+	if err != nil {
 		logger.From(ctx).Warn().Msgf("Invalid request:\n%s", err)
 		a.err(ctx, w, 400, fmt.Errorf("Invalid request: %w", err))
 		return
 	}
 
-	if err := a.register(ctx, *req); err != nil {
+	if err := a.register(ctx, req); err != nil {
 		logger.From(ctx).Warn().Msgf("Error registering functions:\n%s", err)
 		_ = publicerr.WriteHTTP(w, err)
 		return
@@ -164,9 +163,6 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error) {
-	forceHTTPS := false
-	r.URL = util.NormalizeAppURL(r.URL, forceHTTPS)
-
 	sum, err := r.Checksum()
 	if err != nil {
 		return publicerr.Wrap(err, 400, "Invalid request")
