@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -194,6 +195,12 @@ func (d *devserver) runDiscovery(ctx context.Context) {
 func (d *devserver) pollSDKs(ctx context.Context) {
 	// Initially, add every app started with the `-u` flag
 	for _, url := range d.opts.URLs {
+		// URLs must contain a protocol. If not, add http since very few apps
+		// use https during development
+		if !strings.Contains(url, "://") {
+			url = "http://" + url
+		}
+
 		// Create a new app which holds the error message.
 		params := cqrs.InsertAppParams{
 			ID:  uuid.New(),
