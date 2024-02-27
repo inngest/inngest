@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +14,12 @@ import (
 )
 
 func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateAppInput) (*cqrs.App, error) {
+	// URLs must contain a protocol. If not, add http since very few apps use
+	// https during development
+	if !strings.Contains(input.URL, "://") {
+		input.URL = "http://" + input.URL
+	}
+
 	// If we already have the app, return it.
 	if app, err := r.Data.GetAppByURL(ctx, input.URL); err == nil && app != nil {
 		return app, nil
