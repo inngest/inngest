@@ -30,8 +30,8 @@ export default authMiddleware({
     if (
       isUserSetup &&
       !hasActiveOrganization &&
-      request.nextUrl.pathname !== '/organization-list' &&
-      request.nextUrl.pathname !== '/create-organization'
+      !request.nextUrl.pathname.startsWith('/create-organization') &&
+      !request.nextUrl.pathname.startsWith('/organization-list')
     ) {
       const organizationListURL = new URL('/organization-list', request.url);
       organizationListURL.searchParams.append('redirect_url', request.url);
@@ -42,7 +42,8 @@ export default authMiddleware({
       isUserSetup &&
       hasActiveOrganization &&
       !isOrganizationSetup &&
-      request.nextUrl.pathname !== '/create-organization/set-up'
+      !request.nextUrl.pathname.startsWith('/create-organization') &&
+      !request.nextUrl.pathname.startsWith('/organization-list')
     ) {
       return NextResponse.redirect(new URL('/create-organization/set-up', request.url));
     }
