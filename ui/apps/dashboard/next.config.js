@@ -75,13 +75,7 @@ const nextConfig = {
   // Optional build-time configuration for Sentry.
   // See https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/#extend-nextjs-configuration
   sentry: {
-    // Use `hidden-source-map` rather than `source-map` as the Webpack `devtool`
-    // for client-side builds. (This will be the default starting in
-    // `@sentry/nextjs` version 8.0.0.) See
-    // https://webpack.js.org/configuration/devtool/ and
-    // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/#use-hidden-source-map
-    // for more information.
-    hideSourceMaps: true,
+    hideSourceMaps: false,
     // Tunnel sentry events to help circumvent ad-blockers.
     tunnelRoute: '/api/sentry',
   },
