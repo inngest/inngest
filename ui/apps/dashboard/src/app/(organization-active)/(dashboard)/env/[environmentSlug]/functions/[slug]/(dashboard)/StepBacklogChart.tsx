@@ -77,7 +77,7 @@ export default function StepBacklogChart({ functionSlug, timeRange }: StepBacklo
       desc="The backlog status of steps for this function"
       data={metrics}
       legend={[
-        { name: 'Scheduled', dataKey: 'scheduled', color: colors.slate['500'] },
+        { name: 'Queued', dataKey: 'scheduled', color: colors.slate['500'] },
         { name: 'Sleeping', dataKey: 'sleeping', color: colors.teal['500'] },
       ]}
       isLoading={isFetchingMetrics}
