@@ -23,7 +23,7 @@ export default function ReloadClerkAndRedirect({ redirectURL }: ReloadClerkAndRe
     if (!isLoaded) return;
 
     user?.reload().then(() => {
-      window.location.href = redirectURL;
+      window.location.replace(redirectURL);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- We don't want to run this effect when the user changes as this would cause an infinite loop
   }, [isLoaded, redirectURL]);
