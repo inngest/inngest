@@ -2,6 +2,12 @@
 
 import { useMemo } from 'react';
 import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
+import { InformationCircleIcon } from '@heroicons/react/24/outline';
+import {
+  Tooltip as CustomTooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip';
 import {
   Bar,
   BarChart,
@@ -21,6 +27,7 @@ type BarChartProps = {
   className?: string;
   height?: number;
   title: string | React.ReactNode;
+  desc?: string;
   data?: {
     name: string;
     values: {
@@ -77,6 +84,7 @@ export default function StackedBarChart({
   className = '',
   height = 200,
   title,
+  desc,
   data = [],
   legend = [],
   error,
@@ -92,6 +100,14 @@ export default function StackedBarChart({
       <header className="flex items-center justify-between">
         <div className="flex gap-4">
           <h3 className="flex flex-row items-center gap-2 font-medium">{title}</h3>
+          {desc && (
+            <CustomTooltip>
+              <TooltipTrigger>
+                <InformationCircleIcon className="h-4 w-4 text-slate-400" />
+              </TooltipTrigger>
+              <TooltipContent>{desc}</TooltipContent>
+            </CustomTooltip>
+          )}
         </div>
         <div className="flex justify-end gap-4">
           {legend.map((l) => (

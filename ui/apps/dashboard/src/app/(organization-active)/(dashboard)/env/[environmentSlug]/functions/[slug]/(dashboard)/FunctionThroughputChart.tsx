@@ -43,17 +43,6 @@ const GetFnRunMetricsDocument = graphql(`
             value
           }
         }
-        concurrencyLimit: metrics(
-          opts: { name: "concurrency_limit_reached_total", from: $startTime, to: $endTime }
-        ) {
-          from
-          to
-          granularity
-          data {
-            bucket
-            value
-          }
-        }
       }
     }
   }
@@ -83,22 +72,15 @@ export default function FunctionThroughputChart({
   const queued = data?.environment.function?.queued.data ?? [];
   const started = data?.environment.function?.started.data ?? [];
   const ended = data?.environment.function?.ended.data ?? [];
-  const concurrencyLimit = data?.environment.function?.concurrencyLimit.data ?? [];
 
-  const maxLength = Math.max(queued.length, started.length, ended.length, concurrencyLimit.length);
+  const maxLength = Math.max(queued.length, started.length, ended.length);
 
   const metrics = Array.from({ length: maxLength }).map((_, idx) => ({
-    name:
-      queued[idx]?.bucket ||
-      started[idx]?.bucket ||
-      ended[idx]?.bucket ||
-      concurrencyLimit[idx]?.bucket ||
-      '',
+    name: queued[idx]?.bucket || started[idx]?.bucket || ended[idx]?.bucket || '',
     values: {
       queued: queued[idx]?.value ?? 0,
       started: started[idx]?.value ?? 0,
       ended: ended[idx]?.value ?? 0,
-      concurrencyLimit: Boolean(concurrencyLimit[idx]?.value),
     },
   }));
 
@@ -108,12 +90,6 @@ export default function FunctionThroughputChart({
       desc="The number of function runs being processed over time."
       data={metrics}
       legend={[
-        {
-          name: 'Concurrency Limit',
-          dataKey: 'concurrencyLimit',
-          color: colors.amber['500'],
-          referenceArea: true,
-        },
         { name: 'Queued', dataKey: 'queued', color: colors.slate['500'] },
         { name: 'Started', dataKey: 'started', color: colors.sky['500'] },
         { name: 'Ended', dataKey: 'ended', color: colors.teal['500'] },

@@ -30,6 +30,8 @@ import FunctionRunsChart, { type UsageMetrics } from './FunctionRunsChart';
 import FunctionThroughputChart from './FunctionThroughputChart';
 import LatestFailedFunctionRuns from './LatestFailedFunctionRuns';
 import SDKRequestThroughputChart from './SDKRequestThroughput';
+import StepBacklogChart from './StepBacklogChart';
+import StepsRunningChart from './StepsRunningChart';
 
 type FunctionDashboardProps = {
   params: {
@@ -133,6 +135,8 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
           </div>
           <FunctionRunsChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
           <FunctionThroughputChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
+          <StepsRunningChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
+          <StepBacklogChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
           <SDKRequestThroughputChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
           <div className="my-4 px-6">
             <LatestFailedFunctionRuns
