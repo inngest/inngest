@@ -26,6 +26,7 @@ import DashboardTimeRangeFilter, {
   defaultTimeRange,
   getTimeRangeByKey,
 } from './DashboardTimeRangeFilter';
+import FunctionRunRateLimitChart from './FunctionRateLimitChart';
 import FunctionRunsChart, { type UsageMetrics } from './FunctionRunsChart';
 import FunctionThroughputChart from './FunctionThroughputChart';
 import LatestFailedFunctionRuns from './LatestFailedFunctionRuns';
@@ -138,6 +139,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
           <StepsRunningChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
           <StepBacklogChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
           <SDKRequestThroughputChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
+          <FunctionRunRateLimitChart functionSlug={functionSlug} timeRange={selectedTimeRange} />
           <div className="my-4 px-6">
             <LatestFailedFunctionRuns
               environmentSlug={params.environmentSlug}
