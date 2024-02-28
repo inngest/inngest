@@ -1,6 +1,7 @@
+import { IconApp } from '@inngest/components/icons/App';
+import { IconFunction } from '@inngest/components/icons/Function';
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { IconFunction, IconWindow } from '@/icons';
 import NavbarLink from './NavbarLink';
 
 const meta = {
@@ -31,7 +32,7 @@ export const Default: Story = {
 
 export const WithCounter: Story = {
   args: {
-    icon: <IconWindow />,
+    icon: <IconApp />,
     tabName: 'Apps',
     href: '/apps',
   },
@@ -40,7 +41,7 @@ export const WithCounter: Story = {
 export const WithError: Story = {
   args: {
     hasError: true,
-    icon: <IconWindow />,
+    icon: <IconFunction />,
     tabName: 'Apps',
     href: '/apps',
   },
