@@ -1,1 +1,1 @@
-export { Pill, TriggerPillContent } from './Pill';
+export { Pill, PillContent } from './Pill';

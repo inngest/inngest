@@ -3,8 +3,7 @@ import type { Route } from 'next';
 import Link from 'next/link';
 import { IconClock } from '@inngest/components/icons/Clock';
 import { IconEvent } from '@inngest/components/icons/Event';
-
-import { type Trigger } from '../types/trigger';
+import { IconFunction } from '@inngest/components/icons/Function';
 
 export function Pill({
   children,
@@ -28,12 +27,18 @@ export function Pill({
   return <span className={classNames}>{children}</span>;
 }
 
-export function TriggerPillContent({ value, type }: Trigger) {
+type PillContentProps = {
+  children: React.ReactNode;
+  type: 'EVENT' | 'CRON' | 'FUNCTION';
+};
+
+export function PillContent({ children, type }: PillContentProps) {
   return (
     <div className="flex items-center gap-2">
       {type === 'EVENT' && <IconEvent className="text-indigo-500 dark:text-slate-400" />}
       {type === 'CRON' && <IconClock className="text-indigo-500 dark:text-slate-400" />}
-      {value}
+      {type === 'FUNCTION' && <IconFunction className="text-indigo-500 dark:text-slate-400" />}
+      {children}
     </div>
   );
 }

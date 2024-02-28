@@ -1,16 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { ChartBarIcon, CodeBracketSquareIcon } from '@heroicons/react/20/solid';
+import { ChartBarIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
+import { Pill, PillContent } from '@inngest/components/Pill';
+import HorizontalPillList from '@inngest/components/Pill/HorizontalPillList';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import SendEventButton from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/events/[eventName]/SendEventButton';
 import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
 import Header from '@/components/Header/Header';
-import HorizontalPillList from '@/components/Pill/HorizontalPillList';
-import { Pill } from '@/components/Pill/Pill';
 import LoadingIcon from '@/icons/LoadingIcon';
 import EventIcon from '@/icons/event.svg';
 import { useEventTypes } from '@/queries';
@@ -148,10 +148,8 @@ function EventTypesListPaginationPage({
                       functionSlug: function_.slug,
                     })}
                     key={function_.name}
-                    className="bg-white align-middle text-slate-600"
                   >
-                    <CodeBracketSquareIcon className="mr-1 h-3.5 w-3.5 text-indigo-500" />
-                    {function_.name}
+                    <PillContent type="FUNCTION">{function_.name}</PillContent>
                   </Pill>
                 ))}
               />
