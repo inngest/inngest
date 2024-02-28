@@ -125,7 +125,7 @@ export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
         {failure && !isSyncing && <DeployFailure {...failure} />}
       </div>
 
-      <div className="flex flex-row justify-end gap-4 p-6">
+      <div className="flex justify-end gap-2 p-6">
         <Button
           appearance="outlined"
           btnAction={onClose}

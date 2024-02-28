@@ -98,19 +98,19 @@ export default function AppCard({ app }: { app: App }) {
 
   return (
     <div>
-      <AppCardHeader connected={app.connected} functionCount={app.functionCount} />
+      <AppCardHeader synced={app.connected} functionCount={app.functionCount} />
       <div className="divide-y divide-slate-700/30 rounded-b-md border border-slate-700/30 bg-slate-800/30">
         {!app.name ? (
           <div className="flex items-center gap-2 p-4 pr-6">
             <IconSpinner />
-            <p className="text-lg font-normal text-slate-400">Connecting...</p>
+            <p className="text-lg font-normal text-slate-400">Syncing...</p>
           </div>
         ) : (
           <div className="flex items-center justify-between px-6 py-4 ">
             {!app.connected ? (
               <div className="flex items-center gap-2">
                 <IconSpinner />
-                <p className="text-lg font-normal text-slate-400">Connecting to {app.name}...</p>
+                <p className="text-lg font-normal text-slate-400">Syncing to {app.name}...</p>
               </div>
             ) : (
               <p className=" text-lg text-white">{app.name}</p>
@@ -124,9 +124,9 @@ export default function AppCard({ app }: { app: App }) {
               <div className="">
                 <div className="flex items-center gap-3 text-base">
                   {app.connected ? (
-                    <>{<IconStatusCompleted />}Connected to App</>
+                    <>{<IconStatusCompleted />}Synced to app</>
                   ) : (
-                    <>{<IconStatusFailed />}No Connection to App</>
+                    <>{<IconStatusFailed />}Not synced to app</>
                   )}
                 </div>
                 <p className="ui-open:hidden pl-10 text-slate-300 xl:hidden">{app.url}</p>
@@ -142,7 +142,7 @@ export default function AppCard({ app }: { app: App }) {
               {!app.connected && (
                 <>
                   <p className="pb-4 text-slate-400">
-                    The Inngest Dev Server can’t find your application. Ensure your full URL is
+                    The Inngest Dev Server can&apos;t find your application. Ensure your full URL is
                     correct, including the correct port. Inngest automatically scans{' '}
                     <span className="text-white">multiple ports</span> by default.
                   </p>
@@ -195,7 +195,7 @@ export default function AppCard({ app }: { app: App }) {
               </div>
               {!app.connected && (
                 <Link className="w-fit" href="https://www.inngest.com/docs/sdk/serve">
-                  Connecting to the Dev Server
+                  Syncing to the Dev Server
                 </Link>
               )}
             </>
@@ -209,14 +209,14 @@ export default function AppCard({ app }: { app: App }) {
                   <>
                     {app.connected && <IconStatusCompleted />}
                     {!app.connected && <IconStatusCanceled />}
-                    {app.functionCount} Function
-                    {app.functionCount === 1 ? '' : 's'} Registered
+                    {app.functionCount} function
+                    {app.functionCount === 1 ? '' : 's'} registered
                   </>
                 )}
                 {app.functionCount < 1 && (
                   <>
                     <IconStatusCanceled />
-                    No Functions Found
+                    No functions found
                   </>
                 )}
               </div>

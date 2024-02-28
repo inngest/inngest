@@ -72,7 +72,7 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
           )}
         </Modal.Body>
 
-        <Modal.Footer className="flex flex-row justify-end gap-4">
+        <Modal.Footer className="flex justify-end gap-2">
           <Button appearance="outlined" btnAction={onCancel} label="Cancel" />
           <Button appearance="solid" kind="primary" label="Invoke Function" type="submit" />
         </Modal.Footer>

@@ -67,45 +67,43 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
   }
 
   return (
-    <Modal
-      title="Add Inngest App"
-      description="Connect your Inngest application to the Dev Server"
-      isOpen={isOpen}
-      onClose={onClose}
-      footer={
-        <div className="flex items-center justify-between">
-          <Button label="Cancel" appearance="outlined" btnAction={onClose} />
-          <Button
-            disabled={isDisabled || isUrlInvalid}
-            label="Connect App"
-            type="submit"
-            form="add-app"
-          />
-        </div>
-      }
-    >
-      <form id="add-app" onSubmit={handleSubmit}>
-        <div className="p-6">
-          <label htmlFor="addAppUrlModal" className="text-sm font-semibold text-white">
-            App URL
-            <span className="block pb-4 text-sm text-slate-500">The URL of your application</span>
-          </label>
-          <Input
-            id="addAppUrlModal"
-            value={inputUrl}
-            placeholder="http://localhost:3000/api/inngest"
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            isInvalid={isUrlInvalid}
-          />
-        </div>
-        {isUrlInvalid && inputUrl.length > 0 && (
-          <p className="flex items-center gap-2 bg-rose-600/50 px-6 py-2 text-sm text-white">
-            <IconExclamationTriangle />
-            Please enter a valid URL
-          </p>
-        )}
-      </form>
+    <Modal isOpen={isOpen} onClose={onClose}>
+      <Modal.Header description="Sync your Inngest application to the Dev Server">
+        Sync App
+      </Modal.Header>
+      <Modal.Body>
+        <form id="add-app" onSubmit={handleSubmit}>
+          <div>
+            <label htmlFor="addAppUrlModal" className="text-sm font-semibold text-white">
+              App URL
+              <span className="block pb-4 text-sm text-slate-500">The URL of your application</span>
+            </label>
+            <Input
+              id="addAppUrlModal"
+              value={inputUrl}
+              placeholder="http://localhost:3000/api/inngest"
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              isInvalid={isUrlInvalid}
+            />
+          </div>
+          {isUrlInvalid && inputUrl.length > 0 && (
+            <p className="flex items-center gap-2 bg-rose-600/50 px-6 py-2 text-sm text-white">
+              <IconExclamationTriangle />
+              Please enter a valid URL
+            </p>
+          )}
+        </form>
+      </Modal.Body>
+      <Modal.Footer className="flex justify-end gap-2">
+        <Button label="Cancel" appearance="outlined" btnAction={onClose} />
+        <Button
+          disabled={isDisabled || isUrlInvalid}
+          label="Sync App"
+          type="submit"
+          form="add-app"
+        />
+      </Modal.Footer>
     </Modal>
   );
 }
