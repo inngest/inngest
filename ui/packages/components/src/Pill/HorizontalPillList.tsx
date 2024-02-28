@@ -1,4 +1,4 @@
-import * as Tooltip from '@radix-ui/react-tooltip';
+import { Tooltip, TooltipArrow, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 
 import { Pill } from './Pill';
 
@@ -15,27 +15,20 @@ export function HorizontalPillList({ pills, alwaysVisibleCount }: FunctionsCellC
     const alwaysVisiblePills = pills.slice(0, alwaysVisibleCount);
 
     return (
-      <>
+      <div className="flex items-center">
         {alwaysVisiblePills}
-        <Tooltip.Provider>
-          <Tooltip.Root delayDuration={0}>
-            <Tooltip.Trigger className="cursor-default">
-              <Pill className="bg-white px-2.5 align-middle text-slate-600">
-                +{hiddenPills.length}
-              </Pill>
-            </Tooltip.Trigger>
-            <Tooltip.Portal>
-              <Tooltip.Content
-                className="data-[state=delayed-open]:data-[side=top]:animate-slide-down-and-fade data-[state=delayed-open]:data-[side=right]:animate-slide-left-and-fade data-[state=delayed-open]:data-[side=left]:animate-slide-right-and-fade data-[state=delayed-open]:data-[side=bottom]:animate-slide-up-and-fade text-violet11 select-none rounded-[4px] bg-white px-[15px] py-[10px] text-[15px] leading-none shadow-[hsl(206_22%_7%_/_35%)_0px_10px_38px_-10px,_hsl(206_22%_7%_/_20%)_0px_10px_20px_-15px] will-change-[transform,opacity]"
-                sideOffset={5}
-              >
-                <div className="flex flex-col gap-2">{hiddenPills}</div>
-                <Tooltip.Arrow className="fill-white" />
-              </Tooltip.Content>
-            </Tooltip.Portal>
-          </Tooltip.Root>
-        </Tooltip.Provider>
-      </>
+
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger className="cursor-default">
+            <Pill className="px-2.5 align-middle">+{hiddenPills.length}</Pill>
+          </TooltipTrigger>
+
+          <TooltipContent sideOffset={5} className="p-3">
+            <div className="flex flex-col gap-2">{hiddenPills}</div>
+            <TooltipArrow className="fill-white dark:fill-slate-800" />
+          </TooltipContent>
+        </Tooltip>
+      </div>
     );
   }
 
