@@ -51,7 +51,11 @@ const columns = [
   }),
   columnHelper.accessor('app', {
     header: () => <span>App</span>,
-    cell: (props) => props.getValue()?.name,
+    cell: (props) => (
+      <Pill className="text-sm font-normal">
+        <PillContent type="APP">{props.getValue()?.name}</PillContent>
+      </Pill>
+    ),
     enableSorting: false,
     enableGlobalFilter: false,
   }),

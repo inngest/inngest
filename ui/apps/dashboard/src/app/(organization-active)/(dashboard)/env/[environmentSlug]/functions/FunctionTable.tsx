@@ -164,15 +164,9 @@ function createColumns(environmentSlug: string) {
         }
 
         return (
-          <Link
-            key="name"
-            href={`/env/${environmentSlug}/apps/${encodeURIComponent(appExternalID)}` as Route}
-            internalNavigation
-            showIcon={false}
-            className="px-2 py-3 text-sm font-medium"
-          >
-            {appExternalID}
-          </Link>
+          <Pill href={`/env/${environmentSlug}/apps/${encodeURIComponent(appExternalID)}` as Route}>
+            <PillContent type="APP">{appExternalID}</PillContent>
+          </Pill>
         );
       },
       header: 'App',
