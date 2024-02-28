@@ -39,7 +39,7 @@ const columns = [
         <HorizontalPillList
           alwaysVisibleCount={2}
           pills={triggers.map((trigger, i) => (
-            <Pill className="text-sm" key={i}>
+            <Pill className="text-sm font-normal" key={i}>
               <PillContent type={trigger.type}>{trigger.value}</PillContent>
             </Pill>
           ))}
