@@ -1,6 +1,6 @@
 import * as Tooltip from '@radix-ui/react-tooltip';
 
-import { Pill } from '@/components/Pill/Pill';
+import { Pill } from './Pill';
 
 type FunctionsCellContentProps = {
   pills: React.ReactNode[];
