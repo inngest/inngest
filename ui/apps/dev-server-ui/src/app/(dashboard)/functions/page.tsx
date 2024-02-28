@@ -2,8 +2,8 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { BlankSlate } from '@inngest/components/BlankSlate';
+import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
-import { TriggerTags } from '@inngest/components/Tag/TriggerTags';
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -35,7 +35,16 @@ const columns = [
       if (!triggers || triggers.length === 0) {
         return <></>;
       }
-      return <TriggerTags triggers={triggers} />;
+      return (
+        <HorizontalPillList
+          alwaysVisibleCount={2}
+          pills={triggers.map((trigger, i) => (
+            <Pill className="text-sm" key={i}>
+              <PillContent type={trigger.type}>{trigger.value}</PillContent>
+            </Pill>
+          ))}
+        />
+      );
     },
     enableSorting: false,
     enableGlobalFilter: false,

@@ -7,10 +7,7 @@ type FunctionsCellContentProps = {
   alwaysVisibleCount?: number;
 };
 
-export default function HorizontalPillList({
-  pills,
-  alwaysVisibleCount,
-}: FunctionsCellContentProps) {
+export function HorizontalPillList({ pills, alwaysVisibleCount }: FunctionsCellContentProps) {
   if (pills.length === 0) return null;
 
   if (alwaysVisibleCount && pills.length > alwaysVisibleCount) {

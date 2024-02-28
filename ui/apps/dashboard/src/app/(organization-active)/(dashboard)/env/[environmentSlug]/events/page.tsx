@@ -4,8 +4,7 @@ import { useState } from 'react';
 import { ChartBarIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
-import { Pill, PillContent } from '@inngest/components/Pill';
-import HorizontalPillList from '@inngest/components/Pill/HorizontalPillList';
+import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import SendEventButton from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/events/[eventName]/SendEventButton';

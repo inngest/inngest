@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { IconClock } from '@inngest/components/icons/Clock';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
+import { cn } from '@inngest/components/utils/classNames';
 
 export function Pill({
   children,
@@ -14,11 +15,20 @@ export function Pill({
   className?: string;
   href?: Route | UrlObject;
 }) {
-  const classNames = `rounded-full inline-flex items-center h-[26px] px-3 leading-none text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 ${className}`;
+  const classNames = cn(
+    'rounded-full inline-flex items-center h-[26px] px-3 text-xs leading-none font-medium text-slate-600 dark:text-slate-400',
+    className
+  );
 
   if (href) {
     return (
-      <Link href={href} className={classNames}>
+      <Link
+        href={href}
+        className={cn(
+          'dark:bg-slate-910 border border-slate-200 bg-white transition-colors hover:bg-slate-200 dark:border-slate-700 dark:hover:bg-slate-800',
+          classNames
+        )}
+      >
         {children}
       </Link>
     );
