@@ -5,7 +5,6 @@ import { Badge } from '@inngest/components/Badge';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import Header, { type HeaderLink } from '@/components/Header/Header';
-import { Tag } from '@/components/Tag/Tag';
 import { useFunction } from '@/queries';
 import ArchiveFunctionButton from './ArchiveButton';
 import { InvokeButton } from './InvokeButton';
@@ -83,13 +82,15 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
             </div>
           )
         }
-        tag={
+        badge={
           !emptyData && isArchived ? (
-            <Tag size="sm">Archived</Tag>
+            <Badge kind="solid" className="bg-slate-800 text-slate-400">
+              Archived
+            </Badge>
           ) : !emptyData && isPaused ? (
-            <Tag size="sm" className="text-amber-500">
+            <Badge kind="solid" className="bg-slate-800 text-amber-500">
               Paused
-            </Tag>
+            </Badge>
           ) : null
         }
       />

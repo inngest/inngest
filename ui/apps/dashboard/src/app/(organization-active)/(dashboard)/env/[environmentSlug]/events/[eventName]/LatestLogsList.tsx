@@ -2,10 +2,10 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { KeyIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { Pill } from '@inngest/components/Pill';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { Pill } from '@/components/Pill/Pill';
 import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 

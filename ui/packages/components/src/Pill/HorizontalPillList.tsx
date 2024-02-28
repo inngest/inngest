@@ -1,16 +1,13 @@
 import * as Tooltip from '@radix-ui/react-tooltip';
 
-import { Pill } from '@/components/Pill/Pill';
+import { Pill } from './Pill';
 
 type FunctionsCellContentProps = {
   pills: React.ReactNode[];
   alwaysVisibleCount?: number;
 };
 
-export default function HorizontalPillList({
-  pills,
-  alwaysVisibleCount,
-}: FunctionsCellContentProps) {
+export function HorizontalPillList({ pills, alwaysVisibleCount }: FunctionsCellContentProps) {
   if (pills.length === 0) return null;
 
   if (alwaysVisibleCount && pills.length > alwaysVisibleCount) {
