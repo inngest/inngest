@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/fatih/structs"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/coded_err"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -160,14 +159,13 @@ func (f RegisterRequest) Parse(ctx context.Context) ([]*inngest.Function, error)
 		}
 	}
 
-	if me, ok := err.(*multierror.Error); ok {
-		ceData := &coded_err.MultiErrData{}
-		for _, e := range me.Errors {
-			ceData.Add(e)
-		}
+	if err != nil {
+		data := coded_err.MultiErrData{}
+		data.Append(err)
+
 		return nil, &coded_err.Error{
 			Code: coded_err.CodeConfigInvalid,
-			Data: structs.Map(ceData),
+			Data: data.ToMap(),
 		}
 	}
 

@@ -39,7 +39,7 @@ func (c ConcurrencyLimits) Validate(ctx context.Context) error {
 	if len(c.Limits) > consts.MaxConcurrencyLimits {
 		return coded_err.Error{
 			Code:    coded_err.CodeConcurrencyLimit,
-			Message: fmt.Sprintf("Each function cannot have more than %d concurrency limits", consts.MaxConcurrencyLimits),
+			Message: fmt.Sprintf("There are more concurrency limits specified than the allowed max of: %d", consts.MaxConcurrencyLimits),
 		}
 	}
 	for _, l := range c.Limits {

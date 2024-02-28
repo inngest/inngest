@@ -65,7 +65,7 @@ func (c EventBatchConfig) IsValid() error {
 	if c.MaxSize < 2 {
 		return coded_err.Error{
 			Code:    coded_err.CodeBatchSize,
-			Message: "Batch size must be greater than 1",
+			Message: fmt.Sprintf("batch size cannot be smaller than 2: %d", c.MaxSize),
 		}
 	}
 
