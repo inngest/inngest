@@ -24,8 +24,6 @@ import FunctionRunList from './FunctionRunList';
 
 // import OutputList from './OutputList';
 
-// import SourceBadge from './SourceBadge';
-
 const columnHelper = createColumnHelper<StreamItem>();
 
 const columns = [
@@ -39,12 +37,6 @@ const columns = [
     size: 250,
     minSize: 250,
   }),
-  // The Source BE is not built yet
-  // columnHelper.accessor((row) => row.source.name, {
-  //   id: 'source',
-  //   cell: (props) => <SourceBadge row={props.row} />,
-  //   header: () => <span>Source</span>,
-  // }),
   columnHelper.accessor('type', {
     header: () => <span>Trigger</span>,
     cell: (props) => (
