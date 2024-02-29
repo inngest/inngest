@@ -9,11 +9,26 @@ import (
 	cron "github.com/robfig/cron/v3"
 )
 
+// Triggerable represents a single or multiple triggers for a function.
+type Triggerable interface {
+	Triggers() []Trigger
+}
+
+type MultipleTriggers []Trigger
+
+func (m MultipleTriggers) Triggers() []Trigger {
+	return m
+}
+
 // Trigger represents either an event trigger or a cron trigger.  Only one is valid;  when
 // defining a function within Cue we enforce that only an event or cron field can be specified.
 type Trigger struct {
 	*EventTrigger
 	*CronTrigger
+}
+
+func (t Trigger) Triggers() []Trigger {
+	return []Trigger{t}
 }
 
 func (t Trigger) Validate(ctx context.Context) error {
