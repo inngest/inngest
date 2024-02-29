@@ -42,7 +42,7 @@ type Runner interface {
 	StateManager() state.Manager
 	InitializeCrons(ctx context.Context) error
 	Runs(ctx context.Context, eventId ulid.ULID) ([]state.State, error)
-	Events(ctx context.Context, eventId ulid.ULID) ([]event.Event, error)
+	Events(ctx context.Context, eventId *ulid.ULID) ([]event.Event, error)
 }
 
 func WithCQRS(data cqrs.Manager) func(s *svc) {
@@ -270,13 +270,17 @@ func (s *svc) StateManager() state.Manager {
 	return s.state
 }
 
-func (s *svc) Events(ctx context.Context, eventId ulid.ULID) ([]event.Event, error) {
-	evt := s.em.EventById(eventId.String())
-	if evt != nil {
-		return []event.Event{*evt}, nil
+func (s *svc) Events(ctx context.Context, eventId *ulid.ULID) ([]event.Event, error) {
+	if eventId != nil {
+		evt := s.em.EventById(eventId.String())
+		if evt != nil {
+			return []event.Event{*evt}, nil
+		}
+
+		return []event.Event{}, nil
 	}
 
-	return []event.Event{}, nil
+	return s.em.Events(), nil
 }
 
 func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {

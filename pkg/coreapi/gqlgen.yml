@@ -40,6 +40,8 @@ models:
         resolver: true
       status:
         resolver: true
+      raw:
+        resolver: true
   Function:
     fields:
       app:

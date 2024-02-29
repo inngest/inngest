@@ -241,6 +241,7 @@ export type Query = {
   __typename?: 'Query';
   apps: Array<App>;
   event: Maybe<Event>;
+  events: Maybe<Array<Event>>;
   functionRun: Maybe<FunctionRun>;
   functions: Maybe<Array<Function>>;
   stream: Array<StreamItem>;
@@ -249,6 +250,11 @@ export type Query = {
 
 export type QueryEventArgs = {
   query: EventQuery;
+};
+
+
+export type QueryEventsArgs = {
+  query: EventsQuery;
 };
 
 

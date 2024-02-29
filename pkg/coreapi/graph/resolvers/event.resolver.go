@@ -96,7 +96,7 @@ func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.
 }
 
 func (r *eventResolver) Raw(ctx context.Context, obj *models.Event) (*string, error) {
-	evts, err := r.Runner.Events(ctx, obj.ID)
+	evts, err := r.Runner.Events(ctx, &obj.ID)
 	if err != nil {
 		return nil, err
 	}
