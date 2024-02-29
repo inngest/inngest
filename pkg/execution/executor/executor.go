@@ -1989,15 +1989,13 @@ func newFinalError(err error) error {
 }
 
 func generateCancelExpression(eventID ulid.ULID, expr *string) string {
-	receivedAt := strconv.Itoa(int(eventID.Time()))
-
 	// Ensure that we only listen to cancellation events that occur
 	// after the initial event is received.
 	//
 	// NOTE: We don't use `event.ts` here as people can use a future-TS date
 	// to schedule future runs.  Events received between now and that date should
 	// still cancel the run.
-	res := fmt.Sprintf("(async.ts == null || async.ts > %s)", receivedAt)
+	res := fmt.Sprintf("(async.ts == null || async.ts > %d)", eventID.Time())
 	if expr != nil {
 		res = *expr + " && " + res
 	}
