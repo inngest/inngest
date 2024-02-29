@@ -8,11 +8,31 @@ import { Code } from '@inngest/components/Code';
 import { Link } from '@inngest/components/Link';
 import { useLocalStorage } from 'react-use';
 import { toast } from 'sonner';
+import { useMutation } from 'urql';
 
+import type { CodedError } from '@/codedError';
 import Input from '@/components/Forms/Input';
-import { DeployFailure } from '../../deploys/DeployFailure';
+import { SyncFailure } from '@/components/SyncFailure';
+import { graphql } from '@/gql';
+import { pathCreator } from '@/utils/urls';
 import DeploySigningKey from '../../deploys/DeploySigningKey';
-import { deployViaUrl, type RegistrationFailure } from '../../deploys/utils';
+import { useEnvironment } from '../../environment-context';
+
+const SyncNewAppDocument = graphql(`
+  mutation SyncNewApp($appURL: String!, $envID: UUID!) {
+    syncNewApp(appURL: $appURL, envID: $envID) {
+      app {
+        externalID
+        id
+      }
+      error {
+        code
+        data
+        message
+      }
+    }
+  }
+`);
 
 type Props = {
   appsURL: Route;
@@ -20,28 +40,58 @@ type Props = {
 
 export default function ManualSync({ appsURL }: Props) {
   const [input = '', setInput] = useLocalStorage('deploymentUrl', '');
-  const [failure, setFailure] = useState<RegistrationFailure>();
-  const [isLoading, setIsLoading] = useState(false);
+  const [failure, setFailure] = useState<CodedError>();
+  const [isSyncing, setIsSyncing] = useState(false);
   const router = useRouter();
+  const env = useEnvironment();
+  const [, syncNewApp] = useMutation(SyncNewAppDocument);
 
-  async function onClickDeploy() {
-    setIsLoading(true);
+  async function onSync() {
+    setIsSyncing(true);
 
     try {
-      const failure = await deployViaUrl(input);
-      setFailure(failure);
-      if (!failure) {
-        toast.success('App Successfuly Synced');
-        router.push(appsURL);
+      // TODO: This component is using legacy syncs stuff that needs
+      // reorginization and/or refactoring. We should use a GraphQL mutation
+      // that gets the last sync URL, rather than relying on the UI to find it.
+      // failure = await deployViaUrl(url);
+      const res = await syncNewApp({
+        appURL: input,
+        envID: env.id,
+      });
+      if (res.error) {
+        throw res.error;
       }
-    } catch {
+      if (!res.data) {
+        throw new Error('No API response data');
+      }
+
+      if (res.data.syncNewApp.error) {
+        setFailure(res.data.syncNewApp.error);
+        return;
+      }
+
+      setFailure(undefined);
+      toast.success('Synced app');
+
+      const { externalID } = res.data.syncNewApp.app ?? {};
+      let navURL;
+      if (externalID) {
+        navURL = pathCreator.app({
+          envSlug: env.slug,
+          externalAppID: externalID,
+        });
+      } else {
+        // Should be unreachable
+        navURL = pathCreator.apps({ envSlug: env.slug });
+      }
+
+      router.push(navURL);
+    } catch (error) {
       setFailure({
-        errorCode: undefined,
-        headers: {},
-        statusCode: undefined,
+        code: 'unknown',
       });
     } finally {
-      setIsLoading(false);
+      setIsSyncing(false);
     }
   }
 
@@ -97,11 +147,8 @@ export default function ManualSync({ appsURL }: Props) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
           />
-          {failure && !isLoading ? (
-            <div className="mt-2">
-              <DeployFailure {...failure} />
-            </div>
-          ) : null}
+
+          {failure && !isSyncing && <SyncFailure error={failure} />}
         </div>
       </div>
       <div className="flex items-center justify-between px-8 py-6">
@@ -116,10 +163,10 @@ export default function ManualSync({ appsURL }: Props) {
           />
           <Button
             label="Sync App"
-            btnAction={onClickDeploy}
+            btnAction={onSync}
             kind="primary"
             disabled={disabled}
-            loading={isLoading}
+            loading={isSyncing}
           />
         </div>
       </div>

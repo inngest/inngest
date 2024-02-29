@@ -53,6 +53,7 @@ export default function Layout({ children, params: { externalID } }: Props) {
   if (res.data.latestSync?.url) {
     action = (
       <ResyncButton
+        appExternalID={externalID}
         platform={res.data.latestSync.platform}
         latestSyncUrl={res.data.latestSync.url}
       />
