@@ -2,7 +2,9 @@ package devserver
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -23,27 +25,31 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/devserver/discovery"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/mattn/go-isatty"
+	"github.com/oklog/ulid/v2"
 )
 
 const (
 	SDKPollInterval = 5 * time.Second
 )
 
-func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager) *devserver {
+func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher) *devserver {
 	return &devserver{
 		data:        data,
 		runner:      runner,
 		opts:        opts,
 		handlerLock: &sync.Mutex{},
+		publisher:   pb,
 	}
 }
 
@@ -59,11 +65,12 @@ type devserver struct {
 	data cqrs.Manager
 
 	// runner stores the runner
-	runner   runner.Runner
-	tracker  *runner.Tracker
-	state    state.Manager
-	queue    queue.Queue
-	executor execution.Executor
+	runner    runner.Runner
+	tracker   *runner.Tracker
+	state     state.Manager
+	queue     queue.Queue
+	executor  execution.Executor
+	publisher pubsub.Publisher
 
 	apiservice service.Service
 
@@ -96,14 +103,17 @@ func (d *devserver) Pre(ctx context.Context) error {
 		})
 	})
 
+	// d.opts.Config.EventStream.Service.TopicName()
+
 	core, err := coreapi.NewCoreApi(coreapi.Options{
-		Data:    d.data,
-		Config:  d.opts.Config,
-		Logger:  logger.From(ctx),
-		Runner:  d.runner,
-		Tracker: d.tracker,
-		State:   d.state,
-		Queue:   d.queue,
+		Data:         d.data,
+		Config:       d.opts.Config,
+		Logger:       logger.From(ctx),
+		Runner:       d.runner,
+		Tracker:      d.tracker,
+		State:        d.state,
+		Queue:        d.queue,
+		EventHandler: d.handleEvent,
 	})
 	if err != nil {
 		return err
@@ -263,6 +273,42 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		}
 		<-time.After(SDKPollInterval)
 	}
+}
+
+func (d *devserver) handleEvent(ctx context.Context, e *event.Event) (string, error) {
+	// ctx is the request context, so we need to re-add
+	// the caller here.
+	l := logger.From(ctx).With().Str("caller", "devserver").Logger()
+	ctx = logger.With(ctx, l)
+
+	l.Debug().Str("event", e.Name).Msg("handling event")
+
+	internalID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	if e.ID == "" {
+		// Always ensure that the event has an ID, for idempotency.
+		e.ID = internalID.String()
+	}
+
+	byt, err := json.Marshal(e)
+	if err != nil {
+		l.Error().Err(err).Msg("error unmarshalling event as JSON")
+		return "", err
+	}
+
+	l.Info().Str("event_name", e.Name).Str("id", e.ID).Interface("event", e).Msg("publishing event")
+
+	err = d.publisher.Publish(
+		ctx,
+		d.opts.Config.EventStream.Service.TopicName(),
+		pubsub.Message{
+			Name:      event.EventReceivedName,
+			Data:      string(byt),
+			Timestamp: time.Now(),
+		},
+	)
+
+	return e.ID, err
 }
 
 // SDKHandler represents a handler that has registered with the dev server.

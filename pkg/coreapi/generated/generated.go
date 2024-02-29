@@ -146,6 +146,7 @@ type ComplexityRoot struct {
 		CreateApp       func(childComplexity int, input models.CreateAppInput) int
 		DeleteApp       func(childComplexity int, id string) int
 		DeleteAppByName func(childComplexity int, name string) int
+		InvokeFunction  func(childComplexity int, data map[string]interface{}, functionSlug string) int
 		UpdateApp       func(childComplexity int, input models.UpdateAppInput) int
 	}
 
@@ -292,6 +293,7 @@ type MutationResolver interface {
 	UpdateApp(ctx context.Context, input models.UpdateAppInput) (*cqrs.App, error)
 	DeleteApp(ctx context.Context, id string) (string, error)
 	DeleteAppByName(ctx context.Context, name string) (bool, error)
+	InvokeFunction(ctx context.Context, data map[string]interface{}, functionSlug string) (*bool, error)
 }
 type QueryResolver interface {
 	Apps(ctx context.Context) ([]*cqrs.App, error)
@@ -808,6 +810,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.DeleteAppByName(childComplexity, args["name"].(string)), true
+
+	case "Mutation.invokeFunction":
+		if e.complexity.Mutation.InvokeFunction == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_invokeFunction_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.InvokeFunction(childComplexity, args["data"].(map[string]interface{}), args["functionSlug"].(string)), true
 
 	case "Mutation.updateApp":
 		if e.complexity.Mutation.UpdateApp == nil {
@@ -1358,11 +1372,18 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 }
 
 var sources = []*ast.Source{
-	{Name: "../gql.mutations.graphql", Input: `type Mutation {
+	{Name: "../gql.mutations.graphql", Input: `scalar Map
+
+type Mutation {
   createApp(input: CreateAppInput!): App!
   updateApp(input: UpdateAppInput!): App!
   deleteApp(id: String!): String! # returns the ID of the deleted app
   deleteAppByName(name: String!): Boolean!
+
+  invokeFunction(
+    data: Map
+    functionSlug: String!
+  ): Boolean
 }
 
 input CreateAppInput {
@@ -1785,6 +1806,30 @@ func (ec *executionContext) field_Mutation_deleteApp_args(ctx context.Context, r
 		}
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_invokeFunction_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 map[string]interface{}
+	if tmp, ok := rawArgs["data"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("data"))
+		arg0, err = ec.unmarshalOMap2map(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["data"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["functionSlug"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("functionSlug"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["functionSlug"] = arg1
 	return args, nil
 }
 
@@ -5154,6 +5199,58 @@ func (ec *executionContext) fieldContext_Mutation_deleteAppByName(ctx context.Co
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_deleteAppByName_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_invokeFunction(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_invokeFunction(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().InvokeFunction(rctx, fc.Args["data"].(map[string]interface{}), fc.Args["functionSlug"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_invokeFunction(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_invokeFunction_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -11227,6 +11324,12 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "invokeFunction":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_invokeFunction(ctx, field)
+			})
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -13388,6 +13491,22 @@ func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.Sele
 		return graphql.Null
 	}
 	res := graphql.MarshalInt(*v)
+	return res
+}
+
+func (ec *executionContext) unmarshalOMap2map(ctx context.Context, v interface{}) (map[string]interface{}, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalMap(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOMap2map(ctx context.Context, sel ast.SelectionSet, v map[string]interface{}) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	res := graphql.MarshalMap(v)
 	return res
 }
 

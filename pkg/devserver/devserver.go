@@ -251,7 +251,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	// The devserver embeds the event API.
-	ds := newService(opts, runner, dbcqrs)
+	ds := newService(opts, runner, dbcqrs, pb)
 	// embed the tracker
 	ds.tracker = t
 	ds.state = sm
