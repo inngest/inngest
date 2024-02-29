@@ -74,7 +74,7 @@ export default function ManualSync({ appsURL }: Props) {
       toast.success('Synced app');
 
       const { externalID } = res.data.syncNewApp.app ?? {};
-      let navURL: string;
+      let navURL;
       if (externalID) {
         navURL = pathCreator.app({
           envSlug: env.slug,
