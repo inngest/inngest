@@ -15,12 +15,7 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 	accountID := uuid.UUID{}
 	workspaceID := uuid.UUID{}
 
-	eventID, err := ulid.Parse(obj.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	runs, err := r.Data.GetFunctionRunsFromEvents(ctx, accountID, workspaceID, []ulid.ULID{eventID})
+	runs, err := r.Data.GetFunctionRunsFromEvents(ctx, accountID, workspaceID, []ulid.ULID{obj.ID})
 	if err != nil {
 		return nil, err
 	}

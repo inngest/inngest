@@ -124,7 +124,7 @@ func (r *functionRunResolver) Event(ctx context.Context, obj *models.FunctionRun
 
 	return &models.Event{
 		CreatedAt: &evt.ReceivedAt,
-		ID:        evt.ID.String(),
+		ID:        evt.InternalID(),
 		Name:      &evt.EventName,
 		Payload:   util.StrPtr(string(payload)),
 	}, nil
@@ -160,7 +160,7 @@ func (r *functionRunResolver) Events(ctx context.Context, obj *models.FunctionRu
 		}
 
 		result[i] = &models.Event{
-			ID:        e.ID.String(),
+			ID:        e.InternalID(),
 			Name:      &e.EventName,
 			CreatedAt: &e.ReceivedAt,
 			Payload:   util.StrPtr(string(payload)),

@@ -6,17 +6,11 @@ type Query {
   # Get an individual event
   event(query: EventQuery!): Event
 
-  # Get all events sent
-  events(query: EventsQuery!): [Event!]
-
   # Get all functions registered
   functions: [Function!]
 
   # Get an individual function run
   functionRun(query: FunctionRunQuery!): FunctionRun
-
-  # Get all function runs
-  functionRuns(query: FunctionRunsQuery!): [FunctionRun!]
 }
 
 input ActionVersionQuery {

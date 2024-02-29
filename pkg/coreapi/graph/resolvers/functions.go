@@ -3,7 +3,6 @@ package resolvers
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/oklog/ulid/v2"
@@ -69,45 +68,4 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 	fr.Name = &name
 	fr.Status = &status
 	return fr, nil
-}
-
-func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionRunsQuery) ([]*models.FunctionRun, error) {
-	state, err := r.Runner.Runs(ctx, "")
-	if err != nil {
-		return nil, err
-	}
-
-	var runs []*models.FunctionRun
-
-	for _, s := range state {
-		m := s.Metadata()
-		status, err := models.ToFunctionRunStatus(m.Status)
-		if err != nil {
-			return nil, err
-		}
-
-		startedAt := ulid.Time(m.Identifier.RunID.Time())
-
-		name := s.Function().Name
-		pending, _ := r.Queue.OutstandingJobCount(
-			ctx,
-			m.Identifier.WorkspaceID,
-			m.Identifier.WorkflowID,
-			m.Identifier.RunID,
-		)
-
-		runs = append(runs, &models.FunctionRun{
-			ID:           m.Identifier.RunID.String(),
-			Name:         &name,
-			Status:       &status,
-			PendingSteps: &pending,
-			StartedAt:    &startedAt,
-		})
-	}
-
-	sort.Slice(runs, func(i, j int) bool {
-		return runs[i].ID > runs[j].ID
-	})
-
-	return runs, nil
 }
