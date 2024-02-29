@@ -6,24 +6,45 @@ import { Modal } from '@inngest/components/Modal';
 import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch';
 import { cn } from '@inngest/components/utils/classNames';
 import { toast } from 'sonner';
+import { useMutation } from 'urql';
 
+import type { CodedError } from '@/codedError';
 import { Alert } from '@/components/Alert';
 import Input from '@/components/Forms/Input';
-import { DeployFailure } from '../../deploys/DeployFailure';
-import { deployViaUrl, type RegistrationFailure } from '../../deploys/utils';
+import { SyncFailure } from '@/components/SyncFailure/SyncFailure';
+import { graphql } from '@/gql';
+import { useEnvironment } from '../../environment-context';
+
+const ResyncAppDocument = graphql(`
+  mutation ResyncApp($appExternalID: String!, $appURL: String, $envID: UUID!) {
+    resyncApp(appExternalID: $appExternalID, appURL: $appURL, envID: $envID) {
+      app {
+        id
+      }
+      error {
+        code
+        data
+        message
+      }
+    }
+  }
+`);
 
 type Props = {
+  appExternalID: string;
   isOpen: boolean;
   onClose: () => void;
   url: string;
   platform: string | null;
 };
 
-export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
+export default function ResyncModal({ appExternalID, isOpen, onClose, url, platform }: Props) {
   const [overrideValue, setOverrideValue] = useState(url);
   const [isURLOverridden, setURLOverridden] = useState(false);
-  const [failure, setFailure] = useState<RegistrationFailure>();
+  const [failure, setFailure] = useState<CodedError>();
   const [isSyncing, setIsSyncing] = useState(false);
+  const env = useEnvironment();
+  const [, resyncApp] = useMutation(ResyncAppDocument);
 
   if (isURLOverridden) {
     url = overrideValue;
@@ -32,23 +53,34 @@ export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
   async function onSync() {
     setIsSyncing(true);
 
-    let failure;
     try {
       // TODO: This component is using legacy syncs stuff that needs
       // reorginization and/or refactoring. We should use a GraphQL mutation
       // that gets the last sync URL, rather than relying on the UI to find it.
-      failure = await deployViaUrl(url);
-
-      setFailure(failure);
-      if (!failure) {
-        toast.success('Synced app');
-        onClose();
+      // failure = await deployViaUrl(url);
+      const res = await resyncApp({
+        appExternalID,
+        appURL: url,
+        envID: env.id,
+      });
+      if (res.error) {
+        throw res.error;
       }
-    } catch {
+      if (!res.data) {
+        throw new Error('No API response data');
+      }
+
+      if (res.data.resyncApp.error) {
+        setFailure(res.data.resyncApp.error);
+        return;
+      }
+
+      setFailure(undefined);
+      toast.success('Synced app');
+      onClose();
+    } catch (error) {
       setFailure({
-        errorCode: undefined,
-        headers: {},
-        statusCode: undefined,
+        code: 'unknown',
       });
     } finally {
       setIsSyncing(false);
@@ -122,7 +154,7 @@ export default function ResyncModal({ isOpen, onClose, url, platform }: Props) {
           )}
         </div>
 
-        {failure && !isSyncing && <DeployFailure {...failure} />}
+        {failure && !isSyncing && <SyncFailure error={failure} />}
       </div>
 
       <div className="flex justify-end gap-2 p-6">
