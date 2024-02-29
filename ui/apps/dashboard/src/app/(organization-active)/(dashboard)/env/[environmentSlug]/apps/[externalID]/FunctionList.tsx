@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { type Route } from 'next';
 import { Link } from '@inngest/components/Link';
-import { Pill, PillContent } from '@inngest/components/Pill';
+import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
 import type { Function } from '@inngest/components/types/function';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
@@ -69,8 +69,9 @@ function useColumns({ envSlug }: { envSlug: string }) {
       cell: (props) => {
         const triggers = props.getValue();
         return (
-          <div className="flex gap-1">
-            {triggers.map((trigger) => {
+          <HorizontalPillList
+            alwaysVisibleCount={2}
+            pills={triggers.map((trigger) => {
               return (
                 <Pill
                   href={
@@ -84,7 +85,7 @@ function useColumns({ envSlug }: { envSlug: string }) {
                 </Pill>
               );
             })}
-          </div>
+          />
         );
       },
       header: () => <span>Triggers</span>,
