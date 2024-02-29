@@ -622,11 +622,16 @@ func Initialize(ctx context.Context, fn inngest.Function, tracked event.TrackedE
 		fn.ID = inngest.DeterministicUUID(fn)
 	}
 
+	// Use the custom event ID (a.k.a. event idempotency key) if it exists, else
+	// use the internal event ID
+	idempotencyKey := tracked.GetEvent().ID
+
 	// If this is a debounced function, run this through a debouncer.
 
 	return e.Schedule(ctx, execution.ScheduleRequest{
-		Function: fn,
-		Events:   []event.TrackedEvent{tracked},
+		Function:       fn,
+		Events:         []event.TrackedEvent{tracked},
+		IdempotencyKey: &idempotencyKey,
 	})
 }
 
