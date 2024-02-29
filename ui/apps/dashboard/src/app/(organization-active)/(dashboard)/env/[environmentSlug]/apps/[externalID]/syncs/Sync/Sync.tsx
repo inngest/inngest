@@ -56,7 +56,8 @@ export function Sync({ externalAppID, syncID }: Props) {
         syncedFunctions={sync.syncedFunctions}
       />
     );
-  } else if (sync.status === SyncStatus.Duplicate) {
+    // TODO: Replace with SyncStatus.duplicate after we deploy the API changes
+  } else if (sync.status === 'duplicate') {
     functions = (
       <Alert severity="info">
         This sync is a duplicate. Please navigate to the previous successful sync to view its
