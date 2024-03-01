@@ -60,19 +60,11 @@ models:
         resolver: true
       batchCreatedAt:
         resolver: true
-      batchID:
-        resolver: true
       waitingFor:
         resolver: true
       pendingSteps:
         resolver: true
-      status:
-        resolver: true
       function:
-        resolver: true
-      output:
-        resolver: true
-      finishedAt:
         resolver: true
   HistoryType:
     model: github.com/inngest/inngest/pkg/enums.HistoryType
