@@ -1,14 +1,24 @@
 'use client';
 
+import { useCallback } from 'react';
 import { CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { Badge } from '@inngest/components/Badge';
+import { InvokeButton } from '@inngest/components/InvokeButton';
+import { useMutation } from 'urql';
 
+import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import Header, { type HeaderLink } from '@/components/Header/Header';
+import { graphql } from '@/gql';
 import { useFunction } from '@/queries';
 import ArchiveFunctionButton from './ArchiveButton';
-import { InvokeButton } from './InvokeButton';
 import PauseFunctionButton from './PauseButton';
+
+const InvokeFunctionDocument = graphql(`
+  mutation InvokeFunction($envID: UUID!, $data: Map, $functionSlug: String!) {
+    invokeFunction(envID: $envID, data: $data, functionSlug: $functionSlug)
+  }
+`);
 
 type FunctionLayoutProps = {
   children: React.ReactNode;
@@ -20,9 +30,9 @@ type FunctionLayoutProps = {
 
 export default function FunctionLayout({ children, params }: FunctionLayoutProps) {
   const functionSlug = decodeURIComponent(params.slug);
-  const [{ data, fetching }] = useFunction({
-    functionSlug,
-  });
+  const [{ data, fetching }] = useFunction({ functionSlug });
+  const [, invokeFunction] = useMutation(InvokeFunctionDocument);
+  const env = useEnvironment();
 
   const fn = data?.workspace.workflow;
   const { isArchived = false } = fn ?? {};
@@ -60,6 +70,17 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
       return trigger.eventName;
     }) ?? false;
 
+  const invokeAction = useCallback(
+    (data: Record<string, unknown>) => {
+      invokeFunction({
+        envID: env.id,
+        data,
+        functionSlug,
+      });
+    },
+    [env.id, functionSlug, invokeFunction]
+  );
+
   return (
     <>
       <Header
@@ -72,9 +93,9 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
               {/* Disable buttons that do not yet work */}
               <div className="flex items-center gap-2 pr-2">
                 <InvokeButton
-                  functionSlug={functionSlug}
                   disabled={isArchived}
                   doesFunctionAcceptPayload={doesFunctionAcceptPayload}
+                  btnAction={invokeAction}
                 />
                 <PauseFunctionButton functionSlug={functionSlug} disabled={isArchived} />
                 <ArchiveFunctionButton functionSlug={functionSlug} />
