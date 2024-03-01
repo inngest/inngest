@@ -13,6 +13,7 @@ export type Scalars = {
   Float: number;
   /** The environment for the function to be run: `"prod"` or `"test"` */
   Environment: any;
+  Map: any;
   Time: any;
   ULID: any;
   UUID: any;
@@ -214,6 +215,7 @@ export type Mutation = {
   createApp: App;
   deleteApp: Scalars['String'];
   deleteAppByName: Scalars['Boolean'];
+  invokeFunction: Maybe<Scalars['Boolean']>;
   updateApp: App;
 };
 
@@ -230,6 +232,12 @@ export type MutationDeleteAppArgs = {
 
 export type MutationDeleteAppByNameArgs = {
   name: Scalars['String'];
+};
+
+
+export type MutationInvokeFunctionArgs = {
+  data: InputMaybe<Scalars['Map']>;
+  functionSlug: Scalars['String'];
 };
 
 
@@ -491,6 +499,14 @@ export type GetHistoryItemOutputQueryVariables = Exact<{
 
 export type GetHistoryItemOutputQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', historyItemOutput: string | null } | null };
 
+export type InvokeFunctionMutationVariables = Exact<{
+  functionSlug: Scalars['String'];
+  data: InputMaybe<Scalars['Map']>;
+}>;
+
+
+export type InvokeFunctionMutation = { __typename?: 'Mutation', invokeFunction: boolean | null };
+
 
 export const GetEventsStreamDocument = `
     query GetEventsStream {
@@ -727,6 +743,11 @@ export const GetHistoryItemOutputDocument = `
   }
 }
     `;
+export const InvokeFunctionDocument = `
+    mutation InvokeFunction($functionSlug: String!, $data: Map) {
+  invokeFunction(data: $data, functionSlug: $functionSlug)
+}
+    `;
 
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -769,9 +790,12 @@ const injectedRtkApi = api.injectEndpoints({
     GetHistoryItemOutput: build.query<GetHistoryItemOutputQuery, GetHistoryItemOutputQueryVariables>({
       query: (variables) => ({ document: GetHistoryItemOutputDocument, variables })
     }),
+    InvokeFunction: build.mutation<InvokeFunctionMutation, InvokeFunctionMutationVariables>({
+      query: (variables) => ({ document: InvokeFunctionDocument, variables })
+    }),
   }),
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery } = injectedRtkApi;
+export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation } = injectedRtkApi;
 
