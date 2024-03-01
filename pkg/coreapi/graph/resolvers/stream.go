@@ -38,11 +38,14 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 		ids[n] = evt.InternalID()
 	}
 
-	// Fetch all function runs by event
-	fns, err := r.Data.GetFunctionRunsFromEvents(
+	// Values don't matter in the Dev Server
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+
+	fns, err := r.HistoryReader.GetFunctionRunsFromEvents(
 		ctx,
-		uuid.UUID{},
-		uuid.UUID{},
+		accountID,
+		workspaceID,
 		ids,
 	)
 	if err != nil {

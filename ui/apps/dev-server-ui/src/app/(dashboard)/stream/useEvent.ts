@@ -30,7 +30,7 @@ export function useEvent(eventID: string | null): FetchResult<Data, { skippable:
     const functionRuns: Data['functionRuns'] = (event.functionRuns ?? []).map((run) => {
       return {
         id: run.id,
-        name: run.name ?? 'Unknown',
+        name: run.function?.name ?? 'Unknown',
         output: run.output ?? null,
         status: run.status ?? FunctionRunStatus.Running,
       };
