@@ -60,8 +60,9 @@ export function Sync({ externalAppID, syncID }: Props) {
   } else if (sync.status === 'duplicate') {
     functions = (
       <Alert severity="info">
-        This sync is a duplicate. Please navigate to the previous successful sync to view its
-        functions.
+        This sync is a duplicate since none of the function configurations changed since the
+        previous successful sync. If you would like to view its functions, please navigate to the
+        previous successful sync.
       </Alert>
     );
   }
