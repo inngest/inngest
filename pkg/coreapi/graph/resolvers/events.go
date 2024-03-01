@@ -29,11 +29,17 @@ func (r *queryResolver) Event(ctx context.Context, query models.EventQuery) (*mo
 		createdAt = ulid.Time(evt.ID.Time())
 	}
 
+	var externalID *string
+	if evt.EventID != "" {
+		externalID = &evt.EventID
+	}
+
 	return &models.Event{
-		ID:        evt.InternalID(),
-		Name:      &evt.EventName,
-		CreatedAt: &createdAt,
-		Payload:   &payload,
+		ID:         evt.InternalID(),
+		ExternalID: externalID,
+		Name:       &evt.EventName,
+		CreatedAt:  &createdAt,
+		Payload:    &payload,
 	}, nil
 }
 
@@ -41,7 +47,7 @@ func (r *queryResolver) Event(ctx context.Context, query models.EventQuery) (*mo
 // individual resolvers; we shouldn't be mapping any of the fields in this
 // query.
 func (r *queryResolver) Events(ctx context.Context, query models.EventsQuery) ([]*models.Event, error) {
-	evts, err := r.Runner.Events(ctx, nil)
+	evts, err := r.Runner.Events(ctx, "")
 	if err != nil {
 		return nil, err
 	}

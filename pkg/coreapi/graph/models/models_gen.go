@@ -29,6 +29,7 @@ type CreateAppInput struct {
 
 type Event struct {
 	ID           ulid.ULID      `json:"id"`
+	ExternalID   *string        `json:"externalID,omitempty"`
 	Workspace    *Workspace     `json:"workspace,omitempty"`
 	Name         *string        `json:"name,omitempty"`
 	CreatedAt    *time.Time     `json:"createdAt,omitempty"`

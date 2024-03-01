@@ -74,6 +74,7 @@ type ComplexityRoot struct {
 
 	Event struct {
 		CreatedAt    func(childComplexity int) int
+		ExternalID   func(childComplexity int) int
 		FunctionRuns func(childComplexity int) int
 		ID           func(childComplexity int) int
 		Name         func(childComplexity int) int
@@ -409,6 +410,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Event.CreatedAt(childComplexity), true
+
+	case "Event.externalID":
+		if e.complexity.Event.ExternalID == nil {
+			break
+		}
+
+		return e.complexity.Event.ExternalID(childComplexity), true
 
 	case "Event.functionRuns":
 		if e.complexity.Event.FunctionRuns == nil {
@@ -1464,6 +1472,7 @@ type FunctionVersion {
 
 type Event {
   id: ULID!
+  externalID: String
   workspace: Workspace
   name: String
   createdAt: Time
@@ -2482,6 +2491,47 @@ func (ec *executionContext) fieldContext_Event_id(ctx context.Context, field gra
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ULID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Event_externalID(ctx context.Context, field graphql.CollectedField, obj *models.Event) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Event_externalID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ExternalID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Event_externalID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Event",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -3839,6 +3889,8 @@ func (ec *executionContext) fieldContext_FunctionRun_event(ctx context.Context, 
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_Event_id(ctx, field)
+			case "externalID":
+				return ec.fieldContext_Event_externalID(ctx, field)
 			case "workspace":
 				return ec.fieldContext_Event_workspace(ctx, field)
 			case "name":
@@ -3907,6 +3959,8 @@ func (ec *executionContext) fieldContext_FunctionRun_events(ctx context.Context,
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_Event_id(ctx, field)
+			case "externalID":
+				return ec.fieldContext_Event_externalID(ctx, field)
 			case "workspace":
 				return ec.fieldContext_Event_workspace(ctx, field)
 			case "name":
@@ -5283,6 +5337,8 @@ func (ec *executionContext) fieldContext_Query_event(ctx context.Context, field 
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_Event_id(ctx, field)
+			case "externalID":
+				return ec.fieldContext_Event_externalID(ctx, field)
 			case "workspace":
 				return ec.fieldContext_Event_workspace(ctx, field)
 			case "name":
@@ -5359,6 +5415,8 @@ func (ec *executionContext) fieldContext_Query_events(ctx context.Context, field
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_Event_id(ctx, field)
+			case "externalID":
+				return ec.fieldContext_Event_externalID(ctx, field)
 			case "workspace":
 				return ec.fieldContext_Event_workspace(ctx, field)
 			case "name":
@@ -10552,6 +10610,10 @@ func (ec *executionContext) _Event(ctx context.Context, sel ast.SelectionSet, ob
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
+		case "externalID":
+
+			out.Values[i] = ec._Event_externalID(ctx, field, obj)
+
 		case "workspace":
 
 			out.Values[i] = ec._Event_workspace(ctx, field, obj)
