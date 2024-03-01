@@ -49,6 +49,10 @@ export default function PageViewTracker() {
           ...(!!organization?.publicMetadata.accountID && {
             account_id: organization.publicMetadata.accountID,
           }),
+          screen_resolution: `${window.screen.width * window.devicePixelRatio}x${
+            window.screen.height * window.devicePixelRatio
+          }`,
+          screen_size: `${window.screen.width}x${window.screen.height}`,
         },
         v: '2023-05-11.1',
       });

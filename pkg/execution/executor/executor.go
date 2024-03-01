@@ -399,16 +399,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				expires = time.Now().Add(dur)
 			}
 
-			// Ensure that we only listen to cancellation events that occur
-			// after the initial event is received.
-			expr := "(async.ts == null || async.ts > event.ts)"
-			if c.If != nil {
-				expr = expr + " && " + *c.If
-			}
-
 			// Evaluate the expression.  This lets us inspect the expression's attributes
 			// so that we can store only the attrs used in the expression in the pause,
 			// saving space, bandwidth, etc.
+			expr := generateCancelExpression(eventIDs[0], c.If)
 			eval, err := expressions.NewExpressionEvaluator(ctx, expr)
 			if err != nil {
 				return &id, err
@@ -1992,4 +1986,18 @@ func (e execError) Retryable() bool {
 
 func newFinalError(err error) error {
 	return execError{err: err, final: true}
+}
+
+func generateCancelExpression(eventID ulid.ULID, expr *string) string {
+	// Ensure that we only listen to cancellation events that occur
+	// after the initial event is received.
+	//
+	// NOTE: We don't use `event.ts` here as people can use a future-TS date
+	// to schedule future runs.  Events received between now and that date should
+	// still cancel the run.
+	res := fmt.Sprintf("(async.ts == null || async.ts > %d)", eventID.Time())
+	if expr != nil {
+		res = *expr + " && " + res
+	}
+	return res
 }

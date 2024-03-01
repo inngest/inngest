@@ -118,7 +118,6 @@ type ComplexityRoot struct {
 		History           func(childComplexity int) int
 		HistoryItemOutput func(childComplexity int, id ulid.ULID) int
 		ID                func(childComplexity int) int
-		Name              func(childComplexity int) int
 		Output            func(childComplexity int) int
 		PendingSteps      func(childComplexity int) int
 		StartedAt         func(childComplexity int) int
@@ -280,14 +279,12 @@ type FunctionRunResolver interface {
 
 	Event(ctx context.Context, obj *models.FunctionRun) (*models.Event, error)
 	Events(ctx context.Context, obj *models.FunctionRun) ([]*models.Event, error)
-	BatchID(ctx context.Context, obj *models.FunctionRun) (*ulid.ULID, error)
+
 	BatchCreatedAt(ctx context.Context, obj *models.FunctionRun) (*time.Time, error)
-	Status(ctx context.Context, obj *models.FunctionRun) (*models.FunctionRunStatus, error)
+
 	WaitingFor(ctx context.Context, obj *models.FunctionRun) (*models.StepEventWait, error)
 	PendingSteps(ctx context.Context, obj *models.FunctionRun) (*int, error)
 
-	FinishedAt(ctx context.Context, obj *models.FunctionRun) (*time.Time, error)
-	Output(ctx context.Context, obj *models.FunctionRun) (*string, error)
 	History(ctx context.Context, obj *models.FunctionRun) ([]*history_reader.RunHistory, error)
 	HistoryItemOutput(ctx context.Context, obj *models.FunctionRun, id ulid.ULID) (*string, error)
 }
@@ -666,13 +663,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FunctionRun.ID(childComplexity), true
-
-	case "FunctionRun.name":
-		if e.complexity.FunctionRun.Name == nil {
-			break
-		}
-
-		return e.complexity.FunctionRun.Name(childComplexity), true
 
 	case "FunctionRun.output":
 		if e.complexity.FunctionRun.Output == nil {
@@ -1670,7 +1660,6 @@ type FunctionRun {
 
   history: [RunHistoryItem!]!
   historyItemOutput(id: ULID!): String
-  name: String @deprecated # use the embedded function field instead.
   eventID: ID!
 }
 
@@ -3016,8 +3005,6 @@ func (ec *executionContext) fieldContext_Event_functionRuns(ctx context.Context,
 				return ec.fieldContext_FunctionRun_history(ctx, field)
 			case "historyItemOutput":
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
-			case "name":
-				return ec.fieldContext_FunctionRun_name(ctx, field)
 			case "eventID":
 				return ec.fieldContext_FunctionRun_eventID(ctx, field)
 			}
@@ -3565,8 +3552,6 @@ func (ec *executionContext) fieldContext_FunctionEvent_functionRun(ctx context.C
 				return ec.fieldContext_FunctionRun_history(ctx, field)
 			case "historyItemOutput":
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
-			case "name":
-				return ec.fieldContext_FunctionRun_name(ctx, field)
 			case "eventID":
 				return ec.fieldContext_FunctionRun_eventID(ctx, field)
 			}
@@ -4040,7 +4025,7 @@ func (ec *executionContext) _FunctionRun_batchID(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.FunctionRun().BatchID(rctx, obj)
+		return obj.BatchID, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4058,8 +4043,8 @@ func (ec *executionContext) fieldContext_FunctionRun_batchID(ctx context.Context
 	fc = &graphql.FieldContext{
 		Object:     "FunctionRun",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ULID does not have child fields")
 		},
@@ -4122,7 +4107,7 @@ func (ec *executionContext) _FunctionRun_status(ctx context.Context, field graph
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.FunctionRun().Status(rctx, obj)
+		return obj.Status, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4140,8 +4125,8 @@ func (ec *executionContext) fieldContext_FunctionRun_status(ctx context.Context,
 	fc = &graphql.FieldContext{
 		Object:     "FunctionRun",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type FunctionRunStatus does not have child fields")
 		},
@@ -4294,7 +4279,7 @@ func (ec *executionContext) _FunctionRun_finishedAt(ctx context.Context, field g
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.FunctionRun().FinishedAt(rctx, obj)
+		return obj.FinishedAt, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4312,8 +4297,8 @@ func (ec *executionContext) fieldContext_FunctionRun_finishedAt(ctx context.Cont
 	fc = &graphql.FieldContext{
 		Object:     "FunctionRun",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Time does not have child fields")
 		},
@@ -4335,7 +4320,7 @@ func (ec *executionContext) _FunctionRun_output(ctx context.Context, field graph
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.FunctionRun().Output(rctx, obj)
+		return obj.Output, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4353,8 +4338,8 @@ func (ec *executionContext) fieldContext_FunctionRun_output(ctx context.Context,
 	fc = &graphql.FieldContext{
 		Object:     "FunctionRun",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -4488,47 +4473,6 @@ func (ec *executionContext) fieldContext_FunctionRun_historyItemOutput(ctx conte
 	if fc.Args, err = ec.field_FunctionRun_historyItemOutput_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _FunctionRun_name(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRun) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_FunctionRun_name(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Name, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_FunctionRun_name(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "FunctionRun",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
 	}
 	return fc, nil
 }
@@ -5711,8 +5655,6 @@ func (ec *executionContext) fieldContext_Query_functionRun(ctx context.Context, 
 				return ec.fieldContext_FunctionRun_history(ctx, field)
 			case "historyItemOutput":
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
-			case "name":
-				return ec.fieldContext_FunctionRun_name(ctx, field)
 			case "eventID":
 				return ec.fieldContext_FunctionRun_eventID(ctx, field)
 			}
@@ -5801,8 +5743,6 @@ func (ec *executionContext) fieldContext_Query_functionRuns(ctx context.Context,
 				return ec.fieldContext_FunctionRun_history(ctx, field)
 			case "historyItemOutput":
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
-			case "name":
-				return ec.fieldContext_FunctionRun_name(ctx, field)
 			case "eventID":
 				return ec.fieldContext_FunctionRun_eventID(ctx, field)
 			}
@@ -7778,8 +7718,6 @@ func (ec *executionContext) fieldContext_StepEvent_functionRun(ctx context.Conte
 				return ec.fieldContext_FunctionRun_history(ctx, field)
 			case "historyItemOutput":
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
-			case "name":
-				return ec.fieldContext_FunctionRun_name(ctx, field)
 			case "eventID":
 				return ec.fieldContext_FunctionRun_eventID(ctx, field)
 			}
@@ -8413,8 +8351,6 @@ func (ec *executionContext) fieldContext_StreamItem_runs(ctx context.Context, fi
 				return ec.fieldContext_FunctionRun_history(ctx, field)
 			case "historyItemOutput":
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
-			case "name":
-				return ec.fieldContext_FunctionRun_name(ctx, field)
 			case "eventID":
 				return ec.fieldContext_FunctionRun_eventID(ctx, field)
 			}
@@ -11167,22 +11103,9 @@ func (ec *executionContext) _FunctionRun(ctx context.Context, sel ast.SelectionS
 
 			})
 		case "batchID":
-			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._FunctionRun_batchID(ctx, field, obj)
-				return res
-			}
+			out.Values[i] = ec._FunctionRun_batchID(ctx, field, obj)
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
 		case "batchCreatedAt":
 			field := field
 
@@ -11201,22 +11124,9 @@ func (ec *executionContext) _FunctionRun(ctx context.Context, sel ast.SelectionS
 
 			})
 		case "status":
-			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._FunctionRun_status(ctx, field, obj)
-				return res
-			}
+			out.Values[i] = ec._FunctionRun_status(ctx, field, obj)
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
 		case "waitingFor":
 			field := field
 
@@ -11256,39 +11166,13 @@ func (ec *executionContext) _FunctionRun(ctx context.Context, sel ast.SelectionS
 			out.Values[i] = ec._FunctionRun_startedAt(ctx, field, obj)
 
 		case "finishedAt":
-			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._FunctionRun_finishedAt(ctx, field, obj)
-				return res
-			}
+			out.Values[i] = ec._FunctionRun_finishedAt(ctx, field, obj)
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
 		case "output":
-			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._FunctionRun_output(ctx, field, obj)
-				return res
-			}
+			out.Values[i] = ec._FunctionRun_output(ctx, field, obj)
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
 		case "history":
 			field := field
 
@@ -11326,10 +11210,6 @@ func (ec *executionContext) _FunctionRun(ctx context.Context, sel ast.SelectionS
 				return innerFunc(ctx)
 
 			})
-		case "name":
-
-			out.Values[i] = ec._FunctionRun_name(ctx, field, obj)
-
 		case "eventID":
 
 			out.Values[i] = ec._FunctionRun_eventID(ctx, field, obj)

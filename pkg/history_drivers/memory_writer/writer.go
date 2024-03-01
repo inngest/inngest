@@ -72,6 +72,11 @@ func (w *writer) writeWorkflowEnd(
 
 	run := w.store.Data[item.RunID]
 	run.Run.EndedAt = timePtr(time.Now())
+
+	if item.Result != nil {
+		run.Run.Output = &item.Result.Output
+	}
+
 	run.Run.Status = status
 	w.store.Data[item.RunID] = run
 }
