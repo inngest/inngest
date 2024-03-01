@@ -232,3 +232,9 @@ export const HISTORY_ITEM_OUTPUT = gql`
     }
   }
 `;
+
+export const INVOKE_FUNCTION = gql`
+  mutation InvokeFunction($functionSlug: String!, $data: Map) {
+    invokeFunction(data: $data, functionSlug: $functionSlug)
+  }
+`;
