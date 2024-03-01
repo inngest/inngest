@@ -41,7 +41,6 @@ export function useRun(runID: string | null): FetchResult<Data, { skippable: tru
     return {
       func: {
         ...rawRun.function,
-        name: rawRun.name ?? 'unknown',
         triggers: rawRun.function.triggers ?? [],
       },
       history: new HistoryParser(rawRun.history ?? []),

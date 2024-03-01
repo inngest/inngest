@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -33,39 +34,28 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 		return nil, fmt.Errorf("Invalid run ID: %w", err)
 	}
 
-	state, err := r.Runner.StateManager().Load(ctx, runID)
-	if err != nil {
-		return nil, fmt.Errorf("Run ID not found: %w", err)
-	}
-
-	m := state.Metadata()
-	status, err := models.ToFunctionRunStatus(m.Status)
+	run, err := r.HistoryReader.GetRun(
+		ctx,
+		runID,
+		history_reader.GetRunOpts{},
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	name := state.Function().Name
-
-	pending, _ := r.Queue.OutstandingJobCount(
-		ctx,
-		m.Identifier.WorkspaceID,
-		m.Identifier.WorkflowID,
-		m.Identifier.RunID,
-	)
-
-	run, err := r.Data.GetFunctionRun(
-		ctx,
-		m.Identifier.AccountID,
-		m.Identifier.WorkspaceID,
-		runID,
-	)
+	status, err := models.ToFunctionRunStatus(run.Status)
 	if err != nil {
-		return nil, fmt.Errorf("Run ID not found: %w", err)
+		return nil, err
 	}
 
-	fr := models.MakeFunctionRun(run)
-	fr.PendingSteps = &pending
-	fr.Name = &name
-	fr.Status = &status
-	return fr, nil
+	return &models.FunctionRun{
+		ID:         runID.String(),
+		FunctionID: run.WorkflowID.String(),
+		FinishedAt: run.EndedAt,
+		StartedAt:  &run.StartedAt,
+		EventID:    run.EventID.String(),
+		BatchID:    run.BatchID,
+		Status:     &status,
+		Output:     run.Output,
+	}, nil
 }

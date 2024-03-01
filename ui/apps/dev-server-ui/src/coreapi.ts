@@ -10,8 +10,10 @@ export const EVENT = gql`
       pendingRuns
       raw
       functionRuns {
+        function {
+          name
+        }
         id
-        name
         status
         startedAt
         pendingSteps
@@ -30,7 +32,6 @@ export const FUNCTION_RUN = gql`
   query GetFunctionRun($id: ID!) {
     functionRun(query: { functionRunId: $id }) {
       id
-      name
       status
       startedAt
       finishedAt
@@ -42,6 +43,7 @@ export const FUNCTION_RUN = gql`
         expression
       }
       function {
+        name
         triggers {
           type
           value

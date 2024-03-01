@@ -15,16 +15,6 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func (r *functionRunResolver) Status(ctx context.Context, obj *models.FunctionRun) (*models.FunctionRunStatus, error) {
-	md, err := r.Runner.StateManager().Metadata(ctx, ulid.MustParse(obj.ID))
-	if err != nil {
-		return nil, fmt.Errorf("Run ID not found: %w", err)
-	}
-
-	status, err := models.ToFunctionRunStatus(md.Status)
-	return &status, err
-}
-
 func (r *functionRunResolver) PendingSteps(ctx context.Context, obj *models.FunctionRun) (*int, error) {
 	md, err := r.Runner.StateManager().Metadata(ctx, ulid.MustParse(obj.ID))
 	if err != nil {
@@ -45,11 +35,6 @@ func (r *functionRunResolver) Function(ctx context.Context, obj *models.Function
 		return nil, err
 	}
 	return models.MakeFunction(fn)
-}
-
-func (r *functionRunResolver) FinishedAt(ctx context.Context, obj *models.FunctionRun) (*time.Time, error) {
-	// Mapped in MakeFunctionRun
-	return obj.FinishedAt, nil
 }
 
 func (r *functionRunResolver) History(
@@ -96,11 +81,6 @@ func (r *functionRunResolver) HistoryItemOutput(
 			WorkspaceID: randomUUID,
 		},
 	)
-}
-
-func (r *functionRunResolver) Output(ctx context.Context, obj *models.FunctionRun) (*string, error) {
-	// Mapped in MakeFunctionRun
-	return obj.Output, nil
 }
 
 func (r *functionRunResolver) Event(ctx context.Context, obj *models.FunctionRun) (*models.Event, error) {
@@ -168,16 +148,6 @@ func (r *functionRunResolver) Events(ctx context.Context, obj *models.FunctionRu
 	}
 
 	return result, nil
-}
-
-func (r *functionRunResolver) BatchID(ctx context.Context, obj *models.FunctionRun) (*ulid.ULID, error) {
-	runID := ulid.MustParse(obj.ID)
-
-	if batch, err := r.Data.GetEventBatchByRunID(ctx, runID); err == nil {
-		return &batch.ID, nil
-	}
-
-	return nil, nil
 }
 
 func (r *functionRunResolver) WaitingFor(ctx context.Context, obj *models.FunctionRun) (*models.StepEventWait, error) {

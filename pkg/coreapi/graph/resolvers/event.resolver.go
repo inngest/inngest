@@ -23,13 +23,7 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 	var out []*models.FunctionRun
 
 	for _, run := range runs {
-		fn, err := r.Data.GetFunctionByInternalUUID(ctx, workspaceID, run.FunctionID)
-		if err != nil {
-			return nil, err
-		}
-
 		outRun := models.MakeFunctionRun(run)
-		outRun.Name = &fn.Name
 		out = append(out, outRun)
 	}
 
