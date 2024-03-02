@@ -8,7 +8,7 @@ import { classNames } from '@inngest/components/utils/classNames';
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { FrameworkInfo } from '@/components/FrameworkInfo';
 import { LanguageInfo } from '@/components/LanguageInfo';
-import { SyncStatus } from '@/components/SyncStatus';
+import { SyncStatusPill } from '@/components/SyncStatusPill';
 import { Time } from '@/components/Time';
 import { PlatformSection } from './PlatformSection';
 
@@ -53,10 +53,10 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
       lastSyncValue = (
         <div className="flex items-center gap-2">
           <span className="hidden sm:block">
-            <SyncStatus status={sync.status} />
+            <SyncStatusPill status={sync.status} />
           </span>
           <span className="block sm:hidden">
-            <SyncStatus status={sync.status} iconOnly />
+            <SyncStatusPill status={sync.status} iconOnly />
           </span>
           {linkToSyncs && <Time value={sync.lastSyncedAt} />}
           {!linkToSyncs && (
@@ -74,10 +74,10 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
       lastSyncValue = (
         <div className="flex items-center gap-2">
           <span className="hidden sm:block">
-            <SyncStatus status={sync.status} />
+            <SyncStatusPill status={sync.status} />
           </span>
           <span className="block sm:hidden">
-            <SyncStatus status={sync.status} iconOnly />
+            <SyncStatusPill status={sync.status} iconOnly />
           </span>
           <Time value={sync.lastSyncedAt} />
         </div>
