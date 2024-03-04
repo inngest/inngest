@@ -34,9 +34,24 @@ const severityStyles = {
 } as const satisfies { [key in Severity]: SeveritySpecific };
 
 type Props = {
+  /**
+   * The content of the alert.
+   */
   children: React.ReactNode;
+
+  /**
+   * Additional class names to apply to the alert.
+   */
   className?: string;
+
+  /**
+   * The severity of the alert.
+   */
   severity: Severity;
+
+  /**
+   * Whether to show the icon for the alert.
+   */
   showIcon?: boolean;
 };
 
