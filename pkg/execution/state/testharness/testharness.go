@@ -181,7 +181,7 @@ func checkNew(t *testing.T, m state.Manager) {
 	require.EqualValues(t, w, found, "Returned workflow does not match input")
 	require.EqualValues(t, evt, s.Event(), "Returned event does not match input")
 	require.EqualValues(t, batch, s.Events(), "Returned events does not match input")
-	require.EqualValues(t, enums.RunStatusScheduled, s.Metadata().Status, "Status is not Scheduled")
+	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Scheduled")
 	require.EqualValues(t, init.Context, s.Metadata().Context, "Metadata context not saved")
 	require.EqualValues(t, id, s.Metadata().Identifier, "Metadata didn't save Identifier")
 
@@ -1553,7 +1553,7 @@ func checkSetStatus(t *testing.T, m state.Manager) {
 
 	s, err := m.New(ctx, init)
 	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusScheduled, s.Metadata().Status, "Status is not Scheduled")
+	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Scheduled")
 
 	// Add time so that the history ticks a millisecond
 	<-time.After(time.Millisecond)
@@ -1582,7 +1582,7 @@ func checkCancel(t *testing.T, m state.Manager) {
 
 	s, err := m.New(ctx, init)
 	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusScheduled, s.Metadata().Status, "Status is not Scheduled")
+	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Scheduled")
 
 	// Add time so that the history ticks a millisecond
 	<-time.After(time.Millisecond)
@@ -1610,7 +1610,7 @@ func checkCancel_cancelled(t *testing.T, m state.Manager) {
 
 	s, err := m.New(ctx, init)
 	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusScheduled, s.Metadata().Status, "Status is not Scheduled")
+	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Scheduled")
 
 	// Add time so that the history ticks a millisecond
 	<-time.After(time.Millisecond)
@@ -1640,7 +1640,7 @@ func checkCancel_completed(t *testing.T, m state.Manager) {
 
 	s, err := m.New(ctx, init)
 	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusScheduled, s.Metadata().Status, "Status is not Scheduled")
+	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Scheduled")
 
 	// Add time so that the history ticks a millisecond
 	<-time.After(time.Millisecond)
