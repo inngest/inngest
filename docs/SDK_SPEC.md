@@ -237,7 +237,7 @@ The `sdk_name` part SHOULD be the name of the GitHub repository hosting the SDKâ
 - `X-Inngest-Signature`
 A signature of the body of a request sent by Inngest in order to prove that requestâ€™s authenticity. An SDK MUST validate a request came from Inngest by validating this signature.
 
-The format of the signature is a query string (without the leading `?`) with two values: `t` and `s`, e.g. `t=1705586504&s=signkey-prod-02jd7ak2`. `t` is the timestamp for when the request was prepared by Inngest, ensuring old-but-valid requests cannot be repeated. `s` is the actual signature, which is an HMAC with SHA256 of the body of the request.
+The format of the signature is a query string (without the leading `?`) with two values: `t` and `s`, e.g. `t=1705586504&s=3f1c811920eb25da7fa70e3ac484e32e93f01dbbca7c9ce2365f2062a3e10c26`. `t` is the timestamp for when the request was prepared by Inngest, ensuring old-but-valid requests cannot be repeated. `s` is the actual signature, which is a hex-encoded HMAC with SHA256 of the body of the request plus the timestamp.
 
 When receiving any request that is expected to be from Inngest, an SDK MUST validate this signature. See Requirements when receiving requests [[4.1.3](#413-requirements-when-receiving-requests)].
 - `X-Inngest-Env`
@@ -296,14 +296,14 @@ The SDK also MUST send a bearer token authorization request header, as defined i
 For example:
 
 ```bash
-# original signing key
-signkey-prod-8fjau3mn
+# original signing key (hex-encoded)
+signkey-prod-12345678
 
 # hashed signing key
-signkey-prod-3c8335d113497a3a0b3e6bc18c12bf59e3db1c964c9f66765f374f5f7b473ac7
+signkey-prod-b2ed992186a5cb19f6668aade821f502c1d00970dfd0e35128d51bac4649916c
 
 # header
-Authorization: Bearer signkey-prod-3c8335d113497a3a0b3e6bc18c12bf59e3db1c964c9f66765f374f5f7b473ac7
+Authorization: Bearer signkey-prod-b2ed992186a5cb19f6668aade821f502c1d00970dfd0e35128d51bac4649916c
 ```
 
 ## 4.2. Kinds of Inngest Server
