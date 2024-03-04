@@ -14,22 +14,21 @@ type SeveritySpecific = {
   wrapperClassName: string;
 };
 
-// TODO Needs dark styles for Dev Server
 const severityStyles = {
   error: {
     icon: ExclamationCircleIcon,
-    iconClassName: 'text-rose-700',
-    wrapperClassName: 'bg-rose-100 text-rose-700',
+    iconClassName: 'text-rose-700 dark:text-white',
+    wrapperClassName: 'bg-rose-100 dark:bg-rose-600/50 text-rose-700 dark:text-slate-300',
   },
   info: {
     icon: InformationCircleIcon,
-    iconClassName: 'text-blue-700',
-    wrapperClassName: 'bg-blue-100 text-blue-700',
+    iconClassName: 'text-blue-700 dark:text-white',
+    wrapperClassName: 'bg-blue-100 dark:bg-blue-600/50 text-blue-700 dark:text-slate-300',
   },
   warning: {
     icon: ExclamationTriangleIcon,
-    iconClassName: 'text-amber-700',
-    wrapperClassName: 'bg-amber-100 text-amber-700',
+    iconClassName: 'text-amber-700 dark:text-white',
+    wrapperClassName: 'bg-amber-100 dark:bg-amber-600/50 text-amber-700 dark:text-slate-300',
   },
 } as const satisfies { [key in Severity]: SeveritySpecific };
 
