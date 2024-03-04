@@ -3,9 +3,11 @@
 import ExclamationTriangleIcon from '@heroicons/react/20/solid/ExclamationTriangleIcon';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { Alert } from '@/components/Alert';
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
 import { SyncErrorCard } from '@/components/SyncErrorCard';
+import { SyncStatus } from '@/gql/graphql';
 import { FunctionList } from './FunctionList';
 import { useSync } from './useSync';
 
@@ -46,6 +48,25 @@ export function Sync({ externalAppID, syncID }: Props) {
   const { app } = syncRes.data.environment;
   const { sync } = syncRes.data;
 
+  let functions = null;
+  if (sync.status === SyncStatus.Success) {
+    functions = (
+      <FunctionList
+        removedFunctions={sync.removedFunctions}
+        syncedFunctions={sync.syncedFunctions}
+      />
+    );
+    // TODO: Replace with SyncStatus.duplicate after we deploy the API changes
+  } else if (sync.status === 'duplicate') {
+    functions = (
+      <Alert severity="info">
+        This sync is a duplicate because none of the function configurations changed since the
+        previous successful sync. If you would like to view its functions, please navigate to the
+        previous successful sync.
+      </Alert>
+    );
+  }
+
   return (
     <div className="h-full w-full overflow-y-auto">
       <div className="mx-auto w-full max-w-[1200px] p-4">
@@ -54,10 +75,7 @@ export function Sync({ externalAppID, syncID }: Props) {
         <AppInfoCard app={app} className="mb-4" sync={sync} linkToSyncs />
         <AppGitCard className="mb-4" sync={sync} />
 
-        <FunctionList
-          removedFunctions={sync.removedFunctions}
-          syncedFunctions={sync.syncedFunctions}
-        />
+        {functions}
       </div>
     </div>
   );

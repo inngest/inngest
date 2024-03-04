@@ -8,7 +8,7 @@ import { Link as InngestLink } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { classNames } from '@inngest/components/utils/classNames';
 
-import { SyncStatus } from '@/components/SyncStatus';
+import { SyncStatusPill } from '@/components/SyncStatusPill';
 import { Time } from '@/components/Time';
 import AppDiagramImage from '@/images/app-diagram.png';
 import { pathCreator } from '@/utils/urls';
@@ -83,7 +83,7 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
               detail={
                 app.latestSync && (
                   <div className="flex items-center gap-2">
-                    <SyncStatus status={app.latestSync.status} />
+                    <SyncStatusPill status={app.latestSync.status} />
                     <InngestLink
                       internalNavigation
                       showIcon={false}
