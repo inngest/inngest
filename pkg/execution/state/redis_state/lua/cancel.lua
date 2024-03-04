@@ -11,9 +11,7 @@ Output:
 local metadataKey = KEYS[1]
 
 local value = tonumber(redis.call("HGET", metadataKey, "status"))
-
--- If run has ended (completed, failed, etc.)
-if value ~= 0 and value ~= 5 then
+if value ~= 0 then
 	-- Return the function status as an error
 	return value;
 end
