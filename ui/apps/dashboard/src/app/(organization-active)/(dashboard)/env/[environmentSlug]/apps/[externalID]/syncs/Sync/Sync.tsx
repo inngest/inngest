@@ -1,9 +1,9 @@
 'use client';
 
 import ExclamationTriangleIcon from '@heroicons/react/20/solid/ExclamationTriangleIcon';
+import { Alert } from '@inngest/components/Alert';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { Alert } from '@/components/Alert';
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
 import { SyncErrorCard } from '@/components/SyncErrorCard';

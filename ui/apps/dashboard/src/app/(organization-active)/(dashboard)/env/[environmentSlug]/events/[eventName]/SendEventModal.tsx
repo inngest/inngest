@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Tab } from '@headlessui/react';
 import { PaperAirplaneIcon } from '@heroicons/react/20/solid';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import ky from 'ky';
 import { toast } from 'sonner';
@@ -11,7 +12,6 @@ import { type JsonValue } from 'type-fest';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { Alert } from '@/components/Alert';
 import Modal from '@/components/Modal';
 import CodeEditor from '@/components/Textarea/CodeEditor';
 import { graphql } from '@/gql';

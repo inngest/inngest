@@ -1,6 +1,5 @@
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
-
-import { Alert } from '@/components/Alert';
 
 export default function ApprovalDialog({
   title,
