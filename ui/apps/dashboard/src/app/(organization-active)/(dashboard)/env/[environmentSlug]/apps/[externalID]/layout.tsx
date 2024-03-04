@@ -1,9 +1,9 @@
 'use client';
 
 import { Squares2X2Icon } from '@heroicons/react/20/solid';
+import { Alert } from '@inngest/components/Alert';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { Alert } from '@/components/Alert';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { ResyncButton } from './ResyncButton';
 import { useNavData } from './useNavData';
