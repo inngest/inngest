@@ -43,7 +43,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         toastOptions={{
           style: { background: colors.slate['700'] },
         }}
-        position="top-right"
       />
     </div>
   );
