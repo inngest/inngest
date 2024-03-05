@@ -1,5 +1,5 @@
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 
 import type { FunctionRunStatus } from '../types/functionRun';
 
@@ -8,14 +8,13 @@ interface FuncCardProps {
   id: string;
   status?: FunctionRunStatus;
   active?: boolean;
-  footer?: React.ReactNode;
   onClick?: () => void;
 }
 
-export function FuncCard({ title, id, status, active = false, footer, onClick }: FuncCardProps) {
+export function FuncCard({ title, id, status, active = false, onClick }: FuncCardProps) {
   return (
     <a
-      className={classNames(
+      className={cn(
         active
           ? `outline-offset-3 border-slate-700/50 bg-slate-900 outline outline-2 outline-indigo-400`
           : undefined,
@@ -39,7 +38,6 @@ export function FuncCard({ title, id, status, active = false, footer, onClick }:
       <div className="px-5 py-3.5 text-xs leading-none text-slate-500">
         Run ID: <span className="font-mono">{id}</span>
       </div>
-      {footer}
     </a>
   );
 }

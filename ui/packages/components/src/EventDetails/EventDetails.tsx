@@ -170,7 +170,6 @@ export function EventDetails({
                     status={run.status}
                     active={selectedRunID === run.id}
                     onClick={() => onFunctionRunClick(run.id)}
-                    footer={<FuncCardFooter functionRun={run} />}
                   />
                 );
               })}
