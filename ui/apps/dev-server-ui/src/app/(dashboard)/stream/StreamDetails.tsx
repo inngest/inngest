@@ -6,6 +6,7 @@ import { Link } from '@inngest/components/Link';
 import { RunDetails } from '@inngest/components/RunDetails';
 import { classNames } from '@inngest/components/utils/classNames';
 import type { NavigateToRunFn } from 'node_modules/@inngest/components/src/Timeline/Timeline';
+import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
 import SendEventButton from '@/components/Event/SendEventButton';
@@ -73,7 +74,11 @@ export default function StreamDetails() {
       ...JSON.parse(eventResult.data.payload),
       id: eventId,
       ts: Date.now(),
-    }).unwrap();
+    })
+      .unwrap()
+      .then(() => {
+        toast.success('The event was successfully replayed.');
+      });
   }
 
   const navigateToRun: NavigateToRunFn = (opts) => {
