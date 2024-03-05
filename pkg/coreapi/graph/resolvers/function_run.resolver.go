@@ -123,6 +123,11 @@ func (r *functionRunResolver) Events(ctx context.Context, obj *models.FunctionRu
 			return empty, nil
 		}
 
+		// Will be nil if the run was not triggered by an event (i.e. a cron)
+		if evt == nil {
+			return empty, nil
+		}
+
 		return []*models.Event{evt}, nil
 	}
 
