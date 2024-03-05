@@ -78,6 +78,9 @@ export default function StreamDetails() {
       .unwrap()
       .then(() => {
         toast.success('The event was successfully replayed.');
+      })
+      .catch(() => {
+        toast.error('Failed to replay');
       });
   }
 
