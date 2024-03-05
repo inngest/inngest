@@ -15,12 +15,7 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 	accountID := uuid.UUID{}
 	workspaceID := uuid.UUID{}
 
-	eventID, err := ulid.Parse(obj.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	runs, err := r.Data.GetFunctionRunsFromEvents(ctx, accountID, workspaceID, []ulid.ULID{eventID})
+	runs, err := r.Data.GetFunctionRunsFromEvents(ctx, accountID, workspaceID, []ulid.ULID{obj.ID})
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +90,17 @@ func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.
 }
 
 func (r *eventResolver) Raw(ctx context.Context, obj *models.Event) (*string, error) {
-	evts, err := r.Runner.Events(ctx, obj.ID)
+	// Runner.Events maps events by an event ID that could be either the
+	// internal or external ID. It'll be the internal ID if the event didn't
+	// have an external ID
+	var eventID string
+	if obj.ExternalID != nil {
+		eventID = *obj.ExternalID
+	} else {
+		eventID = obj.ID.String()
+	}
+
+	evts, err := r.Runner.Events(ctx, eventID)
 	if err != nil {
 		return nil, err
 	}

@@ -39,7 +39,8 @@ type FunctionVersion {
 }
 
 type Event {
-  id: ID!
+  id: ULID!
+  externalID: String
   workspace: Workspace
   name: String
   createdAt: Time

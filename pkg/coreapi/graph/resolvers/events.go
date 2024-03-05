@@ -29,11 +29,17 @@ func (r *queryResolver) Event(ctx context.Context, query models.EventQuery) (*mo
 		createdAt = ulid.Time(evt.ID.Time())
 	}
 
+	var externalID *string
+	if evt.EventID != "" {
+		externalID = &evt.EventID
+	}
+
 	return &models.Event{
-		ID:        evt.EventID,
-		Name:      &evt.EventName,
-		CreatedAt: &createdAt,
-		Payload:   &payload,
+		ID:         evt.InternalID(),
+		ExternalID: externalID,
+		Name:       &evt.EventName,
+		CreatedAt:  &createdAt,
+		Payload:    &payload,
 	}, nil
 }
 
@@ -64,8 +70,13 @@ func (r *queryResolver) Events(ctx context.Context, query models.EventsQuery) ([
 		}
 		payload := string(payloadByt)
 
+		internalID, err := ulid.Parse(evt.ID)
+		if err != nil {
+			continue
+		}
+
 		events = append(events, &models.Event{
-			ID:        evt.ID,
+			ID:        internalID,
 			Name:      &name,
 			CreatedAt: &createdAt,
 			Payload:   &payload,
@@ -73,7 +84,7 @@ func (r *queryResolver) Events(ctx context.Context, query models.EventsQuery) ([
 	}
 
 	sort.Slice(events, func(i, j int) bool {
-		return events[i].ID > events[j].ID
+		return events[i].ID.String() > events[j].ID.String()
 	})
 
 	return events, nil
