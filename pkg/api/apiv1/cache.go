@@ -11,19 +11,32 @@ import (
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/lib/v4/store"
 	rcache "github.com/eko/gocache/store/rueidis/v4"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/pquerna/cachecontrol/cacheobject"
 	"github.com/redis/rueidis"
 )
 
-func NewRedisCacheMiddleware(r rueidis.Client) CachingMiddleware {
+func NewRedisCacheMiddleware(
+	r rueidis.Client,
+	serverKind string,
+) CachingMiddleware {
 	store := rcache.NewRueidis(r)
 	cache := cache.New[[]byte](store)
-	return NewCacheMiddleware(cache)
+	return NewCacheMiddleware(cache, serverKind)
 }
 
-func NewCacheMiddleware(cache *cache.Cache[[]byte]) CachingMiddleware {
-	return cacheMiddleware{cache: cache}
+func NewCacheMiddleware(
+	cache *cache.Cache[[]byte],
+	serverKind string,
+) CachingMiddleware {
+	return cacheMiddleware{
+		// Allow cache skipping for the Dev Server so that SDK tests can run
+		// faster. Never allow cache skipping in Cloud
+		allowCacheSkip: serverKind == headers.ServerKindDev,
+
+		cache: cache,
+	}
 }
 
 type CachingMiddleware interface {
@@ -31,7 +44,8 @@ type CachingMiddleware interface {
 }
 
 type cacheMiddleware struct {
-	cache *cache.Cache[[]byte]
+	allowCacheSkip bool
+	cache          *cache.Cache[[]byte]
 }
 
 func (c cacheMiddleware) Middleware(next http.Handler) http.Handler {
@@ -45,12 +59,20 @@ func (c cacheMiddleware) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Check the cache.
-		resp, err := c.cache.Get(ctx, *key)
-		if err == nil && len(resp) > 0 {
-			// TODO: Metrics on cache hit.
-			_, _ = w.Write(resp)
-			return
+		// Cache skipping must only be allowed in the Dev Server
+		checkCache := true
+		if c.allowCacheSkip && r.Header.Get(headers.HeaderKeySkipCache) == "true" {
+			checkCache = false
+		}
+
+		if checkCache {
+			// Check the cache.
+			resp, err := c.cache.Get(ctx, *key)
+			if err == nil && len(resp) > 0 {
+				// TODO: Metrics on cache hit.
+				_, _ = w.Write(resp)
+				return
+			}
 		}
 
 		// Record the response from the handler itself.

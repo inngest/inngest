@@ -15,6 +15,9 @@ const (
 	// to be, used to validate that every part of a registration is performed
 	// against the same target.
 	HeaderKeyExpectedServerKind = "X-Inngest-Expected-Server-Kind"
+
+	// Used by SDK tests to tell the Dev Server's REST API to skip caching
+	HeaderKeySkipCache = "X-Inngest-Skip-Cache"
 )
 
 const (
