@@ -22,12 +22,12 @@ export default function StreamDetails() {
 
   const eventResult = useEvent(eventID);
   if (eventResult.error) {
-    throw eventResult.error;
+    console.error(eventResult.error);
   }
 
   const runResult = useRun(runID);
   if (runResult.error) {
-    throw runResult.error;
+    console.error(runResult.error);
   }
 
   const getHistoryItemOutput = useGetHistoryItemOutput(runID);
@@ -52,6 +52,14 @@ export default function StreamDetails() {
       />
     );
   }, [eventResult.data?.payload]);
+
+  if (eventResult.error || runResult.error) {
+    // If there's an error fetching the event or run, we should redirect to the
+    // stream. This happens a lot, since restarting the Dev Server will clear
+    // all data
+    router.push('/stream');
+    return null;
+  }
 
   if (eventResult.isLoading || runResult.isLoading) {
     return (
