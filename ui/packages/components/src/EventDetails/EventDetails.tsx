@@ -3,7 +3,6 @@ import { Button } from '@inngest/components/Button';
 import { CodeBlock, type CodeBlockAction } from '@inngest/components/CodeBlock';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { FuncCard } from '@inngest/components/FuncCard';
-import { FuncCardFooter } from '@inngest/components/FuncCardFooter';
 import { MetadataGrid } from '@inngest/components/Metadata';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import type { Event } from '@inngest/components/types/event';
@@ -170,7 +169,6 @@ export function EventDetails({
                     status={run.status}
                     active={selectedRunID === run.id}
                     onClick={() => onFunctionRunClick(run.id)}
-                    footer={<FuncCardFooter functionRun={run} />}
                   />
                 );
               })}

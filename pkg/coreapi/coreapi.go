@@ -186,13 +186,22 @@ func (a CoreAPI) EventRuns(w http.ResponseWriter, r *http.Request) {
 	// NOTE: In development this does no authentication.  This must check API keys
 	// in self-hosted and production environments.
 	ctx := r.Context()
-	eventID := chi.URLParam(r, "eventID")
-	if eventID == "" {
+	eventIDStr := chi.URLParam(r, "eventID")
+	if eventIDStr == "" {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Status:  400,
 			Message: "No event ID found",
 		})
 		return
+	}
+
+	eventID, err := ulid.Parse(eventIDStr)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Error{
+			Status:  400,
+			Message: "Event ID is not a valid ULID",
+			Err:     err,
+		})
 	}
 
 	runs, err := a.tracker.Runs(ctx, eventID)

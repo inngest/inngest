@@ -104,7 +104,7 @@ func (r *functionRunResolver) Event(ctx context.Context, obj *models.FunctionRun
 
 	return &models.Event{
 		CreatedAt: &evt.ReceivedAt,
-		ID:        evt.ID.String(),
+		ID:        evt.InternalID(),
 		Name:      &evt.EventName,
 		Payload:   util.StrPtr(string(payload)),
 	}, nil
@@ -120,6 +120,11 @@ func (r *functionRunResolver) Events(ctx context.Context, obj *models.FunctionRu
 		// attempt to just return a single event, that's similar to the Event resolver
 		evt, err := r.Event(ctx, obj)
 		if err != nil {
+			return empty, nil
+		}
+
+		// Will be nil if the run was not triggered by an event (i.e. a cron)
+		if evt == nil {
 			return empty, nil
 		}
 
@@ -140,7 +145,7 @@ func (r *functionRunResolver) Events(ctx context.Context, obj *models.FunctionRu
 		}
 
 		result[i] = &models.Event{
-			ID:        e.ID.String(),
+			ID:        e.InternalID(),
 			Name:      &e.EventName,
 			CreatedAt: &e.ReceivedAt,
 			Payload:   util.StrPtr(string(payload)),

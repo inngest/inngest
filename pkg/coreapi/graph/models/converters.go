@@ -1,10 +1,12 @@
 package models
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/logger"
 )
 
 func MakeFunction(f *cqrs.Function) (*Function, error) {
@@ -51,6 +53,16 @@ func MakeFunction(f *cqrs.Function) (*Function, error) {
 }
 
 func MakeFunctionRun(f *cqrs.FunctionRun) *FunctionRun {
+	status, err := ToFunctionRunStatus(f.Status)
+	if err != nil {
+		logger.StdlibLogger(context.Background()).
+			Error(
+				"unknown run status",
+				"error", err,
+				"status", f.Status.String(),
+			)
+	}
+
 	// TODO: Map GQL types to CQRS types and remove this.
 	r := &FunctionRun{
 		ID:         f.RunID.String(),
@@ -59,6 +71,7 @@ func MakeFunctionRun(f *cqrs.FunctionRun) *FunctionRun {
 		StartedAt:  &f.RunStartedAt,
 		EventID:    f.EventID.String(),
 		BatchID:    f.BatchID,
+		Status:     &status,
 	}
 	if len(f.Output) > 0 {
 		str := string(f.Output)

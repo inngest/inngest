@@ -49,8 +49,9 @@ export type CreateAppInput = {
 export type Event = {
   __typename?: 'Event';
   createdAt: Maybe<Scalars['Time']>;
+  externalID: Maybe<Scalars['String']>;
   functionRuns: Maybe<Array<FunctionRun>>;
-  id: Scalars['ID'];
+  id: Scalars['ULID'];
   name: Maybe<Scalars['String']>;
   payload: Maybe<Scalars['String']>;
   pendingRuns: Maybe<Scalars['Int']>;
@@ -249,7 +250,6 @@ export type Query = {
   event: Maybe<Event>;
   events: Maybe<Array<Event>>;
   functionRun: Maybe<FunctionRun>;
-  functionRuns: Maybe<Array<FunctionRun>>;
   functions: Maybe<Array<Function>>;
   stream: Array<StreamItem>;
 };
@@ -267,11 +267,6 @@ export type QueryEventsArgs = {
 
 export type QueryFunctionRunArgs = {
   query: FunctionRunQuery;
-};
-
-
-export type QueryFunctionRunsArgs = {
-  query: FunctionRunsQuery;
 };
 
 
@@ -410,29 +405,19 @@ export type Workspace = {
   id: Scalars['ID'];
 };
 
-export type GetEventsStreamQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type GetEventsStreamQuery = { __typename?: 'Query', events: Array<{ __typename?: 'Event', id: string, name: string | null, createdAt: any | null, status: EventStatus | null, totalRuns: number | null }> | null };
-
-export type GetFunctionsStreamQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type GetFunctionsStreamQuery = { __typename?: 'Query', functionRuns: Array<{ __typename?: 'FunctionRun', id: string, status: FunctionRunStatus | null, startedAt: any | null, pendingSteps: number | null, event: { __typename?: 'Event', id: string } | null }> | null };
-
 export type GetEventQueryVariables = Exact<{
   id: Scalars['ID'];
 }>;
 
 
-export type GetEventQuery = { __typename?: 'Query', event: { __typename?: 'Event', id: string, name: string | null, createdAt: any | null, status: EventStatus | null, pendingRuns: number | null, raw: string | null, functionRuns: Array<{ __typename?: 'FunctionRun', id: string, status: FunctionRunStatus | null, startedAt: any | null, pendingSteps: number | null, output: string | null, function: { __typename?: 'Function', name: string } | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null }> | null } | null };
+export type GetEventQuery = { __typename?: 'Query', event: { __typename?: 'Event', id: any, name: string | null, createdAt: any | null, status: EventStatus | null, pendingRuns: number | null, raw: string | null, functionRuns: Array<{ __typename?: 'FunctionRun', id: string, status: FunctionRunStatus | null, startedAt: any | null, pendingSteps: number | null, output: string | null, function: { __typename?: 'Function', name: string } | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null }> | null } | null };
 
 export type GetFunctionRunQueryVariables = Exact<{
   id: Scalars['ID'];
 }>;
 
 
-export type GetFunctionRunQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', id: string, status: FunctionRunStatus | null, startedAt: any | null, finishedAt: any | null, output: string | null, pendingSteps: number | null, batchID: any | null, batchCreatedAt: any | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null, function: { __typename?: 'Function', name: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null } | null, event: { __typename?: 'Event', id: string, raw: string | null } | null, events: Array<{ __typename?: 'Event', createdAt: any | null, id: string, name: string | null, raw: string | null }>, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: any, functionVersion: number, groupID: any | null, id: any, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: any | null, expression: string | null, userID: any | null } | null, sleep: { __typename?: 'RunHistorySleep', until: any } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: any } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: any | null, timeout: boolean } | null, invokeFunction: { __typename?: 'RunHistoryInvokeFunction', eventID: any, functionID: string, correlationID: string, timeout: any } | null, invokeFunctionResult: { __typename?: 'RunHistoryInvokeFunctionResult', eventID: any | null, timeout: boolean, runID: any | null } | null }> } | null };
+export type GetFunctionRunQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', id: string, status: FunctionRunStatus | null, startedAt: any | null, finishedAt: any | null, output: string | null, pendingSteps: number | null, batchID: any | null, batchCreatedAt: any | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null, function: { __typename?: 'Function', name: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null } | null, event: { __typename?: 'Event', id: any, raw: string | null } | null, events: Array<{ __typename?: 'Event', createdAt: any | null, id: any, name: string | null, raw: string | null }>, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: any, functionVersion: number, groupID: any | null, id: any, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: any | null, expression: string | null, userID: any | null } | null, sleep: { __typename?: 'RunHistorySleep', until: any } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: any } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: any | null, timeout: boolean } | null, invokeFunction: { __typename?: 'RunHistoryInvokeFunction', eventID: any, functionID: string, correlationID: string, timeout: any } | null, invokeFunctionResult: { __typename?: 'RunHistoryInvokeFunctionResult', eventID: any | null, timeout: boolean, runID: any | null } | null }> } | null };
 
 export type GetFunctionsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -473,7 +458,7 @@ export type GetTriggersStreamQueryVariables = Exact<{
 }>;
 
 
-export type GetTriggersStreamQuery = { __typename?: 'Query', stream: Array<{ __typename?: 'StreamItem', createdAt: any, id: string, inBatch: boolean, trigger: string, type: StreamType, runs: Array<{ __typename?: 'FunctionRun', batchID: any | null, id: string, events: Array<{ __typename?: 'Event', id: string }>, function: { __typename?: 'Function', name: string } | null } | null> | null }> };
+export type GetTriggersStreamQuery = { __typename?: 'Query', stream: Array<{ __typename?: 'StreamItem', createdAt: any, id: string, inBatch: boolean, trigger: string, type: StreamType, runs: Array<{ __typename?: 'FunctionRun', batchID: any | null, id: string, events: Array<{ __typename?: 'Event', id: any }>, function: { __typename?: 'Function', name: string } | null } | null> | null }> };
 
 export type GetFunctionRunStatusQueryVariables = Exact<{
   id: Scalars['ID'];
@@ -506,30 +491,6 @@ export type InvokeFunctionMutationVariables = Exact<{
 export type InvokeFunctionMutation = { __typename?: 'Mutation', invokeFunction: boolean | null };
 
 
-export const GetEventsStreamDocument = `
-    query GetEventsStream {
-  events(query: {}) {
-    id
-    name
-    createdAt
-    status
-    totalRuns
-  }
-}
-    `;
-export const GetFunctionsStreamDocument = `
-    query GetFunctionsStream {
-  functionRuns(query: {}) {
-    id
-    status
-    startedAt
-    pendingSteps
-    event {
-      id
-    }
-  }
-}
-    `;
 export const GetEventDocument = `
     query GetEvent($id: ID!) {
   event(query: {eventId: $id}) {
@@ -750,12 +711,6 @@ export const InvokeFunctionDocument = `
 
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
-    GetEventsStream: build.query<GetEventsStreamQuery, GetEventsStreamQueryVariables | void>({
-      query: (variables) => ({ document: GetEventsStreamDocument, variables })
-    }),
-    GetFunctionsStream: build.query<GetFunctionsStreamQuery, GetFunctionsStreamQueryVariables | void>({
-      query: (variables) => ({ document: GetFunctionsStreamDocument, variables })
-    }),
     GetEvent: build.query<GetEventQuery, GetEventQueryVariables>({
       query: (variables) => ({ document: GetEventDocument, variables })
     }),
@@ -796,5 +751,5 @@ const injectedRtkApi = api.injectEndpoints({
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation } = injectedRtkApi;
+export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation } = injectedRtkApi;
 

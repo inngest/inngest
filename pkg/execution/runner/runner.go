@@ -41,7 +41,7 @@ type Runner interface {
 
 	StateManager() state.Manager
 	InitializeCrons(ctx context.Context) error
-	Runs(ctx context.Context, eventId string) ([]state.State, error)
+	Runs(ctx context.Context, eventId ulid.ULID) ([]state.State, error)
 	Events(ctx context.Context, eventId string) ([]event.Event, error)
 }
 
@@ -253,7 +253,7 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 	return nil
 }
 
-func (s *svc) Runs(ctx context.Context, eventID string) ([]state.State, error) {
+func (s *svc) Runs(ctx context.Context, eventID ulid.ULID) ([]state.State, error) {
 	items, _ := s.tracker.Runs(ctx, eventID)
 	result := make([]state.State, len(items))
 	for n, i := range items {
@@ -662,11 +662,11 @@ func (t *Tracker) Add(evtID string, id state.Identifier) {
 	t.evtIDs[evtID] = append(t.evtIDs[evtID], id.RunID)
 }
 
-func (t *Tracker) Runs(ctx context.Context, eventId string) ([]ulid.ULID, error) {
+func (t *Tracker) Runs(ctx context.Context, eventId ulid.ULID) ([]ulid.ULID, error) {
 	if t.l == nil {
 		return nil, nil
 	}
 	t.l.RLock()
 	defer t.l.RUnlock()
-	return t.evtIDs[eventId], nil
+	return t.evtIDs[eventId.String()], nil
 }

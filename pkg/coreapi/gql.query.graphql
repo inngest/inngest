@@ -14,9 +14,6 @@ type Query {
 
   # Get an individual function run
   functionRun(query: FunctionRunQuery!): FunctionRun
-
-  # Get all function runs
-  functionRuns(query: FunctionRunsQuery!): [FunctionRun!]
 }
 
 input ActionVersionQuery {
