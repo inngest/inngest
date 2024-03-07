@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { Event } from '@inngest/components/types/event';
 import {
+  FetchError,
   baseFetchSkipped,
   baseFetchSucceeded,
   baseInitialFetchFailed,
@@ -63,7 +64,7 @@ export function useEvent(eventID: string | null): FetchResult<Data, { skippable:
   if (query.error) {
     return {
       ...baseInitialFetchFailed,
-      error: new Error(query.error.message),
+      error: new FetchError(query.error.message ?? 'something went wrong'),
     };
   }
 
@@ -71,7 +72,7 @@ export function useEvent(eventID: string | null): FetchResult<Data, { skippable:
     // Should be unreachable.
     return {
       ...baseInitialFetchFailed,
-      error: new Error('finished loading but missing data'),
+      error: new FetchError('finished loading but missing data'),
     };
   }
 
