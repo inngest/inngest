@@ -162,6 +162,12 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 	}
 
+	if len(f.Triggers) < 1 {
+		err = multierror.Append(err, fmt.Errorf("At least one trigger is required"))
+	} else if len(f.Triggers) > consts.MaxTriggers {
+		err = multierror.Append(err, fmt.Errorf("This function exceeds the max number of triggers: %d", consts.MaxTriggers))
+	}
+
 	for _, t := range f.Triggers {
 		if terr := t.Validate(ctx); terr != nil {
 			err = multierror.Append(err, terr)
