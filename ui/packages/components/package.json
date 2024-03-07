@@ -16,6 +16,7 @@
   "dependencies": {
     "@headlessui/tailwindcss": "0.1.2",
     "@heroicons/react": "2.1.1",
+    "@internationalized/date": "3.5.2",
     "@monaco-editor/react": "4.6.0",
     "@radix-ui/react-accordion": "1.1.2",
     "@radix-ui/react-alert-dialog": "1.0.5",
@@ -32,11 +33,13 @@
     "monaco-editor": "0.34.1",
     "next": "14.0.3",
     "react": "18.2.0",
+    "react-aria-components": "1.1.1",
     "react-dom": "18.2.0",
     "react-use": "17.4.0",
     "react-virtual": "2.10.4",
     "sonner": "1.2.0",
     "tailwind-merge": "1.10.0",
+    "tailwind-variants": "0.2.0",
     "zod": "3.22.4"
   },
   "devDependencies": {
