@@ -18,7 +18,6 @@ export function InvokeButton({
 
   const onConfirm = useCallback(
     ({ data }: { data: Record<string, unknown> }) => {
-      console.log('onConfirm hit!!');
       setIsModalOpen(false);
       btnAction(data);
     },
