@@ -2,6 +2,7 @@ package inngest
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -35,9 +36,12 @@ func (m MultipleTriggers) Validate(ctx context.Context) error {
 	seen := make(map[string]struct{})
 
 	for _, t := range m {
-		key := t.Key()
+		key, herr := t.Hash()
+		if herr != nil {
+			return fmt.Errorf("failed to hash trigger: %w", herr)
+		}
 
-		if _, exists := seen[key]; exists {
+		if _, ok := seen[key]; ok {
 			err = multierror.Append(err, fmt.Errorf("duplicate trigger %s", t.Name()))
 		}
 		seen[key] = struct{}{}
@@ -78,24 +82,17 @@ func (t Trigger) Validate(ctx context.Context) error {
 	return fmt.Errorf("This trigger is neither an event trigger or cron trigger.  This should never happen :D")
 }
 
-// Key returns a string hashed key for the trigger based on its type and
+// Hash returns a string hashed key for the trigger based on its type and
 // arguments.
-func (t Trigger) Key() string {
-	if t.EventTrigger != nil {
-		event := xxhash.Sum64String(t.EventTrigger.Event)
-
-		expr := ""
-		if t.EventTrigger.Expression != nil {
-			expr = fmt.Sprintf(":%x", xxhash.Sum64String(*t.EventTrigger.Expression))
-		}
-
-		return fmt.Sprintf("event:%x%s", event, expr)
+func (t Trigger) Hash() (string, error) {
+	byt, err := json.Marshal(t)
+	if err != nil {
+		return "", err
 	}
-	if t.CronTrigger != nil {
-		cron := xxhash.Sum64String(t.CronTrigger.Cron)
-		return fmt.Sprintf("cron:%x", cron)
-	}
-	return ""
+
+	hash := xxhash.Sum64(byt)
+
+	return fmt.Sprintf("%x", hash), nil
 }
 
 // Name returns a human-readable name for the trigger.
