@@ -231,10 +231,11 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 			if t.CronTrigger == nil {
 				continue
 			}
-			_, err := s.cronmanager.AddFunc(t.Cron, func() {
+			cron := t.CronTrigger.Cron
+			_, err := s.cronmanager.AddFunc(cron, func() {
 				err := s.initialize(context.Background(), fn, event.NewOSSTrackedEvent(event.Event{
 					Data: map[string]any{
-						"cron": t.CronTrigger.Cron,
+						"cron": cron,
 					},
 					ID:   time.Now().UTC().Format(time.RFC3339),
 					Name: event.FnCronName,
