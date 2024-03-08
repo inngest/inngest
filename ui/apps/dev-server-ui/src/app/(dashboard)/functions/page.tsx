@@ -91,6 +91,7 @@ const columns = [
         <InvokeButton
           disabled={false}
           doesFunctionAcceptPayload={doesFunctionAcceptPayload}
+          btnAppearance="outlined"
           btnAction={(data) => {
             invokeFunction({
               data,

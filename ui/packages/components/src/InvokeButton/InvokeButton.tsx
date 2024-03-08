@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ComponentProps } from 'react';
 import { Button } from '@inngest/components/Button';
 import { InvokeModal } from '@inngest/components/InvokeButton';
 import { IconTriggerFunction } from '@inngest/components/icons/TriggerFunction';
@@ -7,12 +7,14 @@ type Props = {
   disabled?: boolean;
   doesFunctionAcceptPayload: boolean;
   btnAction: (data: Record<string, unknown>) => void;
+  btnAppearance?: ComponentProps<typeof Button>['appearance'];
 };
 
 export function InvokeButton({
   disabled,
   doesFunctionAcceptPayload: hasEventTrigger,
   btnAction,
+  btnAppearance,
 }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -31,6 +33,7 @@ export function InvokeButton({
         disabled={disabled}
         icon={<IconTriggerFunction />}
         label="Invoke"
+        appearance={btnAppearance}
       />
 
       <InvokeModal
