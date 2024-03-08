@@ -21,14 +21,29 @@ export default function StreamDetails() {
   const runID = params.get('run');
 
   const eventResult = useEvent(eventID);
-  if (eventResult.error) {
-    throw eventResult.error;
-  }
+  useEffect(() => {
+    if (eventResult.error) {
+      console.error(eventResult.error);
+      toast.error(`Failed to fetch event ${eventID}`);
+    }
+  }, [eventResult.error]);
 
   const runResult = useRun(runID);
-  if (runResult.error) {
-    throw runResult.error;
-  }
+  useEffect(() => {
+    if (runResult.error) {
+      console.error(runResult.error);
+      toast.error(`Failed to fetch run ${runID}`);
+    }
+  }, [runResult.error]);
+
+  useEffect(() => {
+    if (eventResult.error || runResult.error) {
+      // If there's an error fetching the event or run, we should redirect to the
+      // stream. This happens a lot, since restarting the Dev Server will clear
+      // all data
+      router.replace('/stream');
+    }
+  }, [eventResult.error, runResult.error]);
 
   const getHistoryItemOutput = useGetHistoryItemOutput(runID);
   const router = useRouter();
