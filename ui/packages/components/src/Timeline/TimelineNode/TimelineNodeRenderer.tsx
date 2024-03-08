@@ -92,6 +92,8 @@ export function renderTimelineNode({
       name = 'Running next attempt...';
     } else if (node.status === 'started') {
       name = 'Running next step...';
+    } else if (node.status === 'failed') {
+      name = 'Function errored';
     }
 
     if (
