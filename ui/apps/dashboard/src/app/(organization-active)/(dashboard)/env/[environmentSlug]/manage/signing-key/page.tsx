@@ -1,6 +1,6 @@
+import { Alert } from '@inngest/components/Alert';
 import { CodeKey } from '@inngest/components/CodeKey';
 
-import { Alert } from '@/components/Alert';
 import { graphql } from '@/gql';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getEnvironment } from '@/queries/server-only/getEnvironment';

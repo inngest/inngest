@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useOrganization, useUser } from '@clerk/nextjs';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import * as Sentry from '@sentry/nextjs';
 
 import { type RequestBody } from '@/app/(organization-active)/api/support-tickets/route';
-import { Alert } from '@/components/Alert';
 import { SelectInput } from '@/components/Forms/SelectInput';
 import { Textarea } from '@/components/Forms/Textarea';
 import {

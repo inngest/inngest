@@ -1,8 +1,8 @@
 import { useState } from 'react';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
 
-import { Alert } from '@/components/Alert';
 import CodeEditor from '@/components/Textarea/CodeEditor';
 
 const initialCode = { data: {} };

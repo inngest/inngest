@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { ChartBarIcon } from '@heroicons/react/20/solid';
+import { Alert } from '@inngest/components/Alert';
 import {
   Bar,
   BarChart,
@@ -17,7 +18,6 @@ import {
 import colors from 'tailwindcss/colors';
 import { useQuery } from 'urql';
 
-import { Alert } from '@/components/Alert';
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { StepCounter } from './StepCounter';
