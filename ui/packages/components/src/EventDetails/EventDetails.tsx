@@ -71,10 +71,7 @@ export function EventDetails({
     batch = events;
   }
 
-  const isInternalEvent = useMemo(() => {
-    return Boolean(singleEvent?.name?.startsWith('inngest/'));
-  }, [singleEvent]);
-
+  const isInternalEvent = Boolean(singleEvent?.name?.startsWith('inngest/'));
   let prettyPayload = undefined;
   if (singleEvent && singleEvent.payload) {
     prettyPayload = usePrettyJson(singleEvent.payload);
