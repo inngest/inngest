@@ -65,7 +65,7 @@ type Function struct {
 	Debounce *Debounce `json:"debounce,omitempty"`
 
 	// Trigger represnets the trigger for the function.
-	Triggers []Trigger `json:"triggers"`
+	Triggers MultipleTriggers `json:"triggers"`
 
 	// EventBatch determines how the function will process a list of incoming events
 	EventBatch *EventBatchConfig `json:"batchEvents,omitempty"`
@@ -162,10 +162,8 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 	}
 
-	for _, t := range f.Triggers {
-		if terr := t.Validate(ctx); terr != nil {
-			err = multierror.Append(err, terr)
-		}
+	if terr := f.Triggers.Validate(ctx); terr != nil {
+		err = multierror.Append(err, terr)
 	}
 
 	if f.EventBatch != nil {
