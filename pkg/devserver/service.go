@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/gateway"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/sdk"
@@ -77,6 +78,7 @@ func (devserver) Name() string {
 }
 
 func (d *devserver) Pre(ctx context.Context) error {
+	// NOTE: **REST API**
 	// Create a new API endpoint which hosts SDK-related functionality for
 	// registering functions.
 	devAPI := newDevAPI(d)
@@ -96,6 +98,7 @@ func (d *devserver) Pre(ctx context.Context) error {
 		})
 	})
 
+	// NOTE: **GraphQL API**
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		Data:    d.data,
 		Config:  d.opts.Config,
@@ -108,6 +111,11 @@ func (d *devserver) Pre(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// NOTE: **Gateway**
+	gw := gateway.NewGateway(gateway.Opts{})
+
+	// NOTE: **Event API.**
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
 	// server UI, events, and API for loading data.
@@ -117,6 +125,7 @@ func (d *devserver) Pre(ctx context.Context) error {
 	d.apiservice = api.NewService(
 		d.opts.Config,
 		api.Mount{At: "/", Router: devAPI},
+		api.Mount{At: "/gateway", Router: gw},
 		api.Mount{At: "/v0", Router: core.Router},
 		api.Mount{At: "/debug", Handler: middleware.Profiler()},
 	)
