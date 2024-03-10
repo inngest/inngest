@@ -132,15 +132,13 @@ func (e Event) InngestMetadata() *InngestMetadata {
 }
 
 func NewOSSTrackedEvent(e Event) TrackedEvent {
-	id, err := ulid.Parse(e.ID)
-	if err != nil {
-		id = ulid.MustNew(ulid.Now(), rand.Reader)
-	}
+	// Never use e.ID as the internal ID, since it's specified by the sender
+	internalID := ulid.MustNew(ulid.Now(), rand.Reader)
 	if e.ID == "" {
-		e.ID = id.String()
+		e.ID = internalID.String()
 	}
 	return ossTrackedEvent{
-		id:    id,
+		id:    internalID,
 		event: e,
 	}
 }
