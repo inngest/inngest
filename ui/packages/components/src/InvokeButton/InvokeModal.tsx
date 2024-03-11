@@ -23,7 +23,6 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
     try {
       let payload;
       if (doesFunctionAcceptPayload) {
-        console.log({ rawPayload });
         payload = parseCode(rawPayload);
       } else {
         payload = { data: {} };
