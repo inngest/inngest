@@ -95,7 +95,7 @@ export function EnvironmentArchiveModal(props: Props) {
         </p>
       )}
 
-      {isBranchEnv && (
+      {!isArchived && isBranchEnv && (
         <p className="pb-4 text-sm">
           Since this is a branch environment, any future app syncs will unarchive the environment.
         </p>
