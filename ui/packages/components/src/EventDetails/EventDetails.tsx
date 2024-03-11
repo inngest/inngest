@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Badge } from '@inngest/components/Badge/Badge';
 import { Button } from '@inngest/components/Button';
 import { CodeBlock, type CodeBlockAction } from '@inngest/components/CodeBlock';
@@ -60,7 +61,7 @@ export function EventDetails({
   codeBlockActions = [],
   loading = false,
 }: Props) {
-  let singleEvent = undefined;
+  let singleEvent: NonNullable<typeof events>[number] | undefined = undefined;
   if (!batchID && events?.length === 1) {
     singleEvent = events[0];
   }
@@ -70,6 +71,7 @@ export function EventDetails({
     batch = events;
   }
 
+  const isInternalEvent = Boolean(singleEvent?.name?.startsWith('inngest/'));
   let prettyPayload = undefined;
   if (singleEvent && singleEvent.payload) {
     prettyPayload = usePrettyJson(singleEvent.payload);
@@ -127,7 +129,7 @@ export function EventDetails({
       }
       button={
         <>
-          {singleEvent && onReplayEvent && SendEventButton && (
+          {!isInternalEvent && onReplayEvent && SendEventButton && (
             <>
               <div className="flex items-center gap-1">
                 <Button label="Replay" btnAction={onReplayEvent} />
