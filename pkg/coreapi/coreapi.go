@@ -10,6 +10,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
+	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coreapi/apiutil"
 	"github.com/inngest/inngest/pkg/coreapi/generated"
@@ -29,12 +30,13 @@ import (
 type Options struct {
 	Data cqrs.Manager
 
-	Config  config.Config
-	Logger  *zerolog.Logger
-	Runner  runner.Runner
-	Tracker *runner.Tracker
-	State   state.Manager
-	Queue   queue.JobQueueReader
+	Config       config.Config
+	Logger       *zerolog.Logger
+	Runner       runner.Runner
+	Tracker      *runner.Tracker
+	State        state.Manager
+	Queue        queue.JobQueueReader
+	EventHandler api.EventHandler
 }
 
 func NewCoreApi(o Options) (*CoreAPI, error) {
@@ -64,6 +66,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 		HistoryReader: memory_reader.NewReader(),
 		Runner:        o.Runner,
 		Queue:         o.Queue,
+		EventHandler:  o.EventHandler,
 	}}))
 
 	// TODO - Add option for enabling GraphQL Playground
