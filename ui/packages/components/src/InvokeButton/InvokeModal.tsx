@@ -113,5 +113,12 @@ function parseCode(code: string): { data: Record<string, unknown> } {
     throw new Error('The "data" field must be an object or null');
   }
 
+  const supportedKeys = ['data'];
+  for (const key of Object.keys(payload)) {
+    if (!supportedKeys.includes(key)) {
+      throw new Error(`Property "${key}" is not supported when invoking a function`);
+    }
+  }
+
   return { data };
 }
