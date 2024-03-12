@@ -1,6 +1,7 @@
 package apiv1
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -37,20 +38,11 @@ func (a router) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
 }
 
 // CancelFunctionRun cancels a function run.
-func (a router) CancelFunctionRun(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+func (a API) CancelFunctionRun(ctx context.Context, runID ulid.ULID) error {
 	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No auth found"))
-		return
+		return publicerr.Wrap(err, 401, "No auth found")
 	}
-
-	runID, err := ulid.Parse(chi.URLParam(r, "runID"))
-	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid run ID: %s", chi.URLParam(r, "runID")))
-		return
-	}
-
 	fr, err := a.opts.FunctionRunReader.GetFunctionRun(
 		ctx,
 		auth.AccountID(),
@@ -58,18 +50,26 @@ func (a router) CancelFunctionRun(w http.ResponseWriter, r *http.Request) {
 		runID,
 	)
 	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 404, "Unable to load function run: %s", chi.URLParam(r, "runID")))
-		return
+		return publicerr.Wrapf(err, 404, "Unable to load function run: %s", runID)
 	}
-
 	if fr.WorkspaceID != auth.WorkspaceID() {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 404, "Unable to load function run: %s", chi.URLParam(r, "runID")))
+		return publicerr.Wrapf(err, 404, "Unable to load function run: %s", runID)
+	}
+	if err := a.opts.Executor.Cancel(ctx, runID, execution.CancelRequest{}); err != nil {
+		return publicerr.Wrapf(err, 500, "Unable to cancel function run: %s", err)
+	}
+	return nil
+}
+
+func (a router) cancelFunctionRun(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	runID, err := ulid.Parse(chi.URLParam(r, "runID"))
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid run ID: %s", chi.URLParam(r, "runID")))
 		return
 	}
-
-	if err := a.opts.Executor.Cancel(ctx, runID, execution.CancelRequest{}); err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Unable to cancel function run: %s", err))
-		return
+	if err := a.CancelFunctionRun(ctx, runID); err != nil {
+		_ = publicerr.WriteHTTP(w, err)
 	}
 }
 

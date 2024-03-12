@@ -80,18 +80,18 @@ func (a *router) setup() {
 
 		r.Use(headers.ContentTypeJsonResponse())
 
-		r.Get("/events", a.GetEvents)
-		r.Get("/events/{eventID}", a.GetEvent)
-		r.Get("/events/{eventID}/runs", a.GetEventRuns)
+		r.Get("/events", a.getEvents)
+		r.Get("/events/{eventID}", a.getEvent)
+		r.Get("/events/{eventID}/runs", a.getEventRuns)
 		r.Get("/runs/{runID}", a.GetFunctionRun)
-		r.Delete("/runs/{runID}", a.CancelFunctionRun)
+		r.Delete("/runs/{runID}", a.cancelFunctionRun)
 		r.Get("/runs/{runID}/jobs", a.GetFunctionRunJobs)
 
 		r.Get("/apps/{appName}/functions", a.GetAppFunctions) // Returns an app and all of its functions.
 
-		r.Post("/cancellations", a.CreateCancellation)
-		r.Get("/cancellations", a.GetCancellations)
-		r.Delete("/cancellations/{id}", a.DeleteCancellation)
+		r.Post("/cancellations", a.createCancellation)
+		r.Get("/cancellations", a.getCancellations)
+		r.Delete("/cancellations/{id}", a.deleteCancellation)
 	})
 }
 

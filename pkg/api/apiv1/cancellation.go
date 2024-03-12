@@ -39,7 +39,7 @@ func (a API) DeleteCancellation(ctx context.Context, cancellationID ulid.ULID) e
 }
 
 // DeleteCancellation is the HTTP handler implementation.
-func (a router) DeleteCancellation(w http.ResponseWriter, r *http.Request) {
+func (a router) deleteCancellation(w http.ResponseWriter, r *http.Request) {
 	id, err := ulid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid cancellation ID"))
@@ -67,10 +67,11 @@ func (a API) GetCancellations(ctx context.Context) ([]cqrs.Cancellation, error) 
 	return all, nil
 }
 
-func (a router) GetCancellations(w http.ResponseWriter, r *http.Request) {
+func (a router) getCancellations(w http.ResponseWriter, r *http.Request) {
 	c, err := a.API.GetCancellations(r.Context())
 	if err != nil {
-		publicerr.WriteHTTP(w, err)
+		_ = publicerr.WriteHTTP(w, err)
+		return
 	}
 	_ = WriteResponse(w, c)
 }
@@ -115,7 +116,7 @@ func (a API) CreateCancellation(ctx context.Context, opts CreateCancellationBody
 	return &cancel, nil
 }
 
-func (a router) CreateCancellation(w http.ResponseWriter, r *http.Request) {
+func (a router) createCancellation(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	opts := CreateCancellationBody{}

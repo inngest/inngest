@@ -1,6 +1,7 @@
 package apiv1
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"strconv"
@@ -21,23 +22,36 @@ const (
 
 // GetEvents returns events in reverse chronological order for a workspace, with optional pagination
 // and filtering params.
-func (a API) GetEvents(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+//
+// This has no API
+func (a API) GetEvents(ctx context.Context, opts *cqrs.WorkspaceEventsOpts) ([]cqrs.Event, error) {
 	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No auth found"))
-		return
+		return nil, publicerr.Wrap(err, 401, "No auth found")
 	}
+
+	if a.opts.EventReader == nil {
+		return nil, publicerr.Errorf(500, "No event reader specified")
+	}
+
+	events, err := a.opts.EventReader.WorkspaceEvents(ctx, auth.WorkspaceID(), opts)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error querying events", "error", err)
+		return nil, publicerr.Wrap(err, 500, "Unable to query events")
+	}
+	return events, nil
+}
+
+func (a router) getEvents(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	opts := cqrs.WorkspaceEventsOpts{}
 
 	limit, _ := strconv.Atoi(r.FormValue("limit"))
 	if limit == 0 {
 		limit = DefaultEvents
 	}
-	limit = util.Bound(limit, 1, cqrs.MaxEvents)
-
-	opts := cqrs.WorkspaceEventsOpts{
-		Limit: limit,
-	}
+	opts.Limit = util.Bound(limit, 1, cqrs.MaxEvents)
 
 	if cursor := r.FormValue("cursor"); cursor != "" {
 		parsed, err := ulid.Parse(cursor)
@@ -70,12 +84,7 @@ func (a API) GetEvents(w http.ResponseWriter, r *http.Request) {
 		opts.Name = &name
 	}
 
-	if a.opts.EventReader == nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Errorf(500, "No event reader specified"))
-		return
-	}
-
-	events, err := a.opts.EventReader.WorkspaceEvents(ctx, auth.WorkspaceID(), &opts)
+	events, err := a.API.GetEvents(ctx, &opts)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error querying events", "error", err)
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Unable to query events"))
@@ -87,63 +96,55 @@ func (a API) GetEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetEvent returns a specific event for the given workspace.
-func (a API) GetEvent(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+func (a API) GetEvent(ctx context.Context, eventID ulid.ULID) (*cqrs.Event, error) {
 	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No auth found"))
-		return
+		return nil, publicerr.Wrap(err, 401, "No auth found")
 	}
+	if a.opts.EventReader == nil {
+		return nil, publicerr.Errorf(500, "No event reader specified")
+	}
+	event, err := a.opts.EventReader.FindEvent(ctx, auth.WorkspaceID(), eventID)
+	if err == sql.ErrNoRows {
+		return nil, publicerr.Wrap(err, 404, "Event not found")
+	}
+	if err != nil {
+		return nil, publicerr.Wrap(err, 500, "Unable to query events")
+	}
+	return event, nil
+}
 
+// GetEvent is the HTTP implementation for retrieving events.
+func (a router) getEvent(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	eventID := chi.URLParam(r, "eventID")
 	parsed, err := ulid.Parse(eventID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid event ID: %s", eventID))
 		return
 	}
-
-	if a.opts.EventReader == nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Errorf(500, "No event reader specified"))
-		return
-	}
-
-	event, err := a.opts.EventReader.FindEvent(ctx, auth.WorkspaceID(), parsed)
-	if err == sql.ErrNoRows {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 404, "Event not found"))
-		return
-	}
+	event, err := a.API.GetEvent(ctx, parsed)
 	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Unable to query events"))
+		_ = publicerr.WriteHTTP(w, err)
 		return
 	}
 	_ = WriteCachedResponse(w, event, 5*time.Second)
 }
 
 // GetEventRuns returns function runs given an event ID.
-func (a API) GetEventRuns(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+func (a API) GetEventRuns(ctx context.Context, eventID ulid.ULID) ([]*cqrs.FunctionRun, error) {
 	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No auth found"))
-		return
+		return nil, publicerr.Wrap(err, 401, "No auth found")
 	}
-
-	eventID := chi.URLParam(r, "eventID")
-	parsed, err := ulid.Parse(eventID)
-	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid event ID: %s", eventID))
-		return
-	}
-
 	fr, err := a.opts.FunctionRunReader.GetFunctionRunsFromEvents(
 		ctx,
 		auth.AccountID(),
 		auth.WorkspaceID(),
-		[]ulid.ULID{parsed},
+		[]ulid.ULID{eventID},
 	)
 	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Unable to query function runs"))
-		return
+		return nil, publicerr.Wrap(err, 500, "Unable to query function runs")
 	}
 
 	result := []*cqrs.FunctionRun{}
@@ -152,5 +153,21 @@ func (a API) GetEventRuns(w http.ResponseWriter, r *http.Request) {
 			result = append(result, item)
 		}
 	}
-	_ = WriteCachedResponse(w, result, 5*time.Second)
+	return result, nil
+}
+
+func (a router) getEventRuns(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	eventID := chi.URLParam(r, "eventID")
+	parsed, err := ulid.Parse(eventID)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid event ID: %s", eventID))
+		return
+	}
+	runs, err := a.GetEventRuns(ctx, parsed)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, err)
+		return
+	}
+	_ = WriteCachedResponse(w, runs, 5*time.Second)
 }
