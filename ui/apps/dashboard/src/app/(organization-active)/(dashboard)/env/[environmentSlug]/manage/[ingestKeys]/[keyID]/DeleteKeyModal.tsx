@@ -52,7 +52,7 @@ export default function DeleteKeyModal({ keyID, isOpen, onClose }: DeleteKeyModa
       isOpen={isOpen}
       onClose={onClose}
       title={'Are you sure you want to delete this ' + currentContent?.name.toLowerCase() + '?'}
-      primaryAction={{ label: 'Yes', btnAction: () => handleDelete() }}
+      onSubmit={handleDelete}
     />
   );
 }

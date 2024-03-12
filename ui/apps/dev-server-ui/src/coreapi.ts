@@ -238,3 +238,11 @@ export const INVOKE_FUNCTION = gql`
     invokeFunction(data: $data, functionSlug: $functionSlug)
   }
 `;
+
+export const CANCEL_RUN = gql`
+  mutation CancelRun($runID: ULID!) {
+    cancelRun(runID: $runID) {
+      id
+    }
+  }
+`;
