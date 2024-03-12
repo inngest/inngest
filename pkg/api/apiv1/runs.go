@@ -12,7 +12,7 @@ import (
 )
 
 // GetEventRuns returns function runs given an event ID.
-func (a api) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
+func (a router) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
@@ -37,7 +37,7 @@ func (a api) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
 }
 
 // CancelFunctionRun cancels a function run.
-func (a api) CancelFunctionRun(w http.ResponseWriter, r *http.Request) {
+func (a router) CancelFunctionRun(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
@@ -73,7 +73,7 @@ func (a api) CancelFunctionRun(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a api) GetFunctionRunJobs(w http.ResponseWriter, r *http.Request) {
+func (a router) GetFunctionRunJobs(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {

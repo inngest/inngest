@@ -21,7 +21,7 @@ const (
 
 // GetEvents returns events in reverse chronological order for a workspace, with optional pagination
 // and filtering params.
-func (a api) GetEvents(w http.ResponseWriter, r *http.Request) {
+func (a API) GetEvents(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
@@ -87,7 +87,7 @@ func (a api) GetEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetEvent returns a specific event for the given workspace.
-func (a api) GetEvent(w http.ResponseWriter, r *http.Request) {
+func (a API) GetEvent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
@@ -120,7 +120,7 @@ func (a api) GetEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetEventRuns returns function runs given an event ID.
-func (a api) GetEventRuns(w http.ResponseWriter, r *http.Request) {
+func (a API) GetEventRuns(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {

@@ -41,25 +41,36 @@ type Opts struct {
 
 // AddRoutes adds a new API handler to the given router.
 func AddRoutes(r chi.Router, o Opts) http.Handler {
-	instance := &api{Router: r}
-	if o.AuthMiddleware != nil {
-		instance.Use(o.AuthMiddleware)
-	}
 	if o.AuthFinder == nil {
 		o.AuthFinder = nilAuthFinder
 	}
 
-	instance.opts = o
+	// Create the HTTP implementation, which wraps the handler.  We do ths to code
+	// share and split the HTTP concerns from the actual logic, eg. to share to GQL.
+	impl := &API{opts: o}
+
+	instance := &router{
+		Router: r,
+		API:    impl,
+	}
+	// Add the auth middleware, if specified.
+	if o.AuthMiddleware != nil {
+		instance.Use(o.AuthMiddleware)
+	}
 	instance.setup()
 	return instance
 }
 
-type api struct {
-	chi.Router
+type API struct {
 	opts Opts
 }
 
-func (a *api) setup() {
+type router struct {
+	*API
+	chi.Router
+}
+
+func (a *router) setup() {
 	a.Group(func(r chi.Router) {
 		r.Use(middleware.Recoverer)
 
