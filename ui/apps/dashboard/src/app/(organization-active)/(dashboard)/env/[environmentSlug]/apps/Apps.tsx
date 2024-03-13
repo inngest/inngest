@@ -20,10 +20,7 @@ export function Apps({ isArchived = false }: Props) {
 
   const res = useApps({ envID: env.id, isArchived });
   if (res.error) {
-    if (!res.data) {
-      throw res.error;
-    }
-    console.error(res.error);
+    throw res.error;
   }
   if (res.isLoading && !res.data) {
     return (
