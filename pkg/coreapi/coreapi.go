@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi/generated"
 	"github.com/inngest/inngest/pkg/coreapi/graph/resolvers"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -37,6 +38,7 @@ type Options struct {
 	State        state.Manager
 	Queue        queue.JobQueueReader
 	EventHandler api.EventHandler
+	Executor     execution.Executor
 }
 
 func NewCoreApi(o Options) (*CoreAPI, error) {
@@ -67,6 +69,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 		Runner:        o.Runner,
 		Queue:         o.Queue,
 		EventHandler:  o.EventHandler,
+		Executor:      o.Executor,
 	}}))
 
 	// TODO - Add option for enabling GraphQL Playground

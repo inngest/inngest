@@ -10,6 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -170,4 +172,75 @@ func (r *functionRunResolver) BatchCreatedAt(ctx context.Context, obj *models.Fu
 
 	out := ulid.Time(batch.ID.Time())
 	return &out, nil
+}
+
+// TODO: Refactor to share logic with the `DELETE /v1/runs/{runID}` REST
+// endpoint
+func (r *mutationResolver) CancelRun(
+	ctx context.Context,
+	runID ulid.ULID,
+) (*models.FunctionRun, error) {
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	run, err := r.HistoryReader.GetFunctionRun(
+		ctx,
+		accountID,
+		workspaceID,
+		runID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if run.Status == enums.RunStatusCancelled {
+		// Already cancelled, so return the run as is. This makes the mutation
+		// idempotent
+		return models.MakeFunctionRun(run), nil
+	}
+	if run.EndedAt != nil {
+		return nil, errors.New("cannot cancel an ended run")
+	}
+
+	err = r.Executor.Cancel(ctx, runID, execution.CancelRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Wait an arbitrary amount of time to give the history store enough time to
+	// reflect the cancellation
+	<-time.After(500 * time.Millisecond)
+
+	// Fetch the updated run from the history store, but we need to include
+	// polling since the history store is eventually consistent. The history
+	// store should reflect cancellation almost immediately, but it might take a
+	// noticeable amount of time to update.
+	//
+	// We probably wouldn't need to poll if our UI used a normalized cache,
+	// since we could pseudo-update the status and endedAt fields before
+	// returning data
+	start := time.Now()
+	timeout := 5 * time.Second
+	for {
+		if time.Since(start) > timeout {
+			// Give up and return the run as is. Don't return an error because
+			// the run was still cancelled; it's just that the history store
+			// wasn't updated fast enough
+			return models.MakeFunctionRun(run), nil
+		}
+
+		run, err = r.HistoryReader.GetFunctionRun(
+			ctx,
+			accountID,
+			workspaceID,
+			runID,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if run.Status == enums.RunStatusCancelled {
+			return models.MakeFunctionRun(run), nil
+		}
+
+		<-time.After(time.Second)
+	}
 }

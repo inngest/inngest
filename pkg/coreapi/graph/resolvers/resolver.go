@@ -6,6 +6,7 @@ import (
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/coreapi/generated"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/history_reader"
@@ -17,6 +18,7 @@ type Resolver struct {
 	Runner        runner.Runner
 	Queue         queue.JobQueueReader
 	EventHandler  api.EventHandler
+	Executor      execution.Executor
 }
 
 // Query returns generated.QueryResolver implementation.
