@@ -10,6 +10,8 @@ type Mutation {
     data: Map
     functionSlug: String!
   ): Boolean
+
+  cancelRun(runID: ULID!): FunctionRun!
 }
 
 input CreateAppInput {

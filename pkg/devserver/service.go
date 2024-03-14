@@ -114,6 +114,7 @@ func (d *devserver) Pre(ctx context.Context) error {
 		State:        d.state,
 		Queue:        d.queue,
 		EventHandler: d.handleEvent,
+		Executor:     d.executor,
 	})
 	if err != nil {
 		return err
