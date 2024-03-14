@@ -19,7 +19,7 @@ import { WaitingSummary } from './WaitingSummary';
 import { renderRunMetadata } from './runMetadataRenderer';
 
 type FuncProps = {
-  cancelRun: () => Promise<unknown>;
+  cancelRun?: () => Promise<unknown>;
   functionVersion?: Pick<FunctionVersion, 'url' | 'version'>;
   // TODO: Replace this with an imported component.
   rerunButton?: React.ReactNode;
@@ -72,7 +72,7 @@ export function RunDetails({
       button={
         !loading && (
           <div className="flex gap-2">
-            <CancelRunButton disabled={Boolean(run?.endedAt)} onClick={cancelRun} />
+            {cancelRun && <CancelRunButton disabled={Boolean(run?.endedAt)} onClick={cancelRun} />}
             {rerunButton}
           </div>
         )
