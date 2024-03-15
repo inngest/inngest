@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -130,11 +132,20 @@ func NewOLTPTraceProvider(ctx context.Context, svc string) (*tracer, error) {
 		endpoint = "otel-collector:4317"
 	}
 
+	var maxPayloadSize int
+	maxPayloadSize, _ = strconv.Atoi(os.Getenv("OTEL_TRACES_MAX_PAYLOAD_SIZE_BYTES"))
+	if maxPayloadSize == 0 {
+		maxPayloadSize = (consts.AbsoluteMaxEventSize + consts.MaxBodySize) * 2
+	}
+
 	// NOTE:
 	// assuming the otel collector is within the same private network, we can
-	// skip grpc authn, but probably still better to get it work for production
+	// skip grpc authn, but probably still better to get it work for production eventually
 	conn, err := grpc.Dial(endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallSendMsgSize(maxPayloadSize),
+		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to otel collector via grpc: %w", err)
@@ -154,7 +165,6 @@ func NewOLTPTraceProvider(ctx context.Context, svc string) (*tracer, error) {
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
-			semconv.DeploymentEnvironmentKey.String(env()),
 		)),
 	)
 
