@@ -106,7 +106,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	ctx, span := a.config.Tracer.Provider().
 		Tracer(consts.OtelScopeEventAPI).
-		Start(r.Context(), consts.OtelSpanNameEventAPI, trace.WithAttributes(
+		Start(r.Context(), "event-api", trace.WithAttributes(
 			attribute.Int(consts.OtelSysRootSpan, 1),
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 		))

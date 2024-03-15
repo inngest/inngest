@@ -97,7 +97,7 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 
 	ctx, span := a.config.Tracer.Provider().
 		Tracer(consts.OtelScopeEventIngestion).
-		Start(ctx, consts.OtelSpanNameIngestion, trace.WithAttributes(
+		Start(ctx, "event-ingestion", trace.WithAttributes(
 			attribute.Int(consts.OtelSysRootSpan, 1),
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 		))
