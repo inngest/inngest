@@ -42,7 +42,11 @@ export function useVercelIntegration(): {
   }, [productionEnvironmentId]);
 
   // Fetch data from REST and GQL and merge
-  const { data, error } = useRestAPIRequest<VercelProjectAPIResponse>({ url, method: 'GET' });
+  const {
+    data,
+    fetching: savedProjectsFetch,
+    error,
+  } = useRestAPIRequest<VercelProjectAPIResponse>({ url, method: 'GET' });
   const [{ data: savedVercelProjects }] = useQuery({
     query: GetSavedVercelProjectsDocument,
     variables: {
@@ -68,7 +72,7 @@ export function useVercelIntegration(): {
 
   return {
     data: vercelIntegration,
-    fetching,
+    fetching: fetching || savedProjectsFetch,
     error: environmentError || error,
   };
 }

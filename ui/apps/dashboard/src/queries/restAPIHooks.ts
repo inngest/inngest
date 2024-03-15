@@ -9,14 +9,16 @@ export function useRestAPIRequest<T>({
 }: {
   url: string | URL | null;
   method: string;
-}): { data: T | undefined; error: Error | null } {
+}): { data: T | undefined; fetching: boolean; error: Error | null } {
   const { getToken } = useAuth();
   const [data, setData] = useState<any>();
+  const [fetching, setFetching] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     async function request() {
       if (!url) return;
+      setFetching(true);
       const sessionToken = await getToken();
       if (!sessionToken) return; // TODO - Handle no auth
       const response = await fetch(url, {
@@ -31,9 +33,10 @@ export function useRestAPIRequest<T>({
       const data = await response.json();
 
       setData(data);
+      setFetching(false);
     }
     request();
   }, [getToken, url, method]);
 
-  return { data, error };
+  return { data, fetching, error };
 }
