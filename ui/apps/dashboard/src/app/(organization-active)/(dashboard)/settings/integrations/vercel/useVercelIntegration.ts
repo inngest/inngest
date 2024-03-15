@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from 'urql';
 
 import { useEnvironments } from '@/queries';
