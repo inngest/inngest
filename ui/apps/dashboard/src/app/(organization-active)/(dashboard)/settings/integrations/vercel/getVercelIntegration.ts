@@ -1,50 +1,74 @@
-import restAPI, { HTTPError } from '@/queries/restAPI';
-import { getProductionEnvironment } from '@/queries/server-only/getEnvironment';
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from 'urql';
+
+import { useEnvironments } from '@/queries';
+import { useRestAPIRequest } from '@/queries/restAPIHooks';
+import { getProductionEnvironment } from '@/utils/environments';
 import { type VercelIntegration, type VercelProjectAPIResponse } from './VercelIntegration';
-import enrichVercelProjects from './enrichVercelProjects';
+import mergeVercelProjectData from './mergeVercelProjectData';
+import { GetSavedVercelProjectsDocument } from './queries';
 
-export default async function getVercelIntegration(): Promise<VercelIntegration> {
-  const environment = await getProductionEnvironment();
-  const url = new URL('/v1/integrations/vercel/projects', process.env.NEXT_PUBLIC_API_URL);
-  url.searchParams.set('workspaceID', environment.id);
+const notEnabledVercelIntegration: VercelIntegration = {
+  id: 'not-enabled',
+  name: 'Vercel',
+  slug: 'vercel',
+  projects: [],
+  enabled: false,
+};
 
-  let response: VercelProjectAPIResponse;
-  try {
-    response = await restAPI(url).json<{
-      projects: { id: string; name: string }[];
-    }>();
-  } catch (err) {
-    if (err instanceof HTTPError) {
-      if (err.response.status === 400) {
-        return {
-          id: 'dummy-placeholder-id',
-          name: 'Vercel',
-          slug: 'vercel',
-          projects: [],
-          enabled: false,
-        };
-      } else if (err.response.status === 401) {
-        throw new Error('Please sign in in again to view this page');
-      }
-    } else {
-      throw err;
+export function useVercelIntegration(): {
+  data: VercelIntegration;
+  fetching: boolean;
+  error: Error | null;
+} {
+  const [{ data: environments, fetching, error: environmentError }] = useEnvironments();
+
+  const productionEnvironmentId = useMemo(() => {
+    if (!environments) return null;
+    const env = getProductionEnvironment(environments);
+    return env?.id;
+  }, [environments]);
+
+  // Use memo as the URL object will change on every render
+  const url = useMemo(() => {
+    if (!productionEnvironmentId) {
+      return null;
     }
-    return {
-      id: 'dummy-placeholder-id',
-      name: 'Vercel',
-      slug: 'vercel',
-      projects: [],
-      enabled: false,
-    };
-  }
+    const url = new URL('/v1/integrations/vercel/projects', process.env.NEXT_PUBLIC_API_URL);
+    url.searchParams.set('workspaceID', productionEnvironmentId);
+    return url;
+  }, [productionEnvironmentId]);
 
-  const projects = await enrichVercelProjects(response.projects);
+  // Fetch data from REST and GQL and merge
+  const { data, error } = useRestAPIRequest<VercelProjectAPIResponse>({ url, method: 'GET' });
+  const [{ data: savedVercelProjects }] = useQuery({
+    query: GetSavedVercelProjectsDocument,
+    variables: {
+      environmentID: productionEnvironmentId || '',
+    },
+    pause: !productionEnvironmentId,
+  });
+
+  const projects = mergeVercelProjectData({
+    vercelProjects: data?.projects || [],
+    savedProjects: savedVercelProjects?.environment.savedVercelProjects || [],
+  });
+
+  const vercelIntegration = data
+    ? {
+        id: 'enabled-integration-id',
+        name: 'Vercel',
+        slug: 'vercel',
+        projects,
+        enabled: true,
+      }
+    : notEnabledVercelIntegration;
 
   return {
-    id: 'dummy-placeholder-id',
-    name: 'Vercel',
-    slug: 'vercel',
-    projects,
-    enabled: true,
+    data: vercelIntegration,
+    fetching,
+    error: environmentError || error,
   };
 }
