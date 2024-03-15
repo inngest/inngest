@@ -29,20 +29,35 @@ const (
 	TracerTypeJaeger
 )
 
+type Tracer interface {
+	Provider() *trace.TracerProvider
+	Shutdown(ctx context.Context) func()
+}
+
 type tracer struct {
-	Provider *trace.TracerProvider
-	Shutdown func()
+	provider *trace.TracerProvider
+	shutdown func(context.Context)
+}
+
+func (t *tracer) Provider() *trace.TracerProvider {
+	return t.provider
+}
+
+func (t *tracer) Shutdown(ctx context.Context) func() {
+	return func() {
+		t.shutdown(ctx)
+	}
 }
 
 func TracerSetup(svc string, ttype TracerType) (func(), error) {
 	ctx := context.Background()
 
-	tracer, err := NewTracerProvider(ctx, svc, ttype)
+	tracer, err := NewTracer(ctx, svc, ttype)
 	if err != nil {
 		return nil, err
 	}
 
-	otel.SetTracerProvider(tracer.Provider)
+	otel.SetTracerProvider(tracer.Provider())
 	otel.SetTextMapPropagator(
 		propagation.NewCompositeTextMapPropagator(
 			propagation.TraceContext{},
@@ -50,25 +65,27 @@ func TracerSetup(svc string, ttype TracerType) (func(), error) {
 		),
 	)
 
-	return func() { tracer.Shutdown() }, nil
+	return func() {
+		tracer.Shutdown(ctx)
+	}, nil
 }
 
 // NewTracerProvider creates a new tracer with a provider and exporter based
 // on the passed in `TraceType`.
-func NewTracerProvider(ctx context.Context, svc string, ttype TracerType) (*tracer, error) {
+func NewTracer(ctx context.Context, svc string, ttype TracerType) (Tracer, error) {
 	switch ttype {
 	case TracerTypeOTLP:
-		return NewOLTPTraceProvider(ctx, svc)
+		return newOLTPTraceProvider(ctx, svc)
 	case TracerTypeJaeger:
-		return NewJaegerTraceProvider(ctx, svc)
+		return newJaegerTraceProvider(ctx, svc)
 	case TracerTypeIO:
-		return NewIOTraceProvider(ctx, svc)
+		return newIOTraceProvider(ctx, svc)
 	default:
 		return newNoopTraceProvider(ctx, svc)
 	}
 }
 
-func NewJaegerTraceProvider(ctx context.Context, svc string) (*tracer, error) {
+func newJaegerTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	exp, err := jaegerExporter()
 	if err != nil {
 		return nil, fmt.Errorf("error setting up Jaeger exporter: %w", err)
@@ -82,14 +99,15 @@ func NewJaegerTraceProvider(ctx context.Context, svc string) (*tracer, error) {
 		)),
 	)
 	return &tracer{
-		Provider: tp,
-		Shutdown: func() {
+		provider: tp,
+		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
+			_ = tp.Shutdown(ctx)
 		},
 	}, nil
 }
 
-func NewIOTraceProvider(ctx context.Context, svc string) (*tracer, error) {
+func newIOTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	exp, err := stdouttrace.New()
 	if err != nil {
 		return nil, fmt.Errorf("error settings up stdout trace exporter: %w", err)
@@ -103,14 +121,15 @@ func NewIOTraceProvider(ctx context.Context, svc string) (*tracer, error) {
 		)),
 	)
 	return &tracer{
-		Provider: tp,
-		Shutdown: func() {
+		provider: tp,
+		shutdown: func(ctx context.Context) {
+			_ = tp.ForceFlush(ctx)
 			_ = tp.Shutdown(ctx)
 		},
 	}, nil
 }
 
-func newNoopTraceProvider(ctx context.Context, svc string) (*tracer, error) {
+func newNoopTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	tp := trace.NewTracerProvider(
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
@@ -119,14 +138,13 @@ func newNoopTraceProvider(ctx context.Context, svc string) (*tracer, error) {
 		)),
 	)
 	return &tracer{
-		Provider: tp,
-		Shutdown: func() {
-			_ = tp.Shutdown(ctx)
+		provider: tp,
+		shutdown: func(ctx context.Context) {
 		},
 	}, nil
 }
 
-func NewOLTPTraceProvider(ctx context.Context, svc string) (*tracer, error) {
+func newOLTPTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	endpoint := os.Getenv("OTEL_TRACES_COLLECTOR_ENDPOINT")
 	if endpoint == "" {
 		endpoint = "otel-collector:4317"
@@ -169,8 +187,9 @@ func NewOLTPTraceProvider(ctx context.Context, svc string) (*tracer, error) {
 	)
 
 	return &tracer{
-		Provider: tp,
-		Shutdown: func() {
+		provider: tp,
+		shutdown: func(ctx context.Context) {
+			_ = tp.ForceFlush(ctx)
 			_ = exp.Shutdown(ctx)
 			_ = tp.Shutdown(ctx)
 		},
