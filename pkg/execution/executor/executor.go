@@ -689,6 +689,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	resp, err := e.run(ctx, id, item, edge, s, stackIndex)
 	if resp == nil && err != nil {
 		span.SetStatus(codes.Error, err.Error())
+		if byt, err := json.Marshal(err.Error()); err == nil {
+			span.AddEvent(string(byt), trace.WithAttributes(
+				attribute.Bool(consts.OtelSysStepOutput, true),
+			))
+		}
+
 		return nil, err
 	}
 
@@ -702,9 +708,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		)
 
 		if byt, err := json.Marshal(resp.Output); err == nil {
-			span.SetAttributes(
-				attribute.String(consts.OtelSysStepOutput, string(byt)),
-			)
+			span.AddEvent(string(byt), trace.WithAttributes(
+				attribute.Bool(consts.OtelSysStepOutput, true),
+			))
 		}
 	}
 
