@@ -77,6 +77,15 @@ func doDev(cmd *cobra.Command, args []string) {
 	retryInterval, _ := cmd.Flags().GetInt("retry-interval")
 	tick, _ := cmd.Flags().GetInt("tick")
 
+	// TODO: change this to Noop later
+	tracer, err := telemetry.NewTracer(ctx, "devserver", telemetry.TracerTypeIO)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer tracer.Shutdown(ctx)
+	conf.Tracer = tracer
+
 	opts := devserver.StartOpts{
 		Config:        *conf,
 		URLs:          urls,
@@ -85,13 +94,6 @@ func doDev(cmd *cobra.Command, args []string) {
 		RetryInterval: retryInterval,
 		Tick:          time.Duration(tick) * time.Millisecond,
 	}
-
-	close, err := telemetry.TracerSetup("devserver", telemetry.TracerTypeNoop)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	defer close()
 
 	err = devserver.New(ctx, opts)
 	if err != nil {
