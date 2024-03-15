@@ -12,11 +12,10 @@ export function useRestAPIRequest<T>({
 }): { data: T | undefined; error: Error | null } {
   const { getToken } = useAuth();
   const [data, setData] = useState<any>();
-  const [error, setError] = useState<Error | null>();
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     async function request() {
-      console.log('req', url);
       if (!url) return;
       const sessionToken = await getToken();
       if (!sessionToken) return; // TODO - Handle no auth
@@ -30,7 +29,7 @@ export function useRestAPIRequest<T>({
         return setError(new Error(response.statusText));
       }
       const data = await response.json();
-      console.log('req data', data);
+
       setData(data);
     }
     request();
