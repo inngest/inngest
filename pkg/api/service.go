@@ -132,7 +132,7 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 			Data:      string(byt),
 			Timestamp: time.Now(),
 			Metadata: map[string]any{
-				"trace": carrier,
+				consts.OtelPropagationKey: carrier,
 			},
 		},
 	)

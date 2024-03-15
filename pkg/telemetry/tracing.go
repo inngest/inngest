@@ -7,6 +7,8 @@ import (
 	"strconv"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -111,8 +113,11 @@ func newJaegerTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	}, nil
 }
 
+// IOTraceProvider is expected to be used for debugging purposes and not for production usage
 func newIOTraceProvider(ctx context.Context, svc string) (Tracer, error) {
-	exp, err := stdouttrace.New()
+	exp, err := stdouttrace.New(
+		stdouttrace.WithWriter(log.New(zerolog.TraceLevel)),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error settings up stdout trace exporter: %w", err)
 	}

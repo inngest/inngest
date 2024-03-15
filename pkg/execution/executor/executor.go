@@ -15,6 +15,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
+	"github.com/gosimple/slug"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -35,6 +36,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/xhit/go-str2duration/v2"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -409,11 +412,20 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		id.PriorityFactor = &factor
 	}
 
+	// Inject trace context into state metadata
+	stateMetadata := map[string]any{}
+	if req.Context != nil {
+		stateMetadata = req.Context
+	}
+	carrier := telemetry.NewTraceCarrier()
+	e.tracer.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	stateMetadata[consts.OtelPropagationKey] = carrier
+
 	// Create a new function.
 	s, err := e.sm.New(ctx, state.Input{
 		Identifier:     id,
 		EventBatchData: mapped,
-		Context:        req.Context,
+		Context:        stateMetadata,
 	})
 	if err == state.ErrIdentifierExists {
 		// This function was already created.
@@ -548,6 +560,29 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// reads in the future.
 	ctx = WithContextMetadata(ctx, md)
 
+	// Propagate trace context
+	if md.Context != nil {
+		if trace, ok := md.Context[consts.OtelPropagationKey]; ok {
+			carrier := telemetry.NewTraceCarrier()
+			if err := carrier.Unmarshal(trace); err == nil {
+				ctx = e.tracer.Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+			}
+		}
+	}
+
+	ctx, span := e.tracer.Provider().
+		Tracer(consts.OtelScopeStep).
+		Start(ctx, "running", trace.WithAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, id.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, id.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, id.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, id.WorkflowID.String()),
+			attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
+			attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
+		))
+	defer span.End()
+
 	if md.Status == enums.RunStatusCancelled {
 		return nil, state.ErrFunctionCancelled
 	}
@@ -653,7 +688,24 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	resp, err := e.run(ctx, id, item, edge, s, stackIndex)
 	if resp == nil && err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
+	}
+
+	if resp != nil {
+		spanName := strings.ToLower(slug.Make(resp.Step.Name))
+		span.SetName(spanName)
+
+		span.SetAttributes(
+			attribute.Int(consts.OtelSysStepStatus, resp.StatusCode),
+			attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
+		)
+
+		if byt, err := json.Marshal(resp.Output); err == nil {
+			span.SetAttributes(
+				attribute.String(consts.OtelSysStepOutput, string(byt)),
+			)
+		}
 	}
 
 	err = e.HandleResponse(ctx, id, item, edge, resp)
