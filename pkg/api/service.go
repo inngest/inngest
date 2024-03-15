@@ -14,9 +14,11 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -119,6 +121,9 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 		Interface("event", trackedEvent.GetEvent()).
 		Msg("publishing event")
 
+	carrier := telemetry.NewTraceCarrier()
+	a.config.Tracer.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+
 	err = a.publisher.Publish(
 		ctx,
 		a.config.EventStream.Service.TopicName(),
@@ -126,6 +131,9 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 			Name:      event.EventReceivedName,
 			Data:      string(byt),
 			Timestamp: time.Now(),
+			Metadata: map[string]any{
+				"trace": carrier,
+			},
 		},
 	)
 	if err != nil {

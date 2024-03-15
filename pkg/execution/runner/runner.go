@@ -24,8 +24,10 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"github.com/robfig/cron/v3"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 const (
@@ -293,6 +295,15 @@ func (s *svc) Events(ctx context.Context, eventId string) ([]event.Event, error)
 func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	if m.Name != event.EventReceivedName {
 		return fmt.Errorf("unknown event type: %s", m.Name)
+	}
+
+	if m.Metadata != nil {
+		if trace, ok := m.Metadata["trace"]; ok {
+			carrier := telemetry.NewTraceCarrier()
+			if err := carrier.Unmarshal(trace); err == nil {
+				ctx = s.config.Tracer.Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+			}
+		}
 	}
 
 	var tracked event.TrackedEvent
