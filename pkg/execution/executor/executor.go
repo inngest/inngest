@@ -30,9 +30,12 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
 	"github.com/xhit/go-str2duration/v2"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
@@ -195,6 +198,13 @@ func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.
 	}
 }
 
+func WithTracer(t telemetry.Tracer) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).tracer = t
+		return nil
+	}
+}
+
 // WithRuntimeDrivers specifies the drivers available to use when executing steps
 // of a function.
 //
@@ -233,6 +243,7 @@ type executor struct {
 	invokeNotFoundHandler execution.InvokeNotFoundHandler
 	handleSendingEvent    execution.HandleSendingEvent
 	cancellationChecker   cancellation.Checker
+	tracer                telemetry.Tracer
 
 	lifecycles []execution.LifecycleListener
 
@@ -267,6 +278,19 @@ func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 // If this function has a debounce config, this will return ErrFunctionDebounced instead
 // of an identifier as the function is not scheduled immediately.
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*state.Identifier, error) {
+	ctx, span := e.tracer.Provider().
+		Tracer(consts.OtelScopeFunction).
+		Start(ctx, req.Function.GetSlug(), trace.WithAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, req.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, req.Function.ID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, req.Function.GetSlug()),
+			attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
+		))
+	defer span.End()
+
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
 			AccountID:       req.AccountID,
@@ -308,8 +332,22 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	eventIDs := []ulid.ULID{}
+	spanEventIDs := []string{}
 	for _, e := range req.Events {
-		eventIDs = append(eventIDs, e.GetInternalID())
+		id := e.GetInternalID()
+		eventIDs = append(eventIDs, id)
+		spanEventIDs = append(spanEventIDs, id.String())
+	}
+
+	span.SetAttributes(
+		attribute.String(consts.OtelAttrSDKRunID, runID.String()),
+		attribute.StringSlice(consts.OtelSysEventIDs, spanEventIDs),
+		attribute.String(consts.OtelSysIdempotencyKey, key),
+	)
+	if len(req.Events) > 1 {
+		span.SetAttributes(
+			attribute.String(consts.OtelSysBatchID, req.BatchID.String()),
+		)
 	}
 
 	id := state.Identifier{
