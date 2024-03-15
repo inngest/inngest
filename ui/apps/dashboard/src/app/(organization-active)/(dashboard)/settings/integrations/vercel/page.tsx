@@ -2,7 +2,7 @@
 
 import LoadingIcon from '@/icons/LoadingIcon';
 import VercelIntegrationForm from './VercelIntegrationForm';
-import { useVercelIntegration } from './getVercelIntegration';
+import { useVercelIntegration } from './useVercelIntegration';
 
 export default function VercelIntegrationPage() {
   const { data, fetching, error } = useVercelIntegration();
