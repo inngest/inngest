@@ -31,16 +31,22 @@ const (
 
 type Tracer interface {
 	Provider() *trace.TracerProvider
+	Propagator() propagation.TextMapPropagator
 	Shutdown(ctx context.Context) func()
 }
 
 type tracer struct {
-	provider *trace.TracerProvider
-	shutdown func(context.Context)
+	provider   *trace.TracerProvider
+	propagator propagation.TextMapPropagator
+	shutdown   func(context.Context)
 }
 
 func (t *tracer) Provider() *trace.TracerProvider {
 	return t.provider
+}
+
+func (t *tracer) Propagator() propagation.TextMapPropagator {
+	return t.propagator
 }
 
 func (t *tracer) Shutdown(ctx context.Context) func() {
@@ -59,10 +65,7 @@ func TracerSetup(svc string, ttype TracerType) (func(), error) {
 
 	otel.SetTracerProvider(tracer.Provider())
 	otel.SetTextMapPropagator(
-		propagation.NewCompositeTextMapPropagator(
-			propagation.TraceContext{},
-			propagation.Baggage{},
-		),
+		newTextMapPropagator(),
 	)
 
 	return func() {
@@ -99,7 +102,8 @@ func newJaegerTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 		)),
 	)
 	return &tracer{
-		provider: tp,
+		provider:   tp,
+		propagator: newTextMapPropagator(),
 		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
 			_ = tp.Shutdown(ctx)
@@ -121,7 +125,8 @@ func newIOTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 		)),
 	)
 	return &tracer{
-		provider: tp,
+		provider:   tp,
+		propagator: newTextMapPropagator(),
 		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
 			_ = tp.Shutdown(ctx)
@@ -187,7 +192,8 @@ func newOLTPTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	)
 
 	return &tracer{
-		provider: tp,
+		provider:   tp,
+		propagator: newTextMapPropagator(),
 		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
 			_ = exp.Shutdown(ctx)
@@ -204,4 +210,11 @@ func jaegerExporter() (trace.SpanExporter, error) {
 		return nil, fmt.Errorf("error creating jaeger trace exporter: %w", err)
 	}
 	return exp, nil
+}
+
+func newTextMapPropagator() propagation.TextMapPropagator {
+	return propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	)
 }
