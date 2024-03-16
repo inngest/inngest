@@ -28,7 +28,9 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"github.com/robfig/cron/v3"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -236,7 +238,15 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 			}
 			cron := t.CronTrigger.Cron
 			_, err := s.cronmanager.AddFunc(cron, func() {
-				err := s.initialize(context.Background(), fn, event.NewOSSTrackedEvent(event.Event{
+				ctx, span := s.config.Tracer.Provider().
+					Tracer(consts.OtelScopeCron).
+					Start(context.Background(), "cron", trace.WithAttributes(
+						attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
+						attribute.Int(consts.OtelSysFunctionVersion, fn.FunctionVersion),
+					))
+				defer span.End()
+
+				err := s.initialize(ctx, fn, event.NewOSSTrackedEvent(event.Event{
 					Data: map[string]any{
 						"cron": cron,
 					},

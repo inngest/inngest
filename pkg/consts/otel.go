@@ -35,6 +35,7 @@ const (
 	// otel scopes
 	OtelScopeEventAPI       = "event.api.inngest"
 	OtelScopeEventIngestion = "event.inngest"
+	OtelScopeCron           = "cron.inngest"
 	OtelScopeEnv            = "env.inngest"
 	OtelScopeApp            = "app.env.inngest"
 	OtelScopeFunction       = "function.app.env.inngest"
