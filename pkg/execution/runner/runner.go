@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -298,7 +299,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	}
 
 	if m.Metadata != nil {
-		if trace, ok := m.Metadata["trace"]; ok {
+		if trace, ok := m.Metadata[consts.OtelPropagationKey]; ok {
 			carrier := telemetry.NewTraceCarrier()
 			if err := carrier.Unmarshal(trace); err == nil {
 				ctx = s.config.Tracer.Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
