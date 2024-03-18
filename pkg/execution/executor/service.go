@@ -136,7 +136,8 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 		for _, e := range events {
 			evt := e
 			eg.Go(func() error {
-				byt, err := json.Marshal(evt)
+				trackedEvent := event.NewOSSTrackedEvent(evt)
+				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling event: %w", err)
 				}
@@ -147,7 +148,7 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 					pubsub.Message{
 						Name:      event.EventReceivedName,
 						Data:      string(byt),
-						Timestamp: evt.Time(),
+						Timestamp: trackedEvent.GetEvent().Time(),
 					},
 				)
 				if err != nil {
