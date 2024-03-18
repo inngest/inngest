@@ -54,7 +54,10 @@ func (t *tracer) Shutdown(ctx context.Context) func() {
 func TracerSetup(svc string, ttype TracerType) (func(), error) {
 	ctx := context.Background()
 
-	tracer, err := NewTracer(ctx, svc, ttype)
+	tracer, err := newTracer(ctx, TracerOpts{
+		ServiceName: svc,
+		Type:        ttype,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -71,16 +74,16 @@ func TracerSetup(svc string, ttype TracerType) (func(), error) {
 
 // NewTracerProvider creates a new tracer with a provider and exporter based
 // on the passed in `TraceType`.
-func NewTracer(ctx context.Context, svc string, ttype TracerType) (Tracer, error) {
-	switch ttype {
+func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
+	switch opts.Type {
 	case TracerTypeOTLP:
-		return newOLTPTraceProvider(ctx, svc)
+		return newOLTPTraceProvider(ctx, opts.ServiceName)
 	case TracerTypeJaeger:
-		return newJaegerTraceProvider(ctx, svc)
+		return newJaegerTraceProvider(ctx, opts.ServiceName)
 	case TracerTypeIO:
-		return newIOTraceProvider(ctx, svc)
+		return newIOTraceProvider(ctx, opts.ServiceName)
 	default:
-		return newNoopTraceProvider(ctx, svc)
+		return newNoopTraceProvider(ctx, opts.ServiceName)
 	}
 }
 

@@ -27,7 +27,7 @@ type TracerOpts struct {
 func NewUserTracer(ctx context.Context, opts TracerOpts) error {
 	var err error
 	o.Do(func() {
-		userTracer, err = NewTracer(ctx, opts.ServiceName, opts.Type)
+		userTracer, err = newTracer(ctx, opts)
 	})
 	return err
 }
