@@ -4,8 +4,8 @@ import { useMemo } from 'react';
 import { useQuery } from 'urql';
 
 import { useEnvironments } from '@/queries';
-import { useRestAPIRequest } from '@/queries/restAPIHooks';
 import { getProductionEnvironment } from '@/utils/environments';
+import { useRestAPIRequest } from '@/utils/useRestAPIRequest';
 import { type VercelIntegration, type VercelProjectAPIResponse } from './VercelIntegration';
 import mergeVercelProjectData from './mergeVercelProjectData';
 import { GetSavedVercelProjectsDocument } from './queries';
@@ -21,7 +21,7 @@ const notEnabledVercelIntegration: VercelIntegration = {
 export function useVercelIntegration(): {
   data: VercelIntegration;
   fetching: boolean;
-  error: Error | null;
+  error: Error | undefined;
 } {
   const [{ data: environments, fetching, error: environmentError }] = useEnvironments();
 
@@ -44,7 +44,7 @@ export function useVercelIntegration(): {
   // Fetch data from REST and GQL and merge
   const {
     data,
-    fetching: savedProjectsFetch,
+    isLoading: isLoadingSavedProjects,
     error,
   } = useRestAPIRequest<VercelProjectAPIResponse>({ url, method: 'GET' });
   const [{ data: savedVercelProjects }] = useQuery({
@@ -72,7 +72,7 @@ export function useVercelIntegration(): {
 
   return {
     data: vercelIntegration,
-    fetching: fetching || savedProjectsFetch,
+    fetching: fetching || isLoadingSavedProjects,
     error: environmentError || error,
   };
 }

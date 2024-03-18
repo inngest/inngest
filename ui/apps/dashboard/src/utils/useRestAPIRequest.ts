@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
+import {
+  baseFetchSucceeded,
+  baseInitialFetchFailed,
+  baseInitialFetchLoading,
+  type FetchResult,
+} from '@inngest/components/types/fetch';
 
 export function useRestAPIRequest<T>({
   url,
@@ -9,16 +15,16 @@ export function useRestAPIRequest<T>({
 }: {
   url: string | URL | null;
   method: string;
-}): { data: T | undefined; fetching: boolean; error: Error | null } {
+}): FetchResult<T> {
   const { getToken } = useAuth();
   const [data, setData] = useState<any>();
-  const [fetching, setFetching] = useState<boolean>(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<Error>();
 
   useEffect(() => {
     async function request() {
       if (!url) return;
-      setFetching(true);
+      setIsLoading(true);
       const sessionToken = await getToken();
       if (!sessionToken) return; // TODO - Handle no auth
       const response = await fetch(url, {
@@ -33,10 +39,35 @@ export function useRestAPIRequest<T>({
       const data = await response.json();
 
       setData(data);
-      setFetching(false);
+      setIsLoading(false);
     }
     request();
   }, [getToken, url, method]);
 
-  return { data, fetching, error };
+  if (isLoading) {
+    return {
+      ...baseInitialFetchLoading,
+      isLoading: true,
+    };
+  }
+
+  if (error) {
+    return {
+      ...baseInitialFetchFailed,
+      error,
+    };
+  }
+
+  if (!data) {
+    // Should be unreachable.
+    return {
+      ...baseInitialFetchFailed,
+      error: new Error('finished loading but missing data'),
+    };
+  }
+
+  return {
+    ...baseFetchSucceeded,
+    data,
+  };
 }
