@@ -114,10 +114,7 @@ function PauseFunctionModal({
     <AlertModal
       isOpen={isOpen}
       onClose={onClose}
-      primaryAction={{
-        label: isPaused ? 'Resume' : 'Pause',
-        btnAction: isPaused ? handleResume : handlePause,
-      }}
+      onSubmit={isPaused ? handleResume : handlePause}
       title={`Are you sure you want to ${isPaused ? 'resume' : 'pause'} this function?`}
       className="w-1/3"
     >

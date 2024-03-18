@@ -266,7 +266,7 @@ export default function AppCard({ app }: { app: App }) {
               isOpen={isAlertModalOpen}
               title="Are you sure you want to delete the app?"
               onClose={() => setIsAlertModalOpen(false)}
-              primaryAction={{ label: 'Delete', btnAction: handleDelete }}
+              onSubmit={handleDelete}
             />
             <Button
               kind="danger"
