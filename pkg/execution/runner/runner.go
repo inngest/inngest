@@ -240,7 +240,7 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 			_, err := s.cronmanager.AddFunc(cron, func() {
 				ctx, span := telemetry.UserTracer().Provider().
 					Tracer(consts.OtelScopeCron).
-					Start(context.Background(), "cron", trace.WithAttributes(
+					Start(ctx, "cron", trace.WithAttributes(
 						attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
 						attribute.Int(consts.OtelSysFunctionVersion, fn.FunctionVersion),
 					))

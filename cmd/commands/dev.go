@@ -79,8 +79,7 @@ func doDev(cmd *cobra.Command, args []string) {
 
 	if err := telemetry.NewUserTracer(ctx, telemetry.TracerOpts{
 		ServiceName: "devserver",
-		// TODO: change this to Noop later
-		Type: telemetry.TracerTypeIO,
+		Type:        telemetry.TracerTypeNoop, // No-op so it doesn't blow up stdout for the user
 	}); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
