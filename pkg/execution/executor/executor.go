@@ -201,13 +201,6 @@ func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.
 	}
 }
 
-func WithTracer(t telemetry.Tracer) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).tracer = t
-		return nil
-	}
-}
-
 // WithRuntimeDrivers specifies the drivers available to use when executing steps
 // of a function.
 //
@@ -246,7 +239,6 @@ type executor struct {
 	invokeNotFoundHandler execution.InvokeNotFoundHandler
 	handleSendingEvent    execution.HandleSendingEvent
 	cancellationChecker   cancellation.Checker
-	tracer                telemetry.Tracer
 
 	lifecycles []execution.LifecycleListener
 
@@ -281,7 +273,7 @@ func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 // If this function has a debounce config, this will return ErrFunctionDebounced instead
 // of an identifier as the function is not scheduled immediately.
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*state.Identifier, error) {
-	ctx, span := e.tracer.Provider().
+	ctx, span := telemetry.UserTracer().Provider().
 		Tracer(consts.OtelScopeFunction).
 		Start(ctx, req.Function.GetSlug(), trace.WithAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
@@ -418,7 +410,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		stateMetadata = req.Context
 	}
 	carrier := telemetry.NewTraceCarrier()
-	e.tracer.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 	stateMetadata[consts.OtelPropagationKey] = carrier
 
 	// Create a new function.
@@ -565,12 +557,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		if trace, ok := md.Context[consts.OtelPropagationKey]; ok {
 			carrier := telemetry.NewTraceCarrier()
 			if err := carrier.Unmarshal(trace); err == nil {
-				ctx = e.tracer.Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+				ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
 			}
 		}
 	}
 
-	ctx, span := e.tracer.Provider().
+	ctx, span := telemetry.UserTracer().Provider().
 		Tracer(consts.OtelScopeStep).
 		Start(ctx, "running", trace.WithAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),

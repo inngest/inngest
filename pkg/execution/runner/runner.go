@@ -238,7 +238,7 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 			}
 			cron := t.CronTrigger.Cron
 			_, err := s.cronmanager.AddFunc(cron, func() {
-				ctx, span := s.config.Tracer.Provider().
+				ctx, span := telemetry.UserTracer().Provider().
 					Tracer(consts.OtelScopeCron).
 					Start(context.Background(), "cron", trace.WithAttributes(
 						attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
@@ -312,7 +312,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		if trace, ok := m.Metadata[consts.OtelPropagationKey]; ok {
 			carrier := telemetry.NewTraceCarrier()
 			if err := carrier.Unmarshal(trace); err == nil {
-				ctx = s.config.Tracer.Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+				ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
 			}
 		}
 	}

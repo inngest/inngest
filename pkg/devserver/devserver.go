@@ -221,7 +221,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
 		executor.WithBatcher(batcher),
-		executor.WithTracer(opts.Config.Tracer),
 	)
 	if err != nil {
 		return err

@@ -95,7 +95,7 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 	l := logger.From(ctx).With().Str("caller", "api").Logger()
 	ctx = logger.With(ctx, l)
 
-	ctx, span := a.config.Tracer.Provider().
+	ctx, span := telemetry.UserTracer().Provider().
 		Tracer(consts.OtelScopeEventIngestion).
 		Start(ctx, "event-ingestion", trace.WithAttributes(
 			attribute.Int(consts.OtelSysRootSpan, 1),
@@ -122,7 +122,7 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 		Msg("publishing event")
 
 	carrier := telemetry.NewTraceCarrier()
-	a.config.Tracer.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	err = a.publisher.Publish(
 		ctx,

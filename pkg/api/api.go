@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/eventstream"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -104,7 +105,7 @@ func (a API) HealthCheck(w http.ResponseWriter, r *http.Request) {
 func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	ctx, span := a.config.Tracer.Provider().
+	ctx, span := telemetry.UserTracer().Provider().
 		Tracer(consts.OtelScopeEventAPI).
 		Start(r.Context(), "event-api", trace.WithAttributes(
 			attribute.Int(consts.OtelSysRootSpan, 1),

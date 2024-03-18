@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/config/registration"
-	"github.com/inngest/inngest/pkg/telemetry"
 )
 
 const devConfig = `package main
@@ -60,9 +59,6 @@ type Config struct {
 	Queue Queue
 	// State configures the execution state store.
 	State State
-
-	// Tracer provides the embedded tracer needed for instrumenting workloads
-	Tracer telemetry.Tracer
 }
 
 // Log configures the logger used within Inngest services.
