@@ -142,7 +142,8 @@ func newNoopTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 		)),
 	)
 	return &tracer{
-		provider: tp,
+		provider:   tp,
+		propagator: newTextMapPropagator(),
 		shutdown: func(ctx context.Context) {
 		},
 	}, nil
