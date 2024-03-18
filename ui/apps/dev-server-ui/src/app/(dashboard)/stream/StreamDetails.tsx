@@ -121,8 +121,6 @@ export default function StreamDetails() {
     events = [eventResult.data];
   }
 
-  // async function cancelRun() {}
-
   return (
     <div
       className={classNames(

@@ -1,6 +1,9 @@
+'use client';
+
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { AlertModal } from '@inngest/components/Modal';
+import { toast } from 'sonner';
 
 type Props = {
   isOpen: boolean;
@@ -16,6 +19,7 @@ export function CancelRunModal({ isOpen, onClose, onSubmit }: Props) {
     setIsLoading(true);
     try {
       await onSubmit();
+      toast.success('Function run cancelled');
       setError(undefined);
     } catch (error) {
       if (!(error instanceof Error)) {
