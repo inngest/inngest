@@ -273,19 +273,6 @@ func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 // If this function has a debounce config, this will return ErrFunctionDebounced instead
 // of an identifier as the function is not scheduled immediately.
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*state.Identifier, error) {
-	ctx, span := telemetry.UserTracer().Provider().
-		Tracer(consts.OtelScopeFunction).
-		Start(ctx, req.Function.GetSlug(), trace.WithAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
-			attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
-			attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
-			attribute.String(consts.OtelSysAppID, req.AppID.String()),
-			attribute.String(consts.OtelSysFunctionID, req.Function.ID.String()),
-			attribute.String(consts.OtelSysFunctionSlug, req.Function.GetSlug()),
-			attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
-		))
-	defer span.End()
-
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
 			AccountID:       req.AccountID,
@@ -301,6 +288,19 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		}
 		return nil, ErrFunctionDebounced
 	}
+
+	ctx, span := telemetry.UserTracer().Provider().
+		Tracer(consts.OtelScopeFunction).
+		Start(ctx, req.Function.GetSlug(), trace.WithAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, req.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, req.Function.ID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, req.Function.GetSlug()),
+			attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
+		))
+	defer span.End()
 
 	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
 	// When running a cancellation, functions are cancelled at scheduling time based off of
