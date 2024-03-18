@@ -34,7 +34,12 @@ func NewUserTracer(ctx context.Context, opts TracerOpts) error {
 
 func UserTracer() Tracer {
 	if userTracer == nil {
-		panic("UserTracer is not initialized")
+		if err := NewUserTracer(context.Background(), TracerOpts{
+			ServiceName: "default",
+			Type:        TracerTypeNoop,
+		}); err != nil {
+			panic("fail to setup default user tracer")
+		}
 	}
 	return userTracer
 }
