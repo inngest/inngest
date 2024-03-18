@@ -31,12 +31,6 @@ const (
 	TracerTypeJaeger
 )
 
-type Tracer interface {
-	Provider() *trace.TracerProvider
-	Propagator() propagation.TextMapPropagator
-	Shutdown(ctx context.Context) func()
-}
-
 type tracer struct {
 	provider   *trace.TracerProvider
 	propagator propagation.TextMapPropagator
