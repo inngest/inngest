@@ -6,6 +6,7 @@ const (
 	OtelSysWorkspaceID    = "sys.workspace.id"
 	OtelSysAppID          = "sys.app.id"
 	OtelSysEventData      = "sys.event"
+	OtelSysEventRequestID = "sys.event.request.id"
 	OtelSysEventIDs       = "sys.event.ids"
 	OtelSysBatchID        = "sys.batch.id"
 	OtelSysIdempotencyKey = "sys.idempotency.key"
