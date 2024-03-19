@@ -26,9 +26,10 @@ export function useRestAPIRequest<T>({
   useEffect(() => {
     async function request() {
       if (!url || pause) return;
-      setIsLoading(true);
       const sessionToken = await getToken();
       if (!sessionToken) return; // TODO - Handle no auth
+
+      setIsLoading(true);
       const response = await fetch(url, {
         method,
         headers: {
