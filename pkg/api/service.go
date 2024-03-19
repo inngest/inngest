@@ -98,7 +98,6 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 	ctx, span := telemetry.UserTracer().Provider().
 		Tracer(consts.OtelScopeEventIngestion).
 		Start(ctx, "event-ingestion", trace.WithAttributes(
-			attribute.Int(consts.OtelSysRootSpan, 1),
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 		))
 	defer span.End()

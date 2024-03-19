@@ -18,11 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/eventstream"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/publicerr"
-	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/rs/zerolog"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -103,15 +99,8 @@ func (a API) HealthCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	defer r.Body.Close()
-
-	ctx, span := telemetry.UserTracer().Provider().
-		Tracer(consts.OtelScopeEventAPI).
-		Start(r.Context(), "event-api", trace.WithAttributes(
-			attribute.Int(consts.OtelSysRootSpan, 1),
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
-		))
-	defer span.End()
 
 	key := chi.URLParam(r, "key")
 	if key == "" {
@@ -120,7 +109,6 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 			Error:      "Event key is required",
 		})
 
-		span.SetStatus(codes.Error, "event key is required")
 		return
 	}
 
@@ -200,7 +188,6 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 			Error:  err,
 		})
 
-		span.SetStatus(codes.Error, err.Error())
 		return
 	}
 

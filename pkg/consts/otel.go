@@ -2,7 +2,6 @@ package consts
 
 const (
 	// system attributes
-	OtelSysRootSpan       = "sys.root"
 	OtelSysAccountID      = "sys.account.id"
 	OtelSysWorkspaceID    = "sys.workspace.id"
 	OtelSysAppID          = "sys.app.id"
