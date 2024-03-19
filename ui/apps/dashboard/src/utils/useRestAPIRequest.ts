@@ -12,9 +12,11 @@ import {
 export function useRestAPIRequest<T>({
   url,
   method,
+  pause = false,
 }: {
   url: string | URL | null;
   method: string;
+  pause: boolean;
 }): FetchResult<T> {
   const { getToken } = useAuth();
   const [data, setData] = useState<any>();
@@ -23,7 +25,7 @@ export function useRestAPIRequest<T>({
 
   useEffect(() => {
     async function request() {
-      if (!url) return;
+      if (!url || pause) return;
       setIsLoading(true);
       const sessionToken = await getToken();
       if (!sessionToken) return; // TODO - Handle no auth
@@ -34,6 +36,8 @@ export function useRestAPIRequest<T>({
         },
       });
       if (!response.ok || response.status >= 400) {
+        setData(null);
+        setIsLoading(false);
         return setError(new Error(response.statusText));
       }
       const data = await response.json();
@@ -42,7 +46,7 @@ export function useRestAPIRequest<T>({
       setIsLoading(false);
     }
     request();
-  }, [getToken, url, method]);
+  }, [getToken, url, method, pause]);
 
   if (isLoading) {
     return {
