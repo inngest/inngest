@@ -11,7 +11,7 @@ const syncStatusIcons: Record<string, React.ComponentType> = {
 } as const satisfies { [key in SyncStatus]: unknown };
 
 const syncStatusText: Record<string, string> = {
-  duplicate: 'No change',
+  duplicate: 'No Change',
   error: 'Error',
   pending: 'Syncing',
   success: 'Success',
