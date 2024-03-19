@@ -35,6 +35,8 @@ type CancellationWriter interface {
 
 // Cancellation represents a cancellation of many function runs during the time specified.
 type Cancellation struct {
+	CreatedAt   time.Time `json:"created_at"`
+	Name        *string   `json:"name"`
 	ID          ulid.ULID `json:"id"`
 	WorkspaceID uuid.UUID `json:"environment_id"`
 	// FunctionID represents the function's internal ID.
