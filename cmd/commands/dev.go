@@ -84,7 +84,9 @@ func doDev(cmd *cobra.Command, args []string) {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	defer telemetry.UserTracer().Shutdown(ctx)
+	defer func() {
+		_ = telemetry.CloseUserTracer(ctx)
+	}()
 
 	opts := devserver.StartOpts{
 		Config:        *conf,

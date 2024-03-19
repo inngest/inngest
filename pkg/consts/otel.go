@@ -29,7 +29,7 @@ const (
 	OtelSysStepOutputSizeBytes = "sys.step.output.size.bytes"
 
 	// SDK attributes
-	OtelAttrSDKServiceName = "sdk.app.name"
+	OtelAttrSDKServiceName = "sdk.app.id"
 	OtelAttrSDKRunID       = "sdk.run.id"
 
 	// otel scopes
