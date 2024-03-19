@@ -275,13 +275,19 @@ func (s *svc) Events(ctx context.Context, eventId string) ([]event.Event, error)
 	if eventId != "" {
 		evt := s.em.EventById(eventId)
 		if evt != nil {
-			return []event.Event{*evt}, nil
+			return []event.Event{evt.GetEvent()}, nil
 		}
 
 		return []event.Event{}, nil
 	}
 
-	return s.em.Events(), nil
+	trackedEvents := s.em.Events()
+	evts := make([]event.Event, len(trackedEvents))
+	for i, evt := range trackedEvents {
+		evts[i] = evt.GetEvent()
+	}
+
+	return evts, nil
 }
 
 func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
@@ -289,19 +295,18 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		return fmt.Errorf("unknown event type: %s", m.Name)
 	}
 
-	var evt *event.Event
+	var tracked event.TrackedEvent
 	var err error
 
 	if s.em == nil {
-		evt, err = event.NewEvent(m.Data)
+		tracked, err = event.NewOSSTrackedEventFromString(m.Data)
 	} else {
-		evt, err = s.em.NewEvent(m.Data)
+		tracked, err = s.em.NewEvent(m.Data)
 	}
 	if err != nil {
 		return fmt.Errorf("error creating event: %w", err)
 	}
 
-	tracked := event.NewOSSTrackedEvent(*evt)
 	// Write the event to our CQRS manager for long-term storage.
 	err = s.cqrs.InsertEvent(
 		ctx,
@@ -312,8 +317,9 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	}
 
 	l := logger.From(ctx).With().
-		Str("event", evt.Name).
-		Str("id", evt.ID).
+		Str("event", tracked.GetEvent().Name).
+		Str("id", tracked.GetEvent().ID).
+		Str("internal_id", tracked.GetInternalID().String()).
 		Logger()
 	ctx = logger.With(ctx, l)
 

@@ -289,7 +289,8 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 
 func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
-		byt, err := json.Marshal(evt)
+		trackedEvent := event.NewOSSTrackedEvent(evt)
+		byt, err := json.Marshal(trackedEvent)
 		if err != nil {
 			return fmt.Errorf("error marshalling invocation event: %w", err)
 		}
@@ -318,7 +319,8 @@ func getInvokeNotFoundHandler(ctx context.Context, pb pubsub.Publisher, topic st
 		for _, e := range evts {
 			evt := e
 			eg.Go(func() error {
-				byt, err := json.Marshal(evt)
+				trackedEvent := event.NewOSSTrackedEvent(evt)
+				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling function finished event: %w", err)
 				}
@@ -329,7 +331,7 @@ func getInvokeNotFoundHandler(ctx context.Context, pb pubsub.Publisher, topic st
 					pubsub.Message{
 						Name:      event.EventReceivedName,
 						Data:      string(byt),
-						Timestamp: evt.Time(),
+						Timestamp: trackedEvent.GetEvent().Time(),
 					},
 				)
 				if err != nil {

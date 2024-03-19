@@ -2,7 +2,6 @@ package devserver
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -36,7 +35,6 @@ import (
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/mattn/go-isatty"
-	"github.com/oklog/ulid/v2"
 )
 
 const (
@@ -284,20 +282,20 @@ func (d *devserver) handleEvent(ctx context.Context, e *event.Event) (string, er
 
 	l.Debug().Str("event", e.Name).Msg("handling event")
 
-	internalID := ulid.MustNew(ulid.Now(), rand.Reader)
+	trackedEvent := event.NewOSSTrackedEvent(*e)
 
-	if e.ID == "" {
-		// Always ensure that the event has an ID, for idempotency.
-		e.ID = internalID.String()
-	}
-
-	byt, err := json.Marshal(e)
+	byt, err := json.Marshal(trackedEvent)
 	if err != nil {
 		l.Error().Err(err).Msg("error unmarshalling event as JSON")
 		return "", err
 	}
 
-	l.Info().Str("event_name", e.Name).Str("id", e.ID).Interface("event", e).Msg("publishing event")
+	l.Info().
+		Str("event_name", trackedEvent.GetEvent().Name).
+		Str("internal_id", trackedEvent.GetInternalID().String()).
+		Str("external_id", trackedEvent.GetEvent().ID).
+		Interface("event", trackedEvent.GetEvent()).
+		Msg("publishing event")
 
 	err = d.publisher.Publish(
 		ctx,
@@ -309,7 +307,7 @@ func (d *devserver) handleEvent(ctx context.Context, e *event.Event) (string, er
 		},
 	)
 
-	return e.ID, err
+	return trackedEvent.GetInternalID().String(), err
 }
 
 // SDKHandler represents a handler that has registered with the dev server.
