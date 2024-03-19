@@ -360,7 +360,7 @@ export function graphql(source: "\n  query GetBillingInfo {\n    account {\n    
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query GetSavedVercelProjects($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      savedVercelProjects: vercelApps {\n        projectID\n        path\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetSavedVercelProjects($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      savedVercelProjects: vercelApps {\n        projectID\n        path\n      }\n    }\n  }\n"];
+export function graphql(source: "\n  query GetSavedVercelProjects($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      savedVercelProjects: vercelApps {\n        id\n        projectID\n        path\n        workspaceID\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetSavedVercelProjects($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      savedVercelProjects: vercelApps {\n        id\n        projectID\n        path\n        workspaceID\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
