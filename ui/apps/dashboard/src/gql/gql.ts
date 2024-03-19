@@ -50,6 +50,9 @@ const documents = {
     "\n  query GetFunctionArchival($slug: String!, $environmentID: ID!) {\n    workspace(id: $environmentID) {\n      workflow: workflowBySlug(slug: $slug) {\n        id\n        isArchived\n        name\n      }\n    }\n  }\n": types.GetFunctionArchivalDocument,
     "\n  query GetFunctionVersionNumber($slug: String!, $environmentID: ID!) {\n    workspace(id: $environmentID) {\n      workflow: workflowBySlug(slug: $slug) {\n        id\n        archivedAt\n        current {\n          version\n        }\n        previous {\n          version\n        }\n      }\n    }\n  }\n": types.GetFunctionVersionNumberDocument,
     "\n  mutation PauseFunction($input: EditWorkflowInput!) {\n    editWorkflow(input: $input) {\n      workflow {\n        id\n        name\n      }\n    }\n  }\n": types.PauseFunctionDocument,
+    "\n  query GetCancellations($envID: ID!, $fnID: ID!) {\n    environment: workspace(id: $envID) {\n      function: workflow(id: $fnID) {\n        cancellations {\n          createdAt\n          expression\n          id\n          name\n          queuedAtMax\n          queuedAtMin\n        }\n      }\n    }\n  }\n": types.GetCancellationsDocument,
+    "\n  mutation CreateCancellation($input: CreateCancellationInput!) {\n    createCancellation(input: $input) {\n      id\n    }\n  }\n": types.CreateCancellationDocument,
+    "\n  query GetFunctionCancellationPage($envID: ID!, $fnSlug: String!) {\n    environment: workspace(id: $envID) {\n      function: workflowBySlug(slug: $fnSlug) {\n        id\n      }\n    }\n  }\n": types.GetFunctionCancellationPageDocument,
     "\n  mutation InvokeFunction($envID: UUID!, $data: Map, $functionSlug: String!) {\n    invokeFunction(envID: $envID, data: $data, functionSlug: $functionSlug)\n  }\n": types.InvokeFunctionDocument,
     "\n  mutation RerunFunctionRun($environmentID: ID!, $functionID: ID!, $functionRunID: ULID!) {\n    retryWorkflowRun(\n      input: { workspaceID: $environmentID, workflowID: $functionID }\n      workflowRunID: $functionRunID\n    ) {\n      id\n    }\n  }\n": types.RerunFunctionRunDocument,
     "\n  mutation CancelRun($envID: UUID!, $runID: ULID!) {\n    cancelRun(envID: $envID, runID: $runID) {\n      id\n    }\n  }\n": types.CancelRunDocument,
@@ -258,6 +261,18 @@ export function graphql(source: "\n  query GetFunctionVersionNumber($slug: Strin
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation PauseFunction($input: EditWorkflowInput!) {\n    editWorkflow(input: $input) {\n      workflow {\n        id\n        name\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation PauseFunction($input: EditWorkflowInput!) {\n    editWorkflow(input: $input) {\n      workflow {\n        id\n        name\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetCancellations($envID: ID!, $fnID: ID!) {\n    environment: workspace(id: $envID) {\n      function: workflow(id: $fnID) {\n        cancellations {\n          createdAt\n          expression\n          id\n          name\n          queuedAtMax\n          queuedAtMin\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetCancellations($envID: ID!, $fnID: ID!) {\n    environment: workspace(id: $envID) {\n      function: workflow(id: $fnID) {\n        cancellations {\n          createdAt\n          expression\n          id\n          name\n          queuedAtMax\n          queuedAtMin\n        }\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation CreateCancellation($input: CreateCancellationInput!) {\n    createCancellation(input: $input) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation CreateCancellation($input: CreateCancellationInput!) {\n    createCancellation(input: $input) {\n      id\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetFunctionCancellationPage($envID: ID!, $fnSlug: String!) {\n    environment: workspace(id: $envID) {\n      function: workflowBySlug(slug: $fnSlug) {\n        id\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetFunctionCancellationPage($envID: ID!, $fnSlug: String!) {\n    environment: workspace(id: $envID) {\n      function: workflowBySlug(slug: $fnSlug) {\n        id\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
