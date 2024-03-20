@@ -1261,6 +1261,16 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 				return
 			}
 
+			if pause.TimeoutJobID != nil && *pause.TimeoutJobID != "" {
+				itemToDequeue := queue.Item{
+					JobID:       pause.TimeoutJobID,
+					WorkspaceID: pause.WorkspaceID,
+					Identifier:  pause.Identifier,
+				}
+
+				e.queue.Dequeue(context.WithoutCancel(ctx), itemToDequeue)
+			}
+
 			resumeData := pause.GetResumeData(evt.GetEvent())
 
 			err := e.Resume(ctx, pause, execution.ResumeRequest{
@@ -1781,13 +1791,13 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	err = e.sm.SavePause(ctx, state.Pause{
 		ID:           pauseID,
 		WorkspaceID:  item.WorkspaceID,
-		Identifier:  item.Identifier,
-		GroupID:     item.GroupID,
-		Outgoing:    gen.ID,
-		Incoming:    edge.Edge.Incoming,
-		StepName:    gen.UserDefinedName(),
-		Opcode:      &opcode,
-		Expires:     state.Time(expires),
+		Identifier:   item.Identifier,
+		GroupID:      item.GroupID,
+		Outgoing:     gen.ID,
+		Incoming:     edge.Edge.Incoming,
+		StepName:     gen.UserDefinedName(),
+		Opcode:       &opcode,
+		Expires:      state.Time(expires),
 		Event:        &eventName,
 		Expression:   &strExpr,
 		DataKey:      gen.ID,
