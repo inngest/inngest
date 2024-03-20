@@ -1119,6 +1119,16 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 					Msg("resuming pause")
 			}
 
+			if pause.TimeoutJobID != nil && *pause.TimeoutJobID != "" {
+				itemToDequeue := queue.Item{
+					JobID:       pause.TimeoutJobID,
+					WorkspaceID: pause.WorkspaceID,
+					Identifier:  pause.Identifier,
+				}
+
+				e.queue.Dequeue(context.WithoutCancel(ctx), itemToDequeue)
+			}
+
 			err := e.Resume(ctx, *pause, execution.ResumeRequest{
 				With:     resumeData.With,
 				EventID:  &evtID,
