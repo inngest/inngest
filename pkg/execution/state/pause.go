@@ -174,6 +174,9 @@ type Pause struct {
 	// TriggeringEventID is the event that triggered the original run.  This allows us
 	// to exclude the original event ID when considering triggers.
 	TriggeringEventID *string `json:"tID,omitempty"`
+	// TimeoutJobID is the job ID of the timeout job, if this pause has a
+	// timeout.
+	TimeoutJobID *string `json:"tjID,omitempty"`
 }
 
 func (p Pause) GetID() uuid.UUID {
