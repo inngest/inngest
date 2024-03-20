@@ -1777,9 +1777,10 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	)
 
 	opcode := gen.Op.String()
+	timeoutJobID := fmt.Sprintf("%s-%s-%s", item.Identifier.IdempotencyKey(), gen.ID, "invoke")
 	err = e.sm.SavePause(ctx, state.Pause{
-		ID:          pauseID,
-		WorkspaceID: item.WorkspaceID,
+		ID:           pauseID,
+		WorkspaceID:  item.WorkspaceID,
 		Identifier:  item.Identifier,
 		GroupID:     item.GroupID,
 		Outgoing:    gen.ID,
@@ -1787,9 +1788,10 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		StepName:    gen.UserDefinedName(),
 		Opcode:      &opcode,
 		Expires:     state.Time(expires),
-		Event:       &eventName,
-		Expression:  &strExpr,
-		DataKey:     gen.ID,
+		Event:        &eventName,
+		Expression:   &strExpr,
+		DataKey:      gen.ID,
+		TimeoutJobID: &timeoutJobID,
 	})
 	if err == state.ErrPauseAlreadyExists {
 		return nil
@@ -1799,9 +1801,8 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	}
 
 	// Enqueue a job that will timeout the pause.
-	jobID := fmt.Sprintf("%s-%s-%s", item.Identifier.IdempotencyKey(), gen.ID, "invoke")
 	err = e.queue.Enqueue(ctx, queue.Item{
-		JobID:       &jobID,
+		JobID:       &timeoutJobID,
 		WorkspaceID: item.WorkspaceID,
 		// Use the same group ID, allowing us to track the cancellation of
 		// the step correctly.
