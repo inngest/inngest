@@ -53,7 +53,7 @@ export function Sync({ externalAppID, syncID }: Props) {
         {sync.error && <SyncErrorCard className="mb-4" error={sync.error} />}
 
         {sync.status === 'duplicate' && (
-          <Alert severity="info">
+          <Alert className="mb-4" severity="info">
             No changes detected since the previous sync. Function bodies may have changed, but those
             are not inspected when syncing.
           </Alert>
