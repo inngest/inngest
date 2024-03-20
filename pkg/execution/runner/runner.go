@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -24,8 +25,12 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"github.com/robfig/cron/v3"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -233,7 +238,15 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 			}
 			cron := t.CronTrigger.Cron
 			_, err := s.cronmanager.AddFunc(cron, func() {
-				err := s.initialize(context.Background(), fn, event.NewOSSTrackedEvent(event.Event{
+				ctx, span := telemetry.UserTracer().Provider().
+					Tracer(consts.OtelScopeCron).
+					Start(ctx, "cron", trace.WithAttributes(
+						attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
+						attribute.Int(consts.OtelSysFunctionVersion, fn.FunctionVersion),
+					))
+				defer span.End()
+
+				err := s.initialize(ctx, fn, event.NewOSSTrackedEvent(event.Event{
 					Data: map[string]any{
 						"cron": cron,
 					},
@@ -293,6 +306,15 @@ func (s *svc) Events(ctx context.Context, eventId string) ([]event.Event, error)
 func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	if m.Name != event.EventReceivedName {
 		return fmt.Errorf("unknown event type: %s", m.Name)
+	}
+
+	if m.Metadata != nil {
+		if trace, ok := m.Metadata[consts.OtelPropagationKey]; ok {
+			carrier := telemetry.NewTraceCarrier()
+			if err := carrier.Unmarshal(trace); err == nil {
+				ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+			}
+		}
 	}
 
 	var tracked event.TrackedEvent

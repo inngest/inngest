@@ -9,10 +9,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // NewService returns a new API service for ingesting events.  Any additional
@@ -88,6 +94,13 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 	l := logger.From(ctx).With().Str("caller", "api").Logger()
 	ctx = logger.With(ctx, l)
 
+	ctx, span := telemetry.UserTracer().Provider().
+		Tracer(consts.OtelScopeEventIngestion).
+		Start(ctx, "event-ingestion", trace.WithAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+		))
+	defer span.End()
+
 	l.Debug().Str("event", e.Name).Msg("handling event")
 
 	trackedEvent := event.NewOSSTrackedEvent(*e)
@@ -95,6 +108,7 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 	byt, err := json.Marshal(trackedEvent)
 	if err != nil {
 		l.Error().Err(err).Msg("error unmarshalling event as JSON")
+		span.SetStatus(codes.Error, "error parsing event as JSON")
 		return "", err
 	}
 
@@ -105,6 +119,9 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 		Interface("event", trackedEvent.GetEvent()).
 		Msg("publishing event")
 
+	carrier := telemetry.NewTraceCarrier()
+	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+
 	err = a.publisher.Publish(
 		ctx,
 		a.config.EventStream.Service.TopicName(),
@@ -112,8 +129,14 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 			Name:      event.EventReceivedName,
 			Data:      string(byt),
 			Timestamp: time.Now(),
+			Metadata: map[string]any{
+				consts.OtelPropagationKey: carrier,
+			},
 		},
 	)
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+	}
 
 	return trackedEvent.GetInternalID().String(), err
 }
