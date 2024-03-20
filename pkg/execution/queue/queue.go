@@ -26,8 +26,11 @@ type RunInfo struct {
 type RunFunc func(context.Context, RunInfo, Item) error
 
 type Producer interface {
-	// Enqueue allows an item to be enqueued ton run at the given time.
+	// Enqueue allows an item to be enqueued to run at the given time.
 	Enqueue(context.Context, Item, time.Time) error
+
+	// Dequeue allows an item to be removed from the queue.
+	Dequeue(context.Context, Item) error
 }
 
 type Consumer interface {

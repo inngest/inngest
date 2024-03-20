@@ -184,6 +184,37 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 	return nil
 }
 
+func (q *queue) Dequeue(ctx context.Context, item osqueue.Item) error {
+	if item.JobID == nil {
+		return fmt.Errorf("job ID is required to dequeue an item")
+	}
+
+	qp := QueuePartition{
+		QueueName:   item.QueueName,
+		WorkflowID:  item.Identifier.WorkflowID,
+		WorkspaceID: item.WorkspaceID,
+		Priority:    PriorityMin,
+	}
+
+	var queueName *string
+	if name, ok := q.queueKindMapping[item.Kind]; ok {
+		queueName = &name
+	}
+	// item.QueueName takes precedence if not nil
+	if item.QueueName != nil {
+		queueName = item.QueueName
+	}
+
+	qi := QueueItem{
+		ID:          *item.JobID,
+		WorkspaceID: item.WorkspaceID,
+		WorkflowID:  item.Identifier.WorkflowID,
+		QueueName:   queueName,
+	}
+
+	return q.DequeueItem(ctx, qp, qi)
+}
+
 func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	for i := int32(0); i < q.numWorkers; i++ {
 		go q.worker(ctx, f)
@@ -1087,7 +1118,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
 		q.logger.Info().Interface("item", qi).Msg("dequeueing failed job")
-		if err := q.Dequeue(context.WithoutCancel(ctx), p, qi); err != nil {
+		if err := q.DequeueItem(context.WithoutCancel(ctx), p, qi); err != nil {
 			return err
 		}
 
@@ -1098,7 +1129,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 		}
 
 	case <-doneCh:
-		if err := q.Dequeue(context.WithoutCancel(ctx), p, qi); err != nil {
+		if err := q.DequeueItem(context.WithoutCancel(ctx), p, qi); err != nil {
 			return err
 		}
 	}

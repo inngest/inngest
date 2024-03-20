@@ -1181,7 +1181,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 }
 
 // Dequeue removes an item from the queue entirely.
-func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) error {
+func (q *queue) DequeueItem(ctx context.Context, p QueuePartition, i QueueItem) error {
 	var (
 		ak, pk     string // account, partition, custom concurrency key
 		customKeys = make([]string, 2)

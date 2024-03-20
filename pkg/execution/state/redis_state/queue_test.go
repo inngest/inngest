@@ -362,7 +362,7 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 		require.Equal(t, ErrQueueItemExists, err)
 
 		// Dequeue
-		err = q.Dequeue(ctx, p, item)
+		err = q.DequeueItem(ctx, p, item)
 		require.NoError(t, err)
 
 		// Ensure we can't enqueue even after dequeue.
@@ -848,7 +848,7 @@ func TestQueueDequeue(t *testing.T) {
 			require.EqualValues(t, 1, count)
 		})
 
-		err = q.Dequeue(ctx, p, item)
+		err = q.DequeueItem(ctx, p, item)
 		require.NoError(t, err)
 
 		t.Run("It should remove the item from the queue map", func(t *testing.T) {
@@ -880,7 +880,7 @@ func TestQueueDequeue(t *testing.T) {
 			item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 			require.NoError(t, err)
 
-			err = q.Dequeue(ctx, p, item)
+			err = q.DequeueItem(ctx, p, item)
 			require.NoError(t, err)
 
 			val := r.HGet(defaultQueueKey.QueueItem(), id.String())
@@ -905,7 +905,7 @@ func TestQueueDequeue(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 1, len(keys))
 
-			err = q.Dequeue(ctx, p, item)
+			err = q.DequeueItem(ctx, p, item)
 			require.NoError(t, err)
 
 			keys, err = r.ZMembers(fmt.Sprintf("{queue}:idx:run:%s", rid))
@@ -1312,7 +1312,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	})
 
 	t.Run("It returns a partition not found error if deleted", func(t *testing.T) {
-		err := q.Dequeue(ctx, p, qi)
+		err := q.DequeueItem(ctx, p, qi)
 		require.NoError(t, err)
 		err = q.PartitionRequeue(ctx, &p, time.Now().Add(time.Minute), false)
 		require.Equal(t, ErrPartitionGarbageCollected, err)
@@ -1878,7 +1878,7 @@ func TestSharding(t *testing.T) {
 			require.EqualValues(t, at.Unix(), shardTime.Unix())
 
 			t.Run("partitions with no items are GCd from the shard during requeue", func(t *testing.T) {
-				err := q.Dequeue(ctx, p, item)
+				err := q.DequeueItem(ctx, p, item)
 				require.NoError(t, err)
 
 				// Lease the function queue for a minute
