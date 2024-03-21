@@ -40,6 +40,7 @@ const (
 	OtelScopeApp            = "app.env.inngest"
 	OtelScopeFunction       = "function.app.env.inngest"
 	OtelScopeStep           = "step.function.app.env.inngest"
+	OtelScopeExecution      = "execution.step.function.app.env.inngest"
 
 	// otel collector filter keys
 	OtelUserTraceFilterKey = "inngest.user"

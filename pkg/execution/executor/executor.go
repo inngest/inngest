@@ -582,7 +582,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	ctx, span := telemetry.UserTracer().Provider().
-		Tracer(consts.OtelScopeStep).
+		Tracer(consts.OtelScopeExecution).
 		Start(ctx, "running", trace.WithAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, id.AccountID.String()),
