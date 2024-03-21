@@ -502,6 +502,22 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		at = *req.At
 	}
 
+	ctx, span = telemetry.UserTracer().Provider().
+		Tracer(consts.OtelScopeStep).
+		Start(ctx, "DISCOVERY (initial)", trace.WithAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, id.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, id.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, id.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, id.WorkflowID.String()),
+			attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
+			attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
+		))
+	defer span.End()
+
+	stepCarrier := telemetry.NewTraceCarrier()
+	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(stepCarrier.Context))
+
 	// Prefix the workflow to the job ID so that no invocation can accidentally
 	// cause idempotency issues across users/functions.
 	//
@@ -517,6 +533,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		MaxAttempts: &sourceEdgeRetries,
 		Payload: queue.PayloadEdge{
 			Edge: inngest.SourceEdge,
+		},
+		Metadata: map[string]any{
+			consts.OtelPropagationKey: stepCarrier,
 		},
 	}
 	err = e.queue.Enqueue(ctx, item, at)
