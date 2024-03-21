@@ -4,26 +4,33 @@ import XMarkIcon from '@heroicons/react/24/outline/XMarkIcon';
 import { Button } from '@inngest/components/Button';
 import { cn } from '@inngest/components/utils/classNames';
 
+type Severity = 'info' | 'error' | 'warning';
+
+const backgroundColors = {
+  info: 'bg-blue-100',
+  error: 'bg-rose-100',
+  warning: 'bg-amber-100',
+} as const satisfies { [key in Severity]: string };
+
+const icons = {
+  info: <InformationCircleIcon className="h-6 w-6 text-blue-700" />,
+  error: <ExclamationTriangleIcon className="h-6 w-6 text-rose-700" />,
+  warning: <ExclamationTriangleIcon className="h-6 w-6 text-amber-700" />,
+} as const satisfies { [key in Severity]: React.ReactNode };
+
 export function Banner({
   children,
   className,
   onDismiss,
-  kind,
+  kind = 'info',
 }: {
   children: React.ReactNode;
   className?: string;
   onDismiss?: () => void;
-  kind?: 'info' | 'error';
+  kind?: Severity;
 }) {
-  let Icon: React.ReactNode;
-  let color: string = '';
-  if (kind == 'info') {
-    Icon = <InformationCircleIcon className="h-6 w-6 text-blue-700" />;
-    color = 'bg-blue-100';
-  } else if (kind == 'error') {
-    Icon = <ExclamationTriangleIcon className="h-6 w-6 text-rose-700" />;
-    color = 'bg-rose-100';
-  }
+  const icon = icons[kind];
+  const color = backgroundColors[kind];
 
   return (
     <div
@@ -34,7 +41,7 @@ export function Banner({
       )}
     >
       <div className="flex items-start gap-1 text-sm">
-        <span className="shrink-0">{Icon}</span>
+        <span className="shrink-0">{icon}</span>
         <span className="leading-6">{children}</span>
       </div>
       {onDismiss && (

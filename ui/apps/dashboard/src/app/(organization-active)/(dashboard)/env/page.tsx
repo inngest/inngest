@@ -8,6 +8,7 @@ import AppNavigation from '@/components/Navigation/AppNavigation';
 import Toaster from '@/components/Toaster';
 import getAllEnvironments from '@/queries/server-only/getAllEnvironments';
 import { EnvironmentType, LEGACY_TEST_MODE_NAME } from '@/utils/environments';
+import { EnvironmentArchiveButton } from './EnvironmentArchiveButton';
 import EnvironmentListTable from './EnvironmentListTable';
 
 export default async function Envs() {
@@ -118,6 +119,9 @@ export default async function Envs() {
                         appearance="outlined"
                         label="Manage"
                       />
+
+                      <EnvironmentArchiveButton env={env} />
+
                       <Button
                         href={`/env/${env.slug}/apps` as Route}
                         kind="primary"

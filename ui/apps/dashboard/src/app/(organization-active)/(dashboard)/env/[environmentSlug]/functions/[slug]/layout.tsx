@@ -88,7 +88,8 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
         title={!data || fetching ? '...' : fn?.name || functionSlug}
         links={navLinks}
         action={
-          !emptyData && (
+          !emptyData &&
+          !env.isArchived && (
             <div className="flex items-center gap-2">
               {/* Disable buttons that do not yet work */}
               <div className="flex items-center gap-2 pr-2">

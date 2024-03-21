@@ -70,7 +70,7 @@ export function Apps({ isArchived = false }: Props) {
           <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={latestUnattachedSyncTime} />
         )}
 
-        {!isArchived && hasApps && (
+        {!isArchived && !env.isArchived && hasApps && (
           <Button
             className="mx-auto my-12"
             kind="primary"

@@ -137,7 +137,7 @@ export default function RunsPage({ params }: RunsPageProps) {
           )}
         </div>
         <ClientFeatureFlag flag="function-replay">
-          <NewReplayButton functionSlug={functionSlug} />
+          {!environment.isArchived && <NewReplayButton functionSlug={functionSlug} />}
         </ClientFeatureFlag>
       </div>
       <div className="flex min-h-0 flex-1">
