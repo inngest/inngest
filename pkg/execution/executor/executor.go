@@ -565,6 +565,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, err
 	}
 
+	// We get trace context from this, which is the run metadata.
+	// We should probably get trace context from the queue item if that
+	// contains it.
 	md := s.Metadata()
 
 	// Store the metadata in context for future use.  This can be used to reduce
@@ -572,7 +575,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	ctx = WithContextMetadata(ctx, md)
 
 	// Propagate trace context
-	if md.Context != nil {
+	if trace, ok := item.Metadata[consts.OtelPropagationKey]; ok {
+		carrier := telemetry.NewTraceCarrier()
+		if err := carrier.Unmarshal(trace); err == nil {
+			ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+		}
+	} else if md.Context != nil {
 		if trace, ok := md.Context[consts.OtelPropagationKey]; ok {
 			carrier := telemetry.NewTraceCarrier()
 			if err := carrier.Unmarshal(trace); err == nil {
