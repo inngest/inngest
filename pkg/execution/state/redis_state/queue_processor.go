@@ -113,7 +113,7 @@ func GetItemConcurrencyLatency(ctx context.Context) (time.Duration, bool) {
 func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) error {
 	// propagate
 	if item.Metadata == nil {
-		item.Metadata = map[string]string{}
+		item.Metadata = map[string]any{}
 	}
 
 	id := ""
