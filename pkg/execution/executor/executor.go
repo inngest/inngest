@@ -1733,6 +1733,8 @@ func (e *executor) handleStepError(ctx context.Context, gen state.GeneratorOpcod
 	// Things to bear in mind:
 	// - Steps throwing/returning NonRetriableErrors are still OpcodeStepError
 	// - We are now in charge of rescheduling the entire function
+	span := trace.SpanFromContext(ctx)
+	span.SetStatus(codes.Error, gen.Error.Name)
 
 	if gen.Error == nil {
 		// This should never happen.
