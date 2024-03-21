@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import {
+  baseFetchSkipped,
   baseFetchSucceeded,
   baseInitialFetchFailed,
   baseInitialFetchLoading,
@@ -16,8 +17,8 @@ export function useRestAPIRequest<T>({
 }: {
   url: string | URL | null;
   method: string;
-  pause: boolean;
-}): FetchResult<T> {
+  pause?: boolean;
+}): FetchResult<T, { skippable: true }> {
   const { getToken } = useAuth();
   const [data, setData] = useState<any>();
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -26,10 +27,12 @@ export function useRestAPIRequest<T>({
   useEffect(() => {
     async function request() {
       if (!url || pause) return;
-      const sessionToken = await getToken();
-      if (!sessionToken) return; // TODO - Handle no auth
-
       setIsLoading(true);
+      const sessionToken = await getToken();
+      if (!sessionToken) {
+        setIsLoading(false);
+        return; // TODO - Handle no auth
+      }
       const response = await fetch(url, {
         method,
         headers: {
@@ -63,11 +66,9 @@ export function useRestAPIRequest<T>({
     };
   }
 
-  if (!data) {
-    // Should be unreachable.
+  if (!!pause) {
     return {
-      ...baseInitialFetchFailed,
-      error: new Error('finished loading but missing data'),
+      ...baseFetchSkipped,
     };
   }
 
