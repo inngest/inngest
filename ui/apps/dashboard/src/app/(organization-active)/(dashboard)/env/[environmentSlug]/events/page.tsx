@@ -35,7 +35,7 @@ export default function EventTypesPage() {
       <Header
         title="Events"
         icon={<EventIcon className="h-4 w-4 text-white" />}
-        action={env.isArchived && <SendEventButton />}
+        action={!env.isArchived && <SendEventButton />}
       />
 
       <main className="min-h-0 flex-1 overflow-y-auto bg-slate-100">

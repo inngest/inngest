@@ -35,7 +35,7 @@ export default function EventLayout({ children, params }: EventLayoutProps) {
         title={decodeURIComponent(params.eventName)}
         links={navLinks}
         action={
-          env.isArchived && <SendEventButton eventName={decodeURIComponent(params.eventName)} />
+          !env.isArchived && <SendEventButton eventName={decodeURIComponent(params.eventName)} />
         }
       />
       {children}
