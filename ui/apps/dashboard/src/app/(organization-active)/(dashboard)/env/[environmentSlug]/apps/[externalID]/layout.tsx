@@ -50,7 +50,7 @@ export default function Layout({ children, params: { externalID } }: Props) {
   ];
 
   let action;
-  if (res.data.latestSync?.url) {
+  if (res.data.latestSync?.url && !env.isArchived) {
     action = (
       <ResyncButton
         appExternalID={externalID}

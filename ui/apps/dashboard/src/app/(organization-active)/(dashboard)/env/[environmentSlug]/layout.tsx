@@ -1,3 +1,4 @@
+import { ArchivedEnvBanner } from '@/components/ArchivedEnvBanner';
 import AppNavigation from '@/components/Navigation/AppNavigation';
 import Toaster from '@/components/Toaster';
 import { EnvironmentProvider } from './environment-context';
@@ -14,6 +15,7 @@ export default function RootLayout({ params: { environmentSlug }, children }: Ro
     <EnvironmentProvider environmentSlug={environmentSlug}>
       <div className="isolate flex h-full flex-col">
         <AppNavigation environmentSlug={environmentSlug} />
+        <ArchivedEnvBanner />
         {children}
       </div>
       <Toaster

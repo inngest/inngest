@@ -1,3 +1,6 @@
+'use client';
+
+import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import EventIcon from '@/icons/event.svg';
 import SendEventButton from './SendEventButton';
@@ -11,6 +14,8 @@ type EventLayoutProps = {
 };
 
 export default function EventLayout({ children, params }: EventLayoutProps) {
+  const env = useEnvironment();
+
   const navLinks: HeaderLink[] = [
     {
       href: `/env/${params.environmentSlug}/events/${params.eventName}`,
@@ -29,7 +34,9 @@ export default function EventLayout({ children, params }: EventLayoutProps) {
         icon={<EventIcon className="h-5 w-5 text-white" />}
         title={decodeURIComponent(params.eventName)}
         links={navLinks}
-        action={<SendEventButton eventName={decodeURIComponent(params.eventName)} />}
+        action={
+          env.isArchived && <SendEventButton eventName={decodeURIComponent(params.eventName)} />
+        }
       />
       {children}
     </>
