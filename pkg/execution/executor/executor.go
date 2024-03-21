@@ -718,7 +718,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	if resp != nil {
-		spanName := strings.ToLower(slug.Make(resp.Step.Name))
+		spanName := fmt.Sprintf("%s (attempt #%d)", strings.ToLower(slug.Make(resp.Step.Name)), item.Attempt+1)
+		if resp.StatusCode == 200 {
+			spanName = "function success"
+		} else if resp.Step.Name == "step" {
+			spanName = fmt.Sprintf("reporting %d steps", len(resp.Generator))
+		}
+
 		span.SetName(spanName)
 
 		span.SetAttributes(
