@@ -1946,6 +1946,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 	until := time.Now().Add(dur)
 
 	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
+	// TODO Should this also include a parent step span? It will never have attempts.
 	err = e.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: item.WorkspaceID,
@@ -2025,6 +2026,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 
 	// Enqueue a job that will timeout the pause.
 	jobID := fmt.Sprintf("%s-%s-%s", item.Identifier.IdempotencyKey(), gen.ID, "invoke")
+	// TODO I think this is fine sending no metadata, as we have no attempts.
 	err = e.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: item.WorkspaceID,
@@ -2161,6 +2163,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	// one thread can lease and consume a pause;  the other will find that the
 	// pause is no longer available and return.
 	jobID := fmt.Sprintf("%s-%s-%s", item.Identifier.IdempotencyKey(), gen.ID, "wait")
+	// TODO Is this fine to leave? No attempts.
 	err = e.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: item.WorkspaceID,
