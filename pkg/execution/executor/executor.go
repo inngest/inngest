@@ -1661,6 +1661,38 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
 
+	// Get run trace context from run metadata.
+	md, err := e.sm.Metadata(ctx, item.Identifier.RunID)
+	if err != nil {
+		return err
+	}
+	if md.Context != nil {
+		if trace, ok := md.Context[consts.OtelPropagationKey]; ok {
+			carrier := telemetry.NewTraceCarrier()
+			if err := carrier.Unmarshal(trace); err == nil {
+				ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+			}
+		}
+	}
+
+	spanName := fmt.Sprintf("discovery following %s", gen.UserDefinedName())
+
+	ctx, span := telemetry.UserTracer().Provider().
+		Tracer(consts.OtelScopeStep).
+		Start(ctx, spanName, trace.WithAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
+			attribute.Int(consts.OtelSysFunctionVersion, item.Identifier.WorkflowVersion),
+			attribute.String(consts.OtelAttrSDKRunID, item.Identifier.RunID.String()),
+		))
+	defer span.End()
+
+	carrier := telemetry.NewTraceCarrier()
+	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+
 	// Re-enqueue the exact same edge to run now.
 	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
 	nextItem := queue.Item{
@@ -1672,6 +1704,9 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 		Attempt:     0,
 		MaxAttempts: item.MaxAttempts,
 		Payload:     queue.PayloadEdge{Edge: nextEdge},
+		Metadata: map[string]any{
+			consts.OtelPropagationKey: carrier,
+		},
 	}
 	err = e.queue.Enqueue(ctx, nextItem, time.Now())
 	if err == redis_state.ErrQueueItemExists {
@@ -1754,8 +1789,41 @@ func (e *executor) handleStepError(ctx context.Context, gen state.GeneratorOpcod
 	}
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
-	jobID := fmt.Sprintf("%s-%s-failure", item.Identifier.IdempotencyKey(), gen.ID)
 
+	md, err := e.sm.Metadata(ctx, item.Identifier.RunID)
+	if err != nil {
+		return err
+	}
+	// Set ctx to the run span by getting it from `metadata.Context`
+	if md.Context != nil {
+		if trace, ok := md.Context[consts.OtelPropagationKey]; ok {
+			carrier := telemetry.NewTraceCarrier()
+			if err := carrier.Unmarshal(trace); err == nil {
+				ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+			}
+		}
+	}
+
+	spanName := fmt.Sprintf("discovery following error in %s", gen.UserDefinedName())
+
+	ctx, span := telemetry.UserTracer().Provider().
+		Tracer(consts.OtelScopeStep).
+		Start(ctx, spanName, trace.WithAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
+			attribute.Int(consts.OtelSysFunctionVersion, item.Identifier.WorkflowVersion),
+			attribute.String(consts.OtelAttrSDKRunID, item.Identifier.RunID.String()),
+		))
+	defer span.End()
+
+	carrier := telemetry.NewTraceCarrier()
+	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+
+	// This is the discovery step to find what happens after we error
+	jobID := fmt.Sprintf("%s-%s-failure", item.Identifier.IdempotencyKey(), gen.ID)
 	nextItem := queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: item.WorkspaceID,
@@ -1765,6 +1833,9 @@ func (e *executor) handleStepError(ctx context.Context, gen state.GeneratorOpcod
 		Attempt:     0,
 		MaxAttempts: item.MaxAttempts,
 		Payload:     queue.PayloadEdge{Edge: nextEdge},
+		Metadata: map[string]any{
+			consts.OtelPropagationKey: carrier,
+		},
 	}
 	err = e.queue.Enqueue(ctx, nextItem, time.Now())
 	if err == redis_state.ErrQueueItemExists {
@@ -1796,6 +1867,36 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
 
+	md, err := e.sm.Metadata(ctx, item.Identifier.RunID)
+	if err != nil {
+		return err
+	}
+	// Set ctx to the run span by getting it from `metadata.Context`
+	if md.Context != nil {
+		if trace, ok := md.Context[consts.OtelPropagationKey]; ok {
+			carrier := telemetry.NewTraceCarrier()
+			if err := carrier.Unmarshal(trace); err == nil {
+				ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+			}
+		}
+	}
+
+	ctx, span := telemetry.UserTracer().Provider().
+		Tracer(consts.OtelScopeStep).
+		Start(ctx, gen.UserDefinedName(), trace.WithAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
+			attribute.Int(consts.OtelSysFunctionVersion, item.Identifier.WorkflowVersion),
+			attribute.String(consts.OtelAttrSDKRunID, item.Identifier.RunID.String()),
+		))
+	defer span.End()
+
+	carrier := telemetry.NewTraceCarrier()
+	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+
 	// Re-enqueue the exact same edge to run now.
 	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID+"-plan")
 	nextItem := queue.Item{
@@ -1809,8 +1910,11 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 		Payload: queue.PayloadEdge{
 			Edge: nextEdge,
 		},
+		Metadata: map[string]any{
+			consts.OtelPropagationKey: carrier,
+		},
 	}
-	err := e.queue.Enqueue(ctx, nextItem, time.Now())
+	err = e.queue.Enqueue(ctx, nextItem, time.Now())
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
