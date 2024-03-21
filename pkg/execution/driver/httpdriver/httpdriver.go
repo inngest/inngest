@@ -21,7 +21,9 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 var (
@@ -220,6 +222,9 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		// Use this if provided, and override any sig added.
 		req.Header.Add("X-Inngest-Signature", r.Signature)
 	}
+
+	// Add `traceparent` and `tracestate` headers to the request from `ctx`
+	telemetry.UserTracer().Propagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 
 	pre := time.Now()
 	resp, err := c.Do(req)
