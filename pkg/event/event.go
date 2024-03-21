@@ -138,22 +138,31 @@ func NewOSSTrackedEvent(e Event) TrackedEvent {
 		e.ID = internalID.String()
 	}
 	return ossTrackedEvent{
-		id:    internalID,
-		event: e,
+		Id:    internalID,
+		Event: e,
 	}
 }
 
+func NewOSSTrackedEventFromString(data string) (*ossTrackedEvent, error) {
+	evt := &ossTrackedEvent{}
+	if err := json.Unmarshal([]byte(data), evt); err != nil {
+		return nil, err
+	}
+
+	return evt, nil
+}
+
 type ossTrackedEvent struct {
-	id    ulid.ULID
-	event Event
+	Id    ulid.ULID `json:"internal_id"`
+	Event Event     `json:"event"`
 }
 
 func (o ossTrackedEvent) GetEvent() Event {
-	return o.event
+	return o.Event
 }
 
 func (o ossTrackedEvent) GetInternalID() ulid.ULID {
-	return o.id
+	return o.Id
 }
 
 func (o ossTrackedEvent) GetWorkspaceID() uuid.UUID {

@@ -15,12 +15,8 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
 	"github.com/uber-go/tally/v4"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/propagation"
-	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
-	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"gonum.org/v1/gonum/stat/sampleuv"
@@ -115,21 +111,10 @@ func GetItemConcurrencyLatency(ctx context.Context) (time.Duration, bool) {
 }
 
 func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) error {
-	ctx, span := otel.Tracer(pkgName).Start(ctx, "redis.queue.enqueue", trace.WithAttributes(
-		semconv.MessagingSystemKey.String("redis"),
-		semconv.MessagingDestinationNameKey.String("executor"),
-		semconv.MessagingOperationPublish,
-		attribute.String("item.type", item.Kind),
-		attribute.Int("item.attempt", item.Attempt),
-		attribute.Int("item.attempts.max", item.GetMaxAttempts()),
-	))
-	defer span.End()
-
 	// propagate
 	if item.Metadata == nil {
 		item.Metadata = map[string]string{}
 	}
-	otel.GetTextMapPropagator().Inject(ctx, propagation.MapCarrier(item.Metadata))
 
 	id := ""
 	if item.JobID != nil {
@@ -160,12 +145,6 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		QueueName:  queueName,
 		WallTimeMS: at.UnixMilli(),
 	}
-
-	span.SetAttributes(
-		attribute.String("queue.id", qi.ID),
-		attribute.String("queue.name", qi.Queue()),
-		attribute.Int64("queue.scheduled_at", qi.Score()),
-	)
 
 	// Use the queue item's score, ensuring we process older function runs first
 	// (eg. before at)

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -24,8 +25,12 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"github.com/robfig/cron/v3"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -233,7 +238,15 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 			}
 			cron := t.CronTrigger.Cron
 			_, err := s.cronmanager.AddFunc(cron, func() {
-				err := s.initialize(context.Background(), fn, event.NewOSSTrackedEvent(event.Event{
+				ctx, span := telemetry.UserTracer().Provider().
+					Tracer(consts.OtelScopeCron).
+					Start(ctx, "cron", trace.WithAttributes(
+						attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
+						attribute.Int(consts.OtelSysFunctionVersion, fn.FunctionVersion),
+					))
+				defer span.End()
+
+				err := s.initialize(ctx, fn, event.NewOSSTrackedEvent(event.Event{
 					Data: map[string]any{
 						"cron": cron,
 					},
@@ -275,13 +288,19 @@ func (s *svc) Events(ctx context.Context, eventId string) ([]event.Event, error)
 	if eventId != "" {
 		evt := s.em.EventById(eventId)
 		if evt != nil {
-			return []event.Event{*evt}, nil
+			return []event.Event{evt.GetEvent()}, nil
 		}
 
 		return []event.Event{}, nil
 	}
 
-	return s.em.Events(), nil
+	trackedEvents := s.em.Events()
+	evts := make([]event.Event, len(trackedEvents))
+	for i, evt := range trackedEvents {
+		evts[i] = evt.GetEvent()
+	}
+
+	return evts, nil
 }
 
 func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
@@ -289,19 +308,27 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		return fmt.Errorf("unknown event type: %s", m.Name)
 	}
 
-	var evt *event.Event
+	if m.Metadata != nil {
+		if trace, ok := m.Metadata[consts.OtelPropagationKey]; ok {
+			carrier := telemetry.NewTraceCarrier()
+			if err := carrier.Unmarshal(trace); err == nil {
+				ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+			}
+		}
+	}
+
+	var tracked event.TrackedEvent
 	var err error
 
 	if s.em == nil {
-		evt, err = event.NewEvent(m.Data)
+		tracked, err = event.NewOSSTrackedEventFromString(m.Data)
 	} else {
-		evt, err = s.em.NewEvent(m.Data)
+		tracked, err = s.em.NewEvent(m.Data)
 	}
 	if err != nil {
 		return fmt.Errorf("error creating event: %w", err)
 	}
 
-	tracked := event.NewOSSTrackedEvent(*evt)
 	// Write the event to our CQRS manager for long-term storage.
 	err = s.cqrs.InsertEvent(
 		ctx,
@@ -312,8 +339,9 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	}
 
 	l := logger.From(ctx).With().
-		Str("event", evt.Name).
-		Str("id", evt.ID).
+		Str("event", tracked.GetEvent().Name).
+		Str("id", tracked.GetEvent().ID).
+		Str("internal_id", tracked.GetInternalID().String()).
 		Logger()
 	ctx = logger.With(ctx, l)
 

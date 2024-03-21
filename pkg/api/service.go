@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,11 +9,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
-	"github.com/oklog/ulid/v2"
+	"github.com/inngest/inngest/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // NewService returns a new API service for ingesting events.  Any additional
@@ -90,22 +94,33 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 	l := logger.From(ctx).With().Str("caller", "api").Logger()
 	ctx = logger.With(ctx, l)
 
+	ctx, span := telemetry.UserTracer().Provider().
+		Tracer(consts.OtelScopeEventIngestion).
+		Start(ctx, "event-ingestion", trace.WithAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+		))
+	defer span.End()
+
 	l.Debug().Str("event", e.Name).Msg("handling event")
 
-	internalID := ulid.MustNew(ulid.Now(), rand.Reader)
+	trackedEvent := event.NewOSSTrackedEvent(*e)
 
-	if e.ID == "" {
-		// Always ensure that the event has an ID, for idempotency.
-		e.ID = internalID.String()
-	}
-
-	byt, err := json.Marshal(e)
+	byt, err := json.Marshal(trackedEvent)
 	if err != nil {
 		l.Error().Err(err).Msg("error unmarshalling event as JSON")
+		span.SetStatus(codes.Error, "error parsing event as JSON")
 		return "", err
 	}
 
-	l.Info().Str("event_name", e.Name).Str("id", e.ID).Interface("event", e).Msg("publishing event")
+	l.Info().
+		Str("event_name", trackedEvent.GetEvent().Name).
+		Str("internal_id", trackedEvent.GetInternalID().String()).
+		Str("external_id", trackedEvent.GetEvent().ID).
+		Interface("event", trackedEvent.GetEvent()).
+		Msg("publishing event")
+
+	carrier := telemetry.NewTraceCarrier()
+	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	err = a.publisher.Publish(
 		ctx,
@@ -114,10 +129,16 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 			Name:      event.EventReceivedName,
 			Data:      string(byt),
 			Timestamp: time.Now(),
+			Metadata: map[string]any{
+				consts.OtelPropagationKey: carrier,
+			},
 		},
 	)
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+	}
 
-	return e.ID, err
+	return trackedEvent.GetInternalID().String(), err
 }
 
 func (a *apiServer) Stop(ctx context.Context) error {

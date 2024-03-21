@@ -23,12 +23,7 @@ const ModalWithHooks = (props) => {
   return (
     <>
       <Button label="Delete" btnAction={() => setIsOpen(true)} />
-      <AlertModal
-        {...props}
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
-        primaryAction={{ label: 'Delete', btnAction: () => {} }}
-      />
+      <AlertModal {...props} isOpen={isOpen} onClose={() => setIsOpen(false)} onSubmit={() => {}} />
     </>
   );
 };
