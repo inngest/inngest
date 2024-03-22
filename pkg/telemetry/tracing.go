@@ -31,26 +31,6 @@ const (
 	TracerTypeJaeger
 )
 
-type tracer struct {
-	provider   *trace.TracerProvider
-	propagator propagation.TextMapPropagator
-	shutdown   func(context.Context)
-}
-
-func (t *tracer) Provider() *trace.TracerProvider {
-	return t.provider
-}
-
-func (t *tracer) Propagator() propagation.TextMapPropagator {
-	return t.propagator
-}
-
-func (t *tracer) Shutdown(ctx context.Context) func() {
-	return func() {
-		t.shutdown(ctx)
-	}
-}
-
 func TracerSetup(svc string, ttype TracerType) (func(), error) {
 	ctx := context.Background()
 
@@ -92,8 +72,12 @@ func newJaegerTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error setting up Jaeger exporter: %w", err)
 	}
+	sp := newInngestSpanProcessor(
+		trace.NewBatchSpanProcessor(exp),
+	)
+
 	tp := trace.NewTracerProvider(
-		trace.WithSpanProcessor(NewSpanProcessor(exp)),
+		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
@@ -103,6 +87,7 @@ func newJaegerTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	return &tracer{
 		provider:   tp,
 		propagator: newTextMapPropagator(),
+		processor:  sp,
 		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
 			_ = tp.Shutdown(ctx)
@@ -118,18 +103,26 @@ func newIOTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error settings up stdout trace exporter: %w", err)
 	}
+
+	sp := newInngestSpanProcessor(
+		trace.NewBatchSpanProcessor(exp),
+	)
+
 	tp := trace.NewTracerProvider(
-		trace.WithSpanProcessor(NewSpanProcessor(exp)),
+		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
 			semconv.DeploymentEnvironmentKey.String(env()),
 		)),
 	)
+
 	return &tracer{
 		provider:   tp,
 		propagator: newTextMapPropagator(),
+		processor:  sp,
 		shutdown: func(ctx context.Context) {
+			_ = exp.Shutdown(ctx)
 			_ = tp.ForceFlush(ctx)
 			_ = tp.Shutdown(ctx)
 		},
@@ -185,8 +178,12 @@ func newOLTPTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 		return nil, fmt.Errorf("error creating otlp trace client: %w", err)
 	}
 
+	sp := newInngestSpanProcessor(
+		trace.NewBatchSpanProcessor(exp),
+	)
+
 	tp := trace.NewTracerProvider(
-		trace.WithSpanProcessor(NewSpanProcessor(exp)),
+		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
@@ -196,6 +193,7 @@ func newOLTPTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	return &tracer{
 		provider:   tp,
 		propagator: newTextMapPropagator(),
+		processor:  sp,
 		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
 			_ = exp.Shutdown(ctx)
