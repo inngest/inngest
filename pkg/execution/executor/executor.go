@@ -291,7 +291,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	ctx, span := telemetry.UserTracer().Provider().
 		Tracer(consts.OtelScopeFunction).
-		Start(ctx, req.Function.GetSlug(), trace.WithAttributes(
+		Start(ctx, fmt.Sprintf("UI: Run: %s", req.Function.GetSlug()), trace.WithAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
@@ -504,7 +504,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	ctx, span = telemetry.UserTracer().Provider().
 		Tracer(consts.OtelScopeStep).
-		Start(ctx, "DISCOVERY (initial)", trace.WithAttributes(
+		Start(ctx, "UI: step node (renames to step name when known, could also rename to fn finish node)", trace.WithAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, id.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, id.WorkspaceID.String()),
@@ -591,7 +591,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	ctx, span := telemetry.UserTracer().Provider().
 		Tracer(consts.OtelScopeExecution).
-		Start(ctx, "running", trace.WithAttributes(
+		Start(ctx, "in-progress attempt", trace.WithAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, id.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, id.WorkspaceID.String()),
@@ -722,7 +722,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		if resp.StatusCode == 200 {
 			spanName = "function success"
 		} else if resp.Step.Name == "step" {
-			spanName = fmt.Sprintf("reporting %d steps", len(resp.Generator))
+			spanName = fmt.Sprintf("reporting %d steps; if this is the only attempt, this would be hidden in the UI", len(resp.Generator))
 		}
 
 		span.SetName(spanName)
@@ -1675,7 +1675,8 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 		}
 	}
 
-	spanName := fmt.Sprintf("discovery following %s", gen.UserDefinedName())
+	// spanName := fmt.Sprintf("discovery following %s", gen.UserDefinedName())
+	spanName := fmt.Sprintf("UI: step node (would rename to step name), internally follows %s", gen.UserDefinedName())
 
 	ctx, span := telemetry.UserTracer().Provider().
 		Tracer(consts.OtelScopeStep).
@@ -1710,6 +1711,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 	}
 	err = e.queue.Enqueue(ctx, nextItem, time.Now())
 	if err == redis_state.ErrQueueItemExists {
+		span.SetAttributes(attribute.Bool(consts.OtelSysIgnored, true))
 		return nil
 	}
 
@@ -1806,9 +1808,10 @@ func (e *executor) handleStepError(ctx context.Context, gen state.GeneratorOpcod
 		}
 	}
 
-	spanName := fmt.Sprintf("discovery following error in %s", gen.UserDefinedName())
+	// spanName := fmt.Sprintf("discovery following error in %s", gen.UserDefinedName())
+	spanName := fmt.Sprintf("UI: step node (would rename to step name), internally follows error in %s", gen.UserDefinedName())
 
-	ctx, span := telemetry.UserTracer().Provider().
+	ctx, span = telemetry.UserTracer().Provider().
 		Tracer(consts.OtelScopeStep).
 		Start(ctx, spanName, trace.WithAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
@@ -1841,6 +1844,7 @@ func (e *executor) handleStepError(ctx context.Context, gen state.GeneratorOpcod
 	}
 	err = e.queue.Enqueue(ctx, nextItem, time.Now())
 	if err == redis_state.ErrQueueItemExists {
+		span.SetAttributes(attribute.Bool(consts.OtelSysIgnored, true))
 		return nil
 	}
 
@@ -1883,9 +1887,12 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 		}
 	}
 
+	// spanName := gen.UserDefinedName()
+	spanName := fmt.Sprintf("UI: step node (%s)", gen.UserDefinedName())
+
 	ctx, span := telemetry.UserTracer().Provider().
 		Tracer(consts.OtelScopeStep).
-		Start(ctx, gen.UserDefinedName(), trace.WithAttributes(
+		Start(ctx, spanName, trace.WithAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
@@ -1918,6 +1925,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 	}
 	err = e.queue.Enqueue(ctx, nextItem, time.Now())
 	if err == redis_state.ErrQueueItemExists {
+		span.SetAttributes(attribute.Bool(consts.OtelSysIgnored, true))
 		return nil
 	}
 

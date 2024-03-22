@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -92,8 +93,9 @@ func newJaegerTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error setting up Jaeger exporter: %w", err)
 	}
+	spanProcessor := NewIgnoredSpanProcessor(trace.NewBatchSpanProcessor(exp))
 	tp := trace.NewTracerProvider(
-		trace.WithBatcher(exp),
+		trace.WithSpanProcessor(spanProcessor),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
@@ -219,4 +221,38 @@ func newTextMapPropagator() propagation.TextMapPropagator {
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	)
+}
+
+// IgnoredSpanProcessor processes spans and does not send them to the next
+// processor if they have the "ignored" attribute set to true.
+type IgnoredSpanProcessor struct {
+	next trace.SpanProcessor
+}
+
+func NewIgnoredSpanProcessor(next trace.SpanProcessor) *IgnoredSpanProcessor {
+	return &IgnoredSpanProcessor{next: next}
+}
+
+func (p *IgnoredSpanProcessor) OnStart(parent context.Context, s trace.ReadWriteSpan) {
+	// No operation on start
+}
+
+func (p *IgnoredSpanProcessor) OnEnd(s trace.ReadOnlySpan) {
+
+	// Check for the "ignored" attribute
+	for _, kv := range s.Attributes() {
+		if kv.Key == consts.OtelSysIgnored && kv.Value.Type() == attribute.BOOL && kv.Value.AsBool() {
+			return // If "ignored: true", don't forward the span to the next processor
+		}
+	}
+
+	p.next.OnEnd(s)
+}
+
+func (p *IgnoredSpanProcessor) Shutdown(ctx context.Context) error {
+	return p.next.Shutdown(ctx)
+}
+
+func (p *IgnoredSpanProcessor) ForceFlush(ctx context.Context) error {
+	return p.next.ForceFlush(ctx)
 }
