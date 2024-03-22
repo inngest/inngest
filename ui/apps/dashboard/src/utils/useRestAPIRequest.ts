@@ -42,7 +42,13 @@ export function useRestAPIRequest<T>({
       if (!response.ok || response.status >= 400) {
         setData(null);
         setIsLoading(false);
-        return setError(new Error(response.statusText));
+        try {
+          const data = await response.json();
+          const error = data.error || response.statusText;
+          return setError(new Error(error));
+        } catch (err) {
+          return setError(new Error(response.statusText));
+        }
       }
       const data = await response.json();
 
