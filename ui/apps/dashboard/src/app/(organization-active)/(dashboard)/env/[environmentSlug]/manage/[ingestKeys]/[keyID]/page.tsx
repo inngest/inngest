@@ -35,6 +35,7 @@ const GetKeyDocument = graphql(`
           events
         }
         metadata
+        source
       }
     }
   }
@@ -47,6 +48,8 @@ type KeyDetailsProps = {
     keyID: string;
   };
 };
+
+const SOURCE_INTEGRATION = 'integration';
 
 export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps) {
   const [isDeleteKeyModalVisible, setIsDeleteKeyModalVisible] = useState(false);
@@ -76,6 +79,9 @@ export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps)
   if (!filterType || !isFilterType(filterType)) {
     throw new Error(`invalid filter type: ${filterType}`);
   }
+
+  // Integration created keys cannot be deleted or renamed
+  const isIntegration = key.source === SOURCE_INTEGRATION;
 
   let value = '',
     maskedValue = '',
@@ -112,11 +118,15 @@ export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-
             <DeleteKeyModal
               keyID={keyID}
               isOpen={isDeleteKeyModalVisible}
               onClose={() => setIsDeleteKeyModalVisible(false)}
+              description={
+                isIntegration
+                  ? 'Warning: This key was created via integration. Please confirm that you are no longer using it before deleting.'
+                  : ''
+              }
             />
             <EditKeyNameModal
               keyID={keyID}
@@ -124,6 +134,9 @@ export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps)
               isOpen={isEditKeyNameModalVisible}
               onClose={() => setIsEditKeyNameModalVisible(false)}
             />
+            {key.source === SOURCE_INTEGRATION && (
+              <span className="ml-8 text-sm text-slate-400">Created via integration</span>
+            )}
           </div>
           <div className="w-3/5">
             <CodeKey fullKey={value} maskedKey={maskedValue} label={keyLabel} />
