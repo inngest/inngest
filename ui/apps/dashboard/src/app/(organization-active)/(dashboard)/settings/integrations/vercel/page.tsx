@@ -14,7 +14,12 @@ export default function VercelIntegrationPage() {
     );
   }
   if (error) {
-    throw error;
+    // HACK - This is a hack as we don't have error codes,
+    // match against the error message
+    if (!error.message.match(/(haven't integrated with Vercel yet)/gi)) {
+      console.log(error);
+      throw error;
+    }
   }
   return <VercelIntegrationForm vercelIntegration={data} />;
 }
