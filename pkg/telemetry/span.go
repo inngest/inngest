@@ -1,6 +1,10 @@
 package telemetry
 
-import "time"
+import (
+	"time"
+
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+)
 
 // Span is an attempt to mimic the otel span data structure following the protobuf spec at
 // https://github.com/open-telemetry/opentelemetry-proto/blob/v1.1.0/opentelemetry/proto/trace/v1/trace.proto
@@ -21,9 +25,10 @@ type Span struct {
 	StartTime    time.Time `json:"startts"`
 	EndTime      time.Time `json:"endts"`
 
-	ScopeName    string            `json:"scopeName"`
-	ScopeVersion string            `json:"scopeVersion"`
-	ServiceName  string            `json:"serviceName"`
+	ServiceName  string `json:"serviceName"`
+	ScopeName    string `json:"scopeName"`
+	ScopeVersion string `json:"scopeVersion"`
+
 	ResourceAttr map[string]string `json:"resourceAttr"`
 	SpanAttr     map[string]string `json:"spanAttr"`
 
@@ -43,4 +48,9 @@ type SpanLink struct {
 	TraceState string            `json:"traceState"`
 	Attr       map[string]string `json:"attr"`
 	Flags      [4]byte           `json:"flags"`
+}
+
+// ref: https://github.com/open-telemetry/opentelemetry-go/blob/main/exporters/otlp/otlptrace/internal/tracetransform/span.go#L17
+func (s *Span) Proto() (*tracepb.ResourceSpans, error) {
+	return nil, nil
 }
