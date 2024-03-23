@@ -50,6 +50,7 @@ type SpanLink struct {
 	Flags      [4]byte           `json:"flags"`
 }
 
+// TODO get this working
 // ref: https://github.com/open-telemetry/opentelemetry-go/blob/main/exporters/otlp/otlptrace/internal/tracetransform/span.go#L17
 func (s *Span) Proto() (*tracepb.ResourceSpans, error) {
 	return nil, nil

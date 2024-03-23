@@ -7,6 +7,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/trace"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 var (
@@ -95,6 +96,17 @@ func (t *tracer) Export(ctx context.Context, spans []*Span) error {
 	}
 
 	// TODO: convert the incoming span into their protobuf representations
-	// and export them via the client
-	return t.otlpClient.UploadTraces(ctx, nil)
+	pb := []*tracepb.ResourceSpans{}
+	for _, s := range spans {
+		resource, err := s.Proto()
+		if err != nil {
+			// TODO: log and continue
+			continue
+		}
+
+		pb = append(pb, resource)
+	}
+
+	// Export them via the client
+	return t.otlpClient.UploadTraces(ctx, pb)
 }
