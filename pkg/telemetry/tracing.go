@@ -31,26 +31,6 @@ const (
 	TracerTypeJaeger
 )
 
-type tracer struct {
-	provider   *trace.TracerProvider
-	propagator propagation.TextMapPropagator
-	shutdown   func(context.Context)
-}
-
-func (t *tracer) Provider() *trace.TracerProvider {
-	return t.provider
-}
-
-func (t *tracer) Propagator() propagation.TextMapPropagator {
-	return t.propagator
-}
-
-func (t *tracer) Shutdown(ctx context.Context) func() {
-	return func() {
-		t.shutdown(ctx)
-	}
-}
-
 func TracerSetup(svc string, ttype TracerType) (func(), error) {
 	ctx := context.Background()
 
@@ -130,6 +110,7 @@ func newIOTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 		provider:   tp,
 		propagator: newTextMapPropagator(),
 		shutdown: func(ctx context.Context) {
+			_ = exp.Shutdown(ctx)
 			_ = tp.ForceFlush(ctx)
 			_ = tp.Shutdown(ctx)
 		},
@@ -196,6 +177,7 @@ func newOLTPTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	return &tracer{
 		provider:   tp,
 		propagator: newTextMapPropagator(),
+		otlpClient: client,
 		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
 			_ = exp.Shutdown(ctx)
