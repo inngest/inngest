@@ -699,18 +699,27 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	if resp != nil {
-		spanName := strings.ToLower(slug.Make(resp.Step.Name))
-		span.SetName(spanName)
+		// We do this because we never want to track discovery and only
+		// successful or failed executions of steps where the SDK has
+		// responded.
+		if resp.Step.ID == "step" {
+			span.SetAttributes(
+				attribute.Bool(consts.OtelSysIgnored, true),
+			)
+		} else {
+			spanName := strings.ToLower(slug.Make(resp.Step.Name))
+			span.SetName(spanName)
 
-		span.SetAttributes(
-			attribute.Int(consts.OtelSysStepStatus, resp.StatusCode),
-			attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
-		)
+			span.SetAttributes(
+				attribute.Int(consts.OtelSysStepStatus, resp.StatusCode),
+				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
+			)
 
-		if byt, err := json.Marshal(resp.Output); err == nil {
-			span.AddEvent(string(byt), trace.WithAttributes(
-				attribute.Bool(consts.OtelSysStepOutput, true),
-			))
+			if byt, err := json.Marshal(resp.Output); err == nil {
+				span.AddEvent(string(byt), trace.WithAttributes(
+					attribute.Bool(consts.OtelSysStepOutput, true),
+				))
+			}
 		}
 	}
 
