@@ -521,6 +521,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 	err = e.queue.Enqueue(ctx, item, at)
 	if err == redis_state.ErrQueueItemExists {
+		span.SetAttributes(attribute.Bool(consts.OtelSysIgnored, true))
 		return nil, state.ErrIdentifierExists
 	}
 	if err != nil {
