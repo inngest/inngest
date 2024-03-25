@@ -88,6 +88,8 @@ func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	}
 }
 
+// newSpanProcessor creates a new span processor that wraps the passed in
+// exporter, used to share common logic between different trace providers.
 func newSpanProcessor(exp trace.SpanExporter) trace.SpanProcessor {
 	return NewIgnoredSpanProcessor(trace.NewBatchSpanProcessor(exp))
 }

@@ -291,7 +291,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	ctx, span := telemetry.UserTracer().Provider().
 		Tracer(consts.OtelScopeFunction).
-		Start(ctx, fmt.Sprintf("UI: Run: %s", req.Function.GetSlug()), trace.WithAttributes(
+		Start(ctx, req.Function.GetSlug(), trace.WithAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
@@ -502,22 +502,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		at = *req.At
 	}
 
-	ctx, span = telemetry.UserTracer().Provider().
-		Tracer(consts.OtelScopeStep).
-		Start(ctx, "UI: step node (renames to step name when known, could also rename to fn finish node)", trace.WithAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
-			attribute.String(consts.OtelSysAccountID, id.AccountID.String()),
-			attribute.String(consts.OtelSysWorkspaceID, id.WorkspaceID.String()),
-			attribute.String(consts.OtelSysAppID, id.AppID.String()),
-			attribute.String(consts.OtelSysFunctionID, id.WorkflowID.String()),
-			attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
-			attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
-		))
-	defer span.End()
-
-	stepCarrier := telemetry.NewTraceCarrier()
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(stepCarrier.Context))
-
 	// Prefix the workflow to the job ID so that no invocation can accidentally
 	// cause idempotency issues across users/functions.
 	//
@@ -533,9 +517,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		MaxAttempts: &sourceEdgeRetries,
 		Payload: queue.PayloadEdge{
 			Edge: inngest.SourceEdge,
-		},
-		Metadata: map[string]any{
-			consts.OtelPropagationKey: stepCarrier,
 		},
 	}
 	err = e.queue.Enqueue(ctx, item, at)
@@ -591,7 +572,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	ctx, span := telemetry.UserTracer().Provider().
 		Tracer(consts.OtelScopeExecution).
-		Start(ctx, "in-progress attempt", trace.WithAttributes(
+		Start(ctx, "running", trace.WithAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, id.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, id.WorkspaceID.String()),
@@ -718,13 +699,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	if resp != nil {
-		spanName := fmt.Sprintf("%s (attempt #%d)", strings.ToLower(slug.Make(resp.Step.Name)), item.Attempt+1)
-		if resp.StatusCode == 200 {
-			spanName = "function success"
-		} else if resp.Step.Name == "step" {
-			spanName = fmt.Sprintf("reporting %d steps; if this is the only attempt, this would be hidden in the UI", len(resp.Generator))
-		}
-
+		spanName := strings.ToLower(slug.Make(resp.Step.Name))
 		span.SetName(spanName)
 
 		span.SetAttributes(
@@ -1675,25 +1650,6 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 		}
 	}
 
-	// spanName := fmt.Sprintf("discovery following %s", gen.UserDefinedName())
-	spanName := fmt.Sprintf("UI: step node (would rename to step name), internally follows %s", gen.UserDefinedName())
-
-	ctx, span := telemetry.UserTracer().Provider().
-		Tracer(consts.OtelScopeStep).
-		Start(ctx, spanName, trace.WithAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
-			attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
-			attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
-			attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
-			attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
-			attribute.Int(consts.OtelSysFunctionVersion, item.Identifier.WorkflowVersion),
-			attribute.String(consts.OtelAttrSDKRunID, item.Identifier.RunID.String()),
-		))
-	defer span.End()
-
-	carrier := telemetry.NewTraceCarrier()
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
-
 	// Re-enqueue the exact same edge to run now.
 	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
 	nextItem := queue.Item{
@@ -1705,13 +1661,9 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 		Attempt:     0,
 		MaxAttempts: item.MaxAttempts,
 		Payload:     queue.PayloadEdge{Edge: nextEdge},
-		Metadata: map[string]any{
-			consts.OtelPropagationKey: carrier,
-		},
 	}
 	err = e.queue.Enqueue(ctx, nextItem, time.Now())
 	if err == redis_state.ErrQueueItemExists {
-		span.SetAttributes(attribute.Bool(consts.OtelSysIgnored, true))
 		return nil
 	}
 
@@ -1808,25 +1760,6 @@ func (e *executor) handleStepError(ctx context.Context, gen state.GeneratorOpcod
 		}
 	}
 
-	// spanName := fmt.Sprintf("discovery following error in %s", gen.UserDefinedName())
-	spanName := fmt.Sprintf("UI: step node (would rename to step name), internally follows error in %s", gen.UserDefinedName())
-
-	ctx, span = telemetry.UserTracer().Provider().
-		Tracer(consts.OtelScopeStep).
-		Start(ctx, spanName, trace.WithAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
-			attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
-			attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
-			attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
-			attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
-			attribute.Int(consts.OtelSysFunctionVersion, item.Identifier.WorkflowVersion),
-			attribute.String(consts.OtelAttrSDKRunID, item.Identifier.RunID.String()),
-		))
-	defer span.End()
-
-	carrier := telemetry.NewTraceCarrier()
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
-
 	// This is the discovery step to find what happens after we error
 	jobID := fmt.Sprintf("%s-%s-failure", item.Identifier.IdempotencyKey(), gen.ID)
 	nextItem := queue.Item{
@@ -1838,9 +1771,6 @@ func (e *executor) handleStepError(ctx context.Context, gen state.GeneratorOpcod
 		Attempt:     0,
 		MaxAttempts: item.MaxAttempts,
 		Payload:     queue.PayloadEdge{Edge: nextEdge},
-		Metadata: map[string]any{
-			consts.OtelPropagationKey: carrier,
-		},
 	}
 	err = e.queue.Enqueue(ctx, nextItem, time.Now())
 	if err == redis_state.ErrQueueItemExists {
@@ -1887,25 +1817,6 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 		}
 	}
 
-	// spanName := gen.UserDefinedName()
-	spanName := fmt.Sprintf("UI: step node (%s)", gen.UserDefinedName())
-
-	ctx, span := telemetry.UserTracer().Provider().
-		Tracer(consts.OtelScopeStep).
-		Start(ctx, spanName, trace.WithAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
-			attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
-			attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
-			attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
-			attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
-			attribute.Int(consts.OtelSysFunctionVersion, item.Identifier.WorkflowVersion),
-			attribute.String(consts.OtelAttrSDKRunID, item.Identifier.RunID.String()),
-		))
-	defer span.End()
-
-	carrier := telemetry.NewTraceCarrier()
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
-
 	// Re-enqueue the exact same edge to run now.
 	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID+"-plan")
 	nextItem := queue.Item{
@@ -1919,13 +1830,9 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 		Payload: queue.PayloadEdge{
 			Edge: nextEdge,
 		},
-		Metadata: map[string]any{
-			consts.OtelPropagationKey: carrier,
-		},
 	}
 	err = e.queue.Enqueue(ctx, nextItem, time.Now())
 	if err == redis_state.ErrQueueItemExists {
-		span.SetAttributes(attribute.Bool(consts.OtelSysIgnored, true))
 		return nil
 	}
 
