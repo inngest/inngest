@@ -88,14 +88,18 @@ func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	}
 }
 
+func newSpanProcessor(exp trace.SpanExporter) trace.SpanProcessor {
+	return NewIgnoredSpanProcessor(trace.NewBatchSpanProcessor(exp))
+}
+
 func newJaegerTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	exp, err := jaegerExporter()
 	if err != nil {
 		return nil, fmt.Errorf("error setting up Jaeger exporter: %w", err)
 	}
-	spanProcessor := NewIgnoredSpanProcessor(trace.NewBatchSpanProcessor(exp))
+	sp := newSpanProcessor(exp)
 	tp := trace.NewTracerProvider(
-		trace.WithSpanProcessor(spanProcessor),
+		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
@@ -120,8 +124,9 @@ func newIOTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error settings up stdout trace exporter: %w", err)
 	}
+	sp := newSpanProcessor(exp)
 	tp := trace.NewTracerProvider(
-		trace.WithBatcher(exp),
+		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
@@ -187,8 +192,10 @@ func newOLTPTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 		return nil, fmt.Errorf("error creating otlp trace client: %w", err)
 	}
 
+	sp := newSpanProcessor(exp)
+
 	tp := trace.NewTracerProvider(
-		trace.WithBatcher(exp),
+		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
@@ -225,6 +232,10 @@ func newTextMapPropagator() propagation.TextMapPropagator {
 
 // IgnoredSpanProcessor processes spans and does not send them to the next
 // processor if they have the "ignored" attribute set to true.
+//
+// This can be useful for if a span's creation was required for propagation
+// purposes, but turned out not to be used, e.g. if idempotency filtered out a
+// queued item.
 type IgnoredSpanProcessor struct {
 	next trace.SpanProcessor
 }
@@ -238,7 +249,6 @@ func (p *IgnoredSpanProcessor) OnStart(parent context.Context, s trace.ReadWrite
 }
 
 func (p *IgnoredSpanProcessor) OnEnd(s trace.ReadOnlySpan) {
-
 	// Check for the "ignored" attribute
 	for _, kv := range s.Attributes() {
 		if kv.Key == consts.OtelSysIgnored && kv.Value.Type() == attribute.BOOL && kv.Value.AsBool() {
