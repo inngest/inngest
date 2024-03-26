@@ -1,3 +1,5 @@
+'use client';
+
 import { type Route } from 'next';
 import Link from 'next/link';
 import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
@@ -6,13 +8,30 @@ import { Button } from '@inngest/components/Button';
 import AppLink from '@/components/AppLink';
 import AppNavigation from '@/components/Navigation/AppNavigation';
 import Toaster from '@/components/Toaster';
-import getAllEnvironments from '@/queries/server-only/getAllEnvironments';
+import LoadingIcon from '@/icons/LoadingIcon';
+import { useEnvironments } from '@/queries';
 import { EnvironmentType, LEGACY_TEST_MODE_NAME } from '@/utils/environments';
 import { EnvironmentArchiveButton } from './EnvironmentArchiveButton';
 import EnvironmentListTable from './EnvironmentListTable';
 
-export default async function Envs() {
-  const environments = await getAllEnvironments();
+export default function Envs() {
+  const [{ data: environments, fetching, error }] = useEnvironments();
+  if (error) {
+    throw error;
+  }
+  if (fetching) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <LoadingIcon />
+      </div>
+    );
+  }
+  if (!environments) {
+    // Unreachable
+    throw new Error(
+      'Unable to load environments. Please try again or contact support if this continues.'
+    );
+  }
 
   // Break the environments into different groups
   const legacyTestMode = environments.find(
