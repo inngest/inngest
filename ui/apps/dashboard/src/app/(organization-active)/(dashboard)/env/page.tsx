@@ -8,6 +8,7 @@ import { Button } from '@inngest/components/Button';
 import AppLink from '@/components/AppLink';
 import AppNavigation from '@/components/Navigation/AppNavigation';
 import Toaster from '@/components/Toaster';
+import LoadingIcon from '@/icons/LoadingIcon';
 import { useEnvironments } from '@/queries';
 import { EnvironmentType, LEGACY_TEST_MODE_NAME } from '@/utils/environments';
 import { EnvironmentArchiveButton } from './EnvironmentArchiveButton';
@@ -19,7 +20,11 @@ export default function Envs() {
     throw error;
   }
   if (fetching) {
-    return null;
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <LoadingIcon />
+      </div>
+    );
   }
   if (!environments) {
     // Unreachable
