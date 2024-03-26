@@ -1,3 +1,5 @@
+'use client';
+
 import { type Route } from 'next';
 import Link from 'next/link';
 import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
@@ -6,13 +8,23 @@ import { Button } from '@inngest/components/Button';
 import AppLink from '@/components/AppLink';
 import AppNavigation from '@/components/Navigation/AppNavigation';
 import Toaster from '@/components/Toaster';
-import getAllEnvironments from '@/queries/server-only/getAllEnvironments';
+import { useEnvironments } from '@/queries';
 import { EnvironmentType, LEGACY_TEST_MODE_NAME } from '@/utils/environments';
 import { EnvironmentArchiveButton } from './EnvironmentArchiveButton';
 import EnvironmentListTable from './EnvironmentListTable';
 
-export default async function Envs() {
-  const environments = await getAllEnvironments();
+export default function Envs() {
+  const [{ data: environments, fetching, error }] = useEnvironments();
+  if (error) {
+    throw error;
+  }
+  if (fetching) {
+    return null;
+  }
+  if (!environments) {
+    // Unreachable
+    throw new Error('No data');
+  }
 
   // Break the environments into different groups
   const legacyTestMode = environments.find(
