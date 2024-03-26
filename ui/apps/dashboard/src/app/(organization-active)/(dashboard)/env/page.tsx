@@ -28,7 +28,9 @@ export default function Envs() {
   }
   if (!environments) {
     // Unreachable
-    throw new Error('No data');
+    throw new Error(
+      'Unable to load environments. Please try again or contact support if this continues.'
+    );
   }
 
   // Break the environments into different groups
