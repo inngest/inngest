@@ -1784,7 +1784,6 @@ func (e *executor) handleStepError(ctx context.Context, gen state.GeneratorOpcod
 	}
 	err = e.queue.Enqueue(ctx, nextItem, time.Now())
 	if err == redis_state.ErrQueueItemExists {
-		span.SetAttributes(attribute.Bool(consts.OtelSysIgnored, true))
 		return nil
 	}
 
