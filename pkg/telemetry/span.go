@@ -1,8 +1,28 @@
 package telemetry
 
 import (
+	"context"
 	"time"
 )
+
+type SpanOpt func(s *span)
+
+// NewSpan creates a new span from the provided context, and overrides the internals with
+// additional options provided.
+func NewSpan(ctx context.Context, opts ...SpanOpt) (*span, error) {
+	s := &span{
+		StartTime: time.Now(),
+		Attrs:     map[string]string{},
+		Events:    []spanEvent{},
+		Links:     []spanLink{},
+	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	return s, nil
+}
 
 // span is an attempt to mimic the otel span data structure following the protobuf spec at
 // https://github.com/open-telemetry/opentelemetry-proto/blob/v1.1.0/opentelemetry/proto/trace/v1/trace.proto
