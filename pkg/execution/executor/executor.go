@@ -15,7 +15,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
-	"github.com/gosimple/slug"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -700,15 +699,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	if resp != nil {
-		// We do this because we never want to track discovery and only
-		// successful or failed executions of steps where the SDK has
-		// responded.
-		if resp.Step.ID == "step" {
-			span.SetAttributes(
-				attribute.Bool(consts.OtelSysIgnored, true),
-			)
-		} else {
-			spanName := strings.ToLower(slug.Make(resp.Step.Name))
+		isStepRes := resp.StatusCode == 206 && resp.Generator != nil && len(resp.Generator) == 1 && resp.Generator[0].Op != enums.OpcodeStepPlanned
+		isFnRes := resp.StatusCode == 200
+		if isStepRes {
+			spanName := resp.Generator[0].UserDefinedName()
 			span.SetName(spanName)
 
 			span.SetAttributes(
@@ -721,6 +715,27 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 					attribute.Bool(consts.OtelSysStepOutput, true),
 				))
 			}
+		} else if isFnRes {
+			spanName := "function returned"
+			span.SetName(spanName)
+
+			span.SetAttributes(
+				attribute.Int(consts.OtelSysFunctionStatus, resp.StatusCode),
+			)
+
+			if byt, err := json.Marshal(resp.Output); err == nil {
+				span.AddEvent(string(byt), trace.WithAttributes(
+					attribute.Bool(consts.OtelSysFunctionOutput, true),
+				))
+			}
+
+		} else {
+			// Only add this span if it's a step or function response that
+			// represents either a failed or a successful execution. Do not
+			// record discovery spans.
+			span.SetAttributes(
+				attribute.Bool(consts.OtelSysIgnored, true),
+			)
 		}
 	}
 
