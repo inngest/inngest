@@ -4,10 +4,9 @@ import (
 	"context"
 	"sync"
 
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"github.com/inngest/inngest/pkg/inngest/log"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/trace"
-	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 var (
@@ -30,7 +29,7 @@ type Tracer interface {
 	// of the otel's trace library.
 	// This can be used for sending out spans prior to ending, or
 	// send out duplicate spans, which we can dedup later ourselves.
-	Export(ctx context.Context, spans []*Span) error
+	Export(ctx context.Context, spans []trace.ReadOnlySpan) error
 }
 
 type TracerOpts struct {
@@ -69,10 +68,9 @@ type tracer struct {
 	provider   *trace.TracerProvider
 	propagator propagation.TextMapPropagator
 	shutdown   func(context.Context)
-
-	// otlpClient is the client that handles the actual exporting of spans
-	// it'll be set only when the OTLP tracer is chosen
-	otlpClient otlptrace.Client
+	// exporter leverages the SpanExporter interface to directly
+	// pass on exporting logic to the otel library
+	exporter trace.SpanExporter
 }
 
 func (t *tracer) Provider() *trace.TracerProvider {
@@ -89,24 +87,11 @@ func (t *tracer) Shutdown(ctx context.Context) func() {
 	}
 }
 
-func (t *tracer) Export(ctx context.Context, spans []*Span) error {
-	// Don't attempt to do anything if the OTLP client is not set.
-	if t.otlpClient == nil {
+func (t *tracer) Export(ctx context.Context, spans []trace.ReadOnlySpan) error {
+	if t.exporter == nil {
+		log.From(ctx).Warn().Msg("no exporter available to export custom spans")
 		return nil
 	}
 
-	// TODO: convert the incoming span into their protobuf representations
-	pb := []*tracepb.ResourceSpans{}
-	for _, s := range spans {
-		resource, err := s.Proto()
-		if err != nil {
-			// TODO: log and continue
-			continue
-		}
-
-		pb = append(pb, resource)
-	}
-
-	// Export them via the client
-	return t.otlpClient.UploadTraces(ctx, pb)
+	return t.exporter.ExportSpans(ctx, spans)
 }

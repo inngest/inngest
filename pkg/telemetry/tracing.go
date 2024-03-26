@@ -83,6 +83,7 @@ func newJaegerTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	return &tracer{
 		provider:   tp,
 		propagator: newTextMapPropagator(),
+		exporter:   exp,
 		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
 			_ = tp.Shutdown(ctx)
@@ -106,9 +107,11 @@ func newIOTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 			semconv.DeploymentEnvironmentKey.String(env()),
 		)),
 	)
+
 	return &tracer{
 		provider:   tp,
 		propagator: newTextMapPropagator(),
+		exporter:   exp,
 		shutdown: func(ctx context.Context) {
 			_ = exp.Shutdown(ctx)
 			_ = tp.ForceFlush(ctx)
@@ -177,7 +180,7 @@ func newOLTPTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	return &tracer{
 		provider:   tp,
 		propagator: newTextMapPropagator(),
-		otlpClient: client,
+		exporter:   exp,
 		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
 			_ = exp.Shutdown(ctx)
