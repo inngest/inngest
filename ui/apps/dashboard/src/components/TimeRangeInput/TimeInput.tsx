@@ -9,8 +9,6 @@ import Input from '@/components/Forms/Input';
 
 type Props = {
   className?: string;
-  defaultValue?: Date;
-  label?: string;
   onChange: (newDateTime: Date) => void;
   name?: string;
   placeholder?: string;
@@ -108,20 +106,12 @@ function reducer(state: State, action: Action): State {
   }
 }
 
-export function TimeInput({
-  className,
-  defaultValue,
-  label,
-  onChange,
-  name,
-  placeholder,
-  required,
-}: Props) {
+export function TimeInput({ className, onChange, name, placeholder, required }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, dispatch] = useReducer(reducer, {
-    inputString: defaultValue ? defaultValue.toLocaleString() : '',
+    inputString: '',
     suggestedDateTime: undefined,
-    status: defaultValue ? 'suggestion_applied' : 'idle',
+    status: 'idle',
   });
   useDebounce(
     () => {
@@ -176,12 +166,6 @@ export function TimeInput({
   return (
     <Popover.Root open={state.status === 'focused' || state.status === 'suggestion_available'}>
       <Popover.Anchor>
-        {label && name && (
-          <label htmlFor={name} className="text-sm font-medium text-slate-700">
-            {label}
-          </label>
-        )}
-
         <Input
           className={className}
           name={name}
