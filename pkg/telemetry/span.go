@@ -19,17 +19,17 @@ const (
 	attrCountLimit = 128
 )
 
-type SpanOpt func(s *span)
+type SpanOpt func(s *Span)
 
 func WithSpanAttributes(attr ...attribute.KeyValue) SpanOpt {
-	return func(s *span) {
+	return func(s *Span) {
 		s.SetAttributes(attr...)
 	}
 }
 
 // NewSpan creates a new span from the provided context, and overrides the internals with
 // additional options provided.
-func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *span) {
+func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -37,7 +37,7 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *span) {
 	// TODO: construct a trace correctly from passed in context
 	spanCtx := trace.SpanContextFromContext(ctx)
 
-	s := &span{
+	s := &Span{
 		TraceID:    spanCtx.TraceID(),
 		StartedAt:  time.Now(),
 		Attrs:      []attribute.KeyValue{},
@@ -64,7 +64,7 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *span) {
 //
 // NOTE: to make sure it doesn't conflict the the ReadOnlySpan interface functions,
 // certain fields are named in a little weird way.
-type span struct {
+type Span struct {
 	tracesdk.ReadWriteSpan // embeds both span interfaces
 
 	TraceID      trace.TraceID  `json:"traceID"`
@@ -95,102 +95,102 @@ type span struct {
 // trace.ReadOnlySpan interface functions
 //
 
-func (s *span) Name() string {
+func (s *Span) Name() string {
 	return s.SpanName
 }
 
-func (s *span) SpanContext() trace.SpanContext {
+func (s *Span) SpanContext() trace.SpanContext {
 	return trace.SpanContext{}
 }
 
-func (s *span) Parent() trace.SpanContext {
+func (s *Span) Parent() trace.SpanContext {
 	return trace.SpanContext{}
 }
 
-func (s *span) SpanKind() trace.SpanKind {
+func (s *Span) SpanKind() trace.SpanKind {
 	return s.Kind
 }
 
-func (s *span) StartTime() time.Time {
+func (s *Span) StartTime() time.Time {
 	return s.StartedAt
 }
 
-func (s *span) EndTime() time.Time {
+func (s *Span) EndTime() time.Time {
 	return s.EndedAt
 }
 
-func (s *span) Attributes() []attribute.KeyValue {
+func (s *Span) Attributes() []attribute.KeyValue {
 	return []attribute.KeyValue{}
 }
 
-func (s *span) Links() []tracesdk.Link {
+func (s *Span) Links() []tracesdk.Link {
 	return s.SpanLinks
 }
 
-func (s *span) Events() []tracesdk.Event {
+func (s *Span) Events() []tracesdk.Event {
 	return s.SpanEvents
 }
 
-func (s *span) Status() tracesdk.Status {
+func (s *Span) Status() tracesdk.Status {
 	return tracesdk.Status{
 		Code: codes.Unset,
 	}
 }
 
-func (s *span) InstrumentationScope() instrumentation.Scope {
+func (s *Span) InstrumentationScope() instrumentation.Scope {
 	return instrumentation.Scope{}
 }
 
-func (s *span) InstrumentationLibrary() instrumentation.Library {
+func (s *Span) InstrumentationLibrary() instrumentation.Library {
 	return instrumentation.Library{}
 }
 
-func (s *span) Resource() *resource.Resource {
+func (s *Span) Resource() *resource.Resource {
 	return nil
 }
 
-func (s *span) DroppedAttributes() int {
+func (s *Span) DroppedAttributes() int {
 	return s.droppedAttributes
 }
 
-func (s *span) DroppedLinks() int {
+func (s *Span) DroppedLinks() int {
 	return 0
 }
 
-func (s *span) DroppedEvents() int {
+func (s *Span) DroppedEvents() int {
 	return 0
 }
 
-func (s *span) ChildSpanCount() int {
+func (s *Span) ChildSpanCount() int {
 	return s.childSpanCount
 }
 
 // Span interface functions
 
 // End utilizes the internal tracer's processors to send spans
-func (s *span) End(opts ...trace.SpanEndOption) {
+func (s *Span) End(opts ...trace.SpanEndOption) {
 	if err := UserTracer().Export(s); err != nil {
 		ctx := context.Background()
 		log.From(ctx).Error().Err(err).Msg("error ending span")
 	}
 }
 
-func (s *span) AddEvent(name string, opts ...trace.EventOption) {}
+func (s *Span) AddEvent(name string, opts ...trace.EventOption) {}
 
-func (s *span) IsRecording() bool {
+func (s *Span) IsRecording() bool {
 	return true
 }
 
-func (s *span) RecordError(err error, opts ...trace.EventOption) {}
+func (s *Span) RecordError(err error, opts ...trace.EventOption) {}
 
-func (s *span) SetStatus(code codes.Code, desc string) {}
+func (s *Span) SetStatus(code codes.Code, desc string) {}
 
-func (s *span) SetName(name string) {}
+func (s *Span) SetName(name string) {}
 
 // SetAttributes mimics the official SetAttributes method, but with
 // reduced checks. We're not doing crazy stuff with it so there's
 // less of a need to do so.
-func (s *span) SetAttributes(attrs ...attribute.KeyValue) {
+func (s *Span) SetAttributes(attrs ...attribute.KeyValue) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -246,6 +246,6 @@ func (s *span) SetAttributes(attrs ...attribute.KeyValue) {
 	}
 }
 
-func (s *span) TracerProvider() trace.TracerProvider {
+func (s *Span) TracerProvider() trace.TracerProvider {
 	return UserTracer().Provider()
 }
