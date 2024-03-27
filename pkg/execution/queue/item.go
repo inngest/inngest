@@ -71,7 +71,7 @@ type Item struct {
 	Payload any `json:"payload,omitempty"`
 	// Metadata is used for storing additional metadata related to the queue item.
 	// e.g. tracing data
-	Metadata map[string]string `json:"metadata,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
 	// QueueName allows control over the queue name.  If not provided, this falls
 	// back to the queue mapping defined on the queue or the workflow ID of the fn.
 	QueueName *string `json:"qn,omitempty"`
@@ -113,14 +113,14 @@ func (i Item) IsStepKind() bool {
 
 func (i *Item) UnmarshalJSON(b []byte) error {
 	type kind struct {
-		GroupID     string            `json:"groupID"`
-		WorkspaceID uuid.UUID         `json:"wsID"`
-		Kind        string            `json:"kind"`
-		Identifier  state.Identifier  `json:"identifier"`
-		Attempt     int               `json:"atts"`
-		MaxAttempts *int              `json:"maxAtts,omitempty"`
-		Payload     json.RawMessage   `json:"payload"`
-		Metadata    map[string]string `json:"metadata"`
+		GroupID     string           `json:"groupID"`
+		WorkspaceID uuid.UUID        `json:"wsID"`
+		Kind        string           `json:"kind"`
+		Identifier  state.Identifier `json:"identifier"`
+		Attempt     int              `json:"atts"`
+		MaxAttempts *int             `json:"maxAtts,omitempty"`
+		Payload     json.RawMessage  `json:"payload"`
+		Metadata    map[string]any   `json:"metadata"`
 	}
 	temp := &kind{}
 	err := json.Unmarshal(b, temp)
