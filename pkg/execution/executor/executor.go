@@ -288,11 +288,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, ErrFunctionDebounced
 	}
 
-	// ctx, span := telemetry.NewSpan(ctx)
-
-	ctx, span := telemetry.UserTracer().Provider().
-		Tracer(consts.OtelScopeFunction).
-		Start(ctx, req.Function.GetSlug(), trace.WithAttributes(
+	ctx, span := telemetry.NewSpan(
+		ctx,
+		telemetry.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
@@ -300,7 +298,20 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			attribute.String(consts.OtelSysFunctionID, req.Function.ID.String()),
 			attribute.String(consts.OtelSysFunctionSlug, req.Function.GetSlug()),
 			attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
-		))
+		),
+	)
+
+	// ctx, span := telemetry.UserTracer().Provider().
+	// 	Tracer(consts.OtelScopeFunction).
+	// 	Start(ctx, req.Function.GetSlug(), trace.WithAttributes(
+	// 		attribute.Bool(consts.OtelUserTraceFilterKey, true),
+	// 		attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
+	// 		attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
+	// 		attribute.String(consts.OtelSysAppID, req.AppID.String()),
+	// 		attribute.String(consts.OtelSysFunctionID, req.Function.ID.String()),
+	// 		attribute.String(consts.OtelSysFunctionSlug, req.Function.GetSlug()),
+	// 		attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
+	// 	))
 	defer span.End()
 
 	// Run IDs are created embedding the timestamp now, when the function is being scheduled.

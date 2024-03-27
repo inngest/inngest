@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/inngest/inngest/pkg/inngest/log"
@@ -13,16 +14,36 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+const (
+	// ref: https://opentelemetry.io/docs/specs/otel/common/#configurable-parameters
+	attrCountLimit = 128
+)
+
 type SpanOpt func(s *span)
+
+func WithSpanAttributes(attr ...attribute.KeyValue) SpanOpt {
+	return func(s *span) {
+		s.SetAttributes(attr...)
+	}
+}
 
 // NewSpan creates a new span from the provided context, and overrides the internals with
 // additional options provided.
 func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *span) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	// TODO: construct a trace correctly from passed in context
+	spanCtx := trace.SpanContextFromContext(ctx)
+
 	s := &span{
+		TraceID:    spanCtx.TraceID(),
 		StartedAt:  time.Now(),
-		Attrs:      map[string]string{},
+		Attrs:      []attribute.KeyValue{},
 		SpanEvents: []tracesdk.Event{},
 		SpanLinks:  []tracesdk.Link{},
+		mu:         sync.Mutex{},
 	}
 
 	for _, opt := range opts {
@@ -46,7 +67,7 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *span) {
 type span struct {
 	tracesdk.ReadOnlySpan
 
-	TraceID      string         `json:"traceID"`
+	TraceID      trace.TraceID  `json:"traceID"`
 	SpanID       string         `json:"spanID"`
 	TraceState   string         `json:"traceState"`
 	ParentSpanID *string        `json:"parentSpanID,omitempty"`
@@ -60,13 +81,20 @@ type span struct {
 	ScopeName    string `json:"scopeName"`
 	ScopeVersion string `json:"scopeVersion"`
 
-	Attrs map[string]string `json:"attrs"`
+	Attrs []attribute.KeyValue `json:"attrs"`
 
 	SpanEvents []tracesdk.Event `json:"events"`
 	SpanLinks  []tracesdk.Link  `json:"links"`
+
+	mu                sync.Mutex
+	childSpanCount    int
+	droppedAttributes int
 }
 
-// Implement the functions to fulfill trace.ReadOnlySpan
+//
+// trace.ReadOnlySpan interface functions
+//
+
 func (s *span) Name() string {
 	return s.SpanName
 }
@@ -122,7 +150,7 @@ func (s *span) Resource() *resource.Resource {
 }
 
 func (s *span) DroppedAttributes() int {
-	return 0
+	return s.droppedAttributes
 }
 
 func (s *span) DroppedLinks() int {
@@ -134,7 +162,68 @@ func (s *span) DroppedEvents() int {
 }
 
 func (s *span) ChildSpanCount() int {
-	return 0
+	return s.childSpanCount
+}
+
+// Span interface functions
+
+// SetAttributes mimics the official SetAttributes method, but with
+// reduced checks. We're not doing crazy stuff with it so there's
+// less of a need to do so.
+func (s *span) SetAttributes(attrs ...attribute.KeyValue) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.Attrs == nil {
+		s.Attrs = []attribute.KeyValue{}
+	}
+
+	// dedup if the sum of existing and new attr could exceed limit
+	if len(s.Attrs)+len(attrs) > attrCountLimit {
+		// dedup the existing list of attributes and take the latest one
+		exists := make(map[attribute.Key]int)
+		dedup := []attribute.KeyValue{}
+		for _, a := range s.Attrs {
+			if idx, ok := exists[a.Key]; ok {
+				dedup[idx] = a
+			} else {
+				dedup = append(dedup, a)
+				exists[a.Key] = len(dedup) - 1
+			}
+		}
+
+		for _, a := range attrs {
+			if !a.Valid() {
+				// Drop invalid attributes
+				s.droppedAttributes++
+				continue
+			}
+
+			// if a key is already there, take the latest one
+			if idx, ok := exists[a.Key]; ok {
+				s.Attrs[idx] = a
+				continue
+			}
+
+			// don't bother appending if it's at limits
+			if len(s.Attrs) >= attrCountLimit {
+				s.droppedAttributes++
+				continue
+			}
+
+			s.Attrs = append(s.Attrs, a)
+			exists[a.Key] = len(s.Attrs) - 1
+		}
+	}
+
+	// otherwise, just append
+	for _, a := range attrs {
+		if !a.Valid() {
+			s.droppedAttributes++
+			continue
+		}
+		s.Attrs = append(s.Attrs, a)
+	}
 }
 
 // End utilizes the internal tracer's processors to send spans
