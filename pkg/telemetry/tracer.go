@@ -29,7 +29,7 @@ type Tracer interface {
 	// of the otel's trace library.
 	// This can be used for sending out spans prior to ending, or
 	// send out duplicate spans, which we can dedup later ourselves.
-	Export(ctx context.Context, spans []trace.ReadOnlySpan) error
+	Export(ctx context.Context, span trace.ReadOnlySpan) error
 }
 
 type TracerOpts struct {
@@ -68,9 +68,7 @@ type tracer struct {
 	provider   *trace.TracerProvider
 	propagator propagation.TextMapPropagator
 	shutdown   func(context.Context)
-	// exporter leverages the SpanExporter interface to directly
-	// pass on exporting logic to the otel library
-	exporter trace.SpanExporter
+	processor  trace.SpanProcessor
 }
 
 func (t *tracer) Provider() *trace.TracerProvider {
@@ -87,11 +85,12 @@ func (t *tracer) Shutdown(ctx context.Context) func() {
 	}
 }
 
-func (t *tracer) Export(ctx context.Context, spans []trace.ReadOnlySpan) error {
-	if t.exporter == nil {
+func (t *tracer) Export(ctx context.Context, span trace.ReadOnlySpan) error {
+	if t.processor == nil {
 		log.From(ctx).Warn().Msg("no exporter available to export custom spans")
 		return nil
 	}
 
-	return t.exporter.ExportSpans(ctx, spans)
+	t.processor.OnEnd(span)
+	return nil
 }
