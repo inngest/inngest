@@ -29,7 +29,7 @@ type Tracer interface {
 	// of the otel's trace library.
 	// This can be used for sending out spans prior to ending, or
 	// send out duplicate spans, which we can dedup later ourselves.
-	Export(ctx context.Context, span trace.ReadOnlySpan) error
+	Export(span trace.ReadOnlySpan) error
 }
 
 type TracerOpts struct {
@@ -85,8 +85,9 @@ func (t *tracer) Shutdown(ctx context.Context) func() {
 	}
 }
 
-func (t *tracer) Export(ctx context.Context, span trace.ReadOnlySpan) error {
+func (t *tracer) Export(span trace.ReadOnlySpan) error {
 	if t.processor == nil {
+		ctx := context.Background()
 		log.From(ctx).Warn().Msg("no exporter available to export custom spans")
 		return nil
 	}

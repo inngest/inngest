@@ -288,6 +288,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, ErrFunctionDebounced
 	}
 
+	// ctx, span := telemetry.NewSpan(ctx)
+
 	ctx, span := telemetry.UserTracer().Provider().
 		Tracer(consts.OtelScopeFunction).
 		Start(ctx, req.Function.GetSlug(), trace.WithAttributes(

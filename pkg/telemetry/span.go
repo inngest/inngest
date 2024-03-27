@@ -9,7 +9,7 @@ type SpanOpt func(s *span)
 
 // NewSpan creates a new span from the provided context, and overrides the internals with
 // additional options provided.
-func NewSpan(ctx context.Context, opts ...SpanOpt) (*span, error) {
+func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *span) {
 	s := &span{
 		StartTime: time.Now(),
 		Attrs:     map[string]string{},
@@ -21,7 +21,7 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (*span, error) {
 		opt(s)
 	}
 
-	return s, nil
+	return ctx, s
 }
 
 // span is an attempt to mimic the otel span data structure following the protobuf spec at
@@ -71,7 +71,10 @@ type spanLink struct {
 }
 
 // Implement the functions to fulfill trace.ReadOnlySpan
-
 func (s *span) Name() string {
 	return s.SpanName
+}
+
+func (s *span) End() {
+	UserTracer().Export(s)
 }
