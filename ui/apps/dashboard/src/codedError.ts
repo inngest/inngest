@@ -1,25 +1,38 @@
 import { z } from 'zod';
 
 const codes = [
+  'account_mismatch',
   'app_mismatch',
   'app_uninitialized',
   'batch_size_too_large',
   'env_archived',
   'env_mismatch',
-  'forbidden',
-  'internal_server_error',
+  'env_unspecified',
+  'http_bad_request',
+  'http_forbidden',
+  'http_internal_server_error',
+  'http_method_not_allowed',
+  'http_not_found',
+  'http_unauthorized',
+  'http_unreachable',
+  'http_unsupported_protocol',
   'invalid_function',
   'invalid_signing_key',
   'missing_branch_env_name',
   'missing_signing_key',
   'no_functions',
   'not_sdk',
+  'private_host',
   'too_many_pings',
-  'unauthorized',
   'unknown',
+  'url_invalid',
+
+  // Deprecated
+  'forbidden',
+  'internal_server_error',
+  'unauthorized',
   'unreachable',
   'unsupported_protocol',
-  'url_invalid',
   'url_not_found',
 ] as const;
 export type ErrorCode = (typeof codes)[number];
