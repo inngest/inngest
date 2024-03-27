@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -18,6 +19,9 @@ const (
 	// ref: https://opentelemetry.io/docs/specs/otel/common/#configurable-parameters
 	attrCountLimit = 128
 )
+
+// type assertion
+var _ tracesdk.IDGenerator = &spanCtx{}
 
 type SpanOpt func(s *Span)
 
@@ -43,7 +47,6 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
 		Attrs:      []attribute.KeyValue{},
 		SpanEvents: []tracesdk.Event{},
 		SpanLinks:  []tracesdk.Link{},
-		mu:         sync.Mutex{},
 	}
 
 	for _, opt := range opts {
@@ -66,6 +69,7 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
 // certain fields are named in a little weird way.
 type Span struct {
 	tracesdk.ReadWriteSpan // embeds both span interfaces
+	sync.Mutex
 
 	TraceID      trace.TraceID   `json:"traceID"`
 	SpanID       string          `json:"spanID"`
@@ -87,7 +91,7 @@ type Span struct {
 	SpanEvents []tracesdk.Event `json:"events"`
 	SpanLinks  []tracesdk.Link  `json:"links"`
 
-	mu                sync.Mutex
+	spanCtx           *spanCtx
 	childSpanCount    int
 	droppedAttributes int
 }
@@ -101,7 +105,7 @@ func (s *Span) Name() string {
 }
 
 func (s *Span) SpanContext() trace.SpanContext {
-	return trace.SpanContext{}
+	return s.spanCtx.Context()
 }
 
 func (s *Span) Parent() trace.SpanContext {
@@ -180,8 +184,8 @@ func (s *Span) End(opts ...trace.SpanEndOption) {
 }
 
 func (s *Span) AddEvent(name string, opts ...trace.EventOption) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
 	config := trace.NewEventConfig(opts...)
 
@@ -204,16 +208,16 @@ func (s *Span) IsRecording() bool {
 // official one doesn't actually set the status, but we'll just do it here
 // for convinence's sake.
 func (s *Span) RecordError(err error, opts ...trace.EventOption) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
 	s.AddEvent(err.Error(), opts...)
 	s.SetStatus(codes.Error, err.Error())
 }
 
 func (s *Span) SetStatus(code codes.Code, desc string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 	s.SpanStatus = tracesdk.Status{
 		Code:        code,
 		Description: desc,
@@ -221,8 +225,8 @@ func (s *Span) SetStatus(code codes.Code, desc string) {
 }
 
 func (s *Span) SetName(name string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 	s.SpanName = name
 }
 
@@ -230,8 +234,8 @@ func (s *Span) SetName(name string) {
 // reduced checks. We're not doing crazy stuff with it so there's
 // less of a need to do so.
 func (s *Span) SetAttributes(attrs ...attribute.KeyValue) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
 	if s.Attrs == nil {
 		s.Attrs = []attribute.KeyValue{}
@@ -287,4 +291,37 @@ func (s *Span) SetAttributes(attrs ...attribute.KeyValue) {
 
 func (s *Span) TracerProvider() trace.TracerProvider {
 	return UserTracer().Provider()
+}
+
+// spanCtx provides a way to generate TraceID and SpanID,
+// and also a new SpanContext from those values
+type spanCtx struct {
+	sync.Mutex
+	randSrc *rand.Rand
+}
+
+func (sc *spanCtx) NewSpanID(ctx context.Context, traceID trace.TraceID) trace.SpanID {
+	sc.Lock()
+	defer sc.Unlock()
+
+	sid := trace.SpanID{}
+	_, _ = sc.randSrc.Read(sid[:])
+	return sid
+}
+
+func (sc *spanCtx) NewIDs(ctx context.Context) (trace.TraceID, trace.SpanID) {
+	sc.Lock()
+	defer sc.Unlock()
+	var (
+		tid trace.TraceID
+		sid trace.SpanID
+	)
+
+	_, _ = sc.randSrc.Read(tid[:])
+	_, _ = sc.randSrc.Read(sid[:])
+	return tid, sid
+}
+
+func (sc *spanCtx) Context() trace.SpanContext {
+	return trace.SpanContext{}
 }
