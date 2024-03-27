@@ -2082,7 +2082,11 @@ func (e *executor) newExpressionEvaluator(ctx context.Context, expr string) (exp
 // If neither exist or they are invalid, it returns the original context.
 func (e *executor) extractTraceCtx(ctx context.Context, id state.Identifier, item *queue.Item) context.Context {
 	if item != nil {
-		itemCtx := extractTraceCtxFromMap(ctx, item.Metadata)
+		metadata := make(map[string]any)
+		for k, v := range item.Metadata {
+			metadata[k] = v
+		}
+		itemCtx := extractTraceCtxFromMap(ctx, metadata)
 		if itemCtx != nil {
 			return *itemCtx
 		}
