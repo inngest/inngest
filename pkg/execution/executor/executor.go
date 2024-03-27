@@ -684,10 +684,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	if resp != nil {
-		isStepRes := resp.StatusCode == 206 && resp.Generator != nil && len(resp.Generator) == 1 && resp.Generator[0].Op != enums.OpcodeStepPlanned
-		isFnRes := resp.StatusCode == 200
-		if isStepRes {
-			spanName := resp.Generator[0].UserDefinedName()
+		if op := resp.TraceVisibleStepExecution(); op != nil {
+			spanName := op.UserDefinedName()
 			span.SetName(spanName)
 
 			span.SetAttributes(
@@ -700,7 +698,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 					attribute.Bool(consts.OtelSysStepOutput, true),
 				))
 			}
-		} else if isFnRes {
+		} else if resp.TraceVisibleFunctionExecution() {
 			spanName := "function returned"
 			span.SetName(spanName)
 
