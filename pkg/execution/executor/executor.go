@@ -698,7 +698,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 					attribute.Bool(consts.OtelSysStepOutput, true),
 				))
 			}
-		} else if resp.TraceVisibleFunctionExecution() {
+		} else if resp.IsTraceVisibleFunctionExecution() {
 			spanName := "function returned"
 			span.SetName(spanName)
 
