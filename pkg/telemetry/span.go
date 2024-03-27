@@ -67,15 +67,16 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
 type Span struct {
 	tracesdk.ReadWriteSpan // embeds both span interfaces
 
-	TraceID      trace.TraceID  `json:"traceID"`
-	SpanID       string         `json:"spanID"`
-	TraceState   string         `json:"traceState"`
-	ParentSpanID *string        `json:"parentSpanID,omitempty"`
-	Flags        [4]byte        `json:"flags"`
-	SpanName     string         `json:"name"`
-	Kind         trace.SpanKind `json:"kind"`
-	StartedAt    time.Time      `json:"startts"`
-	EndedAt      time.Time      `json:"endts"`
+	TraceID      trace.TraceID   `json:"traceID"`
+	SpanID       string          `json:"spanID"`
+	TraceState   string          `json:"traceState"`
+	ParentSpanID *string         `json:"parentSpanID,omitempty"`
+	Flags        [4]byte         `json:"flags"`
+	SpanName     string          `json:"name"`
+	Kind         trace.SpanKind  `json:"kind"`
+	StartedAt    time.Time       `json:"startts"`
+	EndedAt      time.Time       `json:"endts"`
+	SpanStatus   tracesdk.Status `json:"status"`
 
 	ServiceName  string `json:"serviceName"`
 	ScopeName    string `json:"scopeName"`
@@ -116,6 +117,9 @@ func (s *Span) StartTime() time.Time {
 }
 
 func (s *Span) EndTime() time.Time {
+	if s.EndedAt.IsZero() {
+		return time.Now()
+	}
 	return s.EndedAt
 }
 
@@ -132,9 +136,7 @@ func (s *Span) Events() []tracesdk.Event {
 }
 
 func (s *Span) Status() tracesdk.Status {
-	return tracesdk.Status{
-		Code: codes.Unset,
-	}
+	return s.SpanStatus
 }
 
 func (s *Span) InstrumentationScope() instrumentation.Scope {
@@ -169,23 +171,60 @@ func (s *Span) ChildSpanCount() int {
 
 // End utilizes the internal tracer's processors to send spans
 func (s *Span) End(opts ...trace.SpanEndOption) {
+	s.EndedAt = time.Now()
+
 	if err := UserTracer().Export(s); err != nil {
 		ctx := context.Background()
 		log.From(ctx).Error().Err(err).Msg("error ending span")
 	}
 }
 
-func (s *Span) AddEvent(name string, opts ...trace.EventOption) {}
+func (s *Span) AddEvent(name string, opts ...trace.EventOption) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	config := trace.NewEventConfig(opts...)
+
+	evt := tracesdk.Event{
+		Name:       name,
+		Time:       time.Now(),
+		Attributes: config.Attributes(),
+	}
+	if !config.Timestamp().IsZero() {
+		evt.Time = config.Timestamp()
+	}
+
+	s.SpanEvents = append(s.SpanEvents, evt)
+}
 
 func (s *Span) IsRecording() bool {
 	return true
 }
 
-func (s *Span) RecordError(err error, opts ...trace.EventOption) {}
+// official one doesn't actually set the status, but we'll just do it here
+// for convinence's sake.
+func (s *Span) RecordError(err error, opts ...trace.EventOption) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-func (s *Span) SetStatus(code codes.Code, desc string) {}
+	s.AddEvent(err.Error(), opts...)
+	s.SetStatus(codes.Error, err.Error())
+}
 
-func (s *Span) SetName(name string) {}
+func (s *Span) SetStatus(code codes.Code, desc string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.SpanStatus = tracesdk.Status{
+		Code:        code,
+		Description: desc,
+	}
+}
+
+func (s *Span) SetName(name string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.SpanName = name
+}
 
 // SetAttributes mimics the official SetAttributes method, but with
 // reduced checks. We're not doing crazy stuff with it so there's
