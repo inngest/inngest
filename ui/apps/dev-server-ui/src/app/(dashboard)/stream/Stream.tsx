@@ -262,6 +262,7 @@ export default function Stream() {
       >
         <Table
           options={{
+            // @ts-expect-error TODO: Properly type this
             data: triggers ?? [],
             columns,
             getCoreRowModel: getCoreRowModel(),
