@@ -50,7 +50,7 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *span) {
 		opt(s)
 	}
 
-	return ctx, s
+	return trace.ContextWithSpan(ctx, s), s
 }
 
 // span is an attempt to mimic the otel span data structure following the protobuf spec at
@@ -65,7 +65,7 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *span) {
 // NOTE: to make sure it doesn't conflict the the ReadOnlySpan interface functions,
 // certain fields are named in a little weird way.
 type span struct {
-	tracesdk.ReadOnlySpan
+	tracesdk.ReadWriteSpan // embeds both span interfaces
 
 	TraceID      trace.TraceID  `json:"traceID"`
 	SpanID       string         `json:"spanID"`
@@ -167,6 +167,26 @@ func (s *span) ChildSpanCount() int {
 
 // Span interface functions
 
+// End utilizes the internal tracer's processors to send spans
+func (s *span) End(opts ...trace.SpanEndOption) {
+	if err := UserTracer().Export(s); err != nil {
+		ctx := context.Background()
+		log.From(ctx).Error().Err(err).Msg("error ending span")
+	}
+}
+
+func (s *span) AddEvent(name string, opts ...trace.EventOption) {}
+
+func (s *span) IsRecording() bool {
+	return true
+}
+
+func (s *span) RecordError(err error, opts ...trace.EventOption) {}
+
+func (s *span) SetStatus(code codes.Code, desc string) {}
+
+func (s *span) SetName(name string) {}
+
 // SetAttributes mimics the official SetAttributes method, but with
 // reduced checks. We're not doing crazy stuff with it so there's
 // less of a need to do so.
@@ -226,10 +246,6 @@ func (s *span) SetAttributes(attrs ...attribute.KeyValue) {
 	}
 }
 
-// End utilizes the internal tracer's processors to send spans
-func (s *span) End() {
-	if err := UserTracer().Export(s); err != nil {
-		ctx := context.Background()
-		log.From(ctx).Error().Err(err).Msg("error ending span")
-	}
+func (s *span) TracerProvider() trace.TracerProvider {
+	return UserTracer().Provider()
 }
