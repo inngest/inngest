@@ -1646,20 +1646,6 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
 
-	// Get run trace context from run metadata.
-	md, err := e.sm.Metadata(ctx, item.Identifier.RunID)
-	if err != nil {
-		return err
-	}
-	if md.Context != nil {
-		if trace, ok := md.Context[consts.OtelPropagationKey]; ok {
-			carrier := telemetry.NewTraceCarrier()
-			if err := carrier.Unmarshal(trace); err == nil {
-				ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
-			}
-		}
-	}
-
 	// Re-enqueue the exact same edge to run now.
 	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
 	nextItem := queue.Item{
@@ -1756,20 +1742,6 @@ func (e *executor) handleStepError(ctx context.Context, gen state.GeneratorOpcod
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
 
-	md, err := e.sm.Metadata(ctx, item.Identifier.RunID)
-	if err != nil {
-		return err
-	}
-	// Set ctx to the run span by getting it from `metadata.Context`
-	if md.Context != nil {
-		if trace, ok := md.Context[consts.OtelPropagationKey]; ok {
-			carrier := telemetry.NewTraceCarrier()
-			if err := carrier.Unmarshal(trace); err == nil {
-				ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
-			}
-		}
-	}
-
 	// This is the discovery step to find what happens after we error
 	jobID := fmt.Sprintf("%s-%s-failure", item.Identifier.IdempotencyKey(), gen.ID)
 	nextItem := queue.Item{
@@ -1812,20 +1784,6 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
 
-	md, err := e.sm.Metadata(ctx, item.Identifier.RunID)
-	if err != nil {
-		return err
-	}
-	// Set ctx to the run span by getting it from `metadata.Context`
-	if md.Context != nil {
-		if trace, ok := md.Context[consts.OtelPropagationKey]; ok {
-			carrier := telemetry.NewTraceCarrier()
-			if err := carrier.Unmarshal(trace); err == nil {
-				ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
-			}
-		}
-	}
-
 	// Re-enqueue the exact same edge to run now.
 	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID+"-plan")
 	nextItem := queue.Item{
@@ -1840,7 +1798,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 			Edge: nextEdge,
 		},
 	}
-	err = e.queue.Enqueue(ctx, nextItem, time.Now())
+	err := e.queue.Enqueue(ctx, nextItem, time.Now())
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
