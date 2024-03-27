@@ -551,24 +551,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// contains it.
 	md := s.Metadata()
 
-	// Store the metadata in context for future use.  This can be used to reduce
-	// reads in the future.
-	ctx = WithContextMetadata(ctx, md)
-
-	// Propagate trace context
-	if trace, ok := item.Metadata[consts.OtelPropagationKey]; ok {
-		carrier := telemetry.NewTraceCarrier()
-		if err := carrier.Unmarshal(trace); err == nil {
-			ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
-		}
-	} else if md.Context != nil {
-		if trace, ok := md.Context[consts.OtelPropagationKey]; ok {
-			carrier := telemetry.NewTraceCarrier()
-			if err := carrier.Unmarshal(trace); err == nil {
-				ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
-			}
-		}
-	}
+	// Store the metadata in context for future use and propagate trace
+	// context. This can be used to reduce reads in the future.
+	ctx = e.extractTraceCtx(WithContextMetadata(ctx, md), id, &item)
 
 	ctx, span := telemetry.UserTracer().Provider().
 		Tracer(consts.OtelScopeExecution).
@@ -2134,6 +2119,46 @@ func (e *executor) newExpressionEvaluator(ctx context.Context, expr string) (exp
 		return e.evalFactory(ctx, expr)
 	}
 	return expressions.NewExpressionEvaluator(ctx, expr)
+}
+
+// extractTraceCtx extracts the trace context from the given item, if it exists.
+// If it doesn't it falls back to extracting the trace for the run overall.
+// If neither exist or they are invalid, it returns the original context.
+func (e *executor) extractTraceCtx(ctx context.Context, id state.Identifier, item *queue.Item) context.Context {
+	if item != nil {
+		itemCtx := extractTraceCtxFromMap(ctx, item.Metadata)
+		if itemCtx != nil {
+			return *itemCtx
+		}
+	}
+
+	md, err := e.sm.Metadata(ctx, id.RunID)
+	if err != nil {
+		return ctx
+	}
+
+	if md.Context != nil {
+		stateCtx := extractTraceCtxFromMap(ctx, md.Context)
+		if stateCtx != nil {
+			return *stateCtx
+		}
+	}
+
+	return ctx
+}
+
+// extractTraceCtxFromMap extracts the trace context from a map, if it exists.
+// If it doesn't or it is invalid, it nil.
+func extractTraceCtxFromMap(ctx context.Context, target map[string]any) *context.Context {
+	if trace, ok := target[consts.OtelPropagationKey]; ok {
+		carrier := telemetry.NewTraceCarrier()
+		if err := carrier.Unmarshal(trace); err == nil {
+			targetCtx := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+			return &targetCtx
+		}
+	}
+
+	return nil
 }
 
 type execError struct {
