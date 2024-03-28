@@ -5,21 +5,21 @@ import { useVirtual } from 'react-virtual';
 
 const cellStyles = 'pl-6 pr-2 py-3 whitespace-nowrap';
 
-type TableProps = {
-  options: TableOptions<any>;
+type TableProps<T> = {
+  options: TableOptions<T>;
   blankState: React.ReactNode;
-  customRowProps?: (row: Row<any>) => void;
+  customRowProps?: (row: Row<T>) => void;
   tableContainerRef: React.RefObject<HTMLDivElement>;
   isVirtualized?: boolean;
 };
 
-export function Table({
+export function Table<T>({
   options,
   blankState,
   customRowProps,
   tableContainerRef,
   isVirtualized = true,
-}: TableProps) {
+}: TableProps<T>) {
   const table = useReactTable(options);
   const { rows } = table.getRowModel();
 

@@ -65,6 +65,18 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
     });
   }
 
+  if (useBooleanFlag('bulk-cancellation-ui').value) {
+    navLinks.push({
+      href: `/env/${params.environmentSlug}/functions/${params.slug}/cancellation`,
+      text: 'Cancellation',
+      badge: (
+        <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
+          New
+        </Badge>
+      ),
+    });
+  }
+
   const doesFunctionAcceptPayload =
     fn?.current?.triggers.some((trigger) => {
       return trigger.eventName;

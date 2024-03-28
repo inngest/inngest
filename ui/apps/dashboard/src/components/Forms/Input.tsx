@@ -4,6 +4,7 @@ import cn from '@/utils/cn';
 
 type InputProps = {
   defaultValue?: HTMLAttributes<HTMLInputElement>['defaultValue'];
+  disablePasswordManager?: boolean;
   error?: string | undefined;
   name?: string;
   id?: string;
@@ -33,6 +34,17 @@ const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
   const size = props.size === undefined ? 'base' : props.size;
   const placeholder = props.placeholder === undefined ? '' : props.placeholder;
   const className = props.className === undefined ? '' : props.className;
+
+  let pwManagerProps = {};
+  if (props.disablePasswordManager) {
+    // https://www.stefanjudis.com/snippets/turn-off-password-managers
+    pwManagerProps = {
+      'data-1p-ignore': 'true', // 1Password
+      'data-lpignore': 'true', // LastPass
+      'data-bwignore': 'true', // Bitwarden
+    };
+  }
+
   return (
     <div className="flex flex-col gap-1">
       {props.label && (
@@ -41,6 +53,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
         </label>
       )}
       <input
+        {...pwManagerProps}
         ref={ref}
         defaultValue={props.defaultValue}
         required={props.required}
