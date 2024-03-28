@@ -290,6 +290,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	ctx, span := telemetry.NewSpan(
 		ctx,
+		telemetry.WithScope(consts.OtelScopeFunction),
+		telemetry.WithName(req.Function.GetSlug()),
 		telemetry.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, req.AccountID.String()),

@@ -27,15 +27,21 @@ var gen tracesdk.IDGenerator = newSpanIDGenerator()
 
 type SpanOpt func(s *spanOpt)
 
+func WithName(n string) SpanOpt {
+	return func(s *spanOpt) {
+		s.name = n
+	}
+}
+
 func WithSpanAttributes(attr ...attribute.KeyValue) SpanOpt {
 	return func(s *spanOpt) {
 		s.attr = attr
 	}
 }
 
-func WithSpanScope(s string) SpanOpt {
+func WithScope(scope string) SpanOpt {
 	return func(s *spanOpt) {
-		// TODO: implement
+		s.scope = scope
 	}
 }
 
@@ -91,6 +97,8 @@ func newSpanOpt(opts ...SpanOpt) *spanOpt {
 }
 
 type spanOpt struct {
+	scope      string
+	name       string
 	root       bool
 	current    bool
 	links      []tracesdk.Link
@@ -110,6 +118,14 @@ func (so *spanOpt) Links() []tracesdk.Link {
 
 func (so *spanOpt) NewRoot() bool {
 	return so.root
+}
+
+func (so *spanOpt) SpanName() string {
+	return so.name
+}
+
+func (so *spanOpt) SpanScope() string {
+	return so.scope
 }
 
 func (so *spanOpt) SpanKind() trace.SpanKind {
@@ -160,14 +176,15 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
 	}
 
 	s := &Span{
-		parent:     psc,
-		StartedAt:  so.Timestamp(),
-		Attrs:      so.Attributes(),
-		SpanEvents: []tracesdk.Event{},
-		SpanLinks:  so.Links(),
-		SpanStatus: tracesdk.Status{Code: codes.Unset},
-		SpanConf:   sconf,
-		Kind:       so.SpanKind(),
+		parent: psc,
+		name:   so.SpanName(),
+		start:  so.Timestamp(),
+		attrs:  so.Attributes(),
+		events: []tracesdk.Event{},
+		links:  so.Links(),
+		status: tracesdk.Status{Code: codes.Unset},
+		conf:   sconf,
+		kind:   so.SpanKind(),
 	}
 
 	return trace.ContextWithSpan(ctx, s), s
@@ -188,18 +205,19 @@ type Span struct {
 	tracesdk.ReadWriteSpan // embeds both span interfaces
 	sync.Mutex
 
-	StartedAt time.Time `json:"startts"`
-	EndedAt   time.Time `json:"endts"`
+	start time.Time
+	end   time.Time
 
-	SpanName   string                  `json:"name"`
-	Attrs      []attribute.KeyValue    `json:"attrs"`
-	SpanStatus tracesdk.Status         `json:"status"`
-	SpanConf   trace.SpanContextConfig `json:"conf"`
-	SpanEvents []tracesdk.Event        `json:"events"`
-	SpanLinks  []tracesdk.Link         `json:"links"`
-	Kind       trace.SpanKind          `json:"kind"`
+	name   string
+	attrs  []attribute.KeyValue
+	status tracesdk.Status
+	events []tracesdk.Event
+	links  []tracesdk.Link
+	kind   trace.SpanKind
 
-	parent            trace.SpanContext
+	parent trace.SpanContext
+	conf   trace.SpanContextConfig
+
 	childSpanCount    int
 	droppedAttributes int
 }
@@ -209,11 +227,11 @@ type Span struct {
 //
 
 func (s *Span) Name() string {
-	return s.SpanName
+	return s.name
 }
 
 func (s *Span) SpanContext() trace.SpanContext {
-	return trace.NewSpanContext(s.SpanConf)
+	return trace.NewSpanContext(s.conf)
 }
 
 func (s *Span) Parent() trace.SpanContext {
@@ -221,45 +239,48 @@ func (s *Span) Parent() trace.SpanContext {
 }
 
 func (s *Span) SpanKind() trace.SpanKind {
-	return s.Kind
+	return s.kind
 }
 
 func (s *Span) StartTime() time.Time {
-	return s.StartedAt
+	return s.start
 }
 
 func (s *Span) EndTime() time.Time {
-	if s.EndedAt.IsZero() {
+	if s.end.IsZero() {
 		return time.Now()
 	}
-	return s.EndedAt
+	return s.end
 }
 
 func (s *Span) Attributes() []attribute.KeyValue {
-	return []attribute.KeyValue{}
+	return s.attrs
 }
 
 func (s *Span) Links() []tracesdk.Link {
-	return s.SpanLinks
+	return s.links
 }
 
 func (s *Span) Events() []tracesdk.Event {
-	return s.SpanEvents
+	return s.events
 }
 
 func (s *Span) Status() tracesdk.Status {
-	return s.SpanStatus
+	return s.status
 }
 
 func (s *Span) InstrumentationScope() instrumentation.Scope {
+	// TODO: implement
 	return instrumentation.Scope{}
 }
 
 func (s *Span) InstrumentationLibrary() instrumentation.Library {
+	// TODO: implement
 	return instrumentation.Library{}
 }
 
 func (s *Span) Resource() *resource.Resource {
+	// TODO: implement
 	return nil
 }
 
@@ -268,10 +289,12 @@ func (s *Span) DroppedAttributes() int {
 }
 
 func (s *Span) DroppedLinks() int {
+	// TODO: verify
 	return 0
 }
 
 func (s *Span) DroppedEvents() int {
+	// TODO: verify
 	return 0
 }
 
@@ -283,7 +306,7 @@ func (s *Span) ChildSpanCount() int {
 
 // End utilizes the internal tracer's processors to send spans
 func (s *Span) End(opts ...trace.SpanEndOption) {
-	s.EndedAt = time.Now()
+	s.end = time.Now()
 
 	if err := UserTracer().Export(s); err != nil {
 		ctx := context.Background()
@@ -306,7 +329,7 @@ func (s *Span) AddEvent(name string, opts ...trace.EventOption) {
 		evt.Time = config.Timestamp()
 	}
 
-	s.SpanEvents = append(s.SpanEvents, evt)
+	s.events = append(s.events, evt)
 }
 
 func (s *Span) IsRecording() bool {
@@ -326,7 +349,7 @@ func (s *Span) RecordError(err error, opts ...trace.EventOption) {
 func (s *Span) SetStatus(code codes.Code, desc string) {
 	s.Lock()
 	defer s.Unlock()
-	s.SpanStatus = tracesdk.Status{
+	s.status = tracesdk.Status{
 		Code:        code,
 		Description: desc,
 	}
@@ -335,7 +358,7 @@ func (s *Span) SetStatus(code codes.Code, desc string) {
 func (s *Span) SetName(name string) {
 	s.Lock()
 	defer s.Unlock()
-	s.SpanName = name
+	s.name = name
 }
 
 // SetAttributes mimics the official SetAttributes method, but with
@@ -345,16 +368,16 @@ func (s *Span) SetAttributes(attrs ...attribute.KeyValue) {
 	s.Lock()
 	defer s.Unlock()
 
-	if s.Attrs == nil {
-		s.Attrs = []attribute.KeyValue{}
+	if s.attrs == nil {
+		s.attrs = []attribute.KeyValue{}
 	}
 
 	// dedup if the sum of existing and new attr could exceed limit
-	if len(s.Attrs)+len(attrs) > attrCountLimit {
+	if len(s.attrs)+len(attrs) > attrCountLimit {
 		// dedup the existing list of attributes and take the latest one
 		exists := make(map[attribute.Key]int)
 		dedup := []attribute.KeyValue{}
-		for _, a := range s.Attrs {
+		for _, a := range s.attrs {
 			if idx, ok := exists[a.Key]; ok {
 				dedup[idx] = a
 			} else {
@@ -372,18 +395,18 @@ func (s *Span) SetAttributes(attrs ...attribute.KeyValue) {
 
 			// if a key is already there, take the latest one
 			if idx, ok := exists[a.Key]; ok {
-				s.Attrs[idx] = a
+				s.attrs[idx] = a
 				continue
 			}
 
 			// don't bother appending if it's at limits
-			if len(s.Attrs) >= attrCountLimit {
+			if len(s.attrs) >= attrCountLimit {
 				s.droppedAttributes++
 				continue
 			}
 
-			s.Attrs = append(s.Attrs, a)
-			exists[a.Key] = len(s.Attrs) - 1
+			s.attrs = append(s.attrs, a)
+			exists[a.Key] = len(s.attrs) - 1
 		}
 	}
 
@@ -393,7 +416,7 @@ func (s *Span) SetAttributes(attrs ...attribute.KeyValue) {
 			s.droppedAttributes++
 			continue
 		}
-		s.Attrs = append(s.Attrs, a)
+		s.attrs = append(s.attrs, a)
 	}
 }
 
