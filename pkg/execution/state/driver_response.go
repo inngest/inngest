@@ -436,16 +436,23 @@ func (r *DriverResponse) HistoryVisibleStep() *GeneratorOpcode {
 // may still be considered to be a function response, in which case it likely
 // also needs to be tracked.
 func (r *DriverResponse) TraceVisibleStepExecution() *GeneratorOpcode {
+	// If the response is not a generator, we received a response that was not
+	// concerning a step.
 	if r.Generator == nil {
 		return nil
 	}
 
+	// If a response contains more than 1 operation, parallelism is enabled and
+	// we are reporting multiple steps at once. We do not want to report this.
 	if len(r.Generator) != 1 {
 		return nil
 	}
 
 	op := r.Generator[0]
 
+	// The planned step opcode is only used when we are in parallel; it's
+	// possible for a single step to be planned during parallelism, so we
+	// capture that here.
 	if op.Op == enums.OpcodeStepPlanned {
 		return nil
 	}
