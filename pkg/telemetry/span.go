@@ -23,13 +23,25 @@ const (
 )
 
 // type assertion
-var _ tracesdk.IDGenerator = &spanCtx{}
+var gen tracesdk.IDGenerator = newSpanIDGenerator()
 
 type SpanOpt func(s *spanOpt)
 
 func WithSpanAttributes(attr ...attribute.KeyValue) SpanOpt {
 	return func(s *spanOpt) {
 		s.attr = attr
+	}
+}
+
+func WithSpanScope(s string) SpanOpt {
+	return func(s *spanOpt) {
+		// TODO: implement
+	}
+}
+
+func WithServiceName(s string) SpanOpt {
+	return func(s *spanOpt) {
+		// TODO: implement
 	}
 }
 
@@ -57,9 +69,9 @@ func WithTimestamp(ts time.Time) SpanOpt {
 	}
 }
 
-func WithSpanID(sid *trace.SpanID) SpanOpt {
+func AsCurrentSpan() SpanOpt {
 	return func(s *spanOpt) {
-		s.spanID = sid
+		s.current = true
 	}
 }
 
@@ -80,24 +92,24 @@ func newSpanOpt(opts ...SpanOpt) *spanOpt {
 
 type spanOpt struct {
 	root       bool
+	current    bool
 	links      []tracesdk.Link
 	attr       []attribute.KeyValue
 	kind       trace.SpanKind
 	stacktrace bool
 	ts         time.Time
-	spanID     *trace.SpanID
 }
 
 func (so *spanOpt) Attributes() []attribute.KeyValue {
 	return so.attr
 }
 
-func (so *spanOpt) NewRoot() bool {
-	return so.root
+func (so *spanOpt) Links() []tracesdk.Link {
+	return so.links
 }
 
-func (so *spanOpt) SpanID() *trace.SpanID {
-	return so.spanID
+func (so *spanOpt) NewRoot() bool {
+	return so.root
 }
 
 func (so *spanOpt) SpanKind() trace.SpanKind {
@@ -112,42 +124,51 @@ func (so *spanOpt) Timestamp() time.Time {
 	return so.ts
 }
 
+func (so *spanOpt) IsCurrentSpan() bool {
+	return so.current
+}
+
 // NewSpan creates a new span from the provided context, and overrides the internals with
 // additional options provided.
 func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
-	// conf := newSpanOpt(opts...)
+	so := newSpanOpt(opts...)
 
-	// var psc trace.SpanContext
-
-	// Steps
-	// - [ ] extract span context from passed in context
-	// - [ ] check if it's valid
-	// - [ ] if so
-	// 	 + [ ] check if this should be a root span
-	// 	 + [ ] if so
-	// 	 	 > [ ] do not store current spanID as parent
-	// 	 + [ ] extract traceID and set it in config
-	// 	 + [ ] extract spanID and set it as parent
-	// 	 + [ ] generate new spanID and set it to config
-	// - [ ] if not
-	//   + [ ] create a new span context config
-	//   + [ ] generate a new traceID and spanID
-
-	// TODO: construct a trace correctly from passed in context
-	// sctx := trace.SpanContextFromContext(ctx)
-
-	s := &Span{
-		StartedAt:  time.Now(),
-		Attrs:      []attribute.KeyValue{},
-		SpanEvents: []tracesdk.Event{},
-		SpanLinks:  []tracesdk.Link{},
-		SpanStatus: tracesdk.Status{Code: codes.Unset},
-		Kind:       trace.SpanKindUnspecified,
+	var psc trace.SpanContext
+	if so.NewRoot() {
+		ctx = trace.ContextWithSpanContext(ctx, psc)
+	} else {
+		psc = trace.SpanContextFromContext(ctx)
 	}
 
-	// for _, opt := range opts {
-	// 	opt(s)
-	// }
+	// prepare the IDs
+	tid := psc.TraceID()
+	var sid trace.SpanID
+	if !psc.TraceID().IsValid() {
+		tid, sid = gen.NewIDs(ctx)
+	} else {
+		sid = gen.NewSpanID(ctx, tid)
+	}
+	// TODO: reconstruct psc as
+	if so.IsCurrentSpan() {
+	}
+
+	sconf := trace.SpanContextConfig{
+		TraceID:    tid,
+		SpanID:     sid,
+		TraceState: psc.TraceState(),
+		TraceFlags: psc.TraceFlags(),
+	}
+
+	s := &Span{
+		parent:     psc,
+		StartedAt:  so.Timestamp(),
+		Attrs:      so.Attributes(),
+		SpanEvents: []tracesdk.Event{},
+		SpanLinks:  so.Links(),
+		SpanStatus: tracesdk.Status{Code: codes.Unset},
+		SpanConf:   sconf,
+		Kind:       so.SpanKind(),
+	}
 
 	return trace.ContextWithSpan(ctx, s), s
 }
@@ -167,23 +188,18 @@ type Span struct {
 	tracesdk.ReadWriteSpan // embeds both span interfaces
 	sync.Mutex
 
-	SpanName     string          `json:"name"`
-	ParentSpanID *trace.SpanID   `json:"parentSpanID,omitempty"`
-	Kind         trace.SpanKind  `json:"kind"`
-	StartedAt    time.Time       `json:"startts"`
-	EndedAt      time.Time       `json:"endts"`
-	SpanStatus   tracesdk.Status `json:"status"`
+	StartedAt time.Time `json:"startts"`
+	EndedAt   time.Time `json:"endts"`
 
-	ServiceName  string `json:"serviceName"`
-	ScopeName    string `json:"scopeName"`
-	ScopeVersion string `json:"scopeVersion"`
-
-	Attrs []attribute.KeyValue `json:"attrs"`
-
+	SpanName   string                  `json:"name"`
+	Attrs      []attribute.KeyValue    `json:"attrs"`
+	SpanStatus tracesdk.Status         `json:"status"`
 	SpanConf   trace.SpanContextConfig `json:"conf"`
 	SpanEvents []tracesdk.Event        `json:"events"`
 	SpanLinks  []tracesdk.Link         `json:"links"`
+	Kind       trace.SpanKind          `json:"kind"`
 
+	parent            trace.SpanContext
 	childSpanCount    int
 	droppedAttributes int
 }
@@ -201,18 +217,7 @@ func (s *Span) SpanContext() trace.SpanContext {
 }
 
 func (s *Span) Parent() trace.SpanContext {
-	conf := trace.SpanContextConfig{
-		TraceID:    s.SpanConf.TraceID,
-		SpanID:     trace.SpanID{},
-		TraceFlags: s.SpanConf.TraceFlags,
-		TraceState: s.SpanConf.TraceState,
-		Remote:     s.SpanConf.Remote,
-	}
-	if s.ParentSpanID != nil {
-		conf.SpanID = *s.ParentSpanID
-	}
-
-	return trace.NewSpanContext(conf)
+	return s.parent
 }
 
 func (s *Span) SpanKind() trace.SpanKind {
@@ -396,26 +401,22 @@ func (s *Span) TracerProvider() trace.TracerProvider {
 	return UserTracer().Provider()
 }
 
-func NewSpanCtx() *spanCtx {
+func newSpanIDGenerator() *spanIDGenerator {
 	var seed int64
 	_ = binary.Read(crand.Reader, binary.LittleEndian, &seed)
 
-	return &spanCtx{
+	return &spanIDGenerator{
 		randSrc: rand.New(rand.NewSource(seed)),
 	}
 }
 
-// spanCtx provides a way to generate TraceID and SpanID,
-// and also a new SpanContext from those values
-type spanCtx struct {
-	tID *trace.TraceID
-	sID *trace.SpanID
-
+// spanIDGenerator provides a way to generate TraceID and SpanID
+type spanIDGenerator struct {
 	sync.Mutex
 	randSrc *rand.Rand
 }
 
-func (sc *spanCtx) NewSpanID(ctx context.Context, traceID trace.TraceID) trace.SpanID {
+func (sc *spanIDGenerator) NewSpanID(ctx context.Context, traceID trace.TraceID) trace.SpanID {
 	sc.Lock()
 	defer sc.Unlock()
 
@@ -424,7 +425,7 @@ func (sc *spanCtx) NewSpanID(ctx context.Context, traceID trace.TraceID) trace.S
 	return sid
 }
 
-func (sc *spanCtx) NewIDs(ctx context.Context) (trace.TraceID, trace.SpanID) {
+func (sc *spanIDGenerator) NewIDs(ctx context.Context) (trace.TraceID, trace.SpanID) {
 	sc.Lock()
 	defer sc.Unlock()
 	var (
@@ -435,8 +436,4 @@ func (sc *spanCtx) NewIDs(ctx context.Context) (trace.TraceID, trace.SpanID) {
 	_, _ = sc.randSrc.Read(tid[:])
 	_, _ = sc.randSrc.Read(sid[:])
 	return tid, sid
-}
-
-func (sc *spanCtx) Context() trace.SpanContext {
-	return trace.SpanContext{}
 }
