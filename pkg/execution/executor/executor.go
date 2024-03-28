@@ -699,7 +699,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				))
 			}
 		} else if resp.IsTraceVisibleFunctionExecution() {
-			spanName := "function returned"
+			spanName := "function success"
+			if resp.StatusCode != 200 {
+				spanName = "function error"
+				span.SetStatus(codes.Error, resp.Error())
+			}
+
 			span.SetName(spanName)
 
 			span.SetAttributes(

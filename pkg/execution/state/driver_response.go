@@ -456,7 +456,7 @@ func (r *DriverResponse) TraceVisibleStepExecution() *GeneratorOpcode {
 // TraceVisibleFunctionExecution returns whether this response is a non-step
 // response and should be visible in a trace.
 func (r *DriverResponse) IsTraceVisibleFunctionExecution() bool {
-	return r.StatusCode == 200
+	return r.StatusCode != 206
 }
 
 type StandardError struct {
