@@ -8,7 +8,7 @@ import { useDebounce } from 'react-use';
 import Input from '@/components/Forms/Input';
 
 type Props = {
-  onChange: (newDateTime: Date) => void;
+  onChange: (newDateTime: Date | undefined) => void;
   placeholder?: string;
   required?: boolean;
 };
@@ -27,7 +27,7 @@ type State =
   | {
       inputString: string;
       suggestedDateTime: Date | undefined;
-      status: 'suggestion_applied';
+      status: 'suggestion_applied' | 'pasted_date_applied';
     };
 
 type Action =
@@ -44,6 +44,11 @@ type Action =
   | {
       type: 'typed';
       value: string;
+    }
+  | {
+      type: 'pasted_date';
+      pastedText: string;
+      pastedDate: Date;
     }
   | {
       type: 'stopped_typing';
@@ -76,6 +81,12 @@ function reducer(state: State, action: Action): State {
         inputString: action.value,
         suggestedDateTime: undefined,
         status: 'typing',
+      };
+    case 'pasted_date':
+      return {
+        ...state,
+        inputString: action.pastedText,
+        status: 'pasted_date_applied',
       };
     case 'stopped_typing':
       // Chrono's types are wrong - parseData can return undefined
@@ -116,8 +127,9 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
       // Debounce gets called when a suggestion is applied, which doesn't mean the user stopped
       // typing, so we need to check if the suggestion was applied before we dispatch the
       // stopped_typing action.
-      if (state.status === 'suggestion_applied') return;
+      if (state.status === 'suggestion_applied' || state.status === 'pasted_date_applied') return;
       dispatch({ type: 'stopped_typing' });
+      onChange(state.suggestedDateTime);
     },
     350,
     [state.inputString]
@@ -143,7 +155,23 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
   }
 
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+    // Check if this is a paste event. If so, we don't want to dispatch the typed action.
+    if ((event.nativeEvent as InputEvent).inputType === 'insertFromPaste') return;
     dispatch({ type: 'typed', value: event.target.value });
+  }
+
+  function handleInputPaste(event: React.ClipboardEvent<HTMLInputElement>) {
+    const pastedText = event.clipboardData.getData('text');
+    const pastedDate = chrono.parseDate(pastedText);
+    // Chrono's types are wrong - parseData can return null.
+    // See https://github.com/wanasit/chrono/pull/544
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (!pastedDate) {
+      dispatch({ type: 'typed', value: pastedText });
+      return;
+    }
+    dispatch({ type: 'pasted_date', pastedDate, pastedText });
+    onChange(pastedDate);
   }
 
   function handleInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -162,13 +190,20 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
   }
 
   return (
-    <Popover.Root open={state.status === 'focused' || state.status === 'suggestion_available'}>
+    <Popover.Root
+      open={
+        state.status === 'focused' ||
+        state.status === 'typing' ||
+        state.status === 'suggestion_available'
+      }
+    >
       <Popover.Anchor>
         <Input
           type="text"
           value={state.inputString}
           placeholder={placeholder}
           onChange={handleInputChange}
+          onPaste={handleInputPaste}
           onKeyDown={handleInputKeyDown}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
@@ -207,20 +242,24 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
               </div>
             </Popover.Content>
           )}
-          {state.status === 'suggestion_available' && (
+          {(state.status === 'typing' || state.status === 'suggestion_available') && (
             <Popover.Content
-              className="shadow-floating z-[100] inline-flex cursor-pointer items-center gap-2 rounded-md bg-white/95 p-2 text-sm text-slate-800 ring-1 ring-black/5 backdrop-blur-[3px]"
+              className="shadow-floating z-[100] inline-flex w-[--radix-popover-trigger-width] cursor-pointer items-center gap-2 rounded-md bg-white/95 p-2 text-sm text-slate-800 ring-1 ring-black/5 backdrop-blur-[3px]"
               sideOffset={5}
               onOpenAutoFocus={(event) => event.preventDefault()}
               onClick={handleSuggestionClick}
             >
-              {state.suggestedDateTime.toLocaleString()}
-              <kbd
-                className="ml-auto flex h-6 w-6 items-center justify-center rounded bg-slate-100 p-2 font-sans text-xs"
-                aria-label="Press Enter to apply the parsed date and time."
-              >
-                ↵
-              </kbd>
+              {state.status === 'suggestion_available'
+                ? state.suggestedDateTime.toLocaleString()
+                : '...'}
+              {state.status === 'suggestion_available' && (
+                <kbd
+                  className="ml-auto flex h-6 w-6 items-center justify-center rounded bg-slate-100 p-2 font-sans text-xs"
+                  aria-label="Press Enter to apply the parsed date and time."
+                >
+                  ↵
+                </kbd>
+              )}
             </Popover.Content>
           )}
         </>

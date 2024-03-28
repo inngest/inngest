@@ -20,6 +20,7 @@ type InputProps = {
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
   onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  onPaste?: (e: React.ClipboardEvent<HTMLInputElement>) => void;
   readonly?: boolean;
 };
 
@@ -62,6 +63,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
         onKeyDown={props.onKeyDown}
         onFocus={props.onFocus}
         onBlur={props.onBlur}
+        onPaste={props.onPaste}
         readOnly={props.readonly}
       />
 

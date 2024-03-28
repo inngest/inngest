@@ -11,7 +11,7 @@ type TimeRange = {
 };
 
 type Props = {
-  onChange: (timeRange: TimeRange) => void;
+  onChange: (timeRange: TimeRange | undefined) => void;
 };
 
 export function TimeRangeInput({ onChange }: Props) {
@@ -20,32 +20,36 @@ export function TimeRangeInput({ onChange }: Props) {
   const [endDateTime, setEndDateTime] = useState<Date>();
   const [endDateTimeError, setEndDateTimeError] = useState<string | undefined>();
 
-  function onStartDateTimeChange(newStartDateTime: Date) {
+  function onStartDateTimeChange(newStartDateTime: Date | undefined) {
     setStartDateTime(newStartDateTime);
     setStartDateTimeError(undefined);
     setEndDateTimeError(undefined);
-    if (endDateTime && newStartDateTime > endDateTime) {
+    if (newStartDateTime && endDateTime && newStartDateTime > endDateTime) {
       setStartDateTimeError('Start time must be before end time');
       return;
     }
 
-    if (endDateTime) {
+    if (endDateTime && newStartDateTime) {
       onChange({ start: newStartDateTime, end: endDateTime });
+      return;
     }
+    onChange(undefined);
   }
 
-  function onEndDateTimeChange(newEndDateTime: Date) {
+  function onEndDateTimeChange(newEndDateTime: Date | undefined) {
     setEndDateTime(newEndDateTime);
     setStartDateTimeError(undefined);
     setEndDateTimeError(undefined);
-    if (startDateTime && newEndDateTime < startDateTime) {
+    if (startDateTime && newEndDateTime && newEndDateTime < startDateTime) {
       setEndDateTimeError('End time must be after start time');
       return;
     }
 
-    if (startDateTime) {
+    if (startDateTime && newEndDateTime) {
       onChange({ start: startDateTime, end: newEndDateTime });
+      return;
     }
+    onChange(undefined);
   }
 
   return (
