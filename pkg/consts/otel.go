@@ -28,6 +28,9 @@ const (
 	OtelSysStepOutput          = "sys.step.output"
 	OtelSysStepOutputSizeBytes = "sys.step.output.size.bytes"
 
+	// flow attributes
+	OtelSysIgnored = "sys.ignored"
+
 	// SDK attributes
 	OtelAttrSDKServiceName = "sdk.app.id"
 	OtelAttrSDKRunID       = "sdk.run.id"
@@ -40,6 +43,7 @@ const (
 	OtelScopeApp            = "app.env.inngest"
 	OtelScopeFunction       = "function.app.env.inngest"
 	OtelScopeStep           = "step.function.app.env.inngest"
+	OtelScopeExecution      = "execution.step.function.app.env.inngest"
 
 	// otel collector filter keys
 	OtelUserTraceFilterKey = "inngest.user"

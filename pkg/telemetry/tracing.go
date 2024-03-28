@@ -93,7 +93,7 @@ func newJaegerTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 		return nil, fmt.Errorf("error setting up Jaeger exporter: %w", err)
 	}
 	tp := trace.NewTracerProvider(
-		trace.WithBatcher(exp),
+		trace.WithSpanProcessor(NewSpanProcessor(exp)),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
@@ -119,7 +119,7 @@ func newIOTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 		return nil, fmt.Errorf("error settings up stdout trace exporter: %w", err)
 	}
 	tp := trace.NewTracerProvider(
-		trace.WithBatcher(exp),
+		trace.WithSpanProcessor(NewSpanProcessor(exp)),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
@@ -186,7 +186,7 @@ func newOLTPTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	}
 
 	tp := trace.NewTracerProvider(
-		trace.WithBatcher(exp),
+		trace.WithSpanProcessor(NewSpanProcessor(exp)),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
