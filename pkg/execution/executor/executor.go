@@ -288,10 +288,15 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, ErrFunctionDebounced
 	}
 
-	ctx, span := telemetry.NewSpan(
-		ctx,
+	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
+	// When running a cancellation, functions are cancelled at scheduling time based off of
+	// this run ID.
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	ctx, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeFunction),
 		telemetry.WithName(req.Function.GetSlug()),
+		telemetry.WithTimestamp(ulid.Time(runID.Time())), // use the runID ts to ensure consistency
 		telemetry.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
@@ -302,24 +307,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
 		),
 	)
-
-	// ctx, span := telemetry.UserTracer().Provider().
-	// 	Tracer(consts.OtelScopeFunction).
-	// 	Start(ctx, req.Function.GetSlug(), trace.WithAttributes(
-	// 		attribute.Bool(consts.OtelUserTraceFilterKey, true),
-	// 		attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
-	// 		attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
-	// 		attribute.String(consts.OtelSysAppID, req.AppID.String()),
-	// 		attribute.String(consts.OtelSysFunctionID, req.Function.ID.String()),
-	// 		attribute.String(consts.OtelSysFunctionSlug, req.Function.GetSlug()),
-	// 		attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
-	// 	))
 	defer span.End()
 
-	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
-	// When running a cancellation, functions are cancelled at scheduling time based off of
-	// this run ID.
-	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	var key string
 	if req.IdempotencyKey != nil {
 		// Use the given idempotency key
@@ -425,7 +414,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 	carrier := telemetry.NewTraceCarrier()
 	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	carrier.AddParentSpanID(span.Parent())
 	stateMetadata[consts.OtelPropagationKey] = carrier
+
+	fmt.Printf("Context\n  %#v\n\n", carrier.Context)
 
 	// Create a new function.
 	s, err := e.sm.New(ctx, state.Input{
@@ -570,9 +562,42 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// context. This can be used to reduce reads in the future.
 	ctx = e.extractTraceCtx(WithContextMetadata(ctx, md), id, &item)
 
-	ctx, span := telemetry.UserTracer().Provider().
-		Tracer(consts.OtelScopeExecution).
-		Start(ctx, "running", trace.WithAttributes(
+	var fnSpan *telemetry.Span
+	// Propagate trace context
+	if md.Context != nil {
+		if trace, ok := md.Context[consts.OtelPropagationKey]; ok {
+			carrier := telemetry.NewTraceCarrier()
+			if err := carrier.Unmarshal(trace); err == nil {
+				ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+
+				fmt.Printf("Propagated:\n  %#v\n\n", carrier.Context)
+
+				if sid, err := carrier.ParentSpanID(); err == nil {
+					ctx, fnSpan = telemetry.NewSpan(ctx,
+						telemetry.WithScope(consts.OtelScopeFunction),
+						telemetry.WithName(s.Function().GetSlug()),
+						telemetry.WithTimestamp(ulid.Time(id.RunID.Time())),
+						telemetry.WithParentSpanID(*sid),
+						telemetry.WithSpanAttributes(
+							attribute.Bool(consts.OtelUserTraceFilterKey, true),
+							attribute.String(consts.OtelSysAccountID, id.AccountID.String()),
+							attribute.String(consts.OtelSysWorkspaceID, id.WorkspaceID.String()),
+							attribute.String(consts.OtelSysAppID, id.AppID.String()),
+							attribute.String(consts.OtelSysFunctionID, id.WorkflowID.String()),
+							attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
+							attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
+							// TODO: add eventIDs, idempotencykey, batchID to match
+						),
+					)
+				}
+			}
+		}
+	}
+
+	ctx, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeStep),
+		telemetry.WithName("running"),
+		telemetry.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, id.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, id.WorkspaceID.String()),
@@ -580,8 +605,16 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.String(consts.OtelSysFunctionID, id.WorkflowID.String()),
 			attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
 			attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
-		))
-	defer span.End()
+		),
+	)
+	defer func() {
+		if fnSpan != nil {
+			fnSpan.End()
+		}
+		span.End()
+	}()
+	// send early here to help show the span has started and is in-progress
+	span.Send()
 
 	if md.Status == enums.RunStatusCancelled {
 		return nil, state.ErrFunctionCancelled

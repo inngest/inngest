@@ -75,9 +75,9 @@ func WithTimestamp(ts time.Time) SpanOpt {
 	}
 }
 
-func AsCurrentSpan() SpanOpt {
+func WithParentSpanID(psid trace.SpanID) SpanOpt {
 	return func(s *spanOpt) {
-		s.current = true
+		s.psid = &psid
 	}
 }
 
@@ -100,12 +100,13 @@ type spanOpt struct {
 	scope      string
 	name       string
 	root       bool
-	current    bool
 	links      []tracesdk.Link
 	attr       []attribute.KeyValue
 	kind       trace.SpanKind
 	stacktrace bool
 	ts         time.Time
+	// Parent SpanID
+	psid *trace.SpanID
 }
 
 func (so *spanOpt) Attributes() []attribute.KeyValue {
@@ -140,8 +141,12 @@ func (so *spanOpt) Timestamp() time.Time {
 	return so.ts
 }
 
-func (so *spanOpt) IsCurrentSpan() bool {
-	return so.current
+func (so *spanOpt) PreserveSpan() bool {
+	return so.psid != nil
+}
+
+func (so *spanOpt) ParentSpanID() *trace.SpanID {
+	return so.psid
 }
 
 // NewSpan creates a new span from the provided context, and overrides the internals with
@@ -164,8 +169,11 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
 	} else {
 		sid = gen.NewSpanID(ctx, tid)
 	}
-	// TODO: reconstruct psc as
-	if so.IsCurrentSpan() {
+	// TODO: how to get grantparent span to override psc's spanID?
+	if so.PreserveSpan() {
+		sid = psc.SpanID()
+		pid := so.ParentSpanID()
+		psc = psc.WithSpanID(*pid)
 	}
 
 	sconf := trace.SpanContextConfig{
@@ -220,6 +228,11 @@ type Span struct {
 
 	childSpanCount    int
 	droppedAttributes int
+}
+
+// Send is just an alias for End
+func (s *Span) Send() {
+	s.End()
 }
 
 //
