@@ -2,6 +2,8 @@ package telemetry
 
 import (
 	"context"
+	crand "crypto/rand"
+	"encoding/binary"
 	"math/rand"
 	"sync"
 	"time"
@@ -23,35 +25,129 @@ const (
 // type assertion
 var _ tracesdk.IDGenerator = &spanCtx{}
 
-type SpanOpt func(s *Span)
+type SpanOpt func(s *spanOpt)
 
 func WithSpanAttributes(attr ...attribute.KeyValue) SpanOpt {
-	return func(s *Span) {
-		s.SetAttributes(attr...)
+	return func(s *spanOpt) {
+		s.attr = attr
 	}
 }
 
-// NewSpan creates a new span from the provided context, and overrides the internals with
-// additional options provided.
-func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
-	if ctx == nil {
-		ctx = context.Background()
+func WithNewRoot() SpanOpt {
+	return func(s *spanOpt) {
+		s.root = true
 	}
+}
 
-	// TODO: construct a trace correctly from passed in context
-	spanCtx := trace.SpanContextFromContext(ctx)
+func WithSpanKind(k trace.SpanKind) SpanOpt {
+	return func(s *spanOpt) {
+		s.kind = k
+	}
+}
 
-	s := &Span{
-		TraceID:    spanCtx.TraceID(),
-		StartedAt:  time.Now(),
-		Attrs:      []attribute.KeyValue{},
-		SpanEvents: []tracesdk.Event{},
-		SpanLinks:  []tracesdk.Link{},
+func WithLinks(l []tracesdk.Link) SpanOpt {
+	return func(s *spanOpt) {
+		s.links = l
+	}
+}
+
+func WithTimestamp(ts time.Time) SpanOpt {
+	return func(s *spanOpt) {
+		s.ts = ts
+	}
+}
+
+func WithSpanID(sid *trace.SpanID) SpanOpt {
+	return func(s *spanOpt) {
+		s.spanID = sid
+	}
+}
+
+func newSpanOpt(opts ...SpanOpt) *spanOpt {
+	s := &spanOpt{
+		kind:  trace.SpanKindUnspecified,
+		ts:    time.Now(),
+		links: []tracesdk.Link{},
+		attr:  []attribute.KeyValue{},
 	}
 
 	for _, opt := range opts {
 		opt(s)
 	}
+
+	return s
+}
+
+type spanOpt struct {
+	root       bool
+	links      []tracesdk.Link
+	attr       []attribute.KeyValue
+	kind       trace.SpanKind
+	stacktrace bool
+	ts         time.Time
+	spanID     *trace.SpanID
+}
+
+func (so *spanOpt) Attributes() []attribute.KeyValue {
+	return so.attr
+}
+
+func (so *spanOpt) NewRoot() bool {
+	return so.root
+}
+
+func (so *spanOpt) SpanID() *trace.SpanID {
+	return so.spanID
+}
+
+func (so *spanOpt) SpanKind() trace.SpanKind {
+	return so.kind
+}
+
+func (so *spanOpt) StackTrace() bool {
+	return so.stacktrace
+}
+
+func (so *spanOpt) Timestamp() time.Time {
+	return so.ts
+}
+
+// NewSpan creates a new span from the provided context, and overrides the internals with
+// additional options provided.
+func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
+	// conf := newSpanOpt(opts...)
+
+	// var psc trace.SpanContext
+
+	// Steps
+	// - [ ] extract span context from passed in context
+	// - [ ] check if it's valid
+	// - [ ] if so
+	// 	 + [ ] check if this should be a root span
+	// 	 + [ ] if so
+	// 	 	 > [ ] do not store current spanID as parent
+	// 	 + [ ] extract traceID and set it in config
+	// 	 + [ ] extract spanID and set it as parent
+	// 	 + [ ] generate new spanID and set it to config
+	// - [ ] if not
+	//   + [ ] create a new span context config
+	//   + [ ] generate a new traceID and spanID
+
+	// TODO: construct a trace correctly from passed in context
+	// sctx := trace.SpanContextFromContext(ctx)
+
+	s := &Span{
+		StartedAt:  time.Now(),
+		Attrs:      []attribute.KeyValue{},
+		SpanEvents: []tracesdk.Event{},
+		SpanLinks:  []tracesdk.Link{},
+		SpanStatus: tracesdk.Status{Code: codes.Unset},
+		Kind:       trace.SpanKindUnspecified,
+	}
+
+	// for _, opt := range opts {
+	// 	opt(s)
+	// }
 
 	return trace.ContextWithSpan(ctx, s), s
 }
@@ -71,12 +167,8 @@ type Span struct {
 	tracesdk.ReadWriteSpan // embeds both span interfaces
 	sync.Mutex
 
-	TraceID      trace.TraceID   `json:"traceID"`
-	SpanID       string          `json:"spanID"`
-	TraceState   string          `json:"traceState"`
-	ParentSpanID *string         `json:"parentSpanID,omitempty"`
-	Flags        [4]byte         `json:"flags"`
 	SpanName     string          `json:"name"`
+	ParentSpanID *trace.SpanID   `json:"parentSpanID,omitempty"`
 	Kind         trace.SpanKind  `json:"kind"`
 	StartedAt    time.Time       `json:"startts"`
 	EndedAt      time.Time       `json:"endts"`
@@ -88,10 +180,10 @@ type Span struct {
 
 	Attrs []attribute.KeyValue `json:"attrs"`
 
-	SpanEvents []tracesdk.Event `json:"events"`
-	SpanLinks  []tracesdk.Link  `json:"links"`
+	SpanConf   trace.SpanContextConfig `json:"conf"`
+	SpanEvents []tracesdk.Event        `json:"events"`
+	SpanLinks  []tracesdk.Link         `json:"links"`
 
-	spanCtx           *spanCtx
 	childSpanCount    int
 	droppedAttributes int
 }
@@ -105,11 +197,22 @@ func (s *Span) Name() string {
 }
 
 func (s *Span) SpanContext() trace.SpanContext {
-	return s.spanCtx.Context()
+	return trace.NewSpanContext(s.SpanConf)
 }
 
 func (s *Span) Parent() trace.SpanContext {
-	return trace.SpanContext{}
+	conf := trace.SpanContextConfig{
+		TraceID:    s.SpanConf.TraceID,
+		SpanID:     trace.SpanID{},
+		TraceFlags: s.SpanConf.TraceFlags,
+		TraceState: s.SpanConf.TraceState,
+		Remote:     s.SpanConf.Remote,
+	}
+	if s.ParentSpanID != nil {
+		conf.SpanID = *s.ParentSpanID
+	}
+
+	return trace.NewSpanContext(conf)
 }
 
 func (s *Span) SpanKind() trace.SpanKind {
@@ -293,9 +396,21 @@ func (s *Span) TracerProvider() trace.TracerProvider {
 	return UserTracer().Provider()
 }
 
+func NewSpanCtx() *spanCtx {
+	var seed int64
+	_ = binary.Read(crand.Reader, binary.LittleEndian, &seed)
+
+	return &spanCtx{
+		randSrc: rand.New(rand.NewSource(seed)),
+	}
+}
+
 // spanCtx provides a way to generate TraceID and SpanID,
 // and also a new SpanContext from those values
 type spanCtx struct {
+	tID *trace.TraceID
+	sID *trace.SpanID
+
 	sync.Mutex
 	randSrc *rand.Rand
 }
