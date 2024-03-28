@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -167,6 +168,33 @@ type Metadata struct {
 	// DisableImmediateExecution is used to tell the SDK whether it should
 	// disallow immediate execution of steps as they are found.
 	DisableImmediateExecution bool `json:"disableImmediateExecution,omitempty"`
+
+	// SpanID is the spanID used for this function run.
+	SpanID string `json:"sid"`
+	// QueuedAt shows the time the function was queued
+	QueuedAt int64 `json:"queuedAt"`
+	// StartedAt shows the time the function started execution
+	StartedAt int64 `json:"startedAt,omitempty"`
+}
+
+func (md *Metadata) GetSpanID() (*trace.SpanID, error) {
+	if md.SpanID != "" {
+		sid, err := trace.SpanIDFromHex(md.SpanID)
+		return &sid, err
+	}
+
+	return nil, fmt.Errorf("invalid otel spanID")
+}
+
+func (md *Metadata) GetQueueTime() time.Time {
+	return time.UnixMilli(md.QueuedAt)
+}
+
+func (md *Metadata) GetStartTime() *time.Time {
+	if md.StartedAt.IsZero() {
+		return nil
+	}
+	return &md.StartedAt
 }
 
 type MetadataUpdate struct {
@@ -174,6 +202,7 @@ type MetadataUpdate struct {
 	Context                   map[string]any `json:"ctx,omitempty"`
 	DisableImmediateExecution bool           `json:"disableImmediateExecution,omitempty"`
 	RequestVersion            int            `json:"rv"`
+	SpanID                    string         `json:"sid"`
 	StartedAt                 time.Time      `json:"sat"`
 }
 
@@ -344,4 +373,7 @@ type Input struct {
 
 	// Context is additional context for the run stored in metadata.
 	Context map[string]any
+
+	// SpanID is the id used for the new function run
+	SpanID string
 }

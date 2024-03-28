@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -45,9 +46,9 @@ func WithScope(scope string) SpanOpt {
 	}
 }
 
-func WithServiceName(s string) SpanOpt {
+func WithServiceName(name string) SpanOpt {
 	return func(s *spanOpt) {
-		// TODO: implement
+		s.serviceName = name
 	}
 }
 
@@ -81,6 +82,18 @@ func WithParentSpanID(psid trace.SpanID) SpanOpt {
 	}
 }
 
+func WithSpanID(sid trace.SpanID) SpanOpt {
+	return func(s *spanOpt) {
+		s.sid = &sid
+	}
+}
+
+func WithDedup() SpanOpt {
+	return func(s *spanOpt) {
+		s.dedup = true
+	}
+}
+
 func newSpanOpt(opts ...SpanOpt) *spanOpt {
 	s := &spanOpt{
 		kind:  trace.SpanKindUnspecified,
@@ -97,16 +110,21 @@ func newSpanOpt(opts ...SpanOpt) *spanOpt {
 }
 
 type spanOpt struct {
-	scope      string
-	name       string
-	root       bool
-	links      []tracesdk.Link
-	attr       []attribute.KeyValue
-	kind       trace.SpanKind
-	stacktrace bool
-	ts         time.Time
-	// Parent SpanID
+	scope       string
+	serviceName string
+	name        string
+	root        bool
+	links       []tracesdk.Link
+	attr        []attribute.KeyValue
+	kind        trace.SpanKind
+	stacktrace  bool
+	ts          time.Time
+	// Parent SpanID that needs to be overwritten
 	psid *trace.SpanID
+	// SpanID that needs to be overwritten
+	sid *trace.SpanID
+	// option to be used to mark the span is duplicated or not
+	dedup bool
 }
 
 func (so *spanOpt) Attributes() []attribute.KeyValue {
@@ -141,12 +159,40 @@ func (so *spanOpt) Timestamp() time.Time {
 	return so.ts
 }
 
-func (so *spanOpt) PreserveSpan() bool {
+func (so *spanOpt) OverrideParentSpanID() bool {
 	return so.psid != nil
+}
+
+func (so *spanOpt) OverrideSpanID() bool {
+	return so.sid != nil
 }
 
 func (so *spanOpt) ParentSpanID() *trace.SpanID {
 	return so.psid
+}
+
+func (so *spanOpt) SpanID() *trace.SpanID {
+	return so.sid
+}
+
+func (so *spanOpt) Dedup() bool {
+	return so.dedup
+}
+
+func (so *spanOpt) Resource() *resource.Resource {
+	ctx := context.Background()
+	name := "inngest"
+	if so.serviceName != "" {
+		name = so.serviceName
+	}
+
+	if r, err := resource.New(ctx, resource.WithAttributes(
+		attribute.String("service.name", name),
+	)); err == nil {
+		return r
+	}
+
+	return nil
 }
 
 // NewSpan creates a new span from the provided context, and overrides the internals with
@@ -169,11 +215,21 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
 	} else {
 		sid = gen.NewSpanID(ctx, tid)
 	}
-	// TODO: how to get grantparent span to override psc's spanID?
-	if so.PreserveSpan() {
+	// Take grantparent span to override psc's spanID
+	if so.OverrideParentSpanID() {
 		sid = psc.SpanID()
 		pid := so.ParentSpanID()
 		psc = psc.WithSpanID(*pid)
+	}
+	if so.OverrideSpanID() {
+		sid = *so.SpanID()
+
+		if so.NewRoot() {
+			psc = trace.SpanContext{}
+		} else if so.OverrideParentSpanID() {
+			pid := so.ParentSpanID()
+			psc = psc.WithSpanID(*pid)
+		}
 	}
 
 	sconf := trace.SpanContextConfig{
@@ -184,15 +240,18 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
 	}
 
 	s := &Span{
-		parent: psc,
-		name:   so.SpanName(),
-		start:  so.Timestamp(),
-		attrs:  so.Attributes(),
-		events: []tracesdk.Event{},
-		links:  so.Links(),
-		status: tracesdk.Status{Code: codes.Unset},
-		conf:   sconf,
-		kind:   so.SpanKind(),
+		parent:   psc,
+		name:     so.SpanName(),
+		scope:    instrumentation.Scope{Name: so.SpanScope()},
+		resource: so.Resource(),
+		start:    so.Timestamp(),
+		attrs:    so.Attributes(),
+		events:   []tracesdk.Event{},
+		links:    so.Links(),
+		status:   tracesdk.Status{Code: codes.Unset},
+		conf:     sconf,
+		kind:     so.SpanKind(),
+		dedup:    so.Dedup(),
 	}
 
 	return trace.ContextWithSpan(ctx, s), s
@@ -214,7 +273,6 @@ type Span struct {
 	sync.Mutex
 
 	start time.Time
-	end   time.Time
 
 	name   string
 	attrs  []attribute.KeyValue
@@ -223,9 +281,16 @@ type Span struct {
 	links  []tracesdk.Link
 	kind   trace.SpanKind
 
-	parent trace.SpanContext
-	conf   trace.SpanContextConfig
+	scope    instrumentation.Scope
+	resource *resource.Resource
+	parent   trace.SpanContext
+	conf     trace.SpanContextConfig
 
+	// dedup marks the span as a potential duplicate, which in turn
+	// can be used as an indicator to allow the span to be sent of not.
+	dedup bool
+	// Mark the span as cancelled, so it doesn't get sent out when it ends
+	cancel            bool
 	childSpanCount    int
 	droppedAttributes int
 }
@@ -233,6 +298,20 @@ type Span struct {
 // Send is just an alias for End
 func (s *Span) Send() {
 	s.End()
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//
+//	FOOTGUN ALERT
+//
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// Cancel will mark the span as cancelled and it will not be sent out when it ends.
+// This will reset the context so if there are spans that will be created after this,
+// it doesn't create a dangling pointer.
+func (s *Span) Cancel(ctx context.Context) context.Context {
+	s.cancel = true
+	// revert the current span context back to the parent's
+	return trace.ContextWithSpanContext(ctx, s.Parent())
 }
 
 //
@@ -260,10 +339,7 @@ func (s *Span) StartTime() time.Time {
 }
 
 func (s *Span) EndTime() time.Time {
-	if s.end.IsZero() {
-		return time.Now()
-	}
-	return s.end
+	return time.Now()
 }
 
 func (s *Span) Attributes() []attribute.KeyValue {
@@ -283,18 +359,16 @@ func (s *Span) Status() tracesdk.Status {
 }
 
 func (s *Span) InstrumentationScope() instrumentation.Scope {
-	// TODO: implement
-	return instrumentation.Scope{}
+	return s.scope
 }
 
+// Basically the same things as scope according to docs
 func (s *Span) InstrumentationLibrary() instrumentation.Library {
-	// TODO: implement
-	return instrumentation.Library{}
+	return s.scope
 }
 
 func (s *Span) Resource() *resource.Resource {
-	// TODO: implement
-	return nil
+	return s.resource
 }
 
 func (s *Span) DroppedAttributes() int {
@@ -319,7 +393,10 @@ func (s *Span) ChildSpanCount() int {
 
 // End utilizes the internal tracer's processors to send spans
 func (s *Span) End(opts ...trace.SpanEndOption) {
-	s.end = time.Now()
+	// don't attempt to export the span if it's marked as dedup or cancel
+	if s.cancel || s.dedup {
+		s.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
+	}
 
 	if err := UserTracer().Export(s); err != nil {
 		ctx := context.Background()
@@ -472,4 +549,8 @@ func (sc *spanIDGenerator) NewIDs(ctx context.Context) (trace.TraceID, trace.Spa
 	_, _ = sc.randSrc.Read(tid[:])
 	_, _ = sc.randSrc.Read(sid[:])
 	return tid, sid
+}
+
+func NewSpanID(ctx context.Context) trace.SpanID {
+	return gen.NewSpanID(ctx, trace.TraceID{})
 }

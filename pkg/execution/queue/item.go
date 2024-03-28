@@ -75,6 +75,8 @@ type Item struct {
 	// QueueName allows control over the queue name.  If not provided, this falls
 	// back to the queue mapping defined on the queue or the workflow ID of the fn.
 	QueueName *string `json:"qn,omitempty"`
+	// RunInfo shows additional runtime information for the item like delays.
+	RunInfo *RunInfo `json:"runinfo,omitempty"`
 	// Throttle represents GCRA rate limiting for the queue item, which is applied when
 	// attempting to lease the item from the queue.
 	Throttle *Throttle `json:"throttle,omitempty"`
