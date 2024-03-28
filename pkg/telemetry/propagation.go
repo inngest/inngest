@@ -1,16 +1,19 @@
 package telemetry
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 
-	"go.opentelemetry.io/otel/baggage"
+	"go.opentelemetry.io/otel/trace"
 )
+
+const psidKey = "psid"
 
 // TraceCarrier stores the data that needs to be carried through systems.
 // e.g. pubsub, queues, etc
 type TraceCarrier struct {
+	sync.Mutex
 	Context map[string]string `json:"ctx,omitempty"`
 }
 
@@ -29,29 +32,23 @@ func (tc *TraceCarrier) Unmarshal(data any) error {
 	return json.Unmarshal(byt, tc)
 }
 
-func AddBaggageMap(ctx context.Context, attrs map[string]string) (context.Context, error) {
-	for key, value := range attrs {
-		newctx, err := AddBaggage(ctx, key, value)
-		if err != nil {
-			return ctx, err
-		}
-		ctx = newctx
+// Embed the parent spanID for propagation purposes
+func (tc *TraceCarrier) AddParentSpanID(psc trace.SpanContext) {
+	tc.Lock()
+	defer tc.Unlock()
+
+	if psc.IsValid() {
+		tc.Context[psidKey] = psc.SpanID().String()
 	}
-	return ctx, nil
 }
 
-func AddBaggage(ctx context.Context, key, value string) (context.Context, error) {
-	bag := baggage.FromContext(ctx)
-
-	multispanattr, err := baggage.NewMember(key, value)
-	if err != nil {
-		return ctx, fmt.Errorf("invalid span attr: %v", err)
+// ParentSpanID returns the embedded spanID if it's available
+func (tc *TraceCarrier) ParentSpanID() (*trace.SpanID, error) {
+	val, ok := tc.Context[psidKey]
+	if !ok {
+		return nil, fmt.Errorf("spanID is not stored in carrier")
 	}
 
-	bag, err = bag.SetMember(multispanattr)
-	if err != nil {
-		return ctx, fmt.Errorf("invalid baggage: %v", err)
-	}
-
-	return baggage.ContextWithBaggage(ctx, bag), nil
+	sid, err := trace.SpanIDFromHex(val)
+	return &sid, err
 }
