@@ -81,6 +81,12 @@ func WithParentSpanID(psid trace.SpanID) SpanOpt {
 	}
 }
 
+func WithDedup() SpanOpt {
+	return func(s *spanOpt) {
+		s.dedup = true
+	}
+}
+
 func newSpanOpt(opts ...SpanOpt) *spanOpt {
 	s := &spanOpt{
 		kind:  trace.SpanKindUnspecified,
@@ -107,6 +113,8 @@ type spanOpt struct {
 	ts         time.Time
 	// Parent SpanID
 	psid *trace.SpanID
+	// option to be used to mark the span is duplicated or not
+	dedup bool
 }
 
 func (so *spanOpt) Attributes() []attribute.KeyValue {
@@ -147,6 +155,10 @@ func (so *spanOpt) PreserveSpan() bool {
 
 func (so *spanOpt) ParentSpanID() *trace.SpanID {
 	return so.psid
+}
+
+func (so *spanOpt) Dedup() bool {
+	return so.dedup
 }
 
 // NewSpan creates a new span from the provided context, and overrides the internals with
@@ -193,6 +205,7 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
 		status: tracesdk.Status{Code: codes.Unset},
 		conf:   sconf,
 		kind:   so.SpanKind(),
+		dedup:  so.Dedup(),
 	}
 
 	return trace.ContextWithSpan(ctx, s), s
@@ -226,6 +239,11 @@ type Span struct {
 	parent trace.SpanContext
 	conf   trace.SpanContextConfig
 
+	// dedup marks the span as a potential duplicate, which in turn
+	// can be used as an indicator to allow the span to be sent of not.
+	dedup bool
+	// Mark the span as cancelled, so it doesn't get sent out when it ends
+	cancel            bool
 	childSpanCount    int
 	droppedAttributes int
 }
@@ -233,6 +251,20 @@ type Span struct {
 // Send is just an alias for End
 func (s *Span) Send() {
 	s.End()
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//
+//	FOOTGUN ALERT
+//
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// Cancel will mark the span as cancelled and it will not be sent out when it ends.
+// This will reset the context so if there are spans that will be created after this,
+// it doesn't create a dangling pointer.
+func (s *Span) Cancel(ctx context.Context) context.Context {
+	s.cancel = true
+	// revert the current span context back to the parent's
+	return trace.ContextWithSpanContext(ctx, s.Parent())
 }
 
 //
@@ -319,6 +351,11 @@ func (s *Span) ChildSpanCount() int {
 
 // End utilizes the internal tracer's processors to send spans
 func (s *Span) End(opts ...trace.SpanEndOption) {
+	// don't attempt to export the span if it's marked as dedup or cancel
+	if s.cancel || s.dedup {
+		return
+	}
+
 	s.end = time.Now()
 
 	if err := UserTracer().Export(s); err != nil {

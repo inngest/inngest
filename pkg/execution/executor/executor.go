@@ -527,7 +527,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 	err = e.queue.Enqueue(ctx, item, at)
 	if err == redis_state.ErrQueueItemExists {
-		span.SetAttributes(attribute.Bool(consts.OtelSysIgnored, true))
+		ctx = span.Cancel(ctx)
 		return nil, state.ErrIdentifierExists
 	}
 	if err != nil {
@@ -754,12 +754,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			}
 
 		} else {
-			// Only add this span if it's a step or function response that
-			// represents either a failed or a successful execution. Do not
-			// record discovery spans.
-			span.SetAttributes(
-				attribute.Bool(consts.OtelSysIgnored, true),
-			)
+			// if it's not a step or function response that represents either a failed or a successful execution.
+			// Do not record discovery spans and cancel it.
+			ctx = span.Cancel(ctx)
 		}
 	}
 
