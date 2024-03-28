@@ -72,10 +72,8 @@ func newJaegerTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error setting up Jaeger exporter: %w", err)
 	}
-	sp := newInngestSpanProcessor(
-		trace.NewBatchSpanProcessor(exp),
-	)
 
+	sp := trace.NewBatchSpanProcessor(exp)
 	tp := trace.NewTracerProvider(
 		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
@@ -104,10 +102,7 @@ func newIOTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 		return nil, fmt.Errorf("error settings up stdout trace exporter: %w", err)
 	}
 
-	sp := newInngestSpanProcessor(
-		trace.NewBatchSpanProcessor(exp),
-	)
-
+	sp := trace.NewBatchSpanProcessor(exp)
 	tp := trace.NewTracerProvider(
 		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
@@ -178,10 +173,7 @@ func newOLTPTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 		return nil, fmt.Errorf("error creating otlp trace client: %w", err)
 	}
 
-	sp := newInngestSpanProcessor(
-		trace.NewBatchSpanProcessor(exp),
-	)
-
+	sp := trace.NewBatchSpanProcessor(exp)
 	tp := trace.NewTracerProvider(
 		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
