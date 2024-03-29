@@ -26,6 +26,8 @@ const messages = {
   missing_signing_key: 'The app is not using a signing key.',
   no_functions: 'No functions found in the app.',
   not_sdk: 'The URL is not hosting an Inngest SDK',
+  signing_key_invalid: "The app's signing key is invalid.",
+  signing_key_unspecified: 'The app is not using a signing key.',
   too_many_pings: 'Too many requests to register in a short time window.',
   unauthorized: 'Unauthorized response from URL.',
   unreachable: 'The URL is unreachable.',
