@@ -10,6 +10,7 @@ const messages = {
   env_unspecified:
     "The app's signing key is for a branch environment but the app did not specify a branch environment name.",
   forbidden: 'Forbidden response from URL.',
+  host_private: "The app's reported host is private (e.g. localhost).",
   http_bad_request: 'Bad request response from URL.',
   http_forbidden: 'Forbidden response from URL.',
   http_internal_server_error: 'Internal server error response from URL.',
@@ -25,7 +26,6 @@ const messages = {
   missing_signing_key: 'The app is not using a signing key.',
   no_functions: 'No functions found in the app.',
   not_sdk: 'The URL is not hosting an Inngest SDK',
-  private_host: "The app's reported host is private (e.g. localhost).",
   too_many_pings: 'Too many requests to register in a short time window.',
   unauthorized: 'Unauthorized response from URL.',
   unreachable: 'The URL is unreachable.',
