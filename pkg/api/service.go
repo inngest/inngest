@@ -15,7 +15,6 @@ import (
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -93,13 +92,7 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 	// the caller here.
 	l := logger.From(ctx).With().Str("caller", "api").Logger()
 	ctx = logger.With(ctx, l)
-
-	ctx, span := telemetry.UserTracer().Provider().
-		Tracer(consts.OtelScopeEventIngestion).
-		Start(ctx, "event-ingestion", trace.WithAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
-		))
-	defer span.End()
+	span := trace.SpanFromContext(ctx)
 
 	l.Debug().Str("event", e.Name).Msg("handling event")
 

@@ -33,8 +33,10 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/redis/rueidis"
+	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -295,6 +297,9 @@ func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic stri
 			return fmt.Errorf("error marshalling invocation event: %w", err)
 		}
 
+		carrier := telemetry.NewTraceCarrier()
+		telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+
 		err = pb.Publish(
 			ctx,
 			topic,
@@ -302,6 +307,9 @@ func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic stri
 				Name:      event.EventReceivedName,
 				Data:      string(byt),
 				Timestamp: time.Now(),
+				Metadata: map[string]any{
+					consts.OtelPropagationKey: carrier,
+				},
 			},
 		)
 		if err != nil {
