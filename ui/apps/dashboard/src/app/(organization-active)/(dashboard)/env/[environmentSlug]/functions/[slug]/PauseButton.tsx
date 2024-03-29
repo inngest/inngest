@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { PauseIcon, PlayIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { AlertModal } from '@inngest/components/Modal';
@@ -63,7 +62,6 @@ function PauseFunctionModal({
 }: PauseFunctionModalProps) {
   const [, pauseFunction] = useMutation(PauseFunctionDocument);
   const [, unpauseFunction] = useMutation(UnpauseFunctionDocument);
-  const router = useRouter();
 
   function handlePause() {
     pauseFunction({ fnID: functionID }).then((result) => {
@@ -71,7 +69,6 @@ function PauseFunctionModal({
         toast.error(`${functionName} could not be paused: ${result.error.message}`);
       } else {
         toast.success(`${functionName} was successfully paused`);
-        router.refresh();
       }
     });
     onClose();
@@ -83,7 +80,6 @@ function PauseFunctionModal({
         toast.error(`${functionName} could not be resumed: ${result.error.message}`);
       } else {
         toast.success(`${functionName} was successfully resumed`);
-        router.refresh();
       }
     });
     onClose();
