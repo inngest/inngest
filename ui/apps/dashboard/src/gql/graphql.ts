@@ -518,14 +518,12 @@ export type Mutation = {
   editWorkflow: Maybe<WorkflowVersionResponse>;
   enableEnvironmentAutoArchive: Workspace;
   invokeFunction: Maybe<Scalars['Boolean']>;
-  pauseFunction: Workflow;
   removeVercelApp: Maybe<RemoveVercelAppResponse>;
   resyncApp: SyncResponse;
   retryWorkflowRun: Maybe<StartWorkflowResponse>;
   setUpAccount: Maybe<SetUpAccountPayload>;
   syncNewApp: SyncResponse;
   unarchiveEnvironment: Workspace;
-  unpauseFunction: Workflow;
   updateAccount: Account;
   updateIngestKey: IngestKey;
   updatePaymentMethod: Maybe<Array<PaymentMethod>>;
@@ -613,11 +611,6 @@ export type MutationInvokeFunctionArgs = {
 };
 
 
-export type MutationPauseFunctionArgs = {
-  fnID: Scalars['ID'];
-};
-
-
 export type MutationRemoveVercelAppArgs = {
   input: RemoveVercelAppInput;
 };
@@ -644,11 +637,6 @@ export type MutationSyncNewAppArgs = {
 
 export type MutationUnarchiveEnvironmentArgs = {
   id: Scalars['ID'];
-};
-
-
-export type MutationUnpauseFunctionArgs = {
-  fnID: Scalars['ID'];
 };
 
 
@@ -1037,7 +1025,6 @@ export type SyncResponse = {
 };
 
 export enum SyncStatus {
-  Duplicate = 'duplicate',
   Error = 'error',
   Pending = 'pending',
   Success = 'success'
