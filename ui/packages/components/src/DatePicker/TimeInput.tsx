@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { format } from 'date-fns';
 import { ZodError, type ZodSchema } from 'zod';
 
 import {
@@ -9,40 +10,72 @@ import {
   secondsSchema,
 } from './timeSchemas';
 
-type TimeInputProps = {
-  is24Format?: boolean;
+type HandleTimeChangeProps = {
+  e: React.ChangeEvent<HTMLInputElement>;
+  schema: ZodSchema<any>;
+  setInputValue: React.Dispatch<React.SetStateAction<string>>;
 };
 
-export function TimeInput({ is24Format = false }: TimeInputProps) {
-  const [hourInput, setHourInput] = useState('');
-  const [minuteInput, setMinuteInput] = useState('');
-  const [secondInput, setSecondInput] = useState('');
-  const [millisecondInput, setMillisecondInput] = useState('');
-  const [periodInput, setPeriodInput] = useState('');
-
-  type HandleTimeChangeProps = {
-    e: React.ChangeEvent<HTMLInputElement>;
-    schema: ZodSchema<any>;
-    setInputValue: React.Dispatch<React.SetStateAction<string>>;
-  };
-
-  const handleTimeChange = ({ e, schema, setInputValue }: HandleTimeChangeProps) => {
-    const value = e.target.value;
-    try {
-      schema.parse(value);
+const handleTimeChange = ({ e, schema, setInputValue }: HandleTimeChangeProps) => {
+  const value = e.target.value;
+  try {
+    schema.parse(value);
+    setInputValue(value);
+  } catch (error) {
+    if (!(error instanceof ZodError)) {
+      return;
+    }
+    const errorCode = error.errors?.[0]?.code;
+    if (value === '') {
+      setInputValue('');
+    } else if (errorCode === 'too_big' || errorCode === 'too_small') {
       setInputValue(value);
-    } catch (error) {
-      if (!(error instanceof ZodError)) {
-        return;
-      }
-      const errorCode = error.errors?.[0]?.code;
-      if (value === '') {
-        setInputValue('');
-      } else if (errorCode === 'too_big' || errorCode === 'too_small') {
-        setInputValue(value);
+    }
+  }
+};
+
+type TimeInputProps = {
+  is24HourFormat?: boolean;
+  selectedTime?: Date;
+  onSelect: React.Dispatch<React.SetStateAction<Date | undefined>>;
+};
+
+export function TimeInput({ selectedTime, onSelect, is24HourFormat = false }: TimeInputProps) {
+  const [hourInput, setHourInput] = useState(
+    selectedTime ? format(selectedTime, is24HourFormat ? 'HH' : 'hh') : ''
+  );
+  const [minuteInput, setMinuteInput] = useState(selectedTime ? format(selectedTime, 'mm') : '');
+  const [secondInput, setSecondInput] = useState(selectedTime ? format(selectedTime, 'ss') : '');
+  const [millisecondInput, setMillisecondInput] = useState(
+    selectedTime ? format(selectedTime, 'SSS') : ''
+  );
+  const [periodInput, setPeriodInput] = useState(
+    selectedTime && !is24HourFormat ? format(selectedTime, 'a') : ''
+  );
+
+  useEffect(() => {
+    // Aggregates the multiple input time parts and combines in one date
+    const newTimeDate = new Date();
+    newTimeDate.setHours(parseInt(hourInput));
+    newTimeDate.setMinutes(parseInt(minuteInput));
+    newTimeDate.setSeconds(parseInt(secondInput));
+    newTimeDate.setMilliseconds(parseInt(millisecondInput));
+    if (periodInput && !is24HourFormat) {
+      const hour = newTimeDate.getHours();
+      if (periodInput.toUpperCase() === 'PM' && hour < 12) {
+        newTimeDate.setHours(hour + 12);
+      } else if (periodInput.toUpperCase() === 'AM' && hour === 12) {
+        newTimeDate.setHours(0);
       }
     }
-  };
+    onSelect(newTimeDate);
+  }, [hourInput, minuteInput, secondInput, millisecondInput, periodInput]);
+
+  useEffect(() => {
+    // Changes the hour and period when switch between 24h and AM/PM format
+    setHourInput(selectedTime ? format(selectedTime, is24HourFormat ? 'HH' : 'hh') : '');
+    setPeriodInput(selectedTime && !is24HourFormat ? format(selectedTime, 'a') : '');
+  }, [is24HourFormat]);
 
   const handlePeriodChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputPeriod = e.target.value;
@@ -70,7 +103,11 @@ export function TimeInput({ is24Format = false }: TimeInputProps) {
         aria-label="Point in time (Hours)"
         maxLength={2}
         onChange={(e) =>
-          handleTimeChange({ e, schema: getHourSchema(is24Format), setInputValue: setHourInput })
+          handleTimeChange({
+            e,
+            schema: getHourSchema(is24HourFormat),
+            setInputValue: setHourInput,
+          })
         }
         value={hourInput}
       />
@@ -107,7 +144,7 @@ export function TimeInput({ is24Format = false }: TimeInputProps) {
         }
         value={millisecondInput}
       />
-      {!is24Format && (
+      {!is24HourFormat && (
         <input
           className="w-7 pl-0.5 focus:outline-none"
           placeholder="AM"

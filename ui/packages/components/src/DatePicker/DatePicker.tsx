@@ -1,24 +1,57 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Button } from '../Button';
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '../Popover';
 import { Switch, SwitchLabel, SwitchWrapper } from '../Switch';
+import { combineDayAndTime, formatDayString, formatTimeString } from '../utils/date';
 import { Calendar } from './Calendar';
 import { DateInputButton } from './DateInputButton';
 import { TimeInput } from './TimeInput';
 
-export function DatePicker() {
-  const [buttonCopy, setButtonCopy] = useState<string>('Enter Date and Time');
-  const [selectedDay, setSelectedDay] = useState<Date>();
+type DatePickerProps = {
+  datePickerDate?: Date;
+  setDatePickerDate: React.Dispatch<React.SetStateAction<Date | undefined>>;
+};
+
+export function DatePicker({ datePickerDate, setDatePickerDate }: DatePickerProps) {
+  const [buttonCopy, setButtonCopy] = useState<string>(
+    datePickerDate?.toISOString() || 'Enter Date and Time'
+  );
+  const [selectedDay, setSelectedDay] = useState<Date | undefined>(datePickerDate);
+  const [selectedTime, setSelectedTime] = useState<Date | undefined>(datePickerDate);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [is24HourFormat, setIs24HourFormat] = useState(false);
+  const [dayString, setDayString] = useState<string>('');
+  const [timeString, setTimeString] = useState<string>('');
+
+  useEffect(() => {
+    // Reset selected day and time when the popover is closed
+    if (!calendarOpen) {
+      setSelectedDay(datePickerDate);
+      setSelectedTime(datePickerDate);
+    }
+  }, [calendarOpen, datePickerDate]);
+
+  useEffect(() => {
+    // To do: date validation
+    // Generates the day and time string for the footer
+    const dateString = selectedDay ? formatDayString(selectedDay) : '';
+    setDayString(dateString);
+    const timeString = selectedTime
+      ? formatTimeString({ date: selectedTime, is24HourFormat: is24HourFormat })
+      : '';
+    setTimeString(timeString);
+  }, [selectedDay, selectedTime, is24HourFormat]);
 
   function handleApply() {
-    if (selectedDay) {
-      const string = selectedDay.toISOString();
-      setButtonCopy(string);
-    } else {
-      setButtonCopy('Enter Date and Time');
+    // To do: date validation
+    if (selectedDay && selectedTime) {
+      const combinedDate = combineDayAndTime({ day: selectedDay, time: selectedTime });
+      setDatePickerDate(combinedDate);
+      const string = combinedDate?.toISOString();
+      if (string) {
+        setButtonCopy(string);
+      }
     }
     setCalendarOpen(false);
   }
@@ -46,15 +79,26 @@ export function DatePicker() {
               <SwitchLabel htmlFor="24hr">24hr</SwitchLabel>
             </SwitchWrapper>
           </div>
-          <TimeInput is24Format={is24HourFormat} />
+          <TimeInput
+            is24HourFormat={is24HourFormat}
+            selectedTime={selectedTime}
+            onSelect={setSelectedTime}
+          />
         </div>
         <footer className="p-4">
-          <p className="pb-2 text-xs font-medium text-red-600">Error</p>
-          <div className="flex justify-end gap-2 text-right">
-            <PopoverClose asChild>
-              <Button appearance="outlined" label="Cancel" />
-            </PopoverClose>
-            <Button kind="primary" label="Apply" btnAction={handleApply} />
+          {/* To do: error handling */}
+          {/* <p className="pb-2 text-xs font-medium text-rose-600">Error</p> */}
+          <div className="flex items-center justify-between">
+            <div>
+              <time className="block text-sm text-slate-600">{dayString}</time>
+              <time className="text-sm text-slate-600">{timeString}</time>
+            </div>
+            <div className="flex justify-end gap-2 text-right">
+              <PopoverClose asChild>
+                <Button appearance="outlined" label="Cancel" />
+              </PopoverClose>
+              <Button kind="primary" label="Apply" btnAction={handleApply} />
+            </div>
           </div>
         </footer>
       </PopoverContent>
