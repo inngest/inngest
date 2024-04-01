@@ -31,7 +31,6 @@ export function DatePicker({ datePickerDate, setDatePickerDate }: DatePickerProp
       setSelectedDay(datePickerDate);
       setSelectedTime(datePickerDate);
     }
-    console.log(datePickerDate, 'initial');
   }, [calendarOpen, datePickerDate]);
 
   useEffect(() => {
