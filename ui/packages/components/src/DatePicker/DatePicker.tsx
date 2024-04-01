@@ -30,6 +30,7 @@ export function DatePicker({ datePickerDate, setDatePickerDate }: DatePickerProp
     if (!calendarOpen) {
       setSelectedDay(datePickerDate);
       setSelectedTime(datePickerDate);
+      setIsValidTime(true);
     }
   }, [calendarOpen, datePickerDate]);
 
