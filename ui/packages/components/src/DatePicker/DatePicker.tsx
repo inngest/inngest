@@ -23,6 +23,7 @@ export function DatePicker({ datePickerDate, setDatePickerDate }: DatePickerProp
   const [is24HourFormat, setIs24HourFormat] = useState(false);
   const [dayString, setDayString] = useState<string>('');
   const [timeString, setTimeString] = useState<string>('');
+  const [isValidTime, setIsValidTime] = useState(true);
 
   useEffect(() => {
     // Reset selected day and time when the popover is closed
@@ -30,13 +31,14 @@ export function DatePicker({ datePickerDate, setDatePickerDate }: DatePickerProp
       setSelectedDay(datePickerDate);
       setSelectedTime(datePickerDate);
     }
+    console.log(datePickerDate, 'initial');
   }, [calendarOpen, datePickerDate]);
 
   useEffect(() => {
-    // To do: date validation
     // Generates the day and time string for the footer
     const dateString = selectedDay ? formatDayString(selectedDay) : '';
     setDayString(dateString);
+
     const timeString = selectedTime
       ? formatTimeString({ date: selectedTime, is24HourFormat: is24HourFormat })
       : '';
@@ -44,12 +46,12 @@ export function DatePicker({ datePickerDate, setDatePickerDate }: DatePickerProp
   }, [selectedDay, selectedTime, is24HourFormat]);
 
   function handleApply() {
-    // To do: date validation
-    if (selectedDay && selectedTime) {
+    // To do: Add plan validation
+    if (selectedDay && selectedTime && isValidTime) {
       const combinedDate = combineDayAndTime({ day: selectedDay, time: selectedTime });
-      setDatePickerDate(combinedDate);
-      const string = combinedDate?.toISOString();
-      if (string) {
+      if (combinedDate) {
+        setDatePickerDate(combinedDate);
+        const string = combinedDate?.toISOString();
         setButtonCopy(string);
       }
     }
@@ -67,7 +69,9 @@ export function DatePicker({ datePickerDate, setDatePickerDate }: DatePickerProp
         </div>
         <div className="bg-slate-300 p-4">
           <div className="flex items-center justify-between pb-4">
-            <p className="text-sm font-medium">UTC</p>
+            <p className="text-sm font-medium">
+              {Intl.DateTimeFormat().resolvedOptions().timeZone}
+            </p>
             <SwitchWrapper>
               <Switch
                 checked={is24HourFormat}
@@ -83,11 +87,12 @@ export function DatePicker({ datePickerDate, setDatePickerDate }: DatePickerProp
             is24HourFormat={is24HourFormat}
             selectedTime={selectedTime}
             onSelect={setSelectedTime}
+            setIsValidTime={setIsValidTime}
+            isValidTime={isValidTime}
           />
         </div>
         <footer className="p-4">
-          {/* To do: error handling */}
-          {/* <p className="pb-2 text-xs font-medium text-rose-600">Error</p> */}
+          {!isValidTime && <p className="pb-2 text-xs font-medium text-rose-600">Invalid time</p>}
           <div className="flex items-center justify-between">
             <div>
               <time className="block text-sm text-slate-600">{dayString}</time>
@@ -97,7 +102,12 @@ export function DatePicker({ datePickerDate, setDatePickerDate }: DatePickerProp
               <PopoverClose asChild>
                 <Button appearance="outlined" label="Cancel" />
               </PopoverClose>
-              <Button kind="primary" label="Apply" btnAction={handleApply} />
+              <Button
+                kind="primary"
+                label="Apply"
+                disabled={!isValidTime || !selectedDay}
+                btnAction={handleApply}
+              />
             </div>
           </div>
         </footer>
