@@ -33,15 +33,15 @@ export function TimeInput({
   isValidTime,
 }: TimeInputProps) {
   const [hourInput, setHourInput] = useState(
-    selectedTime ? format(selectedTime, is24HourFormat ? 'HH' : 'hh') : ''
+    selectedTime ? format(selectedTime, is24HourFormat ? 'HH' : 'hh') : '00'
   );
-  const [minuteInput, setMinuteInput] = useState(selectedTime ? format(selectedTime, 'mm') : '');
-  const [secondInput, setSecondInput] = useState(selectedTime ? format(selectedTime, 'ss') : '');
+  const [minuteInput, setMinuteInput] = useState(selectedTime ? format(selectedTime, 'mm') : '00');
+  const [secondInput, setSecondInput] = useState(selectedTime ? format(selectedTime, 'ss') : '00');
   const [millisecondInput, setMillisecondInput] = useState(
-    selectedTime ? format(selectedTime, 'SSS') : ''
+    selectedTime ? format(selectedTime, 'SSS') : '000'
   );
   const [periodInput, setPeriodInput] = useState(
-    selectedTime && !is24HourFormat ? format(selectedTime, 'a') : ''
+    selectedTime && !is24HourFormat ? format(selectedTime, 'a') : 'AM'
   );
 
   useEffect(() => {
@@ -71,8 +71,8 @@ export function TimeInput({
 
   useEffect(() => {
     // Changes the hour and period when switch between 24h and AM/PM format
-    setHourInput(selectedTime ? format(selectedTime, is24HourFormat ? 'HH' : 'hh') : '');
-    setPeriodInput(selectedTime && !is24HourFormat ? format(selectedTime, 'a') : '');
+    setHourInput(selectedTime ? format(selectedTime, is24HourFormat ? 'HH' : 'hh') : '00');
+    setPeriodInput(selectedTime && !is24HourFormat ? format(selectedTime, 'a') : 'AM');
   }, [is24HourFormat]);
 
   const handleTimeChange = ({ e, schema, setInputValue }: HandleTimeChangeProps) => {

@@ -9,16 +9,14 @@ import { DateInputButton } from './DateInputButton';
 import { TimeInput } from './TimeInput';
 
 type DatePickerProps = {
-  datePickerDate?: Date;
-  setDatePickerDate: React.Dispatch<React.SetStateAction<Date | undefined>>;
+  defaultValue?: Date;
+  onChange: (value: Date | undefined) => void;
 };
 
-export function DatePicker({ datePickerDate, setDatePickerDate }: DatePickerProps) {
-  const [buttonCopy, setButtonCopy] = useState<string>(
-    datePickerDate?.toISOString() || 'Enter Date and Time'
-  );
-  const [selectedDay, setSelectedDay] = useState<Date | undefined>(datePickerDate);
-  const [selectedTime, setSelectedTime] = useState<Date | undefined>(datePickerDate);
+export function DatePicker({ defaultValue, onChange }: DatePickerProps) {
+  const [value, setValue] = useState(defaultValue);
+  const [selectedDay, setSelectedDay] = useState<Date | undefined>(defaultValue);
+  const [selectedTime, setSelectedTime] = useState<Date | undefined>(defaultValue);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [is24HourFormat, setIs24HourFormat] = useState(false);
   const [dayString, setDayString] = useState<string>('');
@@ -28,11 +26,11 @@ export function DatePicker({ datePickerDate, setDatePickerDate }: DatePickerProp
   useEffect(() => {
     // Reset selected day and time when the popover is closed
     if (!calendarOpen) {
-      setSelectedDay(datePickerDate);
-      setSelectedTime(datePickerDate);
+      setSelectedDay(value);
+      setSelectedTime(value);
       setIsValidTime(true);
     }
-  }, [calendarOpen, datePickerDate]);
+  }, [calendarOpen, value]);
 
   useEffect(() => {
     // Generates the day and time string for the footer
@@ -50,9 +48,8 @@ export function DatePicker({ datePickerDate, setDatePickerDate }: DatePickerProp
     if (selectedDay && selectedTime && isValidTime) {
       const combinedDate = combineDayAndTime({ day: selectedDay, time: selectedTime });
       if (combinedDate) {
-        setDatePickerDate(combinedDate);
-        const string = combinedDate?.toISOString();
-        setButtonCopy(string);
+        onChange(combinedDate);
+        setValue(combinedDate);
       }
     }
     setCalendarOpen(false);
@@ -61,7 +58,7 @@ export function DatePicker({ datePickerDate, setDatePickerDate }: DatePickerProp
   return (
     <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
       <PopoverTrigger asChild>
-        <DateInputButton>{buttonCopy}</DateInputButton>
+        <DateInputButton>{value?.toLocaleString() ?? 'Enter Date and Time'}</DateInputButton>
       </PopoverTrigger>
       <PopoverContent>
         <div className="p-4">

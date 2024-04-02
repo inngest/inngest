@@ -42,21 +42,17 @@ export function formatMilliseconds(durationInMs: number) {
 }
 
 // Combines two dates, using the day from one and the time from another
-export function combineDayAndTime({ day, time }: { day: Date; time: Date }): Date | undefined {
-  if (day && time) {
-    const combinedDate = new Date(day);
+export function combineDayAndTime({ day, time }: { day: Date; time: Date }): Date {
+  const combinedDate = new Date(day);
 
-    const hours = time.getHours();
-    const minutes = time.getMinutes();
-    const seconds = time.getSeconds();
-    const milliseconds = time.getMilliseconds();
+  const hours = time.getHours();
+  const minutes = time.getMinutes();
+  const seconds = time.getSeconds();
+  const milliseconds = time.getMilliseconds();
 
-    combinedDate.setHours(hours, minutes, seconds, milliseconds);
+  combinedDate.setHours(hours, minutes, seconds, milliseconds);
 
-    return combinedDate;
-  }
-
-  return;
+  return combinedDate;
 }
 
 export function formatDayString(date: Date): string {
