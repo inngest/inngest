@@ -92,12 +92,13 @@ func (d *devserver) Pre(ctx context.Context) error {
 		caching := apiv1.NewCacheMiddleware(cache)
 
 		apiv1.AddRoutes(r, apiv1.Opts{
-			CachingMiddleware: caching,
-			EventReader:       d.data,
-			FunctionReader:    d.data,
-			FunctionRunReader: d.data,
-			JobQueueReader:    d.queue.(queue.JobQueueReader),
-			Executor:          d.executor,
+			CachingMiddleware:        caching,
+			EventReader:              d.data,
+			FunctionReader:           d.data,
+			FunctionRunReader:        d.data,
+			FunctionRunHistoryReader: d.data,
+			JobQueueReader:           d.queue.(queue.JobQueueReader),
+			Executor:                 d.executor,
 		})
 	})
 

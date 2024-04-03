@@ -661,6 +661,66 @@ func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([
 	return items, nil
 }
 
+const getFunctionRunHistoryAggregate = `-- name: GetFunctionRunHistory :many
+SELECT
+	group_id,
+	max(type) as type,
+	max(step_name) as step_name,
+	max(created_at) as created_at,
+	max(result) as result,
+FROM history
+WHERE run_id = ?
+GROUP BY group_id
+ORDER BY created_at ASC
+`
+
+func (q *Queries) GetFunctionHistoryAggregate(ctx context.Context, runID ulid.ULID) ([]*History, error) {
+	rows, err := q.db.QueryContext(ctx, getFunctionRunHistoryAggregate, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*History
+	for rows.Next() {
+		var i History
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.RunStartedAt,
+			&i.FunctionID,
+			&i.FunctionVersion,
+			&i.RunID,
+			&i.EventID,
+			&i.BatchID,
+			&i.GroupID,
+			&i.IdempotencyKey,
+			&i.Type,
+			&i.Attempt,
+			&i.LatencyMs,
+			&i.StepName,
+			&i.StepID,
+			&i.Url,
+			&i.CancelRequest,
+			&i.Sleep,
+			&i.WaitForEvent,
+			&i.WaitResult,
+			&i.InvokeFunction,
+			&i.InvokeFunctionResult,
+			&i.Result,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFunctionRunsFromEvents = `-- name: GetFunctionRunsFromEvents :many
 SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id

@@ -73,6 +73,34 @@ func (a api) CancelFunctionRun(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (a api) GetFunctionRunLogs(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	auth, err := a.opts.AuthFinder(ctx)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No auth found"))
+		return
+	}
+
+	runID, err := ulid.Parse(chi.URLParam(r, "runID"))
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid run ID: %s", chi.URLParam(r, "runID")))
+		return
+	}
+
+	logs, err := a.opts.FunctionRunHistoryReader.GetFunctionRunLogs(
+		ctx,
+		auth.AccountID(),
+		auth.WorkspaceID(),
+		runID,
+	)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Unable to load function run: %s", chi.URLParam(r, "runID")))
+		return
+	}
+
+	_ = WriteCachedResponse(w, logs, 5*time.Second)
+}
+
 func (a api) GetFunctionRunJobs(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	auth, err := a.opts.AuthFinder(ctx)

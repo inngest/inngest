@@ -580,6 +580,21 @@ func (w wrapper) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]
 	return nil, err
 }
 
+// WIP: Determine final output format for logs
+func (w wrapper) GetFunctionRunLogs(
+	ctx context.Context,
+	accountID uuid.UUID,
+	workspaceID uuid.UUID,
+	runID ulid.ULID,
+) ([]*cqrs.Step, error) {
+
+	history, err := w.q.GetFunctionRunHistory(ctx, runID)
+	if err != nil {
+		return nil, err
+	}
+	return toCQRSSteps(history), nil
+}
+
 func toCQRSRun(run sqlc.FunctionRun, finish sqlc.FunctionFinish) *cqrs.FunctionRun {
 	copied := cqrs.FunctionRun{
 		RunID:           run.RunID,
@@ -603,6 +618,101 @@ func toCQRSRun(run sqlc.FunctionRun, finish sqlc.FunctionFinish) *cqrs.FunctionR
 		copied.EndedAt = &finish.CreatedAt.Time
 	}
 	return &copied
+}
+
+// Aggregate and flatten steps from history
+func toCQRSSteps(history []*sqlc.History) []*cqrs.Step {
+	var steps []*cqrs.Step
+	var stepByID = map[string]*cqrs.Step{}
+
+	for _, historyItem := range history {
+		// If the step exists, update the pointer
+		if stepByID[historyItem.GroupID.String] != nil {
+			existing := stepByID[historyItem.GroupID.String]
+			existing.Type = historyTypeToStepType(historyItem)
+			existing.Name = &historyItem.StepName.String
+			existing.Status = &historyItem.Type
+			// TODO - Sleep updated at is incorrect
+			existing.UpdatedAt = historyItem.CreatedAt
+
+			// Do not overwrite config
+			if existing.Config == nil {
+				println("existing.Config", existing.Config)
+				var raw json.RawMessage
+				if historyItem.WaitForEvent.Valid {
+					raw = json.RawMessage(historyItem.WaitForEvent.String)
+				} else if historyItem.InvokeFunction.Valid {
+					raw = json.RawMessage(historyItem.InvokeFunction.String)
+				} else if historyItem.Sleep.Valid {
+					raw = json.RawMessage(historyItem.Sleep.String)
+				}
+				println(raw)
+				if raw != nil {
+					existing.Config = &raw
+				}
+			}
+
+			// TODO - Properly determine when a step has finished sleeping, currently the status is "StepSleeping"
+
+			if historyItem.WaitResult.Valid && historyItem.WaitResult.String != "null" {
+				existing.Output = json.RawMessage(historyItem.WaitResult.String)
+			} else if historyItem.InvokeFunctionResult.Valid && historyItem.InvokeFunctionResult.String != "null" {
+				existing.Output = json.RawMessage(historyItem.InvokeFunctionResult.String)
+			} else {
+				// TODO - Parse the JSON and return the output or error
+				var m map[string]string
+				rawMessage := json.RawMessage(historyItem.Result.String)
+				// TODO - Handle error
+				_ = json.Unmarshal(rawMessage, &m)
+				// TODO - Handle error output
+				if m["output"] != "" {
+					existing.Output = json.RawMessage(m["output"])
+				} else {
+					existing.Output = rawMessage
+				}
+			}
+			continue
+		}
+		step := &cqrs.Step{
+			ID:        &historyItem.GroupID.String,
+			Type:      historyTypeToStepType(historyItem),
+			Name:      &historyItem.StepName.String,
+			Status:    &historyItem.Type,
+			Output:    json.RawMessage(historyItem.Result.String),
+			CreatedAt: historyItem.CreatedAt,
+			UpdatedAt: historyItem.CreatedAt,
+		}
+		stepByID[historyItem.GroupID.String] = step
+
+		steps = append(steps, step)
+	}
+	return steps
+}
+
+func historyTypeToStepType(historyItem *sqlc.History) string {
+	switch historyItem.Type {
+	// NOTE - The function schedule group id is the same as the first step
+	case enums.HistoryTypeFunctionScheduled.String(),
+		enums.HistoryTypeFunctionStarted.String():
+		return "Step"
+	case enums.HistoryTypeFunctionCompleted.String(),
+		enums.HistoryTypeFunctionFailed.String(),
+		enums.HistoryTypeFunctionCancelled.String():
+		return "Function"
+	}
+	if historyItem.WaitForEvent.Valid && historyItem.WaitForEvent.String != "null" ||
+		historyItem.WaitResult.Valid && historyItem.WaitResult.String != "null" {
+		return "WaitForEvent"
+	}
+	if historyItem.InvokeFunction.Valid && historyItem.InvokeFunction.String != "null" ||
+		historyItem.InvokeFunctionResult.Valid && historyItem.InvokeFunctionResult.String != "null" {
+		return "InvokeFunction"
+	}
+	if historyItem.Sleep.Valid && historyItem.Sleep.String != "null" {
+		return "Sleep"
+	}
+	// TODO - Send Event
+	return "Step"
 }
 
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
