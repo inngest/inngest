@@ -1,7 +1,7 @@
 import { cn } from '../utils/classNames';
 import type { IconProps } from './common';
 
-export function IconCheck({ className, title }: IconProps) {
+export function IconTrash({ className, title }: IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -10,11 +10,7 @@ export function IconCheck({ className, title }: IconProps) {
       className={cn('h-4', className)}
     >
       <title>{title}</title>
-      <path
-        fillRule="evenodd"
-        d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z"
-        clipRule="evenodd"
-      />
+      <path d="M17 6H22V8H20V21C20 21.5523 19.5523 22 19 22H5C4.44772 22 4 21.5523 4 21V8H2V6H7V3C7 2.44772 7.44772 2 8 2H16C16.5523 2 17 2.44772 17 3V6ZM18 8H6V20H18V8ZM9 11H11V17H9V11ZM13 11H15V17H13V11ZM9 4V6H15V4H9Z"></path>
     </svg>
   );
 }

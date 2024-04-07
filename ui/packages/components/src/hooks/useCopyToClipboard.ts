@@ -9,6 +9,7 @@ export function useCopyToClipboard() {
 
     try {
       await navigator.clipboard.writeText(code);
+      console.log(1);
       toast.success(`Copied to clipboard`);
     } catch (error) {
       console.error('Failed to copy:', error);

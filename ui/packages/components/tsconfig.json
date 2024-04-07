@@ -5,6 +5,11 @@
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo.json",
     "rootDirs": ["./src/", "./.storybook/", "./"]
   },
-  "include": ["./src/**/*", "./.storybook/**/preview.tsx", "./tailwind.config.ts"],
+  "include": [
+    "./src/**/*",
+    "./.storybook/**/preview.tsx",
+    "./tailwind.config.ts",
+    "../../apps/dashboard/src/components/Secret"
+  ],
   "exclude": ["node_modules", "./dist/"]
 }

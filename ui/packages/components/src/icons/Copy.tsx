@@ -1,13 +1,15 @@
-export function IconCopy({ className }: { className?: string }) {
+import { cn } from '../utils/classNames';
+import type { IconProps } from './common';
+
+export function IconCopy({ className, title }: IconProps) {
   return (
     <svg
       viewBox="0 0 19 20"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      height="16"
-      width="16"
+      className={cn('h-4', className)}
     >
+      <title>{title}</title>
       <g>
         <g id="Union">
           <path
