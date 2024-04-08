@@ -193,9 +193,7 @@ LOOP:
 			tick.Stop()
 			break LOOP
 		case <-tick.C:
-			q.seqLeaseLock.RLock()
 			if q.capacity() < minWorkersFree {
-				q.seqLeaseLock.RUnlock()
 				// Wait until we have more workers free.  This stops us from
 				// claiming a partition to work on a single job, ensuring we
 				// have capacity to run at least MinWorkersFree concurrent
@@ -203,7 +201,6 @@ LOOP:
 				// there are lots of enqueued and available jobs.
 				continue
 			}
-			q.seqLeaseLock.RUnlock()
 
 			if err := q.scan(ctx); err != nil {
 				// On scan errors, halt the worker entirely.
@@ -409,7 +406,7 @@ func (q *queue) filterShards(ctx context.Context, shards map[string]*QueueShard)
 
 		validLeases := []ulid.ULID{}
 		for _, l := range v.Leases {
-			if time.UnixMilli(int64(l.Time())).After(time.Now()) {
+			if time.UnixMilli(int64(l.Time())).After(getNow()) {
 				validLeases = append(validLeases, l)
 			}
 		}
@@ -621,7 +618,7 @@ func (q *queue) scan(ctx context.Context) error {
 	}
 
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
-	partitions, err := q.partitionPeek(ctx, partitionKey, q.isSequential(), time.Now().Add(PartitionLookahead), PartitionPeekMax)
+	partitions, err := q.partitionPeek(ctx, partitionKey, q.isSequential(), getNow().Add(PartitionLookahead), PartitionPeekMax)
 	if err != nil {
 		return err
 	}
@@ -687,7 +684,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 			go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
 		}
 		q.scope.Counter(counterPartitionConcurrencyLimitReached).Inc(1)
-		return q.PartitionRequeue(ctx, p, time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+		return q.PartitionRequeue(ctx, p, getNow().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 	if err == ErrPartitionAlreadyLeased {
 		q.scope.Counter(counterPartitionLeaseConflict).Inc(1)
@@ -716,7 +713,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	// within 5ms of each other, we fetch them in order but we may process them out of
 	// order, depending on how long it takes for the item to pass through the channel
 	// to the worker, how long Redis takes to lease the item, etc.
-	fetch := time.Now().Truncate(time.Second).Add(PartitionLookahead)
+	fetch := getNow().Truncate(time.Second).Add(PartitionLookahead)
 	queue, err := q.Peek(peekCtx, p.Queue(), fetch, q.peekSize())
 	if err != nil {
 		return err
@@ -728,8 +725,21 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	// Record the number of partitions we're leasing.
 	q.int64counter(ctx, "inngest_queue_partition_lease_total", 1)
 
+	// staticTime is used as the processing time for all items in the queue.
+	// We process queue items sequentially, and time progresses linearly as each
+	// queue item is processed.  We want to use a static time to prevent out-of-order
+	// processing with regards to things like rate limiting;  if we use time.Now(),
+	// queue items later in the array may be processed before queue items earlier in
+	// the array depending on eg. a rate limit becoming available half way through
+	// iteration.
+	staticTime := getNow()
+
 ProcessLoop:
 	for _, qi := range queue {
+		// TODO: Create an in-memory mapping of rate limit keys that have been hit,
+		//       and don't bother to process if the queue item has a limited key.  This
+		//       lessens work done in the queue, as we can `continue` immediately.
+
 		if q.capacity() == 0 {
 			// no longer any available workers for partition, so we can skip
 			// work for now.
@@ -738,7 +748,7 @@ ProcessLoop:
 		}
 
 		item := qi
-		if item.IsLeased(time.Now()) {
+		if item.IsLeased(getNow()) {
 			q.int64counter(ctx, "inngest_queue_partition_lease_contention_total", 1)
 			continue
 		}
@@ -757,7 +767,7 @@ ProcessLoop:
 		//
 		// This is safe:  only one process runs scan(), and we guard the total number of
 		// available workers with the above semaphore.
-		leaseID, err := q.Lease(ctx, *p, *item, QueueLeaseDuration)
+		leaseID, err := q.Lease(ctx, *p, *item, QueueLeaseDuration, staticTime)
 
 		// Check the sojourn delay for this item in the queue. Tracking system latency vs
 		// sojourn latency from concurrency is important.
@@ -865,7 +875,7 @@ ProcessLoop:
 		}
 		// Requeue this partition as we hit concurrency limits.
 		q.int64counter(ctx, "inngest_queue_partition_concurrency_limit_total", 1)
-		return q.PartitionRequeue(ctx, p, time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+		return q.PartitionRequeue(ctx, p, getNow().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 
 	if processErr != nil {
@@ -879,7 +889,7 @@ ProcessLoop:
 	// Requeue the partition, which reads the next unleased job or sets a time of
 	// 30 seconds.  This is why we have to lease items above, else this may return an item that is
 	// about to be leased and processed by the worker.
-	err = q.PartitionRequeue(ctx, p, time.Now().Add(PartitionRequeueExtension), false)
+	err = q.PartitionRequeue(ctx, p, getNow().Add(PartitionRequeueExtension), false)
 	if err == ErrPartitionGarbageCollected {
 		// Safe;  we're preventing this from wasting cycles in the future.
 		return nil
@@ -965,7 +975,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 				Msg("delaying job in memory")
 		}
 
-		n := time.Now()
+		n := getNow()
 
 		// Track the sojourn (concurrency) latency.
 		var sojourn time.Duration
@@ -1128,7 +1138,7 @@ func (q *queue) isSequential() bool {
 	if l == nil {
 		return false
 	}
-	return ulid.Time(l.Time()).After(time.Now())
+	return ulid.Time(l.Time()).After(getNow())
 }
 
 func (q *queue) isScavenger() bool {
@@ -1136,7 +1146,7 @@ func (q *queue) isScavenger() bool {
 	if l == nil {
 		return false
 	}
-	return ulid.Time(l.Time()).After(time.Now())
+	return ulid.Time(l.Time()).After(getNow())
 }
 
 func (q *queue) queueGauges(ctx context.Context) {
@@ -1153,7 +1163,7 @@ func (q *queue) queueGauges(ctx context.Context) {
 		"inngest_queue_global_partition_total_count",
 		metric.WithDescription("Number of total partitions in the global queue"),
 		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
-			cnt, err := q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), time.Now().Add(time.Hour*24*365))
+			cnt, err := q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), getNow().Add(time.Hour*24*365))
 			if err != nil {
 				q.logger.Error().Err(err).Msg("error getting global partition total for gauge")
 			}
@@ -1166,7 +1176,7 @@ func (q *queue) queueGauges(ctx context.Context) {
 		"inngest_queue_global_partition_available_count",
 		metric.WithDescription("Number of available partitions in the global queue"),
 		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
-			cnt, err := q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), time.Now().Add(PartitionLookahead))
+			cnt, err := q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), getNow().Add(PartitionLookahead))
 			if err != nil {
 				q.logger.Error().Err(err).Msg("error getting global partition available for gauge")
 			}
@@ -1234,7 +1244,7 @@ func (q *queue) shardGauges(ctx context.Context) {
 		metric.WithDescription("The number of avaialble partitions by shard"),
 		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
 			for _, shard := range shards {
-				cnt, err := q.partitionSize(ctx, q.kg.ShardPartitionIndex(shard.Name), time.Now().Add(PartitionLookahead))
+				cnt, err := q.partitionSize(ctx, q.kg.ShardPartitionIndex(shard.Name), getNow().Add(PartitionLookahead))
 				if err != nil {
 					q.logger.Error().Err(err).Msg("error getting shard partition size for gauge")
 				}
