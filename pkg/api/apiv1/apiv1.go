@@ -31,8 +31,10 @@ type Opts struct {
 	EventReader EventReader
 	// FunctionReader reads functions from a backing store.
 	FunctionReader cqrs.FunctionReader
-	// FunctionRunReader reads function runs, history, etc. from backing storage
+	// FunctionRunReader reads function runs from backing storage
 	FunctionRunReader cqrs.APIV1FunctionRunReader
+	// FunctionRunHistoryReader reads function run history a from backing storage
+	FunctionRunHistoryReader cqrs.APIV1FunctionRunHistoryReader
 	// JobQueueReader reads information around a function run's job queues.
 	JobQueueReader queue.JobQueueReader
 	// CancellationReadWriter reads and writes cancellations to/from a backing store.
@@ -74,6 +76,7 @@ func (a *api) setup() {
 		r.Get("/events/{eventID}/runs", a.GetEventRuns)
 		r.Get("/runs/{runID}", a.GetFunctionRun)
 		r.Delete("/runs/{runID}", a.CancelFunctionRun)
+		r.Get("/runs/{runID}/logs", a.GetFunctionRunLogs)
 		r.Get("/runs/{runID}/jobs", a.GetFunctionRunJobs)
 
 		r.Get("/apps/{appName}/functions", a.GetAppFunctions) // Returns an app and all of its functions.
