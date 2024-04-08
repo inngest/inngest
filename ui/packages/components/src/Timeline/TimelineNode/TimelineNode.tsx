@@ -146,9 +146,10 @@ function useOutput({
       return;
     }
 
-    // We should only fetch output if the node has ended. There are some edge
-    // cases where a node can have an output item ID but not be in an end state
-    if (!isEndStatus(nodeStatus)) {
+    // We should only fetch output if the node has ended or errored ("errored"
+    // means there will be a retry). There are some edge cases where a node can
+    // have an output item ID but not be in an end state
+    if (!isEndStatus(nodeStatus) && nodeStatus != 'errored') {
       return;
     }
 
