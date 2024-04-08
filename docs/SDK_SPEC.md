@@ -188,6 +188,8 @@ An SDK MUST support these environment variables and use them to fill the appropr
 Used to specify an Event Key to be used when sending Events to an Inngest Server. Always recommend that a Developer specifies an Event Key as an environment variable to avoid checking secrets into source control.
 - `INNGEST_SIGNING_KEY`
 Used to specify a Signing Key to be used when contacting the Inngest API and verifying the integrity of requests from an Inngest Server. Always recommend that a Developer specifies a Signing Key as an environment variable to avoid checking secrets into source control.
+- `INNGEST_SIGNING_KEY_FALLBACK`
+Used to specify a fallback Signing Key in case `INNGEST_SIGNING_KEY` is invalid. The SDK MUST attempt to use `INNGEST_SIGNING_KEY_FALLBACK` any time `INNGEST_SIGNING_KEY` fails, including but not limited to: request signature validation and sending REST API requests (e.g. fetching batch).
 - `INNGEST_ENV`
 MUST be used to set the `X-Inngest-Env` [[4.1.1](#411-definitions)] header when making requests to an Inngest Server, which informs the Inngest Server which environment you’re wanting to send events to.
 
@@ -898,9 +900,31 @@ The execution of a Function, the returned data, and the tooling available to a D
 
 ## 4.5. Introspection Requests
 
-An SDK MAY offer the ability to respond to an Introspection Request, a `GET` request intended to be used as a health check, ensuring that an HTTP request can be correctly handled by an SDK.
+An SDK MUST respond to an Introspection Request, a `GET` request intended to be used as a health check, ensuring that an HTTP request can be correctly handled by an SDK.
 
-If an SDK chooses to respond to this method, it MUST NOT return any sensitive data.
+If the request signature validation fails, then the SDK MUST NOT return any sensitive data. The response schema MUST be:
+
+```ts
+{
+	function_count: number
+	has_event_key: boolean
+	has_signing_key: boolean
+  mode: "cloud" | "dev"
+}
+```
+
+If the request passes signature validation, then the response schema MUST be:
+
+```ts
+{
+  fallback_signing_key_hash: string
+  function_count: number
+  has_event_key: boolean
+  has_signing_key: boolean
+  mode: "cloud" | "dev"
+  signing_key_hash: string
+}
+```
 
 # 5. Steps
 
