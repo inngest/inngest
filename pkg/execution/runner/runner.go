@@ -360,15 +360,18 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		}
 	}()
 
-	// nil check somewhere lol
-	if tracked.GetEvent().InngestMetadata().InvokeCorrelationId != "" {
+	// check if this is an "inngest/function.finished" event
+	// triggered by invoke
+	meta := tracked.GetEvent().InngestMetadata()
+	if meta != nil && meta.InvokeCorrelationId != "" {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-
 			// this is an "inngest/function.finished" event
-			s.executor.HandleInvoke()
-
+			if err := s.invokes(ctx, tracked); err != nil {
+				l.Error().Err(err).Msg("error resuming invoke")
+				errs = multierror.Append(errs, err)
+			}
 		}()
 	}
 
@@ -526,6 +529,25 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 
 	wg.Wait()
 	return errs
+}
+
+// invokes looks for a pause with the same correlation ID and triggers it
+func (s *svc) invokes(ctx context.Context, evt event.TrackedEvent) error {
+	meta := evt.GetEvent().InngestMetadata()
+	if meta != nil {
+		return fmt.Errorf("no metadata available to lookup invoke function")
+	}
+
+	logger.From(ctx).Trace().
+		Str("fnID", meta.InvokeFnID).
+		Str("identifier", meta.InvokeCorrelationId).
+		Msg("looking for invoke trigger")
+
+	// Steps
+	// - Find the pause with correlationID
+	// - Consume the pause
+
+	return nil
 }
 
 // pauses searches for and triggers all pauses from this event.
