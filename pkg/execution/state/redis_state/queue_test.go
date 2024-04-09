@@ -1186,6 +1186,31 @@ func TestQueuePartitionPeek(t *testing.T) {
 		}, items)
 	})
 
+	t.Run("With a single peek max, it returns the first item if sequential every time", func(t *testing.T) {
+		for i := 0; i <= 50; i++ {
+			items, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), 1)
+			require.NoError(t, err)
+			require.Len(t, items, 1)
+			require.Equal(t, idA, items[0].WorkflowID)
+		}
+	})
+
+	t.Run("With a single peek max, it returns random items that are available using offsets", func(t *testing.T) {
+		found := map[uuid.UUID]bool{idA: false, idB: false, idC: false}
+
+		for i := 0; i <= 50; i++ {
+			items, err := q.PartitionPeek(ctx, false, time.Now().Add(time.Hour), 1)
+			require.NoError(t, err)
+			require.Len(t, items, 1)
+			found[items[0].WorkflowID] = true
+			<-time.After(time.Millisecond)
+		}
+
+		for id, v := range found {
+			require.True(t, v, "PartitionPeek didn't find id '%s' via random offsets", id)
+		}
+	})
+
 	t.Run("Random returns items randomly using weighted sample", func(t *testing.T) {
 		a, b, c := 0, 0, 0
 		for i := 0; i <= 1000; i++ {

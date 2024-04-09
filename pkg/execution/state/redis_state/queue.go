@@ -1457,12 +1457,17 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	// TODO: If this is an allowlist, only peek the given partitions.  Use ZMSCORE
 	// to fetch the scores for all allowed partitions, then filter where score <= until.
 	// Call an HMGET to get the partitions.
+	ms := until.UnixMilli()
 
-	unix := until.Unix()
+	isSequential := 0
+	if sequential {
+		isSequential = 1
+	}
 
 	args, err := StrSlice([]any{
-		unix,
+		ms,
 		limit,
+		isSequential,
 	})
 	if err != nil {
 		return nil, err
