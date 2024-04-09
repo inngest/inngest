@@ -8,7 +8,9 @@ import { useDebounce } from 'react-use';
 import Input from '@/components/Forms/Input';
 
 type Props = {
+  className?: string;
   onChange: (newDateTime: Date) => void;
+  name?: string;
   placeholder?: string;
   required?: boolean;
 };
@@ -104,7 +106,7 @@ function reducer(state: State, action: Action): State {
   }
 }
 
-export function TimeInput({ onChange, placeholder, required }: Props) {
+export function TimeInput({ className, onChange, name, placeholder, required }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, dispatch] = useReducer(reducer, {
     inputString: '',
@@ -165,6 +167,8 @@ export function TimeInput({ onChange, placeholder, required }: Props) {
     <Popover.Root open={state.status === 'focused' || state.status === 'suggestion_available'}>
       <Popover.Anchor>
         <Input
+          className={className}
+          name={name}
           type="text"
           value={state.inputString}
           placeholder={placeholder}

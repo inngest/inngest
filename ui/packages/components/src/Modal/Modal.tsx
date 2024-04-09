@@ -77,8 +77,8 @@ export function Modal({
   );
 }
 
-function Body({ children }: React.PropsWithChildren<{}>) {
-  return <div className="m-6">{children}</div>;
+function Body({ children, className }: React.PropsWithChildren<{ className?: string }>) {
+  return <div className={cn('m-6', className)}>{children}</div>;
 }
 
 function Footer({ children, className }: React.PropsWithChildren<{ className?: string }>) {
