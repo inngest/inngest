@@ -20,6 +20,7 @@ const (
 	KindPause         = "pause"
 	KindDebounce      = "debounce"
 	KindScheduleBatch = "schedule-batch"
+	KindInvoke        = "invoke"
 	KindEdgeError     = "edge-error" // KindEdgeError is used to indicate a final step error attempting a graceful save.
 )
 
@@ -191,4 +192,12 @@ type PayloadEdge struct {
 type PayloadPauseTimeout struct {
 	PauseID   uuid.UUID `json:"pauseID"`
 	OnTimeout bool      `json:"onTimeout"`
+}
+
+// PayloadInvokeTimeout is the payload stored when enqueueing an invoke timeout,
+// where it checks if the invoked function has finished yet
+type PayloadInvokeTimeout struct {
+	PauseID       uuid.UUID `json:"pauseID"`
+	CorrelationID string    `json:"cID"`
+	OnTimeout     bool      `json:"onTimeout"`
 }

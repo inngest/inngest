@@ -1890,42 +1890,38 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		return fmt.Errorf("unable to parse invoke function expires: %w", err)
 	}
 
-	e.sm.SaveInvokePause()
+	eventName := event.FnFinishedName
+	correlationID := item.Identifier.RunID.String() + "." + gen.ID
 
-	// eventName := event.FnFinishedName
-	// correlationID := item.Identifier.RunID.String() + "." + gen.ID
-	// strExpr := fmt.Sprintf("async.data.%s == %s", consts.InvokeCorrelationId, strconv.Quote(correlationID))
-	// _, err = e.newExpressionEvaluator(ctx, strExpr)
-	// if err != nil {
-	// 	return execError{err: fmt.Errorf("failed to create expression to wait for invoked function completion: %w", err)}
-	// }
+	logger.From(ctx).Info().Interface("opts", opts).Time("expires", expires).Str("event", eventName).Msg("parsed invoke function opts")
 
-	// logger.From(ctx).Info().Interface("opts", opts).Time("expires", expires).Str("event", eventName).Str("expr", strExpr).Msg("parsed invoke function opts")
+	pauseID := uuid.NewSHA1(
+		uuid.NameSpaceOID,
+		[]byte(item.Identifier.RunID.String()+gen.ID),
+	)
 
-	// pauseID := uuid.NewSHA1(
-	// 	uuid.NameSpaceOID,
-	// 	[]byte(item.Identifier.RunID.String()+gen.ID),
-	// )
-
-	// opcode := gen.Op.String()
-	// err = e.sm.SavePause(ctx, state.Pause{
-	// 	ID:          pauseID,
-	// 	WorkspaceID: item.WorkspaceID,
-	// 	Identifier:  item.Identifier,
-	// 	GroupID:     item.GroupID,
-	// 	Outgoing:    gen.ID,
-	// 	Incoming:    edge.Edge.Incoming,
-	// 	StepName:    gen.UserDefinedName(),
-	// 	Opcode:      &opcode,
-	// 	Expires:     state.Time(expires),
-	// 	Event:       &eventName,
-	// 	// Expression:  &strExpr,
-	// 	InvokeCorrelationID: "",
-	// 	DataKey:     gen.ID,
-	// })
-	// if err == state.ErrPauseAlreadyExists {
-	// 	return nil
-	// }
+	opcode := gen.Op.String()
+	err = e.sm.SaveInvokePause(
+		ctx,
+		correlationID,
+		state.Pause{
+			ID:          pauseID,
+			WorkspaceID: item.WorkspaceID,
+			Identifier:  item.Identifier,
+			GroupID:     item.GroupID,
+			Outgoing:    gen.ID,
+			Incoming:    edge.Edge.Incoming,
+			StepName:    gen.UserDefinedName(),
+			Opcode:      &opcode,
+			Expires:     state.Time(expires),
+			Event:       &eventName,
+			DataKey:     gen.ID,
+			Expression:  &correlationID,
+		},
+	)
+	if err == state.ErrInvokePauseExists {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -1939,11 +1935,12 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		// Use the same group ID, allowing us to track the cancellation of
 		// the step correctly.
 		GroupID:    item.GroupID,
-		Kind:       queue.KindPause,
+		Kind:       queue.KindInvoke,
 		Identifier: item.Identifier,
-		Payload: queue.PayloadPauseTimeout{
-			PauseID:   pauseID,
-			OnTimeout: true,
+		Payload: queue.PayloadInvokeTimeout{
+			PauseID:       pauseID,
+			CorrelationID: correlationID,
+			OnTimeout:     true,
 		},
 	}, expires)
 	if err == redis_state.ErrQueueItemExists {

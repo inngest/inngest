@@ -175,6 +175,9 @@ func (s *svc) Run(ctx context.Context) error {
 			err = s.handleQueueItem(ctx, item)
 		case queue.KindPause:
 			err = s.handlePauseTimeout(ctx, item)
+		case queue.KindInvoke:
+			// TODO: implement handler for invoke timeout
+			err = nil
 		case queue.KindDebounce:
 			d := debounce.DebouncePayload{}
 			if err := json.Unmarshal(item.Payload.(json.RawMessage), &d); err != nil {
