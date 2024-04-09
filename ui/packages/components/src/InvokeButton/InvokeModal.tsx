@@ -1,11 +1,10 @@
 import { useState } from 'react';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
+import { CodeBlock } from '@inngest/components/CodeBlock';
 import { Modal } from '@inngest/components/Modal';
 
-import { Alert } from '@/components/Alert';
-import CodeEditor from '@/components/Textarea/CodeEditor';
-
-const initialCode = { data: {} };
+const initialCode = JSON.stringify({ data: {} }, null, 2);
 
 type Props = {
   doesFunctionAcceptPayload: boolean;
@@ -16,6 +15,7 @@ type Props = {
 
 export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onConfirm }: Props) {
   const [error, setError] = useState<string>();
+  const [rawPayload, setRawPayload] = useState(initialCode);
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -23,8 +23,7 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
     try {
       let payload;
       if (doesFunctionAcceptPayload) {
-        const formData = new FormData(event.currentTarget);
-        payload = parseCode(formData.get('code'));
+        payload = parseCode(rawPayload);
       } else {
         payload = { data: {} };
       }
@@ -44,15 +43,23 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
   let content;
   if (doesFunctionAcceptPayload) {
     content = (
-      <CodeEditor
-        className="rounded-lg bg-slate-900 px-4"
-        initialCode={JSON.stringify(initialCode, null, 2)}
-        language="json"
-        name="code"
+      <CodeBlock
+        tabs={[
+          {
+            content: rawPayload,
+            language: 'json',
+            readOnly: false,
+            handleChange: setRawPayload,
+          },
+        ]}
       />
     );
   } else {
-    content = <p>Cron functions without event triggers cannot include payload data.</p>;
+    content = (
+      <p className="dark:text-white">
+        Cron functions without event triggers cannot include payload data.
+      </p>
+    );
   }
 
   return (
@@ -85,7 +92,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function parseCode(code: unknown): { data: Record<string, unknown> } {
+function parseCode(code: string): { data: Record<string, unknown> } {
   if (typeof code !== 'string') {
     throw new Error("The payload form field isn't a string");
   }
@@ -104,6 +111,13 @@ function parseCode(code: unknown): { data: Record<string, unknown> } {
   }
   if (!isRecord(data)) {
     throw new Error('The "data" field must be an object or null');
+  }
+
+  const supportedKeys = ['data'];
+  for (const key of Object.keys(payload)) {
+    if (!supportedKeys.includes(key)) {
+      throw new Error(`Property "${key}" is not supported when invoking a function`);
+    }
   }
 
   return { data };

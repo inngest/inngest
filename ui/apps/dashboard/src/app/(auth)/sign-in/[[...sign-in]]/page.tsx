@@ -1,9 +1,9 @@
 import { type Metadata } from 'next';
 import Link from 'next/link';
 import { SignIn } from '@clerk/nextjs';
+import { Alert } from '@inngest/components/Alert';
 
 import SplitView from '@/app/(auth)/SplitView';
-import { Alert } from '@/components/Alert';
 import signInRedirectErrors from './SignInRedirectErrors';
 
 export const metadata: Metadata = {

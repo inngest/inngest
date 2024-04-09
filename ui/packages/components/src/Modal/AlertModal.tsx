@@ -6,22 +6,21 @@ import { Button } from '../Button';
 
 type AlertModalProps = {
   children?: React.ReactNode;
+  isLoading?: boolean;
   isOpen: boolean;
   onClose: () => void;
   title?: string | React.ReactNode;
   description?: string;
   className?: string;
-  primaryAction: {
-    label: string;
-    btnAction: () => void;
-  };
+  onSubmit: () => void | Promise<void>;
 };
 
 export function AlertModal({
   children,
+  isLoading = false,
   isOpen,
   onClose,
-  primaryAction,
+  onSubmit,
   title = 'Are you sure you want to delete?',
   description,
   className = 'w-1/4',
@@ -71,14 +70,18 @@ export function AlertModal({
                 )}
                 <div className="flex justify-end gap-2 px-6 pb-6 dark:border-slate-800">
                   <AlertDialog.Cancel asChild>
-                    <Button appearance="outlined" label="Cancel" />
+                    <Button appearance="outlined" disabled={isLoading} label="No" />
                   </AlertDialog.Cancel>
                   <Button
+                    disabled={isLoading}
                     kind="danger"
-                    label={primaryAction.label}
-                    btnAction={() => {
-                      primaryAction.btnAction();
-                      onClose();
+                    label="Yes"
+                    loading={isLoading}
+                    btnAction={async () => {
+                      try {
+                        await onSubmit();
+                        onClose();
+                      } catch {}
                     }}
                   />
                 </div>

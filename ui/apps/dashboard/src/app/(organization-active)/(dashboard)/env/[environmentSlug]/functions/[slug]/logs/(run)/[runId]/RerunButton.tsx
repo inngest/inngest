@@ -58,7 +58,6 @@ export default function RerunButton({ environment, functionRunID, func }: RerunB
   return (
     <Button
       size="small"
-      iconSide="right"
       loading={isMutating}
       btnAction={() => rerunFunction()}
       icon={<ArrowPathIcon className={cn(' text-sky-500', isMutating && 'animate-spin')} />}

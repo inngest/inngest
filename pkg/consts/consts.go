@@ -52,6 +52,9 @@ const (
 	// MaxConcurrencyLimits limits the max concurrency constraints for a specific function.
 	MaxConcurrencyLimits = 2
 
+	// MaxTriggers represents the maximum number of triggers a function can have.
+	MaxTriggers = 10
+
 	// MaxBatchTTL represents the maximum amount of duration the batch key will last
 	MaxBatchTTL = 10 * time.Minute
 

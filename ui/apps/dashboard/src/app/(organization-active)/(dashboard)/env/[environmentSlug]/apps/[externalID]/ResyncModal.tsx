@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import ArrowPathIcon from '@heroicons/react/20/solid/ArrowPathIcon';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
@@ -9,7 +10,6 @@ import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import type { CodedError } from '@/codedError';
-import { Alert } from '@/components/Alert';
 import Input from '@/components/Forms/Input';
 import { SyncFailure } from '@/components/SyncFailure/SyncFailure';
 import { graphql } from '@/gql';

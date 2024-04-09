@@ -13,6 +13,7 @@ export type Scalars = {
   Float: number;
   /** The environment for the function to be run: `"prod"` or `"test"` */
   Environment: any;
+  Map: any;
   Time: any;
   ULID: any;
   UUID: any;
@@ -48,6 +49,7 @@ export type CreateAppInput = {
 export type Event = {
   __typename?: 'Event';
   createdAt: Maybe<Scalars['Time']>;
+  externalID: Maybe<Scalars['String']>;
   functionRuns: Maybe<Array<FunctionRun>>;
   id: Scalars['ULID'];
   name: Maybe<Scalars['String']>;
@@ -209,10 +211,17 @@ export enum HistoryType {
 
 export type Mutation = {
   __typename?: 'Mutation';
+  cancelRun: FunctionRun;
   createApp: App;
   deleteApp: Scalars['String'];
   deleteAppByName: Scalars['Boolean'];
+  invokeFunction: Maybe<Scalars['Boolean']>;
   updateApp: App;
+};
+
+
+export type MutationCancelRunArgs = {
+  runID: Scalars['ULID'];
 };
 
 
@@ -228,6 +237,12 @@ export type MutationDeleteAppArgs = {
 
 export type MutationDeleteAppByNameArgs = {
   name: Scalars['String'];
+};
+
+
+export type MutationInvokeFunctionArgs = {
+  data: InputMaybe<Scalars['Map']>;
+  functionSlug: Scalars['String'];
 };
 
 
@@ -473,6 +488,21 @@ export type GetHistoryItemOutputQueryVariables = Exact<{
 
 export type GetHistoryItemOutputQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', historyItemOutput: string | null } | null };
 
+export type InvokeFunctionMutationVariables = Exact<{
+  functionSlug: Scalars['String'];
+  data: InputMaybe<Scalars['Map']>;
+}>;
+
+
+export type InvokeFunctionMutation = { __typename?: 'Mutation', invokeFunction: boolean | null };
+
+export type CancelRunMutationVariables = Exact<{
+  runID: Scalars['ULID'];
+}>;
+
+
+export type CancelRunMutation = { __typename?: 'Mutation', cancelRun: { __typename?: 'FunctionRun', id: string } };
+
 
 export const GetEventDocument = `
     query GetEvent($id: ID!) {
@@ -686,6 +716,18 @@ export const GetHistoryItemOutputDocument = `
   }
 }
     `;
+export const InvokeFunctionDocument = `
+    mutation InvokeFunction($functionSlug: String!, $data: Map) {
+  invokeFunction(data: $data, functionSlug: $functionSlug)
+}
+    `;
+export const CancelRunDocument = `
+    mutation CancelRun($runID: ULID!) {
+  cancelRun(runID: $runID) {
+    id
+  }
+}
+    `;
 
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -722,9 +764,15 @@ const injectedRtkApi = api.injectEndpoints({
     GetHistoryItemOutput: build.query<GetHistoryItemOutputQuery, GetHistoryItemOutputQueryVariables>({
       query: (variables) => ({ document: GetHistoryItemOutputDocument, variables })
     }),
+    InvokeFunction: build.mutation<InvokeFunctionMutation, InvokeFunctionMutationVariables>({
+      query: (variables) => ({ document: InvokeFunctionDocument, variables })
+    }),
+    CancelRun: build.mutation<CancelRunMutation, CancelRunMutationVariables>({
+      query: (variables) => ({ document: CancelRunDocument, variables })
+    }),
   }),
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery } = injectedRtkApi;
+export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation, useCancelRunMutation } = injectedRtkApi;
 

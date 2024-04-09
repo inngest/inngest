@@ -132,30 +132,37 @@ func (e Event) InngestMetadata() *InngestMetadata {
 }
 
 func NewOSSTrackedEvent(e Event) TrackedEvent {
-	id, err := ulid.Parse(e.ID)
-	if err != nil {
-		id = ulid.MustNew(ulid.Now(), rand.Reader)
-	}
+	// Never use e.ID as the internal ID, since it's specified by the sender
+	internalID := ulid.MustNew(ulid.Now(), rand.Reader)
 	if e.ID == "" {
-		e.ID = id.String()
+		e.ID = internalID.String()
 	}
 	return ossTrackedEvent{
-		id:    id,
-		event: e,
+		Id:    internalID,
+		Event: e,
 	}
+}
+
+func NewOSSTrackedEventFromString(data string) (*ossTrackedEvent, error) {
+	evt := &ossTrackedEvent{}
+	if err := json.Unmarshal([]byte(data), evt); err != nil {
+		return nil, err
+	}
+
+	return evt, nil
 }
 
 type ossTrackedEvent struct {
-	id    ulid.ULID
-	event Event
+	Id    ulid.ULID `json:"internal_id"`
+	Event Event     `json:"event"`
 }
 
 func (o ossTrackedEvent) GetEvent() Event {
-	return o.event
+	return o.Event
 }
 
 func (o ossTrackedEvent) GetInternalID() ulid.ULID {
-	return o.id
+	return o.Id
 }
 
 func (o ossTrackedEvent) GetWorkspaceID() uuid.UUID {

@@ -27,7 +27,6 @@ import (
 	"github.com/uber-go/tally/v4"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/trace"
 	"gonum.org/v1/gonum/stat/sampleuv"
 	"lukechampine.com/frand"
 )
@@ -213,12 +212,6 @@ func WithPollTick(t time.Duration) func(q *queue) {
 	}
 }
 
-func WithTracer(t trace.Tracer) func(q *queue) {
-	return func(q *queue) {
-		q.tracer = t
-	}
-}
-
 func WithQueueItemIndexer(i QueueItemIndexer) func(q *queue) {
 	return func(q *queue) {
 		q.itemIndexer = i
@@ -348,7 +341,6 @@ func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 		queueKindMapping:   make(map[string]string),
 		scope:              tally.NoopScope,
 		meter:              otel.Meter("redis_state.queue"),
-		tracer:             trace.NewNoopTracerProvider().Tracer("redis_queue"),
 		logger:             logger.From(context.Background()),
 		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) (string, int) {
 			return p.Queue(), 10_000
@@ -449,8 +441,6 @@ type queue struct {
 	scope tally.Scope
 	meter metric.Meter
 
-	// tracer is the tracer to use for opentelemetry tracing.
-	tracer trace.Tracer
 	// backoffFunc is the backoff function to use when retrying operations.
 	backoffFunc backoff.BackoffFunc
 }

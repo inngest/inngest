@@ -1,3 +1,5 @@
+'use client';
+
 import { type Route } from 'next';
 import Link from 'next/link';
 import {
@@ -8,7 +10,7 @@ import {
 } from '@heroicons/react/20/solid';
 import { Badge } from '@inngest/components/Badge';
 
-import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import OrganizationDropdown from '@/components/Navigation/OrganizationDropdown';
 import UserDropdown from '@/components/Navigation/UserDropdown';
 import InngestLogo from '@/icons/InngestLogo';
@@ -32,8 +34,8 @@ type NavItem = {
 const ALL_ENVIRONMENTS_SLUG = 'all';
 const BRANCH_PARENT_SLUG = 'branch';
 
-export default async function AppNavigation({ environmentSlug }: AppNavigationProps) {
-  const isEventSearchEnabled = await getBooleanFlag('event-search');
+export default function AppNavigation({ environmentSlug }: AppNavigationProps) {
+  const { value: isEventSearchEnabled } = useBooleanFlag('event-search');
 
   let items: NavItem[] = [
     {

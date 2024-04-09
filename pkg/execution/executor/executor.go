@@ -30,9 +30,14 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
 	"github.com/xhit/go-str2duration/v2"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
@@ -283,6 +288,19 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, ErrFunctionDebounced
 	}
 
+	ctx, span := telemetry.UserTracer().Provider().
+		Tracer(consts.OtelScopeFunction).
+		Start(ctx, req.Function.GetSlug(), trace.WithAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, req.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, req.Function.ID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, req.Function.GetSlug()),
+			attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
+		))
+	defer span.End()
+
 	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
 	// When running a cancellation, functions are cancelled at scheduling time based off of
 	// this run ID.
@@ -308,8 +326,22 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	eventIDs := []ulid.ULID{}
+	spanEventIDs := []string{}
 	for _, e := range req.Events {
-		eventIDs = append(eventIDs, e.GetInternalID())
+		id := e.GetInternalID()
+		eventIDs = append(eventIDs, id)
+		spanEventIDs = append(spanEventIDs, id.String())
+	}
+
+	span.SetAttributes(
+		attribute.String(consts.OtelAttrSDKRunID, runID.String()),
+		attribute.StringSlice(consts.OtelSysEventIDs, spanEventIDs),
+		attribute.String(consts.OtelSysIdempotencyKey, key),
+	)
+	if len(req.Events) > 1 {
+		span.SetAttributes(
+			attribute.String(consts.OtelSysBatchID, req.BatchID.String()),
+		)
 	}
 
 	id := state.Identifier{
@@ -371,11 +403,20 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		id.PriorityFactor = &factor
 	}
 
+	// Inject trace context into state metadata
+	stateMetadata := map[string]any{}
+	if req.Context != nil {
+		stateMetadata = req.Context
+	}
+	carrier := telemetry.NewTraceCarrier()
+	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	stateMetadata[consts.OtelPropagationKey] = carrier
+
 	// Create a new function.
 	s, err := e.sm.New(ctx, state.Input{
 		Identifier:     id,
 		EventBatchData: mapped,
-		Context:        req.Context,
+		Context:        stateMetadata,
 	})
 	if err == state.ErrIdentifierExists {
 		// This function was already created.
@@ -479,6 +520,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 	err = e.queue.Enqueue(ctx, item, at)
 	if err == redis_state.ErrQueueItemExists {
+		span.SetAttributes(attribute.Bool(consts.OtelSysIgnored, true))
 		return nil, state.ErrIdentifierExists
 	}
 	if err != nil {
@@ -504,11 +546,27 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, err
 	}
 
+	// We get trace context from this, which is the run metadata.
+	// We should probably get trace context from the queue item if that
+	// contains it.
 	md := s.Metadata()
 
-	// Store the metadata in context for future use.  This can be used to reduce
-	// reads in the future.
-	ctx = WithContextMetadata(ctx, md)
+	// Store the metadata in context for future use and propagate trace
+	// context. This can be used to reduce reads in the future.
+	ctx = e.extractTraceCtx(WithContextMetadata(ctx, md), id, &item)
+
+	ctx, span := telemetry.UserTracer().Provider().
+		Tracer(consts.OtelScopeExecution).
+		Start(ctx, "running", trace.WithAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, id.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, id.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, id.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, id.WorkflowID.String()),
+			attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
+			attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
+		))
+	defer span.End()
 
 	if md.Status == enums.RunStatusCancelled {
 		return nil, state.ErrFunctionCancelled
@@ -632,7 +690,58 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	resp, err := e.run(ctx, id, item, edge, s, stackIndex)
 	if resp == nil && err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		if byt, err := json.Marshal(err.Error()); err == nil {
+			span.AddEvent(string(byt), trace.WithAttributes(
+				attribute.Bool(consts.OtelSysStepOutput, true),
+			))
+		}
+
 		return nil, err
+	}
+
+	if resp != nil {
+		if op := resp.TraceVisibleStepExecution(); op != nil {
+			spanName := op.UserDefinedName()
+			span.SetName(spanName)
+
+			span.SetAttributes(
+				attribute.Int(consts.OtelSysStepStatus, resp.StatusCode),
+				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
+			)
+
+			if byt, err := json.Marshal(resp.Output); err == nil {
+				span.AddEvent(string(byt), trace.WithAttributes(
+					attribute.Bool(consts.OtelSysStepOutput, true),
+				))
+			}
+		} else if resp.IsTraceVisibleFunctionExecution() {
+			spanName := "function success"
+			if resp.StatusCode != 200 {
+				spanName = "function error"
+				span.SetStatus(codes.Error, resp.Error())
+			}
+
+			span.SetName(spanName)
+
+			span.SetAttributes(
+				attribute.Int(consts.OtelSysFunctionStatus, resp.StatusCode),
+			)
+
+			if byt, err := json.Marshal(resp.Output); err == nil {
+				span.AddEvent(string(byt), trace.WithAttributes(
+					attribute.Bool(consts.OtelSysFunctionOutput, true),
+				))
+			}
+
+		} else {
+			// Only add this span if it's a step or function response that
+			// represents either a failed or a successful execution. Do not
+			// record discovery spans.
+			span.SetAttributes(
+				attribute.Bool(consts.OtelSysIgnored, true),
+			)
+		}
 	}
 
 	err = e.HandleResponse(ctx, id, item, edge, resp)
@@ -1594,6 +1703,8 @@ func (e *executor) handleStepError(ctx context.Context, gen state.GeneratorOpcod
 	// Things to bear in mind:
 	// - Steps throwing/returning NonRetriableErrors are still OpcodeStepError
 	// - We are now in charge of rescheduling the entire function
+	span := trace.SpanFromContext(ctx)
+	span.SetStatus(codes.Error, gen.Error.Name)
 
 	if gen.Error == nil {
 		// This should never happen.
@@ -1650,8 +1761,9 @@ func (e *executor) handleStepError(ctx context.Context, gen state.GeneratorOpcod
 	}
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
-	jobID := fmt.Sprintf("%s-%s-failure", item.Identifier.IdempotencyKey(), gen.ID)
 
+	// This is the discovery step to find what happens after we error
+	jobID := fmt.Sprintf("%s-%s-failure", item.Identifier.IdempotencyKey(), gen.ID)
 	nextItem := queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: item.WorkspaceID,
@@ -1738,6 +1850,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 	until := time.Now().Add(dur)
 
 	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
+	// TODO Should this also include a parent step span? It will never have attempts.
 	err = e.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: item.WorkspaceID,
@@ -1817,6 +1930,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 
 	// Enqueue a job that will timeout the pause.
 	jobID := fmt.Sprintf("%s-%s-%s", item.Identifier.IdempotencyKey(), gen.ID, "invoke")
+	// TODO I think this is fine sending no metadata, as we have no attempts.
 	err = e.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: item.WorkspaceID,
@@ -1953,6 +2067,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	// one thread can lease and consume a pause;  the other will find that the
 	// pause is no longer available and return.
 	jobID := fmt.Sprintf("%s-%s-%s", item.Identifier.IdempotencyKey(), gen.ID, "wait")
+	// TODO Is this fine to leave? No attempts.
 	err = e.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: item.WorkspaceID,
@@ -1982,6 +2097,50 @@ func (e *executor) newExpressionEvaluator(ctx context.Context, expr string) (exp
 		return e.evalFactory(ctx, expr)
 	}
 	return expressions.NewExpressionEvaluator(ctx, expr)
+}
+
+// extractTraceCtx extracts the trace context from the given item, if it exists.
+// If it doesn't it falls back to extracting the trace for the run overall.
+// If neither exist or they are invalid, it returns the original context.
+func (e *executor) extractTraceCtx(ctx context.Context, id state.Identifier, item *queue.Item) context.Context {
+	if item != nil {
+		metadata := make(map[string]any)
+		for k, v := range item.Metadata {
+			metadata[k] = v
+		}
+		itemCtx := extractTraceCtxFromMap(ctx, metadata)
+		if itemCtx != nil {
+			return *itemCtx
+		}
+	}
+
+	md, err := e.sm.Metadata(ctx, id.RunID)
+	if err != nil {
+		return ctx
+	}
+
+	if md.Context != nil {
+		stateCtx := extractTraceCtxFromMap(ctx, md.Context)
+		if stateCtx != nil {
+			return *stateCtx
+		}
+	}
+
+	return ctx
+}
+
+// extractTraceCtxFromMap extracts the trace context from a map, if it exists.
+// If it doesn't or it is invalid, it nil.
+func extractTraceCtxFromMap(ctx context.Context, target map[string]any) *context.Context {
+	if trace, ok := target[consts.OtelPropagationKey]; ok {
+		carrier := telemetry.NewTraceCarrier()
+		if err := carrier.Unmarshal(trace); err == nil {
+			targetCtx := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+			return &targetCtx
+		}
+	}
+
+	return nil
 }
 
 type execError struct {

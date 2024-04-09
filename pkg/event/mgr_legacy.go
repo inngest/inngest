@@ -3,19 +3,19 @@ package event
 import "sync"
 
 type Manager struct {
-	events map[string]Event
+	events map[string]TrackedEvent
 	l      *sync.RWMutex
 }
 
 func NewManager() Manager {
 	return Manager{
-		events: make(map[string]Event),
+		events: make(map[string]TrackedEvent),
 		l:      &sync.RWMutex{},
 	}
 }
 
 // Fetch an individual event by its ID.
-func (e Manager) EventById(id string) *Event {
+func (e Manager) EventById(id string) TrackedEvent {
 	e.l.RLock()
 	defer e.l.RUnlock()
 
@@ -24,18 +24,18 @@ func (e Manager) EventById(id string) *Event {
 		return nil
 	}
 
-	return &evt
+	return evt
 }
 
 // Fetch all events with a given name.
-func (e Manager) EventsByName(name string) []Event {
+func (e Manager) EventsByName(name string) []TrackedEvent {
 	e.l.RLock()
 	defer e.l.RUnlock()
 
-	events := []Event{}
+	events := []TrackedEvent{}
 
 	for _, evt := range e.events {
-		if evt.Name == name {
+		if evt.GetEvent().Name == name {
 			events = append(events, evt)
 		}
 	}
@@ -45,11 +45,11 @@ func (e Manager) EventsByName(name string) []Event {
 }
 
 // Fetch all events.
-func (e Manager) Events() []Event {
+func (e Manager) Events() []TrackedEvent {
 	e.l.RLock()
 	defer e.l.RUnlock()
 
-	events := []Event{}
+	events := []TrackedEvent{}
 
 	for _, evt := range e.events {
 		events = append(events, evt)
@@ -59,16 +59,16 @@ func (e Manager) Events() []Event {
 }
 
 // Parse and create a new event, adding it to the in-memory map as we go.
-func (e Manager) NewEvent(data string) (*Event, error) {
+func (e Manager) NewEvent(data string) (TrackedEvent, error) {
 	e.l.Lock()
 	defer e.l.Unlock()
 
-	evt, err := NewEvent(data)
+	evt, err := NewOSSTrackedEventFromString(data)
 	if err != nil {
 		return nil, err
 	}
 
-	e.events[evt.ID] = *evt
+	e.events[evt.GetInternalID().String()] = *evt
 
 	return evt, err
 }

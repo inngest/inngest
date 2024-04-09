@@ -1,5 +1,6 @@
+import { Alert } from '@inngest/components/Alert';
+
 import { httpDataSchema, type CodedError } from '@/codedError';
-import { Alert } from '@/components/Alert';
 import { getMessage } from './utils';
 
 type Props = {

@@ -18,7 +18,11 @@ import (
 	"github.com/inngest/inngest/pkg/eventstream"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -108,11 +112,33 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 			StatusCode: http.StatusUnauthorized,
 			Error:      "Event key is required",
 		})
+
 		return
 	}
 
-	// Create a new channel which receives a stream of events from the incoming HTTP request
 	ctx, cancel := context.WithCancel(ctx)
+
+	// Create a new trace that may have a link to a previous one
+	fanoutCtx := context.Background()
+	fanoutCtx = telemetry.UserTracer().Propagator().Extract(fanoutCtx, propagation.HeaderCarrier(r.Header))
+
+	ctx, span := telemetry.
+		UserTracer().
+		Provider().
+		Tracer(consts.OtelScopeEventIngestion).
+		Start(
+			ctx,
+			"event-ingestion",
+			trace.WithLinks(
+				trace.LinkFromContext(fanoutCtx),
+			),
+			trace.WithAttributes(
+				attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			),
+		)
+	defer span.End()
+
+	// Create a new channel which receives a stream of events from the incoming HTTP request
 	stream := make(chan eventstream.StreamItem)
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
@@ -158,7 +184,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				evt.Timestamp = time.Now().UnixMilli()
 			}
 
-			id, err := a.handler(r.Context(), &evt)
+			id, err := a.handler(ctx, &evt)
 			if err != nil {
 				a.log.Error().Str("event", evt.Name).Err(err).Msg("error handling event")
 				return err
@@ -184,8 +210,9 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(apiutil.EventAPIResponse{
 			IDs:    ids[0 : max+1],
 			Status: 400,
-			Error:  err,
+			Error:  err.Error(),
 		})
+
 		return
 	}
 

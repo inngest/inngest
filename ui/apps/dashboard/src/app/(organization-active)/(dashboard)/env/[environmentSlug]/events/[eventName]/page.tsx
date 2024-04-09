@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { ChartBarIcon, ChevronRightIcon, CodeBracketSquareIcon } from '@heroicons/react/20/solid';
+import { Alert } from '@inngest/components/Alert';
 import colors from 'tailwindcss/colors';
 
-import { Alert } from '@/components/Alert';
 import Block from '@/components/Block';
 import SimpleBarChart from '@/components/Charts/SimpleBarChart';
 import Overlay from '@/components/Overlay';

@@ -21,6 +21,7 @@ export const runtime = 'nodejs';
 
 export default function EventTypesPage() {
   const [pages, setPages] = useState([1]);
+  const env = useEnvironment();
 
   function appendPage() {
     setPages((prevPages) => {
@@ -34,7 +35,7 @@ export default function EventTypesPage() {
       <Header
         title="Events"
         icon={<EventIcon className="h-4 w-4 text-white" />}
-        action={<SendEventButton />}
+        action={!env.isArchived && <SendEventButton />}
       />
 
       <main className="min-h-0 flex-1 overflow-y-auto bg-slate-100">
