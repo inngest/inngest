@@ -184,6 +184,10 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				evt.Timestamp = time.Now().UnixMilli()
 			}
 
+			if err := evt.Validate(ctx); err != nil {
+				return err
+			}
+
 			id, err := a.handler(ctx, &evt)
 			if err != nil {
 				a.log.Error().Str("event", evt.Name).Err(err).Msg("error handling event")
