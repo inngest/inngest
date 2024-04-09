@@ -506,8 +506,13 @@ type QueuePartition struct {
 	// attempting to run items in the partition's queue.
 	//
 	// Without this, we cannot track sojourn latency.
-	// garbage collection when the queue remains empty.
 	Last int64 `json:"last"`
+
+	// ForcedAtMS records the time that the partition is forced to, in milliseconds, if
+	// the partition has been forced into the future via concurrency issues. This means
+	// that it was requeued due to concurrency issues and should not be brought forward
+	// when a new step is enqueued, if now < ForcedAtMS.
+	ForceAtMS int64 `json:"forceAtMS"`
 
 	// LeaseID represents a lease on this partition.  If the LeaseID is not nil,
 	// this partition can be claimed by a shared-nothing worker to work on the
@@ -845,6 +850,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		partitionTime.Unix(),
 		shard,
 		shardName,
+		getNow().UnixMilli(),
 	})
 	if err != nil {
 		return i, err
@@ -864,7 +870,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	case 1:
 		return i, ErrQueueItemExists
 	default:
-		return i, fmt.Errorf("unknown response enqueueing item: %d", status)
+		return i, fmt.Errorf("unknown response enqueueing item: %v (%T)", status, status)
 	}
 }
 
@@ -1591,7 +1597,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 	}
 	args, err := StrSlice([]any{
 		p.Queue(),
-		at.Unix(),
+		at.UnixMilli(),
 		force,
 	})
 	if err != nil {

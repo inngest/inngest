@@ -20,6 +20,7 @@ import (
 
 func init() {
 	defaultQueueKey.Prefix = "{queue}"
+	miniredis.DumpMaxLineLen = 1024
 }
 
 const testPriority = PriorityDefault
@@ -1294,6 +1295,27 @@ func TestQueuePartitionRequeue(t *testing.T) {
 
 		loaded := getPartition(t, r, idA)
 		require.Nil(t, loaded.LeaseID)
+
+		// Forcing should set a ForceAtMS field.
+		require.NotEmpty(t, loaded.ForceAtMS)
+
+		t.Run("Enqueueing with a force at time should not update the score", func(t *testing.T) {
+			loaded := getPartition(t, r, idA)
+			require.NotEmpty(t, loaded.ForceAtMS)
+
+			qi, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, now)
+
+			loaded = getPartition(t, r, idA)
+			require.NotEmpty(t, loaded.ForceAtMS)
+
+			require.NoError(t, err)
+			requirePartitionScoreEquals(t, r, idA, next)
+			requirePartitionScoreEquals(t, r, idA, time.UnixMilli(loaded.ForceAtMS))
+
+			// Now remove this item, as we dont need it for any future tests.
+			err = q.Dequeue(ctx, p, qi)
+			require.NoError(t, err)
+		})
 	})
 
 	t.Run("Deletes the partition with an empty queue and a leased job", func(t *testing.T) {
@@ -1309,6 +1331,11 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		next := now.Add(time.Hour)
 		err = q.PartitionRequeue(ctx, &p, next, false)
 		require.Error(t, ErrPartitionGarbageCollected, err)
+
+		loaded := getPartition(t, r, idA)
+
+		// This should unset the force at field.
+		require.Empty(t, loaded.ForceAtMS)
 	})
 
 	t.Run("It returns a partition not found error if deleted", func(t *testing.T) {

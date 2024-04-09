@@ -20,8 +20,10 @@ local queueKey                = KEYS[6]
 local partitionConcurrencyKey = KEYS[7] -- We can only GC a partition if no running jobs occur.
 
 local workflowID              = ARGV[1]
-local at                      = tonumber(ARGV[2]) -- time in seconds
+local atMS                    = tonumber(ARGV[2]) -- time in milliseconds
 local forceAt                 = tonumber(ARGV[3])
+
+local atS = math.floor(atMS / 1000) -- in seconds;  partitions are currently second granularity, but this should change.
 
 -- $include(get_partition_item.lua)
 -- $include(has_shard_key.lua)
@@ -47,25 +49,29 @@ end
 local items = redis.call("ZRANGE", queueIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1)
 
 if #items > 0 and forceAt ~= 1 then
-    -- score = redis.call("ZSCORE", queueIndex, items[0])
-    -- at = math.floor(Vcore / 1000)
     local encoded = redis.call("HMGET", queueKey, unpack(items))
     for k, v in pairs(encoded) do
         local item = cjson.decode(v)
-        if (item.leaseID == nil or item.leaseID == cjson.null) and math.floor(item.at / 1000) < at then
-            at = math.floor(item.at / 1000)
+        if (item.leaseID == nil or item.leaseID == cjson.null) and math.floor(item.at / 1000) < atS then
+            atS = math.floor(item.at / 1000)
             break
         end
     end
 end
 
+if forceAt == 1 then
+	existing.forceAtMS = atMS
+else
+	existing.forceAtMS = 0
+end
 
-existing.at = at
+
+existing.at = atS
 existing.leaseID = nil
 redis.call("HSET", partitionKey, workflowID, cjson.encode(existing))
-redis.call("ZADD", keyGlobalPartitionPtr, at, workflowID)
+redis.call("ZADD", keyGlobalPartitionPtr, atS, workflowID)
 if has_shard_key(keyShardPartitionPtr) then
-    redis.call("ZADD", keyShardPartitionPtr, at, workflowID) -- Update any index
+    redis.call("ZADD", keyShardPartitionPtr, atS, workflowID) -- Update any index
 end
 
 return 0
