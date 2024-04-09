@@ -1,3 +1,10 @@
+-- [[
+--
+-- Output:
+--   0: Successfully saved pause
+--   1: Pause already exists
+-- ]]
+
 local pauseKey    = KEYS[1]
 local stepKey     = KEYS[2]
 local pauseEvtKey = KEYS[3]
@@ -6,7 +13,7 @@ local keyPauseExpIdx = KEYS[5]
 
 local pause          = ARGV[1]
 local pauseID        = ARGV[2]
-local event          = ARGV[3] 
+local event          = ARGV[3]
 local expiry         = tonumber(ARGV[4])
 local extendedExpiry = tonumber(ARGV[5])
 local nowUnixSeconds = tonumber(ARGV[6])

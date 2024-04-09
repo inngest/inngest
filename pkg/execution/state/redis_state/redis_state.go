@@ -624,6 +624,30 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 	return fmt.Errorf("unknown response saving pause: %d", status)
 }
 
+func (m mgr) SaveInvokePause(ctx context.Context, correlationID string, p state.Pause) error {
+	packed, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+
+	// store the invoke pause item in a hash map with the correlationID as the key
+	key := m.kf.InvokePause(ctx)
+	cmd := m.pauseR.B().Hsetnx().Key(key).Field(correlationID).Value(string(packed)).Build()
+	status, err := m.pauseR.Do(ctx, cmd).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error saving invoke pause: %w", err)
+	}
+
+	switch status {
+	case 0:
+		return nil
+	case 1:
+		return state.ErrInvokePauseExists
+	}
+
+	return fmt.Errorf("unknown response saving invoke pause: %d", status)
+}
+
 func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 	args, err := StrSlice([]any{
 		time.Now().UnixMilli(),
