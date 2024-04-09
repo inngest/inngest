@@ -210,7 +210,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(apiutil.EventAPIResponse{
 			IDs:    ids[0 : max+1],
 			Status: 400,
-			Error:  err,
+			Error:  err.Error(),
 		})
 
 		return

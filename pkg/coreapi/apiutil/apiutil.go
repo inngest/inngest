@@ -18,7 +18,7 @@ var (
 type EventAPIResponse struct {
 	IDs    []string `json:"ids"`
 	Status int      `json:"status"`
-	Error  error    `json:"error,omitempty"`
+	Error  string   `json:"error,omitempty"`
 }
 
 // InvokeAPIResponse is the API response sent when responding to an invoke
