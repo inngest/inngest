@@ -360,9 +360,22 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		}
 	}()
 
+	// nil check somewhere lol
+	if tracked.GetEvent().InngestMetadata().InvokeCorrelationId != "" {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// this is an "inngest/function.finished" event
+			s.executor.HandleInvoke()
+
+		}()
+	}
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
 		if err := s.pauses(ctx, tracked); err != nil {
 			l.Error().Err(err).Msg("error consuming pauses")
 			errs = multierror.Append(errs, err)
