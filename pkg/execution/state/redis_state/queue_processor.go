@@ -719,8 +719,14 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		return err
 	}
 
-	var processErr error
-	var concurrencyLimitReached bool
+	var (
+		processErr error
+
+		// These flags are used to handle partition rqeueueing.
+		ctrSuccess     int32
+		ctrConcurrency int32
+		ctrRateLimit   int32
+	)
 
 	// Record the number of partitions we're leasing.
 	q.int64counter(ctx, "inngest_queue_partition_lease_total", 1)
@@ -805,13 +811,13 @@ ProcessLoop:
 			q.sem.Release(1)
 		}
 
-		if isConcurrencyLimitError(err) {
-			concurrencyLimitReached = true
-		}
-
 		switch err {
+		case ErrQueueItemThrottled:
+			ctrRateLimit++
+			processErr = nil
+			continue
 		case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
-			q.scope.Counter(counterConcurrencyLimit).Inc(1)
+			ctrConcurrency++
 			// Since the queue is at capacity on a fn or account level, no
 			// more jobs in this loop should be worked on - so break.
 			//
@@ -822,6 +828,7 @@ ProcessLoop:
 			processErr = nil
 			break ProcessLoop
 		case ErrConcurrencyLimitCustomKey0, ErrConcurrencyLimitCustomKey1:
+			ctrConcurrency++
 			// Custom concurrency keys are different.  Each job may have a different key,
 			// so we cannot break the loop in case the next job has a different key and
 			// has capacity.
@@ -842,13 +849,13 @@ ProcessLoop:
 			processErr = nil
 			continue
 		case ErrQueueItemNotFound:
-			q.scope.Counter(counterQueueItemsGone).Inc(1)
 			// This is an okay error.  Move to the next job item.
+			ctrSuccess++ // count as a success for stats purposes.
 			processErr = nil
 			continue
 		case ErrQueueItemAlreadyLeased:
-			q.scope.Counter(counterQueueItemsLeaseConflict).Inc(1)
 			// This is an okay error.  Move to the next job item.
+			ctrSuccess++ // count as a success for stats purposes.
 			processErr = nil
 			continue
 		}
@@ -864,12 +871,15 @@ ProcessLoop:
 		// a semaphore.
 		item.LeaseID = leaseID
 
+		// increase success counter.
+		ctrSuccess++
+
 		q.workers <- processItem{P: *p, I: *item, S: shard}
 	}
 
-	// The lease for the partition will expire and we will be able to restart
-	// work in the future.
-	if concurrencyLimitReached {
+	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
+	// with a force:  ensure that we won't re-scan it until 2 seconds in the future.
+	if ctrConcurrency > 0 || (ctrRateLimit > 0 && ctrConcurrency == 0 && ctrSuccess == 0) {
 		for _, l := range q.lifecycles {
 			go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
 		}
