@@ -572,6 +572,23 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, state.ErrFunctionCancelled
 	}
 
+	if md.Status == enums.RunStatusScheduled {
+		if err := e.sm.SetStatus(ctx, id, enums.RunStatusRunning); err != nil {
+			return nil, err
+		}
+
+		// Reload the metadata to ensure we get all changes that happen when
+		// setting the status.
+		//
+		// TODO: Refactor the state store so that we don't need to reload when
+		// setting the status
+		s, err := e.sm.Load(ctx, id.RunID)
+		if err != nil {
+			return nil, err
+		}
+		md = s.Metadata()
+	}
+
 	if e.steplimit != 0 && len(s.Actions()) >= int(e.steplimit) {
 		// Update this function's state to overflowed, if running.
 		if md.Status == enums.RunStatusRunning {
