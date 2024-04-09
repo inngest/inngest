@@ -906,6 +906,7 @@ If the request signature validation fails, then the SDK MUST NOT return any sens
 
 ```ts
 {
+  extra?: Record<string, any>
 	function_count: number
 	has_event_key: boolean
 	has_signing_key: boolean
@@ -917,14 +918,17 @@ If the request passes signature validation, then the response schema MUST be:
 
 ```ts
 {
-  fallback_signing_key_hash: string
-  function_count: number
-  has_event_key: boolean
-  has_signing_key: boolean
-  mode: "cloud" | "dev"
-  signing_key_hash: string
+  extra?: Record<string, any>
+	fallback_signing_key_hash: string
+	function_count: number
+	has_event_key: boolean
+	has_signing_key: boolean
+	mode: "cloud" | "dev"
+	signing_key_hash: string
 }
 ```
+
+An SDK MUST NOT set any top-level keys not specified in the aforementioned schemas. An SDK MAY put any arbitrary data into the `extra` field. This avoids name collisions in the future.
 
 # 5. Steps
 
