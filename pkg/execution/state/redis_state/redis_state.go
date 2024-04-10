@@ -705,7 +705,13 @@ func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
 	default:
 		return fmt.Errorf("unknown response deleting pause: %d", status)
 	}
+}
 
+func (m mgr) DeleteInvoke(ctx context.Context, correlationID string) error {
+	key := m.kf.InvokePause(ctx)
+	cmd := m.pauseR.B().Hdel().Key(key).Field(correlationID).Build()
+	_, err := m.pauseR.Do(ctx, cmd).AsInt64()
+	return err
 }
 
 func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
@@ -778,6 +784,22 @@ func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) 
 	}
 	pause := &state.Pause{}
 	err = json.Unmarshal([]byte(str), pause)
+	return pause, err
+}
+
+func (m mgr) PauseByInvokeCorrelationID(ctx context.Context, correlationID string) (*state.Pause, error) {
+	key := m.kf.InvokePause(ctx)
+	cmd := m.pauseR.B().Hget().Key(key).Field(correlationID).Build()
+	pstr, err := m.pauseR.Do(ctx, cmd).ToString()
+	if err == rueidis.Nil {
+		return nil, state.ErrInvokePauseNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	pause := &state.Pause{}
+	err = json.Unmarshal([]byte(pstr), pause)
 	return pause, err
 }
 

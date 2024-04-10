@@ -176,8 +176,7 @@ func (s *svc) Run(ctx context.Context) error {
 		case queue.KindPause:
 			err = s.handlePauseTimeout(ctx, item)
 		case queue.KindInvoke:
-			// TODO: implement handler for invoke timeout
-			err = nil
+			err = s.handleInvokeTimeout(ctx, item)
 		case queue.KindDebounce:
 			d := debounce.DebouncePayload{}
 			if err := json.Unmarshal(item.Payload.(json.RawMessage), &d); err != nil {
@@ -293,7 +292,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 
 	pauseTimeout, ok := item.Payload.(queue.PayloadPauseTimeout)
 	if !ok {
-		return fmt.Errorf("unable to get pause timeout form queue item: %T", item.Payload)
+		return fmt.Errorf("unable to get pause timeout from queue item: %T", item.Payload)
 	}
 
 	pause, err := s.state.PauseByID(ctx, pauseTimeout.PauseID)
@@ -321,6 +320,36 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	}
 
 	return s.exec.Resume(ctx, *pause, r)
+}
+
+func (s *svc) handleInvokeTimeout(ctx context.Context, item queue.Item) error {
+	l := logger.From(ctx).With().Str("run_id", item.Identifier.RunID.String()).Logger()
+
+	invokeTimeout, ok := item.Payload.(queue.PayloadInvokeTimeout)
+	if !ok {
+		return fmt.Errorf("unable to get invoke timeout from queue item: %T", item.Payload)
+	}
+	pause, err := s.state.PauseByInvokeCorrelationID(ctx, invokeTimeout.CorrelationID)
+	if err == state.ErrInvokePauseNotFound {
+		// this pause has been consumed
+		l.Debug().Interface("pause", invokeTimeout).Msg("consumed invoke pause timeout ignored")
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if pause == nil {
+		return nil
+	}
+
+	// resume the pause as usual
+	err = s.exec.Resume(ctx, *pause, execution.ResumeRequest{})
+	if err != nil {
+		return err
+	}
+
+	// clean up
+	return s.state.DeleteInvoke(ctx, invokeTimeout.CorrelationID)
 }
 
 // handleScheduledBatch checks for
