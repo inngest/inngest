@@ -109,6 +109,27 @@ func (e Event) Validate(ctx context.Context) error {
 	return nil
 }
 
+// CorrelationID returns the correlation ID for the event.
+func (e Event) CorrelationID() string {
+	if e.Name == InvokeFnName {
+		if metadata := e.InngestMetadata(); metadata != nil {
+			return metadata.InvokeCorrelationId
+		}
+	}
+
+	if e.Name == FnFinishedName {
+		if corrId, ok := e.Data[consts.InvokeCorrelationId].(string); ok {
+			return corrId
+		}
+	}
+
+	return ""
+
+}
+
+// InngestMetadata represents metadata for an event that is used to invoke a
+// function. Note that this metadata is not present on all functions. For
+// accessing an event's correlation ID, prefer using `Event.CorrelationID()`.
 type InngestMetadata struct {
 	InvokeFnID          string `json:"fn_id"`
 	InvokeCorrelationId string `json:"correlation_id,omitempty"`
