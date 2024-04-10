@@ -388,6 +388,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		}
 	}()
 
+	wg.Wait()
 	return errs
 }
 
