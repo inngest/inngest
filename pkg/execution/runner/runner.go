@@ -543,11 +543,7 @@ func (s *svc) invokes(ctx context.Context, evt event.TrackedEvent) error {
 		Str("identifier", meta.InvokeCorrelationId).
 		Msg("looking for invoke trigger")
 
-	// Steps
-	// - Find the pause with correlationID
-	// - Consume the pause
-
-	return nil
+	return s.executor.HandleInvoke(ctx, meta.InvokeCorrelationId, evt)
 }
 
 // pauses searches for and triggers all pauses from this event.

@@ -1411,6 +1411,71 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 	return res, goerr
 }
 
+func (e *executor) HandleInvoke(ctx context.Context, correlationID string, evt event.TrackedEvent) error {
+	evtID := evt.GetInternalID()
+
+	log := e.log
+	if log == nil {
+		log = logger.From(ctx)
+	}
+	l := log.With().Str("event_id", evtID.String()).Logger()
+
+	// find the pause with correlationID
+	pause, err := e.sm.PauseByInvokeCorrelationID(ctx, correlationID)
+	if err == state.ErrInvokePauseNotFound || err == state.ErrPauseNotFound {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	if pause.Expires.Time().Before(time.Now()) {
+		// Consume this pause to remove it entirely
+		l.Debug().Msg("deleting expired pause")
+		_ = e.sm.DeletePause(context.Background(), *pause)
+		return nil
+	}
+
+	if pause.Cancel {
+		// This is a cancellation signal.  Check if the function
+		// has ended, and if so remove the pause.
+		//
+		// NOTE: Bookkeeping must be added to individual function runs and handled on
+		// completion instead of here.  This is a hot path and should only exist whilst
+		// bookkeeping is not implemented.
+		if exists, err := e.sm.Exists(ctx, pause.Identifier.RunID); !exists && err == nil {
+			// This function has ended.  Delete the pause and continue
+			_ = e.sm.DeletePause(context.Background(), *pause)
+			return nil
+		}
+	}
+
+	err = e.sm.ConsumePause(ctx, pause.ID, nil)
+	if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
+		return nil
+	}
+
+	resumeData := pause.GetResumeData(evt.GetEvent())
+	if e.log != nil {
+		e.log.
+			Debug().
+			Interface("with", resumeData.With).
+			Str("pause.DataKey", pause.DataKey).
+			Msg("resuming pause")
+	}
+
+	if err := e.Resume(ctx, *pause, execution.ResumeRequest{
+		With:     resumeData.With,
+		EventID:  &evtID,
+		RunID:    resumeData.RunID,
+		StepName: resumeData.StepName,
+	}); err != nil {
+		return err
+	}
+
+	return e.sm.DeleteInvoke(ctx, correlationID)
+}
+
 // Cancel cancels an in-progress function.
 func (e *executor) Cancel(ctx context.Context, runID ulid.ULID, r execution.CancelRequest) error {
 	s, err := e.sm.Load(ctx, runID)
