@@ -117,14 +117,18 @@ func (e Event) CorrelationID() string {
 		}
 	}
 
-	if e.Name == FnFinishedName {
+	if e.IsFinishedEvent() {
 		if corrId, ok := e.Data[consts.InvokeCorrelationId].(string); ok {
 			return corrId
 		}
 	}
 
 	return ""
+}
 
+// IsFinishedEvent returns true if the event is a function finished event.
+func (e Event) IsFinishedEvent() bool {
+	return e.Name == FnFinishedName
 }
 
 // InngestMetadata represents metadata for an event that is used to invoke a

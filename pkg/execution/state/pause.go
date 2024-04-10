@@ -229,8 +229,7 @@ func (p Pause) GetResumeData(evt event.Event) ResumeData {
 	// data and return only what the function returned. We do this here by unpacking the function
 	// finished event to pull out the correct data to place in state.
 	isInvokeFunctionOpcode := p.Opcode != nil && *p.Opcode == enums.OpcodeInvokeFunction.String()
-	isFnFinishedEvent := evt.Name == event.FnFinishedName
-	if isInvokeFunctionOpcode && isFnFinishedEvent {
+	if isInvokeFunctionOpcode && evt.IsFinishedEvent() {
 		if retRunID, ok := evt.Data["run_id"].(string); ok {
 			if ulidRunID, _ := ulid.Parse(retRunID); ulidRunID != (ulid.ULID{}) {
 				ret.RunID = &ulidRunID

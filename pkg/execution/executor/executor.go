@@ -1075,7 +1075,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 	// Use the aggregator for all funciton finished events, if there are more than
 	// 50 waiting.  It only takes a few milliseconds to iterate and handle less
 	// than 50;  anything more runs the risk of running slow.
-	if evt.GetEvent().Name == event.FnFinishedName && iter.Count() > 50 {
+	if evt.GetEvent().IsFinishedEvent() && iter.Count() > 50 {
 		aggRes, err := e.handleAggregatePauses(ctx, evt)
 		if err != nil {
 			log.From(ctx).Error().Err(err).Msg("error handling aggregate pauses")

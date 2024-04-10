@@ -363,7 +363,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	// check if this is an "inngest/function.finished" event
 	// triggered by invoke
 	corrId := tracked.GetEvent().CorrelationID()
-	if tracked.GetEvent().Name == event.FnFinishedName && corrId != "" {
+	if tracked.GetEvent().IsFinishedEvent() && corrId != "" {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
