@@ -32,6 +32,9 @@ func (a API) DeleteCancellation(ctx context.Context, cancellationID ulid.ULID) e
 			if err != nil {
 				return publicerr.Wrap(err, 500, "Error deleting cancellation")
 			}
+			if err == nil {
+				return nil
+			}
 		}
 	}
 
