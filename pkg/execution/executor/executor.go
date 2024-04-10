@@ -1975,9 +1975,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	if err == state.ErrPauseAlreadyExists {
 		return nil
 	}
-
 	if err != nil {
-		// TODO: should we delete both keys if failed?
 		return err
 	}
 
