@@ -1410,7 +1410,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 	return res, goerr
 }
 
-func (e *executor) HandleInvokeFinish(ctx context.Context, correlationID string, evt event.TrackedEvent) error {
+func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEvent) error {
 	evtID := evt.GetInternalID()
 
 	log := e.log
@@ -1418,6 +1418,11 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, correlationID string,
 		log = logger.From(ctx)
 	}
 	l := log.With().Str("event_id", evtID.String()).Logger()
+
+	correlationID := evt.GetEvent().CorrelationID()
+	if correlationID == "" {
+		return fmt.Errorf("no correlation ID found in event when trying to handle finish")
+	}
 
 	// find the pause with correlationID
 	pause, err := e.sm.PauseByInvokeCorrelationID(ctx, correlationID)

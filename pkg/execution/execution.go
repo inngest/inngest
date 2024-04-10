@@ -106,7 +106,7 @@ type Executor interface {
 	HandlePauses(ctx context.Context, iter state.PauseIterator, event event.TrackedEvent) (HandlePauseResult, error)
 	// HandleInvokeFinish handles the invoke pauses from an incoming event. This delegates to Cancel and
 	// Resume where necessary
-	HandleInvokeFinish(ctx context.Context, correlationID string, event event.TrackedEvent) error
+	HandleInvokeFinish(ctx context.Context, event event.TrackedEvent) error
 	// Cancel cancels an in-progress function run, preventing any enqueued or future steps from running.
 	Cancel(ctx context.Context, runID ulid.ULID, r CancelRequest) error
 	// Resume resumes an in-progress function run from the given waitForEvent pause.

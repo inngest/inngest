@@ -539,14 +539,7 @@ func (s *svc) invokes(ctx context.Context, evt event.TrackedEvent) error {
 
 	l.Trace().Msg("querying for invoke pauses")
 
-	corrId := evt.GetEvent().CorrelationID()
-	if corrId == "" {
-		return fmt.Errorf("no metadata available to lookup invoke function")
-	}
-
-	l.Trace().Str("identifier", corrId).Msg("looking for invoke trigger")
-
-	return s.executor.HandleInvokeFinish(ctx, corrId, evt)
+	return s.executor.HandleInvokeFinish(ctx, evt)
 }
 
 // pauses searches for and triggers all pauses from this event.
