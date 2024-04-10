@@ -624,15 +624,10 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 	return fmt.Errorf("unknown response saving pause: %d", status)
 }
 
-func (m mgr) SaveInvokePause(ctx context.Context, correlationID string, p state.Pause) error {
-	packed, err := json.Marshal(p)
-	if err != nil {
-		return err
-	}
-
+func (m mgr) SaveInvoke(ctx context.Context, correlationID string, pauseID string) error {
 	// store the invoke pause item in a hash map with the correlationID as the key
 	key := m.kf.InvokePause(ctx)
-	cmd := m.pauseR.B().Hsetnx().Key(key).Field(correlationID).Value(string(packed)).Build()
+	cmd := m.pauseR.B().Hsetnx().Key(key).Field(correlationID).Value(pauseID).Build()
 	status, err := m.pauseR.Do(ctx, cmd).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error saving invoke pause: %w", err)
@@ -790,7 +785,7 @@ func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) 
 func (m mgr) PauseByInvokeCorrelationID(ctx context.Context, correlationID string) (*state.Pause, error) {
 	key := m.kf.InvokePause(ctx)
 	cmd := m.pauseR.B().Hget().Key(key).Field(correlationID).Build()
-	pstr, err := m.pauseR.Do(ctx, cmd).ToString()
+	pauseIDstr, err := m.pauseR.Do(ctx, cmd).ToString()
 	if err == rueidis.Nil {
 		return nil, state.ErrInvokePauseNotFound
 	}
@@ -798,9 +793,11 @@ func (m mgr) PauseByInvokeCorrelationID(ctx context.Context, correlationID strin
 		return nil, err
 	}
 
-	pause := &state.Pause{}
-	err = json.Unmarshal([]byte(pstr), pause)
-	return pause, err
+	pauseID, err := uuid.Parse(pauseIDstr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse pauseID UUID: %w", err)
+	}
+	return m.PauseByID(ctx, pauseID)
 }
 
 func (m mgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {

@@ -14,6 +14,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
+	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -1901,10 +1902,15 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	)
 
 	opcode := gen.Op.String()
-	err = e.sm.SaveInvokePause(
-		ctx,
-		correlationID,
-		state.Pause{
+
+	var errs error
+	wg := sync.WaitGroup{}
+
+	// store pause as usual so we can still reuse the pause consumption logic
+	wg.Add(1)
+	go func(ctx context.Context) {
+		defer wg.Done()
+		err := e.sm.SavePause(ctx, state.Pause{
 			ID:          pauseID,
 			WorkspaceID: item.WorkspaceID,
 			Identifier:  item.Identifier,
@@ -1917,18 +1923,37 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 			Event:       &eventName,
 			DataKey:     gen.ID,
 			Expression:  &correlationID,
-		},
-	)
-	if err == state.ErrInvokePauseExists {
-		return nil
-	}
-	if err != nil {
-		return err
+		})
+		if err == state.ErrPauseAlreadyExists {
+			return
+		}
+		if err != nil {
+			errs = multierror.Append(errs, err)
+		}
+	}(ctx)
+
+	// store the pause ID in the invoke hash map for faster lookup
+	wg.Add(1)
+	go func(ctx context.Context) {
+		defer wg.Done()
+
+		err := e.sm.SaveInvoke(ctx, correlationID, pauseID.String())
+		if err == state.ErrInvokePauseExists {
+			return
+		}
+		if err != nil {
+			errs = multierror.Append(errs, err)
+		}
+	}(ctx)
+
+	wg.Wait()
+	if errs != nil {
+		// TODO: should we delete both keys if failed?
+		return errs
 	}
 
 	// Enqueue a job that will timeout the pause.
 	jobID := fmt.Sprintf("%s-%s-%s", item.Identifier.IdempotencyKey(), gen.ID, "invoke")
-	// TODO I think this is fine sending no metadata, as we have no attempts.
 	err = e.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: item.WorkspaceID,

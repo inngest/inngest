@@ -19,7 +19,7 @@ type PauseMutater interface {
 	SavePause(ctx context.Context, p Pause) error
 
 	// SaveInvokePause is similar to SavePause but only handles invoke
-	SaveInvokePause(ctx context.Context, correlationID string, p Pause) error
+	SaveInvoke(ctx context.Context, correlationID string, pauseID string) error
 
 	// LeasePause allows us to lease the pause until the next step is enqueued, at which point
 	// we can 'consume' the pause to remove it.

@@ -330,7 +330,7 @@ func (s *svc) handleInvokeTimeout(ctx context.Context, item queue.Item) error {
 		return fmt.Errorf("unable to get invoke timeout from queue item: %T", item.Payload)
 	}
 	pause, err := s.state.PauseByInvokeCorrelationID(ctx, invokeTimeout.CorrelationID)
-	if err == state.ErrInvokePauseNotFound {
+	if err == state.ErrInvokePauseNotFound || err == state.ErrPauseNotFound {
 		// this pause has been consumed
 		l.Debug().Interface("pause", invokeTimeout).Msg("consumed invoke pause timeout ignored")
 		return nil
