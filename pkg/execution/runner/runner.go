@@ -368,7 +368,12 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		go func() {
 			defer wg.Done()
 			if err := s.invokes(ctx, tracked); err != nil {
-				l.Error().Err(err).Msg("error resuming invoke")
+				if err == state.ErrInvokePauseNotFound || err == state.ErrPauseNotFound {
+					l.Warn().Err(err).Msg("can't find paused function to resume after invoke")
+					return
+				}
+
+				l.Error().Err(err).Msg("error resuming function after invoke")
 				errs = multierror.Append(errs, err)
 			}
 		}()
