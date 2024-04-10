@@ -1459,7 +1459,7 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 			Debug().
 			Interface("with", resumeData.With).
 			Str("pause.DataKey", pause.DataKey).
-			Msg("resuming pause")
+			Msg("resuming pause from invoke")
 	}
 
 	return e.Resume(ctx, *pause, execution.ResumeRequest{
