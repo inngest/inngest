@@ -626,7 +626,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 
 func (m mgr) SaveInvoke(ctx context.Context, correlationID string, pauseID string) error {
 	// store the invoke pause item in a hash map with the correlationID as the key
-	key := m.kf.InvokePause(ctx)
+	key := m.kf.Invoke(ctx)
 	cmd := m.pauseR.B().Hsetnx().Key(key).Field(correlationID).Value(pauseID).Build()
 	status, err := m.pauseR.Do(ctx, cmd).AsInt64()
 	if err != nil {
@@ -703,7 +703,7 @@ func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
 }
 
 func (m mgr) DeleteInvoke(ctx context.Context, correlationID string) error {
-	key := m.kf.InvokePause(ctx)
+	key := m.kf.Invoke(ctx)
 	cmd := m.pauseR.B().Hdel().Key(key).Field(correlationID).Build()
 	_, err := m.pauseR.Do(ctx, cmd).AsInt64()
 	return err
@@ -783,7 +783,7 @@ func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) 
 }
 
 func (m mgr) PauseByInvokeCorrelationID(ctx context.Context, correlationID string) (*state.Pause, error) {
-	key := m.kf.InvokePause(ctx)
+	key := m.kf.Invoke(ctx)
 	cmd := m.pauseR.B().Hget().Key(key).Field(correlationID).Build()
 	pauseIDstr, err := m.pauseR.Do(ctx, cmd).ToString()
 	if err == rueidis.Nil {
