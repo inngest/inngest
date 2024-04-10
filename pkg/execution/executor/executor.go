@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1950,8 +1951,13 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 
 	eventName := event.FnFinishedName
 	correlationID := item.Identifier.RunID.String() + "." + gen.ID
+	strExpr := fmt.Sprintf("async.data.%s == %s", consts.InvokeCorrelationId, strconv.Quote(correlationID))
+	_, err = e.newExpressionEvaluator(ctx, strExpr)
+	if err != nil {
+		return execError{err: fmt.Errorf("failed to create expression to wait for invoked function completion: %w", err)}
+	}
 
-	logger.From(ctx).Info().Interface("opts", opts).Time("expires", expires).Str("event", eventName).Msg("parsed invoke function opts")
+	logger.From(ctx).Info().Interface("opts", opts).Time("expires", expires).Str("event", eventName).Str("expr", strExpr).Msg("parsed invoke function opts")
 
 	pauseID := uuid.NewSHA1(
 		uuid.NameSpaceOID,
@@ -1970,6 +1976,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		Opcode:              &opcode,
 		Expires:             state.Time(expires),
 		Event:               &eventName,
+		Expression:          &strExpr,
 		DataKey:             gen.ID,
 		InvokeCorrelationID: &correlationID,
 	})
