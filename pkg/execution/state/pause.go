@@ -73,7 +73,7 @@ type PauseGetter interface {
 	// This must return expired invoke pauses that have not yet been consumed in order to properly handle timeouts.
 	//
 	// This should not return consumed pauses.
-	PauseByInvokeCorrelationID(ctx context.Context, correlationID string) (*Pause, error)
+	PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*Pause, error)
 }
 
 // PauseIterator allows the runner to iterate over all pauses returned by a PauseGetter.  This

@@ -581,7 +581,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		m.kf.PauseID(ctx, p.ID),
 		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 		m.kf.PauseEvent(ctx, p.WorkspaceID, evt),
-		m.kf.Invoke(ctx),
+		m.kf.Invoke(ctx, p.WorkspaceID),
 		m.kf.PauseIndex(ctx, "add", p.WorkspaceID, evt),
 		m.kf.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 	}
@@ -676,7 +676,7 @@ func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
 		m.kf.PauseID(ctx, p.ID),
 		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 		eventKey,
-		m.kf.Invoke(ctx),
+		m.kf.Invoke(ctx, p.WorkspaceID),
 	}
 	corrId := ""
 	if p.InvokeCorrelationID != nil && *p.InvokeCorrelationID != "" {
@@ -723,7 +723,7 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		m.kf.PauseID(ctx, id),
 		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 		eventKey,
-		m.kf.Invoke(ctx),
+		m.kf.Invoke(ctx, p.WorkspaceID),
 		m.kf.Actions(ctx, p.Identifier),
 		m.kf.Stack(ctx, p.Identifier.RunID),
 	}
@@ -781,8 +781,8 @@ func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) 
 	return pause, err
 }
 
-func (m mgr) PauseByInvokeCorrelationID(ctx context.Context, correlationID string) (*state.Pause, error) {
-	key := m.kf.Invoke(ctx)
+func (m mgr) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*state.Pause, error) {
+	key := m.kf.Invoke(ctx, wsID)
 	cmd := m.pauseR.B().Hget().Key(key).Field(correlationID).Build()
 	pauseIDstr, err := m.pauseR.Do(ctx, cmd).ToString()
 	if err == rueidis.Nil {
