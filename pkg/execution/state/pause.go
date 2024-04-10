@@ -18,9 +18,6 @@ type PauseMutater interface {
 	// DAG executions.
 	SavePause(ctx context.Context, p Pause) error
 
-	// SaveInvokePause is similar to SavePause but only handles invoke
-	SaveInvoke(ctx context.Context, correlationID string, pauseID string) error
-
 	// LeasePause allows us to lease the pause until the next step is enqueued, at which point
 	// we can 'consume' the pause to remove it.
 	//
@@ -42,9 +39,6 @@ type PauseMutater interface {
 
 	// DeletePause permanently deletes a pause.
 	DeletePause(ctx context.Context, p Pause) error
-
-	// DeleteInvoke removes the invoke correlation ID
-	DeleteInvoke(ctx context.Context, correlationID string) error
 }
 
 // PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This
