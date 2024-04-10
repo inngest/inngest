@@ -158,6 +158,8 @@ type Pause struct {
 	// this is empty and the pause contains an expression, function state will
 	// be loaded from the store.
 	ExpressionData map[string]any `json:"data"`
+	// InvokeCorrelationID is the correlation ID for the invoke pause.
+	InvokeCorrelationID *string `json:"icID,omitempty"`
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
 	OnTimeout bool `json:"onTimeout"`

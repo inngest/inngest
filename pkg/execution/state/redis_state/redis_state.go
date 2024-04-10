@@ -568,8 +568,12 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		return err
 	}
 
+	// `evt` is used to search for pauses based on event names. We only want to
+	// do this if this pause is not part of an invoke. If it is, we don't want
+	// to index it by event name as the pause will be processed by correlation
+	// ID.
 	evt := ""
-	if p.Event != nil {
+	if p.Event != nil && (p.InvokeCorrelationID == nil || *p.InvokeCorrelationID == "") {
 		evt = *p.Event
 	}
 
@@ -577,6 +581,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		m.kf.PauseID(ctx, p.ID),
 		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 		m.kf.PauseEvent(ctx, p.WorkspaceID, evt),
+		m.kf.Invoke(ctx),
 		m.kf.PauseIndex(ctx, "add", p.WorkspaceID, evt),
 		m.kf.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 	}
@@ -592,10 +597,16 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		ttl = 1
 	}
 
+	corrId := ""
+	if p.InvokeCorrelationID != nil {
+		corrId = *p.InvokeCorrelationID
+	}
+
 	args, err := StrSlice([]any{
 		string(packed),
 		p.ID.String(),
 		evt,
+		corrId,
 		ttl,
 		// Add at least 10 minutes to this pause, allowing us to process the
 		// pause by ID for 10 minutes past expiry.
@@ -622,25 +633,6 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		return state.ErrPauseAlreadyExists
 	}
 	return fmt.Errorf("unknown response saving pause: %d", status)
-}
-
-func (m mgr) SaveInvoke(ctx context.Context, correlationID string, pauseID string) error {
-	// store the invoke pause item in a hash map with the correlationID as the key
-	key := m.kf.Invoke(ctx)
-	cmd := m.pauseR.B().Hsetnx().Key(key).Field(correlationID).Value(pauseID).Build()
-	status, err := m.pauseR.Do(ctx, cmd).AsInt64()
-	if err != nil {
-		return fmt.Errorf("error saving invoke pause: %w", err)
-	}
-
-	switch status {
-	case 0:
-		return nil
-	case 1:
-		return state.ErrInvokePauseExists
-	}
-
-	return fmt.Errorf("unknown response saving invoke pause: %d", status)
 }
 
 func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
@@ -684,12 +676,20 @@ func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
 		m.kf.PauseID(ctx, p.ID),
 		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 		eventKey,
+		m.kf.Invoke(ctx),
+	}
+	corrId := ""
+	if p.InvokeCorrelationID != nil && *p.InvokeCorrelationID != "" {
+		corrId = *p.InvokeCorrelationID
 	}
 	status, err := scripts["deletePause"].Exec(
 		ctx,
 		m.pauseR,
 		keys,
-		[]string{p.ID.String()},
+		[]string{
+			p.ID.String(),
+			corrId,
+		},
 	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error consuming pause: %w", err)
@@ -730,12 +730,18 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		m.kf.PauseID(ctx, id),
 		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 		eventKey,
+		m.kf.Invoke(ctx),
 		m.kf.Actions(ctx, p.Identifier),
 		m.kf.Stack(ctx, p.Identifier.RunID),
 	}
 
+	corrId := ""
+	if p.InvokeCorrelationID != nil && *p.InvokeCorrelationID != "" {
+		corrId = *p.InvokeCorrelationID
+	}
 	args, err := StrSlice([]any{
 		id.String(),
+		corrId,
 		p.DataKey,
 		string(marshalledData),
 	})

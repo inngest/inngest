@@ -14,7 +14,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
-	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -1411,7 +1410,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 	return res, goerr
 }
 
-func (e *executor) HandleInvoke(ctx context.Context, correlationID string, evt event.TrackedEvent) error {
+func (e *executor) HandleInvokeFinish(ctx context.Context, correlationID string, evt event.TrackedEvent) error {
 	evtID := evt.GetInternalID()
 
 	log := e.log
@@ -1450,11 +1449,6 @@ func (e *executor) HandleInvoke(ctx context.Context, correlationID string, evt e
 		}
 	}
 
-	err = e.sm.ConsumePause(ctx, pause.ID, nil)
-	if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
-		return nil
-	}
-
 	resumeData := pause.GetResumeData(evt.GetEvent())
 	if e.log != nil {
 		e.log.
@@ -1464,16 +1458,12 @@ func (e *executor) HandleInvoke(ctx context.Context, correlationID string, evt e
 			Msg("resuming pause")
 	}
 
-	if err := e.Resume(ctx, *pause, execution.ResumeRequest{
+	return e.Resume(ctx, *pause, execution.ResumeRequest{
 		With:     resumeData.With,
 		EventID:  &evtID,
 		RunID:    resumeData.RunID,
 		StepName: resumeData.StepName,
-	}); err != nil {
-		return err
-	}
-
-	return e.sm.DeleteInvoke(ctx, correlationID)
+	})
 }
 
 // Cancel cancels an in-progress function.
@@ -1968,53 +1958,27 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 
 	opcode := gen.Op.String()
 
-	var errs error
-	wg := sync.WaitGroup{}
+	err = e.sm.SavePause(ctx, state.Pause{
+		ID:                  pauseID,
+		WorkspaceID:         item.WorkspaceID,
+		Identifier:          item.Identifier,
+		GroupID:             item.GroupID,
+		Outgoing:            gen.ID,
+		Incoming:            edge.Edge.Incoming,
+		StepName:            gen.UserDefinedName(),
+		Opcode:              &opcode,
+		Expires:             state.Time(expires),
+		Event:               &eventName,
+		DataKey:             gen.ID,
+		InvokeCorrelationID: &correlationID,
+	})
+	if err == state.ErrPauseAlreadyExists {
+		return nil
+	}
 
-	// store pause as usual so we can still reuse the pause consumption logic
-	wg.Add(1)
-	go func(ctx context.Context) {
-		defer wg.Done()
-		err := e.sm.SavePause(ctx, state.Pause{
-			ID:          pauseID,
-			WorkspaceID: item.WorkspaceID,
-			Identifier:  item.Identifier,
-			GroupID:     item.GroupID,
-			Outgoing:    gen.ID,
-			Incoming:    edge.Edge.Incoming,
-			StepName:    gen.UserDefinedName(),
-			Opcode:      &opcode,
-			Expires:     state.Time(expires),
-			Event:       &eventName,
-			DataKey:     gen.ID,
-			Expression:  &correlationID,
-		})
-		if err == state.ErrPauseAlreadyExists {
-			return
-		}
-		if err != nil {
-			errs = multierror.Append(errs, err)
-		}
-	}(ctx)
-
-	// store the pause ID in the invoke hash map for faster lookup
-	wg.Add(1)
-	go func(ctx context.Context) {
-		defer wg.Done()
-
-		err := e.sm.SaveInvoke(ctx, correlationID, pauseID.String())
-		if err == state.ErrInvokePauseExists {
-			return
-		}
-		if err != nil {
-			errs = multierror.Append(errs, err)
-		}
-	}(ctx)
-
-	wg.Wait()
-	if errs != nil {
+	if err != nil {
 		// TODO: should we delete both keys if failed?
-		return errs
+		return err
 	}
 
 	// Enqueue a job that will timeout the pause.
@@ -2025,12 +1989,11 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		// Use the same group ID, allowing us to track the cancellation of
 		// the step correctly.
 		GroupID:    item.GroupID,
-		Kind:       queue.KindInvoke,
+		Kind:       queue.KindPause,
 		Identifier: item.Identifier,
-		Payload: queue.PayloadInvokeTimeout{
-			PauseID:       pauseID,
-			CorrelationID: correlationID,
-			OnTimeout:     true,
+		Payload: queue.PayloadPauseTimeout{
+			PauseID:   pauseID,
+			OnTimeout: true,
 		},
 	}, expires)
 	if err == redis_state.ErrQueueItemExists {
