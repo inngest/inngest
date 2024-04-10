@@ -106,6 +106,8 @@ var (
 	ErrConcurrencyLimitCustomKey0 = fmt.Errorf("At concurrency limit 0")
 	ErrConcurrencyLimitCustomKey1 = fmt.Errorf("At concurrency limit 1")
 
+	ErrQueueItemThrottled = fmt.Errorf("queue item throttled")
+
 	// internal shard errors
 	errShardNotFound     = fmt.Errorf("shard not found")
 	errShardIndexLeased  = fmt.Errorf("shard index is already leased")
@@ -114,6 +116,10 @@ var (
 
 var (
 	rnd *frandRNG
+
+	// now is a reference to time.Now and exists for overriding within
+	// specific tests, allowing us to eg. test rate limiting with ease.
+	getNow = time.Now
 )
 
 func init() {
@@ -364,6 +370,7 @@ func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 type queue struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
+
 	// redis stores the redis connection to use.
 	r  rueidis.Client
 	pf PriorityFinder
@@ -499,8 +506,13 @@ type QueuePartition struct {
 	// attempting to run items in the partition's queue.
 	//
 	// Without this, we cannot track sojourn latency.
-	// garbage collection when the queue remains empty.
 	Last int64 `json:"last"`
+
+	// ForcedAtMS records the time that the partition is forced to, in milliseconds, if
+	// the partition has been forced into the future via concurrency issues. This means
+	// that it was requeued due to concurrency issues and should not be brought forward
+	// when a new step is enqueued, if now < ForcedAtMS.
+	ForceAtMS int64 `json:"forceAtMS"`
 
 	// LeaseID represents a lease on this partition.  If the LeaseID is not nil,
 	// this partition can be claimed by a shared-nothing worker to work on the
@@ -597,7 +609,7 @@ func (q QueueItem) Score() int64 {
 	// If this is > 2 seconds in the future, don't mess with the time.
 	// This prevents any accidental fudging of future run times, even if the
 	// kind is edge (which should never exist... but, better to be safe).
-	if q.AtMS > time.Now().Add(consts.FutureAtLimit).UnixMilli() {
+	if q.AtMS > getNow().Add(consts.FutureAtLimit).UnixMilli() {
 		return q.AtMS
 	}
 
@@ -766,9 +778,9 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		i.WallTimeMS = at.UnixMilli()
 	}
 
-	if at.Before(time.Now()) {
+	if at.Before(getNow()) {
 		// Normalize to now to minimize latency.
-		i.WallTimeMS = time.Now().UnixMilli()
+		i.WallTimeMS = getNow().UnixMilli()
 	}
 
 	// Add the At timestamp, if not included.
@@ -781,11 +793,11 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	}
 
 	partitionTime := at
-	if at.Before(time.Now()) {
+	if at.Before(getNow()) {
 		// We don't want to enqueue partitions (pointers to fns) before now.
 		// Doing so allows users to stay at the front of the queue for
 		// leases.
-		partitionTime = time.Now()
+		partitionTime = getNow()
 	}
 
 	// Get the queue name from the queue item.  This allows utilization of
@@ -838,6 +850,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		partitionTime.Unix(),
 		shard,
 		shardName,
+		getNow().UnixMilli(),
 	})
 	if err != nil {
 		return i, err
@@ -857,7 +870,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	case 1:
 		return i, ErrQueueItemExists
 	default:
-		return i, fmt.Errorf("unknown response enqueueing item: %d", status)
+		return i, fmt.Errorf("unknown response enqueueing item: %v (%T)", status, status)
 	}
 }
 
@@ -904,7 +917,7 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 	// leased here, so we may end up returning less than the total length.
 	result := make([]*QueueItem, len(items))
 	n := 0
-	now := time.Now()
+	now := getNow()
 
 	for _, str := range items {
 		qi := &QueueItem{}
@@ -963,7 +976,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 			jobID,
 			strconv.Itoa(int(at.UnixMilli())),
 			partitionName,
-			strconv.Itoa(int(time.Now().UnixMilli())),
+			strconv.Itoa(int(getNow().UnixMilli())),
 		},
 	).AsInt64()
 	if err != nil {
@@ -987,7 +1000,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 //
 // Obtaining a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
-func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, duration time.Duration) (*ulid.ULID, error) {
+func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, duration time.Duration, now time.Time) (*ulid.ULID, error) {
 	var (
 		ak, pk string // account, partition concurrency key
 		ac, pc int    // account, partiiton concurrency max
@@ -1019,7 +1032,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		}
 	}
 
-	leaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), rnd)
+	leaseID, err := ulid.New(ulid.Timestamp(getNow().Add(duration).UTC()), rnd)
 	if err != nil {
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
@@ -1042,11 +1055,12 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		q.kg.ConcurrencyIndex(),
 		q.kg.GlobalPartitionIndex(),
 		q.kg.ShardPartitionIndex(shardName),
+		q.kg.ThrottleKey(item.Data.Throttle),
 	}
 	args, err := StrSlice([]any{
 		item.ID,
 		leaseID.String(),
-		time.Now().UnixMilli(),
+		now.UnixMilli(),
 		ac,
 		pc,
 		customLimits[0],
@@ -1061,7 +1075,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		q.r,
 		keys,
 		args,
-	).AsInt64()
+	).ToInt64()
 	if err != nil {
 		return nil, fmt.Errorf("error leasing queue item: %w", err)
 	}
@@ -1081,16 +1095,11 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		return nil, ErrConcurrencyLimitCustomKey0
 	case 6:
 		return nil, ErrConcurrencyLimitCustomKey1
+	case 7:
+		return nil, ErrQueueItemThrottled
 	default:
 		return nil, fmt.Errorf("unknown response enqueueing item: %d", status)
 	}
-}
-
-func isConcurrencyLimitError(err error) bool {
-	return err == ErrPartitionConcurrencyLimit ||
-		err == ErrAccountConcurrencyLimit ||
-		err == ErrConcurrencyLimitCustomKey0 ||
-		err == ErrConcurrencyLimitCustomKey1
 }
 
 // ExtendLease extens the lease for a given queue item, given the queue item is currently
@@ -1123,7 +1132,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 		}
 	}
 
-	newLeaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), rnd)
+	newLeaseID, err := ulid.New(ulid.Timestamp(getNow().Add(duration).UTC()), rnd)
 	if err != nil {
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
@@ -1355,7 +1364,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	// XXX: Check for function throttling prior to leasing;  if it's throttled we can requeue
 	// the pointer and back off.  A question here is enqueuing new items onto the partition
 	// will reset the pointer update, leading to thrash.
-	now := time.Now()
+	now := getNow()
 	leaseExpires := now.Add(duration).UTC().Truncate(time.Millisecond)
 	leaseID, err := ulid.New(ulid.Timestamp(leaseExpires), rnd)
 	if err != nil {
@@ -1448,12 +1457,17 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	// TODO: If this is an allowlist, only peek the given partitions.  Use ZMSCORE
 	// to fetch the scores for all allowed partitions, then filter where score <= until.
 	// Call an HMGET to get the partitions.
+	ms := until.UnixMilli()
 
-	unix := until.Unix()
+	isSequential := 0
+	if sequential {
+		isSequential = 1
+	}
 
 	args, err := StrSlice([]any{
-		unix,
+		ms,
 		limit,
+		isSequential,
 	})
 	if err != nil {
 		return nil, err
@@ -1581,7 +1595,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 	}
 	args, err := StrSlice([]any{
 		p.Queue(),
-		at.Unix(),
+		at.UnixMilli(),
 		force,
 	})
 	if err != nil {
@@ -1652,7 +1666,7 @@ func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, pri
 }
 
 func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey string) (int64, error) {
-	s := time.Now().UnixMilli()
+	s := getNow().UnixMilli()
 	cmd := q.r.B().Zcount().
 		Key(q.kg.Concurrency(prefix, concurrencyKey)).
 		Min(fmt.Sprintf("%d", s)).
@@ -1669,7 +1683,7 @@ func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey st
 func (q *queue) Scavenge(ctx context.Context) (int, error) {
 	// Find all items that have an expired lease - eg. where the min time for a lease is between
 	// (0-now] in unix milliseconds.
-	now := fmt.Sprintf("%d", time.Now().UnixMilli())
+	now := fmt.Sprintf("%d", getNow().UnixMilli())
 
 	cmd := q.r.B().Zrange().
 		Key(q.kg.ConcurrencyIndex()).
@@ -1735,7 +1749,7 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 				resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling job '%s': %w", item, err))
 				continue
 			}
-			if err := q.Requeue(ctx, p, qi, time.Now()); err != nil {
+			if err := q.Requeue(ctx, p, qi, getNow()); err != nil {
 				resultErr = multierror.Append(resultErr, fmt.Errorf("error requeueing job '%s': %w", item, err))
 				continue
 			}
@@ -1762,7 +1776,7 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 		return nil, ErrConfigLeaseExceedsLimits
 	}
 
-	now := time.Now()
+	now := getNow()
 	newLeaseID, err := ulid.New(ulid.Timestamp(now.Add(duration)), rnd)
 	if err != nil {
 		return nil, err
@@ -1825,7 +1839,7 @@ func (q *queue) getShards(ctx context.Context) (map[string]*QueueShard, error) {
 // from claiming the same lease index;  if workers A and B see a shard with 0 leases and both attempt
 // to claim lease "0", only one will succeed.
 func (q *queue) leaseShard(ctx context.Context, shard *QueueShard, duration time.Duration, n int) (*ulid.ULID, error) {
-	now := time.Now()
+	now := getNow()
 	leaseID, err := ulid.New(uint64(now.Add(duration).UnixMilli()), rand.Reader)
 	if err != nil {
 		return nil, err
@@ -1866,7 +1880,7 @@ func (q *queue) leaseShard(ctx context.Context, shard *QueueShard, duration time
 }
 
 func (q *queue) renewShardLease(ctx context.Context, shard *QueueShard, duration time.Duration, leaseID ulid.ULID) (*ulid.ULID, error) {
-	now := time.Now()
+	now := getNow()
 	newLeaseID, err := ulid.New(uint64(now.Add(duration).UnixMilli()), rand.Reader)
 	if err != nil {
 		return nil, err

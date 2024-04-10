@@ -75,6 +75,20 @@ type Item struct {
 	// QueueName allows control over the queue name.  If not provided, this falls
 	// back to the queue mapping defined on the queue or the workflow ID of the fn.
 	QueueName *string `json:"qn,omitempty"`
+
+	Throttle *Throttle `json:"throttle,omitempty"`
+}
+
+type Throttle struct {
+	// Key is the unique throttling key that's used to group queue items when
+	// processing rate limiting/throttling.
+	Key string `json:"k"`
+	// Limit is the actual rate limit
+	Limit int `json:"l"`
+	// Burst is the busrsable capacity of the rate limit
+	Burst int `json:"b"`
+	// Period is the rate limit period, in seconds
+	Period int `json:"p"`
 }
 
 // GetPriorityFactor returns the priority factor for the queue item.  This fudges the job item's

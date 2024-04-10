@@ -24,6 +24,7 @@ local partitionItem       = ARGV[5]           -- {workflow, priority, leasedAt, 
 local partitionTime       = tonumber(ARGV[6]) -- score for partition, lower bounded to now in seconds
 local shard               = ARGV[7]
 local shardName           = ARGV[8]
+local nowMS               = tonumber(ARGV[9]) -- now in ms
 
 -- $include(get_partition_item.lua)
 
@@ -71,24 +72,42 @@ end
 -- is available.
 local currentScore = redis.call("ZSCORE", partitionIndexKey, workflowID)
 if currentScore == false or tonumber(currentScore) > partitionTime then
-    redis.call("ZADD", partitionIndexKey, partitionTime, workflowID)
-
-    -- if this is sharded we have a shard partition to update.
-    if shard ~= "" and shard ~= "null" then
-        redis.call("ZADD", shardIndexKey, partitionTime, workflowID)
-    end
-
     -- Get the partition item, so that we can keep the last lease score.
+    local decoded = cjson.decode(partitionItem)
     local existing = get_partition_item(partitionKey, workflowID)
+
+    -- EnqueuAt doesn't have the latest partition data from the queue, including
+    -- last fetch/lease time and forceAtMS.  Ensure we get these from the item
+    -- atomically here.
     if existing ~= nil then
-        local decoded = cjson.decode(partitionItem)
         decoded.last = existing.last
+        decoded.forceAtMS = existing.forceAtMS
+
+        if (nowMS > decoded.forceAtMS) then
+            -- we've already passed the time at which this partition was forced,
+            -- so unset the forced at field.
+            decoded.forceAtMS = 0
+        end
+    
         partitionItem = cjson.encode(decoded)
     end
 
-    -- Set the partition item.  We must always do this so that we can
-    -- update priorities on the fly.
-    redis.call("HSET", partitionKey, workflowID, partitionItem)
+
+    -- The only case in which now < forceAtMS is when we want to ensure that a 
+    -- partition has a future time and enqueueing should not bring the partition
+    -- earlier, eg. in the case of concurrency limits spinning on partitions.
+    if nowMS > decoded.forceAtMS then
+        redis.call("ZADD", partitionIndexKey, partitionTime, workflowID)
+
+        -- Set the partition item.  We must always do this so that we can
+        -- update priorities on the fly.
+        redis.call("HSET", partitionKey, workflowID, partitionItem)
+
+        -- if this is sharded we have a shard partition to update.
+        if shard ~= "" and shard ~= "null" then
+            redis.call("ZADD", shardIndexKey, partitionTime, workflowID)
+        end
+    end
 end
 
 -- Add optional indexes.
