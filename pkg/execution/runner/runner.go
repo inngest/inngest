@@ -377,7 +377,6 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
 		if err := s.pauses(ctx, tracked); err != nil {
 			l.Error().Err(err).Msg("error consuming pauses")
 			errs = multierror.Append(errs, err)

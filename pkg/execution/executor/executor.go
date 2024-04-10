@@ -1957,7 +1957,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	)
 
 	opcode := gen.Op.String()
-
 	err = e.sm.SavePause(ctx, state.Pause{
 		ID:                  pauseID,
 		WorkspaceID:         item.WorkspaceID,
@@ -1981,6 +1980,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 
 	// Enqueue a job that will timeout the pause.
 	jobID := fmt.Sprintf("%s-%s-%s", item.Identifier.IdempotencyKey(), gen.ID, "invoke")
+	// TODO I think this is fine sending no metadata, as we have no attempts.
 	err = e.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: item.WorkspaceID,
