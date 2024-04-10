@@ -532,25 +532,39 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 
 // invokes looks for a pause with the same correlation ID and triggers it
 func (s *svc) invokes(ctx context.Context, evt event.TrackedEvent) error {
+	l := logger.From(ctx).With().
+		Str("event", evt.GetEvent().Name).
+		Str("id", evt.GetEvent().ID).
+		Str("internal_id", evt.GetInternalID().String()).
+		Logger()
+
+	l.Trace().Msg("querying for invoke pauses")
+
 	corrId := evt.GetEvent().CorrelationID()
 	if corrId == "" {
 		return fmt.Errorf("no metadata available to lookup invoke function")
 	}
 
-	logger.From(ctx).Trace().
-		Str("identifier", corrId).
-		Msg("looking for invoke trigger")
+	l.Trace().Str("identifier", corrId).Msg("looking for invoke trigger")
 
 	return s.executor.HandleInvokeFinish(ctx, corrId, evt)
 }
 
 // pauses searches for and triggers all pauses from this event.
 func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
-	logger.From(ctx).Trace().Msg("querying for pauses")
+	l := logger.From(ctx).With().
+		Str("event", evt.GetEvent().Name).
+		Str("id", evt.GetEvent().ID).
+		Str("internal_id", evt.GetInternalID().String()).
+		Logger()
+
+	l.Trace().Msg("querying for pauses")
 
 	if ok, err := s.state.EventHasPauses(ctx, uuid.UUID{}, evt.GetEvent().Name); err == nil && !ok {
 		return nil
 	}
+
+	l.Trace().Msg("pauses found; handling")
 
 	iter, err := s.state.PausesByEvent(ctx, uuid.UUID{}, evt.GetEvent().Name)
 	if err != nil {
