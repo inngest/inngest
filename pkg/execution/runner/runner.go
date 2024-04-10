@@ -360,6 +360,25 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		}
 	}()
 
+	// check if this is an "inngest/function.finished" event
+	// triggered by invoke
+	corrId := tracked.GetEvent().CorrelationID()
+	if tracked.GetEvent().IsFinishedEvent() && corrId != "" {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := s.invokes(ctx, tracked); err != nil {
+				if err == state.ErrInvokePauseNotFound || err == state.ErrPauseNotFound {
+					l.Warn().Err(err).Msg("can't find paused function to resume after invoke")
+					return
+				}
+
+				l.Error().Err(err).Msg("error resuming function after invoke")
+				errs = multierror.Append(errs, err)
+			}
+		}()
+	}
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -369,6 +388,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		}
 	}()
 
+	wg.Wait()
 	return errs
 }
 
@@ -515,13 +535,34 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 	return errs
 }
 
+// invokes looks for a pause with the same correlation ID and triggers it
+func (s *svc) invokes(ctx context.Context, evt event.TrackedEvent) error {
+	l := logger.From(ctx).With().
+		Str("event", evt.GetEvent().Name).
+		Str("id", evt.GetEvent().ID).
+		Str("internal_id", evt.GetInternalID().String()).
+		Logger()
+
+	l.Trace().Msg("querying for invoke pauses")
+
+	return s.executor.HandleInvokeFinish(ctx, evt)
+}
+
 // pauses searches for and triggers all pauses from this event.
 func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
-	logger.From(ctx).Trace().Msg("querying for pauses")
+	l := logger.From(ctx).With().
+		Str("event", evt.GetEvent().Name).
+		Str("id", evt.GetEvent().ID).
+		Str("internal_id", evt.GetInternalID().String()).
+		Logger()
+
+	l.Trace().Msg("querying for pauses")
 
 	if ok, err := s.state.EventHasPauses(ctx, uuid.UUID{}, evt.GetEvent().Name); err == nil && !ok {
 		return nil
 	}
+
+	l.Trace().Msg("pauses found; handling")
 
 	iter, err := s.state.PausesByEvent(ctx, uuid.UUID{}, evt.GetEvent().Name)
 	if err != nil {

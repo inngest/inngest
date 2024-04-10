@@ -22,7 +22,8 @@ var (
 	ErrStepIncomplete = fmt.Errorf("step has not yet completed")
 	// ErrPauseNotFound is returned when attempting to lease or consume a pause
 	// that doesn't exist within the backing state store.
-	ErrPauseNotFound = fmt.Errorf("pause not found")
+	ErrPauseNotFound       = fmt.Errorf("pause not found")
+	ErrInvokePauseNotFound = fmt.Errorf("invoke pause not found")
 	// ErrPauseLeased is returned when attempting to lease a pause that is
 	// already leased by another event.
 	ErrPauseLeased        = fmt.Errorf("pause already leased")

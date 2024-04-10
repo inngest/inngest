@@ -1076,7 +1076,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 	// Use the aggregator for all funciton finished events, if there are more than
 	// 50 waiting.  It only takes a few milliseconds to iterate and handle less
 	// than 50;  anything more runs the risk of running slow.
-	if evt.GetEvent().Name == event.FnFinishedName && iter.Count() > 50 {
+	if evt.GetEvent().IsFinishedEvent() && iter.Count() > 50 {
 		aggRes, err := e.handleAggregatePauses(ctx, evt)
 		if err != nil {
 			log.From(ctx).Error().Err(err).Msg("error handling aggregate pauses")
@@ -1409,6 +1409,65 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 	wg.Wait()
 
 	return res, goerr
+}
+
+func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEvent) error {
+	evtID := evt.GetInternalID()
+
+	log := e.log
+	if log == nil {
+		log = logger.From(ctx)
+	}
+	l := log.With().Str("event_id", evtID.String()).Logger()
+
+	correlationID := evt.GetEvent().CorrelationID()
+	if correlationID == "" {
+		return fmt.Errorf("no correlation ID found in event when trying to handle finish")
+	}
+
+	// find the pause with correlationID
+	wsID := evt.GetWorkspaceID()
+	pause, err := e.sm.PauseByInvokeCorrelationID(ctx, wsID, correlationID)
+	if err != nil {
+		return err
+	}
+
+	if pause.Expires.Time().Before(time.Now()) {
+		// Consume this pause to remove it entirely
+		l.Debug().Msg("deleting expired pause")
+		_ = e.sm.DeletePause(context.Background(), *pause)
+		return nil
+	}
+
+	if pause.Cancel {
+		// This is a cancellation signal.  Check if the function
+		// has ended, and if so remove the pause.
+		//
+		// NOTE: Bookkeeping must be added to individual function runs and handled on
+		// completion instead of here.  This is a hot path and should only exist whilst
+		// bookkeeping is not implemented.
+		if exists, err := e.sm.Exists(ctx, pause.Identifier.RunID); !exists && err == nil {
+			// This function has ended.  Delete the pause and continue
+			_ = e.sm.DeletePause(context.Background(), *pause)
+			return nil
+		}
+	}
+
+	resumeData := pause.GetResumeData(evt.GetEvent())
+	if e.log != nil {
+		e.log.
+			Debug().
+			Interface("with", resumeData.With).
+			Str("pause.DataKey", pause.DataKey).
+			Msg("resuming pause")
+	}
+
+	return e.Resume(ctx, *pause, execution.ResumeRequest{
+		With:     resumeData.With,
+		EventID:  &evtID,
+		RunID:    resumeData.RunID,
+		StepName: resumeData.StepName,
+	})
 }
 
 // Cancel cancels an in-progress function.
@@ -1908,18 +1967,19 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 
 	opcode := gen.Op.String()
 	err = e.sm.SavePause(ctx, state.Pause{
-		ID:          pauseID,
-		WorkspaceID: item.WorkspaceID,
-		Identifier:  item.Identifier,
-		GroupID:     item.GroupID,
-		Outgoing:    gen.ID,
-		Incoming:    edge.Edge.Incoming,
-		StepName:    gen.UserDefinedName(),
-		Opcode:      &opcode,
-		Expires:     state.Time(expires),
-		Event:       &eventName,
-		Expression:  &strExpr,
-		DataKey:     gen.ID,
+		ID:                  pauseID,
+		WorkspaceID:         item.WorkspaceID,
+		Identifier:          item.Identifier,
+		GroupID:             item.GroupID,
+		Outgoing:            gen.ID,
+		Incoming:            edge.Edge.Incoming,
+		StepName:            gen.UserDefinedName(),
+		Opcode:              &opcode,
+		Expires:             state.Time(expires),
+		Event:               &eventName,
+		Expression:          &strExpr,
+		DataKey:             gen.ID,
+		InvokeCorrelationID: &correlationID,
 	})
 	if err == state.ErrPauseAlreadyExists {
 		return nil

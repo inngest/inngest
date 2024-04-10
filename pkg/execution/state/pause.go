@@ -68,6 +68,12 @@ type PauseGetter interface {
 	//
 	// This should not return consumed pauses.
 	PausesByID(ctx context.Context, pauseID ...uuid.UUID) ([]*Pause, error)
+
+	// PauseByInvokeCorrelationID returns a given pause by the correlation ID.
+	// This must return expired invoke pauses that have not yet been consumed in order to properly handle timeouts.
+	//
+	// This should not return consumed pauses.
+	PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*Pause, error)
 }
 
 // PauseIterator allows the runner to iterate over all pauses returned by a PauseGetter.  This
@@ -146,6 +152,8 @@ type Pause struct {
 	// this is empty and the pause contains an expression, function state will
 	// be loaded from the store.
 	ExpressionData map[string]any `json:"data"`
+	// InvokeCorrelationID is the correlation ID for the invoke pause.
+	InvokeCorrelationID *string `json:"icID,omitempty"`
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
 	OnTimeout bool `json:"onTimeout"`
@@ -221,8 +229,7 @@ func (p Pause) GetResumeData(evt event.Event) ResumeData {
 	// data and return only what the function returned. We do this here by unpacking the function
 	// finished event to pull out the correct data to place in state.
 	isInvokeFunctionOpcode := p.Opcode != nil && *p.Opcode == enums.OpcodeInvokeFunction.String()
-	isFnFinishedEvent := evt.Name == event.FnFinishedName
-	if isInvokeFunctionOpcode && isFnFinishedEvent {
+	if isInvokeFunctionOpcode && evt.IsFinishedEvent() {
 		if retRunID, ok := evt.Data["run_id"].(string); ok {
 			if ulidRunID, _ := ulid.Parse(retRunID); ulidRunID != (ulid.ULID{}) {
 				ret.RunID = &ulidRunID

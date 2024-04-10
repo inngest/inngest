@@ -290,7 +290,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 
 	pauseTimeout, ok := item.Payload.(queue.PayloadPauseTimeout)
 	if !ok {
-		return fmt.Errorf("unable to get pause timeout form queue item: %T", item.Payload)
+		return fmt.Errorf("unable to get pause timeout from queue item: %T", item.Payload)
 	}
 
 	pause, err := s.state.PauseByID(ctx, pauseTimeout.PauseID)
