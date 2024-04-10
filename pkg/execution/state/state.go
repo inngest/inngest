@@ -28,7 +28,6 @@ var (
 	// already leased by another event.
 	ErrPauseLeased        = fmt.Errorf("pause already leased")
 	ErrPauseAlreadyExists = fmt.Errorf("pause already exists")
-	ErrInvokePauseExists  = fmt.Errorf("invoke pause already exists")
 	ErrIdentifierExists   = fmt.Errorf("identifier already exists")
 	ErrFunctionCancelled  = fmt.Errorf("function cancelled")
 	ErrFunctionComplete   = fmt.Errorf("function completed")
