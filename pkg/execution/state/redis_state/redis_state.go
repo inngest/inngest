@@ -702,13 +702,6 @@ func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
 	}
 }
 
-func (m mgr) DeleteInvoke(ctx context.Context, correlationID string) error {
-	key := m.kf.Invoke(ctx)
-	cmd := m.pauseR.B().Hdel().Key(key).Field(correlationID).Build()
-	_, err := m.pauseR.Do(ctx, cmd).AsInt64()
-	return err
-}
-
 func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 	p, err := m.PauseByID(ctx, id)
 	if err != nil {
