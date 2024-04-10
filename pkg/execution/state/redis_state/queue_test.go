@@ -2082,9 +2082,9 @@ func TestShardLease(t *testing.T) {
 
 // TestQueueRateLimit asserts that the queue respects rate limits when added to a queue item.
 func TestQueueRateLimit(t *testing.T) {
-	r := miniredis.RunT(t)
+	mr := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
+		InitAddress:  []string{mr.Addr()},
 		DisableCache: true,
 	})
 	require.NoError(t, err)
@@ -2094,7 +2094,7 @@ func TestQueueRateLimit(t *testing.T) {
 
 	idA, idB := uuid.New(), uuid.New()
 
-	_ = idB
+	r := require.New(t)
 
 	t.Run("Without bursts", func(t *testing.T) {
 		throttle := &osqueue.Throttle{
@@ -2104,7 +2104,7 @@ func TestQueueRateLimit(t *testing.T) {
 			Burst:  0, // No burst.
 		}
 
-		a, err := q.EnqueueItem(ctx, QueueItem{
+		aa, err := q.EnqueueItem(ctx, QueueItem{
 			WorkflowID: idA,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -2113,9 +2113,9 @@ func TestQueueRateLimit(t *testing.T) {
 				Throttle: throttle,
 			},
 		}, getNow())
-		require.NoError(t, err)
+		r.NoError(err)
 
-		b, err := q.EnqueueItem(ctx, QueueItem{
+		ab, err := q.EnqueueItem(ctx, QueueItem{
 			WorkflowID: idA,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -2124,32 +2124,135 @@ func TestQueueRateLimit(t *testing.T) {
 				Throttle: throttle,
 			},
 		}, getNow().Add(time.Second))
-		require.NoError(t, err)
+		r.NoError(err)
 
 		// Leasing A should succeed, then B should fail.
 		partitions, err := q.PartitionPeek(ctx, true, getNow().Add(5*time.Second), 5)
-		require.NoError(t, err)
-		require.EqualValues(t, 1, len(partitions))
+		r.NoError(err)
+		r.EqualValues(1, len(partitions))
 
 		t.Run("Leasing a first item succeeds", func(t *testing.T) {
-			leaseA, err := q.Lease(ctx, *partitions[0], a, 10*time.Second, getNow())
-			require.NoError(t, err, "leasing throttled queue item with capacity failed")
-			require.NotNil(t, leaseA)
+			leaseA, err := q.Lease(ctx, *partitions[0], aa, 10*time.Second, getNow())
+			r.NoError(err, "leasing throttled queue item with capacity failed")
+			r.NotNil(leaseA)
 		})
 
 		t.Run("Attempting to lease another throttled key immediately fails", func(t *testing.T) {
-			leaseB, err := q.Lease(ctx, *partitions[0], b, 10*time.Second, getNow())
-			require.NotNil(t, err, "leasing throttled queue item without capacity didn't error")
-			require.Nil(t, leaseB)
+			leaseB, err := q.Lease(ctx, *partitions[0], ab, 10*time.Second, getNow())
+			r.NotNil(err, "leasing throttled queue item without capacity didn't error")
+			r.Nil(leaseB)
 		})
 
-		t.Run("Attempting to lease another throttled key immediately fails", func(t *testing.T) {
+		t.Run("Leasing another funciton succeeds", func(t *testing.T) {
+			ba, err := q.EnqueueItem(ctx, QueueItem{
+				WorkflowID: idB,
+				Data: osqueue.Item{
+					Identifier: state.Identifier{
+						WorkflowID: idB,
+					},
+					Throttle: &osqueue.Throttle{
+						Key:    "another-key",
+						Limit:  1,
+						Period: 5, // Admit one every 5 seconds
+						Burst:  0, // No burst.
+					},
+				},
+			}, getNow().Add(time.Second))
+			r.NoError(err)
+			lease, err := q.Lease(ctx, *partitions[0], ba, 10*time.Second, getNow())
+			r.Nil(err, "leasing throttled queue item without capacity didn't error")
+			r.NotNil(lease)
+		})
+
+		t.Run("Leasing after the period succeeds", func(t *testing.T) {
 			getNow = func() time.Time {
 				return time.Now().Add(time.Duration(throttle.Period) * time.Second)
 			}
-			leaseB, err := q.Lease(ctx, *partitions[0], b, 10*time.Second, getNow())
-			require.Nil(t, err, "leasing after waiting for throttle should succeed")
-			require.NotNil(t, leaseB)
+			defer func() { getNow = time.Now }()
+
+			leaseB, err := q.Lease(ctx, *partitions[0], ab, 10*time.Second, getNow())
+			r.Nil(err, "leasing after waiting for throttle should succeed")
+			r.NotNil(leaseB)
+		})
+	})
+
+	mr.FlushAll()
+
+	t.Run("With bursts", func(t *testing.T) {
+		throttle := &osqueue.Throttle{
+			Key:    "burst-plz",
+			Limit:  1,
+			Period: 10, // Admit one every 10 seconds
+			Burst:  3,  // With bursts of 3
+		}
+
+		items := []QueueItem{}
+		for i := 0; i <= 20; i++ {
+			item, err := q.EnqueueItem(ctx, QueueItem{
+				WorkflowID: idA,
+				Data: osqueue.Item{
+					Identifier: state.Identifier{WorkflowID: idA},
+					Throttle:   throttle,
+				},
+			}, getNow())
+			r.NoError(err)
+			items = append(items, item)
+		}
+
+		// Leasing A should succeed, then B should fail.
+		partitions, err := q.PartitionPeek(ctx, true, getNow().Add(5*time.Second), 5)
+		r.NoError(err)
+		r.EqualValues(1, len(partitions))
+
+		idx := 0
+
+		t.Run("Leasing up to bursts succeeds", func(t *testing.T) {
+			for i := 0; i < 3; i++ {
+				lease, err := q.Lease(ctx, *partitions[0], items[i], 2*time.Second, getNow())
+				r.NoError(err, "leasing throttled queue item with capacity failed")
+				r.NotNil(lease)
+				idx++
+			}
+		})
+
+		t.Run("Leasing the 4th time fails", func(t *testing.T) {
+			lease, err := q.Lease(ctx, *partitions[0], items[idx], 1*time.Second, getNow())
+			r.NotNil(err, "leasing throttled queue item without capacity didn't error")
+			r.ErrorContains(err, ErrQueueItemThrottled.Error())
+			r.Nil(lease)
+		})
+
+		t.Run("After 10s, we can re-lease once as bursting is done.", func(t *testing.T) {
+			getNow = func() time.Time {
+				return time.Now().Add(time.Duration(throttle.Period) * time.Second).Add(time.Second)
+			}
+			defer func() { getNow = time.Now }()
+
+			lease, err := q.Lease(ctx, *partitions[0], items[idx], 2*time.Second, getNow())
+			r.NoError(err, "leasing throttled queue item with capacity failed")
+			r.NotNil(lease)
+
+			idx++
+
+			// It should fail, as bursting is done.
+			lease, err = q.Lease(ctx, *partitions[0], items[idx], 1*time.Second, getNow())
+			r.NotNil(err, "leasing throttled queue item without capacity didn't error")
+			r.ErrorContains(err, ErrQueueItemThrottled.Error())
+			r.Nil(lease)
+		})
+
+		t.Run("After another 40s, we can burst again", func(t *testing.T) {
+			getNow = func() time.Time {
+				return time.Now().Add(time.Duration(throttle.Period*4) * time.Second)
+			}
+			defer func() { getNow = time.Now }()
+
+			for i := 0; i < 3; i++ {
+				lease, err := q.Lease(ctx, *partitions[0], items[i], 2*time.Second, getNow())
+				r.NoError(err, "leasing throttled queue item with capacity failed")
+				r.NotNil(lease)
+				idx++
+			}
 		})
 	})
 }
