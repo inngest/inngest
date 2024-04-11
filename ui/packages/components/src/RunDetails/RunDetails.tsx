@@ -13,6 +13,7 @@ import type { FunctionVersion } from '@inngest/components/types/functionVersion'
 import type { HistoryParser } from '@inngest/components/utils/historyParser';
 
 import { CancelRunButton } from '../CancelRunButton';
+import { RerunButton } from '../RerunButton';
 import { CancellationSummary } from './CancellationSummary';
 import { SleepingSummary } from './SleepingSummary';
 import { WaitingSummary } from './WaitingSummary';
@@ -21,8 +22,7 @@ import { renderRunMetadata } from './runMetadataRenderer';
 type FuncProps = {
   cancelRun?: () => Promise<unknown>;
   functionVersion?: Pick<FunctionVersion, 'url' | 'version'>;
-  // TODO: Replace this with an imported component.
-  rerunButton?: React.ReactNode;
+  rerun?: () => Promise<unknown>;
 };
 type LoadingRun = {
   func?: Pick<Function, 'name' | 'triggers'>;
@@ -50,7 +50,7 @@ export function RunDetails({
   functionVersion,
   getHistoryItemOutput,
   history,
-  rerunButton,
+  rerun,
   run,
   navigateToRun,
   loading = false,
@@ -73,7 +73,7 @@ export function RunDetails({
         !loading && (
           <div className="flex gap-2">
             {cancelRun && <CancelRunButton disabled={Boolean(run?.endedAt)} onClick={cancelRun} />}
-            {rerunButton}
+            {rerun && <RerunButton onClick={rerun} />}
           </div>
         )
       }

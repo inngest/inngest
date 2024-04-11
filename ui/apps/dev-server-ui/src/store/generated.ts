@@ -216,6 +216,7 @@ export type Mutation = {
   deleteApp: Scalars['String'];
   deleteAppByName: Scalars['Boolean'];
   invokeFunction: Maybe<Scalars['Boolean']>;
+  rerun: Scalars['ULID'];
   updateApp: App;
 };
 
@@ -243,6 +244,11 @@ export type MutationDeleteAppByNameArgs = {
 export type MutationInvokeFunctionArgs = {
   data: InputMaybe<Scalars['Map']>;
   functionSlug: Scalars['String'];
+};
+
+
+export type MutationRerunArgs = {
+  runID: Scalars['ULID'];
 };
 
 
@@ -503,6 +509,13 @@ export type CancelRunMutationVariables = Exact<{
 
 export type CancelRunMutation = { __typename?: 'Mutation', cancelRun: { __typename?: 'FunctionRun', id: string } };
 
+export type RerunMutationVariables = Exact<{
+  runID: Scalars['ULID'];
+}>;
+
+
+export type RerunMutation = { __typename?: 'Mutation', rerun: any };
+
 
 export const GetEventDocument = `
     query GetEvent($id: ID!) {
@@ -728,6 +741,11 @@ export const CancelRunDocument = `
   }
 }
     `;
+export const RerunDocument = `
+    mutation Rerun($runID: ULID!) {
+  rerun(runID: $runID)
+}
+    `;
 
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -770,9 +788,12 @@ const injectedRtkApi = api.injectEndpoints({
     CancelRun: build.mutation<CancelRunMutation, CancelRunMutationVariables>({
       query: (variables) => ({ document: CancelRunDocument, variables })
     }),
+    Rerun: build.mutation<RerunMutation, RerunMutationVariables>({
+      query: (variables) => ({ document: RerunDocument, variables })
+    }),
   }),
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation, useCancelRunMutation } = injectedRtkApi;
+export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation } = injectedRtkApi;
 
