@@ -275,6 +275,7 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 			Triggers:    []inngest.Trigger{{}},
 			RateLimit:   fn.Config().GetRateLimit(),
 			Cancel:      fn.Config().Cancel,
+			Timeouts:    (*inngest.Timeouts)(fn.Config().Timeouts),
 			Steps: map[string]sdk.SDKStep{
 				"step": {
 					ID:      "step",

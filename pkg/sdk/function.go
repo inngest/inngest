@@ -47,6 +47,8 @@ type SDKFunction struct {
 
 	Debounce *inngest.Debounce `json:"debounce,omitempty"`
 
+	Timeouts *inngest.Timeouts `json:"timeouts,omitempty"`
+
 	// Cancel specifies cancellation signals for the function
 	Cancel []inngest.Cancel `json:"cancel,omitempty"`
 
@@ -63,6 +65,7 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 		RateLimit:   s.RateLimit,
 		Cancel:      s.Cancel,
 		Debounce:    s.Debounce,
+		Timeouts:    s.Timeouts,
 	}
 	// Ensure we set the slug here if s.ID is nil.  This defaults to using
 	// the slugged version of the function name.
