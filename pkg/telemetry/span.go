@@ -273,6 +273,7 @@ type Span struct {
 	sync.Mutex
 
 	start time.Time
+	end   time.Time
 
 	name   string
 	attrs  []attribute.KeyValue
@@ -339,7 +340,10 @@ func (s *Span) StartTime() time.Time {
 }
 
 func (s *Span) EndTime() time.Time {
-	return time.Now()
+	if s.end.IsZero() {
+		return time.Now()
+	}
+	return s.end
 }
 
 func (s *Span) Attributes() []attribute.KeyValue {
@@ -393,6 +397,8 @@ func (s *Span) ChildSpanCount() int {
 
 // End utilizes the internal tracer's processors to send spans
 func (s *Span) End(opts ...trace.SpanEndOption) {
+	s.end = time.Now()
+
 	// don't attempt to export the span if it's marked as dedup or cancel
 	if s.cancel || s.dedup {
 		s.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
