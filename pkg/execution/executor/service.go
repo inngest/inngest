@@ -265,7 +265,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		return err
 	}
 
-	if err != nil || resp.Err != nil {
+	if err != nil || (resp != nil && resp.Err != nil) {
 		// Accordingly, we check if the driver's response is retryable here;
 		// this will let us know whether we can re-enqueue.
 		if resp != nil && !resp.Retryable() {

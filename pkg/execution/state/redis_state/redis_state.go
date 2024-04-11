@@ -330,7 +330,8 @@ func (m mgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.Metad
 		return err
 	}
 
-	input := []string{string(byt), "0", "0", strconv.Itoa(consts.RequestVersionUnknown)}
+	input := []string{string(byt), "0", "0", strconv.Itoa(consts.RequestVersionUnknown), "0"}
+
 	if md.Debugger {
 		input[1] = "1"
 	}
@@ -339,6 +340,9 @@ func (m mgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.Metad
 	}
 	if md.RequestVersion != consts.RequestVersionUnknown {
 		input[3] = strconv.Itoa(md.RequestVersion)
+	}
+	if !md.StartedAt.IsZero() {
+		input[4] = strconv.Itoa(int(md.StartedAt.Unix()))
 	}
 
 	status, err := scripts["updateMetadata"].Exec(
@@ -378,7 +382,7 @@ func (m mgr) metadata(ctx context.Context, runID ulid.ULID) (*runMetadata, error
 	if err != nil {
 		return nil, err
 	}
-	return NewRunMetadata(val)
+	return newRunMetadata(val)
 }
 
 func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
@@ -1128,7 +1132,7 @@ func (i *scanIter) Val(ctx context.Context) *state.Pause {
 	return pause
 }
 
-func NewRunMetadata(data map[string]string) (*runMetadata, error) {
+func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	var err error
 	m := &runMetadata{}
 
@@ -1166,6 +1170,14 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 			return nil, fmt.Errorf("invalid hash version detected: %#v", val)
 		}
 		m.RequestVersion = v
+	}
+
+	if val, ok := data["sat"]; ok && val != "" {
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return nil, fmt.Errorf("invalid started at detected: %#v", val)
+		}
+		m.StartedAt = int64(v)
 	}
 
 	// The below fields are optional
@@ -1307,6 +1319,7 @@ type runMetadata struct {
 	RequestVersion            int            `json:"rv"`
 	Context                   map[string]any `json:"ctx,omitempty"`
 	DisableImmediateExecution bool           `json:"die,omitempty"`
+	StartedAt                 int64          `json:"sat,omitempty"`
 }
 
 func (r runMetadata) Map() map[string]any {
@@ -1320,6 +1333,7 @@ func (r runMetadata) Map() map[string]any {
 		"rv":       r.RequestVersion,
 		"ctx":      r.Context,
 		"die":      r.DisableImmediateExecution,
+		"sat":      r.StartedAt,
 	}
 }
 
@@ -1332,8 +1346,8 @@ func (r runMetadata) Metadata() state.Metadata {
 		RequestVersion:            r.RequestVersion,
 		Context:                   r.Context,
 		DisableImmediateExecution: r.DisableImmediateExecution,
+		StartedAt:                 time.Unix(r.StartedAt, 0),
 	}
-
 	if r.RunType != "" {
 		m.RunType = &r.RunType
 	}

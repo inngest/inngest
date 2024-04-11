@@ -144,6 +144,9 @@ type Metadata struct {
 	// implementation.
 	Version int `json:"version"`
 
+	// StartedAt records the time in which the first successful step started.
+	StartedAt time.Time `json:"sat"`
+
 	// RequestVersion represents the executor request versioning/hashing style
 	// used to manage state.
 	//
@@ -171,6 +174,7 @@ type MetadataUpdate struct {
 	Context                   map[string]any `json:"ctx,omitempty"`
 	DisableImmediateExecution bool           `json:"disableImmediateExecution,omitempty"`
 	RequestVersion            int            `json:"rv"`
+	StartedAt                 time.Time      `json:"sat"`
 }
 
 // State represents the current state of a fn run.  It is data-structure

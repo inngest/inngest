@@ -54,7 +54,8 @@ type Function struct {
 
 	Priority *Priority `json:"priority,omitempty"`
 
-	TTL *time.Duration `json:"ttl"`
+	// Timeouts represents timeouts for a function.
+	Timeouts *Timeouts `json:"timeouts,omitempty"`
 
 	// ConcurrencyLimits allows limiting the concurrency of running functions, optionally constrained
 	// by individual concurrency keys.
@@ -82,6 +83,26 @@ type Function struct {
 
 	// Edges represent edges between steps in the dag.
 	Edges []Edge `json:"edges,omitempty"`
+}
+
+// Timeouts represents timeouts for the function. If any of the timeouts are hit, the function
+// will be marked as cancelled with a cancellation reason.
+type Timeouts struct {
+	// Start represents the timeout for starting a function.  If the time between scheduling
+	// and starting a function exceeds this value, the function will be cancelled.  Note that
+	// this is inclusive of time between retries.
+	//
+	// A function may exceed this duration because of concurrency limits, throttling, etc.
+	Start time.Duration `json:"start"`
+
+	// Finish represents the time between a function starting and the function finishing.
+	// If a function takes longer than this time to finish, the function is marked as cancelled.
+	// The start time is taken from the time that the first successful function request begins,
+	// and does not include the time spent in the queue before the function starts.
+	//
+	// Note that if the final request to a function begins before this timeout, and completes
+	// after this timeout, the function will succeed.
+	Finish time.Duration `json:"finish"`
 }
 
 type Priority struct {

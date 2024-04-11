@@ -546,14 +546,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, err
 	}
 
-	// We get trace context from this, which is the run metadata.
-	// We should probably get trace context from the queue item if that
-	// contains it.
-	md := s.Metadata()
-
 	// Store the metadata in context for future use and propagate trace
 	// context. This can be used to reduce reads in the future.
-	ctx = e.extractTraceCtx(WithContextMetadata(ctx, md), id, &item)
+	ctx = e.extractTraceCtx(WithContextMetadata(ctx, s.Metadata()), id, &item)
 
 	ctx, span := telemetry.UserTracer().Provider().
 		Tracer(consts.OtelScopeExecution).
@@ -568,74 +563,21 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		))
 	defer span.End()
 
-	if md.Status == enums.RunStatusCancelled {
-		return nil, state.ErrFunctionCancelled
+	f, err := e.fl.LoadFunction(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("error loading function for run: %w", err)
 	}
 
-	if md.Status == enums.RunStatusScheduled {
-		if err := e.sm.SetStatus(ctx, id, enums.RunStatusRunning); err != nil {
-			return nil, err
-		}
-
-		// Reload the metadata to ensure we get all changes that happen when
-		// setting the status.
-		//
-		// TODO: Refactor the state store so that we don't need to reload when
-		// setting the status
-		s, err := e.sm.Load(ctx, id.RunID)
-		if err != nil {
-			return nil, err
-		}
-		md = s.Metadata()
+	// Validate that the run can execute.
+	v := newRunValidator(item, s, f, e)
+	if err := v.validate(ctx); err != nil {
+		return nil, err
 	}
-
-	if e.steplimit != 0 && len(s.Actions()) >= int(e.steplimit) {
-		// Update this function's state to overflowed, if running.
-		if md.Status == enums.RunStatusRunning {
-			// XXX: Update error to failed, set error message
-			if err := e.sm.SetStatus(ctx, id, enums.RunStatusFailed); err != nil {
-				return nil, err
-			}
-
-			// Create a new driver response to map as the function finished error.
-			resp := state.DriverResponse{}
-			resp.SetError(state.ErrFunctionOverflowed)
-			resp.SetFinal()
-
-			if err := e.runFinishHandler(ctx, id, s, resp); err != nil {
-				logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-			}
-
-			for _, e := range e.lifecycles {
-				go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, resp, s)
-			}
-		}
-		return nil, state.ErrFunctionOverflowed
-	}
-
-	// Check if the function is cancelled.
-	if e.cancellationChecker != nil {
-		cancel, err := e.cancellationChecker.IsCancelled(
-			ctx,
-			md.Identifier.WorkspaceID,
-			md.Identifier.WorkflowID,
-			md.Identifier.RunID,
-			s.Event(),
-		)
-		if err != nil {
-			logger.StdlibLogger(ctx).Error(
-				"error checking cancellation",
-				"error", err.Error(),
-				"run_id", md.Identifier.RunID,
-				"function_id", md.Identifier.WorkflowID,
-				"workspace_id", md.Identifier.WorkspaceID,
-			)
-		}
-		if cancel != nil {
-			return nil, e.Cancel(ctx, md.Identifier.RunID, execution.CancelRequest{
-				CancellationID: &cancel.ID,
-			})
-		}
+	if v.stopWithoutRetry {
+		// Validation prevented execution and doesn't want the executor to retry, so
+		// don't return an error.
+		// XXX: Handle retries with error types and return a non-retryable error here.
+		return nil, nil
 	}
 
 	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
@@ -647,15 +589,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// we automatically enqueue all children of the dag from the root node.
 	// This can be cleaned up.
 	if edge.Incoming == inngest.TriggerName {
-		f, err := e.fl.LoadFunction(ctx, id)
-		if err != nil {
-			return nil, fmt.Errorf("error loading function for run: %w", err)
-		}
 		// We only support functions with a single step, as we've removed the DAG based approach.
 		// This means that we always execute the first step.
 		if len(f.Steps) > 1 {
 			return nil, fmt.Errorf("DAG-based steps are no longer supported")
 		}
+
 		edge.Outgoing = inngest.TriggerName
 		edge.Incoming = f.Steps[0].ID
 		// Update the payload
@@ -688,7 +627,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}, nil
 	}
 
-	resp, err := e.run(ctx, id, item, edge, s, stackIndex)
+	start := time.Now() // for recording function start time after a successful step.
+
+	resp, err := e.run(ctx, id, item, edge, s, stackIndex, f)
+
 	if resp == nil && err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		if byt, err := json.Marshal(err.Error()); err == nil {
@@ -745,6 +687,19 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	err = e.HandleResponse(ctx, id, item, edge, resp)
+
+	if err == nil && item.Kind == queue.KindStart {
+		md := s.Metadata()
+		// This is the first successful step, so mark the fn as started.
+		_ = e.sm.UpdateMetadata(ctx, s.RunID(), state.MetadataUpdate{
+			Debugger:                  md.Debugger,
+			Context:                   md.Context,
+			DisableImmediateExecution: md.DisableImmediateExecution,
+			RequestVersion:            md.RequestVersion,
+			StartedAt:                 start,
+		})
+	}
+
 	return resp, err
 }
 
@@ -992,12 +947,7 @@ func correlationID(event map[string]any) *string {
 //
 // A nil response with an error indicates that an internal error occurred and the step
 // did not run.
-func (e *executor) run(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge, s state.State, stackIndex int) (*state.DriverResponse, error) {
-	f, err := e.fl.LoadFunction(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("error loading function for run: %w", err)
-	}
-
+func (e *executor) run(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge, s state.State, stackIndex int, f *inngest.Function) (*state.DriverResponse, error) {
 	var step *inngest.Step
 	for _, s := range f.Steps {
 		if s.ID == edge.Incoming {
@@ -1613,6 +1563,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, resp *state.Driv
 						Debugger:                  md.Debugger,
 						DisableImmediateExecution: true,
 						RequestVersion:            resp.RequestVersion,
+						StartedAt:                 md.StartedAt,
 					}
 				}
 				update.DisableImmediateExecution = true
