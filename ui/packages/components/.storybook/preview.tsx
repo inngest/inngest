@@ -1,6 +1,7 @@
 import { withThemeByClassName } from '@storybook/addon-themes';
 import type { Preview, ReactRenderer } from '@storybook/react';
 
+import { TooltipProvider } from '../Tooltip';
 import { interTight, robotoMono } from '../src/AppRoot/fonts';
 import '../src/AppRoot/globals.css';
 
@@ -8,13 +9,15 @@ const preview: Preview = {
   decorators: [
     (Story) => {
       return (
-        <div
-          className={`${interTight.variable} ${robotoMono.variable} dark:bg-slate-940 bg-white font-sans`}
-        >
-          <div id="app" />
-          <div id="modals" />
-          <Story />
-        </div>
+        <TooltipProvider>
+          <div
+            className={`${interTight.variable} ${robotoMono.variable} dark:bg-slate-940 bg-white font-sans`}
+          >
+            <div id="app" />
+            <div id="modals" />
+            <Story />
+          </div>
+        </TooltipProvider>
       );
     },
     withThemeByClassName<ReactRenderer>({
