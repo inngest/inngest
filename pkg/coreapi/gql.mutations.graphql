@@ -12,6 +12,7 @@ type Mutation {
   ): Boolean
 
   cancelRun(runID: ULID!): FunctionRun!
+  rerun(runID: ULID!): ULID!
 }
 
 input CreateAppInput {

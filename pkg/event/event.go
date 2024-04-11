@@ -168,6 +168,21 @@ func NewOSSTrackedEvent(e Event) TrackedEvent {
 	}
 }
 
+// NewOSSTrackedEventWithID creates a new TrackedEvent with the given internal
+// ID. For internal use only: users should never be able to specify the internal
+// ID.
+//
+// We created this function because rerunning a function using
+// NewOSSTrackedEvent resulted in the wrong event ID in the history store. If
+// that behavior changes, then maybe this function isn't needed anymore
+func NewOSSTrackedEventWithID(e Event, internalID ulid.ULID) TrackedEvent {
+	e.ID = internalID.String()
+	return ossTrackedEvent{
+		Id:    internalID,
+		Event: e,
+	}
+}
+
 func NewOSSTrackedEventFromString(data string) (*ossTrackedEvent, error) {
 	evt := &ossTrackedEvent{}
 	if err := json.Unmarshal([]byte(data), evt); err != nil {
