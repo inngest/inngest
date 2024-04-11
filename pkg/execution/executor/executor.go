@@ -585,6 +585,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
 			attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
 			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
+			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
 		),
 	)
 	if item.RunInfo != nil {

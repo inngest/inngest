@@ -34,6 +34,7 @@ const (
 	OtelSysStepOutput          = "sys.step.output"
 	OtelSysStepOutputSizeBytes = "sys.step.output.size.bytes"
 	OtelSysStepFirst           = "sys.step.first"
+	OtelSysStepGroupID         = "sys.step.group.id"
 
 	OtelSysStepRetry         = "sys.step.retry"
 	OtelSysStepNextOpcode    = "sys.step.next.opcode"
