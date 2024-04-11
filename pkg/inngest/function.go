@@ -71,8 +71,15 @@ type Function struct {
 	// EventBatch determines how the function will process a list of incoming events
 	EventBatch *EventBatchConfig `json:"batchEvents,omitempty"`
 
-	// RateLimit allows specifying custom rate limiting for the function.
+	// RateLimit allows specifying custom rate limiting for the function.  A RateLimit is
+	// hard rate limiting:  any function invocations over the rate limit will be ignored and
+	// will never run.
 	RateLimit *RateLimit `json:"rateLimit,omitempty"`
+
+	// Throttle represents a soft rate limit for gating function starts.  Any function runs
+	// over the throttle period will be enqueued in the backlog to run at the next available
+	// time.
+	Throttle *Throttle `json:"throttle,omitempty"`
 
 	// Cancel specifies cancellation signals for the function
 	Cancel []Cancel `json:"cancel,omitempty"`
@@ -83,6 +90,23 @@ type Function struct {
 
 	// Edges represent edges between steps in the dag.
 	Edges []Edge `json:"edges,omitempty"`
+}
+
+// Throttle represents concurrency over time.
+type Throttle struct {
+	// Limit is how often the function can be called within the specified period.  The
+	// minimum limit is 1.
+	Limit uint `json:"limit"`
+	// Period represents the time period for throttling the function.  The minimum
+	// granularity is a single second.
+	Period time.Duration `json:"period"`
+	// Burst...
+	Burst uint `json:"burst"`
+	// Key is an optional string to constrain throttling using event data.  For
+	// example, if you want to throttle incoming notifications based off of a user's
+	// ID in an event you can use the following key: "{{ event.user.id }}".  This ensures
+	// that we throttle functions for each user independently.
+	Key *string `json:"key,omitempty"`
 }
 
 // Timeouts represents timeouts for the function. If any of the timeouts are hit, the function

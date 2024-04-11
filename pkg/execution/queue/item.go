@@ -136,6 +136,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 		MaxAttempts *int              `json:"maxAtts,omitempty"`
 		Payload     json.RawMessage   `json:"payload"`
 		Metadata    map[string]string `json:"metadata"`
+		Throttle    *Throttle         `json:"throttle"`
 	}
 	temp := &kind{}
 	err := json.Unmarshal(b, temp)
@@ -150,6 +151,8 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.Attempt = temp.Attempt
 	i.MaxAttempts = temp.MaxAttempts
 	i.Metadata = temp.Metadata
+	i.Throttle = temp.Throttle
+
 	// Save this for custom unmarshalling of other jobs.  This is overwritten
 	// for known queue kinds.
 	if len(temp.Payload) > 0 {
