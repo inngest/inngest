@@ -584,6 +584,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.String(consts.OtelSysFunctionID, id.WorkflowID.String()),
 			attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
 			attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
+			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
 		),
 	)
 	if item.RunInfo != nil {
@@ -591,6 +592,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.Int64(consts.OtelSysDelaySystem, item.RunInfo.Latency.Milliseconds()),
 			attribute.Int64(consts.OtelSysDelaySojourn, item.RunInfo.SojournDelay.Milliseconds()),
 		)
+	}
+	if item.Attempt > 0 {
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepRetry, true))
 	}
 	defer func() {
 		fnSpan.End()
@@ -1853,7 +1857,6 @@ func (e *executor) handleStepError(ctx context.Context, gen state.GeneratorOpcod
 		return nil
 	}
 	span.SetAttributes(
-		attribute.Bool(consts.OtelSysStepRetry, true),
 		attribute.Int64(consts.OtelSysStepNextTimestamp, now.UnixMilli()),
 	)
 
