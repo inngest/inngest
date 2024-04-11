@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -22,6 +21,7 @@ import (
 	"github.com/inngest/inngestgo/errors"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/inngest/inngestgo/step"
+	"golang.org/x/exp/slog"
 )
 
 var (
@@ -275,7 +275,6 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 			Triggers:    []inngest.Trigger{{}},
 			RateLimit:   fn.Config().GetRateLimit(),
 			Cancel:      fn.Config().Cancel,
-			Timeouts:    (*inngest.Timeouts)(fn.Config().Timeouts),
 			Steps: map[string]sdk.SDKStep{
 				"step": {
 					ID:      "step",
