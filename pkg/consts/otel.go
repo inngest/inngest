@@ -9,11 +9,13 @@ const (
 	OtelSysAccountID      = "sys.account.id"
 	OtelSysWorkspaceID    = "sys.workspace.id"
 	OtelSysAppID          = "sys.app.id"
-	OtelSysEventData      = "sys.event"
-	OtelSysEventRequestID = "sys.event.request.id"
-	OtelSysEventIDs       = "sys.event.ids"
-	OtelSysBatchID        = "sys.batch.id"
 	OtelSysIdempotencyKey = "sys.idempotency.key"
+
+	OtelSysEventData       = "sys.event"
+	OtelSysEventRequestID  = "sys.event.request.id"
+	OtelSysEventInternalID = "sys.event.internal.id"
+	OtelSysEventIDs        = "sys.event.ids"
+	OtelSysBatchID         = "sys.batch.id"
 
 	OtelSysFunctionID         = "sys.function.id"
 	OtelSysFunctionSlug       = "sys.function.slug"
