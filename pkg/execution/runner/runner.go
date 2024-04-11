@@ -460,28 +460,10 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 			}
 		}
 		if fn != nil {
-			cancelSpan := false
-			_, span := telemetry.NewSpan(ctx,
-				telemetry.WithScope(consts.OtelScopeTrigger),
-				telemetry.WithName(consts.OtelSpanTrigger),
-				telemetry.WithSpanAttributes(
-					attribute.Bool(consts.OtelUserTraceFilterKey, true),
-					attribute.String(consts.OtelSysFunctionSlug, fn.GetSlug()),
-				),
-			)
-			defer func() {
-				if cancelSpan {
-					_ = span.Cancel(ctx)
-				} else {
-					span.End()
-				}
-			}()
-
 			// Initialize this function for this event only once;  we don't
 			// want multiple matching triggers to run the function more than once.
 			err := s.initialize(ctx, *fn, tracked)
 			if err != nil {
-				cancelSpan = true
 				logger.From(ctx).Error().
 					Err(err).
 					Str("function", fn.Name).
@@ -534,28 +516,10 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 					}
 				}
 
-				cancelSpan := false
-				_, span := telemetry.NewSpan(ctx,
-					telemetry.WithScope(consts.OtelScopeTrigger),
-					telemetry.WithName(consts.OtelSpanTrigger),
-					telemetry.WithSpanAttributes(
-						attribute.Bool(consts.OtelUserTraceFilterKey, true),
-						attribute.String(consts.OtelSysFunctionSlug, copied.GetSlug()),
-					),
-				)
-				defer func() {
-					if cancelSpan {
-						_ = span.Cancel(ctx)
-					} else {
-						span.End()
-					}
-				}()
-
 				// Initialize this function for this event only once;  we don't
 				// want multiple matching triggers to run the function more than once.
 				err := s.initialize(ctx, copied, tracked)
 				if err != nil {
-					cancelSpan = true
 					logger.From(ctx).Error().
 						Err(err).
 						Str("function", copied.Name).

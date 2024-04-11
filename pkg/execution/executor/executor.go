@@ -293,6 +293,27 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// this run ID.
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
+	// span that tells when the function was queued
+	_, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeTrigger),
+		telemetry.WithName(consts.OtelSpanTrigger),
+		telemetry.WithTimestamp(ulid.Time(runID.Time())),
+		telemetry.WithSpanAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, req.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, req.Function.ID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, req.Function.Slug),
+			attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
+			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
+		),
+	)
+	defer span.End()
+	if len(req.Events) > 1 {
+		span.SetAttributes(attribute.String(consts.OtelSysBatchID, req.BatchID.String()))
+	}
+
 	var key string
 	if req.IdempotencyKey != nil {
 		// Use the given idempotency key
@@ -314,11 +335,14 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	eventIDs := []ulid.ULID{}
+	eventIDsStr := []string{}
 	for _, e := range req.Events {
 		id := e.GetInternalID()
 		eventIDs = append(eventIDs, id)
+		eventIDsStr = append(eventIDsStr, id.String())
 	}
 	spanID := telemetry.NewSpanID(ctx)
+	span.SetAttributes(attribute.StringSlice(consts.OtelSysEventIDs, eventIDsStr))
 
 	id := state.Identifier{
 		WorkflowID:      req.Function.ID,
@@ -396,11 +420,13 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		SpanID:         spanID.String(),
 	})
 	if err == state.ErrIdentifierExists {
+		_ = span.Cancel(ctx)
 		// This function was already created.
 		return nil, state.ErrIdentifierExists
 	}
 
 	if err != nil {
+		_ = span.Cancel(ctx)
 		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
 
@@ -497,9 +523,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 	err = e.queue.Enqueue(ctx, item, at)
 	if err == redis_state.ErrQueueItemExists {
+		_ = span.Cancel(ctx)
 		return nil, state.ErrIdentifierExists
 	}
 	if err != nil {
+		_ = span.Cancel(ctx)
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
 
@@ -563,6 +591,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.String(consts.OtelSysWorkspaceID, id.WorkspaceID.String()),
 			attribute.String(consts.OtelSysAppID, id.AppID.String()),
 			attribute.String(consts.OtelSysFunctionID, id.WorkflowID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
 			attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
 			attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
 			attribute.StringSlice(consts.OtelSysEventIDs, evtIDs),
@@ -582,6 +611,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.String(consts.OtelSysWorkspaceID, id.WorkspaceID.String()),
 			attribute.String(consts.OtelSysAppID, id.AppID.String()),
 			attribute.String(consts.OtelSysFunctionID, id.WorkflowID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
 			attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
 			attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
 			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
