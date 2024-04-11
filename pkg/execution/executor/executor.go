@@ -304,7 +304,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
 			attribute.String(consts.OtelSysAppID, req.AppID.String()),
 			attribute.String(consts.OtelSysFunctionID, req.Function.ID.String()),
-			attribute.String(consts.OtelSysFunctionSlug, req.Function.Slug),
+			attribute.String(consts.OtelSysFunctionSlug, req.Function.GetSlug()),
 			attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
 			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
 		),
@@ -687,16 +687,16 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			// Set the start time and spanID in metadata for subsequent runs
 			// This should be an one time operation and is never updated after,
 			// which is enforced on the Lua script.
-			update := state.MetadataUpdate{
+			if err := e.sm.UpdateMetadata(ctx, id.RunID, state.MetadataUpdate{
 				Context:                   md.Context,
 				DisableImmediateExecution: md.DisableImmediateExecution,
 				SpanID:                    fnSpanID.String(),
 				StartedAt:                 start,
 				RequestVersion:            md.RequestVersion,
-			}
-			if err := e.sm.UpdateMetadata(ctx, id.RunID, update); err != nil {
+			}); err != nil {
 				log.From(ctx).Error().Err(err).Msg("error updating metadata on function start")
 			}
+
 			for _, e := range e.lifecycles {
 				go e.OnFunctionStarted(context.WithoutCancel(ctx), id, item, s)
 			}

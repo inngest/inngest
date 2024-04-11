@@ -353,7 +353,7 @@ func (m mgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.Metad
 		input[4] = md.SpanID
 	}
 	if !md.StartedAt.IsZero() {
-		input[4] = strconv.Itoa(int(md.StartedAt.Unix()))
+		input[5] = strconv.Itoa(int(md.StartedAt.Unix()))
 	}
 
 	status, err := scripts["updateMetadata"].Exec(
@@ -1219,14 +1219,8 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 			m.DisableImmediateExecution = true
 		}
 	}
-
 	if val, ok := data["sid"]; ok {
 		m.SpanID = val
-	}
-	if val, ok := data["startedAt"]; ok {
-		if ts, err := strconv.ParseInt(val, 10, 64); err == nil && ts > 0 {
-			m.StartedAt = ts
-		}
 	}
 
 	return m, nil
