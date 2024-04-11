@@ -145,7 +145,7 @@ type Metadata struct {
 	// implementation.
 	Version int `json:"version"`
 
-	// StartedAt records the time in which the first successful step started.
+	// StartedAt records the time when the function started
 	StartedAt time.Time `json:"sat"`
 
 	// RequestVersion represents the executor request versioning/hashing style
@@ -171,10 +171,6 @@ type Metadata struct {
 
 	// SpanID is the spanID used for this function run.
 	SpanID string `json:"sid"`
-	// QueuedAt shows the time the function was queued
-	QueuedAt int64 `json:"queuedAt"`
-	// StartedAt shows the time the function started execution
-	StartedAt int64 `json:"startedAt,omitempty"`
 }
 
 func (md *Metadata) GetSpanID() (*trace.SpanID, error) {
@@ -184,17 +180,6 @@ func (md *Metadata) GetSpanID() (*trace.SpanID, error) {
 	}
 
 	return nil, fmt.Errorf("invalid otel spanID")
-}
-
-func (md *Metadata) GetQueueTime() time.Time {
-	return time.UnixMilli(md.QueuedAt)
-}
-
-func (md *Metadata) GetStartTime() *time.Time {
-	if md.StartedAt.IsZero() {
-		return nil
-	}
-	return &md.StartedAt
 }
 
 type MetadataUpdate struct {

@@ -555,10 +555,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// contains it.
 	md := s.Metadata()
 
-	// Retrieve the start time of the function
-	fnStartTime := time.Now()
-	if md.GetStartTime() != nil {
-		fnStartTime = *md.GetStartTime()
+	start := time.Now() // for recording function start time after a successful step.
+	if !md.StartedAt.IsZero() {
+		start = md.StartedAt
 	}
 
 	// Store the metadata in context for future use and propagate trace
@@ -583,7 +582,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	ctx, fnSpan := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeFunction),
 		telemetry.WithName(s.Function().GetSlug()),
-		telemetry.WithTimestamp(fnStartTime),
+		telemetry.WithTimestamp(start),
 		telemetry.WithSpanID(*fnSpanID),
 		telemetry.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
@@ -692,7 +691,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				Context:                   md.Context,
 				DisableImmediateExecution: md.DisableImmediateExecution,
 				SpanID:                    fnSpanID.String(),
-				StartedAt:                 &fnStartTime,
+				StartedAt:                 start,
 				RequestVersion:            md.RequestVersion,
 			}
 			if err := e.sm.UpdateMetadata(ctx, id.RunID, update); err != nil {
@@ -716,8 +715,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			Err:    nil,
 		}, nil
 	}
-
-	start := time.Now() // for recording function start time after a successful step.
 
 	resp, err := e.run(ctx, id, item, edge, s, stackIndex, f)
 
@@ -778,19 +775,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	err = e.HandleResponse(ctx, id, item, edge, resp)
-
-	if err == nil && item.Kind == queue.KindStart {
-		md := s.Metadata()
-		// This is the first successful step, so mark the fn as started.
-		_ = e.sm.UpdateMetadata(ctx, s.RunID(), state.MetadataUpdate{
-			Debugger:                  md.Debugger,
-			Context:                   md.Context,
-			DisableImmediateExecution: md.DisableImmediateExecution,
-			RequestVersion:            md.RequestVersion,
-			StartedAt:                 start,
-		})
-	}
-
 	return resp, err
 }
 

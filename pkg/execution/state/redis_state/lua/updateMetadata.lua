@@ -18,11 +18,14 @@ redis.call("HSET", keyMetadata, "ctx", ctx)
 redis.call("HSET", keyMetadata, "die", die)
 redis.call("HSET", keyMetadata, "debugger", debugger)
 redis.call("HSET", keyMetadata, "rv", rv)
-redis.call("HSET", keyMetadata, "sat", rv)
 
 -- only update the spanID if the existing value is empty
 if is_field_empty("sid", "") then
   redis.call("HSET", keyMetadata, "sid", spanid)
+end
+
+if is_field_empty("sat", "0") then
+  redis.call("HSET", keyMetadata, "sat", sat)
 end
 
 return 0

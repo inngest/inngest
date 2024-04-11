@@ -266,7 +266,6 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		Context:        input.Context,
 		Status:         enums.RunStatusScheduled,
 		SpanID:         input.SpanID,
-		QueuedAt:       time.Now().UnixMilli(),
 	}
 	if input.RunType != nil {
 		metadata.RunType = *input.RunType
@@ -1223,11 +1222,6 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 
 	if val, ok := data["sid"]; ok {
 		m.SpanID = val
-	}
-	if val, ok := data["queuedAt"]; ok {
-		if ts, err := strconv.ParseInt(val, 10, 64); err == nil {
-			m.QueuedAt = ts
-		}
 	}
 	if val, ok := data["startedAt"]; ok {
 		if ts, err := strconv.ParseInt(val, 10, 64); err == nil && ts > 0 {
