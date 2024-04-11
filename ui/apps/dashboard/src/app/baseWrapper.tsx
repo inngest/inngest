@@ -9,7 +9,10 @@ export function BaseWrapper({ children }: { children: React.ReactNode }) {
       lang="en"
       className={cn('h-full bg-white accent-indigo-500', interTight.variable, robotoMono.variable)}
     >
-      <body className="h-full overflow-hidden">{children}</body>
+      <body className="h-full overflow-hidden">
+        <div id="modals" />
+        {children}
+      </body>
     </html>
   );
 }
