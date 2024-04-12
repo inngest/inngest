@@ -69,16 +69,6 @@ export function Apps({ isArchived = false }: Props) {
         {latestUnattachedSyncTime && !isArchived && (
           <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={latestUnattachedSyncTime} />
         )}
-
-        {!isArchived && !env.isArchived && hasApps && (
-          <Button
-            className="mx-auto my-12"
-            kind="primary"
-            label="Sync New App"
-            btnAction={() => router.push(pathCreator.createApp({ envSlug: env.slug }))}
-            icon={<PlusIcon />}
-          />
-        )}
       </div>
     </div>
   );
