@@ -41,6 +41,11 @@ type SDKFunction struct {
 	// RateLimit allows specifying custom rate limiting for the function.
 	RateLimit *inngest.RateLimit `json:"rateLimit,omitempty"`
 
+	// Throttle represents a soft rate limit for gating function starts.  Any function runs
+	// over the throttle period will be enqueued in the backlog to run at the next available
+	// time.
+	Throttle *inngest.Throttle `json:"throttle,omitempty"`
+
 	// Retries allows specifying the number of retries to attempt across all steps in the
 	// function.
 	Retries *int `json:"retries,omitempty"`
@@ -63,6 +68,7 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 		Triggers:    s.Triggers,
 		Priority:    s.Priority,
 		RateLimit:   s.RateLimit,
+		Throttle:    s.Throttle,
 		Cancel:      s.Cancel,
 		Debounce:    s.Debounce,
 		Timeouts:    s.Timeouts,

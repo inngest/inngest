@@ -501,6 +501,23 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		at = *req.At
 	}
 
+	var throttle *queue.Throttle
+	if req.Function.Throttle != nil {
+		throttleKey := redis_state.HashID(ctx, req.Function.ID.String())
+		if req.Function.Throttle.Key != nil {
+			val, _, _ := expressions.Evaluate(ctx, *req.Function.Throttle.Key, map[string]any{
+				"event": mapped[0],
+			})
+			throttleKey = throttleKey + "-" + redis_state.HashID(ctx, fmt.Sprintf("%v", val))
+		}
+		throttle = &queue.Throttle{
+			Key:    throttleKey,
+			Limit:  int(req.Function.Throttle.Limit),
+			Burst:  int(req.Function.Throttle.Burst),
+			Period: int(req.Function.Throttle.Period.Seconds()),
+		}
+	}
+
 	// Prefix the workflow to the job ID so that no invocation can accidentally
 	// cause idempotency issues across users/functions.
 	//
@@ -517,6 +534,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Payload: queue.PayloadEdge{
 			Edge: inngest.SourceEdge,
 		},
+		Throttle: throttle,
 	}
 	err = e.queue.Enqueue(ctx, item, at)
 	if err == redis_state.ErrQueueItemExists {
