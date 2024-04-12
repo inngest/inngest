@@ -88,7 +88,7 @@ func (t *tracer) Shutdown(ctx context.Context) func() {
 func (t *tracer) Export(span trace.ReadOnlySpan) error {
 	if t.processor == nil {
 		ctx := context.Background()
-		log.From(ctx).Warn().Msg("no exporter available to export custom spans")
+		log.From(ctx).Trace().Msg("no exporter available to export custom spans")
 		return nil
 	}
 

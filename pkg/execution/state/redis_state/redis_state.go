@@ -353,7 +353,7 @@ func (m mgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.Metad
 		input[4] = md.SpanID
 	}
 	if !md.StartedAt.IsZero() {
-		input[5] = strconv.Itoa(int(md.StartedAt.Unix()))
+		input[5] = strconv.FormatInt(md.StartedAt.UnixMilli(), 10)
 	}
 
 	status, err := scripts["updateMetadata"].Exec(
@@ -1184,11 +1184,11 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 
 	if val, ok := data["sat"]; ok && val != "" {
-		v, err := strconv.Atoi(val)
+		v, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("invalid started at detected: %#v", val)
+			return nil, fmt.Errorf("invalid started at timestamp detected: %#v", val)
 		}
-		m.StartedAt = int64(v)
+		m.StartedAt = v
 	}
 
 	// The below fields are optional
@@ -1363,8 +1363,13 @@ func (r runMetadata) Metadata() state.Metadata {
 		Context:                   r.Context,
 		DisableImmediateExecution: r.DisableImmediateExecution,
 		SpanID:                    r.SpanID,
-		StartedAt:                 time.Unix(r.StartedAt, 0),
 	}
+	// 0 != time.IsZero
+	// only convert to time if runMetadata's StartedAt is > 0
+	if r.StartedAt > 0 {
+		m.StartedAt = time.UnixMilli(r.StartedAt)
+	}
+
 	if r.RunType != "" {
 		m.RunType = &r.RunType
 	}

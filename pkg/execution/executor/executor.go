@@ -560,6 +560,23 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		start = md.StartedAt
 	}
 
+	f, err := e.fl.LoadFunction(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("error loading function for run: %w", err)
+	}
+
+	// Validate that the run can execute.
+	v := newRunValidator(item, s, f, e)
+	if err := v.validate(ctx); err != nil {
+		return nil, err
+	}
+	if v.stopWithoutRetry {
+		// Validation prevented execution and doesn't want the executor to retry, so
+		// don't return an error.
+		// XXX: Handle retries with error types and return a non-retryable error here.
+		return nil, nil
+	}
+
 	// Store the metadata in context for future use and propagate trace
 	// context. This can be used to reduce reads in the future.
 	ctx = e.extractTraceCtx(WithContextMetadata(ctx, md), id, &item)
@@ -632,23 +649,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}()
 	// send early here to help show the span has started and is in-progress
 	span.Send()
-
-	f, err := e.fl.LoadFunction(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("error loading function for run: %w", err)
-	}
-
-	// Validate that the run can execute.
-	v := newRunValidator(item, s, f, e)
-	if err := v.validate(ctx); err != nil {
-		return nil, err
-	}
-	if v.stopWithoutRetry {
-		// Validation prevented execution and doesn't want the executor to retry, so
-		// don't return an error.
-		// XXX: Handle retries with error types and return a non-retryable error here.
-		return nil, nil
-	}
 
 	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
 	// that child;  we don't need to handle the trigger individually.
