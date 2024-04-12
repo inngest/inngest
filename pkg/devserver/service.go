@@ -138,9 +138,7 @@ func (d *devserver) Pre(ctx context.Context) error {
 
 func (d *devserver) Run(ctx context.Context) error {
 	// Start polling the SDKs as the APIs are going live.
-	if d.opts.Poll {
-		go d.pollSDKs(ctx)
-	}
+	go d.pollSDKs(ctx)
 
 	// Add a nice output to the terminal.
 	if isatty.IsTerminal(os.Stdout.Fd()) {
@@ -236,6 +234,10 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 			for _, app := range apps {
 				// We've seen this URL.
 				urls[app.Url] = struct{}{}
+
+				if !d.opts.Poll && len(app.Error.String) == 0 {
+					continue
+				}
 
 				// Make a new PUT request to each app, indicating that the
 				// SDK should push functions to the dev server.
