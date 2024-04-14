@@ -238,6 +238,12 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 			}
 			cron := t.CronTrigger.Cron
 			_, err := s.cronmanager.AddFunc(cron, func() {
+				// Create a new context to avoid "context canceled" errors. This
+				// callback is run as a non-blocking goroutine in Cron.Start, so
+				// contexts from outside its scope will likely be cancelled
+				// before the function is run
+				ctx := context.Background()
+
 				ctx, span := telemetry.UserTracer().Provider().
 					Tracer(consts.OtelScopeCron).
 					Start(ctx, "cron", trace.WithAttributes(
