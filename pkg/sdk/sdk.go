@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngest/pkg/coded_err"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/util"
 )
 
@@ -160,12 +160,12 @@ func (f RegisterRequest) Parse(ctx context.Context) ([]*inngest.Function, error)
 	}
 
 	if err != nil {
-		data := coded_err.MultiErrData{}
+		data := syscode.DataMultiErr{}
 		data.Append(err)
 
-		return nil, &coded_err.Error{
-			Code: coded_err.CodeConfigInvalid,
-			Data: data.ToMap(),
+		return nil, &syscode.Error{
+			Code: syscode.CodeConfigInvalid,
+			Data: data,
 		}
 	}
 

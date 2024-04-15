@@ -1,4 +1,4 @@
-package coded_err
+package syscode
 
 import (
 	"encoding/json"
@@ -9,21 +9,21 @@ import (
 )
 
 func fromError(err error) Error {
-	ce := &Error{}
-	if !errors.As(err, ce) && !errors.As(err, &ce) {
-		ce = &Error{
+	e := &Error{}
+	if !errors.As(err, e) && !errors.As(err, &e) {
+		e = &Error{
 			Code:    CodeUnknown,
 			Message: err.Error(),
 		}
 	}
 
-	return *ce
+	return *e
 }
 
 type Error struct {
-	Code    string         `json:"code"`
-	Data    map[string]any `json:"data"`
-	Message string         `json:"message"`
+	Code    string `json:"code"`
+	Data    any    `json:"data"`
+	Message string `json:"message"`
 }
 
 func (e Error) Error() string {
@@ -47,7 +47,7 @@ func (e Error) Error() string {
 // Create an single error message from error data that contains multiple errors.
 // Returns an error if the data isn't valid MultiErrData
 func messageFromMultiErrData(data []byte) (string, error) {
-	me := &MultiErrData{}
+	me := &DataMultiErr{}
 	err := json.Unmarshal(data, me)
 	if err != nil {
 		return "", fmt.Errorf("not MultiErrData: %v", err)
@@ -58,7 +58,7 @@ func messageFromMultiErrData(data []byte) (string, error) {
 
 	// Build a string that mimics what multierror.Error does. This is for
 	// backcompat, since we used the multierror.Error message before we added
-	// the coded_err package
+	// the syscode package
 	out := fmt.Sprintf("%d errors occurred:", len(me.Errors))
 	for _, e := range me.Errors {
 		out += " * " + e.Error()
@@ -68,11 +68,11 @@ func messageFromMultiErrData(data []byte) (string, error) {
 
 // Used to structure Error.Data when there are multiple errors (e.g.
 // synchronization validation)
-type MultiErrData struct {
+type DataMultiErr struct {
 	Errors []Error `json:"errors"`
 }
 
-func (e *MultiErrData) Append(err error) {
+func (e *DataMultiErr) Append(err error) {
 	if err == nil {
 		return
 	}
@@ -87,6 +87,6 @@ func (e *MultiErrData) Append(err error) {
 	e.Errors = append(e.Errors, fromError(err))
 }
 
-func (e *MultiErrData) ToMap() map[string]any {
+func (e *DataMultiErr) ToMap() map[string]any {
 	return map[string]any{"errors": e.Errors}
 }
