@@ -265,6 +265,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		RequestVersion: consts.RequestVersionUnknown, // Always use -1 to indicate unset hash version until first request.
 		Context:        input.Context,
 		Status:         enums.RunStatusScheduled,
+		SpanID:         input.SpanID,
 	}
 	if input.RunType != nil {
 		metadata.RunType = *input.RunType
@@ -330,7 +331,15 @@ func (m mgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.Metad
 		return err
 	}
 
-	input := []string{string(byt), "0", "0", strconv.Itoa(consts.RequestVersionUnknown)}
+	input := []string{
+		string(byt),
+		"0",
+		"0",
+		strconv.Itoa(consts.RequestVersionUnknown),
+		"",  // spanID default value
+		"0", // start time default value
+	}
+
 	if md.Debugger {
 		input[1] = "1"
 	}
@@ -339,6 +348,12 @@ func (m mgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.Metad
 	}
 	if md.RequestVersion != consts.RequestVersionUnknown {
 		input[3] = strconv.Itoa(md.RequestVersion)
+	}
+	if md.SpanID != "" {
+		input[4] = md.SpanID
+	}
+	if !md.StartedAt.IsZero() {
+		input[5] = strconv.FormatInt(md.StartedAt.UnixMilli(), 10)
 	}
 
 	status, err := scripts["updateMetadata"].Exec(
@@ -378,7 +393,7 @@ func (m mgr) metadata(ctx context.Context, runID ulid.ULID) (*runMetadata, error
 	if err != nil {
 		return nil, err
 	}
-	return NewRunMetadata(val)
+	return newRunMetadata(val)
 }
 
 func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
@@ -568,8 +583,12 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		return err
 	}
 
+	// `evt` is used to search for pauses based on event names. We only want to
+	// do this if this pause is not part of an invoke. If it is, we don't want
+	// to index it by event name as the pause will be processed by correlation
+	// ID.
 	evt := ""
-	if p.Event != nil {
+	if p.Event != nil && (p.InvokeCorrelationID == nil || *p.InvokeCorrelationID == "") {
 		evt = *p.Event
 	}
 
@@ -577,6 +596,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		m.kf.PauseID(ctx, p.ID),
 		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 		m.kf.PauseEvent(ctx, p.WorkspaceID, evt),
+		m.kf.Invoke(ctx, p.WorkspaceID),
 		m.kf.PauseIndex(ctx, "add", p.WorkspaceID, evt),
 		m.kf.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 	}
@@ -592,10 +612,16 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		ttl = 1
 	}
 
+	corrId := ""
+	if p.InvokeCorrelationID != nil {
+		corrId = *p.InvokeCorrelationID
+	}
+
 	args, err := StrSlice([]any{
 		string(packed),
 		p.ID.String(),
 		evt,
+		corrId,
 		ttl,
 		// Add at least 10 minutes to this pause, allowing us to process the
 		// pause by ID for 10 minutes past expiry.
@@ -665,12 +691,20 @@ func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
 		m.kf.PauseID(ctx, p.ID),
 		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 		eventKey,
+		m.kf.Invoke(ctx, p.WorkspaceID),
+	}
+	corrId := ""
+	if p.InvokeCorrelationID != nil && *p.InvokeCorrelationID != "" {
+		corrId = *p.InvokeCorrelationID
 	}
 	status, err := scripts["deletePause"].Exec(
 		ctx,
 		m.pauseR,
 		keys,
-		[]string{p.ID.String()},
+		[]string{
+			p.ID.String(),
+			corrId,
+		},
 	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error consuming pause: %w", err)
@@ -681,7 +715,6 @@ func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
 	default:
 		return fmt.Errorf("unknown response deleting pause: %d", status)
 	}
-
 }
 
 func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
@@ -705,12 +738,18 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		m.kf.PauseID(ctx, id),
 		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 		eventKey,
+		m.kf.Invoke(ctx, p.WorkspaceID),
 		m.kf.Actions(ctx, p.Identifier),
 		m.kf.Stack(ctx, p.Identifier.RunID),
 	}
 
+	corrId := ""
+	if p.InvokeCorrelationID != nil && *p.InvokeCorrelationID != "" {
+		corrId = *p.InvokeCorrelationID
+	}
 	args, err := StrSlice([]any{
 		id.String(),
+		corrId,
 		p.DataKey,
 		string(marshalledData),
 	})
@@ -755,6 +794,24 @@ func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) 
 	pause := &state.Pause{}
 	err = json.Unmarshal([]byte(str), pause)
 	return pause, err
+}
+
+func (m mgr) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*state.Pause, error) {
+	key := m.kf.Invoke(ctx, wsID)
+	cmd := m.pauseR.B().Hget().Key(key).Field(correlationID).Build()
+	pauseIDstr, err := m.pauseR.Do(ctx, cmd).ToString()
+	if err == rueidis.Nil {
+		return nil, state.ErrInvokePauseNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	pauseID, err := uuid.Parse(pauseIDstr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse pauseID UUID: %w", err)
+	}
+	return m.PauseByID(ctx, pauseID)
 }
 
 func (m mgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {
@@ -1086,7 +1143,7 @@ func (i *scanIter) Val(ctx context.Context) *state.Pause {
 	return pause
 }
 
-func NewRunMetadata(data map[string]string) (*runMetadata, error) {
+func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	var err error
 	m := &runMetadata{}
 
@@ -1126,6 +1183,14 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 		m.RequestVersion = v
 	}
 
+	if val, ok := data["sat"]; ok && val != "" {
+		v, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid started at timestamp detected: %#v", val)
+		}
+		m.StartedAt = v
+	}
+
 	// The below fields are optional
 	if val, ok := data["debugger"]; ok {
 		if val == "true" || val == "1" {
@@ -1153,6 +1218,9 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 		if val == "true" || val == "1" {
 			m.DisableImmediateExecution = true
 		}
+	}
+	if val, ok := data["sid"]; ok {
+		m.SpanID = val
 	}
 
 	return m, nil
@@ -1265,6 +1333,8 @@ type runMetadata struct {
 	RequestVersion            int            `json:"rv"`
 	Context                   map[string]any `json:"ctx,omitempty"`
 	DisableImmediateExecution bool           `json:"die,omitempty"`
+	SpanID                    string         `json:"sid"`
+	StartedAt                 int64          `json:"sat,omitempty"`
 }
 
 func (r runMetadata) Map() map[string]any {
@@ -1278,6 +1348,8 @@ func (r runMetadata) Map() map[string]any {
 		"rv":       r.RequestVersion,
 		"ctx":      r.Context,
 		"die":      r.DisableImmediateExecution,
+		"sid":      r.SpanID,
+		"sat":      r.StartedAt,
 	}
 }
 
@@ -1290,6 +1362,12 @@ func (r runMetadata) Metadata() state.Metadata {
 		RequestVersion:            r.RequestVersion,
 		Context:                   r.Context,
 		DisableImmediateExecution: r.DisableImmediateExecution,
+		SpanID:                    r.SpanID,
+	}
+	// 0 != time.IsZero
+	// only convert to time if runMetadata's StartedAt is > 0
+	if r.StartedAt > 0 {
+		m.StartedAt = time.UnixMilli(r.StartedAt)
 	}
 
 	if r.RunType != "" {

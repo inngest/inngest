@@ -4,7 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -27,52 +31,51 @@ const (
 	TracerTypeJaeger
 )
 
-type tracer struct {
-	Provider *trace.TracerProvider
-	Shutdown func()
-}
-
 func TracerSetup(svc string, ttype TracerType) (func(), error) {
 	ctx := context.Background()
 
-	tracer, err := NewTracerProvider(ctx, svc, ttype)
+	tracer, err := newTracer(ctx, TracerOpts{
+		ServiceName: svc,
+		Type:        ttype,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	otel.SetTracerProvider(tracer.Provider)
+	otel.SetTracerProvider(tracer.Provider())
 	otel.SetTextMapPropagator(
-		propagation.NewCompositeTextMapPropagator(
-			propagation.TraceContext{},
-			propagation.Baggage{},
-		),
+		newTextMapPropagator(),
 	)
 
-	return func() { tracer.Shutdown() }, nil
+	return func() {
+		tracer.Shutdown(ctx)
+	}, nil
 }
 
 // NewTracerProvider creates a new tracer with a provider and exporter based
 // on the passed in `TraceType`.
-func NewTracerProvider(ctx context.Context, svc string, ttype TracerType) (*tracer, error) {
-	switch ttype {
+func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
+	switch opts.Type {
 	case TracerTypeOTLP:
-		return NewOLTPTraceProvider(ctx, svc)
+		return newOLTPTraceProvider(ctx, opts.ServiceName)
 	case TracerTypeJaeger:
-		return NewJaegerTraceProvider(ctx, svc)
+		return newJaegerTraceProvider(ctx, opts.ServiceName)
 	case TracerTypeIO:
-		return NewIOTraceProvider(ctx, svc)
+		return newIOTraceProvider(ctx, opts.ServiceName)
 	default:
-		return newNoopTraceProvider(ctx, svc)
+		return newNoopTraceProvider(ctx, opts.ServiceName)
 	}
 }
 
-func NewJaegerTraceProvider(ctx context.Context, svc string) (*tracer, error) {
+func newJaegerTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	exp, err := jaegerExporter()
 	if err != nil {
 		return nil, fmt.Errorf("error setting up Jaeger exporter: %w", err)
 	}
+
+	sp := trace.NewBatchSpanProcessor(exp)
 	tp := trace.NewTracerProvider(
-		trace.WithBatcher(exp),
+		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
@@ -80,20 +83,49 @@ func NewJaegerTraceProvider(ctx context.Context, svc string) (*tracer, error) {
 		)),
 	)
 	return &tracer{
-		Provider: tp,
-		Shutdown: func() {
+		provider:   tp,
+		propagator: newTextMapPropagator(),
+		processor:  sp,
+		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
+			_ = tp.Shutdown(ctx)
 		},
 	}, nil
 }
 
-func NewIOTraceProvider(ctx context.Context, svc string) (*tracer, error) {
-	exp, err := stdouttrace.New()
+// IOTraceProvider is expected to be used for debugging purposes and not for production usage
+func newIOTraceProvider(ctx context.Context, svc string) (Tracer, error) {
+	exp, err := stdouttrace.New(
+		stdouttrace.WithWriter(log.New(zerolog.TraceLevel)),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error settings up stdout trace exporter: %w", err)
 	}
+
+	sp := trace.NewBatchSpanProcessor(exp)
 	tp := trace.NewTracerProvider(
-		trace.WithBatcher(exp),
+		trace.WithSpanProcessor(sp),
+		trace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String(svc),
+			semconv.DeploymentEnvironmentKey.String(env()),
+		)),
+	)
+
+	return &tracer{
+		provider:   tp,
+		propagator: newTextMapPropagator(),
+		processor:  sp,
+		shutdown: func(ctx context.Context) {
+			_ = exp.Shutdown(ctx)
+			_ = tp.ForceFlush(ctx)
+			_ = tp.Shutdown(ctx)
+		},
+	}, nil
+}
+
+func newNoopTraceProvider(ctx context.Context, svc string) (Tracer, error) {
+	tp := trace.NewTracerProvider(
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
@@ -101,40 +133,32 @@ func NewIOTraceProvider(ctx context.Context, svc string) (*tracer, error) {
 		)),
 	)
 	return &tracer{
-		Provider: tp,
-		Shutdown: func() {
-			_ = tp.Shutdown(ctx)
-		},
+		provider:   tp,
+		propagator: newTextMapPropagator(),
+		shutdown:   func(ctx context.Context) {},
 	}, nil
 }
 
-func newNoopTraceProvider(ctx context.Context, svc string) (*tracer, error) {
-	tp := trace.NewTracerProvider(
-		trace.WithResource(resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceNameKey.String(svc),
-			semconv.DeploymentEnvironmentKey.String(env()),
-		)),
-	)
-	return &tracer{
-		Provider: tp,
-		Shutdown: func() {
-			_ = tp.Shutdown(ctx)
-		},
-	}, nil
-}
-
-func NewOLTPTraceProvider(ctx context.Context, svc string) (*tracer, error) {
+func newOLTPTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	endpoint := os.Getenv("OTEL_TRACES_COLLECTOR_ENDPOINT")
 	if endpoint == "" {
 		endpoint = "otel-collector:4317"
 	}
 
+	var maxPayloadSize int
+	maxPayloadSize, _ = strconv.Atoi(os.Getenv("OTEL_TRACES_MAX_PAYLOAD_SIZE_BYTES"))
+	if maxPayloadSize == 0 {
+		maxPayloadSize = (consts.AbsoluteMaxEventSize + consts.MaxBodySize) * 2
+	}
+
 	// NOTE:
 	// assuming the otel collector is within the same private network, we can
-	// skip grpc authn, but probably still better to get it work for production
+	// skip grpc authn, but probably still better to get it work for production eventually
 	conn, err := grpc.Dial(endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallSendMsgSize(maxPayloadSize),
+		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to otel collector via grpc: %w", err)
@@ -149,18 +173,21 @@ func NewOLTPTraceProvider(ctx context.Context, svc string) (*tracer, error) {
 		return nil, fmt.Errorf("error creating otlp trace client: %w", err)
 	}
 
+	sp := trace.NewBatchSpanProcessor(exp)
 	tp := trace.NewTracerProvider(
-		trace.WithBatcher(exp),
+		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),
-			semconv.DeploymentEnvironmentKey.String(env()),
 		)),
 	)
 
 	return &tracer{
-		Provider: tp,
-		Shutdown: func() {
+		provider:   tp,
+		propagator: newTextMapPropagator(),
+		processor:  sp,
+		shutdown: func(ctx context.Context) {
+			_ = tp.ForceFlush(ctx)
 			_ = exp.Shutdown(ctx)
 			_ = tp.Shutdown(ctx)
 		},
@@ -175,4 +202,11 @@ func jaegerExporter() (trace.SpanExporter, error) {
 		return nil, fmt.Errorf("error creating jaeger trace exporter: %w", err)
 	}
 	return exp, nil
+}
+
+func newTextMapPropagator() propagation.TextMapPropagator {
+	return propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	)
 }

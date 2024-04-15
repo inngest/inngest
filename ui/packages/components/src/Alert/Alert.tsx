@@ -1,16 +1,15 @@
-import type { ForwardRefExoticComponent, SVGProps } from 'react';
+import type { ForwardRefExoticComponent } from 'react';
 import {
   ExclamationCircleIcon,
   ExclamationTriangleIcon,
   InformationCircleIcon,
 } from '@heroicons/react/20/solid';
-
-import cn from '@/utils/cn';
+import { cn } from '@inngest/components/utils/classNames';
 
 type Severity = 'error' | 'info' | 'warning';
 
 type SeveritySpecific = {
-  icon: ForwardRefExoticComponent<SVGProps<SVGSVGElement>>;
+  icon: ForwardRefExoticComponent<Omit<React.SVGProps<SVGSVGElement>, 'ref'>>;
   iconClassName: string;
   wrapperClassName: string;
 };
@@ -18,25 +17,40 @@ type SeveritySpecific = {
 const severityStyles = {
   error: {
     icon: ExclamationCircleIcon,
-    iconClassName: 'text-rose-700',
-    wrapperClassName: 'bg-rose-100 text-rose-700',
+    iconClassName: 'text-rose-700 dark:text-white',
+    wrapperClassName: 'bg-rose-100 dark:bg-rose-600/50 text-rose-700 dark:text-slate-300',
   },
   info: {
     icon: InformationCircleIcon,
-    iconClassName: 'text-blue-700',
-    wrapperClassName: 'bg-blue-100 text-blue-700',
+    iconClassName: 'text-blue-700 dark:text-white',
+    wrapperClassName: 'bg-blue-100 dark:bg-blue-600/50 text-blue-700 dark:text-slate-300',
   },
   warning: {
     icon: ExclamationTriangleIcon,
-    iconClassName: 'text-amber-700',
-    wrapperClassName: 'bg-amber-100 text-amber-700',
+    iconClassName: 'text-amber-700 dark:text-white',
+    wrapperClassName: 'bg-amber-100 dark:bg-amber-600/50 text-amber-700 dark:text-slate-300',
   },
 } as const satisfies { [key in Severity]: SeveritySpecific };
 
 type Props = {
+  /**
+   * The content of the alert.
+   */
   children: React.ReactNode;
+
+  /**
+   * Additional class names to apply to the alert.
+   */
   className?: string;
+
+  /**
+   * The severity of the alert.
+   */
   severity: Severity;
+
+  /**
+   * Whether to show the icon for the alert.
+   */
   showIcon?: boolean;
 };
 

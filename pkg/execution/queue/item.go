@@ -75,6 +75,23 @@ type Item struct {
 	// QueueName allows control over the queue name.  If not provided, this falls
 	// back to the queue mapping defined on the queue or the workflow ID of the fn.
 	QueueName *string `json:"qn,omitempty"`
+	// RunInfo shows additional runtime information for the item like delays.
+	RunInfo *RunInfo `json:"runinfo,omitempty"`
+	// Throttle represents GCRA rate limiting for the queue item, which is applied when
+	// attempting to lease the item from the queue.
+	Throttle *Throttle `json:"throttle,omitempty"`
+}
+
+type Throttle struct {
+	// Key is the unique throttling key that's used to group queue items when
+	// processing rate limiting/throttling.
+	Key string `json:"k"`
+	// Limit is the actual rate limit
+	Limit int `json:"l"`
+	// Burst is the busrsable capacity of the rate limit
+	Burst int `json:"b"`
+	// Period is the rate limit period, in seconds
+	Period int `json:"p"`
 }
 
 // GetPriorityFactor returns the priority factor for the queue item.  This fudges the job item's
@@ -121,6 +138,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 		MaxAttempts *int              `json:"maxAtts,omitempty"`
 		Payload     json.RawMessage   `json:"payload"`
 		Metadata    map[string]string `json:"metadata"`
+		Throttle    *Throttle         `json:"throttle"`
 	}
 	temp := &kind{}
 	err := json.Unmarshal(b, temp)
@@ -135,6 +153,8 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.Attempt = temp.Attempt
 	i.MaxAttempts = temp.MaxAttempts
 	i.Metadata = temp.Metadata
+	i.Throttle = temp.Throttle
+
 	// Save this for custom unmarshalling of other jobs.  This is overwritten
 	// for known queue kinds.
 	if len(temp.Payload) > 0 {

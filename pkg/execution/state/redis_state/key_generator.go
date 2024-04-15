@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
 )
@@ -68,6 +69,9 @@ type KeyGenerator interface {
 	// which is used when caching pauses in-memory to only load the subset of pauses
 	// added after the cache was last updated.
 	PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string
+
+	// Invoke returns the key used to store the correlation key associated with invoke functions
+	Invoke(ctx context.Context, wsID uuid.UUID) string
 
 	// History returns the key used to store a log entry for run hisotry
 	History(ctx context.Context, runID ulid.ULID) string
@@ -136,6 +140,10 @@ func (d DefaultKeyFunc) PauseIndex(ctx context.Context, kind string, wsID uuid.U
 	return fmt.Sprintf("%s:pause-idx:%s:%s:%s", d.Prefix, kind, wsID, event)
 }
 
+func (d DefaultKeyFunc) Invoke(ctx context.Context, wsID uuid.UUID) string {
+	return fmt.Sprintf("%s:invoke:%s", d.Prefix, wsID)
+}
+
 func (d DefaultKeyFunc) History(ctx context.Context, runID ulid.ULID) string {
 	return fmt.Sprintf("%s:history:%s", d.Prefix, runID)
 }
@@ -170,6 +178,8 @@ type QueueKeyGenerator interface {
 	GlobalPartitionIndex() string
 	// ShardPartitionIndex returns the sorted set for the shard's partition queue.
 	ShardPartitionIndex(shard string) string
+	// ThrottleKey returns the throttle key for a given queue item.
+	ThrottleKey(t *osqueue.Throttle) string
 
 	//
 	// Queue metadata keys
@@ -270,6 +280,13 @@ func (d DefaultQueueKeyGenerator) ShardPartitionIndex(shard string) string {
 		return fmt.Sprintf("%s:shard:-", d.Prefix)
 	}
 	return fmt.Sprintf("%s:shard:%s", d.Prefix, shard)
+}
+
+func (d DefaultQueueKeyGenerator) ThrottleKey(t *osqueue.Throttle) string {
+	if t == nil || t.Key == "" {
+		return fmt.Sprintf("%s:throttle:-", d.Prefix)
+	}
+	return fmt.Sprintf("%s:throttle:%s", d.Prefix, t.Key)
 }
 
 func (d DefaultQueueKeyGenerator) PartitionMeta(id string) string {

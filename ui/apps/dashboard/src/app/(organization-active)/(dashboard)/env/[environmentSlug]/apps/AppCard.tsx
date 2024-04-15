@@ -6,7 +6,7 @@ import ArchiveBoxArrowDownIcon from '@heroicons/react/20/solid/ArchiveBoxArrowDo
 import ChevronRightIcon from '@heroicons/react/20/solid/ChevronRightIcon';
 import { Link as InngestLink } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 
 import { SyncStatusPill } from '@/components/SyncStatusPill';
 import { Time } from '@/components/Time';
@@ -47,8 +47,8 @@ const cardRightPanelStyles = 'h-56 flex flex-col justify-center px-8';
 export function AppCard({ app, className, envSlug, isArchived }: Props) {
   const latestSyncURL = app.latestSync?.url?.replace(/^https:\/\//, '').replace(/\?.+$/, '');
   return (
-    <div className={classNames(cardWrapperStyles, className)}>
-      <div className={cardLeftPanelStyles}>
+    <div className={cn(cardWrapperStyles, className)}>
+      <div className={cn(cardLeftPanelStyles, isArchived && 'bg-slate-700')}>
         <h2>
           <Link
             className="transition-color flex cursor-pointer items-center gap-1 text-white underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-400 hover:decoration-indigo-400"
@@ -75,7 +75,7 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
           <div className="bg-red-100 px-8 py-2 text-red-800">{app.latestSync.error}</div>
         )}
 
-        <div className={classNames(cardRightPanelStyles, 'h-full')}>
+        <div className={cn(cardRightPanelStyles, 'h-full')}>
           <dl className="grid grid-cols-2 gap-4 min-[900px]:grid-cols-3">
             {/* Row 1 */}
             <Description
@@ -135,11 +135,11 @@ export function EmptyAppCard({
   className?: string;
 }) {
   return (
-    <div className={classNames(cardWrapperStyles, className)}>
-      <div className={classNames(cardLeftPanelStyles, 'items-center overflow-hidden')}>
+    <div className={cn(cardWrapperStyles, className)}>
+      <div className={cn(cardLeftPanelStyles, 'items-center overflow-hidden')}>
         <Image src={AppDiagramImage} alt="App diagram" className="object-none md:object-fill" />
       </div>
-      <div className={classNames(cardRightPanelStyles, 'flex-1')}>
+      <div className={cn(cardRightPanelStyles, 'flex-1')}>
         <p>
           When you serve your functions using our serve API handler, you are hosting a new Inngest
           app.{' '}
@@ -168,7 +168,7 @@ export function SkeletonCard() {
   return (
     <div className={cardWrapperStyles}>
       <div className={cardLeftPanelStyles} />
-      <div className={classNames(cardRightPanelStyles, 'flex-1')}>
+      <div className={cn(cardRightPanelStyles, 'flex-1')}>
         <Skeleton className="mb-2 block h-8 w-full" />
         <Skeleton className="mb-2 block h-8 w-full" />
         <Skeleton className="mb-2 block h-8 w-full" />

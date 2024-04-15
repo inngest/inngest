@@ -6,30 +6,30 @@ import { Button } from '../Button';
 
 type AlertModalProps = {
   children?: React.ReactNode;
+  isLoading?: boolean;
   isOpen: boolean;
   onClose: () => void;
   title?: string | React.ReactNode;
   description?: string;
   className?: string;
-  primaryAction: {
-    label: string;
-    btnAction: () => void;
-  };
+  onSubmit: () => void | Promise<void>;
 };
 
 export function AlertModal({
   children,
+  isLoading = false,
   isOpen,
   onClose,
-  primaryAction,
+  onSubmit,
   title = 'Are you sure you want to delete?',
   description,
   className = 'w-1/4',
 }: AlertModalProps) {
+  const container = document.getElementById('modals');
   return (
     <AlertDialog.Root open={isOpen} onOpenChange={onClose}>
       <AnimatePresence>
-        <AlertDialog.Portal>
+        <AlertDialog.Portal container={container}>
           <AlertDialog.Overlay asChild>
             <div
               className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] transition-opacity dark:bg-[#04060C]/90"
@@ -71,14 +71,18 @@ export function AlertModal({
                 )}
                 <div className="flex justify-end gap-2 px-6 pb-6 dark:border-slate-800">
                   <AlertDialog.Cancel asChild>
-                    <Button appearance="outlined" label="Cancel" />
+                    <Button appearance="outlined" disabled={isLoading} label="No" />
                   </AlertDialog.Cancel>
                   <Button
+                    disabled={isLoading}
                     kind="danger"
-                    label={primaryAction.label}
-                    btnAction={() => {
-                      primaryAction.btnAction();
-                      onClose();
+                    label="Yes"
+                    loading={isLoading}
+                    btnAction={async () => {
+                      try {
+                        await onSubmit();
+                        onClose();
+                      } catch {}
                     }}
                   />
                 </div>

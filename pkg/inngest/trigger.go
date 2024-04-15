@@ -2,9 +2,13 @@ package inngest
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
+	"github.com/cespare/xxhash/v2"
+	"github.com/hashicorp/go-multierror"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/expressions"
 	cron "github.com/robfig/cron/v3"
 )
@@ -18,6 +22,36 @@ type MultipleTriggers []Trigger
 
 func (m MultipleTriggers) Triggers() []Trigger {
 	return m
+}
+
+func (m MultipleTriggers) Validate(ctx context.Context) error {
+	var err error
+
+	if len(m) < 1 {
+		err = multierror.Append(err, fmt.Errorf("At least one trigger is required"))
+	} else if len(m) > consts.MaxTriggers {
+		err = multierror.Append(err, fmt.Errorf("This function exceeds the max number of triggers: %d", consts.MaxTriggers))
+	}
+
+	seen := make(map[string]struct{})
+
+	for _, t := range m {
+		key, herr := t.Hash()
+		if herr != nil {
+			return fmt.Errorf("failed to hash trigger: %w", herr)
+		}
+
+		if _, ok := seen[key]; ok {
+			err = multierror.Append(err, fmt.Errorf("duplicate trigger %s", t.Name()))
+		}
+		seen[key] = struct{}{}
+
+		if terr := t.Validate(ctx); terr != nil {
+			err = multierror.Append(err, terr)
+		}
+	}
+
+	return err
 }
 
 // Trigger represents either an event trigger or a cron trigger.  Only one is valid;  when
@@ -46,6 +80,30 @@ func (t Trigger) Validate(ctx context.Context) error {
 	}
 	// heh.  this will (should) never happen.
 	return fmt.Errorf("This trigger is neither an event trigger or cron trigger.  This should never happen :D")
+}
+
+// Hash returns a string hashed key for the trigger based on its type and
+// arguments.
+func (t Trigger) Hash() (string, error) {
+	byt, err := json.Marshal(t)
+	if err != nil {
+		return "", err
+	}
+
+	hash := xxhash.Sum64(byt)
+
+	return fmt.Sprintf("%x", hash), nil
+}
+
+// Name returns a human-readable name for the trigger.
+func (t Trigger) Name() string {
+	if t.EventTrigger != nil {
+		return fmt.Sprintf("event: %s", t.EventTrigger.Event)
+	}
+	if t.CronTrigger != nil {
+		return fmt.Sprintf("cron: %s", t.CronTrigger.Cron)
+	}
+	return "Unknown"
 }
 
 // EventTrigger is a trigger which invokes the function each time a specific event is received.

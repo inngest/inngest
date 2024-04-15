@@ -54,7 +54,8 @@ type Function struct {
 
 	Priority *Priority `json:"priority,omitempty"`
 
-	TTL *time.Duration `json:"ttl"`
+	// Timeouts represents timeouts for a function.
+	Timeouts *Timeouts `json:"timeouts,omitempty"`
 
 	// ConcurrencyLimits allows limiting the concurrency of running functions, optionally constrained
 	// by individual concurrency keys.
@@ -65,13 +66,20 @@ type Function struct {
 	Debounce *Debounce `json:"debounce,omitempty"`
 
 	// Trigger represnets the trigger for the function.
-	Triggers []Trigger `json:"triggers"`
+	Triggers MultipleTriggers `json:"triggers"`
 
 	// EventBatch determines how the function will process a list of incoming events
 	EventBatch *EventBatchConfig `json:"batchEvents,omitempty"`
 
-	// RateLimit allows specifying custom rate limiting for the function.
+	// RateLimit allows specifying custom rate limiting for the function.  A RateLimit is
+	// hard rate limiting:  any function invocations over the rate limit will be ignored and
+	// will never run.
 	RateLimit *RateLimit `json:"rateLimit,omitempty"`
+
+	// Throttle represents a soft rate limit for gating function starts.  Any function runs
+	// over the throttle period will be enqueued in the backlog to run at the next available
+	// time.
+	Throttle *Throttle `json:"throttle,omitempty"`
 
 	// Cancel specifies cancellation signals for the function
 	Cancel []Cancel `json:"cancel,omitempty"`
@@ -82,6 +90,43 @@ type Function struct {
 
 	// Edges represent edges between steps in the dag.
 	Edges []Edge `json:"edges,omitempty"`
+}
+
+// Throttle represents concurrency over time.
+type Throttle struct {
+	// Limit is how often the function can be called within the specified period.  The
+	// minimum limit is 1.
+	Limit uint `json:"limit"`
+	// Period represents the time period for throttling the function.  The minimum
+	// granularity is a single second.
+	Period time.Duration `json:"period"`
+	// Burst...
+	Burst uint `json:"burst"`
+	// Key is an optional string to constrain throttling using event data.  For
+	// example, if you want to throttle incoming notifications based off of a user's
+	// ID in an event you can use the following key: "{{ event.user.id }}".  This ensures
+	// that we throttle functions for each user independently.
+	Key *string `json:"key,omitempty"`
+}
+
+// Timeouts represents timeouts for the function. If any of the timeouts are hit, the function
+// will be marked as cancelled with a cancellation reason.
+type Timeouts struct {
+	// Start represents the timeout for starting a function.  If the time between scheduling
+	// and starting a function exceeds this value, the function will be cancelled.  Note that
+	// this is inclusive of time between retries.
+	//
+	// A function may exceed this duration because of concurrency limits, throttling, etc.
+	Start time.Duration `json:"start"`
+
+	// Finish represents the time between a function starting and the function finishing.
+	// If a function takes longer than this time to finish, the function is marked as cancelled.
+	// The start time is taken from the time that the first successful function request begins,
+	// and does not include the time spent in the queue before the function starts.
+	//
+	// Note that if the final request to a function begins before this timeout, and completes
+	// after this timeout, the function will succeed.
+	Finish time.Duration `json:"finish"`
 }
 
 type Priority struct {
@@ -162,10 +207,8 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 	}
 
-	for _, t := range f.Triggers {
-		if terr := t.Validate(ctx); terr != nil {
-			err = multierror.Append(err, terr)
-		}
+	if terr := f.Triggers.Validate(ctx); terr != nil {
+		err = multierror.Append(err, terr)
 	}
 
 	if f.EventBatch != nil {

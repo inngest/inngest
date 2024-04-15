@@ -18,7 +18,11 @@ import (
 	"github.com/inngest/inngest/pkg/eventstream"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -108,11 +112,16 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 			StatusCode: http.StatusUnauthorized,
 			Error:      "Event key is required",
 		})
+
 		return
 	}
 
-	// Create a new channel which receives a stream of events from the incoming HTTP request
 	ctx, cancel := context.WithCancel(ctx)
+
+	// Create a new trace that may have a link to a previous one
+	ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.HeaderCarrier(r.Header))
+
+	// Create a new channel which receives a stream of events from the incoming HTTP request
 	stream := make(chan eventstream.StreamItem)
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
@@ -154,11 +163,27 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 
+			ts := time.Now()
 			if evt.Timestamp == 0 {
-				evt.Timestamp = time.Now().UnixMilli()
+				evt.Timestamp = ts.UnixMilli()
 			}
 
-			id, err := a.handler(r.Context(), &evt)
+			if err := evt.Validate(ctx); err != nil {
+				return err
+			}
+
+			ctx, span := telemetry.UserTracer().Provider().
+				Tracer(consts.OtelScopeEvent).
+				Start(ctx, consts.OtelSpanEvent,
+					trace.WithTimestamp(ts),
+					trace.WithNewRoot(),
+					trace.WithLinks(trace.LinkFromContext(ctx)),
+					trace.WithAttributes(
+						attribute.Bool(consts.OtelUserTraceFilterKey, true),
+					))
+			defer span.End()
+
+			id, err := a.handler(ctx, &evt)
 			if err != nil {
 				a.log.Error().Str("event", evt.Name).Err(err).Msg("error handling event")
 				return err
@@ -184,8 +209,9 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(apiutil.EventAPIResponse{
 			IDs:    ids[0 : max+1],
 			Status: 400,
-			Error:  err,
+			Error:  err.Error(),
 		})
+
 		return
 	}
 

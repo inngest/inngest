@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import * as Sentry from '@sentry/nextjs';
-
-import { Alert } from '@/components/Alert';
 
 type FunctionListErrorProps = {
   error: Error & { digest?: string };

@@ -22,9 +22,15 @@ type DeleteKeyModalProps = {
   keyID: string;
   isOpen: boolean;
   onClose: () => void;
+  description?: string;
 };
 
-export default function DeleteKeyModal({ keyID, isOpen, onClose }: DeleteKeyModalProps) {
+export default function DeleteKeyModal({
+  keyID,
+  isOpen,
+  onClose,
+  description,
+}: DeleteKeyModalProps) {
   const env = useEnvironment();
   const [, deleteEventKey] = useMutation(DeleteEventKey);
   const router = useRouter();
@@ -52,7 +58,8 @@ export default function DeleteKeyModal({ keyID, isOpen, onClose }: DeleteKeyModa
       isOpen={isOpen}
       onClose={onClose}
       title={'Are you sure you want to delete this ' + currentContent?.name.toLowerCase() + '?'}
-      primaryAction={{ label: 'Yes', btnAction: () => handleDelete() }}
+      description={description}
+      onSubmit={handleDelete}
     />
   );
 }

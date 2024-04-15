@@ -15,11 +15,20 @@ import type { FunctionVersion } from '@inngest/components/types/functionVersion'
 import { classNames } from '@inngest/components/utils/classNames';
 import { type RawHistoryItem } from '@inngest/components/utils/historyParser';
 import type { NavigateToRunFn } from 'node_modules/@inngest/components/src/Timeline/Timeline';
-import { useClient } from 'urql';
+import { useClient, useMutation } from 'urql';
 
+import { graphql } from '@/gql';
 import { devServerURL, useDevServer } from '@/utils/useDevServer';
 import RerunButton from './RerunButton';
 import { getHistoryItemOutput } from './getHistoryItemOutput';
+
+const CancelRunDocument = graphql(`
+  mutation CancelRun($envID: UUID!, $runID: ULID!) {
+    cancelRun(envID: $envID, runID: $runID) {
+      id
+    }
+  }
+`);
 
 type Props = {
   environment: Pick<Environment, 'id' | 'slug'>;
@@ -43,6 +52,7 @@ export function StreamDetails({
 }: Props) {
   const client = useClient();
   const { isRunning, send } = useDevServer();
+  const [, cancelRun] = useMutation(CancelRunDocument);
 
   const getOutput = useMemo(() => {
     return (historyItemID: string) => {
@@ -114,6 +124,13 @@ export function StreamDetails({
         />
       )}
       <RunDetails
+        cancelRun={async () => {
+          const res = await cancelRun({ envID: environment.id, runID: run.id });
+          if (res.error) {
+            // Throw error so that the modal can catch and display it
+            throw res.error;
+          }
+        }}
         func={func}
         functionVersion={functionVersion}
         getHistoryItemOutput={getOutput}

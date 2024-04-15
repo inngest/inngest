@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { PauseIcon, PlayIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { AlertModal } from '@inngest/components/Modal';
@@ -17,6 +16,7 @@ const FunctionVersionNumberDocument = graphql(`
     workspace(id: $environmentID) {
       workflow: workflowBySlug(slug: $slug) {
         id
+        name
         archivedAt
         current {
           version
@@ -30,21 +30,24 @@ const FunctionVersionNumberDocument = graphql(`
 `);
 
 const PauseFunctionDocument = graphql(`
-  mutation PauseFunction($input: EditWorkflowInput!) {
-    editWorkflow(input: $input) {
-      workflow {
-        id
-        name
-      }
+  mutation PauseFunction($fnID: ID!) {
+    pauseFunction(fnID: $fnID) {
+      id
+    }
+  }
+`);
+
+const UnpauseFunctionDocument = graphql(`
+  mutation UnpauseFunction($fnID: ID!) {
+    unpauseFunction(fnID: $fnID) {
+      id
     }
   }
 `);
 
 type PauseFunctionModalProps = {
-  functionID: string | undefined;
+  functionID: string;
   functionName: string;
-  currentVersion?: number | undefined;
-  previousVersion?: number | undefined;
   isPaused: boolean;
   isOpen: boolean;
   onClose: () => void;
@@ -53,71 +56,40 @@ type PauseFunctionModalProps = {
 function PauseFunctionModal({
   functionID,
   functionName,
-  currentVersion,
-  previousVersion,
   isPaused,
   isOpen,
   onClose,
 }: PauseFunctionModalProps) {
-  const [, pauseFunctionMutation] = useMutation(PauseFunctionDocument);
-  const router = useRouter();
+  const [, pauseFunction] = useMutation(PauseFunctionDocument);
+  const [, unpauseFunction] = useMutation(UnpauseFunctionDocument);
 
   function handlePause() {
-    if (functionID && currentVersion) {
-      pauseFunctionMutation({
-        input: {
-          description: null,
-          promote: null,
-          workflowID: functionID,
-          disable: new Date().toISOString(),
-          version: currentVersion,
-        },
-      }).then((result) => {
-        if (result.error) {
-          toast.error(`${functionName} could not be paused: ${result.error.message}`);
-        } else {
-          toast.success(
-            `${result.data?.editWorkflow?.workflow.name || functionName} was successfully paused`
-          );
-          router.refresh();
-        }
-      });
-      onClose();
-    }
+    pauseFunction({ fnID: functionID }).then((result) => {
+      if (result.error) {
+        toast.error(`${functionName} could not be paused: ${result.error.message}`);
+      } else {
+        toast.success(`${functionName} was successfully paused`);
+      }
+    });
+    onClose();
   }
 
   function handleResume() {
-    if (functionID && previousVersion) {
-      pauseFunctionMutation({
-        input: {
-          disable: null,
-          description: null,
-          workflowID: functionID,
-          promote: new Date().toISOString(),
-          version: previousVersion,
-        },
-      }).then((result) => {
-        if (result.error) {
-          toast.error(`${functionName} could not be resumed: ${result.error.message}`);
-        } else {
-          toast.success(
-            `${result.data?.editWorkflow?.workflow.name || functionName} was successfully resumed`
-          );
-          router.refresh();
-        }
-      });
-      onClose();
-    }
+    unpauseFunction({ fnID: functionID }).then((result) => {
+      if (result.error) {
+        toast.error(`${functionName} could not be resumed: ${result.error.message}`);
+      } else {
+        toast.success(`${functionName} was successfully resumed`);
+      }
+    });
+    onClose();
   }
 
   return (
     <AlertModal
       isOpen={isOpen}
       onClose={onClose}
-      primaryAction={{
-        label: isPaused ? 'Resume' : 'Pause',
-        btnAction: isPaused ? handleResume : handlePause,
-      }}
+      onSubmit={isPaused ? handleResume : handlePause}
       title={`Are you sure you want to ${isPaused ? 'resume' : 'pause'} this function?`}
       className="w-1/3"
     >
@@ -163,8 +135,6 @@ export default function PauseFunctionButton({ functionSlug, disabled }: PauseFun
     return null;
   }
 
-  const prevVersionObj = fn.previous.sort((a, b) => b!.version - a!.version)[0];
-  const prevVersion = prevVersionObj?.version;
   const isPaused = !fn.current && !fn.archivedAt;
 
   return (
@@ -197,9 +167,7 @@ export default function PauseFunctionButton({ functionSlug, disabled }: PauseFun
       </Tooltip.Provider>
       <PauseFunctionModal
         functionID={fn.id}
-        functionName={functionSlug}
-        currentVersion={fn.current?.version}
-        previousVersion={prevVersion}
+        functionName={fn.name}
         isPaused={isPaused}
         isOpen={isPauseFunctionModalVisible}
         onClose={() => setIsPauseFunctionModalVisible(false)}

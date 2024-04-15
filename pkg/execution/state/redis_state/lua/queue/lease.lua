@@ -10,6 +10,8 @@ Output:
   5: No custom capacity 1
   6: No custom capacity 2
 
+  7: Rate limited via throttling;  no capacity.
+
 ]]
 
 local queueKey               = KEYS[1]
@@ -24,6 +26,7 @@ local customConcurrencyKeyB  = KEYS[7] -- Optional for eg. for concurrency among
 local concurrencyPointer     = KEYS[8]
 local globalPointerKey       = KEYS[9]
 local shardPointerKey        = KEYS[10]
+local throttleKey            = KEYS[11] -- key used for throttling function run starts.
 
 local queueID                = ARGV[1]
 local newLeaseKey            = ARGV[2]
@@ -44,6 +47,7 @@ local partitionName          = ARGV[8] -- Same as fn queue name/workflow ID
 -- $include(set_item_peek_time.lua)
 -- $include(update_pointer_score.lua)
 -- $include(has_shard_key.lua)
+-- $include(gcra.lua)
 
 -- first, get the queue item.  we must do this and bail early if the queue item
 -- was not found.
@@ -62,6 +66,18 @@ end
 
 -- Track the earliest time this job was attempted in the queue.
 item = set_item_peek_time(queueKey, queueID, item, currentTime)
+
+-- Track throttling/rate limiting IF the queue item has throttling info set.  This allows
+-- us to target specific queue items with rate limiting individually.
+--
+-- We handle this before concurrency as it's typically not used, and it's faster to handle than concurrency,
+-- with o(1) operations vs o(log(n)).
+if item.data ~= nil and item.data.throttle ~= nil then
+	local throttleResult = gcra(throttleKey, currentTime, item.data.throttle.p * 1000, item.data.throttle.l, item.data.throttle.b)
+	if throttleResult == false then
+		return 7
+	end
+end
 
 -- Check the concurrency limits for the account and custom key;  partition keys are checked when
 -- leasing the partition and do not need to be checked again (only one worker can run a partition at

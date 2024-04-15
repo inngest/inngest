@@ -1,8 +1,17 @@
+scalar Map
+
 type Mutation {
   createApp(input: CreateAppInput!): App!
   updateApp(input: UpdateAppInput!): App!
   deleteApp(id: String!): String! # returns the ID of the deleted app
   deleteAppByName(name: String!): Boolean!
+
+  invokeFunction(
+    data: Map
+    functionSlug: String!
+  ): Boolean
+
+  cancelRun(runID: ULID!): FunctionRun!
 }
 
 input CreateAppInput {

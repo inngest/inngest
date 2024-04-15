@@ -54,6 +54,9 @@ export const pathCreator = {
   eventType({ envSlug, eventName }: { envSlug: string; eventName: string }): Route {
     return `/env/${envSlug}/events/${encodeURIComponent(eventName)}` as Route;
   },
+  envs(): Route {
+    return '/env' as Route;
+  },
   functions({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/functions` as Route;
   },
