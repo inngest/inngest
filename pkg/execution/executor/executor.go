@@ -342,7 +342,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		eventIDsStr = append(eventIDsStr, id.String())
 	}
 	spanID := telemetry.NewSpanID(ctx)
-	span.SetAttributes(attribute.StringSlice(consts.OtelSysEventIDs, eventIDsStr))
+	span.SetAttributes(attribute.String(consts.OtelSysEventIDs, strings.Join(eventIDsStr, ",")))
 
 	id := state.Identifier{
 		WorkflowID:      req.Function.ID,
@@ -628,7 +628,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
 			attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
 			attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
-			attribute.StringSlice(consts.OtelSysEventIDs, evtIDs),
+			attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
 			attribute.String(consts.OtelSysIdempotencyKey, id.IdempotencyKey()),
 		),
 	)
