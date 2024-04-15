@@ -30,10 +30,11 @@ export function Modal({
   footer,
   alignTop,
 }: ModalProps) {
+  const container = document.getElementById('modals');
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose} modal>
       <AnimatePresence>
-        <Dialog.Portal>
+        <Dialog.Portal container={container}>
           <Dialog.Overlay asChild>
             <div
               className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] transition-opacity dark:bg-[#04060C]/90"

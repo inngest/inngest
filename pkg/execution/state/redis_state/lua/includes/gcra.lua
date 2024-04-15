@@ -4,7 +4,8 @@
 local function gcra(key, now_ms, period_ms, limit, burst)
 	-- Calculate the basic variables for GCRA.
 	local cost = 1                            -- everything counts as a single rqeuest
-	local emission  = period_ms / limit       -- how frequently we can admit new requests
+
+	local emission  = period_ms / math.max(limit, 1)   -- how frequently we can admit new requests
 	local increment = emission * cost         -- this request's time delta
 	local variance  = period_ms * (math.max(burst, 1)) -- variance takes into account bursts
 

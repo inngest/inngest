@@ -164,10 +164,12 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 
 func (s *svc) Run(ctx context.Context) error {
 	logger.From(ctx).Info().Msg("subscribing to function queue")
-	return s.queue.Run(ctx, func(ctx context.Context, _ queue.RunInfo, item queue.Item) error {
+	return s.queue.Run(ctx, func(ctx context.Context, info queue.RunInfo, item queue.Item) error {
 		// Don't stop the service on errors.
 		s.wg.Add(1)
 		defer s.wg.Done()
+
+		item.RunInfo = &info
 
 		var err error
 		switch item.Kind {
@@ -265,7 +267,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		return err
 	}
 
-	if err != nil || resp.Err != nil {
+	if err != nil || (resp != nil && resp.Err != nil) {
 		// Accordingly, we check if the driver's response is retryable here;
 		// this will let us know whether we can re-enqueue.
 		if resp != nil && !resp.Retryable() {

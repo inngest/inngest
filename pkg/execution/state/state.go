@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -144,6 +145,9 @@ type Metadata struct {
 	// implementation.
 	Version int `json:"version"`
 
+	// StartedAt records the time when the function started
+	StartedAt time.Time `json:"sat"`
+
 	// RequestVersion represents the executor request versioning/hashing style
 	// used to manage state.
 	//
@@ -164,6 +168,18 @@ type Metadata struct {
 	// DisableImmediateExecution is used to tell the SDK whether it should
 	// disallow immediate execution of steps as they are found.
 	DisableImmediateExecution bool `json:"disableImmediateExecution,omitempty"`
+
+	// SpanID is the spanID used for this function run.
+	SpanID string `json:"sid"`
+}
+
+func (md *Metadata) GetSpanID() (*trace.SpanID, error) {
+	if md.SpanID != "" {
+		sid, err := trace.SpanIDFromHex(md.SpanID)
+		return &sid, err
+	}
+
+	return nil, fmt.Errorf("invalid otel spanID")
 }
 
 type MetadataUpdate struct {
@@ -171,6 +187,8 @@ type MetadataUpdate struct {
 	Context                   map[string]any `json:"ctx,omitempty"`
 	DisableImmediateExecution bool           `json:"disableImmediateExecution,omitempty"`
 	RequestVersion            int            `json:"rv"`
+	SpanID                    string         `json:"sid"`
+	StartedAt                 time.Time      `json:"sat"`
 }
 
 // State represents the current state of a fn run.  It is data-structure
@@ -340,4 +358,7 @@ type Input struct {
 
 	// Context is additional context for the run stored in metadata.
 	Context map[string]any
+
+	// SpanID is the id used for the new function run
+	SpanID string
 }
