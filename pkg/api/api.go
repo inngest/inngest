@@ -119,24 +119,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	// Create a new trace that may have a link to a previous one
-	fanoutCtx := context.Background()
-	fanoutCtx = telemetry.UserTracer().Propagator().Extract(fanoutCtx, propagation.HeaderCarrier(r.Header))
-
-	ctx, span := telemetry.
-		UserTracer().
-		Provider().
-		Tracer(consts.OtelScopeEventIngestion).
-		Start(
-			ctx,
-			"event-ingestion",
-			trace.WithLinks(
-				trace.LinkFromContext(fanoutCtx),
-			),
-			trace.WithAttributes(
-				attribute.Bool(consts.OtelUserTraceFilterKey, true),
-			),
-		)
-	defer span.End()
+	ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.HeaderCarrier(r.Header))
 
 	// Create a new channel which receives a stream of events from the incoming HTTP request
 	stream := make(chan eventstream.StreamItem)
@@ -180,13 +163,25 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 
+			ts := time.Now()
 			if evt.Timestamp == 0 {
-				evt.Timestamp = time.Now().UnixMilli()
+				evt.Timestamp = ts.UnixMilli()
 			}
 
 			if err := evt.Validate(ctx); err != nil {
 				return err
 			}
+
+			ctx, span := telemetry.UserTracer().Provider().
+				Tracer(consts.OtelScopeEvent).
+				Start(ctx, consts.OtelSpanEvent,
+					trace.WithTimestamp(ts),
+					trace.WithNewRoot(),
+					trace.WithLinks(trace.LinkFromContext(ctx)),
+					trace.WithAttributes(
+						attribute.Bool(consts.OtelUserTraceFilterKey, true),
+					))
+			defer span.End()
 
 			id, err := a.handler(ctx, &evt)
 			if err != nil {
