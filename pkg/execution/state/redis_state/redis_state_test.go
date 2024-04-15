@@ -80,7 +80,7 @@ func TestNewRunMetadata(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			runMeta, err := NewRunMetadata(test.data)
+			runMeta, err := newRunMetadata(test.data)
 			require.Equal(t, test.expectedError, err)
 			require.Equal(t, test.expectedVal, runMeta)
 		})

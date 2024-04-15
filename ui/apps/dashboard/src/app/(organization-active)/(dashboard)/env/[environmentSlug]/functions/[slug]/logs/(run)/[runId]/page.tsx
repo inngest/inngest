@@ -1,8 +1,13 @@
-import { notFound } from 'next/navigation';
+'use client';
 
+import { notFound } from 'next/navigation';
+import { EventDetails } from '@inngest/components/EventDetails';
+import { RunDetails } from '@inngest/components/RunDetails';
+
+import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { graphql } from '@/gql';
-import graphqlAPI from '@/queries/graphqlAPI';
-import { getEnvironment } from '@/queries/server-only/getEnvironment';
+import cn from '@/utils/cn';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { StreamDetails } from './StreamDetails';
 
 const GetFunctionRunDetailsDocument = graphql(`
@@ -91,24 +96,38 @@ type FunctionRunDetailsLayoutProps = {
   };
 };
 
-export default async function FunctionRunDetailsLayout({ params }: FunctionRunDetailsLayoutProps) {
+export default function FunctionRunDetailsLayout({ params }: FunctionRunDetailsLayoutProps) {
   const functionSlug = decodeURIComponent(params.slug);
-  const environment = await getEnvironment({
-    environmentSlug: params.environmentSlug,
-  });
-  const response = await graphqlAPI.request(GetFunctionRunDetailsDocument, {
-    environmentID: environment.id,
-    functionSlug,
-    functionRunID: params.runId,
+  const environment = useEnvironment();
+
+  const res = useGraphQLQuery({
+    query: GetFunctionRunDetailsDocument,
+    variables: {
+      environmentID: environment.id,
+      functionSlug,
+      functionRunID: params.runId,
+    },
   });
 
-  const { run } = response.environment.function ?? {};
+  if (res.error) {
+    throw res.error;
+  }
+  if (res.isLoading) {
+    return (
+      <div className={cn('dark grid h-full text-white', 'grid-cols-2')}>
+        <EventDetails loading />
+        <RunDetails loading />
+      </div>
+    );
+  }
+
+  const { run } = res.data.environment.function ?? {};
 
   if (!run) {
     notFound();
   }
 
-  const func = response.environment.function;
+  const func = res.data.environment.function;
   const triggers = (run.version?.triggers ?? []).map((trigger) => {
     return {
       type: trigger.schedule ? 'CRON' : 'EVENT',

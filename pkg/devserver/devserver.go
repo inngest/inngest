@@ -33,8 +33,10 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/redis/rueidis"
+	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -251,7 +253,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	// The devserver embeds the event API.
-	ds := newService(opts, runner, dbcqrs)
+	ds := newService(opts, runner, dbcqrs, pb)
 	// embed the tracker
 	ds.tracker = t
 	ds.state = sm
@@ -289,10 +291,14 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 
 func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
-		byt, err := json.Marshal(evt)
+		trackedEvent := event.NewOSSTrackedEvent(evt)
+		byt, err := json.Marshal(trackedEvent)
 		if err != nil {
 			return fmt.Errorf("error marshalling invocation event: %w", err)
 		}
+
+		carrier := telemetry.NewTraceCarrier()
+		telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 		err = pb.Publish(
 			ctx,
@@ -301,6 +307,9 @@ func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic stri
 				Name:      event.EventReceivedName,
 				Data:      string(byt),
 				Timestamp: time.Now(),
+				Metadata: map[string]any{
+					consts.OtelPropagationKey: carrier,
+				},
 			},
 		)
 		if err != nil {
@@ -318,7 +327,8 @@ func getInvokeNotFoundHandler(ctx context.Context, pb pubsub.Publisher, topic st
 		for _, e := range evts {
 			evt := e
 			eg.Go(func() error {
-				byt, err := json.Marshal(evt)
+				trackedEvent := event.NewOSSTrackedEvent(evt)
+				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling function finished event: %w", err)
 				}
@@ -329,7 +339,7 @@ func getInvokeNotFoundHandler(ctx context.Context, pb pubsub.Publisher, topic st
 					pubsub.Message{
 						Name:      event.EventReceivedName,
 						Data:      string(byt),
-						Timestamp: evt.Time(),
+						Timestamp: trackedEvent.GetEvent().Time(),
 					},
 				)
 				if err != nil {

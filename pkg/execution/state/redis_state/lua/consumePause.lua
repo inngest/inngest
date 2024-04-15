@@ -12,12 +12,14 @@ Output:
 local pauseKey      = KEYS[1]
 local pauseStepKey  = KEYS[2]
 local pauseEventKey = KEYS[3]
-local actionKey     = KEYS[4]
-local stackKey      = KEYS[5]
+local pauseInvokeKey = KEYS[4]
+local actionKey     = KEYS[5]
+local stackKey      = KEYS[6]
 
 local pauseID      = ARGV[1]
-local pauseDataKey = ARGV[2] -- used to set data in run state store
-local pauseDataVal = ARGV[3] -- data to set
+local invokeCorrelationId = ARGV[2]
+local pauseDataKey = ARGV[3] -- used to set data in run state store
+local pauseDataVal = ARGV[4] -- data to set
 
 local pause = redis.call("GET", pauseKey)
 if pause == false or pause == nil then
@@ -39,6 +41,10 @@ end
 if actionKey ~= nil and pauseDataKey ~= "" then
 	redis.call("RPUSH", stackKey, pauseDataKey)
 	redis.call("HSET", actionKey, pauseDataKey, pauseDataVal)
+end
+
+if invokeCorrelationId ~= false and invokeCorrelationId ~= "" and invokeCorrelationId ~= nil then
+	redis.call("HDEL", pauseInvokeKey, invokeCorrelationId)
 end
 
 return 0

@@ -19,7 +19,7 @@ type HeaderTypes = {
   icon?: React.ReactNode;
   action?: React.ReactNode;
   className?: string;
-  tag?: React.ReactNode;
+  badge?: React.ReactNode;
 };
 
 export default function Header({
@@ -28,7 +28,7 @@ export default function Header({
   title,
   icon,
   action,
-  tag,
+  badge,
   className = '',
 }: HeaderTypes) {
   return (
@@ -44,7 +44,7 @@ export default function Header({
               ''
             )}
             <h1 className="py-3 text-lg font-medium tracking-wide text-white">{title}</h1>
-            <span className="pl-4">{tag}</span>
+            <span className="pl-4">{badge}</span>
           </div>
           {links && (
             <Navigation className="-ml-2 -mt-2">

@@ -39,7 +39,8 @@ type FunctionVersion {
 }
 
 type Event {
-  id: ID!
+  id: ULID!
+  externalID: String
   workspace: Workspace
   name: String
   createdAt: Time
@@ -198,7 +199,6 @@ type FunctionRun {
 
   history: [RunHistoryItem!]!
   historyItemOutput(id: ULID!): String
-  name: String @deprecated # use the embedded function field instead.
   eventID: ID!
 }
 

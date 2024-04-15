@@ -1,32 +1,5 @@
 import { gql } from 'graphql-request';
 
-export const EVENTS_STREAM = gql`
-  query GetEventsStream {
-    events(query: {}) {
-      id
-      name
-      createdAt
-      status
-      totalRuns
-    }
-  }
-`;
-
-export const FUNCTIONS_STREAM = gql`
-  query GetFunctionsStream {
-    functionRuns(query: {}) {
-      id
-      status
-      startedAt
-      pendingSteps
-      name
-      event {
-        id
-      }
-    }
-  }
-`;
-
 export const EVENT = gql`
   query GetEvent($id: ID!) {
     event(query: { eventId: $id }) {
@@ -37,8 +10,10 @@ export const EVENT = gql`
       pendingRuns
       raw
       functionRuns {
+        function {
+          name
+        }
         id
-        name
         status
         startedAt
         pendingSteps
@@ -57,7 +32,6 @@ export const FUNCTION_RUN = gql`
   query GetFunctionRun($id: ID!) {
     functionRun(query: { functionRunId: $id }) {
       id
-      name
       status
       startedAt
       finishedAt
@@ -69,6 +43,7 @@ export const FUNCTION_RUN = gql`
         expression
       }
       function {
+        name
         triggers {
           type
           value
@@ -254,6 +229,20 @@ export const HISTORY_ITEM_OUTPUT = gql`
   query GetHistoryItemOutput($historyItemID: ULID!, $runID: ID!) {
     functionRun(query: { functionRunId: $runID }) {
       historyItemOutput(id: $historyItemID)
+    }
+  }
+`;
+
+export const INVOKE_FUNCTION = gql`
+  mutation InvokeFunction($functionSlug: String!, $data: Map) {
+    invokeFunction(data: $data, functionSlug: $functionSlug)
+  }
+`;
+
+export const CANCEL_RUN = gql`
+  mutation CancelRun($runID: ULID!) {
+    cancelRun(runID: $runID) {
+      id
     }
   }
 `;

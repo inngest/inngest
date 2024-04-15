@@ -95,17 +95,17 @@ export function useFunctionsPage({
     ...res,
     data: {
       functions: res.data.workspace.workflows.data.map((fn) => {
-        let triggers: { type: 'event' | 'schedule'; value: string }[] = [];
+        let triggers: { type: 'EVENT' | 'CRON'; value: string }[] = [];
         if (fn.current) {
           for (const trigger of fn.current.triggers) {
             if (trigger.schedule) {
               triggers.push({
-                type: 'schedule',
+                type: 'CRON',
                 value: trigger.schedule,
               });
             } else if (trigger.eventName) {
               triggers.push({
-                type: 'event',
+                type: 'EVENT',
                 value: trigger.eventName,
               });
             }

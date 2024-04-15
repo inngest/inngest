@@ -1,6 +1,7 @@
 'use client';
 
 import ExclamationTriangleIcon from '@heroicons/react/20/solid/ExclamationTriangleIcon';
+import { Alert } from '@inngest/components/Alert';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
@@ -50,6 +51,13 @@ export function Sync({ externalAppID, syncID }: Props) {
     <div className="h-full w-full overflow-y-auto">
       <div className="mx-auto w-full max-w-[1200px] p-4">
         {sync.error && <SyncErrorCard className="mb-4" error={sync.error} />}
+
+        {sync.status === 'duplicate' && (
+          <Alert className="mb-4" severity="info">
+            Function configurations have not changed since the last successful sync. Logic in
+            function handlers may have changed, but they are not inspecting when syncing.
+          </Alert>
+        )}
 
         <AppInfoCard app={app} className="mb-4" sync={sync} linkToSyncs />
         <AppGitCard className="mb-4" sync={sync} />

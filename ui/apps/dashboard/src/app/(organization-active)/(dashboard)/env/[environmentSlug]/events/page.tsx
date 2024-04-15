@@ -1,16 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { ChartBarIcon, CodeBracketSquareIcon } from '@heroicons/react/20/solid';
+import { ChartBarIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
+import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import SendEventButton from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/events/[eventName]/SendEventButton';
 import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
 import Header from '@/components/Header/Header';
-import HorizontalPillList from '@/components/Pill/HorizontalPillList';
-import { Pill } from '@/components/Pill/Pill';
 import LoadingIcon from '@/icons/LoadingIcon';
 import EventIcon from '@/icons/event.svg';
 import { useEventTypes } from '@/queries';
@@ -22,6 +21,7 @@ export const runtime = 'nodejs';
 
 export default function EventTypesPage() {
   const [pages, setPages] = useState([1]);
+  const env = useEnvironment();
 
   function appendPage() {
     setPages((prevPages) => {
@@ -35,7 +35,7 @@ export default function EventTypesPage() {
       <Header
         title="Events"
         icon={<EventIcon className="h-4 w-4 text-white" />}
-        action={<SendEventButton />}
+        action={!env.isArchived && <SendEventButton />}
       />
 
       <main className="min-h-0 flex-1 overflow-y-auto bg-slate-100">
@@ -148,10 +148,8 @@ function EventTypesListPaginationPage({
                       functionSlug: function_.slug,
                     })}
                     key={function_.name}
-                    className="bg-white align-middle text-slate-600"
                   >
-                    <CodeBracketSquareIcon className="mr-1 h-3.5 w-3.5 text-indigo-500" />
-                    {function_.name}
+                    <PillContent type="FUNCTION">{function_.name}</PillContent>
                   </Pill>
                 ))}
               />

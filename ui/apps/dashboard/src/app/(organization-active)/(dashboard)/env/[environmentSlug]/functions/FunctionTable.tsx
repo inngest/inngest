@@ -4,6 +4,8 @@ import { useMemo } from 'react';
 import { type Route } from 'next';
 import { ChartBarIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Link } from '@inngest/components/Link';
+import { Pill, PillContent } from '@inngest/components/Pill';
+import { type Trigger } from '@inngest/components/types/trigger';
 import {
   createColumnHelper,
   flexRender,
@@ -13,7 +15,6 @@ import {
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
-import TriggerPill, { TRIGGER_TYPE, type Trigger } from '@/components/Pill/TriggerPill';
 import Placeholder from '@/components/Placeholder';
 import cn from '@/utils/cn';
 
@@ -140,15 +141,16 @@ function createColumns(environmentSlug: string) {
       cell: (info) => {
         return info.getValue().map((trigger) => {
           return (
-            <TriggerPill
-              key={trigger.value}
+            <Pill
               href={
-                trigger.type === TRIGGER_TYPE.event
-                  ? `/env/${environmentSlug}/events/${encodeURIComponent(trigger.value)}`
+                trigger.type === 'EVENT'
+                  ? (`/env/${environmentSlug}/events/${encodeURIComponent(trigger.value)}` as Route)
                   : undefined
               }
-              trigger={trigger}
-            />
+              key={trigger.value}
+            >
+              <PillContent type={trigger.type}>{trigger.value}</PillContent>
+            </Pill>
           );
         });
       },
@@ -162,15 +164,9 @@ function createColumns(environmentSlug: string) {
         }
 
         return (
-          <Link
-            key="name"
-            href={`/env/${environmentSlug}/apps/${encodeURIComponent(appExternalID)}` as Route}
-            internalNavigation
-            showIcon={false}
-            className="px-2 py-3 text-sm font-medium"
-          >
-            {appExternalID}
-          </Link>
+          <Pill href={`/env/${environmentSlug}/apps/${encodeURIComponent(appExternalID)}` as Route}>
+            <PillContent type="APP">{appExternalID}</PillContent>
+          </Pill>
         );
       },
       header: 'App',

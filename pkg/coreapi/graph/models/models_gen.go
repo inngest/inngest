@@ -28,7 +28,8 @@ type CreateAppInput struct {
 }
 
 type Event struct {
-	ID           string         `json:"id"`
+	ID           ulid.ULID      `json:"id"`
+	ExternalID   *string        `json:"externalID,omitempty"`
 	Workspace    *Workspace     `json:"workspace,omitempty"`
 	Name         *string        `json:"name,omitempty"`
 	CreatedAt    *time.Time     `json:"createdAt,omitempty"`
@@ -90,7 +91,6 @@ type FunctionRun struct {
 	Output            *string                      `json:"output,omitempty"`
 	History           []*history_reader.RunHistory `json:"history"`
 	HistoryItemOutput *string                      `json:"historyItemOutput,omitempty"`
-	Name              *string                      `json:"name,omitempty"`
 	EventID           string                       `json:"eventID"`
 }
 

@@ -136,7 +136,8 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 		for _, e := range events {
 			evt := e
 			eg.Go(func() error {
-				byt, err := json.Marshal(evt)
+				trackedEvent := event.NewOSSTrackedEvent(evt)
+				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling event: %w", err)
 				}
@@ -147,7 +148,7 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 					pubsub.Message{
 						Name:      event.EventReceivedName,
 						Data:      string(byt),
-						Timestamp: evt.Time(),
+						Timestamp: trackedEvent.GetEvent().Time(),
 					},
 				)
 				if err != nil {
@@ -163,10 +164,12 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 
 func (s *svc) Run(ctx context.Context) error {
 	logger.From(ctx).Info().Msg("subscribing to function queue")
-	return s.queue.Run(ctx, func(ctx context.Context, _ queue.RunInfo, item queue.Item) error {
+	return s.queue.Run(ctx, func(ctx context.Context, info queue.RunInfo, item queue.Item) error {
 		// Don't stop the service on errors.
 		s.wg.Add(1)
 		defer s.wg.Done()
+
+		item.RunInfo = &info
 
 		var err error
 		switch item.Kind {
@@ -264,7 +267,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		return err
 	}
 
-	if err != nil || resp.Err != nil {
+	if err != nil || (resp != nil && resp.Err != nil) {
 		// Accordingly, we check if the driver's response is retryable here;
 		// this will let us know whether we can re-enqueue.
 		if resp != nil && !resp.Retryable() {
@@ -289,7 +292,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 
 	pauseTimeout, ok := item.Payload.(queue.PayloadPauseTimeout)
 	if !ok {
-		return fmt.Errorf("unable to get pause timeout form queue item: %T", item.Payload)
+		return fmt.Errorf("unable to get pause timeout from queue item: %T", item.Payload)
 	}
 
 	pause, err := s.state.PauseByID(ctx, pauseTimeout.PauseID)

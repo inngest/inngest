@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
+	"github.com/inngest/inngest/pkg/event"
 )
 
 func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateAppInput) (*cqrs.App, error) {
@@ -87,4 +88,26 @@ func (r *mutationResolver) DeleteAppByName(
 	}
 
 	return false, nil
+}
+
+func (r *mutationResolver) InvokeFunction(
+	ctx context.Context,
+	data map[string]any,
+	functionSlug string,
+) (*bool, error) {
+	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
+		Event: event.Event{
+			Data: data,
+		},
+		FnID: functionSlug,
+	})
+
+	sent := false
+	_, err := r.EventHandler(ctx, &evt)
+	if err != nil {
+		return &sent, err
+	}
+
+	sent = true
+	return &sent, nil
 }

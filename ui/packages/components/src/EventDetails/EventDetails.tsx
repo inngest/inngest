@@ -1,9 +1,9 @@
+import { useMemo } from 'react';
 import { Badge } from '@inngest/components/Badge/Badge';
 import { Button } from '@inngest/components/Button';
 import { CodeBlock, type CodeBlockAction } from '@inngest/components/CodeBlock';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { FuncCard } from '@inngest/components/FuncCard';
-import { FuncCardFooter } from '@inngest/components/FuncCardFooter';
 import { MetadataGrid } from '@inngest/components/Metadata';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import type { Event } from '@inngest/components/types/event';
@@ -61,7 +61,7 @@ export function EventDetails({
   codeBlockActions = [],
   loading = false,
 }: Props) {
-  let singleEvent = undefined;
+  let singleEvent: NonNullable<typeof events>[number] | undefined = undefined;
   if (!batchID && events?.length === 1) {
     singleEvent = events[0];
   }
@@ -71,6 +71,7 @@ export function EventDetails({
     batch = events;
   }
 
+  const isInternalEvent = Boolean(singleEvent?.name?.startsWith('inngest/'));
   let prettyPayload = undefined;
   if (singleEvent && singleEvent.payload) {
     prettyPayload = usePrettyJson(singleEvent.payload);
@@ -128,7 +129,7 @@ export function EventDetails({
       }
       button={
         <>
-          {singleEvent && onReplayEvent && SendEventButton && (
+          {!isInternalEvent && onReplayEvent && SendEventButton && (
             <>
               <div className="flex items-center gap-1">
                 <Button label="Replay" btnAction={onReplayEvent} />
@@ -170,7 +171,6 @@ export function EventDetails({
                     status={run.status}
                     active={selectedRunID === run.id}
                     onClick={() => onFunctionRunClick(run.id)}
-                    footer={<FuncCardFooter functionRun={run} />}
                   />
                 );
               })}

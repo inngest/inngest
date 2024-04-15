@@ -4,7 +4,7 @@ import { Skeleton } from '@inngest/components/Skeleton';
 import { IconFunction } from '@inngest/components/icons/Function';
 import { classNames } from '@inngest/components/utils/classNames';
 
-import { SyncStatus } from '@/components/SyncStatus';
+import { SyncStatusPill } from '@/components/SyncStatusPill';
 import { Time } from '@/components/Time';
 
 type Props = {
@@ -67,11 +67,11 @@ export function SyncList({
                 onClick={() => onClick(sync.id)}
               >
                 <div className="flex items-center">
-                  <div className="hidden w-36 p-4 align-middle lg:block">
-                    <SyncStatus status={sync.status} />
+                  <div className="hidden w-40 p-4 align-middle lg:block">
+                    <SyncStatusPill status={sync.status} />
                   </div>
                   <div className="px-2 py-4 align-middle lg:hidden">
-                    <SyncStatus status={sync.status} iconOnly />
+                    <SyncStatusPill status={sync.status} iconOnly />
                   </div>
                   <div className="py-4 align-middle">
                     <Time value={sync.lastSyncedAt} />
@@ -83,8 +83,12 @@ export function SyncList({
                     sync.syncedFunctions.length === 1 ? 'function' : 'functions'
                   }`}
                 >
-                  <IconFunction className="text-slate-500" />
-                  {sync.syncedFunctions.length}
+                  {sync.syncedFunctions.length > 0 && (
+                    <>
+                      <IconFunction className="text-slate-500" />
+                      {sync.syncedFunctions.length}
+                    </>
+                  )}
                 </div>
               </li>
             );

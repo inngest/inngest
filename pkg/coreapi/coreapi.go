@@ -10,11 +10,13 @@ import (
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
+	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coreapi/apiutil"
 	"github.com/inngest/inngest/pkg/coreapi/generated"
 	"github.com/inngest/inngest/pkg/coreapi/graph/resolvers"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -29,12 +31,14 @@ import (
 type Options struct {
 	Data cqrs.Manager
 
-	Config  config.Config
-	Logger  *zerolog.Logger
-	Runner  runner.Runner
-	Tracker *runner.Tracker
-	State   state.Manager
-	Queue   queue.JobQueueReader
+	Config       config.Config
+	Logger       *zerolog.Logger
+	Runner       runner.Runner
+	Tracker      *runner.Tracker
+	State        state.Manager
+	Queue        queue.JobQueueReader
+	EventHandler api.EventHandler
+	Executor     execution.Executor
 }
 
 func NewCoreApi(o Options) (*CoreAPI, error) {
@@ -64,6 +68,8 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 		HistoryReader: memory_reader.NewReader(),
 		Runner:        o.Runner,
 		Queue:         o.Queue,
+		EventHandler:  o.EventHandler,
+		Executor:      o.Executor,
 	}}))
 
 	// TODO - Add option for enabling GraphQL Playground
@@ -183,13 +189,22 @@ func (a CoreAPI) EventRuns(w http.ResponseWriter, r *http.Request) {
 	// NOTE: In development this does no authentication.  This must check API keys
 	// in self-hosted and production environments.
 	ctx := r.Context()
-	eventID := chi.URLParam(r, "eventID")
-	if eventID == "" {
+	eventIDStr := chi.URLParam(r, "eventID")
+	if eventIDStr == "" {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Status:  400,
 			Message: "No event ID found",
 		})
 		return
+	}
+
+	eventID, err := ulid.Parse(eventIDStr)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Error{
+			Status:  400,
+			Message: "Event ID is not a valid ULID",
+			Err:     err,
+		})
 	}
 
 	runs, err := a.tracker.Runs(ctx, eventID)

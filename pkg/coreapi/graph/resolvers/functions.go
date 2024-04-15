@@ -3,9 +3,9 @@ package resolvers
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -34,80 +34,28 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 		return nil, fmt.Errorf("Invalid run ID: %w", err)
 	}
 
-	state, err := r.Runner.StateManager().Load(ctx, runID)
-	if err != nil {
-		return nil, fmt.Errorf("Run ID not found: %w", err)
-	}
-
-	m := state.Metadata()
-	status, err := models.ToFunctionRunStatus(m.Status)
-	if err != nil {
-		return nil, err
-	}
-
-	name := state.Function().Name
-
-	pending, _ := r.Queue.OutstandingJobCount(
+	run, err := r.HistoryReader.GetRun(
 		ctx,
-		m.Identifier.WorkspaceID,
-		m.Identifier.WorkflowID,
-		m.Identifier.RunID,
-	)
-
-	run, err := r.Data.GetFunctionRun(
-		ctx,
-		m.Identifier.AccountID,
-		m.Identifier.WorkspaceID,
 		runID,
+		history_reader.GetRunOpts{},
 	)
-	if err != nil {
-		return nil, fmt.Errorf("Run ID not found: %w", err)
-	}
-
-	fr := models.MakeFunctionRun(run)
-	fr.PendingSteps = &pending
-	fr.Name = &name
-	fr.Status = &status
-	return fr, nil
-}
-
-func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionRunsQuery) ([]*models.FunctionRun, error) {
-	state, err := r.Runner.Runs(ctx, "")
 	if err != nil {
 		return nil, err
 	}
 
-	var runs []*models.FunctionRun
-
-	for _, s := range state {
-		m := s.Metadata()
-		status, err := models.ToFunctionRunStatus(m.Status)
-		if err != nil {
-			return nil, err
-		}
-
-		startedAt := ulid.Time(m.Identifier.RunID.Time())
-
-		name := s.Function().Name
-		pending, _ := r.Queue.OutstandingJobCount(
-			ctx,
-			m.Identifier.WorkspaceID,
-			m.Identifier.WorkflowID,
-			m.Identifier.RunID,
-		)
-
-		runs = append(runs, &models.FunctionRun{
-			ID:           m.Identifier.RunID.String(),
-			Name:         &name,
-			Status:       &status,
-			PendingSteps: &pending,
-			StartedAt:    &startedAt,
-		})
+	status, err := models.ToFunctionRunStatus(run.Status)
+	if err != nil {
+		return nil, err
 	}
 
-	sort.Slice(runs, func(i, j int) bool {
-		return runs[i].ID > runs[j].ID
-	})
-
-	return runs, nil
+	return &models.FunctionRun{
+		ID:         runID.String(),
+		FunctionID: run.WorkflowID.String(),
+		FinishedAt: run.EndedAt,
+		StartedAt:  &run.StartedAt,
+		EventID:    run.EventID.String(),
+		BatchID:    run.BatchID,
+		Status:     &status,
+		Output:     run.Output,
+	}, nil
 }

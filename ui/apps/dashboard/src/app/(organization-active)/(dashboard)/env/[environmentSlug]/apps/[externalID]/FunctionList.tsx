@@ -1,11 +1,10 @@
 import { useRef } from 'react';
 import { type Route } from 'next';
 import { Link } from '@inngest/components/Link';
+import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
 import type { Function } from '@inngest/components/types/function';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
-
-import TriggerPill from '@/components/Pill/TriggerPill';
 
 type Fn = Pick<Function, 'name' | 'slug' | 'triggers'>;
 
@@ -70,24 +69,23 @@ function useColumns({ envSlug }: { envSlug: string }) {
       cell: (props) => {
         const triggers = props.getValue();
         return (
-          <div className="flex gap-1">
-            {triggers.map((trigger) => {
+          <HorizontalPillList
+            alwaysVisibleCount={2}
+            pills={triggers.map((trigger) => {
               return (
-                <TriggerPill
+                <Pill
                   href={
                     trigger.type === 'EVENT'
-                      ? `/env/${envSlug}/events/${encodeURIComponent(trigger.value)}`
+                      ? (`/env/${envSlug}/events/${encodeURIComponent(trigger.value)}` as Route)
                       : undefined
                   }
                   key={trigger.type + trigger.value}
-                  trigger={{
-                    type: trigger.type === 'EVENT' ? 'event' : 'schedule',
-                    value: trigger.value,
-                  }}
-                />
+                >
+                  <PillContent type={trigger.type}>{trigger.value}</PillContent>
+                </Pill>
               );
             })}
-          </div>
+          />
         );
       },
       header: () => <span>Triggers</span>,

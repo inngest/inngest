@@ -15,12 +15,7 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 	accountID := uuid.UUID{}
 	workspaceID := uuid.UUID{}
 
-	eventID, err := ulid.Parse(obj.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	runs, err := r.Data.GetFunctionRunsFromEvents(ctx, accountID, workspaceID, []ulid.ULID{eventID})
+	runs, err := r.Data.GetFunctionRunsFromEvents(ctx, accountID, workspaceID, []ulid.ULID{obj.ID})
 	if err != nil {
 		return nil, err
 	}
@@ -28,13 +23,7 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 	var out []*models.FunctionRun
 
 	for _, run := range runs {
-		fn, err := r.Data.GetFunctionByInternalUUID(ctx, workspaceID, run.FunctionID)
-		if err != nil {
-			return nil, err
-		}
-
 		outRun := models.MakeFunctionRun(run)
-		outRun.Name = &fn.Name
 		out = append(out, outRun)
 	}
 
@@ -101,7 +90,8 @@ func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.
 }
 
 func (r *eventResolver) Raw(ctx context.Context, obj *models.Event) (*string, error) {
-	evts, err := r.Runner.Events(ctx, obj.ID)
+	eventID := obj.ID.String()
+	evts, err := r.Runner.Events(ctx, eventID)
 	if err != nil {
 		return nil, err
 	}

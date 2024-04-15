@@ -20,10 +20,7 @@ export function Apps({ isArchived = false }: Props) {
 
   const res = useApps({ envID: env.id, isArchived });
   if (res.error) {
-    if (!res.data) {
-      throw res.error;
-    }
-    console.error(res.error);
+    throw res.error;
   }
   if (res.isLoading && !res.data) {
     return (
@@ -71,16 +68,6 @@ export function Apps({ isArchived = false }: Props) {
 
         {latestUnattachedSyncTime && !isArchived && (
           <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={latestUnattachedSyncTime} />
-        )}
-
-        {!isArchived && hasApps && (
-          <Button
-            className="mx-auto my-12"
-            kind="primary"
-            label="Sync New App"
-            btnAction={() => router.push(pathCreator.createApp({ envSlug: env.slug }))}
-            icon={<PlusIcon />}
-          />
         )}
       </div>
     </div>

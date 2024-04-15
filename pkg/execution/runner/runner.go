@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -24,8 +25,12 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"github.com/robfig/cron/v3"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -41,7 +46,7 @@ type Runner interface {
 
 	StateManager() state.Manager
 	InitializeCrons(ctx context.Context) error
-	Runs(ctx context.Context, eventId string) ([]state.State, error)
+	Runs(ctx context.Context, eventId ulid.ULID) ([]state.State, error)
 	Events(ctx context.Context, eventId string) ([]event.Event, error)
 }
 
@@ -231,10 +236,25 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 			if t.CronTrigger == nil {
 				continue
 			}
-			_, err := s.cronmanager.AddFunc(t.Cron, func() {
-				err := s.initialize(context.Background(), fn, event.NewOSSTrackedEvent(event.Event{
+			cron := t.CronTrigger.Cron
+			_, err := s.cronmanager.AddFunc(cron, func() {
+				// Create a new context to avoid "context canceled" errors. This
+				// callback is run as a non-blocking goroutine in Cron.Start, so
+				// contexts from outside its scope will likely be cancelled
+				// before the function is run
+				ctx := context.Background()
+
+				ctx, span := telemetry.UserTracer().Provider().
+					Tracer(consts.OtelScopeCron).
+					Start(ctx, "cron", trace.WithAttributes(
+						attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
+						attribute.Int(consts.OtelSysFunctionVersion, fn.FunctionVersion),
+					))
+				defer span.End()
+
+				err := s.initialize(ctx, fn, event.NewOSSTrackedEvent(event.Event{
 					Data: map[string]any{
-						"cron": t.CronTrigger.Cron,
+						"cron": cron,
 					},
 					ID:   time.Now().UTC().Format(time.RFC3339),
 					Name: event.FnCronName,
@@ -253,7 +273,7 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 	return nil
 }
 
-func (s *svc) Runs(ctx context.Context, eventID string) ([]state.State, error) {
+func (s *svc) Runs(ctx context.Context, eventID ulid.ULID) ([]state.State, error) {
 	items, _ := s.tracker.Runs(ctx, eventID)
 	result := make([]state.State, len(items))
 	for n, i := range items {
@@ -274,13 +294,19 @@ func (s *svc) Events(ctx context.Context, eventId string) ([]event.Event, error)
 	if eventId != "" {
 		evt := s.em.EventById(eventId)
 		if evt != nil {
-			return []event.Event{*evt}, nil
+			return []event.Event{evt.GetEvent()}, nil
 		}
 
 		return []event.Event{}, nil
 	}
 
-	return s.em.Events(), nil
+	trackedEvents := s.em.Events()
+	evts := make([]event.Event, len(trackedEvents))
+	for i, evt := range trackedEvents {
+		evts[i] = evt.GetEvent()
+	}
+
+	return evts, nil
 }
 
 func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
@@ -288,19 +314,27 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		return fmt.Errorf("unknown event type: %s", m.Name)
 	}
 
-	var evt *event.Event
+	if m.Metadata != nil {
+		if trace, ok := m.Metadata[consts.OtelPropagationKey]; ok {
+			carrier := telemetry.NewTraceCarrier()
+			if err := carrier.Unmarshal(trace); err == nil {
+				ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+			}
+		}
+	}
+
+	var tracked event.TrackedEvent
 	var err error
 
 	if s.em == nil {
-		evt, err = event.NewEvent(m.Data)
+		tracked, err = event.NewOSSTrackedEventFromString(m.Data)
 	} else {
-		evt, err = s.em.NewEvent(m.Data)
+		tracked, err = s.em.NewEvent(m.Data)
 	}
 	if err != nil {
 		return fmt.Errorf("error creating event: %w", err)
 	}
 
-	tracked := event.NewOSSTrackedEvent(*evt)
 	// Write the event to our CQRS manager for long-term storage.
 	err = s.cqrs.InsertEvent(
 		ctx,
@@ -311,8 +345,9 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	}
 
 	l := logger.From(ctx).With().
-		Str("event", evt.Name).
-		Str("id", evt.ID).
+		Str("event", tracked.GetEvent().Name).
+		Str("id", tracked.GetEvent().ID).
+		Str("internal_id", tracked.GetInternalID().String()).
 		Logger()
 	ctx = logger.With(ctx, l)
 
@@ -331,6 +366,25 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		}
 	}()
 
+	// check if this is an "inngest/function.finished" event
+	// triggered by invoke
+	corrId := tracked.GetEvent().CorrelationID()
+	if tracked.GetEvent().IsFinishedEvent() && corrId != "" {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := s.invokes(ctx, tracked); err != nil {
+				if err == state.ErrInvokePauseNotFound || err == state.ErrPauseNotFound {
+					l.Warn().Err(err).Msg("can't find paused function to resume after invoke")
+					return
+				}
+
+				l.Error().Err(err).Msg("error resuming function after invoke")
+				errs = multierror.Append(errs, err)
+			}
+		}()
+	}
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -340,6 +394,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		}
 	}()
 
+	wg.Wait()
 	return errs
 }
 
@@ -486,13 +541,34 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 	return errs
 }
 
+// invokes looks for a pause with the same correlation ID and triggers it
+func (s *svc) invokes(ctx context.Context, evt event.TrackedEvent) error {
+	l := logger.From(ctx).With().
+		Str("event", evt.GetEvent().Name).
+		Str("id", evt.GetEvent().ID).
+		Str("internal_id", evt.GetInternalID().String()).
+		Logger()
+
+	l.Trace().Msg("querying for invoke pauses")
+
+	return s.executor.HandleInvokeFinish(ctx, evt)
+}
+
 // pauses searches for and triggers all pauses from this event.
 func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
-	logger.From(ctx).Trace().Msg("querying for pauses")
+	l := logger.From(ctx).With().
+		Str("event", evt.GetEvent().Name).
+		Str("id", evt.GetEvent().ID).
+		Str("internal_id", evt.GetInternalID().String()).
+		Logger()
+
+	l.Trace().Msg("querying for pauses")
 
 	if ok, err := s.state.EventHasPauses(ctx, uuid.UUID{}, evt.GetEvent().Name); err == nil && !ok {
 		return nil
 	}
+
+	l.Trace().Msg("pauses found; handling")
 
 	iter, err := s.state.PausesByEvent(ctx, uuid.UUID{}, evt.GetEvent().Name)
 	if err != nil {
@@ -622,11 +698,16 @@ func Initialize(ctx context.Context, fn inngest.Function, tracked event.TrackedE
 		fn.ID = inngest.DeterministicUUID(fn)
 	}
 
+	// Use the custom event ID (a.k.a. event idempotency key) if it exists, else
+	// use the internal event ID
+	idempotencyKey := tracked.GetEvent().ID
+
 	// If this is a debounced function, run this through a debouncer.
 
 	return e.Schedule(ctx, execution.ScheduleRequest{
-		Function: fn,
-		Events:   []event.TrackedEvent{tracked},
+		Function:       fn,
+		Events:         []event.TrackedEvent{tracked},
+		IdempotencyKey: &idempotencyKey,
 	})
 }
 
@@ -657,11 +738,11 @@ func (t *Tracker) Add(evtID string, id state.Identifier) {
 	t.evtIDs[evtID] = append(t.evtIDs[evtID], id.RunID)
 }
 
-func (t *Tracker) Runs(ctx context.Context, eventId string) ([]ulid.ULID, error) {
+func (t *Tracker) Runs(ctx context.Context, eventId ulid.ULID) ([]ulid.ULID, error) {
 	if t.l == nil {
 		return nil, nil
 	}
 	t.l.RLock()
 	defer t.l.RUnlock()
-	return t.evtIDs[eventId], nil
+	return t.evtIDs[eventId.String()], nil
 }

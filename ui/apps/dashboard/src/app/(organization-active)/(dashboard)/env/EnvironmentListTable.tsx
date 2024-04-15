@@ -11,23 +11,7 @@ import cn from '@/utils/cn';
 import { type Environment } from '@/utils/environments';
 import { notNullish } from '@/utils/typeGuards';
 import { pathCreator } from '@/utils/urls';
-import { EnvironmentArchiveModal } from './EnvironmentArchiveModal';
-
-const ArchiveEnvironmentDocument = graphql(`
-  mutation ArchiveEnvironment($id: ID!) {
-    archiveEnvironment(id: $id) {
-      id
-    }
-  }
-`);
-
-const UnarchiveEnvironmentDocument = graphql(`
-  mutation UnarchiveEnvironment($id: ID!) {
-    unarchiveEnvironment(id: $id) {
-      id
-    }
-  }
-`);
+import { EnvironmentArchiveButton } from './EnvironmentArchiveButton';
 
 const DisableEnvironmentAutoArchiveDocument = graphql(`
   mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {
@@ -128,10 +112,7 @@ function TableRow(props: { env: Environment }) {
     setEnv(props.env);
   }, [props.env]);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isModifying, setIsModifying] = useState(false);
-  const [, archive] = useMutation(ArchiveEnvironmentDocument);
-  const [, unarchive] = useMutation(UnarchiveEnvironmentDocument);
   const [, disableAutoArchive] = useMutation(DisableEnvironmentAutoArchiveDocument);
   const [, enableAutoArchive] = useMutation(EnableEnvironmentAutoArchiveDocument);
 
@@ -178,49 +159,6 @@ function TableRow(props: { env: Environment }) {
     [disableAutoArchive, enableAutoArchive, env]
   );
 
-  const onClickArchive = useCallback(
-    async (id: string, newValue: boolean) => {
-      setIsModifying(true);
-
-      // Optimistic update.
-      setEnv({ ...env, isArchived: newValue });
-      const rollback = () => {
-        setEnv({ ...env, isArchived: !newValue });
-      };
-
-      let success = false;
-      try {
-        let res;
-        if (newValue) {
-          res = await archive({ id });
-        } else {
-          res = await unarchive({ id });
-        }
-        success = !Boolean(res.error);
-      } catch (err) {
-        rollback();
-        throw err;
-      } finally {
-        setIsModifying(false);
-
-        if (success) {
-          if (newValue) {
-            toast.success(`Archived ${env.name}`);
-          } else {
-            toast.success(`Unarchived ${env.name}`);
-          }
-        } else {
-          if (newValue) {
-            toast.error(`Failed to archive ${env.name}`);
-          } else {
-            toast.error(`Failed to unarchive ${env.name}`);
-          }
-        }
-      }
-    },
-    [archive, env, unarchive]
-  );
-
   const { id, isArchived, isAutoArchiveEnabled, name, slug, lastDeployedAt } = env;
 
   let statusColorClass: string;
@@ -261,22 +199,7 @@ function TableRow(props: { env: Environment }) {
       </td>
 
       <td className="pl-4">
-        <Button
-          disabled={isModifying}
-          btnAction={() => setIsModalOpen(true)}
-          appearance="outlined"
-          label={env.isArchived ? 'Unarchive' : 'Archive'}
-        />
-
-        <EnvironmentArchiveModal
-          isArchived={isArchived}
-          isOpen={isModalOpen}
-          onCancel={() => setIsModalOpen(false)}
-          onConfirm={() => {
-            onClickArchive(id, !isArchived);
-            setIsModalOpen(false);
-          }}
-        />
+        <EnvironmentArchiveButton env={env} />
       </td>
 
       <td className="px-4">

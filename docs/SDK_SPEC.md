@@ -69,7 +69,7 @@ Capitalized usage of these terms means that we are referring to these definition
 - **Inngest Server**
 Inngest provides both a hosted Cloud (production) service and a Dev Server which allows local development of Inngest Functions. We refer to both as an Inngest Server. This concept is explored more in Kinds of Inngest Server [[4.2](#42-kinds-of-inngest-server)].
 - **Developer**
-The user the SDK, using its APIs and interfaces to use Inngest’s platform.
+The user of the SDK, using its APIs and interfaces to use Inngest’s platform.
 - **App**
 A collection of Functions.
 - **Sync**
@@ -132,33 +132,33 @@ An Event always has the following structure:
    * only processed once; if an event with the same ID is sent again, it will
    * not trigger any functions.
    */
-	id: string;
+  id: string;
 
   /**
    * A unique ID for the type of event. We recommend using lowercase dot
    * notation for names, prepending `prefixes/` with a slash for organization.
    *
-   * e.g. `cloudwatch/alarms/triggered`, `cart/session.created`
+   * e.g. `cloudwatch/alarms.triggered`, `cart/session.created`
    */
-	name: string;
+  name: string;
 
   /**
    * Any data pertinent to the event.
-	 *
+   *
    * Must be an object, in order to encourage evolving data.
    */
-	data: { [key: string]: any };
+  data: { [key: string]: any };
 
   /**
    * Any user data associated with the event.
    */
   user?: { [key: string]: any };
 
-	/**
+  /**
    * An integer representing the milliseconds since the unix epoch at which this
    * event occurred.
    */
-	ts: number;
+  ts: number;
 }
 ```
 
@@ -188,6 +188,8 @@ An SDK MUST support these environment variables and use them to fill the appropr
 Used to specify an Event Key to be used when sending Events to an Inngest Server. Always recommend that a Developer specifies an Event Key as an environment variable to avoid checking secrets into source control.
 - `INNGEST_SIGNING_KEY`
 Used to specify a Signing Key to be used when contacting the Inngest API and verifying the integrity of requests from an Inngest Server. Always recommend that a Developer specifies a Signing Key as an environment variable to avoid checking secrets into source control.
+- `INNGEST_SIGNING_KEY_FALLBACK`
+Used to specify a fallback Signing Key in case `INNGEST_SIGNING_KEY` is invalid. The SDK MUST attempt to use `INNGEST_SIGNING_KEY_FALLBACK` any time `INNGEST_SIGNING_KEY` fails, including but not limited to: request signature validation and sending REST API requests (e.g. fetching batch).
 - `INNGEST_ENV`
 MUST be used to set the `X-Inngest-Env` [[4.1.1](#411-definitions)] header when making requests to an Inngest Server, which informs the Inngest Server which environment you’re wanting to send events to.
 
@@ -237,7 +239,7 @@ The `sdk_name` part SHOULD be the name of the GitHub repository hosting the SDK�
 - `X-Inngest-Signature`
 A signature of the body of a request sent by Inngest in order to prove that request’s authenticity. An SDK MUST validate a request came from Inngest by validating this signature.
 
-The format of the signature is a query string (without the leading `?`) with two values: `t` and `s`, e.g. `t=1705586504&s=signkey-prod-02jd7ak2`. `t` is the timestamp for when the request was prepared by Inngest, ensuring old-but-valid requests cannot be repeated. `s` is the actual signature, which is an HMAC with SHA256 of the body of the request.
+The format of the signature is a query string (without the leading `?`) with two values: `t` and `s`, e.g. `t=1705586504&s=3f1c811920eb25da7fa70e3ac484e32e93f01dbbca7c9ce2365f2062a3e10c26`. `t` is the timestamp for when the request was prepared by Inngest, ensuring old-but-valid requests cannot be repeated. `s` is the actual signature, which is a hex-encoded HMAC with SHA256 of the body of the request plus the timestamp.
 
 When receiving any request that is expected to be from Inngest, an SDK MUST validate this signature. See Requirements when receiving requests [[4.1.3](#413-requirements-when-receiving-requests)].
 - `X-Inngest-Env`
@@ -277,7 +279,8 @@ To achieve this, the `X-Inngest-Signature` [[4.1.1](#411-definitions)] header is
 3. If the SDK is intending to use Inngest Cloud [[4.2](#42-kinds-of-inngest-server)] and no `X-Inngest-Signature` header has been given, the SDK MUST reject the request and return a `500 Internal Server Error` response.
 4. The SDK SHOULD then extract the `t` timestamp from the `X-Inngest-Signature` header and ensure it is a time within the last 5 minutes according to the SDK’s known time.
 
-If this is checked and the timestamp is not within this time period, the SDK MUST reject the request and return a `500 Internal Server Error` response.
+   If this is checked and the timestamp is not within this time period, the SDK MUST reject the request and return a `500 Internal Server Error` response.
+
 5. The SDK then MUST calculate an HMAC with SHA256 by specifying the key as the `s` value of the `X-Inngest-Signature` header with the `signkey-*-` prefix removed and hashing the body of the request followed by the timestamp `t` with hex encoding.
 
 Note that if the raw bytes of the request body are inaccessible, the body should first be parsed using the JSON Canonicalization Scheme (JCS) as specified in [RFC 8785](https://datatracker.ietf.org/doc/html/rfc8785).
@@ -295,14 +298,14 @@ The SDK also MUST send a bearer token authorization request header, as defined i
 For example:
 
 ```bash
-# original signing key
-signkey-prod-8fjau3mn
+# original signing key (hex-encoded)
+signkey-prod-12345678
 
 # hashed signing key
-signkey-prod-3c8335d113497a3a0b3e6bc18c12bf59e3db1c964c9f66765f374f5f7b473ac7
+signkey-prod-b2ed992186a5cb19f6668aade821f502c1d00970dfd0e35128d51bac4649916c
 
 # header
-Authorization: Bearer signkey-prod-3c8335d113497a3a0b3e6bc18c12bf59e3db1c964c9f66765f374f5f7b473ac7
+Authorization: Bearer signkey-prod-b2ed992186a5cb19f6668aade821f502c1d00970dfd0e35128d51bac4649916c
 ```
 
 ## 4.2. Kinds of Inngest Server
@@ -330,7 +333,7 @@ The `INNGEST_DEV` environment variable may have a non-empty value, including an 
 - API Origin: `http://localhost:8288`
 - Event ingestion endpoint: `http://localhost:8288/e/:event_key`
 
-If the `INNGEST_DEV` value is a vcalid [RFC 6454](https://datatracker.ietf.org/doc/html/rfc6454) origin, for example `http://example.com`, the resulting endpoints will then be used:
+If the `INNGEST_DEV` value is a valid [RFC 6454](https://datatracker.ietf.org/doc/html/rfc6454) origin, for example `http://example.com`, the resulting endpoints will then be used:
 
 - API Origin: `http://example.com`
 - Event ingestion endpoint: `http://example.com/e/:event_key`
@@ -897,9 +900,35 @@ The execution of a Function, the returned data, and the tooling available to a D
 
 ## 4.5. Introspection Requests
 
-An SDK MAY offer the ability to respond to an Introspection Request, a `GET` request intended to be used as a health check, ensuring that an HTTP request can be correctly handled by an SDK.
+An SDK MUST respond to an Introspection Request, a `GET` request intended to be used as a health check, ensuring that an HTTP request can be correctly handled by an SDK.
 
-If an SDK chooses to respond to this method, it MUST NOT return any sensitive data.
+If the request signature validation fails, then the SDK MUST NOT return any sensitive data. The response schema MUST be:
+
+```ts
+{
+  extra?: Record<string, any>
+	function_count: number
+	has_event_key: boolean
+	has_signing_key: boolean
+  mode: "cloud" | "dev"
+}
+```
+
+If the request passes signature validation, then the response schema MUST be:
+
+```ts
+{
+  extra?: Record<string, any>
+	function_count: number
+	has_event_key: boolean
+	has_signing_key: boolean
+	mode: "cloud" | "dev"
+	signing_key_fallback_hash: string
+	signing_key_hash: string
+}
+```
+
+An SDK MUST NOT set any top-level keys not specified in the aforementioned schemas. An SDK MAY put any arbitrary data into the `extra` field. This avoids name collisions in the future.
 
 # 5. Steps
 

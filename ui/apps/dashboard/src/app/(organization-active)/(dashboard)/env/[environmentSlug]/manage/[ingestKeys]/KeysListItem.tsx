@@ -19,13 +19,18 @@ type KeysListItemProps = {
   }[];
 };
 
+const pageFilters: { [key: string]: string[] } = {
+  keys: ['key', 'integration'],
+  webhooks: ['webhook'],
+};
+
 export default function KeysListItem({ list }: KeysListItemProps) {
   const env = useEnvironment();
   const pathname = usePathname();
   const page = getManageKey(pathname);
 
   // Change once there's a way to get the route param in a server component
-  const filteredList = list.filter((item) => `${item.source}s` === page);
+  const filteredList = page ? list.filter((item) => pageFilters[page]?.includes(item.source)) : [];
 
   if (filteredList.length === 0) {
     return (

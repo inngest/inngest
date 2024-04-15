@@ -109,6 +109,31 @@ func (e Event) Validate(ctx context.Context) error {
 	return nil
 }
 
+// CorrelationID returns the correlation ID for the event.
+func (e Event) CorrelationID() string {
+	if e.Name == InvokeFnName {
+		if metadata := e.InngestMetadata(); metadata != nil {
+			return metadata.InvokeCorrelationId
+		}
+	}
+
+	if e.IsFinishedEvent() {
+		if corrId, ok := e.Data[consts.InvokeCorrelationId].(string); ok {
+			return corrId
+		}
+	}
+
+	return ""
+}
+
+// IsFinishedEvent returns true if the event is a function finished event.
+func (e Event) IsFinishedEvent() bool {
+	return e.Name == FnFinishedName
+}
+
+// InngestMetadata represents metadata for an event that is used to invoke a
+// function. Note that this metadata is not present on all functions. For
+// accessing an event's correlation ID, prefer using `Event.CorrelationID()`.
 type InngestMetadata struct {
 	InvokeFnID          string `json:"fn_id"`
 	InvokeCorrelationId string `json:"correlation_id,omitempty"`
@@ -132,30 +157,37 @@ func (e Event) InngestMetadata() *InngestMetadata {
 }
 
 func NewOSSTrackedEvent(e Event) TrackedEvent {
-	id, err := ulid.Parse(e.ID)
-	if err != nil {
-		id = ulid.MustNew(ulid.Now(), rand.Reader)
-	}
+	// Never use e.ID as the internal ID, since it's specified by the sender
+	internalID := ulid.MustNew(ulid.Now(), rand.Reader)
 	if e.ID == "" {
-		e.ID = id.String()
+		e.ID = internalID.String()
 	}
 	return ossTrackedEvent{
-		id:    id,
-		event: e,
+		Id:    internalID,
+		Event: e,
 	}
+}
+
+func NewOSSTrackedEventFromString(data string) (*ossTrackedEvent, error) {
+	evt := &ossTrackedEvent{}
+	if err := json.Unmarshal([]byte(data), evt); err != nil {
+		return nil, err
+	}
+
+	return evt, nil
 }
 
 type ossTrackedEvent struct {
-	id    ulid.ULID
-	event Event
+	Id    ulid.ULID `json:"internal_id"`
+	Event Event     `json:"event"`
 }
 
 func (o ossTrackedEvent) GetEvent() Event {
-	return o.event
+	return o.Event
 }
 
 func (o ossTrackedEvent) GetInternalID() ulid.ULID {
-	return o.id
+	return o.Id
 }
 
 func (o ossTrackedEvent) GetWorkspaceID() uuid.UUID {

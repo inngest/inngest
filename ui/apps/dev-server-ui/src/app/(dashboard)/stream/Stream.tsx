@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BlankSlate } from '@inngest/components/BlankSlate';
 import { Button } from '@inngest/components/Button';
+import { Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
-import { TriggerTag } from '@inngest/components/Tag/TriggerTag';
 import { IconChevron } from '@inngest/components/icons/Chevron';
 import { fullDate } from '@inngest/components/utils/date';
 import { useInfiniteQuery } from '@tanstack/react-query';
@@ -24,8 +24,6 @@ import FunctionRunList from './FunctionRunList';
 
 // import OutputList from './OutputList';
 
-// import SourceBadge from './SourceBadge';
-
 const columnHelper = createColumnHelper<StreamItem>();
 
 const columns = [
@@ -39,16 +37,12 @@ const columns = [
     size: 250,
     minSize: 250,
   }),
-  // The Source BE is not built yet
-  // columnHelper.accessor((row) => row.source.name, {
-  //   id: 'source',
-  //   cell: (props) => <SourceBadge row={props.row} />,
-  //   header: () => <span>Source</span>,
-  // }),
   columnHelper.accessor('type', {
     header: () => <span>Trigger</span>,
     cell: (props) => (
-      <TriggerTag value={props.row.original.trigger} type={props.row.original.type} />
+      <Pill className="text-sm font-normal">
+        <PillContent type={props.row.original.type}>{props.row.original.trigger}</PillContent>
+      </Pill>
     ),
     size: 300,
     minSize: 300,

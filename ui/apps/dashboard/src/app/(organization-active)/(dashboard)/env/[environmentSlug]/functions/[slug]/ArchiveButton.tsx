@@ -81,10 +81,7 @@ function ArchiveFunctionModal({
       className="w-1/3"
       isOpen={isOpen}
       onClose={onClose}
-      primaryAction={{
-        label: isArchived ? 'Unarchive' : 'Archive',
-        btnAction: handleArchive,
-      }}
+      onSubmit={handleArchive}
       title={`Are you sure you want to ${isArchived ? 'unarchive' : 'archive'} this function?`}
     >
       {isArchived && (
