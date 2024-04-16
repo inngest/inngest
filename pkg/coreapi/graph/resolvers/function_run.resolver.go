@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -251,21 +252,23 @@ func (r *mutationResolver) Rerun(
 	runID ulid.ULID,
 ) (ulid.ULID, error) {
 	zero := ulid.ULID{}
+	accountID := uuid.New()
+	workspaceID := uuid.New()
 
-	run, err := r.HistoryReader.GetRun(
+	run, err := r.Data.GetFunctionRun(
 		ctx,
+		accountID,
+		workspaceID,
 		runID,
-		history_reader.GetRunOpts{},
 	)
 	if err != nil {
 		return zero, err
 	}
 
-	workspaceID := uuid.UUID{}
 	fnCQRS, err := r.Data.GetFunctionByInternalUUID(
 		ctx,
 		workspaceID,
-		run.WorkflowID,
+		run.FunctionID,
 	)
 	if err != nil {
 		return zero, err
@@ -277,7 +280,11 @@ func (r *mutationResolver) Rerun(
 	}
 
 	evt, err := r.Data.GetEventByInternalID(ctx, run.EventID)
-	if err != nil {
+	if run.Cron != nil && err == sql.ErrNoRows {
+		// Create a dummy event since we don't store cron events. We can delete
+		// this dummy when we start storing cron events
+		evt = &cqrs.Event{}
+	} else if err != nil {
 		return zero, fmt.Errorf("failed to get run event: %w", err)
 	}
 
@@ -286,7 +293,7 @@ func (r *mutationResolver) Rerun(
 		Events: []event.TrackedEvent{
 			event.NewOSSTrackedEventWithID(evt.Event(), evt.InternalID()),
 		},
-		OriginalRunID: &run.ID,
+		OriginalRunID: &run.RunID,
 	})
 	if err != nil {
 		return zero, err
