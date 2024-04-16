@@ -27,11 +27,12 @@ func (l lifecycle) OnFunctionScheduled(
 	s state.State,
 ) {
 	_ = l.cqrs.InsertFunctionRun(ctx, cqrs.FunctionRun{
-		RunID:        id.RunID,
-		RunStartedAt: ulid.Time(id.RunID.Time()),
-		FunctionID:   id.WorkflowID,
-		EventID:      id.EventID,
-		Cron:         s.CronSchedule(),
+		RunID:         id.RunID,
+		RunStartedAt:  ulid.Time(id.RunID.Time()),
+		FunctionID:    id.WorkflowID,
+		EventID:       id.EventID,
+		Cron:          s.CronSchedule(),
+		OriginalRunID: id.OriginalRunID,
 	})
 
 	if id.BatchID != nil {
