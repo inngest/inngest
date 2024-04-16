@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"sort"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
+	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
@@ -107,6 +109,46 @@ type Throttle struct {
 	// ID in an event you can use the following key: "{{ event.user.id }}".  This ensures
 	// that we throttle functions for each user independently.
 	Key *string `json:"key,omitempty"`
+}
+
+func (t *Throttle) UnmarshalJSON(in []byte) error {
+	if t == nil {
+		t = &Throttle{}
+	}
+
+	var err error
+	input := struct {
+		Limit  uint    `json:"limit"`
+		Period string  `json:"period"`
+		Burst  uint    `json:"burst"`
+		Key    *string `json:"key,omitempty"`
+	}{}
+	if err = json.Unmarshal(in, &input); err != nil {
+		return err
+	}
+
+	t.Limit = input.Limit
+	t.Burst = input.Burst
+	t.Key = input.Key
+	t.Period, err = str2duration.ParseDuration(input.Period)
+
+	// Normalization
+	if t.Limit == 0 {
+		t.Limit = 1
+	}
+	if t.Burst == 0 {
+		t.Burst = 1
+	}
+	return err
+}
+
+func (t Throttle) MarshalJSON() ([]byte, error) {
+	s := structs.New(t)
+	s.TagName = "json"
+	val := s.Map()
+	// convert period to a string.
+	val["period"] = str2duration.String(t.Period)
+	return json.Marshal(val)
 }
 
 // Timeouts represents timeouts for the function. If any of the timeouts are hit, the function

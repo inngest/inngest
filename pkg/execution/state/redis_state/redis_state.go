@@ -248,7 +248,7 @@ type mgr struct {
 func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 	f, err := m.LoadFunction(ctx, input.Identifier)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error loading function in state store: %w", err)
 	}
 
 	// We marshal this ahead of creating a redis transaction as it's necessary
