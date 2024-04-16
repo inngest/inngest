@@ -72,6 +72,7 @@ func MakeFunctionRun(f *cqrs.FunctionRun) *FunctionRun {
 		EventID:    f.EventID.String(),
 		BatchID:    f.BatchID,
 		Status:     &status,
+		Cron:       f.Cron,
 	}
 	if len(f.Output) > 0 {
 		str := string(f.Output)

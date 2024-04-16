@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
-	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -280,18 +279,17 @@ func (r *mutationResolver) Rerun(
 	}
 
 	evt, err := r.Data.GetEventByInternalID(ctx, run.EventID)
-	if run.Cron != nil && err == sql.ErrNoRows {
-		// Create a dummy event since we don't store cron events. We can delete
-		// this dummy when we start storing cron events
-		evt = &cqrs.Event{}
-	} else if err != nil {
+	if err != nil {
 		return zero, fmt.Errorf("failed to get run event: %w", err)
 	}
 
 	identifier, err := r.Executor.Schedule(ctx, execution.ScheduleRequest{
 		Function: *fn,
 		Events: []event.TrackedEvent{
-			event.NewOSSTrackedEvent(evt.Event()),
+			// We need NewOSSTrackedEventWithID to ensure that the tracked event
+			// has the same ID as the original event. Calling NewOSSTrackedEvent
+			// will result in the creation of a new ID
+			event.NewOSSTrackedEventWithID(evt.Event(), evt.InternalID()),
 		},
 		OriginalRunID: &run.RunID,
 	})

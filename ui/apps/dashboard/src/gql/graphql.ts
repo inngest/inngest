@@ -509,11 +509,13 @@ export type Mutation = {
   completeAWSMarketplaceSetup: Maybe<AwsMarketplaceSetupResponse>;
   createFunctionReplay: Replay;
   createIngestKey: IngestKey;
+  createSigningKey: SigningKey;
   createStripeSubscription: CreateStripeSubscriptionResponse;
   createUser: Maybe<CreateUserPayload>;
   createVercelApp: Maybe<CreateVercelAppResponse>;
   createWorkspace: Array<Maybe<Workspace>>;
   deleteIngestKey: Maybe<DeleteResponse>;
+  deleteSigningKey: SigningKey;
   disableEnvironmentAutoArchive: Workspace;
   editWorkflow: Maybe<WorkflowVersionResponse>;
   enableEnvironmentAutoArchive: Workspace;
@@ -522,6 +524,7 @@ export type Mutation = {
   removeVercelApp: Maybe<RemoveVercelAppResponse>;
   resyncApp: SyncResponse;
   retryWorkflowRun: Maybe<StartWorkflowResponse>;
+  rotateSigningKey: SigningKey;
   setUpAccount: Maybe<SetUpAccountPayload>;
   syncNewApp: SyncResponse;
   unarchiveEnvironment: Workspace;
@@ -571,6 +574,11 @@ export type MutationCreateIngestKeyArgs = {
 };
 
 
+export type MutationCreateSigningKeyArgs = {
+  envID: Scalars['UUID'];
+};
+
+
 export type MutationCreateStripeSubscriptionArgs = {
   input: StripeSubscriptionInput;
 };
@@ -588,6 +596,11 @@ export type MutationCreateWorkspaceArgs = {
 
 export type MutationDeleteIngestKeyArgs = {
   input: DeleteIngestKey;
+};
+
+
+export type MutationDeleteSigningKeyArgs = {
+  id: Scalars['UUID'];
 };
 
 
@@ -633,6 +646,11 @@ export type MutationResyncAppArgs = {
 export type MutationRetryWorkflowRunArgs = {
   input: StartWorkflowInput;
   workflowRunID: Scalars['ULID'];
+};
+
+
+export type MutationRotateSigningKeyArgs = {
+  envID: Scalars['UUID'];
 };
 
 
@@ -1002,6 +1020,15 @@ export type SetUpAccountPayload = {
   account: Maybe<Account>;
 };
 
+export type SigningKey = {
+  __typename?: 'SigningKey';
+  createdAt: Scalars['Time'];
+  decryptedValue: Scalars['String'];
+  id: Scalars['UUID'];
+  isActive: Scalars['Boolean'];
+  user: Maybe<User>;
+};
+
 export type StartWorkflowInput = {
   workflowID: Scalars['ID'];
   workflowVersion?: InputMaybe<Scalars['Int']>;
@@ -1234,6 +1261,7 @@ export type Workspace = {
   lastDeployedAt: Maybe<Scalars['Time']>;
   name: Scalars['String'];
   parentID: Maybe<Scalars['ID']>;
+  signingKeys: Array<SigningKey>;
   test: Scalars['Boolean'];
   type: EnvironmentType;
   unattachedSyncs: Array<Deploy>;
