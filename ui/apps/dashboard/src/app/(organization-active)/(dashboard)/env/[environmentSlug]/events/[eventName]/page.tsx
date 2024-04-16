@@ -63,7 +63,7 @@ export default function EventDashboard({ params }: EventDashboardProps) {
         />
         <LatestLogsList environmentSlug={params.environmentSlug} eventName={eventNameDecoded} />
       </main>
-      <aside className="border border-slate-200 bg-white px-6 py-4">
+      <aside className="overflow-y-auto border border-slate-200 bg-white px-6 py-4">
         <Block title="Triggered Functions">
           {eventType && eventType.workflows.length > 0
             ? eventType.workflows.map((w) => (
