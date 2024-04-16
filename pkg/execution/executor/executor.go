@@ -651,6 +651,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if len(id.EventIDs) > 1 {
 		fnSpan.SetAttributes(attribute.String(consts.OtelSysBatchID, id.BatchID.String()))
 	}
+	for _, e := range s.Events() {
+		if byt, err := json.Marshal(e); err == nil {
+			fnSpan.AddEvent(string(byt), trace.WithAttributes(
+				attribute.Bool(consts.OtelSysEventData, true),
+			))
+		}
+	}
 
 	ctx, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeExecution),
