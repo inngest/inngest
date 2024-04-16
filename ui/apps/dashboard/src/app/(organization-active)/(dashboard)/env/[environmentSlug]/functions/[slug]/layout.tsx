@@ -7,7 +7,6 @@ import { InvokeButton } from '@inngest/components/InvokeButton';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { graphql } from '@/gql';
 import { useFunction } from '@/queries';

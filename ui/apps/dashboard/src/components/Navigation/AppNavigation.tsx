@@ -8,7 +8,6 @@ import {
   Squares2X2Icon,
   WrenchIcon,
 } from '@heroicons/react/20/solid';
-import { Badge } from '@inngest/components/Badge';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import OrganizationDropdown from '@/components/Navigation/OrganizationDropdown';
