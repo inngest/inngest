@@ -291,7 +291,7 @@ func (r *mutationResolver) Rerun(
 	identifier, err := r.Executor.Schedule(ctx, execution.ScheduleRequest{
 		Function: *fn,
 		Events: []event.TrackedEvent{
-			event.NewOSSTrackedEventWithID(evt.Event(), evt.InternalID()),
+			event.NewOSSTrackedEvent(evt.Event()),
 		},
 		OriginalRunID: &run.RunID,
 	})
