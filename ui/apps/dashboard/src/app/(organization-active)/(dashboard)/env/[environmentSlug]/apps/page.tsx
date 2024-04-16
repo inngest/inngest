@@ -6,10 +6,8 @@ import { InformationCircleIcon, PlusIcon, Squares2X2Icon } from '@heroicons/reac
 import { Button } from '@inngest/components/Button';
 import { HoverCardContent, HoverCardRoot, HoverCardTrigger } from '@inngest/components/HoverCard';
 import { Link } from '@inngest/components/Link';
-import { useLocalStorage } from 'react-use';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { Banner } from '@/components/Banner';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { pathCreator } from '@/utils/urls';
 import { useBooleanSearchParam } from '@/utils/useSearchParam';
@@ -18,10 +16,6 @@ import { Apps } from './Apps';
 export default function Page() {
   const env = useEnvironment();
   const router = useRouter();
-  const [isAppsBannerVisible, setIsAppsBannerVisible] = useLocalStorage(
-    'AppsLaunchBannerVisible',
-    true
-  );
 
   const [isArchived] = useBooleanSearchParam('archived');
 
@@ -78,8 +72,6 @@ export default function Page() {
                   automatically.
                 </p>
                 <br />
-                <p>Deploys have been renamed to “Syncs.” Syncs are found within Apps.</p>
-                <br />
                 <Link href="https://www.inngest.com/docs/apps/cloud">Read Docs</Link>
               </HoverCardContent>
             </HoverCardRoot>
@@ -87,28 +79,6 @@ export default function Page() {
         }
       />
       <div className="relative h-full overflow-y-auto bg-slate-100">
-        {isAppsBannerVisible && (
-          <Banner
-            kind="info"
-            onDismiss={() => {
-              setIsAppsBannerVisible(false);
-            }}
-            className="absolute"
-          >
-            <p className="flex-1 pr-2">
-              Inngest deploys have been renamed to “<b>Syncs</b>”. All of your syncs can be found
-              within your apps.{' '}
-              <Link
-                className="inline-flex"
-                internalNavigation={false}
-                href="https://www.inngest.com/docs/apps"
-              >
-                Learn More
-              </Link>
-            </p>
-          </Banner>
-        )}
-
         <Apps isArchived={isArchived} />
       </div>
     </>

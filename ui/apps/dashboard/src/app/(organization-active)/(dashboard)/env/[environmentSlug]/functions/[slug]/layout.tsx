@@ -7,7 +7,6 @@ import { InvokeButton } from '@inngest/components/InvokeButton';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { graphql } from '@/gql';
 import { useFunction } from '@/queries';
@@ -38,8 +37,6 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
   const { isArchived = false } = fn ?? {};
   const isPaused = !isArchived && !data?.workspace.workflow?.current;
 
-  const isReplayEnabled = useBooleanFlag('function-replay');
-
   const emptyData = !data || fetching || !fn;
   const navLinks: HeaderLink[] = [
     {
@@ -51,19 +48,11 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
       href: `/env/${params.environmentSlug}/functions/${params.slug}/logs`,
       text: 'Runs',
     },
-  ];
-
-  if (isReplayEnabled.value) {
-    navLinks.push({
+    {
       href: `/env/${params.environmentSlug}/functions/${params.slug}/replay`,
       text: 'Replay',
-      badge: (
-        <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
-          New
-        </Badge>
-      ),
-    });
-  }
+    },
+  ];
 
   const doesFunctionAcceptPayload =
     fn?.current?.triggers.some((trigger) => {
