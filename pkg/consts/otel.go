@@ -68,5 +68,6 @@ const (
 	// otel collector filter keys
 	OtelUserTraceFilterKey = "inngest.user"
 
-	OtelPropagationKey = "sys.trace"
+	OtelPropagationKey     = "sys.trace"
+	OtelPropagationLinkKey = "sys.trace.link"
 )

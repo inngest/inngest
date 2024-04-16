@@ -314,6 +314,13 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	if len(req.Events) > 1 {
 		span.SetAttributes(attribute.String(consts.OtelSysBatchID, req.BatchID.String()))
 	}
+	if req.Context != nil {
+		if val, ok := req.Context[consts.OtelPropagationLinkKey]; ok {
+			if link, ok := val.(string); ok {
+				span.SetAttributes(attribute.String(consts.OtelPropagationLinkKey, link))
+			}
+		}
+	}
 
 	var key string
 	if req.IdempotencyKey != nil {
