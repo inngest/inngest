@@ -25,14 +25,12 @@ export function RerunButton(props: Props) {
   }
 
   return (
-    <>
-      <Button
-        btnAction={onClick}
-        disabled={isLoading}
-        icon={<ArrowPathIcon className={cn(' text-sky-500', isLoading && 'animate-spin')} />}
-        label="Rerun"
-        size="small"
-      />
-    </>
+    <Button
+      btnAction={onClick}
+      disabled={isLoading}
+      icon={<ArrowPathIcon className={cn(' text-sky-500', isLoading && 'animate-spin')} />}
+      label="Rerun"
+      size="small"
+    />
   );
 }
