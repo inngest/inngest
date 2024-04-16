@@ -307,6 +307,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			attribute.String(consts.OtelSysFunctionSlug, req.Function.GetSlug()),
 			attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
 			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
+			attribute.String(consts.OtelSysFunctionStatus, enums.RunStatusScheduled.String()),
 		),
 	)
 	defer span.End()
