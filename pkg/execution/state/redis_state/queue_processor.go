@@ -815,6 +815,7 @@ ProcessLoop:
 		case ErrQueueItemThrottled:
 			ctrRateLimit++
 			processErr = nil
+			q.int64counter(ctx, "inngest_queue_throttled_total", 1)
 			continue
 		case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
 			ctrConcurrency++
