@@ -321,6 +321,14 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			}
 		}
 	}
+	for _, e := range req.Events {
+		evt := e.GetEvent()
+		if byt, err := json.Marshal(evt); err == nil {
+			span.AddEvent(string(byt), trace.WithAttributes(
+				attribute.Bool(consts.OtelSysEventData, true),
+			))
+		}
+	}
 
 	var key string
 	if req.IdempotencyKey != nil {
