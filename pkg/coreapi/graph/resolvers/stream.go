@@ -84,7 +84,7 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 		return nil, err
 	}
 	for _, i := range fns {
-		if i.Cron == nil {
+		if i.Cron == nil && i.OriginalRunID == nil {
 			// These are children of events.
 			continue
 		}
@@ -92,6 +92,8 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 		var trigger string
 		if i.Cron != nil {
 			trigger = *i.Cron
+		} else if i.OriginalRunID != nil {
+			trigger = "Cron rerun"
 		}
 
 		runs := []*models.FunctionRun{models.MakeFunctionRun(i)}

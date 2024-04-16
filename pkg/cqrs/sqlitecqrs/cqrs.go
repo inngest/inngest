@@ -592,7 +592,7 @@ func toCQRSRun(run sqlc.FunctionRun, finish sqlc.FunctionFinish) *cqrs.FunctionR
 		copied.BatchID = &run.BatchID
 	}
 	if run.OriginalRunID != nilULID {
-		copied.BatchID = &run.OriginalRunID
+		copied.OriginalRunID = &run.OriginalRunID
 	}
 	if run.Cron.Valid {
 		copied.Cron = &run.Cron.String
