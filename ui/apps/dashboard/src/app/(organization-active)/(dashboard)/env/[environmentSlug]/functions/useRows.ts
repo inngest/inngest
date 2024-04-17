@@ -49,7 +49,6 @@ export function useRows({ archived }: { archived: boolean }): Output {
     }
 
     if (functionsRes.data.page.page > functionsData.lastPage) {
-      console.log('a2', functionsRes.data.functions.length);
       setFunctionsData((prev) => {
         return {
           lastPage: functionsRes.data.page.page,
