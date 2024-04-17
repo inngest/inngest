@@ -16,7 +16,10 @@ const (
 	OtelSysEventRequestID  = "sys.event.request.id"
 	OtelSysEventInternalID = "sys.event.internal.id"
 	OtelSysEventIDs        = "sys.event.ids"
-	OtelSysBatchID         = "sys.batch.id"
+
+	OtelSysBatchID      = "sys.batch.id"
+	OtelSysBatchFull    = "sys.batch.full"
+	OtelSysBatchTimeout = "sys.batch.timeout"
 
 	OtelSysFunctionID         = "sys.function.id"
 	OtelSysFunctionSlug       = "sys.function.slug"
