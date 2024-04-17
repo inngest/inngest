@@ -3,6 +3,7 @@ package consts
 const (
 	OtelSpanEvent   = "event"
 	OtelSpanCron    = "cron"
+	OtelSpanBatch   = "batch"
 	OtelSpanTrigger = "trigger"
 
 	// system attributes
