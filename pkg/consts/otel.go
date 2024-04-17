@@ -33,6 +33,7 @@ const (
 	OtelSysStepStatus          = "sys.step.status"
 	OtelSysStepStatusCode      = "sys.step.status.code"
 	OtelSysStepAttempt         = "sys.step.attempt"
+	OtelSysStepMaxAttempt      = "sys.step.attempt.max"
 	OtelSysStepOutput          = "sys.step.output"
 	OtelSysStepOutputSizeBytes = "sys.step.output.size.bytes"
 	OtelSysStepFirst           = "sys.step.first"
