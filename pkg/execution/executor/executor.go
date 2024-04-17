@@ -367,10 +367,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	mapped := make([]map[string]any, len(req.Events))
 	for n, item := range req.Events {
-		mapped[n] = item.GetEvent().Map()
+		evt := item.GetEvent()
+		mapped[n] = evt.Map()
 
 		// serialize this data to the span at the same time
-		if byt, err := json.Marshal(item); err == nil {
+		if byt, err := json.Marshal(evt); err == nil {
 			span.AddEvent(string(byt), trace.WithAttributes(
 				attribute.Bool(consts.OtelSysEventData, true),
 			))
