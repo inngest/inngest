@@ -21,6 +21,9 @@ const (
 	OtelSysBatchFull    = "sys.batch.full"
 	OtelSysBatchTimeout = "sys.batch.timeout"
 
+	OtelSysDebounceID      = "sys.debounce.id"
+	OtelSysDebounceTimeout = "sys.debounce.timeout"
+
 	OtelSysFunctionID         = "sys.function.id"
 	OtelSysFunctionSlug       = "sys.function.slug"
 	OtelSysFunctionVersion    = "sys.function.version"
