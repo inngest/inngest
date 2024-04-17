@@ -64,9 +64,13 @@ func WithSpanKind(k trace.SpanKind) SpanOpt {
 	}
 }
 
-func WithLinks(l []tracesdk.Link) SpanOpt {
+func WithLinks(links ...tracesdk.Link) SpanOpt {
 	return func(s *spanOpt) {
-		s.links = l
+		for _, l := range links {
+			if l.SpanContext.IsValid() {
+				s.links = append(s.links, l)
+			}
+		}
 	}
 }
 

@@ -33,6 +33,7 @@ const (
 	OtelSysStepStatus          = "sys.step.status"
 	OtelSysStepStatusCode      = "sys.step.status.code"
 	OtelSysStepAttempt         = "sys.step.attempt"
+	OtelSysStepMaxAttempt      = "sys.step.attempt.max"
 	OtelSysStepOutput          = "sys.step.output"
 	OtelSysStepOutputSizeBytes = "sys.step.output.size.bytes"
 	OtelSysStepFirst           = "sys.step.first"
@@ -68,5 +69,6 @@ const (
 	// otel collector filter keys
 	OtelUserTraceFilterKey = "inngest.user"
 
-	OtelPropagationKey = "sys.trace"
+	OtelPropagationKey     = "sys.trace"
+	OtelPropagationLinkKey = "sys.trace.link"
 )
