@@ -311,22 +311,17 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		),
 	)
 	defer span.End()
-	if len(req.Events) > 1 {
+	if req.BatchID != nil {
 		span.SetAttributes(attribute.String(consts.OtelSysBatchID, req.BatchID.String()))
+	}
+	if req.PreventDebounce {
+		span.SetAttributes(attribute.Bool(consts.OtelSysDebounceTimeout, true))
 	}
 	if req.Context != nil {
 		if val, ok := req.Context[consts.OtelPropagationLinkKey]; ok {
 			if link, ok := val.(string); ok {
 				span.SetAttributes(attribute.String(consts.OtelPropagationLinkKey, link))
 			}
-		}
-	}
-	for _, e := range req.Events {
-		evt := e.GetEvent()
-		if byt, err := json.Marshal(evt); err == nil {
-			span.AddEvent(string(byt), trace.WithAttributes(
-				attribute.Bool(consts.OtelSysEventData, true),
-			))
 		}
 	}
 
@@ -351,14 +346,12 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	eventIDs := []ulid.ULID{}
-	eventIDsStr := []string{}
 	for _, e := range req.Events {
 		id := e.GetInternalID()
 		eventIDs = append(eventIDs, id)
-		eventIDsStr = append(eventIDsStr, id.String())
 	}
 	spanID := telemetry.NewSpanID(ctx)
-	span.SetAttributes(attribute.String(consts.OtelSysEventIDs, strings.Join(eventIDsStr, ",")))
+	span.SetEventIDs(req.Events...)
 
 	id := state.Identifier{
 		WorkflowID:      req.Function.ID,
@@ -377,7 +370,15 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	mapped := make([]map[string]any, len(req.Events))
 	for n, item := range req.Events {
-		mapped[n] = item.GetEvent().Map()
+		evt := item.GetEvent()
+		mapped[n] = evt.Map()
+
+		// serialize this data to the span at the same time
+		if byt, err := json.Marshal(evt); err == nil {
+			span.AddEvent(string(byt), trace.WithAttributes(
+				attribute.Bool(consts.OtelSysEventData, true),
+			))
+		}
 	}
 
 	if req.Function.Concurrency != nil {
@@ -442,7 +443,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	if err != nil {
-		_ = span.Cancel(ctx)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
 
@@ -561,7 +562,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, state.ErrIdentifierExists
 	}
 	if err != nil {
-		_ = span.Cancel(ctx)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
 
@@ -648,15 +649,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.String(consts.OtelSysIdempotencyKey, id.IdempotencyKey()),
 		),
 	)
-	if len(id.EventIDs) > 1 {
+	if id.BatchID != nil {
 		fnSpan.SetAttributes(attribute.String(consts.OtelSysBatchID, id.BatchID.String()))
-	}
-	for _, e := range s.Events() {
-		if byt, err := json.Marshal(e); err == nil {
-			fnSpan.AddEvent(string(byt), trace.WithAttributes(
-				attribute.Bool(consts.OtelSysEventData, true),
-			))
-		}
 	}
 
 	ctx, span := telemetry.NewSpan(ctx,
