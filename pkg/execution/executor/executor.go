@@ -15,6 +15,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
+	"github.com/gowebpki/jcs"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -324,9 +325,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	for _, e := range req.Events {
 		evt := e.GetEvent()
 		if byt, err := json.Marshal(evt); err == nil {
-			span.AddEvent(string(byt), trace.WithAttributes(
-				attribute.Bool(consts.OtelSysEventData, true),
-			))
+			if b, err := jcs.Transform(byt); err == nil {
+				span.AddEvent(string(b), trace.WithAttributes(
+					attribute.Bool(consts.OtelSysEventData, true),
+				))
+			}
 		}
 	}
 
@@ -651,9 +654,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 	for _, e := range s.Events() {
 		if byt, err := json.Marshal(e); err == nil {
-			fnSpan.AddEvent(string(byt), trace.WithAttributes(
-				attribute.Bool(consts.OtelSysEventData, true),
-			))
+			if b, err := jcs.Transform(byt); err == nil {
+				fnSpan.AddEvent(string(b), trace.WithAttributes(
+					attribute.Bool(consts.OtelSysEventData, true),
+				))
+			}
 		}
 	}
 
