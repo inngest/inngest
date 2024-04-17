@@ -439,7 +439,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	if err != nil {
-		_ = span.Cancel(ctx)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
 
@@ -558,7 +558,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, state.ErrIdentifierExists
 	}
 	if err != nil {
-		_ = span.Cancel(ctx)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
 
