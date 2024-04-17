@@ -351,14 +351,12 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	eventIDs := []ulid.ULID{}
-	eventIDsStr := []string{}
 	for _, e := range req.Events {
 		id := e.GetInternalID()
 		eventIDs = append(eventIDs, id)
-		eventIDsStr = append(eventIDsStr, id.String())
 	}
 	spanID := telemetry.NewSpanID(ctx)
-	span.SetAttributes(attribute.String(consts.OtelSysEventIDs, strings.Join(eventIDsStr, ",")))
+	span.SetEventIDs(req.Events...)
 
 	id := state.Identifier{
 		WorkflowID:      req.Function.ID,
