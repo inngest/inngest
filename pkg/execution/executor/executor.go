@@ -311,7 +311,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		),
 	)
 	defer span.End()
-	if len(req.Events) > 1 {
+	if req.BatchID != nil {
 		span.SetAttributes(attribute.String(consts.OtelSysBatchID, req.BatchID.String()))
 	}
 	if req.Context != nil {
@@ -648,7 +648,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.String(consts.OtelSysIdempotencyKey, id.IdempotencyKey()),
 		),
 	)
-	if len(id.EventIDs) > 1 {
+	if id.BatchID != nil {
 		fnSpan.SetAttributes(attribute.String(consts.OtelSysBatchID, id.BatchID.String()))
 	}
 	for _, e := range s.Events() {
