@@ -3,7 +3,6 @@
 // import { useQuery } from 'urql';
 
 // import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { useSearchParam } from '@/utils/useSearchParam';
 // import { graphql } from '@/gql';
 import RunsTable from './RunsTable';
 import { mockedRuns } from './mockedRuns';
@@ -27,7 +26,7 @@ export default function RunsPage() {
   //     },
   //   });
 
-  const runs = mockedRuns || [];
+  const runs = mockedRuns;
 
   return (
     <main className="bg-white">

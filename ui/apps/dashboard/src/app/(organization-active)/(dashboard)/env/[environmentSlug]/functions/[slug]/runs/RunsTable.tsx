@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { ArrowDownIcon, ArrowUpIcon } from '@heroicons/react/20/solid';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { IDCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
@@ -31,9 +30,7 @@ type RunsTableProps = {
 };
 
 export default function RunsTable({ data = [], isLoading, sorting, setSorting }: RunsTableProps) {
-  const columns = useMemo(() => {
-    return useColumns();
-  }, []);
+  const columns = useColumns();
 
   const table = useReactTable({
     data,
@@ -45,6 +42,9 @@ export default function RunsTable({ data = [], isLoading, sorting, setSorting }:
       sorting,
     },
   });
+
+  // TODO: pass loading to column cells for skeletons
+  if (isLoading) return;
 
   const tableStyles = 'w-full border-y border-slate-200';
   const tableHeadStyles = 'border-b border-slate-200';
