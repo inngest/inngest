@@ -7,6 +7,7 @@ import { InvokeButton } from '@inngest/components/InvokeButton';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { graphql } from '@/gql';
 import { useFunction } from '@/queries';
@@ -37,6 +38,8 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
   const { isArchived = false } = fn ?? {};
   const isPaused = !isArchived && !data?.workspace.workflow?.current;
 
+  const isNewRunsEnabled = useBooleanFlag('new-runs');
+
   const emptyData = !data || fetching || !fn;
   const navLinks: HeaderLink[] = [
     {
@@ -53,6 +56,18 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
       text: 'Replay',
     },
   ];
+
+  if (isNewRunsEnabled.value) {
+    navLinks.push({
+      href: `/env/${params.environmentSlug}/functions/${params.slug}/runs`,
+      text: 'Runs',
+      badge: (
+        <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
+          Beta
+        </Badge>
+      ),
+    });
+  }
 
   const doesFunctionAcceptPayload =
     fn?.current?.triggers.some((trigger) => {
