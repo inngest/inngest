@@ -88,6 +88,12 @@ func WithParentSpanID(psid trace.SpanID) SpanOpt {
 	}
 }
 
+func WithTraceID(tid trace.TraceID) SpanOpt {
+	return func(s *spanOpt) {
+		s.tid = &tid
+	}
+}
+
 func WithSpanID(sid trace.SpanID) SpanOpt {
 	return func(s *spanOpt) {
 		s.sid = &sid
@@ -128,6 +134,7 @@ type spanOpt struct {
 	// Parent SpanID that needs to be overwritten
 	psid *trace.SpanID
 	// SpanID that needs to be overwritten
+	tid *trace.TraceID
 	sid *trace.SpanID
 	// option to be used to mark the span is duplicated or not
 	dedup bool
@@ -169,12 +176,20 @@ func (so *spanOpt) OverrideParentSpanID() bool {
 	return so.psid != nil
 }
 
+func (so *spanOpt) OverrideTraceID() bool {
+	return so.tid != nil
+}
+
 func (so *spanOpt) OverrideSpanID() bool {
 	return so.sid != nil
 }
 
 func (so *spanOpt) ParentSpanID() *trace.SpanID {
 	return so.psid
+}
+
+func (so *spanOpt) TraceID() *trace.TraceID {
+	return so.tid
 }
 
 func (so *spanOpt) SpanID() *trace.SpanID {
@@ -236,6 +251,9 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
 			pid := so.ParentSpanID()
 			psc = psc.WithSpanID(*pid)
 		}
+	}
+	if so.OverrideTraceID() {
+		tid = *so.TraceID()
 	}
 
 	sconf := trace.SpanContextConfig{
