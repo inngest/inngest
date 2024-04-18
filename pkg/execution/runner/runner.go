@@ -631,6 +631,19 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 				events[i] = e
 			}
 
+			ctx, span := telemetry.NewSpan(ctx,
+				telemetry.WithScope(consts.OtelScopeBatch),
+				telemetry.WithName(consts.OtelSpanBatch),
+				telemetry.WithSpanAttributes(
+					attribute.String(consts.OtelSysAccountID, bi.AccountID.String()),
+					attribute.String(consts.OtelSysWorkspaceID, bi.WorkspaceID.String()),
+					attribute.String(consts.OtelSysAppID, bi.AppID.String()),
+					attribute.String(consts.OtelSysFunctionID, bi.FunctionID.String()),
+					attribute.String(consts.OtelSysBatchID, batchID.String()),
+					attribute.Bool(consts.OtelSysBatchFull, true),
+				))
+			defer span.End()
+
 			key := fmt.Sprintf("%s-%s", fn.ID, batchID)
 			_, err = s.executor.Schedule(ctx, execution.ScheduleRequest{
 				AccountID:      bi.AccountID,

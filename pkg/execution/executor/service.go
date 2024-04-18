@@ -329,6 +329,20 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 		events[i] = item
 	}
 
+	ctx, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeBatch),
+		telemetry.WithName(consts.OtelSpanBatch),
+		telemetry.WithSpanAttributes(
+			attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
+			attribute.String(consts.OtelSysBatchID, batchID.String()),
+			attribute.Bool(consts.OtelSysBatchFull, true),
+		),
+	)
+	defer span.End()
+
 	// start execution
 	id := fmt.Sprintf("%s-%s", opts.FunctionID, batchID)
 	_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
