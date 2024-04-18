@@ -1,10 +1,11 @@
 package consts
 
 const (
-	OtelSpanEvent   = "event"
-	OtelSpanCron    = "cron"
-	OtelSpanBatch   = "batch"
-	OtelSpanTrigger = "trigger"
+	OtelSpanEvent    = "event"
+	OtelSpanCron     = "cron"
+	OtelSpanBatch    = "batch"
+	OtelSpanDebounce = "debounce"
+	OtelSpanTrigger  = "trigger"
 
 	// system attributes
 	OtelSysAccountID      = "sys.account.id"
@@ -65,6 +66,8 @@ const (
 
 	// otel scopes
 	OtelScopeEvent     = "event.inngest"
+	OtelScopeBatch     = "batch.inngest"
+	OtelScopeDebounce  = "debounce.inngest"
 	OtelScopeTrigger   = "trigger.inngest"
 	OtelScopeCron      = "cron.inngest"
 	OtelScopeEnv       = "env.inngest"
