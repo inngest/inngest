@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import type { Route } from 'next';
+import { useRouter } from 'next/navigation';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { Link } from '@inngest/components/Link';
 import { RunDetails } from '@inngest/components/RunDetails';
@@ -19,7 +20,6 @@ import { useClient, useMutation } from 'urql';
 
 import { graphql } from '@/gql';
 import { devServerURL, useDevServer } from '@/utils/useDevServer';
-import RerunButton from './RerunButton';
 import { getHistoryItemOutput } from './getHistoryItemOutput';
 
 const CancelRunDocument = graphql(`
@@ -52,7 +52,14 @@ export function StreamDetails({
 }: Props) {
   const client = useClient();
   const { isRunning, send } = useDevServer();
-  const [, cancelRun] = useMutation(CancelRunDocument);
+  const cancelRun = useCancelRun({ envID: environment.id, runID: run.id });
+  const rerun = useRerun({
+    envID: environment.id,
+    envSlug: environment.slug,
+    fnID: func.id,
+    fnSlug: func.slug,
+    runID: run.id,
+  });
 
   const getOutput = useMemo(() => {
     return (historyItemID: string) => {
@@ -67,11 +74,6 @@ export function StreamDetails({
   }, [client, environment.id, func.id, run.id]);
 
   const history = useParsedHistory(rawHistory);
-
-  let rerunButton: React.ReactNode | undefined;
-  if (run.canRerun) {
-    rerunButton = <RerunButton environment={environment} func={func} functionRunID={run.id} />;
-  }
 
   const navigateToRun: NavigateToRunFn = (opts) => {
     return (
@@ -124,21 +126,75 @@ export function StreamDetails({
         />
       )}
       <RunDetails
-        cancelRun={async () => {
-          const res = await cancelRun({ envID: environment.id, runID: run.id });
-          if (res.error) {
-            // Throw error so that the modal can catch and display it
-            throw res.error;
-          }
-        }}
+        cancelRun={cancelRun}
         func={func}
         functionVersion={functionVersion}
         getHistoryItemOutput={getOutput}
         history={history}
-        rerunButton={rerunButton}
+        rerun={rerun}
         run={run}
         navigateToRun={navigateToRun}
       />
     </div>
   );
+}
+
+function useCancelRun({ envID, runID }: { envID: string; runID: string }) {
+  const [, mutate] = useMutation(CancelRunDocument);
+
+  return async () => {
+    const res = await mutate({ envID, runID });
+    if (res.error) {
+      // Throw error so that the modal can catch and display it
+      throw res.error;
+    }
+  };
+}
+
+const RerunFunctionRunDocument = graphql(/* GraphQL */ `
+  mutation RerunFunctionRun($environmentID: ID!, $functionID: ID!, $functionRunID: ULID!) {
+    retryWorkflowRun(
+      input: { workspaceID: $environmentID, workflowID: $functionID }
+      workflowRunID: $functionRunID
+    ) {
+      id
+    }
+  }
+`);
+
+function useRerun({
+  envID,
+  envSlug,
+  fnID,
+  fnSlug,
+  runID,
+}: {
+  envID: string;
+  envSlug: string;
+  fnID: string;
+  fnSlug: string;
+  runID: string;
+}) {
+  const [, rerunFunctionRunMutation] = useMutation(RerunFunctionRunDocument);
+  const router = useRouter();
+
+  return async () => {
+    const response = await rerunFunctionRunMutation({
+      environmentID: envID,
+      functionID: fnID,
+      functionRunID: runID,
+    });
+    if (response.error) {
+      throw response.error;
+    }
+    const newRunID = response.data?.retryWorkflowRun?.id;
+    if (!newRunID) {
+      throw new Error('missing new run ID');
+    }
+
+    router.refresh();
+    router.push(
+      `/env/${envSlug}/functions/${encodeURIComponent(fnSlug)}/logs/${newRunID}` as Route
+    );
+  };
 }

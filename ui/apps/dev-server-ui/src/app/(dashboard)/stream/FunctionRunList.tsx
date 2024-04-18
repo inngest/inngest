@@ -1,6 +1,6 @@
 import { Badge } from '@inngest/components/Badge';
-import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { BatchSize } from '@inngest/components/BatchSize';
+import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 
 import { useGetFunctionRunStatusQuery, type FunctionRun } from '@/store/generated';
 
@@ -19,7 +19,14 @@ export default function FunctionRunList({ inBatch, functionRuns }: FunctionRunLi
           {functionRuns &&
             functionRuns
               ?.slice()
-              .sort((a, b) => (a.function?.name || '').localeCompare(b.function?.name || ''))
+              .sort((a, b) => {
+                // Append with run ID to ensure unique keys. Rerunning
+                // intentionally results in duplicate function names
+                const aVal = `${a.function?.name || ''}${a.id}`;
+                const bVal = `${b.function?.name || ''}${b.id}`;
+
+                return aVal.localeCompare(bVal);
+              })
               .map((functionRun) => {
                 let batchSize;
                 if (functionRun.batchID) {

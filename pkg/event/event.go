@@ -168,6 +168,13 @@ func NewOSSTrackedEvent(e Event) TrackedEvent {
 	}
 }
 
+func NewOSSTrackedEventWithID(e Event, id ulid.ULID) TrackedEvent {
+	return ossTrackedEvent{
+		Id:    id,
+		Event: e,
+	}
+}
+
 func NewOSSTrackedEventFromString(data string) (*ossTrackedEvent, error) {
 	evt := &ossTrackedEvent{}
 	if err := json.Unmarshal([]byte(data), evt); err != nil {

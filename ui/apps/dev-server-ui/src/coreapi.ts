@@ -246,3 +246,9 @@ export const CANCEL_RUN = gql`
     }
   }
 `;
+
+export const RERUN = gql`
+  mutation Rerun($runID: ULID!) {
+    rerun(runID: $runID)
+  }
+`;

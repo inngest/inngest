@@ -73,44 +73,20 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 			CreatedAt: time.UnixMilli(i.EventTS),
 			Runs:      []*models.FunctionRun{},
 		}
-		if len(fnsByID[i.ID]) > 0 {
-			items[n].Runs = fnsByID[i.ID]
-		}
-	}
 
-	// Query all function runs received, and filter by crons.
-	fns, err = r.Data.GetFunctionRunsTimebound(ctx, tb, q.Limit)
-	if err != nil {
-		return nil, err
-	}
-	for _, i := range fns {
-		if i.Cron == nil && i.OriginalRunID == nil {
-			// These are children of events.
-			continue
-		}
+		runs := fnsByID[i.ID]
+		if len(runs) > 0 {
+			// If any of the runs is a cron, then the stream item is a cron
+			for _, run := range runs {
+				if run.Cron != nil {
+					items[n].Trigger = *run.Cron
+					items[n].Type = models.StreamTypeCron
+					break
+				}
+			}
 
-		var trigger string
-		if i.Cron != nil {
-			trigger = *i.Cron
-		} else if i.OriginalRunID != nil {
-			trigger = "Cron rerun"
+			items[n].Runs = runs
 		}
-
-		runs := []*models.FunctionRun{models.MakeFunctionRun(i)}
-		_, err := r.Data.GetFunctionByInternalUUID(ctx, uuid.UUID{}, uuid.MustParse(runs[0].FunctionID))
-		if err == sql.ErrNoRows {
-			// Skip run since its function doesn't exist. This can happen when
-			// deleting a function or changing its ID.
-			runs = []*models.FunctionRun{}
-		}
-
-		items = append(items, &models.StreamItem{
-			ID:        i.RunID.String(),
-			Trigger:   trigger,
-			Type:      models.StreamTypeCron,
-			CreatedAt: i.RunStartedAt,
-			Runs:      runs,
-		})
 	}
 
 	sort.Slice(items, func(i, j int) bool {
