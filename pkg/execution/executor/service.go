@@ -178,36 +178,7 @@ func (s *svc) Run(ctx context.Context) error {
 		case queue.KindPause:
 			err = s.handlePauseTimeout(ctx, item)
 		case queue.KindDebounce:
-			d := debounce.DebouncePayload{}
-			if err := json.Unmarshal(item.Payload.(json.RawMessage), &d); err != nil {
-				return fmt.Errorf("error unmarshalling debounce payload: %w", err)
-			}
-
-			all, err := s.data.Functions(ctx)
-			if err != nil {
-				return err
-			}
-
-			for _, f := range all {
-				if f.ID == d.FunctionID {
-					di, err := s.debouncer.GetDebounceItem(ctx, d.DebounceID)
-					if err != nil {
-						return err
-					}
-					_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
-						Function:        f,
-						AccountID:       di.AccountID,
-						WorkspaceID:     di.WorkspaceID,
-						AppID:           di.AppID,
-						Events:          []event.TrackedEvent{di},
-						PreventDebounce: true,
-					})
-					if err != nil {
-						return err
-					}
-					_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID)
-				}
-			}
+			err = s.handleDebounce(ctx, item)
 		case queue.KindScheduleBatch:
 			err = s.handleScheduledBatch(ctx, item)
 		default:
@@ -372,6 +343,42 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 
 	if err := s.batcher.ExpireKeys(ctx, batchID); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
+	d := debounce.DebouncePayload{}
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &d); err != nil {
+		return fmt.Errorf("error unmarshalling debounce payload: %w", err)
+	}
+
+	all, err := s.data.Functions(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range all {
+		if f.ID == d.FunctionID {
+			di, err := s.debouncer.GetDebounceItem(ctx, d.DebounceID)
+			if err != nil {
+				return err
+			}
+
+			_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
+				Function:        f,
+				AccountID:       di.AccountID,
+				WorkspaceID:     di.WorkspaceID,
+				AppID:           di.AppID,
+				Events:          []event.TrackedEvent{di},
+				PreventDebounce: true,
+			})
+			if err != nil {
+				return err
+			}
+			_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID)
+		}
 	}
 
 	return nil
