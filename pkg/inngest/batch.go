@@ -68,6 +68,12 @@ func (c EventBatchConfig) IsValid() error {
 			Message: fmt.Sprintf("batch size cannot be smaller than 2: %d", c.MaxSize),
 		}
 	}
+	if c.MaxSize > consts.DefaultBatchSize {
+		return syscode.Error{
+			Code:    syscode.CodeBatchSizeInvalid,
+			Message: fmt.Sprintf("batch size cannot be larger than %d", consts.DefaultBatchSize),
+		}
+	}
 
 	if _, err := time.ParseDuration(c.Timeout); err != nil {
 		return fmt.Errorf("invalid timeout string: %v", err)
