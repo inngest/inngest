@@ -590,6 +590,10 @@ func (sc *spanIDGenerator) NewIDs(ctx context.Context) (trace.TraceID, trace.Spa
 	return tid, sid
 }
 
+func NewTrace(ctx context.Context) (trace.TraceID, trace.SpanID) {
+	return gen.NewIDs(ctx)
+}
+
 func NewSpanID(ctx context.Context) trace.SpanID {
 	return gen.NewSpanID(ctx, trace.TraceID{})
 }

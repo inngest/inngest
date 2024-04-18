@@ -350,7 +350,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		id := e.GetInternalID()
 		eventIDs = append(eventIDs, id)
 	}
-	spanID := telemetry.NewSpanID(ctx)
+	traceID, spanID := telemetry.NewTrace(ctx)
 	span.SetEventIDs(req.Events...)
 
 	id := state.Identifier{
@@ -434,7 +434,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Identifier:     id,
 		EventBatchData: mapped,
 		Context:        stateMetadata,
-		SpanID:         spanID.String(),
+		Trace:          fmt.Sprintf("%s-%s", traceID.String(), spanID.String()),
 	})
 	if err == state.ErrIdentifierExists {
 		_ = span.Cancel(ctx)
@@ -590,11 +590,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// contains it.
 	md := s.Metadata()
 
-	start := time.Now() // for recording function start time after a successful step.
-	if !md.StartedAt.IsZero() {
-		start = md.StartedAt
-	}
-
+	start := md.GetStartedAt()
 	f, err := e.fl.LoadFunction(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("error loading function for run: %w", err)
@@ -617,7 +613,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	ctx = e.extractTraceCtx(WithContextMetadata(ctx, md), id, &item)
 
 	// spanID should always exists
-	fnSpanID, err := md.GetSpanID()
+	_, fnSpanID, err := md.GetTrace()
 	if err != nil {
 		// generate a new one here to be used for subsequent runs.
 		// this could happen for runs that started before this feature was introduced.

@@ -3,6 +3,7 @@ package state
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -169,17 +170,45 @@ type Metadata struct {
 	// disallow immediate execution of steps as they are found.
 	DisableImmediateExecution bool `json:"disableImmediateExecution,omitempty"`
 
-	// SpanID is the spanID used for this function run.
-	SpanID string `json:"sid"`
+	// Trace stores the traceID and spanID used for this function run.
+	//   fmt: <traceID>-<spanID>
+	Trace string `json:"trace"`
 }
 
-func (md *Metadata) GetSpanID() (*trace.SpanID, error) {
-	if md.SpanID != "" {
-		sid, err := trace.SpanIDFromHex(md.SpanID)
-		return &sid, err
+func (md *Metadata) GetTrace() (*trace.TraceID, *trace.SpanID, error) {
+	if md.Trace == "" {
+		return nil, nil, fmt.Errorf("no trace data stored")
 	}
 
-	return nil, fmt.Errorf("invalid otel spanID")
+	ids := strings.Split(md.Trace, "-")
+	if len(ids) != 2 {
+		return nil, nil, fmt.Errorf("invalid trace stored in metadata")
+	}
+
+	var (
+		err error
+		tid trace.TraceID
+		sid trace.SpanID
+	)
+
+	tid, err = trace.TraceIDFromHex(ids[0])
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid traceID format")
+	}
+
+	sid, err = trace.SpanIDFromHex(ids[1])
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid spanID format")
+	}
+
+	return &tid, &sid, nil
+}
+
+func (md *Metadata) GetStartedAt() time.Time {
+	if !md.StartedAt.IsZero() {
+		return md.StartedAt
+	}
+	return time.Now()
 }
 
 type MetadataUpdate struct {
@@ -359,6 +388,6 @@ type Input struct {
 	// Context is additional context for the run stored in metadata.
 	Context map[string]any
 
-	// SpanID is the id used for the new function run
-	SpanID string
+	// Trace is the <traceID>-<spanID> used for the new function run
+	Trace string
 }

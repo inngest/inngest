@@ -265,7 +265,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		RequestVersion: consts.RequestVersionUnknown, // Always use -1 to indicate unset hash version until first request.
 		Context:        input.Context,
 		Status:         enums.RunStatusScheduled,
-		SpanID:         input.SpanID,
+		Trace:          input.Trace,
 	}
 	if input.RunType != nil {
 		metadata.RunType = *input.RunType
@@ -1219,8 +1219,8 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 			m.DisableImmediateExecution = true
 		}
 	}
-	if val, ok := data["sid"]; ok {
-		m.SpanID = val
+	if val, ok := data["trace"]; ok {
+		m.Trace = val
 	}
 
 	return m, nil
@@ -1333,7 +1333,7 @@ type runMetadata struct {
 	RequestVersion            int            `json:"rv"`
 	Context                   map[string]any `json:"ctx,omitempty"`
 	DisableImmediateExecution bool           `json:"die,omitempty"`
-	SpanID                    string         `json:"sid"`
+	Trace                     string         `json:"trace"`
 	StartedAt                 int64          `json:"sat,omitempty"`
 }
 
@@ -1348,7 +1348,7 @@ func (r runMetadata) Map() map[string]any {
 		"rv":       r.RequestVersion,
 		"ctx":      r.Context,
 		"die":      r.DisableImmediateExecution,
-		"sid":      r.SpanID,
+		"trace":    r.Trace,
 		"sat":      r.StartedAt,
 	}
 }
@@ -1362,7 +1362,7 @@ func (r runMetadata) Metadata() state.Metadata {
 		RequestVersion:            r.RequestVersion,
 		Context:                   r.Context,
 		DisableImmediateExecution: r.DisableImmediateExecution,
-		SpanID:                    r.SpanID,
+		Trace:                     r.Trace,
 	}
 	// 0 != time.IsZero
 	// only convert to time if runMetadata's StartedAt is > 0
