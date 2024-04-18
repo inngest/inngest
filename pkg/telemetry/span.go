@@ -221,6 +221,16 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
 	} else {
 		sid = gen.NewSpanID(ctx, tid)
 	}
+
+	// NOTE: meddling with span context and parents are a little messy
+	//
+	// Case 1: No need to meddle with parent span, trace propagated accurately for in context execution
+	//   e.g. event triggered runs
+	// Case 2: No parent needed, out of context execution, root span
+	//   e.g. batching, debounce
+	// Case 3: Need parent, out of context updates, non root span
+	//   e.g. cancellation
+
 	// Take grantparent span to override psc's spanID
 	if so.OverrideParentSpanID() {
 		sid = psc.SpanID()
@@ -243,6 +253,7 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
 		SpanID:     sid,
 		TraceState: psc.TraceState(),
 		TraceFlags: psc.TraceFlags(),
+		// TraceFlags: psc.TraceFlags() | trace.FlagsSampled, // NOTE: make it always sample for now, otherwise the batch span processor will ignore it
 	}
 
 	s := &Span{

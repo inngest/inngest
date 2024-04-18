@@ -1559,6 +1559,7 @@ func (e *executor) Cancel(ctx context.Context, runID ulid.ULID, r execution.Canc
 		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
 	}
 
+	ctx = e.extractTraceCtx(ctx, md.Identifier, nil)
 	for _, e := range e.lifecycles {
 		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md.Identifier, r, s)
 	}
