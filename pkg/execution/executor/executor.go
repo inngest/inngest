@@ -307,7 +307,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			attribute.String(consts.OtelSysFunctionSlug, req.Function.GetSlug()),
 			attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
 			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
-			attribute.String(consts.OtelSysFunctionStatus, enums.RunStatusScheduled.String()),
+			attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusScheduled.ToCode()),
 		),
 	)
 	defer span.End()
@@ -770,7 +770,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			spanName := op.UserDefinedName()
 			span.SetName(spanName)
 
-			fnSpan.SetAttributes(attribute.String(consts.OtelSysFunctionStatus, enums.RunStatusRunning.String()))
+			fnSpan.SetAttributes(attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusRunning.ToCode()))
 			span.SetAttributes(
 				attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
 				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
@@ -783,20 +783,16 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			}
 		} else if resp.IsTraceVisibleFunctionExecution() {
 			spanName := "function success"
-			fnstatus := attribute.String(consts.OtelSysFunctionStatus, enums.RunStatusCompleted.String())
+			fnstatus := attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCompleted.ToCode())
 
 			if resp.StatusCode != 200 {
 				spanName = "function error"
-				fnstatus = attribute.String(consts.OtelSysFunctionStatus, enums.RunStatusFailed.String())
+				fnstatus = attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusFailed.ToCode())
 				span.SetStatus(codes.Error, resp.Error())
 			}
 
 			fnSpan.SetAttributes(fnstatus)
-
 			span.SetName(spanName)
-			span.SetAttributes(
-				attribute.Int(consts.OtelSysFunctionStatusCode, resp.StatusCode),
-			)
 
 			if byt, err := json.Marshal(resp.Output); err == nil {
 				span.AddEvent(string(byt), trace.WithAttributes(

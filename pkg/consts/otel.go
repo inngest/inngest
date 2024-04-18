@@ -31,7 +31,6 @@ const (
 	OtelSysFunctionScheduleAt = "sys.function.time.schedule"
 	OtelSysFunctionStartAt    = "sys.function.time.start"
 	OtelSysFunctionEndAt      = "sys.function.time.end"
-	OtelSysFunctionStatus     = "sys.function.status"
 	OtelSysFunctionStatusCode = "sys.function.status.code"
 	OtelSysFunctionOutput     = "sys.function.output"
 

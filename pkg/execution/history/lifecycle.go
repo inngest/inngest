@@ -246,7 +246,7 @@ func (l lifecycle) OnFunctionCancelled(
 				attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
 				attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
 				attribute.String(consts.OtelSysIdempotencyKey, id.IdempotencyKey()),
-				attribute.String(consts.OtelSysFunctionStatus, enums.RunStatusCancelled.String()),
+				attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCancelled.ToCode()),
 			),
 		)
 		if id.BatchID != nil {
