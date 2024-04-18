@@ -18,6 +18,7 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/xhit/go-str2duration/v2"
 )
 
@@ -257,6 +258,20 @@ func (f Function) Validate(ctx context.Context) error {
 		if berr := f.EventBatch.IsValid(); berr != nil {
 			err = multierror.Append(err, berr)
 		}
+
+		if len(f.Cancel) > 0 {
+			err = multierror.Append(err, syscode.Error{
+				Code:    syscode.CodeComboUnsupported,
+				Message: "Batching and cancellation are mutually exclusive",
+			})
+		}
+
+		if f.Debounce != nil {
+			err = multierror.Append(err, syscode.Error{
+				Code:    syscode.CodeComboUnsupported,
+				Message: "Batching and debouncing are mutually exclusive",
+			})
+		}
 	}
 
 	for _, step := range f.Steps {
@@ -343,10 +358,6 @@ func (f Function) Validate(ctx context.Context) error {
 			}
 		}
 
-		// NOTE: Debounce is not valid when batch is enabled.
-		if f.EventBatch != nil {
-			err = multierror.Append(err, fmt.Errorf("A function cannot specify batch and debounce"))
-		}
 		period, perr := str2duration.ParseDuration(f.Debounce.Period)
 		if perr != nil {
 			err = multierror.Append(err, fmt.Errorf("The debounce period of '%s' is invalid: %w", f.Debounce.Period, perr))
