@@ -63,12 +63,11 @@ export default function RunsTable({ data = [], isLoading, sorting, setSorting }:
               >
                 {header.isPlaceholder ? null : (
                   <div
-                    {...{
-                      className: header.column.getCanSort()
-                        ? 'select-none cursor-pointer flex items-center gap-1'
-                        : '',
-                      onClick: header.column.getToggleSortingHandler(),
-                    }}
+                    className={cn(
+                      header.column.getCanSort() &&
+                        'flex cursor-pointer select-none items-center gap-1'
+                    )}
+                    onClick={header.column.getToggleSortingHandler()}
                   >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                     {{
