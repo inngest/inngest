@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -21,6 +22,8 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -365,6 +368,19 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 			if err != nil {
 				return err
 			}
+
+			ctx, span := telemetry.NewSpan(ctx,
+				telemetry.WithScope(consts.OtelScopeDebounce),
+				telemetry.WithName(consts.OtelSpanDebounce),
+				telemetry.WithSpanAttributes(
+					attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
+					attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
+					attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
+					attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
+					attribute.Bool(consts.OtelSysDebounceTimeout, true),
+				),
+			)
+			defer span.End()
 
 			_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
 				Function:        f,

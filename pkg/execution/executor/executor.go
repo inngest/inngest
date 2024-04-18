@@ -314,6 +314,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	if req.BatchID != nil {
 		span.SetAttributes(attribute.String(consts.OtelSysBatchID, req.BatchID.String()))
 	}
+	if req.PreventDebounce {
+		span.SetAttributes(attribute.Bool(consts.OtelSysDebounceTimeout, true))
+	}
 	if req.Context != nil {
 		if val, ok := req.Context[consts.OtelPropagationLinkKey]; ok {
 			if link, ok := val.(string); ok {
