@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { ArrowDownIcon, ArrowUpIcon } from '@heroicons/react/20/solid';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+import { Skeleton } from '@inngest/components/Skeleton';
 import { IDCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
 import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { cn } from '@inngest/components/utils/classNames';
@@ -30,11 +32,23 @@ type RunsTableProps = {
 };
 
 export default function RunsTable({ data = [], isLoading, sorting, setSorting }: RunsTableProps) {
-  const columns = useColumns();
+  // Render 8 empty lines for skeletons when data is loading
+  const tableData = useMemo(() => (isLoading ? Array(8).fill({}) : data), [isLoading, data]);
+
+  const tableColumns = useMemo(
+    () =>
+      isLoading
+        ? useColumns().map((column) => ({
+            ...column,
+            cell: () => <Skeleton className="my-4 block h-4" />,
+          }))
+        : useColumns(),
+    [isLoading, data]
+  );
 
   const table = useReactTable({
-    data,
-    columns,
+    data: tableData,
+    columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
     manualSorting: true,
     onSortingChange: setSorting,
@@ -42,9 +56,6 @@ export default function RunsTable({ data = [], isLoading, sorting, setSorting }:
       sorting,
     },
   });
-
-  // TODO: pass loading to column cells for skeletons
-  if (isLoading) return;
 
   const tableStyles = 'w-full border-y border-slate-200';
   const tableHeadStyles = 'border-b border-slate-200';
