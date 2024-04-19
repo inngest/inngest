@@ -51,8 +51,10 @@ export default function RunsTable({ data = [], isLoading, sorting, setSorting }:
   const tableBodyStyles = 'divide-y divide-slate-200';
   const tableColumnStyles = 'px-4';
 
+  const isEmpty = data.length < 1 && !isLoading;
+
   return (
-    <table className={tableStyles}>
+    <table className={cn(isEmpty && 'h-full', tableStyles)}>
       <thead className={tableHeadStyles}>
         {table.getHeaderGroups().map((headerGroup) => (
           <tr key={headerGroup.id} className="h-12">
@@ -82,15 +84,24 @@ export default function RunsTable({ data = [], isLoading, sorting, setSorting }:
         ))}
       </thead>
       <tbody className={tableBodyStyles}>
-        {table.getRowModel().rows.map((row) => (
-          <tr key={row.id} className="h-12">
-            {row.getVisibleCells().map((cell) => (
-              <td className={tableColumnStyles} key={cell.id}>
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </td>
-            ))}
+        {isEmpty && (
+          <tr>
+            {/* TODO: when we introduce column visibility options, this colSpan has to be dinamically calculated depending on # visible columns */}
+            <td className="pt-28 text-center align-top	font-medium text-slate-600" colSpan={5}>
+              No results were found.
+            </td>
           </tr>
-        ))}
+        )}
+        {!isEmpty &&
+          table.getRowModel().rows.map((row) => (
+            <tr key={row.id} className="h-12">
+              {row.getVisibleCells().map((cell) => (
+                <td className={tableColumnStyles} key={cell.id}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </td>
+              ))}
+            </tr>
+          ))}
       </tbody>
       <tfoot>
         {table.getFooterGroups().map((footerGroup) => (
