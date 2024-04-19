@@ -1546,6 +1546,9 @@ func (e *executor) Cancel(ctx context.Context, runID ulid.ULID, r execution.Canc
 		return fmt.Errorf("error cancelling function: %w", err)
 	}
 
+	if err := e.sm.Delete(ctx, s.Identifier()); err != nil {
+		logger.From(ctx).Error().Err(err).Msg("error deleting state after cancel")
+	}
 	// TODO: Load all pauses for the function and remove, once we index pauses.
 
 	fnCancelledErr := state.ErrFunctionCancelled.Error()

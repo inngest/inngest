@@ -680,6 +680,44 @@ func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 	}
 }
 
+// Delete deletes state from the state store.  Previously, we would handle this in a
+// lifecycle.  Now, state stores must account for deletion directly.  Note that if the
+// state store is queue-aware, it must delete queue items for the run also.  This may
+// not always be the case.
+func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
+	// Ensure this context isn't cancelled;  this is called in a goroutine.
+	callCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	// Ensure function idempotency exists for the defined period.
+	key := m.kf.Idempotency(ctx, i)
+
+	cmd := m.r.B().Expire().Key(key).Seconds(int64(consts.FunctionIdempotencyPeriod.Seconds())).Build()
+	if err := m.r.Do(callCtx, cmd).Error(); err != nil {
+		return err
+	}
+
+	// Clear all other data for a job.
+	keys := []string{
+		m.kf.Actions(ctx, i),
+		m.kf.RunMetadata(ctx, i.RunID),
+		m.kf.Events(ctx, i),
+		m.kf.Stack(ctx, i.RunID),
+
+		// XXX: remove these in a state store refactor.
+		m.kf.Event(ctx, i),
+		m.kf.History(ctx, i.RunID),
+		m.kf.Errors(ctx, i),
+	}
+	for _, k := range keys {
+		cmd := m.r.B().Del().Key(k).Build()
+		if err := m.r.Do(callCtx, cmd).Error(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
 	// Add a default event here, which is null and overwritten by everything.  This is necessary
 	// to keep the same cluster key.
