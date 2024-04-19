@@ -32,12 +32,12 @@ export function AlertModal({
         <AlertDialog.Portal container={container}>
           <AlertDialog.Overlay asChild>
             <div
-              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] transition-opacity dark:bg-[#04060C]/90"
+              className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-[2px] transition-opacity dark:bg-[#04060C]/90"
               aria-hidden="true"
             />
           </AlertDialog.Overlay>
           {/* Full-screen container to center the panel */}
-          <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="fixed inset-0 z-[100] overflow-y-auto">
             <motion.div
               className="flex min-h-full w-full items-center justify-center p-6"
               initial={{ y: -20, opacity: 0.2 }}
