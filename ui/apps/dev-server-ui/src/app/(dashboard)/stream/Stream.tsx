@@ -195,20 +195,16 @@ export default function Stream() {
 
   function handleOpenSlideOver({
     triggerID,
-    isCron,
     e,
     firstRunID,
   }: {
     triggerID: string;
-    isCron: boolean;
     e: React.MouseEvent<HTMLElement>;
     firstRunID?: string;
   }) {
     if (e.target instanceof HTMLElement) {
       const runID = e.target.dataset.key || firstRunID;
-      const params = new URLSearchParams({
-        [isCron ? 'cron' : 'event']: triggerID,
-      });
+      const params = new URLSearchParams({ event: triggerID });
       if (runID) {
         params.append('run', runID);
       }
@@ -223,14 +219,12 @@ export default function Stream() {
       cursor: 'pointer',
     },
     onClick: (e: React.MouseEvent<HTMLElement>) => {
-      const isCron = row.original.type === 'CRON';
       const firstRunID =
         row.original.runs && row.original.runs?.length > 0 ? row.original.runs[0]?.id : undefined;
       handleOpenSlideOver({
         triggerID: row.original.id,
         e,
         firstRunID: firstRunID,
-        isCron: isCron,
       });
     },
   });

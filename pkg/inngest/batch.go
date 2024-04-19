@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/syscode"
 )
 
 func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
@@ -23,7 +24,7 @@ func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
 		return nil, fmt.Errorf("failed to decode batch config: %v", err)
 	}
 
-	if config.MaxSize <= 0 {
+	if config.MaxSize <= 0 || config.MaxSize > consts.DefaultBatchSize {
 		config.MaxSize = consts.DefaultBatchSize
 	}
 
@@ -62,7 +63,16 @@ func (c EventBatchConfig) IsEnabled() bool {
 
 func (c EventBatchConfig) IsValid() error {
 	if c.MaxSize < 2 {
-		return fmt.Errorf("batch size cannot be smaller than 2: %d", c.MaxSize)
+		return syscode.Error{
+			Code:    syscode.CodeBatchSizeInvalid,
+			Message: fmt.Sprintf("batch size cannot be smaller than 2: %d", c.MaxSize),
+		}
+	}
+	if c.MaxSize > consts.DefaultBatchSize {
+		return syscode.Error{
+			Code:    syscode.CodeBatchSizeInvalid,
+			Message: fmt.Sprintf("batch size cannot be larger than %d", consts.DefaultBatchSize),
+		}
 	}
 
 	if _, err := time.ParseDuration(c.Timeout); err != nil {

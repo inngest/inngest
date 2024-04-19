@@ -88,6 +88,7 @@ func (w *writer) writeWorkflowStart(
 	run := w.store.Data[item.RunID]
 	run.Run.AccountID = item.AccountID
 	run.Run.BatchID = item.BatchID
+	run.Run.Cron = item.Cron
 	run.Run.EventID = item.EventID
 	run.Run.ID = item.RunID
 	run.Run.OriginalRunID = item.OriginalRunID

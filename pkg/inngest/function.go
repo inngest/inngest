@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"sort"
@@ -11,11 +12,13 @@ import (
 	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
+	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/xhit/go-str2duration/v2"
 )
 
@@ -107,6 +110,46 @@ type Throttle struct {
 	// ID in an event you can use the following key: "{{ event.user.id }}".  This ensures
 	// that we throttle functions for each user independently.
 	Key *string `json:"key,omitempty"`
+}
+
+func (t *Throttle) UnmarshalJSON(in []byte) error {
+	if t == nil {
+		t = &Throttle{}
+	}
+
+	var err error
+	input := struct {
+		Limit  uint    `json:"limit"`
+		Period string  `json:"period"`
+		Burst  uint    `json:"burst"`
+		Key    *string `json:"key,omitempty"`
+	}{}
+	if err = json.Unmarshal(in, &input); err != nil {
+		return err
+	}
+
+	t.Limit = input.Limit
+	t.Burst = input.Burst
+	t.Key = input.Key
+	t.Period, err = str2duration.ParseDuration(input.Period)
+
+	// Normalization
+	if t.Limit == 0 {
+		t.Limit = 1
+	}
+	if t.Burst == 0 {
+		t.Burst = 1
+	}
+	return err
+}
+
+func (t Throttle) MarshalJSON() ([]byte, error) {
+	s := structs.New(t)
+	s.TagName = "json"
+	val := s.Map()
+	// convert period to a string.
+	val["period"] = str2duration.String(t.Period)
+	return json.Marshal(val)
 }
 
 // Timeouts represents timeouts for the function. If any of the timeouts are hit, the function
@@ -215,6 +258,20 @@ func (f Function) Validate(ctx context.Context) error {
 		if berr := f.EventBatch.IsValid(); berr != nil {
 			err = multierror.Append(err, berr)
 		}
+
+		if len(f.Cancel) > 0 {
+			err = multierror.Append(err, syscode.Error{
+				Code:    syscode.CodeComboUnsupported,
+				Message: "Batching and cancellation are mutually exclusive",
+			})
+		}
+
+		if f.Debounce != nil {
+			err = multierror.Append(err, syscode.Error{
+				Code:    syscode.CodeComboUnsupported,
+				Message: "Batching and debouncing are mutually exclusive",
+			})
+		}
 	}
 
 	for _, step := range f.Steps {
@@ -301,10 +358,6 @@ func (f Function) Validate(ctx context.Context) error {
 			}
 		}
 
-		// NOTE: Debounce is not valid when batch is enabled.
-		if f.EventBatch != nil {
-			err = multierror.Append(err, fmt.Errorf("A function cannot specify batch and debounce"))
-		}
 		period, perr := str2duration.ParseDuration(f.Debounce.Period)
 		if perr != nil {
 			err = multierror.Append(err, fmt.Errorf("The debounce period of '%s' is invalid: %w", f.Debounce.Period, perr))

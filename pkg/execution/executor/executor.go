@@ -307,11 +307,22 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			attribute.String(consts.OtelSysFunctionSlug, req.Function.GetSlug()),
 			attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
 			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
+			attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusScheduled.ToCode()),
 		),
 	)
 	defer span.End()
-	if len(req.Events) > 1 {
+	if req.BatchID != nil {
 		span.SetAttributes(attribute.String(consts.OtelSysBatchID, req.BatchID.String()))
+	}
+	if req.PreventDebounce {
+		span.SetAttributes(attribute.Bool(consts.OtelSysDebounceTimeout, true))
+	}
+	if req.Context != nil {
+		if val, ok := req.Context[consts.OtelPropagationLinkKey]; ok {
+			if link, ok := val.(string); ok {
+				span.SetAttributes(attribute.String(consts.OtelPropagationLinkKey, link))
+			}
+		}
 	}
 
 	var key string
@@ -335,14 +346,12 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	eventIDs := []ulid.ULID{}
-	eventIDsStr := []string{}
 	for _, e := range req.Events {
 		id := e.GetInternalID()
 		eventIDs = append(eventIDs, id)
-		eventIDsStr = append(eventIDsStr, id.String())
 	}
 	spanID := telemetry.NewSpanID(ctx)
-	span.SetAttributes(attribute.StringSlice(consts.OtelSysEventIDs, eventIDsStr))
+	span.SetEventIDs(req.Events...)
 
 	id := state.Identifier{
 		WorkflowID:      req.Function.ID,
@@ -361,7 +370,15 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	mapped := make([]map[string]any, len(req.Events))
 	for n, item := range req.Events {
-		mapped[n] = item.GetEvent().Map()
+		evt := item.GetEvent()
+		mapped[n] = evt.Map()
+
+		// serialize this data to the span at the same time
+		if byt, err := json.Marshal(evt); err == nil {
+			span.AddEvent(string(byt), trace.WithAttributes(
+				attribute.Bool(consts.OtelSysEventData, true),
+			))
+		}
 	}
 
 	if req.Function.Concurrency != nil {
@@ -426,7 +443,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	if err != nil {
-		_ = span.Cancel(ctx)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
 
@@ -545,7 +562,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, state.ErrIdentifierExists
 	}
 	if err != nil {
-		_ = span.Cancel(ctx)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
 
@@ -628,11 +645,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
 			attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
 			attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
-			attribute.StringSlice(consts.OtelSysEventIDs, evtIDs),
+			attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
 			attribute.String(consts.OtelSysIdempotencyKey, id.IdempotencyKey()),
 		),
 	)
-	if len(id.EventIDs) > 1 {
+	if id.BatchID != nil {
 		fnSpan.SetAttributes(attribute.String(consts.OtelSysBatchID, id.BatchID.String()))
 	}
 
@@ -649,6 +666,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
 			attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
 			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
+			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
 			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
 		),
 	)
@@ -752,7 +770,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			spanName := op.UserDefinedName()
 			span.SetName(spanName)
 
-			fnSpan.SetAttributes(attribute.String(consts.OtelSysFunctionStatus, enums.RunStatusRunning.String()))
+			fnSpan.SetAttributes(attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusRunning.ToCode()))
 			span.SetAttributes(
 				attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
 				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
@@ -765,20 +783,16 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			}
 		} else if resp.IsTraceVisibleFunctionExecution() {
 			spanName := "function success"
-			fnstatus := attribute.String(consts.OtelSysFunctionStatus, enums.RunStatusCompleted.String())
+			fnstatus := attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCompleted.ToCode())
 
 			if resp.StatusCode != 200 {
 				spanName = "function error"
-				fnstatus = attribute.String(consts.OtelSysFunctionStatus, enums.RunStatusFailed.String())
+				fnstatus = attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusFailed.ToCode())
 				span.SetStatus(codes.Error, resp.Error())
 			}
 
 			fnSpan.SetAttributes(fnstatus)
-
 			span.SetName(spanName)
-			span.SetAttributes(
-				attribute.Int(consts.OtelSysFunctionStatusCode, resp.StatusCode),
-			)
 
 			if byt, err := json.Marshal(resp.Output); err == nil {
 				span.AddEvent(string(byt), trace.WithAttributes(
@@ -1541,6 +1555,7 @@ func (e *executor) Cancel(ctx context.Context, runID ulid.ULID, r execution.Canc
 		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
 	}
 
+	ctx = e.extractTraceCtx(ctx, md.Identifier, nil)
 	for _, e := range e.lifecycles {
 		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md.Identifier, r, s)
 	}

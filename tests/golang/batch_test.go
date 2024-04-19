@@ -78,7 +78,7 @@ func TestBatchInvoke(t *testing.T) {
 			ID:   "batcher",
 			Name: "test batching",
 			BatchEvents: &inngest.EventBatchConfig{
-				MaxSize: 5,
+				MaxSize: 3,
 				Timeout: "5s",
 			},
 		},
@@ -119,7 +119,7 @@ func TestBatchInvoke(t *testing.T) {
 
 	t.Run("trigger a batch", func(t *testing.T) {
 		// Call invoke twice
-		for i := 0; i < 2; i++ {
+		for i := 0; i < 5; i++ {
 			_, err := inngestgo.Send(ctx, BatchEvent{
 				Name: "batchinvoke/caller",
 				Data: BatchEventData{Time: time.Now()},
@@ -127,10 +127,16 @@ func TestBatchInvoke(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		// First trigger should be because of the batch timeout, with two invokes.
-		<-time.After(6 * time.Second)
+		// First trigger should be because of batch is full
+		<-time.After(2 * time.Second)
 		require.EqualValues(t, 1, atomic.LoadInt32(&counter))
-		require.EqualValues(t, 2, atomic.LoadInt32(&totalEvents))
-		require.EqualValues(t, 2, atomic.LoadInt32(&invokeCounter))
+		require.EqualValues(t, 3, atomic.LoadInt32(&totalEvents))
+		require.EqualValues(t, 3, atomic.LoadInt32(&invokeCounter))
+
+		// Second trigger should be because of the batch timeout
+		<-time.After(5 * time.Second)
+		require.EqualValues(t, 2, atomic.LoadInt32(&counter))
+		require.EqualValues(t, 5, atomic.LoadInt32(&totalEvents))
+		require.EqualValues(t, 5, atomic.LoadInt32(&invokeCounter))
 	})
 }

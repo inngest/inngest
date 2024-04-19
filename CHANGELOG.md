@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.27.0] - 2024-04-16
+
+### Added
+- Added support for throttling function runs
+- Added support for function timeouts
+- Added support for new metrics
+
+### Changed
+- Improved support for tracing
+- Improved SDK registration handling
+
+### Fixed
+- Various dev server fixes
+
+
 ## [v0.26.0] - 2024-02-22
 
 ### Added

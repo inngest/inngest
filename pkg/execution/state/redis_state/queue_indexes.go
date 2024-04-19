@@ -31,6 +31,7 @@ func QueueItemIndexerFunc(ctx context.Context, i QueueItem, kg QueueKeyGenerator
 	switch i.Data.Kind {
 	case osqueue.KindStart:
 		return QueueItemIndex{
+			kg.RunIndex(i.Data.Identifier.RunID),
 			kg.Status("start", i.WorkflowID),
 		}
 	case osqueue.KindEdge, osqueue.KindEdgeError:
@@ -45,9 +46,11 @@ func QueueItemIndexerFunc(ctx context.Context, i QueueItem, kg QueueKeyGenerator
 			kg.Status("sleep", i.WorkflowID),
 		}
 	case osqueue.KindPause:
-		// Pause jobs are an implementation detail and are not indexed.  Instead,
-		// we should store indexes for each pause <> run separately.  Consuming
-		// or deleting pauses should delete the index.
+		// Still keep this in the run index so that we know jobs are present
+		// for the run.
+		return QueueItemIndex{
+			kg.RunIndex(i.Data.Identifier.RunID),
+		}
 	}
 	return QueueItemIndex{}
 }

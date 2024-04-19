@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -106,6 +107,12 @@ func WithTracker(t *Tracker) func(s *svc) {
 	}
 }
 
+func WithPublisher(p pubsub.Publisher) func(s *svc) {
+	return func(s *svc) {
+		s.publisher = p
+	}
+}
+
 func NewService(c config.Config, opts ...Opt) Runner {
 	svc := &svc{config: c}
 	for _, o := range opts {
@@ -119,7 +126,8 @@ type svc struct {
 	cqrs   cqrs.Manager
 	// pubsub allows us to subscribe to new events, and re-publish events
 	// if there are errors.
-	pubsub pubsub.PublishSubscriber
+	pubsub    pubsub.PublishSubscriber
+	publisher pubsub.Publisher
 	// executor handles execution of functions.
 	executor execution.Executor
 	// data provides the required loading capabilities to trigger functions
@@ -252,13 +260,33 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 					))
 				defer span.End()
 
-				err := s.initialize(ctx, fn, event.NewOSSTrackedEvent(event.Event{
+				trackedEvent := event.NewOSSTrackedEvent(event.Event{
 					Data: map[string]any{
 						"cron": cron,
 					},
 					ID:   time.Now().UTC().Format(time.RFC3339),
 					Name: event.FnCronName,
-				}))
+				})
+
+				byt, err := json.Marshal(trackedEvent)
+				if err == nil {
+					err := s.publisher.Publish(
+						ctx,
+						s.config.EventStream.Service.TopicName(),
+						pubsub.Message{
+							Name:      event.EventReceivedName,
+							Data:      string(byt),
+							Timestamp: time.Now(),
+						},
+					)
+					if err != nil {
+						logger.From(ctx).Error().Err(err).Msg("error publishing cron event")
+					}
+				} else {
+					logger.From(ctx).Error().Err(err).Msg("error marshaling cron event")
+				}
+
+				err = s.initialize(ctx, fn, trackedEvent)
 				if err != nil {
 					logger.From(ctx).Error().Err(err).Msg("error initializing scheduled function")
 				}
@@ -630,6 +658,19 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 			for i, e := range evtList {
 				events[i] = e
 			}
+
+			ctx, span := telemetry.NewSpan(ctx,
+				telemetry.WithScope(consts.OtelScopeBatch),
+				telemetry.WithName(consts.OtelSpanBatch),
+				telemetry.WithSpanAttributes(
+					attribute.String(consts.OtelSysAccountID, bi.AccountID.String()),
+					attribute.String(consts.OtelSysWorkspaceID, bi.WorkspaceID.String()),
+					attribute.String(consts.OtelSysAppID, bi.AppID.String()),
+					attribute.String(consts.OtelSysFunctionID, bi.FunctionID.String()),
+					attribute.String(consts.OtelSysBatchID, batchID.String()),
+					attribute.Bool(consts.OtelSysBatchFull, true),
+				))
+			defer span.End()
 
 			key := fmt.Sprintf("%s-%s", fn.ID, batchID)
 			_, err = s.executor.Schedule(ctx, execution.ScheduleRequest{

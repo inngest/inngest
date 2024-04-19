@@ -11,7 +11,7 @@ import { ulid } from 'ulid';
 
 import SendEventButton from '@/components/Event/SendEventButton';
 import { useSendEventMutation } from '@/store/devApi';
-import { useCancelRunMutation } from '@/store/generated';
+import { useCancelRunMutation, useRerunMutation } from '@/store/generated';
 import { useEvent } from './useEvent';
 import { useGetHistoryItemOutput } from './useGetHistoryItemOutput';
 import { useRun } from './useRun';
@@ -21,6 +21,7 @@ export default function StreamDetails() {
   const eventID = params.get('event');
   const runID = params.get('run');
   const [cancelRun] = useCancelRunMutation();
+  const [rerun] = useRerunMutation();
 
   const eventResult = useEvent(eventID);
   useEffect(() => {
@@ -156,6 +157,13 @@ export default function StreamDetails() {
           func={runResult.data.func}
           getHistoryItemOutput={getHistoryItemOutput}
           history={runResult.data.history}
+          rerun={async () => {
+            const res = await rerun({ runID: runResult.data.run.id });
+            if ('error' in res) {
+              // Throw error so that the modal can catch and display it
+              throw res.error;
+            }
+          }}
           run={runResult.data.run}
           navigateToRun={navigateToRun}
         />

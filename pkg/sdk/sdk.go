@@ -12,6 +12,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/util"
 )
 
@@ -155,6 +156,16 @@ func (f RegisterRequest) Parse(ctx context.Context) ([]*inngest.Function, error)
 				continue
 			}
 			fn.Steps[n] = step
+		}
+	}
+
+	if err != nil {
+		data := syscode.DataMultiErr{}
+		data.Append(err)
+
+		return nil, &syscode.Error{
+			Code: syscode.CodeConfigInvalid,
+			Data: data,
 		}
 	}
 

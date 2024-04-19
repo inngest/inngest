@@ -439,6 +439,38 @@ export enum FunctionRunTimeField {
   StartedAt = 'STARTED_AT'
 }
 
+export enum FunctionRunTimeFieldV2 {
+  EndedAt = 'ENDED_AT',
+  QueuedAt = 'QUEUED_AT',
+  StartedAt = 'STARTED_AT'
+}
+
+export type FunctionRunV2 = {
+  __typename?: 'FunctionRunV2';
+  accountID: Scalars['UUID'];
+  appID: Scalars['UUID'];
+  durationMS: Scalars['Int'];
+  endedAt: Maybe<Scalars['Time']>;
+  functionID: Scalars['UUID'];
+  id: Scalars['ULID'];
+  isBatch: Scalars['Boolean'];
+  output: Scalars['Bytes'];
+  queuedAt: Scalars['Time'];
+  sourceID: Maybe<Scalars['String']>;
+  startedAt: Maybe<Scalars['Time']>;
+  status: FunctionRunStatus;
+  traceID: Scalars['String'];
+  triggerIDs: Array<Scalars['ULID']>;
+  triggers: Array<Scalars['Bytes']>;
+  workspaceID: Scalars['UUID'];
+};
+
+export type FunctionRunV2Edge = {
+  __typename?: 'FunctionRunV2Edge';
+  cursor: Scalars['String'];
+  node: FunctionRunV2;
+};
+
 export enum HistoryStepType {
   Run = 'Run',
   Send = 'Send',
@@ -978,12 +1010,44 @@ export type RunListItemEdge = {
   node: RunListItem;
 };
 
+export type RunsConnection = {
+  __typename?: 'RunsConnection';
+  edges: Array<FunctionRunV2Edge>;
+  pageInfo: PageInfo;
+};
+
 export type RunsFilter = {
   lowerTime: Scalars['Time'];
   status?: InputMaybe<Array<FunctionRunStatus>>;
   timeField?: InputMaybe<FunctionRunTimeField>;
   upperTime: Scalars['Time'];
 };
+
+export type RunsFilterV2 = {
+  appID?: InputMaybe<Scalars['UUID']>;
+  from: Scalars['Time'];
+  functionID?: InputMaybe<Scalars['UUID']>;
+  query?: InputMaybe<Scalars['String']>;
+  status?: InputMaybe<Array<FunctionRunStatus>>;
+  timeField?: InputMaybe<FunctionRunTimeFieldV2>;
+  until?: InputMaybe<Scalars['Time']>;
+};
+
+export type RunsOrderBy = {
+  direction: RunsOrderByDirection;
+  field: RunsOrderByField;
+};
+
+export enum RunsOrderByDirection {
+  Asc = 'ASC',
+  Desc = 'DESC'
+}
+
+export enum RunsOrderByField {
+  EndedAt = 'ENDED_AT',
+  QueuedAt = 'QUEUED_AT',
+  StartedAt = 'STARTED_AT'
+}
 
 export type SearchInput = {
   term: Scalars['String'];
@@ -1261,6 +1325,8 @@ export type Workspace = {
   lastDeployedAt: Maybe<Scalars['Time']>;
   name: Scalars['String'];
   parentID: Maybe<Scalars['ID']>;
+  runs: RunsConnection;
+  runsMetrics: MetricsResponse;
   signingKeys: Array<SigningKey>;
   test: Scalars['Boolean'];
   type: EnvironmentType;
@@ -1312,6 +1378,19 @@ export type WorkspaceIngestKeyArgs = {
 
 export type WorkspaceIngestKeysArgs = {
   filter: InputMaybe<IngestKeyFilter>;
+};
+
+
+export type WorkspaceRunsArgs = {
+  after: InputMaybe<Scalars['String']>;
+  filter: RunsFilterV2;
+  first?: Scalars['Int'];
+  orderBy: Array<RunsOrderBy>;
+};
+
+
+export type WorkspaceRunsMetricsArgs = {
+  filter: RunsFilterV2;
 };
 
 

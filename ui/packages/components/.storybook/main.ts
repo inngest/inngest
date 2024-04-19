@@ -5,7 +5,6 @@ const config: StorybookConfig = {
   addons: [
     '@storybook/addon-a11y',
     '@storybook/addon-actions',
-    '@storybook/addon-essentials',
     '@storybook/addon-links',
     '@storybook/addon-interactions',
     '@storybook/addon-themes',
@@ -17,13 +16,19 @@ const config: StorybookConfig = {
         },
       },
     },
+    {
+      name: '@storybook/addon-essentials',
+      options: {
+        backgrounds: false, // 👈 disable the backgrounds addon
+      },
+    },
   ],
   framework: {
     name: '@storybook/nextjs',
     options: {},
   },
   docs: {
-    autodocs: 'tag',
+    autodocs: false,
   },
 };
 export default config;

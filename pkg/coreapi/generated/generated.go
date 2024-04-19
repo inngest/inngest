@@ -110,6 +110,7 @@ type ComplexityRoot struct {
 	FunctionRun struct {
 		BatchCreatedAt    func(childComplexity int) int
 		BatchID           func(childComplexity int) int
+		Cron              func(childComplexity int) int
 		Event             func(childComplexity int) int
 		EventID           func(childComplexity int) int
 		Events            func(childComplexity int) int
@@ -148,6 +149,7 @@ type ComplexityRoot struct {
 		DeleteApp       func(childComplexity int, id string) int
 		DeleteAppByName func(childComplexity int, name string) int
 		InvokeFunction  func(childComplexity int, data map[string]interface{}, functionSlug string) int
+		Rerun           func(childComplexity int, runID ulid.ULID) int
 		UpdateApp       func(childComplexity int, input models.UpdateAppInput) int
 	}
 
@@ -296,6 +298,7 @@ type MutationResolver interface {
 	DeleteAppByName(ctx context.Context, name string) (bool, error)
 	InvokeFunction(ctx context.Context, data map[string]interface{}, functionSlug string) (*bool, error)
 	CancelRun(ctx context.Context, runID ulid.ULID) (*models.FunctionRun, error)
+	Rerun(ctx context.Context, runID ulid.ULID) (ulid.ULID, error)
 }
 type QueryResolver interface {
 	Apps(ctx context.Context) ([]*cqrs.App, error)
@@ -604,6 +607,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.FunctionRun.BatchID(childComplexity), true
 
+	case "FunctionRun.cron":
+		if e.complexity.FunctionRun.Cron == nil {
+			break
+		}
+
+		return e.complexity.FunctionRun.Cron(childComplexity), true
+
 	case "FunctionRun.event":
 		if e.complexity.FunctionRun.Event == nil {
 			break
@@ -836,6 +846,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.InvokeFunction(childComplexity, args["data"].(map[string]interface{}), args["functionSlug"].(string)), true
+
+	case "Mutation.rerun":
+		if e.complexity.Mutation.Rerun == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_rerun_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.Rerun(childComplexity, args["runID"].(ulid.ULID)), true
 
 	case "Mutation.updateApp":
 		if e.complexity.Mutation.UpdateApp == nil {
@@ -1400,6 +1422,7 @@ type Mutation {
   ): Boolean
 
   cancelRun(runID: ULID!): FunctionRun!
+  rerun(runID: ULID!): ULID!
 }
 
 input CreateAppInput {
@@ -1669,6 +1692,7 @@ type FunctionRun {
   history: [RunHistoryItem!]!
   historyItemOutput(id: ULID!): String
   eventID: ID!
+  cron: String
 }
 
 enum HistoryType {
@@ -1861,6 +1885,21 @@ func (ec *executionContext) field_Mutation_invokeFunction_args(ctx context.Conte
 		}
 	}
 	args["functionSlug"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_rerun_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 ulid.ULID
+	if tmp, ok := rawArgs["runID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("runID"))
+		arg0, err = ec.unmarshalNULID2githubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["runID"] = arg0
 	return args, nil
 }
 
@@ -3056,6 +3095,8 @@ func (ec *executionContext) fieldContext_Event_functionRuns(ctx context.Context,
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
 			case "eventID":
 				return ec.fieldContext_FunctionRun_eventID(ctx, field)
+			case "cron":
+				return ec.fieldContext_FunctionRun_cron(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRun", field.Name)
 		},
@@ -3603,6 +3644,8 @@ func (ec *executionContext) fieldContext_FunctionEvent_functionRun(ctx context.C
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
 			case "eventID":
 				return ec.fieldContext_FunctionRun_eventID(ctx, field)
+			case "cron":
+				return ec.fieldContext_FunctionRun_cron(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRun", field.Name)
 		},
@@ -4574,6 +4617,47 @@ func (ec *executionContext) fieldContext_FunctionRun_eventID(ctx context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _FunctionRun_cron(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRun) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionRun_cron(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cron, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionRun_cron(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionRun",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _FunctionTrigger_type(ctx context.Context, field graphql.CollectedField, obj *models.FunctionTrigger) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_FunctionTrigger_type(ctx, field)
 	if err != nil {
@@ -5361,6 +5445,8 @@ func (ec *executionContext) fieldContext_Mutation_cancelRun(ctx context.Context,
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
 			case "eventID":
 				return ec.fieldContext_FunctionRun_eventID(ctx, field)
+			case "cron":
+				return ec.fieldContext_FunctionRun_cron(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRun", field.Name)
 		},
@@ -5373,6 +5459,61 @@ func (ec *executionContext) fieldContext_Mutation_cancelRun(ctx context.Context,
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_cancelRun_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_rerun(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_rerun(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().Rerun(rctx, fc.Args["runID"].(ulid.ULID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(ulid.ULID)
+	fc.Result = res
+	return ec.marshalNULID2githubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_rerun(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ULID does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_rerun_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -5805,6 +5946,8 @@ func (ec *executionContext) fieldContext_Query_functionRun(ctx context.Context, 
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
 			case "eventID":
 				return ec.fieldContext_FunctionRun_eventID(ctx, field)
+			case "cron":
+				return ec.fieldContext_FunctionRun_cron(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRun", field.Name)
 		},
@@ -7780,6 +7923,8 @@ func (ec *executionContext) fieldContext_StepEvent_functionRun(ctx context.Conte
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
 			case "eventID":
 				return ec.fieldContext_FunctionRun_eventID(ctx, field)
+			case "cron":
+				return ec.fieldContext_FunctionRun_cron(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRun", field.Name)
 		},
@@ -8413,6 +8558,8 @@ func (ec *executionContext) fieldContext_StreamItem_runs(ctx context.Context, fi
 				return ec.fieldContext_FunctionRun_historyItemOutput(ctx, field)
 			case "eventID":
 				return ec.fieldContext_FunctionRun_eventID(ctx, field)
+			case "cron":
+				return ec.fieldContext_FunctionRun_cron(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRun", field.Name)
 		},
@@ -11281,6 +11428,10 @@ func (ec *executionContext) _FunctionRun(ctx context.Context, sel ast.SelectionS
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
+		case "cron":
+
+			out.Values[i] = ec._FunctionRun_cron(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -11456,6 +11607,15 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_cancelRun(ctx, field)
+			})
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "rerun":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_rerun(ctx, field)
 			})
 
 			if out.Values[i] == graphql.Null {

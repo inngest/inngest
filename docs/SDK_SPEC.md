@@ -919,11 +919,11 @@ If the request passes signature validation, then the response schema MUST be:
 ```ts
 {
   extra?: Record<string, any>
-	fallback_signing_key_hash: string
 	function_count: number
 	has_event_key: boolean
 	has_signing_key: boolean
 	mode: "cloud" | "dev"
+	signing_key_fallback_hash: string
 	signing_key_hash: string
 }
 ```

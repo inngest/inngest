@@ -25,10 +25,11 @@ export function AlertModal({
   description,
   className = 'w-1/4',
 }: AlertModalProps) {
+  const container = document.getElementById('modals');
   return (
     <AlertDialog.Root open={isOpen} onOpenChange={onClose}>
       <AnimatePresence>
-        <AlertDialog.Portal>
+        <AlertDialog.Portal container={container}>
           <AlertDialog.Overlay asChild>
             <div
               className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] transition-opacity dark:bg-[#04060C]/90"

@@ -8,7 +8,6 @@ import {
   Squares2X2Icon,
   WrenchIcon,
 } from '@heroicons/react/20/solid';
-import { Badge } from '@inngest/components/Badge';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import OrganizationDropdown from '@/components/Navigation/OrganizationDropdown';
@@ -43,11 +42,6 @@ export default function AppNavigation({ environmentSlug }: AppNavigationProps) {
       text: 'Apps',
       hide: [ALL_ENVIRONMENTS_SLUG],
       icon: <Squares2X2Icon className="w-3.5" />,
-      badge: (
-        <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
-          New
-        </Badge>
-      ),
     },
     {
       href: `/env/${environmentSlug}/functions`,

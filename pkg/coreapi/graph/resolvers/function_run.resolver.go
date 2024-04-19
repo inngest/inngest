@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/inngest/inngest/pkg/util"
@@ -243,4 +244,58 @@ func (r *mutationResolver) CancelRun(
 
 		<-time.After(time.Second)
 	}
+}
+
+func (r *mutationResolver) Rerun(
+	ctx context.Context,
+	runID ulid.ULID,
+) (ulid.ULID, error) {
+	zero := ulid.ULID{}
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+
+	run, err := r.Data.GetFunctionRun(
+		ctx,
+		accountID,
+		workspaceID,
+		runID,
+	)
+	if err != nil {
+		return zero, err
+	}
+
+	fnCQRS, err := r.Data.GetFunctionByInternalUUID(
+		ctx,
+		workspaceID,
+		run.FunctionID,
+	)
+	if err != nil {
+		return zero, err
+	}
+
+	fn, err := fnCQRS.InngestFunction()
+	if err != nil {
+		return zero, err
+	}
+
+	evt, err := r.Data.GetEventByInternalID(ctx, run.EventID)
+	if err != nil {
+		return zero, fmt.Errorf("failed to get run event: %w", err)
+	}
+
+	identifier, err := r.Executor.Schedule(ctx, execution.ScheduleRequest{
+		Function: *fn,
+		Events: []event.TrackedEvent{
+			// We need NewOSSTrackedEventWithID to ensure that the tracked event
+			// has the same ID as the original event. Calling NewOSSTrackedEvent
+			// will result in the creation of a new ID
+			event.NewOSSTrackedEventWithID(evt.Event(), evt.InternalID()),
+		},
+		OriginalRunID: &run.RunID,
+	})
+	if err != nil {
+		return zero, err
+	}
+
+	return identifier.RunID, nil
 }

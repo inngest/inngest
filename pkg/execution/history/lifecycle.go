@@ -11,14 +11,18 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func NewLifecycleListener(l *slog.Logger, d ...Driver) execution.LifecycleListener {
@@ -207,6 +211,49 @@ func (l lifecycle) OnFunctionCancelled(
 	req execution.CancelRequest,
 	s state.State,
 ) {
+	md := s.Metadata()
+
+	go func(ctx context.Context) {
+		start := time.Now()
+		if !md.StartedAt.IsZero() {
+			start = md.StartedAt
+		}
+
+		fnSpanID, err := md.GetSpanID()
+		if err != nil {
+			log.From(ctx).Error().Err(err).Interface("identifier", id).Msg("error retrieving spanID for cancelled function run")
+			return
+		}
+
+		evtIDs := make([]string, len(id.EventIDs))
+		for i, eid := range id.EventIDs {
+			evtIDs[i] = eid.String()
+		}
+
+		_, span := telemetry.NewSpan(ctx,
+			telemetry.WithScope(consts.OtelScopeFunction),
+			telemetry.WithName(s.Function().GetSlug()),
+			telemetry.WithTimestamp(start),
+			telemetry.WithSpanID(*fnSpanID),
+			telemetry.WithSpanAttributes(
+				attribute.Bool(consts.OtelUserTraceFilterKey, true),
+				attribute.String(consts.OtelSysAccountID, id.AccountID.String()),
+				attribute.String(consts.OtelSysWorkspaceID, id.WorkspaceID.String()),
+				attribute.String(consts.OtelSysAppID, id.AppID.String()),
+				attribute.String(consts.OtelSysFunctionID, id.WorkflowID.String()),
+				attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
+				attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
+				attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
+				attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
+				attribute.String(consts.OtelSysIdempotencyKey, id.IdempotencyKey()),
+				attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCancelled.ToCode()),
+			),
+		)
+		if id.BatchID != nil {
+			span.SetAttributes(attribute.String(consts.OtelSysBatchID, id.BatchID.String()))
+		}
+		defer span.End()
+	}(ctx)
 	completedStepCount := int64(len(s.Actions()) + len(s.Errors()))
 	groupID := uuid.New()
 

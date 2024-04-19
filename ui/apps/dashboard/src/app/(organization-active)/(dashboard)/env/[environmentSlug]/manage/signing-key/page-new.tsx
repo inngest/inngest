@@ -1,5 +1,6 @@
 'use client';
 
+import { Alert } from '@inngest/components/Alert';
 import { Card } from '@inngest/components/Card';
 import { Link } from '@inngest/components/Link';
 
@@ -76,17 +77,35 @@ export default function Page() {
           </div>
 
           <Card>
-            <Card.Content className="flex items-center p-4">
-              <div className="grow">
-                <p className="mb-2 font-medium">Rotate key</p>
+            <Card.Content className="p-4">
+              <div className="mb-4 flex items-center">
+                <div className="grow">
+                  <p className="mb-2 font-medium">Rotate key</p>
 
-                <p className="text-sm text-slate-500">
-                  This action replaces the <span className="font-bold">current key</span> with the{' '}
-                  <span className="font-bold">new key</span>, permanently deleting the current key.
-                </p>
+                  <p className="text-sm text-slate-500">
+                    This action replaces the <span className="font-bold">current key</span> with the{' '}
+                    <span className="font-bold">new key</span>, permanently deleting the current
+                    key.
+                  </p>
+                </div>
+
+                <RotateSigningKeyButton disabled={inactiveKeys.length === 0} envID={env.id} />
               </div>
 
-              <RotateSigningKeyButton disabled={inactiveKeys.length === 0} envID={env.id} />
+              <Alert severity="warning">
+                <p className="mb-2">
+                  Rotation will be zero downtime if your SDK version meets the minimum:
+                </p>
+
+                <div className="grid w-fit grid-cols-2 gap-x-4 gap-y-1">
+                  <div>Go</div>
+                  <div>0.7.2</div>
+                  <div>Python</div>
+                  <div>0.3.9</div>
+                  <div>TypeScript</div>
+                  <div>3.18.0</div>
+                </div>
+              </Alert>
             </Card.Content>
           </Card>
         </div>

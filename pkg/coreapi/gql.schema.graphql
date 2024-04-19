@@ -200,6 +200,7 @@ type FunctionRun {
   history: [RunHistoryItem!]!
   historyItemOutput(id: ULID!): String
   eventID: ID!
+  cron: String
 }
 
 enum HistoryType {
