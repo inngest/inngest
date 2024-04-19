@@ -1,9 +1,11 @@
 package consts
 
 const (
-	OtelSpanEvent   = "event"
-	OtelSpanCron    = "cron"
-	OtelSpanTrigger = "trigger"
+	OtelSpanEvent    = "event"
+	OtelSpanCron     = "cron"
+	OtelSpanBatch    = "batch"
+	OtelSpanDebounce = "debounce"
+	OtelSpanTrigger  = "trigger"
 
 	// system attributes
 	OtelSysAccountID      = "sys.account.id"
@@ -15,7 +17,13 @@ const (
 	OtelSysEventRequestID  = "sys.event.request.id"
 	OtelSysEventInternalID = "sys.event.internal.id"
 	OtelSysEventIDs        = "sys.event.ids"
-	OtelSysBatchID         = "sys.batch.id"
+
+	OtelSysBatchID      = "sys.batch.id"
+	OtelSysBatchFull    = "sys.batch.full"
+	OtelSysBatchTimeout = "sys.batch.timeout"
+
+	OtelSysDebounceID      = "sys.debounce.id"
+	OtelSysDebounceTimeout = "sys.debounce.timeout"
 
 	OtelSysFunctionID         = "sys.function.id"
 	OtelSysFunctionSlug       = "sys.function.slug"
@@ -23,7 +31,6 @@ const (
 	OtelSysFunctionScheduleAt = "sys.function.time.schedule"
 	OtelSysFunctionStartAt    = "sys.function.time.start"
 	OtelSysFunctionEndAt      = "sys.function.time.end"
-	OtelSysFunctionStatus     = "sys.function.status"
 	OtelSysFunctionStatusCode = "sys.function.status.code"
 	OtelSysFunctionOutput     = "sys.function.output"
 
@@ -58,6 +65,8 @@ const (
 
 	// otel scopes
 	OtelScopeEvent     = "event.inngest"
+	OtelScopeBatch     = "batch.inngest"
+	OtelScopeDebounce  = "debounce.inngest"
 	OtelScopeTrigger   = "trigger.inngest"
 	OtelScopeCron      = "cron.inngest"
 	OtelScopeEnv       = "env.inngest"

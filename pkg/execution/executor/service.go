@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -21,6 +22,8 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -178,36 +181,7 @@ func (s *svc) Run(ctx context.Context) error {
 		case queue.KindPause:
 			err = s.handlePauseTimeout(ctx, item)
 		case queue.KindDebounce:
-			d := debounce.DebouncePayload{}
-			if err := json.Unmarshal(item.Payload.(json.RawMessage), &d); err != nil {
-				return fmt.Errorf("error unmarshalling debounce payload: %w", err)
-			}
-
-			all, err := s.data.Functions(ctx)
-			if err != nil {
-				return err
-			}
-
-			for _, f := range all {
-				if f.ID == d.FunctionID {
-					di, err := s.debouncer.GetDebounceItem(ctx, d.DebounceID)
-					if err != nil {
-						return err
-					}
-					_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
-						Function:        f,
-						AccountID:       di.AccountID,
-						WorkspaceID:     di.WorkspaceID,
-						AppID:           di.AppID,
-						Events:          []event.TrackedEvent{di},
-						PreventDebounce: true,
-					})
-					if err != nil {
-						return err
-					}
-					_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID)
-				}
-			}
+			err = s.handleDebounce(ctx, item)
 		case queue.KindScheduleBatch:
 			err = s.handleScheduledBatch(ctx, item)
 		default:
@@ -355,6 +329,20 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 		events[i] = item
 	}
 
+	ctx, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeBatch),
+		telemetry.WithName(consts.OtelSpanBatch),
+		telemetry.WithSpanAttributes(
+			attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
+			attribute.String(consts.OtelSysBatchID, batchID.String()),
+			attribute.Bool(consts.OtelSysBatchFull, true),
+		),
+	)
+	defer span.End()
+
 	// start execution
 	id := fmt.Sprintf("%s-%s", opts.FunctionID, batchID)
 	_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
@@ -372,6 +360,55 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 
 	if err := s.batcher.ExpireKeys(ctx, batchID); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
+	d := debounce.DebouncePayload{}
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &d); err != nil {
+		return fmt.Errorf("error unmarshalling debounce payload: %w", err)
+	}
+
+	all, err := s.data.Functions(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range all {
+		if f.ID == d.FunctionID {
+			di, err := s.debouncer.GetDebounceItem(ctx, d.DebounceID)
+			if err != nil {
+				return err
+			}
+
+			ctx, span := telemetry.NewSpan(ctx,
+				telemetry.WithScope(consts.OtelScopeDebounce),
+				telemetry.WithName(consts.OtelSpanDebounce),
+				telemetry.WithSpanAttributes(
+					attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
+					attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
+					attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
+					attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
+					attribute.Bool(consts.OtelSysDebounceTimeout, true),
+				),
+			)
+			defer span.End()
+
+			_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
+				Function:        f,
+				AccountID:       di.AccountID,
+				WorkspaceID:     di.WorkspaceID,
+				AppID:           di.AppID,
+				Events:          []event.TrackedEvent{di},
+				PreventDebounce: true,
+			})
+			if err != nil {
+				return err
+			}
+			_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID)
+		}
 	}
 
 	return nil
