@@ -64,6 +64,10 @@ type HandlerOpts struct {
 	// to os.Getenv("INNGEST_SIGNING_KEY").
 	SigningKey *string
 
+	// SigningKeyFallback is the fallback signing key for your app. If nil, this
+	// defaults to os.Getenv("INNGEST_SIGNING_KEY_FALLBACK").
+	SigningKeyFallback *string
+
 	// Env is the branch environment to deploy to.  If nil, this uses
 	// os.Getenv("INNGEST_ENV").  This only deploys to branches if the
 	// signing key is a branch signing key.
@@ -97,6 +101,19 @@ func (h HandlerOpts) GetSigningKey() string {
 		return os.Getenv("INNGEST_SIGNING_KEY")
 	}
 	return *h.SigningKey
+}
+
+// GetSigningKeyFallback returns the signing key fallback defined within
+// HandlerOpts, or the default defined within INNGEST_SIGNING_KEY_FALLBACK.
+//
+// This is the fallback private key used to register functions and communicate
+// with the private API. If a request fails auth with the signing key then we'll
+// try again with the fallback
+func (h HandlerOpts) GetSigningKeyFallback() string {
+	if h.SigningKeyFallback == nil {
+		return os.Getenv("INNGEST_SIGNING_KEY_FALLBACK")
+	}
+	return *h.SigningKeyFallback
 }
 
 // GetEnv returns the env defined within HandlerOpts, or the default
@@ -211,6 +228,11 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	SetBasicResponseHeaders(w)
 
 	switch r.Method {
+	case http.MethodGet:
+		if err := h.introspect(w, r); err != nil {
+			_ = publicerr.WriteHTTP(w, err)
+		}
+		return
 	case http.MethodPost:
 		if err := h.invoke(w, r); err != nil {
 			_ = publicerr.WriteHTTP(w, err)
@@ -219,6 +241,12 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPut:
 		if err := h.register(w, r); err != nil {
 			h.Logger.Error("error registering functions", "error", err.Error())
+
+			w.WriteHeader(500)
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"message": err.Error(),
+			})
 		}
 		return
 	}
@@ -236,10 +264,19 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 		scheme = "https"
 	}
 	host := r.Host
-	path := r.URL.String()
+
+	// Get the sync ID from the URL and then remove it, since we don't want the
+	// sync ID to show in the function URLs (that would affect the checksum and
+	// is ugly in the UI)
+	qp := r.URL.Query()
+	syncID := qp.Get("deployId")
+	qp.Del("deployId")
+	r.URL.RawQuery = qp.Encode()
+
+	pathAndParams := r.URL.String()
 
 	config := sdk.RegisterRequest{
-		URL:        fmt.Sprintf("%s://%s%s", scheme, host, path),
+		URL:        fmt.Sprintf("%s://%s%s", scheme, host, pathAndParams),
 		V:          "1",
 		DeployType: "ping",
 		SDK:        HeaderValueSDK,
@@ -272,9 +309,11 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 			Slug:        h.appName + "-" + fn.Slug(),
 			Idempotency: c.Idempotency,
 			Priority:    fn.Config().Priority,
-			Triggers:    []inngest.Trigger{{}},
+			Triggers:    inngest.MultipleTriggers{},
 			RateLimit:   fn.Config().GetRateLimit(),
 			Cancel:      fn.Config().Cancel,
+			Timeouts:    (*inngest.Timeouts)(fn.Config().Timeouts),
+			Throttle:    (*inngest.Throttle)(fn.Config().Throttle),
 			Steps: map[string]sdk.SDKStep{
 				"step": {
 					ID:      "step",
@@ -310,15 +349,21 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 			f.Concurrency = &inngest.ConcurrencyLimits{Limits: c.Concurrency}
 		}
 
-		trigger := fn.Trigger()
-		if trigger.EventTrigger != nil {
-			f.Triggers[0].EventTrigger = &inngest.EventTrigger{
-				Event:      trigger.Event,
-				Expression: trigger.Expression,
-			}
-		} else {
-			f.Triggers[0].CronTrigger = &inngest.CronTrigger{
-				Cron: trigger.Cron,
+		triggers := fn.Trigger().Triggers()
+		for _, trigger := range triggers {
+			if trigger.EventTrigger != nil {
+				f.Triggers = append(f.Triggers, inngest.Trigger{
+					EventTrigger: &inngest.EventTrigger{
+						Event:      trigger.Event,
+						Expression: trigger.Expression,
+					},
+				})
+			} else {
+				f.Triggers = append(f.Triggers, inngest.Trigger{
+					CronTrigger: &inngest.CronTrigger{
+						Cron: trigger.Cron,
+					},
+				})
 			}
 		}
 
@@ -334,26 +379,45 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 		registerURL = *h.RegisterURL
 	}
 
-	byt, err := json.Marshal(config)
-	if err != nil {
-		return fmt.Errorf("error marshalling function config: %w", err)
-	}
-	req, err := http.NewRequest(http.MethodPost, registerURL, bytes.NewReader(byt))
-	if err != nil {
-		return fmt.Errorf("error creating new request: %w", err)
+	createRequest := func() (*http.Request, error) {
+		byt, err := json.Marshal(config)
+		if err != nil {
+			return nil, fmt.Errorf("error marshalling function config: %w", err)
+		}
+
+		req, err := http.NewRequest(http.MethodPost, registerURL, bytes.NewReader(byt))
+		if err != nil {
+			return nil, fmt.Errorf("error creating new request: %w", err)
+		}
+		if syncID != "" {
+			qp := req.URL.Query()
+			qp.Set("deployId", syncID)
+			req.URL.RawQuery = qp.Encode()
+		}
+
+		// If the request specifies a server kind then include it as an expectation
+		// in the outgoing request
+		if r.Header.Get(HeaderKeyServerKind) != "" {
+			req.Header.Set(
+				HeaderKeyExpectedServerKind,
+				r.Header.Get(HeaderKeyServerKind),
+			)
+		}
+
+		if h.GetEnv() != "" {
+			req.Header.Add(HeaderKeyEnv, h.GetEnv())
+		}
+
+		SetBasicRequestHeaders(req)
+
+		return req, nil
 	}
 
-	key, err := hashedSigningKey([]byte(h.GetSigningKey()))
-	if err != nil {
-		return fmt.Errorf("error creating signing key: %w", err)
-	}
-	req.Header.Add(HeaderKeyAuthorization, fmt.Sprintf("Bearer %s", string(key)))
-	if h.GetEnv() != "" {
-		req.Header.Add(HeaderKeyEnv, h.GetEnv())
-	}
-	SetBasicRequestHeaders(req)
-
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := fetchWithAuthFallback(
+		createRequest,
+		h.GetSigningKey(),
+		h.GetSigningKeyFallback(),
+	)
 	if err != nil {
 		return fmt.Errorf("error performing registration request: %w", err)
 	}
@@ -410,14 +474,17 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	if !IsDev() {
-		// Validate the signature.
-		if valid, err := ValidateSignature(r.Context(), sig, []byte(h.GetSigningKey()), byt); !valid {
-			h.Logger.Error("unauthorized inngest invoke request", "error", err)
-			return publicerr.Error{
-				Message: "unauthorized",
-				Status:  401,
-			}
+	if valid, err := ValidateSignature(
+		r.Context(),
+		sig,
+		h.GetSigningKey(),
+		h.GetSigningKeyFallback(),
+		byt,
+	); !valid {
+		h.Logger.Error("unauthorized inngest invoke request", "error", err)
+		return publicerr.Error{
+			Message: "unauthorized",
+			Status:  401,
 		}
 	}
 
@@ -555,6 +622,83 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 
 	// Return the function response.
 	return json.NewEncoder(w).Encode(resp)
+}
+
+type insecureIntrospection struct {
+	FunctionCount int    `json:"function_count"`
+	HasEventKey   bool   `json:"has_event_key"`
+	HasSigningKey bool   `json:"has_signing_key"`
+	Mode          string `json:"mode"`
+}
+
+type secureIntrospection struct {
+	insecureIntrospection
+	SigningKeyFallbackHash *string `json:"signing_key_fallback_hash"`
+	SigningKeyHash         *string `json:"signing_key_hash"`
+}
+
+func (h *handler) introspect(w http.ResponseWriter, r *http.Request) error {
+	defer r.Body.Close()
+
+	mode := "cloud"
+	if IsDev() {
+		mode = "dev"
+	}
+
+	sig := r.Header.Get(HeaderKeySignature)
+	valid, _ := ValidateSignature(
+		r.Context(),
+		sig,
+		h.GetSigningKey(),
+		h.GetSigningKeyFallback(),
+		[]byte{},
+	)
+	if valid {
+		var signingKeyHash *string
+		if h.GetSigningKey() != "" {
+			key, err := hashedSigningKey([]byte(h.GetSigningKey()))
+			if err != nil {
+				return fmt.Errorf("error hashing signing key: %w", err)
+			}
+			hash := string(key)
+			signingKeyHash = &hash
+		}
+
+		var signingKeyFallbackHash *string
+		if h.GetSigningKeyFallback() != "" {
+			key, err := hashedSigningKey([]byte(h.GetSigningKeyFallback()))
+			if err != nil {
+				return fmt.Errorf("error hashing signing key fallback: %w", err)
+			}
+			hash := string(key)
+			signingKeyFallbackHash = &hash
+		}
+
+		introspection := secureIntrospection{
+			insecureIntrospection: insecureIntrospection{
+				FunctionCount: len(h.funcs),
+				HasEventKey:   os.Getenv("INNGEST_EVENT_KEY") != "",
+				HasSigningKey: h.GetSigningKey() != "",
+				Mode:          mode,
+			},
+			SigningKeyFallbackHash: signingKeyFallbackHash,
+			SigningKeyHash:         signingKeyHash,
+		}
+
+		w.Header().Set(HeaderKeyContentType, "application/json")
+		return json.NewEncoder(w).Encode(introspection)
+	}
+
+	introspection := insecureIntrospection{
+		FunctionCount: len(h.funcs),
+		HasEventKey:   os.Getenv("INNGEST_EVENT_KEY") != "",
+		HasSigningKey: h.GetSigningKey() != "",
+		Mode:          mode,
+	}
+
+	w.Header().Set(HeaderKeyContentType, "application/json")
+	return json.NewEncoder(w).Encode(introspection)
+
 }
 
 type StreamResponse struct {
