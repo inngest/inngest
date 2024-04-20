@@ -28,7 +28,7 @@ func NewSDKHandler(t *testing.T, appID string, hopts ...opt) (inngestgo.Handler,
 		EventKey: &key,
 	})
 
-	os.Setenv("INNGEST_DEV", DEV_URL)
+	_ = os.Setenv("INNGEST_DEV", DEV_URL)
 
 	opts := inngestgo.HandlerOpts{
 		RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
