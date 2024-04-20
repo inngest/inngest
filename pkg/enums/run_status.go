@@ -75,7 +75,7 @@ func (r *RunStatus) UnmarshalBinary(byt []byte) error {
 	if err != nil {
 		return err
 	}
-	rs := RunStatus(i)
+	rs := RunStatus(int(i))
 	*r = rs
 	return nil
 }
