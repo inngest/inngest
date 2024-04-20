@@ -3,6 +3,8 @@
 package enums
 
 import (
+	"fmt"
+	"math"
 	"strconv"
 )
 
@@ -75,6 +77,10 @@ func (r *RunStatus) UnmarshalBinary(byt []byte) error {
 	if err != nil {
 		return err
 	}
+	if i < 0 || i > math.MaxInt {
+		return fmt.Errorf("enum value is out of bound of int type: %d", i)
+	}
+
 	rs := RunStatus(int(i))
 	*r = rs
 	return nil
