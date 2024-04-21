@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { type Route } from 'next';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
-import { ArrowLeftIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { RiArrowLeftLine } from '@remixicon/react';
 import { ThreadStatus, type ThreadPartsFragment } from '@team-plain/typescript-sdk';
 import { useQuery } from 'urql';
 
@@ -55,7 +55,7 @@ export default function Page() {
             href={process.env.NEXT_PUBLIC_HOME_PATH as Route}
             size="small"
             appearance="outlined"
-            icon={<ArrowLeftIcon className="h-3" />}
+            icon={<RiArrowLeftLine />}
             label={isSignedIn ? 'Back To Dashboard' : 'Sign In To Dashboard'}
           />
         </div>
