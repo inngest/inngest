@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
-import { ArrowDownIcon, ArrowUpIcon } from '@heroicons/react/20/solid';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { IDCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
 import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { cn } from '@inngest/components/utils/classNames';
 import { formatMilliseconds } from '@inngest/components/utils/date';
+import { RiSortAsc, RiSortDesc } from '@remixicon/react';
 import {
   createColumnHelper,
   flexRender,
@@ -85,8 +85,8 @@ export default function RunsTable({ data = [], isLoading, sorting, setSorting }:
                   >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                     {{
-                      asc: <ArrowDownIcon className="h-4 w-4" />,
-                      desc: <ArrowUpIcon className="h-4 w-4" />,
+                      asc: <RiSortDesc className="h-4 w-4" />,
+                      desc: <RiSortAsc className="h-4 w-4" />,
                     }[header.column.getIsSorted() as string] ?? null}
                   </div>
                 )}

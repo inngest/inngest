@@ -4,8 +4,8 @@
 
 // import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 // import { graphql } from '@/gql';
-import { ArrowPathIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { RiLoopLeftLine } from '@remixicon/react';
 
 import { FunctionRunStatus } from '@/gql/graphql';
 import { useStringArraySearchParam } from '@/utils/useSearchParam';
@@ -52,7 +52,7 @@ export default function RunsPage() {
           onStatusesChange={handleStatusesChange}
         />
         {/* TODO: wire button */}
-        <Button label="Refresh" appearance="text" icon={<ArrowPathIcon />} />
+        <Button label="Refresh" appearance="text" icon={<RiLoopLeftLine />} />
       </div>
       {/* @ts-ignore */}
       <RunsTable data={runs} />
