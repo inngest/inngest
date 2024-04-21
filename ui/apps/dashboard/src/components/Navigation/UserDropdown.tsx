@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth, useUser } from '@clerk/nextjs';
-import { MapPinIcon, NewspaperIcon, PowerIcon } from '@heroicons/react/20/solid';
+import { NewspaperIcon, PowerIcon } from '@heroicons/react/20/solid';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
 import { Skeleton } from '@inngest/components/Skeleton';
-import { RiQuestionLine, RiSettings3Line } from '@remixicon/react';
+import { RiMapPinLine, RiQuestionLine, RiSettings3Line } from '@remixicon/react';
 
 import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
 import SystemStatusIcon from '@/components/Navigation/SystemStatusIcon';
@@ -61,7 +61,7 @@ export default function UserDropdown() {
         </DropdownMenuGroup>
         <DropdownMenuGroup className="p-2">
           <OrganizationDropdownMenuItem
-            icon={MapPinIcon}
+            icon={RiMapPinLine}
             href="https://roadmap.inngest.com/roadmap"
             label="Roadmap"
           />
