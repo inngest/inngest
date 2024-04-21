@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ArchiveBoxIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { RiArchive2Line } from '@remixicon/react';
 
 import ArchiveEventModal from './ArchiveEventModal';
 
@@ -15,7 +15,7 @@ export default function ArchiveEventButton({ eventName }: ArchiveButtonProps) {
   return (
     <>
       <Button
-        icon={<ArchiveBoxIcon />}
+        icon={<RiArchive2Line />}
         appearance="outlined"
         btnAction={() => setIsArchiveEventModalVisible(true)}
         label="Archive Event"

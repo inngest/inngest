@@ -2,11 +2,11 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import ArchiveBoxArrowDownIcon from '@heroicons/react/20/solid/ArchiveBoxArrowDownIcon';
 import ChevronRightIcon from '@heroicons/react/20/solid/ChevronRightIcon';
 import { Link as InngestLink } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { cn } from '@inngest/components/utils/classNames';
+import { RiArchive2Line } from '@remixicon/react';
 
 import { SyncStatusPill } from '@/components/SyncStatusPill';
 import { Time } from '@/components/Time';
@@ -54,7 +54,7 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
             className="transition-color flex cursor-pointer items-center gap-1 text-white underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-400 hover:decoration-indigo-400"
             href={pathCreator.app({ envSlug, externalAppID: app.externalID })}
           >
-            {isArchived && <ArchiveBoxArrowDownIcon className="h-4 w-4" />}
+            {isArchived && <RiArchive2Line className="h-4 w-4" />}
             <span className="truncate" title={app.name}>
               {app.name}
             </span>

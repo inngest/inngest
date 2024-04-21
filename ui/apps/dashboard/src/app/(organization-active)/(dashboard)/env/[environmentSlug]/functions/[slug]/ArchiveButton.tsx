@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArchiveBoxIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { AlertModal } from '@inngest/components/Modal';
 import * as Tooltip from '@radix-ui/react-tooltip';
+import { RiArchive2Line } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
 
@@ -139,7 +139,7 @@ export default function ArchiveFunctionButton({ functionSlug }: ArchiveFunctionP
                   isArchived ? (
                     <UnarchiveIcon className=" text-slate-300" />
                   ) : (
-                    <ArchiveBoxIcon className=" text-slate-300" />
+                    <RiArchive2Line className=" text-slate-300" />
                   )
                 }
                 btnAction={() => setIsArchivedFunctionModalVisible(true)}
