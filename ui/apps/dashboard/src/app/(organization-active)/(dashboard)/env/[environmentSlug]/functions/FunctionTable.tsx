@@ -2,10 +2,11 @@
 
 import { useMemo } from 'react';
 import { type Route } from 'next';
-import { ChartBarIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
+import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Link } from '@inngest/components/Link';
 import { Pill, PillContent } from '@inngest/components/Pill';
 import { type Trigger } from '@inngest/components/types/trigger';
+import { RiBarChart2Fill } from '@remixicon/react';
 import {
   createColumnHelper,
   flexRender,
@@ -206,7 +207,7 @@ function createColumns(environmentSlug: string) {
               className="overflow-hidden whitespace-nowrap text-xs text-slate-600"
             >
               <div className="flex items-center gap-1 align-middle text-sm text-slate-600">
-                <ChartBarIcon className="-ml-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                <RiBarChart2Fill className="-ml-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
                 {value.total.toLocaleString(undefined, {
                   notation: 'compact',
                   compactDisplay: 'short',

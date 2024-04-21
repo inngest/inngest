@@ -2,7 +2,7 @@
 
 import type { Route } from 'next';
 import Link from 'next/link';
-import { ChartBarIcon, ChevronRightIcon, XCircleIcon } from '@heroicons/react/20/solid';
+import { ChevronRightIcon, XCircleIcon } from '@heroicons/react/20/solid';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
@@ -10,6 +10,7 @@ import { useCron } from '@inngest/components/hooks/useCron';
 import { IconClock } from '@inngest/components/icons/Clock';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
+import { RiBarChart2Fill } from '@remixicon/react';
 import { ErrorBoundary } from '@sentry/nextjs';
 import { titleCase } from 'title-case';
 
@@ -109,7 +110,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
             <div className="flex gap-14">
               <div className="inline-flex gap-3">
                 <h3 className="inline-flex items-center gap-2 font-medium text-slate-600">
-                  <ChartBarIcon className="h-5 text-indigo-500" />
+                  <RiBarChart2Fill className="h-5 text-indigo-500" />
                   Volume
                 </h3>
                 <span className="text-xl font-medium text-slate-800">
