@@ -5,7 +5,7 @@ import { type Route } from 'next';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { Button } from '@inngest/components/Button';
-import { RiArrowLeftLine } from '@remixicon/react';
+import { RiArrowLeftLine, RiGithubFill } from '@remixicon/react';
 import { ThreadStatus, type ThreadPartsFragment } from '@team-plain/typescript-sdk';
 import { useQuery } from 'urql';
 
@@ -13,7 +13,6 @@ import { isEnterprisePlan } from '@/app/(organization-active)/(dashboard)/settin
 import AppLink from '@/components/AppLink';
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
-import GitHubIcon from '@/icons/github.svg';
 import cn from '@/utils/cn';
 import { SupportForm } from './SupportForm';
 import { useSystemStatus } from './statusPage';
@@ -167,7 +166,8 @@ export default function Page() {
                 appearance="outlined"
                 href="https://github.com/inngest/inngest/issues"
                 label="inngest/inngest"
-                icon={<GitHubIcon className="-ml-0.5 mr-1" />}
+                icon={<RiGithubFill />}
+                className="justify-start"
               />
             </div>
             <div>
@@ -176,7 +176,7 @@ export default function Page() {
                 appearance="outlined"
                 href="https://github.com/inngest/inngest-js/issues"
                 label="inngest/inngest-js"
-                icon={<GitHubIcon className="-ml-0.5 mr-1" />}
+                icon={<RiGithubFill />}
               />
             </div>
           </SupportChannel>
