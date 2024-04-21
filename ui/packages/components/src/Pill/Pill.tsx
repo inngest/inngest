@@ -47,7 +47,7 @@ export function PillContent({ children, type }: PillContentProps) {
   return (
     <div className="flex items-center gap-2">
       {type === 'EVENT' && <IconEvent className="text-indigo-500 dark:text-slate-400" />}
-      {type === 'CRON' && <RiTimeLine className="text-indigo-500 dark:text-slate-400" />}
+      {type === 'CRON' && <RiTimeLine className="h-4 w-4 text-indigo-500 dark:text-slate-400" />}
       {type === 'FUNCTION' && <IconFunction className="text-indigo-500 dark:text-slate-400" />}
       {type === 'APP' && <IconApp className="text-indigo-500 dark:text-slate-400" />}
       {children}

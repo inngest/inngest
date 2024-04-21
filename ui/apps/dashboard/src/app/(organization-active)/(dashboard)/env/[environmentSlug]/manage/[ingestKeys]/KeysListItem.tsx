@@ -54,7 +54,7 @@ export default function KeysListItem({ list }: KeysListItemProps) {
             >
               <p className="mb-1 text-sm font-semibold text-slate-800">{key.name}</p>
               <div className="flex items-center gap-1">
-                <RiTimeLine />
+                <RiTimeLine className="h-4 w-4" />
 
                 <Time
                   className="truncate text-sm text-slate-700"

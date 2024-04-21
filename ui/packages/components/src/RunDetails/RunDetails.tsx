@@ -84,7 +84,7 @@ export function RunDetails({
         cron ? (
           <div className="py-2">
             <Badge className="bg-orange-400/10 text-orange-400" kind="solid">
-              <RiTimeLine />
+              <RiTimeLine className="h-4 w-4" />
               {firstTrigger.value}
             </Badge>
           </div>
