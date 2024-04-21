@@ -2,10 +2,10 @@ import type { UrlObject } from 'url';
 import type { Route } from 'next';
 import Link from 'next/link';
 import { IconApp } from '@inngest/components/icons/App';
-import { IconClock } from '@inngest/components/icons/Clock';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
 import { cn } from '@inngest/components/utils/classNames';
+import { RiTimeLine } from '@remixicon/react';
 
 export function Pill({
   children,
@@ -47,7 +47,7 @@ export function PillContent({ children, type }: PillContentProps) {
   return (
     <div className="flex items-center gap-2">
       {type === 'EVENT' && <IconEvent className="text-indigo-500 dark:text-slate-400" />}
-      {type === 'CRON' && <IconClock className="text-indigo-500 dark:text-slate-400" />}
+      {type === 'CRON' && <RiTimeLine className="text-indigo-500 dark:text-slate-400" />}
       {type === 'FUNCTION' && <IconFunction className="text-indigo-500 dark:text-slate-400" />}
       {type === 'APP' && <IconApp className="text-indigo-500 dark:text-slate-400" />}
       {children}

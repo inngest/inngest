@@ -1,8 +1,8 @@
 'use client';
 
-import { ClockIcon, ExclamationCircleIcon, XMarkIcon } from '@heroicons/react/20/solid';
+import { ExclamationCircleIcon, XMarkIcon } from '@heroicons/react/20/solid';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { RiCheckLine } from '@remixicon/react';
+import { RiCheckLine, RiTimeLine } from '@remixicon/react';
 
 type PaymentIconProps = {
   status: String;
@@ -25,7 +25,7 @@ export default function PaymentIcon({ status }: PaymentIconProps) {
       label = 'Canceled';
       break;
     case 'processing':
-      icon = <ClockIcon className="mx-auto w-4 text-slate-500" />;
+      icon = <RiTimeLine className="mx-auto w-4 text-slate-500" />;
       label = 'Processing';
       break;
     case 'requires_confirmation':

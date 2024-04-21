@@ -7,10 +7,9 @@ import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { useCron } from '@inngest/components/hooks/useCron';
-import { IconClock } from '@inngest/components/icons/Clock';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
-import { RiArrowRightSLine, RiBarChart2Fill } from '@remixicon/react';
+import { RiArrowRightSLine, RiBarChart2Fill, RiTimeLine } from '@remixicon/react';
 import { ErrorBoundary } from '@sentry/nextjs';
 import { titleCase } from 'title-case';
 
@@ -334,7 +333,7 @@ function ScheduleTrigger({ schedule, condition }: ScheduleTriggerProps) {
       <div className="flex min-w-0 items-center">
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex min-w-0 items-center">
-            <IconClock className="w-8 shrink-0 pr-2 text-indigo-500" />
+            <RiTimeLine className="w-8 shrink-0 pr-2 text-indigo-500" />
             <p className="truncate font-medium">{schedule}</p>
           </div>
           <dl className="text-xs">
