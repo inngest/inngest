@@ -5,7 +5,6 @@ import type { Route } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useOrganization, useOrganizationList } from '@clerk/nextjs';
-import { UserGroupIcon } from '@heroicons/react/20/solid';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +19,7 @@ import {
   RiBankCardLine,
   RiBox3Line,
   RiSettings3Line,
+  RiTeamFill,
 } from '@remixicon/react';
 
 export default function OrganizationDropdown() {
@@ -61,7 +61,7 @@ export default function OrganizationDropdown() {
             label="Organization Settings"
           />
           <OrganizationDropdownMenuItem
-            icon={UserGroupIcon}
+            icon={RiTeamFill}
             href="/settings/organization"
             label="Members"
           />
