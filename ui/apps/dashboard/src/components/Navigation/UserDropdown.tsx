@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth, useUser } from '@clerk/nextjs';
-import { NewspaperIcon, PowerIcon } from '@heroicons/react/20/solid';
+import { PowerIcon } from '@heroicons/react/20/solid';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
 import { Skeleton } from '@inngest/components/Skeleton';
-import { RiMapPinLine, RiQuestionLine, RiSettings3Line } from '@remixicon/react';
+import { RiMapPinLine, RiNewspaperLine, RiQuestionLine, RiSettings3Line } from '@remixicon/react';
 
 import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
 import SystemStatusIcon from '@/components/Navigation/SystemStatusIcon';
@@ -66,7 +66,7 @@ export default function UserDropdown() {
             label="Roadmap"
           />
           <OrganizationDropdownMenuItem
-            icon={NewspaperIcon}
+            icon={RiNewspaperLine}
             href="https://roadmap.inngest.com/changelog"
             label="Release Notes"
           />
