@@ -5,7 +5,7 @@ import type { Route } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useOrganization, useOrganizationList } from '@clerk/nextjs';
-import { CubeIcon, PlusCircleIcon, UserGroupIcon } from '@heroicons/react/20/solid';
+import { PlusCircleIcon, UserGroupIcon } from '@heroicons/react/20/solid';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +14,12 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
 import { Skeleton } from '@inngest/components/Skeleton';
-import { RiArrowLeftRightLine, RiBankCardLine, RiSettings3Line } from '@remixicon/react';
+import {
+  RiArrowLeftRightLine,
+  RiBankCardLine,
+  RiBox3Line,
+  RiSettings3Line,
+} from '@remixicon/react';
 
 export default function OrganizationDropdown() {
   const { isLoaded, organization } = useOrganization();
@@ -60,7 +65,7 @@ export default function OrganizationDropdown() {
             label="Members"
           />
           <OrganizationDropdownMenuItem
-            icon={CubeIcon}
+            icon={RiBox3Line}
             href="/settings/integrations"
             label="Integrations"
           />
