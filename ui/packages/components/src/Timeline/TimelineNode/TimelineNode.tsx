@@ -5,10 +5,10 @@ import { Button } from '@inngest/components/Button';
 import { MetadataGrid } from '@inngest/components/Metadata';
 import { OutputCard } from '@inngest/components/OutputCard';
 import { renderStepMetadata } from '@inngest/components/RunDetails/stepMetadataRenderer';
-import { IconChevron } from '@inngest/components/icons/Chevron';
 import { type HistoryNode } from '@inngest/components/utils/historyParser';
 import { isEndStatus, type Status } from '@inngest/components/utils/historyParser/types';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
+import { RiArrowDownSLine } from '@remixicon/react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import type { Timeline } from '..';
@@ -61,7 +61,7 @@ export function TimelineNode({ getOutput, node, children, isAttempt, navigateToR
             <Button
               className="group"
               icon={
-                <IconChevron className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
+                <RiArrowDownSLine className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
               }
             />
           </AccordionPrimitive.Trigger>

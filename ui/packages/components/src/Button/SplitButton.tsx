@@ -7,9 +7,9 @@ import {
   getButtonSizeStyles,
   getDisabledStyles,
 } from '@inngest/components/Button';
-import { IconChevron } from '@inngest/components/icons/Chevron';
 import { classNames } from '@inngest/components/utils/classNames';
 import * as Select from '@radix-ui/react-select';
+import { RiArrowDownSLine } from '@remixicon/react';
 
 type ButtonCopyProps = {
   kind?: 'default' | 'primary' | 'success' | 'danger';
@@ -56,7 +56,7 @@ export function SplitButton({ kind = 'default', size = 'small', items }: ButtonC
           )}
         >
           <Select.Icon>
-            <IconChevron />
+            <RiArrowDownSLine />
           </Select.Icon>
         </Select.Trigger>
 
