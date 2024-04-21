@@ -5,6 +5,7 @@ import { Skeleton } from '@inngest/components/Skeleton';
 import { IDCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
 import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { cn } from '@inngest/components/utils/classNames';
+import { formatMilliseconds } from '@inngest/components/utils/date';
 import {
   createColumnHelper,
   flexRender,
@@ -18,7 +19,7 @@ import { Time } from '@/components/Time';
 
 export type Run = {
   status: FunctionRunStatus;
-  duration: string;
+  duration: number;
   id: string;
   queuedAt: string;
   endedAt: string;
@@ -195,7 +196,7 @@ const columns = [
       return (
         <div className="flex items-center">
           <TextCell>
-            <p>{duration || '-'}</p>
+            <p>{duration ? formatMilliseconds(duration) : '-'}</p>
           </TextCell>
         </div>
       );
