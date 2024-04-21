@@ -6,7 +6,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useOrganization, useOrganizationList } from '@clerk/nextjs';
 import {
-  ArrowsRightLeftIcon,
   Cog6ToothIcon,
   CreditCardIcon,
   CubeIcon,
@@ -21,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
 import { Skeleton } from '@inngest/components/Skeleton';
+import { RiArrowLeftRightLine } from '@remixicon/react';
 
 export default function OrganizationDropdown() {
   const { isLoaded, organization } = useOrganization();
@@ -79,7 +79,7 @@ export default function OrganizationDropdown() {
         <DropdownMenuGroup className="p-2">
           {userMemberships.count && userMemberships.count > 1 ? (
             <OrganizationDropdownMenuItem
-              icon={ArrowsRightLeftIcon}
+              icon={RiArrowLeftRightLine}
               href="/organization-list"
               label="Switch Organization"
             />
