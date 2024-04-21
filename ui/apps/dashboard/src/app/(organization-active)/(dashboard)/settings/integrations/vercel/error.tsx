@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
-import { ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
+import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { RiLoopLeftLine } from '@remixicon/react';
 import * as Sentry from '@sentry/nextjs';
 
 type VercelIntegrationErrorProps = {
@@ -24,7 +25,7 @@ export default function VercelIntegrationError({ error, reset }: VercelIntegrati
       <Button
         appearance="outlined"
         iconSide="right"
-        icon={<ArrowPathIcon className=" text-slate-700" />}
+        icon={<RiLoopLeftLine className=" text-slate-700" />}
         btnAction={() => reset()}
         label="Reload"
       />

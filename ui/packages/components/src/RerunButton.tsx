@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { ArrowPathIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { RiLoopLeftLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import { cn } from './utils/classNames';
@@ -28,7 +28,7 @@ export function RerunButton(props: Props) {
     <Button
       btnAction={onClick}
       disabled={isLoading}
-      icon={<ArrowPathIcon className={cn(' text-sky-500', isLoading && 'animate-spin')} />}
+      icon={<RiLoopLeftLine className={cn(' text-sky-500', isLoading && 'animate-spin')} />}
       label="Rerun"
       size="small"
     />
