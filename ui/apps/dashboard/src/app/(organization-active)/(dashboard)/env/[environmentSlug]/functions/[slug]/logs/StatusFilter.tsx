@@ -2,7 +2,8 @@
 
 import { Fragment, useRef } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
-import { ChevronDownIcon, XMarkIcon } from '@heroicons/react/20/solid';
+import { XMarkIcon } from '@heroicons/react/20/solid';
+import { RiArrowDownSLine } from '@remixicon/react';
 import { noCase } from 'change-case';
 import { titleCase } from 'title-case';
 
@@ -67,7 +68,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
               <p>Status</p>
               <p className="sr-only">Filter by status</p>
               <span>{statusDots}</span>
-              <ChevronDownIcon className="h-4 w-4" aria-hidden="true" />
+              <RiArrowDownSLine className="h-4 w-4" aria-hidden="true" />
             </Listbox.Button>
 
             <Transition

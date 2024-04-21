@@ -128,7 +128,7 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
                 </>
               ) : (
                 <>
-                  <RiCloudLine className="mr-2 h-4" />
+                  <RiCloudLine className="mr-2 h-4 w-4" />
                   <span className="block truncate">All Environments</span>
                 </>
               )}
@@ -194,7 +194,7 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
                   href="/env"
                   className="flex w-full cursor-pointer items-center gap-2 truncate rounded px-3.5 py-3 text-sm text-slate-50 transition-all hover:bg-slate-700 hover:text-white"
                 >
-                  <RiCloudLine className="h-3" />
+                  <RiCloudLine className="h-3 w-3" />
                   View All Environments
                 </Link>
               </div>

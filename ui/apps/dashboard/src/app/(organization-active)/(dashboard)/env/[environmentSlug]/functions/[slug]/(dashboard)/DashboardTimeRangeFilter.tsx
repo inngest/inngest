@@ -1,6 +1,6 @@
 import { Fragment } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
-import { ChevronDownIcon } from '@heroicons/react/20/solid';
+import { RiArrowDownSLine } from '@remixicon/react';
 import dayjs from 'dayjs';
 import { useQuery } from 'urql';
 
@@ -118,7 +118,7 @@ export default function DashboardTimeRangeFilter({
           <div className="relative">
             <Listbox.Button className="shadow-outline-secondary-light group inline-flex items-center gap-1 rounded-[6px] bg-slate-50 px-3 py-[5px] text-sm font-medium capitalize text-slate-800 hover:bg-slate-100 focus:outline-indigo-500">
               <p>Last {getTimeRangeLabel(selectedTimeRange)}</p>
-              <ChevronDownIcon className="h-4 w-4" aria-hidden="true" />
+              <RiArrowDownSLine className="h-4 w-4" aria-hidden="true" />
             </Listbox.Button>
 
             <Transition
