@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth, useUser } from '@clerk/nextjs';
-import { LifebuoyIcon, MapPinIcon, NewspaperIcon, PowerIcon } from '@heroicons/react/20/solid';
+import { MapPinIcon, NewspaperIcon, PowerIcon } from '@heroicons/react/20/solid';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
 import { Skeleton } from '@inngest/components/Skeleton';
-import { RiSettings3Line } from '@remixicon/react';
+import { RiQuestionLine, RiSettings3Line } from '@remixicon/react';
 
 import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
 import SystemStatusIcon from '@/components/Navigation/SystemStatusIcon';
@@ -71,7 +71,7 @@ export default function UserDropdown() {
             label="Release Notes"
           />
           <OrganizationDropdownMenuItem
-            icon={LifebuoyIcon}
+            icon={RiQuestionLine}
             href="/support"
             label="Contact Support"
           />
