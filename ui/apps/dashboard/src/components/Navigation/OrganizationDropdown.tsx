@@ -5,13 +5,7 @@ import type { Route } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useOrganization, useOrganizationList } from '@clerk/nextjs';
-import {
-  Cog6ToothIcon,
-  CreditCardIcon,
-  CubeIcon,
-  PlusCircleIcon,
-  UserGroupIcon,
-} from '@heroicons/react/20/solid';
+import { CreditCardIcon, CubeIcon, PlusCircleIcon, UserGroupIcon } from '@heroicons/react/20/solid';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
 import { Skeleton } from '@inngest/components/Skeleton';
-import { RiArrowLeftRightLine } from '@remixicon/react';
+import { RiArrowLeftRightLine, RiSettings3Line } from '@remixicon/react';
 
 export default function OrganizationDropdown() {
   const { isLoaded, organization } = useOrganization();
@@ -56,7 +50,7 @@ export default function OrganizationDropdown() {
       >
         <DropdownMenuGroup className="p-2">
           <OrganizationDropdownMenuItem
-            icon={Cog6ToothIcon}
+            icon={RiSettings3Line}
             href="/settings/organization/organization-settings"
             label="Organization Settings"
           />

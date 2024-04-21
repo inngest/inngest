@@ -6,13 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth, useUser } from '@clerk/nextjs';
-import {
-  Cog6ToothIcon,
-  LifebuoyIcon,
-  MapPinIcon,
-  NewspaperIcon,
-  PowerIcon,
-} from '@heroicons/react/20/solid';
+import { LifebuoyIcon, MapPinIcon, NewspaperIcon, PowerIcon } from '@heroicons/react/20/solid';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
 import { Skeleton } from '@inngest/components/Skeleton';
+import { RiSettings3Line } from '@remixicon/react';
 
 import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
 import SystemStatusIcon from '@/components/Navigation/SystemStatusIcon';
@@ -59,7 +54,7 @@ export default function UserDropdown() {
       >
         <DropdownMenuGroup className="p-2">
           <OrganizationDropdownMenuItem
-            icon={Cog6ToothIcon}
+            icon={RiSettings3Line}
             href="/settings/user"
             label="User Settings"
           />

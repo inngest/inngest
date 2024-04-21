@@ -5,12 +5,8 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigation';
 import { Listbox, Transition } from '@headlessui/react';
-import {
-  ChevronUpDownIcon,
-  CloudIcon,
-  Cog6ToothIcon,
-  RocketLaunchIcon,
-} from '@heroicons/react/20/solid';
+import { ChevronUpDownIcon, CloudIcon, RocketLaunchIcon } from '@heroicons/react/20/solid';
+import { RiSettings3Line } from '@remixicon/react';
 
 import { useEnvironments } from '@/queries/environments';
 import cn from '@/utils/cn';
@@ -113,7 +109,7 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
             <span className="flex max-w-full items-center pr-4">
               {isBranchParentSelected ? (
                 <>
-                  <Cog6ToothIcon className="mr-2 h-4" />
+                  <RiSettings3Line className="mr-2 h-4" />
                   <span className="block truncate">Branch Environments</span>
                 </>
               ) : selected ? (
