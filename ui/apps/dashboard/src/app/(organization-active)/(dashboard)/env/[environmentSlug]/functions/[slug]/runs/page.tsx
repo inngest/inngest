@@ -48,7 +48,7 @@ export default function RunsPage() {
     <main className="min-h-0 overflow-y-auto bg-white">
       <div className="flex justify-between gap-2 bg-slate-50 px-8 py-2">
         <StatusFilter
-          selectedStatuses={(filteredStatus as FunctionRunStatus[]) ?? []}
+          selectedStatuses={filteredStatus ? (filteredStatus as FunctionRunStatus[]) : []}
           onStatusesChange={handleStatusesChange}
         />
         {/* TODO: wire button */}

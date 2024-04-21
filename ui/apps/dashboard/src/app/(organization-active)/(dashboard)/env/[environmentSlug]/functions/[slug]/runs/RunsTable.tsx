@@ -38,12 +38,12 @@ export default function RunsTable({ data = [], isLoading, sorting, setSorting }:
   const tableColumns = useMemo(
     () =>
       isLoading
-        ? useColumns().map((column) => ({
+        ? columns.map((column) => ({
             ...column,
             cell: () => <Skeleton className="my-4 block h-4" />,
           }))
-        : useColumns(),
-    [isLoading, data]
+        : columns,
+    [isLoading]
   );
 
   const table = useReactTable({
@@ -131,77 +131,75 @@ export default function RunsTable({ data = [], isLoading, sorting, setSorting }:
   );
 }
 
-function useColumns() {
-  const columnHelper = createColumnHelper<Run>();
+const columnHelper = createColumnHelper<Run>();
 
-  return [
-    columnHelper.accessor('status', {
-      cell: (info) => {
-        const status = info.getValue();
+const columns = [
+  columnHelper.accessor('status', {
+    cell: (info) => {
+      const status = info.getValue();
 
-        return (
-          <div className="flex items-center">
-            <StatusCell status={status}>
-              <FunctionRunStatusIcon status={status} className="h-5 w-5" />
-            </StatusCell>
-          </div>
-        );
-      },
-      header: 'Status',
-    }),
-    columnHelper.accessor('id', {
-      cell: (info) => {
-        const id = info.getValue();
+      return (
+        <div className="flex items-center">
+          <StatusCell status={status}>
+            <FunctionRunStatusIcon status={status} className="h-5 w-5" />
+          </StatusCell>
+        </div>
+      );
+    },
+    header: 'Status',
+  }),
+  columnHelper.accessor('id', {
+    cell: (info) => {
+      const id = info.getValue();
 
-        return (
-          <div className="flex items-center">
-            <IDCell>{id}</IDCell>
-          </div>
-        );
-      },
-      header: 'Run ID',
-    }),
-    columnHelper.accessor('queuedAt', {
-      cell: (info) => {
-        const time = info.getValue();
+      return (
+        <div className="flex items-center">
+          <IDCell>{id}</IDCell>
+        </div>
+      );
+    },
+    header: 'Run ID',
+  }),
+  columnHelper.accessor('queuedAt', {
+    cell: (info) => {
+      const time = info.getValue();
 
-        return (
-          <div className="flex items-center">
-            <TimeCell>
-              <Time value={new Date(time)} />
-            </TimeCell>
-          </div>
-        );
-      },
-      header: 'Queued At',
-    }),
-    columnHelper.accessor('endedAt', {
-      cell: (info) => {
-        const time = info.getValue();
+      return (
+        <div className="flex items-center">
+          <TimeCell>
+            <Time value={new Date(time)} />
+          </TimeCell>
+        </div>
+      );
+    },
+    header: 'Queued At',
+  }),
+  columnHelper.accessor('endedAt', {
+    cell: (info) => {
+      const time = info.getValue();
 
-        return (
-          <div className="flex items-center">
-            <TimeCell>
-              <Time value={new Date(time)} />
-            </TimeCell>
-          </div>
-        );
-      },
-      header: 'Ended At',
-    }),
-    columnHelper.accessor('duration', {
-      cell: (info) => {
-        const duration = info.getValue();
+      return (
+        <div className="flex items-center">
+          <TimeCell>
+            <Time value={new Date(time)} />
+          </TimeCell>
+        </div>
+      );
+    },
+    header: 'Ended At',
+  }),
+  columnHelper.accessor('duration', {
+    cell: (info) => {
+      const duration = info.getValue();
 
-        return (
-          <div className="flex items-center">
-            <TextCell>
-              <p>{duration || '-'}</p>
-            </TextCell>
-          </div>
-        );
-      },
-      header: 'Duration',
-    }),
-  ];
-}
+      return (
+        <div className="flex items-center">
+          <TextCell>
+            <p>{duration || '-'}</p>
+          </TextCell>
+        </div>
+      );
+    },
+    header: 'Duration',
+  }),
+];
