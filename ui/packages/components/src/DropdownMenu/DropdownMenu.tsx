@@ -1,8 +1,9 @@
 'use client';
 
 import { forwardRef } from 'react';
-import { CheckIcon, MinusIcon } from '@heroicons/react/16/solid';
+import { MinusIcon } from '@heroicons/react/16/solid';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
+import { RiCheckLine } from '@remixicon/react';
 
 import { cn } from '../utils/classNames';
 
@@ -63,7 +64,7 @@ export const DropdownMenuCheckboxItem = forwardRef<
       {children}
       <DropdownMenuPrimitive.ItemIndicator>
         {props.checked === 'indeterminate' && <MinusIcon />}
-        {props.checked === true && <CheckIcon />}
+        {props.checked === true && <RiCheckLine />}
       </DropdownMenuPrimitive.ItemIndicator>
     </DropdownMenuPrimitive.CheckboxItem>
   );
@@ -79,7 +80,7 @@ export const DropdownMenuRadioItem = forwardRef<
     <DropdownMenuPrimitive.RadioItem {...props} ref={forwardedRef}>
       {children}
       <DropdownMenuPrimitive.ItemIndicator>
-        <CheckIcon />
+        <RiCheckLine />
       </DropdownMenuPrimitive.ItemIndicator>
     </DropdownMenuPrimitive.RadioItem>
   );

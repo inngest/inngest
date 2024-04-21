@@ -1,7 +1,8 @@
 'use client';
 
-import { CheckIcon, ClockIcon, ExclamationCircleIcon, XMarkIcon } from '@heroicons/react/20/solid';
+import { ClockIcon, ExclamationCircleIcon, XMarkIcon } from '@heroicons/react/20/solid';
 import * as Tooltip from '@radix-ui/react-tooltip';
+import { RiCheckLine } from '@remixicon/react';
 
 type PaymentIconProps = {
   status: String;
@@ -12,7 +13,7 @@ export default function PaymentIcon({ status }: PaymentIconProps) {
   let label;
   switch (status) {
     case 'succeeded':
-      icon = <CheckIcon className="mx-auto w-4 text-teal-500" />;
+      icon = <RiCheckLine className="mx-auto w-4 text-teal-500" />;
       label = 'Paid';
       break;
     case 'requires_payment_method':
