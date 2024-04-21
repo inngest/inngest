@@ -5,7 +5,7 @@ import type { Route } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useOrganization, useOrganizationList } from '@clerk/nextjs';
-import { PlusCircleIcon, UserGroupIcon } from '@heroicons/react/20/solid';
+import { UserGroupIcon } from '@heroicons/react/20/solid';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +15,7 @@ import {
 } from '@inngest/components/DropdownMenu';
 import { Skeleton } from '@inngest/components/Skeleton';
 import {
+  RiAddCircleLine,
   RiArrowLeftRightLine,
   RiBankCardLine,
   RiBox3Line,
@@ -84,7 +85,7 @@ export default function OrganizationDropdown() {
             />
           ) : (
             <OrganizationDropdownMenuItem
-              icon={PlusCircleIcon}
+              icon={RiAddCircleLine}
               href="/create-organization"
               label="Create Organization"
             />
