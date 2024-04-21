@@ -2,11 +2,10 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import ChevronRightIcon from '@heroicons/react/20/solid/ChevronRightIcon';
 import { Link as InngestLink } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiArchive2Line } from '@remixicon/react';
+import { RiArchive2Line, RiArrowRightSLine } from '@remixicon/react';
 
 import { SyncStatusPill } from '@/components/SyncStatusPill';
 import { Time } from '@/components/Time';
@@ -58,7 +57,7 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
             <span className="truncate" title={app.name}>
               {app.name}
             </span>
-            <ChevronRightIcon className="h-4 w-4" />
+            <RiArrowRightSLine className="h-4 w-4" />
           </Link>
         </h2>
         {latestSyncURL && (

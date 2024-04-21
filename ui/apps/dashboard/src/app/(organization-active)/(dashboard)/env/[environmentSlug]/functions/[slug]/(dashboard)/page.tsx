@@ -2,7 +2,7 @@
 
 import type { Route } from 'next';
 import Link from 'next/link';
-import { ChevronRightIcon, XCircleIcon } from '@heroicons/react/20/solid';
+import { XCircleIcon } from '@heroicons/react/20/solid';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
@@ -10,7 +10,7 @@ import { useCron } from '@inngest/components/hooks/useCron';
 import { IconClock } from '@inngest/components/icons/Clock';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
-import { RiBarChart2Fill } from '@remixicon/react';
+import { RiArrowRightSLine, RiBarChart2Fill } from '@remixicon/react';
 import { ErrorBoundary } from '@sentry/nextjs';
 import { titleCase } from 'title-case';
 
@@ -185,7 +185,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                         />
                       )}
                     </div>
-                    <ChevronRightIcon className="h-5" />
+                    <RiArrowRightSLine className="h-5" />
                   </div>
                 </Link>
               </Block>
@@ -224,7 +224,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                               )}
                             </dl>
                           </div>
-                          <ChevronRightIcon className="h-5" />
+                          <RiArrowRightSLine className="h-5" />
                         </div>
                       </Link>
                     ) : trigger.schedule ? (
@@ -280,7 +280,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                                   )}
                                 </dl>
                               </div>
-                              <ChevronRightIcon className="h-5" />
+                              <RiArrowRightSLine className="h-5" />
                             </div>
                           </Link>
                         );
@@ -304,7 +304,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                             <p className="truncate font-medium">{function_.failureHandler.name}</p>
                           </div>
                         </div>
-                        <ChevronRightIcon className="h-5" />
+                        <RiArrowRightSLine className="h-5" />
                       </div>
                     </Link>
                   </div>

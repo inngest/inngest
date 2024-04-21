@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRightIcon, CodeBracketSquareIcon } from '@heroicons/react/20/solid';
+import { CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { Alert } from '@inngest/components/Alert';
-import { RiBarChart2Fill } from '@remixicon/react';
+import { RiArrowRightSLine, RiBarChart2Fill } from '@remixicon/react';
 import colors from 'tailwindcss/colors';
 
 import Block from '@/components/Block';
@@ -88,7 +88,7 @@ export default function EventDashboard({ params }: EventDashboardProps) {
                         />
                       )}
                     </div>
-                    <ChevronRightIcon className="h-5" />
+                    <RiArrowRightSLine className="h-5" />
                   </div>
                 </Link>
               ))

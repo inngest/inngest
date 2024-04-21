@@ -1,10 +1,11 @@
 import Link from 'next/link';
-import { ChevronRightIcon, CodeBracketSquareIcon } from '@heroicons/react/20/solid';
+import { CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { IconStatusCanceled } from '@inngest/components/icons/status/Canceled';
 import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
 import { IconStatusFailed } from '@inngest/components/icons/status/Failed';
 import { IconStatusQueued } from '@inngest/components/icons/status/Queued';
 import { IconStatusRunning } from '@inngest/components/icons/status/Running';
+import { RiArrowRightSLine } from '@remixicon/react';
 import { noCase } from 'change-case';
 import { titleCase } from 'title-case';
 
@@ -92,7 +93,7 @@ export default async function TriggeredFunctionCard({
         </dl>
       </div>
       <div className="shrink-0">
-        <ChevronRightIcon className="h-5 w-5 text-slate-400" />
+        <RiArrowRightSLine className="h-5 w-5 text-slate-400" />
       </div>
     </Link>
   );
