@@ -5,8 +5,8 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigation';
 import { Listbox, Transition } from '@headlessui/react';
-import { ChevronUpDownIcon, CloudIcon, RocketLaunchIcon } from '@heroicons/react/20/solid';
-import { RiSettings3Line } from '@remixicon/react';
+import { ChevronUpDownIcon, RocketLaunchIcon } from '@heroicons/react/20/solid';
+import { RiCloudLine, RiSettings3Line } from '@remixicon/react';
 
 import { useEnvironments } from '@/queries/environments';
 import cn from '@/utils/cn';
@@ -128,7 +128,7 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
                 </>
               ) : (
                 <>
-                  <CloudIcon className="mr-2 h-4" />
+                  <RiCloudLine className="mr-2 h-4" />
                   <span className="block truncate">All Environments</span>
                 </>
               )}
@@ -194,7 +194,7 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
                   href="/env"
                   className="flex w-full cursor-pointer items-center gap-2 truncate rounded px-3.5 py-3 text-sm text-slate-50 transition-all hover:bg-slate-700 hover:text-white"
                 >
-                  <CloudIcon className="h-3" />
+                  <RiCloudLine className="h-3" />
                   View All Environments
                 </Link>
               </div>
