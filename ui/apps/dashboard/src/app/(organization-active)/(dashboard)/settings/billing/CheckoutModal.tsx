@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { CreditCardIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
+import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
+import { RiBankCardLine } from '@remixicon/react';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { useMutation } from 'urql';
@@ -38,7 +39,7 @@ export default function CheckoutModal({ items, onCancel, onSuccess }: CheckoutMo
   return (
     <Modal className="flex min-w-[600px] max-w-xl flex-col gap-4" isOpen={true} onClose={onCancel}>
       <header className="flex flex-row items-center gap-3">
-        <CreditCardIcon className="h-5 text-indigo-500" />
+        <RiBankCardLine className="h-5 text-indigo-500" />
         <h2 className="text-lg font-semibold">Upgrade to {planName}</h2>
       </header>
 
