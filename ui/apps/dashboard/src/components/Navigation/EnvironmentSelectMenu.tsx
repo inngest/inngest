@@ -5,8 +5,8 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigation';
 import { Listbox, Transition } from '@headlessui/react';
-import { ChevronUpDownIcon, RocketLaunchIcon } from '@heroicons/react/20/solid';
-import { RiCloudLine, RiSettings3Line } from '@remixicon/react';
+import { RocketLaunchIcon } from '@heroicons/react/20/solid';
+import { RiCloudLine, RiExpandUpDownLine, RiSettings3Line } from '@remixicon/react';
 
 import { useEnvironments } from '@/queries/environments';
 import cn from '@/utils/cn';
@@ -73,7 +73,7 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
         <div className="font-regular flex h-full  w-28 items-center gap-0.5 py-1.5 pl-4 pr-4 text-sm  tracking-wide text-white hover:bg-slate-800 lg:w-36 xl:w-[180px]">
           <span className="text-shadow pr-4 text-sm font-medium text-white">Loading...</span>
           <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
-            <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+            <RiExpandUpDownLine className="h-5 w-5 text-gray-400" aria-hidden="true" />
           </span>
         </div>
       </div>
@@ -134,7 +134,7 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
               )}
             </span>
             <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
-              <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+              <RiExpandUpDownLine className="h-5 w-5 text-gray-400" aria-hidden="true" />
             </span>
           </Listbox.Button>
 
