@@ -17,7 +17,6 @@ export function Card({ accentColor, accentPosition = 'top', children, className 
   if (accentColor) {
     if (accentPosition === 'left') {
       // The left border is the responsibility of the accent
-      // accentClass = 'rounded-l-md border-l';
       accentClass = 'rounded-l-md';
       contentClass = 'rounded-r-md border-l-0';
 
@@ -25,7 +24,6 @@ export function Card({ accentColor, accentPosition = 'top', children, className 
       wrapperClass = 'flex';
     } else if (accentPosition === 'top') {
       // The top border is the responsibility of the accent
-      // accentClass = 'rounded-t-md border-t';
       accentClass = 'rounded-t-md';
       contentClass = 'rounded-b-md border-t-0';
     }
