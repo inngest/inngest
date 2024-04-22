@@ -195,9 +195,7 @@ const columns = [
 
       return (
         <div className="flex items-center">
-          <TextCell>
-            <p>{duration ? formatMilliseconds(duration) : '-'}</p>
-          </TextCell>
+          <TextCell>{duration ? formatMilliseconds(duration) : '-'}</TextCell>
         </div>
       );
     },

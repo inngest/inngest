@@ -18,9 +18,9 @@ export function TimeCell({ children }: React.PropsWithChildren) {
 export function StatusCell({ status, children }: React.PropsWithChildren<{ status: string }>) {
   // TODO: Use new runs circles and colors instead of passing FunctionRunStatusIcon as children
   return (
-    <p className={cn(cellStyles, 'flex items-center gap-2.5 font-medium')}>
+    <div className={cn(cellStyles, 'flex items-center gap-2.5 font-medium')}>
       {children}
       <p className="lowercase first-letter:capitalize">{status}</p>
-    </p>
+    </div>
   );
 }

@@ -45,7 +45,7 @@ export default function RunsPage() {
   }
 
   const environment = useEnvironment();
-  const [{ data, fetching: fetchingRuns }] = useQuery({
+  const [{ data, fetching: fetchingRuns }, refetch] = useQuery({
     query: GetRunsDocument,
     variables: {
       environmentID: environment.id,
@@ -73,7 +73,7 @@ export default function RunsPage() {
           onStatusesChange={handleStatusesChange}
         />
         {/* TODO: wire button */}
-        <Button label="Refresh" appearance="text" icon={<RiLoopLeftLine />} />
+        <Button label="Refresh" appearance="text" btnAction={refetch} icon={<RiLoopLeftLine />} />
       </div>
       {/* @ts-ignore */}
       <RunsTable data={runs} isLoading={fetchingRuns} />
