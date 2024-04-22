@@ -50,7 +50,7 @@ export default function RunsPage() {
     variables: {
       environmentID: environment.id,
       startTime: '2024-04-19T11:26:03.203Z',
-      status: (filteredStatus as FunctionRunStatus[]) || undefined,
+      status: filteredStatus ? (filteredStatus as FunctionRunStatus[]) : null,
     },
   });
 
