@@ -26,6 +26,7 @@
     "@radix-ui/react-select": "1.2.2",
     "@radix-ui/react-switch": "1.0.3",
     "@radix-ui/react-tooltip": "1.0.6",
+    "@remixicon/react": "4.2.0",
     "@tanstack/react-table": "8.9.3",
     "croner": "7.0.5",
     "date-fns": "3.6.0",

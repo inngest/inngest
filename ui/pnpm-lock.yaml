@@ -71,6 +71,9 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: 1.0.6
         version: 1.0.6(@types/react-dom@18.2.4)(@types/react@18.2.11)(react-dom@18.2.0)(react@18.2.0)
+      '@remixicon/react':
+        specifier: 4.2.0
+        version: 4.2.0(react@18.2.0)
       '@sentry/nextjs':
         specifier: 7.88.0
         version: 7.88.0(next@14.0.3)(react@18.2.0)(webpack@5.90.1)
@@ -294,6 +297,9 @@ importers:
       '@reduxjs/toolkit':
         specifier: 1.9.0
         version: 1.9.0(react-redux@8.0.5)(react@18.2.0)
+      '@remixicon/react':
+        specifier: 4.2.0
+        version: 4.2.0(react@18.2.0)
       '@rtk-query/graphql-request-base-query':
         specifier: 2.2.0
         version: 2.2.0(@reduxjs/toolkit@1.9.0)(graphql@16.8.1)
@@ -469,6 +475,9 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: 1.0.6
         version: 1.0.6(@types/react-dom@18.2.4)(@types/react@18.2.11)(react-dom@18.2.0)(react@18.2.0)
+      '@remixicon/react':
+        specifier: 4.2.0
+        version: 4.2.0(react@18.2.0)
       '@tanstack/react-table':
         specifier: 8.9.3
         version: 8.9.3(react-dom@18.2.0)(react@18.2.0)
@@ -6758,6 +6767,14 @@ packages:
       redux: 4.2.1
       redux-thunk: 2.4.2(redux@4.2.1)
       reselect: 4.1.8
+
+  /@remixicon/react@4.2.0(react@18.2.0):
+    resolution: {integrity: sha512-eGhKpZ88OU0qkcY9pJu6khBmItDV82nU130E6C68yc+FbljueHlUYy/4CrJsmf860RIDMay2Rpzl27OSJ81miw==}
+    peerDependencies:
+      react: '>=18.2.0'
+    dependencies:
+      react: 18.2.0
+    dev: false
 
   /@repeaterjs/repeater@3.0.4:
     resolution: {integrity: sha512-AW8PKd6iX3vAZ0vA43nOUOnbq/X5ihgU+mSXXqunMkeQADGiqw/PY0JNeYtD5sr0PAy51YPgAPbDoeapv9r8WA==}
