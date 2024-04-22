@@ -39,10 +39,10 @@ func Sign(ctx context.Context, at time.Time, key, body []byte) string {
 	return fmt.Sprintf("t=%d&s=%s", ts, sig)
 }
 
-// ValidateSignature ensures that the signature for the given body is signed with
+// validateSignature ensures that the signature for the given body is signed with
 // the given key within a given time period to prevent invalid requests or
 // replay attacks.
-func ValidateSignature(ctx context.Context, sig string, key, body []byte) (bool, error) {
+func validateSignature(ctx context.Context, sig string, key, body []byte) (bool, error) {
 	key = normalizeKey(key)
 
 	val, err := url.ParseQuery(sig)
@@ -64,6 +64,29 @@ func ValidateSignature(ctx context.Context, sig string, key, body []byte) (bool,
 	}
 
 	return true, nil
+}
+
+// ValidateSignature ensures that the signature for the given body is signed with
+// the given key within a given time period to prevent invalid requests or
+// replay attacks. A signing key fallback is used if provided
+func ValidateSignature(
+	ctx context.Context,
+	sig string,
+	signingKey string,
+	signingKeyFallback string,
+	body []byte,
+) (bool, error) {
+	if IsDev() {
+		return true, nil
+	}
+
+	valid, err := validateSignature(ctx, sig, []byte(signingKey), body)
+	if !valid && signingKeyFallback != "" {
+		// Validation failed with the primary key, so try the fallback key
+		valid, err = validateSignature(ctx, sig, []byte(signingKeyFallback), body)
+	}
+
+	return valid, err
 }
 
 func normalizeKey(key []byte) []byte {

@@ -48,7 +48,7 @@ func init() {
 	// If the ENV_EVENT_URL isn't specified default to the API url, assuming that this
 	// is the dev server and runs both APIs.
 	if os.Getenv(ENV_EVENT_URL) == "" {
-		os.Setenv(ENV_EVENT_URL, apiURL.String())
+		_ = os.Setenv(ENV_EVENT_URL, apiURL.String())
 	}
 	eventURL = parseEnvURL(ENV_EVENT_URL)
 	signingKey = os.Getenv(ENV_SIGNING_KEY)
@@ -105,7 +105,7 @@ func run(t *testing.T, test *Test) {
 	mux.HandleFunc("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Ignore ping requests
 		if r.Method == http.MethodPut {
-			r.Body.Close()
+			_ = r.Body.Close()
 			return
 		}
 
@@ -114,7 +114,7 @@ func run(t *testing.T, test *Test) {
 		fmt.Printf(" ==> Received executor request:\n\t%s\n", string(byt))
 
 		// Recreate reader to re-read in assertion, then pass to assertion.
-		r.Body.Close()
+		_ = r.Body.Close()
 		r.Body = io.NopCloser(bytes.NewReader(byt))
 
 		select {
@@ -143,7 +143,7 @@ func run(t *testing.T, test *Test) {
 		byt, err = io.ReadAll(rdr)
 		require.NoError(t, err)
 
-		sdkResponse.Body.Close()
+		_ = sdkResponse.Body.Close()
 		sdkResponse.Body = io.NopCloser(bytes.NewReader(byt))
 
 		fmt.Printf(" ==> Received SDK response:\n\t%s\n", string(byt))
