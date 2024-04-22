@@ -94,17 +94,14 @@ export default function Page() {
 
               <Alert severity="warning">
                 <p className="mb-2">
-                  Rotation will be zero downtime if your SDK version meets the minimum:
+                  Rotation may cause downtime if your SDK does not meet the minimum version.
+                  <Link
+                    internalNavigation={false}
+                    href="https://www.inngest.com/docs/security#rotation"
+                  >
+                    Learn More
+                  </Link>
                 </p>
-
-                <div className="grid w-fit grid-cols-2 gap-x-4 gap-y-1">
-                  <div>Go</div>
-                  <div>0.7.2</div>
-                  <div>Python</div>
-                  <div>0.3.9</div>
-                  <div>TypeScript</div>
-                  <div>3.18.0</div>
-                </div>
               </Alert>
             </Card.Content>
           </Card>

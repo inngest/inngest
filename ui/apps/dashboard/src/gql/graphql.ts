@@ -454,7 +454,7 @@ export type FunctionRunV2 = {
   functionID: Scalars['UUID'];
   id: Scalars['ULID'];
   isBatch: Scalars['Boolean'];
-  output: Scalars['Bytes'];
+  output: Maybe<Scalars['Bytes']>;
   queuedAt: Scalars['Time'];
   sourceID: Maybe<Scalars['String']>;
   startedAt: Maybe<Scalars['Time']>;
