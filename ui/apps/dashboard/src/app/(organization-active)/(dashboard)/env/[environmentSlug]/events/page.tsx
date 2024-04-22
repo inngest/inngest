@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { ChartBarIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
+import { RiBarChart2Fill } from '@remixicon/react';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import SendEventButton from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/events/[eventName]/SendEventButton';
@@ -157,7 +157,7 @@ function EventTypesListPaginationPage({
             <td className="w-60 py-1 pl-2 pr-6">
               <div className="flex w-56 items-center justify-end gap-2">
                 <div className="flex items-center gap-1 align-middle text-slate-600">
-                  <ChartBarIcon className="-ml-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                  <RiBarChart2Fill className="-ml-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
                   <span className="overflow-hidden whitespace-nowrap text-sm text-slate-600">
                     {dailyVolume.toLocaleString(undefined, {
                       notation: 'compact',

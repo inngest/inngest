@@ -3,10 +3,10 @@
 import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { RiTimeLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { Time } from '@/components/Time';
-import ClockIcon from '@/icons/ClockIcon';
 import cn from '@/utils/cn';
 import { getManageKey } from '@/utils/urls';
 
@@ -54,7 +54,7 @@ export default function KeysListItem({ list }: KeysListItemProps) {
             >
               <p className="mb-1 text-sm font-semibold text-slate-800">{key.name}</p>
               <div className="flex items-center gap-1">
-                <ClockIcon />
+                <RiTimeLine className="h-4 w-4" />
 
                 <Time
                   className="truncate text-sm text-slate-700"

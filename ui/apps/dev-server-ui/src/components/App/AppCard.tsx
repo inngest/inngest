@@ -4,11 +4,11 @@ import { Button } from '@inngest/components/Button';
 import { CodeLine } from '@inngest/components/CodeLine';
 import { Link } from '@inngest/components/Link/Link';
 import { AlertModal } from '@inngest/components/Modal';
-import { IconChevron } from '@inngest/components/icons/Chevron';
 import { IconStatusCanceled } from '@inngest/components/icons/status/Canceled';
 import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
 import { IconStatusFailed } from '@inngest/components/icons/status/Failed';
 import { cn } from '@inngest/components/utils/classNames';
+import { RiArrowDownSLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import AppCardHeader from '@/components/App/AppCardHeader';
@@ -133,7 +133,7 @@ export default function AppCard({ app }: { app: App }) {
               </div>
               <div className="flex items-center gap-4">
                 <p className="xl:ui-open:hidden hidden text-slate-300 xl:flex">{app.url}</p>
-                <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500 transition-transform duration-500" />
+                <RiArrowDownSLine className="ui-open:-rotate-180 transform-90 text-slate-500 transition-transform duration-500" />
               </div>
             </>
           }
@@ -226,7 +226,7 @@ export default function AppCard({ app }: { app: App }) {
                     View Functions
                   </Link>
                 )}
-                <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500 transition-transform duration-500" />
+                <RiArrowDownSLine className="ui-open:-rotate-180 transform-90 text-slate-500 transition-transform duration-500" />
               </div>
             </>
           }

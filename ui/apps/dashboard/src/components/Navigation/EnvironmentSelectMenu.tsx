@@ -5,12 +5,8 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigation';
 import { Listbox, Transition } from '@headlessui/react';
-import {
-  ChevronUpDownIcon,
-  CloudIcon,
-  Cog6ToothIcon,
-  RocketLaunchIcon,
-} from '@heroicons/react/20/solid';
+import { RocketLaunchIcon } from '@heroicons/react/20/solid';
+import { RiCloudLine, RiExpandUpDownLine, RiSettings3Line } from '@remixicon/react';
 
 import { useEnvironments } from '@/queries/environments';
 import cn from '@/utils/cn';
@@ -77,7 +73,7 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
         <div className="font-regular flex h-full  w-28 items-center gap-0.5 py-1.5 pl-4 pr-4 text-sm  tracking-wide text-white hover:bg-slate-800 lg:w-36 xl:w-[180px]">
           <span className="text-shadow pr-4 text-sm font-medium text-white">Loading...</span>
           <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
-            <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+            <RiExpandUpDownLine className="h-5 w-5 text-gray-400" aria-hidden="true" />
           </span>
         </div>
       </div>
@@ -113,7 +109,7 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
             <span className="flex max-w-full items-center pr-4">
               {isBranchParentSelected ? (
                 <>
-                  <Cog6ToothIcon className="mr-2 h-4" />
+                  <RiSettings3Line className="mr-2 h-4" />
                   <span className="block truncate">Branch Environments</span>
                 </>
               ) : selected ? (
@@ -132,13 +128,13 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
                 </>
               ) : (
                 <>
-                  <CloudIcon className="mr-2 h-4" />
+                  <RiCloudLine className="mr-2 h-4 w-4" />
                   <span className="block truncate">All Environments</span>
                 </>
               )}
             </span>
             <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
-              <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+              <RiExpandUpDownLine className="h-5 w-5 text-gray-400" aria-hidden="true" />
             </span>
           </Listbox.Button>
 
@@ -198,7 +194,7 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
                   href="/env"
                   className="flex w-full cursor-pointer items-center gap-2 truncate rounded px-3.5 py-3 text-sm text-slate-50 transition-all hover:bg-slate-700 hover:text-white"
                 >
-                  <CloudIcon className="h-3" />
+                  <RiCloudLine className="h-3 w-3" />
                   View All Environments
                 </Link>
               </div>

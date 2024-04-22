@@ -2,8 +2,9 @@
 
 import type { Route } from 'next';
 import Image from 'next/image';
-import { ClipboardIcon, ExclamationTriangleIcon } from '@heroicons/react/20/solid';
+import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { RiClipboardLine } from '@remixicon/react';
 import { useCopyToClipboard } from 'react-use';
 import { toast } from 'sonner';
 
@@ -20,7 +21,7 @@ export default function FunctionListNotFound() {
     copy(command);
     toast.message(
       <>
-        <ClipboardIcon className="h-3" /> Copied to clipboard!
+        <RiClipboardLine className="h-3 w-3" /> Copied to clipboard!
       </>
     );
   }
@@ -59,7 +60,7 @@ export default function FunctionListNotFound() {
               ease.
             </p>
             <div className="mt-4 flex flex-row gap-2 rounded-lg bg-slate-800 px-3 py-2 font-mono text-sm text-white">
-              <ClipboardIcon onClick={copyCommand} className="w-3 cursor-pointer" />
+              <RiClipboardLine onClick={copyCommand} className="h-3 w-3 cursor-pointer" />
               <span>{command}</span>
             </div>
           </div>

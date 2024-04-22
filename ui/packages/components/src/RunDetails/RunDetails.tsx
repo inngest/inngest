@@ -6,11 +6,11 @@ import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon
 import { MetadataGrid } from '@inngest/components/Metadata';
 import { OutputCard } from '@inngest/components/OutputCard';
 import { Timeline } from '@inngest/components/Timeline';
-import { IconClock } from '@inngest/components/icons/Clock';
 import type { Function } from '@inngest/components/types/function';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
 import type { FunctionVersion } from '@inngest/components/types/functionVersion';
 import type { HistoryParser } from '@inngest/components/utils/historyParser';
+import { RiTimeLine } from '@remixicon/react';
 
 import { CancelRunButton } from '../CancelRunButton';
 import { RerunButton } from '../RerunButton';
@@ -84,7 +84,7 @@ export function RunDetails({
         cron ? (
           <div className="py-2">
             <Badge className="bg-orange-400/10 text-orange-400" kind="solid">
-              <IconClock />
+              <RiTimeLine className="h-4 w-4" />
               {firstTrigger.value}
             </Badge>
           </div>

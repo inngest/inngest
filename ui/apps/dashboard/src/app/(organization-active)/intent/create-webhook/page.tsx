@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowRightIcon } from '@heroicons/react/20/solid';
+import { RiArrowRightLine } from '@remixicon/react';
 import slugify from '@sindresorhus/slugify';
 import { capitalCase } from 'change-case';
 import { useMutation } from 'urql';
@@ -168,7 +168,7 @@ export default function Page() {
       }
       graphic={
         <>
-          <ArrowRightIcon className="w-16 text-indigo-400" />
+          <RiArrowRightLine className="w-16 text-indigo-400" />
           <WebhookIcon className="w-16 text-indigo-400" />
         </>
       }

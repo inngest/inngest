@@ -1,11 +1,10 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
-import ArrowRightIcon from '@heroicons/react/20/solid/ArrowRightIcon';
-import ChevronDownIcon from '@heroicons/react/20/solid/ChevronDownIcon';
 import { Button } from '@inngest/components/Button';
 import { defaultLinkStyles } from '@inngest/components/Link';
 import type { Function } from '@inngest/components/types/function';
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiArrowDownSLine, RiArrowRightLine } from '@remixicon/react';
 import { useLocalStorage } from 'react-use';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
@@ -68,7 +67,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                 className="group"
                 appearance="outlined"
                 icon={
-                  <ChevronDownIcon className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
+                  <RiArrowDownSLine className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
                 }
               />
             </CollapsibleCardTrigger>
@@ -85,14 +84,14 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                       key={fn.id}
                     >
                       <div
-                        className={classNames(
+                        className={cn(
                           defaultLinkStyles,
                           'group flex w-full items-center gap-2 border-slate-200 py-3 pl-6 pr-2 text-sm font-medium hover:bg-slate-100',
                           !isLast && 'border-b'
                         )}
                       >
                         {fn.name}
-                        <ArrowRightIcon className="h-3 w-3 -translate-x-3 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+                        <RiArrowRightLine className="h-3 w-3 -translate-x-3 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
                       </div>
                     </Link>
                   );
@@ -118,7 +117,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                 className="group"
                 appearance="outlined"
                 icon={
-                  <ChevronDownIcon className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
+                  <RiArrowDownSLine className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
                 }
               />
             </CollapsibleCardTrigger>
@@ -134,14 +133,14 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                     key={fn.id}
                   >
                     <div
-                      className={classNames(
+                      className={cn(
                         defaultLinkStyles,
                         'group flex w-full items-center gap-2 border-slate-200 py-3 pl-6 pr-2 text-sm font-medium hover:bg-slate-100',
                         !isLast && 'border-b'
                       )}
                     >
                       {fn.name}
-                      <ArrowRightIcon className="h-3 w-3 -translate-x-3 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+                      <RiArrowRightLine className="h-3 w-3 -translate-x-3 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
                     </div>
                   </Link>
                 );

@@ -1,4 +1,4 @@
-import { Cog6ToothIcon } from '@heroicons/react/20/solid';
+import { RiSettings3Line } from '@remixicon/react';
 
 import Header from '@/components/Header/Header';
 import AppNavigation from '@/components/Navigation/AppNavigation';
@@ -36,7 +36,7 @@ export default async function SettingsLayout({ children }: SettingsLayoutProps) 
       <Header
         title="Settings"
         links={navLinks}
-        icon={<Cog6ToothIcon className="w-4 text-white" />}
+        icon={<RiSettings3Line className="w-4 text-white" />}
       />
       {children}
       <Toaster />

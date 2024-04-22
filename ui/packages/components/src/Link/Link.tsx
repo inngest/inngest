@@ -1,9 +1,9 @@
 import type { UrlObject } from 'url';
 import type { Route } from 'next';
 import NextLink from 'next/link';
-import { IconArrowRight } from '@inngest/components/icons/ArrowRight';
 import { IconArrowTopRightOnSquare } from '@inngest/components/icons/ArrowTopRightOnSquare';
 import { classNames } from '@inngest/components/utils/classNames';
+import { RiArrowRightLine } from '@remixicon/react';
 
 type LinkProps = {
   internalNavigation?: boolean;
@@ -35,7 +35,7 @@ export function Link({
       >
         {children}
         {showIcon && (
-          <IconArrowRight className="h-3 w-3 -translate-x-3 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+          <RiArrowRightLine className="h-3 w-3 -translate-x-3 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
         )}
       </NextLink>
     );

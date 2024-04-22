@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { Table } from '@inngest/components/Table';
-import { IconArrowRight } from '@inngest/components/icons/ArrowRight';
+import { RiArrowRightLine } from '@remixicon/react';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 
 import { Time } from '@/components/Time';
@@ -40,7 +40,7 @@ function useColumns(onSelect: (eventID: string) => void) {
             onClick={() => onSelect(id)}
           >
             {id}
-            <IconArrowRight className="h-3 w-3 -translate-x-3 text-indigo-400 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+            <RiArrowRightLine className="h-3 w-3 -translate-x-3 text-indigo-400 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
           </button>
         );
       },

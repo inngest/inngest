@@ -4,8 +4,9 @@ import { useState } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@headlessui/react';
-import { ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
+import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { RiLoopLeftLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import {
@@ -78,7 +79,7 @@ export default function VercelIntegrationForm({ vercelIntegration }: VercelInteg
             <Button
               appearance="outlined"
               btnAction={() => router.refresh()}
-              icon={<ArrowPathIcon className=" text-slate-500" />}
+              icon={<RiLoopLeftLine className=" text-slate-500" />}
               label="Refresh Project List"
             />
             <Button

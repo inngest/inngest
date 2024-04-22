@@ -7,13 +7,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth, useUser } from '@clerk/nextjs';
 import {
-  Cog6ToothIcon,
-  LifebuoyIcon,
-  MapPinIcon,
-  NewspaperIcon,
-  PowerIcon,
-} from '@heroicons/react/20/solid';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
@@ -21,6 +14,13 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
 import { Skeleton } from '@inngest/components/Skeleton';
+import {
+  RiMapPinLine,
+  RiNewspaperLine,
+  RiQuestionLine,
+  RiSettings3Line,
+  RiShutDownLine,
+} from '@remixicon/react';
 
 import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
 import SystemStatusIcon from '@/components/Navigation/SystemStatusIcon';
@@ -59,24 +59,24 @@ export default function UserDropdown() {
       >
         <DropdownMenuGroup className="p-2">
           <OrganizationDropdownMenuItem
-            icon={Cog6ToothIcon}
+            icon={RiSettings3Line}
             href="/settings/user"
             label="User Settings"
           />
         </DropdownMenuGroup>
         <DropdownMenuGroup className="p-2">
           <OrganizationDropdownMenuItem
-            icon={MapPinIcon}
+            icon={RiMapPinLine}
             href="https://roadmap.inngest.com/roadmap"
             label="Roadmap"
           />
           <OrganizationDropdownMenuItem
-            icon={NewspaperIcon}
+            icon={RiNewspaperLine}
             href="https://roadmap.inngest.com/changelog"
             label="Release Notes"
           />
           <OrganizationDropdownMenuItem
-            icon={LifebuoyIcon}
+            icon={RiQuestionLine}
             href="/support"
             label="Contact Support"
           />
@@ -88,7 +88,7 @@ export default function UserDropdown() {
         </DropdownMenuGroup>
         <DropdownMenuGroup className="p-2">
           <OrganizationDropdownMenuItem
-            icon={PowerIcon}
+            icon={RiShutDownLine}
             onSelect={() =>
               signOut(() =>
                 router.push((process.env.NEXT_PUBLIC_SIGN_IN_PATH || '/sign-in') as Route)

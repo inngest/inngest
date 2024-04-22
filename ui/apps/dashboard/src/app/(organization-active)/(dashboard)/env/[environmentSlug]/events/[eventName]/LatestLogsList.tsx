@@ -1,8 +1,8 @@
 import { type Route } from 'next';
 import Link from 'next/link';
-import { KeyIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { Pill } from '@inngest/components/Pill';
+import { RiKey2Fill } from '@remixicon/react';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
@@ -109,7 +109,7 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
                       </td>
                       <td>
                         <Pill>
-                          <KeyIcon className="h-4 pr-1 text-indigo-500" />
+                          <RiKey2Fill className="h-4 pr-1 text-indigo-500" />
                           {e.source?.name}
                         </Pill>
                       </td>
