@@ -19,7 +19,7 @@ import { Time } from '@/components/Time';
 
 export type Run = {
   status: FunctionRunStatus;
-  duration: number;
+  durationMS: number;
   id: string;
   queuedAt: string;
   endedAt: string;
@@ -189,7 +189,7 @@ const columns = [
     },
     header: 'Ended At',
   }),
-  columnHelper.accessor('duration', {
+  columnHelper.accessor('durationMS', {
     cell: (info) => {
       const duration = info.getValue();
 
