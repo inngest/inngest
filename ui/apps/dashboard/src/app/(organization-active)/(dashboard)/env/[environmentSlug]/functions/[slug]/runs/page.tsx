@@ -12,9 +12,12 @@ import StatusFilter from '../logs/StatusFilter';
 import RunsTable from './RunsTable';
 
 const GetRunsDocument = graphql(`
-  query GetRuns($environmentID: ID!, $startTime: Time!) {
+  query GetRuns($environmentID: ID!, $startTime: Time!, $status: [FunctionRunStatus!]) {
     environment: workspace(id: $environmentID) {
-      runs(filter: { from: $startTime }, orderBy: [{ field: QUEUED_AT, direction: ASC }]) {
+      runs(
+        filter: { from: $startTime, status: $status }
+        orderBy: [{ field: QUEUED_AT, direction: ASC }]
+      ) {
         edges {
           node {
             id
@@ -47,7 +50,7 @@ export default function RunsPage() {
     variables: {
       environmentID: environment.id,
       startTime: '2024-04-19T11:26:03.203Z',
-      // filter: filtering,
+      status: (filteredStatus as FunctionRunStatus[]) || undefined,
     },
   });
 
