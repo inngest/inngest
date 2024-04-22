@@ -71,13 +71,17 @@ type Throttle struct {
 	// minimum limit is 1.
 	Limit uint `json:"limit"`
 	// Period represents the time period for throttling the function.  The minimum
-	// granularity is a single second.
+	// granularity is 1 second.  Run starts are spaced evenly through the given period.
 	Period time.Duration `json:"period"`
-	// Burst...
+	// Burst is number of runs allowed to start in the given window, in a single burst,
+	// before throttling applies.
+	//
+	// A burst > 1 bypasses smoothing for the burst and allows many runs to start
+	// at once, if desired.  Defaults to 1, which disables bursting.
 	Burst uint `json:"burst"`
 	// Key is an optional string to constrain throttling using event data.  For
 	// example, if you want to throttle incoming notifications based off of a user's
-	// ID in an event you can use the following key: "{{ event.user.id }}".  This ensures
+	// ID in an event you can use the following key: "event.user.id".  This ensures
 	// that we throttle functions for each user independently.
 	Key *string `json:"key,omitempty"`
 }
@@ -87,10 +91,10 @@ type RateLimit struct {
 	Limit uint `json:"limit"`
 	// Period represents the time period for throttling the function
 	Period time.Duration `json:"period"`
-	// Key is an optional string to constrain throttling using event data.  For
-	// example, if you want to throttle incoming notifications based off of a user's
-	// ID in an event you can use the following key: "{{ event.user.id }}".  This ensures
-	// that we throttle functions for each user independently.
+	// Key is an optional string to constrain rate limiting using event data.  For
+	// example, if you want to rate limit incoming notifications based off of a user's
+	// ID in an event you can use the following key: "event.user.id".  This ensures
+	// that we rate limit functions for each user independently.
 	Key *string `json:"key,omitempty"`
 }
 

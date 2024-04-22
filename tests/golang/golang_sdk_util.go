@@ -2,7 +2,6 @@ package golang
 
 import (
 	"fmt"
-	"log/slog"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slog"
 )
 
 const DEV_URL = "http://127.0.0.1:8288"
@@ -28,7 +28,7 @@ func NewSDKHandler(t *testing.T, appID string, hopts ...opt) (inngestgo.Handler,
 		EventKey: &key,
 	})
 
-	os.Setenv("INNGEST_DEV", DEV_URL)
+	_ = os.Setenv("INNGEST_DEV", DEV_URL)
 
 	opts := inngestgo.HandlerOpts{
 		RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),

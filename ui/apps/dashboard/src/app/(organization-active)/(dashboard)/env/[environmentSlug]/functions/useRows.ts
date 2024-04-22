@@ -44,7 +44,11 @@ export function useRows({ archived }: { archived: boolean }): Output {
 
   // Append new function data.
   useEffect(() => {
-    if (functionsRes.data && functionsRes.data.page.page > functionsData.lastPage) {
+    if (!functionsRes.data || functionsRes.isLoading) {
+      return;
+    }
+
+    if (functionsRes.data.page.page > functionsData.lastPage) {
       setFunctionsData((prev) => {
         return {
           lastPage: functionsRes.data.page.page,

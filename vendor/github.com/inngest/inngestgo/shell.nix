@@ -1,10 +1,7 @@
-{ pkgs ? import (fetchTarball
-  "https://github.com/NixOS/nixpkgs/archive/refs/tags/23.05.tar.gz") { } }:
+let pkgs = import <nixos-23.11> { };
 
-with pkgs;
-
-mkShell {
-  buildInputs = [
+in pkgs.mkShell {
+  nativeBuildInputs = [
     # Go
     pkgs.go
     pkgs.golangci-lint
