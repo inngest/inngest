@@ -2,9 +2,10 @@ import type { UrlObject } from 'url';
 import React, { forwardRef } from 'react';
 import type { Route } from 'next';
 import Link from 'next/link';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 
-import { cn } from '../utils/classNames';
+import { classNames } from '../utils/classNames';
 import {
   getButtonColors,
   getButtonSizeStyles,
@@ -33,6 +34,7 @@ type ButtonProps<PassedHref extends string> = {
   rel?: string;
   title?: string;
   form?: string;
+  tooltip?: React.ReactNode;
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(function Button(
@@ -51,6 +53,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
     type = 'button',
     keys,
     className,
+    tooltip,
     ...props
   }: ButtonProps<string>,
   ref
@@ -64,13 +67,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
 
   const iconElement = React.isValidElement(icon)
     ? React.cloneElement(icon as React.ReactElement, {
-        className: cn(iconSizes, icon.props.className),
+        className: classNames(iconSizes, icon.props.className),
       })
     : null;
 
   const children = (
     <>
-      {loading && <IconSpinner className={cn(spinnerStyles, iconSizes)} />}
+      {loading && <IconSpinner className={classNames(spinnerStyles, iconSizes)} />}
       {!loading && iconSide === 'left' && iconElement}
       {label && label}
       {!loading && iconSide === 'right' && iconElement}
@@ -79,7 +82,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
           {keys.map((key, i) => (
             <kbd
               key={i}
-              className={cn(
+              className={classNames(
                 disabled
                   ? 'bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
                   : keyColor,
@@ -96,7 +99,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
 
   const Element = href ? (
     <Link
-      className={cn(
+      className={classNames(
         buttonColors,
         buttonSizes,
         disabledStyles,
@@ -111,7 +114,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
   ) : (
     <button
       ref={ref}
-      className={cn(
+      className={classNames(
         buttonColors,
         buttonSizes,
         disabledStyles,
@@ -127,6 +130,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
       {children}
     </button>
   );
+
+  if (tooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger>{Element}</TooltipTrigger>
+        <TooltipContent>{tooltip}</TooltipContent>
+      </Tooltip>
+    );
+  }
 
   return Element;
 });
