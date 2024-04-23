@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { ChartBarIcon, ChevronRightIcon, CodeBracketSquareIcon } from '@heroicons/react/20/solid';
+import { CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { Alert } from '@inngest/components/Alert';
+import { RiArrowRightSLine, RiBarChart2Fill } from '@remixicon/react';
 import colors from 'tailwindcss/colors';
 
 import Block from '@/components/Block';
@@ -44,7 +45,7 @@ export default function EventDashboard({ params }: EventDashboardProps) {
         <SimpleBarChart
           title={
             <>
-              <ChartBarIcon className="text-indigo-40X h-4" fill="#334155" /> Volume
+              <RiBarChart2Fill className="h-4 text-slate-700" /> Volume
             </>
           }
           period="24 Hours"
@@ -87,7 +88,7 @@ export default function EventDashboard({ params }: EventDashboardProps) {
                         />
                       )}
                     </div>
-                    <ChevronRightIcon className="h-5" />
+                    <RiArrowRightSLine className="h-5" />
                   </div>
                 </Link>
               ))

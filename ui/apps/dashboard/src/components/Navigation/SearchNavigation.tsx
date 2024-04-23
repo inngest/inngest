@@ -4,13 +4,10 @@ import { useEffect, useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { useOrganization, useUser } from '@clerk/nextjs';
-import {
-  ArrowUturnRightIcon,
-  CodeBracketSquareIcon,
-  MagnifyingGlassIcon,
-} from '@heroicons/react/20/solid';
+import { CodeBracketSquareIcon, MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import { Modal } from '@inngest/components/Modal';
 import { classNames } from '@inngest/components/utils/classNames';
+import { RiArrowGoForwardLine } from '@remixicon/react';
 import { Command } from 'cmdk';
 import { useQuery } from 'urql';
 
@@ -209,7 +206,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
                     aria-label="press enter to jump to page"
                     className="ml-auto hidden rounded bg-slate-200 p-1.5 text-white group-data-[selected]:block"
                   >
-                    <ArrowUturnRightIcon className="h-3 w-3 rotate-180 text-slate-600" />
+                    <RiArrowGoForwardLine className="h-3 w-3 rotate-180 text-slate-600" />
                   </kbd>
                 </Command.Item>
               </Command.Group>

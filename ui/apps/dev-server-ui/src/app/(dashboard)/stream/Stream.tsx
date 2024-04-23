@@ -6,8 +6,8 @@ import { BlankSlate } from '@inngest/components/BlankSlate';
 import { Button } from '@inngest/components/Button';
 import { Pill, PillContent } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
-import { IconChevron } from '@inngest/components/icons/Chevron';
 import { fullDate } from '@inngest/components/utils/date';
+import { RiArrowDownSLine } from '@remixicon/react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-table';
 
@@ -289,7 +289,7 @@ export default function Stream() {
       </div>
       {tableScrollTopPosition > 0 && (
         <span className="absolute bottom-5 right-5 animate-bounce">
-          <Button btnAction={scrollToTop} icon={<IconChevron className="rotate-180" />} />
+          <Button btnAction={scrollToTop} icon={<RiArrowDownSLine className="rotate-180" />} />
         </span>
       )}
     </div>

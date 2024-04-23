@@ -2,13 +2,13 @@
 
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import ArrowPathIcon from '@heroicons/react/20/solid/ArrowPathIcon';
 import Squares2X2Icon from '@heroicons/react/20/solid/Squares2X2Icon';
 import { Button } from '@inngest/components/Button';
 import { Code } from '@inngest/components/Code';
 import { CodeLine } from '@inngest/components/CodeLine';
 import { Link } from '@inngest/components/Link';
 import * as Tabs from '@radix-ui/react-tabs';
+import { RiLoopLeftLine } from '@remixicon/react';
 
 import Header from '@/components/Header/Header';
 import { setSkipCacheSearchParam } from '@/utils/urls';
@@ -31,7 +31,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
         <section className="mx-auto mt-16 max-w-screen-md overflow-hidden rounded-lg">
           <header className="bg-slate-940 px-8 pb-3 pt-6 text-white">
             <div className="flex items-center gap-4 pb-4">
-              <ArrowPathIcon className="h-6 w-6" />
+              <RiLoopLeftLine className="h-6 w-6" />
               <h2 className="text-xl">Sync App</h2>
             </div>
             <p>Provide the location of your app.</p>

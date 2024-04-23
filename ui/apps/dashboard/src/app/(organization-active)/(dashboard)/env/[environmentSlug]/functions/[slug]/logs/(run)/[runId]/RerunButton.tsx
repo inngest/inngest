@@ -2,10 +2,10 @@
 
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { ArrowPathIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import type { Environment } from '@inngest/components/types/environment';
 import type { Function } from '@inngest/components/types/function';
+import { RiLoopLeftLine } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
@@ -60,7 +60,7 @@ export default function RerunButton({ environment, functionRunID, func }: RerunB
       size="small"
       loading={isMutating}
       btnAction={() => rerunFunction()}
-      icon={<ArrowPathIcon className={cn(' text-sky-500', isMutating && 'animate-spin')} />}
+      icon={<RiLoopLeftLine className={cn(' text-sky-500', isMutating && 'animate-spin')} />}
       label={isMutating ? 'Running...' : 'Rerun'}
     />
   );

@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import ChevronRightIcon from '@heroicons/react/20/solid/ChevronRightIcon';
 import { Link as InngestLink } from '@inngest/components/Link';
 import { classNames } from '@inngest/components/utils/classNames';
+import { RiArrowRightSLine } from '@remixicon/react';
 
 import { Time } from '@/components/Time';
 import { pathCreator } from '@/utils/urls';
@@ -30,7 +30,7 @@ export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Prop
             href={pathCreator.unattachedSyncs({ envSlug })}
           >
             Unattached Syncs
-            <ChevronRightIcon className="h-4 w-4" />
+            <RiArrowRightSLine className="h-4 w-4" />
           </Link>
         </h2>
       </div>

@@ -2,7 +2,7 @@
 
 import { Fragment } from 'react';
 import { Menu, Transition } from '@headlessui/react';
-import { ChevronDownIcon } from '@heroicons/react/20/solid';
+import { RiArrowDownSLine } from '@remixicon/react';
 
 import cn from '@/utils/cn';
 
@@ -38,7 +38,7 @@ export default function Dropdown({ label, children, context = 'dark' }: Dropdown
         )}
       >
         {label}
-        <ChevronDownIcon className="h-4 w-4 text-slate-500" aria-hidden="true" />
+        <RiArrowDownSLine className="h-4 w-4 text-slate-500" aria-hidden="true" />
       </Menu.Button>
 
       <Transition

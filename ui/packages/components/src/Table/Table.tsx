@@ -1,5 +1,5 @@
-import { IconChevron } from '@inngest/components/icons/Chevron';
 import { classNames } from '@inngest/components/utils/classNames';
+import { RiArrowDownSLine } from '@remixicon/react';
 import { flexRender, useReactTable, type Row, type TableOptions } from '@tanstack/react-table';
 import { useVirtual } from 'react-virtual';
 
@@ -68,7 +68,7 @@ export function Table({
                     ? null
                     : flexRender(header.column.columnDef.header, header.getContext())}
                   {header.column.getIsSorted() && options.data.length > 1 && (
-                    <IconChevron
+                    <RiArrowDownSLine
                       className={classNames(
                         'h-3 w-3 transition-all duration-500',
                         header.column.getIsSorted() === 'asc' && '-rotate-180'

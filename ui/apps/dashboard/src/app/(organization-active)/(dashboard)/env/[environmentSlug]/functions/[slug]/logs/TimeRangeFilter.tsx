@@ -2,7 +2,7 @@
 
 import { Fragment } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
-import { ChevronDownIcon } from '@heroicons/react/20/solid';
+import { RiArrowDownSLine } from '@remixicon/react';
 import { useQuery } from 'urql';
 
 import GroupButton from '@/components/GroupButton/GroupButton';
@@ -131,7 +131,7 @@ export default function TimeRangeFilter({
                 {getTimeFieldLabel(selectedTimeField)} in Last{' '}
                 {selectedTimeRangeOption ? getTimeRangeLabel(selectedTimeRangeOption) : ''}
               </p>
-              <ChevronDownIcon className="h-4 w-4" aria-hidden="true" />
+              <RiArrowDownSLine className="h-4 w-4" aria-hidden="true" />
             </Listbox.Button>
 
             <Transition

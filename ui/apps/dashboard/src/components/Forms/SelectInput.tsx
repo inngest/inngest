@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { CheckIcon, ChevronDownIcon } from '@heroicons/react/20/solid';
 import * as Select from '@radix-ui/react-select';
+import { RiArrowDownSLine, RiCheckLine } from '@remixicon/react';
 
 export type SelectOption<T extends string> = {
   label: string | React.ReactNode;
@@ -38,7 +38,7 @@ export function SelectInput<T extends string>(props: SelectProps<T>) {
       <Select.Trigger className="flex items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm leading-none shadow outline-2 outline-offset-2 outline-indigo-500 transition-all focus:outline data-[placeholder]:text-slate-500">
         <Select.Value placeholder={props.placeholder} />
         <Select.Icon className="">
-          <ChevronDownIcon className="h-5" />
+          <RiArrowDownSLine className="h-5" />
         </Select.Icon>
       </Select.Trigger>
 
@@ -59,7 +59,7 @@ export function SelectInput<T extends string>(props: SelectProps<T>) {
                 <span className="flex flex-row items-center">
                   <Select.ItemText>{opt.label}</Select.ItemText>
                   <Select.ItemIndicator>
-                    <CheckIcon className="ml-2 h-4 text-indigo-500" />
+                    <RiCheckLine className="ml-2 h-4 text-indigo-500" />
                   </Select.ItemIndicator>
                 </span>
                 {opt.description && (

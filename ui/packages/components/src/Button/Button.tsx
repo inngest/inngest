@@ -4,7 +4,7 @@ import type { Route } from 'next';
 import Link from 'next/link';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 
-import { classNames } from '../utils/classNames';
+import { cn } from '../utils/classNames';
 import {
   getButtonColors,
   getButtonSizeStyles,
@@ -64,13 +64,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
 
   const iconElement = React.isValidElement(icon)
     ? React.cloneElement(icon as React.ReactElement, {
-        className: classNames(iconSizes, icon.props.className),
+        className: cn(iconSizes, icon.props.className),
       })
     : null;
 
   const children = (
     <>
-      {loading && <IconSpinner className={classNames(spinnerStyles, iconSizes)} />}
+      {loading && <IconSpinner className={cn(spinnerStyles, iconSizes)} />}
       {!loading && iconSide === 'left' && iconElement}
       {label && label}
       {!loading && iconSide === 'right' && iconElement}
@@ -79,7 +79,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
           {keys.map((key, i) => (
             <kbd
               key={i}
-              className={classNames(
+              className={cn(
                 disabled
                   ? 'bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
                   : keyColor,
@@ -96,7 +96,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
 
   const Element = href ? (
     <Link
-      className={classNames(
+      className={cn(
         buttonColors,
         buttonSizes,
         disabledStyles,
@@ -111,7 +111,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
   ) : (
     <button
       ref={ref}
-      className={classNames(
+      className={cn(
         buttonColors,
         buttonSizes,
         disabledStyles,

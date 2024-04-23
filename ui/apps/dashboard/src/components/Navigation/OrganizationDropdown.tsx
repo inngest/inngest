@@ -6,14 +6,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useOrganization, useOrganizationList } from '@clerk/nextjs';
 import {
-  ArrowsRightLeftIcon,
-  Cog6ToothIcon,
-  CreditCardIcon,
-  CubeIcon,
-  PlusCircleIcon,
-  UserGroupIcon,
-} from '@heroicons/react/20/solid';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
@@ -21,6 +13,14 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
 import { Skeleton } from '@inngest/components/Skeleton';
+import {
+  RiAddCircleLine,
+  RiArrowLeftRightLine,
+  RiBankCardLine,
+  RiBox3Line,
+  RiSettings3Line,
+  RiTeamFill,
+} from '@remixicon/react';
 
 export default function OrganizationDropdown() {
   const { isLoaded, organization } = useOrganization();
@@ -56,22 +56,22 @@ export default function OrganizationDropdown() {
       >
         <DropdownMenuGroup className="p-2">
           <OrganizationDropdownMenuItem
-            icon={Cog6ToothIcon}
+            icon={RiSettings3Line}
             href="/settings/organization/organization-settings"
             label="Organization Settings"
           />
           <OrganizationDropdownMenuItem
-            icon={UserGroupIcon}
+            icon={RiTeamFill}
             href="/settings/organization"
             label="Members"
           />
           <OrganizationDropdownMenuItem
-            icon={CubeIcon}
+            icon={RiBox3Line}
             href="/settings/integrations"
             label="Integrations"
           />
           <OrganizationDropdownMenuItem
-            icon={CreditCardIcon}
+            icon={RiBankCardLine}
             href="/settings/billing"
             label="Billing"
           />
@@ -79,13 +79,13 @@ export default function OrganizationDropdown() {
         <DropdownMenuGroup className="p-2">
           {userMemberships.count && userMemberships.count > 1 ? (
             <OrganizationDropdownMenuItem
-              icon={ArrowsRightLeftIcon}
+              icon={RiArrowLeftRightLine}
               href="/organization-list"
               label="Switch Organization"
             />
           ) : (
             <OrganizationDropdownMenuItem
-              icon={PlusCircleIcon}
+              icon={RiAddCircleLine}
               href="/create-organization"
               label="Create Organization"
             />

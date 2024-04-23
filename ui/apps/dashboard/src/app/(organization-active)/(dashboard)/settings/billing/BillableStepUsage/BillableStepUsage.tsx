@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ChartBarIcon } from '@heroicons/react/20/solid';
 import { Alert } from '@inngest/components/Alert';
+import { RiBarChart2Fill } from '@remixicon/react';
 import {
   Bar,
   BarChart,
@@ -104,7 +104,7 @@ export function BillableStepUsage({ includedStepCountLimit }: Props) {
     <div className="text-slate-800">
       <div className="mb-4 flex items-center justify-end gap-x-8">
         <div className="flex text-lg text-slate-600">
-          <ChartBarIcon className="mr-2 w-5" />
+          <RiBarChart2Fill className="mr-2 w-5" />
           <span className="font-medium">Function Usage</span>
         </div>
 

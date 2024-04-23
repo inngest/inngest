@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import ArrowPathIcon from '@heroicons/react/20/solid/ArrowPathIcon';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
 import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch';
 import { cn } from '@inngest/components/utils/classNames';
+import { RiLoopLeftLine } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
@@ -95,7 +95,7 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
       onClose={onClose}
       title={
         <div className="mb-4 flex flex-row items-center gap-3">
-          <ArrowPathIcon className="h-6 w-6" />
+          <RiLoopLeftLine className="h-6 w-6" />
           <h2 className="text-lg font-medium">Resync App</h2>
         </div>
       }
