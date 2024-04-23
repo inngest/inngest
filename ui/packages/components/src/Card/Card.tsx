@@ -38,7 +38,7 @@ export function Card({ accentColor, accentPosition = 'top', children, className 
       )}
     >
       {accentColor && <div className={cn('p-0.5', accentClass, accentColor)} />}
-      <div className={cn('grow border border-slate-300', contentClass)}>{children}</div>
+      <div className={cn('w-full grow border border-slate-300', contentClass)}>{children}</div>
     </div>
   );
 }
