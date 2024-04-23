@@ -1,6 +1,8 @@
 import { useCallback } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
+import isStringArray from './isStringArray';
+
 type SetParam<T> = (value: T) => void;
 
 /**
@@ -49,4 +51,46 @@ export function useBooleanSearchParam(name: string): [boolean | undefined, SetPa
   }
 
   return [value, upsert];
+}
+
+export function useStringArraySearchParam(
+  name: string
+): [Array<string> | undefined, SetParam<Array<string>>, () => void] {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const upsert = useCallback(
+    (value: Array<string>) => {
+      const params = new URLSearchParams(searchParams);
+      params.set(name, JSON.stringify(value));
+
+      // @ts-expect-error Router doesn't like strings.
+      router.replace(pathname + '?' + params.toString());
+    },
+    [name, pathname, router, searchParams]
+  );
+
+  const remove = useCallback(() => {
+    const params = new URLSearchParams(searchParams);
+    params.delete(name);
+
+    // @ts-expect-error Router doesn't like strings.
+    router.replace(pathname + '?' + params.toString());
+  }, [name, pathname, router, searchParams]);
+
+  let value = undefined;
+  const rawValue = searchParams.get(name);
+  if (typeof rawValue === 'string') {
+    const parsed: unknown = JSON.parse(rawValue);
+
+    if (isStringArray(parsed)) {
+      value = parsed;
+    } else {
+      // This means the query param value is the wrong type
+      console.error(`invalid type for search param ${name}`);
+    }
+  }
+
+  return [value, upsert, remove];
 }
