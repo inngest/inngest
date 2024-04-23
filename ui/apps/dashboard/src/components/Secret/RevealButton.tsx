@@ -1,6 +1,5 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
-import { IconEye } from '@inngest/components/icons/Eye';
-import { IconEyeSlash } from '@inngest/components/icons/EyeSlash';
+import { RiEyeLine, RiEyeOffLine } from '@remixicon/react';
 
 type Props = {
   isRevealed: boolean;
@@ -8,10 +7,10 @@ type Props = {
 };
 
 export function RevealButton({ isRevealed, onClick }: Props) {
-  let Icon = IconEye;
+  let Icon = RiEyeLine;
   let label = 'Reveal';
   if (isRevealed) {
-    Icon = IconEyeSlash;
+    Icon = RiEyeOffLine;
     label = 'Hide';
   }
 

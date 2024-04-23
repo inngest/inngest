@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import { IconTrash } from '@inngest/components/icons/Trash';
+import { RiDeleteBin2Line } from '@remixicon/react';
 
 import { DeleteSigningKeyModal } from './DeleteSigningKeyModal';
 
@@ -19,7 +19,7 @@ export function DeleteSigningKeyButton({ signingKeyID }: Props) {
         appearance="outlined"
         aria-label="Delete"
         btnAction={() => setIsModalOpen(true)}
-        icon={<IconTrash />}
+        icon={<RiDeleteBin2Line />}
         kind="danger"
         size="small"
         tooltip="Delete"

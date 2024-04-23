@@ -1,6 +1,6 @@
 import { Badge } from '@inngest/components/Badge';
 import { Card } from '@inngest/components/Card';
-import { IconStar } from '@inngest/components/icons/Star';
+import { RiStarFill } from '@remixicon/react';
 
 import { Secret } from '@/components/Secret';
 import { Time } from '@/components/Time';
@@ -40,7 +40,7 @@ export function SigningKey({ signingKey }: Props) {
   if (signingKey.createdAt > new Date(Date.now() - 24 * 60 * 60 * 1000)) {
     pill = (
       <Badge className="border-0 bg-amber-100">
-        <IconStar className="text-amber-600" />
+        <RiStarFill className="text-amber-600" size={16} />
         <span className="text-amber-600">New</span>
       </Badge>
     );

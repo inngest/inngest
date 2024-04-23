@@ -2,8 +2,7 @@
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { useCopyToClipboard } from '@inngest/components/hooks/useCopyToClipboard';
-import { IconCheck } from '@inngest/components/icons/Check';
-import { IconCopy } from '@inngest/components/icons/Copy';
+import { RiCheckLine, RiFileCopy2Line } from '@remixicon/react';
 
 type Props = {
   value: string;
@@ -12,9 +11,9 @@ type Props = {
 export function CopyButton({ value }: Props) {
   const { handleCopyClick, isCopying } = useCopyToClipboard();
 
-  let Icon = IconCopy;
+  let Icon = RiFileCopy2Line;
   if (isCopying) {
-    Icon = IconCheck;
+    Icon = RiCheckLine;
   }
 
   const label = 'Copy';

@@ -1,7 +1,7 @@
 'use client';
 
-import { PlusIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { RiAddLine } from '@remixicon/react';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
@@ -27,7 +27,7 @@ export function CreateSigningKeyButton({ disabled, envID }: Props) {
       btnAction={() => createSigningKey({ envID })}
       disabled={disabled}
       kind="primary"
-      icon={<PlusIcon />}
+      icon={<RiAddLine />}
       label="Create new signing key"
     />
   );
