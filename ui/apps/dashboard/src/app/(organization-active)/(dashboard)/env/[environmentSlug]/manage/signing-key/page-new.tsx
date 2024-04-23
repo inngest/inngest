@@ -41,7 +41,7 @@ export default function Page() {
 
   return (
     <div className="mb-4 mt-8 flex items-center justify-center">
-      <div className="mb-8 w-full max-w-[800px] divide-y">
+      <div className="w-full max-w-[800px] divide-y">
         <div className="mb-8">
           <h1 className="mb-2 text-2xl">Signing keys</h1>
 
