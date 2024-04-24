@@ -158,21 +158,9 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
       </div>
 
       <div className="flex justify-end gap-2 p-6">
-        <Button
-          appearance="outlined"
-          btnAction={onClose}
-          className="px-16"
-          disabled={isSyncing}
-          label="Cancel"
-        />
+        <Button appearance="outlined" btnAction={onClose} disabled={isSyncing} label="Cancel" />
 
-        <Button
-          btnAction={onSync}
-          className="px-16"
-          disabled={isSyncing}
-          kind="primary"
-          label="Resync App"
-        />
+        <Button btnAction={onSync} disabled={isSyncing} kind="primary" label="Resync App" />
       </div>
     </Modal>
   );
