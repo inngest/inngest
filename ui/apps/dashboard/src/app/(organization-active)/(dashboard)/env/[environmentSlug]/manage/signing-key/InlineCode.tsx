@@ -1,10 +1,18 @@
+import cn from '@/utils/cn';
+
 type Props = {
+  className?: string;
   value: string;
 };
 
-export function InlineCode({ value }: Props) {
+export function InlineCode({ className, value }: Props) {
   return (
-    <code className="inline-flex items-center rounded bg-slate-200 px-2 py-1 font-mono text-xs font-semibold leading-none">
+    <code
+      className={cn(
+        'inline-flex items-center rounded-sm bg-slate-200 px-1 py-1 font-mono text-xs font-semibold leading-none',
+        className
+      )}
+    >
       {value}
     </code>
   );

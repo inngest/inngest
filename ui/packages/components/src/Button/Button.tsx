@@ -2,6 +2,7 @@ import type { UrlObject } from 'url';
 import React, { forwardRef } from 'react';
 import type { Route } from 'next';
 import Link from 'next/link';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 
 import { cn } from '../utils/classNames';
@@ -33,6 +34,7 @@ type ButtonProps<PassedHref extends string> = {
   rel?: string;
   title?: string;
   form?: string;
+  tooltip?: React.ReactNode;
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(function Button(
@@ -51,6 +53,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
     type = 'button',
     keys,
     className,
+    tooltip,
     ...props
   }: ButtonProps<string>,
   ref
@@ -116,7 +119,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
         buttonSizes,
         disabledStyles,
         isSplit ? 'rounded-l' : 'rounded',
-        'flex items-center justify-center gap-1.5 drop-shadow-sm transition-all active:scale-95 ',
+        'flex items-center justify-center gap-1.5 whitespace-nowrap drop-shadow-sm transition-all active:scale-95',
         className
       )}
       type={type}
@@ -127,6 +130,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
       {children}
     </button>
   );
+
+  if (tooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger>{Element}</TooltipTrigger>
+        <TooltipContent>{tooltip}</TooltipContent>
+      </Tooltip>
+    );
+  }
 
   return Element;
 });
