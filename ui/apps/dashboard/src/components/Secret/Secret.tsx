@@ -28,7 +28,7 @@ export function Secret({ className, kind, secret }: Props) {
       )}
     >
       <div className="flex grow items-center truncate border-r border-slate-300 p-2 text-slate-500">
-        <span className="grow overflow-hidden truncate font-mono text-sm">{value}</span>
+        <span className="grow truncate font-mono text-sm">{value}</span>
         <RevealButton isRevealed={isRevealed} onClick={() => setIsRevealed((prev) => !prev)} />
       </div>
 
