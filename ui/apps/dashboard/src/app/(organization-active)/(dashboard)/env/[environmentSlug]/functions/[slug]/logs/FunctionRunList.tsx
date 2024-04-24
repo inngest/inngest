@@ -6,11 +6,11 @@ import { Button } from '@inngest/components/Button';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { Link } from '@inngest/components/Link';
 import { Table } from '@inngest/components/Table';
+import { Time } from '@inngest/components/Time';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import { FunctionRunStatus, FunctionRunTimeField, type RunListItem } from '@/gql/graphql';
 import { type TimeRange } from './TimeRangeFilter';

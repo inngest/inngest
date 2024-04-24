@@ -4,9 +4,9 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
+import { Time } from '@inngest/components/Time';
 import { useQuery } from 'urql';
 
-import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import cn from '@/utils/cn';

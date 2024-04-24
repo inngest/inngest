@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { CodeBracketSquareIcon } from '@heroicons/react/20/solid';
+import { Time } from '@inngest/components/Time';
 import { IconStatusCanceled } from '@inngest/components/icons/status/Canceled';
 import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
 import { IconStatusFailed } from '@inngest/components/icons/status/Failed';
@@ -9,7 +10,6 @@ import { RiArrowRightSLine } from '@remixicon/react';
 import { noCase } from 'change-case';
 import { titleCase } from 'title-case';
 
-import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import { FunctionRunStatus } from '@/gql/graphql';
 import graphqlAPI from '@/queries/graphqlAPI';

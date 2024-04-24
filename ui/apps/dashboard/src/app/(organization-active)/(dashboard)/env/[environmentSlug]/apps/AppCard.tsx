@@ -4,11 +4,11 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Link as InngestLink } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
+import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArchive2Line, RiArrowRightSLine } from '@remixicon/react';
 
 import { SyncStatusPill } from '@/components/SyncStatusPill';
-import { Time } from '@/components/Time';
 import AppDiagramImage from '@/images/app-diagram.png';
 import { pathCreator } from '@/utils/urls';
 

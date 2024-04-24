@@ -1,11 +1,11 @@
 'use client';
 
 import { Skeleton } from '@inngest/components/Skeleton';
+import { Time } from '@inngest/components/Time';
 import { IconFunction } from '@inngest/components/icons/Function';
 import { classNames } from '@inngest/components/utils/classNames';
 
 import { SyncStatusPill } from '@/components/SyncStatusPill';
-import { Time } from '@/components/Time';
 
 type Props = {
   className?: string;

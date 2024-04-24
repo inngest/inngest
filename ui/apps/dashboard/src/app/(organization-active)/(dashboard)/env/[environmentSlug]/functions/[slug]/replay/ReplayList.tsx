@@ -5,12 +5,12 @@ import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Link } from '@inngest/components/Link';
 import { ReplayStatusIcon } from '@inngest/components/ReplayStatusIcon';
 import { Table } from '@inngest/components/Table';
+import { Time } from '@inngest/components/Time';
 import type { Replay } from '@inngest/components/types/replay';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { duration } from '@/utils/date';

@@ -1,4 +1,28 @@
 import { format } from 'date-fns';
+import dayjs from 'dayjs';
+import calendar from 'dayjs/plugin/calendar';
+import durationPlugin from 'dayjs/plugin/duration';
+import localizedFormat from 'dayjs/plugin/localizedFormat';
+import { default as relativeTimePlugin } from 'dayjs/plugin/relativeTime';
+
+dayjs.extend(calendar);
+dayjs.extend(durationPlugin);
+dayjs.extend(localizedFormat);
+dayjs.extend(relativeTimePlugin, {
+  thresholds: [
+    { l: 's', r: 1 },
+    { l: 'm', r: 1 },
+    { l: 'mm', r: 60, d: 'minute' },
+    { l: 'h', r: 2 },
+    { l: 'hh', r: 24, d: 'hour' },
+    { l: 'd', r: 2 },
+    { l: 'dd', r: 30, d: 'day' },
+    { l: 'M', r: 2 },
+    { l: 'MM', r: 12, d: 'month' },
+    { l: 'y', r: 2 },
+    { l: 'yy', d: 'year' },
+  ],
+});
 
 // Format: 20 Jul 2023, 00:08:42
 export function fullDate(date: Date): string {
@@ -70,4 +94,8 @@ export function formatTimeString({
   const formatString = is24HourFormat ? 'HH:mm:ss.SSS X' : 'hh:mm:ss.SSS a X';
 
   return format(date, formatString);
+}
+
+export function relativeTime(d: dayjs.ConfigType): string {
+  return dayjs(d).fromNow();
 }
