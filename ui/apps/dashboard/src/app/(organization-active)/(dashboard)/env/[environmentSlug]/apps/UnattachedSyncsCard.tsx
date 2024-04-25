@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { Link as InngestLink } from '@inngest/components/Link';
+import { Time } from '@inngest/components/Time';
 import { classNames } from '@inngest/components/utils/classNames';
 import { RiArrowRightSLine } from '@remixicon/react';
 
-import { Time } from '@/components/Time';
 import { pathCreator } from '@/utils/urls';
 import { cardWrapperStyles } from './AppCard';
 import { Description } from './Description';

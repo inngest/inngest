@@ -1,9 +1,9 @@
 import { useRef } from 'react';
 import { Table } from '@inngest/components/Table';
+import { Time } from '@inngest/components/Time';
 import { RiArrowRightLine } from '@remixicon/react';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 
-import { Time } from '@/components/Time';
 import type { Event } from './types';
 
 type Props = {

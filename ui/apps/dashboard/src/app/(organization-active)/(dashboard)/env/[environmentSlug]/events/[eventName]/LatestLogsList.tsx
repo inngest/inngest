@@ -2,11 +2,11 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { Button } from '@inngest/components/Button';
 import { Pill } from '@inngest/components/Pill';
+import { Time } from '@inngest/components/Time';
 import { RiKey2Fill } from '@remixicon/react';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 
 const GetLatestEventLogs = graphql(`

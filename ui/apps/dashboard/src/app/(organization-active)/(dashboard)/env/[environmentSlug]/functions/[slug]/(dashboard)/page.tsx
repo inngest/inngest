@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { XCircleIcon } from '@heroicons/react/20/solid';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
+import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { useCron } from '@inngest/components/hooks/useCron';
 import { IconEvent } from '@inngest/components/icons/Event';
@@ -17,7 +18,6 @@ import FunctionConfiguration from '@/app/(organization-active)/(dashboard)/env/[
 import type { TimeRange } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import { Badge as LegacyBadge } from '@/components/Badge/Badge';
 import Block from '@/components/Block';
-import { Time } from '@/components/Time';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
 import { relativeTime } from '@/utils/date';

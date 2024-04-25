@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { IDCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
+import { Time } from '@inngest/components/Time';
 import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { cn } from '@inngest/components/utils/classNames';
 import { formatMilliseconds } from '@inngest/components/utils/date';
@@ -14,8 +15,6 @@ import {
   type OnChangeFn,
   type SortingState,
 } from '@tanstack/react-table';
-
-import { Time } from '@/components/Time';
 
 export type Run = {
   status: FunctionRunStatus;

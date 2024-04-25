@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { Alert } from '@inngest/components/Alert';
+import { Time } from '@inngest/components/Time';
 import { RiArrowRightSLine, RiBarChart2Fill } from '@remixicon/react';
 import colors from 'tailwindcss/colors';
 
 import Block from '@/components/Block';
 import SimpleBarChart from '@/components/Charts/SimpleBarChart';
 import Overlay from '@/components/Overlay';
-import { Time } from '@/components/Time';
 import { useEventType } from '@/queries';
 import LatestLogsList from './LatestLogsList';
 

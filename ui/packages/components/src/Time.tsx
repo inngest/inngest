@@ -1,8 +1,7 @@
 'use client';
 
-import { classNames } from '@inngest/components/utils/classNames';
-
-import { relativeTime } from '@/utils/date';
+import { cn } from './utils/classNames';
+import { relativeTime } from './utils/date';
 
 /**
  * Use this component instead of the builtin <time> element. Since server-side
@@ -21,16 +20,16 @@ export function Time({ className, format, value }: Props) {
   let title: string | undefined;
   if (format === 'relative') {
     dateString = relativeTime(value);
-    title = value.toString();
+    title = value.toISOString();
   } else {
     dateString = value.toLocaleString();
-    title = value.toString();
+    title = value.toISOString();
   }
 
   return (
     <time
       suppressHydrationWarning={true}
-      className={classNames('whitespace-nowrap', className)}
+      className={cn('whitespace-nowrap', className)}
       dateTime={value.toISOString()}
       title={title}
     >

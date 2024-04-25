@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
+import { Time } from '@inngest/components/Time';
 
-import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getEnvironment } from '@/queries/server-only/getEnvironment';

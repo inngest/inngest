@@ -3,10 +3,10 @@
 import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Time } from '@inngest/components/Time';
 import { RiTimeLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { Time } from '@/components/Time';
 import cn from '@/utils/cn';
 import { getManageKey } from '@/utils/urls';
 

@@ -4,10 +4,10 @@ import { useMemo } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
+import { Time } from '@inngest/components/Time';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 
 const GetFailedFunctionRunsDocument = graphql(`

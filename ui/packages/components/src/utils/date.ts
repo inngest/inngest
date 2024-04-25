@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 
 // Format: 20 Jul 2023, 00:08:42
 export function fullDate(date: Date): string {
@@ -70,4 +70,8 @@ export function formatTimeString({
   const formatString = is24HourFormat ? 'HH:mm:ss.SSS X' : 'hh:mm:ss.SSS a X';
 
   return format(date, formatString);
+}
+
+export function relativeTime(d: Date): string {
+  return formatDistanceToNow(d, { addSuffix: true });
 }
