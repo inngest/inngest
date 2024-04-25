@@ -32,6 +32,11 @@ const GetRunsDocument = graphql(`
   }
 `);
 
+const renderSubComponent = ({ id }: { id: string }) => {
+  /* TODO: Render the timeline instead */
+  return <p>Subrow {id}</p>;
+};
+
 export default function RunsPage() {
   const [filteredStatus, setFilteredStatus, removeFilteredStatus] =
     useStringArraySearchParam('filterStatus');
@@ -75,8 +80,13 @@ export default function RunsPage() {
         {/* TODO: wire button */}
         <Button label="Refresh" appearance="text" btnAction={refetch} icon={<RiLoopLeftLine />} />
       </div>
-      {/* @ts-ignore */}
-      <RunsTable data={runs} isLoading={fetchingRuns} />
+      <RunsTable
+        //@ts-ignore
+        data={runs}
+        isLoading={fetchingRuns}
+        renderSubComponent={renderSubComponent}
+        getRowCanExpand={() => true}
+      />
     </main>
   );
 }

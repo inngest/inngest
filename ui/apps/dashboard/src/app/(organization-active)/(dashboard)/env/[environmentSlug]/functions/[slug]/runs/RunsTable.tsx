@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { IDCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
@@ -10,8 +10,10 @@ import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
+  getExpandedRowModel,
   useReactTable,
   type OnChangeFn,
+  type Row,
   type SortingState,
 } from '@tanstack/react-table';
 
@@ -25,14 +27,23 @@ export type Run = {
   endedAt: string;
 };
 
-type RunsTableProps = {
+type RunsTableProps<TData> = {
   data: Run[] | undefined;
   sorting?: SortingState;
   setSorting?: OnChangeFn<SortingState>;
   isLoading?: boolean;
+  renderSubComponent: (props: { id: string }) => React.ReactElement;
+  getRowCanExpand: (row: Row<TData>) => boolean;
 };
 
-export default function RunsTable({ data = [], isLoading, sorting, setSorting }: RunsTableProps) {
+export default function RunsTable({
+  data = [],
+  isLoading,
+  sorting,
+  setSorting,
+  getRowCanExpand,
+  renderSubComponent,
+}: RunsTableProps<Run>) {
   // Render 8 empty lines for skeletons when data is loading
   const tableData = useMemo(() => (isLoading ? Array(8).fill({}) : data), [isLoading, data]);
 
@@ -51,6 +62,8 @@ export default function RunsTable({ data = [], isLoading, sorting, setSorting }:
     data: tableData,
     columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    getRowCanExpand,
     manualSorting: true,
     onSortingChange: setSorting,
     state: {
@@ -106,13 +119,26 @@ export default function RunsTable({ data = [], isLoading, sorting, setSorting }:
         )}
         {!isEmpty &&
           table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className="h-12">
-              {row.getVisibleCells().map((cell) => (
-                <td className={tableColumnStyles} key={cell.id}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
+            <Fragment key={row.id}>
+              <tr
+                key={row.id}
+                className="h-12 cursor-pointer hover:bg-sky-50"
+                onClick={row.getToggleExpandedHandler()}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td className={tableColumnStyles} key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+              {row.getIsExpanded() && (
+                <tr>
+                  <td colSpan={row.getVisibleCells().length}>
+                    {renderSubComponent({ id: row.id })}
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
       </tbody>
       <tfoot>
