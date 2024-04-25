@@ -28,7 +28,7 @@ const columnHelper = createColumnHelper<StreamItem>();
 
 const columns = [
   columnHelper.accessor('createdAt', {
-    header: () => <span>Started At</span>,
+    header: () => <span>Queued At</span>,
     cell: (props) => (
       <time dateTime={fullDate(new Date(props.getValue()))} suppressHydrationWarning={true}>
         {fullDate(new Date(props.getValue()))}
