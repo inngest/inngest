@@ -168,11 +168,8 @@ func WithLifecycleListeners(l ...execution.LifecycleListener) ExecutorOpt {
 	}
 }
 
-func WithStepLimits(limit uint) ExecutorOpt {
+func WithStepLimits(limit func(id state.Identifier) int) ExecutorOpt {
 	return func(e execution.Executor) error {
-		if limit > consts.AbsoluteMaxStepLimit {
-			return fmt.Errorf("%d is greater than the absolute step limit of %d", limit, consts.AbsoluteMaxStepLimit)
-		}
 		e.(*executor).steplimit = limit
 		return nil
 	}
@@ -241,7 +238,7 @@ type executor struct {
 
 	lifecycles []execution.LifecycleListener
 
-	steplimit uint
+	steplimit func(id state.Identifier) int
 }
 
 func (e *executor) SetFinishHandler(f execution.FinishHandler) {
