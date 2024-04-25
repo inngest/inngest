@@ -86,7 +86,7 @@ export default function RunsTable({
             {headerGroup.headers.map((header) => (
               <th
                 key={header.id}
-                className={cn(tableColumnStyles, 'text-sm font-semibold text-slate-500 ')}
+                className={cn(tableColumnStyles, 'text-left text-sm font-semibold text-slate-500')}
               >
                 {header.isPlaceholder ? null : (
                   <div
@@ -174,6 +174,7 @@ const columns = [
       );
     },
     header: 'Status',
+    enableSorting: false,
   }),
   columnHelper.accessor('id', {
     cell: (info) => {
@@ -186,6 +187,7 @@ const columns = [
       );
     },
     header: 'Run ID',
+    enableSorting: false,
   }),
   columnHelper.accessor('queuedAt', {
     cell: (info) => {
@@ -200,6 +202,7 @@ const columns = [
       );
     },
     header: 'Queued At',
+    enableSorting: false,
   }),
   columnHelper.accessor('endedAt', {
     cell: (info) => {
@@ -214,6 +217,7 @@ const columns = [
       );
     },
     header: 'Ended At',
+    enableSorting: false,
   }),
   columnHelper.accessor('durationMS', {
     cell: (info) => {
@@ -226,5 +230,6 @@ const columns = [
       );
     },
     header: 'Duration',
+    enableSorting: false,
   }),
 ];
