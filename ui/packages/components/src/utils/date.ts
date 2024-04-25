@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, formatDistance } from 'date-fns';
 import dayjs from 'dayjs';
 import calendar from 'dayjs/plugin/calendar';
 import durationPlugin from 'dayjs/plugin/duration';
@@ -96,6 +96,6 @@ export function formatTimeString({
   return format(date, formatString);
 }
 
-export function relativeTime(d: dayjs.ConfigType): string {
-  return dayjs(d).fromNow();
+export function relativeTime(d: Date): string {
+  return formatDistance(d, new Date(), { addSuffix: true });
 }
