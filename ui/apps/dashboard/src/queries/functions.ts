@@ -186,6 +186,12 @@ const GetFunctionDocument = graphql(`
             period
             key
           }
+          throttle {
+            burst
+            key
+            limit
+            period
+          }
         }
       }
     }
