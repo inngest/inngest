@@ -118,16 +118,16 @@ CREATE TABLE traces (
 	status_message TEXT,
 	events BLOB NOT NULL, -- list of events
 	links BLOB NOT NULL,  -- list of links
-	run_id BLOB
+	run_id CHAR(26)
 );
 
 CREATE TABLE trace_runs (
-	account_id BLOB NOT NULL,
-	workspace_id BLOB NOT NULL,
-	app_id BLOB NOT NULL,
-	function_id BLOB NOT NULL,
+	account_id CHAR(36) NOT NULL,
+	workspace_id CHAR(36) NOT NULL,
+	app_id CHAR(36) NOT NULL,
+	function_id CHAR(36) NOT NULL,
 	trace_id BLOB NOT NULL,
-	run_id BLOB NOT NULL,
+	run_id CHAR(26) NOT NULL,
 
 	queued_at TIMESTAMP NOT NULL,
 	started_at TIMESTAMP,
@@ -135,6 +135,10 @@ CREATE TABLE trace_runs (
 	duration INT,
 
 	status INT, -- more like enum values
+	source_id BLOB,
+	trigger_ids BLOB NOT NULL,
+	triggers BLOB NOT NULL,
+	output BLOB,
 	is_batch BOOLEAN,
 	is_debounce BOOLEAN
 );

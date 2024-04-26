@@ -1156,9 +1156,9 @@ func (q *Queries) InsertTrace(ctx context.Context, arg InsertTraceParams) error 
 
 const insertTraceRun = `-- name: InsertTraceRun :exec
 INSERT INTO trace_runs
-	(account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, duration, status, is_batch, is_debounce)
+	(account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, duration, status, source_id, trigger_ids, triggers, output, is_batch, is_debounce)
 VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertTraceRunParams struct {
@@ -1173,6 +1173,10 @@ type InsertTraceRunParams struct {
 	EndedAt     sql.NullTime
 	Duration    sql.NullInt64
 	Status      sql.NullInt64
+	SourceID    []byte
+	TriggerIds  []byte
+	Triggers    []byte
+	Output      []byte
 	IsBatch     sql.NullBool
 	IsDebounce  sql.NullBool
 }
@@ -1190,6 +1194,10 @@ func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) 
 		arg.EndedAt,
 		arg.Duration,
 		arg.Status,
+		arg.SourceID,
+		arg.TriggerIds,
+		arg.Triggers,
+		arg.Output,
 		arg.IsBatch,
 		arg.IsDebounce,
 	)

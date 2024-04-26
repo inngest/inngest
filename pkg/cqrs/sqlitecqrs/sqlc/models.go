@@ -142,6 +142,10 @@ type TraceRun struct {
 	EndedAt     sql.NullTime
 	Duration    sql.NullInt64
 	Status      sql.NullInt64
+	SourceID    []byte
+	TriggerIds  []byte
+	Triggers    []byte
+	Output      []byte
 	IsBatch     sql.NullBool
 	IsDebounce  sql.NullBool
 }
