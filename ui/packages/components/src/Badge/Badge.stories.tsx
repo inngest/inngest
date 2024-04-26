@@ -36,3 +36,15 @@ export const Solid: Story = {
     className: 'text-orange-400 bg-orange-400/10',
   },
 };
+
+export const FlatLeft: Story = {
+  args: {
+    flatSide: 'left',
+  },
+};
+
+export const FlatRight: Story = {
+  args: {
+    flatSide: 'right',
+  },
+};
