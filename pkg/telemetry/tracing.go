@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -29,6 +30,7 @@ const (
 	TracerTypeIO
 	TracerTypeOTLP
 	TracerTypeJaeger
+	TracerTypeOTLPHTTP
 )
 
 func TracerSetup(svc string, ttype TracerType) (func(), error) {
@@ -57,7 +59,9 @@ func TracerSetup(svc string, ttype TracerType) (func(), error) {
 func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	switch opts.Type {
 	case TracerTypeOTLP:
-		return newOLTPTraceProvider(ctx, opts.ServiceName)
+		return newOLTPGRPCTraceProvider(ctx, opts.ServiceName)
+	case TracerTypeOTLPHTTP:
+		return newOTLPHTTPTraceProvider(ctx, opts.ServiceName)
 	case TracerTypeJaeger:
 		return newJaegerTraceProvider(ctx, opts.ServiceName)
 	case TracerTypeIO:
@@ -139,7 +143,44 @@ func newNoopTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	}, nil
 }
 
-func newOLTPTraceProvider(ctx context.Context, svc string) (Tracer, error) {
+func newOTLPHTTPTraceProvider(ctx context.Context, svc string) (Tracer, error) {
+	endpoint := os.Getenv("OTEL_TRACE_COLLECTOR_ENDPOINT")
+	if endpoint == "" {
+		endpoint = "localhost:8288"
+	}
+
+	client := otlptracehttp.NewClient(
+		otlptracehttp.WithEndpoint(endpoint),
+		otlptracehttp.WithInsecure(),
+	)
+
+	exp, err := otlptrace.New(ctx, client)
+	if err != nil {
+		return nil, fmt.Errorf("error create otlp http trace client: %w", err)
+	}
+
+	sp := trace.NewBatchSpanProcessor(exp)
+	tp := trace.NewTracerProvider(
+		trace.WithSpanProcessor(sp),
+		trace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String(svc),
+		)),
+	)
+
+	return &tracer{
+		provider:   tp,
+		propagator: newTextMapPropagator(),
+		processor:  sp,
+		shutdown: func(ctx context.Context) {
+			_ = tp.ForceFlush(ctx)
+			_ = exp.Shutdown(ctx)
+			_ = tp.Shutdown(ctx)
+		},
+	}, nil
+}
+
+func newOLTPGRPCTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	endpoint := os.Getenv("OTEL_TRACES_COLLECTOR_ENDPOINT")
 	if endpoint == "" {
 		endpoint = "otel-collector:4317"
