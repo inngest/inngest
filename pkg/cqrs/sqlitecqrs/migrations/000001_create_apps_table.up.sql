@@ -51,6 +51,7 @@ CREATE TABLE function_runs (
 	event_id BLOB NOT NULL,
 	batch_id BLOB,
 	original_run_id BLOB
+	cron VARCHAR;
 );
 
 CREATE TABLE function_finishes (
