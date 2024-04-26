@@ -75,6 +75,32 @@ export default function FunctionConfiguration({ configuration }: FunctionConfigu
     }
   }
 
+  let throttleItems: MetadataItemProps[] | undefined;
+  if (configuration.throttle) {
+    throttleItems = [
+      {
+        label: 'Period',
+        value: configuration.throttle.period,
+      },
+      {
+        label: 'Limit',
+        value: configuration.throttle.limit.toString(),
+      },
+      {
+        label: 'Burst',
+        value: configuration.throttle.burst.toString(),
+      },
+    ];
+
+    if (configuration.throttle.key) {
+      throttleItems.push({
+        label: 'Key',
+        value: configuration.throttle.key,
+        type: 'code',
+      });
+    }
+  }
+
   return (
     <Block title="Configuration">
       <MetadataGrid columns={2} metadataItems={miscellaneousItems} />
@@ -139,6 +165,12 @@ export default function FunctionConfiguration({ configuration }: FunctionConfigu
         <>
           <h3 className="pb-2 pt-6 text-sm font-medium text-slate-800">Debounce</h3>
           <MetadataGrid columns={2} metadataItems={debounceItems} />
+        </>
+      )}
+      {throttleItems && (
+        <>
+          <h3 className="pb-2 pt-6 text-sm font-medium text-slate-800">Throttle</h3>
+          <MetadataGrid columns={2} metadataItems={throttleItems} />
         </>
       )}
     </Block>
