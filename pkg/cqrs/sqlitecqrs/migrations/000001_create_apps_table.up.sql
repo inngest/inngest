@@ -50,8 +50,8 @@ CREATE TABLE function_runs (
 	-- or 'cron' if this is a cron-based function.
 	event_id BLOB NOT NULL,
 	batch_id BLOB,
-	original_run_id BLOB
-	cron VARCHAR;
+	original_run_id BLOB,
+	cron VARCHAR
 );
 
 CREATE TABLE function_finishes (
@@ -98,4 +98,43 @@ CREATE TABLE event_batches (
 	started_at TIMESTAMP NOT NULL,
 	executed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	event_ids BLOB NOT NULL
-)
+);
+
+CREATE TABLE traces (
+	timestamp TIMESTAMP NOT NULL,
+	trace_id BLOB NOT NULL,
+	span_id BLOB NOT NULL,
+	parent_span_id BLOB,
+	trace_state BLOB,
+	span_name VARCHAR NOT NULL,
+	span_kind VARCHAR NOT NULL,
+	service_name VARCHAR NOT NULL,
+	resource_attributes BLOB NOT NULL,
+	scope_name VARCHAR NOT NULL,
+	scope_version VARCHAR NOT NULL,
+	span_attributes BLOB NOT NULL,
+	duration INT NOT NULL, -- duration in milli
+	status_code VARCHAR NOT NULL,
+	status_message TEXT,
+	events BLOB NOT NULL, -- list of events
+	links BLOB NOT NULL,  -- list of links
+	run_id BLOB
+);
+
+CREATE TABLE trace_runs (
+	account_id BLOB NOT NULL,
+	workspace_id BLOB NOT NULL,
+	app_id BLOB NOT NULL,
+	function_id BLOB NOT NULL,
+	trace_id BLOB NOT NULL,
+	run_id BLOB NOT NULL,
+
+	queued_at TIMESTAMP NOT NULL,
+	started_at TIMESTAMP,
+	ended_at TIMESTAMP,
+	duration INT,
+
+	status INT, -- more like enum values
+	is_batch BOOLEAN,
+	is_debounce BOOLEAN
+);

@@ -169,3 +169,20 @@ INSERT INTO history
 
 -- name: GetFunctionRunHistory :many
 SELECT * FROM history WHERE run_id = ? ORDER BY created_at ASC;
+
+
+--
+-- Traces
+--
+
+-- name: InsertTrace :exec
+INSERT INTO traces
+	(timestamp, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id)
+VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: InsertTraceRun :exec
+INSERT INTO trace_runs
+	(account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, duration, status, is_batch, is_debounce)
+VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);

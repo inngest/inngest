@@ -28,7 +28,6 @@ func (a router) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var encoder ptrace.Unmarshaler
-
 	cnt := r.Header.Get("Content-Type")
 	switch cnt {
 	case pbContentType:

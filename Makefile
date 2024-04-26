@@ -29,7 +29,7 @@ e2e:
 
 # $GOBIN must be set and be in your path for this to work
 queries:
-	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+	# go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 	sqlc generate
 
 .PHONY: snapshot
