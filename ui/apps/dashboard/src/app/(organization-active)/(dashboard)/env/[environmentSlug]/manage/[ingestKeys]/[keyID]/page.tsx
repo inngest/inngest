@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { notFound } from 'next/navigation';
 import { PencilIcon, TrashIcon } from '@heroicons/react/20/solid';
-import { CodeKey } from '@inngest/components/CodeKey';
+import { Card } from '@inngest/components/Card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +13,8 @@ import {
 import { RiMore2Line } from '@remixicon/react';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { Secret } from '@/components/Secret';
+import type { SecretKind } from '@/components/Secret/Secret';
 import { graphql } from '@/gql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { Provider } from './Context';
@@ -84,18 +86,17 @@ export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps)
   // Integration created keys cannot be deleted or renamed
   const isIntegration = key.source === SOURCE_INTEGRATION;
 
-  let value = '',
-    maskedValue = '',
-    keyLabel = 'Key';
+  let secretKind: SecretKind;
+  let label;
+  let value;
   if (ingestKeys === 'webhooks') {
+    label = 'Webhook path';
+    secretKind = 'webhook-path';
     value = key.url || '';
-    // Leave the base url + the beginning of the key
-    maskedValue = value.replace(/(.{0,}\/e\/)(\w{0,8}).+/, '$1$2');
-    keyLabel = 'Webhook URL';
   } else {
+    label = 'Event key';
+    secretKind = 'event-key';
     value = key.presharedKey;
-    maskedValue = value.substring(0, 8);
-    keyLabel = 'Event Key';
   }
 
   return (
@@ -140,7 +141,13 @@ export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps)
             )}
           </div>
           <div className="w-3/5">
-            <CodeKey fullKey={value} maskedKey={maskedValue} label={keyLabel} />
+            {/* <Secret isLabeled kind={secretKind} secret={value} /> */}
+            <Card className="mt-4">
+              <Card.Header>{label}</Card.Header>
+              <Card.Content>
+                <Secret kind={secretKind} secret={value} />
+              </Card.Content>
+            </Card>
           </div>
         </div>
         <TransformEvent keyID={keyID} metadata={key.metadata} keyName={key.name} />

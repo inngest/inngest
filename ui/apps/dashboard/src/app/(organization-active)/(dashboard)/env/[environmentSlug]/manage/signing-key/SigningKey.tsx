@@ -1,9 +1,9 @@
 import { Badge } from '@inngest/components/Badge';
 import { Card } from '@inngest/components/Card';
+import { Time } from '@inngest/components/Time';
 import { RiStarFill } from '@remixicon/react';
 
 import { Secret } from '@/components/Secret';
-import { Time } from '@/components/Time';
 import { DeleteSigningKeyButton } from './DeleteSigningKeyButton';
 
 type Props = {
