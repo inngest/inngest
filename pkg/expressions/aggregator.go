@@ -127,11 +127,10 @@ func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.Tracked
 		"evaluated aggregate expressions",
 		"workspace_id", event.GetWorkspaceID(),
 		"event", name,
-		"event_data", event.GetEvent(),
 		"eval_count", evalCount,
 		"matched_count", len(found),
 		"total_count", eval.Len(),
-		"found", found,
+		"found_count", len(found),
 	)
 
 	return found, evalCount, err
