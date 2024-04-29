@@ -59,66 +59,29 @@ function Button({
   );
 }
 
-type OptionProps = React.PropsWithChildren<{
-  children: (option: string) => React.ReactNode;
-  options: string[];
-  multiple?: boolean;
-}>;
-
-function Options({ children, options, multiple }: React.PropsWithChildren<OptionProps>) {
+function Options({ children }: React.PropsWithChildren) {
   return (
     <Listbox.Options className="absolute mt-1 min-w-max">
       <div className="overflow-hidden rounded-md border border-slate-200 bg-white drop-shadow-lg">
-        {options.map((option) => {
-          return (
-            <Listbox.Option
-              key={option}
-              className="ui-active:bg-blue-50 flex select-none items-center justify-between px-2 py-4 focus:outline-none"
-              value={option}
-            >
-              {({ selected }) => (
-                <>
-                  <span className="inline-flex items-center gap-2 lowercase">
-                    {multiple && (
-                      <CheckList selected={selected} option={option}>
-                        {children}
-                      </CheckList>
-                    )}
-                    {!multiple && <p className="text-sm first-letter:capitalize">{option}</p>}
-                  </span>
-                </>
-              )}
-            </Listbox.Option>
-          );
-        })}
+        {children}
       </div>
     </Listbox.Options>
   );
 }
 
-Select.Button = Button;
-Select.Options = Options;
-
-type Cenas = {
-  selected: boolean;
-  option: string;
-  children: (option: string) => React.ReactNode;
-};
-
-function CheckList({ selected, option, children }: Cenas) {
+function Option({ children, option }: React.PropsWithChildren<{ option: string }>) {
   return (
-    <span className="inline-flex items-center gap-2 lowercase">
-      <input
-        type="checkbox"
-        id={option}
-        checked={selected}
-        readOnly
-        className="h-[15px] w-[15px] rounded border-slate-300 text-indigo-500 drop-shadow-sm checked:border-indigo-500 checked:drop-shadow-none"
-      />
-      <span className="flex items-center gap-1">
-        {children(option)}
-        <label className="text-sm first-letter:capitalize">{option}</label>
-      </span>
-    </span>
+    <Listbox.Option
+      className="ui-active:bg-blue-50 flex select-none items-center justify-between px-2 py-4 focus:outline-none"
+      key={option}
+      value={option}
+    >
+      {children}
+    </Listbox.Option>
   );
 }
+
+Select.Button = Button;
+Select.Options = Options;
+Select.Option = Option;
+Select.CustomOption = Listbox.Option;

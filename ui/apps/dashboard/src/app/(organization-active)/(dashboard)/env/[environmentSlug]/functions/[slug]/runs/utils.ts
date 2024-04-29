@@ -1,7 +1,4 @@
-import {
-  isFunctionRunStatus,
-  type FunctionRunStatus,
-} from '@inngest/components/types/functionRun.js';
+import { isFunctionRunStatus, type FunctionRunStatus } from '@inngest/components/types/functionRun';
 
 import { FunctionRunStatus as FunctionRunStatusEnum } from '@/gql/graphql';
 
