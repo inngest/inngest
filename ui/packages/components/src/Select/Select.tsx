@@ -1,5 +1,5 @@
 import { Listbox } from '@headlessui/react';
-import ChevronDownIcon from '@heroicons/react/20/solid/ChevronDownIcon';
+import { RiArrowDownSLine } from '@remixicon/react';
 
 import { cn } from '../utils/classNames';
 
@@ -54,7 +54,7 @@ function Button({
       )}
     >
       {children}
-      <ChevronDownIcon className="h-4 w-4 text-slate-500" aria-hidden="true" />
+      <RiArrowDownSLine className="h-4 w-4 text-slate-500" aria-hidden="true" />
     </Listbox.Button>
   );
 }
