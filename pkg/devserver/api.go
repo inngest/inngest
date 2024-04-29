@@ -18,10 +18,12 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
+	ptrace "go.opentelemetry.io/collector/pdata/ptrace"
 )
 
 type devapi struct {
@@ -56,6 +58,7 @@ func (a *devapi) addRoutes() {
 	a.Use(headers.StaticHeadersMiddleware(headers.ServerKindDev))
 
 	a.Get("/dev", a.Info)
+	a.Post("/dev/traces", a.OTLPTrace)
 	a.Post("/fn/register", a.Register)
 	// This allows tests to remove apps by URL
 	a.Delete("/fn/remove", a.RemoveApp)
@@ -65,6 +68,7 @@ func (a *devapi) addRoutes() {
 	// directory by using fs.Sub: https://pkg.go.dev/io/fs#Sub.
 	staticFS, _ := fs.Sub(static, "static")
 	a.Get("/images/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
+
 	a.Get("/assets/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
 	a.Get("/_next/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
 	a.Get("/{file}.txt", http.FileServer(http.FS(staticFS)).ServeHTTP)
@@ -300,6 +304,61 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		return publicerr.Wrap(err, 500, "Error deleting removed function")
 	}
 	return nil
+}
+
+func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Error{
+			Status:  400,
+			Err:     err,
+			Message: err.Error(),
+		})
+	}
+	defer r.Body.Close()
+
+	var encoder ptrace.Unmarshaler
+	cnt := r.Header.Get("Content-Type")
+	switch cnt {
+	case "application/x-protobuf":
+		encoder = &ptrace.ProtoUnmarshaler{}
+	case "application/json":
+		encoder = &ptrace.JSONUnmarshaler{}
+	default:
+		log.From(ctx).Error().Str("content-type", cnt).Msg("unknown content type for traces")
+		err = fmt.Errorf("unable to handle unknown content type for traces: %s", cnt)
+		_ = publicerr.WriteHTTP(w, publicerr.Error{
+			Status:  400,
+			Err:     err,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	traces, err := encoder.UnmarshalTraces(body)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Error{
+			Status:  400,
+			Err:     err,
+			Message: err.Error(),
+		})
+		return
+	}
+	log.From(ctx).Trace().Int("len", traces.SpanCount()).Msg("recording otel trace spans")
+
+	for i := 0; i < traces.ResourceSpans().Len(); i++ {
+		rs := traces.ResourceSpans().At(i)
+		for j := 0; j < rs.ScopeSpans().Len(); j++ {
+			ss := rs.ScopeSpans().At(j)
+			for k := 0; k < ss.Spans().Len(); k++ {
+				// span := ss.Spans().At(k)
+				// TODO: construct the data to be inserted into the DB
+				// fmt.Printf("Span: %#v\n", span.Name())
+			}
+		}
+	}
 }
 
 // RemoveApp allows users to de-register an app by its URL

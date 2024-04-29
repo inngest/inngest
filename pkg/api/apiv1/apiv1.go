@@ -92,9 +92,6 @@ func (a *router) setup() {
 		r.Post("/cancellations", a.createCancellation)
 		r.Get("/cancellations", a.getCancellations)
 		r.Delete("/cancellations/{id}", a.deleteCancellation)
-
-		// NOTE: this is for dev server only, and not an actual v1 API
-		r.Post("/traces", a.OTLPTrace)
 	})
 }
 

@@ -149,8 +149,14 @@ func newOTLPHTTPTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 		endpoint = "localhost:8288"
 	}
 
+	urlpath := os.Getenv("OTEL_TRACE_COLLECTOR_URL_PATH")
+	if urlpath == "" {
+		urlpath = "/dev/traces"
+	}
+
 	client := otlptracehttp.NewClient(
 		otlptracehttp.WithEndpoint(endpoint),
+		otlptracehttp.WithURLPath(urlpath),
 		otlptracehttp.WithInsecure(),
 	)
 
