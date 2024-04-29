@@ -1,5 +1,6 @@
 import { type PropsWithChildren } from 'react';
-import { cn } from '@inngest/components/utils/classNames';
+
+import { cn } from '../utils/classNames';
 
 type Props = PropsWithChildren<{
   accentColor?: string;
@@ -44,14 +45,14 @@ export function Card({ accentColor, accentPosition = 'top', children, className 
 }
 
 Card.Content = ({ children, className }: PropsWithChildren<{ className?: string }>) => {
-  return <div className={cn('p-2.5 dark:bg-slate-800/40', className)}>{children}</div>;
+  return <div className={cn('px-6 py-4 dark:bg-slate-800/40', className)}>{children}</div>;
 };
 
 Card.Footer = ({ children, className }: PropsWithChildren<{ className?: string }>) => {
   return (
     <div
       className={cn(
-        'border-t border-slate-300 px-4 py-2 dark:border-slate-800/50 dark:bg-slate-800/40',
+        'border-t border-slate-300 px-6 py-4 dark:border-slate-800/50 dark:bg-slate-800/40',
         className
       )}
     >
@@ -64,7 +65,7 @@ Card.Header = ({ children, className }: PropsWithChildren<{ className?: string }
   return (
     <div
       className={cn(
-        'flex flex-col gap-1 border-b border-slate-300 px-4 py-2.5 text-sm text-slate-700 dark:border-slate-800/50 dark:bg-slate-800/40 dark:text-slate-400',
+        'flex flex-col gap-1 border-b border-slate-300 px-6 py-3 text-sm text-slate-700 dark:border-slate-800/50 dark:bg-slate-800/40 dark:text-slate-400',
         className
       )}
     >
