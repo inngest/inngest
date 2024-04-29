@@ -27,7 +27,13 @@ lint:
 e2e:
 	./tests.sh
 
+.PHONY: gen
+gen:
+	go generate ./...
+	sqlc generate
+
 # $GOBIN must be set and be in your path for this to work
+.PHONY: queries
 queries:
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 	sqlc generate

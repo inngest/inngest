@@ -77,7 +77,6 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	a.Handle("/gql", srv)
 
 	// V0 APIs
-	a.Get("/events/{eventID}/runs", a.EventRuns)
 	a.Delete("/runs/{runID}", a.CancelRun)
 	// NOTE: These are present in the 2.x and 3.x SDKs to enable large payload sizes.
 	a.Get("/runs/{runID}/batch", a.GetEventBatch)
@@ -175,53 +174,6 @@ func (a CoreAPI) GetEventBatch(w http.ResponseWriter, r *http.Request) {
 
 	events := state.Events()
 	_ = json.NewEncoder(w).Encode(events)
-}
-
-func (a CoreAPI) EventRuns(w http.ResponseWriter, r *http.Request) {
-	if a.tracker == nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Error{
-			Status:  500,
-			Message: "No tracker",
-		})
-		return
-	}
-
-	// NOTE: In development this does no authentication.  This must check API keys
-	// in self-hosted and production environments.
-	ctx := r.Context()
-	eventIDStr := chi.URLParam(r, "eventID")
-	if eventIDStr == "" {
-		_ = publicerr.WriteHTTP(w, publicerr.Error{
-			Status:  400,
-			Message: "No event ID found",
-		})
-		return
-	}
-
-	eventID, err := ulid.Parse(eventIDStr)
-	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Error{
-			Status:  400,
-			Message: "Event ID is not a valid ULID",
-			Err:     err,
-		})
-	}
-
-	runs, err := a.tracker.Runs(ctx, eventID)
-	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Error{
-			Status:  500,
-			Message: "Unable to load function runs from event ID",
-			Err:     err,
-		})
-		return
-	}
-
-	if runs == nil {
-		runs = []ulid.ULID{}
-	}
-
-	_ = json.NewEncoder(w).Encode(runs)
 }
 
 // CancelRun is used to cancel a function run via an API callo.

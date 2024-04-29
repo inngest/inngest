@@ -41,6 +41,7 @@ in pkgs.mkShell {
 
     # Tools
     pkgs.sqlite
+    pkgs.sqlc
   ];
 
   packages = [ corepack ];
