@@ -218,7 +218,7 @@ func start(ctx context.Context, opts StartOpts) error {
 				eventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
 			},
 		),
-		executor.WithStepLimits(consts.DefaultMaxStepLimit),
+		executor.WithStepLimits(func(id state.Identifier) int { return consts.DefaultMaxStepLimit }),
 		executor.WithInvokeNotFoundHandler(getInvokeNotFoundHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),

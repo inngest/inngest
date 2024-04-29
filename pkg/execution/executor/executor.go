@@ -409,7 +409,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	// Evaluate the run priority based off of the input event data.
-	factor, err := req.Function.RunPriorityFactor(ctx, mapped[0])
+	factor, _ := req.Function.RunPriorityFactor(ctx, mapped[0])
 	if factor != 0 {
 		id.PriorityFactor = &factor
 	}
