@@ -403,7 +403,7 @@ func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 		[]string{m.kf.RunMetadata(ctx, id.RunID)},
 		[]string{},
 	).AsInt64()
-	if err != nil {
+	if err != nil && !rueidis.IsRedisNil(err) {
 		return fmt.Errorf("error cancelling: %w", err)
 	}
 	switch status {
