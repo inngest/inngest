@@ -24,13 +24,13 @@ export function Select({
         <span
           className={cn(
             isLabelVisible && 'divide-x divide-slate-300',
-            'flex rounded-md border border-slate-300 text-sm'
+            'flex items-center rounded-md border border-slate-300 bg-slate-50 text-sm'
           )}
         >
           <Listbox.Label
             className={cn(
               !isLabelVisible && 'sr-only',
-              'rounded-l-[5px] bg-slate-50 px-2 py-2.5 text-slate-600'
+              'rounded-l-[5px] px-2 py-2.5 text-slate-600'
             )}
           >
             {label}
