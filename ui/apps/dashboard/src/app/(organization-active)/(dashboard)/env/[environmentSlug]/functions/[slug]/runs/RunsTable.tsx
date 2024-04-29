@@ -27,13 +27,13 @@ export type Run = {
   endedAt: string;
 };
 
-type RunsTableProps<TData> = {
+type RunsTableProps = {
   data: Run[] | undefined;
   sorting?: SortingState;
   setSorting?: OnChangeFn<SortingState>;
   isLoading?: boolean;
   renderSubComponent: (props: { id: string }) => React.ReactElement;
-  getRowCanExpand: (row: Row<TData>) => boolean;
+  getRowCanExpand: (row: Row<Run>) => boolean;
 };
 
 export default function RunsTable({
@@ -43,7 +43,7 @@ export default function RunsTable({
   setSorting,
   getRowCanExpand,
   renderSubComponent,
-}: RunsTableProps<Run>) {
+}: RunsTableProps) {
   // Render 8 empty lines for skeletons when data is loading
   const tableData = useMemo(() => (isLoading ? Array(8).fill({}) : data), [isLoading, data]);
 
