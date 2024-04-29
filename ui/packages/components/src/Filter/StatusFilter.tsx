@@ -1,6 +1,10 @@
 import { RunStatusIcon, statusStyles } from '../FunctionRunStatusIcon/RunStatusIcons';
 import { Select } from '../Select/Select';
-import { functionRunStatuses, type FunctionRunStatus } from '../types/functionRun';
+import {
+  functionRunStatuses,
+  isFunctionRunStatus,
+  type FunctionRunStatus,
+} from '../types/functionRun';
 import { cn } from '../utils/classNames';
 
 type StatusFilterProps = {
@@ -26,8 +30,17 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
   return (
     <Select
       defaultValue={selectedStatuses}
-      onChange={onStatusesChange}
-      options={functionRunStatuses}
+      onChange={(value: string[]) => {
+        const newValue: FunctionRunStatus[] = [];
+        value.forEach((status) => {
+          if (isFunctionRunStatus(status)) {
+            newValue.push(status);
+          } else {
+            console.error(`invalid status: ${status}`);
+          }
+        });
+        onStatusesChange(newValue);
+      }}
       label="Status"
     >
       <Select.Button>{statusDots}</Select.Button>
