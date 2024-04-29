@@ -1,11 +1,11 @@
 import type { RawHistoryItem } from '@inngest/components/utils/historyParser';
 
 export const functionRunStatuses = [
-  'CANCELLED',
-  'COMPLETED',
   'FAILED',
   'RUNNING',
   'QUEUED',
+  'COMPLETED',
+  'CANCELLED',
 ] as const;
 const FunctionRunEndedStatuses = ['CANCELLED', 'COMPLETED', 'FAILED'] as const;
 export type FunctionRunStatus = (typeof functionRunStatuses)[number];

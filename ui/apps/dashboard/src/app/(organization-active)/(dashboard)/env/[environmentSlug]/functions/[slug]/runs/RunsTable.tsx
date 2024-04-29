@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { IDCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
@@ -10,8 +10,10 @@ import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
+  getExpandedRowModel,
   useReactTable,
   type OnChangeFn,
+  type Row,
   type SortingState,
 } from '@tanstack/react-table';
 
@@ -28,9 +30,18 @@ type RunsTableProps = {
   sorting?: SortingState;
   setSorting?: OnChangeFn<SortingState>;
   isLoading?: boolean;
+  renderSubComponent: (props: { id: string }) => React.ReactElement;
+  getRowCanExpand: (row: Row<Run>) => boolean;
 };
 
-export default function RunsTable({ data = [], isLoading, sorting, setSorting }: RunsTableProps) {
+export default function RunsTable({
+  data = [],
+  isLoading,
+  sorting,
+  setSorting,
+  getRowCanExpand,
+  renderSubComponent,
+}: RunsTableProps) {
   // Render 8 empty lines for skeletons when data is loading
   const tableData = useMemo(() => (isLoading ? Array(8).fill({}) : data), [isLoading, data]);
 
@@ -49,6 +60,8 @@ export default function RunsTable({ data = [], isLoading, sorting, setSorting }:
     data: tableData,
     columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    getRowCanExpand,
     manualSorting: true,
     onSortingChange: setSorting,
     state: {
@@ -71,7 +84,7 @@ export default function RunsTable({ data = [], isLoading, sorting, setSorting }:
             {headerGroup.headers.map((header) => (
               <th
                 key={header.id}
-                className={cn(tableColumnStyles, 'text-sm font-semibold text-slate-500 ')}
+                className={cn(tableColumnStyles, 'text-left text-sm font-semibold text-slate-500')}
               >
                 {header.isPlaceholder ? null : (
                   <div
@@ -104,13 +117,26 @@ export default function RunsTable({ data = [], isLoading, sorting, setSorting }:
         )}
         {!isEmpty &&
           table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className="h-12">
-              {row.getVisibleCells().map((cell) => (
-                <td className={tableColumnStyles} key={cell.id}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
+            <Fragment key={row.id}>
+              <tr
+                key={row.id}
+                className="h-12 cursor-pointer hover:bg-sky-50"
+                onClick={row.getToggleExpandedHandler()}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td className={tableColumnStyles} key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+              {row.getIsExpanded() && (
+                <tr>
+                  <td colSpan={row.getVisibleCells().length}>
+                    {renderSubComponent({ id: row.id })}
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
       </tbody>
       <tfoot>
@@ -144,6 +170,7 @@ const columns = [
       );
     },
     header: 'Status',
+    enableSorting: false,
   }),
   columnHelper.accessor('id', {
     cell: (info) => {
@@ -156,6 +183,7 @@ const columns = [
       );
     },
     header: 'Run ID',
+    enableSorting: false,
   }),
   columnHelper.accessor('queuedAt', {
     cell: (info) => {
@@ -170,6 +198,7 @@ const columns = [
       );
     },
     header: 'Queued At',
+    enableSorting: false,
   }),
   columnHelper.accessor('endedAt', {
     cell: (info) => {
@@ -184,6 +213,7 @@ const columns = [
       );
     },
     header: 'Ended At',
+    enableSorting: false,
   }),
   columnHelper.accessor('durationMS', {
     cell: (info) => {
@@ -196,5 +226,6 @@ const columns = [
       );
     },
     header: 'Duration',
+    enableSorting: false,
   }),
 ];

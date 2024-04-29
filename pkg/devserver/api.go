@@ -132,7 +132,7 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 
 	expectedServerKind := r.Header.Get(headers.HeaderKeyExpectedServerKind)
 	if expectedServerKind != "" && expectedServerKind != headers.ServerKindDev {
-		a.err(ctx, w, 400, fmt.Errorf("Expected server kind %s, got %s", expectedServerKind, headers.ServerKindDev))
+		a.err(ctx, w, 400, fmt.Errorf("Expected server kind %s, got %s", headers.ServerKindDev, expectedServerKind))
 		return
 	}
 

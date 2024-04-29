@@ -1069,10 +1069,6 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 
 			qi.Data.Attempt += 1
 			qi.AtMS = at.UnixMilli()
-			q.logger.Warn().Err(err).
-				Str("queue", qi.Queue()).
-				Int64("at_ms", at.UnixMilli()).
-				Msg("requeuing job")
 			if err := q.Requeue(context.WithoutCancel(ctx), p, qi, at); err != nil {
 				q.logger.Error().Err(err).Interface("item", qi).Msg("error requeuing job")
 				return err
@@ -1086,7 +1082,6 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		q.logger.Info().Interface("item", qi).Msg("dequeueing failed job")
 		if err := q.Dequeue(context.WithoutCancel(ctx), p, qi); err != nil {
 			return err
 		}
