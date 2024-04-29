@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@inngest/components/Button';
+import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import { RiLoopLeftLine } from '@remixicon/react';
 import { useQuery } from 'urql';
 
@@ -8,7 +9,6 @@ import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[env
 import { graphql } from '@/gql';
 import { FunctionRunStatus } from '@/gql/graphql';
 import { useStringArraySearchParam } from '@/utils/useSearchParam';
-import StatusFilter from '../logs/StatusFilter';
 import RunsTable from './RunsTable';
 
 const GetRunsDocument = graphql(`
@@ -36,9 +36,9 @@ export default function RunsPage() {
   const [filteredStatus, setFilteredStatus, removeFilteredStatus] =
     useStringArraySearchParam('filterStatus');
 
-  function handleStatusesChange(statuses: FunctionRunStatus[]) {
-    if (statuses.length > 0) {
-      setFilteredStatus(statuses);
+  function handleStatusesChange(value: FunctionRunStatus[]) {
+    if (value.length > 0) {
+      setFilteredStatus(value);
     } else {
       removeFilteredStatus();
     }
@@ -67,7 +67,7 @@ export default function RunsPage() {
 
   return (
     <main className="h-full min-h-0 overflow-y-auto bg-white">
-      <div className="flex justify-between gap-2 bg-slate-50 px-8 py-2">
+      <div className="flex items-center justify-between gap-2 bg-slate-50 px-8 py-2">
         <StatusFilter
           selectedStatuses={filteredStatus ? (filteredStatus as FunctionRunStatus[]) : []}
           onStatusesChange={handleStatusesChange}
@@ -75,7 +75,7 @@ export default function RunsPage() {
         {/* TODO: wire button */}
         <Button label="Refresh" appearance="text" btnAction={refetch} icon={<RiLoopLeftLine />} />
       </div>
-      {/* @ts-ignore */}
+      {/* @ts-expect-error */}
       <RunsTable data={runs} isLoading={fetchingRuns} />
     </main>
   );
