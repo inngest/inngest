@@ -991,6 +991,12 @@ func (m mgr) EvaluablesByID(ctx context.Context, ids ...uuid.UUID) ([]expr.Evalu
 
 func (m mgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {
 
+	// Keep a list of pauses that should be deleted because they've expired.
+	//
+	// Note that we don't do this in the iteration loop, as redis can use either HSCAN or
+	// MGET;  deleting during iteration may lead to skipped items.
+	expired := []*state.Pause{}
+
 	it, err := m.PausesByEventSince(ctx, workspaceID, eventName, since)
 	if err != nil {
 		return err
@@ -1000,14 +1006,26 @@ func (m mgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eve
 		if pause == nil {
 			continue
 		}
+
+		if pause.Expires.Time().Before(time.Now()) {
+			expired = append(expired, pause)
+			continue
+		}
+
 		if err := do(ctx, pause); err != nil {
 			return err
 		}
 	}
 
+	// GC pauses on fetch.
+	for _, pause := range expired {
+		_ = m.DeletePause(ctx, *pause)
+	}
+
 	if it.Error() != context.Canceled && it.Error() != scanDoneErr {
 		return it.Error()
 	}
+
 	return nil
 }
 

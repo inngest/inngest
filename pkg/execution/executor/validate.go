@@ -2,8 +2,10 @@ package executor
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -63,7 +65,20 @@ func (r *runValidator) checkCancelled(ctx context.Context) error {
 }
 
 func (r *runValidator) checkStepLimit(ctx context.Context) error {
-	if r.e.steplimit != 0 && len(r.s.Actions()) >= int(r.e.steplimit) {
+	var limit int
+
+	if r.e.steplimit != nil {
+		limit = r.e.steplimit(r.item.Identifier)
+	}
+
+	if limit == 0 {
+		limit = consts.DefaultMaxStepLimit
+	}
+	if limit > consts.AbsoluteMaxStepLimit {
+		return fmt.Errorf("%d is greater than the absolute step limit of %d", limit, consts.AbsoluteMaxStepLimit)
+	}
+
+	if limit > 0 && len(r.s.Actions()) >= limit {
 		// Update this function's state to overflowed, if running.
 		if r.md.Status == enums.RunStatusRunning {
 			// XXX: Update error to failed, set error message

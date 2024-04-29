@@ -168,11 +168,8 @@ func WithLifecycleListeners(l ...execution.LifecycleListener) ExecutorOpt {
 	}
 }
 
-func WithStepLimits(limit uint) ExecutorOpt {
+func WithStepLimits(limit func(id state.Identifier) int) ExecutorOpt {
 	return func(e execution.Executor) error {
-		if limit > consts.AbsoluteMaxStepLimit {
-			return fmt.Errorf("%d is greater than the absolute step limit of %d", limit, consts.AbsoluteMaxStepLimit)
-		}
 		e.(*executor).steplimit = limit
 		return nil
 	}
@@ -241,7 +238,7 @@ type executor struct {
 
 	lifecycles []execution.LifecycleListener
 
-	steplimit uint
+	steplimit func(id state.Identifier) int
 }
 
 func (e *executor) SetFinishHandler(f execution.FinishHandler) {
@@ -413,9 +410,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	// Evaluate the run priority based off of the input event data.
 	factor, err := req.Function.RunPriorityFactor(ctx, mapped[0])
-	if err != nil && e.log != nil {
-		e.log.Warn().Err(err).Msg("run priority errored")
-	}
 	if factor != 0 {
 		id.PriorityFactor = &factor
 	}
@@ -1133,7 +1127,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 	// Use the aggregator for all funciton finished events, if there are more than
 	// 50 waiting.  It only takes a few milliseconds to iterate and handle less
 	// than 50;  anything more runs the risk of running slow.
-	if evt.GetEvent().IsFinishedEvent() && iter.Count() > 50 {
+	if iter.Count() > 10 {
 		aggRes, err := e.handleAggregatePauses(ctx, evt)
 		if err != nil {
 			log.From(ctx).Error().Err(err).Msg("error handling aggregate pauses")
@@ -1334,7 +1328,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 		return execution.HandlePauseResult{}, fmt.Errorf("no expression evaluator found")
 	}
 
-	base := logger.From(ctx).With().Str("event_id", evt.GetInternalID().String()).Logger()
+	log := logger.StdlibLogger(ctx).With("event_id", evt.GetInternalID().String())
 	evtID := evt.GetInternalID()
 	evtIDStr := evtID.String()
 
@@ -1347,11 +1341,6 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 		goerr error
 		wg    sync.WaitGroup
 	)
-
-	base.Debug().
-		Int("pause_len", len(evals)).
-		Int32("matched_len", count).
-		Msg("matched pauses via aggregator")
 
 	for _, i := range evals {
 		found, ok := i.(*state.Pause)
@@ -1367,19 +1356,19 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 
 			defer wg.Done()
 
-			l := base.With().
-				Str("pause_id", pause.ID.String()).
-				Str("run_id", pause.Identifier.RunID.String()).
-				Str("workflow_id", pause.Identifier.WorkflowID.String()).
-				Str("expires", pause.Expires.String()).
-				Logger()
+			l := log.With(
+				"pause_id", pause.ID.String(),
+				"run_id", pause.Identifier.RunID.String(),
+				"workflow_id", pause.Identifier.WorkflowID.String(),
+				"expires", pause.Expires.String(),
+			)
 
 			// NOTE: Some pauses may be nil or expired, as the iterator may take
 			// time to process.  We handle that here and assume that the event
 			// did not occur in time.
 			if pause.Expires.Time().Before(time.Now()) {
 				// Consume this pause to remove it entirely
-				l.Debug().Msg("deleting expired pause")
+				l.Debug("deleting expired pause")
 				_ = e.sm.DeletePause(context.Background(), pause)
 				_ = e.exprAggregator.RemovePause(ctx, pause)
 				return
@@ -1459,7 +1448,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 			// Add to the counter.
 			atomic.AddInt32(&res[1], 1)
 			if err := e.exprAggregator.RemovePause(ctx, pause); err != nil {
-				l.Error().Err(err).Msg("error removing pause from aggregator")
+				l.Error("error removing pause from aggregator")
 			}
 		}()
 	}
@@ -2023,7 +2012,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 
 func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
 	span := trace.SpanFromContext(ctx)
-	logger.From(ctx).Info().Msg("handling invoke function")
 	if e.handleSendingEvent == nil {
 		return fmt.Errorf("no handleSendingEvent function specified")
 	}
@@ -2044,8 +2032,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	if err != nil {
 		return execError{err: fmt.Errorf("failed to create expression to wait for invoked function completion: %w", err)}
 	}
-
-	logger.From(ctx).Info().Interface("opts", opts).Time("expires", expires).Str("event", eventName).Str("expr", strExpr).Msg("parsed invoke function opts")
 
 	pauseID := uuid.NewSHA1(
 		uuid.NameSpaceOID,

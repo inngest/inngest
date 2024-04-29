@@ -19,7 +19,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
-	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
@@ -575,8 +574,6 @@ func (l lifecycle) OnInvokeFunction(
 	eventID ulid.ULID,
 	corrID string,
 ) {
-	logger.From(ctx).Debug().Interface("id", id).Msg("OnInvokeFunction")
-
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
 		l.log.Error(
