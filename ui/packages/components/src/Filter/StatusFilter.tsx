@@ -48,29 +48,12 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
       <Select.Options>
         {functionRunStatuses.map((option) => {
           return (
-            <Select.CustomOption
-              key={option}
-              value={option}
-              className="ui-active:bg-blue-50 flex select-none items-center justify-between px-2 py-1.5 focus:outline-none"
-            >
-              {({ selected }: { selected: boolean }) => (
-                <span className="inline-flex items-center gap-2 lowercase">
-                  <span className="inline-flex items-center gap-2 lowercase">
-                    <input
-                      type="checkbox"
-                      id={option}
-                      checked={selected}
-                      readOnly
-                      className="h-[15px] w-[15px] rounded border-slate-300 text-indigo-500 drop-shadow-sm checked:border-indigo-500 checked:drop-shadow-none"
-                    />
-                    <span className="flex items-center gap-1">
-                      <RunStatusIcon status={option} className="h-2 w-2" />
-                      <label className="text-sm first-letter:capitalize">{option}</label>
-                    </span>
-                  </span>
-                </span>
-              )}
-            </Select.CustomOption>
+            <Select.CheckboxOption key={option} option={option}>
+              <span className="flex items-center gap-1 lowercase">
+                <RunStatusIcon status={option} className="h-2 w-2" />
+                <label className="text-sm first-letter:capitalize">{option}</label>
+              </span>
+            </Select.CheckboxOption>
           );
         })}
       </Select.Options>
