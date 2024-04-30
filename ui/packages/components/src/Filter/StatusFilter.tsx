@@ -44,7 +44,9 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
       }}
       label="Status"
     >
-      <Select.Button>{statusDots}</Select.Button>
+      <Select.Button>
+        {selectedStatuses.length > 0 && <span className="pr-2">{statusDots}</span>}
+      </Select.Button>
       <Select.Options>
         {functionRunStatuses.map((option) => {
           return (
