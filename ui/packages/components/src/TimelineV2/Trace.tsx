@@ -79,7 +79,7 @@ export function Trace({ depth, getOutput, isExpandable = true, maxTime, minTime,
         </div>
 
         <InlineSpans
-          className="mb-2 mt-2"
+          className="my-2"
           maxTime={maxTime}
           minTime={minTime}
           spans={spans}

@@ -1,7 +1,10 @@
+import { RiArrowRightSLine } from '@remixicon/react';
+
 import { Badge } from '../Badge';
+import { Button } from '../Button';
 import { Time } from '../Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
-import { ExpandButton } from './ExpandButton';
+import { cn } from '../utils/classNames';
 
 type Props = {
   isExpanded: boolean;
@@ -60,7 +63,16 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
   return (
     <div className="flex w-72 gap-2">
       {isExpandable && (
-        <ExpandButton className="mt-1" isExpanded={isExpanded} onClick={onClickExpandToggle} />
+        <Button
+          btnAction={onClickExpandToggle}
+          size="small"
+          appearance={isExpanded ? 'solid' : 'outlined'}
+          icon={
+            <RiArrowRightSLine
+              className={cn(isExpanded && 'rotate-90 ', 'h-4 transition-transform duration-500')}
+            />
+          }
+        />
       )}
 
       <div className="grow">
