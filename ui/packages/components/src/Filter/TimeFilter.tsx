@@ -6,7 +6,7 @@ import {
 } from '../types/functionRun';
 
 type TimeFilterProps = {
-  selectedTimeField?: FunctionRunTimeField;
+  selectedTimeField: FunctionRunTimeField;
   onTimeFieldChange: (value: FunctionRunTimeField) => void;
 };
 
@@ -14,10 +14,7 @@ function replaceUnderscoreWithSpace(option: FunctionRunTimeField) {
   return option.replace(/_/g, ' ');
 }
 
-export default function TimeFilter({
-  selectedTimeField = 'QUEUED_AT',
-  onTimeFieldChange,
-}: TimeFilterProps) {
+export default function TimeFilter({ selectedTimeField, onTimeFieldChange }: TimeFilterProps) {
   return (
     <Select
       defaultValue={selectedTimeField}
