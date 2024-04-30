@@ -22,6 +22,7 @@ type Props = {
   className?: string;
 };
 
+/** @deprecated For new designs use RunStatusIcons instead. */
 export function FunctionRunStatusIcon({ status, className }: Props) {
   const Icon = icons[status] ?? IconStatusQueued;
 
