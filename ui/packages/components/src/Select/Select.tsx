@@ -19,7 +19,7 @@ export function Select({
   onChange,
 }: SelectProps) {
   return (
-    <Listbox value={defaultValue} onChange={onChange} multiple={multiple}>
+    <Listbox value={defaultValue} onChange={onChange} multiple>
       <span
         className={cn(
           isLabelVisible && 'divide-x divide-slate-300',
