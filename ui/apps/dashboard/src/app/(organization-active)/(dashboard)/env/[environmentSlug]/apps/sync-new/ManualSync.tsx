@@ -12,10 +12,10 @@ import { useMutation } from 'urql';
 
 import type { CodedError } from '@/codedError';
 import Input from '@/components/Forms/Input';
+import { Secret } from '@/components/Secret';
 import { SyncFailure } from '@/components/SyncFailure';
 import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
-import DeploySigningKey from '../../deploys/DeploySigningKey';
 import { useEnvironment } from '../../environment-context';
 
 const SyncNewAppDocument = graphql(`
@@ -136,7 +136,9 @@ export default function ManualSync({ appsURL }: Props) {
           . Verify that you assigned the signing key below to the <Code>INNGEST_SIGNING_KEY</Code>{' '}
           environment variable:
         </p>
-        <DeploySigningKey className="py-6" />
+
+        <Secret className="my-6" kind="event-key" secret={env.webhookSigningKey} />
+
         <div className="border-t border-slate-200">
           <label htmlFor="url" className="my-2 block text-slate-500">
             App URL

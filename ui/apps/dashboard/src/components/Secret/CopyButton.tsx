@@ -20,10 +20,10 @@ export function CopyButton({ value }: Props) {
 
   return (
     <Tooltip>
-      <TooltipTrigger className="rounded-r-md bg-white">
+      <TooltipTrigger asChild>
         <button
           aria-label={label}
-          className="flex w-8 items-center justify-center"
+          className="flex items-center justify-center bg-white px-2"
           onClick={() => handleCopyClick(value)}
         >
           <Icon className="h-6" />
