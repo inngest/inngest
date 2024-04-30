@@ -1,5 +1,6 @@
 import { type PropsWithChildren } from 'react';
-import { cn } from '@inngest/components/utils/classNames';
+
+import { cn } from '../utils/classNames';
 
 type Props = PropsWithChildren<{
   accentColor?: string;
