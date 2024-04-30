@@ -20,7 +20,7 @@ export function CopyButton({ value }: Props) {
 
   return (
     <Tooltip>
-      <TooltipTrigger className="" asChild>
+      <TooltipTrigger asChild>
         <button
           aria-label={label}
           className="flex items-center justify-center bg-white px-2"
