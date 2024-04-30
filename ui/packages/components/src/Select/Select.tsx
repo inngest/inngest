@@ -60,7 +60,10 @@ function Button({
       )}
     >
       {children}
-      <RiArrowDownSLine className="h-4 w-4 text-slate-500" aria-hidden="true" />
+      <RiArrowDownSLine
+        className="ui-open:-rotate-180 h-4 w-4 text-slate-500 transition-transform duration-500"
+        aria-hidden="true"
+      />
     </Listbox.Button>
   );
 }
