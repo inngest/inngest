@@ -20,7 +20,7 @@ export function RevealButton({ className, isRevealed, onClick }: Props) {
     <Tooltip>
       <TooltipTrigger asChild>
         <button
-          area-label={label}
+          aria-label={label}
           className={cn('flex items-center justify-center px-2', className)}
           onClick={onClick}
         >
