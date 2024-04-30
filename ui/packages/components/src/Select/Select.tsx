@@ -19,25 +19,20 @@ export function Select({
   onChange,
 }: SelectProps) {
   return (
-    <Listbox value={defaultValue} onChange={onChange} multiple>
-      <>
-        <span
-          className={cn(
-            isLabelVisible && 'divide-x divide-slate-300',
-            'flex items-center rounded-md border border-slate-300 bg-slate-50 text-sm'
-          )}
+    <Listbox value={defaultValue} onChange={onChange} multiple={multiple}>
+      <span
+        className={cn(
+          isLabelVisible && 'divide-x divide-slate-300',
+          'flex items-center rounded-md border border-slate-300 bg-slate-50 text-sm'
+        )}
+      >
+        <Listbox.Label
+          className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2 py-2.5 text-slate-600')}
         >
-          <Listbox.Label
-            className={cn(
-              !isLabelVisible && 'sr-only',
-              'rounded-l-[5px] px-2 py-2.5 text-slate-600'
-            )}
-          >
-            {label}
-          </Listbox.Label>
-          <span className="relative">{children}</span>
-        </span>
-      </>
+          {label}
+        </Listbox.Label>
+        <span className="relative">{children}</span>
+      </span>
     </Listbox>
   );
 }
