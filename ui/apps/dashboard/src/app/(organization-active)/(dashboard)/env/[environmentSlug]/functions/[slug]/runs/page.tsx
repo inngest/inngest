@@ -1,15 +1,17 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Button } from '@inngest/components/Button';
+import StatusFilter from '@inngest/components/Filter/StatusFilter';
+import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { RiLoopLeftLine } from '@remixicon/react';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { graphql } from '@/gql';
-import { FunctionRunStatus } from '@/gql/graphql';
 import { useStringArraySearchParam } from '@/utils/useSearchParam';
-import StatusFilter from '../logs/StatusFilter';
 import RunsTable from './RunsTable';
+import { toRunStatuses } from './utils';
 
 const GetRunsDocument = graphql(`
   query GetRuns($environmentID: ID!, $startTime: Time!, $status: [FunctionRunStatus!]) {
@@ -38,12 +40,16 @@ const renderSubComponent = ({ id }: { id: string }) => {
 };
 
 export default function RunsPage() {
-  const [filteredStatus, setFilteredStatus, removeFilteredStatus] =
+  const [rawFilteredStatus, setFilteredStatus, removeFilteredStatus] =
     useStringArraySearchParam('filterStatus');
 
-  function handleStatusesChange(statuses: FunctionRunStatus[]) {
-    if (statuses.length > 0) {
-      setFilteredStatus(statuses);
+  const filteredStatus = useMemo(() => {
+    return toRunStatuses(rawFilteredStatus ?? []);
+  }, [rawFilteredStatus]);
+
+  function handleStatusesChange(value: FunctionRunStatus[]) {
+    if (value.length > 0) {
+      setFilteredStatus(value);
     } else {
       removeFilteredStatus();
     }
@@ -55,7 +61,7 @@ export default function RunsPage() {
     variables: {
       environmentID: environment.id,
       startTime: '2024-04-19T11:26:03.203Z',
-      status: filteredStatus ? (filteredStatus as FunctionRunStatus[]) : null,
+      status: filteredStatus.length > 0 ? filteredStatus : null,
     },
   });
 
@@ -72,11 +78,8 @@ export default function RunsPage() {
 
   return (
     <main className="h-full min-h-0 overflow-y-auto bg-white">
-      <div className="flex justify-between gap-2 bg-slate-50 px-8 py-2">
-        <StatusFilter
-          selectedStatuses={filteredStatus ? (filteredStatus as FunctionRunStatus[]) : []}
-          onStatusesChange={handleStatusesChange}
-        />
+      <div className="flex items-center justify-between gap-2 bg-slate-50 px-8 py-2">
+        <StatusFilter selectedStatuses={filteredStatus} onStatusesChange={handleStatusesChange} />
         {/* TODO: wire button */}
         <Button label="Refresh" appearance="text" btnAction={refetch} icon={<RiLoopLeftLine />} />
       </div>

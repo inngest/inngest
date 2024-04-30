@@ -1,5 +1,4 @@
 import { Fragment, useMemo } from 'react';
-import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { IDCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
@@ -166,9 +165,7 @@ const columns = [
 
       return (
         <div className="flex items-center">
-          <StatusCell status={status}>
-            <FunctionRunStatusIcon status={status} className="h-5 w-5" />
-          </StatusCell>
+          <StatusCell status={status} />
         </div>
       );
     },

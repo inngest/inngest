@@ -1,4 +1,6 @@
-import { cn } from '../utils/classNames';
+import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcon/RunStatusIcons';
+import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
+import { cn } from '@inngest/components/utils/classNames';
 
 const cellStyles = 'text-slate-950 text-sm';
 
@@ -15,12 +17,20 @@ export function TimeCell({ children }: React.PropsWithChildren) {
   return <span className={cn(cellStyles, 'font-medium')}>{children}</span>;
 }
 
-export function StatusCell({ status, children }: React.PropsWithChildren<{ status: string }>) {
-  // TODO: Use new runs circles and colors instead of passing FunctionRunStatusIcon as children
+export function StatusCell({ status }: React.PropsWithChildren<{ status: FunctionRunStatus }>) {
+  const statusStyles: Record<string, string> = {
+    CANCELLED: 'text-neutral-600',
+    COMPLETED: 'text-teal-700',
+    FAILED: 'text-rose-500',
+    RUNNING: 'text-sky-500',
+    QUEUED: 'text-amber-500',
+  } as const satisfies { [key in FunctionRunStatus]: string };
+  const style = statusStyles[status] ?? statusStyles['CANCELLED'];
+
   return (
     <div className={cn(cellStyles, 'flex items-center gap-2.5 font-medium')}>
-      {children}
-      <p className="lowercase first-letter:capitalize">{status}</p>
+      <RunStatusIcon status={status} />
+      <p className={cn(style, 'lowercase first-letter:capitalize')}>{status}</p>
     </div>
   );
 }

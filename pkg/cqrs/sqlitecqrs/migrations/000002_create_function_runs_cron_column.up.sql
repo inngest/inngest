@@ -1,1 +1,0 @@
-ALTER TABLE function_runs ADD COLUMN cron VARCHAR;

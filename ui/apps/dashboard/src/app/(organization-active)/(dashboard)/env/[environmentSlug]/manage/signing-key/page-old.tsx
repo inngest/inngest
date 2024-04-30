@@ -4,8 +4,8 @@
  */
 
 import { Alert } from '@inngest/components/Alert';
-import { CodeKey } from '@inngest/components/CodeKey';
 
+import { Secret } from '@/components/Secret';
 import { graphql } from '@/gql';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getEnvironment } from '@/queries/server-only/getEnvironment';
@@ -32,21 +32,12 @@ export default async function Page({ environmentSlug }: Props) {
     environmentID: environment.id,
   });
 
-  const maskedSigningKey = res.environment.webhookSigningKey.replace(
-    /signkey-(prod|test)-.+/,
-    'signkey-$1'
-  );
-
   return (
     <div className="flex place-content-center">
       <div className="mt-8 max-w-3xl rounded-md border border-slate-200 px-8 pb-8 pt-6">
         <h2 className="mb-6 text-lg font-semibold text-slate-800">Inngest Signing Key</h2>
 
-        <CodeKey
-          fullKey={res.environment.webhookSigningKey}
-          maskedKey={maskedSigningKey}
-          label="Signing key"
-        />
+        <Secret kind="signing-key" secret={res.environment.webhookSigningKey} />
 
         <p className="mt-8 text-sm leading-relaxed text-slate-700">
           Use this <span className="font-bold text-slate-800">secret signing key</span> with the
