@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { notFound } from 'next/navigation';
 import { PencilIcon, TrashIcon } from '@heroicons/react/20/solid';
-import { Card } from '@inngest/components/Card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -87,14 +86,11 @@ export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps)
   const isIntegration = key.source === SOURCE_INTEGRATION;
 
   let secretKind: SecretKind;
-  let label;
   let value;
   if (ingestKeys === 'webhooks') {
-    label = 'Webhook path';
     secretKind = 'webhook-path';
     value = key.url || '';
   } else {
-    label = 'Event key';
     secretKind = 'event-key';
     value = key.presharedKey;
   }
@@ -141,13 +137,7 @@ export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps)
             )}
           </div>
           <div className="w-3/5">
-            {/* <Secret isLabeled kind={secretKind} secret={value} /> */}
-            <Card className="mt-4">
-              <Card.Header>{label}</Card.Header>
-              <Card.Content>
-                <Secret kind={secretKind} secret={value} />
-              </Card.Content>
-            </Card>
+            <Secret kind={secretKind} secret={value} />
           </div>
         </div>
         <TransformEvent keyID={keyID} metadata={key.metadata} keyName={key.name} />
