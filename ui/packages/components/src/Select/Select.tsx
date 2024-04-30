@@ -118,3 +118,12 @@ Select.Button = Button;
 Select.Options = Options;
 Select.Option = Option;
 Select.CheckboxOption = CheckboxOption;
+
+// Used as a wrapper when we group select components in something similar to a button group
+export function SelectGroup({ children }: React.PropsWithChildren) {
+  return (
+    <div className="flex items-center [&>*:first-child]:rounded-r-none [&>*:last-child]:rounded-l-none [&>*:not(:first-child)]:border-l-0">
+      {children}
+    </div>
+  );
+}
