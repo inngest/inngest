@@ -31,27 +31,29 @@ export function createSpanWidths({
 
   afterWidth = maxTime.getTime() - (trace.endedAt ?? maxTime).getTime();
 
-  const timelineWidth = maxTime.getTime() - minTime.getTime();
-
-  if (beforeWidth > 0) {
-    beforeWidth = Math.max(Math.floor((beforeWidth / timelineWidth) * 1000), 1);
-  }
-  if (queuedWidth > 0) {
-    queuedWidth = Math.max(Math.floor((queuedWidth / timelineWidth) * 1000), 1);
-  }
-  if (runningWidth > 0) {
-    runningWidth = Math.max(Math.floor((runningWidth / timelineWidth) * 1000), 1);
-  }
-  if (afterWidth > 0) {
-    afterWidth = Math.max(Math.floor((afterWidth / timelineWidth) * 1000), 1);
-  }
+  const totalWidth = maxTime.getTime() - minTime.getTime();
 
   return {
-    after: afterWidth,
-    before: beforeWidth,
-    queued: queuedWidth,
-    running: runningWidth,
+    after: normalizeWidth({ width: afterWidth, totalWidth }),
+    before: normalizeWidth({ width: beforeWidth, totalWidth }),
+    queued: normalizeWidth({ width: queuedWidth, totalWidth }),
+    running: normalizeWidth({ width: runningWidth, totalWidth }),
   };
+}
+
+/**
+ * Turn the width into an integer and scale it down to ensure it isn't a massive
+ * number
+ */
+function normalizeWidth({ totalWidth, width }: { totalWidth: number; width: number }): number {
+  if (width === 0) {
+    return 0;
+  }
+
+  // Ensure the width is between the min and max
+  const minWidth = 1;
+  const maxWidth = 1000;
+  return Math.max(Math.floor((width / totalWidth) * maxWidth), minWidth);
 }
 
 export function toMaybeDate<T extends string | null | undefined>(value: T): Date | null {
