@@ -25,7 +25,7 @@ export function Secret({ className, kind, secret }: Props) {
   return (
     <div
       className={cn(
-        'flex truncate rounded-md border border-slate-300 bg-slate-50 text-slate-500',
+        'flex overflow-hidden rounded-md border border-slate-300 bg-slate-50 text-slate-500',
         className
       )}
     >
