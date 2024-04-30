@@ -50,7 +50,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
             <Select.CustomOption
               key={option}
               value={option}
-              className="ui-active:bg-blue-50 flex select-none items-center justify-between px-2 py-4 focus:outline-none"
+              className="ui-active:bg-blue-50 flex select-none items-center justify-between px-2 py-1.5 focus:outline-none"
             >
               {({ selected }: { selected: boolean }) => (
                 <span className="inline-flex items-center gap-2 lowercase">

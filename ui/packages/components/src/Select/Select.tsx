@@ -57,7 +57,7 @@ function Button({
 function Options({ children }: React.PropsWithChildren) {
   return (
     <Listbox.Options className="absolute mt-1 min-w-max">
-      <div className="overflow-hidden rounded-md border border-slate-200 bg-white drop-shadow-lg">
+      <div className="overflow-hidden rounded-md border border-slate-200 bg-white py-1 drop-shadow-lg">
         {children}
       </div>
     </Listbox.Options>
