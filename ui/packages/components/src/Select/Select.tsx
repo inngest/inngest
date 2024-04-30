@@ -5,10 +5,20 @@ import { cn } from '../utils/classNames';
 
 type SelectProps = {
   label?: string;
-  defaultValue?: string[];
-  onChange: (value: string[]) => void;
   isLabelVisible?: boolean;
   children: React.ReactNode;
+};
+
+type MultiProps = {
+  onChange: (value: string[]) => void;
+  defaultValue?: string[];
+  multiple: true;
+};
+
+type SingleProps = {
+  onChange: (value: string) => void;
+  defaultValue?: string;
+  multiple?: false;
 };
 
 export function Select({
@@ -17,9 +27,10 @@ export function Select({
   isLabelVisible = true,
   children,
   onChange,
-}: SelectProps) {
+  multiple,
+}: SelectProps & (MultiProps | SingleProps)) {
   return (
-    <Listbox value={defaultValue} onChange={onChange} multiple>
+    <Listbox value={defaultValue} onChange={onChange} multiple={multiple}>
       <span
         className={cn(
           isLabelVisible && 'divide-x divide-slate-300',

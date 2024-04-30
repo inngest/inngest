@@ -29,6 +29,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
 
   return (
     <Select
+      multiple
       defaultValue={selectedStatuses}
       onChange={(value: string[]) => {
         const newValue: FunctionRunStatus[] = [];
