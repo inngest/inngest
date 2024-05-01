@@ -5,13 +5,14 @@ import { Button } from '../Button';
 import { Time } from '../Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 import { cn } from '../utils/classNames';
+import { isStepStatus } from './types';
 
 type Props = {
   isExpanded: boolean;
   isExpandable: boolean;
   onClickExpandToggle: () => void;
   trace: {
-    attempts: number;
+    attempts: number | null;
     childrenSpans?: unknown[];
     endedAt: string | null;
     name: string;
@@ -25,7 +26,7 @@ type Props = {
 export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, trace }: Props) {
   let opCodeBadge;
   if (trace.stepOp && (trace.childrenSpans?.length ?? 0) > 0) {
-    const isRetried = trace.attempts > 1;
+    const isRetried = (trace.attempts ?? 0) > 1;
 
     opCodeBadge = (
       <span className="ml-2 flex h-fit">
@@ -42,7 +43,7 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
           <TooltipContent>Step method</TooltipContent>
         </Tooltip>
 
-        {trace.attempts > 1 && (
+        {(trace.attempts ?? 0) > 1 && (
           <Tooltip>
             <TooltipTrigger>
               <Badge
@@ -92,12 +93,15 @@ function TimeWithText({ trace }: { trace: Props['trace'] }) {
   let value: Date;
   if (trace.endedAt) {
     text = 'Ended';
-    if (trace.status === 'CANCELLED') {
-      text = 'Cancelled';
-    } else if (trace.status === 'SUCCEEDED') {
-      text = 'Completed';
-    } else if (trace.status === 'FAILED') {
-      text = 'Failed';
+
+    if (isStepStatus(trace.status)) {
+      if (trace.status === 'CANCELLED') {
+        text = 'Cancelled';
+      } else if (trace.status === 'COMPLETED') {
+        text = 'Completed';
+      } else if (trace.status === 'FAILED') {
+        text = 'Failed';
+      }
     }
 
     value = new Date(trace.endedAt);

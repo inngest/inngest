@@ -35,7 +35,9 @@ export function InlineSpans({ className, minTime, maxTime, spans, widths }: Prop
         }}
       >
         {spans.map((item) => {
-          return <Span isInline key={item.id} maxTime={maxTime} minTime={minTime} trace={item} />;
+          return (
+            <Span isInline key={item.spanID} maxTime={maxTime} minTime={minTime} trace={item} />
+          );
         })}
       </div>
 

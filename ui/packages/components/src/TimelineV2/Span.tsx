@@ -10,8 +10,8 @@ type Props = {
   minTime: Date;
   trace: {
     endedAt: string | null;
-    id: string;
     queuedAt: string;
+    spanID: string;
     startedAt: string | null;
     status: string;
   };
@@ -19,13 +19,11 @@ type Props = {
 
 export function Span({ className, isInline, maxTime, minTime, trace }: Props) {
   const widths = createSpanWidths({
-    maxTime,
-    minTime,
-    trace: {
-      endedAt: trace.endedAt ? new Date(trace.endedAt) : null,
-      queuedAt: new Date(trace.queuedAt),
-      startedAt: trace.startedAt ? new Date(trace.startedAt) : null,
-    },
+    ended: toMaybeDate(trace.endedAt)?.getTime() ?? null,
+    max: maxTime.getTime(),
+    min: minTime.getTime(),
+    queued: new Date(trace.queuedAt).getTime(),
+    started: toMaybeDate(trace.startedAt)?.getTime() ?? null,
   });
 
   if (isInline) {
@@ -61,11 +59,11 @@ export function Span({ className, isInline, maxTime, minTime, trace }: Props) {
 }
 
 const statusColors: { [key in StepStatus | 'UNKNOWN']: string } = {
-  [StepStatus.Cancelled]: 'bg-slate-400',
-  [StepStatus.Failed]: 'bg-rose-600',
-  [StepStatus.Queued]: 'bg-amber-500',
-  [StepStatus.Running]: 'bg-sky-500',
-  [StepStatus.Succeeded]: 'bg-teal-500',
+  CANCELLED: 'bg-slate-400',
+  COMPLETED: 'bg-teal-500',
+  FAILED: 'bg-rose-600',
+  QUEUED: 'bg-amber-500',
+  RUNNING: 'bg-sky-500',
   UNKNOWN: 'bg-slate-500',
 };
 

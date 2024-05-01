@@ -1,11 +1,11 @@
 export type Trace = {
-  attempts: number;
+  attempts: number | null;
   endedAt: string | null;
-  id: string;
   isRoot: boolean;
   name: string;
   outputID: string | null;
   queuedAt: string;
+  spanID: string;
   startedAt: string | null;
   status: string;
   childrenSpans?: Trace[];
@@ -15,10 +15,10 @@ export type Trace = {
 
 export enum StepStatus {
   Cancelled = 'CANCELLED',
+  Completed = 'COMPLETED',
   Failed = 'FAILED',
   Queued = 'QUEUED',
   Running = 'RUNNING',
-  Succeeded = 'SUCCEEDED',
 }
 
 export function isStepStatus(value: string): value is StepStatus {

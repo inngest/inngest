@@ -22,6 +22,7 @@ type Props = {
       endedAt: string | null;
       queuedAt: string;
       startedAt: string | null;
+      status: string;
     };
   };
 };
@@ -60,6 +61,8 @@ export function RunInfo({ className, app, fn, run }: Props) {
                 <span className="font-mono">{run.id}</span>
               </Labeled>
 
+              <Labeled label="Status">{run.trace.status}</Labeled>
+
               <Labeled label="Trigger">foo</Labeled>
 
               <Labeled label="Event received at"></Labeled>
@@ -71,8 +74,6 @@ export function RunInfo({ className, app, fn, run }: Props) {
               <Labeled label="Started at">{startedAt ? <Time value={startedAt} /> : '-'}</Labeled>
 
               <Labeled label="Ended at">{endedAt ? <Time value={endedAt} /> : '-'}</Labeled>
-
-              <Labeled label="Delay">{delayText}</Labeled>
 
               <Labeled label="Duration">{durationText}</Labeled>
 
