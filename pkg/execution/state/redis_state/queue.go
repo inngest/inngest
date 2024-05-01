@@ -621,7 +621,7 @@ func (q QueueItem) Score() int64 {
 		return startAt - q.Data.GetPriorityFactor()
 	}
 
-	return q.AtMS - q.Data.GetPriorityFactor()
+	return startAt - q.Data.GetPriorityFactor()
 }
 
 func (q QueueItem) MarshalBinary() ([]byte, error) {
