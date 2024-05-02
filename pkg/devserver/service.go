@@ -182,6 +182,7 @@ func (d *devserver) Stop(ctx context.Context) error {
 // any point.
 func (d *devserver) runDiscovery(ctx context.Context) {
 	logger.From(ctx).Info().Msg("autodiscovering locally hosted SDKs")
+	pollInterval := time.Duration(d.opts.PollInterval) * time.Second
 	for {
 		if ctx.Err() != nil {
 			return
@@ -191,14 +192,14 @@ func (d *devserver) runDiscovery(ctx context.Context) {
 			_ = discovery.Autodiscover(ctx)
 		}
 
-		<-time.After(5 * time.Second)
+		<-time.After(pollInterval)
 	}
 }
 
 // pollSDKs hits each SDK's register endpoint, asking them to communicate with
 // the dev server to re-register their functions.
 func (d *devserver) pollSDKs(ctx context.Context) {
-	pollInterval := time.Duration(d.opts.PollInterval)
+	pollInterval := time.Duration(d.opts.PollInterval) * time.Second
 
 	// Initially, add every app started with the `-u` flag
 	for _, url := range d.opts.URLs {
