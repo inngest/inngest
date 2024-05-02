@@ -23,7 +23,7 @@ export default function TimeFilter({ selectedTimeField, onTimeFieldChange }: Tim
           onTimeFieldChange(value);
         }
       }}
-      label="Status"
+      label="Time Field"
       isLabelVisible={false}
     >
       <Select.Button>
