@@ -35,7 +35,7 @@ export default function Table<T extends Row>({
             data.map((row, idx) => (
               <tr className="truncate" key={`tr-${idx}`}>
                 {columns.map((column, idx) => (
-                  <td className={cn('p-3', column.className)} key={`td-${idx}`}>
+                  <td className={cn('truncate p-3', column.className)} key={`td-${idx}`}>
                     {column.render ? column.render(row) : row[column.key]}
                   </td>
                 ))}
