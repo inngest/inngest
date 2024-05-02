@@ -37,10 +37,6 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
-const (
-	SDKPollInterval = 5 * time.Second
-)
-
 func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher) *devserver {
 	return &devserver{
 		data:        data,
@@ -202,6 +198,8 @@ func (d *devserver) runDiscovery(ctx context.Context) {
 // pollSDKs hits each SDK's register endpoint, asking them to communicate with
 // the dev server to re-register their functions.
 func (d *devserver) pollSDKs(ctx context.Context) {
+	pollInterval := time.Duration(d.opts.PollInterval)
+
 	// Initially, add every app started with the `-u` flag
 	for _, url := range d.opts.URLs {
 		// URLs must contain a protocol. If not, add http since very few apps
@@ -270,7 +268,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 				}
 			}
 		}
-		<-time.After(SDKPollInterval)
+		<-time.After(pollInterval)
 	}
 }
 
