@@ -16,8 +16,8 @@ type MultiProps = {
 };
 
 type SingleProps = {
-  onChange: (value: string) => void;
-  defaultValue?: string;
+  onChange: (value: string | number) => void;
+  defaultValue?: string | number;
   multiple?: false;
 };
 
@@ -78,7 +78,7 @@ function Options({ children }: React.PropsWithChildren) {
   );
 }
 
-function Option({ children, option }: React.PropsWithChildren<{ option: string }>) {
+function Option({ children, option }: React.PropsWithChildren<{ option: string | number }>) {
   return (
     <Listbox.Option
       className=" ui-selected:text-indigo-500 ui-selected:font-medium ui-active:bg-blue-50 flex select-none items-center justify-between focus:outline-none"

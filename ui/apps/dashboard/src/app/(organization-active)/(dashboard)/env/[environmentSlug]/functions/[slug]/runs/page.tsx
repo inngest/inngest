@@ -1,14 +1,16 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
+import RelativeTimeFilter from '@inngest/components/Filter/RelativeTimeFilter';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFilter from '@inngest/components/Filter/TimeFilter';
-// import { SelectGroup } from '@inngest/components/Select/Select';
+import { SelectGroup } from '@inngest/components/Select/Select';
 import {
   type FunctionRunStatus,
   type FunctionRunTimeField,
 } from '@inngest/components/types/functionRun';
+import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 import { RiLoopLeftLine } from '@remixicon/react';
 import { useQuery } from 'urql';
 
@@ -19,7 +21,14 @@ import { useSearchParam, useStringArraySearchParam } from '@/utils/useSearchPara
 import RunsTable from './RunsTable';
 import { toRunStatuses, toTimeField } from './utils';
 
-const TimeFilterDefault = FunctionRunTimeFieldV2.QueuedAt;
+const TimeFieldFilterDefault = FunctionRunTimeFieldV2.QueuedAt;
+const TimeRangeFilterDefault = {
+  startTime: getTimestampDaysAgo({
+    currentDate: new Date(),
+    days: 3,
+  }),
+  days: '3',
+};
 
 const GetRunsDocument = graphql(`
   query GetRuns($environmentID: ID!, $startTime: Time!, $status: [FunctionRunStatus!]) {
@@ -51,6 +60,27 @@ export default function RunsPage() {
   const [rawFilteredStatus, setFilteredStatus, removeFilteredStatus] =
     useStringArraySearchParam('filterStatus');
   const [rawTimeField, setTimeField] = useSearchParam('timeField');
+  const [lastDays, setLastDays] = useSearchParam('last');
+
+  /* TODO: Time params for absolute time filter */
+  // const [fromTime, setFromTime] = useSearchParam('from');
+  // const [untilTime, setUntilTime] = useSearchParam('until');
+
+  /* TODO: When we have absolute time, the start date will be either coming from the date picker or the relative time */
+  const [startTime, setStartTime] = useState<Date>(new Date());
+
+  useEffect(() => {
+    if (lastDays) {
+      setStartTime(
+        getTimestampDaysAgo({
+          currentDate: new Date(),
+          days: parseInt(lastDays),
+        })
+      );
+    } else {
+      setStartTime(TimeRangeFilterDefault.startTime);
+    }
+  }, [lastDays]);
 
   const filteredStatus = useMemo(() => {
     return toRunStatuses(rawFilteredStatus ?? []);
@@ -58,7 +88,7 @@ export default function RunsPage() {
 
   const timeField = useMemo(() => {
     if (!rawTimeField) {
-      return TimeFilterDefault;
+      return TimeFieldFilterDefault;
     }
     return toTimeField(rawTimeField);
   }, [rawTimeField]);
@@ -77,14 +107,20 @@ export default function RunsPage() {
     }
   }
 
+  function handleDaysChange(value: number) {
+    if (value) {
+      setLastDays(value.toString());
+    }
+  }
+
   const environment = useEnvironment();
   const [{ data, fetching: fetchingRuns }, refetch] = useQuery({
     query: GetRunsDocument,
     variables: {
       environmentID: environment.id,
-      startTime: '2024-04-19T11:26:03.203Z',
+      startTime: startTime.toISOString(),
       status: filteredStatus.length > 0 ? filteredStatus : null,
-      timeField: timeField ?? TimeFilterDefault,
+      timeField: timeField ?? TimeFieldFilterDefault,
     },
   });
 
@@ -103,13 +139,16 @@ export default function RunsPage() {
     <main className="h-full min-h-0 overflow-y-auto bg-white">
       <div className="flex items-center justify-between gap-2 bg-slate-50 px-8 py-2">
         <div className="flex items-center gap-2">
-          {/* <SelectGroup> */}
-          <TimeFilter
-            selectedTimeField={timeField ?? TimeFilterDefault}
-            onTimeFieldChange={handleTimeFieldChange}
-          />
-          {/* TODO: Add date filter here */}
-          {/* </SelectGroup> */}
+          <SelectGroup>
+            <TimeFilter
+              selectedTimeField={timeField ?? TimeFieldFilterDefault}
+              onTimeFieldChange={handleTimeFieldChange}
+            />
+            <RelativeTimeFilter
+              selectedDays={lastDays ? parseInt(lastDays) : parseInt(TimeRangeFilterDefault.days)}
+              onDaysChange={handleDaysChange}
+            />
+          </SelectGroup>
           <StatusFilter selectedStatuses={filteredStatus} onStatusesChange={handleStatusesChange} />
         </div>
         {/* TODO: wire button */}
