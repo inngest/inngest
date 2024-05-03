@@ -326,34 +326,20 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 }
 
 func (m mgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.MetadataUpdate) error {
-	byt, err := json.Marshal(md.Context)
-	if err != nil {
-		return err
-	}
-
 	input := []string{
-		string(byt),
-		"0",
 		"0",
 		strconv.Itoa(consts.RequestVersionUnknown),
-		"",  // spanID default value
 		"0", // start time default value
 	}
 
-	if md.Debugger {
-		input[1] = "1"
-	}
 	if md.DisableImmediateExecution {
-		input[2] = "1"
+		input[0] = "1"
 	}
 	if md.RequestVersion != consts.RequestVersionUnknown {
-		input[3] = strconv.Itoa(md.RequestVersion)
-	}
-	if md.SpanID != "" {
-		input[4] = md.SpanID
+		input[1] = strconv.Itoa(md.RequestVersion)
 	}
 	if !md.StartedAt.IsZero() {
-		input[5] = strconv.FormatInt(md.StartedAt.UnixMilli(), 10)
+		input[2] = strconv.FormatInt(md.StartedAt.UnixMilli(), 10)
 	}
 
 	status, err := scripts["updateMetadata"].Exec(

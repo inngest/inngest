@@ -106,12 +106,6 @@ func (i Identifier) IdempotencyKey() string {
 	return fmt.Sprintf("%s:%d:%s", i.WorkflowID, i.WorkflowVersion, key)
 }
 
-type StepNotification struct {
-	ID      Identifier
-	Step    string
-	Attempt int
-}
-
 // Metadata must be stored for each workflow run, allowing the runner to inspect
 // when the execution started, the number of steps enqueued, and the number of
 // steps finalized.
@@ -183,12 +177,9 @@ func (md *Metadata) GetSpanID() (*trace.SpanID, error) {
 }
 
 type MetadataUpdate struct {
-	Debugger                  bool           `json:"debugger"`
-	Context                   map[string]any `json:"ctx,omitempty"`
-	DisableImmediateExecution bool           `json:"disableImmediateExecution,omitempty"`
-	RequestVersion            int            `json:"rv"`
-	SpanID                    string         `json:"sid"`
-	StartedAt                 time.Time      `json:"sat"`
+	DisableImmediateExecution bool      `json:"disableImmediateExecution,omitempty"`
+	RequestVersion            int       `json:"rv"`
+	StartedAt                 time.Time `json:"sat"`
 }
 
 // State represents the current state of a fn run.  It is data-structure

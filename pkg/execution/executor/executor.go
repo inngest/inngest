@@ -718,9 +718,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			// This should be an one time operation and is never updated after,
 			// which is enforced on the Lua script.
 			if err := e.sm.UpdateMetadata(ctx, id.RunID, state.MetadataUpdate{
-				Context:                   md.Context,
 				DisableImmediateExecution: md.DisableImmediateExecution,
-				SpanID:                    fnSpanID.String(),
 				StartedAt:                 start,
 				RequestVersion:            md.RequestVersion,
 			}); err != nil {
@@ -1066,7 +1064,7 @@ func (e *executor) run(ctx context.Context, id state.Identifier, item queue.Item
 	}
 
 	// Execute the actual step.
-	response, err := e.executeDriverForStep(ctx, id, item, step, s, edge, stackIndex)
+	response, err := e.executeDriverForStep(ctx, item, step, s, edge, stackIndex)
 
 	if response.Err != nil && err == nil {
 		// This step errored, so always return an error.
@@ -1077,7 +1075,7 @@ func (e *executor) run(ctx context.Context, id state.Identifier, item queue.Item
 
 // executeDriverForStep runs the enqueued step by invoking the driver.  It also inspects
 // and normalizes responses (eg. max retry attempts).
-func (e *executor) executeDriverForStep(ctx context.Context, id state.Identifier, item queue.Item, step *inngest.Step, s state.State, edge inngest.Edge, stackIndex int) (*state.DriverResponse, error) {
+func (e *executor) executeDriverForStep(ctx context.Context, item queue.Item, step *inngest.Step, s state.State, edge inngest.Edge, stackIndex int) (*state.DriverResponse, error) {
 	d, ok := e.runtimeDrivers[step.Driver()]
 	if !ok {
 		return nil, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, step.Driver())
@@ -1647,10 +1645,9 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, resp *state.Driv
 		// fn is ending and it doesn't matter.
 		if md.RequestVersion == -1 {
 			update = &state.MetadataUpdate{
-				Context:                   md.Context,
-				Debugger:                  md.Debugger,
 				DisableImmediateExecution: md.DisableImmediateExecution,
 				RequestVersion:            resp.RequestVersion,
+				StartedAt:                 md.StartedAt,
 			}
 		}
 		if len(resp.Generator) > 1 {
@@ -1659,8 +1656,6 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, resp *state.Driv
 				// enforcing that every step becomes pre-planned.
 				if update == nil {
 					update = &state.MetadataUpdate{
-						Context:                   md.Context,
-						Debugger:                  md.Debugger,
 						DisableImmediateExecution: true,
 						RequestVersion:            resp.RequestVersion,
 						StartedAt:                 md.StartedAt,
