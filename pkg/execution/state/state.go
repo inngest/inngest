@@ -289,7 +289,7 @@ type StateLoader interface {
 // FunctionLoader loads function definitions based off of an identifier.
 type FunctionLoader interface {
 	// LoadFunction should always return the latest live version of a function
-	LoadFunction(ctx context.Context, identifier Identifier) (*inngest.Function, error)
+	LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*inngest.Function, error)
 }
 
 // Mutater mutates state for a given identifier, storing the state and returning

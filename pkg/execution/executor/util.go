@@ -14,31 +14,6 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-var metadataCtxKey = metadataCtxType{}
-
-type metadataCtxType struct{}
-
-// WithContextMetadata stores the given function run metadata within the given context.
-func WithContextMetadata(ctx context.Context, m state.Metadata) context.Context {
-	return context.WithValue(ctx, metadataCtxKey, &m)
-}
-
-// GetContextMetadata returns function run metadata stored in context or nil if not present.
-func GetContextMetadata(ctx context.Context) *state.Metadata {
-	val, _ := ctx.Value(metadataCtxKey).(*state.Metadata)
-	return val
-}
-
-// GetFunctionMetadata returns a function run's metadata.  This attempts to load metadata
-// from context first, to reduce state store reads, falling back to the state.Manager's Metadata()
-// method if the metadata does not exist in context.
-func GetFunctionRunMetadata(ctx context.Context, sm state.Manager, runID ulid.ULID) (*state.Metadata, error) {
-	if val := GetContextMetadata(ctx); val != nil {
-		return val, nil
-	}
-	return sm.Metadata(ctx, runID)
-}
-
 // OpcodeGroup is a group of opcodes that can be processed in parallel.
 type OpcodeGroup struct {
 	// Opcodes is the list of opcodes in the group.

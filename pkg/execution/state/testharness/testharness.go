@@ -82,14 +82,14 @@ func FunctionLoader() state.FunctionLoader {
 
 type loader struct{}
 
-func (loader) LoadFunction(ctx context.Context, identifier state.Identifier) (*inngest.Function, error) {
-	if identifier.WorkflowID == w.ID {
+func (loader) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*inngest.Function, error) {
+	if fnID == w.ID {
 		return &w, nil
 	}
-	if identifier.WorkflowID == n100.ID {
+	if fnID == n100.ID {
 		return &n100, nil
 	}
-	return nil, fmt.Errorf("workflow not found: %s", identifier.WorkflowID)
+	return nil, fmt.Errorf("workflow not found: %s", fnID)
 }
 
 func init() {
@@ -306,13 +306,8 @@ func checkUpdateMetadata(t *testing.T, m state.Manager) {
 	require.False(t, s.Metadata().DisableImmediateExecution)
 
 	update := state.MetadataUpdate{
-		Debugger:                  true,
 		DisableImmediateExecution: true,
-		Context: map[string]any{
-			"ok":      true,
-			"another": "yes",
-		},
-		RequestVersion: 2,
+		RequestVersion:            2,
 	}
 
 	err = m.UpdateMetadata(ctx, runID, update)
@@ -323,8 +318,6 @@ func checkUpdateMetadata(t *testing.T, m state.Manager) {
 
 	found := loaded.Metadata()
 	require.EqualValues(t, true, found.DisableImmediateExecution)
-	require.EqualValues(t, true, found.Debugger)
-	require.EqualValues(t, update.Context, found.Context)
 	require.EqualValues(t, 2, found.RequestVersion)
 }
 

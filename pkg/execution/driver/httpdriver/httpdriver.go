@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/telemetry"
@@ -64,13 +65,13 @@ func (e executor) RuntimeType() string {
 	return "http"
 }
 
-func (e executor) Execute(ctx context.Context, s state.State, item queue.Item, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
+func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadata, item queue.Item, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
 	uri, err := url.Parse(step.URI)
 	if err != nil {
 		return nil, err
 	}
 
-	input, err := driver.MarshalV1(ctx, s, step, idx, "", attempt)
+	input, err := driver.MarshalV1(ctx, sl, s, step, idx, "", attempt)
 	if err != nil {
 		return nil, err
 	}

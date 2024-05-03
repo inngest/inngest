@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -729,7 +730,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 //
 // This is a separate, exported function so that it can be used from this service
 // and also from eg. the run command.
-func Initialize(ctx context.Context, fn inngest.Function, tracked event.TrackedEvent, e execution.Executor) (*state.Identifier, error) {
+func Initialize(ctx context.Context, fn inngest.Function, tracked event.TrackedEvent, e execution.Executor) (*sv2.Metadata, error) {
 	zero := uuid.UUID{}
 	if bytes.Equal(fn.ID[:], zero[:]) {
 		// Locally, we want to ensure that each function has its own deterministic
@@ -744,12 +745,15 @@ func Initialize(ctx context.Context, fn inngest.Function, tracked event.TrackedE
 	idempotencyKey := tracked.GetEvent().ID
 
 	// If this is a debounced function, run this through a debouncer.
-
-	return e.Schedule(ctx, execution.ScheduleRequest{
+	md, err := e.Schedule(ctx, execution.ScheduleRequest{
 		Function:       fn,
 		Events:         []event.TrackedEvent{tracked},
 		IdempotencyKey: &idempotencyKey,
 	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error scheduling function", "error", err)
+	}
+	return md, err
 }
 
 // NewTracker returns a crappy in-memory tracker used for registering function runs.

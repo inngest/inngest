@@ -8,6 +8,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
@@ -20,7 +21,7 @@ const RuntimeName = "mock"
 type Mock struct {
 	// DynamicResponses allows users to specify a function which allows
 	// steps to return different data on each execution invocation.
-	DynamicResponses func(context.Context, state.State, queue.Item, inngest.Edge, inngest.Step, int, int) map[string]state.DriverResponse
+	DynamicResponses func(context.Context, sv2.Metadata, queue.Item, inngest.Edge, inngest.Step, int, int) map[string]state.DriverResponse
 
 	// Responses stores the responses that a driver should return.
 	Responses map[string]state.DriverResponse
@@ -46,7 +47,7 @@ func (m *Mock) RuntimeType() string {
 	return m.RuntimeName
 }
 
-func (m *Mock) Execute(ctx context.Context, s state.State, item queue.Item, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
+func (m *Mock) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadata, item queue.Item, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -78,7 +79,7 @@ type Config struct {
 	Responses map[string]state.DriverResponse
 	// DynamicResponses allows users to specify a function which allows
 	// steps to return different data on each execution invocation.
-	DynamicResponses func(context.Context, state.State, queue.Item, inngest.Edge, inngest.Step, int, int) map[string]state.DriverResponse
+	DynamicResponses func(context.Context, sv2.Metadata, queue.Item, inngest.Edge, inngest.Step, int, int) map[string]state.DriverResponse
 	// driver stores the driver once, as a singleton per config instance.
 	driver driver.Driver
 	Driver string

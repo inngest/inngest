@@ -37,8 +37,12 @@ const (
 	RunServiceCreateProcedure = "/state.v2.RunService/Create"
 	// RunServiceDeleteProcedure is the fully-qualified name of the RunService's Delete RPC.
 	RunServiceDeleteProcedure = "/state.v2.RunService/Delete"
+	// RunServiceExistsProcedure is the fully-qualified name of the RunService's Exists RPC.
+	RunServiceExistsProcedure = "/state.v2.RunService/Exists"
 	// RunServiceLoadMetadataProcedure is the fully-qualified name of the RunService's LoadMetadata RPC.
 	RunServiceLoadMetadataProcedure = "/state.v2.RunService/LoadMetadata"
+	// RunServiceLoadEventsProcedure is the fully-qualified name of the RunService's LoadEvents RPC.
+	RunServiceLoadEventsProcedure = "/state.v2.RunService/LoadEvents"
 	// RunServiceUpdateMetadataProcedure is the fully-qualified name of the RunService's UpdateMetadata
 	// RPC.
 	RunServiceUpdateMetadataProcedure = "/state.v2.RunService/UpdateMetadata"
@@ -51,7 +55,9 @@ var (
 	runServiceServiceDescriptor              = v2.File_state_v2_state_proto.Services().ByName("RunService")
 	runServiceCreateMethodDescriptor         = runServiceServiceDescriptor.Methods().ByName("Create")
 	runServiceDeleteMethodDescriptor         = runServiceServiceDescriptor.Methods().ByName("Delete")
+	runServiceExistsMethodDescriptor         = runServiceServiceDescriptor.Methods().ByName("Exists")
 	runServiceLoadMetadataMethodDescriptor   = runServiceServiceDescriptor.Methods().ByName("LoadMetadata")
+	runServiceLoadEventsMethodDescriptor     = runServiceServiceDescriptor.Methods().ByName("LoadEvents")
 	runServiceUpdateMetadataMethodDescriptor = runServiceServiceDescriptor.Methods().ByName("UpdateMetadata")
 	runServiceSaveStepMethodDescriptor       = runServiceServiceDescriptor.Methods().ByName("SaveStep")
 )
@@ -60,7 +66,9 @@ var (
 type RunServiceClient interface {
 	Create(context.Context, *connect.Request[v2.CreateStateRequest]) (*connect.Response[v2.CreateStateResponse], error)
 	Delete(context.Context, *connect.Request[v2.DeleteStateRequest]) (*connect.Response[v2.DeleteStateResponse], error)
+	Exists(context.Context, *connect.Request[v2.ExistsRequest]) (*connect.Response[v2.ExistsResponse], error)
 	LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error)
+	LoadEvents(context.Context, *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error)
 	UpdateMetadata(context.Context, *connect.Request[v2.MutateMetadataRequest]) (*connect.Response[v2.MutateMetadataResponse], error)
 	SaveStep(context.Context, *connect.Request[v2.SaveStepRequest]) (*connect.Response[v2.SaveStepResponse], error)
 }
@@ -87,10 +95,22 @@ func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(runServiceDeleteMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		exists: connect.NewClient[v2.ExistsRequest, v2.ExistsResponse](
+			httpClient,
+			baseURL+RunServiceExistsProcedure,
+			connect.WithSchema(runServiceExistsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		loadMetadata: connect.NewClient[v2.LoadMetadataRequest, v2.LoadMetadataResponse](
 			httpClient,
 			baseURL+RunServiceLoadMetadataProcedure,
 			connect.WithSchema(runServiceLoadMetadataMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		loadEvents: connect.NewClient[v2.LoadEventsRequest, v2.LoadEventsResponse](
+			httpClient,
+			baseURL+RunServiceLoadEventsProcedure,
+			connect.WithSchema(runServiceLoadEventsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		updateMetadata: connect.NewClient[v2.MutateMetadataRequest, v2.MutateMetadataResponse](
@@ -112,7 +132,9 @@ func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 type runServiceClient struct {
 	create         *connect.Client[v2.CreateStateRequest, v2.CreateStateResponse]
 	delete         *connect.Client[v2.DeleteStateRequest, v2.DeleteStateResponse]
+	exists         *connect.Client[v2.ExistsRequest, v2.ExistsResponse]
 	loadMetadata   *connect.Client[v2.LoadMetadataRequest, v2.LoadMetadataResponse]
+	loadEvents     *connect.Client[v2.LoadEventsRequest, v2.LoadEventsResponse]
 	updateMetadata *connect.Client[v2.MutateMetadataRequest, v2.MutateMetadataResponse]
 	saveStep       *connect.Client[v2.SaveStepRequest, v2.SaveStepResponse]
 }
@@ -127,9 +149,19 @@ func (c *runServiceClient) Delete(ctx context.Context, req *connect.Request[v2.D
 	return c.delete.CallUnary(ctx, req)
 }
 
+// Exists calls state.v2.RunService.Exists.
+func (c *runServiceClient) Exists(ctx context.Context, req *connect.Request[v2.ExistsRequest]) (*connect.Response[v2.ExistsResponse], error) {
+	return c.exists.CallUnary(ctx, req)
+}
+
 // LoadMetadata calls state.v2.RunService.LoadMetadata.
 func (c *runServiceClient) LoadMetadata(ctx context.Context, req *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error) {
 	return c.loadMetadata.CallUnary(ctx, req)
+}
+
+// LoadEvents calls state.v2.RunService.LoadEvents.
+func (c *runServiceClient) LoadEvents(ctx context.Context, req *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error) {
+	return c.loadEvents.CallUnary(ctx, req)
 }
 
 // UpdateMetadata calls state.v2.RunService.UpdateMetadata.
@@ -146,7 +178,9 @@ func (c *runServiceClient) SaveStep(ctx context.Context, req *connect.Request[v2
 type RunServiceHandler interface {
 	Create(context.Context, *connect.Request[v2.CreateStateRequest]) (*connect.Response[v2.CreateStateResponse], error)
 	Delete(context.Context, *connect.Request[v2.DeleteStateRequest]) (*connect.Response[v2.DeleteStateResponse], error)
+	Exists(context.Context, *connect.Request[v2.ExistsRequest]) (*connect.Response[v2.ExistsResponse], error)
 	LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error)
+	LoadEvents(context.Context, *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error)
 	UpdateMetadata(context.Context, *connect.Request[v2.MutateMetadataRequest]) (*connect.Response[v2.MutateMetadataResponse], error)
 	SaveStep(context.Context, *connect.Request[v2.SaveStepRequest]) (*connect.Response[v2.SaveStepResponse], error)
 }
@@ -169,10 +203,22 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(runServiceDeleteMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	runServiceExistsHandler := connect.NewUnaryHandler(
+		RunServiceExistsProcedure,
+		svc.Exists,
+		connect.WithSchema(runServiceExistsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	runServiceLoadMetadataHandler := connect.NewUnaryHandler(
 		RunServiceLoadMetadataProcedure,
 		svc.LoadMetadata,
 		connect.WithSchema(runServiceLoadMetadataMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	runServiceLoadEventsHandler := connect.NewUnaryHandler(
+		RunServiceLoadEventsProcedure,
+		svc.LoadEvents,
+		connect.WithSchema(runServiceLoadEventsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	runServiceUpdateMetadataHandler := connect.NewUnaryHandler(
@@ -193,8 +239,12 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 			runServiceCreateHandler.ServeHTTP(w, r)
 		case RunServiceDeleteProcedure:
 			runServiceDeleteHandler.ServeHTTP(w, r)
+		case RunServiceExistsProcedure:
+			runServiceExistsHandler.ServeHTTP(w, r)
 		case RunServiceLoadMetadataProcedure:
 			runServiceLoadMetadataHandler.ServeHTTP(w, r)
+		case RunServiceLoadEventsProcedure:
+			runServiceLoadEventsHandler.ServeHTTP(w, r)
 		case RunServiceUpdateMetadataProcedure:
 			runServiceUpdateMetadataHandler.ServeHTTP(w, r)
 		case RunServiceSaveStepProcedure:
@@ -216,8 +266,16 @@ func (UnimplementedRunServiceHandler) Delete(context.Context, *connect.Request[v
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.Delete is not implemented"))
 }
 
+func (UnimplementedRunServiceHandler) Exists(context.Context, *connect.Request[v2.ExistsRequest]) (*connect.Response[v2.ExistsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.Exists is not implemented"))
+}
+
 func (UnimplementedRunServiceHandler) LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.LoadMetadata is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) LoadEvents(context.Context, *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.LoadEvents is not implemented"))
 }
 
 func (UnimplementedRunServiceHandler) UpdateMetadata(context.Context, *connect.Request[v2.MutateMetadataRequest]) (*connect.Response[v2.MutateMetadataResponse], error) {

@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/oklog/ulid/v2"
 )
@@ -55,7 +56,12 @@ func (a API) CancelFunctionRun(ctx context.Context, runID ulid.ULID) error {
 	if fr.WorkspaceID != auth.WorkspaceID() {
 		return publicerr.Wrapf(err, 404, "Unable to load function run: %s", runID)
 	}
-	if err := a.opts.Executor.Cancel(ctx, runID, execution.CancelRequest{}); err != nil {
+
+	id := state.ID{
+		RunID:      runID,
+		FunctionID: fr.FunctionID,
+	}
+	if err := a.opts.Executor.Cancel(ctx, id, execution.CancelRequest{}); err != nil {
 		return publicerr.Wrapf(err, 500, "Unable to cancel function run: %s", err)
 	}
 	return nil

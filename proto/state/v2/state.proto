@@ -8,14 +8,14 @@ option go_package = "github.com/inngest/inngest/proto/gen/state/v2;statev2";
 
 message Metadata {
   ID         id      = 1;
-  Tenant     tenant  = 2;
-  Config     config  = 3;
-  RunMetrics metrics = 4;
+  Config     config  = 2;
+  RunMetrics metrics = 3;
 }
 
 message ID {
   string run_id      = 1;
   string function_id = 2;
+  Tenant tenant      = 3;
 }
 
 message Config {
@@ -88,10 +88,28 @@ message SaveStepRequest {
 
 message SaveStepResponse{}
 
+message ExistsRequest {
+  ID id = 1;
+}
+
+message ExistsResponse {
+  bool exists = 1;
+}
+
+message LoadEventsRequest {
+  ID id = 1;
+}
+
+message LoadEventsResponse {
+  repeated bytes events = 4;
+}
+
 service RunService {
   rpc Create(CreateStateRequest) returns (CreateStateResponse) {}
   rpc Delete(DeleteStateRequest) returns (DeleteStateResponse) {}
+  rpc Exists(ExistsRequest) returns (ExistsResponse) {}
   rpc LoadMetadata(LoadMetadataRequest) returns (LoadMetadataResponse) {}
+  rpc LoadEvents(LoadEventsRequest) returns (LoadEventsResponse) {}
   rpc UpdateMetadata(MutateMetadataRequest) returns (MutateMetadataResponse) {}
   rpc SaveStep(SaveStepRequest) returns (SaveStepResponse) {}
 }

@@ -1,24 +1,52 @@
 package state
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type ID struct {
 	RunID      ulid.ULID
 	FunctionID uuid.UUID
+	// Tenant provides tennat information for the run ID.  This is embedded into
+	// the identifier as additional fields that may be used in various
+	// implementations, but should not be used to reference specific run IDs.
+	Tenant Tenant
+}
+
+// IDFromV1 returns v2.ID from a statev1.Identifier
+func IDFromV1(id statev1.Identifier) ID {
+	return ID{
+		RunID:      id.RunID,
+		FunctionID: id.WorkflowID,
+		Tenant: Tenant{
+			AppID:     id.AppID,
+			EnvID:     id.WorkspaceID,
+			AccountID: id.AccountID,
+		},
+	}
 }
 
 // Metadata represets metadata for the run state.
 type Metadata struct {
 	ID      ID
-	Tenant  Tenant
 	Config  Config
 	Metrics RunMetrics
+	// Stack stores the order of the step IDs as a stack
+	Stack []string
+}
+
+func (m Metadata) IdempotencyKey() string {
+	key := m.Config.Idempotency
+	if key == "" {
+		key = m.ID.RunID.String()
+	}
+	return fmt.Sprintf("%s:%s", m.ID.FunctionID, key)
 }
 
 // Tenant represents tenant information for the run.
@@ -30,6 +58,14 @@ type Tenant struct {
 
 // Config represents run config, stored within metadata.
 type Config struct {
+	// FunctionSlug stores the function slug.
+	FunctionSlug string
+	// FunctionVersion stores the version of the function used when the run is
+	// scheduled.
+	FunctionVersion int
+	// If this run was started via a schedule, this stores the schedule information
+	// used.
+	CronSchedule *string
 	// SpanID stores the root span ID for the run's trace.
 	SpanID string
 	// StartedAt stores the time that the first step started.  This allows us to
@@ -74,11 +110,25 @@ type Config struct {
 	Context map[string]any
 }
 
+func (c Config) GetSpanID() (*trace.SpanID, error) {
+	if c.SpanID != "" {
+		sid, err := trace.SpanIDFromHex(c.SpanID)
+		return &sid, err
+	}
+	return nil, fmt.Errorf("invalid span id in run config")
+}
+
 // RunMetrics stores state-level run metrics.
 type RunMetrics struct {
 	// StateSize stores the total size, in bytes, of all events and step output.
 	// This is a counter and always increments.
 	StateSize int
+
+	// EventSize stores the size of all events that triggered the function, in bytes
+	EventSize int
+
+	// StepCount represents the total number of steps already completed.
+	StepCount int
 
 	// TODO
 
@@ -103,22 +153,3 @@ type MutableConfig struct {
 }
 
 type CustomConcurrency = statev1.CustomConcurrency
-
-/*
-type CustomConcurrency struct {
-	// Key represents the actual evaluated concurrency key.
-	Key string `json:"k"`
-	// Hash represents the hash of the concurrency expression - unevaluated -
-	// as defined in the function.  This lets us look up the latest concurrency
-	// values as defined in the most recent version of the function and use
-	// these concurrency values.  Without this, it's impossible to adjust concurrency
-	// for in-progress functions.
-	Hash string `json:"h"`
-	// Limit represents the limit at the time the function started.  If the concurrency
-	// key is removed from the fn definition, this pre-computed value will be used instead.
-	//
-	// NOTE: If the value is removed from the last deployed function we could also disregard
-	// this concurrency key.
-	Limit int `json:"l"`
-}
-*/

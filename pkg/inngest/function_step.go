@@ -34,7 +34,11 @@ func (s Step) RetryCount() int {
 
 func (s Step) Driver() string {
 	uri, _ := url.Parse(s.URI)
-	switch uri.Scheme {
+	return SchemeDriver(uri.Scheme)
+}
+
+func SchemeDriver(scheme string) string {
+	switch scheme {
 	case "http", "https":
 		return "http"
 	default:
