@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
@@ -51,7 +52,7 @@ type Executor interface {
 	// Note that the executor does *not* handle rate limiting, debouncing, batching,
 	// expressions, etc.  Any Schedule request will immediately be scheduled for the
 	// given time. Filtering of events in any way must be handled prior scheduling.
-	Schedule(ctx context.Context, r ScheduleRequest) (*state.Identifier, error)
+	Schedule(ctx context.Context, r ScheduleRequest) (*sv2.Metadata, error)
 
 	// Execute runs the given function via the execution drivers.  If the
 	// from ID is "$trigger" this is treated as a new workflow invocation from the
@@ -87,20 +88,6 @@ type Executor interface {
 		stackIndex int,
 	) (*state.DriverResponse, error)
 
-	// HandleResponse handles the response from running a step.
-	HandleResponse(
-		ctx context.Context,
-		id state.Identifier,
-		item queue.Item,
-		edge inngest.Edge,
-		resp *state.DriverResponse,
-	) error
-
-	// HandleGeneratorResponse handles all generator responses.
-	HandleGeneratorResponse(ctx context.Context, resp *state.DriverResponse, item queue.Item) error
-	// HandleGenerator handles an individual generator response returned from the SDK.
-	HandleGenerator(ctx context.Context, gen state.GeneratorOpcode, item queue.Item) error
-
 	// HandlePauses handles pauses loaded from an incoming event.  This delegates to Cancel and
 	// Resume where necessary, depending on pauses that have been loaded and matched.
 	HandlePauses(ctx context.Context, iter state.PauseIterator, event event.TrackedEvent) (HandlePauseResult, error)
@@ -108,7 +95,7 @@ type Executor interface {
 	// Resume where necessary
 	HandleInvokeFinish(ctx context.Context, event event.TrackedEvent) error
 	// Cancel cancels an in-progress function run, preventing any enqueued or future steps from running.
-	Cancel(ctx context.Context, runID ulid.ULID, r CancelRequest) error
+	Cancel(ctx context.Context, id sv2.ID, r CancelRequest) error
 	// Resume resumes an in-progress function run from the given waitForEvent pause.
 	Resume(ctx context.Context, p state.Pause, r ResumeRequest) error
 
@@ -116,8 +103,9 @@ type Executor interface {
 	// always add to a list of listeners vs replace listeners.
 	AddLifecycleListener(l LifecycleListener)
 
-	// SetFinishHandler sets the finish handler, called when a function run finishes.
-	SetFinishHandler(f FinishHandler)
+	// SetFinalizer sets the function which publishes finalization events on
+	// run completion
+	SetFinalizer(f FinalizePublisher)
 
 	// InvokeNotFoundHandler invokes the invoke not found handler.
 	InvokeNotFoundHandler(context.Context, InvokeNotFoundHandlerOpts) error
@@ -132,9 +120,9 @@ type InvokeNotFoundHandlerOpts struct {
 	Result        any
 }
 
-// FinishHandler is a function that handles functions finishing in the executor.
+// FinalizePublisher is a function that handles functions finishing in the executor.
 // It should be used to send the given events.
-type FinishHandler func(context.Context, state.State, []event.Event) error
+type FinalizePublisher func(context.Context, sv2.ID, []event.Event) error
 
 // InvokeNotFoundHandler is a function that handles invocations failing due to
 // the function not being found. It is passed a list of events to send.

@@ -6,8 +6,10 @@ import (
 	"fmt"
 
 	"github.com/gowebpki/jcs"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
@@ -17,7 +19,8 @@ type Driver interface {
 	// Execute executes the given action for the given step.
 	Execute(
 		ctx context.Context,
-		s state.State,
+		sl sv2.StateLoader,
+		md sv2.Metadata,
 		item queue.Item,
 		edge inngest.Edge,
 		step inngest.Step,
@@ -29,39 +32,60 @@ type Driver interface {
 // MarshalV1 marshals state as an input to driver runtimes.
 func MarshalV1(
 	ctx context.Context,
-	s state.State,
+	sl sv2.StateLoader,
+	md sv2.Metadata,
 	step inngest.Step,
 	stackIndex int,
 	env string,
 	attempt int,
 ) ([]byte, error) {
-	md := s.Metadata()
 
 	req := &SDKRequest{
-		Events:  s.Events(),
-		Event:   s.Event(),
-		Actions: s.Actions(),
+		Event:   map[string]any{},
+		Events:  []map[string]any{},
+		Actions: map[string]any{},
 		Context: &SDKRequestContext{
-			FunctionID: s.Function().ID,
+			UseAPI:     true,
+			FunctionID: md.ID.FunctionID,
 			Env:        env,
 			StepID:     step.ID,
-			RunID:      s.RunID(),
+			RunID:      md.ID.RunID,
 			Stack: &FunctionStack{
-				Stack:   s.Stack(),
+				Stack:   md.Stack,
 				Current: stackIndex,
 			},
 			Attempt:                   attempt,
-			DisableImmediateExecution: md.DisableImmediateExecution,
+			DisableImmediateExecution: md.Config.ForceStepPlan,
 		},
-		Version: md.RequestVersion,
+		Version: md.Config.RequestVersion,
+		UseAPI:  true,
 	}
 
-	// empty the attrs that consume the most
-	if req.IsBodySizeTooLarge() {
-		req.Events = []map[string]any{}
-		req.Actions = map[string]any{}
-		req.UseAPI = true
-		req.Context.UseAPI = true
+	if md.Metrics.StateSize <= consts.MaxBodySize {
+		// Load the actual function state here.
+		state, err := sl.LoadState(ctx, md.ID)
+		if err != nil {
+			return nil, fmt.Errorf("error loading state in driver marshaller: %w", err)
+		}
+
+		// Unmarshal events.
+		evts := make([]map[string]any, len(state.Events))
+		for n, i := range state.Events {
+			evts[n] = map[string]any{}
+			if err := json.Unmarshal(i, &evts[n]); err != nil {
+				return nil, fmt.Errorf("error unmarshalling event in driver marshaller: %w", err)
+			}
+		}
+		req.Event = evts[0]
+		req.Events = evts
+
+		// We do not need to unmarshal state, as it's already marshalled.
+		for k, v := range state.Steps {
+			req.Actions[k] = v
+		}
+
+		req.UseAPI = false
+		req.Context.UseAPI = false
 	}
 
 	j, err := json.Marshal(req)

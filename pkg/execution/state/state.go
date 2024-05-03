@@ -106,12 +106,6 @@ func (i Identifier) IdempotencyKey() string {
 	return fmt.Sprintf("%s:%d:%s", i.WorkflowID, i.WorkflowVersion, key)
 }
 
-type StepNotification struct {
-	ID      Identifier
-	Step    string
-	Attempt int
-}
-
 // Metadata must be stored for each workflow run, allowing the runner to inspect
 // when the execution started, the number of steps enqueued, and the number of
 // steps finalized.
@@ -183,12 +177,9 @@ func (md *Metadata) GetSpanID() (*trace.SpanID, error) {
 }
 
 type MetadataUpdate struct {
-	Debugger                  bool           `json:"debugger"`
-	Context                   map[string]any `json:"ctx,omitempty"`
-	DisableImmediateExecution bool           `json:"disableImmediateExecution,omitempty"`
-	RequestVersion            int            `json:"rv"`
-	SpanID                    string         `json:"sid"`
-	StartedAt                 time.Time      `json:"sat"`
+	DisableImmediateExecution bool      `json:"disableImmediateExecution,omitempty"`
+	RequestVersion            int       `json:"rv"`
+	StartedAt                 time.Time `json:"sat"`
 }
 
 // State represents the current state of a fn run.  It is data-structure
@@ -298,7 +289,7 @@ type StateLoader interface {
 // FunctionLoader loads function definitions based off of an identifier.
 type FunctionLoader interface {
 	// LoadFunction should always return the latest live version of a function
-	LoadFunction(ctx context.Context, identifier Identifier) (*inngest.Function, error)
+	LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*inngest.Function, error)
 }
 
 // Mutater mutates state for a given identifier, storing the state and returning

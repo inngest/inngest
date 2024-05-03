@@ -17,14 +17,14 @@ jobs:
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: '1.21'
+          go-version: '1.22'
       - name: Lint
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.55.1
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.58.0
           ./bin/golangci-lint run --verbose
   test-linux-race:
     strategy:
@@ -32,10 +32,10 @@ jobs:
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: '1.21'
+          go-version: '1.22'
       - name: Test
         run: go test $(go list ./... | grep -v tests) -race -count=1

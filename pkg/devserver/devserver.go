@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -108,6 +109,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	if err != nil {
 		return err
 	}
+	smv2 := redis_state.MustRunServiceV2(sm)
 
 	queueKG := &redis_state.DefaultQueueKeyGenerator{
 		Prefix: "{queue}",
@@ -118,14 +120,16 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithPollTick(opts.Tick),
 		redis_state.WithQueueKeyGenerator(queueKG),
 		redis_state.WithCustomConcurrencyKeyGenerator(func(ctx context.Context, i redis_state.QueueItem) []state.CustomConcurrency {
+			keys := i.Data.GetConcurrencyKeys()
+
 			fn, err := dbcqrs.GetFunctionByInternalUUID(ctx, i.Data.Identifier.WorkspaceID, i.Data.Identifier.WorkflowID)
 			if err != nil {
 				// Use what's stored in the state store.
-				return i.Data.Identifier.CustomConcurrencyKeys
+				return keys
 			}
 			f, err := fn.InngestFunction()
 			if err != nil {
-				return i.Data.Identifier.CustomConcurrencyKeys
+				return keys
 			}
 
 			if f.Concurrency != nil {
@@ -138,14 +142,16 @@ func start(ctx context.Context, opts StartOpts) error {
 					//
 					// NOTE:  This is accidentally quadratic but is okay as we bound concurrency
 					// keys to a low value (2-3).
-					for _, actual := range i.Data.Identifier.CustomConcurrencyKeys {
+					for n, actual := range keys {
 						if actual.Hash != "" && actual.Hash == c.Hash {
 							actual.Limit = c.Limit
+							keys[n] = actual
 						}
 					}
 				}
 			}
-			return i.Data.Identifier.CustomConcurrencyKeys
+
+			return keys
 		}),
 		redis_state.WithAccountConcurrencyKeyGenerator(func(ctx context.Context, i redis_state.QueueItem) (string, int) {
 			// NOTE: In the dev server there are no account concurrency limits.
@@ -197,8 +203,10 @@ func start(ctx context.Context, opts StartOpts) error {
 	if err != nil {
 		return fmt.Errorf("failed to create publisher: %w", err)
 	}
+
 	exec, err := executor.NewExecutor(
-		executor.WithStateManager(sm),
+		executor.WithStateManager(smv2),
+		executor.WithPauseManager(sm),
 		executor.WithRuntimeDrivers(
 			drivers...,
 		),
@@ -213,13 +221,12 @@ func start(ctx context.Context, opts StartOpts) error {
 				memory_writer.NewWriter(),
 			),
 			lifecycle{
-				sm:         sm,
 				cqrs:       dbcqrs,
 				pb:         pb,
 				eventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
 			},
 		),
-		executor.WithStepLimits(func(id state.Identifier) int { return consts.DefaultMaxStepLimit }),
+		executor.WithStepLimits(func(id sv2.ID) int { return consts.DefaultMaxStepLimit }),
 		executor.WithInvokeNotFoundHandler(getInvokeNotFoundHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),

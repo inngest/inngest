@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
@@ -116,7 +117,7 @@ func (s *svc) Pre(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create finish handler: %w", err)
 	}
-	s.exec.SetFinishHandler(finishHandler)
+	s.exec.SetFinalizer(finishHandler)
 
 	return nil
 }
@@ -125,7 +126,7 @@ func (s *svc) Executor() execution.Executor {
 	return s.exec
 }
 
-func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state.State, []event.Event) error, error) {
+func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.ID, []event.Event) error, error) {
 	pb, err := pubsub.NewPublisher(ctx, s.config.EventStream.Service)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create publisher: %w", err)
@@ -133,7 +134,7 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 
 	topicName := s.config.EventStream.Service.Concrete.TopicName()
 
-	return func(ctx context.Context, st state.State, events []event.Event) error {
+	return func(ctx context.Context, id sv2.ID, events []event.Event) error {
 		eg := errgroup.Group{}
 
 		for _, e := range events {
@@ -187,6 +188,11 @@ func (s *svc) Run(ctx context.Context) error {
 		default:
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
+
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error handling queue item", "error", err)
+		}
+
 		return err
 	})
 }

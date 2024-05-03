@@ -23,7 +23,6 @@ func NewStateInstance(
 	metadata Metadata,
 	events []map[string]any,
 	actions map[string]any,
-	errors map[string]error,
 	stack []string,
 ) State {
 	return &memstate{
@@ -32,7 +31,6 @@ func NewStateInstance(
 		metadata:   metadata,
 		events:     events,
 		actions:    actions,
-		errors:     errors,
 		stack:      stack,
 	}
 }

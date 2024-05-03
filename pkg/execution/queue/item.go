@@ -61,6 +61,7 @@ type Item struct {
 	Kind string `json:"kind"`
 	// Identifier represents the unique workflow ID and run ID for the current job.
 	Identifier state.Identifier `json:"identifier"`
+
 	// Attempt stores the zero index attempt counter
 	Attempt int `json:"atts"`
 	// MaxAttempts is the maximum number of attempts we can retry.  When attempts == this,
@@ -80,6 +81,19 @@ type Item struct {
 	// Throttle represents GCRA rate limiting for the queue item, which is applied when
 	// attempting to lease the item from the queue.
 	Throttle *Throttle `json:"throttle,omitempty"`
+	// CustomConcurrencyKeys stores custom concurrency keys for this function run.  This
+	// allows us to use custom concurrency keys for each job when processing steps for
+	// the function, with cached expression results.
+	//
+	// NOTE: This was added as Identifier is being deprecated as of 2024-04-09.  Items added
+	// to the queue prior to this date may have item.Identifier.CustomConcurrencyKeys added.
+	CustomConcurrencyKeys []state.CustomConcurrency `json:"cck,omitempty"`
+	// PriorityFactor is the overall priority factor for this particular function
+	// run.  This allows individual runs to take precedence within the same queue.
+	// The higher the number (up to consts.PriorityFactorMax), the higher priority
+	// this run has.  All next steps will use this as the factor when scheduling
+	// future edge jobs (on their first attempt).
+	PriorityFactor *int64 `json:"pf,omitempty"`
 }
 
 type Throttle struct {
@@ -92,6 +106,14 @@ type Throttle struct {
 	Burst int `json:"b"`
 	// Period is the rate limit period, in seconds
 	Period int `json:"p"`
+}
+
+func (i Item) GetConcurrencyKeys() []state.CustomConcurrency {
+	if len(i.Identifier.CustomConcurrencyKeys) > 0 {
+		// Only use this if specified.
+		return i.Identifier.CustomConcurrencyKeys
+	}
+	return i.CustomConcurrencyKeys
 }
 
 // GetPriorityFactor returns the priority factor for the queue item.  This fudges the job item's
@@ -107,6 +129,10 @@ type Throttle struct {
 func (i Item) GetPriorityFactor() int64 {
 	switch i.Kind {
 	case KindStart, KindEdge, KindEdgeError:
+		if i.PriorityFactor != nil {
+			// This takes precedence.
+			return int64(*i.PriorityFactor * 1000)
+		}
 		// Only support edges right now.  We don't account for the factor on other queue entries,
 		// else eg. sleeps would wake up at the wrong time.
 		if i.Identifier.PriorityFactor != nil {
@@ -130,15 +156,19 @@ func (i Item) IsStepKind() bool {
 
 func (i *Item) UnmarshalJSON(b []byte) error {
 	type kind struct {
-		GroupID     string            `json:"groupID"`
-		WorkspaceID uuid.UUID         `json:"wsID"`
-		Kind        string            `json:"kind"`
-		Identifier  state.Identifier  `json:"identifier"`
-		Attempt     int               `json:"atts"`
-		MaxAttempts *int              `json:"maxAtts,omitempty"`
-		Payload     json.RawMessage   `json:"payload"`
-		Metadata    map[string]string `json:"metadata"`
-		Throttle    *Throttle         `json:"throttle"`
+		GroupID               string                    `json:"groupID"`
+		WorkspaceID           uuid.UUID                 `json:"wsID"`
+		Kind                  string                    `json:"kind"`
+		Identifier            state.Identifier          `json:"identifier"`
+		Attempt               int                       `json:"atts"`
+		MaxAttempts           *int                      `json:"maxAtts,omitempty"`
+		Payload               json.RawMessage           `json:"payload"`
+		Metadata              map[string]string         `json:"metadata"`
+		QueueName             *string                   `json:"qn,omitempty"`
+		RunInfo               *RunInfo                  `json:"runinfo,omitempty"`
+		Throttle              *Throttle                 `json:"throttle"`
+		CustomConcurrencyKeys []state.CustomConcurrency `json:"cck,omitempty"`
+		PriorityFactor        *int64                    `json:"pf,omitempty"`
 	}
 	temp := &kind{}
 	err := json.Unmarshal(b, temp)
@@ -154,6 +184,9 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.MaxAttempts = temp.MaxAttempts
 	i.Metadata = temp.Metadata
 	i.Throttle = temp.Throttle
+	i.RunInfo = temp.RunInfo
+	i.CustomConcurrencyKeys = temp.CustomConcurrencyKeys
+	i.PriorityFactor = temp.PriorityFactor
 
 	// Save this for custom unmarshalling of other jobs.  This is overwritten
 	// for known queue kinds.

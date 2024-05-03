@@ -852,6 +852,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		shardName,
 		getNow().UnixMilli(),
 	})
+
 	if err != nil {
 		return i, err
 	}

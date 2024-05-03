@@ -1,0 +1,115 @@
+syntax = "proto3";
+package state.v2;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/state/v2;statev2";
+
+message Metadata {
+  ID         id      = 1;
+  Config     config  = 2;
+  RunMetrics metrics = 3;
+}
+
+message ID {
+  string run_id      = 1;
+  string function_id = 2;
+  Tenant tenant      = 3;
+}
+
+message Config {
+  string                            span_id          = 1;
+  google.protobuf.Timestamp         ts               = 2;
+  repeated string                   event_ids        = 3;
+  int64                             request_version  = 4;
+  string                            idempotency      = 5;
+  optional string                   replay_id        = 6;
+  optional int64                    priority_factor  = 7;
+  repeated ConcurrencyKey           concurrency_keys = 8;
+  bool                              force_step_plan  = 9;
+  map<string, google.protobuf.Any>  context          = 10;
+}
+
+message ConcurrencyKey {
+  string key   = 1;
+  string hash  = 2;
+  int64  limit = 3;
+}
+
+message RunMetrics {
+  int64 state_size = 1;
+}
+
+message Tenant {
+  string app_id     = 1;
+  string env_id     = 2;
+  string account_id = 3;
+}
+
+message CreateStateRequest {
+  string         run_id = 1;
+  Tenant         tenant = 2;
+  Config         config = 3;
+  repeated bytes events = 4;
+}
+
+message CreateStateResponse {}
+
+message DeleteStateRequest {
+  string run_id = 1;
+}
+
+
+message DeleteStateResponse {}
+
+message LoadMetadataRequest {
+  string run_id = 1;
+}
+
+message LoadMetadataResponse {
+  Metadata metadata = 1;
+}
+
+message MutateMetadataRequest {
+  google.protobuf.Timestamp started_at      = 1;
+  int64                     request_version = 2;
+  bool                      force_step_plan = 3;
+}
+
+message MutateMetadataResponse{}
+
+
+message SaveStepRequest {
+  string run_id  = 1;
+  string step_id = 2;
+  bytes  data    = 3;
+}
+
+message SaveStepResponse{}
+
+message ExistsRequest {
+  ID id = 1;
+}
+
+message ExistsResponse {
+  bool exists = 1;
+}
+
+message LoadEventsRequest {
+  ID id = 1;
+}
+
+message LoadEventsResponse {
+  repeated bytes events = 4;
+}
+
+service RunService {
+  rpc Create(CreateStateRequest) returns (CreateStateResponse) {}
+  rpc Delete(DeleteStateRequest) returns (DeleteStateResponse) {}
+  rpc Exists(ExistsRequest) returns (ExistsResponse) {}
+  rpc LoadMetadata(LoadMetadataRequest) returns (LoadMetadataResponse) {}
+  rpc LoadEvents(LoadEventsRequest) returns (LoadEventsResponse) {}
+  rpc UpdateMetadata(MutateMetadataRequest) returns (MutateMetadataResponse) {}
+  rpc SaveStep(SaveStepRequest) returns (SaveStepResponse) {}
+}

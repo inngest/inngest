@@ -26,7 +26,7 @@ func TestFunctionSteps(t *testing.T) {
 
 	a := inngestgo.CreateFunction(
 		inngestgo.FunctionOpts{Name: "test sdk"},
-		inngestgo.EventTrigger("test/sdk", nil),
+		inngestgo.EventTrigger("test/sdk-steps", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			runID = input.InputCtx.RunID
 
@@ -75,7 +75,7 @@ func TestFunctionSteps(t *testing.T) {
 	registerFuncs()
 
 	evt := inngestgo.Event{
-		Name: "test/sdk",
+		Name: "test/sdk-steps",
 		Data: map[string]any{
 			"test": true,
 			"id":   "1",
@@ -86,33 +86,8 @@ func TestFunctionSteps(t *testing.T) {
 
 	<-time.After(3 * time.Second)
 
-	// Send the first event to trigger the wait.
-	_, err = inngestgo.Send(context.Background(), inngestgo.Event{
-		Name: "api/new.event",
-		Data: map[string]any{
-			"test": true,
-		},
-	})
-	require.NoError(t, err)
-
-	<-time.After(time.Second)
-
-	// And the second event to trigger the next wait.
-	_, err = inngestgo.Send(context.Background(), inngestgo.Event{
-		Name: "api/new.event",
-		Data: map[string]any{
-			"ok": "yes",
-			"id": "1",
-		},
-	})
-	require.NoError(t, err)
-
-	<-time.After(time.Second)
-
-	require.Eventually(t, func() bool {
-		return atomic.LoadInt32(&counter) == 3
-	}, 15*time.Second, time.Second)
-
+	// While we're waiting, ensure that the batch API works.  We must do this while the function is
+	// in-progress as the state is cleared up.
 	t.Run("Check batch API", func(t *testing.T) {
 		// Fetch event data and step data from the V0 APIs;  it should exist.
 		resp, err := http.Get(fmt.Sprintf("%s/v0/runs/%s/batch", DEV_URL, runID))
@@ -139,7 +114,37 @@ func TestFunctionSteps(t *testing.T) {
 		_ = resp.Body.Close()
 		require.NoError(t, err)
 
-		// 5 steps plus overall fn response
-		require.Equal(t, 6, len(body))
+		// 3 step so far: 2 steps, 1 wait
+		require.Equal(t, 3, len(body))
 	})
+
+	t.Run("waitForEvents succeed", func(t *testing.T) {
+		// Send the first event to trigger the wait.
+		_, err = inngestgo.Send(context.Background(), inngestgo.Event{
+			Name: "api/new.event",
+			Data: map[string]any{
+				"test": true,
+			},
+		})
+		require.NoError(t, err)
+
+		<-time.After(time.Second)
+
+		// And the second event to trigger the next wait.
+		_, err = inngestgo.Send(context.Background(), inngestgo.Event{
+			Name: "api/new.event",
+			Data: map[string]any{
+				"ok": "yes",
+				"id": "1",
+			},
+		})
+		require.NoError(t, err)
+
+		<-time.After(time.Second)
+
+		require.Eventually(t, func() bool {
+			return atomic.LoadInt32(&counter) == 3
+		}, 15*time.Second, time.Second)
+	})
+
 }

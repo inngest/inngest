@@ -246,7 +246,7 @@ type mgr struct {
 }
 
 func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
-	f, err := m.LoadFunction(ctx, input.Identifier)
+	f, err := m.LoadFunction(ctx, input.Identifier.WorkspaceID, input.Identifier.WorkflowID)
 	if err != nil {
 		return nil, fmt.Errorf("error loading function in state store: %w", err)
 	}
@@ -266,14 +266,10 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		Context:        input.Context,
 		Status:         enums.RunStatusScheduled,
 		SpanID:         input.SpanID,
+		EventSize:      len(events),
 	}
 	if input.RunType != nil {
 		metadata.RunType = *input.RunType
-	}
-
-	metadataByt, err := json.Marshal(metadata.Map())
-	if err != nil {
-		return nil, fmt.Errorf("error storing run state in redis: %w", err)
 	}
 
 	var stepsByt []byte
@@ -282,6 +278,14 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error storing run state in redis: %w", err)
 		}
+	}
+
+	// Add total state size, including size of input steps.
+	metadata.StateSize = len(events) + len(stepsByt)
+
+	metadataByt, err := json.Marshal(metadata.Map())
+	if err != nil {
+		return nil, fmt.Errorf("error storing run state in redis: %w", err)
 	}
 
 	args, err := StrSlice([]any{
@@ -319,43 +323,26 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 			metadata.Metadata(),
 			input.EventBatchData,
 			input.Steps,
-			map[string]error{},
 			make([]string, 0),
 		),
 		nil
 }
 
 func (m mgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.MetadataUpdate) error {
-	byt, err := json.Marshal(md.Context)
-	if err != nil {
-		return err
-	}
-
 	input := []string{
-		string(byt),
-		"0",
-		"0",
-		strconv.Itoa(consts.RequestVersionUnknown),
-		"",  // spanID default value
+		"0", // Force planning / disable immediate execution
+		strconv.Itoa(consts.RequestVersionUnknown), // Request version
 		"0", // start time default value
 	}
-
-	if md.Debugger {
-		input[1] = "1"
-	}
 	if md.DisableImmediateExecution {
-		input[2] = "1"
+		input[0] = "1"
 	}
 	if md.RequestVersion != consts.RequestVersionUnknown {
-		input[3] = strconv.Itoa(md.RequestVersion)
-	}
-	if md.SpanID != "" {
-		input[4] = md.SpanID
+		input[1] = strconv.Itoa(md.RequestVersion)
 	}
 	if !md.StartedAt.IsZero() {
-		input[5] = strconv.FormatInt(md.StartedAt.UnixMilli(), 10)
+		input[2] = strconv.FormatInt(md.StartedAt.UnixMilli(), 10)
 	}
-
 	status, err := scripts["updateMetadata"].Exec(
 		ctx,
 		m.r,
@@ -448,11 +435,59 @@ func (m mgr) Metadata(ctx context.Context, runID ulid.ULID) (*state.Metadata, er
 	return &meta, nil
 }
 
-func (m mgr) LoadFunction(ctx context.Context, id state.Identifier) (*inngest.Function, error) {
+func (m mgr) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*inngest.Function, error) {
 	if m.fl == nil {
 		return nil, ErrNoFunctionLoader
 	}
-	return m.fl.LoadFunction(ctx, id)
+	return m.fl.LoadFunction(ctx, envID, fnID)
+}
+
+func (m mgr) LoadEvents(ctx context.Context, fnID uuid.UUID, runID ulid.ULID) ([]json.RawMessage, error) {
+	var (
+		events []json.RawMessage
+		v1id   = state.Identifier{
+			RunID:      runID,
+			WorkflowID: fnID,
+		}
+	)
+
+	cmd := m.r.B().Get().Key(m.kf.Events(ctx, v1id)).Build()
+	byt, err := m.r.Do(ctx, cmd).AsBytes()
+	if err == nil {
+		if err := json.Unmarshal(byt, &events); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
+		}
+		return events, nil
+	}
+
+	// Pre-batch days for backcompat.
+	cmd = m.r.B().Get().Key(m.kf.Event(ctx, v1id)).Build()
+	byt, err = m.r.Do(ctx, cmd).AsBytes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get event; %w", err)
+	}
+	return []json.RawMessage{byt}, nil
+}
+
+func (m mgr) LoadSteps(ctx context.Context, fnID uuid.UUID, runID ulid.ULID) (map[string]json.RawMessage, error) {
+	var (
+		steps = map[string]json.RawMessage{}
+		v1id  = state.Identifier{
+			RunID:      runID,
+			WorkflowID: fnID,
+		}
+	)
+
+	// Load the actions.  This is a map of step IDs to JSON-encoded results.
+	cmd := m.r.B().Hgetall().Key(m.kf.Actions(ctx, v1id)).Build()
+	rmap, err := m.r.Do(ctx, cmd).AsStrMap()
+	if err != nil {
+		return nil, fmt.Errorf("failed loading actions; %w", err)
+	}
+	for stepID, marshalled := range rmap {
+		steps[stepID] = json.RawMessage(marshalled)
+	}
+	return steps, nil
 }
 
 func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
@@ -464,7 +499,7 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 
 	id := metadata.Identifier
 
-	fn, err := m.fl.LoadFunction(ctx, id)
+	fn, err := m.fl.LoadFunction(ctx, id.WorkspaceID, id.WorkflowID)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load function from state function loader: %s: %w", id.WorkflowID, err)
 	}
@@ -511,27 +546,23 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 		actions[stepID] = data
 	}
 
-	// Load the errors.  This is a map of step IDs to error strings.
-	// The original error type is not preserved.
-	cmd = m.r.B().Hgetall().Key(m.kf.Errors(ctx, id)).Build()
-	rmap, err = m.r.Do(ctx, cmd).AsStrMap()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load errors; %w", err)
-	}
-	errors := map[string]error{}
-	for stepID, str := range rmap {
-		errors[stepID] = fmt.Errorf(str)
-	}
-
 	meta := metadata.Metadata()
 
-	cmd = m.r.B().Lrange().Key(m.kf.Stack(ctx, id.RunID)).Start(0).Stop(-1).Build()
-	stack, err := m.r.Do(ctx, cmd).AsStrSlice()
+	stack, err := m.stack(ctx, id.RunID)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching stack: %w", err)
 	}
 
-	return state.NewStateInstance(*fn, id, meta, events, actions, errors, stack), nil
+	return state.NewStateInstance(*fn, id, meta, events, actions, stack), nil
+}
+
+func (m mgr) stack(ctx context.Context, runID ulid.ULID) ([]string, error) {
+	cmd := m.r.B().Lrange().Key(m.kf.Stack(ctx, runID)).Start(0).Stop(-1).Build()
+	stack, err := m.r.Do(ctx, cmd).AsStrSlice()
+	if err != nil {
+		return nil, fmt.Errorf("error fetching stack: %w", err)
+	}
+	return stack, nil
 }
 
 func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error) {
@@ -553,7 +584,6 @@ func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (in
 }
 
 func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) error {
-
 	keys := []string{
 		m.kf.Actions(ctx, i),
 		m.kf.RunMetadata(ctx, i.RunID),
@@ -779,6 +809,7 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		m.kf.Invoke(ctx, p.WorkspaceID),
 		m.kf.Actions(ctx, p.Identifier),
 		m.kf.Stack(ctx, p.Identifier.RunID),
+		m.kf.RunMetadata(ctx, p.Identifier.RunID),
 	}
 
 	corrId := ""
@@ -1213,14 +1244,21 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 	m.Status = enums.RunStatus(status)
 
-	str, ok := data["pending"]
-	if !ok {
-		return nil, fmt.Errorf("no created at stored in run metadata")
+	parseInt := func(v string) (int, error) {
+		str, ok := data[v]
+		if !ok {
+			return 0, fmt.Errorf("no created at stored in run metadata")
+		}
+		val, err := strconv.Atoi(str)
+		if err != nil {
+			return 0, fmt.Errorf("invalid pending stored in run metadata")
+		}
+		return val, nil
 	}
-	m.Pending, err = strconv.Atoi(str)
-	if err != nil {
-		return nil, fmt.Errorf("invalid pending stored in run metadata")
-	}
+
+	m.StateSize, _ = parseInt("state_size")
+	m.EventSize, _ = parseInt("event_size")
+	m.StepCount, _ = parseInt("step_count")
 
 	if val, ok := data["version"]; ok && val != "" {
 		v, err := strconv.Atoi(val)
@@ -1381,7 +1419,9 @@ type runMetadata struct {
 	Identifier state.Identifier `json:"id"`
 	Status     enums.RunStatus  `json:"status"`
 	// These are the fields for standard state metadata.
-	Pending                   int            `json:"pending"`
+	StateSize                 int            `json:"state_size"`
+	EventSize                 int            `json:"event_size"`
+	StepCount                 int            `json:"step_count"`
 	Debugger                  bool           `json:"debugger"`
 	RunType                   string         `json:"runType,omitempty"`
 	ReplayID                  string         `json:"rID,omitempty"`
@@ -1397,7 +1437,6 @@ func (r runMetadata) Map() map[string]any {
 	return map[string]any{
 		"id":       r.Identifier,
 		"status":   int(r.Status), // Always store this as an int
-		"pending":  r.Pending,
 		"debugger": r.Debugger,
 		"runType":  r.RunType,
 		"version":  r.Version,

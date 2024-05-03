@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/telemetry"
@@ -54,9 +55,8 @@ func (l lifecycle) Close() error {
 // may start if and when there's capacity due to concurrency.
 func (l lifecycle) OnFunctionScheduled(
 	ctx context.Context,
-	id state.Identifier,
+	md sv2.Metadata,
 	item queue.Item,
-	s state.State,
 ) {
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
@@ -64,25 +64,25 @@ func (l lifecycle) OnFunctionScheduled(
 			"error parsing group ID",
 			"error", err,
 			"group_id", item.GroupID,
-			"run_id", id.RunID.String(),
+			"run_id", md.ID.RunID.String(),
 		)
 	}
 
 	h := History{
-		Cron:            s.CronSchedule(),
+		Cron:            md.Config.CronSchedule,
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-		AccountID:       id.AccountID,
-		WorkspaceID:     id.WorkspaceID,
+		AccountID:       md.ID.Tenant.AccountID,
+		WorkspaceID:     md.ID.Tenant.EnvID,
 		CreatedAt:       time.Now(),
-		FunctionID:      id.WorkflowID,
-		FunctionVersion: int64(id.WorkflowVersion),
+		FunctionID:      md.ID.FunctionID,
+		FunctionVersion: int64(md.Config.FunctionVersion),
 		GroupID:         groupID,
-		RunID:           id.RunID,
+		RunID:           md.ID.RunID,
 		Type:            enums.HistoryTypeFunctionScheduled.String(),
 		Attempt:         int64(item.Attempt),
-		IdempotencyKey:  id.IdempotencyKey(),
-		EventID:         id.EventID,
-		BatchID:         id.BatchID,
+		IdempotencyKey:  md.IdempotencyKey(),
+		EventID:         md.Config.EventIDs[0],
+		BatchID:         md.Config.BatchID,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
@@ -97,9 +97,8 @@ func (l lifecycle) OnFunctionScheduled(
 // function is scheduled.
 func (l lifecycle) OnFunctionStarted(
 	ctx context.Context,
-	id state.Identifier,
+	md sv2.Metadata,
 	item queue.Item,
-	s state.State,
 ) {
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
@@ -107,7 +106,7 @@ func (l lifecycle) OnFunctionStarted(
 			"error parsing group ID",
 			"error", err,
 			"group_id", item.GroupID,
-			"run_id", id.RunID.String(),
+			"run_id", md.ID.RunID.String(),
 		)
 	}
 
@@ -115,21 +114,21 @@ func (l lifecycle) OnFunctionStarted(
 	latencyMS := latency.Milliseconds()
 
 	h := History{
-		Cron:            s.CronSchedule(),
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-		AccountID:       id.AccountID,
-		WorkspaceID:     id.WorkspaceID,
+		Cron:            md.Config.CronSchedule,
+		AccountID:       md.ID.Tenant.AccountID,
+		WorkspaceID:     md.ID.Tenant.EnvID,
 		CreatedAt:       time.Now(),
-		FunctionID:      id.WorkflowID,
-		FunctionVersion: int64(id.WorkflowVersion),
+		FunctionID:      md.ID.FunctionID,
+		FunctionVersion: int64(md.Config.FunctionVersion),
 		GroupID:         groupID,
-		RunID:           id.RunID,
+		RunID:           md.ID.RunID,
 		Type:            enums.HistoryTypeFunctionStarted.String(),
 		Attempt:         int64(item.Attempt),
-		IdempotencyKey:  id.IdempotencyKey(),
-		EventID:         id.EventID,
-		BatchID:         id.BatchID,
+		IdempotencyKey:  md.IdempotencyKey(),
+		EventID:         md.Config.EventIDs[0],
 		LatencyMS:       &latencyMS,
+		BatchID:         md.Config.BatchID,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
@@ -145,39 +144,38 @@ func (l lifecycle) OnFunctionStarted(
 // If failed, DriverResponse will contain a non nil Err string.
 func (l lifecycle) OnFunctionFinished(
 	ctx context.Context,
-	id state.Identifier,
+	md sv2.Metadata,
 	item queue.Item,
 	resp state.DriverResponse,
-	s state.State,
 ) {
-	completedStepCount := int64(len(s.Actions()) + len(s.Errors()))
-
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
 		l.log.Error(
 			"error parsing group ID",
 			"error", err,
 			"group_id", item.GroupID,
-			"run_id", id.RunID.String(),
+			"run_id", md.ID.RunID.String(),
 		)
 	}
 
+	completedStepCount := int64(md.Metrics.StepCount)
+
 	h := History{
-		Cron:               s.CronSchedule(),
+		Cron:               md.Config.CronSchedule,
 		ID:                 ulid.MustNew(ulid.Now(), rand.Reader),
-		AccountID:          id.AccountID,
-		WorkspaceID:        id.WorkspaceID,
+		AccountID:          md.ID.Tenant.AccountID,
+		WorkspaceID:        md.ID.Tenant.EnvID,
 		CompletedStepCount: &completedStepCount,
 		CreatedAt:          time.Now(),
-		FunctionID:         id.WorkflowID,
-		FunctionVersion:    int64(id.WorkflowVersion),
+		FunctionID:         md.ID.FunctionID,
+		FunctionVersion:    int64(md.Config.FunctionVersion),
+		RunID:              md.ID.RunID,
 		GroupID:            groupID,
-		RunID:              id.RunID,
 		Type:               enums.HistoryTypeFunctionCompleted.String(),
 		Attempt:            int64(item.Attempt),
-		IdempotencyKey:     id.IdempotencyKey(),
-		EventID:            id.EventID,
-		BatchID:            id.BatchID,
+		IdempotencyKey:     md.IdempotencyKey(),
+		EventID:            md.Config.EventIDs[0],
+		BatchID:            md.Config.BatchID,
 	}
 
 	err = applyResponse(&h, &resp)
@@ -187,7 +185,7 @@ func (l lifecycle) OnFunctionFinished(
 		l.log.Error(
 			"error applying response to history",
 			"error", err,
-			"run_id", id.RunID.String(),
+			"run_id", md.ID.RunID.String(),
 		)
 	}
 
@@ -206,72 +204,69 @@ func (l lifecycle) OnFunctionFinished(
 // function or the API request information.
 func (l lifecycle) OnFunctionCancelled(
 	ctx context.Context,
-	id state.Identifier,
+	md sv2.Metadata,
 	req execution.CancelRequest,
-	s state.State,
 ) {
-	md := s.Metadata()
-
 	go func(ctx context.Context) {
 		start := time.Now()
-		if !md.StartedAt.IsZero() {
-			start = md.StartedAt
+		if !md.Config.StartedAt.IsZero() {
+			start = md.Config.StartedAt
 		}
 
-		fnSpanID, err := md.GetSpanID()
+		fnSpanID, err := md.Config.GetSpanID()
 		if err != nil {
-			log.From(ctx).Error().Err(err).Interface("identifier", id).Msg("error retrieving spanID for cancelled function run")
+			log.From(ctx).Error().Err(err).Interface("identifier", md.ID).Msg("error retrieving spanID for cancelled function run")
 			return
 		}
 
-		evtIDs := make([]string, len(id.EventIDs))
-		for i, eid := range id.EventIDs {
+		evtIDs := make([]string, len(md.Config.EventIDs))
+		for i, eid := range md.Config.EventIDs {
 			evtIDs[i] = eid.String()
 		}
 
 		_, span := telemetry.NewSpan(ctx,
 			telemetry.WithScope(consts.OtelScopeFunction),
-			telemetry.WithName(s.Function().GetSlug()),
+			telemetry.WithName(md.Config.FunctionSlug),
 			telemetry.WithTimestamp(start),
 			telemetry.WithSpanID(*fnSpanID),
 			telemetry.WithSpanAttributes(
 				attribute.Bool(consts.OtelUserTraceFilterKey, true),
-				attribute.String(consts.OtelSysAccountID, id.AccountID.String()),
-				attribute.String(consts.OtelSysWorkspaceID, id.WorkspaceID.String()),
-				attribute.String(consts.OtelSysAppID, id.AppID.String()),
-				attribute.String(consts.OtelSysFunctionID, id.WorkflowID.String()),
-				attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
-				attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
-				attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
+				attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
+				attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
+				attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
+				attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
+				attribute.String(consts.OtelSysFunctionSlug, md.Config.FunctionSlug),
+				attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
+				attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()),
 				attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
-				attribute.String(consts.OtelSysIdempotencyKey, id.IdempotencyKey()),
+				attribute.String(consts.OtelSysIdempotencyKey, md.IdempotencyKey()),
 				attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCancelled.ToCode()),
 			),
 		)
-		if id.BatchID != nil {
-			span.SetAttributes(attribute.String(consts.OtelSysBatchID, id.BatchID.String()))
+		if md.Config.BatchID != nil {
+			span.SetAttributes(attribute.String(consts.OtelSysBatchID, md.Config.BatchID.String()))
 		}
 		defer span.End()
 	}(ctx)
-	completedStepCount := int64(len(s.Actions()) + len(s.Errors()))
+	completedStepCount := int64(md.Metrics.StepCount)
 	groupID := uuid.New()
 
 	h := History{
-		Cron:               s.CronSchedule(),
+		Cron:               md.Config.CronSchedule,
 		ID:                 ulid.MustNew(ulid.Now(), rand.Reader),
-		AccountID:          id.AccountID,
-		WorkspaceID:        id.WorkspaceID,
+		AccountID:          md.ID.Tenant.AccountID,
+		WorkspaceID:        md.ID.Tenant.EnvID,
 		CompletedStepCount: &completedStepCount,
 		CreatedAt:          time.Now(),
-		FunctionID:         id.WorkflowID,
-		FunctionVersion:    int64(id.WorkflowVersion),
+		FunctionID:         md.ID.FunctionID,
+		FunctionVersion:    int64(md.Config.FunctionVersion),
 		GroupID:            &groupID,
-		RunID:              id.RunID,
+		RunID:              md.ID.RunID,
 		Type:               enums.HistoryTypeFunctionCancelled.String(),
-		IdempotencyKey:     id.IdempotencyKey(),
-		EventID:            id.EventID,
-		BatchID:            id.BatchID,
+		IdempotencyKey:     md.IdempotencyKey(),
+		EventID:            md.Config.EventIDs[0],
 		Cancel:             &req,
+		BatchID:            md.Config.BatchID,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
@@ -284,7 +279,7 @@ func (l lifecycle) OnFunctionCancelled(
 // queue item which embeds the next step information.
 func (l lifecycle) OnStepScheduled(
 	ctx context.Context,
-	id state.Identifier,
+	md sv2.Metadata,
 	item queue.Item,
 	stepName *string,
 ) {
@@ -299,26 +294,26 @@ func (l lifecycle) OnStepScheduled(
 			"error parsing group ID",
 			"error", err,
 			"group_id", item.GroupID,
-			"run_id", id.RunID.String(),
+			"run_id", md.ID.RunID.String(),
 		)
 	}
 
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-		AccountID:       id.AccountID,
-		WorkspaceID:     id.WorkspaceID,
+		AccountID:       md.ID.Tenant.AccountID,
+		WorkspaceID:     md.ID.Tenant.EnvID,
 		CreatedAt:       time.Now(),
-		FunctionID:      id.WorkflowID,
-		FunctionVersion: int64(id.WorkflowVersion),
+		FunctionID:      md.ID.FunctionID,
+		FunctionVersion: int64(md.Config.FunctionVersion),
 		GroupID:         groupID,
-		RunID:           id.RunID,
+		RunID:           md.ID.RunID,
 		Type:            enums.HistoryTypeStepScheduled.String(),
 		Attempt:         int64(item.Attempt),
-		IdempotencyKey:  id.IdempotencyKey(),
+		IdempotencyKey:  md.IdempotencyKey(),
+		EventID:         md.Config.EventIDs[0],
 		StepName:        stepName,
 		StepID:          &edge.Edge.Incoming, // TODO: Add step name to edge.
-		EventID:         id.EventID,
-		BatchID:         id.BatchID,
+		BatchID:         md.Config.BatchID,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
@@ -329,11 +324,10 @@ func (l lifecycle) OnStepScheduled(
 
 func (l lifecycle) OnStepStarted(
 	ctx context.Context,
-	id state.Identifier,
+	md sv2.Metadata,
 	item queue.Item,
 	edge inngest.Edge,
-	step inngest.Step,
-	state state.State,
+	url string,
 ) {
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
@@ -341,7 +335,7 @@ func (l lifecycle) OnStepStarted(
 			"error parsing group ID",
 			"error", err,
 			"group_id", item.GroupID,
-			"run_id", id.RunID.String(),
+			"run_id", md.ID.RunID.String(),
 		)
 	}
 
@@ -350,21 +344,20 @@ func (l lifecycle) OnStepStarted(
 
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-		AccountID:       id.AccountID,
-		WorkspaceID:     id.WorkspaceID,
+		AccountID:       md.ID.Tenant.AccountID,
+		WorkspaceID:     md.ID.Tenant.EnvID,
 		CreatedAt:       time.Now(),
-		FunctionID:      id.WorkflowID,
-		FunctionVersion: int64(id.WorkflowVersion),
+		FunctionID:      md.ID.FunctionID,
+		FunctionVersion: int64(md.Config.FunctionVersion),
 		GroupID:         groupID,
-		RunID:           id.RunID,
+		RunID:           md.ID.RunID,
 		Type:            enums.HistoryTypeStepStarted.String(),
 		Attempt:         int64(item.Attempt),
-		IdempotencyKey:  id.IdempotencyKey(),
+		IdempotencyKey:  md.IdempotencyKey(),
+		EventID:         md.Config.EventIDs[0],
 		StepName:        &edge.Incoming,
 		StepID:          &edge.Incoming, // TODO: Add step name to edge.
-		EventID:         id.EventID,
-		BatchID:         id.BatchID,
-		URL:             &step.URI,
+		URL:             &url,
 		LatencyMS:       &latencyMS,
 	}
 
@@ -377,7 +370,7 @@ func (l lifecycle) OnStepStarted(
 
 func (l lifecycle) OnStepFinished(
 	ctx context.Context,
-	id state.Identifier,
+	md sv2.Metadata,
 	item queue.Item,
 	edge inngest.Edge,
 	step inngest.Step,
@@ -389,27 +382,27 @@ func (l lifecycle) OnStepFinished(
 			"error parsing group ID",
 			"error", err,
 			"group_id", item.GroupID,
-			"run_id", id.RunID.String(),
+			"run_id", md.ID.RunID.String(),
 		)
 	}
 
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-		AccountID:       id.AccountID,
-		WorkspaceID:     id.WorkspaceID,
+		AccountID:       md.ID.Tenant.AccountID,
+		WorkspaceID:     md.ID.Tenant.EnvID,
 		CreatedAt:       time.Now(),
-		FunctionID:      id.WorkflowID,
-		FunctionVersion: int64(id.WorkflowVersion),
+		FunctionID:      md.ID.FunctionID,
+		FunctionVersion: int64(md.Config.FunctionVersion),
+		RunID:           md.ID.RunID,
 		GroupID:         groupID,
-		RunID:           id.RunID,
 		Type:            enums.HistoryTypeStepCompleted.String(),
 		Attempt:         int64(item.Attempt),
-		IdempotencyKey:  id.IdempotencyKey(),
+		IdempotencyKey:  md.IdempotencyKey(),
+		EventID:         md.Config.EventIDs[0],
 		StepName:        &resp.Step.Name,
 		StepID:          &edge.Incoming,
-		EventID:         id.EventID,
-		BatchID:         id.BatchID,
 		URL:             &step.URI,
+		BatchID:         md.Config.BatchID,
 	}
 
 	err = applyResponse(&h, &resp)
@@ -419,7 +412,7 @@ func (l lifecycle) OnStepFinished(
 		l.log.Error(
 			"error applying response to history",
 			"error", err,
-			"run_id", id.RunID.String(),
+			"run_id", md.ID.RunID.String(),
 		)
 	}
 
@@ -465,7 +458,7 @@ func (l lifecycle) OnStepFinished(
 
 func (l lifecycle) OnWaitForEvent(
 	ctx context.Context,
-	id state.Identifier,
+	md sv2.Metadata,
 	item queue.Item,
 	op state.GeneratorOpcode,
 ) {
@@ -475,7 +468,7 @@ func (l lifecycle) OnWaitForEvent(
 			"error parsing group ID",
 			"error", err,
 			"group_id", item.GroupID,
-			"run_id", id.RunID.String(),
+			"run_id", md.ID.RunID.String(),
 		)
 	}
 
@@ -485,18 +478,17 @@ func (l lifecycle) OnWaitForEvent(
 	// nothing right now.
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-		AccountID:       id.AccountID,
-		WorkspaceID:     id.WorkspaceID,
+		AccountID:       md.ID.Tenant.AccountID,
+		WorkspaceID:     md.ID.Tenant.EnvID,
 		CreatedAt:       time.Now(),
-		FunctionID:      id.WorkflowID,
-		FunctionVersion: int64(id.WorkflowVersion),
+		FunctionID:      md.ID.FunctionID,
+		FunctionVersion: int64(md.Config.FunctionVersion),
 		GroupID:         groupID,
-		RunID:           id.RunID,
+		RunID:           md.ID.RunID,
 		Type:            enums.HistoryTypeStepWaiting.String(),
 		Attempt:         int64(item.Attempt),
-		IdempotencyKey:  id.IdempotencyKey(),
-		EventID:         id.EventID,
-		BatchID:         id.BatchID,
+		IdempotencyKey:  md.IdempotencyKey(),
+		EventID:         md.Config.EventIDs[0],
 		StepName:        &stepName,
 		StepID:          &op.ID,
 		WaitForEvent: &WaitForEvent{
@@ -504,6 +496,7 @@ func (l lifecycle) OnWaitForEvent(
 			Expression: opts.If,
 			Timeout:    expires,
 		},
+		BatchID: md.Config.BatchID,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
@@ -516,7 +509,7 @@ func (l lifecycle) OnWaitForEvent(
 // an event.
 func (l lifecycle) OnWaitForEventResumed(
 	ctx context.Context,
-	id state.Identifier,
+	md sv2.Metadata,
 	req execution.ResumeRequest,
 	groupID string,
 ) {
@@ -528,7 +521,7 @@ func (l lifecycle) OnWaitForEventResumed(
 				"error parsing group ID",
 				"error", err,
 				"group_id", groupID,
-				"run_id", id.RunID.String(),
+				"run_id", md.ID.RunID.String(),
 			)
 		}
 		groupIDUUID = val
@@ -540,22 +533,22 @@ func (l lifecycle) OnWaitForEventResumed(
 	}
 
 	h := History{
-		AccountID:       id.AccountID,
-		WorkspaceID:     id.WorkspaceID,
+		AccountID:       md.ID.Tenant.AccountID,
+		WorkspaceID:     md.ID.Tenant.EnvID,
 		CreatedAt:       time.Now(),
-		FunctionID:      id.WorkflowID,
-		FunctionVersion: int64(id.WorkflowVersion),
+		FunctionID:      md.ID.FunctionID,
+		FunctionVersion: int64(md.Config.FunctionVersion),
 		GroupID:         groupIDUUID,
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-		RunID:           id.RunID,
+		RunID:           md.ID.RunID,
 		Type:            enums.HistoryTypeStepCompleted.String(),
-		IdempotencyKey:  id.IdempotencyKey(),
-		EventID:         id.EventID,
-		BatchID:         id.BatchID,
+		IdempotencyKey:  md.IdempotencyKey(),
+		EventID:         md.Config.EventIDs[0],
 		WaitResult: &WaitResult{
 			EventID: req.EventID,
 			Timeout: req.EventID == nil,
 		},
+		BatchID:  md.Config.BatchID,
 		StepName: stepName,
 	}
 	for _, d := range l.drivers {
@@ -568,7 +561,7 @@ func (l lifecycle) OnWaitForEventResumed(
 // OnInvokeFunction is called when a function is invoked from a step.
 func (l lifecycle) OnInvokeFunction(
 	ctx context.Context,
-	id state.Identifier,
+	md sv2.Metadata,
 	item queue.Item,
 	op state.GeneratorOpcode,
 	eventID ulid.ULID,
@@ -580,7 +573,7 @@ func (l lifecycle) OnInvokeFunction(
 			"error parsing group ID",
 			"error", err,
 			"group_id", item.GroupID,
-			"run_id", id.RunID.String(),
+			"run_id", md.ID.RunID.String(),
 		)
 	}
 
@@ -619,22 +612,22 @@ func (l lifecycle) OnInvokeFunction(
 
 	stepName := op.UserDefinedName()
 	h := History{
-		AccountID:       id.AccountID,
+		AccountID:       md.ID.Tenant.AccountID,
 		Attempt:         int64(item.Attempt),
-		BatchID:         id.BatchID,
 		CreatedAt:       time.Now(),
-		EventID:         id.EventID,
-		FunctionID:      id.WorkflowID,
-		FunctionVersion: int64(id.WorkflowVersion),
+		EventID:         md.Config.EventIDs[0],
+		FunctionID:      md.ID.FunctionID,
+		FunctionVersion: int64(md.Config.FunctionVersion),
 		GroupID:         groupID,
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-		IdempotencyKey:  id.IdempotencyKey(),
+		IdempotencyKey:  md.IdempotencyKey(),
 		InvokeFunction:  invokeFunction,
-		RunID:           id.RunID,
+		RunID:           md.ID.RunID,
 		StepID:          &op.ID,
 		StepName:        &stepName,
 		Type:            enums.HistoryTypeStepInvoking.String(),
-		WorkspaceID:     id.WorkspaceID,
+		WorkspaceID:     md.ID.Tenant.EnvID,
+		BatchID:         md.Config.BatchID,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
@@ -648,7 +641,7 @@ func (l lifecycle) OnInvokeFunction(
 // completed or the step timed out whilst waiting.
 func (l lifecycle) OnInvokeFunctionResumed(
 	ctx context.Context,
-	id state.Identifier,
+	md sv2.Metadata,
 	req execution.ResumeRequest,
 	groupID string,
 ) {
@@ -660,7 +653,7 @@ func (l lifecycle) OnInvokeFunctionResumed(
 				"error parsing group ID",
 				"error", err,
 				"group_id", groupID,
-				"run_id", id.RunID.String(),
+				"run_id", md.ID.RunID.String(),
 			)
 		}
 		groupIDUUID = val
@@ -672,24 +665,24 @@ func (l lifecycle) OnInvokeFunctionResumed(
 	}
 
 	h := History{
-		AccountID:       id.AccountID,
-		BatchID:         id.BatchID,
+		AccountID:       md.ID.Tenant.AccountID,
+		WorkspaceID:     md.ID.Tenant.EnvID,
 		CreatedAt:       time.Now(),
-		EventID:         id.EventID,
-		FunctionID:      id.WorkflowID,
-		FunctionVersion: int64(id.WorkflowVersion),
+		EventID:         md.Config.EventIDs[0],
+		FunctionID:      md.ID.FunctionID,
+		FunctionVersion: int64(md.Config.FunctionVersion),
 		GroupID:         groupIDUUID,
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-		IdempotencyKey:  id.IdempotencyKey(),
+		IdempotencyKey:  md.IdempotencyKey(),
 		InvokeFunctionResult: &InvokeFunctionResult{
 			EventID: req.EventID,
 			RunID:   req.RunID,
 			Timeout: req.EventID == nil,
 		},
-		RunID:       id.RunID,
-		Type:        enums.HistoryTypeStepCompleted.String(),
-		WorkspaceID: id.WorkspaceID,
-		StepName:    stepName,
+		RunID:    md.ID.RunID,
+		Type:     enums.HistoryTypeStepCompleted.String(),
+		StepName: stepName,
+		BatchID:  md.Config.BatchID,
 	}
 
 	if withErr := req.Error(); withErr != "" {
@@ -714,7 +707,7 @@ func (l lifecycle) OnInvokeFunctionResumed(
 // state.GeneratorOpcode contains the sleep details.
 func (l lifecycle) OnSleep(
 	ctx context.Context,
-	id state.Identifier,
+	md sv2.Metadata,
 	item queue.Item,
 	op state.GeneratorOpcode,
 	until time.Time,
@@ -725,30 +718,30 @@ func (l lifecycle) OnSleep(
 			"error parsing group ID",
 			"error", err,
 			"group_id", item.GroupID,
-			"run_id", id.RunID.String(),
+			"run_id", md.ID.RunID.String(),
 		)
 	}
 
 	stepName := op.UserDefinedName()
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-		AccountID:       id.AccountID,
-		WorkspaceID:     id.WorkspaceID,
+		AccountID:       md.ID.Tenant.AccountID,
+		WorkspaceID:     md.ID.Tenant.EnvID,
+		FunctionID:      md.ID.FunctionID,
+		FunctionVersion: int64(md.Config.FunctionVersion),
+		RunID:           md.ID.RunID,
 		CreatedAt:       time.Now(),
-		FunctionID:      id.WorkflowID,
-		FunctionVersion: int64(id.WorkflowVersion),
 		GroupID:         groupID,
-		RunID:           id.RunID,
 		Type:            enums.HistoryTypeStepSleeping.String(),
 		Attempt:         int64(item.Attempt),
-		IdempotencyKey:  id.IdempotencyKey(),
-		EventID:         id.EventID,
-		BatchID:         id.BatchID,
+		IdempotencyKey:  md.IdempotencyKey(),
+		EventID:         md.Config.EventIDs[0],
 		StepName:        &stepName,
 		StepID:          &op.ID,
 		Sleep: &Sleep{
 			Until: until,
 		},
+		BatchID: md.Config.BatchID,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
