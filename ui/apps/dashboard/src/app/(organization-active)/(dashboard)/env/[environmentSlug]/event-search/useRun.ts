@@ -1,5 +1,9 @@
 import { useMemo } from 'react';
-import { baseInitialFetchFailed, type FetchResult } from '@inngest/components/types/fetch';
+import {
+  FetchError,
+  baseInitialFetchFailed,
+  type FetchResult,
+} from '@inngest/components/types/fetch';
 import type { Function } from '@inngest/components/types/function';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
 import type { FunctionVersion } from '@inngest/components/types/functionVersion';
@@ -137,7 +141,7 @@ export function useRun({
     // Should be unreachable
     return {
       ...baseInitialFetchFailed,
-      error: data,
+      error: new FetchError(data.message),
     };
   }
 

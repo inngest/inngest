@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
+  FetchError,
   baseFetchSkipped,
   baseFetchSucceeded,
   baseInitialFetchFailed,
@@ -9,7 +10,8 @@ import {
   baseRefetchLoading,
   type FetchResult,
 } from '@inngest/components/types/fetch';
-import { useQuery, type TypedDocumentNode, type UseQueryArgs } from 'urql';
+import { isRecord } from '@inngest/components/utils/typeGuards';
+import { CombinedError, useQuery, type TypedDocumentNode, type UseQueryArgs } from 'urql';
 
 import { skipCacheSearchParam } from './urls';
 
@@ -128,14 +130,14 @@ export function useSkippableGraphQLQuery<
     if (!data) {
       return {
         ...baseInitialFetchFailed,
-        error: new Error(res.error.message),
+        error: toFetchError(res.error),
       };
     }
 
     return {
       ...baseRefetchFailed,
       data,
-      error: new Error(res.error.message),
+      error: toFetchError(res.error),
     };
   }
 
@@ -143,7 +145,7 @@ export function useSkippableGraphQLQuery<
     // Should be unreachable.
     return {
       ...baseInitialFetchFailed,
-      error: new Error('finished loading but missing data'),
+      error: new FetchError('finished loading but missing data'),
     };
   }
 
@@ -151,4 +153,28 @@ export function useSkippableGraphQLQuery<
     ...baseFetchSucceeded,
     data,
   };
+}
+
+function toFetchError(error: CombinedError): FetchError {
+  let code;
+  let data;
+  for (const graphQLError of error.graphQLErrors) {
+    if (graphQLError.extensions.code && typeof graphQLError.extensions.code === 'string') {
+      // Use the first valid error code we find. Technically there could be
+      // multiple error codes, but that's a complexity we don't need to handle
+      // right now
+      code = graphQLError.extensions.code;
+
+      if (isRecord(graphQLError.extensions.data)) {
+        data = graphQLError.extensions.data;
+      }
+
+      break;
+    }
+  }
+
+  return new FetchError(error.message, {
+    code: code ?? 'unknown',
+    data,
+  });
 }

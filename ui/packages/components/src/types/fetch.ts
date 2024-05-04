@@ -1,5 +1,5 @@
 type InitialFetchFailed = {
-  error: Error;
+  error: FetchError;
   data: undefined;
   isLoading: false;
 };
@@ -25,7 +25,7 @@ type Succeeded<T = never> = {
 
 // Same as InitialFetchFailed, but it has data
 type RefetchFailed<T = never> = {
-  error: Error;
+  error: FetchError;
   data: T;
   isLoading: false;
 };
@@ -108,3 +108,24 @@ export type FetchResult<
   // Optional
   TOptions extends Options = {}
 > = TOptions['skippable'] extends true ? FetchResultWithSkip<TData> : FetchResultWithoutSkip<TData>;
+
+export class FetchError extends Error {
+  code: string;
+  data: Record<string, unknown>;
+
+  constructor(
+    message: string,
+    {
+      code,
+      data,
+    }: {
+      code?: string;
+      data?: Record<string, unknown>;
+    } = {}
+  ) {
+    super(message);
+    this.code = code ?? 'unknown';
+    this.data = data ?? {};
+    this.name = 'FetchError';
+  }
+}
