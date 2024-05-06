@@ -138,6 +138,34 @@ func (l lifecycle) OnFunctionStarted(
 	}
 }
 
+// OnFunctionSkipped is called when a function run is skipped.
+func (l lifecycle) OnFunctionSkipped(
+	ctx context.Context,
+	id state.Identifier,
+	s execution.SkipState,
+) {
+	h := History{
+		Cron:            s.CronSchedule,
+		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:       id.AccountID,
+		WorkspaceID:     id.WorkspaceID,
+		CreatedAt:       time.Now(),
+		FunctionID:      id.WorkflowID,
+		FunctionVersion: int64(id.WorkflowVersion),
+		RunID:           id.RunID,
+		Type:            enums.HistoryTypeFunctionSkipped.String(),
+		Attempt:         0,
+		IdempotencyKey:  id.IdempotencyKey(),
+		EventID:         id.EventID,
+		BatchID:         id.BatchID,
+	}
+	for _, d := range l.drivers {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
+			l.log.Error("execution lifecycle error", "lifecycle", "onFunctionSkipped", "error", err)
+		}
+	}
+}
+
 // OnFunctionFinished is called when a function finishes.  This will
 // be called when a function completes successfully or permanently failed,
 // with the final driver response indicating the type of success.

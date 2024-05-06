@@ -335,8 +335,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	if isPaused {
-		// TODO(cdzombak): lifecycle method
-		// TODO(cdzombak): write to history store
+		for _, e := range e.lifecycles {
+			go e.OnFunctionSkipped(context.WithoutCancel(ctx), id, execution.SkipState{
+				CronSchedule: req.Events[0].GetEvent().CronSchedule(),
+			})
+		}
 		return nil, nil
 	}
 
