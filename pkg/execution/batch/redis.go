@@ -5,6 +5,10 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
 	"time"
 
 	"github.com/google/uuid"
@@ -204,6 +208,96 @@ func (b redisBatchManager) ExpireKeys(ctx context.Context, batchID ulid.ULID) er
 		args,
 	).AsInt64(); err != nil {
 		return fmt.Errorf("failed to expire batch '%s' related keys: %v", batchID, err)
+	}
+
+	return nil
+}
+
+// AppendAndSchedule appends a new batch item. If a new batch is created, it will be scheduled to run
+// after the batch timeout. If the item finalizes the batch, a function run is immediately scheduled.
+func (b redisBatchManager) AppendAndSchedule(ctx context.Context, executor execution.Executor, fn inngest.Function, bi BatchItem) error {
+	result, err := b.Append(ctx, bi, fn)
+	if err != nil {
+		return err
+	}
+
+	switch result.Status {
+	case enums.BatchAppend:
+		// noop
+	case enums.BatchNew:
+		dur, err := time.ParseDuration(fn.EventBatch.Timeout)
+		if err != nil {
+			return err
+		}
+		at := time.Now().Add(dur)
+
+		if err := b.ScheduleExecution(ctx, ScheduleBatchOpts{
+			ScheduleBatchPayload: ScheduleBatchPayload{
+				BatchID:         ulid.MustParse(result.BatchID),
+				AccountID:       bi.AccountID,
+				WorkspaceID:     bi.WorkspaceID,
+				AppID:           bi.AppID,
+				FunctionID:      bi.FunctionID,
+				FunctionVersion: bi.FunctionVersion,
+			},
+			At: at,
+		}); err != nil {
+			return err
+		}
+	case enums.BatchFull:
+		// start execution immediately
+		batchID := ulid.MustParse(result.BatchID)
+		if err := b.RetrieveAndSchedule(ctx, executor, batchID, fn, bi.AccountID, bi.WorkspaceID, bi.AppID); err != nil {
+			return fmt.Errorf("could not retrieve and schedule batch items: %w", err)
+		}
+	default:
+		return fmt.Errorf("invalid status of batch append ops: %d", result.Status)
+	}
+
+	return nil
+}
+
+// RetrieveAndSchedule retrieves all items from a started batch and schedules a function run
+func (b redisBatchManager) RetrieveAndSchedule(ctx context.Context, executor execution.Executor, batchID ulid.ULID, fn inngest.Function, accountId, workspaceId, appId uuid.UUID) error {
+	evtList, err := b.RetrieveItems(ctx, batchID)
+	if err != nil {
+		return err
+	}
+
+	events := make([]event.TrackedEvent, len(evtList))
+	for i, e := range evtList {
+		events[i] = e
+	}
+
+	ctx, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeBatch),
+		telemetry.WithName(consts.OtelSpanBatch),
+		telemetry.WithSpanAttributes(
+			attribute.String(consts.OtelSysAccountID, accountId.String()),
+			attribute.String(consts.OtelSysWorkspaceID, workspaceId.String()),
+			attribute.String(consts.OtelSysAppID, appId.String()),
+			attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
+			attribute.String(consts.OtelSysBatchID, batchID.String()),
+			attribute.Bool(consts.OtelSysBatchFull, true),
+		))
+	defer span.End()
+
+	key := fmt.Sprintf("%s-%s", fn.ID, batchID)
+	_, err = executor.Schedule(ctx, execution.ScheduleRequest{
+		AccountID:      accountId,
+		WorkspaceID:    workspaceId,
+		AppID:          appId,
+		Function:       fn,
+		Events:         events,
+		BatchID:        &batchID,
+		IdempotencyKey: &key,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := b.ExpireKeys(ctx, batchID); err != nil {
+		return err
 	}
 
 	return nil
