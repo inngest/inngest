@@ -34,6 +34,13 @@ export function Apps({ isArchived = false }: Props) {
 
   const { apps, latestUnattachedSyncTime } = res.data;
   const hasApps = apps.length > 0;
+  // Sort apps by latest sync time
+  const sortedApps = apps.sort((a, b) => {
+    return (
+      (b.latestSync ? new Date(b.latestSync.lastSyncedAt).getTime() : 0) -
+      (a.latestSync ? new Date(a.latestSync.lastSyncedAt).getTime() : 0)
+    );
+  });
 
   return (
     <div className="mb-4 mt-16 flex items-center justify-center">
@@ -54,7 +61,7 @@ export function Apps({ isArchived = false }: Props) {
         {!hasApps && isArchived && (
           <p className="rounded-lg bg-slate-500 p-4 text-center text-white">No archived apps</p>
         )}
-        {apps.map((app) => {
+        {sortedApps.map((app) => {
           return (
             <AppCard
               app={app}
