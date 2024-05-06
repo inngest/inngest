@@ -2355,10 +2355,18 @@ func (e executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Funct
 			attribute.String(consts.OtelSysAppID, payload.AppID.String()),
 			attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
 			attribute.String(consts.OtelSysBatchID, payload.BatchID.String()),
-			attribute.Bool(consts.OtelSysBatchFull, true),
 			attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
 		))
 	defer span.End()
+
+	// still process events in case the user disables batching while a batch is still in-flight
+	if fn.EventBatch != nil {
+		if len(events) == fn.EventBatch.MaxSize {
+			span.SetAttributes(attribute.Bool(consts.OtelSysBatchFull, true))
+		} else {
+			span.SetAttributes(attribute.Bool(consts.OtelSysBatchTimeout, true))
+		}
+	}
 
 	key := fmt.Sprintf("%s-%s", fn.ID, payload.BatchID)
 	identifier, err := e.Schedule(ctx, execution.ScheduleRequest{
