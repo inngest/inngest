@@ -171,6 +171,8 @@ type ScheduleRequest struct {
 	// execution.  This is used after the debounce has finished to force execution
 	// of the function, instead of debouncing again.
 	PreventDebounce bool
+	// FunctionPausedAt indicates whether the function is paused.
+	FunctionPausedAt *time.Time
 }
 
 // CancelRequest stores information about the incoming cancellation request within
