@@ -42,7 +42,7 @@ type LifecycleListener interface {
 
 	// OnFunctionStarted is called when the function starts.  This may be
 	// immediately after the function is scheduled, or in the case of increased
-	// latency (eg. due to debouncing or concurrency limits) some time after the
+	// latency (e.g. due to debouncing or concurrency limits) some time after the
 	// function is scheduled.
 	OnFunctionStarted(
 		context.Context,
