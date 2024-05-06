@@ -165,7 +165,7 @@ type ScheduleRequest struct {
 	BatchID *ulid.ULID
 	// IdempotencyKey represents an optional idempotency key for the function.
 	IdempotencyKey *string
-	// Context represents additional context used when initialiizing function runs.
+	// Context represents additional context used when initializing function runs.
 	Context map[string]any
 	// PreventDebounce prevents debouncing this function and immediately schedules
 	// execution.  This is used after the debounce has finished to force execution
