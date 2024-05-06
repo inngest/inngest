@@ -286,8 +286,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, ErrFunctionDebounced
 	}
 
-	isPaused := req.FunctionPausedAt != nil && req.FunctionPausedAt.Before(time.Now())
-
 	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
 	// When running a cancellation, functions are cancelled at scheduling time based off of
 	// this run ID.
@@ -334,6 +332,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		ReplayID:        req.ReplayID,
 	}
 
+	isPaused := req.FunctionPausedAt != nil && req.FunctionPausedAt.Before(time.Now())
 	if isPaused {
 		for _, e := range e.lifecycles {
 			go e.OnFunctionSkipped(context.WithoutCancel(ctx), id, execution.SkipState{
