@@ -48,6 +48,7 @@ var (
 	ErrNoActionLoader    = fmt.Errorf("no action loader provided")
 	ErrNoRuntimeDriver   = fmt.Errorf("runtime driver for action not found")
 	ErrFunctionDebounced = fmt.Errorf("function debounced")
+	ErrFunctionSkipped   = fmt.Errorf("function skipped")
 
 	ErrFunctionEnded = fmt.Errorf("function already ended")
 
