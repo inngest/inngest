@@ -616,7 +616,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 			Event:           evt.GetEvent(),
 		}
 
-		if err := s.batcher.(batch.BatchExecutor).AppendAndSchedule(ctx, s.executor, fn, bi); err != nil {
+		if err := s.executor.AppendAndScheduleBatch(ctx, fn, bi); err != nil {
 			return fmt.Errorf("could not append and schedule batch item: %w", err)
 		}
 

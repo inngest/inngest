@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"encoding/json"
+	"github.com/inngest/inngest/pkg/execution/batch"
 	"time"
 
 	"github.com/google/uuid"
@@ -121,6 +122,9 @@ type Executor interface {
 
 	// InvokeNotFoundHandler invokes the invoke not found handler.
 	InvokeNotFoundHandler(context.Context, InvokeNotFoundHandlerOpts) error
+
+	AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem) error
+	RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload) error
 }
 
 // PublishFinishedEventOpts represents the options for publishing a finished event.

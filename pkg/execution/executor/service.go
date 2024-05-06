@@ -318,7 +318,14 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 		return err
 	}
 
-	if err := s.batcher.(batch.BatchExecutor).RetrieveAndSchedule(ctx, s.Executor(), batchID, *fn, item.Identifier.AccountID, item.Identifier.WorkspaceID, item.Identifier.AppID); err != nil {
+	if err := s.exec.RetrieveAndScheduleBatch(ctx, *fn, batch.ScheduleBatchPayload{
+		BatchID:         batchID,
+		AccountID:       item.Identifier.AccountID,
+		WorkspaceID:     item.Identifier.WorkspaceID,
+		AppID:           item.Identifier.AppID,
+		FunctionID:      item.Identifier.WorkflowID,
+		FunctionVersion: 0,
+	}); err != nil {
 		return fmt.Errorf("could not retrieve and schedule batch items: %w", err)
 	}
 

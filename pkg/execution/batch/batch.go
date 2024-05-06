@@ -2,7 +2,6 @@ package batch
 
 import (
 	"context"
-	"github.com/inngest/inngest/pkg/execution"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,15 +35,6 @@ type BatchManager interface {
 	StartExecution(ctx context.Context, fnID uuid.UUID, batchID ulid.ULID) (string, error)
 	ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error
 	ExpireKeys(ctx context.Context, batchID ulid.ULID) error
-}
-
-// BatchExecutor extends BatchManager and implements higher-level batch lifecycle methods for
-// both scheduling and running batch executions
-type BatchExecutor interface {
-	BatchManager
-
-	AppendAndSchedule(ctx context.Context, executor execution.Executor, fn inngest.Function, bi BatchItem) error
-	RetrieveAndSchedule(ctx context.Context, executor execution.Executor, batchID ulid.ULID, fn inngest.Function, accountId, workspaceId, appId uuid.UUID) error
 }
 
 // BatchItem represents the item that are being batched.
