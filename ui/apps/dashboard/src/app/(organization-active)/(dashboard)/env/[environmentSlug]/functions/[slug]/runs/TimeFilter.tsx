@@ -26,7 +26,7 @@ type RelativeTimeFilterProps = {
   onDaysChange: (value: string) => void;
 };
 
-const datesArray = ['1', '3', '7', '14', '30'];
+const daysAgoArray = ['1', '3', '7', '14', '30'];
 
 export default function TimeFilter({ selectedDays, onDaysChange }: RelativeTimeFilterProps) {
   const [{ data }] = useQuery({
@@ -40,7 +40,7 @@ export default function TimeFilter({ selectedDays, onDaysChange }: RelativeTimeF
     logRetention = data.account.plan.features.log_retention;
   }
 
-  const options: Option[] = datesArray.map((date) => ({
+  const options: Option[] = daysAgoArray.map((date) => ({
     id: date,
     name: date === '1' ? `Last ${date} day` : `Last ${date} days`,
     disabled: parseInt(date) > logRetention,
