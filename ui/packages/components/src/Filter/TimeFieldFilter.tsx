@@ -19,10 +19,7 @@ export default function TimeFieldFilter({
   selectedTimeField,
   onTimeFieldChange,
 }: TimeFieldFilterProps) {
-  const selectedValue: Option = {
-    id: selectedTimeField,
-    name: selectedTimeField.replace(/_/g, ' '),
-  };
+  const selectedValue = options.find((option) => option.id === selectedTimeField);
 
   return (
     <Select
@@ -36,7 +33,9 @@ export default function TimeFieldFilter({
       isLabelVisible={false}
     >
       <Select.Button>
-        <span className="pr-2 text-sm lowercase first-letter:capitalize">{selectedValue.name}</span>
+        <span className="pr-2 text-sm lowercase first-letter:capitalize">
+          {selectedValue?.name}
+        </span>
       </Select.Button>
       <Select.Options>
         {options.map((option) => {

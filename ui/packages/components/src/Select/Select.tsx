@@ -9,17 +9,25 @@ type SelectProps = {
   children: React.ReactNode;
 };
 
+export type Option = {
+  id: string;
+  name: string;
+  disabled?: boolean;
+};
+
 type MultiProps = {
-  onChange: (value: string[]) => void;
-  defaultValue?: string[];
+  onChange: (value: Option[]) => void;
+  defaultValue?: Option[];
   multiple: true;
 };
 
 type SingleProps = {
-  onChange: (value: string | number) => void;
-  defaultValue?: string | number;
+  onChange: (value: Option) => void;
+  defaultValue?: Option;
   multiple?: false;
 };
+
+type Props = SelectProps & (MultiProps | SingleProps);
 
 export function Select({
   defaultValue,
@@ -28,7 +36,7 @@ export function Select({
   children,
   onChange,
   multiple,
-}: SelectProps & (MultiProps | SingleProps)) {
+}: Props) {
   return (
     <Listbox value={defaultValue} onChange={onChange} multiple={multiple}>
       <span
@@ -78,12 +86,13 @@ function Options({ children }: React.PropsWithChildren) {
   );
 }
 
-function Option({ children, option }: React.PropsWithChildren<{ option: string | number }>) {
+function Option({ children, option }: React.PropsWithChildren<{ option: Option }>) {
   return (
     <Listbox.Option
       className=" ui-selected:text-indigo-500 ui-selected:font-medium ui-active:bg-blue-50 flex select-none items-center justify-between focus:outline-none"
-      key={option}
+      key={option.id}
       value={option}
+      disabled={option.disabled}
     >
       <div className="ui-selected:border-indigo-500 my-2 border-l-2 border-transparent pl-5 pr-4">
         {children}
@@ -92,11 +101,11 @@ function Option({ children, option }: React.PropsWithChildren<{ option: string |
   );
 }
 
-function CheckboxOption({ children, option }: React.PropsWithChildren<{ option: string }>) {
+function CheckboxOption({ children, option }: React.PropsWithChildren<{ option: Option }>) {
   return (
     <Listbox.Option
       className=" ui-active:bg-blue-50 flex select-none items-center justify-between py-1.5 pl-2 pr-4 focus:outline-none"
-      key={option}
+      key={option.id}
       value={option}
     >
       {({ selected }: { selected: boolean }) => (
@@ -104,8 +113,9 @@ function CheckboxOption({ children, option }: React.PropsWithChildren<{ option: 
           <span className="inline-flex items-center gap-2">
             <input
               type="checkbox"
-              id={option}
+              id={option.id}
               checked={selected}
+              disabled={option.disabled}
               readOnly
               className="h-[15px] w-[15px] rounded border-slate-300 text-indigo-500 drop-shadow-sm checked:border-indigo-500 checked:drop-shadow-none"
             />
