@@ -24,9 +24,6 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/rs/zerolog"
-	"github.com/uber-go/tally/v4"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/metric"
 	"gonum.org/v1/gonum/stat/sampleuv"
 	"lukechampine.com/frand"
 )
@@ -161,12 +158,6 @@ func WithQueueLifecycles(l ...QueueLifecycleListener) QueueOpt {
 	}
 }
 
-func WithMetricsScope(scope tally.Scope) QueueOpt {
-	return func(q *queue) {
-		q.scope = scope
-	}
-}
-
 func WithPriorityFinder(pf PriorityFinder) QueueOpt {
 	return func(q *queue) {
 		q.pf = pf
@@ -188,12 +179,6 @@ func WithQueueKeyGenerator(kg QueueKeyGenerator) QueueOpt {
 func WithIdempotencyTTL(t time.Duration) QueueOpt {
 	return func(q *queue) {
 		q.idempotencyTTL = t
-	}
-}
-
-func WithOtelMeter(m metric.Meter) QueueOpt {
-	return func(q *queue) {
-		q.meter = m
 	}
 }
 
@@ -352,8 +337,6 @@ func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 		pollTick:           defaultPollTick,
 		idempotencyTTL:     defaultIdempotencyTTL,
 		queueKindMapping:   make(map[string]string),
-		scope:              tally.NoopScope,
-		meter:              otel.Meter("redis_state.queue"),
 		logger:             logger.From(context.Background()),
 		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) (string, int) {
 			return p.Queue(), 10_000
@@ -452,10 +435,6 @@ type queue struct {
 	// shardLeases represents shards that are leased by the current queue worker.
 	shardLeases    []leasedShard
 	shardLeaseLock *sync.Mutex
-
-	// metrics allows reporting of metrics
-	scope tally.Scope
-	meter metric.Meter
 
 	// backoffFunc is the backoff function to use when retrying operations.
 	backoffFunc backoff.BackoffFunc
