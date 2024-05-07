@@ -154,43 +154,43 @@ func WithName(name string) func(q *queue) {
 	}
 }
 
-func WithQueueLifecycles(l ...QueueLifecycleListener) func(q *queue) {
+func WithQueueLifecycles(l ...QueueLifecycleListener) QueueOpt {
 	return func(q *queue) {
 		q.lifecycles = l
 	}
 }
 
-func WithMetricsScope(scope tally.Scope) func(q *queue) {
+func WithMetricsScope(scope tally.Scope) QueueOpt {
 	return func(q *queue) {
 		q.scope = scope
 	}
 }
 
-func WithPriorityFinder(pf PriorityFinder) func(q *queue) {
+func WithPriorityFinder(pf PriorityFinder) QueueOpt {
 	return func(q *queue) {
 		q.pf = pf
 	}
 }
 
-func WithShardFinder(sf ShardFinder) func(q *queue) {
+func WithShardFinder(sf ShardFinder) QueueOpt {
 	return func(q *queue) {
 		q.sf = sf
 	}
 }
 
-func WithQueueKeyGenerator(kg QueueKeyGenerator) func(q *queue) {
+func WithQueueKeyGenerator(kg QueueKeyGenerator) QueueOpt {
 	return func(q *queue) {
 		q.kg = kg
 	}
 }
 
-func WithIdempotencyTTL(t time.Duration) func(q *queue) {
+func WithIdempotencyTTL(t time.Duration) QueueOpt {
 	return func(q *queue) {
 		q.idempotencyTTL = t
 	}
 }
 
-func WithOtelMeter(m metric.Meter) func(q *queue) {
+func WithOtelMeter(m metric.Meter) QueueOpt {
 	return func(q *queue) {
 		q.meter = m
 	}
@@ -198,13 +198,13 @@ func WithOtelMeter(m metric.Meter) func(q *queue) {
 
 // WithIdempotencyTTLFunc returns custom idempotecy durations given a QueueItem.
 // This allows customization of the idempotency TTL based off of specific jobs.
-func WithIdempotencyTTLFunc(f func(context.Context, QueueItem) time.Duration) func(q *queue) {
+func WithIdempotencyTTLFunc(f func(context.Context, QueueItem) time.Duration) QueueOpt {
 	return func(q *queue) {
 		q.idempotencyTTLFunc = f
 	}
 }
 
-func WithNumWorkers(n int32) func(q *queue) {
+func WithNumWorkers(n int32) QueueOpt {
 	return func(q *queue) {
 		q.numWorkers = n
 	}
@@ -218,13 +218,13 @@ func WithPeekSize(n int64) QueueOpt {
 
 // WithPollTick specifies the interval at which the queue will poll the backing store
 // for available partitions.
-func WithPollTick(t time.Duration) func(q *queue) {
+func WithPollTick(t time.Duration) QueueOpt {
 	return func(q *queue) {
 		q.pollTick = t
 	}
 }
 
-func WithQueueItemIndexer(i QueueItemIndexer) func(q *queue) {
+func WithQueueItemIndexer(i QueueItemIndexer) QueueOpt {
 	return func(q *queue) {
 		q.itemIndexer = i
 	}
