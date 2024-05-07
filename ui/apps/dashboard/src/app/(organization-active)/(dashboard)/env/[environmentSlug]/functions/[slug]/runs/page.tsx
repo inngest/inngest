@@ -107,9 +107,9 @@ export default function RunsPage() {
     }
   }
 
-  function handleDaysChange(value: number) {
+  function handleDaysChange(value: string) {
     if (value) {
-      setLastDays(value.toString());
+      setLastDays(value);
     }
   }
 
@@ -145,7 +145,7 @@ export default function RunsPage() {
               onTimeFieldChange={handleTimeFieldChange}
             />
             <TimeFilter
-              selectedDays={lastDays ? parseInt(lastDays) : parseInt(TimeRangeFilterDefault.days)}
+              selectedDays={lastDays || TimeRangeFilterDefault.days}
               onDaysChange={handleDaysChange}
             />
           </SelectGroup>

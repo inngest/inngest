@@ -22,8 +22,8 @@ const GetBillingPlanDocument = graphql(`
 `);
 
 type RelativeTimeFilterProps = {
-  selectedDays: number;
-  onDaysChange: (value: number) => void;
+  selectedDays: string;
+  onDaysChange: (value: string) => void;
 };
 
 const datesArray = ['1', '3', '7', '14', '30'];
@@ -46,7 +46,7 @@ export default function TimeFilter({ selectedDays, onDaysChange }: RelativeTimeF
       onDaysChange={(value: Option) => {
         const numericId = parseInt(value.id);
         if (!isNaN(numericId)) {
-          onDaysChange(numericId);
+          onDaysChange(value.id);
         }
       }}
     />
