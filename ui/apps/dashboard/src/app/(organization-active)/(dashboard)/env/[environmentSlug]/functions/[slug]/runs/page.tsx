@@ -21,15 +21,6 @@ import RunsTable from './RunsTable';
 import TimeFilter from './TimeFilter';
 import { toRunStatuses, toTimeField } from './utils';
 
-const TimeFieldFilterDefault = FunctionRunTimeFieldV2.QueuedAt;
-const TimeRangeFilterDefault = {
-  startTime: getTimestampDaysAgo({
-    currentDate: new Date(),
-    days: 3,
-  }),
-  days: '3',
-};
-
 const GetRunsDocument = graphql(`
   query GetRuns(
     $environmentID: ID!
@@ -67,6 +58,8 @@ export default function RunsPage() {
   const [rawTimeField, setTimeField] = useSearchParam('timeField');
   const [lastDays = '3', setLastDays] = useSearchParam('last');
 
+  const timeField = toTimeField(rawTimeField ?? '') ?? FunctionRunTimeFieldV2.QueuedAt;
+
   /* TODO: Time params for absolute time filter */
   // const [fromTime, setFromTime] = useSearchParam('from');
   // const [untilTime, setUntilTime] = useSearchParam('until');
@@ -88,13 +81,6 @@ export default function RunsPage() {
   const filteredStatus = useMemo(() => {
     return toRunStatuses(rawFilteredStatus ?? []);
   }, [rawFilteredStatus]);
-
-  const timeField = useMemo(() => {
-    if (!rawTimeField) {
-      return TimeFieldFilterDefault;
-    }
-    return toTimeField(rawTimeField);
-  }, [rawTimeField]);
 
   function handleStatusesChange(value: FunctionRunStatus[]) {
     if (value.length > 0) {
@@ -123,7 +109,7 @@ export default function RunsPage() {
       environmentID: environment.id,
       startTime: startTime.toISOString(),
       status: filteredStatus.length > 0 ? filteredStatus : null,
-      timeField: timeField ?? TimeFieldFilterDefault,
+      timeField,
     },
   });
 
@@ -144,13 +130,10 @@ export default function RunsPage() {
         <div className="flex items-center gap-2">
           <SelectGroup>
             <TimeFieldFilter
-              selectedTimeField={timeField ?? TimeFieldFilterDefault}
+              selectedTimeField={timeField}
               onTimeFieldChange={handleTimeFieldChange}
             />
-            <TimeFilter
-              selectedDays={lastDays || TimeRangeFilterDefault.days}
-              onDaysChange={handleDaysChange}
-            />
+            <TimeFilter selectedDays={lastDays} onDaysChange={handleDaysChange} />
           </SelectGroup>
           <StatusFilter selectedStatuses={filteredStatus} onStatusesChange={handleStatusesChange} />
         </div>
