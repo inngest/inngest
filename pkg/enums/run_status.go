@@ -34,6 +34,8 @@ const (
 	// This is unlikely to happen during normal execution, and more likely when converting between
 	// the status code
 	RunStatusUnknown
+	// RunStatusSkipped indicates that the function run was skipped.
+	RunStatusSkipped
 )
 
 var (
@@ -46,6 +48,7 @@ var (
 		RunStatusCompleted:  300,
 		RunStatusFailed:     400,
 		RunStatusCancelled:  500,
+		RunStatusSkipped:    600,
 	}
 
 	codeStatusMap = map[int64]RunStatus{}
