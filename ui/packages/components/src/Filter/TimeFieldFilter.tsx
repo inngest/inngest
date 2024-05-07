@@ -31,6 +31,7 @@ export default function TimeFieldFilter({
       }}
       label="Time Field"
       isLabelVisible={false}
+      className="w-[6.6rem]"
     >
       <Select.Button>
         <span className="pr-2 text-sm lowercase first-letter:capitalize">

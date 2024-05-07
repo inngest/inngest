@@ -18,6 +18,7 @@ export default function RelativeTimeFilter({
       onChange={onDaysChange}
       label="Last Days"
       isLabelVisible={false}
+      className="w-[7.5rem]"
     >
       <Select.Button>
         <span className="pr-2 text-sm lowercase first-letter:capitalize">{selectedDays?.name}</span>

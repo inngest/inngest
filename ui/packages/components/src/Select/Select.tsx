@@ -7,6 +7,7 @@ type SelectProps = {
   label?: string;
   isLabelVisible?: boolean;
   children: React.ReactNode;
+  className?: string;
 };
 
 export type Option = {
@@ -36,13 +37,15 @@ export function Select({
   children,
   onChange,
   multiple,
+  className,
 }: Props) {
   return (
     <Listbox value={defaultValue} onChange={onChange} multiple={multiple}>
       <span
         className={cn(
           isLabelVisible && 'divide-x divide-slate-300',
-          'flex items-center rounded-md border border-slate-300 bg-slate-50 text-sm'
+          'flex items-center rounded-md border border-slate-300 bg-slate-50 text-sm',
+          className
         )}
       >
         <Listbox.Label
@@ -50,7 +53,7 @@ export function Select({
         >
           {label}
         </Listbox.Label>
-        <span className="relative">{children}</span>
+        <span className="relative w-full">{children}</span>
       </span>
     </Listbox>
   );
@@ -64,7 +67,7 @@ function Button({
     <Listbox.Button
       className={cn(
         !isLabelVisible && 'rounded-l-[5px]',
-        'flex h-10 items-center rounded-r-[5px] bg-white px-2'
+        'flex h-10 w-full items-center justify-between rounded-r-[5px] bg-white px-2'
       )}
     >
       {children}
