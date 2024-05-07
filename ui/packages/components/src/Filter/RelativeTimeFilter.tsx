@@ -1,35 +1,33 @@
-import { Select } from '../Select/Select';
-
-const datesArray = [1, 3, 7, 14, 30];
+import { Select, type Option } from '../Select/Select';
 
 type RelativeTimeFilterProps = {
-  selectedDays: number;
-  onDaysChange: (value: number) => void;
+  options: Option[];
+  selectedDays?: Option;
+  onDaysChange: (value: Option) => void;
 };
 
 export default function RelativeTimeFilter({
   selectedDays,
   onDaysChange,
+  options,
 }: RelativeTimeFilterProps) {
   return (
     <Select
       defaultValue={selectedDays}
-      //@ts-ignore
       onChange={onDaysChange}
       label="Last Days"
       isLabelVisible={false}
     >
       <Select.Button>
-        <span className="pr-2 text-sm lowercase first-letter:capitalize">
-          {`Last ${selectedDays} days`}
-        </span>
+        <span className="pr-2 text-sm lowercase first-letter:capitalize">{selectedDays?.name}</span>
       </Select.Button>
       <Select.Options>
-        {datesArray.map((option) => {
+        {options.map((option) => {
           return (
-            <Select.Option key={option} option={option}>
+            <Select.Option key={option.id} option={option}>
               <span className="inline-flex items-center gap-2 lowercase">
-                <label className="text-sm first-letter:capitalize">{`Last ${option} days`}</label>
+                <label className="text-sm first-letter:capitalize">{option.name}</label>
+                {option.disabled && 'Upgrade Plan'}
               </span>
             </Select.Option>
           );

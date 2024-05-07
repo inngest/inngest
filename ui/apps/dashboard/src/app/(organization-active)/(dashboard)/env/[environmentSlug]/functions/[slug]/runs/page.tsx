@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import RelativeTimeFilter from '@inngest/components/Filter/RelativeTimeFilter';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
-import TimeFilter from '@inngest/components/Filter/TimeFilter';
+import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
 import { SelectGroup } from '@inngest/components/Select/Select';
 import {
   type FunctionRunStatus,
@@ -19,6 +18,7 @@ import { graphql } from '@/gql';
 import { FunctionRunTimeFieldV2 } from '@/gql/graphql';
 import { useSearchParam, useStringArraySearchParam } from '@/utils/useSearchParam';
 import RunsTable from './RunsTable';
+import TimeFilter from './TimeFilter';
 import { toRunStatuses, toTimeField } from './utils';
 
 const TimeFieldFilterDefault = FunctionRunTimeFieldV2.QueuedAt;
@@ -140,11 +140,11 @@ export default function RunsPage() {
       <div className="flex items-center justify-between gap-2 bg-slate-50 px-8 py-2">
         <div className="flex items-center gap-2">
           <SelectGroup>
-            <TimeFilter
+            <TimeFieldFilter
               selectedTimeField={timeField ?? TimeFieldFilterDefault}
               onTimeFieldChange={handleTimeFieldChange}
             />
-            <RelativeTimeFilter
+            <TimeFilter
               selectedDays={lastDays ? parseInt(lastDays) : parseInt(TimeRangeFilterDefault.days)}
               onDaysChange={handleDaysChange}
             />
