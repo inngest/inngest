@@ -65,7 +65,7 @@ export default function RunsPage() {
   const [rawFilteredStatus, setFilteredStatus, removeFilteredStatus] =
     useStringArraySearchParam('filterStatus');
   const [rawTimeField, setTimeField] = useSearchParam('timeField');
-  const [lastDays, setLastDays] = useSearchParam('last');
+  const [lastDays = '3', setLastDays] = useSearchParam('last');
 
   /* TODO: Time params for absolute time filter */
   // const [fromTime, setFromTime] = useSearchParam('from');
@@ -82,8 +82,6 @@ export default function RunsPage() {
           days: parseInt(lastDays),
         })
       );
-    } else {
-      setStartTime(TimeRangeFilterDefault.startTime);
     }
   }, [lastDays]);
 
