@@ -94,7 +94,7 @@ function Option({ children, option }: React.PropsWithChildren<{ option: Option }
       value={option}
       disabled={option.disabled}
     >
-      <div className="ui-selected:border-indigo-500 my-2 border-l-2 border-transparent pl-5 pr-4">
+      <div className="ui-selected:border-indigo-500 my-2 w-full border-l-2 border-transparent pl-5 pr-4">
         {children}
       </div>
     </Listbox.Option>

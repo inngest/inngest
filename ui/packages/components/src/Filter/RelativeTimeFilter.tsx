@@ -1,3 +1,4 @@
+import { Badge } from '../Badge';
 import { Select, type Option } from '../Select/Select';
 
 type RelativeTimeFilterProps = {
@@ -25,9 +26,13 @@ export default function RelativeTimeFilter({
         {options.map((option) => {
           return (
             <Select.Option key={option.id} option={option}>
-              <span className="inline-flex items-center gap-2 lowercase">
-                <label className="text-sm first-letter:capitalize">{option.name}</label>
-                {option.disabled && 'Upgrade Plan'}
+              <span className="inline-flex w-full items-center justify-between gap-2">
+                <label className="text-sm lowercase first-letter:capitalize">{option.name}</label>
+                {option.disabled && (
+                  <Badge className="border-indigo-500 text-indigo-500" kind="outlined">
+                    Upgrade Plan
+                  </Badge>
+                )}
               </span>
             </Select.Option>
           );
