@@ -31,10 +31,15 @@ const TimeRangeFilterDefault = {
 };
 
 const GetRunsDocument = graphql(`
-  query GetRuns($environmentID: ID!, $startTime: Time!, $status: [FunctionRunStatus!]) {
+  query GetRuns(
+    $environmentID: ID!
+    $startTime: Time!
+    $status: [FunctionRunStatus!]
+    $timeField: FunctionRunTimeFieldV2
+  ) {
     environment: workspace(id: $environmentID) {
       runs(
-        filter: { from: $startTime, status: $status }
+        filter: { from: $startTime, status: $status, timeField: $timeField }
         orderBy: [{ field: QUEUED_AT, direction: ASC }]
       ) {
         edges {
