@@ -31,7 +31,7 @@ const GetRunsDocument = graphql(`
     environment: workspace(id: $environmentID) {
       runs(
         filter: { from: $startTime, status: $status, timeField: $timeField }
-        orderBy: [{ field: QUEUED_AT, direction: ASC }]
+        orderBy: [{ field: QUEUED_AT, direction: DESC }]
       ) {
         edges {
           node {
