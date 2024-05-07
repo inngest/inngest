@@ -62,7 +62,7 @@ const (
 	PartitionLookahead                        = time.Second
 
 	QueuePeekMax        int64 = 1000
-	QueuePeekDefault    int64 = 200
+	QueuePeekDefault    int64 = 250
 	QueueLeaseDuration        = 10 * time.Second
 	ConfigLeaseDuration       = 10 * time.Second
 	ConfigLeaseMax            = 20 * time.Second
@@ -207,6 +207,12 @@ func WithIdempotencyTTLFunc(f func(context.Context, QueueItem) time.Duration) fu
 func WithNumWorkers(n int32) func(q *queue) {
 	return func(q *queue) {
 		q.numWorkers = n
+	}
+}
+
+func WithPeekSize(n int64) QueueOpt {
+	return func(q *queue) {
+		q.peek = n
 	}
 }
 
@@ -399,6 +405,8 @@ type queue struct {
 	wg *sync.WaitGroup
 	// numWorkers stores the number of workers available to concurrently process jobs.
 	numWorkers int32
+	// peek sets the number of items to check on queue peeks
+	peek int64
 	// workers is a buffered channel which allows scanners to send queue items
 	// to workers to be processed
 	workers chan processItem

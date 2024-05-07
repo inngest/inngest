@@ -1132,11 +1132,17 @@ func (q *queue) capacity() int64 {
 // peekSize returns the total number of available workers which can consume individual
 // queue items.
 func (q *queue) peekSize() int64 {
-	f := q.capacity()
-	if f > QueuePeekMax {
-		return QueuePeekMax
+	size := q.peek
+	if size == 0 {
+		size = QueuePeekMax
 	}
-	return f
+
+	cap := q.capacity()
+	if size > cap {
+		size = cap
+	}
+
+	return size
 }
 
 func (q *queue) isSequential() bool {
