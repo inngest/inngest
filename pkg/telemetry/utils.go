@@ -50,7 +50,7 @@ func recordCounterMetric(ctx context.Context, incr int64, opts counterOpt) {
 			metric.WithUnit(opts.Unit),
 		)
 	if err != nil {
-		log.From(ctx).Error().Err(err).Msg(fmt.Sprintf("error for meter: %s", opts.MetricName))
+		log.From(ctx).Error().Err(err).Str("metric", opts.MetricName).Msg("error recording counter metric")
 		return
 	}
 
@@ -64,10 +64,10 @@ type gaugeOpt struct {
 	Meter       metric.Meter
 	Attributes  map[string]any
 	Unit        string
-	Callback    gaugeCallback
+	Callback    GaugeCallback
 }
 
-type gaugeCallback func(ctx context.Context) (int64, error)
+type GaugeCallback func(ctx context.Context) (int64, error)
 
 // RecordGaugeMetric records the gauge value via a callback.
 // The callback needs to be passed in so it doesn't get captured as a closure when instrumenting the value
@@ -100,7 +100,7 @@ func recordGaugeMetric(ctx context.Context, opts gaugeOpt) {
 			metric.WithUnit(opts.Unit),
 			metric.WithInt64Callback(observe),
 		); err != nil {
-		log.From(ctx).Error().Err(err).Msg(fmt.Sprintf("error for meter: %s", opts.MetricName))
+		log.From(ctx).Error().Err(err).Str("metric", opts.MetricName).Msg("error recording gauge metric")
 		return
 	}
 }
@@ -133,7 +133,7 @@ func recordIntHistogramMetric(ctx context.Context, value int64, opts histogramOp
 		)
 
 	if err != nil {
-		log.From(ctx).Err(err).Msg(fmt.Sprintf("error for meter: %s", opts.MetricName))
+		log.From(ctx).Err(err).Str("metric", opts.MetricName).Msg("error recording histogram metric")
 		return
 	}
 

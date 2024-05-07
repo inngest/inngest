@@ -15,7 +15,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
-	"github.com/uber-go/tally/v4"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"golang.org/x/sync/errgroup"
@@ -25,25 +24,6 @@ import (
 
 const (
 	minWorkersFree = 5
-
-	// Mtric consts
-	counterQueueItemsStarted                = "queue_items_started_total"              // Queue item started
-	counterQueueItemsErrored                = "queue_items_errored_total"              // Queue item errored
-	counterQueueItemsComplete               = "queue_items_complete_total"             // Queue item finished
-	counterQueueItemsEnqueued               = "queue_items_enqueued_total"             // Item enqueued
-	counterQueueItemsProcessLeaseExists     = "queue_items_process_lease_exists_total" // Scanned an item with an exisitng lease
-	counterQueueItemsLeaseConflict          = "queue_items_lease_conflict_total"       // Attempt to lease an item with an existing lease
-	counterQueueItemsGone                   = "queue_items_gone_total"                 // Attempt to lease a dequeued item
-	counterSequentialLeaseClaims            = "queue_sequential_lease_claims_total"    // Sequential lease claimed by worker
-	counterPartitionProcessNoCapacity       = "partition_process_no_capacity_total"    // Processing items but there's no more capacity
-	counterPartitionProcessItems            = "partition_process_items_total"          // Leased a queue item within a partition to begin work
-	counterConcurrencyLimit                 = "concurrency_limit_processing_total"
-	counterPartitionProcess                 = "partition_process_total"
-	counterPartitionLeaseConflict           = "partition_lease_conflict_total"
-	counterPartitionConcurrencyLimitReached = "partition_concurrency_limit_reached_total"
-	counterPartitionGone                    = "partition_gone_total"
-	gaugeQueueItemLatencyEWMA               = "queue_item_latency_ewma"
-	histogramItemLatency                    = "queue_item_latency_duration"
 )
 
 var (
@@ -59,20 +39,6 @@ var (
 var (
 	latencyAvg ewma.MovingAverage
 	latencySem *sync.Mutex
-
-	latencyBuckets = tally.DurationBuckets{
-		time.Millisecond,
-		5 * time.Millisecond,
-		10 * time.Millisecond,
-		25 * time.Millisecond,
-		50 * time.Millisecond,
-		100 * time.Millisecond,
-		250 * time.Millisecond,
-		500 * time.Millisecond,
-		time.Second,
-		10 * time.Second,
-		time.Minute,
-	}
 
 	startedAtKey = startedAtCtxKey{}
 	sojournKey   = sojournCtxKey{}
@@ -131,9 +97,10 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		queueName = item.QueueName
 	}
 
-	go q.scope.Tagged(map[string]string{
-		"kind": item.Kind,
-	}).Counter(counterQueueItemsEnqueued).Inc(1)
+	telemetry.IncrQueueItemEnqueuedCounter(ctx, telemetry.CounterOpt{
+		PkgName: pkgName,
+		Tags:    map[string]any{"kind": item.Kind},
+	})
 
 	qi := QueueItem{
 		ID:          id,
@@ -490,7 +457,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 			if q.seqLeaseID == nil {
 				// Only track this if we're creating a new lease, not if we're renewing
 				// a lease.
-				go q.scope.Counter(counterSequentialLeaseClaims).Inc(1)
+				telemetry.IncrQueueSequentialLeaseClaimsCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 			}
 			q.seqLeaseID = leaseID
 			q.seqLeaseLock.Unlock()
@@ -553,7 +520,7 @@ func (q *queue) runScavenger(ctx context.Context) {
 			if q.scavengerLeaseID == nil {
 				// Only track this if we're creating a new lease, not if we're renewing
 				// a lease.
-				go q.scope.Counter(counterSequentialLeaseClaims).Inc(1)
+				telemetry.IncrQueueSequentialLeaseClaimsCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 			}
 			q.scavengerLeaseID = leaseID
 			q.scavengerLeaseLock.Unlock()
@@ -632,7 +599,7 @@ func (q *queue) scan(ctx context.Context) error {
 			if q.capacity() == 0 {
 				// no longer any available workers for partition, so we can skip
 				// work
-				q.int64counter(ctx, "inngest_queue_scan_no_capacity_total", 1)
+				telemetry.IncrQueueScanNoCapacityCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 				return nil
 			}
 			if err := q.processPartition(ctx, &p, shard); err != nil {
@@ -648,9 +615,9 @@ func (q *queue) scan(ctx context.Context) error {
 				return err
 			}
 
-			q.int64counter(ctx, "inngest_queue_partition_processed_total", 1, attribute.KeyValue{
-				Key:   attribute.Key("shard"),
-				Value: attribute.StringValue(metricShardName),
+			telemetry.IncrQueuePartitionProcessedCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"shard": metricShardName},
 			})
 			return nil
 		})
@@ -662,8 +629,6 @@ func (q *queue) scan(ctx context.Context) error {
 // NOTE: Shard is only passed as a reference if the partition was peeked from
 // a shard.  It exists for accounting and tracking purposes only, eg. to report shard metrics.
 func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *QueueShard) error {
-	q.scope.Counter(counterPartitionProcess).Inc(1)
-
 	// Attempt to lease items.  This checks partition-level concurrency limits
 	//
 	// For oprimization, because this is the only thread that can be leasing
@@ -684,18 +649,18 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 			// scanning of jobs altogether.
 			go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
 		}
-		q.scope.Counter(counterPartitionConcurrencyLimitReached).Inc(1)
+		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 		return q.PartitionRequeue(ctx, p, getNow().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 	if err == ErrPartitionAlreadyLeased {
-		q.scope.Counter(counterPartitionLeaseConflict).Inc(1)
+		telemetry.IncrQueuePartitionLeaseContentionCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 		return nil
 	}
 	if err == ErrPartitionNotFound {
 		// Another worker must have pocessed this partition between
 		// this worker's peek and process.  Increase partition
 		// contention metric and continue.  This is unsolvable.
-		q.scope.Counter(counterPartitionGone).Inc(1)
+		telemetry.IncrPartitionGoneCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 		return nil
 	}
 	if err != nil {
@@ -719,9 +684,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	if err != nil {
 		return err
 	}
-	telemetry.IncrQueuePeekedCounter(ctx, int64(len(queue)), telemetry.CounterOpt{
-		PkgName: pkgName,
-	})
+	telemetry.IncrQueuePeekedCounter(ctx, int64(len(queue)), telemetry.CounterOpt{PkgName: pkgName})
 
 	var (
 		processErr error
@@ -733,7 +696,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	)
 
 	// Record the number of partitions we're leasing.
-	q.int64counter(ctx, "inngest_queue_partition_lease_total", 1)
+	telemetry.IncrQueuePartitionLeasedCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 
 	// staticTime is used as the processing time for all items in the queue.
 	// We process queue items sequentially, and time progresses linearly as each
@@ -753,19 +716,19 @@ ProcessLoop:
 		if q.capacity() == 0 {
 			// no longer any available workers for partition, so we can skip
 			// work for now.
-			q.int64counter(ctx, "inngest_queue_process_no_capacity_total", 1)
+			telemetry.IncrQueueProcessNoCapacityCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 			break ProcessLoop
 		}
 
 		item := qi
 		if item.IsLeased(getNow()) {
-			q.int64counter(ctx, "inngest_queue_partition_lease_contention_total", 1)
+			telemetry.IncrQueueItemLeaseContentionCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 			continue
 		}
 
 		// Cbeck if there's capacity from our local workers atomically prior to leasing our tiems.
 		if !q.sem.TryAcquire(1) {
-			q.int64counter(ctx, "inngest_queue_partition_process_no_capacity_total", 1)
+			telemetry.IncrQueuePartitionProcessNoCapacityCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 			break
 		}
 
@@ -819,7 +782,7 @@ ProcessLoop:
 		case ErrQueueItemThrottled:
 			ctrRateLimit++
 			processErr = nil
-			q.int64counter(ctx, "inngest_queue_throttled_total", 1)
+			telemetry.IncrQueueThrottledCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 			continue
 		case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
 			ctrConcurrency++
@@ -889,7 +852,7 @@ ProcessLoop:
 			go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
 		}
 		// Requeue this partition as we hit concurrency limits.
-		q.int64counter(ctx, "inngest_queue_partition_concurrency_limit_total", 1)
+		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 		return q.PartitionRequeue(ctx, p, getNow().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 
@@ -918,10 +881,6 @@ ProcessLoop:
 func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *QueueShard, f osqueue.RunFunc) error {
 	var err error
 	leaseID := qi.LeaseID
-
-	scope := q.scope.Tagged(map[string]string{
-		"kind": qi.Data.Kind,
-	})
 
 	// Allow the main runner to block until this work is done
 	q.wg.Add(1)
@@ -1014,14 +973,19 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 			// Update the ewma
 			latencySem.Lock()
 			latencyAvg.Add(float64(latency))
-			scope.Gauge(gaugeQueueItemLatencyEWMA).Update(latencyAvg.Value() / 1e6)
+			telemetry.GaugeQueueItemLatencyEWMA(ctx, int64(latencyAvg.Value()/1e6), telemetry.GaugeOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"kind": qi.Data.Kind},
+			})
 			latencySem.Unlock()
 
 			// Set the metrics historgram and gauge, which reports the ewma value.
-			scope.Histogram(histogramItemLatency, latencyBuckets).RecordDuration(latency)
+			telemetry.HistogramQueueItemLatency(ctx, latency.Milliseconds(), telemetry.HistogramOpt{
+				PkgName: pkgName,
+			})
 		}()
 
-		go scope.Counter(counterQueueItemsStarted).Inc(1)
+		telemetry.IncrQueueItemStartedCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 
 		runInfo := osqueue.RunInfo{
 			Latency:      latency,
@@ -1037,11 +1001,11 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 		err := f(jobCtx, runInfo, qi.Data)
 		extendLeaseTick.Stop()
 		if err != nil {
-			go scope.Counter(counterQueueItemsErrored).Inc(1)
+			telemetry.IncrQueueItemErroredCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 			errCh <- err
 			return
 		}
-		go scope.Counter(counterQueueItemsComplete).Inc(1)
+		telemetry.IncrQueueItemCompletedCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 
 		// Closing this channel prevents the goroutine which extends lease from leaking,
 		// and dequeues the job
@@ -1167,39 +1131,22 @@ func (q *queue) isScavenger() bool {
 
 func (q *queue) queueGauges(ctx context.Context) {
 	// Report gauges to otel.
-	_, _ = q.meter.Int64ObservableGauge(
-		"inngest_queue_capacity_total",
-		metric.WithDescription("Capacity of current worker"),
-		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
-			o.Observe(q.capacity())
-			return nil
-		}),
-	)
-	_, _ = q.meter.Int64ObservableGauge(
-		"inngest_queue_global_partition_total_count",
-		metric.WithDescription("Number of total partitions in the global queue"),
-		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
-			cnt, err := q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), getNow().Add(time.Hour*24*365))
-			if err != nil {
-				q.logger.Error().Err(err).Msg("error getting global partition total for gauge")
-			}
-			o.Observe(cnt)
-			return nil
-		}),
-	)
-	// Report gauges to otel.
-	_, _ = q.meter.Int64ObservableGauge(
-		"inngest_queue_global_partition_available_count",
-		metric.WithDescription("Number of available partitions in the global queue"),
-		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
-			cnt, err := q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), getNow().Add(PartitionLookahead))
-			if err != nil {
-				q.logger.Error().Err(err).Msg("error getting global partition available for gauge")
-			}
-			o.Observe(cnt)
-			return nil
-		}),
-	)
+	telemetry.GaugeWorkerQueueCapacity(ctx, q.capacity(), telemetry.GaugeOpt{PkgName: pkgName})
+
+	telemetry.GaugeGlobalQueuePartitionCount(ctx, telemetry.GaugeOpt{
+		PkgName: pkgName,
+		Observer: func(ctx context.Context) (int64, error) {
+			dur := time.Hour * 24 * 365
+			return q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), getNow().Add(dur))
+		},
+	})
+
+	telemetry.GaugeGlobalQueuePartitionAvailable(ctx, telemetry.GaugeOpt{
+		PkgName: pkgName,
+		Observer: func(ctx context.Context) (int64, error) {
+			return q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), getNow().Add(PartitionLookahead))
+		},
+	})
 }
 
 // shardGauges reports shard gauges via otel.
@@ -1271,12 +1218,6 @@ func (q *queue) shardGauges(ctx context.Context) {
 			return nil
 		}),
 	)
-}
-
-func (q *queue) int64counter(ctx context.Context, name string, value int64, attrs ...attribute.KeyValue) {
-	if c, err := q.meter.Int64Counter(name); err == nil {
-		c.Add(ctx, value, metric.WithAttributes(attrs...))
-	}
 }
 
 // trackingSemaphore returns a semaphore that tracks closely - but not atomically -
