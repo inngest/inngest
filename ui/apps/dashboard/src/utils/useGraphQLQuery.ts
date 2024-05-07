@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   baseFetchSkipped,
@@ -107,19 +107,33 @@ export function useSkippableGraphQLQuery<
     return () => clearTimeout(timeoutID);
   }, [skip, res.fetching, pollIntervalInMilliseconds, executeQuery]);
 
+  const refetch = useCallback(() => {
+    return () =>
+      executeQuery({
+        // Ignore cache
+        requestPolicy: 'network-only',
+      });
+  }, [executeQuery]);
+
   if (skip) {
-    return baseFetchSkipped;
+    return {
+      ...baseFetchSkipped,
+    };
   }
 
   // Handle both fetching states (initial fetch and refetch)
   if (res.fetching) {
     if (!data) {
-      return baseInitialFetchLoading;
+      return {
+        ...baseInitialFetchLoading,
+        refetch,
+      };
     }
 
     return {
       ...baseRefetchLoading,
       data,
+      refetch,
     };
   }
 
@@ -129,6 +143,7 @@ export function useSkippableGraphQLQuery<
       return {
         ...baseInitialFetchFailed,
         error: new Error(res.error.message),
+        refetch,
       };
     }
 
@@ -136,6 +151,7 @@ export function useSkippableGraphQLQuery<
       ...baseRefetchFailed,
       data,
       error: new Error(res.error.message),
+      refetch,
     };
   }
 
@@ -144,11 +160,13 @@ export function useSkippableGraphQLQuery<
     return {
       ...baseInitialFetchFailed,
       error: new Error('finished loading but missing data'),
+      refetch,
     };
   }
 
   return {
     ...baseFetchSucceeded,
     data,
+    refetch,
   };
 }
