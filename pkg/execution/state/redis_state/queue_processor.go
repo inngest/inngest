@@ -15,8 +15,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/metric"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"gonum.org/v1/gonum/stat/sampleuv"
@@ -1165,59 +1163,29 @@ func (q *queue) shardGauges(ctx context.Context) {
 			case <-tick.C:
 				// Reload shards.
 				shards, err = q.getShards(ctx)
+				if err != nil {
+					q.logger.Error().Err(err).Msg("error retrieving shards")
+				}
 			}
 		}
 	}()
 
 	// Report gauges to otel.
-	_, _ = q.meter.Int64ObservableGauge(
-		"inngest_queue_shards_count",
-		metric.WithDescription("Number of shards in the queue"),
-		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
-			o.Observe(int64(len(shards)))
-			return err
-		}),
-	)
-	_, _ = q.meter.Int64ObservableGauge(
-		"inngest_queue_shards_guaranteed_capacity_count",
-		metric.WithDescription("Shard guaranteed capacity, by shard name"),
-		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
-			for _, shard := range shards {
-				o.Observe(int64(shard.GuaranteedCapacity), metric.WithAttributes(
-					attribute.KeyValue{Key: attribute.Key("shard_name"), Value: attribute.StringValue(shard.Name)},
-				))
-			}
-			return err
-		}),
-	)
-	_, _ = q.meter.Int64ObservableGauge(
-		"inngest_queue_shards_lease_count",
-		metric.WithDescription("Shard current lease count, by shard name"),
-		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
-			for _, shard := range shards {
-				o.Observe(int64(len(shard.Leases)), metric.WithAttributes(
-					attribute.KeyValue{Key: attribute.Key("shard_name"), Value: attribute.StringValue(shard.Name)},
-				))
-			}
-			return err
-		}),
-	)
-	_, _ = q.meter.Int64ObservableGauge(
-		"inngest_queue_shard_partition_available_count",
-		metric.WithDescription("The number of avaialble partitions by shard"),
-		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
-			for _, shard := range shards {
-				cnt, err := q.partitionSize(ctx, q.kg.ShardPartitionIndex(shard.Name), getNow().Add(PartitionLookahead))
-				if err != nil {
-					q.logger.Error().Err(err).Msg("error getting shard partition size for gauge")
-				}
-				o.Observe(cnt, metric.WithAttributes(
-					attribute.KeyValue{Key: attribute.Key("shard_name"), Value: attribute.StringValue(shard.Name)},
-				))
-			}
-			return nil
-		}),
-	)
+	telemetry.GaugeQueueShardCount(ctx, int64(len(shards)), telemetry.GaugeOpt{PkgName: pkgName})
+
+	for _, shard := range shards {
+		tags := map[string]any{"shard_name": shard.Name}
+
+		telemetry.GaugeQueueShardGuaranteedCapacityCount(ctx, int64(shard.GuaranteedCapacity), telemetry.GaugeOpt{PkgName: pkgName, Tags: tags})
+		telemetry.GaugeQueueShardLeaseCount(ctx, int64(len(shard.Leases)), telemetry.GaugeOpt{PkgName: pkgName, Tags: tags})
+		telemetry.GaugeQueueShardPartitionAvailableCount(ctx, telemetry.GaugeOpt{
+			PkgName: pkgName,
+			Tags:    tags,
+			Observer: func(ctx context.Context) (int64, error) {
+				return q.partitionSize(ctx, q.kg.ShardPartitionIndex(shard.Name), getNow().Add(PartitionLookahead))
+			},
+		})
+	}
 }
 
 // trackingSemaphore returns a semaphore that tracks closely - but not atomically -
