@@ -138,6 +138,7 @@ export function useRun({
     return {
       ...baseInitialFetchFailed,
       error: data,
+      refetch: res.refetch,
     };
   }
 

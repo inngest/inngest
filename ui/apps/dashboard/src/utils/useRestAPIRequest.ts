@@ -18,7 +18,7 @@ export function useRestAPIRequest<T>({
   url: string | URL | null;
   method: string;
   pause?: boolean;
-}): FetchResult<T, { skippable: true }> {
+}): Omit<FetchResult<T, { skippable: true }>, 'refetch'> {
   const { getToken } = useAuth();
   const [data, setData] = useState<any>();
   const [isLoading, setIsLoading] = useState<boolean>(false);
