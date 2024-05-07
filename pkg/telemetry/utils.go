@@ -20,7 +20,7 @@ func env() string {
 	return val
 }
 
-type CounterOpt struct {
+type counterOpt struct {
 	Name        string
 	Description string
 	Meter       metric.Meter
@@ -31,7 +31,7 @@ type CounterOpt struct {
 
 // RecordCounterMetric increments the counter by the provided value.
 // The meter used can either be passed in or is the global meter
-func RecordCounterMetric(ctx context.Context, incr int64, opts CounterOpt) {
+func recordCounterMetric(ctx context.Context, incr int64, opts counterOpt) {
 	attrs := []attribute.KeyValue{}
 	if opts.Attributes != nil {
 		attrs = append(attrs, parseAttributes(opts.Attributes)...)
@@ -57,21 +57,21 @@ func RecordCounterMetric(ctx context.Context, incr int64, opts CounterOpt) {
 	c.Add(ctx, incr, metric.WithAttributes(attrs...))
 }
 
-type GaugeOpt struct {
+type gaugeOpt struct {
 	Name        string
 	Description string
 	MetricName  string
 	Meter       metric.Meter
 	Attributes  map[string]any
 	Unit        string
-	Callback    GaugeCallback
+	Callback    gaugeCallback
 }
 
-type GaugeCallback func(ctx context.Context) (int64, error)
+type gaugeCallback func(ctx context.Context) (int64, error)
 
 // RecordGaugeMetric records the gauge value via a callback.
 // The callback needs to be passed in so it doesn't get captured as a closure when instrumenting the value
-func RecordGaugeMetric(ctx context.Context, opts GaugeOpt) {
+func recordGaugeMetric(ctx context.Context, opts gaugeOpt) {
 	// use the global one by default
 	meter := otel.Meter(opts.Name)
 	if opts.Meter != nil {
@@ -105,7 +105,7 @@ func RecordGaugeMetric(ctx context.Context, opts GaugeOpt) {
 	}
 }
 
-type HistogramOpt struct {
+type histogramOpt struct {
 	Name        string
 	Description string
 	Meter       metric.Meter
@@ -117,7 +117,7 @@ type HistogramOpt struct {
 
 // RecordIntHistogramMetric records the observed value for distributions.
 // Bucket can be provided
-func RecordIntHistogramMetric(ctx context.Context, value int64, opts HistogramOpt) {
+func recordIntHistogramMetric(ctx context.Context, value int64, opts histogramOpt) {
 	// use the global one by default
 	meter := otel.Meter(opts.Name)
 	if opts.Meter != nil {

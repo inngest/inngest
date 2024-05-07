@@ -13,6 +13,7 @@ import (
 	"github.com/VividCortex/ewma"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"github.com/uber-go/tally/v4"
 	"go.opentelemetry.io/otel/attribute"
@@ -718,6 +719,9 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	if err != nil {
 		return err
 	}
+	telemetry.IncrQueuePeekedCounter(ctx, int64(len(queue)), telemetry.CounterOpt{
+		PkgName: pkgName,
+	})
 
 	var (
 		processErr error

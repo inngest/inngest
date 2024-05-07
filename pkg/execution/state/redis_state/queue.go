@@ -37,6 +37,7 @@ var (
 )
 
 const (
+	pkgName = "redis_state.state.execution.inngest"
 
 	// PartitionLeaseDuration dictates how long a worker holds the lease for
 	// a partition.  This gives the worker a right to scan all queue items
