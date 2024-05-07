@@ -28,6 +28,7 @@ func NewCmdDev() *cobra.Command {
 	cmd.Flags().StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
 	cmd.Flags().Bool("no-discovery", false, "Disable autodiscovery")
 	cmd.Flags().Bool("no-poll", false, "Disable polling of apps for updates")
+	cmd.Flags().Int("poll-interval", 5, "Interval in seconds between polling for updates to apps")
 	cmd.Flags().Int("retry-interval", 0, "Retry interval in seconds for linear backoff when retrying functions - must be 1 or above")
 
 	cmd.Flags().Int("tick", 150, "The interval (in milliseconds) at which the executor checks for new work, during local development")
@@ -74,6 +75,7 @@ func doDev(cmd *cobra.Command, args []string) {
 	// Run auto-discovery unless we've explicitly disabled it.
 	noDiscovery, _ := cmd.Flags().GetBool("no-discovery")
 	noPoll, _ := cmd.Flags().GetBool("no-poll")
+	pollInterval, _ := cmd.Flags().GetInt("poll-interval")
 	retryInterval, _ := cmd.Flags().GetInt("retry-interval")
 	tick, _ := cmd.Flags().GetInt("tick")
 
@@ -93,6 +95,7 @@ func doDev(cmd *cobra.Command, args []string) {
 		URLs:          urls,
 		Autodiscover:  !noDiscovery,
 		Poll:          !noPoll,
+		PollInterval:  pollInterval,
 		RetryInterval: retryInterval,
 		Tick:          time.Duration(tick) * time.Millisecond,
 	}

@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/inngest/inngest/pkg/util"
 )
 
 var (
@@ -71,7 +73,7 @@ func Autodiscover(ctx context.Context) map[string]struct{} {
 		for _, path := range Paths {
 			// These requests _should_ be fast as we know a port is open,
 			// so we do these sequentially.
-			url := fmt.Sprintf("http://127.0.0.1:%d%s", port, path)
+			url := util.NormalizeAppURL(fmt.Sprintf("http://127.0.0.1:%d%s", port, path), false)
 			if err := checkURL(ctx, url); err == nil {
 				if _, ok := urls[url]; !ok {
 					// only add if the URL doesn't exist;  this ensures
