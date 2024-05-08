@@ -2348,6 +2348,7 @@ func (e executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Funct
 	ctx, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeBatch),
 		telemetry.WithName(consts.OtelSpanBatch),
+		telemetry.WithNewRoot(),
 		telemetry.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, payload.AccountID.String()),
