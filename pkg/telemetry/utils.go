@@ -20,7 +20,7 @@ func env() string {
 	return val
 }
 
-type CounterOpt struct {
+type counterOpt struct {
 	Name        string
 	Description string
 	Meter       metric.Meter
@@ -31,7 +31,7 @@ type CounterOpt struct {
 
 // RecordCounterMetric increments the counter by the provided value.
 // The meter used can either be passed in or is the global meter
-func RecordCounterMetric(ctx context.Context, incr int64, opts CounterOpt) {
+func recordCounterMetric(ctx context.Context, incr int64, opts counterOpt) {
 	attrs := []attribute.KeyValue{}
 	if opts.Attributes != nil {
 		attrs = append(attrs, parseAttributes(opts.Attributes)...)
@@ -50,14 +50,14 @@ func RecordCounterMetric(ctx context.Context, incr int64, opts CounterOpt) {
 			metric.WithUnit(opts.Unit),
 		)
 	if err != nil {
-		log.From(ctx).Error().Err(err).Msg(fmt.Sprintf("error for meter: %s", opts.MetricName))
+		log.From(ctx).Error().Err(err).Str("metric", opts.MetricName).Msg("error recording counter metric")
 		return
 	}
 
 	c.Add(ctx, incr, metric.WithAttributes(attrs...))
 }
 
-type GaugeOpt struct {
+type gaugeOpt struct {
 	Name        string
 	Description string
 	MetricName  string
@@ -71,7 +71,7 @@ type GaugeCallback func(ctx context.Context) (int64, error)
 
 // RecordGaugeMetric records the gauge value via a callback.
 // The callback needs to be passed in so it doesn't get captured as a closure when instrumenting the value
-func RecordGaugeMetric(ctx context.Context, opts GaugeOpt) {
+func recordGaugeMetric(ctx context.Context, opts gaugeOpt) {
 	// use the global one by default
 	meter := otel.Meter(opts.Name)
 	if opts.Meter != nil {
@@ -100,12 +100,12 @@ func RecordGaugeMetric(ctx context.Context, opts GaugeOpt) {
 			metric.WithUnit(opts.Unit),
 			metric.WithInt64Callback(observe),
 		); err != nil {
-		log.From(ctx).Error().Err(err).Msg(fmt.Sprintf("error for meter: %s", opts.MetricName))
+		log.From(ctx).Error().Err(err).Str("metric", opts.MetricName).Msg("error recording gauge metric")
 		return
 	}
 }
 
-type HistogramOpt struct {
+type histogramOpt struct {
 	Name        string
 	Description string
 	Meter       metric.Meter
@@ -117,7 +117,7 @@ type HistogramOpt struct {
 
 // RecordIntHistogramMetric records the observed value for distributions.
 // Bucket can be provided
-func RecordIntHistogramMetric(ctx context.Context, value int64, opts HistogramOpt) {
+func recordIntHistogramMetric(ctx context.Context, value int64, opts histogramOpt) {
 	// use the global one by default
 	meter := otel.Meter(opts.Name)
 	if opts.Meter != nil {
@@ -133,7 +133,7 @@ func RecordIntHistogramMetric(ctx context.Context, value int64, opts HistogramOp
 		)
 
 	if err != nil {
-		log.From(ctx).Err(err).Msg(fmt.Sprintf("error for meter: %s", opts.MetricName))
+		log.From(ctx).Err(err).Str("metric", opts.MetricName).Msg("error recording histogram metric")
 		return
 	}
 
