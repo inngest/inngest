@@ -23,6 +23,4 @@ const (
 	HistoryTypeStepWaiting
 	HistoryTypeStepSleeping
 	HistoryTypeStepInvoking
-
-	HistoryTypeFunctionSkipped
 )
