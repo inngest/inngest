@@ -28,6 +28,7 @@ const GetFunctionArchivalDocument = graphql(`
       workflow: workflowBySlug(slug: $slug) {
         id
         isArchived
+        isParentArchived
         name
       }
     }
@@ -125,7 +126,7 @@ export default function ArchiveFunctionButton({ functionSlug }: ArchiveFunctionP
     return null;
   }
 
-  const { isArchived } = fn;
+  const { isArchived, isParentArchived } = fn;
 
   return (
     <>
@@ -142,7 +143,7 @@ export default function ArchiveFunctionButton({ functionSlug }: ArchiveFunctionP
                   )
                 }
                 btnAction={() => setIsArchivedFunctionModalVisible(true)}
-                disabled={isFetchingVersions}
+                disabled={isFetchingVersions || isParentArchived}
                 label={isArchived ? 'Unarchive' : 'Archive'}
               />
             </span>

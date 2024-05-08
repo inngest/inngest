@@ -7,6 +7,7 @@ import { InvokeButton } from '@inngest/components/InvokeButton';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { graphql } from '@/gql';
@@ -85,8 +86,11 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
     [env.id, functionSlug, invokeFunction]
   );
 
+  const externalAppID = data?.workspace.workflow?.appName;
+
   return (
     <>
+      {externalAppID && <ArchivedAppBanner externalAppID={externalAppID} />}
       <Header
         icon={<CodeBracketSquareIcon className="h-3.5 w-3.5 text-white" />}
         title={!data || fetching ? '...' : fn?.name || functionSlug}

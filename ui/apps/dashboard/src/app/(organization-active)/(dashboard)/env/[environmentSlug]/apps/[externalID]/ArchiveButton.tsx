@@ -1,33 +1,37 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 
-import ResyncModal from './ResyncModal';
+import { ArchiveModal } from './ArchiveModal';
 
 type Props = {
-  appExternalID: string;
+  appID: string;
   disabled?: boolean;
-  latestSyncUrl: string;
-  platform: string | null;
+  isArchived: boolean;
 };
 
-export function ResyncButton({ appExternalID, disabled = false, latestSyncUrl, platform }: Props) {
+export function ArchiveButton({ appID, disabled = false, isArchived }: Props) {
   const [isModalVisible, setIsModalVisible] = useState(false);
+
+  let label = 'Archive';
+  if (isArchived) {
+    label = 'Unarchive';
+  }
 
   return (
     <>
       <Button
+        appearance="outlined"
         btnAction={() => setIsModalVisible(true)}
         disabled={disabled}
-        kind="primary"
-        label="Resync"
+        kind="danger"
+        label={label}
       />
 
-      <ResyncModal
-        appExternalID={appExternalID}
+      <ArchiveModal
+        appID={appID}
+        isArchived={isArchived}
         isOpen={isModalVisible}
         onClose={() => setIsModalVisible(false)}
-        url={latestSyncUrl}
-        platform={platform}
       />
     </>
   );
