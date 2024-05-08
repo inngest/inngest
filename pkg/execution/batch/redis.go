@@ -162,8 +162,10 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 		Identifier: state.Identifier{
 			WorkflowID:      opts.FunctionID,
 			WorkflowVersion: opts.FunctionVersion,
-			RunID:           ulid.Make(),
 			Key:             fmt.Sprintf("batchschedule:%s", opts.BatchID),
+			AccountID:       opts.AccountID,
+			WorkspaceID:     opts.WorkspaceID,
+			AppID:           opts.AppID,
 		},
 		Attempt:     0,
 		MaxAttempts: &maxAttempts,

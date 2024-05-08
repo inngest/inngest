@@ -2282,6 +2282,121 @@ func (e *executor) extractTraceCtx(ctx context.Context, id state.Identifier, ite
 	return ctx
 }
 
+// AppendAndScheduleBatch appends a new batch item. If a new batch is created, it will be scheduled to run
+// after the batch timeout. If the item finalizes the batch, a function run is immediately scheduled.
+func (e executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem) error {
+	result, err := e.batcher.Append(ctx, bi, fn)
+	if err != nil {
+		return err
+	}
+
+	switch result.Status {
+	case enums.BatchAppend:
+		// noop
+	case enums.BatchNew:
+		dur, err := time.ParseDuration(fn.EventBatch.Timeout)
+		if err != nil {
+			return err
+		}
+		at := time.Now().Add(dur)
+
+		if err := e.batcher.ScheduleExecution(ctx, batch.ScheduleBatchOpts{
+			ScheduleBatchPayload: batch.ScheduleBatchPayload{
+				BatchID:         ulid.MustParse(result.BatchID),
+				AccountID:       bi.AccountID,
+				WorkspaceID:     bi.WorkspaceID,
+				AppID:           bi.AppID,
+				FunctionID:      bi.FunctionID,
+				FunctionVersion: bi.FunctionVersion,
+			},
+			At: at,
+		}); err != nil {
+			return err
+		}
+	case enums.BatchFull:
+		// start execution immediately
+		batchID := ulid.MustParse(result.BatchID)
+		if err := e.RetrieveAndScheduleBatch(ctx, fn, batch.ScheduleBatchPayload{
+			BatchID:     batchID,
+			AppID:       bi.AppID,
+			WorkspaceID: bi.WorkspaceID,
+			AccountID:   bi.AccountID,
+		}); err != nil {
+			return fmt.Errorf("could not retrieve and schedule batch items: %w", err)
+		}
+	default:
+		return fmt.Errorf("invalid status of batch append ops: %d", result.Status)
+	}
+
+	return nil
+}
+
+// RetrieveAndScheduleBatch retrieves all items from a started batch and schedules a function run
+func (e executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload) error {
+	evtList, err := e.batcher.RetrieveItems(ctx, payload.BatchID)
+	if err != nil {
+		return err
+	}
+
+	evtIDs := make([]string, len(evtList))
+	events := make([]event.TrackedEvent, len(evtList))
+	for i, e := range evtList {
+		events[i] = e
+		evtIDs[i] = e.GetInternalID().String()
+	}
+
+	ctx, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeBatch),
+		telemetry.WithName(consts.OtelSpanBatch),
+		telemetry.WithNewRoot(),
+		telemetry.WithSpanAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, payload.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, payload.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, payload.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
+			attribute.String(consts.OtelSysBatchID, payload.BatchID.String()),
+			attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
+		))
+	defer span.End()
+
+	// still process events in case the user disables batching while a batch is still in-flight
+	if fn.EventBatch != nil {
+		if len(events) == fn.EventBatch.MaxSize {
+			span.SetAttributes(attribute.Bool(consts.OtelSysBatchFull, true))
+		} else {
+			span.SetAttributes(attribute.Bool(consts.OtelSysBatchTimeout, true))
+		}
+	}
+
+	key := fmt.Sprintf("%s-%s", fn.ID, payload.BatchID)
+	identifier, err := e.Schedule(ctx, execution.ScheduleRequest{
+		AccountID:      payload.AccountID,
+		WorkspaceID:    payload.WorkspaceID,
+		AppID:          payload.AppID,
+		Function:       fn,
+		Events:         events,
+		BatchID:        &payload.BatchID,
+		IdempotencyKey: &key,
+	})
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		return err
+	}
+
+	if identifier != nil {
+		span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, identifier.RunID.String()))
+	} else {
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
+	}
+
+	if err := e.batcher.ExpireKeys(ctx, payload.BatchID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // extractTraceCtxFromMap extracts the trace context from a map, if it exists.
 // If it doesn't or it is invalid, it nil.
 func extractTraceCtxFromMap(ctx context.Context, target map[string]any) (context.Context, bool) {

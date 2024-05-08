@@ -15,3 +15,5 @@ pkg/devserver/static/
 Thumbs.db
 
 /.vercel/
+
+.idea
