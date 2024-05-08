@@ -318,48 +318,15 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 		return err
 	}
 
-	// TODO: this logic is repeated in runner, consolidate it somewhere
-	// convert batch items to tracked events
-	items, err := s.batcher.RetrieveItems(ctx, batchID)
-	if err != nil {
-		return err
-	}
-	events := make([]event.TrackedEvent, len(items))
-	for i, item := range items {
-		events[i] = item
-	}
-
-	ctx, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeBatch),
-		telemetry.WithName(consts.OtelSpanBatch),
-		telemetry.WithSpanAttributes(
-			attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
-			attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
-			attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
-			attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
-			attribute.String(consts.OtelSysBatchID, batchID.String()),
-			attribute.Bool(consts.OtelSysBatchFull, true),
-		),
-	)
-	defer span.End()
-
-	// start execution
-	id := fmt.Sprintf("%s-%s", opts.FunctionID, batchID)
-	_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
-		AccountID:      opts.AccountID,
-		WorkspaceID:    opts.WorkspaceID,
-		AppID:          opts.AppID,
-		Function:       *fn,
-		Events:         events,
-		BatchID:        &batchID,
-		IdempotencyKey: &id,
-	})
-	if err != nil {
-		return err
-	}
-
-	if err := s.batcher.ExpireKeys(ctx, batchID); err != nil {
-		return err
+	if err := s.exec.RetrieveAndScheduleBatch(ctx, *fn, batch.ScheduleBatchPayload{
+		BatchID:         batchID,
+		AccountID:       item.Identifier.AccountID,
+		WorkspaceID:     item.Identifier.WorkspaceID,
+		AppID:           item.Identifier.AppID,
+		FunctionID:      item.Identifier.WorkflowID,
+		FunctionVersion: fn.FunctionVersion,
+	}); err != nil {
+		return fmt.Errorf("could not retrieve and schedule batch items: %w", err)
 	}
 
 	return nil

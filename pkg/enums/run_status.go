@@ -11,31 +11,34 @@ import (
 type RunStatus int
 
 // NOTE:
-// DO NOT EVER DELETE. There are Lua scripts that rely on the integer values in the state metadata.
-// Deleting value enum will result in a change in order, and will break things.
+// DO NOT EVER DELETE OR REUSE.
+// There are Lua scripts that rely on the integer values in the state metadata.
+// Deleting/reusing enum value will break things.
+//
+//goland:noinspection GoDeprecation
 const (
 	// RunStatusRunning indicates that the function is running.  This is the
 	// default state, even if steps are scheduled in the future.
-	RunStatusRunning RunStatus = iota
+	RunStatusRunning RunStatus = 0
 	// RunStatusCompleted indicates that the function has completed running.
-	RunStatusCompleted
+	RunStatusCompleted RunStatus = 1
 	// RunStatusFailed indicates that the function failed in one or more steps.
-	RunStatusFailed
+	RunStatusFailed RunStatus = 2
 	// RunStatusCancelled indicates that the function has been cancelled prior
 	// to any errors
-	RunStatusCancelled
+	RunStatusCancelled RunStatus = 3
 	// RunStatusOverflowed indicates that the function had too many steps ran.
 	// Deprecated.  This must be RunStatusFailed with an appropriate error code.
-	RunStatusOverflowed
+	RunStatusOverflowed RunStatus = 4
 	// RunStatusScheduled indicates that the function is scheduled but have not started
 	// processing
-	RunStatusScheduled
+	RunStatusScheduled RunStatus = 5
 	// RunStatusUnknown indicates that the function is in an unknown status.
 	// This is unlikely to happen during normal execution, and more likely when converting between
 	// the status code
-	RunStatusUnknown
+	RunStatusUnknown RunStatus = 6
 	// RunStatusSkipped indicates that the function run was skipped.
-	RunStatusSkipped
+	RunStatusSkipped RunStatus = 7
 )
 
 var (
