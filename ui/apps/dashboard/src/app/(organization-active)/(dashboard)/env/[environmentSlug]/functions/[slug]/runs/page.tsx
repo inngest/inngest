@@ -59,7 +59,7 @@ export default function RunsPage() {
     useSearchParam('timeField');
   const [lastDays = '3', setLastDays] = useSearchParam('last');
 
-  const timeField = toTimeField(rawTimeField ?? '') ?? FunctionRunTimeFieldV2.QueuedAt;
+  const timeField = toTimeField(rawTimeField) ?? FunctionRunTimeFieldV2.QueuedAt;
 
   /* TODO: Time params for absolute time filter */
   // const [fromTime, setFromTime] = useSearchParam('from');
