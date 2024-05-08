@@ -91,12 +91,13 @@ type FetchResultWithSkip<
 type FetchResultWithoutSkip<
   // Required
   TData = never
-> =
+> = (
   | InitialFetchFailed
   | InitialFetchLoading
   | Succeeded<TData>
   | RefetchFailed<TData>
-  | RefetchLoading<TData>;
+  | RefetchLoading<TData>
+) & { refetch: () => void };
 
 type Options = {
   skippable?: boolean;
