@@ -94,9 +94,10 @@ func (sh *spanIngestionHandler) Add(span *cqrs.Span) {
 
 		// assign output
 		if run.Output == nil || len(run.Output) == 0 {
-			output := spanAttr(span.SpanAttributes, consts.OtelSysFunctionOutput)
-			if output != "" {
-				run.Output = []byte(output)
+			for _, e := range span.Events {
+				if spanAttr(e.Attributes, consts.OtelSysFunctionOutput) != "" {
+					run.Output = []byte(e.Name)
+				}
 			}
 		}
 
