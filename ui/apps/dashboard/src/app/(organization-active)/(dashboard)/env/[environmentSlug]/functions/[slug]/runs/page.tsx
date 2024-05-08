@@ -55,7 +55,8 @@ const renderSubComponent = ({ id }: { id: string }) => {
 export default function RunsPage() {
   const [rawFilteredStatus, setFilteredStatus, removeFilteredStatus] =
     useStringArraySearchParam('filterStatus');
-  const [rawTimeField, setTimeField] = useSearchParam('timeField');
+  const [rawTimeField = FunctionRunTimeFieldV2.QueuedAt, setTimeField] =
+    useSearchParam('timeField');
   const [lastDays = '3', setLastDays] = useSearchParam('last');
 
   const timeField = toTimeField(rawTimeField ?? '') ?? FunctionRunTimeFieldV2.QueuedAt;
