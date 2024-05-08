@@ -183,6 +183,6 @@ VALUES
 
 -- name: InsertTraceRun :exec
 INSERT INTO trace_runs
-	(account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, duration, status, source_id, trigger_ids, triggers, output, is_batch, is_debounce)
+	(account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, duration, status, source_id, trigger_ids, output, is_batch, is_debounce)
 VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
