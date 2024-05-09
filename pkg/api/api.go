@@ -167,6 +167,9 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 			if evt.Timestamp == 0 {
 				evt.Timestamp = ts.UnixMilli()
 			}
+			if evt.User == nil {
+				evt.User = map[string]any{}
+			}
 
 			if err := evt.Validate(ctx); err != nil {
 				return err
