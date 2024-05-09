@@ -665,6 +665,13 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		return fmt.Errorf("error leasing partition: %w", err)
 	}
 
+	begin := time.Now()
+	defer func() {
+		telemetry.HistogramProcessPartitionDration(ctx, time.Now().Sub(begin).Milliseconds(), telemetry.HistogramOpt{
+			PkgName: pkgName,
+		})
+	}()
+
 	// Ensure that peek doesn't take longer than the partition lease, to
 	// reduce contention.
 	peekCtx, cancel := context.WithTimeout(ctx, PartitionLeaseDuration)
