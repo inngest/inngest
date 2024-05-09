@@ -782,6 +782,10 @@ func (r handleQueueItemsResult) IsConcurrentyLimited() bool {
 }
 
 func (r *handleQueueItemsResult) Accumulate(res *handleQueueItemsResult) {
+	if res == nil {
+		return
+	}
+
 	r.totalItems += res.totalItems
 	r.ctrConcurrency += res.ctrConcurrency
 	r.ctrSuccess += res.ctrSuccess
