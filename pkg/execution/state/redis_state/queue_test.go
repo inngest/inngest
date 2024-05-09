@@ -612,6 +612,13 @@ func TestQueueLease(t *testing.T) {
 		// Use the new item's workflow ID
 		p := QueuePartition{WorkflowID: itemA.WorkflowID}
 
+		t.Run("With denylists it does not lease.", func(t *testing.T) {
+			list := newLeaseDenyList()
+			list.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, p.Queue()))
+			_, err = q.Lease(ctx, p, itemA, 5*time.Second, getNow(), list)
+			require.ErrorIs(t, err, ErrPartitionConcurrencyLimit)
+		})
+
 		t.Run("Leases with capacity", func(t *testing.T) {
 			_, err = q.Lease(ctx, p, itemA, 5*time.Second, getNow(), nil)
 			require.NoError(t, err)
@@ -652,8 +659,7 @@ func TestQueueLease(t *testing.T) {
 		})
 	})
 
-	t.Run("With account concurrency limits", func(t *testing.T) {
-		// Only allow a single leased item
+	t.Run("With custom concurrency limits", func(t *testing.T) {
 		q.partitionConcurrencyGen = func(ctx context.Context, p QueuePartition) (string, int) {
 			return p.Queue(), 100
 		}
@@ -674,6 +680,13 @@ func TestQueueLease(t *testing.T) {
 		require.NoError(t, err)
 		// Use the new item's workflow ID
 		p := QueuePartition{WorkflowID: itemA.WorkflowID}
+
+		t.Run("With denylists it does not lease.", func(t *testing.T) {
+			list := newLeaseDenyList()
+			list.addConcurrency(newKeyError(ErrConcurrencyLimitCustomKey0, "custom-level-key"))
+			_, err = q.Lease(ctx, p, itemA, 5*time.Second, getNow(), list)
+			require.ErrorIs(t, err, ErrConcurrencyLimitCustomKey0)
+		})
 
 		t.Run("Leases with capacity", func(t *testing.T) {
 			_, err = q.Lease(ctx, p, itemA, 5*time.Second, getNow(), nil)

@@ -2008,7 +2008,6 @@ type leaseDenies struct {
 }
 
 func (l *leaseDenies) addThrottled(err error) {
-
 	var key keyError
 	if !errors.As(err, &key) {
 		return
