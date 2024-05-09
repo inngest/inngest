@@ -1,8 +1,7 @@
 'use client';
 
-import { ExclamationCircleIcon, XMarkIcon } from '@heroicons/react/20/solid';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { RiCheckLine, RiTimeLine } from '@remixicon/react';
+import { RiCheckLine, RiCloseLine, RiErrorWarningLine, RiTimeLine } from '@remixicon/react';
 
 type PaymentIconProps = {
   status: String;
@@ -17,11 +16,11 @@ export default function PaymentIcon({ status }: PaymentIconProps) {
       label = 'Paid';
       break;
     case 'requires_payment_method':
-      icon = <XMarkIcon className="mx-auto w-4 text-red-500" />;
+      icon = <RiCloseLine className="mx-auto w-4 text-red-500" />;
       label = 'Failed';
       break;
     case 'canceled':
-      icon = <XMarkIcon className="mx-auto w-4 text-slate-400" />;
+      icon = <RiCloseLine className="mx-auto w-4 text-slate-400" />;
       label = 'Canceled';
       break;
     case 'processing':
@@ -29,7 +28,7 @@ export default function PaymentIcon({ status }: PaymentIconProps) {
       label = 'Processing';
       break;
     case 'requires_confirmation':
-      icon = <ExclamationCircleIcon className="mx-auto w-4 text-amber-500" />;
+      icon = <RiErrorWarningLine className="mx-auto w-4 text-amber-500" />;
       label = 'Awaiting payment';
       break;
     default:
