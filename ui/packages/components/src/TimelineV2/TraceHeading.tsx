@@ -4,8 +4,8 @@ import { Badge } from '../Badge';
 import { Button } from '../Button';
 import { Time } from '../Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
+import { isFunctionRunStatus } from '../types/functionRun';
 import { cn } from '../utils/classNames';
-import { isStepStatus } from './types';
 
 type Props = {
   isExpanded: boolean;
@@ -94,7 +94,7 @@ function TimeWithText({ trace }: { trace: Props['trace'] }) {
   if (trace.endedAt) {
     text = 'Ended';
 
-    if (isStepStatus(trace.status)) {
+    if (isFunctionRunStatus(trace.status)) {
       if (trace.status === 'CANCELLED') {
         text = 'Cancelled';
       } else if (trace.status === 'COMPLETED') {

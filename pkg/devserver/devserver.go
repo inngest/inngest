@@ -49,6 +49,7 @@ type StartOpts struct {
 	URLs          []string      `json:"urls"`
 	Autodiscover  bool          `json:"autodiscover"`
 	Poll          bool          `json:"poll"`
+	PollInterval  int           `json:"poll_interval"`
 	Tick          time.Duration `json:"tick"`
 	RetryInterval int           `json:"retry_interval"`
 }

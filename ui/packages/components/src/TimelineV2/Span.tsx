@@ -1,6 +1,5 @@
+import { isFunctionRunStatus, type FunctionRunStatus } from '../types/functionRun';
 import { cn } from '../utils/classNames';
-import { formatMilliseconds } from '../utils/date';
-import { StepStatus, isStepStatus } from './types';
 import { createSpanWidths, toMaybeDate } from './utils';
 
 type Props = {
@@ -58,7 +57,7 @@ export function Span({ className, isInline, maxTime, minTime, trace }: Props) {
   );
 }
 
-const statusColors: { [key in StepStatus | 'UNKNOWN']: string } = {
+const statusColors: { [key in FunctionRunStatus | 'UNKNOWN']: string } = {
   CANCELLED: 'bg-slate-400',
   COMPLETED: 'bg-teal-500',
   FAILED: 'bg-rose-600',
@@ -68,7 +67,7 @@ const statusColors: { [key in StepStatus | 'UNKNOWN']: string } = {
 };
 
 function getStatusColor(status: string): string {
-  if (isStepStatus(status)) {
+  if (isFunctionRunStatus(status)) {
     return statusColors[status];
   }
   return statusColors['UNKNOWN'];

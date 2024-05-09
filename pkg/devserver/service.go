@@ -37,10 +37,6 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
-const (
-	SDKPollInterval = 5 * time.Second
-)
-
 func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher) *devserver {
 	return &devserver{
 		data:        data,
@@ -138,9 +134,7 @@ func (d *devserver) Pre(ctx context.Context) error {
 
 func (d *devserver) Run(ctx context.Context) error {
 	// Start polling the SDKs as the APIs are going live.
-	if d.opts.Poll {
-		go d.pollSDKs(ctx)
-	}
+	go d.pollSDKs(ctx)
 
 	// Add a nice output to the terminal.
 	if isatty.IsTerminal(os.Stdout.Fd()) {
@@ -186,6 +180,7 @@ func (d *devserver) Stop(ctx context.Context) error {
 // any point.
 func (d *devserver) runDiscovery(ctx context.Context) {
 	logger.From(ctx).Info().Msg("autodiscovering locally hosted SDKs")
+	pollInterval := time.Duration(d.opts.PollInterval) * time.Second
 	for {
 		if ctx.Err() != nil {
 			return
@@ -195,13 +190,15 @@ func (d *devserver) runDiscovery(ctx context.Context) {
 			_ = discovery.Autodiscover(ctx)
 		}
 
-		<-time.After(5 * time.Second)
+		<-time.After(pollInterval)
 	}
 }
 
 // pollSDKs hits each SDK's register endpoint, asking them to communicate with
 // the dev server to re-register their functions.
 func (d *devserver) pollSDKs(ctx context.Context) {
+	pollInterval := time.Duration(d.opts.PollInterval) * time.Second
+
 	// Initially, add every app started with the `-u` flag
 	for _, url := range d.opts.URLs {
 		// URLs must contain a protocol. If not, add http since very few apps
@@ -237,6 +234,10 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 				// We've seen this URL.
 				urls[app.Url] = struct{}{}
 
+				if !d.opts.Poll && len(app.Error.String) == 0 {
+					continue
+				}
+
 				// Make a new PUT request to each app, indicating that the
 				// SDK should push functions to the dev server.
 				res := deploy.Ping(ctx, app.Url)
@@ -270,7 +271,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 				}
 			}
 		}
-		<-time.After(SDKPollInterval)
+		<-time.After(pollInterval)
 	}
 }
 

@@ -1,4 +1,4 @@
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, subDays } from 'date-fns';
 
 // Format: 20 Jul 2023, 00:08:42
 export function fullDate(date: Date): string {
@@ -74,4 +74,8 @@ export function formatTimeString({
 
 export function relativeTime(d: Date): string {
   return formatDistanceToNow(d, { addSuffix: true });
+}
+
+export function getTimestampDaysAgo({ currentDate, days }: { currentDate: Date; days: number }) {
+  return subDays(currentDate, days);
 }

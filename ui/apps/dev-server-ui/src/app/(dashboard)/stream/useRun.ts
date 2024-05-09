@@ -63,12 +63,16 @@ export function useRun(runID: string | null): FetchResult<Data, { skippable: tru
 
   if (query.isLoading) {
     if (!data) {
-      return baseInitialFetchLoading;
+      return {
+        ...baseInitialFetchLoading,
+        refetch: query.refetch,
+      };
     }
 
     return {
       ...baseRefetchLoading,
       data,
+      refetch: query.refetch,
     };
   }
 
@@ -80,6 +84,7 @@ export function useRun(runID: string | null): FetchResult<Data, { skippable: tru
     return {
       ...baseInitialFetchFailed,
       error: new Error(query.error.message),
+      refetch: query.refetch,
     };
   }
 
@@ -88,11 +93,13 @@ export function useRun(runID: string | null): FetchResult<Data, { skippable: tru
     return {
       ...baseInitialFetchFailed,
       error: new Error('finished loading but missing data'),
+      refetch: query.refetch,
     };
   }
 
   return {
     ...baseFetchSucceeded,
     data,
+    refetch: query.refetch,
   };
 }

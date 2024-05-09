@@ -234,3 +234,25 @@ func NewInvocationEvent(opts NewInvocationEventOpts) Event {
 
 	return evt
 }
+
+func (e Event) IsCron() bool {
+	return IsCron(e.Name)
+}
+
+func (e Event) CronSchedule() *string {
+	if !IsCron(e.Name) {
+		return nil
+	}
+	return CronSchedule(e.Data)
+}
+
+func IsCron(evtName string) bool {
+	return evtName == FnCronName
+}
+
+func CronSchedule(evtData map[string]any) *string {
+	if cron, ok := evtData["cron"].(string); ok && cron != "" {
+		return &cron
+	}
+	return nil
+}

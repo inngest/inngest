@@ -32,8 +32,6 @@ export function RunInfo({ className, app, fn, run }: Props) {
   const startedAt = toMaybeDate(run.trace.startedAt);
   const endedAt = toMaybeDate(run.trace.endedAt);
 
-  const delayText = formatMilliseconds((startedAt ?? new Date()).getTime() - queuedAt.getTime());
-
   let durationText = '-';
   if (startedAt) {
     durationText = formatMilliseconds((endedAt ?? new Date()).getTime() - startedAt.getTime());

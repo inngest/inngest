@@ -4,10 +4,10 @@ on:
   push:
     branches: [main]
     paths:
-      - 'npm/**'
+      - "npm/**"
   pull_request:
     paths:
-      - 'npm/**'
+      - "npm/**"
 
 jobs:
   install:
@@ -26,13 +26,13 @@ jobs:
       run:
         working-directory: npm
     steps:
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: 'Get previous version tag'
+      - name: "Get previous version tag"
         id: previoustag
         uses: "WyriHaximus/github-action-get-previous-tag@v1"
         with:
@@ -40,8 +40,8 @@ jobs:
       - id: version
         shell: bash
         run: |
-            echo "${{ steps.previoustag.outputs.tag }}" | cut -c2- | tee version.txt
-            echo "::set-output name=version::$(cat version.txt)"
+          echo "${{ steps.previoustag.outputs.tag }}" | cut -c2- | tee version.txt
+          echo "::set-output name=version::$(cat version.txt)"
       - run: npm ci
         env:
           SKIP_POSTINSTALL: 1
@@ -50,5 +50,5 @@ jobs:
       - name: Trigger postinstall
         run: npm install --foreground-scripts
         env:
-          DEBUG: 'inngest:*'
+          DEBUG: "inngest:*"
       - run: bin/inngest version
