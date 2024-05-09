@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { useOrganization, useUser } from '@clerk/nextjs';
-import { CodeBracketSquareIcon, MagnifyingGlassIcon } from '@heroicons/react/20/solid';
+import { CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { Modal } from '@inngest/components/Modal';
-import { classNames } from '@inngest/components/utils/classNames';
-import { RiArrowGoForwardLine } from '@remixicon/react';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiArrowGoForwardLine, RiSearchLine } from '@remixicon/react';
 import { Command } from 'cmdk';
 import { useQuery } from 'urql';
 
@@ -177,7 +177,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
           placeholder="Search by ID..."
           value={search}
           onValueChange={setSearch}
-          className={classNames(
+          className={cn(
             search && 'border-b border-slate-200 focus:border-slate-200',
             'w-[656px] border-0 px-3 py-3 placeholder-slate-500 outline-none focus:ring-0'
           )}
@@ -211,7 +211,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
                 </Command.Item>
               </Command.Group>
             )}
-            <Command.Empty className={classNames(isLoading && 'hidden')}>
+            <Command.Empty className={cn(isLoading && 'hidden')}>
               No results found. Make sure you are typing the full ID.
             </Command.Empty>
           </Command.List>
@@ -253,7 +253,7 @@ export default function SearchNavigation() {
         aria-label="Search by ID"
       >
         <div className="flex items-center gap-1 px-2">
-          <MagnifyingGlassIcon className="h-4 w-4" />
+          <RiSearchLine className="h-4 w-4" />
           ID
         </div>
 

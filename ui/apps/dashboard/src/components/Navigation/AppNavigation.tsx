@@ -2,12 +2,8 @@
 
 import { type Route } from 'next';
 import Link from 'next/link';
-import {
-  CodeBracketSquareIcon,
-  MagnifyingGlassIcon,
-  Squares2X2Icon,
-  WrenchIcon,
-} from '@heroicons/react/20/solid';
+import { CodeBracketSquareIcon, Squares2X2Icon } from '@heroicons/react/20/solid';
+import { RiSearchLine, RiToolsLine } from '@remixicon/react';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import OrganizationDropdown from '@/components/Navigation/OrganizationDropdown';
@@ -59,7 +55,7 @@ export default function AppNavigation({ environmentSlug }: AppNavigationProps) {
       href: `/env/${environmentSlug}/manage`,
       text: 'Manage',
       hide: [ALL_ENVIRONMENTS_SLUG],
-      icon: <WrenchIcon className="w-3.5" />,
+      icon: <RiToolsLine className="w-3.5" />,
     },
   ];
 
@@ -71,7 +67,7 @@ export default function AppNavigation({ environmentSlug }: AppNavigationProps) {
         href: `/env/${environmentSlug}/event-search`,
         text: 'Event Search',
         hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
-        icon: <MagnifyingGlassIcon className="w-3.5" />,
+        icon: <RiSearchLine className="w-3.5" />,
       },
       ...items.slice(3),
     ];
