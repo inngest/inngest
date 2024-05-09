@@ -26,6 +26,9 @@ type Manager interface {
 	EventManager
 	HistoryManager
 
+	// Trace / dev only
+	TraceReadWriter
+
 	// Scoped allows creating a new manager using a transaction.
 	WithTx(ctx context.Context) (TxManager, error)
 }

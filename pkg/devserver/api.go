@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/tel"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -23,6 +24,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
+	"github.com/oklog/ulid/v2"
 	ptrace "go.opentelemetry.io/collector/pdata/ptrace"
 )
 
@@ -348,15 +350,120 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 	}
 	log.From(ctx).Trace().Int("len", traces.SpanCount()).Msg("recording otel trace spans")
 
+	handler := newSpanIngestionHandler()
+
 	for i := 0; i < traces.ResourceSpans().Len(); i++ {
 		rs := traces.ResourceSpans().At(i)
+
+		rattr, err := convertMap(rs.Resource().Attributes().AsRaw())
+		if err != nil {
+			log.From(ctx).Warn().Err(err).Interface("resource", rs.Resource().Attributes().AsRaw()).Msg("error parsing resource attributes")
+		}
+
+		var serviceName string
+		if v, ok := rattr["service.name"]; ok {
+			serviceName = v
+		}
+
 		for j := 0; j < rs.ScopeSpans().Len(); j++ {
 			ss := rs.ScopeSpans().At(j)
+
+			scopeName := ss.Scope().Name()
+			scopeVersion := ss.Scope().Version()
+
 			for k := 0; k < ss.Spans().Len(); k++ {
-				// span := ss.Spans().At(k)
-				// TODO: construct the data to be inserted into the DB
-				// fmt.Printf("Span: %#v\n", span.Name())
+				span := ss.Spans().At(k)
+
+				dur := span.EndTimestamp().AsTime().Sub(span.StartTimestamp().AsTime())
+				sattr, err := convertMap(span.Attributes().AsRaw())
+				if err != nil {
+					log.From(ctx).Warn().Err(err).Interface("span attr", span.Attributes().AsRaw()).Msg("error parsing span attributes")
+
+				}
+
+				evts := []cqrs.SpanEvent{}
+				for ei := 0; ei < span.Events().Len(); ei++ {
+					evt := span.Events().At(ei)
+					attr, err := convertMap(evt.Attributes().AsRaw())
+					if err != nil {
+						log.From(ctx).Error().Err(err).Interface("span event", evt.Attributes().AsRaw()).Msg("error parsing span event")
+						continue
+					}
+
+					evts = append(evts, cqrs.SpanEvent{
+						Timestamp:  evt.Timestamp().AsTime(),
+						Name:       evt.Name(),
+						Attributes: attr,
+					})
+				}
+
+				links := []cqrs.SpanLink{}
+				for li := 0; li < span.Links().Len(); li++ {
+					link := span.Links().At(li)
+					attr, err := convertMap(link.Attributes().AsRaw())
+					if err != nil {
+						log.From(ctx).Error().Err(err).Interface("span link", link.Attributes().AsRaw()).Msg("error parsing span link")
+					}
+
+					links = append(links, cqrs.SpanLink{
+						TraceID:    link.TraceID().String(),
+						SpanID:     link.SpanID().String(),
+						TraceState: link.TraceState().AsRaw(),
+						Attributes: attr,
+					})
+				}
+
+				cqrsspan := &cqrs.Span{
+					Timestamp:          span.StartTimestamp().AsTime(),
+					TraceID:            span.TraceID().String(),
+					SpanID:             span.SpanID().String(),
+					SpanName:           span.Name(),
+					SpanKind:           span.Kind().String(),
+					ServiceName:        serviceName,
+					ResourceAttributes: rattr,
+					ScopeName:          scopeName,
+					ScopeVersion:       scopeVersion,
+					SpanAttributes:     sattr,
+					Duration:           dur,
+					StatusCode:         span.Status().Code().String(),
+					Events:             evts,
+					Links:              links,
+				}
+
+				if !span.ParentSpanID().IsEmpty() {
+					id := span.ParentSpanID().String()
+					cqrsspan.ParentSpanID = &id
+				}
+				if span.TraceState().AsRaw() != "" {
+					state := span.TraceState().AsRaw()
+					cqrsspan.TraceState = &state
+				}
+				if span.Status().Message() != "" {
+					msg := span.Status().Message()
+					cqrsspan.StatusMessage = &msg
+				}
+
+				if v, ok := sattr[consts.OtelAttrSDKRunID]; ok {
+					if rid, err := ulid.Parse(v); err == nil {
+						cqrsspan.RunID = &rid
+					}
+				}
+
+				handler.Add(cqrsspan)
 			}
+		}
+	}
+
+	for _, s := range handler.Spans() {
+		if err := a.devserver.data.InsertSpan(ctx, s); err != nil {
+			log.From(ctx).Error().Err(err).Interface("span", *s).Msg("error inserting span")
+		}
+	}
+
+	for _, r := range handler.TraceRuns() {
+		// log.From(ctx).Debug().Interface("run", r).Msg("trace run")
+		if err := a.devserver.data.InsertTraceRun(ctx, r); err != nil {
+			log.From(ctx).Error().Err(err).Interface("trace run", r).Msg("error inserting trace run")
 		}
 	}
 }

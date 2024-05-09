@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -603,6 +604,91 @@ func toCQRSRun(run sqlc.FunctionRun, finish sqlc.FunctionFinish) *cqrs.FunctionR
 		copied.EndedAt = &finish.CreatedAt.Time
 	}
 	return &copied
+}
+
+//
+// Trace
+//
+
+func (w wrapper) InsertSpan(ctx context.Context, span *cqrs.Span) error {
+	params := &sqlc.InsertTraceParams{
+		Timestamp:    span.Timestamp,
+		TraceID:      []byte(span.TraceID),
+		SpanID:       []byte(span.SpanID),
+		SpanName:     span.SpanName,
+		SpanKind:     span.SpanKind,
+		ServiceName:  span.ServiceName,
+		ScopeName:    span.ScopeName,
+		ScopeVersion: span.ScopeVersion,
+		Duration:     int64(span.Duration),
+		StatusCode:   span.StatusCode,
+	}
+
+	if span.RunID != nil {
+		params.RunID = *span.RunID
+	}
+	if span.ParentSpanID != nil {
+		params.ParentSpanID = []byte(*span.ParentSpanID)
+	}
+	if span.TraceState != nil {
+		params.TraceState = []byte(*span.TraceState)
+	}
+	if byt, err := json.Marshal(span.ResourceAttributes); err == nil {
+		params.ResourceAttributes = byt
+	}
+	if byt, err := json.Marshal(span.SpanAttributes); err == nil {
+		params.SpanAttributes = byt
+	}
+	if byt, err := json.Marshal(span.Events); err == nil {
+		params.Events = byt
+	}
+	if byt, err := json.Marshal(span.Links); err == nil {
+		params.Links = byt
+	}
+	if span.StatusMessage != nil {
+		params.StatusMessage = sql.NullString{String: *span.StatusMessage, Valid: true}
+	}
+
+	return w.q.InsertTrace(ctx, *params)
+}
+
+func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
+	params := sqlc.InsertTraceRunParams{
+		AccountID:   run.AccountID,
+		WorkspaceID: run.WorkspaceID,
+		AppID:       run.AppID,
+		FunctionID:  run.FunctionID,
+		TraceID:     []byte(run.TraceID),
+		SourceID:    run.SourceID,
+		RunID:       run.RunID,
+		QueuedAt:    run.QueuedAt,
+		StartedAt:   run.StartedAt,
+		EndedAt:     run.EndedAt,
+		Duration:    run.Duration.Milliseconds(),
+		Status:      run.Status.ToCode(),
+		TriggerIds:  []byte{},
+		Output:      run.Output,
+		IsBatch:     run.IsBatch,
+		IsDebounce:  run.IsDebounce,
+	}
+
+	evtIDs := make([]string, len(run.TriggerIDs))
+	for i, id := range run.TriggerIDs {
+		evtIDs[i] = id.String()
+	}
+	if len(evtIDs) > 0 {
+		params.TriggerIds = []byte(strings.Join(evtIDs, ","))
+	}
+
+	return w.q.InsertTraceRun(ctx, params)
+}
+
+func (w wrapper) GetSpansByTraceIDAndRunID(ctx context.Context, tid string, runID ulid.ULID) ([]*cqrs.Span, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
