@@ -733,6 +733,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			// annotate the step as the first step of the function run.
 			// this way the delay associated with this run is directly correlated to the delay of the
 			// function run itself.
+			fnSpan.SetAttributes(attribute.Bool(consts.OtelSysStepFirst, true))
 			span.SetAttributes(attribute.Bool(consts.OtelSysStepFirst, true))
 
 			// Set the start time and spanID in metadata for subsequent runs
