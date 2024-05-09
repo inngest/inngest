@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Tab } from '@headlessui/react';
-import { PaperAirplaneIcon } from '@heroicons/react/20/solid';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import ky from 'ky';
@@ -162,7 +161,6 @@ await inngest.send({
       <Tab.Group as="section" className="space-y-6">
         <header className="flex items-center justify-between">
           <span className="inline-flex items-center gap-2">
-            <PaperAirplaneIcon className="h-5 text-indigo-500" />
             <h2 className="text-lg font-medium">Send Event</h2>
           </span>
           <Tab.List className="flex items-center gap-1 rounded-lg bg-slate-50 p-1">
