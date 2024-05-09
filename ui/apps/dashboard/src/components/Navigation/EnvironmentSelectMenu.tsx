@@ -5,8 +5,7 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigation';
 import { Listbox, Transition } from '@headlessui/react';
-import { RocketLaunchIcon } from '@heroicons/react/20/solid';
-import { RiCloudLine, RiExpandUpDownLine, RiSettings3Line } from '@remixicon/react';
+import { RiCloudLine, RiExpandUpDownLine, RiLoopLeftLine, RiSettings3Line } from '@remixicon/react';
 
 import { useEnvironments } from '@/queries/environments';
 import cn from '@/utils/cn';
@@ -146,15 +145,6 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
             leaveTo="opacity-0"
           >
             <Listbox.Options className="bg-slate-940/95 absolute left-0 z-10 mt-2 w-[280px] origin-top-right divide-y divide-dashed divide-slate-700 rounded-md text-sm backdrop-blur focus:outline-none">
-              {/* <div className="py-1 pl-4 pr-1 flex gap-1 items-center border-b border-slate-700">
-                <MagnifyingGlassIcon className="h-3 text-white" />
-                <input
-                  type="text"
-                  placeholder="Find Environment..."
-                  className="bg-transparent hover:bg-slate-900 focus:bg-slate-900 focus:outline-none focus:placeholder:text-slate-500 rounded w-full text-sm py-1 px-2.5 placeholder-slate-300 text-sm text-white"
-                />
-              </div> */}
-
               {productionEnvironment !== null && (
                 <EnvironmentItem environment={productionEnvironment} />
               )}
@@ -162,10 +152,6 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
               {legacyTestMode !== null && (
                 <div>
                   <EnvironmentItem environment={legacyTestMode} name="Test mode" />
-                  {/* <div className="px-3.5 pb-3 flex items-center gap-2 text-yellow-300">
-                    <ExclamationTriangleIcon className="h-4" />
-                    <span className="text-xs font-medium">Test Mode is a legacy environment</span>
-                  </div> */}
                 </div>
               )}
 
@@ -183,7 +169,7 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
                     href="/env"
                     className="flex items-center gap-2.5 px-3.5 py-3 font-medium text-slate-300 transition-all hover:bg-slate-800 hover:text-white"
                   >
-                    <RocketLaunchIcon className="h-3" />
+                    <RiLoopLeftLine className="h-3" />
                     Sync a branch
                   </Link>
                 )}
