@@ -2,14 +2,13 @@
 
 import { useState } from 'react';
 import { notFound } from 'next/navigation';
-import { PencilIcon, TrashIcon } from '@heroicons/react/20/solid';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
-import { RiMore2Line } from '@remixicon/react';
+import { RiDeleteBinLine, RiMore2Line, RiPencilLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { Secret } from '@/components/Secret';
@@ -107,11 +106,11 @@ export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps)
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onSelect={() => setIsEditKeyNameModalVisible(true)}>
-                  <PencilIcon className="h-4 w-4" />
+                  <RiPencilLine className="h-4 w-4" />
                   Edit Name
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => setIsDeleteKeyModalVisible(true)}>
-                  <TrashIcon className="h-4 w-4" />
+                  <RiDeleteBinLine className="h-4 w-4" />
                   Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>
