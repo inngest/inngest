@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { ArrowTopRightOnSquareIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { RiExternalLinkLine } from '@remixicon/react';
 
 import cn from '@/utils/cn';
 import { WEBSITE_PRICING_URL } from '@/utils/urls';
@@ -90,7 +90,7 @@ export default function BillingPlanSelector({
           target="_blank"
           appearance="outlined"
           iconSide="right"
-          icon={<ArrowTopRightOnSquareIcon />}
+          icon={<RiExternalLinkLine />}
           label="View Pricing Comparison"
         />
       </div>
