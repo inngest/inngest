@@ -138,6 +138,15 @@ func (l lifecycle) OnFunctionStarted(
 	}
 }
 
+// OnFunctionSkipped is called when a function run is skipped.
+func (l lifecycle) OnFunctionSkipped(
+	_ context.Context,
+	_ state.Identifier,
+	_ execution.SkipState,
+) {
+	// no-op for now.
+}
+
 // OnFunctionFinished is called when a function finishes.  This will
 // be called when a function completes successfully or permanently failed,
 // with the final driver response indicating the type of success.

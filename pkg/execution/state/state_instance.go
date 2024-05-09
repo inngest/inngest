@@ -117,18 +117,15 @@ func (s memstate) CronSchedule() *string {
 	}
 
 	if data, ok := s.Event()["data"].(map[string]any); ok {
-		if cron, ok := data["cron"].(string); ok && cron != "" {
-			return &cron
-		}
+		return event.CronSchedule(data)
 	}
 
 	return nil
 }
 
 func (s memstate) IsCron() bool {
-	if name, _ := s.Event()["name"].(string); name != event.FnCronName {
-		return false
+	if name, _ := s.Event()["name"].(string); event.IsCron(name) {
+		return true
 	}
-
-	return true
+	return false
 }

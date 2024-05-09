@@ -48,6 +48,7 @@ var (
 	ErrNoActionLoader    = fmt.Errorf("no action loader provided")
 	ErrNoRuntimeDriver   = fmt.Errorf("runtime driver for action not found")
 	ErrFunctionDebounced = fmt.Errorf("function debounced")
+	ErrFunctionSkipped   = fmt.Errorf("function skipped")
 
 	ErrFunctionEnded = fmt.Errorf("function already ended")
 
@@ -290,38 +291,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// this run ID.
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
-	// span that tells when the function was queued
-	_, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeTrigger),
-		telemetry.WithName(consts.OtelSpanTrigger),
-		telemetry.WithTimestamp(ulid.Time(runID.Time())),
-		telemetry.WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
-			attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
-			attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
-			attribute.String(consts.OtelSysAppID, req.AppID.String()),
-			attribute.String(consts.OtelSysFunctionID, req.Function.ID.String()),
-			attribute.String(consts.OtelSysFunctionSlug, req.Function.GetSlug()),
-			attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
-			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
-			attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusScheduled.ToCode()),
-		),
-	)
-	defer span.End()
-	if req.BatchID != nil {
-		span.SetAttributes(attribute.String(consts.OtelSysBatchID, req.BatchID.String()))
-	}
-	if req.PreventDebounce {
-		span.SetAttributes(attribute.Bool(consts.OtelSysDebounceTimeout, true))
-	}
-	if req.Context != nil {
-		if val, ok := req.Context[consts.OtelPropagationLinkKey]; ok {
-			if link, ok := val.(string); ok {
-				span.SetAttributes(attribute.String(consts.OtelPropagationLinkKey, link))
-			}
-		}
-	}
-
 	var key string
 	if req.IdempotencyKey != nil {
 		// Use the given idempotency key
@@ -347,8 +316,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		id := e.GetInternalID()
 		eventIDs = append(eventIDs, id)
 	}
-	spanID := telemetry.NewSpanID(ctx)
-	span.SetEventIDs(req.Events...)
 
 	id := state.Identifier{
 		WorkflowID:      req.Function.ID,
@@ -364,6 +331,51 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		OriginalRunID:   req.OriginalRunID,
 		ReplayID:        req.ReplayID,
 	}
+
+	isPaused := req.FunctionPausedAt != nil && req.FunctionPausedAt.Before(time.Now())
+	if isPaused {
+		for _, e := range e.lifecycles {
+			go e.OnFunctionSkipped(context.WithoutCancel(ctx), id, execution.SkipState{
+				CronSchedule: req.Events[0].GetEvent().CronSchedule(),
+			})
+		}
+		return nil, nil
+	}
+
+	// span that tells when the function was queued
+	_, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeTrigger),
+		telemetry.WithName(consts.OtelSpanTrigger),
+		telemetry.WithTimestamp(ulid.Time(runID.Time())),
+		telemetry.WithSpanAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, req.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, req.Function.ID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, req.Function.GetSlug()),
+			attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
+			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
+			attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusScheduled.ToCode()),
+		),
+	)
+	defer span.End()
+
+	if req.BatchID != nil {
+		span.SetAttributes(attribute.String(consts.OtelSysBatchID, req.BatchID.String()))
+	}
+	if req.PreventDebounce {
+		span.SetAttributes(attribute.Bool(consts.OtelSysDebounceTimeout, true))
+	}
+	if req.Context != nil {
+		if val, ok := req.Context[consts.OtelPropagationLinkKey]; ok {
+			if link, ok := val.(string); ok {
+				span.SetAttributes(attribute.String(consts.OtelPropagationLinkKey, link))
+			}
+		}
+	}
+
+	span.SetEventIDs(req.Events...)
 
 	mapped := make([]map[string]any, len(req.Events))
 	for n, item := range req.Events {
@@ -422,6 +434,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	carrier := telemetry.NewTraceCarrier()
 	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 	stateMetadata[consts.OtelPropagationKey] = carrier
+
+	spanID := telemetry.NewSpanID(ctx)
 
 	// Create a new function.
 	s, err := e.sm.New(ctx, state.Input{
