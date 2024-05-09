@@ -8,4 +8,3 @@ export { IconExclamationTriangle } from './ExclamationTriangle';
 export { InngestSmallLogo } from './InngestSmallLogo';
 export { IconReplay } from './Replay';
 export { IconWebhook } from './Webhook';
-export { IconMagnifyingGlass } from './MagnifyingGlass';
