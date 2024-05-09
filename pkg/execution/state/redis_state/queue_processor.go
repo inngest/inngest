@@ -672,44 +672,126 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		})
 	}()
 
-	// Ensure that peek doesn't take longer than the partition lease, to
-	// reduce contention.
-	peekCtx, cancel := context.WithTimeout(ctx, PartitionLeaseDuration)
-	defer cancel()
+	var (
+		offset     int64
+		totalItems int64
+	)
+	results := &handleQueueItemsResult{}
 
-	// We need to round ourselves up to the nearest second, then add another second
-	// to peek for jobs in the next <= 1999 milliseconds.
-	//
-	// There's a really subtle issue:  if two jobs contend for a pause and are scheduled
-	// within 5ms of each other, we fetch them in order but we may process them out of
-	// order, depending on how long it takes for the item to pass through the channel
-	// to the worker, how long Redis takes to lease the item, etc.
-	fetch := getNow().Truncate(time.Second).Add(PartitionLookahead)
-	var offset int64
-	queue, err := q.Peek(peekCtx, p.Queue(), fetch, offset, q.peekSize())
+	for i := 0; i < q.peekIter(); i++ {
+		// Ensure that peek doesn't take longer than the partition lease, to
+		// reduce contention.
+		peekCtx, cancel := context.WithTimeout(ctx, PartitionLeaseDuration)
+		defer cancel()
+
+		var (
+			items []*QueueItem
+			res   *handleQueueItemsResult
+		)
+
+		// We need to round ourselves up to the nearest second, then add another second
+		// to peek for jobs in the next <= 1999 milliseconds.
+		//
+		// There's a really subtle issue:  if two jobs contend for a pause and are scheduled
+		// within 5ms of each other, we fetch them in order but we may process them out of
+		// order, depending on how long it takes for the item to pass through the channel
+		// to the worker, how long Redis takes to lease the item, etc.
+		fetch := getNow().Truncate(time.Second).Add(PartitionLookahead)
+
+		items, err = q.Peek(peekCtx, p.Queue(), fetch, offset, q.peekSize())
+		if err != nil {
+			break
+		}
+		telemetry.IncrQueuePeekedCounter(ctx, int64(len(items)), telemetry.CounterOpt{PkgName: pkgName})
+
+		// Record the number of partitions we're leasing.
+		telemetry.IncrQueuePartitionLeasedCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+
+		denies := newLeaseDenyList()
+		res, err = q.handleQueueItems(ctx, p, shard, items, denies)
+		results.Accumulate(res)
+		if err != nil {
+			break
+		}
+
+		// reduce the peek size to what's needed
+		totalItems += res.Handled()
+		offset = int64(len(items))
+
+		// exit loop early if it has everything it needs
+		if totalItems >= q.peekItems() {
+			break
+		}
+
+		// if there are too much skipped, iterate again
+		if res.SkippedRatio() <= q.peekSkipRatioThreshold() {
+			break
+		}
+	}
+
+	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
+	// with a force:  ensure that we won't re-scan it until 2 seconds in the future.
+	if results.IsConcurrentyLimited() {
+		for _, l := range q.lifecycles {
+			go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
+		}
+		// Requeue this partition as we hit concurrency limits.
+		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+		return q.PartitionRequeue(ctx, p, getNow().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+	}
+
 	if err != nil {
+		// This wasn't a concurrency error so handle things separately.
 		return err
 	}
-	telemetry.IncrQueuePeekedCounter(ctx, int64(len(queue)), telemetry.CounterOpt{PkgName: pkgName})
 
-	// Record the number of partitions we're leasing.
-	telemetry.IncrQueuePartitionLeasedCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+	// XXX: If we haven't been able to lease a single item, ensure we enqueue this
+	// for a minimum of 5 seconds.
 
-	denies := newLeaseDenyList()
-	err = q.handleQueueItems(ctx, p, shard, queue, denies)
-
+	// Requeue the partition, which reads the next unleased job or sets a time of
+	// 30 seconds.  This is why we have to lease items above, else this may return an item that is
+	// about to be leased and processed by the worker.
+	err = q.PartitionRequeue(ctx, p, getNow().Add(PartitionRequeueExtension), false)
+	if err == ErrPartitionGarbageCollected {
+		// Safe;  we're preventing this from wasting cycles in the future.
+		return nil
+	}
 	return err
 }
 
-func (q *queue) handleQueueItems(ctx context.Context, p *QueuePartition, shard *QueueShard, items []*QueueItem, denies *leaseDenies) error {
-	var (
-		processErr error
+type handleQueueItemsResult struct {
+	totalItems     int
+	ctrSuccess     int32
+	ctrConcurrency int32
+	ctrRateLimit   int32
+	handled        int64
+}
 
-		// These flags are used to handle partition rqeueueing.
-		ctrSuccess     int32
-		ctrConcurrency int32
-		ctrRateLimit   int32
-	)
+func (r handleQueueItemsResult) SkippedRatio() float32 {
+	return float32(r.ctrRateLimit) / float32(r.totalItems)
+}
+
+func (r handleQueueItemsResult) Handled() int64 {
+	return r.handled
+}
+
+func (r handleQueueItemsResult) IsConcurrentyLimited() bool {
+	return r.ctrConcurrency > 0 || (r.ctrRateLimit > 0 && r.ctrConcurrency == 0 && r.ctrSuccess == 0)
+}
+
+func (r *handleQueueItemsResult) Accumulate(res *handleQueueItemsResult) {
+	r.totalItems += res.totalItems
+	r.ctrConcurrency += res.ctrConcurrency
+	r.ctrSuccess += res.ctrSuccess
+	r.ctrRateLimit += res.ctrRateLimit
+	r.handled += res.handled
+}
+
+func (q *queue) handleQueueItems(ctx context.Context, p *QueuePartition, shard *QueueShard, items []*QueueItem, denies *leaseDenies) (*handleQueueItemsResult, error) {
+	var processErr error
+	result := &handleQueueItemsResult{
+		totalItems: len(items),
+	}
 
 	// staticTime is used as the processing time for all items in the queue.
 	// We process queue items sequentially, and time progresses linearly as each
@@ -734,7 +816,7 @@ func (q *queue) handleQueueItems(ctx context.Context, p *QueuePartition, shard *
 			telemetry.IncrQueuePartitionProcessNoCapacityCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 			// Break the loop to prevent out of order work.
 			// TODO: should this be an error?
-			return nil
+			return result, nil
 		}
 
 		// Attempt to lease this item before passing this to a worker.  We have to do this
@@ -798,12 +880,12 @@ func (q *queue) handleQueueItems(ctx context.Context, p *QueuePartition, shard *
 			// This maintains FIFO ordering amongst all custom concurrency keys.
 			denies.addThrottled(err)
 
-			ctrRateLimit++
+			result.ctrRateLimit++
 			processErr = nil
 			telemetry.IncrQueueThrottledCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 			continue
 		case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
-			ctrConcurrency++
+			result.ctrConcurrency++
 			// Since the queue is at capacity on a fn or account level, no
 			// more jobs in this loop should be worked on - so break.
 			//
@@ -811,10 +893,9 @@ func (q *queue) handleQueueItems(ctx context.Context, p *QueuePartition, shard *
 			// want to claim the job, as this breaks ordering guarantees.  The
 			// only safe thing to do when we hit a function or account level
 			// concurrency key.
-			processErr = nil
-			return nil
+			return result, nil
 		case ErrConcurrencyLimitCustomKey0, ErrConcurrencyLimitCustomKey1:
-			ctrConcurrency++
+			result.ctrConcurrency++
 			// Custom concurrency keys are different.  Each job may have a different key,
 			// so we cannot break the loop in case the next job has a different key and
 			// has capacity.
@@ -828,20 +909,19 @@ func (q *queue) handleQueueItems(ctx context.Context, p *QueuePartition, shard *
 			continue
 		case ErrQueueItemNotFound:
 			// This is an okay error.  Move to the next job item.
-			ctrSuccess++ // count as a success for stats purposes.
+			result.ctrSuccess++ // count as a success for stats purposes.
 			processErr = nil
 			continue
 		case ErrQueueItemAlreadyLeased:
 			// This is an okay error.  Move to the next job item.
-			ctrSuccess++ // count as a success for stats purposes.
+			result.ctrSuccess++ // count as a success for stats purposes.
 			processErr = nil
 			continue
 		}
 
 		// Handle other errors.
 		if err != nil {
-			processErr = fmt.Errorf("error leasing in process: %w", err)
-			return nil
+			return result, fmt.Errorf("error leasing in process: %w", err)
 		}
 
 		// Assign the lease ID and pass this to be handled by the available worker.
@@ -850,38 +930,12 @@ func (q *queue) handleQueueItems(ctx context.Context, p *QueuePartition, shard *
 		item.LeaseID = leaseID
 
 		// increase success counter.
-		ctrSuccess++
+		result.ctrSuccess++
+		result.handled++
 		q.workers <- processItem{P: *p, I: *item, S: shard}
 	}
 
-	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
-	// with a force:  ensure that we won't re-scan it until 2 seconds in the future.
-	if ctrConcurrency > 0 || (ctrRateLimit > 0 && ctrConcurrency == 0 && ctrSuccess == 0) {
-		for _, l := range q.lifecycles {
-			go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
-		}
-		// Requeue this partition as we hit concurrency limits.
-		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
-		return q.PartitionRequeue(ctx, p, getNow().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
-	}
-
-	if processErr != nil {
-		// This wasn't a concurrency error so handle things separately.
-		return processErr
-	}
-
-	// XXX: If we haven't been able to lease a single item, ensure we enqueue this
-	// for a minimum of 5 seconds.
-
-	// Requeue the partition, which reads the next unleased job or sets a time of
-	// 30 seconds.  This is why we have to lease items above, else this may return an item that is
-	// about to be leased and processed by the worker.
-	err := q.PartitionRequeue(ctx, p, getNow().Add(PartitionRequeueExtension), false)
-	if err == ErrPartitionGarbageCollected {
-		// Safe;  we're preventing this from wasting cycles in the future.
-		return nil
-	}
-	return err
+	return result, processErr
 }
 
 func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *QueueShard, f osqueue.RunFunc) error {
@@ -1127,12 +1181,20 @@ func (q *queue) peekItems() int64 {
 	return num
 }
 
-func (q *queue) peekIter() int64 {
+func (q *queue) peekIter() int {
 	num := q.peekMaxIter
 	if num == 0 {
 		num = QueuePeekMaxIter
 	}
 	return num
+}
+
+func (q *queue) peekSkipRatioThreshold() float32 {
+	r := q.peekSkipRatio
+	if r == 0.0 {
+		r = QueuePeekSkippedRatio
+	}
+	return r
 }
 
 func (q *queue) isSequential() bool {
