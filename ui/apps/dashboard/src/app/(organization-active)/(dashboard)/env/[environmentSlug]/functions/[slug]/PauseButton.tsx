@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { PauseIcon, PlayIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { AlertModal } from '@inngest/components/Modal';
 import * as Tooltip from '@radix-ui/react-tooltip';
+import { RiPauseLine, RiPlayFill } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
 
@@ -146,9 +146,9 @@ export default function PauseFunctionButton({ functionSlug, disabled }: PauseFun
               <Button
                 icon={
                   isPaused ? (
-                    <PlayIcon className=" text-green-600" />
+                    <RiPlayFill className=" text-green-600" />
                   ) : (
-                    <PauseIcon className=" text-amber-500" />
+                    <RiPauseLine className=" text-amber-500" />
                   )
                 }
                 btnAction={() => setIsPauseFunctionModalVisible(true)}

@@ -1,32 +1,31 @@
-import type { ForwardRefExoticComponent } from 'react';
-import {
-  ExclamationCircleIcon,
-  ExclamationTriangleIcon,
-  InformationCircleIcon,
-} from '@heroicons/react/20/solid';
 import { cn } from '@inngest/components/utils/classNames';
+import {
+  RiErrorWarningLine,
+  RiInformationLine,
+  type RemixiconComponentType,
+} from '@remixicon/react';
 
 type Severity = 'error' | 'info' | 'warning';
 
 type SeveritySpecific = {
-  icon: ForwardRefExoticComponent<Omit<React.SVGProps<SVGSVGElement>, 'ref'>>;
+  icon: RemixiconComponentType;
   iconClassName: string;
   wrapperClassName: string;
 };
 
 const severityStyles = {
   error: {
-    icon: ExclamationCircleIcon,
+    icon: RiErrorWarningLine,
     iconClassName: 'text-rose-700 dark:text-white',
     wrapperClassName: 'bg-rose-100 dark:bg-rose-600/50 text-rose-700 dark:text-slate-300',
   },
   info: {
-    icon: InformationCircleIcon,
+    icon: RiInformationLine,
     iconClassName: 'text-blue-700 dark:text-white',
     wrapperClassName: 'bg-blue-100 dark:bg-blue-600/50 text-blue-700 dark:text-slate-300',
   },
   warning: {
-    icon: ExclamationTriangleIcon,
+    icon: RiErrorWarningLine,
     iconClassName: 'text-amber-700 dark:text-white',
     wrapperClassName: 'bg-amber-100 dark:bg-amber-600/50 text-amber-700 dark:text-slate-300',
   },

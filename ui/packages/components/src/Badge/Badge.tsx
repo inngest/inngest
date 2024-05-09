@@ -1,4 +1,4 @@
-import { IconExclamationTriangle } from '@inngest/components/icons/ExclamationTriangle';
+import { RiErrorWarningLine } from '@remixicon/react';
 
 import { cn } from '../utils/classNames';
 
@@ -37,7 +37,7 @@ export function Badge({ children, className = '', kind = 'outlined', flatSide }:
         className
       )}
     >
-      {kind === 'error' && <IconExclamationTriangle className="mt-0.5 h-3 w-3 text-rose-400" />}
+      {kind === 'error' && <RiErrorWarningLine className="mt-0.5 h-3 w-3 text-rose-400" />}
       {children}
     </span>
   );

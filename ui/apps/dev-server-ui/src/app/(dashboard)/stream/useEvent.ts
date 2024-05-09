@@ -47,12 +47,16 @@ export function useEvent(eventID: string | null): FetchResult<Data, { skippable:
 
   if (query.isLoading) {
     if (!data) {
-      return baseInitialFetchLoading;
+      return {
+        ...baseInitialFetchLoading,
+        refetch: query.refetch,
+      };
     }
 
     return {
       ...baseRefetchLoading,
       data,
+      refetch: query.refetch,
     };
   }
 
@@ -64,6 +68,7 @@ export function useEvent(eventID: string | null): FetchResult<Data, { skippable:
     return {
       ...baseInitialFetchFailed,
       error: new Error(query.error.message),
+      refetch: query.refetch,
     };
   }
 
@@ -72,11 +77,13 @@ export function useEvent(eventID: string | null): FetchResult<Data, { skippable:
     return {
       ...baseInitialFetchFailed,
       error: new Error('finished loading but missing data'),
+      refetch: query.refetch,
     };
   }
 
   return {
     ...baseFetchSucceeded,
     data,
+    refetch: query.refetch,
   };
 }

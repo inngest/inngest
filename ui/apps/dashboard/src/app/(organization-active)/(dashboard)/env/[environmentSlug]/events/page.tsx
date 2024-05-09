@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
+import { IconEvent } from '@inngest/components/icons/Event';
 import { RiBarChart2Fill } from '@remixicon/react';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
@@ -11,7 +12,6 @@ import SendEventButton from '@/app/(organization-active)/(dashboard)/env/[enviro
 import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
 import Header from '@/components/Header/Header';
 import LoadingIcon from '@/icons/LoadingIcon';
-import EventIcon from '@/icons/event.svg';
 import { useEventTypes } from '@/queries';
 import cn from '@/utils/cn';
 import { pathCreator } from '@/utils/urls';
@@ -34,7 +34,7 @@ export default function EventTypesPage() {
     <>
       <Header
         title="Events"
-        icon={<EventIcon className="h-4 w-4 text-white" />}
+        icon={<IconEvent className="h-4 w-4 text-white" />}
         action={!env.isArchived && <SendEventButton />}
       />
 

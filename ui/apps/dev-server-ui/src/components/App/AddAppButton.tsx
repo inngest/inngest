@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
+import { RiAddLine } from '@remixicon/react';
 
 import AddAppModal from '@/components/App/AddAppModal';
-import { IconPlus } from '@/icons';
 
 export default function AddAppButton() {
   const [isAddAppModalVisible, setAddAppModalVisible] = useState(false);
@@ -11,7 +11,7 @@ export default function AddAppButton() {
     <>
       <Button
         label="Sync New App"
-        icon={<IconPlus />}
+        icon={<RiAddLine />}
         btnAction={() => setAddAppModalVisible(true)}
       />
       {isAddAppModalVisible && (

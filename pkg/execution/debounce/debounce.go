@@ -77,6 +77,8 @@ type DebounceItem struct {
 	Event event.Event `json:"e"`
 	// Timeout is the timeout for the debounce, in unix milliseconds.
 	Timeout int64 `json:"t,omitempty"`
+	// FunctionPausedAt indicates whether the function is paused.
+	FunctionPausedAt *time.Time `json:"fpAt,omitempty"`
 }
 
 func (d DebounceItem) QueuePayload() DebouncePayload {

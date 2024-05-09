@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -24,9 +25,6 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/rs/zerolog"
-	"github.com/uber-go/tally/v4"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/metric"
 	"gonum.org/v1/gonum/stat/sampleuv"
 	"lukechampine.com/frand"
 )
@@ -37,6 +35,7 @@ var (
 )
 
 const (
+	pkgName = "redis_state.state.execution.inngest"
 
 	// PartitionLeaseDuration dictates how long a worker holds the lease for
 	// a partition.  This gives the worker a right to scan all queue items
@@ -62,7 +61,7 @@ const (
 	PartitionLookahead                        = time.Second
 
 	QueuePeekMax        int64 = 1000
-	QueuePeekDefault    int64 = 200
+	QueuePeekDefault    int64 = 250
 	QueueLeaseDuration        = 10 * time.Second
 	ConfigLeaseDuration       = 10 * time.Second
 	ConfigLeaseMax            = 20 * time.Second
@@ -105,8 +104,6 @@ var (
 
 	ErrConcurrencyLimitCustomKey0 = fmt.Errorf("At concurrency limit 0")
 	ErrConcurrencyLimitCustomKey1 = fmt.Errorf("At concurrency limit 1")
-
-	ErrQueueItemThrottled = fmt.Errorf("queue item throttled")
 
 	// internal shard errors
 	errShardNotFound     = fmt.Errorf("shard not found")
@@ -154,71 +151,65 @@ func WithName(name string) func(q *queue) {
 	}
 }
 
-func WithQueueLifecycles(l ...QueueLifecycleListener) func(q *queue) {
+func WithQueueLifecycles(l ...QueueLifecycleListener) QueueOpt {
 	return func(q *queue) {
 		q.lifecycles = l
 	}
 }
 
-func WithMetricsScope(scope tally.Scope) func(q *queue) {
-	return func(q *queue) {
-		q.scope = scope
-	}
-}
-
-func WithPriorityFinder(pf PriorityFinder) func(q *queue) {
+func WithPriorityFinder(pf PriorityFinder) QueueOpt {
 	return func(q *queue) {
 		q.pf = pf
 	}
 }
 
-func WithShardFinder(sf ShardFinder) func(q *queue) {
+func WithShardFinder(sf ShardFinder) QueueOpt {
 	return func(q *queue) {
 		q.sf = sf
 	}
 }
 
-func WithQueueKeyGenerator(kg QueueKeyGenerator) func(q *queue) {
+func WithQueueKeyGenerator(kg QueueKeyGenerator) QueueOpt {
 	return func(q *queue) {
 		q.kg = kg
 	}
 }
 
-func WithIdempotencyTTL(t time.Duration) func(q *queue) {
+func WithIdempotencyTTL(t time.Duration) QueueOpt {
 	return func(q *queue) {
 		q.idempotencyTTL = t
 	}
 }
 
-func WithOtelMeter(m metric.Meter) func(q *queue) {
-	return func(q *queue) {
-		q.meter = m
-	}
-}
-
 // WithIdempotencyTTLFunc returns custom idempotecy durations given a QueueItem.
 // This allows customization of the idempotency TTL based off of specific jobs.
-func WithIdempotencyTTLFunc(f func(context.Context, QueueItem) time.Duration) func(q *queue) {
+func WithIdempotencyTTLFunc(f func(context.Context, QueueItem) time.Duration) QueueOpt {
 	return func(q *queue) {
 		q.idempotencyTTLFunc = f
 	}
 }
 
-func WithNumWorkers(n int32) func(q *queue) {
+func WithNumWorkers(n int32) QueueOpt {
 	return func(q *queue) {
 		q.numWorkers = n
 	}
 }
 
+func WithPeekSize(n int64) QueueOpt {
+	return func(q *queue) {
+		q.peek = n
+	}
+}
+
 // WithPollTick specifies the interval at which the queue will poll the backing store
 // for available partitions.
-func WithPollTick(t time.Duration) func(q *queue) {
+func WithPollTick(t time.Duration) QueueOpt {
 	return func(q *queue) {
 		q.pollTick = t
 	}
 }
 
-func WithQueueItemIndexer(i QueueItemIndexer) func(q *queue) {
+func WithQueueItemIndexer(i QueueItemIndexer) QueueOpt {
 	return func(q *queue) {
 		q.itemIndexer = i
 	}
@@ -345,8 +336,6 @@ func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 		pollTick:           defaultPollTick,
 		idempotencyTTL:     defaultIdempotencyTTL,
 		queueKindMapping:   make(map[string]string),
-		scope:              tally.NoopScope,
-		meter:              otel.Meter("redis_state.queue"),
 		logger:             logger.From(context.Background()),
 		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) (string, int) {
 			return p.Queue(), 10_000
@@ -399,6 +388,8 @@ type queue struct {
 	wg *sync.WaitGroup
 	// numWorkers stores the number of workers available to concurrently process jobs.
 	numWorkers int32
+	// peek sets the number of items to check on queue peeks
+	peek int64
 	// workers is a buffered channel which allows scanners to send queue items
 	// to workers to be processed
 	workers chan processItem
@@ -443,10 +434,6 @@ type queue struct {
 	// shardLeases represents shards that are leased by the current queue worker.
 	shardLeases    []leasedShard
 	shardLeaseLock *sync.Mutex
-
-	// metrics allows reporting of metrics
-	scope tally.Scope
-	meter metric.Meter
 
 	// backoffFunc is the backoff function to use when retrying operations.
 	backoffFunc backoff.BackoffFunc
@@ -1002,7 +989,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 //
 // Obtaining a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
-func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, duration time.Duration, now time.Time) (*ulid.ULID, error) {
+func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, duration time.Duration, now time.Time, denies *leaseDenies) (*ulid.ULID, error) {
 	var (
 		ak, pk string // account, partition concurrency key
 		ac, pc int    // account, partiiton concurrency max
@@ -1011,16 +998,31 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		customLimits = make([]int, 2)
 	)
 
+	if item.Data.Throttle != nil && denies != nil && denies.denyThrottle(item.Data.Throttle.Key) {
+		return nil, ErrQueueItemThrottled
+	}
+
 	// Required.
 	//
 	// This should be found by calling function.ConcurrencyLimit() to return
 	// the lowest concurrency limit available.  It limits the capacity of all
 	// runs for the given function.
 	pk, pc = q.partitionConcurrencyGen(ctx, p)
+	// Check to see if this key has already been denied in the lease iteration.
+	// If so, fail early.
+	if denies != nil && denies.denyConcurrency(pk) {
+		// Note that we do not need to wrap the key as the key is already present.
+		return nil, ErrPartitionConcurrencyLimit
+	}
 
 	// optional
 	if q.accountConcurrencyGen != nil {
 		ak, ac = q.accountConcurrencyGen(ctx, item)
+		// Check to see if this key has already been denied in the lease iteration.
+		// If so, fail early.
+		if denies != nil && denies.denyConcurrency(ak) {
+			return nil, ErrAccountConcurrencyLimit
+		}
 	}
 	if q.customConcurrencyGen != nil {
 		// Get the custom concurrency key, if available.
@@ -1029,6 +1031,16 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 				// We only support two concurrency keys right now.
 				break
 			}
+
+			// Check to see if this key has already been denied in the lease iteration.
+			// If so, fail early.
+			if denies != nil && denies.denyConcurrency(item.Key) {
+				if i == 0 {
+					return nil, ErrConcurrencyLimitCustomKey0
+				}
+				return nil, ErrConcurrencyLimitCustomKey1
+			}
+
 			customKeys[i] = item.Key
 			customLimits[i] = item.Limit
 		}
@@ -1090,15 +1102,15 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		return nil, ErrQueueItemAlreadyLeased
 	case 3:
 		// fn limit relevant to all runs in the fn
-		return nil, ErrPartitionConcurrencyLimit
+		return nil, newKeyError(ErrPartitionConcurrencyLimit, pk)
 	case 4:
-		return nil, ErrAccountConcurrencyLimit
+		return nil, newKeyError(ErrAccountConcurrencyLimit, ak)
 	case 5:
-		return nil, ErrConcurrencyLimitCustomKey0
+		return nil, newKeyError(ErrConcurrencyLimitCustomKey0, customKeys[0])
 	case 6:
-		return nil, ErrConcurrencyLimitCustomKey1
+		return nil, newKeyError(ErrConcurrencyLimitCustomKey1, customKeys[1])
 	case 7:
-		return nil, ErrQueueItemThrottled
+		return nil, newKeyError(ErrQueueItemThrottled, item.Data.Throttle.Key)
 	default:
 		return nil, fmt.Errorf("unknown response enqueueing item: %d", status)
 	}
@@ -1972,4 +1984,60 @@ func (f *frandRNG) Float64() float64 {
 
 func (f *frandRNG) Seed(seed uint64) {
 	// Do nothing.
+}
+
+func newLeaseDenyList() *leaseDenies {
+	return &leaseDenies{
+		lock:        &sync.RWMutex{},
+		concurrency: map[string]struct{}{},
+		throttle:    map[string]struct{}{},
+	}
+}
+
+// leaseDenies stores a mapping of keys that must not be leased.
+//
+// When iterating over a list of peeked queue items, each queue item may have the same
+// or different concurrency keys.  As soon as one of these concurrency keys reaches its
+// limit, any next queue items with the same keys must _never_ be considered for leasing.
+//
+// This has two benefits:  we prevent wasted work, and we prevent out of order work.
+type leaseDenies struct {
+	lock *sync.RWMutex
+
+	concurrency map[string]struct{}
+	throttle    map[string]struct{}
+}
+
+func (l *leaseDenies) addThrottled(err error) {
+	var key keyError
+	if !errors.As(err, &key) {
+		return
+	}
+	l.lock.Lock()
+	l.throttle[key.key] = struct{}{}
+	l.lock.Unlock()
+}
+
+func (l *leaseDenies) addConcurrency(err error) {
+	var key keyError
+	if !errors.As(err, &key) {
+		return
+	}
+	l.lock.Lock()
+	l.concurrency[key.key] = struct{}{}
+	l.lock.Unlock()
+}
+
+func (l *leaseDenies) denyConcurrency(key string) bool {
+	l.lock.RLock()
+	_, ok := l.concurrency[key]
+	l.lock.RUnlock()
+	return ok
+}
+
+func (l *leaseDenies) denyThrottle(key string) bool {
+	l.lock.RLock()
+	_, ok := l.throttle[key]
+	l.lock.RUnlock()
+	return ok
 }

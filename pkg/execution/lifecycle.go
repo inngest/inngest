@@ -11,6 +11,12 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+// SkipState represents the subset of state.State's data required for OnFunctionSkipped.
+type SkipState struct {
+	// CronSchedule, if present, is the cron schedule string that triggered the skipped function.
+	CronSchedule *string
+}
+
 var _ LifecycleListener = (*NoopLifecyceListener)(nil)
 
 // LifecycleListener listens to lifecycle events on the executor.
@@ -26,9 +32,17 @@ type LifecycleListener interface {
 		queue.Item,
 	)
 
+	// OnFunctionSkipped is called when a function run is skipped.
+	// Currently, this happens iff the function is paused.
+	OnFunctionSkipped(
+		context.Context,
+		state.Metadata,
+		SkipState,
+	)
+
 	// OnFunctionStarted is called when the function starts.  This may be
 	// immediately after the function is scheduled, or in the case of increased
-	// latency (eg. due to debouncing or concurrency limits) some time after the
+	// latency (e.g. due to debouncing or concurrency limits) some time after the
 	// function is scheduled.
 	OnFunctionStarted(
 		context.Context,
@@ -154,6 +168,14 @@ func (NoopLifecyceListener) OnFunctionScheduled(
 	context.Context,
 	state.Metadata,
 	queue.Item,
+) {
+}
+
+// OnFunctionSkipped is called when a function run is skipped.
+func (NoopLifecyceListener) OnFunctionSkipped(
+	context.Context,
+	state.Metadata,
+	SkipState,
 ) {
 }
 

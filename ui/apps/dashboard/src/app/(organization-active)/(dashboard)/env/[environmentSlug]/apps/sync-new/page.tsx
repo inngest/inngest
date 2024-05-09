@@ -2,11 +2,11 @@
 
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import Squares2X2Icon from '@heroicons/react/20/solid/Squares2X2Icon';
 import { Button } from '@inngest/components/Button';
 import { Code } from '@inngest/components/Code';
 import { CodeLine } from '@inngest/components/CodeLine';
 import { Link } from '@inngest/components/Link';
+import { IconApp } from '@inngest/components/icons/App';
 import * as Tabs from '@radix-ui/react-tabs';
 import { RiLoopLeftLine } from '@remixicon/react';
 
@@ -25,7 +25,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
   const APPS_URL = setSkipCacheSearchParam(`/env/${environmentSlug}/apps`) as Route;
   return (
     <>
-      <Header title="Apps" icon={<Squares2X2Icon className="h-5 w-5 text-white" />} />
+      <Header title="Apps" icon={<IconApp className="h-5 w-5 text-white" />} />
 
       <div className="h-full overflow-y-auto bg-slate-100">
         <section className="mx-auto mt-16 max-w-screen-md overflow-hidden rounded-lg">

@@ -138,14 +138,13 @@ type TraceRun struct {
 	TraceID     []byte
 	RunID       ulid.ULID
 	QueuedAt    time.Time
-	StartedAt   sql.NullTime
-	EndedAt     sql.NullTime
-	Duration    sql.NullInt64
-	Status      sql.NullInt64
-	SourceID    []byte
+	StartedAt   time.Time
+	EndedAt     time.Time
+	Duration    int64
+	Status      int64
+	SourceID    string
 	TriggerIds  []byte
-	Triggers    []byte
 	Output      []byte
-	IsBatch     sql.NullBool
-	IsDebounce  sql.NullBool
+	IsBatch     bool
+	IsDebounce  bool
 }

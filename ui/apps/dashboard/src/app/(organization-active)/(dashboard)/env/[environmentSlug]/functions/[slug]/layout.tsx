@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback } from 'react';
-import { CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { Badge } from '@inngest/components/Badge';
 import { InvokeButton } from '@inngest/components/InvokeButton';
+import { IconFunction } from '@inngest/components/icons/Function';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
@@ -88,7 +88,7 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
   return (
     <>
       <Header
-        icon={<CodeBracketSquareIcon className="h-3.5 w-3.5 text-white" />}
+        icon={<IconFunction className="h-3.5 w-3.5 text-white" />}
         title={!data || fetching ? '...' : fn?.name || functionSlug}
         links={navLinks}
         action={

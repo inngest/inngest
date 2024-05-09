@@ -28,7 +28,7 @@ export type FunctionRun = {
   status: FunctionRunStatus;
 };
 
-export const FunctionRunTimeFields = ['ENDED_AT', 'QUEUED_AT', 'STARTED_AT'] as const;
+export const FunctionRunTimeFields = ['QUEUED_AT', 'STARTED_AT', 'ENDED_AT'] as const;
 export type FunctionRunTimeField = (typeof FunctionRunTimeFields)[number];
 export function isFunctionTimeField(s: string): s is FunctionRunTimeField {
   return FunctionRunTimeFields.includes(s as FunctionRunTimeField);

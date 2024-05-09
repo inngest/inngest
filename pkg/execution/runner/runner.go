@@ -13,7 +13,6 @@ import (
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
@@ -617,81 +616,9 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 			EventID:         evt.GetInternalID(),
 			Event:           evt.GetEvent(),
 		}
-		result, err := s.batcher.Append(ctx, bi, fn)
-		if err != nil {
-			return err
-		}
 
-		switch result.Status {
-		case enums.BatchAppend:
-			// noop
-		case enums.BatchNew:
-			dur, err := time.ParseDuration(fn.EventBatch.Timeout)
-			if err != nil {
-				return err
-			}
-			at := time.Now().Add(dur)
-
-			if err := s.batcher.ScheduleExecution(ctx, batch.ScheduleBatchOpts{
-				ScheduleBatchPayload: batch.ScheduleBatchPayload{
-					BatchID:         ulid.MustParse(result.BatchID),
-					AccountID:       bi.AccountID,
-					WorkspaceID:     bi.WorkspaceID,
-					AppID:           bi.AppID,
-					FunctionID:      bi.FunctionID,
-					FunctionVersion: bi.FunctionVersion,
-				},
-				At: at,
-			}); err != nil {
-				return err
-			}
-		case enums.BatchFull:
-			// start execution immediately
-			batchID := ulid.MustParse(result.BatchID)
-
-			// TODO: this logic is repeated in executor, consolidate it somewhere
-			evtList, err := s.batcher.RetrieveItems(ctx, batchID)
-			if err != nil {
-				return err
-			}
-
-			events := make([]event.TrackedEvent, len(evtList))
-			for i, e := range evtList {
-				events[i] = e
-			}
-
-			ctx, span := telemetry.NewSpan(ctx,
-				telemetry.WithScope(consts.OtelScopeBatch),
-				telemetry.WithName(consts.OtelSpanBatch),
-				telemetry.WithSpanAttributes(
-					attribute.String(consts.OtelSysAccountID, bi.AccountID.String()),
-					attribute.String(consts.OtelSysWorkspaceID, bi.WorkspaceID.String()),
-					attribute.String(consts.OtelSysAppID, bi.AppID.String()),
-					attribute.String(consts.OtelSysFunctionID, bi.FunctionID.String()),
-					attribute.String(consts.OtelSysBatchID, batchID.String()),
-					attribute.Bool(consts.OtelSysBatchFull, true),
-				))
-			defer span.End()
-
-			key := fmt.Sprintf("%s-%s", fn.ID, batchID)
-			_, err = s.executor.Schedule(ctx, execution.ScheduleRequest{
-				AccountID:      bi.AccountID,
-				WorkspaceID:    bi.WorkspaceID,
-				AppID:          bi.AppID,
-				Function:       fn,
-				Events:         events,
-				BatchID:        &batchID,
-				IdempotencyKey: &key,
-			})
-			if err != nil {
-				return err
-			}
-
-			if err := s.batcher.ExpireKeys(ctx, batchID); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("invalid status of batch append ops: %d", result.Status)
+		if err := s.executor.AppendAndScheduleBatch(ctx, fn, bi); err != nil {
+			return fmt.Errorf("could not append and schedule batch item: %w", err)
 		}
 
 		return nil

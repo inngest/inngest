@@ -130,15 +130,14 @@ CREATE TABLE trace_runs (
 	run_id CHAR(26) NOT NULL,
 
 	queued_at TIMESTAMP NOT NULL,
-	started_at TIMESTAMP,
-	ended_at TIMESTAMP,
-	duration INT,
+	started_at TIMESTAMP NOT NULL,
+	ended_at TIMESTAMP NOT NULL,
+	duration INT NOT NULL,
 
-	status INT, -- more like enum values
-	source_id BLOB,
+	status INT NOT NULL, -- more like enum values
+	source_id VARCHAR NOT NULL,
 	trigger_ids BLOB NOT NULL,
-	triggers BLOB NOT NULL,
 	output BLOB,
-	is_batch BOOLEAN,
-	is_debounce BOOLEAN
+	is_batch BOOLEAN NOT NULL,
+	is_debounce BOOLEAN NOT NULL
 );

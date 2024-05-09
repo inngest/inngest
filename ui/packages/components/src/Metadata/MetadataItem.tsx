@@ -1,8 +1,8 @@
 import { Badge } from '@inngest/components/Badge';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
-import { IconInfo } from '@inngest/components/icons/Info';
 import { classNames } from '@inngest/components/utils/classNames';
+import { RiInformationLine } from '@remixicon/react';
 
 export type MetadataItemProps = {
   className?: string;
@@ -38,7 +38,7 @@ export function MetadataItem({
             <TooltipTrigger asChild>
               {/* Temporarily breaks accessibility https://github.com/radix-ui/primitives/discussions/560 */}
               <span>
-                <IconInfo className="h-4 w-4 text-slate-400" />
+                <RiInformationLine className="h-4 w-4 text-slate-400" />
               </span>
             </TooltipTrigger>
             <TooltipContent className="whitespace-pre-line">{tooltip}</TooltipContent>

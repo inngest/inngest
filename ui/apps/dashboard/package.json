@@ -31,7 +31,6 @@
     "@graphql-typed-document-node/core": "3.2.0",
     "@headlessui/react": "1.7.17",
     "@headlessui/tailwindcss": "0.1.2",
-    "@heroicons/react": "2.0.16",
     "@inngest/components": "workspace:*",
     "@launchdarkly/node-server-sdk": "9.0.3",
     "@next/third-parties": "14.1.3",

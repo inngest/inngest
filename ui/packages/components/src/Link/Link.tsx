@@ -1,9 +1,8 @@
 import type { UrlObject } from 'url';
 import type { Route } from 'next';
 import NextLink from 'next/link';
-import { IconArrowTopRightOnSquare } from '@inngest/components/icons/ArrowTopRightOnSquare';
-import { classNames } from '@inngest/components/utils/classNames';
-import { RiArrowRightLine } from '@remixicon/react';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiArrowRightLine, RiExternalLinkLine } from '@remixicon/react';
 
 type LinkProps = {
   internalNavigation?: boolean;
@@ -27,11 +26,7 @@ export function Link({
     return (
       <NextLink
         href={href}
-        className={classNames(
-          className,
-          showIcon && 'group flex items-center gap-1',
-          defaultLinkStyles
-        )}
+        className={cn(className, showIcon && 'group flex items-center gap-1', defaultLinkStyles)}
       >
         {children}
         {showIcon && (
@@ -42,17 +37,13 @@ export function Link({
   } else if (typeof href === 'string') {
     return (
       <a
-        className={classNames(
-          className,
-          showIcon && 'group flex items-center gap-1',
-          defaultLinkStyles
-        )}
+        className={cn(className, showIcon && 'group flex items-center gap-1', defaultLinkStyles)}
         target="_blank"
         rel="noopener noreferrer"
         href={href}
       >
         {children}
-        {showIcon && <IconArrowTopRightOnSquare className="h-4 w-4 shrink-0" />}
+        {showIcon && <RiExternalLinkLine className="h-4 w-4 shrink-0" />}
       </a>
     );
   }

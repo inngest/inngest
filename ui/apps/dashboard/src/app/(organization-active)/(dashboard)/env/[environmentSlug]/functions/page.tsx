@@ -1,7 +1,7 @@
 'use client';
 
-import { CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { IconFunction } from '@inngest/components/icons/Function';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import Header, { type HeaderLink } from '@/components/Header/Header';
@@ -59,7 +59,7 @@ function FunctionsHeader() {
 
   return (
     <Header
-      icon={<CodeBracketSquareIcon className="h-5 w-5 text-white" />}
+      icon={<IconFunction className="h-5 w-5 text-white" />}
       links={navLinks}
       title="Functions"
     />

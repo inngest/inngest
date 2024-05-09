@@ -49,6 +49,7 @@ var (
 	ErrNoActionLoader    = fmt.Errorf("no action loader provided")
 	ErrNoRuntimeDriver   = fmt.Errorf("runtime driver for action not found")
 	ErrFunctionDebounced = fmt.Errorf("function debounced")
+	ErrFunctionSkipped   = fmt.Errorf("function skipped")
 
 	ErrFunctionEnded = fmt.Errorf("function already ended")
 
@@ -306,38 +307,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// this run ID.
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
-	// span that tells when the function was queued
-	_, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeTrigger),
-		telemetry.WithName(consts.OtelSpanTrigger),
-		telemetry.WithTimestamp(ulid.Time(runID.Time())),
-		telemetry.WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
-			attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
-			attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
-			attribute.String(consts.OtelSysAppID, req.AppID.String()),
-			attribute.String(consts.OtelSysFunctionID, req.Function.ID.String()),
-			attribute.String(consts.OtelSysFunctionSlug, req.Function.GetSlug()),
-			attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
-			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
-			attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusScheduled.ToCode()),
-		),
-	)
-	defer span.End()
-	if req.BatchID != nil {
-		span.SetAttributes(attribute.String(consts.OtelSysBatchID, req.BatchID.String()))
-	}
-	if req.PreventDebounce {
-		span.SetAttributes(attribute.Bool(consts.OtelSysDebounceTimeout, true))
-	}
-	if req.Context != nil {
-		if val, ok := req.Context[consts.OtelPropagationLinkKey]; ok {
-			if link, ok := val.(string); ok {
-				span.SetAttributes(attribute.String(consts.OtelPropagationLinkKey, link))
-			}
-		}
-	}
-
 	var key string
 	if req.IdempotencyKey != nil {
 		// Use the given idempotency key
@@ -357,14 +326,16 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		// Finally, if there is a batch use the batch ID as the idempotency key.
 		key = req.BatchID.String()
 	}
+	if req.Context == nil {
+		req.Context = map[string]any{}
+	}
 
+	// Normalization
 	eventIDs := []ulid.ULID{}
 	for _, e := range req.Events {
 		id := e.GetInternalID()
 		eventIDs = append(eventIDs, id)
 	}
-	spanID := telemetry.NewSpanID(ctx)
-	span.SetEventIDs(req.Events...)
 
 	evts := make([]json.RawMessage, len(req.Events))
 	for n, item := range req.Events {
@@ -375,11 +346,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			return nil, fmt.Errorf("error marshalling event: %w", err)
 		}
 		evts[n] = byt
-		span.AddEvent(string(byt), trace.WithAttributes(
-			attribute.Bool(consts.OtelSysEventData, true),
-		))
 	}
-
 	// Evaluate the run priority based off of the input event data.
 	evtMap := req.Events[0].GetEvent().Map()
 	factor, _ := req.Function.RunPriorityFactor(ctx, evtMap)
@@ -407,14 +374,29 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			FunctionSlug:    req.Function.GetSlug(),
 			FunctionVersion: req.Function.FunctionVersion,
 			CronSchedule:    schedule,
-			SpanID:          spanID.String(),
+			SpanID:          telemetry.NewSpanID(ctx).String(),
 			EventIDs:        eventIDs,
 			Idempotency:     key,
 			ReplayID:        req.ReplayID,
 			OriginalRunID:   req.OriginalRunID,
 			PriorityFactor:  &factor,
 			BatchID:         req.BatchID,
+			Context:         req.Context,
 		},
+	}
+	carrier := telemetry.NewTraceCarrier()
+	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	metadata.Config.Context[consts.OtelPropagationKey] = carrier
+
+	// If this is paused, immediately end just before creating state.
+	isPaused := req.FunctionPausedAt != nil && req.FunctionPausedAt.Before(time.Now())
+	if isPaused {
+		for _, e := range e.lifecycles {
+			go e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
+				CronSchedule: req.Events[0].GetEvent().CronSchedule(),
+			})
+		}
+		return nil, ErrFunctionSkipped
 	}
 
 	if req.Function.Concurrency != nil {
@@ -450,14 +432,71 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		}
 	}
 
-	// Inject trace context into state metadata
-	metadata.Config.Context = map[string]any{}
-	if req.Context != nil {
-		metadata.Config.Context = req.Context
+	//
+	// Create traces.
+	//
+
+	//
+	// This is the span that tells when the function was queued.
+	//
+	_, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeTrigger),
+		telemetry.WithName(consts.OtelSpanTrigger),
+		telemetry.WithTimestamp(ulid.Time(runID.Time())),
+		telemetry.WithSpanAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, req.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, req.Function.ID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, req.Function.GetSlug()),
+			attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
+			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
+			attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusScheduled.ToCode()),
+		),
+	)
+	defer span.End()
+	if req.BatchID != nil {
+		span.SetAttributes(attribute.String(consts.OtelSysBatchID, req.BatchID.String()))
 	}
-	carrier := telemetry.NewTraceCarrier()
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
-	metadata.Config.Context[consts.OtelPropagationKey] = carrier
+	if req.PreventDebounce {
+		span.SetAttributes(attribute.Bool(consts.OtelSysDebounceTimeout, true))
+	}
+	if req.Context != nil {
+		if val, ok := req.Context[consts.OtelPropagationLinkKey]; ok {
+			if link, ok := val.(string); ok {
+				span.SetAttributes(attribute.String(consts.OtelPropagationLinkKey, link))
+			}
+		}
+	}
+	span.SetEventIDs(req.Events...)
+	for _, evt := range evts {
+		span.AddEvent(string(evt), trace.WithAttributes(attribute.Bool(consts.OtelSysEventData, true)))
+	}
+
+	//
+	// Create throttle information prior to creating state.  This is used in the queue.
+	//
+	var throttle *queue.Throttle
+	if req.Function.Throttle != nil {
+		throttleKey := redis_state.HashID(ctx, req.Function.ID.String())
+		if req.Function.Throttle.Key != nil {
+			val, _, _ := expressions.Evaluate(ctx, *req.Function.Throttle.Key, map[string]any{
+				"event": evtMap,
+			})
+			throttleKey = throttleKey + "-" + redis_state.HashID(ctx, fmt.Sprintf("%v", val))
+		}
+		throttle = &queue.Throttle{
+			Key:    throttleKey,
+			Limit:  int(req.Function.Throttle.Limit),
+			Burst:  int(req.Function.Throttle.Burst),
+			Period: int(req.Function.Throttle.Period.Seconds()),
+		}
+	}
+
+	//
+	// Create the run state.
+	//
 
 	err := e.smv2.Create(ctx, sv2.CreateState{
 		Metadata: metadata,
@@ -473,7 +512,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
 
+	//
 	// Create cancellation pauses immediately, only if this is a non-batch event.
+	//
 	if req.BatchID == nil {
 		for _, c := range req.Function.Cancel {
 			pauseID := uuid.New()
@@ -552,23 +593,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		at = *req.At
 	}
 
-	var throttle *queue.Throttle
-	if req.Function.Throttle != nil {
-		throttleKey := redis_state.HashID(ctx, req.Function.ID.String())
-		if req.Function.Throttle.Key != nil {
-			val, _, _ := expressions.Evaluate(ctx, *req.Function.Throttle.Key, map[string]any{
-				"event": evtMap,
-			})
-			throttleKey = throttleKey + "-" + redis_state.HashID(ctx, fmt.Sprintf("%v", val))
-		}
-		throttle = &queue.Throttle{
-			Key:    throttleKey,
-			Limit:  int(req.Function.Throttle.Limit),
-			Burst:  int(req.Function.Throttle.Burst),
-			Period: int(req.Function.Throttle.Period.Seconds()),
-		}
-	}
-
 	// Prefix the workflow to the job ID so that no invocation can accidentally
 	// cause idempotency issues across users/functions.
 	//
@@ -585,7 +609,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			WorkspaceID: req.WorkspaceID,
 			AccountID:   req.AccountID,
 		},
-		// Always include these
 		CustomConcurrencyKeys: metadata.Config.CustomConcurrencyKeys,
 		PriorityFactor:        metadata.Config.PriorityFactor,
 		Attempt:               0,
@@ -776,6 +799,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			// annotate the step as the first step of the function run.
 			// this way the delay associated with this run is directly correlated to the delay of the
 			// function run itself.
+			fnSpan.SetAttributes(attribute.Bool(consts.OtelSysStepFirst, true))
 			span.SetAttributes(attribute.Bool(consts.OtelSysStepFirst, true))
 
 			// Set the start time and spanID in metadata for subsequent runs
@@ -2267,6 +2291,121 @@ func (e *executor) extractTraceCtx(ctx context.Context, md sv2.Metadata, item *q
 	}
 
 	return ctx
+}
+
+// AppendAndScheduleBatch appends a new batch item. If a new batch is created, it will be scheduled to run
+// after the batch timeout. If the item finalizes the batch, a function run is immediately scheduled.
+func (e executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem) error {
+	result, err := e.batcher.Append(ctx, bi, fn)
+	if err != nil {
+		return err
+	}
+
+	switch result.Status {
+	case enums.BatchAppend:
+		// noop
+	case enums.BatchNew:
+		dur, err := time.ParseDuration(fn.EventBatch.Timeout)
+		if err != nil {
+			return err
+		}
+		at := time.Now().Add(dur)
+
+		if err := e.batcher.ScheduleExecution(ctx, batch.ScheduleBatchOpts{
+			ScheduleBatchPayload: batch.ScheduleBatchPayload{
+				BatchID:         ulid.MustParse(result.BatchID),
+				AccountID:       bi.AccountID,
+				WorkspaceID:     bi.WorkspaceID,
+				AppID:           bi.AppID,
+				FunctionID:      bi.FunctionID,
+				FunctionVersion: bi.FunctionVersion,
+			},
+			At: at,
+		}); err != nil {
+			return err
+		}
+	case enums.BatchFull:
+		// start execution immediately
+		batchID := ulid.MustParse(result.BatchID)
+		if err := e.RetrieveAndScheduleBatch(ctx, fn, batch.ScheduleBatchPayload{
+			BatchID:     batchID,
+			AppID:       bi.AppID,
+			WorkspaceID: bi.WorkspaceID,
+			AccountID:   bi.AccountID,
+		}); err != nil {
+			return fmt.Errorf("could not retrieve and schedule batch items: %w", err)
+		}
+	default:
+		return fmt.Errorf("invalid status of batch append ops: %d", result.Status)
+	}
+
+	return nil
+}
+
+// RetrieveAndScheduleBatch retrieves all items from a started batch and schedules a function run
+func (e executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload) error {
+	evtList, err := e.batcher.RetrieveItems(ctx, payload.BatchID)
+	if err != nil {
+		return err
+	}
+
+	evtIDs := make([]string, len(evtList))
+	events := make([]event.TrackedEvent, len(evtList))
+	for i, e := range evtList {
+		events[i] = e
+		evtIDs[i] = e.GetInternalID().String()
+	}
+
+	ctx, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeBatch),
+		telemetry.WithName(consts.OtelSpanBatch),
+		telemetry.WithNewRoot(),
+		telemetry.WithSpanAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, payload.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, payload.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, payload.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
+			attribute.String(consts.OtelSysBatchID, payload.BatchID.String()),
+			attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
+		))
+	defer span.End()
+
+	// still process events in case the user disables batching while a batch is still in-flight
+	if fn.EventBatch != nil {
+		if len(events) == fn.EventBatch.MaxSize {
+			span.SetAttributes(attribute.Bool(consts.OtelSysBatchFull, true))
+		} else {
+			span.SetAttributes(attribute.Bool(consts.OtelSysBatchTimeout, true))
+		}
+	}
+
+	key := fmt.Sprintf("%s-%s", fn.ID, payload.BatchID)
+	md, err := e.Schedule(ctx, execution.ScheduleRequest{
+		AccountID:      payload.AccountID,
+		WorkspaceID:    payload.WorkspaceID,
+		AppID:          payload.AppID,
+		Function:       fn,
+		Events:         events,
+		BatchID:        &payload.BatchID,
+		IdempotencyKey: &key,
+	})
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		return err
+	}
+
+	if md != nil {
+		span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))
+	} else {
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
+	}
+
+	if err := e.batcher.ExpireKeys(ctx, payload.BatchID); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // extractTraceCtxFromMap extracts the trace context from a map, if it exists.
