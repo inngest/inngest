@@ -3,6 +3,7 @@
 import { type Route } from 'next';
 import Link from 'next/link';
 import { IconApp } from '@inngest/components/icons/App';
+import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
 import { RiSearchLine, RiToolsLine } from '@remixicon/react';
 
@@ -10,7 +11,6 @@ import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import OrganizationDropdown from '@/components/Navigation/OrganizationDropdown';
 import UserDropdown from '@/components/Navigation/UserDropdown';
 import InngestLogo from '@/icons/InngestLogo';
-import EventIcon from '@/icons/event.svg';
 import EnvironmentSelectMenu from './EnvironmentSelectMenu';
 import NavItem from './NavItem';
 import Navigation from './Navigation';
@@ -50,7 +50,7 @@ export default function AppNavigation({ environmentSlug }: AppNavigationProps) {
       href: `/env/${environmentSlug}/events`,
       text: 'Events',
       hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
-      icon: <EventIcon className="w-5" />,
+      icon: <IconEvent className="w-5" />,
     },
     {
       href: `/env/${environmentSlug}/manage`,

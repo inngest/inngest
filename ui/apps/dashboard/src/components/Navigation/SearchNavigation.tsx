@@ -5,6 +5,7 @@ import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { useOrganization, useUser } from '@clerk/nextjs';
 import { Modal } from '@inngest/components/Modal';
+import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowGoForwardLine, RiSearchLine } from '@remixicon/react';
@@ -12,7 +13,6 @@ import { Command } from 'cmdk';
 import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
-import EventIcon from '@/icons/event.svg';
 import { getEnvironmentSlug } from '@/utils/environments';
 
 const GetGlobalSearchDocument = graphql(`
@@ -164,7 +164,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
         globalResults.value.id
       }`,
       name: globalResults.value.name,
-      icon: <EventIcon className="w-5" />,
+      icon: <IconEvent className="w-5" />,
     };
   }
 

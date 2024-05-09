@@ -1,8 +1,9 @@
 'use client';
 
+import { IconEvent } from '@inngest/components/icons/Event';
+
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import Header, { type HeaderLink } from '@/components/Header/Header';
-import EventIcon from '@/icons/event.svg';
 import SendEventButton from './SendEventButton';
 
 type EventLayoutProps = {
@@ -31,7 +32,7 @@ export default function EventLayout({ children, params }: EventLayoutProps) {
   return (
     <>
       <Header
-        icon={<EventIcon className="h-5 w-5 text-white" />}
+        icon={<IconEvent className="h-5 w-5 text-white" />}
         title={decodeURIComponent(params.eventName)}
         links={navLinks}
         action={
