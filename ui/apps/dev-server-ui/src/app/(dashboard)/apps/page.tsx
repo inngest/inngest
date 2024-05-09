@@ -3,10 +3,10 @@
 import { useMemo } from 'react';
 import { Link } from '@inngest/components/Link';
 import { IconApp } from '@inngest/components/icons/App';
+import { IconSpinner } from '@inngest/components/icons/Spinner';
 
 import AddAppButton from '@/components/App/AddAppButton';
 import AppCard from '@/components/App/AppCard';
-import { IconSpinner } from '@/icons';
 import { useGetAppsQuery } from '@/store/generated';
 
 export default function AppList() {

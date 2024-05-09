@@ -4,6 +4,7 @@ import { Button } from '@inngest/components/Button';
 import { CodeLine } from '@inngest/components/CodeLine';
 import { Link } from '@inngest/components/Link/Link';
 import { AlertModal } from '@inngest/components/Modal';
+import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { IconStatusCanceled } from '@inngest/components/icons/status/Canceled';
 import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
 import { IconStatusFailed } from '@inngest/components/icons/status/Failed';
@@ -13,7 +14,6 @@ import { toast } from 'sonner';
 
 import AppCardHeader from '@/components/App/AppCardHeader';
 import useDebounce from '@/hooks/useDebounce';
-import { IconSpinner } from '@/icons';
 import {
   useDeleteAppMutation,
   useUpdateAppMutation,
