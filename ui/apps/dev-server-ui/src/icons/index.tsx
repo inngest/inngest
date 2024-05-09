@@ -7,4 +7,3 @@ export { IconCheckCircle } from './CheckCircle';
 export { IconExclamationTriangle } from './ExclamationTriangle';
 export { InngestSmallLogo } from './InngestSmallLogo';
 export { IconReplay } from './Replay';
-export { IconWebhook } from './Webhook';
