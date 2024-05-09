@@ -1117,6 +1117,22 @@ func (q *queue) peekSize() int64 {
 	return size
 }
 
+func (q *queue) peekItems() int64 {
+	num := q.peekMaxItems
+	if num == 0 {
+		num = QueuePeekMaxItems
+	}
+	return num
+}
+
+func (q *queue) peekIter() int64 {
+	num := q.peekMaxIter
+	if num == 0 {
+		num = QueuePeekMaxIter
+	}
+	return num
+}
+
 func (q *queue) isSequential() bool {
 	l := q.sequentialLease()
 	if l == nil {

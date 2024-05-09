@@ -60,8 +60,10 @@ const (
 	PartitionConcurrencyLimitRequeueExtension = 2 * time.Second
 	PartitionLookahead                        = time.Second
 
-	QueuePeekMax        int64 = 1000
+	QueuePeekMax        int64 = 500
 	QueuePeekDefault    int64 = 250
+	QueuePeekMaxIter    int64 = 4
+	QueuePeekMaxItems   int64 = 1000
 	QueueLeaseDuration        = 10 * time.Second
 	ConfigLeaseDuration       = 10 * time.Second
 	ConfigLeaseMax            = 20 * time.Second
@@ -198,6 +200,18 @@ func WithNumWorkers(n int32) QueueOpt {
 func WithPeekSize(n int64) QueueOpt {
 	return func(q *queue) {
 		q.peek = n
+	}
+}
+
+func WithPeekMaxIterations(n int64) QueueOpt {
+	return func(q *queue) {
+		q.peekMaxIter = n
+	}
+}
+
+func WithPeekMaxItems(n int64) QueueOpt {
+	return func(q *queue) {
+		q.peekMaxItems = n
 	}
 }
 
@@ -389,7 +403,9 @@ type queue struct {
 	// numWorkers stores the number of workers available to concurrently process jobs.
 	numWorkers int32
 	// peek sets the number of items to check on queue peeks
-	peek int64
+	peek         int64
+	peekMaxItems int64
+	peekMaxIter  int64
 	// workers is a buffered channel which allows scanners to send queue items
 	// to workers to be processed
 	workers chan processItem
