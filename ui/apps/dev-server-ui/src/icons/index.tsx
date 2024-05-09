@@ -1,6 +1,5 @@
 // custom icons
 export { IconFeed } from './Feed';
-export { IconBook } from './Book';
 export { InngestLogo } from './InngestLogo';
 export { IconPlus } from './Plus';
 export { IconSpinner } from './Spinner';
