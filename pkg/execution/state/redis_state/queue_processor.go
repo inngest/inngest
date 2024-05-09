@@ -1149,42 +1149,36 @@ func (q *queue) queueGauges(ctx context.Context) {
 
 // shardGauges reports shard gauges via otel.
 func (q *queue) shardGauges(ctx context.Context) {
-	var (
-		shards map[string]*QueueShard
-		err    error
-	)
-	go func() {
-		tick := time.NewTicker(ShardTickTime)
-		for {
-			select {
-			case <-ctx.Done():
-				tick.Stop()
-				return
-			case <-tick.C:
-				// Reload shards.
-				shards, err = q.getShards(ctx)
-				if err != nil {
-					q.logger.Error().Err(err).Msg("error retrieving shards")
-				}
+	tick := time.NewTicker(ShardTickTime)
+	for {
+		select {
+		case <-ctx.Done():
+			tick.Stop()
+			return
+		case <-tick.C:
+			// Reload shards.
+			shards, err := q.getShards(ctx)
+			if err != nil {
+				q.logger.Error().Err(err).Msg("error retrieving shards")
+			}
+
+			// Report gauges to otel.
+			telemetry.GaugeQueueShardCount(ctx, int64(len(shards)), telemetry.GaugeOpt{PkgName: pkgName})
+
+			for _, shard := range shards {
+				tags := map[string]any{"shard_name": shard.Name}
+
+				telemetry.GaugeQueueShardGuaranteedCapacityCount(ctx, int64(shard.GuaranteedCapacity), telemetry.GaugeOpt{PkgName: pkgName, Tags: tags})
+				telemetry.GaugeQueueShardLeaseCount(ctx, int64(len(shard.Leases)), telemetry.GaugeOpt{PkgName: pkgName, Tags: tags})
+				telemetry.GaugeQueueShardPartitionAvailableCount(ctx, telemetry.GaugeOpt{
+					PkgName: pkgName,
+					Tags:    tags,
+					Observer: func(ctx context.Context) (int64, error) {
+						return q.partitionSize(ctx, q.kg.ShardPartitionIndex(shard.Name), getNow().Add(PartitionLookahead))
+					},
+				})
 			}
 		}
-	}()
-
-	// Report gauges to otel.
-	telemetry.GaugeQueueShardCount(ctx, int64(len(shards)), telemetry.GaugeOpt{PkgName: pkgName})
-
-	for _, shard := range shards {
-		tags := map[string]any{"shard_name": shard.Name}
-
-		telemetry.GaugeQueueShardGuaranteedCapacityCount(ctx, int64(shard.GuaranteedCapacity), telemetry.GaugeOpt{PkgName: pkgName, Tags: tags})
-		telemetry.GaugeQueueShardLeaseCount(ctx, int64(len(shard.Leases)), telemetry.GaugeOpt{PkgName: pkgName, Tags: tags})
-		telemetry.GaugeQueueShardPartitionAvailableCount(ctx, telemetry.GaugeOpt{
-			PkgName: pkgName,
-			Tags:    tags,
-			Observer: func(ctx context.Context) (int64, error) {
-				return q.partitionSize(ctx, q.kg.ShardPartitionIndex(shard.Name), getNow().Add(PartitionLookahead))
-			},
-		})
 	}
 }
 
