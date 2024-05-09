@@ -665,6 +665,13 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		return fmt.Errorf("error leasing partition: %w", err)
 	}
 
+	begin := time.Now()
+	defer func() {
+		telemetry.HistogramProcessPartitionDration(ctx, time.Since(begin).Milliseconds(), telemetry.HistogramOpt{
+			PkgName: pkgName,
+		})
+	}()
+
 	// Ensure that peek doesn't take longer than the partition lease, to
 	// reduce contention.
 	peekCtx, cancel := context.WithTimeout(ctx, PartitionLeaseDuration)
@@ -705,20 +712,13 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	// iteration.
 	staticTime := getNow()
 
+	denies := newLeaseDenyList()
+
 ProcessLoop:
-	for _, qi := range queue {
+	for _, item := range queue {
 		// TODO: Create an in-memory mapping of rate limit keys that have been hit,
 		//       and don't bother to process if the queue item has a limited key.  This
 		//       lessens work done in the queue, as we can `continue` immediately.
-
-		if q.capacity() == 0 {
-			// no longer any available workers for partition, so we can skip
-			// work for now.
-			telemetry.IncrQueueProcessNoCapacityCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
-			break ProcessLoop
-		}
-
-		item := qi
 		if item.IsLeased(getNow()) {
 			telemetry.IncrQueueItemLeaseContentionCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 			continue
@@ -727,7 +727,8 @@ ProcessLoop:
 		// Cbeck if there's capacity from our local workers atomically prior to leasing our tiems.
 		if !q.sem.TryAcquire(1) {
 			telemetry.IncrQueuePartitionProcessNoCapacityCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
-			break
+			// Break the entire loop to prevent out of order work.
+			break ProcessLoop
 		}
 
 		// Attempt to lease this item before passing this to a worker.  We have to do this
@@ -738,7 +739,15 @@ ProcessLoop:
 		//
 		// This is safe:  only one process runs scan(), and we guard the total number of
 		// available workers with the above semaphore.
-		leaseID, err := q.Lease(ctx, *p, *item, QueueLeaseDuration, staticTime)
+		leaseID, err := q.Lease(ctx, *p, *item, QueueLeaseDuration, staticTime, denies)
+
+		// NOTE: If this loop ends in an error, we must _always_ release an item from the
+		// semaphore to free capacity.  This will happen automatically when the worker
+		// finishes processing a queue item on success.
+		if err != nil {
+			// Continue on and handle the error below.
+			q.sem.Release(1)
+		}
 
 		// Check the sojourn delay for this item in the queue. Tracking system latency vs
 		// sojourn latency from concurrency is important.
@@ -761,7 +770,6 @@ ProcessLoop:
 		//
 		// Anyway, here we set the first peek item to the item's start time if there was a
 		// peek since the job was added.
-
 		if p.Last > 0 && p.Last > item.AtMS {
 			// Fudge the earliest peek time because we know this wasn't peeked and so
 			// the peek time wasn't set;  but, as we were still processing jobs after
@@ -769,15 +777,21 @@ ProcessLoop:
 			item.EarliestPeekTime = item.AtMS
 		}
 
-		// NOTE: If this loop ends in an error, we must _always_ release an item from the
-		// semaphore to free capacity.  This will happen automatically when the worker
-		// finishes processing a queue item on success.
-		if err != nil {
-			q.sem.Release(1)
+		// We may return a keyError, which masks the actual error underneath.  If so,
+		// grab the cause.
+		cause := err
+		var key keyError
+		if errors.As(err, &key) {
+			cause = key.cause
 		}
 
-		switch err {
+		switch cause {
 		case ErrQueueItemThrottled:
+			// Here we denylist each throttled key that's been limited here, then ignore
+			// any other jobs from being leased as we continue to iterate through the loop.
+			// This maintains FIFO ordering amongst all custom concurrency keys.
+			denies.addThrottled(err)
+
 			ctrRateLimit++
 			processErr = nil
 			telemetry.IncrQueueThrottledCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
@@ -799,19 +813,11 @@ ProcessLoop:
 			// so we cannot break the loop in case the next job has a different key and
 			// has capacity.
 			//
-			// In an ideal world we'd denylist each concurrency key that's been
-			// limited here, then ignore any other jobs from being leased as we continue
-			// to iterate through the loop.
-			//
-			// This maintains FIFO ordering amongst all custom concurrency keys.  For now,
-			// we move to the next job.  Note that capacity may be available for another job
-			// in the loop, meaning out of order jobs for now.
+			// Here we denylist each concurrency key that's been limited here, then ignore
+			// any other jobs from being leased as we continue to iterate through the loop.
+			// This maintains FIFO ordering amongst all custom concurrency keys.
+			denies.addConcurrency(err)
 
-			// TODO: Grab the key from the custom limit
-			//       Set key in denylist lookup table.
-			//       Modify above loop entrance:
-			//         Check lookup table for all concurrency keys
-			//         If present, skip item
 			processErr = nil
 			continue
 		case ErrQueueItemNotFound:
@@ -839,7 +845,6 @@ ProcessLoop:
 
 		// increase success counter.
 		ctrSuccess++
-
 		q.workers <- processItem{P: *p, I: *item, S: shard}
 	}
 
