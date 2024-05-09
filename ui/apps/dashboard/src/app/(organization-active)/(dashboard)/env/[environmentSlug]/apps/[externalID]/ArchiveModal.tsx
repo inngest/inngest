@@ -7,22 +7,6 @@ import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
 
-const ArchiveAppDocument = graphql(`
-  mutation AchiveApp($appID: UUID!) {
-    archiveApp(id: $appID) {
-      id
-    }
-  }
-`);
-
-const UnarchiveAppDocument = graphql(`
-  mutation UnachiveApp($appID: UUID!) {
-    unarchiveApp(id: $appID) {
-      id
-    }
-  }
-`);
-
 type Props = {
   appID: string;
   isArchived: boolean;
@@ -58,7 +42,7 @@ export function ArchiveModal({ appID, isArchived, isOpen, onClose }: Props) {
       if (error instanceof Error) {
         setError(error);
       } else {
-        setError(new Error('Unknown error'));
+        setError(new Error('unknown error'));
       }
     } finally {
       setIsLoading(false);
@@ -70,7 +54,8 @@ export function ArchiveModal({ appID, isArchived, isOpen, onClose }: Props) {
       <Modal className="w-[800px]" isOpen={isOpen} onClose={onClose}>
         <Modal.Header>Unarchive app</Modal.Header>
         <Modal.Body>
-          Are you sure you want to unarchive this app? Its functions will become triggerable again.
+          Are you sure you want to unarchive this app? Its functions will also unarchive, allowing
+          them to trigger.
         </Modal.Body>
         <Modal.Footer className="flex justify-end gap-2">
           <Button appearance="outlined" btnAction={onClose} disabled={isLoading} label="Cancel" />
@@ -84,8 +69,8 @@ export function ArchiveModal({ appID, isArchived, isOpen, onClose }: Props) {
     <Modal className="w-[800px]" isOpen={isOpen} onClose={onClose}>
       <Modal.Header>Archive app</Modal.Header>
       <Modal.Body>
-        Are you sure you want to archive this app? Its functions will no longer trigger. An archived
-        app may be unarchived at any time.
+        Are you sure you want to archive this app? Its functions functions will also archive,
+        preventing them from triggering. An archived app may be unarchived at any time.
         {error && (
           <Alert className="mt-4" severity="error">
             {error.message}
@@ -99,3 +84,19 @@ export function ArchiveModal({ appID, isArchived, isOpen, onClose }: Props) {
     </Modal>
   );
 }
+
+const ArchiveAppDocument = graphql(`
+  mutation AchiveApp($appID: UUID!) {
+    archiveApp(id: $appID) {
+      id
+    }
+  }
+`);
+
+const UnarchiveAppDocument = graphql(`
+  mutation UnachiveApp($appID: UUID!) {
+    unarchiveApp(id: $appID) {
+      id
+    }
+  }
+`);
