@@ -685,7 +685,8 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	// order, depending on how long it takes for the item to pass through the channel
 	// to the worker, how long Redis takes to lease the item, etc.
 	fetch := getNow().Truncate(time.Second).Add(PartitionLookahead)
-	queue, err := q.Peek(peekCtx, p.Queue(), fetch, q.peekSize())
+	var offset int64
+	queue, err := q.Peek(peekCtx, p.Queue(), fetch, offset, q.peekSize())
 	if err != nil {
 		return err
 	}

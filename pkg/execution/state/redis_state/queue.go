@@ -867,7 +867,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 //
 // If limit is -1, this will return the first unleased item - representing the next available item in the
 // queue.
-func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, limit int64) ([]*QueueItem, error) {
+func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, offset int64, limit int64) ([]*QueueItem, error) {
 	// Check whether limit is -1, peeking next available time
 	isPeekNext := limit == -1
 
@@ -882,6 +882,7 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 
 	args, err := StrSlice([]any{
 		until.UnixMilli(),
+		offset,
 		limit,
 	})
 	if err != nil {

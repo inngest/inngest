@@ -399,7 +399,7 @@ func TestQueuePeek(t *testing.T) {
 	workflowID := uuid.UUID{}
 
 	t.Run("It returns none with no items enqueued", func(t *testing.T) {
-		items, err := q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 10)
+		items, err := q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 0, 10)
 		require.NoError(t, err)
 		require.EqualValues(t, 0, len(items))
 	})
@@ -417,7 +417,7 @@ func TestQueuePeek(t *testing.T) {
 		ic, err := q.EnqueueItem(ctx, QueueItem{ID: "c"}, c)
 		require.NoError(t, err)
 
-		items, err := q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 10)
+		items, err := q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 0, 10)
 		require.NoError(t, err)
 		require.EqualValues(t, 3, len(items))
 		require.EqualValues(t, []*QueueItem{&ia, &ib, &ic}, items)
@@ -426,24 +426,24 @@ func TestQueuePeek(t *testing.T) {
 		id, err := q.EnqueueItem(ctx, QueueItem{ID: "d"}, d)
 		require.NoError(t, err)
 
-		items, err = q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 10)
+		items, err = q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 0, 10)
 		require.NoError(t, err)
 		require.EqualValues(t, 4, len(items))
 		require.EqualValues(t, []*QueueItem{&ia, &ib, &ic, &id}, items)
 
 		t.Run("It should limit the list", func(t *testing.T) {
-			items, err = q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 2)
+			items, err = q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 0, 2)
 			require.NoError(t, err)
 			require.EqualValues(t, 2, len(items))
 			require.EqualValues(t, []*QueueItem{&ia, &ib}, items)
 		})
 
 		t.Run("It should apply a peek offset", func(t *testing.T) {
-			items, err = q.Peek(ctx, workflowID.String(), time.Now().Add(-1*time.Hour), QueuePeekMax)
+			items, err = q.Peek(ctx, workflowID.String(), time.Now().Add(-1*time.Hour), 0, QueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, len(items))
 
-			items, err = q.Peek(ctx, workflowID.String(), c, QueuePeekMax)
+			items, err = q.Peek(ctx, workflowID.String(), c, 0, QueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 3, len(items))
 			require.EqualValues(t, []*QueueItem{&ia, &ib, &ic}, items)
@@ -456,7 +456,7 @@ func TestQueuePeek(t *testing.T) {
 			_, err := q.Lease(ctx, p, ia, 50*time.Millisecond, getNow(), nil)
 			require.NoError(t, err)
 
-			items, err = q.Peek(ctx, workflowID.String(), d, QueuePeekMax)
+			items, err = q.Peek(ctx, workflowID.String(), d, 0, QueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 3, len(items))
 			require.EqualValues(t, []*QueueItem{&ib, &ic, &id}, items)
@@ -477,7 +477,7 @@ func TestQueuePeek(t *testing.T) {
 			require.NoError(t, err)
 			require.EqualValues(t, 1, caught)
 
-			items, err = q.Peek(ctx, workflowID.String(), d, QueuePeekMax)
+			items, err = q.Peek(ctx, workflowID.String(), d, 0, QueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 4, len(items))
 
@@ -877,7 +877,7 @@ func TestQueueDequeue(t *testing.T) {
 		})
 
 		t.Run("It should remove the item from the queue index", func(t *testing.T) {
-			items, err := q.Peek(ctx, item.Queue(), time.Now().Add(time.Hour), 10)
+			items, err := q.Peek(ctx, item.Queue(), time.Now().Add(time.Hour), 0, 10)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, len(items))
 		})
@@ -1547,7 +1547,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		require.Nil(t, err, r.Dump())
 
 		t.Run("It updates the queue's At time", func(t *testing.T) {
-			found, err := q.Peek(ctx, wsA.String(), at.Add(10*time.Second), 5)
+			found, err := q.Peek(ctx, wsA.String(), at.Add(10*time.Second), 0, 5)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(found))
 			require.NotEqual(t, item.AtMS, found[0].AtMS)
@@ -1618,7 +1618,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		})
 
 		t.Run("It updates the queue's At time", func(t *testing.T) {
-			found, err := q.Peek(ctx, wsA.String(), at.Add(30*time.Second), 5)
+			found, err := q.Peek(ctx, wsA.String(), at.Add(30*time.Second), 0, 5)
 			require.NoError(t, err)
 			require.Equal(t, 5, len(found))
 			require.Equal(t, at.UnixMilli(), found[0].AtMS, "First job shouldn't change")
