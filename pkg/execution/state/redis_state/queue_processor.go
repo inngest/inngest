@@ -692,6 +692,16 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	}
 	telemetry.IncrQueuePeekedCounter(ctx, int64(len(queue)), telemetry.CounterOpt{PkgName: pkgName})
 
+	// Record the number of partitions we're leasing.
+	telemetry.IncrQueuePartitionLeasedCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+
+	denies := newLeaseDenyList()
+	err = q.handleQueueItems(ctx, p, shard, queue, denies)
+
+	return err
+}
+
+func (q *queue) handleQueueItems(ctx context.Context, p *QueuePartition, shard *QueueShard, items []*QueueItem, denies *leaseDenies) error {
 	var (
 		processErr error
 
@@ -700,9 +710,6 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		ctrConcurrency int32
 		ctrRateLimit   int32
 	)
-
-	// Record the number of partitions we're leasing.
-	telemetry.IncrQueuePartitionLeasedCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 
 	// staticTime is used as the processing time for all items in the queue.
 	// We process queue items sequentially, and time progresses linearly as each
@@ -713,10 +720,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	// iteration.
 	staticTime := getNow()
 
-	denies := newLeaseDenyList()
-
-ProcessLoop:
-	for _, item := range queue {
+	for _, item := range items {
 		// TODO: Create an in-memory mapping of rate limit keys that have been hit,
 		//       and don't bother to process if the queue item has a limited key.  This
 		//       lessens work done in the queue, as we can `continue` immediately.
@@ -728,8 +732,9 @@ ProcessLoop:
 		// Cbeck if there's capacity from our local workers atomically prior to leasing our tiems.
 		if !q.sem.TryAcquire(1) {
 			telemetry.IncrQueuePartitionProcessNoCapacityCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
-			// Break the entire loop to prevent out of order work.
-			break ProcessLoop
+			// Break the loop to prevent out of order work.
+			// TODO: should this be an error?
+			return nil
 		}
 
 		// Attempt to lease this item before passing this to a worker.  We have to do this
@@ -807,7 +812,7 @@ ProcessLoop:
 			// only safe thing to do when we hit a function or account level
 			// concurrency key.
 			processErr = nil
-			break ProcessLoop
+			return nil
 		case ErrConcurrencyLimitCustomKey0, ErrConcurrencyLimitCustomKey1:
 			ctrConcurrency++
 			// Custom concurrency keys are different.  Each job may have a different key,
@@ -836,7 +841,7 @@ ProcessLoop:
 		// Handle other errors.
 		if err != nil {
 			processErr = fmt.Errorf("error leasing in process: %w", err)
-			break ProcessLoop
+			return nil
 		}
 
 		// Assign the lease ID and pass this to be handled by the available worker.
@@ -871,15 +876,12 @@ ProcessLoop:
 	// Requeue the partition, which reads the next unleased job or sets a time of
 	// 30 seconds.  This is why we have to lease items above, else this may return an item that is
 	// about to be leased and processed by the worker.
-	err = q.PartitionRequeue(ctx, p, getNow().Add(PartitionRequeueExtension), false)
+	err := q.PartitionRequeue(ctx, p, getNow().Add(PartitionRequeueExtension), false)
 	if err == ErrPartitionGarbageCollected {
 		// Safe;  we're preventing this from wasting cycles in the future.
 		return nil
 	}
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *QueueShard, f osqueue.RunFunc) error {
