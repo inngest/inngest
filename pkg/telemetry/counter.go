@@ -34,6 +34,15 @@ func IncrQueueProcessNoCapacityCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrQueueProcessedItemsCounter(ctx context.Context, incr int64, opts CounterOpt) {
+	recordCounterMetric(ctx, incr, counterOpt{
+		Name:        opts.PkgName,
+		MetricName:  "queue_processed_items_total",
+		Description: "The actual number of newly processed queue items when processing a partition",
+		Attributes:  opts.Tags,
+	})
+}
+
 func IncrQueuePartitionLeaseContentionCounter(ctx context.Context, opts CounterOpt) {
 	recordCounterMetric(ctx, 1, counterOpt{
 		Name:        opts.PkgName,

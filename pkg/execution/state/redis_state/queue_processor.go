@@ -729,6 +729,8 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		}
 	}
 
+	telemetry.IncrQueueProcessedItemsCounter(ctx, results.Handled(), telemetry.CounterOpt{PkgName: pkgName})
+
 	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
 	// with a force:  ensure that we won't re-scan it until 2 seconds in the future.
 	if results.IsConcurrentyLimited() {
