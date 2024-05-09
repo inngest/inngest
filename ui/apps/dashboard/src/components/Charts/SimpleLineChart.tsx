@@ -1,9 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
-import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import { RiErrorWarningLine, RiInformationLine } from '@remixicon/react';
 import {
   CartesianGrid,
   Tooltip as ChartTooltip,
@@ -107,7 +106,7 @@ export default function SimpleLineChart({
           {desc && (
             <Tooltip>
               <TooltipTrigger>
-                <InformationCircleIcon className="h-4 w-4 text-slate-400" />
+                <RiInformationLine className="h-4 w-4 text-slate-400" />
               </TooltipTrigger>
               <TooltipContent>{desc}</TooltipContent>
             </Tooltip>
@@ -134,7 +133,7 @@ export default function SimpleLineChart({
           ) : error ? (
             <div className="flex h-full w-full flex-col items-center justify-center gap-5">
               <div className="inline-flex items-center gap-2 text-red-600">
-                <ExclamationCircleIcon className="h-4 w-4" />
+                <RiErrorWarningLine className="h-4 w-4" />
                 <h2 className="text-sm">Failed to load chart</h2>
               </div>
             </div>

@@ -2,10 +2,11 @@
 
 import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
-import { InformationCircleIcon, PlusIcon, Squares2X2Icon } from '@heroicons/react/20/solid';
+import { Squares2X2Icon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { HoverCardContent, HoverCardRoot, HoverCardTrigger } from '@inngest/components/HoverCard';
 import { Link } from '@inngest/components/Link';
+import { RiAddLine, RiInformationLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import Header, { type HeaderLink } from '@/components/Header/Header';
@@ -45,7 +46,7 @@ export default function Page() {
                 kind="primary"
                 label="Sync App"
                 btnAction={() => router.push(pathCreator.createApp({ envSlug: env.slug }))}
-                icon={<PlusIcon />}
+                icon={<RiAddLine />}
               />
             )}
             <HoverCardRoot>
@@ -56,7 +57,7 @@ export default function Page() {
                   target="_blank"
                   rel="noreferrer noopener"
                 >
-                  <InformationCircleIcon className="h-5 w-5" />
+                  <RiInformationLine className="h-5 w-5" />
                   What are Apps?
                 </NextLink>
               </HoverCardTrigger>

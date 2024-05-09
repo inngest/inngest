@@ -2,12 +2,12 @@
 
 import { useMemo } from 'react';
 import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
-import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import {
   Tooltip as CustomTooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@inngest/components/Tooltip';
+import { RiInformationLine } from '@remixicon/react';
 import {
   Bar,
   BarChart,
@@ -103,7 +103,7 @@ export default function StackedBarChart({
           {desc && (
             <CustomTooltip>
               <TooltipTrigger>
-                <InformationCircleIcon className="h-4 w-4 text-slate-400" />
+                <RiInformationLine className="h-4 w-4 text-slate-400" />
               </TooltipTrigger>
               <TooltipContent>{desc}</TooltipContent>
             </CustomTooltip>
