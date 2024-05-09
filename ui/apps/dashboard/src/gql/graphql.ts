@@ -456,6 +456,7 @@ export type FunctionRunV2 = {
   appID: Scalars['UUID'];
   durationMS: Scalars['Int'];
   endedAt: Maybe<Scalars['Time']>;
+  function: Maybe<Workflow>;
   functionID: Scalars['UUID'];
   id: Scalars['ULID'];
   isBatch: Scalars['Boolean'];
@@ -464,6 +465,7 @@ export type FunctionRunV2 = {
   sourceID: Maybe<Scalars['String']>;
   startedAt: Maybe<Scalars['Time']>;
   status: FunctionRunStatus;
+  trace: Maybe<RunTraceSpan>;
   traceID: Scalars['String'];
   triggerIDs: Array<Scalars['ULID']>;
   triggers: Array<Scalars['Bytes']>;
@@ -515,6 +517,16 @@ export type IngestKey = {
 export type IngestKeyFilter = {
   name?: InputMaybe<Scalars['String']>;
   source?: InputMaybe<Scalars['String']>;
+};
+
+export type InvokeStepInfo = {
+  __typename?: 'InvokeStepInfo';
+  functionID: Scalars['String'];
+  returnEventID: Maybe<Scalars['ULID']>;
+  runID: Maybe<Scalars['ULID']>;
+  timedOut: Scalars['Boolean'];
+  timeout: Scalars['Time'];
+  triggeringEventID: Scalars['ULID'];
 };
 
 export type MetricsData = {
@@ -1027,6 +1039,45 @@ export type RunListItemEdge = {
   node: RunListItem;
 };
 
+export type RunTraceSpan = {
+  __typename?: 'RunTraceSpan';
+  account: Account;
+  accountID: Scalars['UUID'];
+  attempts: Maybe<Scalars['Int']>;
+  childrenSpans: Array<RunTraceSpan>;
+  duration: Maybe<Scalars['Int']>;
+  endedAt: Maybe<Scalars['Time']>;
+  isRoot: Scalars['Boolean'];
+  name: Scalars['String'];
+  outputID: Maybe<Scalars['String']>;
+  parentSpan: Maybe<RunTraceSpan>;
+  parentSpanID: Maybe<Scalars['String']>;
+  queuedAt: Scalars['Time'];
+  run: FunctionRun;
+  runID: Scalars['ULID'];
+  spanID: Scalars['String'];
+  startedAt: Maybe<Scalars['Time']>;
+  status: RunTraceSpanStatus;
+  stepInfo: Maybe<StepInfo>;
+  stepOp: Maybe<StepOp>;
+  traceID: Scalars['String'];
+  workspace: Workspace;
+  workspaceID: Scalars['UUID'];
+};
+
+export type RunTraceSpanOutput = {
+  __typename?: 'RunTraceSpanOutput';
+  data: Maybe<Scalars['Bytes']>;
+};
+
+export enum RunTraceSpanStatus {
+  Completed = 'COMPLETED',
+  Failed = 'FAILED',
+  Running = 'RUNNING',
+  TimedOut = 'TIMED_OUT',
+  Waiting = 'WAITING'
+}
+
 export type RunsConnection = {
   __typename?: 'RunsConnection';
   edges: Array<FunctionRunV2Edge>;
@@ -1124,6 +1175,11 @@ export type SigningKeyRotationCheck = {
   signingKeyState: SdkSigningKeyState;
 };
 
+export type SleepStepInfo = {
+  __typename?: 'SleepStepInfo';
+  sleepUntil: Scalars['Time'];
+};
+
 export type StartWorkflowInput = {
   workflowID: Scalars['ID'];
   workflowVersion?: InputMaybe<Scalars['Int']>;
@@ -1134,6 +1190,15 @@ export type StartWorkflowResponse = {
   __typename?: 'StartWorkflowResponse';
   id: Scalars['ULID'];
 };
+
+export type StepInfo = InvokeStepInfo | SleepStepInfo | WaitForEventStepInfo;
+
+export enum StepOp {
+  Invoke = 'INVOKE',
+  Run = 'RUN',
+  Sleep = 'SLEEP',
+  WaitForEvent = 'WAIT_FOR_EVENT'
+}
 
 export type StepUsageTimeOptions = {
   interval?: InputMaybe<Scalars['String']>;
@@ -1248,6 +1313,15 @@ export type VercelApp = {
   path: Maybe<Scalars['String']>;
   projectID: Scalars['String'];
   workspaceID: Scalars['UUID'];
+};
+
+export type WaitForEventStepInfo = {
+  __typename?: 'WaitForEventStepInfo';
+  eventName: Scalars['String'];
+  expression: Maybe<Scalars['String']>;
+  foundEventID: Maybe<Scalars['ULID']>;
+  timedOut: Scalars['Boolean'];
+  timeout: Scalars['Time'];
 };
 
 export type Workflow = {
@@ -1366,6 +1440,8 @@ export type Workspace = {
   lastDeployedAt: Maybe<Scalars['Time']>;
   name: Scalars['String'];
   parentID: Maybe<Scalars['ID']>;
+  run: Maybe<FunctionRunV2>;
+  runTraceByRunID: Maybe<RunTraceSpan>;
   runs: RunsConnection;
   runsMetrics: MetricsResponse;
   signingKeys: Array<SigningKey>;
@@ -1419,6 +1495,16 @@ export type WorkspaceIngestKeyArgs = {
 
 export type WorkspaceIngestKeysArgs = {
   filter: InputMaybe<IngestKeyFilter>;
+};
+
+
+export type WorkspaceRunArgs = {
+  runID: Scalars['String'];
+};
+
+
+export type WorkspaceRunTraceByRunIdArgs = {
+  runID: Scalars['String'];
 };
 
 
