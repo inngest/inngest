@@ -667,7 +667,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 
 	begin := time.Now()
 	defer func() {
-		telemetry.HistogramProcessPartitionDration(ctx, time.Now().Sub(begin).Milliseconds(), telemetry.HistogramOpt{
+		telemetry.HistogramProcessPartitionDration(ctx, time.Since(begin).Milliseconds(), telemetry.HistogramOpt{
 			PkgName: pkgName,
 		})
 	}()
@@ -845,7 +845,6 @@ ProcessLoop:
 
 		// increase success counter.
 		ctrSuccess++
-
 		q.workers <- processItem{P: *p, I: *item, S: shard}
 	}
 
