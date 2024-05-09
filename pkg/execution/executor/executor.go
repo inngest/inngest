@@ -339,7 +339,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				CronSchedule: req.Events[0].GetEvent().CronSchedule(),
 			})
 		}
-		return nil, nil
+		return nil, ErrFunctionSkipped
 	}
 
 	// span that tells when the function was queued
