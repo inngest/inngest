@@ -2,9 +2,9 @@
 
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card';
+import { RiErrorWarningLine } from '@remixicon/react';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
@@ -55,7 +55,7 @@ export default function EventListNotFound() {
       <div className="mx-auto flex w-[640px] flex-col gap-4">
         <div className="text-center">
           <h3 className="mb-4 flex items-center justify-center gap-1 rounded-lg border border-indigo-100 bg-indigo-50 py-2.5 text-lg font-semibold text-indigo-500">
-            <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 text-indigo-700" />
+            <RiErrorWarningLine className="mt-0.5 h-5 w-5 text-indigo-700" />
             <span>
               No Events <span className="font-medium text-indigo-900">received in</span>{' '}
               {environment.name}

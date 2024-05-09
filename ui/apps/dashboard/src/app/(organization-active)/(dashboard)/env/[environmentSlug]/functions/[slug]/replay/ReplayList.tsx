@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useMemo, useRef } from 'react';
-import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Link } from '@inngest/components/Link';
 import { ReplayStatusIcon } from '@inngest/components/ReplayStatusIcon';
 import { Table } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
 import type { Replay } from '@inngest/components/types/replay';
+import { RiErrorWarningLine } from '@remixicon/react';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 
@@ -143,7 +143,7 @@ export function ReplayList({ functionSlug }: Props) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-5">
         <div className="inline-flex items-center gap-2 text-red-600">
-          <ExclamationCircleIcon className="h-4 w-4" />
+          <RiErrorWarningLine className="h-4 w-4" />
           <h2 className="text-sm">Could not load replays</h2>
         </div>
       </div>

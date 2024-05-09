@@ -2,8 +2,8 @@
 
 import { type Route } from 'next';
 import Link from 'next/link';
-import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import { RiErrorWarningLine } from '@remixicon/react';
 
 import AppLink from '@/components/AppLink';
 import AppNavigation from '@/components/Navigation/AppNavigation';
@@ -95,7 +95,7 @@ export default function Envs() {
                   </h3>
                 </Link>
                 <p className="mt-4 text-sm text-amber-600">
-                  <ExclamationTriangleIcon className="mr-1 inline-block h-4 w-4 text-amber-500" />
+                  <RiErrorWarningLine className="mr-1 inline-block h-4 w-4 text-amber-500" />
                   Test mode is a legacy environment
                 </p>
               </div>

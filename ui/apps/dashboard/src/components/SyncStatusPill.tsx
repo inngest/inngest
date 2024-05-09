@@ -1,12 +1,11 @@
-import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import { IconStatusRunning } from '@inngest/components/icons/status/Running';
 import { type SyncStatus } from '@inngest/components/types/sync';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiCheckLine, RiSubtractLine } from '@remixicon/react';
+import { RiCheckLine, RiErrorWarningLine, RiSubtractLine } from '@remixicon/react';
 
 const syncStatusIcons: Record<string, React.ComponentType> = {
   duplicate: RiCheckLine,
-  error: ExclamationTriangleIcon,
+  error: RiErrorWarningLine,
   pending: IconStatusRunning,
   success: RiCheckLine,
 } as const satisfies { [key in SyncStatus]: unknown };
