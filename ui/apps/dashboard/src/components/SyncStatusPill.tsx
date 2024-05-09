@@ -1,8 +1,8 @@
-import { ExclamationTriangleIcon, MinusIcon } from '@heroicons/react/20/solid';
+import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import { IconStatusRunning } from '@inngest/components/icons/status/Running';
 import { type SyncStatus } from '@inngest/components/types/sync';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiCheckLine } from '@remixicon/react';
+import { RiCheckLine, RiSubtractLine } from '@remixicon/react';
 
 const syncStatusIcons: Record<string, React.ComponentType> = {
   duplicate: RiCheckLine,
@@ -38,10 +38,15 @@ type Props = {
 };
 
 export function SyncStatusPill({ status, iconOnly = false }: Props) {
-  const Icon = syncStatusIcons[status] ?? MinusIcon;
+  const Icon = syncStatusIcons[status] ?? RiSubtractLine;
   const text = syncStatusText[status] ?? 'Unknown';
   const color = syncStatusColor[status] ?? 'bg-slate-100 text-slate-800 border-slate-500';
   const iconColor = syncStatusIconColor[status] ?? 'text-slate-500';
+
+  const iconProps = {
+    className: cn(iconColor, 'h-4 w-4'),
+    title: text,
+  };
 
   return (
     <div
@@ -51,7 +56,7 @@ export function SyncStatusPill({ status, iconOnly = false }: Props) {
         'flex h-8 w-fit items-center gap-2 whitespace-nowrap rounded-full border'
       )}
     >
-      <Icon className={cn(iconColor, 'h-4 w-4')} title={text} />
+      <Icon {...iconProps} />
       {!iconOnly && text}
     </div>
   );
