@@ -47,6 +47,12 @@ const QueryDocument = graphql(`
   query GetRunTrace($envID: ID!, $runID: String!) {
     workspace(id: $envID) {
       run(runID: $runID) {
+        function {
+          app {
+            name
+          }
+          name
+        }
         trace {
           ...TraceDetails
           childrenSpans {
@@ -84,23 +90,27 @@ export default function Page({ params }: Props) {
   if (res.isLoading && !res.data) {
     return <Loading />;
   }
-  if (!res.data.workspace.run) {
+  const { run } = res.data.workspace;
+  if (!run) {
     throw new Error('missing run');
+  }
+  const { function: fn } = run;
+  if (!fn) {
+    throw new Error('missing function');
+  }
+  const { trace } = run;
+  if (!trace) {
+    throw new Error('missing trace');
   }
 
   async function getOutput() {
     return null;
   }
 
-  const { trace } = res.data.workspace.run;
-  if (!trace) {
-    throw new Error('missing trace');
-  }
-
   return (
     <RunDetails
-      app={{ name: 'my-app' }}
-      fn={{ name: 'my-fn' }}
+      app={fn.app}
+      fn={fn}
       getOutput={getOutput}
       run={{
         id: params.runID,

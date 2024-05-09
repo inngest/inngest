@@ -61,9 +61,9 @@ export function RunInfo({ className, app, fn, run }: Props) {
 
               <Labeled label="Status">{run.trace.status}</Labeled>
 
-              <Labeled label="Trigger">foo</Labeled>
+              <Labeled label="Trigger">TODO</Labeled>
 
-              <Labeled label="Event received at"></Labeled>
+              <Labeled label="Event received at">TODO</Labeled>
 
               <Labeled label="Queued at">
                 <Time value={queuedAt} />
