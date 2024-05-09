@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { Time } from '@inngest/components/Time';
+import { IconFunction } from '@inngest/components/icons/Function';
 import { IconStatusCanceled } from '@inngest/components/icons/status/Canceled';
 import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
 import { IconStatusFailed } from '@inngest/components/icons/status/Failed';
@@ -74,7 +74,7 @@ export default async function TriggeredFunctionCard({
     >
       <div className="flex-1">
         <div className="flex items-center gap-1.5">
-          <CodeBracketSquareIcon className="h-4 w-4 text-slate-500" />
+          <IconFunction className="h-4 w-4 text-slate-500" />
           <h4 className="font-medium text-slate-800">{function_.name}</h4>
         </div>
         <dl>

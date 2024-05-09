@@ -2,8 +2,8 @@
 
 import { type Route } from 'next';
 import Link from 'next/link';
-import { CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { IconApp } from '@inngest/components/icons/App';
+import { IconFunction } from '@inngest/components/icons/Function';
 import { RiSearchLine, RiToolsLine } from '@remixicon/react';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
@@ -44,7 +44,7 @@ export default function AppNavigation({ environmentSlug }: AppNavigationProps) {
       href: `/env/${environmentSlug}/functions`,
       text: 'Functions',
       hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
-      icon: <CodeBracketSquareIcon className="w-4" />,
+      icon: <IconFunction className="w-4" />,
     },
     {
       href: `/env/${environmentSlug}/events`,

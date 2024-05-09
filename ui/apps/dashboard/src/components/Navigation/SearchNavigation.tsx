@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { useOrganization, useUser } from '@clerk/nextjs';
-import { CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { Modal } from '@inngest/components/Modal';
+import { IconFunction } from '@inngest/components/icons/Function';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowGoForwardLine, RiSearchLine } from '@remixicon/react';
 import { Command } from 'cmdk';
@@ -155,7 +155,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
         globalResults.value.id
       }`,
       name: functionResults.name || '',
-      icon: <CodeBracketSquareIcon className="w-4" />,
+      icon: <IconFunction className="w-4" />,
     };
   } else if (globalResults?.value.__typename === 'ArchivedEvent') {
     searchResult = {
