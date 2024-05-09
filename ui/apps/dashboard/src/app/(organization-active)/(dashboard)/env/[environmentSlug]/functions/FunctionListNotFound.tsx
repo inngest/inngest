@@ -2,9 +2,8 @@
 
 import type { Route } from 'next';
 import Image from 'next/image';
-import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
-import { RiClipboardLine } from '@remixicon/react';
+import { RiClipboardLine, RiErrorWarningLine } from '@remixicon/react';
 import { useCopyToClipboard } from 'react-use';
 import { toast } from 'sonner';
 
@@ -31,7 +30,7 @@ export default function FunctionListNotFound() {
       <div className="mx-auto flex w-[640px] flex-col gap-4">
         <div className="text-center">
           <h3 className="mb-4 flex items-center justify-center gap-1 rounded-lg border border-indigo-100 bg-indigo-50 py-2.5 text-lg font-semibold text-indigo-500">
-            <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 text-indigo-700" />
+            <RiErrorWarningLine className="mt-0.5 h-5 w-5 text-indigo-700" />
             <span>
               No Functions <span className="font-medium text-indigo-900">registered in</span>{' '}
               {env.name}

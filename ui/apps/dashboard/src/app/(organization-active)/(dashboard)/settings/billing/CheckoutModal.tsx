@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
-import { RiBankCardLine } from '@remixicon/react';
+import { RiBankCardLine, RiErrorWarningLine } from '@remixicon/react';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { useMutation } from 'urql';
@@ -153,7 +152,7 @@ function CheckoutForm({ items, onSuccess }: { items: CheckoutItem[]; onSuccess: 
       {/* TODO - Explore re-use alert from signing key page PR */}
       {Boolean(error) && (
         <div className="my-4 flex rounded-md border border-red-600 bg-red-100 p-4 text-sm text-red-600">
-          <ExclamationCircleIcon className="mr-2 w-4 text-red-600" />
+          <RiErrorWarningLine className="mr-2 w-4 text-red-600" />
           {error}
         </div>
       )}

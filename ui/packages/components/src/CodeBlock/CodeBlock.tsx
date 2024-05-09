@@ -5,13 +5,13 @@ import { Button } from '@inngest/components/Button';
 import { CopyButton } from '@inngest/components/CopyButton';
 import { maxRenderedOutputSizeBytes } from '@inngest/components/constants';
 import { useCopyToClipboard } from '@inngest/components/hooks/useCopyToClipboard';
-import { IconArrayDownTray } from '@inngest/components/icons/ArrayDownTray';
 import { IconExpandText } from '@inngest/components/icons/ExpandText';
 import { IconOverflowText } from '@inngest/components/icons/OverflowText';
 import { IconShrinkText } from '@inngest/components/icons/ShrinkText';
 import { IconWrapText } from '@inngest/components/icons/WrapText';
 import { classNames } from '@inngest/components/utils/classNames';
 import Editor, { useMonaco } from '@monaco-editor/react';
+import { RiDownload2Line } from '@remixicon/react';
 import { type editor } from 'monaco-editor';
 import { useLocalStorage } from 'react-use';
 import colors from 'tailwindcss/colors';
@@ -366,7 +366,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
               <div className="flex h-24 items-center justify-center	">
                 <Button
                   label="Download Raw"
-                  icon={<IconArrayDownTray />}
+                  icon={<RiDownload2Line />}
                   btnAction={() => downloadJson({ content: content })}
                 />
               </div>

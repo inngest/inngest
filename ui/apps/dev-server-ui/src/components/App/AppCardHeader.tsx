@@ -1,6 +1,5 @@
 import { cn } from '@inngest/components/utils/classNames';
-
-import { IconCheckCircle, IconExclamationTriangle } from '@/icons';
+import { RiCheckboxCircleLine, RiErrorWarningLine } from '@remixicon/react';
 
 type AppCardHeaderProps = {
   functionCount: number;
@@ -13,15 +12,15 @@ export default function AppCardHeader({ synced, functionCount }: AppCardHeaderPr
   if (!synced) {
     headerColor = 'bg-rose-600/50';
     headerLabel = 'Not Synced';
-    headerIcon = <IconExclamationTriangle className="h-5 w-5 text-white" />;
+    headerIcon = <RiErrorWarningLine className="h-5 w-5 text-white" />;
   } else if (functionCount < 1) {
     headerColor = 'bg-orange-400/70';
     headerLabel = 'No Functions Found';
-    headerIcon = <IconExclamationTriangle className="h-5 w-5 text-white" />;
+    headerIcon = <RiErrorWarningLine className="h-5 w-5 text-white" />;
   } else {
     headerColor = 'bg-teal-400/50';
     headerLabel = 'Synced';
-    headerIcon = <IconCheckCircle className="h-5 w-5 text-white" />;
+    headerIcon = <RiCheckboxCircleLine className="h-5 w-5 text-white" />;
   }
 
   return (

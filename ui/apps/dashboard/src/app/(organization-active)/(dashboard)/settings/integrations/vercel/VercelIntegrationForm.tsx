@@ -4,9 +4,8 @@ import { useState } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@headlessui/react';
-import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
-import { RiLoopLeftLine } from '@remixicon/react';
+import { RiErrorWarningLine, RiLoopLeftLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import {
@@ -107,7 +106,7 @@ export default function VercelIntegrationForm({ vercelIntegration }: VercelInteg
                 VercelDeploymentProtection.ProdDeploymentURLsAndAllPreviews ||
                 project.ssoProtection?.deploymentType === VercelDeploymentProtection.Previews) && (
                 <div className="flex items-center gap-2 text-sm">
-                  <ExclamationCircleIcon className="h-4 text-amber-500" /> Deployment protection
+                  <RiErrorWarningLine className="h-4 text-amber-500" /> Deployment protection
                   enabled -{' '}
                   <AppLink
                     href="https://www.inngest.com/docs/deploy/vercel#bypassing-deployment-protection"

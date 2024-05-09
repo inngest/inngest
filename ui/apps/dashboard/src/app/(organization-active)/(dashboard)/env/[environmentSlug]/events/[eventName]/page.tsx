@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { CodeBracketSquareIcon } from '@heroicons/react/20/solid';
 import { Alert } from '@inngest/components/Alert';
 import { Time } from '@inngest/components/Time';
+import { IconFunction } from '@inngest/components/icons/Function';
 import { RiArrowRightSLine, RiBarChart2Fill } from '@remixicon/react';
 import colors from 'tailwindcss/colors';
 
@@ -76,7 +76,7 @@ export default function EventDashboard({ params }: EventDashboardProps) {
                   <div className="flex min-w-0 items-center">
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center">
-                        <CodeBracketSquareIcon className="h-5 pr-2 text-indigo-500" />
+                        <IconFunction className="h-5 pr-2 text-indigo-500" />
                         <p className="truncate font-medium">{w.name}</p>
                       </div>
 

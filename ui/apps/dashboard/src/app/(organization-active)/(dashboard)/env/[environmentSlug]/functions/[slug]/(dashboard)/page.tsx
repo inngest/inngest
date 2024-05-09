@@ -2,7 +2,6 @@
 
 import type { Route } from 'next';
 import Link from 'next/link';
-import { XCircleIcon } from '@heroicons/react/20/solid';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Time } from '@inngest/components/Time';
@@ -10,7 +9,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 import { useCron } from '@inngest/components/hooks/useCron';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
-import { RiArrowRightSLine, RiBarChart2Fill, RiTimeLine } from '@remixicon/react';
+import {
+  RiArrowRightSLine,
+  RiBarChart2Fill,
+  RiCloseCircleLine,
+  RiTimeLine,
+} from '@remixicon/react';
 import { ErrorBoundary } from '@sentry/nextjs';
 import { titleCase } from 'title-case';
 
@@ -121,7 +125,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               </div>
               <div className="inline-flex gap-3">
                 <h3 className="inline-flex items-center gap-2 font-medium text-slate-600">
-                  <XCircleIcon className="h-5 text-rose-500" /> Failure rate
+                  <RiCloseCircleLine className="h-5 text-rose-500" /> Failure rate
                 </h3>
                 <span className="text-xl font-medium text-slate-800">{`${failureRate}%`}</span>
               </div>

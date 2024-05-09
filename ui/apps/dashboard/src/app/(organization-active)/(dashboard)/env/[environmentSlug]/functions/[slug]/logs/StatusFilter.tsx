@@ -2,8 +2,7 @@
 
 import { Fragment, useRef } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
-import { XMarkIcon } from '@heroicons/react/20/solid';
-import { RiArrowDownSLine } from '@remixicon/react';
+import { RiArrowDownSLine, RiCloseLine } from '@remixicon/react';
 import { noCase } from 'change-case';
 import { titleCase } from 'title-case';
 
@@ -116,7 +115,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
                     className="inline-flex w-full items-center gap-1 border-t border-slate-100 p-2.5 text-[13px] font-semibold text-slate-500 hover:text-slate-700"
                     onClick={resetSelection}
                   >
-                    <XMarkIcon className="h-[17px] w-[17px]" aria-hidden="true" />
+                    <RiCloseLine className="h-[17px] w-[17px]" aria-hidden="true" />
                     <p>Reset Selection</p>
                   </button>
                 ) : null}

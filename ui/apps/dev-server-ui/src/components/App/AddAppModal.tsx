@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
+import { RiErrorWarningLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import Input from '@/components/Form/Input';
 import useDebounce from '@/hooks/useDebounce';
-import { IconExclamationTriangle } from '@/icons';
 import { useCreateAppMutation } from '@/store/generated';
 import isValidUrl from '@/utils/urlValidation';
 
@@ -89,7 +89,7 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
           </div>
           {isUrlInvalid && inputUrl.length > 0 && (
             <p className="flex items-center gap-2 bg-rose-600/50 px-6 py-2 text-sm text-white">
-              <IconExclamationTriangle />
+              <RiErrorWarningLine />
               Please enter a valid URL
             </p>
           )}

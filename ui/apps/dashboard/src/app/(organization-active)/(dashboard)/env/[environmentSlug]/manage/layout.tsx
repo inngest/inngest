@@ -1,4 +1,4 @@
-import { WrenchIcon } from '@heroicons/react/20/solid';
+import { RiToolsLine } from '@remixicon/react';
 
 import Header from '@/components/Header/Header';
 import { getEnvironment } from '@/queries/server-only/getEnvironment';
@@ -42,7 +42,7 @@ export default async function ManageLayout({ children, params }: ManageLayoutPro
         <>
           <Header
             title="Manage Environment"
-            icon={<WrenchIcon className="h-4 w-4 text-white" />}
+            icon={<RiToolsLine className="h-4 w-4 text-white" />}
             links={navLinks}
             action={!environment.isArchived && <CreateKeyButton />}
           />
