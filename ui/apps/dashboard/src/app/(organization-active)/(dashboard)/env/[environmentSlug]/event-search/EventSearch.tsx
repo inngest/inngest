@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
-import { IconInfo } from '@inngest/components/icons/Info';
+import { RiInformationLine } from '@remixicon/react';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
@@ -92,7 +92,7 @@ export function EventSearch() {
           <p className="text-sm">Experimental feature</p>
           <Tooltip>
             <TooltipTrigger>
-              <IconInfo className="h-4 w-4 text-slate-400" />
+              <RiInformationLine className="h-4 w-4 text-slate-400" />
             </TooltipTrigger>
             <TooltipContent className="whitespace-pre-line">
               This is an experimental feature, with a few limitations:
