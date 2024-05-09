@@ -2,18 +2,15 @@
 
 import { type Route } from 'next';
 import Link from 'next/link';
-import {
-  CodeBracketSquareIcon,
-  MagnifyingGlassIcon,
-  Squares2X2Icon,
-  WrenchIcon,
-} from '@heroicons/react/20/solid';
+import { IconApp } from '@inngest/components/icons/App';
+import { IconEvent } from '@inngest/components/icons/Event';
+import { IconFunction } from '@inngest/components/icons/Function';
+import { RiSearchLine, RiToolsLine } from '@remixicon/react';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import OrganizationDropdown from '@/components/Navigation/OrganizationDropdown';
 import UserDropdown from '@/components/Navigation/UserDropdown';
 import InngestLogo from '@/icons/InngestLogo';
-import EventIcon from '@/icons/event.svg';
 import EnvironmentSelectMenu from './EnvironmentSelectMenu';
 import NavItem from './NavItem';
 import Navigation from './Navigation';
@@ -41,25 +38,25 @@ export default function AppNavigation({ environmentSlug }: AppNavigationProps) {
       href: `/env/${environmentSlug}/apps`,
       text: 'Apps',
       hide: [ALL_ENVIRONMENTS_SLUG],
-      icon: <Squares2X2Icon className="w-3.5" />,
+      icon: <IconApp className="w-3.5" />,
     },
     {
       href: `/env/${environmentSlug}/functions`,
       text: 'Functions',
       hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
-      icon: <CodeBracketSquareIcon className="w-4" />,
+      icon: <IconFunction className="w-4" />,
     },
     {
       href: `/env/${environmentSlug}/events`,
       text: 'Events',
       hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
-      icon: <EventIcon className="w-5" />,
+      icon: <IconEvent className="w-5" />,
     },
     {
       href: `/env/${environmentSlug}/manage`,
       text: 'Manage',
       hide: [ALL_ENVIRONMENTS_SLUG],
-      icon: <WrenchIcon className="w-3.5" />,
+      icon: <RiToolsLine className="w-3.5" />,
     },
   ];
 
@@ -71,7 +68,7 @@ export default function AppNavigation({ environmentSlug }: AppNavigationProps) {
         href: `/env/${environmentSlug}/event-search`,
         text: 'Event Search',
         hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
-        icon: <MagnifyingGlassIcon className="w-3.5" />,
+        icon: <RiSearchLine className="w-3.5" />,
       },
       ...items.slice(3),
     ];

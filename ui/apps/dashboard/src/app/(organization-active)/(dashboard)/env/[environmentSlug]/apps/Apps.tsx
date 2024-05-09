@@ -1,8 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import PlusIcon from '@heroicons/react/20/solid/PlusIcon';
 import { Button } from '@inngest/components/Button';
+import { RiAddLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { pathCreator } from '@/utils/urls';
@@ -53,7 +53,7 @@ export function Apps({ isArchived = false }: Props) {
                 kind="primary"
                 label="Sync App"
                 btnAction={() => router.push(pathCreator.createApp({ envSlug: env.slug }))}
-                icon={<PlusIcon />}
+                icon={<RiAddLine />}
               />
             </div>
           </EmptyAppCard>

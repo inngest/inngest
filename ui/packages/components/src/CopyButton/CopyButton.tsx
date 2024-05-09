@@ -1,6 +1,5 @@
 import { Button } from '@inngest/components/Button';
-import { IconCheck } from '@inngest/components/icons/Check';
-import { IconCopy } from '@inngest/components/icons/Copy';
+import { RiCheckLine, RiFileCopy2Line } from '@remixicon/react';
 
 type ButtonCopyProps = {
   code?: string;
@@ -11,7 +10,7 @@ type ButtonCopyProps = {
 };
 
 export function CopyButton({ size, code, iconOnly, isCopying, handleCopyClick }: ButtonCopyProps) {
-  const icon = isCopying ? <IconCheck /> : <IconCopy />;
+  const icon = isCopying ? <RiCheckLine /> : <RiFileCopy2Line />;
   const label = isCopying ? 'Copied!' : 'Copy';
 
   return (

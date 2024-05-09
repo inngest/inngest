@@ -2,11 +2,10 @@
 
 import { useMemo } from 'react';
 import { type Route } from 'next';
-import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { Link } from '@inngest/components/Link';
 import { Pill, PillContent } from '@inngest/components/Pill';
 import { type Trigger } from '@inngest/components/types/trigger';
-import { RiBarChart2Fill } from '@remixicon/react';
+import { RiBarChart2Fill, RiErrorWarningLine } from '@remixicon/react';
 import {
   createColumnHelper,
   flexRender,
@@ -181,7 +180,7 @@ function createColumns(environmentSlug: string) {
 
         let icon;
         if (value > 0) {
-          icon = <ExclamationCircleIcon className="-ml-1 mr-1 h-4 w-4 text-rose-500" />;
+          icon = <RiErrorWarningLine className="-ml-1 mr-1 h-4 w-4 text-rose-500" />;
         }
 
         return (

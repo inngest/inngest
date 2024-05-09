@@ -1,7 +1,7 @@
 import { useCallback, useState, type ComponentProps } from 'react';
 import { Button } from '@inngest/components/Button';
 import { InvokeModal } from '@inngest/components/InvokeButton';
-import { IconTriggerFunction } from '@inngest/components/icons/TriggerFunction';
+import { RiFlashlightFill } from '@remixicon/react';
 
 type Props = {
   disabled?: boolean;
@@ -31,7 +31,7 @@ export function InvokeButton({
       <Button
         btnAction={() => setIsModalOpen(true)}
         disabled={disabled}
-        icon={<IconTriggerFunction />}
+        icon={<RiFlashlightFill className="text-sky-500" />}
         label="Invoke"
         appearance={btnAppearance}
       />

@@ -1,5 +1,5 @@
-import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
 import { cn } from '@inngest/components/utils/classNames';
+import { RiErrorWarningLine } from '@remixicon/react';
 
 type Props = {
   className?: string;
@@ -14,7 +14,7 @@ export function SyncErrorCard({ className, error }: Props) {
         className
       )}
     >
-      <ExclamationTriangleIcon className="h-4 w-4 text-rose-700" /> {error}
+      <RiErrorWarningLine className="h-4 w-4 text-rose-700" /> {error}
     </div>
   );
 }

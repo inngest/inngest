@@ -1,8 +1,6 @@
-import ExclamationTriangleIcon from '@heroicons/react/24/outline/ExclamationTriangleIcon';
-import InformationCircleIcon from '@heroicons/react/24/outline/InformationCircleIcon';
-import XMarkIcon from '@heroicons/react/24/outline/XMarkIcon';
 import { Button } from '@inngest/components/Button';
 import { cn } from '@inngest/components/utils/classNames';
+import { RiCloseLine, RiErrorWarningLine, RiInformationLine } from '@remixicon/react';
 
 type Severity = 'info' | 'error' | 'warning';
 
@@ -13,9 +11,9 @@ const backgroundColors = {
 } as const satisfies { [key in Severity]: string };
 
 const icons = {
-  info: <InformationCircleIcon className="h-6 w-6 text-blue-700" />,
-  error: <ExclamationTriangleIcon className="h-6 w-6 text-rose-700" />,
-  warning: <ExclamationTriangleIcon className="h-6 w-6 text-amber-700" />,
+  info: <RiInformationLine className="h-6 w-6 text-blue-700" />,
+  error: <RiErrorWarningLine className="h-6 w-6 text-rose-700" />,
+  warning: <RiErrorWarningLine className="h-6 w-6 text-amber-700" />,
 } as const satisfies { [key in Severity]: React.ReactNode };
 
 export function Banner({
@@ -49,7 +47,7 @@ export function Banner({
           size="small"
           appearance="text"
           btnAction={onDismiss}
-          icon={<XMarkIcon className="h-5 w-5" />}
+          icon={<RiCloseLine className="h-5 w-5" />}
         />
       )}
     </div>

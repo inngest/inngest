@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -103,8 +104,6 @@ var (
 
 	ErrConcurrencyLimitCustomKey0 = fmt.Errorf("At concurrency limit 0")
 	ErrConcurrencyLimitCustomKey1 = fmt.Errorf("At concurrency limit 1")
-
-	ErrQueueItemThrottled = fmt.Errorf("queue item throttled")
 
 	// internal shard errors
 	errShardNotFound     = fmt.Errorf("shard not found")
@@ -989,7 +988,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 //
 // Obtaining a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
-func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, duration time.Duration, now time.Time) (*ulid.ULID, error) {
+func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, duration time.Duration, now time.Time, denies *leaseDenies) (*ulid.ULID, error) {
 	var (
 		ak, pk string // account, partition concurrency key
 		ac, pc int    // account, partiiton concurrency max
@@ -998,16 +997,31 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		customLimits = make([]int, 2)
 	)
 
+	if item.Data.Throttle != nil && denies != nil && denies.denyThrottle(item.Data.Throttle.Key) {
+		return nil, ErrQueueItemThrottled
+	}
+
 	// Required.
 	//
 	// This should be found by calling function.ConcurrencyLimit() to return
 	// the lowest concurrency limit available.  It limits the capacity of all
 	// runs for the given function.
 	pk, pc = q.partitionConcurrencyGen(ctx, p)
+	// Check to see if this key has already been denied in the lease iteration.
+	// If so, fail early.
+	if denies != nil && denies.denyConcurrency(pk) {
+		// Note that we do not need to wrap the key as the key is already present.
+		return nil, ErrPartitionConcurrencyLimit
+	}
 
 	// optional
 	if q.accountConcurrencyGen != nil {
 		ak, ac = q.accountConcurrencyGen(ctx, item)
+		// Check to see if this key has already been denied in the lease iteration.
+		// If so, fail early.
+		if denies != nil && denies.denyConcurrency(ak) {
+			return nil, ErrAccountConcurrencyLimit
+		}
 	}
 	if q.customConcurrencyGen != nil {
 		// Get the custom concurrency key, if available.
@@ -1016,6 +1030,16 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 				// We only support two concurrency keys right now.
 				break
 			}
+
+			// Check to see if this key has already been denied in the lease iteration.
+			// If so, fail early.
+			if denies != nil && denies.denyConcurrency(item.Key) {
+				if i == 0 {
+					return nil, ErrConcurrencyLimitCustomKey0
+				}
+				return nil, ErrConcurrencyLimitCustomKey1
+			}
+
 			customKeys[i] = item.Key
 			customLimits[i] = item.Limit
 		}
@@ -1077,15 +1101,15 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		return nil, ErrQueueItemAlreadyLeased
 	case 3:
 		// fn limit relevant to all runs in the fn
-		return nil, ErrPartitionConcurrencyLimit
+		return nil, newKeyError(ErrPartitionConcurrencyLimit, pk)
 	case 4:
-		return nil, ErrAccountConcurrencyLimit
+		return nil, newKeyError(ErrAccountConcurrencyLimit, ak)
 	case 5:
-		return nil, ErrConcurrencyLimitCustomKey0
+		return nil, newKeyError(ErrConcurrencyLimitCustomKey0, customKeys[0])
 	case 6:
-		return nil, ErrConcurrencyLimitCustomKey1
+		return nil, newKeyError(ErrConcurrencyLimitCustomKey1, customKeys[1])
 	case 7:
-		return nil, ErrQueueItemThrottled
+		return nil, newKeyError(ErrQueueItemThrottled, item.Data.Throttle.Key)
 	default:
 		return nil, fmt.Errorf("unknown response enqueueing item: %d", status)
 	}
@@ -1959,4 +1983,60 @@ func (f *frandRNG) Float64() float64 {
 
 func (f *frandRNG) Seed(seed uint64) {
 	// Do nothing.
+}
+
+func newLeaseDenyList() *leaseDenies {
+	return &leaseDenies{
+		lock:        &sync.RWMutex{},
+		concurrency: map[string]struct{}{},
+		throttle:    map[string]struct{}{},
+	}
+}
+
+// leaseDenies stores a mapping of keys that must not be leased.
+//
+// When iterating over a list of peeked queue items, each queue item may have the same
+// or different concurrency keys.  As soon as one of these concurrency keys reaches its
+// limit, any next queue items with the same keys must _never_ be considered for leasing.
+//
+// This has two benefits:  we prevent wasted work, and we prevent out of order work.
+type leaseDenies struct {
+	lock *sync.RWMutex
+
+	concurrency map[string]struct{}
+	throttle    map[string]struct{}
+}
+
+func (l *leaseDenies) addThrottled(err error) {
+	var key keyError
+	if !errors.As(err, &key) {
+		return
+	}
+	l.lock.Lock()
+	l.throttle[key.key] = struct{}{}
+	l.lock.Unlock()
+}
+
+func (l *leaseDenies) addConcurrency(err error) {
+	var key keyError
+	if !errors.As(err, &key) {
+		return
+	}
+	l.lock.Lock()
+	l.concurrency[key.key] = struct{}{}
+	l.lock.Unlock()
+}
+
+func (l *leaseDenies) denyConcurrency(key string) bool {
+	l.lock.RLock()
+	_, ok := l.concurrency[key]
+	l.lock.RUnlock()
+	return ok
+}
+
+func (l *leaseDenies) denyThrottle(key string) bool {
+	l.lock.RLock()
+	_, ok := l.throttle[key]
+	l.lock.RUnlock()
+	return ok
 }

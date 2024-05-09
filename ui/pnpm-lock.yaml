@@ -38,9 +38,6 @@ importers:
       '@headlessui/tailwindcss':
         specifier: 0.1.2
         version: 0.1.2(tailwindcss@3.4.1)
-      '@heroicons/react':
-        specifier: 2.0.16
-        version: 2.0.16(react@18.2.0)
       '@inngest/components':
         specifier: workspace:*
         version: link:../../packages/components
@@ -445,9 +442,6 @@ importers:
       '@headlessui/tailwindcss':
         specifier: 0.1.2
         version: 0.1.2(tailwindcss@3.4.1)
-      '@heroicons/react':
-        specifier: 2.1.1
-        version: 2.1.1(react@18.2.0)
       '@monaco-editor/react':
         specifier: 4.6.0
         version: 4.6.0(monaco-editor@0.34.1)(react-dom@18.2.0)(react@18.2.0)
@@ -5064,22 +5058,6 @@ packages:
       tailwindcss: ^3.0
     dependencies:
       tailwindcss: 3.4.1(ts-node@10.9.1)
-    dev: false
-
-  /@heroicons/react@2.0.16(react@18.2.0):
-    resolution: {integrity: sha512-x89rFxH3SRdYaA+JCXwfe+RkE1SFTo9GcOkZettHer71Y3T7V+ogKmfw5CjTazgS3d0ClJ7p1NA+SP7VQLQcLw==}
-    peerDependencies:
-      react: '>= 16'
-    dependencies:
-      react: 18.2.0
-    dev: false
-
-  /@heroicons/react@2.1.1(react@18.2.0):
-    resolution: {integrity: sha512-JyyN9Lo66kirbCMuMMRPtJxtKJoIsXKS569ebHGGRKbl8s4CtUfLnyKJxteA+vIKySocO4s1SkTkGS4xtG/yEA==}
-    peerDependencies:
-      react: '>= 16'
-    dependencies:
-      react: 18.2.0
     dev: false
 
   /@humanwhocodes/config-array@0.11.10:

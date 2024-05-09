@@ -1,7 +1,7 @@
 'use client';
 
-import ExclamationTriangleIcon from '@heroicons/react/20/solid/ExclamationTriangleIcon';
 import { Alert } from '@inngest/components/Alert';
+import { RiErrorWarningLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
@@ -25,7 +25,7 @@ export function Sync({ externalAppID, syncID }: Props) {
         <div className="h-full w-full overflow-y-auto">
           <div className="mx-auto w-full max-w-[1200px] p-4">
             <div className="flex items-center gap-2.5 rounded-lg border border-red-500 bg-red-100 px-8 py-4 text-red-500">
-              <ExclamationTriangleIcon className="h-5 w-5" />
+              <RiErrorWarningLine className="h-5 w-5" />
               Sync not found
             </div>
           </div>
