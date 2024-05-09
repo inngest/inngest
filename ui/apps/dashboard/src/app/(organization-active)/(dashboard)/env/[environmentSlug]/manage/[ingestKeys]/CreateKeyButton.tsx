@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { PlusIcon } from '@heroicons/react/24/solid';
 import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
+import { RiAddLine } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
@@ -67,7 +67,7 @@ export default function CreateKeyButton() {
   return (
     <>
       <Button
-        icon={<PlusIcon />}
+        icon={<RiAddLine />}
         btnAction={() => setModalOpen(true)}
         disabled={!currentContent}
         kind="primary"
