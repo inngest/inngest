@@ -2121,7 +2121,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 	}, until)
 	if err == redis_state.ErrQueueItemExists {
 		// Safely ignore this error.
-		ctx = span.Cancel(ctx)
+		span.Cancel(ctx)
 		return nil
 	}
 	span.Send()
