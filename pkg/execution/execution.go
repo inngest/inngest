@@ -3,8 +3,9 @@ package execution
 import (
 	"context"
 	"encoding/json"
-	"github.com/inngest/inngest/pkg/execution/batch"
 	"time"
+
+	"github.com/inngest/inngest/pkg/execution/batch"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/event"
@@ -201,6 +202,10 @@ func (r *ResumeRequest) Error() string {
 	return r.withKey(StateErrorKey)
 }
 
+func (r *ResumeRequest) HasError() bool {
+	return r.Error() != ""
+}
+
 // Set `r.With` to `error` given a `name` and `message`
 func (r *ResumeRequest) SetError(name string, message string) {
 	r.With = map[string]any{
@@ -214,6 +219,10 @@ func (r *ResumeRequest) SetError(name string, message string) {
 
 func (r *ResumeRequest) Data() string {
 	return r.withKey(StateDataKey)
+}
+
+func (r *ResumeRequest) HasData() bool {
+	return r.Data() != ""
 }
 
 // Set `r.With` to `data` given any data to be set

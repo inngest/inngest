@@ -759,6 +759,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	incoming := edge.Incoming
 	if edge.IncomingGeneratorStep != "" {
 		incoming = edge.IncomingGeneratorStep
+		span.SetAttributes(attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepRun.String()))
 	}
 	if resp, _ := s.ActionID(incoming); resp != nil {
 		// This has already successfully been executed.
@@ -787,9 +788,20 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			span.SetName(spanName)
 
 			fnSpan.SetAttributes(attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusRunning.ToCode()))
+
+			foundOp := op.Op
+			// The op changes based on the current state of the step, so we
+			// are required to normalize here.
+			switch foundOp {
+			case enums.OpcodeStep, enums.OpcodeStepError:
+				foundOp = enums.OpcodeStepRun
+			}
+
 			span.SetAttributes(
 				attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
 				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
+				attribute.String(consts.OtelSysStepDisplayName, op.UserDefinedName()),
+				attribute.String(consts.OtelSysStepOpcode, foundOp.String()),
 			)
 
 			if byt, err := json.Marshal(resp.Output); err == nil {
@@ -1648,6 +1660,69 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	}
 
 	if pause.Opcode != nil && *pause.Opcode == enums.OpcodeInvokeFunction.String() {
+		if pause.StepSpanID != nil && *pause.StepSpanID != "" {
+			if spanID, err := trace.SpanIDFromHex(*pause.StepSpanID); err == nil {
+				triggeringEventID := ""
+				if pause.TriggeringEventID != nil {
+					triggeringEventID = *pause.TriggeringEventID
+				}
+
+				returnedEventID := ""
+				if r.EventID != nil {
+					returnedEventID = r.EventID.String()
+				}
+
+				runID := ""
+				if r.RunID != nil {
+					runID = r.RunID.String()
+				}
+
+				targetFnID := ""
+				if pause.InvokeTargetFnID != nil {
+					targetFnID = *pause.InvokeTargetFnID
+				}
+
+				ts := time.Now()
+				if pause.TraceStartedAt != nil {
+					ts = (*pause.TraceStartedAt).Time()
+				}
+
+				var span *telemetry.Span
+				ctx, span = telemetry.NewSpan(ctx,
+					telemetry.WithScope(consts.OtelScopeStep),
+					telemetry.WithName("invoke"),
+					telemetry.WithTimestamp(ts),
+					telemetry.WithSpanID(spanID),
+					telemetry.WithSpanAttributes(
+						attribute.Bool(consts.OtelUserTraceFilterKey, true),
+						attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
+						attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
+						attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),
+						attribute.String(consts.OtelSysFunctionID, pause.Identifier.WorkflowID.String()),
+						// attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
+						attribute.Int(consts.OtelSysFunctionVersion, pause.Identifier.WorkflowVersion),
+						attribute.String(consts.OtelAttrSDKRunID, pause.Identifier.RunID.String()),
+						attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
+						attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
+						attribute.String(consts.OtelSysStepGroupID, pause.GroupID),
+						attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
+						attribute.String(consts.OtelSysStepDisplayName, pause.StepName),
+
+						attribute.String(consts.OtelSysStepInvokeTargetFnID, targetFnID),
+						attribute.Int64(consts.OtelSysStepInvokeExpires, pause.Expires.Time().UnixMilli()),
+						attribute.String(consts.OtelSysStepInvokeTriggeringEventID, triggeringEventID),
+						attribute.String(consts.OtelSysStepInvokeReturnedEventID, returnedEventID),
+						attribute.String(consts.OtelSysStepInvokeRunID, runID),
+						attribute.Bool(consts.OtelSysStepInvokeExpired, r.EventID == nil),
+					),
+				)
+				if r.HasError() {
+					span.SetStatus(codes.Error, r.Error())
+				}
+				span.Send()
+			}
+		}
+
 		for _, e := range e.lifecycles {
 			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), pause.Identifier, r, pause.GroupID)
 		}
@@ -1986,22 +2061,46 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 // handleSleep handles the sleep opcode, ensuring that we enqueue the function to rerun
 // at the correct time.
 func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
-	span := trace.SpanFromContext(ctx)
-
 	dur, err := gen.SleepDuration()
 	if err != nil {
 		return err
 	}
+
+	executionSpan := trace.SpanFromContext(ctx)
 
 	nextEdge := inngest.Edge{
 		Outgoing: gen.ID,             // Leaving sleep
 		Incoming: edge.Edge.Incoming, // To re-call the SDK
 	}
 
+	startedAt := time.Now()
+	endedAt := startedAt.Add(dur)
+
 	// Create another group for the next item which will run.  We're enqueueing
 	// the function to run again after sleep, so need a new group.
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
+	ctx, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeStep),
+		telemetry.WithName("sleep"),
+		telemetry.WithTimestamp(startedAt),
+		telemetry.WithSpanAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
+			// attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
+			attribute.Int(consts.OtelSysFunctionVersion, item.Identifier.WorkflowVersion),
+			attribute.String(consts.OtelAttrSDKRunID, item.Identifier.RunID.String()),
+			attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
+			attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
+			attribute.String(consts.OtelSysStepGroupID, groupID),
+			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeSleep.String()),
+			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
+			attribute.String(consts.OtelSysStepSleepEndAt, endedAt.Format(time.RFC3339Nano)),
+		),
+	)
 
 	until := time.Now().Add(dur)
 
@@ -2022,9 +2121,11 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 	}, until)
 	if err == redis_state.ErrQueueItemExists {
 		// Safely ignore this error.
+		span.Cancel(ctx)
 		return nil
 	}
-	span.SetAttributes(
+	span.Send()
+	executionSpan.SetAttributes(
 		attribute.String(consts.OtelSysStepNextOpcode, enums.OpcodeSleep.String()),
 		attribute.Int64(consts.OtelSysStepNextTimestamp, until.UnixMilli()),
 	)
@@ -2037,7 +2138,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 }
 
 func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
-	span := trace.SpanFromContext(ctx)
+	executionSpan := trace.SpanFromContext(ctx)
 	if e.handleSendingEvent == nil {
 		return fmt.Errorf("no handleSendingEvent function specified")
 	}
@@ -2063,8 +2164,45 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		uuid.NameSpaceOID,
 		[]byte(item.Identifier.RunID.String()+gen.ID),
 	)
-
 	opcode := gen.Op.String()
+	now := time.Now()
+
+	// Always create an invocation event.
+	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
+		Event:         *opts.Payload,
+		FnID:          opts.FunctionID,
+		CorrelationID: &correlationID,
+	})
+
+	ctx, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeStep),
+		telemetry.WithName("invoke"),
+		telemetry.WithTimestamp(now),
+		telemetry.WithSpanAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
+			// attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
+			attribute.Int(consts.OtelSysFunctionVersion, item.Identifier.WorkflowVersion),
+			attribute.String(consts.OtelAttrSDKRunID, item.Identifier.RunID.String()),
+			attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
+			attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
+			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
+			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
+			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
+
+			attribute.String(consts.OtelSysStepInvokeTargetFnID, opts.FunctionID),
+			attribute.Int64(consts.OtelSysStepInvokeExpires, expires.UnixMilli()),
+			attribute.String(consts.OtelSysStepInvokeTriggeringEventID, evt.ID),
+		),
+	)
+	span.Send()
+
+	spanID := span.SpanContext().SpanID().String()
+	traceStartedAt := state.Time(now)
+
 	err = e.sm.SavePause(ctx, state.Pause{
 		ID:                  pauseID,
 		WorkspaceID:         item.WorkspaceID,
@@ -2079,11 +2217,17 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		Expression:          &strExpr,
 		DataKey:             gen.ID,
 		InvokeCorrelationID: &correlationID,
+		StepSpanID:          &spanID,
+		TriggeringEventID:   &evt.ID,
+		TraceStartedAt:      &traceStartedAt,
+		InvokeTargetFnID:    &opts.FunctionID,
 	})
 	if err == state.ErrPauseAlreadyExists {
+		span.Cancel(ctx)
 		return nil
 	}
 	if err != nil {
+		span.Cancel(ctx)
 		return err
 	}
 
@@ -2104,26 +2248,23 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		},
 	}, expires)
 	if err == redis_state.ErrQueueItemExists {
+		span.Cancel(ctx)
 		return nil
 	}
-	span.SetAttributes(
+	executionSpan.SetAttributes(
 		attribute.String(consts.OtelSysStepNextOpcode, enums.OpcodeInvokeFunction.String()),
 		attribute.Int64(consts.OtelSysStepNextTimestamp, time.Now().UnixMilli()),
 		attribute.Int64(consts.OtelSysStepNextExpires, expires.UnixMilli()),
 	)
 
-	// Always create an invocation event.
-	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
-		Event:         *opts.Payload,
-		FnID:          opts.FunctionID,
-		CorrelationID: &correlationID,
-	})
-
 	err = e.handleSendingEvent(ctx, evt, item)
 	if err != nil {
+		span.Cancel(ctx)
 		// TODO Cancel pause/timeout?
 		return fmt.Errorf("error publishing internal invocation event: %w", err)
 	}
+
+	span.Send()
 
 	for _, e := range e.lifecycles {
 		go e.OnInvokeFunction(context.WithoutCancel(ctx), item.Identifier, item, gen, ulid.MustParse(evt.ID), correlationID)
