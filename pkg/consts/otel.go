@@ -34,6 +34,8 @@ const (
 	OtelSysFunctionStatusCode = "sys.function.status.code"
 	OtelSysFunctionOutput     = "sys.function.output"
 
+	OtelSysStepDisplayName     = "sys.step.display.name"
+	OtelSysStepOpcode          = "sys.step.opcode"
 	OtelSysStepScheduleAt      = "sys.step.time.schedule"
 	OtelSysStepStartAt         = "sys.step.time.start"
 	OtelSysStepEndAt           = "sys.step.time.end"
@@ -45,6 +47,15 @@ const (
 	OtelSysStepOutputSizeBytes = "sys.step.output.size.bytes"
 	OtelSysStepFirst           = "sys.step.first"
 	OtelSysStepGroupID         = "sys.step.group.id"
+
+	OtelSysStepSleepEndAt = "sys.step.sleep.end"
+
+	OtelSysStepInvokeExpires           = "sys.step.invoke.expires"
+	OtelSysStepInvokeTargetFnID        = "sys.step.invoke.fn.id"
+	OtelSysStepInvokeTriggeringEventID = "sys.step.invoke.event.outgoing.id"
+	OtelSysStepInvokeReturnedEventID   = "sys.step.invoke.event.incoming.id"
+	OtelSysStepInvokeRunID             = "sys.step.invoke.run.id"
+	OtelSysStepInvokeExpired           = "sys.step.invoke.expired"
 
 	OtelSysStepRetry         = "sys.step.retry"
 	OtelSysStepNextOpcode    = "sys.step.next.opcode"
