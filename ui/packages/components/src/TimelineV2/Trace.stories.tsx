@@ -40,7 +40,7 @@ export const Retry: Story = {
       outputID: 'MDFIVzVDWTZGNVEzQzE1Q1k1M1oxMDRXVE4=',
       queuedAt: '2024-04-23T11:26:40.460Z',
       startedAt: '2024-04-23T11:26:40.560Z',
-      status: 'SUCCEEDED',
+      status: 'COMPLETED',
       stepInfo: null,
       stepOp: 'RUN',
       childrenSpans: [
@@ -66,7 +66,7 @@ export const Retry: Story = {
           outputID: 'MDFIVzVEMjNNWTRNQ1g0MjFNMFJKN1czQUo=',
           queuedAt: '2024-04-23T11:26:42.060Z',
           startedAt: '2024-04-23T11:26:42.160Z',
-          status: 'SUCCEEDED',
+          status: 'COMPLETED',
           stepInfo: null,
           stepOp: 'RUN',
         },
