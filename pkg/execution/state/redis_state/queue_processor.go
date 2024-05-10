@@ -789,11 +789,12 @@ type handleQueueItemsResult struct {
 	ctrSuccess     int32
 	ctrConcurrency int32
 	ctrRateLimit   int32
+	ctrSkip        int32
 	handled        int64
 }
 
 func (r handleQueueItemsResult) SkippedRatio() float32 {
-	return float32(r.ctrRateLimit) / float32(r.totalItems)
+	return float32(r.ctrSkip) / float32(r.totalItems)
 }
 
 func (r handleQueueItemsResult) Handled() int64 {
@@ -910,11 +911,13 @@ func (q *queue) handleQueueItems(ctx context.Context, p *QueuePartition, shard *
 			denies.addThrottled(err)
 
 			result.ctrRateLimit++
+			result.ctrSkip++
 			processErr = nil
 			telemetry.IncrQueueThrottledCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 			continue
 		case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
 			result.ctrConcurrency++
+			result.ctrSkip++
 			// Since the queue is at capacity on a fn or account level, no
 			// more jobs in this loop should be worked on - so break.
 			//
@@ -925,6 +928,7 @@ func (q *queue) handleQueueItems(ctx context.Context, p *QueuePartition, shard *
 			return result, nil
 		case ErrConcurrencyLimitCustomKey0, ErrConcurrencyLimitCustomKey1:
 			result.ctrConcurrency++
+			result.ctrSkip++
 			// Custom concurrency keys are different.  Each job may have a different key,
 			// so we cannot break the loop in case the next job has a different key and
 			// has capacity.
@@ -939,11 +943,13 @@ func (q *queue) handleQueueItems(ctx context.Context, p *QueuePartition, shard *
 		case ErrQueueItemNotFound:
 			// This is an okay error.  Move to the next job item.
 			result.ctrSuccess++ // count as a success for stats purposes.
+			result.ctrSkip++
 			processErr = nil
 			continue
 		case ErrQueueItemAlreadyLeased:
 			// This is an okay error.  Move to the next job item.
 			result.ctrSuccess++ // count as a success for stats purposes.
+			result.ctrSkip++
 			processErr = nil
 			continue
 		}
