@@ -3,7 +3,6 @@ package state
 import (
 	"context"
 	"encoding/json"
-	"io"
 
 	"github.com/google/uuid"
 )
@@ -57,5 +56,5 @@ type StateLoader interface {
 	LoadState(ctx context.Context, id ID) (State, error)
 
 	// StreamState returns all state without loading in-memory
-	StreamState(ctx context.Context, id ID) (io.Reader, error)
+	// StreamState(ctx context.Context, id ID) (io.Reader, error)
 }

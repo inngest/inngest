@@ -48,6 +48,10 @@ const (
 	RunServiceLoadMetadataProcedure = "/state.v2.RunService/LoadMetadata"
 	// RunServiceLoadEventsProcedure is the fully-qualified name of the RunService's LoadEvents RPC.
 	RunServiceLoadEventsProcedure = "/state.v2.RunService/LoadEvents"
+	// RunServiceLoadStepsProcedure is the fully-qualified name of the RunService's LoadSteps RPC.
+	RunServiceLoadStepsProcedure = "/state.v2.RunService/LoadSteps"
+	// RunServiceLoadStateProcedure is the fully-qualified name of the RunService's LoadState RPC.
+	RunServiceLoadStateProcedure = "/state.v2.RunService/LoadState"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -60,6 +64,8 @@ var (
 	runServiceSaveStepMethodDescriptor       = runServiceServiceDescriptor.Methods().ByName("SaveStep")
 	runServiceLoadMetadataMethodDescriptor   = runServiceServiceDescriptor.Methods().ByName("LoadMetadata")
 	runServiceLoadEventsMethodDescriptor     = runServiceServiceDescriptor.Methods().ByName("LoadEvents")
+	runServiceLoadStepsMethodDescriptor      = runServiceServiceDescriptor.Methods().ByName("LoadSteps")
+	runServiceLoadStateMethodDescriptor      = runServiceServiceDescriptor.Methods().ByName("LoadState")
 )
 
 // RunServiceClient is a client for the state.v2.RunService service.
@@ -71,6 +77,8 @@ type RunServiceClient interface {
 	SaveStep(context.Context, *connect.Request[v2.SaveStepRequest]) (*connect.Response[v2.SaveStepResponse], error)
 	LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error)
 	LoadEvents(context.Context, *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error)
+	LoadSteps(context.Context, *connect.Request[v2.LoadStepsRequest]) (*connect.Response[v2.LoadStepsResponse], error)
+	LoadState(context.Context, *connect.Request[v2.LoadStateRequest]) (*connect.Response[v2.LoadStateResponse], error)
 }
 
 // NewRunServiceClient constructs a client for the state.v2.RunService service. By default, it uses
@@ -125,6 +133,18 @@ func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(runServiceLoadEventsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		loadSteps: connect.NewClient[v2.LoadStepsRequest, v2.LoadStepsResponse](
+			httpClient,
+			baseURL+RunServiceLoadStepsProcedure,
+			connect.WithSchema(runServiceLoadStepsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		loadState: connect.NewClient[v2.LoadStateRequest, v2.LoadStateResponse](
+			httpClient,
+			baseURL+RunServiceLoadStateProcedure,
+			connect.WithSchema(runServiceLoadStateMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -137,6 +157,8 @@ type runServiceClient struct {
 	saveStep       *connect.Client[v2.SaveStepRequest, v2.SaveStepResponse]
 	loadMetadata   *connect.Client[v2.LoadMetadataRequest, v2.LoadMetadataResponse]
 	loadEvents     *connect.Client[v2.LoadEventsRequest, v2.LoadEventsResponse]
+	loadSteps      *connect.Client[v2.LoadStepsRequest, v2.LoadStepsResponse]
+	loadState      *connect.Client[v2.LoadStateRequest, v2.LoadStateResponse]
 }
 
 // Create calls state.v2.RunService.Create.
@@ -174,6 +196,16 @@ func (c *runServiceClient) LoadEvents(ctx context.Context, req *connect.Request[
 	return c.loadEvents.CallUnary(ctx, req)
 }
 
+// LoadSteps calls state.v2.RunService.LoadSteps.
+func (c *runServiceClient) LoadSteps(ctx context.Context, req *connect.Request[v2.LoadStepsRequest]) (*connect.Response[v2.LoadStepsResponse], error) {
+	return c.loadSteps.CallUnary(ctx, req)
+}
+
+// LoadState calls state.v2.RunService.LoadState.
+func (c *runServiceClient) LoadState(ctx context.Context, req *connect.Request[v2.LoadStateRequest]) (*connect.Response[v2.LoadStateResponse], error) {
+	return c.loadState.CallUnary(ctx, req)
+}
+
 // RunServiceHandler is an implementation of the state.v2.RunService service.
 type RunServiceHandler interface {
 	Create(context.Context, *connect.Request[v2.CreateStateRequest]) (*connect.Response[v2.CreateStateResponse], error)
@@ -183,6 +215,8 @@ type RunServiceHandler interface {
 	SaveStep(context.Context, *connect.Request[v2.SaveStepRequest]) (*connect.Response[v2.SaveStepResponse], error)
 	LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error)
 	LoadEvents(context.Context, *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error)
+	LoadSteps(context.Context, *connect.Request[v2.LoadStepsRequest]) (*connect.Response[v2.LoadStepsResponse], error)
+	LoadState(context.Context, *connect.Request[v2.LoadStateRequest]) (*connect.Response[v2.LoadStateResponse], error)
 }
 
 // NewRunServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -233,6 +267,18 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(runServiceLoadEventsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	runServiceLoadStepsHandler := connect.NewUnaryHandler(
+		RunServiceLoadStepsProcedure,
+		svc.LoadSteps,
+		connect.WithSchema(runServiceLoadStepsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	runServiceLoadStateHandler := connect.NewUnaryHandler(
+		RunServiceLoadStateProcedure,
+		svc.LoadState,
+		connect.WithSchema(runServiceLoadStateMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/state.v2.RunService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RunServiceCreateProcedure:
@@ -249,6 +295,10 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 			runServiceLoadMetadataHandler.ServeHTTP(w, r)
 		case RunServiceLoadEventsProcedure:
 			runServiceLoadEventsHandler.ServeHTTP(w, r)
+		case RunServiceLoadStepsProcedure:
+			runServiceLoadStepsHandler.ServeHTTP(w, r)
+		case RunServiceLoadStateProcedure:
+			runServiceLoadStateHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -284,4 +334,12 @@ func (UnimplementedRunServiceHandler) LoadMetadata(context.Context, *connect.Req
 
 func (UnimplementedRunServiceHandler) LoadEvents(context.Context, *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.LoadEvents is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) LoadSteps(context.Context, *connect.Request[v2.LoadStepsRequest]) (*connect.Response[v2.LoadStepsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.LoadSteps is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) LoadState(context.Context, *connect.Request[v2.LoadStateRequest]) (*connect.Response[v2.LoadStateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.LoadState is not implemented"))
 }

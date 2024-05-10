@@ -20,7 +20,6 @@ message ID {
 }
 
 message Config {
-  // TODO: match up
   string                            function_slug    = 1;
   int64                             function_version = 2;
   string                            cron_schedule    = 3;
@@ -110,6 +109,25 @@ message LoadEventsResponse {
   repeated bytes events = 4;
 }
 
+
+message LoadStepsRequest {
+  ID id = 1;
+}
+
+message LoadStepsResponse {
+  map<string, bytes> steps = 1;
+}
+
+message LoadStateRequest {
+  ID id = 1;
+}
+
+message LoadStateResponse {
+  Metadata           metadata = 1;
+  repeated bytes     events   = 2;
+  map<string, bytes> steps    = 3;
+}
+
 service RunService {
   rpc Create(CreateStateRequest) returns (CreateStateResponse) {}
   rpc Delete(DeleteStateRequest) returns (DeleteStateResponse) {}
@@ -119,8 +137,6 @@ service RunService {
 
   rpc LoadMetadata(LoadMetadataRequest) returns (LoadMetadataResponse) {}
   rpc LoadEvents(LoadEventsRequest) returns (LoadEventsResponse) {}
-
-  // TODO
-  // rpc LoadSteps(LoadStepsRequest) returns (LoadStepsResponse) {}
-  // rpc LoadState(LoadStateRequest) returns (LoadStateResponse) {}
+  rpc LoadSteps(LoadStepsRequest) returns (LoadStepsResponse) {}
+  rpc LoadState(LoadStateRequest) returns (LoadStateResponse) {}
 }
