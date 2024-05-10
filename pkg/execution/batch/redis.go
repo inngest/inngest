@@ -38,14 +38,14 @@ type redisBatchManager struct {
 }
 
 func (b redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inngest.Function) (string, error) {
-	if fn.Debounce.Key == nil {
+	if fn.EventBatch.Key == nil {
 		return fn.ID.String(), nil
 	}
 
 	out, _, err := expressions.Evaluate(ctx, *fn.EventBatch.Key, map[string]any{"event": evt.Map()})
 	if err != nil {
 		log.From(ctx).Error().Err(err).
-			Str("expression", *fn.Debounce.Key).
+			Str("expression", *fn.EventBatch.Key).
 			Interface("event", evt.Map()).
 			Msg("error evaluating batch key expression")
 		return "<invalid>", nil
