@@ -8,6 +8,22 @@ scalar Environment
 scalar Uint
 scalar ULID
 scalar UUID
+scalar Bytes
+
+"The pagination information in a connection."
+type PageInfo {
+  "Indicates if there are any pages subsequent to the current page."
+  hasNextPage: Boolean!
+
+  "Indicates if there are any pages prior to the current page."
+  hasPreviousPage: Boolean!
+
+  "When paginating backward, the cursor to query the previous page."
+  startCursor: String
+
+  "When paginating forward, the cursor to query the next page."
+  endCursor: String
+}
 
 type Workspace {
   id: ID!
@@ -78,7 +94,6 @@ enum EventStatus {
   # The event triggered no functions.
   NO_FUNCTIONS
 }
-
 
 enum FunctionStatus {
   RUNNING
@@ -196,7 +211,6 @@ type FunctionRun {
   startedAt: Time
   finishedAt: Time
   output: String # JSON encoded output of the function, or JSON encoded error if this is a failure.
-
   history: [RunHistoryItem!]!
   historyItemOutput(id: ULID!): String
   eventID: ID!
@@ -204,20 +218,20 @@ type FunctionRun {
 }
 
 enum HistoryType {
-	FunctionCancelled
-	FunctionCompleted
-	FunctionFailed
-	FunctionScheduled
-	FunctionStarted
-	FunctionStatusUpdated
-	None
-	StepCompleted
-	StepErrored
-	StepFailed
-	StepScheduled
-	StepSleeping
-	StepStarted
-	StepWaiting
+  FunctionCancelled
+  FunctionCompleted
+  FunctionFailed
+  FunctionScheduled
+  FunctionStarted
+  FunctionStatusUpdated
+  None
+  StepCompleted
+  StepErrored
+  StepFailed
+  StepScheduled
+  StepSleeping
+  StepStarted
+  StepWaiting
 }
 
 enum HistoryStepType {
@@ -288,4 +302,70 @@ type RunHistoryInvokeFunctionResult {
   eventID: ULID
   timeout: Boolean!
   runID: ULID
+}
+
+# trace runs
+input RunsFilterV2 {
+  from: Time!
+  until: Time
+  timeField: FunctionRunTimeFieldV2 = QUEUED_AT
+
+  status: [FunctionRunStatus!]
+  functionIDs: [UUID!]
+  appIDs: [UUID!]
+
+  query: String # CEL query string
+}
+
+enum FunctionRunTimeFieldV2 {
+  QUEUED_AT
+  STARTED_AT
+  ENDED_AT
+}
+
+input RunsV2OrderBy {
+  field: RunsV2OrderByField!
+  direction: RunsOrderByDirection!
+}
+
+enum RunsV2OrderByField {
+  QUEUED_AT
+  STARTED_AT
+  ENDED_AT
+}
+
+enum RunsOrderByDirection {
+  ASC
+  DESC
+}
+
+type FunctionRunV2 {
+  id: ULID!
+  appID: UUID!
+  functionID: UUID!
+  function: Function!
+  traceID: String!
+
+  # timestamps
+  queuedAt: Time!
+  startedAt: Time
+  endedAt: Time
+
+  status: FunctionRunStatus!
+  sourceID: String # The parent trace / run that triggered this run
+  triggerIDs: [ULID!]!
+  triggers: [Bytes!]!
+  isBatch: Boolean!
+
+  output: Bytes
+}
+
+type RunsV2Connection {
+  edges: [FunctionRunV2Edge!]!
+  pageInfo: PageInfo!
+}
+
+type FunctionRunV2Edge {
+  node: FunctionRunV2!
+  cursor: String!
 }
