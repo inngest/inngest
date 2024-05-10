@@ -19,7 +19,7 @@ import {
 
 export type Run = {
   status: FunctionRunStatus;
-  durationMS: number;
+  durationMS: number | null;
   id: string;
   queuedAt: string;
   endedAt: string;

@@ -9,7 +9,7 @@ import {
   type FunctionRunStatus,
   type FunctionRunTimeField,
 } from '@inngest/components/types/functionRun';
-import { getTimestampDaysAgo } from '@inngest/components/utils/date';
+import { getTimestampDaysAgo, toMaybeDate } from '@inngest/components/utils/date';
 import { RiLoopLeftLine } from '@remixicon/react';
 import { useQuery } from 'urql';
 
@@ -38,7 +38,7 @@ const GetRunsDocument = graphql(`
             id
             queuedAt
             endedAt
-            durationMS
+            startedAt
             status
           }
         }
@@ -117,13 +117,21 @@ export default function RunsPage() {
   {
     /* TODO: This is a temp parser */
   }
-  const runs = data?.environment.runs.edges.map((edge) => ({
-    id: edge.node.id,
-    queuedAt: edge.node.queuedAt,
-    endedAt: edge.node.endedAt,
-    durationMS: edge.node.durationMS,
-    status: edge.node.status,
-  }));
+  const runs = data?.environment.runs.edges.map((edge) => {
+    const startedAt = toMaybeDate(edge.node.startedAt);
+    let durationMS = null;
+    if (startedAt) {
+      durationMS = (toMaybeDate(edge.node.endedAt) ?? new Date()).getTime() - startedAt.getTime();
+    }
+
+    return {
+      id: edge.node.id,
+      queuedAt: edge.node.queuedAt,
+      endedAt: edge.node.endedAt,
+      durationMS,
+      status: edge.node.status,
+    };
+  });
 
   return (
     <main className="h-full min-h-0 overflow-y-auto bg-white">

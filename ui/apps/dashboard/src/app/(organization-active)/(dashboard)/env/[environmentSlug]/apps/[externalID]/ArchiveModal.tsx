@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
-import { Modal } from '@inngest/components/Modal';
+import { AlertModal, Modal } from '@inngest/components/Modal';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
@@ -51,37 +51,48 @@ export function ArchiveModal({ appID, isArchived, isOpen, onClose }: Props) {
 
   if (isArchived) {
     return (
-      <Modal className="w-[800px]" isOpen={isOpen} onClose={onClose}>
-        <Modal.Header>Unarchive app</Modal.Header>
-        <Modal.Body>
-          Are you sure you want to unarchive this app? Its functions will also unarchive, allowing
-          them to trigger.
-        </Modal.Body>
-        <Modal.Footer className="flex justify-end gap-2">
-          <Button appearance="outlined" btnAction={onClose} disabled={isLoading} label="Cancel" />
-          <Button btnAction={onConfirm} disabled={isLoading} kind="danger" label="Unarchive" />
-        </Modal.Footer>
-      </Modal>
-    );
-  }
+      <AlertModal
+        isOpen={isOpen}
+        onClose={onClose}
+        onSubmit={onConfirm}
+        title="Are you sure you want to unarchive this app?"
+        className="w-[600px]"
+      >
+        <ul className="mt-4 list-inside list-disc">
+          <li>New function runs can trigger.</li>
+          <li>You may re-archive at any time.</li>
+        </ul>
 
-  return (
-    <Modal className="w-[800px]" isOpen={isOpen} onClose={onClose}>
-      <Modal.Header>Archive app</Modal.Header>
-      <Modal.Body>
-        Are you sure you want to archive this app? Its functions functions will also archive,
-        preventing them from triggering. An archived app may be unarchived at any time.
         {error && (
           <Alert className="mt-4" severity="error">
             {error.message}
           </Alert>
         )}
-      </Modal.Body>
-      <Modal.Footer className="flex justify-end gap-2">
-        <Button appearance="outlined" btnAction={onClose} disabled={isLoading} label="Cancel" />
-        <Button btnAction={onConfirm} disabled={isLoading} kind="danger" label="Archive" />
-      </Modal.Footer>
-    </Modal>
+      </AlertModal>
+    );
+  }
+
+  return (
+    <AlertModal
+      isOpen={isOpen}
+      onClose={onClose}
+      onSubmit={onConfirm}
+      title="Are you sure you want to archive this app?"
+      className="w-[600px]"
+    >
+      <ul className="mt-4 list-inside list-disc">
+        <li>New function runs will not trigger.</li>
+        <li>Existing function runs will continue until completion.</li>
+        <li>Functions will still be visible, including their run history.</li>
+        <li>You may unarchive at any time.</li>
+      </ul>
+
+      {error && (
+        <Alert className="mt-4" severity="error">
+          {error.message}
+        </Alert>
+      )}
+    </AlertModal>
   );
 }
 
