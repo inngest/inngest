@@ -639,7 +639,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	// items are dynamic generators).  This means that we have to delay
 	// processing the partition by N seconds, meaning the latency is increased by
 	// up to this period for scheduled items behind the concurrency limits.
-	_, err := q.PartitionLease(ctx, p, PartitionLeaseDuration)
+	leaseID, err := q.PartitionLease(ctx, p, PartitionLeaseDuration)
 	if err == ErrPartitionConcurrencyLimit {
 		for _, l := range q.lifecycles {
 			// Track lifecycles; this function hit a partition limit ahead of
@@ -677,13 +677,28 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		totalItems int64
 	)
 	results := &handleQueueItemsResult{}
+	timeout := time.Now().Add(PartitionLeaseDuration)
+
+	// Ensure that peek doesn't take longer than the partition lease, to
+	// reduce contention.
+	peekCtx, cancel := context.WithCancel(ctx)
+	go func() {
+		tick := time.NewTicker(1 * time.Second)
+
+		for {
+			select {
+			case <-ctx.Done():
+				tick.Stop()
+				return
+			case <-tick.C:
+				if time.Now().After(timeout) {
+					cancel()
+				}
+			}
+		}
+	}()
 
 	for i := 0; i < q.peekIter(); i++ {
-		// Ensure that peek doesn't take longer than the partition lease, to
-		// reduce contention.
-		peekCtx, cancel := context.WithTimeout(ctx, PartitionLeaseDuration)
-		defer cancel()
-
 		var (
 			items []*QueueItem
 			res   *handleQueueItemsResult
@@ -714,17 +729,25 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 			break
 		}
 
-		// reduce the peek size to what's needed
+		// update the total items handled and offset
 		totalItems += res.Handled()
 		offset = int64(len(items))
 
-		// exit loop early if it has everything it needs
+		// exit loop early if it has processed enough amount of items
 		if totalItems >= q.peekItems() {
 			break
 		}
 
-		// if there are too much skipped, iterate again
+		// exit if the skipped ratio is within acceptable threshold
 		if res.SkippedRatio() <= q.peekSkipRatioThreshold() {
+			break
+		}
+
+		// peek again, extending the timeout
+		timeout = time.Now().Add(PartitionLeaseDuration)
+		leaseID, err = q.ExtendPartitionLease(ctx, p, leaseID, PartitionLeaseDuration)
+		if err != nil {
+			// don't continue if lease can't be extended
 			break
 		}
 	}

@@ -94,6 +94,7 @@ var (
 	ErrPriorityTooHigh               = fmt.Errorf("priority is too high")
 	ErrWeightedSampleRead            = fmt.Errorf("error reading from weighted sample")
 	ErrPartitionNotFound             = fmt.Errorf("partition not found")
+	ErrPartitionNotLeased            = fmt.Errorf("partition not leased")
 	ErrPartitionAlreadyLeased        = fmt.Errorf("partition already leased")
 	ErrPartitionPeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", PartitionPeekMax)
 	ErrPartitionGarbageCollected     = fmt.Errorf("partition garbage collected")
@@ -1468,6 +1469,69 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 
 		// result is the available concurrency within this partition
 		return &leaseID, nil
+	}
+}
+
+// ExtendPartitionLease extends a lease for a partition, and returns the new leaseID
+func (q *queue) ExtendPartitionLease(ctx context.Context, p *QueuePartition, leaseID *ulid.ULID, dur time.Duration) (*ulid.ULID, error) {
+	var (
+		concurrencyKey string
+		concurrency    = defaultPartitionConcurrency
+	)
+	if q.partitionConcurrencyGen != nil {
+		concurrencyKey, concurrency = q.partitionConcurrencyGen(ctx, *p)
+	}
+
+	extendedTS := getNow().Add(dur).UTC()
+	newLeaseID, err := ulid.New(ulid.Timestamp(extendedTS), rnd)
+	if err != nil {
+		return nil, fmt.Errorf("error generating ID to extend partition lease: %w", err)
+	}
+
+	var shardName string
+	if q.sf != nil {
+		if shard := q.sf(ctx, p.Queue(), p.WorkspaceID); shard != nil {
+			shardName = shard.Name
+		}
+	}
+
+	keys := []string{
+		q.kg.PartitionItem(),
+		q.kg.GlobalPartitionIndex(),
+		q.kg.ShardPartitionIndex(shardName),
+		q.kg.Concurrency("p", concurrencyKey),
+	}
+
+	args, err := StrSlice([]any{
+		p.Queue(),
+		leaseID.String(),
+		newLeaseID.String(),
+		concurrency,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := scripts["queue/extendPartitionLease"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error extending partition lease: %w", err)
+	}
+	switch result {
+	case 0:
+		return &newLeaseID, nil
+	case 1:
+		return nil, ErrPartitionNotFound
+	case 2:
+		return nil, ErrPartitionNotLeased
+	case 3:
+		return nil, ErrPartitionAlreadyLeased
+	default:
+		return nil, fmt.Errorf("unknown response extending partition lease: %w", err)
 	}
 }
 
