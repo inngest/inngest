@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
-import { AlertModal, Modal } from '@inngest/components/Modal';
+import { AlertModal } from '@inngest/components/Modal';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
@@ -52,6 +51,7 @@ export function ArchiveModal({ appID, isArchived, isOpen, onClose }: Props) {
   if (isArchived) {
     return (
       <AlertModal
+        isLoading={isLoading}
         isOpen={isOpen}
         onClose={onClose}
         onSubmit={onConfirm}
@@ -74,6 +74,7 @@ export function ArchiveModal({ appID, isArchived, isOpen, onClose }: Props) {
 
   return (
     <AlertModal
+      isLoading={isLoading}
       isOpen={isOpen}
       onClose={onClose}
       onSubmit={onConfirm}
