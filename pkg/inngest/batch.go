@@ -47,6 +47,8 @@ func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
 // - The batch is full
 // - The time to wait is up
 type EventBatchConfig struct {
+	Key *string `json:"key,omitempty"`
+
 	// MaxSize is the maximum number of events that can be
 	// included in a batch
 	MaxSize int `json:"maxSize"`

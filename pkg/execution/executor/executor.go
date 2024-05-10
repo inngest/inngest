@@ -2629,6 +2629,7 @@ func (e *executor) AppendAndScheduleBatchWithOpts(ctx context.Context, fn innges
 				AppID:           bi.AppID,
 				FunctionID:      bi.FunctionID,
 				FunctionVersion: bi.FunctionVersion,
+				BatchPointer:    result.BatchPointerKey,
 			},
 			At: at,
 		}); err != nil {

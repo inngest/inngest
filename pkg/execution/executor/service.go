@@ -304,7 +304,8 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 	}
 
 	batchID := opts.BatchID
-	status, err := s.batcher.StartExecution(ctx, opts.FunctionID, batchID)
+	// TODO Gracefully handle old message without batch pointer as well!
+	status, err := s.batcher.StartExecution(ctx, batchID, opts.BatchPointer)
 	if err != nil {
 		return err
 	}
