@@ -7,9 +7,10 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/inngest/inngest/proto/gen/state/v2;statev2";
 
 message Metadata {
-  ID         id      = 1;
-  Config     config  = 2;
-  RunMetrics metrics = 3;
+  ID              id      = 1;
+  Config          config  = 2;
+  RunMetrics      metrics = 3;
+  repeated string stack   = 4;
 }
 
 message ID {
@@ -19,16 +20,21 @@ message ID {
 }
 
 message Config {
-  string                            span_id          = 1;
-  google.protobuf.Timestamp         ts               = 2;
-  repeated string                   event_ids        = 3;
-  int64                             request_version  = 4;
-  string                            idempotency      = 5;
-  optional string                   replay_id        = 6;
-  optional int64                    priority_factor  = 7;
-  repeated ConcurrencyKey           concurrency_keys = 8;
-  bool                              force_step_plan  = 9;
-  map<string, google.protobuf.Any>  context          = 10;
+  // TODO: match up
+  string                            function_slug    = 1;
+  int64                             function_version = 2;
+  string                            cron_schedule    = 3;
+  string                            span_id          = 4;
+  string                            batch_id         = 5;
+  google.protobuf.Timestamp         started_at       = 6;
+  repeated string                   event_ids        = 7;
+  int64                             request_version  = 8;
+  string                            idempotency      = 9;
+  optional string                   replay_id        = 10;
+  optional int64                    priority_factor  = 11;
+  repeated ConcurrencyKey           concurrency_keys = 12;
+  bool                              force_step_plan  = 13;
+  map<string, google.protobuf.Any>  context          = 14;
 }
 
 message ConcurrencyKey {
@@ -39,6 +45,8 @@ message ConcurrencyKey {
 
 message RunMetrics {
   int64 state_size = 1;
+  int64 event_size = 2;
+  int64 step_count = 3;
 }
 
 message Tenant {
@@ -48,40 +56,38 @@ message Tenant {
 }
 
 message CreateStateRequest {
-  string         run_id = 1;
-  Tenant         tenant = 2;
-  Config         config = 3;
-  repeated bytes events = 4;
+  Metadata       metadata = 1;
+  repeated bytes events   = 2;
 }
 
 message CreateStateResponse {}
 
 message DeleteStateRequest {
-  string run_id = 1;
+  ID id = 1;
 }
 
 
 message DeleteStateResponse {}
 
 message LoadMetadataRequest {
-  string run_id = 1;
+  ID id = 1;
 }
 
 message LoadMetadataResponse {
   Metadata metadata = 1;
 }
 
-message MutateMetadataRequest {
-  google.protobuf.Timestamp started_at      = 1;
-  int64                     request_version = 2;
-  bool                      force_step_plan = 3;
+message UpdateMetadataRequest {
+  ID                        id              = 1;
+  google.protobuf.Timestamp started_at      = 2;
+  int64                     request_version = 3;
+  bool                      force_step_plan = 4;
 }
 
-message MutateMetadataResponse{}
-
+message UpdateMetadataResponse{}
 
 message SaveStepRequest {
-  string run_id  = 1;
+  ID     id      = 1;
   string step_id = 2;
   bytes  data    = 3;
 }
@@ -108,8 +114,13 @@ service RunService {
   rpc Create(CreateStateRequest) returns (CreateStateResponse) {}
   rpc Delete(DeleteStateRequest) returns (DeleteStateResponse) {}
   rpc Exists(ExistsRequest) returns (ExistsResponse) {}
+  rpc UpdateMetadata(UpdateMetadataRequest) returns (UpdateMetadataResponse) {}
+  rpc SaveStep(SaveStepRequest) returns (SaveStepResponse) {}
+
   rpc LoadMetadata(LoadMetadataRequest) returns (LoadMetadataResponse) {}
   rpc LoadEvents(LoadEventsRequest) returns (LoadEventsResponse) {}
-  rpc UpdateMetadata(MutateMetadataRequest) returns (MutateMetadataResponse) {}
-  rpc SaveStep(SaveStepRequest) returns (SaveStepResponse) {}
+
+  // TODO
+  // rpc LoadSteps(LoadStepsRequest) returns (LoadStepsResponse) {}
+  // rpc LoadState(LoadStateRequest) returns (LoadStateResponse) {}
 }
