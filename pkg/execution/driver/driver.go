@@ -69,11 +69,16 @@ func MarshalV1(
 		}
 
 		// Unmarshal events.
+		// TODO: Prevent this.  We do not need to do this.
 		evts := make([]map[string]any, len(state.Events))
 		for n, i := range state.Events {
 			evts[n] = map[string]any{}
 			if err := json.Unmarshal(i, &evts[n]); err != nil {
 				return nil, fmt.Errorf("error unmarshalling event in driver marshaller: %w", err)
+			}
+			// ensure the user object is always an array.
+			if evts[n]["user"] == nil {
+				evts[n]["user"] = map[string]any{}
 			}
 		}
 		req.Event = evts[0]

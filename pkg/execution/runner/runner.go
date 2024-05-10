@@ -681,6 +681,14 @@ func Initialize(ctx context.Context, fn inngest.Function, tracked event.TrackedE
 		Events:         []event.TrackedEvent{tracked},
 		IdempotencyKey: &idempotencyKey,
 	})
+
+	switch err {
+	case executor.ErrFunctionDebounced,
+		executor.ErrFunctionSkipped,
+		state.ErrIdentifierExists:
+		return nil, nil
+	}
+
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error scheduling function", "error", err)
 	}
