@@ -97,6 +97,12 @@ func (g GeneratorOpcode) Output() (string, error) {
 	return "", nil
 }
 
+// IsError returns whether this op represents an error, for example a
+// `StepError` being passed back from an SDK.
+func (g GeneratorOpcode) IsError() bool {
+	return g.Error != nil
+}
+
 func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {
 	if opts, ok := g.Opts.(*WaitForEventOpts); ok && opts != nil {
 		return opts, nil
