@@ -11,7 +11,7 @@ export function Timeline({ getOutput, trace }: Props) {
   const maxTime = toMaybeDate(trace.endedAt) ?? new Date();
 
   return (
-    <div className="border-t border-slate-300">
+    <div>
       <Trace
         depth={0}
         getOutput={getOutput}
@@ -26,7 +26,7 @@ export function Timeline({ getOutput, trace }: Props) {
           <Trace
             depth={0}
             getOutput={getOutput}
-            key={child.id}
+            key={child.spanID}
             maxTime={maxTime}
             minTime={minTime}
             trace={child}

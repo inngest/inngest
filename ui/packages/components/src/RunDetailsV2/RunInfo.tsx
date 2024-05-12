@@ -22,6 +22,7 @@ type Props = {
       endedAt: string | null;
       queuedAt: string;
       startedAt: string | null;
+      status: string;
     };
   };
 };
@@ -30,8 +31,6 @@ export function RunInfo({ className, app, fn, run }: Props) {
   const queuedAt = new Date(run.trace.queuedAt);
   const startedAt = toMaybeDate(run.trace.startedAt);
   const endedAt = toMaybeDate(run.trace.endedAt);
-
-  const delayText = formatMilliseconds((startedAt ?? new Date()).getTime() - queuedAt.getTime());
 
   let durationText = '-';
   if (startedAt) {
@@ -60,9 +59,11 @@ export function RunInfo({ className, app, fn, run }: Props) {
                 <span className="font-mono">{run.id}</span>
               </Labeled>
 
-              <Labeled label="Trigger">foo</Labeled>
+              <Labeled label="Status">{run.trace.status}</Labeled>
 
-              <Labeled label="Event received at"></Labeled>
+              <Labeled label="Trigger">TODO</Labeled>
+
+              <Labeled label="Event received at">TODO</Labeled>
 
               <Labeled label="Queued at">
                 <Time value={queuedAt} />
@@ -71,8 +72,6 @@ export function RunInfo({ className, app, fn, run }: Props) {
               <Labeled label="Started at">{startedAt ? <Time value={startedAt} /> : '-'}</Labeled>
 
               <Labeled label="Ended at">{endedAt ? <Time value={endedAt} /> : '-'}</Labeled>
-
-              <Labeled label="Delay">{delayText}</Labeled>
 
               <Labeled label="Duration">{durationText}</Labeled>
 
