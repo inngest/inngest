@@ -20,7 +20,7 @@ import (
 	"github.com/jinzhu/copier"
 	"github.com/oklog/ulid/v2"
 
-	_ "github.com/doug-martin/goqu/v9"
+	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
 )
 
@@ -667,7 +667,6 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 		QueuedAt:    run.QueuedAt,
 		StartedAt:   run.StartedAt,
 		EndedAt:     run.EndedAt,
-		Duration:    run.Duration.Milliseconds(),
 		Status:      run.Status.ToCode(),
 		TriggerIds:  []byte{},
 		Output:      run.Output,
@@ -690,8 +689,114 @@ func (w wrapper) GetSpansByTraceIDAndRunID(ctx context.Context, tid string, runI
 	return nil, fmt.Errorf("not implemented")
 }
 
+// traceRun is a model mapped to the `trace_runs` table
+type traceRun struct {
+	AccountID   uuid.UUID `db:"account_id"`
+	WorkspaceID uuid.UUID `db:"workspace_id"`
+	AppID       uuid.UUID `db:"app_id"`
+	FunctionID  uuid.UUID `db:"function_id"`
+	TraceID     string    `db:"trace_id"`
+	RunID       ulid.ULID `db:"run_id"`
+	QueuedAt    time.Time `db:"queued_at"`
+	StartedAt   time.Time `db:"started_at"`
+	EndedAt     time.Time `db:"ended_at"`
+	Status      int64     `db:"status"`
+	SourceID    string    `db:"source_id"`
+	TriggerIDs  []byte    `db:"trigger_ids"`
+	Output      []byte    `db:"output, omitempty"`
+	IsBatch     bool      `db:"is_batch"`
+	IsDebounce  bool      `db:"is_debounce"`
+}
+
+func (tr *traceRun) EventIDs() []ulid.ULID {
+	if len(tr.TriggerIDs) == 0 {
+		return []ulid.ULID{}
+	}
+
+	list := strings.Split(string(tr.TriggerIDs), ",")
+	if len(list) == 0 {
+		return []ulid.ULID{}
+	}
+
+	res := []ulid.ULID{}
+	for _, s := range list {
+		if id, err := ulid.Parse(s); err == nil {
+			res = append(res, id)
+		}
+	}
+	return res
+}
+
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
-	return nil, fmt.Errorf("not implemented")
+	sqlite := sq.Dialect("sqlite3")
+
+	b := sqlite.From("trace_runs").Select(
+		"app_id",
+		"function_id",
+		"trace_id",
+		"run_id",
+		"queued_at",
+		"started_at",
+		"ended_at",
+		"status",
+		"source_id",
+		"trigger_ids",
+		"output",
+		"is_batch",
+		"is_debounce",
+	)
+
+	sql, args, err := b.ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := w.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	res := []*cqrs.TraceRun{}
+	for rows.Next() {
+		data := traceRun{}
+		err := rows.Scan(
+			&data.AppID,
+			&data.FunctionID,
+			&data.TraceID,
+			&data.RunID,
+			&data.QueuedAt,
+			&data.StartedAt,
+			&data.EndedAt,
+			&data.Status,
+			&data.SourceID,
+			&data.TriggerIDs,
+			&data.Output,
+			&data.IsBatch,
+			&data.IsDebounce,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		res = append(res, &cqrs.TraceRun{
+			AppID:      data.AppID,
+			FunctionID: data.FunctionID,
+			TraceID:    data.TraceID,
+			RunID:      data.RunID,
+			QueuedAt:   data.QueuedAt,
+			StartedAt:  data.StartedAt,
+			EndedAt:    data.EndedAt,
+			SourceID:   data.SourceID,
+			TriggerIDs: data.EventIDs(),
+			Triggers:   [][]byte{},
+			Output:     data.Output,
+			Status:     enums.RunCodeToStatus(data.Status),
+			IsBatch:    data.IsBatch,
+			IsDebounce: data.IsDebounce,
+		})
+	}
+
+	return res, nil
 }
 
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
