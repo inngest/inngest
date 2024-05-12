@@ -79,3 +79,11 @@ export function relativeTime(d: Date): string {
 export function getTimestampDaysAgo({ currentDate, days }: { currentDate: Date; days: number }) {
   return subDays(currentDate, days);
 }
+
+export function toMaybeDate<T extends string | null | undefined>(value: T): Date | null {
+  if (!value) {
+    return null;
+  }
+
+  return new Date(value);
+}

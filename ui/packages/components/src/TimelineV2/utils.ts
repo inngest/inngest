@@ -59,11 +59,3 @@ function normalizeWidth({ totalWidth, width }: { totalWidth: number; width: numb
   const maxWidth = 1000;
   return Math.max(Math.floor((width / totalWidth) * maxWidth), minWidth);
 }
-
-export function toMaybeDate<T extends string | null | undefined>(value: T): Date | null {
-  if (!value) {
-    return null;
-  }
-
-  return new Date(value);
-}

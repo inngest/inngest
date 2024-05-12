@@ -1,9 +1,8 @@
 import { Card } from '../Card';
 import { Time } from '../Time';
 import { cn } from '../utils/classNames';
-import { formatMilliseconds } from '../utils/date';
+import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import type { Trace } from './types';
-import { toMaybeDate } from './utils';
 
 type Props = {
   className?: string;
