@@ -17,6 +17,7 @@ import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[env
 import { graphql } from '@/gql';
 import { FunctionRunTimeFieldV2 } from '@/gql/graphql';
 import { useSearchParam, useStringArraySearchParam } from '@/utils/useSearchParam';
+import Page from '../../../runs/[runID]/page';
 import RunsTable from './RunsTable';
 import TimeFilter from './TimeFilter';
 import { toRunStatuses, toTimeField } from './utils';
@@ -48,8 +49,11 @@ const GetRunsDocument = graphql(`
 `);
 
 const renderSubComponent = ({ id }: { id: string }) => {
-  /* TODO: Render the timeline instead */
-  return <p>Subrow {id}</p>;
+  return (
+    <div className="mx-5">
+      <Page params={{ runID: id }} />
+    </div>
+  );
 };
 
 export default function RunsPage() {

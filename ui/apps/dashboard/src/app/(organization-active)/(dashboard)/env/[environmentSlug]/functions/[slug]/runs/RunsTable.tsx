@@ -110,16 +110,16 @@ export default function RunsTable({
         {isEmpty && (
           <tr>
             {/* TODO: when we introduce column visibility options, this colSpan has to be dinamically calculated depending on # visible columns */}
-            <td className="pt-28 text-center align-top	font-medium text-slate-600" colSpan={5}>
+            <td className="pt-28 text-center align-top font-medium text-slate-600" colSpan={5}>
               No results were found.
             </td>
           </tr>
         )}
         {!isEmpty &&
           table.getRowModel().rows.map((row) => (
-            <Fragment key={row.id}>
+            <Fragment key={row.original.id}>
               <tr
-                key={row.id}
+                key={row.original.id}
                 className="h-12 cursor-pointer hover:bg-sky-50"
                 onClick={row.getToggleExpandedHandler()}
               >
@@ -130,9 +130,10 @@ export default function RunsTable({
                 ))}
               </tr>
               {row.getIsExpanded() && (
-                <tr>
+                // Overrides tableStyles divider color
+                <tr className="!border-transparent">
                   <td colSpan={row.getVisibleCells().length}>
-                    {renderSubComponent({ id: row.id })}
+                    {renderSubComponent({ id: row.original.id })}
                   </td>
                 </tr>
               )}
