@@ -219,7 +219,9 @@ func WithQueueItemIndexer(i QueueItemIndexer) QueueOpt {
 // WithAsyncInstrumentation registers all the async instrumentation that needs to happen on
 // each instrumentation cycle
 // These are mostly gauges for point in time metrics
-func WithAsyncInstrumentation(ctx context.Context) QueueOpt {
+func WithAsyncInstrumentation() QueueOpt {
+	ctx := context.Background()
+
 	return func(q *queue) {
 		telemetry.GaugeWorkerQueueCapacity(ctx, telemetry.GaugeOpt{
 			PkgName:  pkgName,
