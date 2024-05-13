@@ -16,6 +16,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
 
 func init() {
@@ -24,6 +25,10 @@ func init() {
 }
 
 const testPriority = PriorityDefault
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestQueueItemScore(t *testing.T) {
 	parse := func(layout, val string) time.Time {
