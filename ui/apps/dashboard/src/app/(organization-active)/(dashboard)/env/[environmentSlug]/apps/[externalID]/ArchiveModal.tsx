@@ -57,7 +57,7 @@ export function ArchiveModal({ appID, isArchived, isOpen, onClose }: Props) {
       title={`Are you sure you want to ${isArchived ? 'unarchive' : 'archive'} this app?`}
       className="w-[600px]"
     >
-      <ul className="mt-4 list-inside list-disc">
+      <ul className="list-inside list-disc p-6 pb-0">
         {isArchived && (
           <>
             <li>New function runs can trigger.</li>
