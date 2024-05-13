@@ -10,14 +10,18 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFunctionSteps(t *testing.T) {
 	h, server, registerFuncs := NewSDKHandler(t, "my-app")
 	defer server.Close()
+
+	c := client.New(t)
 
 	var (
 		counter int32
@@ -74,6 +78,7 @@ func TestFunctionSteps(t *testing.T) {
 	h.Register(a)
 	registerFuncs()
 
+	start := time.Now()
 	evt := inngestgo.Event{
 		Name: "test/sdk",
 		Data: map[string]any{
@@ -112,6 +117,18 @@ func TestFunctionSteps(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&counter) == 3
 	}, 15*time.Second, time.Second)
+	end := time.Now()
+
+	t.Run("Check function runs", func(t *testing.T) {
+		ctx := context.Background()
+		edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
+			Start: start,
+			End:   end,
+		})
+
+		assert.Equal(t, 1, len(edges))
+		assert.False(t, pageInfo.HasNextPage)
+	})
 
 	t.Run("Check batch API", func(t *testing.T) {
 		// Fetch event data and step data from the V0 APIs;  it should exist.
