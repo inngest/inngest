@@ -48,44 +48,30 @@ export function ArchiveModal({ appID, isArchived, isOpen, onClose }: Props) {
     }
   }
 
-  if (isArchived) {
-    return (
-      <AlertModal
-        isLoading={isLoading}
-        isOpen={isOpen}
-        onClose={onClose}
-        onSubmit={onConfirm}
-        title="Are you sure you want to unarchive this app?"
-        className="w-[600px]"
-      >
-        <ul className="mt-4 list-inside list-disc">
-          <li>New function runs can trigger.</li>
-          <li>You may re-archive at any time.</li>
-        </ul>
-
-        {error && (
-          <Alert className="mt-4" severity="error">
-            {error.message}
-          </Alert>
-        )}
-      </AlertModal>
-    );
-  }
-
   return (
     <AlertModal
       isLoading={isLoading}
       isOpen={isOpen}
       onClose={onClose}
       onSubmit={onConfirm}
-      title="Are you sure you want to archive this app?"
+      title={`Are you sure you want to ${isArchived ? 'unarchive' : 'archive'} this app?`}
       className="w-[600px]"
     >
       <ul className="mt-4 list-inside list-disc">
-        <li>New function runs will not trigger.</li>
-        <li>Existing function runs will continue until completion.</li>
-        <li>Functions will still be visible, including their run history.</li>
-        <li>You may unarchive at any time.</li>
+        {isArchived && (
+          <>
+            <li>New function runs can trigger.</li>
+            <li>You may re-archive at any time.</li>
+          </>
+        )}
+        {!isArchived && (
+          <>
+            <li>New function runs will not trigger.</li>
+            <li>Existing function runs will continue until completion.</li>
+            <li>Functions will still be visible, including their run history.</li>
+            <li>You may unarchive at any time.</li>
+          </>
+        )}
       </ul>
 
       {error && (
