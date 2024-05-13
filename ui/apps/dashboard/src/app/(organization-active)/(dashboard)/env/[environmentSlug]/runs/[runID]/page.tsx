@@ -108,16 +108,18 @@ export default function Page({ params }: Props) {
   }
 
   return (
-    <RunDetails
-      app={fn.app}
-      fn={fn}
-      getOutput={getOutput}
-      run={{
-        id: params.runID,
-        output: null,
-        trace: getFragmentData(TraceDetailsFragment, trace),
-      }}
-    />
+    <div className="overflow-y-auto">
+      <RunDetails
+        app={fn.app}
+        fn={fn}
+        getOutput={getOutput}
+        run={{
+          id: params.runID,
+          output: null,
+          trace: getFragmentData(TraceDetailsFragment, trace),
+        }}
+      />
+    </div>
   );
 }
 

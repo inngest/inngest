@@ -1,7 +1,6 @@
 import { cn } from '../utils/classNames';
-import { formatMilliseconds } from '../utils/date';
+import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { Span } from './Span';
-import { toMaybeDate } from './utils';
 
 type Props = {
   className?: string;

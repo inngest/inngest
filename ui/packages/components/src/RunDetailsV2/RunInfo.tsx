@@ -2,9 +2,8 @@ import { Button } from '../Button';
 import { Card } from '../Card';
 import { CodeBlock } from '../CodeBlock';
 import { Time } from '../Time';
-import { toMaybeDate } from '../TimelineV2/utils';
 import { cn } from '../utils/classNames';
-import { formatMilliseconds } from '../utils/date';
+import { formatMilliseconds, toMaybeDate } from '../utils/date';
 
 type Props = {
   className?: string;
