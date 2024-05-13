@@ -17,29 +17,91 @@ var (
 	registry = newRegistry()
 )
 
+type counterMap struct {
+	rw sync.RWMutex
+	m  map[string]metric.Int64Counter
+}
+
+func newCounterMap() *counterMap {
+	return &counterMap{m: map[string]metric.Int64Counter{}}
+}
+
+func (c *counterMap) Get(name string) (metric.Int64Counter, bool) {
+	c.rw.RLock()
+	defer c.rw.RUnlock()
+	v, ok := c.m[name]
+	return v, ok
+}
+
+func (c *counterMap) Add(name string, m metric.Int64Counter) {
+	c.rw.Lock()
+	defer c.rw.Unlock()
+	c.m[name] = m
+}
+
+type asyncGaugeMap struct {
+	rw sync.RWMutex
+	m  map[string]metric.Int64ObservableGauge
+}
+
+func newAsyncGaugeMap() *asyncGaugeMap {
+	return &asyncGaugeMap{m: map[string]metric.Int64ObservableGauge{}}
+}
+
+func (g *asyncGaugeMap) Get(name string) (metric.Int64ObservableGauge, bool) {
+	g.rw.RLock()
+	defer g.rw.RUnlock()
+	v, ok := g.m[name]
+	return v, ok
+}
+
+func (g *asyncGaugeMap) Add(name string, m metric.Int64ObservableGauge) {
+	g.rw.Lock()
+	defer g.rw.Unlock()
+	g.m[name] = m
+}
+
+type histogramMap struct {
+	rw sync.RWMutex
+	m  map[string]metric.Int64Histogram
+}
+
+func newHistogramMap() *histogramMap {
+	return &histogramMap{m: map[string]metric.Int64Histogram{}}
+}
+
+func (h *histogramMap) Get(name string) (metric.Int64Histogram, bool) {
+	h.rw.RLock()
+	defer h.rw.RUnlock()
+	v, ok := h.m[name]
+	return v, ok
+}
+
+func (h *histogramMap) Add(name string, m metric.Int64Histogram) {
+	h.rw.Lock()
+	defer h.rw.Unlock()
+	h.m[name] = m
+}
+
 type metricsRegistry struct {
 	mu sync.RWMutex
 
-	counters    map[string]metric.Int64Counter
-	asyncGauges map[string]metric.Int64ObservableGauge
-	histograms  map[string]metric.Int64Histogram
+	counters    *counterMap
+	asyncGauges *asyncGaugeMap
+	histograms  *histogramMap
 }
 
 func newRegistry() *metricsRegistry {
 	return &metricsRegistry{
-		counters:    map[string]metric.Int64Counter{},
-		asyncGauges: map[string]metric.Int64ObservableGauge{},
-		histograms:  map[string]metric.Int64Histogram{},
+		counters:    newCounterMap(),
+		asyncGauges: newAsyncGaugeMap(),
+		histograms:  newHistogramMap(),
 	}
 }
 
 func (r *metricsRegistry) getCounter(ctx context.Context, opts CounterOpt) (metric.Int64Counter, error) {
 	name := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
-
-	r.mu.RLock()
-	c, ok := r.counters[name]
-	r.mu.RUnlock()
-	if ok {
+	if c, ok := r.counters.Get(name); ok {
 		return c, nil
 	}
 
@@ -49,26 +111,20 @@ func (r *metricsRegistry) getCounter(ctx context.Context, opts CounterOpt) (metr
 		meter = opts.Meter
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	c, err := meter.Int64Counter(
 		name,
 		metric.WithDescription(opts.Description),
 		metric.WithUnit(opts.Unit),
 	)
 	if err == nil {
-		r.counters[name] = c
+		r.counters.Add(name, c)
 	}
 	return c, err
 }
 
 func (r *metricsRegistry) setAsyncGauge(ctx context.Context, opts GaugeOpt) (metric.Int64ObservableGauge, error) {
 	name := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
-
-	r.mu.RLock()
-	g, ok := r.asyncGauges[name]
-	r.mu.RUnlock()
-	if ok {
+	if g, ok := r.asyncGauges.Get(name); ok {
 		return g, nil
 	}
 
@@ -78,8 +134,6 @@ func (r *metricsRegistry) setAsyncGauge(ctx context.Context, opts GaugeOpt) (met
 		meter = opts.Meter
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	g, err := meter.Int64ObservableGauge(
 		name,
 		metric.WithDescription(opts.PkgName),
@@ -98,18 +152,14 @@ func (r *metricsRegistry) setAsyncGauge(ctx context.Context, opts GaugeOpt) (met
 		}),
 	)
 	if err == nil {
-		r.asyncGauges[name] = g
+		r.asyncGauges.Add(name, g)
 	}
 	return g, err
 }
 
 func (r *metricsRegistry) getHistogram(ctx context.Context, opts HistogramOpt) (metric.Int64Histogram, error) {
 	name := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
-
-	r.mu.RLock()
-	h, ok := r.histograms[name]
-	r.mu.RUnlock()
-	if ok {
+	if h, ok := r.histograms.Get(name); ok {
 		return h, nil
 	}
 
@@ -128,7 +178,7 @@ func (r *metricsRegistry) getHistogram(ctx context.Context, opts HistogramOpt) (
 		metric.WithExplicitBucketBoundaries(opts.Boundaries...),
 	)
 	if err == nil {
-		r.histograms[name] = m
+		r.histograms.Add(name, m)
 	}
 	return m, err
 }
