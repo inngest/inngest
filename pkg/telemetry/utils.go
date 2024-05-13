@@ -17,20 +17,170 @@ var (
 	registry = newRegistry()
 )
 
-type metricsRegistry struct {
-	mu sync.Mutex
+type counterMap struct {
+	rw sync.RWMutex
+	m  map[string]metric.Int64Counter
+}
 
-	counters    map[string]metric.Int64Counter
-	asyncGauges map[string]metric.Int64ObservableGauge
-	histograms  map[string]metric.Int64Histogram
+func newCounterMap() *counterMap {
+	return &counterMap{m: map[string]metric.Int64Counter{}}
+}
+
+func (c *counterMap) Get(name string) (metric.Int64Counter, bool) {
+	c.rw.RLock()
+	defer c.rw.RUnlock()
+	v, ok := c.m[name]
+	return v, ok
+}
+
+func (c *counterMap) Add(name string, m metric.Int64Counter) {
+	c.rw.Lock()
+	defer c.rw.Unlock()
+	c.m[name] = m
+}
+
+type asyncGaugeMap struct {
+	rw sync.RWMutex
+	m  map[string]metric.Int64ObservableGauge
+}
+
+func newAsyncGaugeMap() *asyncGaugeMap {
+	return &asyncGaugeMap{m: map[string]metric.Int64ObservableGauge{}}
+}
+
+func (g *asyncGaugeMap) Get(name string) (metric.Int64ObservableGauge, bool) {
+	g.rw.RLock()
+	defer g.rw.RUnlock()
+	v, ok := g.m[name]
+	return v, ok
+}
+
+func (g *asyncGaugeMap) Add(name string, m metric.Int64ObservableGauge) {
+	g.rw.Lock()
+	defer g.rw.Unlock()
+	g.m[name] = m
+}
+
+type histogramMap struct {
+	rw sync.RWMutex
+	m  map[string]metric.Int64Histogram
+}
+
+func newHistogramMap() *histogramMap {
+	return &histogramMap{m: map[string]metric.Int64Histogram{}}
+}
+
+func (h *histogramMap) Get(name string) (metric.Int64Histogram, bool) {
+	h.rw.RLock()
+	defer h.rw.RUnlock()
+	v, ok := h.m[name]
+	return v, ok
+}
+
+func (h *histogramMap) Add(name string, m metric.Int64Histogram) {
+	h.rw.Lock()
+	defer h.rw.Unlock()
+	h.m[name] = m
+}
+
+type metricsRegistry struct {
+	mu sync.RWMutex
+
+	counters    *counterMap
+	asyncGauges *asyncGaugeMap
+	histograms  *histogramMap
 }
 
 func newRegistry() *metricsRegistry {
 	return &metricsRegistry{
-		counters:    map[string]metric.Int64Counter{},
-		asyncGauges: map[string]metric.Int64ObservableGauge{},
-		histograms:  map[string]metric.Int64Histogram{},
+		counters:    newCounterMap(),
+		asyncGauges: newAsyncGaugeMap(),
+		histograms:  newHistogramMap(),
 	}
+}
+
+func (r *metricsRegistry) getCounter(ctx context.Context, opts CounterOpt) (metric.Int64Counter, error) {
+	name := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
+	if c, ok := r.counters.Get(name); ok {
+		return c, nil
+	}
+
+	// use the global one by default
+	meter := otel.Meter(opts.PkgName)
+	if opts.Meter != nil {
+		meter = opts.Meter
+	}
+
+	c, err := meter.Int64Counter(
+		name,
+		metric.WithDescription(opts.Description),
+		metric.WithUnit(opts.Unit),
+	)
+	if err == nil {
+		r.counters.Add(name, c)
+	}
+	return c, err
+}
+
+func (r *metricsRegistry) setAsyncGauge(ctx context.Context, opts GaugeOpt) (metric.Int64ObservableGauge, error) {
+	name := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
+	if g, ok := r.asyncGauges.Get(name); ok {
+		return g, nil
+	}
+
+	// use the global one by default
+	meter := otel.Meter(opts.PkgName)
+	if opts.Meter != nil {
+		meter = opts.Meter
+	}
+
+	g, err := meter.Int64ObservableGauge(
+		name,
+		metric.WithDescription(opts.PkgName),
+		metric.WithUnit(opts.Unit),
+		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
+			value, err := opts.Callback(ctx)
+			if err != nil {
+				return err
+			}
+			attrs := []attribute.KeyValue{}
+			if opts.Tags != nil {
+				attrs = append(attrs, parseAttributes(opts.Tags)...)
+			}
+			o.Observe(value, metric.WithAttributes(attrs...))
+			return nil
+		}),
+	)
+	if err == nil {
+		r.asyncGauges.Add(name, g)
+	}
+	return g, err
+}
+
+func (r *metricsRegistry) getHistogram(ctx context.Context, opts HistogramOpt) (metric.Int64Histogram, error) {
+	name := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
+	if h, ok := r.histograms.Get(name); ok {
+		return h, nil
+	}
+
+	// use the global one by default
+	meter := otel.Meter(opts.PkgName)
+	if opts.Meter != nil {
+		meter = opts.Meter
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	m, err := meter.Int64Histogram(
+		name,
+		metric.WithDescription(opts.Description),
+		metric.WithUnit(opts.Unit),
+		metric.WithExplicitBucketBoundaries(opts.Boundaries...),
+	)
+	if err == nil {
+		r.histograms.Add(name, m)
+	}
+	return m, err
 }
 
 func env() string {
@@ -41,62 +191,39 @@ func env() string {
 	return val
 }
 
-type counterOpt struct {
-	Name        string
+type CounterOpt struct {
+	PkgName     string
 	Description string
 	Meter       metric.Meter
 	MetricName  string
-	Attributes  map[string]any
+	Tags        map[string]any
 	Unit        string
 }
 
 // RecordCounterMetric increments the counter by the provided value.
 // The meter used can either be passed in or is the global meter
-func recordCounterMetric(ctx context.Context, incr int64, opts counterOpt) {
+func RecordCounterMetric(ctx context.Context, incr int64, opts CounterOpt) {
 	attrs := []attribute.KeyValue{}
-	if opts.Attributes != nil {
-		attrs = append(attrs, parseAttributes(opts.Attributes)...)
+	if opts.Tags != nil {
+		attrs = append(attrs, parseAttributes(opts.Tags)...)
 	}
 
-	// use the global one by default
-	meter := otel.Meter(opts.Name)
-	if opts.Meter != nil {
-		meter = opts.Meter
-	}
-
-	var (
-		c   metric.Int64Counter
-		err error
-	)
 	metricName := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
-
-	if m, ok := registry.counters[metricName]; ok {
-		c = m
-	} else {
-		c, err = meter.
-			Int64Counter(
-				metricName,
-				metric.WithDescription(opts.Description),
-				metric.WithUnit(opts.Unit),
-			)
-		if err != nil {
-			log.From(ctx).Error().Err(err).Str("metric", opts.MetricName).Msg("error recording counter metric")
-			return
-		}
-		registry.mu.Lock()
-		registry.counters[metricName] = c
-		registry.mu.Unlock()
+	c, err := registry.getCounter(ctx, opts)
+	if err != nil {
+		log.From(ctx).Error().Err(err).Str("metric_name", metricName).Msg("error accessing counter metric")
+		return
 	}
 
 	c.Add(ctx, incr, metric.WithAttributes(attrs...))
 }
 
-type gaugeOpt struct {
-	Name        string
+type GaugeOpt struct {
+	PkgName     string
 	Description string
 	MetricName  string
 	Meter       metric.Meter
-	Attributes  map[string]any
+	Tags        map[string]any
 	Unit        string
 	Callback    GaugeCallback
 }
@@ -105,96 +232,37 @@ type GaugeCallback func(ctx context.Context) (int64, error)
 
 // RecordGaugeMetric records the gauge value via a callback.
 // The callback needs to be passed in so it doesn't get captured as a closure when instrumenting the value
-func registerAsyncGauge(ctx context.Context, opts gaugeOpt) {
-	// use the global one by default
-	meter := otel.Meter(opts.Name)
-	if opts.Meter != nil {
-		meter = opts.Meter
-	}
-
-	attrs := []attribute.KeyValue{}
-	if opts.Attributes != nil {
-		attrs = append(attrs, parseAttributes(opts.Attributes)...)
-	}
-
+func RegisterAsyncGauge(ctx context.Context, opts GaugeOpt) {
 	metricName := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
-	if _, ok := registry.asyncGauges[metricName]; !ok {
-		observe := func(ctx context.Context, o metric.Int64Observer) error {
-			value, err := opts.Callback(ctx)
-			if err != nil {
-				return err
-			}
-			o.Observe(value, metric.WithAttributes(attrs...))
-
-			return nil
-		}
-
-		g, err := meter.
-			Int64ObservableGauge(
-				metricName,
-				metric.WithDescription(opts.Name),
-				metric.WithUnit(opts.Unit),
-				metric.WithInt64Callback(observe),
-			)
-		if err != nil {
-			log.From(ctx).Error().Err(err).Str("metric", opts.MetricName).Msg("error recording gauge metric")
-			return
-		}
-
-		registry.mu.Lock()
-		registry.asyncGauges[metricName] = g
-		registry.mu.Unlock()
+	_, err := registry.setAsyncGauge(ctx, opts)
+	if err != nil {
+		log.From(ctx).Error().Err(err).Str("metric_name", metricName).Msg("error setting async gauge")
 	}
 }
 
-type histogramOpt struct {
-	Name        string
+type HistogramOpt struct {
+	PkgName     string
 	Description string
 	Meter       metric.Meter
 	MetricName  string
-	Attributes  map[string]any
+	Tags        map[string]any
 	Unit        string
 	Boundaries  []float64
 }
 
 // RecordIntHistogramMetric records the observed value for distributions.
 // Bucket can be provided
-func recordIntHistogramMetric(ctx context.Context, value int64, opts histogramOpt) {
-	// use the global one by default
-	meter := otel.Meter(opts.Name)
-	if opts.Meter != nil {
-		meter = opts.Meter
-	}
-
-	var (
-		h   metric.Int64Histogram
-		err error
-	)
+func RecordIntHistogramMetric(ctx context.Context, value int64, opts HistogramOpt) {
 	metricName := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
-
-	if m, ok := registry.histograms[metricName]; ok {
-		h = m
-	} else {
-		h, err = meter.
-			Int64Histogram(
-				metricName,
-				metric.WithDescription(opts.Description),
-				metric.WithUnit(opts.Unit),
-				metric.WithExplicitBucketBoundaries(opts.Boundaries...),
-			)
-		if err != nil {
-			log.From(ctx).Err(err).Str("metric", opts.MetricName).Msg("error recording histogram metric")
-			return
-		}
-
-		registry.mu.Lock()
-		registry.histograms[metricName] = h
-		registry.mu.Unlock()
+	h, err := registry.getHistogram(ctx, opts)
+	if err != nil {
+		log.From(ctx).Error().Err(err).Str("metric_name", metricName).Msg("error accessing histogram metric")
+		return
 	}
 
 	attrs := []attribute.KeyValue{}
-	if opts.Attributes != nil {
-		attrs = append(attrs, parseAttributes(opts.Attributes)...)
+	if opts.Tags != nil {
+		attrs = append(attrs, parseAttributes(opts.Tags)...)
 	}
 	h.Record(ctx, value, metric.WithAttributes(attrs...))
 }

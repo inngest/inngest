@@ -219,13 +219,18 @@ func WithQueueItemIndexer(i QueueItemIndexer) QueueOpt {
 // WithAsyncInstrumentation registers all the async instrumentation that needs to happen on
 // each instrumentation cycle
 // These are mostly gauges for point in time metrics
-func WithAsyncInstrumentation(ctx context.Context) QueueOpt {
+func WithAsyncInstrumentation() QueueOpt {
+	ctx := context.Background()
+
 	return func(q *queue) {
-		telemetry.GaugeWorkerQueueCapacity(ctx, q.capacity(), telemetry.GaugeOpt{PkgName: pkgName})
+		telemetry.GaugeWorkerQueueCapacity(ctx, telemetry.GaugeOpt{
+			PkgName:  pkgName,
+			Callback: func(ctx context.Context) (int64, error) { return q.capacity(), nil },
+		})
 
 		telemetry.GaugeGlobalQueuePartitionCount(ctx, telemetry.GaugeOpt{
 			PkgName: pkgName,
-			Observer: func(ctx context.Context) (int64, error) {
+			Callback: func(ctx context.Context) (int64, error) {
 				dur := time.Hour * 24 * 365
 				return q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), getNow().Add(dur))
 			},
@@ -233,7 +238,7 @@ func WithAsyncInstrumentation(ctx context.Context) QueueOpt {
 
 		telemetry.GaugeGlobalQueuePartitionAvailable(ctx, telemetry.GaugeOpt{
 			PkgName: pkgName,
-			Observer: func(ctx context.Context) (int64, error) {
+			Callback: func(ctx context.Context) (int64, error) {
 				return q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), getNow().Add(PartitionLookahead))
 			},
 		})
@@ -248,12 +253,20 @@ func WithAsyncInstrumentation(ctx context.Context) QueueOpt {
 		for _, shard := range shards {
 			tags := map[string]any{"shard_name": shard.Name}
 
-			telemetry.GaugeQueueShardGuaranteedCapacityCount(ctx, int64(shard.GuaranteedCapacity), telemetry.GaugeOpt{PkgName: pkgName, Tags: tags})
-			telemetry.GaugeQueueShardLeaseCount(ctx, int64(len(shard.Leases)), telemetry.GaugeOpt{PkgName: pkgName, Tags: tags})
+			telemetry.GaugeQueueShardGuaranteedCapacityCount(ctx, telemetry.GaugeOpt{
+				PkgName:  pkgName,
+				Tags:     tags,
+				Callback: func(ctx context.Context) (int64, error) { return int64(shard.GuaranteedCapacity), nil },
+			})
+			telemetry.GaugeQueueShardLeaseCount(ctx, telemetry.GaugeOpt{
+				PkgName:  pkgName,
+				Tags:     tags,
+				Callback: func(ctx context.Context) (int64, error) { return int64(len(shard.Leases)), nil },
+			})
 			telemetry.GaugeQueueShardPartitionAvailableCount(ctx, telemetry.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    tags,
-				Observer: func(ctx context.Context) (int64, error) {
+				Callback: func(ctx context.Context) (int64, error) {
 					return q.partitionSize(ctx, q.kg.ShardPartitionIndex(shard.Name), getNow().Add(PartitionLookahead))
 				},
 			})
