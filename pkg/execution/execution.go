@@ -84,10 +84,6 @@ type Executor interface {
 		// Incoming, optionally using the StepPlanned field to execute a substep if
 		// the step is a generator.
 		edge inngest.Edge,
-		// stackIndex represents the stack pointer at the time this step was scheduled.
-		// This lets SDKs correctly evaluate parallelism by replaying generated steps in the
-		// right order.
-		stackIndex int,
 	) (*state.DriverResponse, error)
 
 	// HandlePauses handles pauses loaded from an incoming event.  This delegates to Cancel and

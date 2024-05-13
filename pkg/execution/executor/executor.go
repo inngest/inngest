@@ -646,18 +646,47 @@ type runInstance struct {
 
 // Execute loads a workflow and the current run state, then executes the
 // function's step via the necessary driver.
-func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge, stackIndex int) (*state.DriverResponse, error) {
+func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge) (*state.DriverResponse, error) {
 	if e.fl == nil {
 		return nil, fmt.Errorf("no function loader specified running step")
+	}
+
+	// If this is of type sleep, ensure that we save "nil" within the state store
+	// for the outgoing edge ID.  This ensures that we properly increase the stack
+	// for `tools.sleep` within generator functions.
+	if item.Kind == queue.KindSleep && item.Attempt == 0 {
+		if err := e.smv2.SaveStep(ctx, sv2.ID{
+			RunID:      id.RunID,
+			FunctionID: id.WorkflowID,
+		}, edge.Outgoing, []byte("null")); err != nil {
+			return nil, err
+		}
+		// After the sleep, we start a new step.  This means we also want to start a new
+		// group ID, ensuring that we correlate the next step _after_ this sleep (to be
+		// scheduled in this executor run)
+		ctx = state.WithGroupID(ctx, uuid.New().String())
 	}
 
 	md, err := e.smv2.LoadMetadata(ctx, sv2.ID{
 		RunID:      id.RunID,
 		FunctionID: id.WorkflowID,
 	})
-	// TODO: MetadataNotFound -> assume fn is deleted.
+	// XXX: MetadataNotFound -> assume fn is deleted.
 	if err != nil {
 		return nil, fmt.Errorf("cannot load metadata to execute run: %w", err)
+	}
+
+	// Find the stack index for the incoming step.
+	//
+	// stackIndex represents the stack pointer at the time this step was scheduled.
+	// This lets SDKs correctly evaluate parallelism by replaying generated steps in the
+	// right order.
+	var stackIndex int
+	for n, id := range md.Stack {
+		if id == edge.Outgoing {
+			stackIndex = n + 1
+			break
+		}
 	}
 
 	events, err := e.smv2.LoadEvents(ctx, md.ID)

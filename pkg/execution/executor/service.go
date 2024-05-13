@@ -210,32 +210,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	}
 	edge := payload.Edge
 
-	// If this is of type sleep, ensure that we save "nil" within the state store
-	// for the outgoing edge ID.  This ensures that we properly increase the stack
-	// for `tools.sleep` within generator functions.
-	var stackIdx int
-	if item.Kind == queue.KindSleep && item.Attempt == 0 {
-		if err = s.state.SaveResponse(ctx, item.Identifier, edge.Outgoing, "null"); err != nil {
-			return err
-		}
-		// Load the position within the stack we just saved.
-		stackIdx, err = s.state.StackIndex(ctx, item.Identifier.RunID, edge.Outgoing)
-		if err != nil {
-			return err
-		}
-		// After the sleep, we start a new step.  THis means we also want to start a new
-		// group ID, ensuring that we correlate the next step _after_ this sleep (to be
-		// scheduled in this executor run)
-		ctx = state.WithGroupID(ctx, uuid.New().String())
-	} else if edge.Outgoing != inngest.TriggerName {
-		// Load the position within the stack for standard edges.
-		stackIdx, err = s.state.StackIndex(ctx, item.Identifier.RunID, edge.Outgoing)
-		if err != nil {
-			return fmt.Errorf("unable to find stack index: %w", err)
-		}
-	}
-
-	resp, err := s.exec.Execute(ctx, item.Identifier, item, edge, stackIdx)
+	resp, err := s.exec.Execute(ctx, item.Identifier, item, edge)
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.
 	if err == state.ErrFunctionCancelled {
