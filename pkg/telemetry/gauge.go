@@ -9,7 +9,7 @@ type GaugeOpt struct {
 }
 
 func GaugeQueueItemLatencyEWMA(ctx context.Context, value int64, opts GaugeOpt) {
-	recordGaugeMetric(ctx, gaugeOpt{
+	registerAsyncGauge(ctx, gaugeOpt{
 		Name:        opts.PkgName,
 		MetricName:  "queue_item_latency_ewma",
 		Description: "The moving average of the queue item latency",
@@ -21,7 +21,7 @@ func GaugeQueueItemLatencyEWMA(ctx context.Context, value int64, opts GaugeOpt) 
 }
 
 func GaugeWorkerQueueCapacity(ctx context.Context, value int64, opts GaugeOpt) {
-	recordGaugeMetric(ctx, gaugeOpt{
+	registerAsyncGauge(ctx, gaugeOpt{
 		Name:        opts.PkgName,
 		MetricName:  "queue_capacity_total",
 		Description: "Capacity of current worker",
@@ -33,7 +33,7 @@ func GaugeWorkerQueueCapacity(ctx context.Context, value int64, opts GaugeOpt) {
 }
 
 func GaugeGlobalQueuePartitionCount(ctx context.Context, opts GaugeOpt) {
-	recordGaugeMetric(ctx, gaugeOpt{
+	registerAsyncGauge(ctx, gaugeOpt{
 		Name:        opts.PkgName,
 		MetricName:  "queue_global_partition_count",
 		Description: "Number of total partitions in the global queue",
@@ -43,7 +43,7 @@ func GaugeGlobalQueuePartitionCount(ctx context.Context, opts GaugeOpt) {
 }
 
 func GaugeGlobalQueuePartitionAvailable(ctx context.Context, opts GaugeOpt) {
-	recordGaugeMetric(ctx, gaugeOpt{
+	registerAsyncGauge(ctx, gaugeOpt{
 		Name:        opts.PkgName,
 		MetricName:  "queue_global_partition_available_count",
 		Description: "Number of available partitions in the global queue",
@@ -53,7 +53,7 @@ func GaugeGlobalQueuePartitionAvailable(ctx context.Context, opts GaugeOpt) {
 }
 
 func GaugeQueueShardCount(ctx context.Context, value int64, opts GaugeOpt) {
-	recordGaugeMetric(ctx, gaugeOpt{
+	registerAsyncGauge(ctx, gaugeOpt{
 		Name:        opts.PkgName,
 		MetricName:  "queue_shards_count",
 		Description: "Number of shards in the queue",
@@ -65,7 +65,7 @@ func GaugeQueueShardCount(ctx context.Context, value int64, opts GaugeOpt) {
 }
 
 func GaugeQueueShardGuaranteedCapacityCount(ctx context.Context, value int64, opts GaugeOpt) {
-	recordGaugeMetric(ctx, gaugeOpt{
+	registerAsyncGauge(ctx, gaugeOpt{
 		Name:        opts.PkgName,
 		MetricName:  "queue_shards_guaranteed_capacity_count",
 		Description: "Shard guaranteed capacity",
@@ -77,7 +77,7 @@ func GaugeQueueShardGuaranteedCapacityCount(ctx context.Context, value int64, op
 }
 
 func GaugeQueueShardLeaseCount(ctx context.Context, value int64, opts GaugeOpt) {
-	recordGaugeMetric(ctx, gaugeOpt{
+	registerAsyncGauge(ctx, gaugeOpt{
 		Name:        opts.PkgName,
 		MetricName:  "queue_shards_lease_count",
 		Description: "Shard current lease count",
@@ -89,7 +89,7 @@ func GaugeQueueShardLeaseCount(ctx context.Context, value int64, opts GaugeOpt) 
 }
 
 func GaugeQueueShardPartitionAvailableCount(ctx context.Context, opts GaugeOpt) {
-	recordGaugeMetric(ctx, gaugeOpt{
+	registerAsyncGauge(ctx, gaugeOpt{
 		Name:        opts.PkgName,
 		MetricName:  "queue_shard_partition_available_count",
 		Description: "The number of shard partitions available",

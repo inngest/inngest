@@ -105,7 +105,7 @@ type GaugeCallback func(ctx context.Context) (int64, error)
 
 // RecordGaugeMetric records the gauge value via a callback.
 // The callback needs to be passed in so it doesn't get captured as a closure when instrumenting the value
-func recordGaugeMetric(ctx context.Context, opts gaugeOpt) {
+func registerAsyncGauge(ctx context.Context, opts gaugeOpt) {
 	// use the global one by default
 	meter := otel.Meter(opts.Name)
 	if opts.Meter != nil {
