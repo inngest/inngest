@@ -19,6 +19,9 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jinzhu/copier"
 	"github.com/oklog/ulid/v2"
+
+	_ "github.com/doug-martin/goqu/v9"
+	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
 )
 
 const (
