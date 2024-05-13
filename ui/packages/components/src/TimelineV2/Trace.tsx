@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { CodeBlock } from '../CodeBlock';
 import { cn } from '../utils/classNames';
+import { toMaybeDate } from '../utils/date';
 import { InlineSpans } from './InlineSpans';
 import { TraceHeading } from './TraceHeading';
 import { TraceInfo } from './TraceInfo';
@@ -38,13 +39,11 @@ export function Trace({ depth, getOutput, isExpandable = true, maxTime, minTime,
   }
 
   const widths = createSpanWidths({
-    minTime,
-    maxTime,
-    trace: {
-      endedAt: trace.endedAt ? new Date(trace.endedAt) : new Date(),
-      queuedAt: new Date(trace.queuedAt),
-      startedAt: trace.startedAt ? new Date(trace.startedAt) : null,
-    },
+    ended: toMaybeDate(trace.endedAt)?.getTime() ?? null,
+    max: maxTime.getTime(),
+    min: minTime.getTime(),
+    queued: new Date(trace.queuedAt).getTime(),
+    started: toMaybeDate(trace.startedAt)?.getTime() ?? null,
   });
 
   let spans = [trace];
@@ -57,7 +56,7 @@ export function Trace({ depth, getOutput, isExpandable = true, maxTime, minTime,
       className={cn(
         'py-2',
         // We don't want borders or horizontal padding on step attempts
-        depth === 0 && 'border-b border-slate-300 px-4',
+        depth === 0 && 'px-4',
         isExpanded && 'bg-blue-50'
       )}
     >

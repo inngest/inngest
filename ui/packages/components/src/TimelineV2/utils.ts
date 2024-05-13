@@ -12,26 +12,30 @@ export type SpanWidths = {
 };
 
 export function createSpanWidths({
-  maxTime,
-  minTime,
-  trace,
+  ended,
+  max,
+  min,
+  queued,
+  started,
 }: {
-  maxTime: Date;
-  minTime: Date;
-  trace: Span;
+  ended: number | null;
+  max: number;
+  min: number;
+  queued: number;
+  started: number | null;
 }) {
-  let beforeWidth = trace.queuedAt.getTime() - minTime.getTime();
-  let queuedWidth = (trace.startedAt ?? maxTime).getTime() - trace.queuedAt.getTime();
+  let beforeWidth = queued - min;
+  let queuedWidth = (started ?? max) - queued;
   let runningWidth = 0;
   let afterWidth = 0;
 
-  if (trace.startedAt) {
-    runningWidth = (trace.endedAt ?? maxTime).getTime() - trace.startedAt.getTime();
+  if (started) {
+    runningWidth = (ended ?? max) - started;
   }
 
-  afterWidth = maxTime.getTime() - (trace.endedAt ?? maxTime).getTime();
+  afterWidth = max - (ended ?? max);
 
-  const totalWidth = maxTime.getTime() - minTime.getTime();
+  const totalWidth = max - min;
 
   return {
     after: normalizeWidth({ width: afterWidth, totalWidth }),
@@ -54,12 +58,4 @@ function normalizeWidth({ totalWidth, width }: { totalWidth: number; width: numb
   const minWidth = 1;
   const maxWidth = 1000;
   return Math.max(Math.floor((width / totalWidth) * maxWidth), minWidth);
-}
-
-export function toMaybeDate<T extends string | null | undefined>(value: T): Date | null {
-  if (!value) {
-    return null;
-  }
-
-  return new Date(value);
 }
