@@ -6,6 +6,6 @@ import (
 	"go.uber.org/goleak"
 )
 
-func TestMain(t *testing.T) {
-	goleak.VerifyTestMain(t)
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 }
