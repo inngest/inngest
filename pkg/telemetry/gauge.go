@@ -35,7 +35,7 @@ func GaugeWorkerQueueCapacity(ctx context.Context, value int64, opts GaugeOpt) {
 func GaugeGlobalQueuePartitionCount(ctx context.Context, opts GaugeOpt) {
 	recordGaugeMetric(ctx, gaugeOpt{
 		Name:        opts.PkgName,
-		MetricName:  "queue_global_partition_total_count",
+		MetricName:  "queue_global_partition_count",
 		Description: "Number of total partitions in the global queue",
 		Attributes:  opts.Tags,
 		Callback:    opts.Observer,
