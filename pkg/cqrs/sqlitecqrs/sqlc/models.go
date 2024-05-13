@@ -140,7 +140,6 @@ type TraceRun struct {
 	QueuedAt    time.Time
 	StartedAt   time.Time
 	EndedAt     time.Time
-	Duration    int64
 	Status      int64
 	SourceID    string
 	TriggerIds  []byte

@@ -132,7 +132,6 @@ CREATE TABLE trace_runs (
 	queued_at TIMESTAMP NOT NULL,
 	started_at TIMESTAMP NOT NULL,
 	ended_at TIMESTAMP NOT NULL,
-	duration INT NOT NULL,
 
 	status INT NOT NULL, -- more like enum values
 	source_id VARCHAR NOT NULL,
