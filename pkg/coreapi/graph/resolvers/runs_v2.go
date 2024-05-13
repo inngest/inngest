@@ -44,8 +44,10 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 
 	orderBy := []cqrs.GetTraceRunOrder{}
 	for _, o := range order {
-		field := enums.TraceRunTimeQueuedAt
-		dir := enums.TraceRunOrderDesc
+		var (
+			field enums.TraceRunTime
+			dir   enums.TraceRunOrder
+		)
 
 		switch o.Field {
 		case models.RunsV2OrderByFieldQueuedAt:
@@ -121,6 +123,11 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 			output = &s
 		}
 
+		status, err := models.ToFunctionRunStatus(r.Status)
+		if err != nil {
+			continue
+		}
+
 		node := &models.FunctionRunV2{
 			ID:         r.RunID,
 			AppID:      r.AppID,
@@ -130,6 +137,7 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 			StartedAt:  started,
 			EndedAt:    ended,
 			SourceID:   sourceID,
+			Status:     status,
 			TriggerIDs: r.TriggerIDs,
 			Triggers:   []string{},
 			Output:     output,

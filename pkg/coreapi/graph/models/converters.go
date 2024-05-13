@@ -83,6 +83,8 @@ func MakeFunctionRun(f *cqrs.FunctionRun) *FunctionRun {
 
 func ToFunctionRunStatus(s enums.RunStatus) (FunctionRunStatus, error) {
 	switch s {
+	case enums.RunStatusScheduled:
+		return FunctionRunStatusQueued, nil
 	case enums.RunStatusRunning:
 		return FunctionRunStatusRunning, nil
 	case enums.RunStatusCompleted:
@@ -91,8 +93,6 @@ func ToFunctionRunStatus(s enums.RunStatus) (FunctionRunStatus, error) {
 		return FunctionRunStatusFailed, nil
 	case enums.RunStatusCancelled:
 		return FunctionRunStatusCancelled, nil
-	case enums.RunStatusScheduled:
-		return FunctionRunStatusQueued, nil
 	default:
 		return FunctionRunStatusRunning, fmt.Errorf("unknown run status: %d", s)
 	}
