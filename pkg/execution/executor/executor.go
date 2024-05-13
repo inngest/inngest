@@ -2527,13 +2527,14 @@ func (e executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Funct
 
 	key := fmt.Sprintf("%s-%s", fn.ID, payload.BatchID)
 	identifier, err := e.Schedule(ctx, execution.ScheduleRequest{
-		AccountID:      payload.AccountID,
-		WorkspaceID:    payload.WorkspaceID,
-		AppID:          payload.AppID,
-		Function:       fn,
-		Events:         events,
-		BatchID:        &payload.BatchID,
-		IdempotencyKey: &key,
+		AccountID:        payload.AccountID,
+		WorkspaceID:      payload.WorkspaceID,
+		AppID:            payload.AppID,
+		Function:         fn,
+		Events:           events,
+		BatchID:          &payload.BatchID,
+		IdempotencyKey:   &key,
+		FunctionPausedAt: payload.FunctionPausedAt,
 	})
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())

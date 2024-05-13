@@ -78,10 +78,11 @@ type ScheduleBatchOpts struct {
 }
 
 type ScheduleBatchPayload struct {
-	BatchID         ulid.ULID `json:"batchID"`
-	AccountID       uuid.UUID `json:"acctID"`
-	WorkspaceID     uuid.UUID `json:"wsID"`
-	AppID           uuid.UUID `json:"appID"`
-	FunctionID      uuid.UUID `json:"fnID"`
-	FunctionVersion int       `json:"fnV"`
+	BatchID          ulid.ULID  `json:"batchID"`
+	AccountID        uuid.UUID  `json:"acctID"`
+	WorkspaceID      uuid.UUID  `json:"wsID"`
+	AppID            uuid.UUID  `json:"appID"`
+	FunctionID       uuid.UUID  `json:"fnID"`
+	FunctionVersion  int        `json:"fnV"`
+	FunctionPausedAt *time.Time `json:"fpAt,omitempty"`
 }
