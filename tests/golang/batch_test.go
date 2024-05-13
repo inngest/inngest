@@ -10,11 +10,13 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type BatchEventData struct {
 	Time time.Time `json:"time"`
+	Num  int       `json:"num"`
 }
 
 type BatchEvent = inngestgo.GenericEvent[BatchEventData, any]
@@ -59,6 +61,52 @@ func TestBatchEvents(t *testing.T) {
 		<-time.After(5 * time.Second)
 		require.EqualValues(t, 2, atomic.LoadInt32(&counter))
 		require.EqualValues(t, 8, atomic.LoadInt32(&totalEvents))
+	})
+}
+
+func TestBatchConditional(t *testing.T) {
+	ctx := context.Background()
+	h, server, registerFuncs := NewSDKHandler(t, "batch-cond")
+	defer server.Close()
+
+	var (
+		counter     int32
+		totalEvents int32
+	)
+
+	batch := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			ID:   "batch-cond",
+			Name: "test batching conditional",
+			BatchEvents: &inngest.EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "3s",
+			},
+		},
+		inngestgo.EventTrigger("batch/cond", inngestgo.StrPtr("has(event.data.num) && event.data.num % 2 == 0")),
+		func(ctx context.Context, input inngestgo.Input[BatchEvent]) (any, error) {
+			evts := input.Events
+			atomic.AddInt32(&counter, 1)
+			atomic.AddInt32(&totalEvents, int32(len(evts)))
+			return true, nil
+		},
+	)
+	h.Register(batch)
+	registerFuncs()
+
+	t.Run("batch with conditional event trigger", func(t *testing.T) {
+		for i := 1; i <= 10; i++ {
+			_, err := inngestgo.Send(ctx, BatchEvent{
+				Name: "batch/cond",
+				Data: BatchEventData{Num: i},
+			})
+			require.NoError(t, err)
+		}
+
+		// Wait for trigger to run
+		<-time.After(4 * time.Second)
+		assert.Equal(t, 1, atomic.LoadInt32(&counter))
+		assert.Equal(t, 5, atomic.LoadInt32(&totalEvents))
 	})
 }
 
