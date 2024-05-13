@@ -263,6 +263,7 @@ export default function AppCard({ app }: { app: App }) {
         {!app.autodiscovered && (
           <div className="p-4 pr-6 text-white">
             <AlertModal
+              className="w-1/3 max-w-xl"
               isOpen={isAlertModalOpen}
               title="Are you sure you want to delete the app?"
               onClose={() => setIsAlertModalOpen(false)}
