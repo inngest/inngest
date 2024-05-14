@@ -69,7 +69,7 @@ func TestFunctionRunList(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < successTotal; i++ {
-			inngestgo.Send(ctx, inngestgo.Event{Name: "fnrun/ok", Data: map[string]any{"success": true}})
+			_, _ = inngestgo.Send(ctx, inngestgo.Event{Name: "fnrun/ok", Data: map[string]any{"success": true}})
 		}
 	}()
 
@@ -77,7 +77,7 @@ func TestFunctionRunList(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < failureTotal; i++ {
-			inngestgo.Send(ctx, inngestgo.Event{Name: "fnrun/failed", Data: map[string]any{"success": false}})
+			_, _ = inngestgo.Send(ctx, inngestgo.Event{Name: "fnrun/failed", Data: map[string]any{"success": false}})
 		}
 	}()
 
