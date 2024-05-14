@@ -2380,6 +2380,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		telemetry.WithTimestamp(now),
 		telemetry.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeWaitForEvent.String()),
 			attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
 			attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
 			attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
