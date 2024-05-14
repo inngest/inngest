@@ -16,12 +16,14 @@ import (
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jinzhu/copier"
 	"github.com/oklog/ulid/v2"
 
 	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
+	sqexp "github.com/doug-martin/goqu/v9/exp"
 )
 
 const (
@@ -697,9 +699,9 @@ type traceRun struct {
 	FunctionID  uuid.UUID `db:"function_id"`
 	TraceID     string    `db:"trace_id"`
 	RunID       ulid.ULID `db:"run_id"`
-	QueuedAt    time.Time `db:"queued_at"`
-	StartedAt   time.Time `db:"started_at"`
-	EndedAt     time.Time `db:"ended_at"`
+	QueuedAt    int64     `db:"queued_at"`
+	StartedAt   int64     `db:"started_at"`
+	EndedAt     int64     `db:"ended_at"`
 	Status      int64     `db:"status"`
 	SourceID    string    `db:"source_id"`
 	TriggerIDs  []byte    `db:"trigger_ids"`
@@ -728,25 +730,92 @@ func (tr *traceRun) EventIDs() []ulid.ULID {
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
-	sqlite := sq.Dialect("sqlite3")
+	// filters
+	filter := []sq.Expression{}
+	if len(opt.Filter.AppID) > 0 {
+		filter = append(filter, sq.C("app_id").In(opt.Filter.AppID))
+	}
+	if len(opt.Filter.FunctionID) > 0 {
+		filter = append(filter, sq.C("function_id").In(opt.Filter.FunctionID))
+	}
+	if len(opt.Filter.Status) > 0 {
+		status := []int64{}
+		for _, s := range opt.Filter.Status {
+			switch s {
+			case enums.RunStatusUnknown, enums.RunStatusOverflowed:
+				continue
+			}
+			status = append(status, s.ToCode())
+		}
+		filter = append(filter, sq.C("status").In(status))
+	}
+	tsfield := strings.ToLower(opt.Filter.TimeField.String())
+	filter = append(filter, sq.C(tsfield).Gte(opt.Filter.From.UnixMilli()))
 
-	b := sqlite.From("trace_runs").Select(
-		"app_id",
-		"function_id",
-		"trace_id",
-		"run_id",
-		"queued_at",
-		"started_at",
-		"ended_at",
-		"status",
-		"source_id",
-		"trigger_ids",
-		"output",
-		"is_batch",
-		"is_debounce",
-	)
+	until := opt.Filter.Until
+	if until.UnixMilli() <= 0 {
+		until = time.Now()
+	}
+	filter = append(filter, sq.C(tsfield).Lt(until.UnixMilli()))
 
-	sql, args, err := b.ToSQL()
+	// order by
+	sortOrder := []enums.TraceRunTime{}
+	sortDir := map[enums.TraceRunTime]enums.TraceRunOrder{}
+	for _, f := range opt.Order {
+		sortDir[f.Field] = f.Direction
+		found := false
+		for _, field := range sortOrder {
+			if f.Field == field {
+				found = true
+				break
+			}
+		}
+		if !found {
+			sortOrder = append(sortOrder, f.Field)
+		}
+	}
+	order := []sqexp.OrderedExpression{}
+	for _, f := range sortOrder {
+		var o sqexp.OrderedExpression
+		field := strings.ToLower(f.String())
+		if d, ok := sortDir[f]; ok {
+			switch d {
+			case enums.TraceRunOrderAsc:
+				o = sq.C(field).Asc()
+			case enums.TraceRunOrderDesc:
+				o = sq.C(field).Desc()
+			default:
+				log.From(ctx).Error().Str("field", field).Str("direction", d.String()).Msg("invalid direction specified for sorting")
+				continue
+			}
+
+			order = append(order, o)
+		}
+	}
+	order = append(order, sq.C("run_id").Asc())
+
+	// read from database
+	sql, args, err := sq.Dialect("sqlite3").
+		From("trace_runs").
+		Select(
+			"app_id",
+			"function_id",
+			"trace_id",
+			"run_id",
+			"queued_at",
+			"started_at",
+			"ended_at",
+			"status",
+			"source_id",
+			"trigger_ids",
+			"output",
+			"is_batch",
+			"is_debounce",
+		).
+		Where(filter...).
+		Limit(opt.Items).
+		Order(order...).
+		ToSQL()
 	if err != nil {
 		return nil, err
 	}
@@ -783,9 +852,9 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			FunctionID: data.FunctionID,
 			TraceID:    data.TraceID,
 			RunID:      data.RunID,
-			QueuedAt:   data.QueuedAt,
-			StartedAt:  data.StartedAt,
-			EndedAt:    data.EndedAt,
+			QueuedAt:   time.UnixMilli(data.QueuedAt),
+			StartedAt:  time.UnixMilli(data.StartedAt),
+			EndedAt:    time.UnixMilli(data.EndedAt),
 			SourceID:   data.SourceID,
 			TriggerIDs: data.EventIDs(),
 			Triggers:   [][]byte{},

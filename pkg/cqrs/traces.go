@@ -97,6 +97,8 @@ type GetTraceRunFilter struct {
 	AppID       []uuid.UUID
 	FunctionID  []uuid.UUID
 	TimeField   enums.TraceRunTime
+	From        time.Time
+	Until       time.Time
 	Status      []enums.RunStatus
 	CEL         string
 }

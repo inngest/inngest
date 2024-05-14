@@ -82,11 +82,17 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 		cel = *filter.Query
 	}
 
+	until := time.Now()
+	if filter.Until != nil {
+		until = *filter.Until
+	}
 	opts := cqrs.GetTraceRunOpt{
 		Filter: cqrs.GetTraceRunFilter{
 			AppID:      filter.AppIDs,
 			FunctionID: filter.FunctionIDs,
 			TimeField:  tsfield,
+			From:       filter.From,
+			Until:      until,
 			Status:     statuses,
 			CEL:        cel,
 		},
