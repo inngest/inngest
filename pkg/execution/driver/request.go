@@ -1,10 +1,7 @@
 package driver
 
 import (
-	"encoding/json"
-
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -20,18 +17,6 @@ type SDKRequest struct {
 
 	// DEPRECATED: NOTE: This is moved into SDKRequestContext for V3+/Non-TS SDKs
 	UseAPI bool `json:"use_api"`
-}
-
-// TODO:
-// This can be improved with a static map reference of size limits
-// for each serverless providers so we don't always enforced it at
-// the lowest common denominator, since those limits rarely changes.
-func (req *SDKRequest) IsBodySizeTooLarge() bool {
-	byt, err := json.Marshal(req)
-	if err != nil {
-		return false
-	}
-	return len(byt) >= consts.MaxBodySize
 }
 
 type SDKRequestContext struct {

@@ -61,7 +61,8 @@ func MarshalV1(
 		UseAPI:  true,
 	}
 
-	if md.Metrics.StateSize <= consts.MaxBodySize {
+	// Ensure that we're not sending data that's too large to the SDK.
+	if md.Metrics.StateSize <= (consts.MaxBodySize - 1024) {
 		// Load the actual function state here.
 		state, err := sl.LoadState(ctx, md.ID)
 		if err != nil {
@@ -96,6 +97,20 @@ func MarshalV1(
 	j, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling request to JSON: %w", err)
+	}
+
+	// And here, to double check, ensure that the length isn't excessive once again.
+	// This is because, as Jack points out, for backcompat we send both events and the
+	// first event.  We also may have incorrect state sizes for runs before this is tracked.
+	if len(j) > consts.MaxBodySize {
+		req.Events = []map[string]any{}
+		req.Actions = map[string]any{}
+		req.UseAPI = true
+		req.Context.UseAPI = true
+		if j, err = json.Marshal(req); err != nil {
+			return nil, fmt.Errorf("error marshalling request to JSON: %w", err)
+		}
+
 	}
 
 	b, err := jcs.Transform(j)
