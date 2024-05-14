@@ -4,7 +4,7 @@ package state.v2;
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/tonyhb/datos/protobuf/buf/gen/state/v2;statev2";
+option go_package = "github.com/inngest/inngest/proto/gen/state/v2;statev2";
 
 message Metadata {
   ID              id      = 1;
