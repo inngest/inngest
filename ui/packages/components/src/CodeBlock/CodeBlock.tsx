@@ -16,6 +16,8 @@ import { type editor } from 'monaco-editor';
 import { useLocalStorage } from 'react-use';
 import colors from 'tailwindcss/colors';
 
+import { isDark } from '../utils/theme';
+
 const LINE_HEIGHT = 26;
 const MAX_HEIGHT = 280; // Equivalent to 10 lines + padding
 const MAX_LINES = 10;
@@ -49,9 +51,12 @@ interface CodeBlockProps {
     handleChange?: (value: string) => void;
   }[];
   actions?: CodeBlockAction[];
+  //
+  // component will use tailwind/system color scheme settings unless overridden
+  colorScheme?: 'dark' | 'light';
 }
 
-export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
+export function CodeBlock({ header, tabs, actions = [], colorScheme }: CodeBlockProps) {
   const [activeTab, setActiveTab] = useState(0);
   const editorRef = useRef<MonacoEditorType>(null);
 
@@ -71,8 +76,10 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
       return;
     }
 
+    const dark = colorScheme ? colorScheme === 'dark' : isDark();
+
     monaco.editor.defineTheme('inngest-theme', {
-      base: 'vs-dark',
+      base: dark ? 'vs-dark' : 'vs',
       inherit: true,
       rules: [
         {
@@ -113,13 +120,15 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
           foreground: colors.red['500'],
         },
       ],
-      colors: {
-        'editor.background': '#1e293b4d', // slate-800/40
-        'editorLineNumber.foreground': '#cbd5e14d', // slate-300/30
-        'editorLineNumber.activeForeground': colors.slate['300'], // slate-300
-        'editorWidget.background': colors.slate['800'],
-        'editorWidget.border': colors.slate['500'],
-      },
+      colors: dark
+        ? {
+            'editor.background': '#1e293b4d', // slate-800/40
+            'editorLineNumber.foreground': '#cbd5e14d', // slate-300/30
+            'editorLineNumber.activeForeground': colors.slate['300'], // slate-300
+            'editorWidget.background': colors.slate['800'],
+            'editorWidget.border': colors.slate['500'],
+          }
+        : {},
     });
   }, [monaco]);
 

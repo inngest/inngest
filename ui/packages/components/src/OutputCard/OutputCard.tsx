@@ -29,6 +29,7 @@ export function OutputCard({ isSuccess, content }: OutputCardProps) {
           content: output,
         },
       ]}
+      colorScheme="dark"
     />
   );
 }
