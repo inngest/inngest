@@ -124,7 +124,12 @@ type Executor interface {
 	// InvokeNotFoundHandler invokes the invoke not found handler.
 	InvokeNotFoundHandler(context.Context, InvokeNotFoundHandlerOpts) error
 
+	AppendAndScheduleBatchWithOpts(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts BatchExecOpts) error
+	// deprecated; use AppendAndScheduleBatchWithOpts in new code
 	AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem) error
+
+	RetrieveAndScheduleBatchWithOpts(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts BatchExecOpts) error
+	// deprecated; use RetrieveAndScheduleBatchWithOpts in new code
 	RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload) error
 }
 
@@ -135,6 +140,12 @@ type InvokeNotFoundHandlerOpts struct {
 	RunID         string
 	Err           map[string]any
 	Result        any
+}
+
+// BatchExecOpts communicates state and options that are relevant only when scheduling a batch
+// to be worked on *imminently* (i.e. ~now, not at some future time).
+type BatchExecOpts struct {
+	FunctionPausedAt *time.Time
 }
 
 // FinishHandler is a function that handles functions finishing in the executor.
