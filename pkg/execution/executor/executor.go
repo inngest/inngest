@@ -1660,9 +1660,30 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		return fmt.Errorf("error enqueueing after pause: %w", err)
 	}
 
+	ts := time.Now()
+	if pause.TraceStartedAt != nil {
+		ts = (*pause.TraceStartedAt).Time()
+	}
+
+	commonAttrs := []attribute.KeyValue{
+		attribute.Bool(consts.OtelUserTraceFilterKey, true),
+		attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
+		attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
+		attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),
+		attribute.String(consts.OtelSysFunctionID, pause.Identifier.WorkflowID.String()),
+		// attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
+		attribute.Int(consts.OtelSysFunctionVersion, pause.Identifier.WorkflowVersion),
+		attribute.String(consts.OtelAttrSDKRunID, pause.Identifier.RunID.String()),
+		attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
+		attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
+		attribute.String(consts.OtelSysStepGroupID, pause.GroupID),
+		attribute.String(consts.OtelSysStepDisplayName, pause.StepName),
+	}
+
 	if pause.Opcode != nil && *pause.Opcode == enums.OpcodeInvokeFunction.String() {
 		if pause.StepSpanID != nil && *pause.StepSpanID != "" {
 			if spanID, err := trace.SpanIDFromHex(*pause.StepSpanID); err == nil {
+				// Used for spans
 				triggeringEventID := ""
 				if pause.TriggeringEventID != nil {
 					triggeringEventID = *pause.TriggeringEventID
@@ -1673,42 +1694,24 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 					returnedEventID = r.EventID.String()
 				}
 
-				runID := ""
-				if r.RunID != nil {
-					runID = r.RunID.String()
-				}
-
 				targetFnID := ""
 				if pause.InvokeTargetFnID != nil {
 					targetFnID = *pause.InvokeTargetFnID
 				}
 
-				ts := time.Now()
-				if pause.TraceStartedAt != nil {
-					ts = (*pause.TraceStartedAt).Time()
+				runID := ""
+				if r.RunID != nil {
+					runID = r.RunID.String()
 				}
 
 				var span *telemetry.Span
 				ctx, span = telemetry.NewSpan(ctx,
 					telemetry.WithScope(consts.OtelScopeStep),
-					telemetry.WithName("invoke"),
+					telemetry.WithName(consts.OtelSpanInvoke),
 					telemetry.WithTimestamp(ts),
 					telemetry.WithSpanID(spanID),
 					telemetry.WithSpanAttributes(
-						attribute.Bool(consts.OtelUserTraceFilterKey, true),
-						attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
-						attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
-						attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),
-						attribute.String(consts.OtelSysFunctionID, pause.Identifier.WorkflowID.String()),
-						// attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
-						attribute.Int(consts.OtelSysFunctionVersion, pause.Identifier.WorkflowVersion),
-						attribute.String(consts.OtelAttrSDKRunID, pause.Identifier.RunID.String()),
-						attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
-						attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
-						attribute.String(consts.OtelSysStepGroupID, pause.GroupID),
 						attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
-						attribute.String(consts.OtelSysStepDisplayName, pause.StepName),
-
 						attribute.String(consts.OtelSysStepInvokeTargetFnID, targetFnID),
 						attribute.Int64(consts.OtelSysStepInvokeExpires, pause.Expires.Time().UnixMilli()),
 						attribute.String(consts.OtelSysStepInvokeTriggeringEventID, triggeringEventID),
@@ -1717,10 +1720,11 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 						attribute.Bool(consts.OtelSysStepInvokeExpired, r.EventID == nil),
 					),
 				)
+				defer span.Send()
+				span.SetAttributes(commonAttrs...)
 				if r.HasError() {
 					span.SetStatus(codes.Error, r.Error())
 				}
-				span.Send()
 			}
 		}
 
@@ -1728,6 +1732,28 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), pause.Identifier, r, pause.GroupID)
 		}
 	} else {
+		if pause.StepSpanID != nil && *pause.StepSpanID != "" {
+			if spanID, err := trace.SpanIDFromHex(*pause.StepSpanID); err == nil {
+				var span *telemetry.Span
+				ctx, span = telemetry.NewSpan(ctx,
+					telemetry.WithScope(consts.OtelScopeStep),
+					telemetry.WithName(consts.OtelSpanInvoke),
+					telemetry.WithTimestamp(ts),
+					telemetry.WithSpanID(spanID),
+					telemetry.WithSpanAttributes(
+						attribute.String(consts.OtelSysStepOpcode, enums.OpcodeWaitForEvent.String()),
+						attribute.Int64(consts.OtelSysStepWaitExpires, pause.Expires.Time().UnixMilli()),
+						attribute.Bool(consts.OtelSysStepWaitExpired, r.EventID == nil),
+					),
+				)
+				defer span.Send()
+				span.SetAttributes(commonAttrs...)
+				if r.HasError() {
+					span.SetStatus(codes.Error, r.Error())
+				}
+			}
+		}
+
 		for _, e := range e.lifecycles {
 			go e.OnWaitForEventResumed(context.WithoutCancel(ctx), pause.Identifier, r, pause.GroupID)
 		}
