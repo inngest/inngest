@@ -1,10 +1,10 @@
 syntax = "proto3";
 package state.v2;
 
-import "google/protobuf/any.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/inngest/inngest/proto/gen/state/v2;statev2";
+option go_package = "github.com/tonyhb/datos/protobuf/buf/gen/state/v2;statev2";
 
 message Metadata {
   ID              id      = 1;
@@ -30,10 +30,11 @@ message Config {
   int64                             request_version  = 8;
   string                            idempotency      = 9;
   optional string                   replay_id        = 10;
-  optional int64                    priority_factor  = 11;
-  repeated ConcurrencyKey           concurrency_keys = 12;
-  bool                              force_step_plan  = 13;
-  map<string, google.protobuf.Any>  context          = 14;
+  optional string                   original_run_id  = 11;
+  optional int64                    priority_factor  = 12;
+  repeated ConcurrencyKey           concurrency_keys = 13;
+  bool                              force_step_plan  = 14;
+  google.protobuf.Struct            context          = 15;
 }
 
 message ConcurrencyKey {
