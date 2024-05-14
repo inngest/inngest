@@ -87,7 +87,6 @@ func TestStateHarness(t *testing.T) {
 	sm, err := New(
 		context.Background(),
 		WithKeyPrefix("{test}:"),
-		WithFunctionLoader(testharness.FunctionLoader()),
 		WithConnectOpts(rueidis.ClientOption{
 			InitAddress:  []string{r.Addr()},
 			DisableCache: true,

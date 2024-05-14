@@ -100,7 +100,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	t := runner.NewTracker()
 	sm, err = redis_state.New(
 		ctx,
-		redis_state.WithFunctionLoader(loader),
 		redis_state.WithRedisClient(rc),
 		redis_state.WithKeyGenerator(redis_state.DefaultKeyFunc{
 			Prefix: "{state}",

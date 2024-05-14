@@ -189,9 +189,6 @@ type MetadataUpdate struct {
 // It is assumed that, once initialized, state does not error when returning
 // data for the given identifier.
 type State interface {
-	// Function returns the inngest function for the given run.
-	Function() inngest.Function
-
 	// Metadata returns the run metadata, including the started at time
 	// as well as the pending count.
 	Metadata() Metadata
@@ -239,7 +236,6 @@ type State interface {
 
 // Manager represents a state manager which can both load and mutate state.
 type Manager interface {
-	FunctionLoader
 	StateLoader
 	Mutater
 	PauseManager

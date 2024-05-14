@@ -3,7 +3,6 @@ package state
 import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -18,7 +17,6 @@ import (
 //
 // This is safe to use and fulfils that requirement.
 func NewStateInstance(
-	f inngest.Function,
 	id Identifier,
 	metadata Metadata,
 	events []map[string]any,
@@ -26,7 +24,6 @@ func NewStateInstance(
 	stack []string,
 ) State {
 	return &memstate{
-		function:   f,
 		identifier: id,
 		metadata:   metadata,
 		events:     events,
@@ -36,8 +33,6 @@ func NewStateInstance(
 }
 
 type memstate struct {
-	function inngest.Function
-
 	identifier Identifier
 
 	metadata Metadata
@@ -61,10 +56,6 @@ func (s memstate) Metadata() Metadata {
 
 func (s memstate) Identifier() Identifier {
 	return s.identifier
-}
-
-func (s memstate) Function() inngest.Function {
-	return s.function
 }
 
 func (s memstate) WorkflowID() uuid.UUID {

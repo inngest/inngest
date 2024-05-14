@@ -177,8 +177,6 @@ func checkNew(t *testing.T, m state.Manager) {
 	s, err := m.New(ctx, init)
 	require.NoError(t, err)
 
-	found := s.Function()
-	require.EqualValues(t, w, found, "Returned workflow does not match input")
 	require.EqualValues(t, evt, s.Event(), "Returned event does not match input")
 	require.EqualValues(t, batch, s.Events(), "Returned events does not match input")
 	require.EqualValues(t, enums.RunStatusScheduled, s.Metadata().Status, "Status is not Scheduled")
@@ -188,8 +186,6 @@ func checkNew(t *testing.T, m state.Manager) {
 	loaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 
-	found = loaded.Function()
-	require.EqualValues(t, w, found, "Loaded workflow does not match input")
 	require.EqualValues(t, input.Map(), loaded.Event(), "Loaded event does not match input")
 }
 
@@ -260,16 +256,12 @@ func checkNew_stepdata(t *testing.T, m state.Manager) {
 	s, err := m.New(ctx, init)
 	require.NoError(t, err)
 
-	found := s.Function()
-	require.EqualValues(t, w, found, "Returned workflow does not match input")
 	require.EqualValues(t, evt, s.Event(), "Returned event does not match input")
 	require.EqualValues(t, batch, s.Events(), "Returned events does not match input")
 
 	loaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 
-	found = loaded.Function()
-	require.EqualValues(t, w, found, "Loaded workflow does not match input")
 	require.EqualValues(t, input.Map(), loaded.Event(), "Loaded event does not match input")
 
 	data := loaded.Actions()
@@ -353,7 +345,6 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 
 	// Ensure basics haven't changed.
 	require.EqualValues(t, s.Identifier(), next.Identifier())
-	require.EqualValues(t, s.Function(), next.Function())
 	require.EqualValues(t, s.Event(), next.Event())
 
 	// Assert that the next state has actions set. for the first step.
@@ -393,7 +384,6 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	require.NotNil(t, next)
 
 	require.EqualValues(t, s.Identifier(), next.Identifier())
-	require.EqualValues(t, s.Function(), next.Function())
 	require.EqualValues(t, s.Event(), next.Event())
 	// Assert that the next state has actions set. for the first step.
 	require.Equal(t, 0, len(s.Actions()))
@@ -415,7 +405,6 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	reloaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, next.Identifier(), reloaded.Identifier())
-	require.EqualValues(t, next.Function(), reloaded.Function())
 	require.EqualValues(t, next.Event(), reloaded.Event())
 	require.EqualValues(t, next.Actions(), reloaded.Actions())
 	require.EqualValues(t, next.Errors(), reloaded.Errors())

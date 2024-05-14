@@ -21,7 +21,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
@@ -33,8 +32,6 @@ var (
 	// scripts stores all embedded lua scripts on initialization
 	scripts = map[string]*rueidis.Lua{}
 	include = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
-
-	ErrNoFunctionLoader = fmt.Errorf("No function loader specified within redis state store")
 
 	// A number to version backend logic in order to prevent non-backward compatible
 	// changes to break
@@ -224,20 +221,8 @@ func WithKeyGenerator(kf KeyGenerator) Opt {
 	}
 }
 
-// WithFunctionLoader adds a function loader to the state interface.
-//
-// As of v0.13.0, function configuration is stored outside of the state store,
-// either in a cache or a datastore.  Because this is read-heavy, this should
-// be cached where possible.
-func WithFunctionLoader(fl state.FunctionLoader) Opt {
-	return func(m *mgr) {
-		m.fl = fl
-	}
-}
-
 type mgr struct {
 	kf KeyGenerator
-	fl state.FunctionLoader
 
 	// this is the standard redis client for the state store.
 	r rueidis.Client
@@ -246,11 +231,6 @@ type mgr struct {
 }
 
 func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
-	f, err := m.LoadFunction(ctx, input.Identifier.WorkspaceID, input.Identifier.WorkflowID)
-	if err != nil {
-		return nil, fmt.Errorf("error loading function in state store: %w", err)
-	}
-
 	// We marshal this ahead of creating a redis transaction as it's necessary
 	// every time and reduces the duration that the lock is held.
 	events, err := json.Marshal(input.EventBatchData)
@@ -318,7 +298,6 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 	}
 
 	return state.NewStateInstance(
-			*f,
 			input.Identifier,
 			metadata.Metadata(),
 			input.EventBatchData,
@@ -435,13 +414,6 @@ func (m mgr) Metadata(ctx context.Context, runID ulid.ULID) (*state.Metadata, er
 	return &meta, nil
 }
 
-func (m mgr) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*inngest.Function, error) {
-	if m.fl == nil {
-		return nil, ErrNoFunctionLoader
-	}
-	return m.fl.LoadFunction(ctx, envID, fnID)
-}
-
 func (m mgr) LoadEvents(ctx context.Context, fnID uuid.UUID, runID ulid.ULID) ([]json.RawMessage, error) {
 	var (
 		events []json.RawMessage
@@ -499,11 +471,6 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 
 	id := metadata.Identifier
 
-	fn, err := m.fl.LoadFunction(ctx, id.WorkspaceID, id.WorkflowID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to load function from state function loader: %s: %w", id.WorkflowID, err)
-	}
-
 	// Load events.
 	events := []map[string]any{}
 	switch metadata.Version {
@@ -553,7 +520,7 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 		return nil, fmt.Errorf("error fetching stack: %w", err)
 	}
 
-	return state.NewStateInstance(*fn, id, meta, events, actions, stack), nil
+	return state.NewStateInstance(id, meta, events, actions, stack), nil
 }
 
 func (m mgr) stack(ctx context.Context, runID ulid.ULID) ([]string, error) {
