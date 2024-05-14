@@ -174,60 +174,60 @@ func TestFunctionRunList(t *testing.T) {
 		}
 	})
 
-	// t.Run("paginate without additional filter", func(t *testing.T) {
-	// 	items := 10
-	// 	edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
-	// 		Start: start,
-	// 		End:   end,
-	// 		Items: items,
-	// 	})
+	t.Run("paginate without additional filter", func(t *testing.T) {
+		items := 10
+		edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
+			Start: start,
+			End:   end,
+			Items: items,
+		})
 
-	// 	assert.Equal(t, items, len(edges))
-	// 	assert.True(t, pageInfo.HasNextPage)
+		assert.Equal(t, items, len(edges))
+		assert.True(t, pageInfo.HasNextPage)
 
-	// 	// there should be only 3 left
-	// 	edges, pageInfo = c.FunctionRuns(ctx, client.FunctionRunOpt{
-	// 		Start:  start,
-	// 		End:    end,
-	// 		Items:  items,
-	// 		Cursor: *pageInfo.EndCursor,
-	// 	})
-	// 	remain := successTotal + failureTotal - items
-	// 	assert.Equal(t, remain, len(edges))
-	// 	assert.False(t, pageInfo.HasNextPage)
-	// })
+		// there should be only 3 left
+		edges, pageInfo = c.FunctionRuns(ctx, client.FunctionRunOpt{
+			Start:  start,
+			End:    end,
+			Items:  items,
+			Cursor: *pageInfo.EndCursor,
+		})
+		remain := successTotal + failureTotal - items
+		assert.Equal(t, remain, len(edges))
+		assert.False(t, pageInfo.HasNextPage)
+	})
 
-	// t.Run("paginate with status filter", func(t *testing.T) {
-	// 	items := 2
-	// 	edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
-	// 		Start:     start,
-	// 		End:       end,
-	// 		TimeField: models.FunctionRunTimeFieldV2EndedAt,
-	// 		Status:    []string{models.FunctionRunStatusFailed.String()},
-	// 		Order: []models.RunsV2OrderBy{
-	// 			{Field: models.RunsV2OrderByFieldEndedAt, Direction: models.RunsOrderByDirectionDesc},
-	// 		},
-	// 		Items: items,
-	// 	})
+	t.Run("paginate with status filter", func(t *testing.T) {
+		items := 2
+		edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
+			Start:     start,
+			End:       end,
+			TimeField: models.FunctionRunTimeFieldV2EndedAt,
+			Status:    []string{models.FunctionRunStatusFailed.String()},
+			Order: []models.RunsV2OrderBy{
+				{Field: models.RunsV2OrderByFieldEndedAt, Direction: models.RunsOrderByDirectionDesc},
+			},
+			Items: items,
+		})
 
-	// 	assert.Equal(t, 2, len(edges))
-	// 	assert.True(t, pageInfo.HasNextPage)
+		assert.Equal(t, 2, len(edges))
+		assert.True(t, pageInfo.HasNextPage)
 
-	// 	// there are only 3 failed runs, so there shouldn't be anymore than 1
-	// 	edges, pageInfo = c.FunctionRuns(ctx, client.FunctionRunOpt{
-	// 		Start:     start,
-	// 		End:       end,
-	// 		TimeField: models.FunctionRunTimeFieldV2EndedAt,
-	// 		Status:    []string{models.FunctionRunStatusFailed.String()},
-	// 		Items:     items,
-	// 		Order: []models.RunsV2OrderBy{
-	// 			{Field: models.RunsV2OrderByFieldEndedAt, Direction: models.RunsOrderByDirectionDesc},
-	// 		},
-	// 		Cursor: *pageInfo.EndCursor,
-	// 	})
+		// there are only 3 failed runs, so there shouldn't be anymore than 1
+		edges, pageInfo = c.FunctionRuns(ctx, client.FunctionRunOpt{
+			Start:     start,
+			End:       end,
+			TimeField: models.FunctionRunTimeFieldV2EndedAt,
+			Status:    []string{models.FunctionRunStatusFailed.String()},
+			Items:     items,
+			Order: []models.RunsV2OrderBy{
+				{Field: models.RunsV2OrderByFieldEndedAt, Direction: models.RunsOrderByDirectionDesc},
+			},
+			Cursor: *pageInfo.EndCursor,
+		})
 
-	// 	remain := failureTotal - items
-	// 	assert.Equal(t, remain, len(edges))
-	// 	assert.False(t, pageInfo.HasNextPage)
-	// })
+		remain := failureTotal - items
+		assert.Equal(t, remain, len(edges))
+		assert.False(t, pageInfo.HasNextPage)
+	})
 }

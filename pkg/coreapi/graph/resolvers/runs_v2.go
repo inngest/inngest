@@ -10,6 +10,11 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 )
 
+const (
+	defaultRunItems = 40
+	maxRunItems     = 400
+)
+
 func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []*models.RunsV2OrderBy, filter models.RunsFilterV2) (*models.RunsV2Connection, error) {
 	tsfield := enums.TraceRunTimeQueuedAt
 	switch *filter.TimeField {
@@ -86,6 +91,12 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 	if filter.Until != nil {
 		until = *filter.Until
 	}
+
+	items := defaultRunItems
+	if num > 0 && num < maxRunItems {
+		items = num
+	}
+
 	opts := cqrs.GetTraceRunOpt{
 		Filter: cqrs.GetTraceRunFilter{
 			AppID:      filter.AppIDs,
@@ -98,7 +109,7 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 		},
 		Order:  orderBy,
 		Cursor: cursor,
-		Items:  uint(num),
+		Items:  uint(items),
 	}
 
 	runs, err := r.Data.GetTraceRuns(ctx, opts)
@@ -106,14 +117,27 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 		return nil, fmt.Errorf("error retrieving runs: %w", err)
 	}
 
+	var (
+		scursor *string
+		ecursor *string
+	)
 	edges := []*models.FunctionRunV2Edge{}
-	for _, r := range runs {
+	total := len(runs)
+	for i, r := range runs {
 		var (
 			started  *time.Time
 			ended    *time.Time
 			sourceID *string
 			output   *string
 		)
+
+		c := r.Cursor
+		if i == 0 {
+			scursor = &c // start cursor
+		}
+		if i == total-1 {
+			ecursor = &c // end cursor
+		}
 
 		if r.StartedAt.UnixMilli() > 0 {
 			started = &r.StartedAt
@@ -152,12 +176,18 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 
 		edges = append(edges, &models.FunctionRunV2Edge{
 			Node:   node,
-			Cursor: "",
+			Cursor: r.Cursor,
 		})
+	}
+
+	pageInfo := &models.PageInfo{
+		HasNextPage: total == int(opts.Items),
+		StartCursor: scursor,
+		EndCursor:   ecursor,
 	}
 
 	return &models.RunsV2Connection{
 		Edges:    edges,
-		PageInfo: &models.PageInfo{},
+		PageInfo: pageInfo,
 	}, nil
 }

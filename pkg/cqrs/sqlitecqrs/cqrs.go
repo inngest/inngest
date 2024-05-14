@@ -729,6 +729,11 @@ func (tr *traceRun) EventIDs() []ulid.ULID {
 	return res
 }
 
+type traceRunCursorFilter struct {
+	ID    string
+	Value int64
+}
+
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
 	// filters
 	filter := []sq.Expression{}
@@ -758,9 +763,26 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	}
 	filter = append(filter, sq.C(tsfield).Lt(until.UnixMilli()))
 
+	// Layout to be used for the response cursors
+	resCursorLayout := cqrs.TracePageCursor{
+		Cursors: map[string]cqrs.TraceCursor{},
+	}
+
+	reqcursor := &cqrs.TracePageCursor{}
+	if opt.Cursor != "" {
+		if err := reqcursor.Decode(opt.Cursor); err != nil {
+			log.From(ctx).Error().Err(err).Str("cursor", opt.Cursor).Msg("error decoding function run cursor")
+		}
+	}
+
 	// order by
+	//
+	// When going through the sorting fields, construct
+	// - response pagination cursor layout
+	// - update filter with op against sorted fields for pagination
 	sortOrder := []enums.TraceRunTime{}
 	sortDir := map[enums.TraceRunTime]enums.TraceRunOrder{}
+	cursorFilter := map[enums.TraceRunTime]traceRunCursorFilter{}
 	for _, f := range opt.Order {
 		sortDir[f.Field] = f.Direction
 		found := false
@@ -773,7 +795,14 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		if !found {
 			sortOrder = append(sortOrder, f.Field)
 		}
+
+		rc := reqcursor.Find(f.Field.String())
+		if rc != nil {
+			cursorFilter[f.Field] = traceRunCursorFilter{ID: reqcursor.ID, Value: rc.Value}
+		}
+		resCursorLayout.Add(f.Field.String())
 	}
+
 	order := []sqexp.OrderedExpression{}
 	for _, f := range sortOrder {
 		var o sqexp.OrderedExpression
@@ -793,6 +822,33 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		}
 	}
 	order = append(order, sq.C("run_id").Asc())
+
+	// cursor filter
+	for k, cf := range cursorFilter {
+		ord, ok := sortDir[k]
+		if !ok {
+			continue
+		}
+
+		var compare sq.Expression
+		field := strings.ToLower(k.String())
+		switch ord {
+		case enums.TraceRunOrderAsc:
+			compare = sq.C(field).Gt(cf.Value)
+		case enums.TraceRunOrderDesc:
+			compare = sq.C(field).Lt(cf.Value)
+		default:
+			continue
+		}
+
+		filter = append(filter, sq.Or(
+			compare,
+			sq.And(
+				sq.C(field).Eq(cf.Value),
+				sq.C("run_id").Gt(cf.ID),
+			),
+		))
+	}
 
 	// read from database
 	sql, args, err := sq.Dialect("sqlite3").
@@ -847,6 +903,34 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			return nil, err
 		}
 
+		// the cursor target should be skipped
+		if reqcursor != nil && reqcursor.ID == data.RunID.String() {
+			continue
+		}
+
+		// copy layout
+		pc := resCursorLayout
+		// construct the needed fields to generate a cursor representing this run
+		pc.ID = data.RunID.String()
+		for k := range pc.Cursors {
+			switch k {
+			case strings.ToLower(enums.TraceRunTimeQueuedAt.String()):
+				pc.Cursors[k] = cqrs.TraceCursor{Field: k, Value: data.QueuedAt}
+			case strings.ToLower(enums.TraceRunTimeStartedAt.String()):
+				pc.Cursors[k] = cqrs.TraceCursor{Field: k, Value: data.StartedAt}
+			case strings.ToLower(enums.TraceRunTimeEndedAt.String()):
+				pc.Cursors[k] = cqrs.TraceCursor{Field: k, Value: data.EndedAt}
+			default:
+				log.From(ctx).Warn().Str("field", k).Msg("unknown field registered as cursor")
+				delete(pc.Cursors, k)
+			}
+		}
+
+		cursor, err := pc.Encode()
+		if err != nil {
+			log.From(ctx).Error().Err(err).Interface("page_cursor", pc).Msg("error encoding cursor")
+		}
+
 		res = append(res, &cqrs.TraceRun{
 			AppID:      data.AppID,
 			FunctionID: data.FunctionID,
@@ -862,6 +946,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			Status:     enums.RunCodeToStatus(data.Status),
 			IsBatch:    data.IsBatch,
 			IsDebounce: data.IsDebounce,
+			Cursor:     cursor,
 		})
 	}
 
