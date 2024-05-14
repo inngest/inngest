@@ -90,7 +90,7 @@ func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 	return m, nil
 }
 
-// ExecutorOpt modifies the built in executor on creation.
+// ExecutorOpt modifies the built-in executor on creation.
 type ExecutorOpt func(m execution.Executor) error
 
 func WithCancellationChecker(c cancellation.Checker) ExecutorOpt {
