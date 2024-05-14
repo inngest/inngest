@@ -1,6 +1,7 @@
 import { isFunctionRunStatus, type FunctionRunStatus } from '../types/functionRun';
 import { cn } from '../utils/classNames';
-import { createSpanWidths, toMaybeDate } from './utils';
+import { toMaybeDate } from '../utils/date';
+import { createSpanWidths } from './utils';
 
 type Props = {
   className?: string;

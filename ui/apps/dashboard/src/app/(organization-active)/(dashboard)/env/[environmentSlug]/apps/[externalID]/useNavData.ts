@@ -5,6 +5,9 @@ const query = graphql(`
   query AppNavData($envID: ID!, $externalAppID: String!) {
     environment: workspace(id: $envID) {
       app: appByExternalID(externalID: $externalAppID) {
+        id
+        isArchived
+        isParentArchived
         latestSync {
           platform
           url

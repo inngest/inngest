@@ -288,13 +288,14 @@ func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*sv2.Metadata, error) {
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
-			AccountID:       req.AccountID,
-			WorkspaceID:     req.WorkspaceID,
-			AppID:           req.AppID,
-			FunctionID:      req.Function.ID,
-			FunctionVersion: req.Function.FunctionVersion,
-			EventID:         req.Events[0].GetInternalID(),
-			Event:           req.Events[0].GetEvent(),
+			AccountID:        req.AccountID,
+			WorkspaceID:      req.WorkspaceID,
+			AppID:            req.AppID,
+			FunctionID:       req.Function.ID,
+			FunctionVersion:  req.Function.FunctionVersion,
+			EventID:          req.Events[0].GetInternalID(),
+			Event:            req.Events[0].GetEvent(),
+			FunctionPausedAt: req.FunctionPausedAt,
 		}, req.Function)
 		if err != nil {
 			return nil, err
@@ -2551,13 +2552,14 @@ func (e executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Funct
 
 	key := fmt.Sprintf("%s-%s", fn.ID, payload.BatchID)
 	md, err := e.Schedule(ctx, execution.ScheduleRequest{
-		AccountID:      payload.AccountID,
-		WorkspaceID:    payload.WorkspaceID,
-		AppID:          payload.AppID,
-		Function:       fn,
-		Events:         events,
-		BatchID:        &payload.BatchID,
-		IdempotencyKey: &key,
+		AccountID:        payload.AccountID,
+		WorkspaceID:      payload.WorkspaceID,
+		AppID:            payload.AppID,
+		Function:         fn,
+		Events:           events,
+		BatchID:          &payload.BatchID,
+		IdempotencyKey:   &key,
+		FunctionPausedAt: payload.FunctionPausedAt,
 	})
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())

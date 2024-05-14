@@ -4,7 +4,9 @@ import { Alert } from '@inngest/components/Alert';
 import { IconApp } from '@inngest/components/icons/App';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
 import Header, { type HeaderLink } from '@/components/Header/Header';
+import { ArchiveButton } from './ArchiveButton';
 import { ResyncButton } from './ResyncButton';
 import { useNavData } from './useNavData';
 
@@ -49,21 +51,31 @@ export default function Layout({ children, params: { externalID } }: Props) {
     },
   ];
 
-  let action;
-  if (res.data.latestSync?.url && !env.isArchived) {
-    action = (
+  const actions = [];
+  if (res.data.latestSync?.url) {
+    actions.push(
       <ResyncButton
         appExternalID={externalID}
+        disabled={res.data.isArchived}
         platform={res.data.latestSync.platform}
         latestSyncUrl={res.data.latestSync.url}
       />
     );
   }
 
+  actions.push(
+    <ArchiveButton
+      appID={res.data.id}
+      disabled={res.data.isParentArchived}
+      isArchived={res.data.isArchived}
+    />
+  );
+
   return (
     <>
+      {<ArchivedAppBanner externalAppID={externalID} />}
       <Header
-        action={action}
+        action={<div className="flex gap-4">{actions}</div>}
         icon={<IconApp className="h-5 w-5 text-white" />}
         links={navLinks}
         title={res.data.name}

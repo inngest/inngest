@@ -345,12 +345,13 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 			defer span.End()
 
 			_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
-				Function:        f,
-				AccountID:       di.AccountID,
-				WorkspaceID:     di.WorkspaceID,
-				AppID:           di.AppID,
-				Events:          []event.TrackedEvent{di},
-				PreventDebounce: true,
+				Function:         f,
+				AccountID:        di.AccountID,
+				WorkspaceID:      di.WorkspaceID,
+				AppID:            di.AppID,
+				Events:           []event.TrackedEvent{di},
+				PreventDebounce:  true,
+				FunctionPausedAt: di.FunctionPausedAt,
 			})
 			if err != nil {
 				return err

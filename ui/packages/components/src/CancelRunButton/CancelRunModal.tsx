@@ -43,7 +43,7 @@ export function CancelRunModal({ isOpen, onClose, onSubmit }: Props) {
       onSubmit={handleSubmit}
       title="Are you sure you want to cancel this function run?"
     >
-      <p className="pt-4 dark:text-white">
+      <p className="px-6 pb-0 pt-4 dark:text-white">
         The function run will end early and its status will be "cancelled". This action cannot be
         undone.
       </p>

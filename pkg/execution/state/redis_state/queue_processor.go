@@ -134,7 +134,6 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		go q.worker(ctx, f)
 	}
 
-	go q.queueGauges(ctx)
 	go q.claimShards(ctx)
 	go q.claimSequentialLease(ctx)
 	go q.runScavenger(ctx)
@@ -197,9 +196,6 @@ func (q *queue) claimShards(ctx context.Context) {
 		q.logger.Info().Msg("no shard finder;  skipping shard claiming")
 		return
 	}
-
-	// Report shard gauge metrics.
-	go q.shardGauges(ctx)
 
 	scanTick := time.NewTicker(ShardTickTime)
 	leaseTick := time.NewTicker(ShardLeaseTime / 2)
@@ -976,10 +972,11 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 			// Update the ewma
 			latencySem.Lock()
 			latencyAvg.Add(float64(latency))
-			telemetry.GaugeQueueItemLatencyEWMA(ctx, int64(latencyAvg.Value()/1e6), telemetry.GaugeOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"kind": qi.Data.Kind},
-			})
+			// TODO: Add this back when sync gauge instrumentation is available - https://github.com/open-telemetry/opentelemetry-go/pull/5304
+			// telemetry.GaugeQueueItemLatencyEWMA(ctx, int64(latencyAvg.Value()/1e6), telemetry.GaugeOpt{
+			// 	PkgName: pkgName,
+			// 	Tags:    map[string]any{"kind": qi.Data.Kind},
+			// })
 			latencySem.Unlock()
 
 			// Set the metrics historgram and gauge, which reports the ewma value.
@@ -1130,61 +1127,6 @@ func (q *queue) isScavenger() bool {
 		return false
 	}
 	return ulid.Time(l.Time()).After(getNow())
-}
-
-func (q *queue) queueGauges(ctx context.Context) {
-	// Report gauges to otel.
-	telemetry.GaugeWorkerQueueCapacity(ctx, q.capacity(), telemetry.GaugeOpt{PkgName: pkgName})
-
-	telemetry.GaugeGlobalQueuePartitionCount(ctx, telemetry.GaugeOpt{
-		PkgName: pkgName,
-		Observer: func(ctx context.Context) (int64, error) {
-			dur := time.Hour * 24 * 365
-			return q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), getNow().Add(dur))
-		},
-	})
-
-	telemetry.GaugeGlobalQueuePartitionAvailable(ctx, telemetry.GaugeOpt{
-		PkgName: pkgName,
-		Observer: func(ctx context.Context) (int64, error) {
-			return q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), getNow().Add(PartitionLookahead))
-		},
-	})
-}
-
-// shardGauges reports shard gauges via otel.
-func (q *queue) shardGauges(ctx context.Context) {
-	tick := time.NewTicker(ShardTickTime)
-	for {
-		select {
-		case <-ctx.Done():
-			tick.Stop()
-			return
-		case <-tick.C:
-			// Reload shards.
-			shards, err := q.getShards(ctx)
-			if err != nil {
-				q.logger.Error().Err(err).Msg("error retrieving shards")
-			}
-
-			// Report gauges to otel.
-			telemetry.GaugeQueueShardCount(ctx, int64(len(shards)), telemetry.GaugeOpt{PkgName: pkgName})
-
-			for _, shard := range shards {
-				tags := map[string]any{"shard_name": shard.Name}
-
-				telemetry.GaugeQueueShardGuaranteedCapacityCount(ctx, int64(shard.GuaranteedCapacity), telemetry.GaugeOpt{PkgName: pkgName, Tags: tags})
-				telemetry.GaugeQueueShardLeaseCount(ctx, int64(len(shard.Leases)), telemetry.GaugeOpt{PkgName: pkgName, Tags: tags})
-				telemetry.GaugeQueueShardPartitionAvailableCount(ctx, telemetry.GaugeOpt{
-					PkgName: pkgName,
-					Tags:    tags,
-					Observer: func(ctx context.Context) (int64, error) {
-						return q.partitionSize(ctx, q.kg.ShardPartitionIndex(shard.Name), getNow().Add(PartitionLookahead))
-					},
-				})
-			}
-		}
-	}
 }
 
 // trackingSemaphore returns a semaphore that tracks closely - but not atomically -

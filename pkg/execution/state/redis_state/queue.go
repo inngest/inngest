@@ -22,6 +22,7 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/rs/zerolog"
@@ -212,6 +213,64 @@ func WithPollTick(t time.Duration) QueueOpt {
 func WithQueueItemIndexer(i QueueItemIndexer) QueueOpt {
 	return func(q *queue) {
 		q.itemIndexer = i
+	}
+}
+
+// WithAsyncInstrumentation registers all the async instrumentation that needs to happen on
+// each instrumentation cycle
+// These are mostly gauges for point in time metrics
+func WithAsyncInstrumentation() QueueOpt {
+	ctx := context.Background()
+
+	return func(q *queue) {
+		telemetry.GaugeWorkerQueueCapacity(ctx, telemetry.GaugeOpt{
+			PkgName:  pkgName,
+			Callback: func(ctx context.Context) (int64, error) { return q.capacity(), nil },
+		})
+
+		telemetry.GaugeGlobalQueuePartitionCount(ctx, telemetry.GaugeOpt{
+			PkgName: pkgName,
+			Callback: func(ctx context.Context) (int64, error) {
+				dur := time.Hour * 24 * 365
+				return q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), getNow().Add(dur))
+			},
+		})
+
+		telemetry.GaugeGlobalQueuePartitionAvailable(ctx, telemetry.GaugeOpt{
+			PkgName: pkgName,
+			Callback: func(ctx context.Context) (int64, error) {
+				return q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), getNow().Add(PartitionLookahead))
+			},
+		})
+
+		// Shard instrumentations
+		shards, err := q.getShards(ctx)
+		if err != nil {
+			q.logger.Error().Err(err).Msg("error retrieving shards")
+		}
+
+		telemetry.GaugeQueueShardCount(ctx, int64(len(shards)), telemetry.GaugeOpt{PkgName: pkgName})
+		for _, shard := range shards {
+			tags := map[string]any{"shard_name": shard.Name}
+
+			telemetry.GaugeQueueShardGuaranteedCapacityCount(ctx, telemetry.GaugeOpt{
+				PkgName:  pkgName,
+				Tags:     tags,
+				Callback: func(ctx context.Context) (int64, error) { return int64(shard.GuaranteedCapacity), nil },
+			})
+			telemetry.GaugeQueueShardLeaseCount(ctx, telemetry.GaugeOpt{
+				PkgName:  pkgName,
+				Tags:     tags,
+				Callback: func(ctx context.Context) (int64, error) { return int64(len(shard.Leases)), nil },
+			})
+			telemetry.GaugeQueueShardPartitionAvailableCount(ctx, telemetry.GaugeOpt{
+				PkgName: pkgName,
+				Tags:    tags,
+				Callback: func(ctx context.Context) (int64, error) {
+					return q.partitionSize(ctx, q.kg.ShardPartitionIndex(shard.Name), getNow().Add(PartitionLookahead))
+				},
+			})
+		}
 	}
 }
 

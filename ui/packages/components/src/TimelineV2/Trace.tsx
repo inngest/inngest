@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 
 import { CodeBlock } from '../CodeBlock';
 import { cn } from '../utils/classNames';
+import { toMaybeDate } from '../utils/date';
 import { InlineSpans } from './InlineSpans';
 import { TraceHeading } from './TraceHeading';
 import { TraceInfo } from './TraceInfo';
 import type { Trace } from './types';
-import { createSpanWidths, toMaybeDate } from './utils';
+import { createSpanWidths } from './utils';
 
 type Props = {
   depth: number;
