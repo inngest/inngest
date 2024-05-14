@@ -1573,6 +1573,16 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			return nil, fmt.Errorf("error reading partition item: %w", err)
 		}
 
+		// NOTE: The queue does two conflicting things:  we peek ahead of now() to fetch partitions
+		// shortly available, and we also requeue partitions if there are concurrency conflicts.
+		//
+		// We want to ignore any partitions requeued because of conflicts, as this will cause needless
+		// churn every peek MS.
+		if item.ForceAtMS > ms {
+			ignored++
+			continue
+		}
+
 		// If we have an allowlist, only accept this partition if its in the allowlist.
 		if len(q.allowQueues) > 0 && !checkList(item.Queue(), q.allowQueueMap, q.allowQueuePrefixes) {
 			// This is not in the allowlist specified, so do not allow this partition to be used.
