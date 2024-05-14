@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	// "github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/assert"
@@ -83,9 +83,9 @@ func TestFunctionRunList(t *testing.T) {
 
 	wg.Wait()
 
-	<-time.After(5 * time.Second)
+	<-time.After(3 * time.Second)
 	end := time.Now()
-	<-time.After(5 * time.Second)
+	<-time.After(3 * time.Second)
 
 	require.EqualValues(t, successTotal, ok)
 	require.EqualValues(t, failureTotal, failed)
@@ -109,70 +109,70 @@ func TestFunctionRunList(t *testing.T) {
 		}
 	})
 
-	// t.Run("retrieve only successful runs filtered by started_at", func(t *testing.T) {
-	// 	edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
-	// 		Start:     start,
-	// 		End:       end,
-	// 		TimeField: models.FunctionRunTimeFieldV2StartedAt,
-	// 		Order: []models.RunsV2OrderBy{
-	// 			{Field: models.RunsV2OrderByFieldStartedAt, Direction: models.RunsOrderByDirectionDesc},
-	// 		},
-	// 		Status: []string{models.FunctionRunStatusCompleted.String()},
-	// 	})
+	t.Run("retrieve only successful runs sorted by started_at", func(t *testing.T) {
+		edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
+			Start:     start,
+			End:       end,
+			TimeField: models.FunctionRunTimeFieldV2StartedAt,
+			Order: []models.RunsV2OrderBy{
+				{Field: models.RunsV2OrderByFieldStartedAt, Direction: models.RunsOrderByDirectionDesc},
+			},
+			Status: []string{models.FunctionRunStatusCompleted.String()},
+		})
 
-	// 	assert.Equal(t, successTotal, len(edges))
-	// 	assert.False(t, pageInfo.HasNextPage)
+		assert.Equal(t, successTotal, len(edges))
+		assert.False(t, pageInfo.HasNextPage)
 
-	// 	// should be sorted by started_at desc order
-	// 	ts := time.Now()
-	// 	for _, e := range edges {
-	// 		startedAt := e.Node.StartedAt
-	// 		assert.True(t, startedAt.UnixMilli() <= ts.UnixMilli())
-	// 		ts = startedAt
-	// 	}
-	// })
+		// should be sorted by started_at desc order
+		ts := time.Now()
+		for _, e := range edges {
+			startedAt := e.Node.StartedAt
+			assert.True(t, startedAt.UnixMilli() <= ts.UnixMilli())
+			ts = startedAt
+		}
+	})
 
-	// t.Run("retrieve only failed runs filtered by by ended_at", func(t *testing.T) {
-	// 	edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
-	// 		Start:     start,
-	// 		End:       end,
-	// 		TimeField: models.FunctionRunTimeFieldV2EndedAt,
-	// 		Order: []models.RunsV2OrderBy{
-	// 			{Field: models.RunsV2OrderByFieldEndedAt, Direction: models.RunsOrderByDirectionAsc},
-	// 		},
-	// 		Status: []string{models.FunctionRunStatusFailed.String()},
-	// 	})
+	t.Run("retrieve only failed runs sorted by by ended_at", func(t *testing.T) {
+		edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
+			Start:     start,
+			End:       end,
+			TimeField: models.FunctionRunTimeFieldV2EndedAt,
+			Order: []models.RunsV2OrderBy{
+				{Field: models.RunsV2OrderByFieldEndedAt, Direction: models.RunsOrderByDirectionAsc},
+			},
+			Status: []string{models.FunctionRunStatusFailed.String()},
+		})
 
-	// 	assert.Equal(t, failureTotal, len(edges))
-	// 	assert.False(t, pageInfo.HasNextPage)
+		assert.Equal(t, failureTotal, len(edges))
+		assert.False(t, pageInfo.HasNextPage)
 
-	// 	// should be sorted by ended_at asc order
-	// 	ts := start
-	// 	for _, e := range edges {
-	// 		endedAt := e.Node.EndedAt
-	// 		assert.True(t, endedAt.UnixMilli() >= ts.UnixMilli())
-	// 		ts = endedAt
-	// 	}
-	// })
+		// should be sorted by ended_at asc order
+		ts := start
+		for _, e := range edges {
+			endedAt := e.Node.EndedAt
+			assert.True(t, endedAt.UnixMilli() >= ts.UnixMilli())
+			ts = endedAt
+		}
+	})
 
-	// t.Run("retrieve only failed runs", func(t *testing.T) {
-	// 	edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
-	// 		Start:  start,
-	// 		End:    end,
-	// 		Status: []string{models.FunctionRunStatusFailed.String()},
-	// 	})
+	t.Run("retrieve only failed runs", func(t *testing.T) {
+		edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
+			Start:  start,
+			End:    end,
+			Status: []string{models.FunctionRunStatusFailed.String()},
+		})
 
-	// 	assert.Equal(t, failureTotal, len(edges))
-	// 	assert.False(t, pageInfo.HasNextPage)
+		assert.Equal(t, failureTotal, len(edges))
+		assert.False(t, pageInfo.HasNextPage)
 
-	// 	// should be sorted by queued_at desc order
-	// 	ts := time.Now()
-	// 	for _, e := range edges {
-	// 		queuedAt := e.Node.QueuedAt
-	// 		assert.True(t, queuedAt.UnixMilli() <= ts.UnixMilli())
-	// 		ts = queuedAt
-	// 	}
-	// })
+		// should be sorted by queued_at desc order
+		ts := time.Now()
+		for _, e := range edges {
+			queuedAt := e.Node.QueuedAt
+			assert.True(t, queuedAt.UnixMilli() <= ts.UnixMilli())
+			ts = queuedAt
+		}
+	})
 
 	// t.Run("paginate without additional filter", func(t *testing.T) {
 	// 	items := 10
