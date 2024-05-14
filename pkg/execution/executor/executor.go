@@ -1720,7 +1720,8 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 						attribute.Bool(consts.OtelSysStepInvokeExpired, r.EventID == nil),
 					),
 				)
-				defer span.Send()
+				span.Send()
+				defer span.End()
 				span.SetAttributes(commonAttrs...)
 				if r.HasError() {
 					span.SetStatus(codes.Error, r.Error())
@@ -1746,7 +1747,8 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 						attribute.Bool(consts.OtelSysStepWaitExpired, r.EventID == nil),
 					),
 				)
-				defer span.Send()
+				span.Send()
+				defer span.End()
 				span.SetAttributes(commonAttrs...)
 				if r.HasError() {
 					span.SetStatus(codes.Error, r.Error())
@@ -2203,7 +2205,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 
 	ctx, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeStep),
-		telemetry.WithName("invoke"),
+		telemetry.WithName(consts.OtelSpanInvoke),
 		telemetry.WithTimestamp(now),
 		telemetry.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
@@ -2211,7 +2213,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 			attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
 			attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
 			attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
-			// attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
 			attribute.Int(consts.OtelSysFunctionVersion, item.Identifier.WorkflowVersion),
 			attribute.String(consts.OtelAttrSDKRunID, item.Identifier.RunID.String()),
 			attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
@@ -2226,6 +2227,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		),
 	)
 	span.Send()
+	defer span.End()
 
 	spanID := span.SpanContext().SpanID().String()
 	traceStartedAt := state.Time(now)
@@ -2291,8 +2293,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		return fmt.Errorf("error publishing internal invocation event: %w", err)
 	}
 
-	span.Send()
-
 	for _, e := range e.lifecycles {
 		go e.OnInvokeFunction(context.WithoutCancel(ctx), item.Identifier, item, gen, ulid.MustParse(evt.ID), correlationID)
 	}
@@ -2301,7 +2301,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 }
 
 func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
-	span := trace.SpanFromContext(ctx)
+	execSpan := trace.SpanFromContext(ctx)
 	opts, err := gen.WaitForEventOpts()
 	if err != nil {
 		return fmt.Errorf("unable to parse wait for event opts: %w", err)
@@ -2372,6 +2372,30 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	}
 
 	opcode := gen.Op.String()
+	now := time.Now()
+
+	ctx, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeWait),
+		telemetry.WithName(consts.OtelSpanWaitForEvent),
+		telemetry.WithTimestamp(now),
+		telemetry.WithSpanAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
+			attribute.Int(consts.OtelSysFunctionVersion, item.Identifier.WorkflowVersion),
+			attribute.String(consts.OtelAttrSDKRunID, item.Identifier.RunID.String()),
+			attribute.Int(consts.OtelSysStepAttempt, 0),
+			attribute.Int(consts.OtelSysStepMaxAttempt, 1),
+			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
+		),
+	)
+	span.Send()
+	defer span.End()
+	spanID := span.SpanContext().SpanID().String()
+	traceStartedAt := state.Time(now)
+
 	err = e.sm.SavePause(ctx, state.Pause{
 		ID:             pauseID,
 		WorkspaceID:    item.WorkspaceID,
@@ -2386,11 +2410,14 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		Expression:     expr,
 		ExpressionData: data,
 		DataKey:        gen.ID,
+		StepSpanID:     &spanID,
+		TraceStartedAt: &traceStartedAt,
 	})
 	if err == state.ErrPauseAlreadyExists {
 		return nil
 	}
 	if err != nil {
+		span.Cancel(ctx)
 		return err
 	}
 
@@ -2415,9 +2442,10 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		},
 	}, expires)
 	if err == redis_state.ErrQueueItemExists {
+		span.Cancel(ctx)
 		return nil
 	}
-	span.SetAttributes(
+	execSpan.SetAttributes(
 		attribute.String(consts.OtelSysStepNextOpcode, enums.OpcodeWaitForEvent.String()),
 		attribute.Int64(consts.OtelSysStepNextTimestamp, time.Now().UnixMilli()),
 		attribute.Int64(consts.OtelSysStepNextExpires, expires.UnixMilli()),

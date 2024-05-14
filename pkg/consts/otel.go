@@ -83,6 +83,7 @@ const (
 	OtelScopeEvent     = "event.inngest"
 	OtelScopeBatch     = "batch.inngest"
 	OtelScopeDebounce  = "debounce.inngest"
+	OtelScopeWait      = "wait.inngest"
 	OtelScopeTrigger   = "trigger.inngest"
 	OtelScopeCron      = "cron.inngest"
 	OtelScopeEnv       = "env.inngest"
