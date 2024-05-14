@@ -132,7 +132,7 @@ func TestFunctionRunList(t *testing.T) {
 		}
 	})
 
-	t.Run("retrieve only failed runs sorted by by ended_at", func(t *testing.T) {
+	t.Run("retrieve only failed runs sorted by ended_at", func(t *testing.T) {
 		edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
 			Start:     start,
 			End:       end,
