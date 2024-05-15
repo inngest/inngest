@@ -5,12 +5,14 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -141,6 +143,7 @@ type InngestMetadata struct {
 	SourceFnVersion     int    `json:"source_fn_v"`
 	InvokeFnID          string `json:"fn_id"`
 	InvokeCorrelationId string `json:"correlation_id,omitempty"`
+	InvokeParentSpanID  string `json:"psid,omitempty"`
 	InvokeSpanID        string `json:"sid,omitempty"`
 	InvokeTimestamp     int64  `json:"ts"`
 	InvokeExpiresAt     int64  `json:"expire"`
@@ -169,6 +172,28 @@ func (m *InngestMetadata) RunID() *ulid.ULID {
 		return &id
 	}
 	return nil
+}
+
+func (m *InngestMetadata) SpanIDs() (*trace.SpanID, *trace.SpanID, error) {
+	if m.InvokeParentSpanID == "" {
+		return nil, nil, fmt.Errorf("invoke step's parent spanID is not available")
+	}
+
+	if m.InvokeSpanID == "" {
+		return nil, nil, fmt.Errorf("invoke step's spanID is not available")
+	}
+
+	psid, err := trace.SpanIDFromHex(m.InvokeParentSpanID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	sid, err := trace.SpanIDFromHex(m.InvokeSpanID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &psid, &sid, nil
 }
 
 func (e Event) InngestMetadata() *InngestMetadata {
@@ -241,6 +266,7 @@ type NewInvocationEventOpts struct {
 	Event           Event
 	FnID            string
 	CorrelationID   *string
+	ParentSpanID    *string
 	SpanID          *string
 	SpanTimestamp   int64
 	ExpiresAt       int64
@@ -272,9 +298,15 @@ func NewInvocationEvent(opts NewInvocationEventOpts) Event {
 		spanID = *opts.SpanID
 	}
 
+	parentSpanID := ""
+	if opts.ParentSpanID != nil {
+		parentSpanID = *opts.ParentSpanID
+	}
+
 	evt.Data[consts.InngestEventDataPrefix] = InngestMetadata{
 		InvokeFnID:          opts.FnID,
 		InvokeCorrelationId: correlationID,
+		InvokeParentSpanID:  parentSpanID,
 		InvokeSpanID:        spanID,
 		InvokeTimestamp:     opts.SpanTimestamp,
 		InvokeExpiresAt:     opts.ExpiresAt,

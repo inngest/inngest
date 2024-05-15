@@ -2,12 +2,14 @@ package state
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
@@ -186,6 +188,8 @@ type Pause struct {
 	// TriggeringEventID is the event that triggered the original run.  This allows us
 	// to exclude the original event ID when considering triggers.
 	TriggeringEventID *string `json:"tID,omitempty"`
+	// StepParentSpanID is the parent span ID for the step that caused this pause.
+	StepParentSpanID *string `json:"spsid,omitempty"`
 	// StepSpanID is the span ID for the step that caused this pause.
 	StepSpanID *string `json:"ssID,omitempty"`
 	// SpanStartedAt is the time at which the span for this pause was started.
@@ -216,6 +220,28 @@ func (p Pause) Edge() inngest.Edge {
 		Outgoing: p.Outgoing,
 		Incoming: p.Incoming,
 	}
+}
+
+func (p Pause) SpanIDs() (*trace.SpanID, *trace.SpanID, error) {
+	if p.StepParentSpanID == nil {
+		return nil, nil, fmt.Errorf("pause step's parent spanID is not available")
+	}
+
+	if p.StepSpanID == nil {
+		return nil, nil, fmt.Errorf("pause step's spanID is not available")
+	}
+
+	psid, err := trace.SpanIDFromHex(*p.StepParentSpanID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	sid, err := trace.SpanIDFromHex(*p.StepSpanID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &psid, &sid, nil
 }
 
 type ResumeData struct {
