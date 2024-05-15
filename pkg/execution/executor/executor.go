@@ -594,7 +594,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 						_, ispan := telemetry.NewSpan(ctx,
 							telemetry.WithScope(consts.OtelScopeStep),
-							telemetry.WithName("invoke"),
+							telemetry.WithName(consts.OtelSpanInvoke),
 							telemetry.WithTimestamp(time.UnixMilli(meta.InvokeTimestamp)),
 							telemetry.WithSpanID(sid),
 							telemetry.WithSpanAttributes(
@@ -1715,13 +1715,17 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		ts = (*pause.TraceStartedAt).Time()
 	}
 
+	returnedEventID := ""
+	if r.EventID != nil {
+		returnedEventID = r.EventID.String()
+	}
+
 	commonAttrs := []attribute.KeyValue{
 		attribute.Bool(consts.OtelUserTraceFilterKey, true),
 		attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
 		attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
 		attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),
 		attribute.String(consts.OtelSysFunctionID, pause.Identifier.WorkflowID.String()),
-		// attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
 		attribute.Int(consts.OtelSysFunctionVersion, pause.Identifier.WorkflowVersion),
 		attribute.String(consts.OtelAttrSDKRunID, pause.Identifier.RunID.String()),
 		attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
@@ -1737,11 +1741,6 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				triggeringEventID := ""
 				if pause.TriggeringEventID != nil {
 					triggeringEventID = *pause.TriggeringEventID
-				}
-
-				returnedEventID := ""
-				if r.EventID != nil {
-					returnedEventID = r.EventID.String()
 				}
 
 				targetFnID := ""
@@ -1770,7 +1769,6 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 						attribute.Bool(consts.OtelSysStepInvokeExpired, r.EventID == nil),
 					),
 				)
-				span.Send()
 				defer span.End()
 				span.SetAttributes(commonAttrs...)
 				if r.HasError() {
@@ -1788,18 +1786,24 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				var span *telemetry.Span
 				ctx, span = telemetry.NewSpan(ctx,
 					telemetry.WithScope(consts.OtelScopeStep),
-					telemetry.WithName(consts.OtelSpanInvoke),
+					telemetry.WithName(consts.OtelSpanWaitForEvent),
 					telemetry.WithTimestamp(ts),
 					telemetry.WithSpanID(spanID),
 					telemetry.WithSpanAttributes(
 						attribute.String(consts.OtelSysStepOpcode, enums.OpcodeWaitForEvent.String()),
 						attribute.Int64(consts.OtelSysStepWaitExpires, pause.Expires.Time().UnixMilli()),
 						attribute.Bool(consts.OtelSysStepWaitExpired, r.EventID == nil),
+						attribute.String(consts.OtelSysStepWaitMatchedEventID, returnedEventID),
 					),
 				)
-				span.Send()
 				defer span.End()
 				span.SetAttributes(commonAttrs...)
+				if pause.Event != nil {
+					span.SetAttributes(attribute.String(consts.OtelSysStepWaitEventName, *pause.Event))
+				}
+				if pause.Expression != nil {
+					span.SetAttributes(attribute.String(consts.OtelSysStepWaitExpression, *pause.Expression))
+				}
 				if r.HasError() {
 					span.SetStatus(codes.Error, r.Error())
 				}
@@ -2450,10 +2454,16 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 			attribute.Int(consts.OtelSysStepAttempt, 0),
 			attribute.Int(consts.OtelSysStepMaxAttempt, 1),
 			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
+			attribute.String(consts.OtelSysStepWaitEventName, opts.Event),
+			attribute.Int64(consts.OtelSysStepWaitExpires, expires.UnixMilli()),
 		),
 	)
-	span.Send()
 	defer span.End()
+
+	if opts.If != nil {
+		span.SetAttributes(attribute.String(consts.OtelSysStepWaitExpression, *opts.If))
+	}
+
 	spanID := span.SpanContext().SpanID().String()
 	traceStartedAt := state.Time(now)
 
