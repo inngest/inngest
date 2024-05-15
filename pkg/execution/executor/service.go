@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -71,6 +72,12 @@ func WithServiceBatcher(b batch.BatchManager) func(s *svc) {
 	}
 }
 
+func WithRateLimiter(rl ratelimit.RateLimiter) func(s *svc) {
+	return func(s *svc) {
+		s.rl = rl
+	}
+}
+
 func NewService(c config.Config, opts ...Opt) service.Service {
 	svc := &svc{config: c}
 	for _, o := range opts {
@@ -91,6 +98,7 @@ type svc struct {
 	exec      execution.Executor
 	debouncer debounce.Debouncer
 	batcher   batch.BatchManager
+	rl        ratelimit.RateLimiter
 
 	wg sync.WaitGroup
 
@@ -348,6 +356,25 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 			di, err := s.debouncer.GetDebounceItem(ctx, d.DebounceID)
 			if err != nil {
 				return err
+			}
+
+			if f.RateLimit != nil {
+				if s.rl != nil {
+					key, err := ratelimit.RateLimitKey(ctx, f.ID, *f.RateLimit, di.Event.Map())
+					if err != nil {
+						return err
+					}
+					limited, _, err := s.rl.RateLimit(ctx, key, *f.RateLimit)
+					if err != nil {
+						return err
+					}
+					if limited {
+						// Do nothing.
+						return nil
+					}
+				} else {
+					logger.From(ctx).Error().Msg("missing rate limiter")
+				}
 			}
 
 			ctx, span := telemetry.NewSpan(ctx,

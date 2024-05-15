@@ -268,3 +268,55 @@ func TestDebounce_Timeout(t *testing.T) {
 		return atomic.LoadInt32(&counter) == 1
 	}, 15*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
 }
+
+func TestDebounceWithIdempotency(t *testing.T) {
+	// Ensure that debouncing works properly with idempotency.
+
+	r := require.New(t)
+	h, server, registerFuncs := NewSDKHandler(t, "TestDebounceWithIdempotency")
+	defer server.Close()
+
+	var counter int32
+
+	a := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name: "my-fn",
+			Debounce: &inngestgo.Debounce{
+				Period: time.Second,
+			},
+			Idempotency: inngestgo.StrPtr("event.data.name"),
+		},
+		inngestgo.EventTrigger("test/sdk", nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			atomic.AddInt32(&counter, 1)
+			return nil, nil
+		},
+	)
+	h.Register(a)
+	registerFuncs()
+
+	sendEvents := func(count int) {
+		for i := 0; i < count; i++ {
+			_, err := inngestgo.Send(context.Background(), DebounceEvent{
+				Name: "test/sdk",
+				Data: DebounceEventData{
+					Name: "Alice",
+				},
+			})
+			r.NoError(err)
+		}
+	}
+
+	// Send 2 events but trigger once
+	sendEvents(2)
+	r.Eventually(func() bool {
+		return atomic.LoadInt32(&counter) == 1
+	}, 5*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
+
+	// Send more events but don't trigger at all
+	counter = 0
+	sendEvents(2)
+	r.Never(func() bool {
+		return atomic.LoadInt32(&counter) > 0
+	}, 5*time.Second, 100*time.Millisecond, "Expected 0, got %d", counter)
+}

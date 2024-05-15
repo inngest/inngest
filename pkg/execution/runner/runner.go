@@ -625,17 +625,23 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 
 	// Attempt to rate-limit the incoming function.
 	if s.rl != nil && fn.RateLimit != nil {
-		key, err := ratelimit.RateLimitKey(ctx, fn.ID, *fn.RateLimit, evt.GetEvent().Map())
-		if err != nil {
-			return err
-		}
-		limited, _, err := s.rl.RateLimit(ctx, key, *fn.RateLimit)
-		if err != nil {
-			return err
-		}
-		if limited {
-			// Do nothing.
-			return nil
+		// Only rate-limit if the function is not debounced. Debouncing needs to
+		// enforce rate-limiting since debounced scheduling is delayed. If we
+		// also enforced rate-limiting here then we'd "double enforce" it,
+		// leading to unscheduled runs.
+		if fn.Debounce != nil {
+			key, err := ratelimit.RateLimitKey(ctx, fn.ID, *fn.RateLimit, evt.GetEvent().Map())
+			if err != nil {
+				return err
+			}
+			limited, _, err := s.rl.RateLimit(ctx, key, *fn.RateLimit)
+			if err != nil {
+				return err
+			}
+			if limited {
+				// Do nothing.
+				return nil
+			}
 		}
 	}
 
