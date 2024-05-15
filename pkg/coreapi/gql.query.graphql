@@ -14,6 +14,13 @@ type Query {
 
   # Get an individual function run
   functionRun(query: FunctionRunQuery!): FunctionRun
+
+  runs(
+    first: Int! = 100
+    after: String
+    orderBy: [RunsV2OrderBy!]!
+    filter: RunsFilterV2!
+  ): RunsV2Connection!
 }
 
 input ActionVersionQuery {

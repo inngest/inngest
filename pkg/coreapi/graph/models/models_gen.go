@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/history_reader"
 	ulid "github.com/oklog/ulid/v2"
@@ -100,6 +101,28 @@ type FunctionRunQuery struct {
 	FunctionRunID string `json:"functionRunId"`
 }
 
+type FunctionRunV2 struct {
+	ID         ulid.ULID         `json:"id"`
+	AppID      uuid.UUID         `json:"appID"`
+	FunctionID uuid.UUID         `json:"functionID"`
+	Function   *Function         `json:"function"`
+	TraceID    string            `json:"traceID"`
+	QueuedAt   time.Time         `json:"queuedAt"`
+	StartedAt  *time.Time        `json:"startedAt,omitempty"`
+	EndedAt    *time.Time        `json:"endedAt,omitempty"`
+	Status     FunctionRunStatus `json:"status"`
+	SourceID   *string           `json:"sourceID,omitempty"`
+	TriggerIDs []ulid.ULID       `json:"triggerIDs"`
+	Triggers   []string          `json:"triggers"`
+	IsBatch    bool              `json:"isBatch"`
+	Output     *string           `json:"output,omitempty"`
+}
+
+type FunctionRunV2Edge struct {
+	Node   *FunctionRunV2 `json:"node"`
+	Cursor string         `json:"cursor"`
+}
+
 type FunctionRunsQuery struct {
 	WorkspaceID string `json:"workspaceId"`
 }
@@ -107,6 +130,38 @@ type FunctionRunsQuery struct {
 type FunctionTrigger struct {
 	Type  FunctionTriggerTypes `json:"type"`
 	Value string               `json:"value"`
+}
+
+// The pagination information in a connection.
+type PageInfo struct {
+	// Indicates if there are any pages subsequent to the current page.
+	HasNextPage bool `json:"hasNextPage"`
+	// Indicates if there are any pages prior to the current page.
+	HasPreviousPage bool `json:"hasPreviousPage"`
+	// When paginating backward, the cursor to query the previous page.
+	StartCursor *string `json:"startCursor,omitempty"`
+	// When paginating forward, the cursor to query the next page.
+	EndCursor *string `json:"endCursor,omitempty"`
+}
+
+type RunsFilterV2 struct {
+	From        time.Time               `json:"from"`
+	Until       *time.Time              `json:"until,omitempty"`
+	TimeField   *FunctionRunTimeFieldV2 `json:"timeField,omitempty"`
+	Status      []FunctionRunStatus     `json:"status,omitempty"`
+	FunctionIDs []uuid.UUID             `json:"functionIDs,omitempty"`
+	AppIDs      []uuid.UUID             `json:"appIDs,omitempty"`
+	Query       *string                 `json:"query,omitempty"`
+}
+
+type RunsV2Connection struct {
+	Edges    []*FunctionRunV2Edge `json:"edges"`
+	PageInfo *PageInfo            `json:"pageInfo"`
+}
+
+type RunsV2OrderBy struct {
+	Field     RunsV2OrderByField   `json:"field"`
+	Direction RunsOrderByDirection `json:"direction"`
 }
 
 type StepEvent struct {
@@ -294,6 +349,49 @@ func (e FunctionRunStatus) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
+type FunctionRunTimeFieldV2 string
+
+const (
+	FunctionRunTimeFieldV2QueuedAt  FunctionRunTimeFieldV2 = "QUEUED_AT"
+	FunctionRunTimeFieldV2StartedAt FunctionRunTimeFieldV2 = "STARTED_AT"
+	FunctionRunTimeFieldV2EndedAt   FunctionRunTimeFieldV2 = "ENDED_AT"
+)
+
+var AllFunctionRunTimeFieldV2 = []FunctionRunTimeFieldV2{
+	FunctionRunTimeFieldV2QueuedAt,
+	FunctionRunTimeFieldV2StartedAt,
+	FunctionRunTimeFieldV2EndedAt,
+}
+
+func (e FunctionRunTimeFieldV2) IsValid() bool {
+	switch e {
+	case FunctionRunTimeFieldV2QueuedAt, FunctionRunTimeFieldV2StartedAt, FunctionRunTimeFieldV2EndedAt:
+		return true
+	}
+	return false
+}
+
+func (e FunctionRunTimeFieldV2) String() string {
+	return string(e)
+}
+
+func (e *FunctionRunTimeFieldV2) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FunctionRunTimeFieldV2(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FunctionRunTimeFieldV2", str)
+	}
+	return nil
+}
+
+func (e FunctionRunTimeFieldV2) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
 type FunctionStatus string
 
 const (
@@ -377,6 +475,90 @@ func (e *FunctionTriggerTypes) UnmarshalGQL(v interface{}) error {
 }
 
 func (e FunctionTriggerTypes) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type RunsOrderByDirection string
+
+const (
+	RunsOrderByDirectionAsc  RunsOrderByDirection = "ASC"
+	RunsOrderByDirectionDesc RunsOrderByDirection = "DESC"
+)
+
+var AllRunsOrderByDirection = []RunsOrderByDirection{
+	RunsOrderByDirectionAsc,
+	RunsOrderByDirectionDesc,
+}
+
+func (e RunsOrderByDirection) IsValid() bool {
+	switch e {
+	case RunsOrderByDirectionAsc, RunsOrderByDirectionDesc:
+		return true
+	}
+	return false
+}
+
+func (e RunsOrderByDirection) String() string {
+	return string(e)
+}
+
+func (e *RunsOrderByDirection) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = RunsOrderByDirection(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid RunsOrderByDirection", str)
+	}
+	return nil
+}
+
+func (e RunsOrderByDirection) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type RunsV2OrderByField string
+
+const (
+	RunsV2OrderByFieldQueuedAt  RunsV2OrderByField = "QUEUED_AT"
+	RunsV2OrderByFieldStartedAt RunsV2OrderByField = "STARTED_AT"
+	RunsV2OrderByFieldEndedAt   RunsV2OrderByField = "ENDED_AT"
+)
+
+var AllRunsV2OrderByField = []RunsV2OrderByField{
+	RunsV2OrderByFieldQueuedAt,
+	RunsV2OrderByFieldStartedAt,
+	RunsV2OrderByFieldEndedAt,
+}
+
+func (e RunsV2OrderByField) IsValid() bool {
+	switch e {
+	case RunsV2OrderByFieldQueuedAt, RunsV2OrderByFieldStartedAt, RunsV2OrderByFieldEndedAt:
+		return true
+	}
+	return false
+}
+
+func (e RunsV2OrderByField) String() string {
+	return string(e)
+}
+
+func (e *RunsV2OrderByField) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = RunsV2OrderByField(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid RunsV2OrderByField", str)
+	}
+	return nil
+}
+
+func (e RunsV2OrderByField) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

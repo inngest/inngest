@@ -11,6 +11,7 @@ export type Scalars = {
   Boolean: boolean;
   Int: number;
   Float: number;
+  Bytes: any;
   /** The environment for the function to be run: `"prod"` or `"test"` */
   Environment: any;
   Map: any;
@@ -114,6 +115,7 @@ export type FunctionRun = {
   __typename?: 'FunctionRun';
   batchCreatedAt: Maybe<Scalars['Time']>;
   batchID: Maybe<Scalars['ULID']>;
+  cron: Maybe<Scalars['String']>;
   event: Maybe<Event>;
   eventID: Scalars['ID'];
   events: Array<Event>;
@@ -151,6 +153,36 @@ export enum FunctionRunStatus {
   Queued = 'QUEUED',
   Running = 'RUNNING'
 }
+
+export enum FunctionRunTimeFieldV2 {
+  EndedAt = 'ENDED_AT',
+  QueuedAt = 'QUEUED_AT',
+  StartedAt = 'STARTED_AT'
+}
+
+export type FunctionRunV2 = {
+  __typename?: 'FunctionRunV2';
+  appID: Scalars['UUID'];
+  endedAt: Maybe<Scalars['Time']>;
+  function: Function;
+  functionID: Scalars['UUID'];
+  id: Scalars['ULID'];
+  isBatch: Scalars['Boolean'];
+  output: Maybe<Scalars['Bytes']>;
+  queuedAt: Scalars['Time'];
+  sourceID: Maybe<Scalars['String']>;
+  startedAt: Maybe<Scalars['Time']>;
+  status: FunctionRunStatus;
+  traceID: Scalars['String'];
+  triggerIDs: Array<Scalars['ULID']>;
+  triggers: Array<Scalars['Bytes']>;
+};
+
+export type FunctionRunV2Edge = {
+  __typename?: 'FunctionRunV2Edge';
+  cursor: Scalars['String'];
+  node: FunctionRunV2;
+};
 
 export type FunctionRunsQuery = {
   workspaceId?: Scalars['ID'];
@@ -256,6 +288,19 @@ export type MutationUpdateAppArgs = {
   input: UpdateAppInput;
 };
 
+/** The pagination information in a connection. */
+export type PageInfo = {
+  __typename?: 'PageInfo';
+  /** When paginating forward, the cursor to query the next page. */
+  endCursor: Maybe<Scalars['String']>;
+  /** Indicates if there are any pages subsequent to the current page. */
+  hasNextPage: Scalars['Boolean'];
+  /** Indicates if there are any pages prior to the current page. */
+  hasPreviousPage: Scalars['Boolean'];
+  /** When paginating backward, the cursor to query the previous page. */
+  startCursor: Maybe<Scalars['String']>;
+};
+
 export type Query = {
   __typename?: 'Query';
   apps: Array<App>;
@@ -263,6 +308,7 @@ export type Query = {
   events: Maybe<Array<Event>>;
   functionRun: Maybe<FunctionRun>;
   functions: Maybe<Array<Function>>;
+  runs: RunsV2Connection;
   stream: Array<StreamItem>;
 };
 
@@ -279,6 +325,14 @@ export type QueryEventsArgs = {
 
 export type QueryFunctionRunArgs = {
   query: FunctionRunQuery;
+};
+
+
+export type QueryRunsArgs = {
+  after: InputMaybe<Scalars['String']>;
+  filter: RunsFilterV2;
+  first?: Scalars['Int'];
+  orderBy: Array<RunsV2OrderBy>;
 };
 
 
@@ -356,6 +410,38 @@ export type RunHistoryWaitResult = {
   eventID: Maybe<Scalars['ULID']>;
   timeout: Scalars['Boolean'];
 };
+
+export type RunsFilterV2 = {
+  appIDs?: InputMaybe<Array<Scalars['UUID']>>;
+  from: Scalars['Time'];
+  functionIDs?: InputMaybe<Array<Scalars['UUID']>>;
+  query?: InputMaybe<Scalars['String']>;
+  status?: InputMaybe<Array<FunctionRunStatus>>;
+  timeField?: InputMaybe<FunctionRunTimeFieldV2>;
+  until?: InputMaybe<Scalars['Time']>;
+};
+
+export enum RunsOrderByDirection {
+  Asc = 'ASC',
+  Desc = 'DESC'
+}
+
+export type RunsV2Connection = {
+  __typename?: 'RunsV2Connection';
+  edges: Array<FunctionRunV2Edge>;
+  pageInfo: PageInfo;
+};
+
+export type RunsV2OrderBy = {
+  direction: RunsOrderByDirection;
+  field: RunsV2OrderByField;
+};
+
+export enum RunsV2OrderByField {
+  EndedAt = 'ENDED_AT',
+  QueuedAt = 'QUEUED_AT',
+  StartedAt = 'STARTED_AT'
+}
 
 export type StepEvent = {
   __typename?: 'StepEvent';
