@@ -2440,15 +2440,19 @@ func (e *executor) extractTraceCtx(ctx context.Context, id state.Identifier, ite
 }
 
 func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem) error {
-	return e.AppendAndScheduleBatchWithOpts(ctx, fn, bi, execution.BatchExecOpts{})
+	return e.AppendAndScheduleBatchWithOpts(ctx, fn, bi, nil)
 }
 
 // AppendAndScheduleBatchWithOpts appends a new batch item. If a new batch is created, it will be scheduled to run
 // after the batch timeout. If the item finalizes the batch, a function run is immediately scheduled.
-func (e *executor) AppendAndScheduleBatchWithOpts(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts execution.BatchExecOpts) error {
+func (e *executor) AppendAndScheduleBatchWithOpts(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *execution.BatchExecOpts) error {
 	result, err := e.batcher.Append(ctx, bi, fn)
 	if err != nil {
 		return err
+	}
+
+	if opts == nil {
+		opts = &execution.BatchExecOpts{}
 	}
 
 	switch result.Status {
@@ -2482,7 +2486,7 @@ func (e *executor) AppendAndScheduleBatchWithOpts(ctx context.Context, fn innges
 			AppID:       bi.AppID,
 			WorkspaceID: bi.WorkspaceID,
 			AccountID:   bi.AccountID,
-		}, execution.BatchExecOpts{
+		}, &execution.BatchExecOpts{
 			FunctionPausedAt: opts.FunctionPausedAt,
 		}); err != nil {
 			return fmt.Errorf("could not retrieve and schedule batch items: %w", err)
@@ -2495,14 +2499,18 @@ func (e *executor) AppendAndScheduleBatchWithOpts(ctx context.Context, fn innges
 }
 
 func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload) error {
-	return e.RetrieveAndScheduleBatchWithOpts(ctx, fn, payload, execution.BatchExecOpts{})
+	return e.RetrieveAndScheduleBatchWithOpts(ctx, fn, payload, nil)
 }
 
 // RetrieveAndScheduleBatchWithOpts retrieves all items from a started batch and schedules a function run
-func (e *executor) RetrieveAndScheduleBatchWithOpts(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts execution.BatchExecOpts) error {
+func (e *executor) RetrieveAndScheduleBatchWithOpts(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
 	evtList, err := e.batcher.RetrieveItems(ctx, payload.BatchID)
 	if err != nil {
 		return err
+	}
+
+	if opts == nil {
+		opts = &execution.BatchExecOpts{}
 	}
 
 	evtIDs := make([]string, len(evtList))

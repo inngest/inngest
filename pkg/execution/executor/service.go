@@ -325,7 +325,7 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 		AppID:           item.Identifier.AppID,
 		FunctionID:      item.Identifier.WorkflowID,
 		FunctionVersion: fn.FunctionVersion,
-	}, execution.BatchExecOpts{}); err != nil {
+	}, nil); err != nil {
 		return fmt.Errorf("could not retrieve and schedule batch items: %w", err)
 	}
 
