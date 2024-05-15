@@ -137,6 +137,8 @@ func (e Event) IsFinishedEvent() bool {
 type InngestMetadata struct {
 	InvokeFnID          string `json:"fn_id"`
 	InvokeCorrelationId string `json:"correlation_id,omitempty"`
+	InvokeSpanID        string `json:"sid,omitempty"`
+	InvokeTimestamp     int64  `json:"ts"`
 }
 
 func (e Event) InngestMetadata() *InngestMetadata {
@@ -206,6 +208,8 @@ type NewInvocationEventOpts struct {
 	Event         Event
 	FnID          string
 	CorrelationID *string
+	SpanID        *string
+	SpanTimestamp int64
 }
 
 func NewInvocationEvent(opts NewInvocationEventOpts) Event {
@@ -222,14 +226,26 @@ func NewInvocationEvent(opts NewInvocationEventOpts) Event {
 	}
 	evt.Name = InvokeFnName
 
+	correlationID := ""
+	if opts.CorrelationID != nil {
+		correlationID = *opts.CorrelationID
+	}
+
+	spanID := ""
+	if opts.SpanID != nil {
+		spanID = *opts.SpanID
+	}
+
+	var spants int64
+	if opts.SpanTimestamp > 0 {
+		spants = opts.SpanTimestamp
+	}
+
 	evt.Data[consts.InngestEventDataPrefix] = InngestMetadata{
-		InvokeFnID: opts.FnID,
-		InvokeCorrelationId: func() string {
-			if opts.CorrelationID != nil {
-				return *opts.CorrelationID
-			}
-			return ""
-		}(),
+		InvokeFnID:          opts.FnID,
+		InvokeCorrelationId: correlationID,
+		InvokeSpanID:        spanID,
+		InvokeTimestamp:     spants,
 	}
 
 	return evt

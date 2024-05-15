@@ -2196,17 +2196,23 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	opcode := gen.Op.String()
 	now := time.Now()
 
+	sid := telemetry.NewSpanID(ctx)
+	sidstr := sid.String()
+
 	// Always create an invocation event.
 	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
 		Event:         *opts.Payload,
 		FnID:          opts.FunctionID,
 		CorrelationID: &correlationID,
+		SpanID:        &sidstr,
+		SpanTimestamp: now.UnixMilli(),
 	})
 
 	ctx, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeStep),
 		telemetry.WithName(consts.OtelSpanInvoke),
 		telemetry.WithTimestamp(now),
+		telemetry.WithSpanID(sid),
 		telemetry.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
@@ -2229,9 +2235,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	span.Send()
 	defer span.End()
 
-	spanID := span.SpanContext().SpanID().String()
 	traceStartedAt := state.Time(now)
-
 	err = e.sm.SavePause(ctx, state.Pause{
 		ID:                  pauseID,
 		WorkspaceID:         item.WorkspaceID,
@@ -2246,7 +2250,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		Expression:          &strExpr,
 		DataKey:             gen.ID,
 		InvokeCorrelationID: &correlationID,
-		StepSpanID:          &spanID,
+		StepSpanID:          &sidstr,
 		TriggeringEventID:   &evt.ID,
 		TraceStartedAt:      &traceStartedAt,
 		InvokeTargetFnID:    &opts.FunctionID,
