@@ -1,11 +1,13 @@
 package consts
 
 const (
-	OtelSpanEvent    = "event"
-	OtelSpanCron     = "cron"
-	OtelSpanBatch    = "batch"
-	OtelSpanDebounce = "debounce"
-	OtelSpanTrigger  = "trigger"
+	OtelSpanEvent        = "event"
+	OtelSpanCron         = "cron"
+	OtelSpanBatch        = "batch"
+	OtelSpanDebounce     = "debounce"
+	OtelSpanTrigger      = "trigger"
+	OtelSpanInvoke       = "invoke"
+	OtelSpanWaitForEvent = "wait"
 
 	// system attributes
 	OtelSysAccountID      = "sys.account.id"
@@ -50,6 +52,9 @@ const (
 
 	OtelSysStepSleepEndAt = "sys.step.sleep.end"
 
+	OtelSysStepWaitExpires = "sys.step.wait.expires"
+	OtelSysStepWaitExpired = "sys.step.wait.expired"
+
 	OtelSysStepInvokeExpires           = "sys.step.invoke.expires"
 	OtelSysStepInvokeTargetFnID        = "sys.step.invoke.fn.id"
 	OtelSysStepInvokeTriggeringEventID = "sys.step.invoke.event.outgoing.id"
@@ -78,6 +83,7 @@ const (
 	OtelScopeEvent     = "event.inngest"
 	OtelScopeBatch     = "batch.inngest"
 	OtelScopeDebounce  = "debounce.inngest"
+	OtelScopeWait      = "wait.inngest"
 	OtelScopeTrigger   = "trigger.inngest"
 	OtelScopeCron      = "cron.inngest"
 	OtelScopeEnv       = "env.inngest"
