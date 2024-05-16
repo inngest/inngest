@@ -353,7 +353,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
           <div
             className={classNames(
               !header && 'rounded-t-lg',
-              'flex justify-between border-b border-slate-200 shadow dark:border-slate-700/20 dark:bg-slate-800/40'
+              'flex justify-between border-b border-slate-200 dark:shadow dark:border-slate-700/20 dark:bg-slate-800/40'
             )}
           >
             <div className="-mb-px flex">
