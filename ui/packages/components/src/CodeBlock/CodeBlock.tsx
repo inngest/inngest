@@ -337,7 +337,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
       {monaco && (
         <div
           ref={wrapperRef}
-          className="dark:bg-slate-910 dark: w-full rounded-lg border border-slate-200 
+          className="dark:bg-slate-910 w-full rounded-lg border border-slate-200 
              border-slate-700/30 bg-white text-slate-700 shadow dark:bg-slate-800/40"
         >
           {header && (
