@@ -268,3 +268,97 @@ func TestDebounce_Timeout(t *testing.T) {
 		return atomic.LoadInt32(&counter) == 1
 	}, 15*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
 }
+
+func TestDebounceAndEventIdempotency(t *testing.T) {
+	// Ensure that debouncing works properly with event idempotency.
+
+	r := require.New(t)
+	h, server, registerFuncs := NewSDKHandler(t, "TestDebounceAndEventIdempotency")
+	defer server.Close()
+
+	var counter int32
+
+	a := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name: "my-fn",
+			Debounce: &inngestgo.Debounce{
+				Period: time.Second,
+			},
+		},
+		inngestgo.EventTrigger("test/sdk", nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			fmt.Println("run")
+			atomic.AddInt32(&counter, 1)
+			return nil, nil
+		},
+	)
+	h.Register(a)
+	registerFuncs()
+
+	evt := DebounceEvent{
+		ID:   inngestgo.StrPtr("foo"),
+		Name: "test/sdk",
+	}
+
+	_, err := inngestgo.Send(context.Background(), evt)
+	r.NoError(err)
+	r.Eventually(func() bool {
+		return atomic.LoadInt32(&counter) == 1
+	}, 5*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
+
+	counter = 0
+	_, err = inngestgo.Send(context.Background(), evt)
+	r.NoError(err)
+	r.Eventually(func() bool {
+		// TODO: FIX IDEMPOTENCY! Users expect the function to not run again.
+		return atomic.LoadInt32(&counter) == 1
+	}, 10*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
+}
+
+func TestDebounceAndFunctionIdempotency(t *testing.T) {
+	// Ensure that debouncing works properly with function idempotency.
+
+	r := require.New(t)
+	h, server, registerFuncs := NewSDKHandler(t, "TestDebounceAndFunctionIdempotency")
+	defer server.Close()
+
+	var counter int32
+
+	a := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name: "my-fn",
+			Debounce: &inngestgo.Debounce{
+				Period: time.Second,
+			},
+			Idempotency: inngestgo.StrPtr("event.data.name"),
+		},
+		inngestgo.EventTrigger("test/sdk", nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			atomic.AddInt32(&counter, 1)
+			return nil, nil
+		},
+	)
+	h.Register(a)
+	registerFuncs()
+
+	evt := DebounceEvent{
+		Name: "test/sdk",
+		Data: DebounceEventData{
+			Name: "Alice",
+		},
+	}
+
+	_, err := inngestgo.Send(context.Background(), evt)
+	r.NoError(err)
+	r.Eventually(func() bool {
+		return atomic.LoadInt32(&counter) == 1
+	}, 5*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
+
+	counter = 0
+	_, err = inngestgo.Send(context.Background(), evt)
+	r.NoError(err)
+	r.Never(func() bool {
+		// TODO: FIX IDEMPOTENCY! Users expect the function to not run again.
+		return atomic.LoadInt32(&counter) == 1
+	}, 5*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
+}
