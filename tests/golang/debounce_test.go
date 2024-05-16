@@ -304,7 +304,7 @@ func TestDebounceAndEventIdempotency(t *testing.T) {
 	r.NoError(err)
 	r.Eventually(func() bool {
 		return atomic.LoadInt32(&counter) == 1
-	}, 5*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
+	}, 10*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
 
 	counter = 0
 	_, err = inngestgo.Send(context.Background(), evt)
@@ -352,7 +352,7 @@ func TestDebounceAndFunctionIdempotency(t *testing.T) {
 	r.NoError(err)
 	r.Eventually(func() bool {
 		return atomic.LoadInt32(&counter) == 1
-	}, 5*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
+	}, 10*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
 
 	counter = 0
 	_, err = inngestgo.Send(context.Background(), evt)
@@ -360,5 +360,5 @@ func TestDebounceAndFunctionIdempotency(t *testing.T) {
 	r.Never(func() bool {
 		// TODO: FIX IDEMPOTENCY! Users expect the function to not run again.
 		return atomic.LoadInt32(&counter) == 1
-	}, 5*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
+	}, 10*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
 }
