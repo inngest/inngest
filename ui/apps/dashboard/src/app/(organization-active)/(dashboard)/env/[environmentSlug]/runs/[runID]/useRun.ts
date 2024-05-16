@@ -76,7 +76,6 @@ export function useRun({ envID, runID }: { envID: string; runID: string }) {
     return res;
   }
 
-  console.log(res.data.workspace);
   const { run } = res.data.workspace;
   if (!run) {
     return {
