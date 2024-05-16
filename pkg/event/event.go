@@ -5,14 +5,13 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
-	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -138,17 +137,15 @@ func (e Event) IsFinishedEvent() bool {
 // function. Note that this metadata is not present on all functions. For
 // accessing an event's correlation ID, prefer using `Event.CorrelationID()`.
 type InngestMetadata struct {
-	SourceAppID         string `json:"source_app_id"`
-	SourceFnID          string `json:"source_fn_id"`
-	SourceFnVersion     int    `json:"source_fn_v"`
-	InvokeFnID          string `json:"fn_id"`
-	InvokeCorrelationId string `json:"correlation_id,omitempty"`
-	InvokeParentSpanID  string `json:"psid,omitempty"`
-	InvokeSpanID        string `json:"sid,omitempty"`
-	InvokeTimestamp     int64  `json:"ts"`
-	InvokeExpiresAt     int64  `json:"expire"`
-	InvokeGroupID       string `json:"gid"`
-	InvokeDisplayName   string `json:"name"`
+	SourceAppID         string                  `json:"source_app_id"`
+	SourceFnID          string                  `json:"source_fn_id"`
+	SourceFnVersion     int                     `json:"source_fn_v"`
+	InvokeFnID          string                  `json:"fn_id"`
+	InvokeCorrelationId string                  `json:"correlation_id,omitempty"`
+	InvokeTraceCarrier  *telemetry.TraceCarrier `json:"tc,omitempty"`
+	InvokeExpiresAt     int64                   `json:"expire"`
+	InvokeGroupID       string                  `json:"gid"`
+	InvokeDisplayName   string                  `json:"name"`
 }
 
 func (m *InngestMetadata) Decode(data any) error {
@@ -172,28 +169,6 @@ func (m *InngestMetadata) RunID() *ulid.ULID {
 		return &id
 	}
 	return nil
-}
-
-func (m *InngestMetadata) SpanIDs() (*trace.SpanID, *trace.SpanID, error) {
-	if m.InvokeParentSpanID == "" {
-		return nil, nil, fmt.Errorf("invoke step's parent spanID is not available")
-	}
-
-	if m.InvokeSpanID == "" {
-		return nil, nil, fmt.Errorf("invoke step's spanID is not available")
-	}
-
-	psid, err := trace.SpanIDFromHex(m.InvokeParentSpanID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	sid, err := trace.SpanIDFromHex(m.InvokeSpanID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return &psid, &sid, nil
 }
 
 func (e Event) InngestMetadata() *InngestMetadata {
@@ -266,9 +241,7 @@ type NewInvocationEventOpts struct {
 	Event           Event
 	FnID            string
 	CorrelationID   *string
-	ParentSpanID    *string
-	SpanID          *string
-	SpanTimestamp   int64
+	TraceCarrier    *telemetry.TraceCarrier
 	ExpiresAt       int64
 	GroupID         string
 	DisplayName     string
@@ -293,22 +266,10 @@ func NewInvocationEvent(opts NewInvocationEventOpts) Event {
 		correlationID = *opts.CorrelationID
 	}
 
-	spanID := ""
-	if opts.SpanID != nil {
-		spanID = *opts.SpanID
-	}
-
-	parentSpanID := ""
-	if opts.ParentSpanID != nil {
-		parentSpanID = *opts.ParentSpanID
-	}
-
 	evt.Data[consts.InngestEventDataPrefix] = InngestMetadata{
 		InvokeFnID:          opts.FnID,
 		InvokeCorrelationId: correlationID,
-		InvokeParentSpanID:  parentSpanID,
-		InvokeSpanID:        spanID,
-		InvokeTimestamp:     opts.SpanTimestamp,
+		InvokeTraceCarrier:  opts.TraceCarrier,
 		InvokeExpiresAt:     opts.ExpiresAt,
 		InvokeGroupID:       opts.GroupID,
 		InvokeDisplayName:   opts.DisplayName,

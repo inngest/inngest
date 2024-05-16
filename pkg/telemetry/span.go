@@ -5,12 +5,10 @@ import (
 	crand "crypto/rand"
 	"encoding/binary"
 	"math/rand"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -534,15 +532,6 @@ func (s *Span) SetAttributes(attrs ...attribute.KeyValue) {
 
 func (s *Span) TracerProvider() trace.TracerProvider {
 	return UserTracer().Provider()
-}
-
-// additional helper methods
-func (s *Span) SetEventIDs(evts ...event.TrackedEvent) {
-	ids := []string{}
-	for _, evt := range evts {
-		ids = append(ids, evt.GetInternalID().String())
-	}
-	s.SetAttributes(attribute.String(consts.OtelSysEventIDs, strings.Join(ids, ",")))
 }
 
 func newSpanIDGenerator() *spanIDGenerator {
