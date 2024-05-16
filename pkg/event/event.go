@@ -5,10 +5,12 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -135,8 +137,38 @@ func (e Event) IsFinishedEvent() bool {
 // function. Note that this metadata is not present on all functions. For
 // accessing an event's correlation ID, prefer using `Event.CorrelationID()`.
 type InngestMetadata struct {
-	InvokeFnID          string `json:"fn_id"`
-	InvokeCorrelationId string `json:"correlation_id,omitempty"`
+	SourceAppID         string                  `json:"source_app_id"`
+	SourceFnID          string                  `json:"source_fn_id"`
+	SourceFnVersion     int                     `json:"source_fn_v"`
+	InvokeFnID          string                  `json:"fn_id"`
+	InvokeCorrelationId string                  `json:"correlation_id,omitempty"`
+	InvokeTraceCarrier  *telemetry.TraceCarrier `json:"tc,omitempty"`
+	InvokeExpiresAt     int64                   `json:"expire"`
+	InvokeGroupID       string                  `json:"gid"`
+	InvokeDisplayName   string                  `json:"name"`
+}
+
+func (m *InngestMetadata) Decode(data any) error {
+	byt, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(byt, m)
+}
+
+func (m *InngestMetadata) RunID() *ulid.ULID {
+	if len(m.InvokeCorrelationId) == 0 {
+		return nil
+	}
+	s := strings.Split(m.InvokeCorrelationId, ".")
+	if len(s) != 2 {
+		return nil
+	}
+
+	if id, err := ulid.Parse(s[0]); err == nil {
+		return &id
+	}
+	return nil
 }
 
 func (e Event) InngestMetadata() *InngestMetadata {
@@ -203,9 +235,16 @@ func (o ossTrackedEvent) GetWorkspaceID() uuid.UUID {
 }
 
 type NewInvocationEventOpts struct {
-	Event         Event
-	FnID          string
-	CorrelationID *string
+	SourceAppID     string
+	SourceFnID      string
+	SourceFnVersion int
+	Event           Event
+	FnID            string
+	CorrelationID   *string
+	TraceCarrier    *telemetry.TraceCarrier
+	ExpiresAt       int64
+	GroupID         string
+	DisplayName     string
 }
 
 func NewInvocationEvent(opts NewInvocationEventOpts) Event {
@@ -222,14 +261,21 @@ func NewInvocationEvent(opts NewInvocationEventOpts) Event {
 	}
 	evt.Name = InvokeFnName
 
+	correlationID := ""
+	if opts.CorrelationID != nil {
+		correlationID = *opts.CorrelationID
+	}
+
 	evt.Data[consts.InngestEventDataPrefix] = InngestMetadata{
-		InvokeFnID: opts.FnID,
-		InvokeCorrelationId: func() string {
-			if opts.CorrelationID != nil {
-				return *opts.CorrelationID
-			}
-			return ""
-		}(),
+		InvokeFnID:          opts.FnID,
+		InvokeCorrelationId: correlationID,
+		InvokeTraceCarrier:  opts.TraceCarrier,
+		InvokeExpiresAt:     opts.ExpiresAt,
+		InvokeGroupID:       opts.GroupID,
+		InvokeDisplayName:   opts.DisplayName,
+		SourceAppID:         opts.SourceAppID,
+		SourceFnID:          opts.SourceFnID,
+		SourceFnVersion:     opts.SourceFnVersion,
 	}
 
 	return evt

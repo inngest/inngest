@@ -52,8 +52,11 @@ const (
 
 	OtelSysStepSleepEndAt = "sys.step.sleep.end"
 
-	OtelSysStepWaitExpires = "sys.step.wait.expires"
-	OtelSysStepWaitExpired = "sys.step.wait.expired"
+	OtelSysStepWaitExpires        = "sys.step.wait.expires"
+	OtelSysStepWaitExpired        = "sys.step.wait.expired"
+	OtelSysStepWaitEventName      = "sys.step.wait.event"
+	OtelSysStepWaitExpression     = "sys.step.wait.expr"
+	OtelSysStepWaitMatchedEventID = "sys.step.wait.matched.event.id"
 
 	OtelSysStepInvokeExpires           = "sys.step.invoke.expires"
 	OtelSysStepInvokeTargetFnID        = "sys.step.invoke.fn.id"
@@ -83,7 +86,6 @@ const (
 	OtelScopeEvent     = "event.inngest"
 	OtelScopeBatch     = "batch.inngest"
 	OtelScopeDebounce  = "debounce.inngest"
-	OtelScopeWait      = "wait.inngest"
 	OtelScopeTrigger   = "trigger.inngest"
 	OtelScopeCron      = "cron.inngest"
 	OtelScopeEnv       = "env.inngest"
