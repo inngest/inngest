@@ -2261,10 +2261,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	opcode := gen.Op.String()
 	now := time.Now()
 
-	psid := execSpan.SpanContext().SpanID().String()
 	sid := telemetry.NewSpanID(ctx)
-	sidstr := sid.String()
-
 	// NOTE: the context here still contains the execSpan's traceID & spanID,
 	// which is what we want because that's the parent that needs to be referenced later on
 	carrier := telemetry.NewTraceCarrier(
@@ -2313,7 +2310,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 	)
 	defer span.End()
 
-	traceStartedAt := state.Time(now)
 	err = e.sm.SavePause(ctx, state.Pause{
 		ID:                  pauseID,
 		WorkspaceID:         item.WorkspaceID,
@@ -2328,10 +2324,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, gen state.
 		Expression:          &strExpr,
 		DataKey:             gen.ID,
 		InvokeCorrelationID: &correlationID,
-		StepParentSpanID:    &psid,
-		StepSpanID:          &sidstr,
 		TriggeringEventID:   &evt.ID,
-		TraceStartedAt:      &traceStartedAt,
 		InvokeTargetFnID:    &opts.FunctionID,
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
@@ -2497,27 +2490,20 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 		span.SetAttributes(attribute.String(consts.OtelSysStepWaitExpression, *opts.If))
 	}
 
-	psid := execSpan.SpanContext().SpanID().String()
-	sidstr := sid.String()
-	traceStartedAt := state.Time(now)
-
 	err = e.sm.SavePause(ctx, state.Pause{
-		ID:               pauseID,
-		WorkspaceID:      item.WorkspaceID,
-		Identifier:       item.Identifier,
-		GroupID:          item.GroupID,
-		Outgoing:         gen.ID,
-		Incoming:         edge.Edge.Incoming,
-		StepName:         gen.UserDefinedName(),
-		Opcode:           &opcode,
-		Expires:          state.Time(expires),
-		Event:            &opts.Event,
-		Expression:       expr,
-		ExpressionData:   data,
-		DataKey:          gen.ID,
-		StepParentSpanID: &psid,
-		StepSpanID:       &sidstr,
-		TraceStartedAt:   &traceStartedAt,
+		ID:             pauseID,
+		WorkspaceID:    item.WorkspaceID,
+		Identifier:     item.Identifier,
+		GroupID:        item.GroupID,
+		Outgoing:       gen.ID,
+		Incoming:       edge.Edge.Incoming,
+		StepName:       gen.UserDefinedName(),
+		Opcode:         &opcode,
+		Expires:        state.Time(expires),
+		Event:          &opts.Event,
+		Expression:     expr,
+		ExpressionData: data,
+		DataKey:        gen.ID,
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
