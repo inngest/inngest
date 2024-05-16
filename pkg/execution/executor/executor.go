@@ -95,7 +95,7 @@ func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 	return m, nil
 }
 
-// ExecutorOpt modifies the built in executor on creation.
+// ExecutorOpt modifies the built-in executor on creation.
 type ExecutorOpt func(m execution.Executor) error
 
 func WithCancellationChecker(c cancellation.Checker) ExecutorOpt {
@@ -1714,9 +1714,30 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		return fmt.Errorf("error enqueueing after pause: %w", err)
 	}
 
+	ts := time.Now()
+	if pause.TraceStartedAt != nil {
+		ts = (*pause.TraceStartedAt).Time()
+	}
+
+	commonAttrs := []attribute.KeyValue{
+		attribute.Bool(consts.OtelUserTraceFilterKey, true),
+		attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
+		attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
+		attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),
+		attribute.String(consts.OtelSysFunctionID, pause.Identifier.WorkflowID.String()),
+		// attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
+		attribute.Int(consts.OtelSysFunctionVersion, pause.Identifier.WorkflowVersion),
+		attribute.String(consts.OtelAttrSDKRunID, pause.Identifier.RunID.String()),
+		attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
+		attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
+		attribute.String(consts.OtelSysStepGroupID, pause.GroupID),
+		attribute.String(consts.OtelSysStepDisplayName, pause.StepName),
+	}
+
 	if pause.Opcode != nil && *pause.Opcode == enums.OpcodeInvokeFunction.String() {
 		if pause.StepSpanID != nil && *pause.StepSpanID != "" {
 			if spanID, err := trace.SpanIDFromHex(*pause.StepSpanID); err == nil {
+				// Used for spans
 				triggeringEventID := ""
 				if pause.TriggeringEventID != nil {
 					triggeringEventID = *pause.TriggeringEventID
@@ -1727,42 +1748,24 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 					returnedEventID = r.EventID.String()
 				}
 
-				runID := ""
-				if r.RunID != nil {
-					runID = r.RunID.String()
-				}
-
 				targetFnID := ""
 				if pause.InvokeTargetFnID != nil {
 					targetFnID = *pause.InvokeTargetFnID
 				}
 
-				ts := time.Now()
-				if pause.TraceStartedAt != nil {
-					ts = (*pause.TraceStartedAt).Time()
+				runID := ""
+				if r.RunID != nil {
+					runID = r.RunID.String()
 				}
 
 				var span *telemetry.Span
 				ctx, span = telemetry.NewSpan(ctx,
 					telemetry.WithScope(consts.OtelScopeStep),
-					telemetry.WithName("invoke"),
+					telemetry.WithName(consts.OtelSpanInvoke),
 					telemetry.WithTimestamp(ts),
 					telemetry.WithSpanID(spanID),
 					telemetry.WithSpanAttributes(
-						attribute.Bool(consts.OtelUserTraceFilterKey, true),
-						attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
-						attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
-						attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),
-						attribute.String(consts.OtelSysFunctionID, pause.Identifier.WorkflowID.String()),
-						// attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
-						attribute.Int(consts.OtelSysFunctionVersion, pause.Identifier.WorkflowVersion),
-						attribute.String(consts.OtelAttrSDKRunID, pause.Identifier.RunID.String()),
-						attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
-						attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
-						attribute.String(consts.OtelSysStepGroupID, pause.GroupID),
 						attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
-						attribute.String(consts.OtelSysStepDisplayName, pause.StepName),
-
 						attribute.String(consts.OtelSysStepInvokeTargetFnID, targetFnID),
 						attribute.Int64(consts.OtelSysStepInvokeExpires, pause.Expires.Time().UnixMilli()),
 						attribute.String(consts.OtelSysStepInvokeTriggeringEventID, triggeringEventID),
@@ -1771,10 +1774,12 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 						attribute.Bool(consts.OtelSysStepInvokeExpired, r.EventID == nil),
 					),
 				)
+				span.Send()
+				defer span.End()
+				span.SetAttributes(commonAttrs...)
 				if r.HasError() {
 					span.SetStatus(codes.Error, r.Error())
 				}
-				span.Send()
 			}
 		}
 
@@ -1782,6 +1787,29 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, r, pause.GroupID)
 		}
 	} else {
+		if pause.StepSpanID != nil && *pause.StepSpanID != "" {
+			if spanID, err := trace.SpanIDFromHex(*pause.StepSpanID); err == nil {
+				var span *telemetry.Span
+				ctx, span = telemetry.NewSpan(ctx,
+					telemetry.WithScope(consts.OtelScopeStep),
+					telemetry.WithName(consts.OtelSpanInvoke),
+					telemetry.WithTimestamp(ts),
+					telemetry.WithSpanID(spanID),
+					telemetry.WithSpanAttributes(
+						attribute.String(consts.OtelSysStepOpcode, enums.OpcodeWaitForEvent.String()),
+						attribute.Int64(consts.OtelSysStepWaitExpires, pause.Expires.Time().UnixMilli()),
+						attribute.Bool(consts.OtelSysStepWaitExpired, r.EventID == nil),
+					),
+				)
+				span.Send()
+				defer span.End()
+				span.SetAttributes(commonAttrs...)
+				if r.HasError() {
+					span.SetStatus(codes.Error, r.Error())
+				}
+			}
+		}
+
 		for _, e := range e.lifecycles {
 			go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, r, pause.GroupID)
 		}
@@ -2228,7 +2256,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 
 	ctx, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeStep),
-		telemetry.WithName("invoke"),
+		telemetry.WithName(consts.OtelSpanInvoke),
 		telemetry.WithTimestamp(now),
 		telemetry.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
@@ -2236,7 +2264,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 			attribute.String(consts.OtelSysWorkspaceID, i.item.Identifier.WorkspaceID.String()),
 			attribute.String(consts.OtelSysAppID, i.item.Identifier.AppID.String()),
 			attribute.String(consts.OtelSysFunctionID, i.item.Identifier.WorkflowID.String()),
-			// attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
+			attribute.String(consts.OtelSysFunctionSlug, i.md.Config.FunctionSlug),
 			attribute.Int(consts.OtelSysFunctionVersion, i.item.Identifier.WorkflowVersion),
 			attribute.String(consts.OtelAttrSDKRunID, i.item.Identifier.RunID.String()),
 			attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
@@ -2251,6 +2279,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		),
 	)
 	span.Send()
+	defer span.End()
 
 	spanID := span.SpanContext().SpanID().String()
 	traceStartedAt := state.Time(now)
@@ -2319,8 +2348,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		return fmt.Errorf("error publishing internal invocation event: %w", err)
 	}
 
-	span.Send()
-
 	for _, e := range e.lifecycles {
 		go e.OnInvokeFunction(context.WithoutCancel(ctx), i.md, i.item, gen, ulid.MustParse(evt.ID), correlationID)
 	}
@@ -2329,7 +2356,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 }
 
 func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	span := trace.SpanFromContext(ctx)
+	execSpan := trace.SpanFromContext(ctx)
 	opts, err := gen.WaitForEventOpts()
 	if err != nil {
 		return fmt.Errorf("unable to parse wait for event opts: %w", err)
@@ -2373,25 +2400,53 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		gen.Opts = opts
 	}
 
+	now := time.Now()
+
+	ctx, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeWait),
+		telemetry.WithName(consts.OtelSpanWaitForEvent),
+		telemetry.WithTimestamp(now),
+		telemetry.WithSpanAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeWaitForEvent.String()),
+			attribute.String(consts.OtelSysAccountID, i.item.Identifier.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, i.item.Identifier.WorkspaceID.String()),
+			attribute.String(consts.OtelSysAppID, i.item.Identifier.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, i.item.Identifier.WorkflowID.String()),
+			attribute.Int(consts.OtelSysFunctionVersion, i.item.Identifier.WorkflowVersion),
+			attribute.String(consts.OtelAttrSDKRunID, i.item.Identifier.RunID.String()),
+			attribute.Int(consts.OtelSysStepAttempt, 0),
+			attribute.Int(consts.OtelSysStepMaxAttempt, 1),
+			attribute.String(consts.OtelSysStepGroupID, i.item.GroupID),
+		),
+	)
+	span.Send()
+	defer span.End()
+	spanID := span.SpanContext().SpanID().String()
+	traceStartedAt := state.Time(now)
+
 	opcode := gen.Op.String()
 	err = e.pm.SavePause(ctx, state.Pause{
-		ID:          pauseID,
-		WorkspaceID: i.md.ID.Tenant.EnvID,
-		Identifier:  i.item.Identifier,
-		GroupID:     i.item.GroupID,
-		Outgoing:    gen.ID,
-		Incoming:    edge.Edge.Incoming,
-		StepName:    gen.UserDefinedName(),
-		Opcode:      &opcode,
-		Expires:     state.Time(expires),
-		Event:       &opts.Event,
-		Expression:  expr,
-		DataKey:     gen.ID,
+		ID:             pauseID,
+		WorkspaceID:    i.md.ID.Tenant.EnvID,
+		Identifier:     i.item.Identifier,
+		GroupID:        i.item.GroupID,
+		Outgoing:       gen.ID,
+		Incoming:       edge.Edge.Incoming,
+		StepName:       gen.UserDefinedName(),
+		Opcode:         &opcode,
+		Expires:        state.Time(expires),
+		Event:          &opts.Event,
+		Expression:     expr,
+		DataKey:        gen.ID,
+		StepSpanID:     &spanID,
+		TraceStartedAt: &traceStartedAt,
 	})
 	if err == state.ErrPauseAlreadyExists {
 		return nil
 	}
 	if err != nil {
+		span.Cancel(ctx)
 		return err
 	}
 
@@ -2418,9 +2473,10 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		},
 	}, expires)
 	if err == redis_state.ErrQueueItemExists {
+		span.Cancel(ctx)
 		return nil
 	}
-	span.SetAttributes(
+	execSpan.SetAttributes(
 		attribute.String(consts.OtelSysStepNextOpcode, enums.OpcodeWaitForEvent.String()),
 		attribute.Int64(consts.OtelSysStepNextTimestamp, time.Now().UnixMilli()),
 		attribute.Int64(consts.OtelSysStepNextExpires, expires.UnixMilli()),
@@ -2463,12 +2519,20 @@ func (e *executor) extractTraceCtx(ctx context.Context, md sv2.Metadata, item *q
 	return ctx
 }
 
-// AppendAndScheduleBatch appends a new batch item. If a new batch is created, it will be scheduled to run
+func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem) error {
+	return e.AppendAndScheduleBatchWithOpts(ctx, fn, bi, nil)
+}
+
+// AppendAndScheduleBatchWithOpts appends a new batch item. If a new batch is created, it will be scheduled to run
 // after the batch timeout. If the item finalizes the batch, a function run is immediately scheduled.
-func (e executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem) error {
+func (e *executor) AppendAndScheduleBatchWithOpts(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *execution.BatchExecOpts) error {
 	result, err := e.batcher.Append(ctx, bi, fn)
 	if err != nil {
 		return err
+	}
+
+	if opts == nil {
+		opts = &execution.BatchExecOpts{}
 	}
 
 	switch result.Status {
@@ -2497,11 +2561,13 @@ func (e executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functio
 	case enums.BatchFull:
 		// start execution immediately
 		batchID := ulid.MustParse(result.BatchID)
-		if err := e.RetrieveAndScheduleBatch(ctx, fn, batch.ScheduleBatchPayload{
+		if err := e.RetrieveAndScheduleBatchWithOpts(ctx, fn, batch.ScheduleBatchPayload{
 			BatchID:     batchID,
 			AppID:       bi.AppID,
 			WorkspaceID: bi.WorkspaceID,
 			AccountID:   bi.AccountID,
+		}, &execution.BatchExecOpts{
+			FunctionPausedAt: opts.FunctionPausedAt,
 		}); err != nil {
 			return fmt.Errorf("could not retrieve and schedule batch items: %w", err)
 		}
@@ -2512,11 +2578,19 @@ func (e executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functio
 	return nil
 }
 
-// RetrieveAndScheduleBatch retrieves all items from a started batch and schedules a function run
-func (e executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload) error {
+func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload) error {
+	return e.RetrieveAndScheduleBatchWithOpts(ctx, fn, payload, nil)
+}
+
+// RetrieveAndScheduleBatchWithOpts retrieves all items from a started batch and schedules a function run
+func (e *executor) RetrieveAndScheduleBatchWithOpts(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
 	evtList, err := e.batcher.RetrieveItems(ctx, payload.BatchID)
 	if err != nil {
 		return err
+	}
+
+	if opts == nil {
+		opts = &execution.BatchExecOpts{}
 	}
 
 	evtIDs := make([]string, len(evtList))
@@ -2559,7 +2633,7 @@ func (e executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Funct
 		Events:           events,
 		BatchID:          &payload.BatchID,
 		IdempotencyKey:   &key,
-		FunctionPausedAt: payload.FunctionPausedAt,
+		FunctionPausedAt: opts.FunctionPausedAt,
 	})
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
