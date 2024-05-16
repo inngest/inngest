@@ -16,6 +16,103 @@ import { type editor } from 'monaco-editor';
 import { useLocalStorage } from 'react-use';
 import colors from 'tailwindcss/colors';
 
+import { isDark } from '../utils/theme';
+
+const DARK_RULES = [
+  {
+    token: 'delimiter.bracket.json',
+    foreground: colors.slate['300'],
+  },
+  {
+    token: 'string.key.json',
+    foreground: colors.indigo['400'],
+  },
+  {
+    token: 'number.json',
+    foreground: colors.amber['400'],
+  },
+  {
+    token: 'string.value.json',
+    foreground: colors.emerald['300'],
+  },
+  {
+    token: 'keyword.json',
+    foreground: colors.fuchsia['300'],
+  },
+  {
+    token: 'comment',
+    fontStyle: 'italic',
+    foreground: colors.slate['500'],
+  },
+  {
+    token: 'string',
+    foreground: colors.teal['400'],
+  },
+  {
+    token: 'keyword',
+    foreground: colors.indigo['400'],
+  },
+  {
+    token: 'entity.name.function',
+    foreground: colors.red['500'],
+  },
+];
+const LIGHT_RULES = [
+  {
+    token: 'delimiter.bracket.json',
+    foreground: colors.slate['700'],
+  },
+  {
+    token: 'string.key.json',
+    foreground: colors.indigo['600'],
+  },
+  {
+    token: 'number.json',
+    foreground: colors.amber['600'],
+  },
+  {
+    token: 'string.value.json',
+    foreground: colors.emerald['600'],
+  },
+  {
+    token: 'keyword.json',
+    foreground: colors.fuchsia['600'],
+  },
+  {
+    token: 'comment',
+    fontStyle: 'italic',
+    foreground: colors.slate['500'],
+  },
+  {
+    token: 'string',
+    foreground: colors.teal['600'],
+  },
+  {
+    token: 'keyword',
+    foreground: colors.indigo['600'],
+  },
+  {
+    token: 'entity.name.function',
+    foreground: colors.red['500'],
+  },
+];
+
+const DARK_COLORS = {
+  'editor.background': '#1e293b4d', // slate-800/40
+  'editorLineNumber.foreground': '#cbd5e14d', // slate-300/30
+  'editorLineNumber.activeForeground': colors.slate['300'], // slate-300
+  'editorWidget.background': colors.slate['800'],
+  'editorWidget.border': colors.slate['500'],
+};
+
+const LIGHT_COLORS = {
+  'editor.background': colors.slate['50'],
+  'editorLineNumber.foreground': colors.slate['400'],
+  'editorLineNumber.activeForeground': colors.slate['600'],
+  'editorWidget.background': colors.slate['50'],
+  'editorWidget.border': colors.slate['200'],
+};
+
 const LINE_HEIGHT = 26;
 const MAX_HEIGHT = 280; // Equivalent to 10 lines + padding
 const MAX_LINES = 10;
@@ -52,8 +149,10 @@ interface CodeBlockProps {
 }
 
 export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
+  const [dark, setDark] = useState(isDark());
   const [activeTab, setActiveTab] = useState(0);
   const editorRef = useRef<MonacoEditorType>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const [isWordWrap, setIsWordWrap] = useLocalStorage('isWordWrap', false);
   const [isFullHeight, setIsFullHeight] = useLocalStorage('isFullHeight', false);
@@ -67,61 +166,25 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
   const handleChange = tabs[activeTab]?.handleChange ?? undefined;
 
   useEffect(() => {
+    //
+    // We don't have a DOM ref until we're rendered, so check for dark theme parent classes then
+    if (wrapperRef.current) {
+      setDark(isDark(wrapperRef.current));
+    }
+  });
+
+  useEffect(() => {
     if (!monaco) {
       return;
     }
 
     monaco.editor.defineTheme('inngest-theme', {
-      base: 'vs-dark',
+      base: dark ? 'vs-dark' : 'vs',
       inherit: true,
-      rules: [
-        {
-          token: 'delimiter.bracket.json',
-          foreground: colors.slate['300'],
-        },
-        {
-          token: 'string.key.json',
-          foreground: colors.indigo['400'],
-        },
-        {
-          token: 'number.json',
-          foreground: colors.amber['400'],
-        },
-        {
-          token: 'string.value.json',
-          foreground: colors.emerald['300'],
-        },
-        {
-          token: 'keyword.json',
-          foreground: colors.fuchsia['300'],
-        },
-        {
-          token: 'comment',
-          fontStyle: 'italic',
-          foreground: colors.slate['500'],
-        },
-        {
-          token: 'string',
-          foreground: colors.teal['400'],
-        },
-        {
-          token: 'keyword',
-          foreground: colors.indigo['400'],
-        },
-        {
-          token: 'entity.name.function',
-          foreground: colors.red['500'],
-        },
-      ],
-      colors: {
-        'editor.background': '#1e293b4d', // slate-800/40
-        'editorLineNumber.foreground': '#cbd5e14d', // slate-300/30
-        'editorLineNumber.activeForeground': colors.slate['300'], // slate-300
-        'editorWidget.background': colors.slate['800'],
-        'editorWidget.border': colors.slate['500'],
-      },
+      rules: dark ? DARK_RULES : LIGHT_RULES,
+      colors: dark ? DARK_COLORS : LIGHT_COLORS,
     });
-  }, [monaco]);
+  }, [monaco, dark]);
 
   useEffect(() => {
     if (editorRef.current) {
@@ -132,15 +195,6 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
   const handleTabClick = (index: number) => {
     setActiveTab(index);
   };
-
-  function handleEditorDidMount(editor: MonacoEditorType) {
-    editorRef.current = editor;
-
-    const element = document.querySelector('.overflow-guard');
-    if (element) {
-      element.classList.add('rounded-b-lg');
-    }
-  }
 
   function getTextWidth(text: string, font: string) {
     const canvas = document.createElement('canvas');
@@ -281,7 +335,11 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
   return (
     <>
       {monaco && (
-        <div className="bg-slate-910 w-full rounded-lg border border-slate-700/30 bg-slate-800/40 shadow">
+        <div
+          ref={wrapperRef}
+          className="dark:bg-slate-910 w-full rounded-lg border border-slate-200 
+             bg-slate-50 text-slate-700 dark:border-slate-700/30 dark:bg-slate-800/40 dark:shadow"
+        >
           {header && (
             <div className={classNames(header.color, 'rounded-t-lg pt-3')}>
               {(header.title || header.description) && (
@@ -295,7 +353,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
           <div
             className={classNames(
               !header && 'rounded-t-lg',
-              'flex justify-between border-b border-slate-700/20 bg-slate-800/40 shadow'
+              'flex justify-between border-b border-slate-200 dark:border-slate-700/20 dark:bg-slate-800/40 dark:shadow'
             )}
           >
             <div className="-mb-px flex">
@@ -309,10 +367,10 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
                     className={classNames(
                       `px-5 py-2.5 text-xs`,
                       isSingleTab
-                        ? 'text-slate-400'
+                        ? 'text-slate-700 dark:text-slate-400'
                         : 'block border-b outline-none transition-all duration-150',
-                      isActive && 'border-indigo-400 text-white',
-                      !isActive && !isSingleTab && 'border-transparent text-slate-400'
+                      isActive && 'border-indigo-400 text-indigo-500 dark:text-white',
+                      !isActive && !isSingleTab && 'border-transparent text-slate-700 dark:text-slate-400'
                     )}
                     onClick={() => handleTabClick(i)}
                   >
@@ -322,7 +380,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
               })}
             </div>
             {!isOutputTooLarge && (
-              <div className="dark mr-2 flex items-center gap-2 py-2">
+              <div className="mr-2 flex items-center gap-2 py-2">
                 {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
                   <Button
                     key={idx}
@@ -333,6 +391,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
                     title={title ?? label}
                     label={label}
                     disabled={disabled}
+                    appearance="outlined"
                   />
                 ))}
                 <CopyButton
@@ -340,6 +399,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
                   code={content}
                   isCopying={isCopying}
                   handleCopyClick={handleCopyClick}
+                  appearance="outlined"
                 />
                 <Button
                   icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
@@ -347,6 +407,8 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
                   size="small"
                   aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
                   title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                  tooltip={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                  appearance="outlined"
                 />
                 <Button
                   btnAction={handleFullHeight}
@@ -354,6 +416,8 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
                   icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
                   aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
                   title={isFullHeight ? 'Shrink text' : 'Expand text'}
+                  tooltip={isFullHeight ? 'Shrink text' : 'Expand text'}
+                  appearance="outlined"
                 />
               </div>
             )}
@@ -368,6 +432,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
                   label="Download Raw"
                   icon={<RiDownload2Line />}
                   btnAction={() => downloadJson({ content: content })}
+                  appearance="outlined"
                 />
               </div>
             </>
@@ -396,7 +461,10 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
                   highlightActiveBracketPair: false,
                   highlightActiveIndentation: false,
                 },
-                scrollbar: { verticalScrollbarSize: 10, alwaysConsumeMouseWheel: false },
+                scrollbar: {
+                  verticalScrollbarSize: 10,
+                  alwaysConsumeMouseWheel: false,
+                },
                 padding: {
                   top: 10,
                   bottom: 10,
@@ -404,7 +472,6 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
                 wordWrap: isWordWrap ? 'on' : 'off',
               }}
               onMount={(editor) => {
-                handleEditorDidMount(editor);
                 updateEditorLayout(editor);
               }}
               onChange={(value) => {

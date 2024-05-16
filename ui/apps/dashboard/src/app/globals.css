@@ -13,6 +13,9 @@
       radial-gradient(at 89% 26%, hsla(266, 100%, 57%, 1) 0px, transparent 50%),
       radial-gradient(at 84% 79%, hsla(240, 100%, 70%, 1) 0px, transparent 50%);
   }
+  .monaco-editor .overflow-guard {
+    @apply rounded-b-lg;
+  }
 }
 
 @layer utilities {
