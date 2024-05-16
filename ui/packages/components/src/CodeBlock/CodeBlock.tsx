@@ -152,7 +152,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
   const [activeTab, setActiveTab] = useState(0);
   const editorRef = useRef<MonacoEditorType>(null);
-  const wrapperRef = useRef<any>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const [isWordWrap, setIsWordWrap] = useLocalStorage('isWordWrap', false);
   const [isFullHeight, setIsFullHeight] = useLocalStorage('isFullHeight', false);
