@@ -2,6 +2,9 @@ package cqrs
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -63,6 +66,8 @@ type TraceRun struct {
 	Status      enums.RunStatus `json:"status"`
 	IsBatch     bool            `json:"is_batch"`
 	IsDebounce  bool            `json:"is_debounce"`
+	// Cursor is a composite cursor used for pagination
+	Cursor string `json:"cursor"`
 }
 
 type TraceReadWriter interface {
@@ -97,6 +102,8 @@ type GetTraceRunFilter struct {
 	AppID       []uuid.UUID
 	FunctionID  []uuid.UUID
 	TimeField   enums.TraceRunTime
+	From        time.Time
+	Until       time.Time
 	Status      []enums.RunStatus
 	CEL         string
 }
@@ -104,4 +111,61 @@ type GetTraceRunFilter struct {
 type GetTraceRunOrder struct {
 	Field     enums.TraceRunTime
 	Direction enums.TraceRunOrder
+}
+
+// TracePageCursor represents the composite cursor used to handle pagination
+type TracePageCursor struct {
+	ID      string                 `json:"id"`
+	Cursors map[string]TraceCursor `json:"c"`
+}
+
+func (c *TracePageCursor) IsEmpty() bool {
+	return c.Cursors == nil || len(c.Cursors) == 0
+}
+
+// Find finds a cusor with the provided name
+func (c *TracePageCursor) Find(field string) *TraceCursor {
+	if c.IsEmpty() {
+		return nil
+	}
+
+	f := strings.ToLower(field)
+	if v, ok := c.Cursors[f]; ok {
+		return &v
+	}
+	return nil
+}
+
+func (c *TracePageCursor) Add(field string) {
+	f := strings.ToLower(field)
+	if _, ok := c.Cursors[f]; !ok {
+		c.Cursors[f] = TraceCursor{Field: f}
+	}
+}
+
+func (c *TracePageCursor) Encode() (string, error) {
+	byt, err := json.Marshal(c)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(byt), nil
+}
+
+func (c *TracePageCursor) Decode(val string) error {
+	if c.Cursors == nil {
+		c.Cursors = map[string]TraceCursor{}
+	}
+	byt, err := base64.StdEncoding.DecodeString(val)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(byt, c)
+}
+
+// TraceCursor represents a cursor that is used as part of the pagination cursor
+type TraceCursor struct {
+	// Field represents the field used for this cursor
+	Field string `json:"f"`
+	// Value represents the value used for this cursor
+	Value int64 `json:"v"`
 }

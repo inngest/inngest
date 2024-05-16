@@ -129,10 +129,9 @@ CREATE TABLE trace_runs (
 	trace_id BLOB NOT NULL,
 	run_id CHAR(26) NOT NULL,
 
-	queued_at TIMESTAMP NOT NULL,
-	started_at TIMESTAMP NOT NULL,
-	ended_at TIMESTAMP NOT NULL,
-	duration INT NOT NULL,
+	queued_at INT NOT NULL,
+	started_at INT NOT NULL,
+	ended_at INT NOT NULL,
 
 	status INT NOT NULL, -- more like enum values
 	source_id VARCHAR NOT NULL,

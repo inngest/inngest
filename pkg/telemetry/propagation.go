@@ -2,25 +2,36 @@ package telemetry
 
 import (
 	"encoding/json"
-	"fmt"
-	"sync"
+	"time"
 
 	"go.opentelemetry.io/otel/trace"
 )
 
-const psidKey = "psid"
+const (
+	sidkey = "sid"
+)
+
+type TraceCarrierOpt func(tc *TraceCarrier)
 
 // TraceCarrier stores the data that needs to be carried through systems.
 // e.g. pubsub, queues, etc
 type TraceCarrier struct {
-	sync.Mutex
-	Context map[string]string `json:"ctx,omitempty"`
+	// Context is used for text map propagation, this typically stores the traceID and the spanID
+	// of the time of running Inject.
+	Context   map[string]string `json:"ctx,omitempty"`
+	Timestamp time.Time         `json:"ts"`
 }
 
-func NewTraceCarrier() *TraceCarrier {
-	return &TraceCarrier{
+func NewTraceCarrier(opts ...TraceCarrierOpt) *TraceCarrier {
+	carrier := &TraceCarrier{
 		Context: map[string]string{},
 	}
+
+	for _, opt := range opts {
+		opt(carrier)
+	}
+
+	return carrier
 }
 
 func (tc *TraceCarrier) Unmarshal(data any) error {
@@ -28,27 +39,39 @@ func (tc *TraceCarrier) Unmarshal(data any) error {
 	if err != nil {
 		return err
 	}
-
 	return json.Unmarshal(byt, tc)
 }
 
-// Embed the parent spanID for propagation purposes
-func (tc *TraceCarrier) AddParentSpanID(psc trace.SpanContext) {
-	tc.Lock()
-	defer tc.Unlock()
+func (tc *TraceCarrier) CanResumePause() bool {
+	sid := tc.SpanID()
+	return tc.Context != nil && tc.Timestamp.UnixMilli() > 0 && sid.IsValid()
+}
 
-	if psc.IsValid() {
-		tc.Context[psidKey] = psc.SpanID().String()
+func (tc *TraceCarrier) SpanID() trace.SpanID {
+	if tc.Context == nil {
+		return trace.SpanID{}
+	}
+
+	if val, ok := tc.Context[sidkey]; ok {
+		if sid, err := trace.SpanIDFromHex(val); err == nil {
+			return sid
+		}
+	}
+
+	return trace.SpanID{}
+}
+
+func WithTraceCarrierTimestamp(ts time.Time) TraceCarrierOpt {
+	return func(tc *TraceCarrier) {
+		tc.Timestamp = ts
 	}
 }
 
-// ParentSpanID returns the embedded spanID if it's available
-func (tc *TraceCarrier) ParentSpanID() (*trace.SpanID, error) {
-	val, ok := tc.Context[psidKey]
-	if !ok {
-		return nil, fmt.Errorf("spanID is not stored in carrier")
+func WithTraceCarrierSpanID(sid *trace.SpanID) TraceCarrierOpt {
+	return func(tc *TraceCarrier) {
+		if tc.Context == nil {
+			tc.Context = map[string]string{}
+		}
+		tc.Context[sidkey] = sid.String()
 	}
-
-	sid, err := trace.SpanIDFromHex(val)
-	return &sid, err
 }

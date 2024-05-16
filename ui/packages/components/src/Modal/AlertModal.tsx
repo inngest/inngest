@@ -59,17 +59,17 @@ export function AlertModal({
                 )}
               >
                 {(title || description) && (
-                  <div className="p-6">
-                    <AlertDialog.Title className="text-xl font-semibold text-slate-600 dark:text-white">
+                  <div className="dark:bg-slate-910 border-b border-slate-200 bg-slate-900 p-6 dark:border-slate-800">
+                    <AlertDialog.Title className="dark:bg-slate-910 bg-slate-900 text-xl font-semibold text-white">
                       {title}
                     </AlertDialog.Title>
                     <AlertDialog.Description className="text-sm text-slate-500 dark:font-medium dark:text-slate-400">
                       {description}
                     </AlertDialog.Description>
-                    {children}
                   </div>
                 )}
-                <div className="flex justify-end gap-2 px-6 pb-6 dark:border-slate-800">
+                {children}
+                <div className="flex justify-end gap-2 p-6 dark:border-slate-800">
                   <AlertDialog.Cancel asChild>
                     <Button appearance="outlined" disabled={isLoading} label="No" />
                   </AlertDialog.Cancel>

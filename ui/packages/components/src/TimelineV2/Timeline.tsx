@@ -1,5 +1,5 @@
+import { toMaybeDate } from '../utils/date';
 import { Trace } from './Trace';
-import { toMaybeDate } from './utils';
 
 type Props = {
   getOutput: (outputID: string) => Promise<string | null>;

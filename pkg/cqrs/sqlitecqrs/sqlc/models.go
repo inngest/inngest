@@ -137,10 +137,9 @@ type TraceRun struct {
 	FunctionID  uuid.UUID
 	TraceID     []byte
 	RunID       ulid.ULID
-	QueuedAt    time.Time
-	StartedAt   time.Time
-	EndedAt     time.Time
-	Duration    int64
+	QueuedAt    int64
+	StartedAt   int64
+	EndedAt     int64
 	Status      int64
 	SourceID    string
 	TriggerIds  []byte

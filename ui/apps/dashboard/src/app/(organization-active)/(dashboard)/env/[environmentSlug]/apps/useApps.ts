@@ -8,6 +8,7 @@ const query = graphql(`
         id
         externalID
         functionCount
+        isArchived
         name
         latestSync {
           error
@@ -54,7 +55,7 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
           // This is a hack to get around the fact that app archival is not a
           // first-class feature yet. We'll infer that an app is archived if all
           // of its functions are archived.
-          isArchived: app.functionCount === 0,
+          isArchived: app.isArchived || app.functionCount === 0,
         };
       })
       .filter((app) => {

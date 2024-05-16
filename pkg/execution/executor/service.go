@@ -318,14 +318,14 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 		return err
 	}
 
-	if err := s.exec.RetrieveAndScheduleBatch(ctx, *fn, batch.ScheduleBatchPayload{
+	if err := s.exec.RetrieveAndScheduleBatchWithOpts(ctx, *fn, batch.ScheduleBatchPayload{
 		BatchID:         batchID,
 		AccountID:       item.Identifier.AccountID,
 		WorkspaceID:     item.Identifier.WorkspaceID,
 		AppID:           item.Identifier.AppID,
 		FunctionID:      item.Identifier.WorkflowID,
 		FunctionVersion: fn.FunctionVersion,
-	}); err != nil {
+	}, nil); err != nil {
 		return fmt.Errorf("could not retrieve and schedule batch items: %w", err)
 	}
 
@@ -364,12 +364,13 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 			defer span.End()
 
 			_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
-				Function:        f,
-				AccountID:       di.AccountID,
-				WorkspaceID:     di.WorkspaceID,
-				AppID:           di.AppID,
-				Events:          []event.TrackedEvent{di},
-				PreventDebounce: true,
+				Function:         f,
+				AccountID:        di.AccountID,
+				WorkspaceID:      di.WorkspaceID,
+				AppID:            di.AppID,
+				Events:           []event.TrackedEvent{di},
+				PreventDebounce:  true,
+				FunctionPausedAt: di.FunctionPausedAt,
 			})
 			if err != nil {
 				return err
