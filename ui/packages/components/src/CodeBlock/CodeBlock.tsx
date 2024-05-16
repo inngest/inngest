@@ -167,7 +167,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
 
   useEffect(() => {
     //
-    // We don't have a dom ref until we're renedered, so check for dark theme parent classes then
+    // We don't have a DOM ref until we're rendered, so check for dark theme parent classes then
     if (wrapperRef.current) {
       setDark(isDark(wrapperRef.current));
     }
