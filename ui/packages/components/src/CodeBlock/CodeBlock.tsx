@@ -338,7 +338,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
         <div
           ref={wrapperRef}
           className="dark:bg-slate-910 w-full rounded-lg border border-slate-200 
-             border-slate-700/30 bg-white text-slate-700 shadow dark:bg-slate-800/40"
+             dark:border-slate-700/30 bg-slate-50 text-slate-700 dark:shadow dark:bg-slate-800/40"
         >
           {header && (
             <div className={classNames(header.color, 'rounded-t-lg pt-3')}>
