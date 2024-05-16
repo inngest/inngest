@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { RiLoopLeftLine } from '@remixicon/react';
-import { toast } from 'sonner';
 
 import { cn } from './utils/classNames';
 
@@ -9,9 +8,6 @@ type Props = {
   onClick: () => Promise<unknown>;
 };
 
-/**
- * @deprecated Delete this when the old run details page is removed
- */
 export function RerunButton(props: Props) {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -19,9 +15,7 @@ export function RerunButton(props: Props) {
     setIsLoading(true);
     try {
       await props.onClick();
-      toast.success('Queued rerun');
     } catch {
-      toast.error('Failed to queue rerun');
     } finally {
       setIsLoading(false);
     }

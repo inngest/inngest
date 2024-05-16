@@ -11,9 +11,11 @@ type Props = {
   };
   cancelRun: () => Promise<unknown>;
   fn: {
+    id: string;
     name: string;
   };
   getOutput: (outputID: string) => Promise<string | null>;
+  rerun: (args: { fnID: string }) => Promise<unknown>;
   run: {
     id: string;
     output: string | null;
@@ -22,7 +24,7 @@ type Props = {
 };
 
 export function RunDetails(props: Props) {
-  const { app, getOutput, fn, run } = props;
+  const { app, getOutput, fn, rerun, run } = props;
 
   const cancelRun = useCallback(async () => {
     try {
@@ -36,7 +38,7 @@ export function RunDetails(props: Props) {
 
   return (
     <div>
-      <RunInfo app={app} cancelRun={cancelRun} className="mb-4" fn={fn} run={run} />
+      <RunInfo app={app} cancelRun={cancelRun} className="mb-4" fn={fn} rerun={rerun} run={run} />
       <Timeline getOutput={getOutput} trace={run.trace} />
     </div>
   );

@@ -47,6 +47,7 @@ const query = graphql(`
           app {
             name
           }
+          id
           name
         }
         trace {

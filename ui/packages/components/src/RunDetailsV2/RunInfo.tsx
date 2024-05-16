@@ -2,6 +2,7 @@ import { Button } from '../Button';
 import { CancelRunButton } from '../CancelRunButton';
 import { Card } from '../Card';
 import { CodeBlock } from '../CodeBlock';
+import { RerunButton } from '../RerunButtonV2';
 import { Time } from '../Time';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
@@ -13,8 +14,10 @@ type Props = {
     name: string;
   };
   fn: {
+    id: string;
     name: string;
   };
+  rerun: (args: { fnID: string }) => Promise<unknown>;
   run: {
     id: string;
     output: string | null;
@@ -28,7 +31,7 @@ type Props = {
   };
 };
 
-export function RunInfo({ cancelRun, className, app, fn, run }: Props) {
+export function RunInfo({ app, cancelRun, className, fn, rerun, run }: Props) {
   const queuedAt = new Date(run.trace.queuedAt);
   const startedAt = toMaybeDate(run.trace.startedAt);
   const endedAt = toMaybeDate(run.trace.endedAt);
@@ -45,7 +48,7 @@ export function RunInfo({ cancelRun, className, app, fn, run }: Props) {
           <div className="grow">Run details</div>
 
           <CancelRunButton disabled={Boolean(endedAt)} onClick={cancelRun} />
-          <Button label="Rerun" size="small" />
+          <RerunButton onClick={() => rerun({ fnID: fn.id })} />
           <Button label="Rerun in Dev Server" size="small" />
         </Card.Header>
 
