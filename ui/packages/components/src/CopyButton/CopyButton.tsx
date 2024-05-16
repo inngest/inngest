@@ -16,7 +16,7 @@ export function CopyButton({
   iconOnly,
   isCopying,
   handleCopyClick,
-  appearance,
+  appearance = 'solid',
 }: ButtonCopyProps) {
   const icon = isCopying ? <RiCheckLine /> : <RiFileCopy2Line />;
   const label = isCopying ? 'Copied!' : 'Copy';

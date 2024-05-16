@@ -338,7 +338,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
         <div
           ref={wrapperRef}
           className="dark:bg-slate-910 w-full rounded-lg border border-slate-200 
-             dark:border-slate-700/30 bg-slate-50 text-slate-700 dark:shadow dark:bg-slate-800/40"
+             bg-slate-50 text-slate-700 dark:border-slate-700/30 dark:bg-slate-800/40 dark:shadow"
         >
           {header && (
             <div className={classNames(header.color, 'rounded-t-lg pt-3')}>
@@ -353,7 +353,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
           <div
             className={classNames(
               !header && 'rounded-t-lg',
-              'flex justify-between border-b border-slate-200 dark:shadow dark:border-slate-700/20 dark:bg-slate-800/40'
+              'flex justify-between border-b border-slate-200 dark:border-slate-700/20 dark:bg-slate-800/40 dark:shadow'
             )}
           >
             <div className="-mb-px flex">
