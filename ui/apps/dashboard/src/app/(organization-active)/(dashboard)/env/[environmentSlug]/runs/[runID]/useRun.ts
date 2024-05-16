@@ -77,19 +77,36 @@ export function useRun({ envID, runID }: { envID: string; runID: string }) {
   }
 
   console.log(res.data.workspace);
-  if (!res.data.workspace.run?.trace) {
-    // Unreachable
+  const { run } = res.data.workspace;
+  if (!run) {
+    return {
+      ...baseInitialFetchFailed,
+      error: new Error('missing run'),
+    };
+  }
+
+  if (!run.trace) {
     return {
       ...baseInitialFetchFailed,
       error: new Error('missing trace'),
     };
   }
 
+  if (!run.function) {
+    return {
+      ...baseInitialFetchFailed,
+      error: new Error('missing function'),
+    };
+  }
+
   return {
     ...res,
     data: {
-      run: res.data.workspace.run,
-      trace: getFragmentData(traceDetailsFragment, res.data.workspace.run.trace),
+      run: {
+        ...run,
+        function: run.function,
+      },
+      trace: getFragmentData(traceDetailsFragment, run.trace),
     },
   };
 }

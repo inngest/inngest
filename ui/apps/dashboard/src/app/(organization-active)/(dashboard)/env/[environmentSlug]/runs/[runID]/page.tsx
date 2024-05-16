@@ -26,13 +26,6 @@ export default function Page({ params }: Props) {
     return <Loading />;
   }
   const { run, trace } = res.data;
-  if (!run) {
-    throw new Error('missing run');
-  }
-  const { function: fn } = run;
-  if (!fn) {
-    throw new Error('missing function');
-  }
 
   async function getOutput() {
     return null;
@@ -41,9 +34,9 @@ export default function Page({ params }: Props) {
   return (
     <div className="overflow-y-auto">
       <RunDetails
-        app={fn.app}
+        app={run.function.app}
         cancelRun={cancelRun}
-        fn={fn}
+        fn={run.function}
         getOutput={getOutput}
         run={{
           id: params.runID,
