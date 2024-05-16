@@ -7,16 +7,16 @@ export const PopoverClose = PopoverPrimitive.Close;
 
 export const PopoverContent = forwardRef<
   React.ElementRef<typeof PopoverPrimitive.Portal>,
-  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Portal>
->(({ children, ...props }, forwardedRef) => {
+  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
+>(({ children, className, ...props }, forwardedRef) => {
   const container = document.getElementById('modals');
   return (
     <PopoverPrimitive.Portal container={container}>
       <PopoverPrimitive.Content
         sideOffset={5}
-        {...props}
         ref={forwardedRef}
-        className="rounded bg-white drop-shadow"
+        className={`z-[100] rounded bg-white drop-shadow ${className}`}
+        {...props}
       >
         {children}
       </PopoverPrimitive.Content>

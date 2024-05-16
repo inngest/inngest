@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
+import { DatePicker } from '@inngest/components/DatePicker';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
@@ -13,10 +14,8 @@ import { ulid } from 'ulid';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { type TimeRange } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import Input from '@/components/Forms/Input';
 import Placeholder from '@/components/Placeholder';
-import { TimeRangeInput } from '@/components/TimeRangeInput';
 import { graphql } from '@/gql';
 import { FunctionRunStatus } from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
@@ -101,10 +100,16 @@ type NewReplayModalProps = {
   onClose: () => void;
 };
 
+export type DateRange = {
+  start?: Date;
+  end?: Date;
+  key?: string;
+};
+
 export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewReplayModalProps) {
   const router = useRouter();
   const [name, setName] = useState<string>('');
-  const [timeRange, setTimeRange] = useState<TimeRange>();
+  const [timeRange, setTimeRange] = useState<DateRange>();
   const [selectedStatuses, setSelectedStatuses] = useState<FunctionRunEndStatus[]>([
     FunctionRunStatus.Failed,
   ]);
@@ -115,8 +120,8 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
     variables: {
       environmentID: environment.id,
       functionSlug,
-      timeRangeStart: timeRange ? timeRange.start.toISOString() : '',
-      timeRangeEnd: timeRange ? timeRange.end.toISOString() : '',
+      timeRangeStart: timeRange?.start ? timeRange.start.toISOString() : '',
+      timeRangeEnd: timeRange?.end ? timeRange.end.toISOString() : '',
     },
     skip: !timeRange,
   });
@@ -159,8 +164,8 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
       environmentID: environment.id,
       functionID: functionID,
       name,
-      fromRange: ulid(timeRange.start.valueOf()),
-      toRange: ulid(timeRange.end.valueOf()),
+      fromRange: ulid(timeRange?.start?.valueOf()),
+      toRange: ulid(timeRange?.end?.valueOf()),
       statuses: selectedStatuses,
     });
 
@@ -216,12 +221,30 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
               />
             </div>
           </div>
-          <div className="flex justify-between gap-7 px-6 py-4">
+          <div className="flex flex-col justify-between gap-2 px-6 py-4">
             <div className="space-y-0.5">
-              <span className="text-sm font-semibold text-slate-800">Time Range</span>
+              <span className="text-sm font-semibold text-slate-800">Date Range</span>
               <p className="text-xs text-slate-500">Select a specific range of function runs.</p>
             </div>
-            <TimeRangeInput onChange={setTimeRange} />
+            <div className="flex flex-row gap-x-2">
+              <DatePicker
+                placeholder="Start"
+                defaultValue={timeRange?.start}
+                onChange={(d) =>
+                  setTimeRange({ start: d, end: timeRange?.end, key: timeRange?.key })
+                }
+                className="w-1/2"
+              />
+
+              <DatePicker
+                placeholder="End"
+                defaultValue={timeRange?.end}
+                onChange={(d) =>
+                  setTimeRange({ start: timeRange?.start, end: d, key: timeRange?.key })
+                }
+                className="w-1/2"
+              />
+            </div>
           </div>
         </div>
         <div className="space-y-5 px-6 py-4">

@@ -5,15 +5,16 @@ import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '../Popove
 import { Switch, SwitchLabel, SwitchWrapper } from '../Switch';
 import { combineDayAndTime, formatDayString, formatTimeString } from '../utils/date';
 import { Calendar } from './Calendar';
-import { DateInputButton } from './DateInputButton';
+import { DateInputButton, type DateInputButtonProps } from './DateInputButton';
 import { TimeInput } from './TimeInput';
 
-type DatePickerProps = {
+type DatePickerProps = Omit<DateInputButtonProps, 'defaultValue' | 'onChange'> & {
   defaultValue?: Date;
+  placeholder?: string;
   onChange: (value: Date | undefined) => void;
 };
 
-export function DatePicker({ defaultValue, onChange }: DatePickerProps) {
+export function DatePicker({ defaultValue, placeholder, onChange, ...props }: DatePickerProps) {
   const [value, setValue] = useState(defaultValue);
   const [selectedDay, setSelectedDay] = useState<Date | undefined>(defaultValue);
   const [selectedTime, setSelectedTime] = useState<Date | undefined>(defaultValue);
@@ -58,7 +59,9 @@ export function DatePicker({ defaultValue, onChange }: DatePickerProps) {
   return (
     <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
       <PopoverTrigger asChild>
-        <DateInputButton>{value?.toLocaleString() ?? 'Enter Date and Time'}</DateInputButton>
+        <DateInputButton {...props}>
+          {value?.toLocaleString() ?? placeholder ?? 'Enter Date and Time'}
+        </DateInputButton>
       </PopoverTrigger>
       <PopoverContent>
         <div className="p-4">
