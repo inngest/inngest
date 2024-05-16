@@ -21,8 +21,6 @@ export default function IncidentBanner() {
     message = `${status.description}`;
     if (status.indicator === 'minor') {
       severity = 'info';
-    } else {
-      severity = 'warning';
     }
   }
 
