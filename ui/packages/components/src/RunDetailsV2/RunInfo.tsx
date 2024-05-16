@@ -1,4 +1,5 @@
 import { Button } from '../Button';
+import { CancelRunButton } from '../CancelRunButton';
 import { Card } from '../Card';
 import { CodeBlock } from '../CodeBlock';
 import { Time } from '../Time';
@@ -6,6 +7,7 @@ import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 
 type Props = {
+  cancelRun: () => Promise<unknown>;
   className?: string;
   app: {
     name: string;
@@ -26,7 +28,7 @@ type Props = {
   };
 };
 
-export function RunInfo({ className, app, fn, run }: Props) {
+export function RunInfo({ cancelRun, className, app, fn, run }: Props) {
   const queuedAt = new Date(run.trace.queuedAt);
   const startedAt = toMaybeDate(run.trace.startedAt);
   const endedAt = toMaybeDate(run.trace.endedAt);
@@ -42,7 +44,7 @@ export function RunInfo({ className, app, fn, run }: Props) {
         <Card.Header className="flex-row items-center gap-2">
           <div className="grow">Run details</div>
 
-          <Button label="Cancel" size="small" />
+          <CancelRunButton disabled={Boolean(endedAt)} onClick={cancelRun} />
           <Button label="Rerun" size="small" />
           <Button label="Rerun in Dev Server" size="small" />
         </Card.Header>

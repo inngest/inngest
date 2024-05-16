@@ -3,69 +3,9 @@
 import { RunDetails } from '@inngest/components/RunDetailsV2';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { getFragmentData, graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
-
-const TraceDetailsFragment = graphql(`
-  fragment TraceDetails on RunTraceSpan {
-    name
-    status
-    attempts
-    queuedAt
-    startedAt
-    endedAt
-    isRoot
-    outputID
-    spanID
-    stepOp
-    stepInfo {
-      __typename
-      ... on InvokeStepInfo {
-        triggeringEventID
-        functionID
-        timeout
-        returnEventID
-        runID
-        timedOut
-      }
-      ... on SleepStepInfo {
-        sleepUntil
-      }
-      ... on WaitForEventStepInfo {
-        eventName
-        expression
-        timeout
-        foundEventID
-        timedOut
-      }
-    }
-  }
-`);
-
-const QueryDocument = graphql(`
-  query GetRunTrace($envID: ID!, $runID: String!) {
-    workspace(id: $envID) {
-      run(runID: $runID) {
-        function {
-          app {
-            name
-          }
-          name
-        }
-        trace {
-          ...TraceDetails
-          childrenSpans {
-            ...TraceDetails
-            childrenSpans {
-              ...TraceDetails
-            }
-          }
-        }
-      }
-    }
-  }
-`);
+import { useCancelRun } from '@/queries/useCancelRun';
+import { useRun } from './useRun';
 
 type Props = {
   params: {
@@ -74,33 +14,24 @@ type Props = {
 };
 
 export default function Page({ params }: Props) {
+  const runID = decodeURIComponent(params.runID);
   const env = useEnvironment();
+  const cancelRun = useCancelRun({ envID: env.id, runID });
 
-  const res = useGraphQLQuery({
-    //   const [res] = useQuery({
-    query: QueryDocument,
-    variables: {
-      envID: env.id,
-      runID: params.runID,
-    },
-  });
+  const res = useRun({ envID: env.id, runID });
   if (res.error) {
     throw res.error;
   }
   if (res.isLoading && !res.data) {
     return <Loading />;
   }
-  const { run } = res.data.workspace;
+  const { run, trace } = res.data;
   if (!run) {
     throw new Error('missing run');
   }
   const { function: fn } = run;
   if (!fn) {
     throw new Error('missing function');
-  }
-  const { trace } = run;
-  if (!trace) {
-    throw new Error('missing trace');
   }
 
   async function getOutput() {
@@ -111,12 +42,13 @@ export default function Page({ params }: Props) {
     <div className="overflow-y-auto">
       <RunDetails
         app={fn.app}
+        cancelRun={cancelRun}
         fn={fn}
         getOutput={getOutput}
         run={{
           id: params.runID,
           output: null,
-          trace: getFragmentData(TraceDetailsFragment, trace),
+          trace,
         }}
       />
     </div>
