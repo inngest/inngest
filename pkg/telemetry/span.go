@@ -252,8 +252,7 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
 		TraceID:    tid,
 		SpanID:     sid,
 		TraceState: psc.TraceState(),
-		TraceFlags: psc.TraceFlags(),
-		// TraceFlags: psc.TraceFlags() | trace.FlagsSampled, // NOTE: make it always sample for now, otherwise the batch span processor will ignore it
+		TraceFlags: psc.TraceFlags() | trace.FlagsSampled, // NOTE: make it always sample for now, otherwise the batch span processor will ignore it
 	}
 
 	s := &Span{

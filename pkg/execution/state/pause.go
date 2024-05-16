@@ -194,6 +194,8 @@ type Pause struct {
 	StepSpanID *string `json:"ssID,omitempty"`
 	// SpanStartedAt is the time at which the span for this pause was started.
 	TraceStartedAt *Time `json:"tsa"`
+	// Metadata is additional metadata that should be stored with the pause
+	Metadata map[string]any
 }
 
 func (p Pause) GetID() uuid.UUID {
@@ -220,6 +222,10 @@ func (p Pause) Edge() inngest.Edge {
 		Outgoing: p.Outgoing,
 		Incoming: p.Incoming,
 	}
+}
+
+func (p Pause) IsInvoke() bool {
+	return p.Opcode != nil && *p.Opcode == enums.OpcodeInvokeFunction.String()
 }
 
 func (p Pause) SpanIDs() (*trace.SpanID, *trace.SpanID, error) {
