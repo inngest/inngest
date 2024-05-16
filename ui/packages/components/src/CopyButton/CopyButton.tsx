@@ -28,7 +28,7 @@ export function CopyButton({
       kind={isCopying ? 'success' : 'default'}
       btnAction={code ? () => handleCopyClick(code) : undefined}
       label={iconOnly ? undefined : label}
-      appearance={appearance ? appearance : iconOnly ? 'text' : 'solid'}
+      appearance={iconOnly ? 'text' : appearance}
       icon={iconOnly && icon}
       title="Click to copy"
       aria-label="Copy"
