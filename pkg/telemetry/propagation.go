@@ -7,14 +7,19 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+const (
+	sidkey = "sid"
+)
+
 type TraceCarrierOpt func(tc *TraceCarrier)
 
 // TraceCarrier stores the data that needs to be carried through systems.
 // e.g. pubsub, queues, etc
 type TraceCarrier struct {
+	// Context is used for text map propagation, this typically stores the traceID and the spanID
+	// of the time of running Inject.
 	Context   map[string]string `json:"ctx,omitempty"`
 	Timestamp time.Time         `json:"ts"`
-	SpanID    *trace.SpanID     `json:"sid,omitempty"`
 }
 
 func NewTraceCarrier(opts ...TraceCarrierOpt) *TraceCarrier {
@@ -37,8 +42,23 @@ func (tc *TraceCarrier) Unmarshal(data any) error {
 	return json.Unmarshal(byt, tc)
 }
 
-func (tc *TraceCarrier) IsNonZero() bool {
-	return tc.Context != nil && tc.Timestamp.UnixMilli() > 0 && tc.SpanID != nil
+func (tc *TraceCarrier) CanResumePause() bool {
+	sid := tc.SpanID()
+	return tc.Context != nil && tc.Timestamp.UnixMilli() > 0 && sid.IsValid()
+}
+
+func (tc *TraceCarrier) SpanID() trace.SpanID {
+	if tc.Context == nil {
+		return trace.SpanID{}
+	}
+
+	if val, ok := tc.Context[sidkey]; ok {
+		if sid, err := trace.SpanIDFromHex(val); err == nil {
+			return sid
+		}
+	}
+
+	return trace.SpanID{}
 }
 
 func WithTraceCarrierTimestamp(ts time.Time) TraceCarrierOpt {
@@ -49,6 +69,9 @@ func WithTraceCarrierTimestamp(ts time.Time) TraceCarrierOpt {
 
 func WithTraceCarrierSpanID(sid *trace.SpanID) TraceCarrierOpt {
 	return func(tc *TraceCarrier) {
-		tc.SpanID = sid
+		if tc.Context == nil {
+			tc.Context = map[string]string{}
+		}
+		tc.Context[sidkey] = sid.String()
 	}
 }

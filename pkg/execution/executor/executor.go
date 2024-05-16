@@ -1741,7 +1741,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				carrier := telemetry.NewTraceCarrier()
 				if err := carrier.Unmarshal(meta); err == nil {
 					ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
-					if carrier.IsNonZero() {
+					if carrier.CanResumePause() {
 						// Used for spans
 						triggeringEventID := ""
 						if pause.TriggeringEventID != nil {
@@ -1762,7 +1762,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 							telemetry.WithScope(consts.OtelScopeStep),
 							telemetry.WithName(consts.OtelSpanInvoke),
 							telemetry.WithTimestamp(carrier.Timestamp),
-							telemetry.WithSpanID(*carrier.SpanID),
+							telemetry.WithSpanID(carrier.SpanID()),
 							telemetry.WithSpanAttributes(
 								attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
 								attribute.String(consts.OtelSysStepInvokeTargetFnID, targetFnID),
@@ -1792,12 +1792,12 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				carrier := telemetry.NewTraceCarrier()
 				if err := carrier.Unmarshal(meta); err == nil {
 					ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
-					if carrier.IsNonZero() {
+					if carrier.CanResumePause() {
 						_, span := telemetry.NewSpan(ctx,
 							telemetry.WithScope(consts.OtelScopeStep),
 							telemetry.WithName(consts.OtelSpanWaitForEvent),
 							telemetry.WithTimestamp(carrier.Timestamp),
-							telemetry.WithSpanID(*carrier.SpanID),
+							telemetry.WithSpanID(carrier.SpanID()),
 							telemetry.WithSpanAttributes(
 								attribute.String(consts.OtelSysStepOpcode, enums.OpcodeWaitForEvent.String()),
 								attribute.Int64(consts.OtelSysStepWaitExpires, pause.Expires.Time().UnixMilli()),
