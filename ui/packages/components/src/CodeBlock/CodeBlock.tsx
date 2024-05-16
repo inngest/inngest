@@ -367,9 +367,9 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
                     className={classNames(
                       `px-5 py-2.5 text-xs`,
                       isSingleTab
-                        ? 'text-slate-400'
+                        ? 'text-slate-700 dark:text-slate-400'
                         : 'block border-b outline-none transition-all duration-150',
-                      isActive && 'border-indigo-400 text-white',
+                      isActive && 'border-indigo-400 text-indigo-500 dark:text-white',
                       !isActive && !isSingleTab && 'border-transparent text-slate-400'
                     )}
                     onClick={() => handleTabClick(i)}
