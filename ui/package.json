@@ -15,6 +15,6 @@
     "node": "18.x",
     "pnpm": "8.15.8"
   },
-  "packageManager": "pnpm@8.6.2",
+  "packageManager": "pnpm@8.15.8",
   "private": true
 }
