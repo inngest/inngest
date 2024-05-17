@@ -10,15 +10,13 @@ export default function IncidentBanner() {
   const isIncidentBannerEnabled = useBooleanFlag('incident-banner');
   const status = useSystemStatus();
 
-  if (!isIncidentBannerEnabled.value && status.indicator === 'none') return;
+  if (!isIncidentBannerEnabled.value) return;
 
-  let message = '';
+  let message = 'We are experiencing some issues.';
   let severity: Severity = 'warning';
 
-  if (isIncidentBannerEnabled.value) {
-    message = ' We are experiencing some issues.';
-  } else {
-    message = `${status.description}`;
+  if (status.indicator !== 'none') {
+    message = `${status.description} -`;
     if (status.indicator === 'minor') {
       severity = 'info';
     }
@@ -28,7 +26,7 @@ export default function IncidentBanner() {
     <Banner kind={severity}>
       {message} Please check the{' '}
       <span style={{ display: 'inline-flex' }}>
-        <Link href="https://status.inngest.com/">status page.</Link>
+        <Link href="https://status.inngest.com/">status page</Link>
       </span>
     </Banner>
   );

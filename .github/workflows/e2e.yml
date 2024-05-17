@@ -28,7 +28,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 8.6.2
+          version: 8.15.8
       - name: Build UI
         run: make build-ui
       - name: Build dev serve
