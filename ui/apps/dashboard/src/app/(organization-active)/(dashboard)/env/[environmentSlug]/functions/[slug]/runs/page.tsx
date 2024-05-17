@@ -23,7 +23,7 @@ import TimeFilter from './TimeFilter';
 import { toRunStatuses, toTimeField } from './utils';
 
 const GetRunsDocument = graphql(`
-  query GetRunsBySlug(
+  query GetRuns(
     $environmentID: ID!
     $startTime: Time!
     $status: [FunctionRunStatus!]
@@ -31,9 +31,8 @@ const GetRunsDocument = graphql(`
     $functionSlug: String!
   ) {
     environment: workspace(id: $environmentID) {
-      runsByFunctionSlug(
-        functionSlug: $functionSlug
-        filter: { from: $startTime, status: $status, timeField: $timeField }
+      runs(
+        filter: { from: $startTime, status: $status, timeField: $timeField, fnSlug: $functionSlug }
         orderBy: [{ field: QUEUED_AT, direction: DESC }]
       ) {
         edges {
@@ -134,7 +133,7 @@ export default function RunsPage({
     throw res.error;
   }
 
-  const runsData = res.data?.environment.runsByFunctionSlug.edges;
+  const runsData = res.data?.environment.runs.edges;
 
   if (functionSlug && !runsData && !res.isLoading) {
     throw new Error('missing run');
