@@ -2192,7 +2192,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 			attribute.String(consts.OtelSysStepGroupID, groupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeSleep.String()),
 			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
-			attribute.String(consts.OtelSysStepSleepEndAt, endedAt.Format(time.RFC3339Nano)),
+			attribute.Int64(consts.OtelSysStepSleepEndAt, endedAt.UnixMilli()),
 		),
 	)
 
