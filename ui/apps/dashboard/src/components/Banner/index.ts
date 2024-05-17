@@ -1,1 +1,1 @@
-export { Banner } from './Banner';
+export { Banner, type Severity } from './Banner';

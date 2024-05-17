@@ -29,3 +29,7 @@
 :focus-visible {
   outline-color: white;
 }
+
+.monaco-editor .overflow-guard {
+  @apply rounded-b-lg;
+}
