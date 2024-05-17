@@ -33,7 +33,7 @@
     "dayjs": "1.11.7",
     "framer-motion": "10.16.4",
     "monaco-editor": "0.34.1",
-    "next": "14.0.3",
+    "next": "14.2.3",
     "react": "18.2.0",
     "react-day-picker": "8.10.0",
     "react-dom": "18.2.0",
