@@ -659,6 +659,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		if err := e.smv2.SaveStep(ctx, sv2.ID{
 			RunID:      id.RunID,
 			FunctionID: id.WorkflowID,
+			Tenant: sv2.Tenant{
+				AppID:     id.AppID,
+				EnvID:     id.WorkspaceID,
+				AccountID: id.AccountID,
+			},
 		}, edge.Outgoing, []byte("null")); err != nil {
 			return nil, err
 		}
@@ -671,6 +676,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	md, err := e.smv2.LoadMetadata(ctx, sv2.ID{
 		RunID:      id.RunID,
 		FunctionID: id.WorkflowID,
+		Tenant: sv2.Tenant{
+			AppID:     id.AppID,
+			EnvID:     id.WorkspaceID,
+			AccountID: id.AccountID,
+		},
 	})
 	// XXX: MetadataNotFound -> assume fn is deleted.
 	if err != nil {
@@ -1647,6 +1657,11 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	md, err := e.smv2.LoadMetadata(ctx, sv2.ID{
 		RunID:      pause.Identifier.RunID,
 		FunctionID: pause.Identifier.WorkflowID,
+		Tenant: sv2.Tenant{
+			AppID:     pause.Identifier.AppID,
+			EnvID:     pause.Identifier.WorkspaceID,
+			AccountID: pause.Identifier.AccountID,
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("error loading metadata to resume from pause: %w", err)
