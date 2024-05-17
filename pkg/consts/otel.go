@@ -8,6 +8,7 @@ const (
 	OtelSpanTrigger      = "trigger"
 	OtelSpanInvoke       = "invoke"
 	OtelSpanWaitForEvent = "wait"
+	OtelSpanSleep        = "sleep"
 
 	// system attributes
 	OtelSysAccountID      = "sys.account.id"

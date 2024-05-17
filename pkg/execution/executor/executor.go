@@ -2168,7 +2168,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 	}
 
 	startedAt := time.Now()
-	endedAt := startedAt.Add(dur)
+	until := startedAt.Add(dur)
 
 	// Create another group for the next item which will run.  We're enqueueing
 	// the function to run again after sleep, so need a new group.
@@ -2176,7 +2176,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 	ctx = state.WithGroupID(ctx, groupID)
 	ctx, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeStep),
-		telemetry.WithName("sleep"),
+		telemetry.WithName(consts.OtelSpanSleep),
 		telemetry.WithTimestamp(startedAt),
 		telemetry.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
@@ -2192,11 +2192,10 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 			attribute.String(consts.OtelSysStepGroupID, groupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeSleep.String()),
 			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
-			attribute.Int64(consts.OtelSysStepSleepEndAt, endedAt.UnixMilli()),
+			attribute.Int64(consts.OtelSysStepSleepEndAt, until.UnixMilli()),
 		),
 	)
-
-	until := time.Now().Add(dur)
+	defer span.End(trace.WithTimestamp(until))
 
 	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
 	// TODO Should this also include a parent step span? It will never have attempts.
