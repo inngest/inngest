@@ -16,6 +16,7 @@ const FunctionVersionNumberDocument = graphql(`
     workspace(id: $environmentID) {
       workflow: workflowBySlug(slug: $slug) {
         id
+        isPaused
         name
         archivedAt
         current {
@@ -135,7 +136,7 @@ export default function PauseFunctionButton({ functionSlug, disabled }: PauseFun
     return null;
   }
 
-  const isPaused = !fn.current && !fn.archivedAt;
+  const { isPaused } = fn;
 
   return (
     <>

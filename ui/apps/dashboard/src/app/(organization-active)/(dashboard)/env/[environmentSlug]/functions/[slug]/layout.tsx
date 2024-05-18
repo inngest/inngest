@@ -36,8 +36,7 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
   const env = useEnvironment();
 
   const fn = data?.workspace.workflow;
-  const { isArchived = false } = fn ?? {};
-  const isPaused = !isArchived && !data?.workspace.workflow?.current;
+  const { isArchived = false, isPaused } = fn ?? {};
 
   const isNewRunsEnabled = useBooleanFlag('new-runs');
 

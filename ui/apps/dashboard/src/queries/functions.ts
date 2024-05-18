@@ -52,6 +52,7 @@ const GetFunctionsDocument = graphql(`
           id
           slug
           name
+          isPaused
           isArchived
           current {
             triggers {
@@ -115,8 +116,6 @@ export function useFunctionsPage({
         return {
           ...fn,
           failureRate: undefined,
-          isActive: !fn.isArchived,
-          isPaused: !fn.isArchived && !fn.current,
           triggers,
           usage: undefined,
         };
@@ -137,6 +136,7 @@ const GetFunctionDocument = graphql(`
         id
         name
         slug
+        isPaused
         isArchived
         appName
         current {

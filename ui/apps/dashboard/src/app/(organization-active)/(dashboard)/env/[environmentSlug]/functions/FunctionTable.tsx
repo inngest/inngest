@@ -22,7 +22,6 @@ export type FunctionTableRow = {
   appName: string | null;
   name: string;
   isArchived: boolean;
-  isActive: boolean;
   isPaused: boolean;
   slug: string;
   triggers: Trigger[];
