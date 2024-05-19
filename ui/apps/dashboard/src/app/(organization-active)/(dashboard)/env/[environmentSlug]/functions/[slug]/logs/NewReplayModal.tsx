@@ -143,8 +143,8 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
 
   async function createFunctionReplay(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!timeRange) {
-      toast.error('Please specify a valid time range.');
+    if (!timeRange?.start || !timeRange.end) {
+      toast.error('Please specify a range start and end date.');
       return;
     }
 
