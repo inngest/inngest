@@ -757,7 +757,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		fnSpan.End()
 		span.End()
 	}()
+	// if this run just started, there won't be any root spans available so send the function span out
+	// early
 	if isNewRun {
+		fnSpan.SetAttributes(attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusRunning.ToCode()))
 		fnSpan.Send()
 	}
 	// send early here to help show the span has started and is in-progress
