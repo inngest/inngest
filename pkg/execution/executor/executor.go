@@ -655,9 +655,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// contains it.
 	md := s.Metadata()
 
+	isNewRun := true    // flag to tell if this is a new run that just started or not
 	start := time.Now() // for recording function start time after a successful step.
 	if !md.StartedAt.IsZero() {
 		start = md.StartedAt
+		isNewRun = false
 	}
 
 	f, err := e.fl.LoadFunction(ctx, id)
@@ -755,6 +757,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		fnSpan.End()
 		span.End()
 	}()
+	if isNewRun {
+		fnSpan.Send()
+	}
 	// send early here to help show the span has started and is in-progress
 	span.Send()
 
