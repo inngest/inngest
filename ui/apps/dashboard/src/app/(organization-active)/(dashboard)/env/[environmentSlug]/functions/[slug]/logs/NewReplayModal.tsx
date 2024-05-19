@@ -164,8 +164,8 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
       environmentID: environment.id,
       functionID: functionID,
       name,
-      fromRange: ulid(timeRange.start?.valueOf()),
-      toRange: ulid(timeRange.end?.valueOf()),
+      fromRange: ulid(timeRange.start.valueOf()),
+      toRange: ulid(timeRange.end.valueOf()),
       statuses: selectedStatuses,
     });
 
