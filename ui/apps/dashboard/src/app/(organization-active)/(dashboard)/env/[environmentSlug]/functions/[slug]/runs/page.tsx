@@ -51,7 +51,7 @@ const GetRunsDocument = graphql(`
 
 const renderSubComponent = ({ id }: { id: string }) => {
   return (
-    <div className="mx-5">
+    <div className="border-l-4 border-slate-400 px-5 pb-6">
       <Page params={{ runID: id }} />
     </div>
   );

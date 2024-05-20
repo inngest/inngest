@@ -49,7 +49,7 @@ export function RunInfo({ className, app, fn, run }: Props) {
 
         <Card.Content>
           <div>
-            <dl className="flex flex-wrap gap-2">
+            <dl className="flex flex-wrap gap-4">
               <Labeled label="App">{app.name}</Labeled>
 
               <Labeled label="Function">{fn.name}</Labeled>
