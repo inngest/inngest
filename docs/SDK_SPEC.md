@@ -1210,6 +1210,10 @@ If an SDK supports parallelism, it MUST follow the `ctx.stack.stack` and recover
 
 # 6. Middleware
 
+Middleware allows users to run arbitrary code at certain points in the execution lifecycle. Middleware is used to add functionality such as logging, error handling, and more.
+
+Since SDKs strive to be idiomatic to their respective languages, the ergonomics of middleware may deviate significantly between SDKs. However, all SDKs MUST provide the same lifecycle methods.
+
 ## 6.1. Client and function
 
 Middleware may be specified on the Inngest Client and/or individual Inngest Functions:
