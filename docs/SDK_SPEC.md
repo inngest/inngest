@@ -53,6 +53,8 @@ This document presents the Open Source SDK Specification for Inngest, outlining 
     - [5.3.4](#534-invoke). Invoke
   - [5.4](#54-recovery-and-the-stack). Recovery and the stack
   - [5.5](#55-parallelism). Parallelism
+- [6](#6-middleware). Middleware
+  - [6.1](#61-lifecycle-methods). Lifecycle methods
 
 # 1. Introduction
 
@@ -1205,3 +1207,53 @@ Next, the SDK MUST continue to memoize Steps, but no longer expect them to seque
 An SDK MAY support parallelism. Multiple steps can be reported in a single Call Request, where those Steps will be run in parallel in their own separate Call Requests.
 
 If an SDK supports parallelism, it MUST follow the `ctx.stack.stack` and recovery techniques [[5.4](#54-recovery-and-the-stack)]. When a Run reports >1 Step in response to a Call Request, `ctx.disable_immediate_execution` will be `true` for all subsequent Call Requests, meaning the SDK MUST then always report Steps with `StepPlanned` before executing them [[5.3.1](#531-run)].
+
+# 6. Middleware
+
+## 6.1. Client and function
+
+Middleware may be specified on the Inngest Client and/or individual Inngest Functions:
+- Client middleware is executed when any function runs.
+- Function middleware is executed only when its function runs.
+
+## 6.2. Lifecycle methods
+
+- All lifecycle methods MUST NOT be called multiple times within a single SDK request, unless explicitly stated otherwise.
+- All lifecycle methods MAY be called multiple times within a single function run. This will always happen (except for the "events" lifecycle methods) when steps are used.
+
+### Transform input
+- MUST call before executing the Inngest Function callback.
+- Use cases:
+  - Decrypt data from an Inngest Server.
+
+### Before memoization
+- MUST call before beginning first memoized step call.
+- Effectively the same as "transform input", but executed after it.
+
+### After memoization
+- MUST call after last memoized step call.
+- Not called if a memoized step is not found. This can occur if the function is non-deterministic or if the Inngest Function callback has intentionally changed.
+
+### Before execution
+- MUST call before executing unmemoized code.
+- Not called between steps.
+
+### Before send events
+- MUST call before sending events to an Inngest Server.
+- If a events are sent multiple times within a single SDK request, this method MUST be called before each send.
+
+### After send events
+- MUST call after sending events to an Inngest Server.
+- If a events are sent multiple times within a single SDK request, this method MUST be called before each send.
+
+### After execution
+- MUST call after executing unmemoized code.
+- Not called between steps.
+
+### Transform output
+- MUST call after a function or step returns or throws an error.
+- Use cases:
+  - Encrypt data before sending to an Inngest Server.
+
+### Before response
+- MUST call after the output has been set and before the response is sent back to an Inngest Server.
