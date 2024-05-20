@@ -1223,6 +1223,9 @@ Middleware may be specified on the Inngest Client and/or individual Inngest Func
 
 ### Transform input
 - MUST call before executing the Inngest Function callback.
+- Arguments:
+  - Context object that's passed to the Inngest Function callback.
+  - Map of memoized step data
 - Use cases:
   - Decrypt data from an Inngest Server.
 
@@ -1240,10 +1243,15 @@ Middleware may be specified on the Inngest Client and/or individual Inngest Func
 
 ### Before send events
 - MUST call before sending events to an Inngest Server.
+- Arguments:
+  - Array of events to send.
 - If a events are sent multiple times within a single SDK request, this method MUST be called before each send.
 
 ### After send events
 - MUST call after sending events to an Inngest Server.
+- Arguments:
+  - Array of IDs for the sent events.
+  - Error if 1 or more events failed to send. Errors are "partial": it's possible to successfully send 1 event but error on another. Will not exist if all events were sent successfully.
 - If a events are sent multiple times within a single SDK request, this method MUST be called before each send.
 
 ### After execution
@@ -1251,7 +1259,11 @@ Middleware may be specified on the Inngest Client and/or individual Inngest Func
 - Not called between steps.
 
 ### Transform output
-- MUST call after a function or step returns or throws an error.
+- MUST call after a function/step returns or throws an error.
+- Arguments:
+  - Thrown/returned error. Will not exist if the function/step returned successfully.
+  - Data returned by the function/step. Will not exist if the function/step errored.
+  - Step data (user-specified ID, opcode, etc.). Will not exist of a new step was not executed.
 - Use cases:
   - Encrypt data before sending to an Inngest Server.
 
