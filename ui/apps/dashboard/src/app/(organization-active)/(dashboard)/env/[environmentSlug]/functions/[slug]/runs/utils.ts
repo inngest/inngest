@@ -2,7 +2,7 @@ import { isFunctionRunStatus, type FunctionRunStatus } from '@inngest/components
 
 import {
   FunctionRunStatus as FunctionRunStatusEnum,
-  FunctionRunTimeFieldV2 as FunctionRunTimeFieldEnum,
+  RunsOrderByField as FunctionRunTimeFieldEnum,
 } from '@/gql/graphql';
 
 /**

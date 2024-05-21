@@ -134,7 +134,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
   if (tooltip) {
     return (
       <Tooltip>
-        <TooltipTrigger>{Element}</TooltipTrigger>
+        <TooltipTrigger asChild>{Element}</TooltipTrigger>
         <TooltipContent>{tooltip}</TooltipContent>
       </Tooltip>
     );

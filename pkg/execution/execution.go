@@ -228,12 +228,14 @@ func (r *ResumeRequest) SetData(data any) {
 }
 
 func (r *ResumeRequest) withKey(key string) string {
-	if withData, ok := r.With.(map[string]any)[key]; ok {
-		byt, err := json.Marshal(withData)
-		if err == nil {
-			return string(byt)
+	if r.With != nil {
+		if withData, ok := r.With.(map[string]any)[key]; ok {
+			byt, err := json.Marshal(withData)
+			if err == nil {
+				return string(byt)
+			}
+			return ""
 		}
-		return ""
 	}
 
 	return ""

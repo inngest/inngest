@@ -11,11 +11,11 @@ import {
 } from '@inngest/components/types/functionRun';
 import { getTimestampDaysAgo, toMaybeDate } from '@inngest/components/utils/date';
 import { RiLoopLeftLine } from '@remixicon/react';
-import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { graphql } from '@/gql';
-import { FunctionRunTimeFieldV2 } from '@/gql/graphql';
+import { RunsOrderByField } from '@/gql/graphql';
+import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useSearchParam, useStringArraySearchParam } from '@/utils/useSearchParam';
 import Page from '../../../runs/[runID]/page';
 import RunsTable from './RunsTable';
@@ -27,12 +27,13 @@ const GetRunsDocument = graphql(`
     $environmentID: ID!
     $startTime: Time!
     $status: [FunctionRunStatus!]
-    $timeField: FunctionRunTimeFieldV2
+    $timeField: RunsOrderByField!
+    $functionSlug: String!
   ) {
     environment: workspace(id: $environmentID) {
       runs(
-        filter: { from: $startTime, status: $status, timeField: $timeField }
-        orderBy: [{ field: QUEUED_AT, direction: DESC }]
+        filter: { from: $startTime, status: $status, timeField: $timeField, fnSlug: $functionSlug }
+        orderBy: [{ field: $timeField, direction: DESC }]
       ) {
         edges {
           node {
@@ -50,20 +51,27 @@ const GetRunsDocument = graphql(`
 
 const renderSubComponent = ({ id }: { id: string }) => {
   return (
-    <div className="mx-5">
+    <div className="border-l-4 border-slate-400 px-5 pb-6">
       <Page params={{ runID: id }} />
     </div>
   );
 };
 
-export default function RunsPage() {
+export default function RunsPage({
+  params,
+}: {
+  params: {
+    slug: string;
+  };
+}) {
+  const functionSlug = decodeURIComponent(params.slug);
+
   const [rawFilteredStatus, setFilteredStatus, removeFilteredStatus] =
     useStringArraySearchParam('filterStatus');
-  const [rawTimeField = FunctionRunTimeFieldV2.QueuedAt, setTimeField] =
-    useSearchParam('timeField');
+  const [rawTimeField = RunsOrderByField.QueuedAt, setTimeField] = useSearchParam('timeField');
   const [lastDays = '3', setLastDays] = useSearchParam('last');
 
-  const timeField = toTimeField(rawTimeField) ?? FunctionRunTimeFieldV2.QueuedAt;
+  const timeField = toTimeField(rawTimeField) ?? RunsOrderByField.QueuedAt;
 
   /* TODO: Time params for absolute time filter */
   // const [fromTime, setFromTime] = useSearchParam('from');
@@ -108,20 +116,32 @@ export default function RunsPage() {
   }
 
   const environment = useEnvironment();
-  const [{ data, fetching: fetchingRuns }, refetch] = useQuery({
+  const res = useSkippableGraphQLQuery({
     query: GetRunsDocument,
+    skip: !functionSlug,
     variables: {
       environmentID: environment.id,
+      functionSlug,
       startTime: startTime.toISOString(),
       status: filteredStatus.length > 0 ? filteredStatus : null,
       timeField,
     },
   });
 
+  if (res.error) {
+    throw res.error;
+  }
+
+  const runsData = res.data?.environment.runs.edges;
+
+  if (functionSlug && !runsData && !res.isLoading) {
+    throw new Error('missing run');
+  }
+
   {
     /* TODO: This is a temp parser */
   }
-  const runs = data?.environment.runs.edges.map((edge) => {
+  const runs = runsData?.map((edge) => {
     const startedAt = toMaybeDate(edge.node.startedAt);
     let durationMS = null;
     if (startedAt) {
@@ -151,12 +171,18 @@ export default function RunsPage() {
           <StatusFilter selectedStatuses={filteredStatus} onStatusesChange={handleStatusesChange} />
         </div>
         {/* TODO: wire button */}
-        <Button label="Refresh" appearance="text" btnAction={refetch} icon={<RiLoopLeftLine />} />
+        <Button
+          label="Refresh"
+          appearance="text"
+          btnAction={() => {}}
+          icon={<RiLoopLeftLine />}
+          disabled
+        />
       </div>
       <RunsTable
         //@ts-ignore
         data={runs}
-        isLoading={fetchingRuns}
+        isLoading={res.isLoading}
         renderSubComponent={renderSubComponent}
         getRowCanExpand={() => true}
       />

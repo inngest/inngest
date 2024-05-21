@@ -186,10 +186,8 @@ type Pause struct {
 	// TriggeringEventID is the event that triggered the original run.  This allows us
 	// to exclude the original event ID when considering triggers.
 	TriggeringEventID *string `json:"tID,omitempty"`
-	// StepSpanID is the span ID for the step that caused this pause.
-	StepSpanID *string `json:"ssID,omitempty"`
-	// SpanStartedAt is the time at which the span for this pause was started.
-	TraceStartedAt *Time `json:"tsa"`
+	// Metadata is additional metadata that should be stored with the pause
+	Metadata map[string]any
 }
 
 func (p Pause) GetID() uuid.UUID {
@@ -216,6 +214,10 @@ func (p Pause) Edge() inngest.Edge {
 		Outgoing: p.Outgoing,
 		Incoming: p.Incoming,
 	}
+}
+
+func (p Pause) IsInvoke() bool {
+	return p.Opcode != nil && *p.Opcode == enums.OpcodeInvokeFunction.String()
 }
 
 type ResumeData struct {

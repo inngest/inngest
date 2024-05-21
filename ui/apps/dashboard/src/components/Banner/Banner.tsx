@@ -2,7 +2,7 @@ import { Button } from '@inngest/components/Button';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiCloseLine, RiErrorWarningLine, RiInformationLine } from '@remixicon/react';
 
-type Severity = 'info' | 'error' | 'warning';
+export type Severity = 'info' | 'error' | 'warning';
 
 const backgroundColors = {
   info: 'bg-blue-100',

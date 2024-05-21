@@ -264,8 +264,9 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 					Data: map[string]any{
 						"cron": cron,
 					},
-					ID:   time.Now().UTC().Format(time.RFC3339),
-					Name: event.FnCronName,
+					ID:        time.Now().UTC().Format(time.RFC3339),
+					Name:      event.FnCronName,
+					Timestamp: time.Now().UnixMilli(),
 				})
 
 				byt, err := json.Marshal(trackedEvent)

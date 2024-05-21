@@ -77,10 +77,10 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
   return (
     <form className="pt-3" onSubmit={handleSubmit}>
       <h2 className="pb-1 text-lg font-semibold">Filter Events</h2>
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-slate-700">
         Filtering allows you to specify allow or deny lists for event names and/or IP addresses.
       </p>
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-slate-700">
         Allowlists only allow specified values, whereas denylists allow all but the specified
         values.
       </p>

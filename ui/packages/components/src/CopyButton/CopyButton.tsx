@@ -7,9 +7,17 @@ type ButtonCopyProps = {
   isCopying: boolean;
   handleCopyClick: (code: string) => void;
   size?: 'small' | 'regular' | 'large';
+  appearance?: 'solid' | 'outlined' | 'text';
 };
 
-export function CopyButton({ size, code, iconOnly, isCopying, handleCopyClick }: ButtonCopyProps) {
+export function CopyButton({
+  size,
+  code,
+  iconOnly,
+  isCopying,
+  handleCopyClick,
+  appearance = 'solid',
+}: ButtonCopyProps) {
   const icon = isCopying ? <RiCheckLine /> : <RiFileCopy2Line />;
   const label = isCopying ? 'Copied!' : 'Copy';
 
@@ -20,7 +28,7 @@ export function CopyButton({ size, code, iconOnly, isCopying, handleCopyClick }:
       kind={isCopying ? 'success' : 'default'}
       btnAction={code ? () => handleCopyClick(code) : undefined}
       label={iconOnly ? undefined : label}
-      appearance={iconOnly ? 'text' : 'solid'}
+      appearance={iconOnly ? 'text' : appearance}
       icon={iconOnly && icon}
       title="Click to copy"
       aria-label="Copy"
