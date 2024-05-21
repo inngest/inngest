@@ -15,7 +15,10 @@ export const PopoverContent = forwardRef<
       <PopoverPrimitive.Content
         sideOffset={5}
         ref={forwardedRef}
-        className={`z-[100] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto overflow-x-hidden rounded bg-white drop-shadow ${className}`}
+        className={cn(
+          'z-[100] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto overflow-x-hidden rounded bg-white drop-shadow',
+          className
+        )}
         {...props}
       >
         {children}
