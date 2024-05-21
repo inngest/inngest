@@ -1212,15 +1212,24 @@ If an SDK supports parallelism, it MUST follow the `ctx.stack.stack` and recover
 
 Middleware allows users to run arbitrary code at certain points in the execution lifecycle. Middleware is used to add functionality such as logging, error handling, and more.
 
-Since SDKs strive to be idiomatic to their respective languages, the ergonomics of middleware may deviate significantly between SDKs. However, all SDKs MUST provide the same lifecycle methods.
+## 6.1. Required functionality
 
-## 6.1. Client and function
+Since SDKs strive to be idiomatic to their respective languages, the ergonomics of middleware and names/signatures of lifecycle methods MAY deviate significantly between SDKs. However, all SDKs MUST support the same middleware.
 
-Middleware may be specified on the Inngest Client and/or individual Inngest Functions:
+Required functionality:
+- Adding custom fields to the Inngest Function context (e.g. database connection)
+- Accessing the framework/platform level HTTP request (i.e. before the `serve` function normalizes it)
+- Mutate the memoized step data before calling an Inngest Function
+- Mutate the step/function output and errors before sending to the Inngest Server
+- Mutate events before sending to the Inngest Server
+
+## 6.2. Client and function
+
+Middleware MAY be specified on the Inngest Client and/or individual Inngest Functions:
 - Client middleware is executed when any function runs.
 - Function middleware is executed only when its function runs.
 
-## 6.2. Lifecycle methods
+## 6.3. Lifecycle methods
 
 - All lifecycle methods MUST NOT be called multiple times within a single SDK request, unless explicitly stated otherwise.
 - All lifecycle methods MAY be called multiple times within a single function run. This will always happen (except for the "events" lifecycle methods) when steps are used.
@@ -1273,3 +1282,11 @@ Middleware may be specified on the Inngest Client and/or individual Inngest Func
 
 ### Before response
 - MUST call after the output has been set and before the response is sent back to an Inngest Server.
+
+## 6.4. Glossary
+
+### Unmemoized code
+
+The vast majority of the time, "unmemoized code" is function-level code encountered after exhausting the memoized step data.
+
+However, a non-deterministic function may cause the SDK to encounter an unmemoized step before exhausting the memoized step data. In this case, the unmemoized step is the start of the unmemoized code.
