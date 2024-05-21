@@ -49,7 +49,6 @@ export function RunInfo({ app, cancelRun, className, fn, rerun, run }: Props) {
 
           <CancelRunButton disabled={Boolean(endedAt)} onClick={cancelRun} />
           <RerunButton onClick={() => rerun({ fnID: fn.id })} />
-          <Button label="Rerun in Dev Server" size="small" />
         </Card.Header>
 
         <Card.Content>
