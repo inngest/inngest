@@ -341,7 +341,7 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 			f.EventBatch = map[string]any{
 				"maxSize": c.BatchEvents.MaxSize,
 				"timeout": c.BatchEvents.Timeout,
-				"key": c.BatchEvents.Key,
+				"key":     c.BatchEvents.Key,
 			}
 		}
 

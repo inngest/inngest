@@ -307,7 +307,7 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 
 	var status string
 	var err error
-	if opts.ScheduleBatchPayload.BatchPointer != "" {
+	if opts.BatchPointer != "" {
 		// if we encounter a new producer, use new method
 		status, err = s.batcher.StartExecutionWithBatchPointer(ctx, batchID, opts.BatchPointer)
 	} else {

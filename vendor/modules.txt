@@ -515,7 +515,7 @@ github.com/inconshreveable/mousetrap
 # github.com/inngest/expr v0.0.0-20240201152704-a643bc6ace48
 ## explicit; go 1.21.0
 github.com/inngest/expr
-# github.com/inngest/inngestgo v0.7.3-0.20240420014807-6d7557139285
+# github.com/inngest/inngestgo v0.7.3-0.20240521072529-2795f6b14496
 ## explicit; go 1.21.0
 github.com/inngest/inngestgo
 github.com/inngest/inngestgo/errors
