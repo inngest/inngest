@@ -150,7 +150,7 @@ func (l lifecycle) OnFunctionSkipped(
 		EventID:      md.Config.EventIDs[0],
 		RunID:        &md.ID.RunID,
 		RunSkippedAt: s.At,
-		Status:       s.Reason.String(),
+		Reason:       s.Reason.String(),
 		FunctionID:   md.ID.FunctionID,
 		WorkspaceID:  md.ID.Tenant.EnvID,
 	}

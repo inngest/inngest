@@ -111,7 +111,7 @@ type HistorySkip struct {
 	OriginalRunID *ulid.ULID
 	RunID         *ulid.ULID
 	RunSkippedAt  time.Time
-	Status        string
+	Reason        string
 	FunctionID    uuid.UUID
 	WorkspaceID   uuid.UUID
 }
