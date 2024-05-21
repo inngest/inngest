@@ -35,43 +35,43 @@ export function Modal({
     <Dialog.Root open={isOpen} onOpenChange={onClose} modal>
       <AnimatePresence>
         <Dialog.Portal container={container}>
-          <Dialog.Overlay asChild>
-            <div
-              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] transition-opacity dark:bg-[#04060C]/90"
-              aria-hidden="true"
-            />
-          </Dialog.Overlay>
-          {/* Full-screen container to center the panel */}
-          <div className="fixed inset-0 z-50 overflow-y-auto">
-            <motion.div
-              className={cn(
-                alignTop ? 'items-baseline' : 'items-center',
-                'flex min-h-full w-full justify-center p-6'
-              )}
-              initial={{ y: -20, opacity: 0.2 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{
-                y: -20,
-                opacity: 0.2,
-                transition: { duration: 0.2, type: 'tween' },
-              }}
-              transition={{
-                duration: 0.15,
-                type: 'tween',
-              }}
-            >
-              <Dialog.Content
+          <Dialog.Overlay
+            asChild
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] transition-opacity dark:bg-[#04060C]/90"
+            aria-hidden="true"
+          >
+            {/* Full-screen container to center the panel */}
+            <div className="fixed inset-0 z-50">
+              <motion.div
                 className={cn(
-                  className,
-                  'dark:bg-slate-910 transform overflow-hidden rounded-lg bg-white shadow-xl transition-all'
+                  alignTop ? 'items-baseline' : 'items-center',
+                  'flex h-full w-full justify-center p-6'
                 )}
+                initial={{ y: -20, opacity: 0.2 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{
+                  y: -20,
+                  opacity: 0.2,
+                  transition: { duration: 0.2, type: 'tween' },
+                }}
+                transition={{
+                  duration: 0.15,
+                  type: 'tween',
+                }}
               >
-                {(title || description) && <Header description={description}>{title}</Header>}
-                {children}
-                {footer && <Footer>{footer}</Footer>}
-              </Dialog.Content>
-            </motion.div>
-          </div>
+                <Dialog.Content
+                  className={cn(
+                    className,
+                    'dark:bg-slate-910 max-h-full overflow-y-auto overflow-x-hidden rounded-lg bg-white shadow-xl'
+                  )}
+                >
+                  {(title || description) && <Header description={description}>{title}</Header>}
+                  {children}
+                  {footer && <Footer>{footer}</Footer>}
+                </Dialog.Content>
+              </motion.div>
+            </div>
+          </Dialog.Overlay>
         </Dialog.Portal>
       </AnimatePresence>
     </Dialog.Root>
