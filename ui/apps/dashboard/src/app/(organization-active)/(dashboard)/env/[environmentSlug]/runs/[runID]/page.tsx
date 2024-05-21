@@ -5,6 +5,7 @@ import { RunDetails } from '@inngest/components/RunDetailsV2';
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useCancelRun } from '@/queries/useCancelRun';
+import { useRerun } from '@/queries/useRerun';
 import { useRun } from './useRun';
 
 type Props = {
@@ -17,6 +18,7 @@ export default function Page({ params }: Props) {
   const runID = decodeURIComponent(params.runID);
   const env = useEnvironment();
   const cancelRun = useCancelRun({ envID: env.id, runID });
+  const rerun = useRerun({ envID: env.id, envSlug: env.slug, runID });
 
   const res = useRun({ envID: env.id, runID });
   if (res.error) {
@@ -38,6 +40,7 @@ export default function Page({ params }: Props) {
         cancelRun={cancelRun}
         fn={run.function}
         getOutput={getOutput}
+        rerun={rerun}
         run={{
           id: params.runID,
           output: null,
