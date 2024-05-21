@@ -1,6 +1,8 @@
 import { forwardRef } from 'react';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 
+import { cn } from '../utils/classNames';
+
 export const Popover = PopoverPrimitive.Root;
 export const PopoverTrigger = PopoverPrimitive.Trigger;
 export const PopoverClose = PopoverPrimitive.Close;
