@@ -30,13 +30,11 @@ func TestNewRunMetadata(t *testing.T) {
 			name: "should return value if data is valid",
 			data: map[string]string{
 				"status":   "1",
-				"pending":  "0",
 				"version":  "1",
 				"debugger": "false",
 			},
 			expectedVal: &runMetadata{
 				Status:   enums.RunStatusCompleted,
-				Pending:  0,
 				Version:  1,
 				Debugger: false,
 			},
@@ -57,12 +55,10 @@ func TestNewRunMetadata(t *testing.T) {
 		{
 			name: "missing version should return 0",
 			data: map[string]string{
-				"status":  "1",
-				"pending": "0",
+				"status": "1",
 			},
 			expectedVal: &runMetadata{
 				Status:  enums.RunStatusCompleted,
-				Pending: 0,
 				Version: 0,
 			},
 			expectedError: nil,
@@ -71,7 +67,6 @@ func TestNewRunMetadata(t *testing.T) {
 			name: "invalid version should return error",
 			data: map[string]string{
 				"status":  "1",
-				"pending": "0",
 				"version": "yolo",
 			},
 			expectedError: errors.New("invalid metadata version detected: \"yolo\""),
@@ -92,7 +87,6 @@ func TestStateHarness(t *testing.T) {
 	sm, err := New(
 		context.Background(),
 		WithKeyPrefix("{test}:"),
-		WithFunctionLoader(testharness.FunctionLoader()),
 		WithConnectOpts(rueidis.ClientOption{
 			InitAddress:  []string{r.Addr()},
 			DisableCache: true,

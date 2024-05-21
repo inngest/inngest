@@ -13,6 +13,10 @@ cloud.google.com/go/iam/apiv1/iampb
 cloud.google.com/go/pubsub/apiv1
 cloud.google.com/go/pubsub/apiv1/pubsubpb
 cloud.google.com/go/pubsub/internal
+# connectrpc.com/connect v1.16.1
+## explicit; go 1.20
+connectrpc.com/connect
+connectrpc.com/connect/internal/gen/connectext/grpc/status/v1
 # cuelang.org/go v0.4.2
 ## explicit; go 1.13
 cuelang.org/go/cue

@@ -1,0 +1,143 @@
+syntax = "proto3";
+package state.v2;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/state/v2;statev2";
+
+message Metadata {
+  ID              id      = 1;
+  Config          config  = 2;
+  RunMetrics      metrics = 3;
+  repeated string stack   = 4;
+}
+
+message ID {
+  string run_id      = 1;
+  string function_id = 2;
+  Tenant tenant      = 3;
+}
+
+message Config {
+  string                            function_slug    = 1;
+  int64                             function_version = 2;
+  string                            cron_schedule    = 3;
+  string                            span_id          = 4;
+  string                            batch_id         = 5;
+  google.protobuf.Timestamp         started_at       = 6;
+  repeated string                   event_ids        = 7;
+  int64                             request_version  = 8;
+  string                            idempotency      = 9;
+  optional string                   replay_id        = 10;
+  optional string                   original_run_id  = 11;
+  optional int64                    priority_factor  = 12;
+  repeated ConcurrencyKey           concurrency_keys = 13;
+  bool                              force_step_plan  = 14;
+  google.protobuf.Struct            context          = 15;
+}
+
+message ConcurrencyKey {
+  string key   = 1;
+  string hash  = 2;
+  int64  limit = 3;
+}
+
+message RunMetrics {
+  int64 state_size = 1;
+  int64 event_size = 2;
+  int64 step_count = 3;
+}
+
+message Tenant {
+  string app_id     = 1;
+  string env_id     = 2;
+  string account_id = 3;
+}
+
+message CreateStateRequest {
+  Metadata       metadata = 1;
+  repeated bytes events   = 2;
+}
+
+message CreateStateResponse {}
+
+message DeleteStateRequest {
+  ID id = 1;
+}
+
+
+message DeleteStateResponse {}
+
+message LoadMetadataRequest {
+  ID id = 1;
+}
+
+message LoadMetadataResponse {
+  Metadata metadata = 1;
+}
+
+message UpdateMetadataRequest {
+  ID                        id              = 1;
+  google.protobuf.Timestamp started_at      = 2;
+  int64                     request_version = 3;
+  bool                      force_step_plan = 4;
+}
+
+message UpdateMetadataResponse{}
+
+message SaveStepRequest {
+  ID     id      = 1;
+  string step_id = 2;
+  bytes  data    = 3;
+}
+
+message SaveStepResponse{}
+
+message ExistsRequest {
+  ID id = 1;
+}
+
+message ExistsResponse {
+  bool exists = 1;
+}
+
+message LoadEventsRequest {
+  ID id = 1;
+}
+
+message LoadEventsResponse {
+  repeated bytes events = 4;
+}
+
+
+message LoadStepsRequest {
+  ID id = 1;
+}
+
+message LoadStepsResponse {
+  map<string, bytes> steps = 1;
+}
+
+message LoadStateRequest {
+  ID id = 1;
+}
+
+message LoadStateResponse {
+  Metadata           metadata = 1;
+  repeated bytes     events   = 2;
+  map<string, bytes> steps    = 3;
+}
+
+service RunService {
+  rpc Create(CreateStateRequest) returns (CreateStateResponse) {}
+  rpc Delete(DeleteStateRequest) returns (DeleteStateResponse) {}
+  rpc Exists(ExistsRequest) returns (ExistsResponse) {}
+  rpc UpdateMetadata(UpdateMetadataRequest) returns (UpdateMetadataResponse) {}
+  rpc SaveStep(SaveStepRequest) returns (SaveStepResponse) {}
+
+  rpc LoadMetadata(LoadMetadataRequest) returns (LoadMetadataResponse) {}
+  rpc LoadEvents(LoadEventsRequest) returns (LoadEventsResponse) {}
+  rpc LoadSteps(LoadStepsRequest) returns (LoadStepsResponse) {}
+  rpc LoadState(LoadStateRequest) returns (LoadStateResponse) {}
+}

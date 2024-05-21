@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
@@ -116,7 +117,7 @@ func (s *svc) Pre(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create finish handler: %w", err)
 	}
-	s.exec.SetFinishHandler(finishHandler)
+	s.exec.SetFinalizer(finishHandler)
 
 	return nil
 }
@@ -125,7 +126,7 @@ func (s *svc) Executor() execution.Executor {
 	return s.exec
 }
 
-func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state.State, []event.Event) error, error) {
+func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.ID, []event.Event) error, error) {
 	pb, err := pubsub.NewPublisher(ctx, s.config.EventStream.Service)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create publisher: %w", err)
@@ -133,7 +134,7 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 
 	topicName := s.config.EventStream.Service.Concrete.TopicName()
 
-	return func(ctx context.Context, st state.State, events []event.Event) error {
+	return func(ctx context.Context, id sv2.ID, events []event.Event) error {
 		eg := errgroup.Group{}
 
 		for _, e := range events {
@@ -187,6 +188,11 @@ func (s *svc) Run(ctx context.Context) error {
 		default:
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
+
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error handling queue item", "error", err)
+		}
+
 		return err
 	})
 }
@@ -204,32 +210,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	}
 	edge := payload.Edge
 
-	// If this is of type sleep, ensure that we save "nil" within the state store
-	// for the outgoing edge ID.  This ensures that we properly increase the stack
-	// for `tools.sleep` within generator functions.
-	var stackIdx int
-	if item.Kind == queue.KindSleep && item.Attempt == 0 {
-		if err = s.state.SaveResponse(ctx, item.Identifier, edge.Outgoing, "null"); err != nil {
-			return err
-		}
-		// Load the position within the stack we just saved.
-		stackIdx, err = s.state.StackIndex(ctx, item.Identifier.RunID, edge.Outgoing)
-		if err != nil {
-			return err
-		}
-		// After the sleep, we start a new step.  THis means we also want to start a new
-		// group ID, ensuring that we correlate the next step _after_ this sleep (to be
-		// scheduled in this executor run)
-		ctx = state.WithGroupID(ctx, uuid.New().String())
-	} else if edge.Outgoing != inngest.TriggerName {
-		// Load the position within the stack for standard edges.
-		stackIdx, err = s.state.StackIndex(ctx, item.Identifier.RunID, edge.Outgoing)
-		if err != nil {
-			return fmt.Errorf("unable to find stack index: %w", err)
-		}
-	}
-
-	resp, err := s.exec.Execute(ctx, item.Identifier, item, edge, stackIdx)
+	resp, err := s.exec.Execute(ctx, item.Identifier, item, edge)
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.
 	if err == state.ErrFunctionCancelled {

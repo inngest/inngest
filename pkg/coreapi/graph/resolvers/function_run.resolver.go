@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -201,7 +202,12 @@ func (r *mutationResolver) CancelRun(
 		return nil, errors.New("cannot cancel an ended run")
 	}
 
-	err = r.Executor.Cancel(ctx, runID, execution.CancelRequest{})
+	id := state.ID{
+		RunID:      runID,
+		FunctionID: run.FunctionID,
+	}
+
+	err = r.Executor.Cancel(ctx, id, execution.CancelRequest{})
 	if err != nil {
 		return nil, err
 	}
@@ -297,5 +303,5 @@ func (r *mutationResolver) Rerun(
 		return zero, err
 	}
 
-	return identifier.RunID, nil
+	return identifier.ID.RunID, nil
 }

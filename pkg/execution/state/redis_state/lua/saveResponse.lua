@@ -20,7 +20,8 @@ if redis.call("HEXISTS", keyStep, stepID) == 1 then
 	return -1
 end
 
-redis.call("HINCRBY", keyMetadata, "pending", -1) -- no longer necessary
+redis.call("HINCRBY", keyMetadata, "step_count", 1)
+redis.call("HINCRBY", keyMetadata, "state_size", #data)
 redis.call("HSET", keyStep, stepID, data)
 redis.call("RPUSH", keyStack, stepID)
 return 0

@@ -35,9 +35,9 @@ type TrackedEvent interface {
 	GetEvent() Event
 }
 
-func NewEvent(data string) (*Event, error) {
+func NewEvent(data []byte) (*Event, error) {
 	evt := &Event{}
-	if err := json.Unmarshal([]byte(data), evt); err != nil {
+	if err := json.Unmarshal(data, evt); err != nil {
 		return nil, err
 	}
 
