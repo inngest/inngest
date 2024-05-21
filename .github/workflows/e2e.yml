@@ -21,7 +21,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version: "1.22"
       - uses: actions/setup-node@v4
         with:
           node-version: "18"
@@ -62,7 +62,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version: "1.22"
       - name: Build dev server
         run: |
           go build -o ./inngest-bin ./cmd/main.go

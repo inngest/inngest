@@ -64,7 +64,9 @@ export function Alert({ children, className, severity, showIcon = true }: Props)
         className
       )}
     >
-      {showIcon && <Icon className={cn('w-5 shrink-0', severityStyles[severity].iconClassName)} />}
+      {showIcon && (
+        <Icon className={cn('h-5 w-5 shrink-0', severityStyles[severity].iconClassName)} />
+      )}
 
       <div className="leading-5">{children}</div>
     </div>

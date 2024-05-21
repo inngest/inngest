@@ -15,6 +15,7 @@ local pauseEventKey = KEYS[3]
 local pauseInvokeKey = KEYS[4]
 local actionKey     = KEYS[5]
 local stackKey      = KEYS[6]
+local keyMetadata   = KEYS[7]
 
 local pauseID      = ARGV[1]
 local invokeCorrelationId = ARGV[2]
@@ -41,6 +42,8 @@ end
 if actionKey ~= nil and pauseDataKey ~= "" then
 	redis.call("RPUSH", stackKey, pauseDataKey)
 	redis.call("HSET", actionKey, pauseDataKey, pauseDataVal)
+	redis.call("HINCRBY", keyMetadata, "step_count", 1)
+	redis.call("HINCRBY", keyMetadata, "state_size", #pauseDataVal)
 end
 
 if invokeCorrelationId ~= false and invokeCorrelationId ~= "" and invokeCorrelationId ~= nil then

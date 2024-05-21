@@ -19,16 +19,9 @@ import type { NavigateToRunFn } from 'node_modules/@inngest/components/src/Timel
 import { useClient, useMutation } from 'urql';
 
 import { graphql } from '@/gql';
+import { useCancelRun } from '@/queries/useCancelRun';
 import { devServerURL, useDevServer } from '@/utils/useDevServer';
 import { getHistoryItemOutput } from './getHistoryItemOutput';
-
-const CancelRunDocument = graphql(`
-  mutation CancelRun($envID: UUID!, $runID: ULID!) {
-    cancelRun(envID: $envID, runID: $runID) {
-      id
-    }
-  }
-`);
 
 type Props = {
   environment: Pick<Environment, 'id' | 'slug'>;
@@ -137,18 +130,6 @@ export function StreamDetails({
       />
     </div>
   );
-}
-
-function useCancelRun({ envID, runID }: { envID: string; runID: string }) {
-  const [, mutate] = useMutation(CancelRunDocument);
-
-  return async () => {
-    const res = await mutate({ envID, runID });
-    if (res.error) {
-      // Throw error so that the modal can catch and display it
-      throw res.error;
-    }
-  };
 }
 
 const RerunFunctionRunDocument = graphql(/* GraphQL */ `

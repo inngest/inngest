@@ -411,7 +411,12 @@ func (s *Span) ChildSpanCount() int {
 
 // End utilizes the internal tracer's processors to send spans
 func (s *Span) End(opts ...trace.SpanEndOption) {
+	sc := trace.NewSpanEndConfig(opts...)
+
 	s.end = time.Now()
+	if sc.Timestamp().UnixMilli() > 0 {
+		s.end = sc.Timestamp()
+	}
 
 	// don't attempt to export the span if it's marked as dedup or cancel
 	if s.cancel || s.dedup {
