@@ -21,5 +21,5 @@ export function RerunButton(props: Props) {
     }
   }
 
-  return <Button btnAction={onClick} disabled={isLoading} label="Rerun" size="small" />;
+  return <Button btnAction={onClick} loading={isLoading} label="Rerun" size="small" />;
 }
