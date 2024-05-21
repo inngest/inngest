@@ -48,7 +48,7 @@ func (b redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inn
 			Str("expression", *fn.EventBatch.Key).
 			Interface("event", evt.Map()).
 			Msg("error evaluating batch key expression")
-		return "<invalid>", nil
+		return fn.ID.String(), fmt.Errorf("invalid expression: %w", err)
 	}
 	if str, ok := out.(string); ok {
 		return str, nil
