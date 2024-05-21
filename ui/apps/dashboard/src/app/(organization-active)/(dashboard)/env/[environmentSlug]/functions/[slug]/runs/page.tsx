@@ -14,7 +14,7 @@ import { RiLoopLeftLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { graphql } from '@/gql';
-import { FunctionRunTimeFieldV2 } from '@/gql/graphql';
+import { RunsOrderByField } from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useSearchParam, useStringArraySearchParam } from '@/utils/useSearchParam';
 import Page from '../../../runs/[runID]/page';
@@ -27,7 +27,7 @@ const GetRunsDocument = graphql(`
     $environmentID: ID!
     $startTime: Time!
     $status: [FunctionRunStatus!]
-    $timeField: FunctionRunTimeFieldV2
+    $timeField: RunsOrderByField
     $functionSlug: String!
   ) {
     environment: workspace(id: $environmentID) {
@@ -68,11 +68,10 @@ export default function RunsPage({
 
   const [rawFilteredStatus, setFilteredStatus, removeFilteredStatus] =
     useStringArraySearchParam('filterStatus');
-  const [rawTimeField = FunctionRunTimeFieldV2.QueuedAt, setTimeField] =
-    useSearchParam('timeField');
+  const [rawTimeField = RunsOrderByField.QueuedAt, setTimeField] = useSearchParam('timeField');
   const [lastDays = '3', setLastDays] = useSearchParam('last');
 
-  const timeField = toTimeField(rawTimeField) ?? FunctionRunTimeFieldV2.QueuedAt;
+  const timeField = toTimeField(rawTimeField) ?? RunsOrderByField.QueuedAt;
 
   /* TODO: Time params for absolute time filter */
   // const [fromTime, setFromTime] = useSearchParam('from');

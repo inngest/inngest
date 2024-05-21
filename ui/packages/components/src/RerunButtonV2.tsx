@@ -21,13 +21,5 @@ export function RerunButton(props: Props) {
     }
   }
 
-  return (
-    <Button
-      btnAction={onClick}
-      disabled={isLoading}
-      icon={<RiLoopLeftLine className={cn(' text-sky-500', isLoading && 'animate-spin')} />}
-      label="Rerun"
-      size="small"
-    />
-  );
+  return <Button btnAction={onClick} disabled={isLoading} label="Rerun" size="small" />;
 }
