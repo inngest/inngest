@@ -60,7 +60,11 @@ export function DatePicker({ defaultValue, placeholder, onChange, ...props }: Da
     <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
       <PopoverTrigger asChild>
         <DateInputButton {...props}>
-          {value?.toLocaleString() ?? placeholder ?? 'Enter Date and Time'}
+          {value ? (
+            <time className="text-slate-900">{value.toLocaleString()}</time>
+          ) : (
+            <span className="text-slate-500">{placeholder}</span>
+          )}
         </DateInputButton>
       </PopoverTrigger>
       <PopoverContent>
