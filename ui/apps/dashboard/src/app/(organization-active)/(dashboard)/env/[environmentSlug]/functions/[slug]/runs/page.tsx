@@ -27,13 +27,13 @@ const GetRunsDocument = graphql(`
     $environmentID: ID!
     $startTime: Time!
     $status: [FunctionRunStatus!]
-    $timeField: RunsOrderByField
+    $timeField: RunsOrderByField!
     $functionSlug: String!
   ) {
     environment: workspace(id: $environmentID) {
       runs(
         filter: { from: $startTime, status: $status, timeField: $timeField, fnSlug: $functionSlug }
-        orderBy: [{ field: QUEUED_AT, direction: DESC }]
+        orderBy: [{ field: $timeField, direction: DESC }]
       ) {
         edges {
           node {
@@ -51,7 +51,7 @@ const GetRunsDocument = graphql(`
 
 const renderSubComponent = ({ id }: { id: string }) => {
   return (
-    <div className="mx-5">
+    <div className="border-l-4 border-slate-400 px-5 pb-6">
       <Page params={{ runID: id }} />
     </div>
   );

@@ -655,9 +655,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// contains it.
 	md := s.Metadata()
 
+	isNewRun := true    // flag to tell if this is a new run that just started or not
 	start := time.Now() // for recording function start time after a successful step.
 	if !md.StartedAt.IsZero() {
 		start = md.StartedAt
+		isNewRun = false
 	}
 
 	f, err := e.fl.LoadFunction(ctx, id)
@@ -755,6 +757,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		fnSpan.End()
 		span.End()
 	}()
+	// if this run just started, there won't be any root spans available so send the function span out
+	// early
+	if isNewRun {
+		fnSpan.SetAttributes(attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusRunning.ToCode()))
+		fnSpan.Send()
+	}
 	// send early here to help show the span has started and is in-progress
 	span.Send()
 
@@ -2168,7 +2176,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 	}
 
 	startedAt := time.Now()
-	endedAt := startedAt.Add(dur)
+	until := startedAt.Add(dur)
 
 	// Create another group for the next item which will run.  We're enqueueing
 	// the function to run again after sleep, so need a new group.
@@ -2176,7 +2184,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 	ctx = state.WithGroupID(ctx, groupID)
 	ctx, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeStep),
-		telemetry.WithName("sleep"),
+		telemetry.WithName(consts.OtelSpanSleep),
 		telemetry.WithTimestamp(startedAt),
 		telemetry.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
@@ -2192,11 +2200,10 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 			attribute.String(consts.OtelSysStepGroupID, groupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeSleep.String()),
 			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
-			attribute.String(consts.OtelSysStepSleepEndAt, endedAt.Format(time.RFC3339Nano)),
+			attribute.Int64(consts.OtelSysStepSleepEndAt, until.UnixMilli()),
 		),
 	)
-
-	until := time.Now().Add(dur)
+	defer span.End(trace.WithTimestamp(until))
 
 	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
 	// TODO Should this also include a parent step span? It will never have attempts.

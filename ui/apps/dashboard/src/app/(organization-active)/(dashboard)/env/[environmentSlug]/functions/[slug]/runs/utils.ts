@@ -1,6 +1,9 @@
 import { isFunctionRunStatus, type FunctionRunStatus } from '@inngest/components/types/functionRun';
 
-import { FunctionRunStatus as FunctionRunStatusEnum, RunsOrderByField } from '@/gql/graphql';
+import {
+  FunctionRunStatus as FunctionRunStatusEnum,
+  RunsOrderByField as FunctionRunTimeFieldEnum,
+} from '@/gql/graphql';
 
 /**
  * Convert a run status union type into an enum. This is necessary because
@@ -43,14 +46,14 @@ export function toRunStatuses(statuses: string[]): FunctionRunStatusEnum[] {
  * Convert a time field union type into an enum. This is necessary because
  * TypeScript treats as enums as nominal types, which causes silly type errors.
  */
-export function toTimeField(time: string): RunsOrderByField | undefined {
+export function toTimeField(time: string): FunctionRunTimeFieldEnum | undefined {
   switch (time) {
     case 'ENDED_AT':
-      return RunsOrderByField.EndedAt;
+      return FunctionRunTimeFieldEnum.EndedAt;
     case 'QUEUED_AT':
-      return RunsOrderByField.QueuedAt;
+      return FunctionRunTimeFieldEnum.QueuedAt;
     case 'STARTED_AT':
-      return RunsOrderByField.StartedAt;
+      return FunctionRunTimeFieldEnum.StartedAt;
     default:
       console.error(`unexpected time field: ${time}`);
   }
