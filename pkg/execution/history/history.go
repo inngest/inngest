@@ -13,9 +13,10 @@ import (
 type Driver interface {
 	Close() error
 	Write(context.Context, History) error
+	WriteSkip(context.Context, HistorySkip) error
 }
 
-// Represents a row in the workflow_run_history table
+// History represents a row in the workflow_run_history table
 type History struct {
 	AccountID            uuid.UUID
 	Attempt              int64
@@ -99,4 +100,18 @@ type Result struct {
 	SDKVersion  string           `json:"sdk_version"`
 	SizeBytes   int              `json:"response_size_bytes"`
 	Stack       []map[string]any `json:"stack"`
+}
+
+// HistorySkip represents a row in the workflow_run_skips table
+type HistorySkip struct {
+	AccountID     uuid.UUID
+	BatchID       *ulid.ULID
+	Cron          *string
+	EventID       ulid.ULID
+	OriginalRunID *ulid.ULID
+	RunID         *ulid.ULID
+	RunSkippedAt  time.Time
+	Status        string
+	FunctionID    uuid.UUID
+	WorkspaceID   uuid.UUID
 }

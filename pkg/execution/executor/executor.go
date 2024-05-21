@@ -397,6 +397,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		for _, e := range e.lifecycles {
 			go e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
 				CronSchedule: req.Events[0].GetEvent().CronSchedule(),
+				Reason:       enums.SkipReasonFunctionPaused,
+				At:           ulid.Time(runID.Time()),
 			})
 		}
 		return nil, ErrFunctionSkipped

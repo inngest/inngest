@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
@@ -13,8 +14,14 @@ import (
 
 // SkipState represents the subset of state.State's data required for OnFunctionSkipped.
 type SkipState struct {
+	// Reason represents the reason the function was skipped.
+	Reason enums.SkipReason
+
 	// CronSchedule, if present, is the cron schedule string that triggered the skipped function.
 	CronSchedule *string
+
+	// At represents the time the function was skipped.
+	At time.Time
 }
 
 var _ LifecycleListener = (*NoopLifecyceListener)(nil)
