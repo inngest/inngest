@@ -1263,11 +1263,11 @@ There are two lifecycles groups to cover: a function run and sending an event.
 
 #### After memoization
 - MUST call after last memoized step call.
-- Not called if a memoized step is not found. This can occur if the function is non-deterministic or if the Inngest Function callback has intentionally changed.
+- Called immediately after the "before memoization" hook if the run has no state, as we will immediately be executing new code.
 
 #### Before execution
 - MUST call before executing unmemoized code.
-- Not called between steps.
+- MUST be called before function-level code will run that is after the last step to memoize.
 
 #### After execution
 - MUST call after executing unmemoized code.
