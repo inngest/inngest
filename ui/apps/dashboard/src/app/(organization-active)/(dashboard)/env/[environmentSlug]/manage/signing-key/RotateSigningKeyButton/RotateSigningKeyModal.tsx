@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
+import { InlineCode } from '@inngest/components/InlineCode';
 import { Modal } from '@inngest/components/Modal';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
-import { InlineCode } from '../InlineCode';
 
 const Mutation = graphql(`
   mutation RotateSigningKey($envID: UUID!) {

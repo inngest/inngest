@@ -15,6 +15,9 @@ type Props = {
     name: string;
   };
   getOutput: (outputID: string) => Promise<string | null>;
+  pathCreator: {
+    runPopout: (params: { runID: string }) => string;
+  };
   rerun: (args: { fnID: string }) => Promise<unknown>;
   run: {
     id: string;
@@ -24,7 +27,7 @@ type Props = {
 };
 
 export function RunDetails(props: Props) {
-  const { app, getOutput, fn, rerun, run } = props;
+  const { app, getOutput, fn, pathCreator, rerun, run } = props;
 
   const cancelRun = useCallback(async () => {
     try {
@@ -39,7 +42,7 @@ export function RunDetails(props: Props) {
   return (
     <div>
       <RunInfo app={app} cancelRun={cancelRun} className="mb-4" fn={fn} rerun={rerun} run={run} />
-      <Timeline getOutput={getOutput} trace={run.trace} />
+      <Timeline getOutput={getOutput} pathCreator={pathCreator} trace={run.trace} />
     </div>
   );
 }

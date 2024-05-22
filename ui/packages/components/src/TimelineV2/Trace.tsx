@@ -15,10 +15,21 @@ type Props = {
   isExpandable?: boolean;
   minTime?: Date;
   maxTime?: Date;
+  pathCreator: {
+    runPopout: (params: { runID: string }) => string;
+  };
   trace: Trace;
 };
 
-export function Trace({ depth, getOutput, isExpandable = true, maxTime, minTime, trace }: Props) {
+export function Trace({
+  depth,
+  getOutput,
+  isExpandable = true,
+  maxTime,
+  minTime,
+  pathCreator,
+  trace,
+}: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [output, setOutput] = useState<string>();
 
@@ -88,7 +99,7 @@ export function Trace({ depth, getOutput, isExpandable = true, maxTime, minTime,
 
       {isExpanded && (
         <div className="ml-8">
-          <TraceInfo className="my-4 grow" trace={trace} />
+          <TraceInfo className="my-4 grow" pathCreator={pathCreator} trace={trace} />
 
           {output && (
             <div className="mb-4">
@@ -112,6 +123,7 @@ export function Trace({ depth, getOutput, isExpandable = true, maxTime, minTime,
                     getOutput={getOutput}
                     maxTime={maxTime}
                     minTime={minTime}
+                    pathCreator={pathCreator}
                     trace={child}
                   />
                 </div>
