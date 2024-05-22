@@ -39,7 +39,7 @@ type redisBatchManager struct {
 
 func (b redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inngest.Function) (string, error) {
 	if fn.EventBatch.Key == nil {
-		return fn.ID.String(), nil
+		return "default", nil
 	}
 
 	out, _, err := expressions.Evaluate(ctx, *fn.EventBatch.Key, map[string]any{"event": evt.Map()})
