@@ -354,15 +354,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	evtMap := req.Events[0].GetEvent().Map()
 	factor, _ := req.Function.RunPriorityFactor(ctx, evtMap)
 
-	// Grab the cron schedule for function config.  This is necessary for fast
-	// lookups, trace info, etc.
-	var schedule *string
-	if len(req.Events) == 1 && req.Events[0].GetEvent().Name == event.FnCronName {
-		if cron, ok := req.Events[0].GetEvent().Data["cron"].(string); ok {
-			schedule = &cron
-		}
-	}
-
 	metadata := sv2.Metadata{
 		ID: sv2.ID{
 			RunID:      runID,
@@ -376,7 +367,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Config: sv2.Config{
 			FunctionSlug:    req.Function.GetSlug(),
 			FunctionVersion: req.Function.FunctionVersion,
-			CronSchedule:    schedule,
 			SpanID:          telemetry.NewSpanID(ctx).String(),
 			EventIDs:        eventIDs,
 			Idempotency:     key,
@@ -387,6 +377,17 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			Context:         req.Context,
 		},
 	}
+
+	// Grab the cron schedule for function config.  This is necessary for fast
+	// lookups, trace info, etc.
+	var schedule *string
+	if len(req.Events) == 1 && req.Events[0].GetEvent().Name == event.FnCronName {
+		if cron, ok := req.Events[0].GetEvent().Data["cron"].(string); ok {
+			schedule = &cron
+			metadata.Config.SetCronSchedule(cron)
+		}
+	}
+
 	carrier := telemetry.NewTraceCarrier()
 	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 	metadata.Config.Context[consts.OtelPropagationKey] = carrier
@@ -836,8 +837,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.String(consts.OtelSysIdempotencyKey, id.IdempotencyKey()),
 		),
 	)
-	if md.Config.CronSchedule != nil {
-		fnSpan.SetAttributes(attribute.String(consts.OtelSysCronExpr, *md.Config.CronSchedule))
+	if md.Config.CronSchedule() != nil {
+		fnSpan.SetAttributes(attribute.String(consts.OtelSysCronExpr, *md.Config.CronSchedule()))
 	}
 	if md.Config.BatchID != nil {
 		fnSpan.SetAttributes(
