@@ -143,20 +143,21 @@ func (l lifecycle) OnFunctionSkipped(
 	md sv2.Metadata,
 	s execution.SkipState,
 ) {
-	h := HistorySkip{
-		AccountID:    md.ID.Tenant.AccountID,
-		BatchID:      md.Config.BatchID,
-		Cron:         s.CronSchedule,
-		EventID:      md.Config.EventIDs[0],
-		RunID:        &md.ID.RunID,
-		RunSkippedAt: s.At,
-		Reason:       s.Reason.String(),
-		FunctionID:   md.ID.FunctionID,
-		WorkspaceID:  md.ID.Tenant.EnvID,
+	h := History{
+		AccountID:   md.ID.Tenant.AccountID,
+		BatchID:     md.Config.BatchID,
+		Cron:        s.CronSchedule,
+		EventID:     md.Config.EventIDs[0],
+		RunID:       md.ID.RunID,
+		CreatedAt:   time.Now(),
+		SkipReason:  &s.Reason,
+		FunctionID:  md.ID.FunctionID,
+		WorkspaceID: md.ID.Tenant.EnvID,
+		Type:        enums.HistoryTypeFunctionSkipped.String(),
 	}
 
 	for _, d := range l.drivers {
-		if err := d.WriteSkip(context.WithoutCancel(ctx), h); err != nil {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
 			l.log.Error("execution lifecycle error", "lifecycle", "onFunctionSkipped", "error", err)
 		}
 	}

@@ -13,36 +13,38 @@ import (
 type Driver interface {
 	Close() error
 	Write(context.Context, History) error
-	WriteSkip(context.Context, HistorySkip) error
 }
 
-// History represents a row in the workflow_run_history table
+// History represents a row in:
+// - the workflow_run_history table and associated start/end tables
+// - or the workflow_run_skips table
 type History struct {
 	AccountID            uuid.UUID
-	Attempt              int64
+	Attempt              int64 // ignored for skips
 	BatchID              *ulid.ULID
 	Cancel               *execution.CancelRequest
 	CompletedStepCount   *int64
-	CreatedAt            time.Time
-	Cron                 *string
+	CreatedAt            time.Time // for skips, means "run skipped at"
+	Cron                 *string   // cron schedule for the run, if this was triggered by cron
 	EventID              ulid.ULID
 	FunctionID           uuid.UUID
-	FunctionVersion      int64
+	FunctionVersion      int64 // ignored for skips
 	GroupID              *uuid.UUID
-	ID                   ulid.ULID
-	IdempotencyKey       string
+	ID                   ulid.ULID // ignored for skips
+	IdempotencyKey       string    // ignored for skips
 	InvokeFunction       *InvokeFunction
 	InvokeFunctionResult *InvokeFunctionResult
 	LatencyMS            *int64
 	OriginalRunID        *ulid.ULID
 	Result               *Result
 	RunID                ulid.ULID
+	SkipReason           *enums.SkipReason // valid iff Type == enums.HistoryTypeFunctionSkipped
 	Sleep                *Sleep
 	Status               *string
 	StepID               *string
 	StepName             *string
 	StepType             *enums.HistoryStepType
-	Type                 string
+	Type                 string // see enums.HistoryType
 	URL                  *string
 	WaitForEvent         *WaitForEvent
 	WaitResult           *WaitResult
@@ -100,18 +102,4 @@ type Result struct {
 	SDKVersion  string           `json:"sdk_version"`
 	SizeBytes   int              `json:"response_size_bytes"`
 	Stack       []map[string]any `json:"stack"`
-}
-
-// HistorySkip represents a row in the workflow_run_skips table
-type HistorySkip struct {
-	AccountID     uuid.UUID
-	BatchID       *ulid.ULID
-	Cron          *string
-	EventID       ulid.ULID
-	OriginalRunID *ulid.ULID
-	RunID         *ulid.ULID
-	RunSkippedAt  time.Time
-	Reason        string
-	FunctionID    uuid.UUID
-	WorkspaceID   uuid.UUID
 }

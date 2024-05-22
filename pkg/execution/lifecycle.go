@@ -19,9 +19,6 @@ type SkipState struct {
 
 	// CronSchedule, if present, is the cron schedule string that triggered the skipped function.
 	CronSchedule *string
-
-	// At represents the time the function was skipped.
-	At time.Time
 }
 
 var _ LifecycleListener = (*NoopLifecyceListener)(nil)
