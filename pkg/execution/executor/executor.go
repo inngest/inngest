@@ -426,7 +426,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		span.SetAttributes(attribute.String(consts.OtelSysCronExpr, *schedule))
 	}
 	if req.BatchID != nil {
-		span.SetAttributes(attribute.String(consts.OtelSysBatchID, req.BatchID.String()))
+		span.SetAttributes(
+			attribute.String(consts.OtelSysBatchID, req.BatchID.String()),
+			attribute.Int64(consts.OtelSysBatchTS, int64(req.BatchID.Time())),
+		)
 	}
 	if req.PreventDebounce {
 		span.SetAttributes(attribute.Bool(consts.OtelSysDebounceTimeout, true))
@@ -837,7 +840,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		fnSpan.SetAttributes(attribute.String(consts.OtelSysCronExpr, *md.Config.CronSchedule))
 	}
 	if md.Config.BatchID != nil {
-		fnSpan.SetAttributes(attribute.String(consts.OtelSysBatchID, md.Config.BatchID.String()))
+		fnSpan.SetAttributes(
+			attribute.String(consts.OtelSysBatchID, md.Config.BatchID.String()),
+			attribute.Int64(consts.OtelSysBatchTS, int64(md.Config.BatchID.Time())),
+		)
 	}
 
 	for _, evt := range events {
