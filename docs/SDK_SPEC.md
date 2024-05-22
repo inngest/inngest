@@ -54,7 +54,12 @@ This document presents the Open Source SDK Specification for Inngest, outlining 
   - [5.4](#54-recovery-and-the-stack). Recovery and the stack
   - [5.5](#55-parallelism). Parallelism
 - [6](#6-middleware). Middleware
-  - [6.1](#61-lifecycle-methods). Lifecycle methods
+  - [6.1](#61-required-functionality). Required functionality
+  - [6.2](#62-client-and-function). Client and function
+  - [6.3](#63-lifecycle-methods). Lifecycle methods
+    - [6.3.1](#631-function-run). Function run
+    - [6.3.2](#632-event-send). Event send
+  - [6.4](#64-glossary). Glossary
 
 # 1. Introduction
 
@@ -1214,9 +1219,8 @@ Middleware allows users to run arbitrary code at certain points in the execution
 
 ## 6.1. Required functionality
 
-Since SDKs strive to be idiomatic to their respective languages, the ergonomics of middleware and names/signatures of lifecycle methods MAY deviate significantly between SDKs. However, all SDKs MUST support the same middleware.
+Since SDKs strive to be idiomatic to their respective languages, the ergonomics of middleware and names/signatures of lifecycle methods MAY deviate significantly between SDKs. However, all SDKs MUST support the same basic required functionality:
 
-Required functionality:
 - Adding custom fields to the Inngest Function context (e.g. database connection)
 - Accessing the framework/platform level HTTP request (i.e. before the `serve` function normalizes it)
 - Mutate the memoized step data before calling an Inngest Function
@@ -1229,59 +1233,60 @@ Middleware MAY be specified on the Inngest Client and/or individual Inngest Func
 - Client middleware is executed when any function runs.
 - Function middleware is executed only when its function runs.
 
+Client-level middleware MUST always be run before function-level middleware, and all middleware MUST be run in the order it was registered.
+
 ## 6.3. Lifecycle methods
 
-- All lifecycle methods MUST NOT be called multiple times within a single SDK request, unless explicitly stated otherwise.
-- All lifecycle methods MAY be called multiple times within a single function run. This will always happen (except for the "events" lifecycle methods) when steps are used.
+There are two lifecycles groups to cover: a function run and sending an event.
 
-### Transform input
+### 6.3.1. Function run
+
+#### Transform input
 - MUST call before executing the Inngest Function callback.
 - Arguments:
   - Context object that's passed to the Inngest Function callback.
   - Map of memoized step data
-- Use cases:
-  - Decrypt data from an Inngest Server.
 
-### Before memoization
+#### Before memoization
 - MUST call before beginning first memoized step call.
 - Effectively the same as "transform input", but executed after it.
 
-### After memoization
+#### After memoization
 - MUST call after last memoized step call.
 - Not called if a memoized step is not found. This can occur if the function is non-deterministic or if the Inngest Function callback has intentionally changed.
 
-### Before execution
+#### Before execution
 - MUST call before executing unmemoized code.
 - Not called between steps.
 
-### Before send events
-- MUST call before sending events to an Inngest Server.
-- Arguments:
-  - Array of events to send.
-- If a events are sent multiple times within a single SDK request, this method MUST be called before each send.
-
-### After send events
-- MUST call after sending events to an Inngest Server.
-- Arguments:
-  - Array of IDs for the sent events.
-  - Error if 1 or more events failed to send. Errors are "partial": it's possible to successfully send 1 event but error on another. Will not exist if all events were sent successfully.
-- If a events are sent multiple times within a single SDK request, this method MUST be called before each send.
-
-### After execution
+#### After execution
 - MUST call after executing unmemoized code.
 - Not called between steps.
 
-### Transform output
+#### Transform output
 - MUST call after a function/step returns or throws an error.
 - Arguments:
   - Thrown/returned error. Will not exist if the function/step returned successfully.
   - Data returned by the function/step. Will not exist if the function/step errored.
   - Step data (user-specified ID, opcode, etc.). Will not exist of a new step was not executed.
-- Use cases:
-  - Encrypt data before sending to an Inngest Server.
 
-### Before response
+#### Before response
 - MUST call after the output has been set and before the response is sent back to an Inngest Server.
+
+### 6.3.2. Event send
+
+#### Before send events
+- MUST call before sending events to an Inngest Server.
+- Arguments:
+  - Array of events to send.
+- If a events are sent multiple times within a single SDK request, this method MUST be called before each send.
+
+#### After send events
+- MUST call after sending events to an Inngest Server.
+- Arguments:
+  - Array of IDs for the sent events.
+  - Error if 1 or more events failed to send. Errors are "partial": it's possible to successfully send 1 event but error on another. Will not exist if all events were sent successfully.
+- If a events are sent multiple times within a single SDK request, this method MUST be called before each send.
 
 ## 6.4. Glossary
 
