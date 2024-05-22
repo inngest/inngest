@@ -1898,6 +1898,13 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 						if pause.Expression != nil {
 							span.SetAttributes(attribute.String(consts.OtelSysStepWaitExpression, *pause.Expression))
 						}
+						if r.With != nil {
+							if byt, err := json.Marshal(r.With); err == nil {
+								span.AddEvent(string(byt), trace.WithAttributes(
+									attribute.Bool(consts.OtelSysStepOutput, true),
+								))
+							}
+						}
 						if r.HasError() {
 							span.SetStatus(codes.Error, r.Error())
 						}
