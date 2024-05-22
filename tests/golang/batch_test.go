@@ -177,8 +177,6 @@ func TestBatchEventsWithKeys(t *testing.T) {
 	)
 	h.Register(a)
 	registerFuncs()
-	// calls pkg/devserver/api.go:256
-	// wrong type in pkg/sdk/function.go:11
 
 	t.Run("trigger batch", func(t *testing.T) {
 		sequence := []string{"a", "b", "c", "a", "b", "c", "a", "b"}
@@ -209,6 +207,6 @@ func TestBatchEventsWithKeys(t *testing.T) {
 		require.EqualValues(t, 1, batchInvokedCounter["c"])
 		require.EqualValues(t, 2, batchEventsCounter["c"])
 
-		require.EqualValues(t, 8, atomic.LoadInt32(&totalEvents))
+		require.EqualValues(t, len(sequence), atomic.LoadInt32(&totalEvents))
 	})
 }
