@@ -836,8 +836,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if md.Config.CronSchedule != nil {
 		fnSpan.SetAttributes(attribute.String(consts.OtelSysCronExpr, *md.Config.CronSchedule))
 	}
-	if id.BatchID != nil {
-		fnSpan.SetAttributes(attribute.String(consts.OtelSysBatchID, id.BatchID.String()))
+	if md.Config.BatchID != nil {
+		fnSpan.SetAttributes(attribute.String(consts.OtelSysBatchID, md.Config.BatchID.String()))
 	}
 
 	for _, evt := range events {
@@ -989,10 +989,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		} else if resp.IsTraceVisibleFunctionExecution() {
 			spanName := "function success"
 			fnstatus := attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCompleted.ToCode())
+			fnSpan.SetStatus(codes.Ok, "success")
+			span.SetStatus(codes.Ok, "success")
 
 			if resp.StatusCode != 200 {
 				spanName = "function error"
 				fnstatus = attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusFailed.ToCode())
+				fnSpan.SetStatus(codes.Error, resp.Error())
 				span.SetStatus(codes.Error, resp.Error())
 			}
 
