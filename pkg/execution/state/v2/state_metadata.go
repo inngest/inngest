@@ -10,6 +10,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+const (
+	cronScheduleKey = "__cron"
+)
+
 type ID struct {
 	RunID      ulid.ULID
 	FunctionID uuid.UUID
@@ -63,9 +67,6 @@ type Config struct {
 	// FunctionVersion stores the version of the function used when the run is
 	// scheduled.
 	FunctionVersion int
-	// If this run was started via a schedule, this stores the schedule information
-	// used.
-	CronSchedule *string
 	// SpanID stores the root span ID for the run's trace.
 	SpanID string
 	// BatchID tracks the batch ID for the function, if the function uses batching.
@@ -112,12 +113,34 @@ type Config struct {
 	Context map[string]any
 }
 
-func (c Config) GetSpanID() (*trace.SpanID, error) {
+func (c *Config) GetSpanID() (*trace.SpanID, error) {
 	if c.SpanID != "" {
 		sid, err := trace.SpanIDFromHex(c.SpanID)
 		return &sid, err
 	}
 	return nil, fmt.Errorf("invalid span id in run config")
+}
+
+func (c *Config) SetCronSchedule(schedule string) {
+	if c.Context == nil {
+		c.Context = map[string]any{}
+	}
+	c.Context[cronScheduleKey] = schedule
+}
+
+// CronSchedule retrieves the stored cron schedule information if available
+func (c *Config) CronSchedule() *string {
+	if c.Context == nil {
+		return nil
+	}
+
+	if v, ok := c.Context[cronScheduleKey]; ok {
+		if schedule, ok := v.(string); ok {
+			return &schedule
+		}
+	}
+
+	return nil
 }
 
 // RunMetrics stores state-level run metrics.
