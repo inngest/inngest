@@ -422,6 +422,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	)
 	defer span.End()
 
+	if schedule != nil {
+		span.SetAttributes(attribute.String(consts.OtelSysCronExpr, *schedule))
+	}
 	if req.BatchID != nil {
 		span.SetAttributes(attribute.String(consts.OtelSysBatchID, req.BatchID.String()))
 	}
@@ -830,6 +833,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.String(consts.OtelSysIdempotencyKey, id.IdempotencyKey()),
 		),
 	)
+	if md.Config.CronSchedule != nil {
+		fnSpan.SetAttributes(attribute.String(consts.OtelSysCronExpr, *md.Config.CronSchedule))
+	}
 	if id.BatchID != nil {
 		fnSpan.SetAttributes(attribute.String(consts.OtelSysBatchID, id.BatchID.String()))
 	}
