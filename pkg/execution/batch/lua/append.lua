@@ -30,7 +30,7 @@ end
 
 -- start execution
 local batchID = get_or_create_batch_key(batchPointerKey)
-local resp = { status = "append", batchID = batchID }
+local resp = { status = "append", batchID = batchID, batchPointerKey = batchPointerKey }
 
 -- NOTE: these need to be identical to the ones in the queue key generator
 --   * Batch
@@ -50,7 +50,7 @@ local len = redis.call("RPUSH", batchKey, event)
 
 if len == 1 then
   -- newly started batch
-  resp = { status = "new", batchID = batchID }
+  resp = { status = "new", batchID = batchID, batchPointerKey = batchPointerKey }
 end
 
 -- if batch is full
@@ -61,7 +61,7 @@ if len >= batchLimit then
 
   -- change poiner so following ops don't append to this batch anymore
   update_pointer(batchPointerKey, newULID)
-  resp = { status = "full", batchID = batchID }
+  resp = { status = "full", batchID = batchID, batchPointerKey = batchPointerKey }
 end
 
 return cjson.encode(resp)

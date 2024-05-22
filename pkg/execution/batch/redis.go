@@ -3,8 +3,12 @@ package batch
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/expressions"
 	"time"
 
 	"github.com/google/uuid"
@@ -33,6 +37,43 @@ type redisBatchManager struct {
 	q redis_state.QueueManager
 }
 
+func (b redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inngest.Function) (string, error) {
+	if fn.EventBatch.Key == nil {
+		return "default", nil
+	}
+
+	out, _, err := expressions.Evaluate(ctx, *fn.EventBatch.Key, map[string]any{"event": evt.Map()})
+	if err != nil {
+		log.From(ctx).Error().Err(err).
+			Str("expression", *fn.EventBatch.Key).
+			Interface("event", evt.Map()).
+			Msg("error evaluating batch key expression")
+		return fn.ID.String(), fmt.Errorf("invalid expression: %w", err)
+	}
+	if str, ok := out.(string); ok {
+		return str, nil
+	}
+	return fmt.Sprintf("%v", out), nil
+}
+
+func (b redisBatchManager) batchPointer(ctx context.Context, fn inngest.Function, evt event.Event) (string, error) {
+	batchPointer := b.k.BatchPointer(ctx, fn.ID)
+
+	if fn.EventBatch.Key != nil {
+		batchKey, err := b.batchKey(ctx, evt, fn)
+		if err != nil {
+			return "", fmt.Errorf("could not retrieve batch key: %w", err)
+		}
+
+		hashedBatchKey := sha256.Sum256([]byte(batchKey))
+		encodedBatchKey := base64.StdEncoding.EncodeToString(hashedBatchKey[:])
+
+		batchPointer = b.k.BatchPointerWithKey(ctx, fn.ID, encodedBatchKey)
+	}
+
+	return batchPointer, nil
+}
+
 // Append add an item to a batch, and handle things slightly differently based on the batch sitation after
 // the item is appended.
 //
@@ -52,9 +93,14 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 		return nil, fmt.Errorf("no batch config found for for function: %s", fn.Slug)
 	}
 
+	batchPointer, err := b.batchPointer(ctx, fn, bi.Event)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve batch pointer: %w", err)
+	}
+
 	// script keys
 	keys := []string{
-		b.k.BatchPointer(ctx, bi.FunctionID),
+		batchPointer,
 	}
 
 	// script args
@@ -113,6 +159,40 @@ func (b redisBatchManager) RetrieveItems(ctx context.Context, batchID ulid.ULID)
 	}
 
 	return items, nil
+}
+
+// StartExecution sets the status to `started`
+// If it has already started, don't do anything
+func (b redisBatchManager) StartExecutionWithBatchPointer(ctx context.Context, batchID ulid.ULID, batchPointer string) (string, error) {
+	keys := []string{
+		b.k.BatchMetadata(ctx, batchID),
+		batchPointer,
+	}
+	args := []string{
+		enums.BatchStatusStarted.String(),
+		ulid.Make().String(),
+	}
+
+	status, err := scripts["start"].Exec(
+		ctx,
+		b.r,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return "", fmt.Errorf("failed to start batch execution: %w", err)
+	}
+
+	switch status {
+	case 0: // haven't started, so mark mark it started
+		return enums.BatchStatusReady.String(), nil
+
+	case 1: // Already started
+		return enums.BatchStatusStarted.String(), nil
+
+	default:
+		return "", fmt.Errorf("invalid status for start batch ops: %d", status)
+	}
 }
 
 // StartExecution sets the status to `started`

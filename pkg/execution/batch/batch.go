@@ -32,6 +32,8 @@ import (
 type BatchManager interface {
 	Append(ctx context.Context, bi BatchItem, fn inngest.Function) (*BatchAppendResult, error)
 	RetrieveItems(ctx context.Context, batchID ulid.ULID) ([]BatchItem, error)
+	StartExecutionWithBatchPointer(ctx context.Context, batchID ulid.ULID, batchPointer string) (string, error)
+	// deprecated, use StartExecutionWithBatchPointer
 	StartExecution(ctx context.Context, fnID uuid.UUID, batchID ulid.ULID) (string, error)
 	ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error
 	ExpireKeys(ctx context.Context, batchID ulid.ULID) error
@@ -67,8 +69,9 @@ type BatchAppendResult struct {
 	//   append: An event successfully appended to an existing batch
 	//   new: A new batch was created with the passed in event
 	//   full: The batch is full and ready for execution
-	Status  enums.Batch `json:"status"`
-	BatchID string      `json:"batchID,omitempty"`
+	Status          enums.Batch `json:"status"`
+	BatchID         string      `json:"batchID,omitempty"`
+	BatchPointerKey string      `json:"batchPointerKey"`
 }
 
 type ScheduleBatchOpts struct {
@@ -79,6 +82,7 @@ type ScheduleBatchOpts struct {
 
 type ScheduleBatchPayload struct {
 	BatchID                    ulid.ULID  `json:"batchID"`
+	BatchPointer               string     `json:"batchPointer"`
 	AccountID                  uuid.UUID  `json:"acctID"`
 	WorkspaceID                uuid.UUID  `json:"wsID"`
 	AppID                      uuid.UUID  `json:"appID"`
