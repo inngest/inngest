@@ -1241,6 +1241,16 @@ There are two lifecycles groups to cover: a function run and sending an event.
 
 ### 6.3.1. Function run
 
+- For a single SDK request, all lifecycle methods MUST be called EXACTLY once.
+- The lifecycle methods MUST be called in the following order:
+  - Transform input
+  - Before memoization
+  - After memoization
+  - Before execution
+  - After execution
+  - Transform output
+  - Before response
+
 #### Transform input
 - MUST call before executing the Inngest Function callback.
 - Arguments:
@@ -1274,6 +1284,12 @@ There are two lifecycles groups to cover: a function run and sending an event.
 - MUST call after the output has been set and before the response is sent back to an Inngest Server.
 
 ### 6.3.2. Event send
+
+- For a single request to send an event, all lifecycle methods MUST be called EXACTLY once.
+- The lifecycle methods MUST be called in the following order:
+  - Transform input
+  - Transform output
+- This entire lifecycle may be called multiple times for a single SDK request.
 
 #### Before send events
 - MUST call before sending events to an Inngest Server.
