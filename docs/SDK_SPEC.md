@@ -1271,7 +1271,6 @@ There are two lifecycles groups to cover: a function run and sending an event.
 
 #### After execution
 - MUST call after executing unmemoized code.
-- Not called between steps.
 
 #### Transform output
 - MUST call after a function/step returns or throws an error.
