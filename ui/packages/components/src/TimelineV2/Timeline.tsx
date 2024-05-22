@@ -1,10 +1,12 @@
+import type { Route } from 'next';
+
 import { toMaybeDate } from '../utils/date';
 import { Trace } from './Trace';
 
 type Props = {
   getOutput: (outputID: string) => Promise<string | null>;
   pathCreator: {
-    runPopout: (params: { runID: string }) => string;
+    runPopout: (params: { runID: string }) => Route;
   };
   trace: React.ComponentProps<typeof Trace>['trace'];
 };

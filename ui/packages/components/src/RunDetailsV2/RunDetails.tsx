@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import type { Route } from 'next';
 import { toast } from 'sonner';
 
 import { Trace } from '../TimelineV2';
@@ -16,7 +17,7 @@ type Props = {
   };
   getOutput: (outputID: string) => Promise<string | null>;
   pathCreator: {
-    runPopout: (params: { runID: string }) => string;
+    runPopout: (params: { runID: string }) => Route;
   };
   rerun: (args: { fnID: string }) => Promise<unknown>;
   run: {

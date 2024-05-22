@@ -1,3 +1,5 @@
+import type { Route } from 'next';
+
 import { Card } from '../Card';
 import { InlineCode } from '../InlineCode';
 import { Link } from '../Link';
@@ -9,7 +11,7 @@ import { isStepInfoInvoke, isStepInfoSleep, isStepInfoWait, type Trace } from '.
 type Props = {
   className?: string;
   pathCreator: {
-    runPopout: (params: { runID: string }) => string;
+    runPopout: (params: { runID: string }) => Route;
   };
   trace: Trace;
 };

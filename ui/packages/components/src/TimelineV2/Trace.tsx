@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { Route } from 'next';
 
 import { CodeBlock } from '../CodeBlock';
 import { cn } from '../utils/classNames';
@@ -16,7 +17,7 @@ type Props = {
   minTime?: Date;
   maxTime?: Date;
   pathCreator: {
-    runPopout: (params: { runID: string }) => string;
+    runPopout: (params: { runID: string }) => Route;
   };
   trace: Trace;
 };
