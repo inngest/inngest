@@ -255,7 +255,7 @@ func (f Function) Validate(ctx context.Context) error {
 	}
 
 	if f.EventBatch != nil {
-		if berr := f.EventBatch.IsValid(); berr != nil {
+		if berr := f.EventBatch.IsValid(ctx); berr != nil {
 			err = multierror.Append(err, berr)
 		}
 

@@ -22,6 +22,7 @@ const (
 	OtelSysEventIDs        = "sys.event.ids"
 
 	OtelSysBatchID      = "sys.batch.id"
+	OtelSysBatchTS      = "sys.batch.timestamp"
 	OtelSysBatchFull    = "sys.batch.full"
 	OtelSysBatchTimeout = "sys.batch.timeout"
 
