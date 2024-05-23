@@ -235,6 +235,9 @@ type BatchKeyGenerator interface {
 	// BatchPointer returns the key used as the pointer reference to the
 	// actual batch
 	BatchPointer(context.Context, uuid.UUID) string
+	// BatchPointerWithKey returns the key used as the pointer reference to the
+	// actual batch for a given batchKey
+	BatchPointerWithKey(context.Context, uuid.UUID, string) string
 	// Batch returns the key used to store the specific batch of
 	// events, that is used to trigger a function run
 	Batch(context.Context, ulid.ULID) string
@@ -323,6 +326,10 @@ func (d DefaultQueueKeyGenerator) QueuePrefix() string {
 
 func (d DefaultQueueKeyGenerator) BatchPointer(ctx context.Context, workflowID uuid.UUID) string {
 	return fmt.Sprintf("%s:workflows:%s:batch", d.Prefix, workflowID)
+}
+
+func (d DefaultQueueKeyGenerator) BatchPointerWithKey(ctx context.Context, workflowID uuid.UUID, batchKey string) string {
+	return fmt.Sprintf("%s:%s", d.BatchPointer(ctx, workflowID), batchKey)
 }
 
 func (d DefaultQueueKeyGenerator) Batch(ctx context.Context, batchID ulid.ULID) string {

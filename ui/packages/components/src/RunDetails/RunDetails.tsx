@@ -72,7 +72,9 @@ export function RunDetails({
       button={
         !loading && (
           <div className="flex gap-2">
-            {cancelRun && <CancelRunButton disabled={Boolean(run?.endedAt)} onClick={cancelRun} />}
+            {cancelRun && (
+              <CancelRunButton disabled={Boolean(run?.endedAt)} hasIcon onClick={cancelRun} />
+            )}
             {rerun && <RerunButton onClick={rerun} />}
           </div>
         )

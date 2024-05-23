@@ -69,7 +69,7 @@ func (l lifecycle) OnFunctionScheduled(
 	}
 
 	h := History{
-		Cron:            md.Config.CronSchedule,
+		Cron:            md.Config.CronSchedule(),
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:       md.ID.Tenant.AccountID,
 		WorkspaceID:     md.ID.Tenant.EnvID,
@@ -115,7 +115,7 @@ func (l lifecycle) OnFunctionStarted(
 
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-		Cron:            md.Config.CronSchedule,
+		Cron:            md.Config.CronSchedule(),
 		AccountID:       md.ID.Tenant.AccountID,
 		WorkspaceID:     md.ID.Tenant.EnvID,
 		CreatedAt:       time.Now(),
@@ -170,7 +170,7 @@ func (l lifecycle) OnFunctionFinished(
 	completedStepCount := int64(md.Metrics.StepCount)
 
 	h := History{
-		Cron:               md.Config.CronSchedule,
+		Cron:               md.Config.CronSchedule(),
 		ID:                 ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:          md.ID.Tenant.AccountID,
 		WorkspaceID:        md.ID.Tenant.EnvID,
@@ -261,7 +261,7 @@ func (l lifecycle) OnFunctionCancelled(
 	groupID := uuid.New()
 
 	h := History{
-		Cron:               md.Config.CronSchedule,
+		Cron:               md.Config.CronSchedule(),
 		ID:                 ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:          md.ID.Tenant.AccountID,
 		WorkspaceID:        md.ID.Tenant.EnvID,

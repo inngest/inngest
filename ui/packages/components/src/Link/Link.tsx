@@ -7,7 +7,7 @@ import { RiArrowRightLine, RiExternalLinkLine } from '@remixicon/react';
 type LinkProps = {
   internalNavigation?: boolean;
   showIcon?: boolean;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   className?: string;
   href: Route | UrlObject;
 };
