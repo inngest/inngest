@@ -50,7 +50,7 @@ export function RunInfo({ app, cancelRun, className, fn, rerun, run, standalone 
   return (
     <div className={cn('flex flex-col gap-5', className)}>
       <Card>
-        <Card.Header className="flex-row items-center gap-2">
+        <Card.Header className="h-11 flex-row items-center gap-2">
           <div className="flex grow items-center gap-2">
             Run details {!standalone && <Link href={run.url} />}
           </div>

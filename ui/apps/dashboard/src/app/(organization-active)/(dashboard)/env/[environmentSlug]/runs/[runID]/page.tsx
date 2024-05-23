@@ -1,12 +1,14 @@
 'use client';
 
 import { RunDetails } from '@inngest/components/RunDetailsV2';
+import { StatusCell } from '@inngest/components/Table';
+import { cn } from '@inngest/components/utils/classNames';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import LoadingIcon from '@/icons/LoadingIcon';
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
 import { pathCreator } from '@/utils/urls';
+import { toRunStatus } from '../../functions/[slug]/runs/utils';
 import { useRun } from './useRun';
 
 type Props = {
@@ -36,7 +38,15 @@ export default function Page({ params, standalone = true }: Props) {
   }
 
   return (
-    <div className="overflow-y-auto">
+    <div className={cn('overflow-y-auto', standalone && 'p-5 pt-8')}>
+      {standalone && (
+        <div className="flex flex-col gap-2 pb-6">
+          {/* @ts-ignore */}
+          {run.trace && <StatusCell status={toRunStatus(run.trace.status)} />}
+          <p className="text-2xl font-medium">{run.function.name}</p>
+          <p className="font-mono text-slate-500">{params.runID}</p>
+        </div>
+      )}
       <RunDetails
         standalone={standalone}
         app={{
@@ -62,7 +72,6 @@ function Loading() {
   return (
     <div className="flex h-full w-full items-center justify-center">
       <div className="flex flex-col items-center justify-center gap-2">
-        <LoadingIcon />
         <div>Loading</div>
       </div>
     </div>
