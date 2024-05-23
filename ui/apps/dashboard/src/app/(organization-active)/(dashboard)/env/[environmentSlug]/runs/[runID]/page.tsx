@@ -13,9 +13,10 @@ type Props = {
   params: {
     runID: string;
   };
+  standalone?: boolean;
 };
 
-export default function Page({ params }: Props) {
+export default function Page({ params, standalone = true }: Props) {
   const runID = decodeURIComponent(params.runID);
   const env = useEnvironment();
   const cancelRun = useCancelRun({ envID: env.id, runID });
@@ -37,6 +38,7 @@ export default function Page({ params }: Props) {
   return (
     <div className="overflow-y-auto">
       <RunDetails
+        standalone={standalone}
         app={{
           url: pathCreator.app({ envSlug: env.slug, externalAppID: run.function.app.externalID }),
           ...run.function.app,
@@ -49,6 +51,7 @@ export default function Page({ params }: Props) {
           id: params.runID,
           output: null,
           trace,
+          url: pathCreator.runPopout({ envSlug: env.slug, runID: params.runID }),
         }}
       />
     </div>

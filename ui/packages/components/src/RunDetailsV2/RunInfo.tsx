@@ -11,6 +11,7 @@ import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 
 type Props = {
+  standalone: boolean;
   cancelRun: () => Promise<unknown>;
   className?: string;
   app: {
@@ -25,6 +26,7 @@ type Props = {
   run: {
     id: string;
     output: string | null;
+    url: Route | UrlObject;
     trace: {
       childrenSpans?: unknown[];
       endedAt: string | null;
@@ -35,7 +37,7 @@ type Props = {
   };
 };
 
-export function RunInfo({ app, cancelRun, className, fn, rerun, run }: Props) {
+export function RunInfo({ app, cancelRun, className, fn, rerun, run, standalone }: Props) {
   const queuedAt = new Date(run.trace.queuedAt);
   const startedAt = toMaybeDate(run.trace.startedAt);
   const endedAt = toMaybeDate(run.trace.endedAt);
@@ -49,7 +51,9 @@ export function RunInfo({ app, cancelRun, className, fn, rerun, run }: Props) {
     <div className={cn('flex flex-col gap-5', className)}>
       <Card>
         <Card.Header className="flex-row items-center gap-2">
-          <div className="grow">Run details</div>
+          <div className="flex grow items-center gap-2">
+            Run details {!standalone && <Link href={run.url} />}
+          </div>
 
           <CancelRunButton disabled={Boolean(endedAt)} onClick={cancelRun} />
           <RerunButton onClick={() => rerun({ fnID: fn.id })} />
@@ -68,6 +72,8 @@ export function RunInfo({ app, cancelRun, className, fn, rerun, run }: Props) {
                 </Link>
               </Labeled>
 
+              <Labeled label="Duration">{durationText}</Labeled>
+
               <Labeled label="Queued at">
                 <Time value={queuedAt} />
               </Labeled>
@@ -75,8 +81,6 @@ export function RunInfo({ app, cancelRun, className, fn, rerun, run }: Props) {
               <Labeled label="Started at">{startedAt ? <Time value={startedAt} /> : '-'}</Labeled>
 
               <Labeled label="Ended at">{endedAt ? <Time value={endedAt} /> : '-'}</Labeled>
-
-              <Labeled label="Duration">{durationText}</Labeled>
 
               <Labeled label="Step count">{run.trace.childrenSpans?.length ?? 0}</Labeled>
             </dl>
