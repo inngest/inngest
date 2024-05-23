@@ -1,9 +1,12 @@
 import { isFunctionRunStatus, type FunctionRunStatus } from '@inngest/components/types/functionRun';
+import { toMaybeDate } from '@inngest/components/utils/date';
 
 import {
   FunctionRunStatus as FunctionRunStatusEnum,
   RunsOrderByField as FunctionRunTimeFieldEnum,
+  type FunctionRunV2,
 } from '@/gql/graphql';
+import { type Run } from './RunsTable';
 
 /**
  * Convert a run status union type into an enum. This is necessary because
@@ -57,4 +60,35 @@ export function toTimeField(time: string): FunctionRunTimeFieldEnum | undefined 
     default:
       console.error(`unexpected time field: ${time}`);
   }
+}
+
+type PickedFunctionRunV2 = Pick<
+  FunctionRunV2,
+  'id' | 'queuedAt' | 'startedAt' | 'status' | 'endedAt'
+>;
+type PickedFunctionRunV2EdgeWithNode = {
+  node: PickedFunctionRunV2;
+};
+
+/**
+ * Parses the runs data into the table format
+ */
+export function parseRunsData(runsData: PickedFunctionRunV2EdgeWithNode[] | undefined): Run[] {
+  return (
+    runsData?.map((edge) => {
+      const startedAt = toMaybeDate(edge.node.startedAt);
+      let durationMS = null;
+      if (startedAt) {
+        durationMS = (toMaybeDate(edge.node.endedAt) ?? new Date()).getTime() - startedAt.getTime();
+      }
+
+      return {
+        id: edge.node.id,
+        queuedAt: edge.node.queuedAt,
+        endedAt: edge.node.endedAt,
+        durationMS,
+        status: edge.node.status,
+      };
+    }) ?? []
+  );
 }
