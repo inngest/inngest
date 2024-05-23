@@ -13,11 +13,11 @@ import { getTimestampDaysAgo, toMaybeDate } from '@inngest/components/utils/date
 import { RiLoopLeftLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { RunDetails } from '@/components/RunDetails/RunDetails';
 import { graphql } from '@/gql';
 import { RunsOrderByField } from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useSearchParam, useStringArraySearchParam } from '@/utils/useSearchParam';
-import Page from '../../../runs/[runID]/page';
 import RunsTable from './RunsTable';
 import TimeFilter from './TimeFilter';
 import { toRunStatuses, toTimeField } from './utils';
@@ -52,7 +52,7 @@ const GetRunsDocument = graphql(`
 const renderSubComponent = ({ id }: { id: string }) => {
   return (
     <div className="border-l-4 border-slate-400 px-5 pb-6">
-      <Page params={{ runID: id }} />
+      <RunDetails runID={id} />
     </div>
   );
 };
