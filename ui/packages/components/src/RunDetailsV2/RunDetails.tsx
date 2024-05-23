@@ -1,4 +1,6 @@
+import type { UrlObject } from 'url';
 import { useCallback } from 'react';
+import type { Route } from 'next';
 import { toast } from 'sonner';
 
 import { Trace } from '../TimelineV2';
@@ -6,8 +8,10 @@ import { Timeline } from '../TimelineV2/Timeline';
 import { RunInfo } from './RunInfo';
 
 type Props = {
+  standalone: boolean;
   app: {
     name: string;
+    url: Route | UrlObject;
   };
   cancelRun: () => Promise<unknown>;
   fn: {
@@ -20,11 +24,12 @@ type Props = {
     id: string;
     output: string | null;
     trace: React.ComponentProps<typeof Trace>['trace'];
+    url: Route | UrlObject;
   };
 };
 
 export function RunDetails(props: Props) {
-  const { app, getOutput, fn, rerun, run } = props;
+  const { app, getOutput, fn, rerun, run, standalone } = props;
 
   const cancelRun = useCallback(async () => {
     try {
@@ -38,7 +43,15 @@ export function RunDetails(props: Props) {
 
   return (
     <div>
-      <RunInfo app={app} cancelRun={cancelRun} className="mb-4" fn={fn} rerun={rerun} run={run} />
+      <RunInfo
+        app={app}
+        cancelRun={cancelRun}
+        className="mb-4"
+        fn={fn}
+        rerun={rerun}
+        run={run}
+        standalone={standalone}
+      />
       <Timeline getOutput={getOutput} trace={run.trace} />
     </div>
   );

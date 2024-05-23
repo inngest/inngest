@@ -9,7 +9,7 @@ import {
  * Convert a run status union type into an enum. This is necessary because
  * TypeScript treats as enums as nominal types, which causes silly type errors.
  */
-function toRunStatus(status: FunctionRunStatus): FunctionRunStatusEnum {
+export function toRunStatus(status: FunctionRunStatus): FunctionRunStatusEnum {
   switch (status) {
     case 'CANCELLED':
       return FunctionRunStatusEnum.Cancelled;

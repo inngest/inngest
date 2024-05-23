@@ -46,6 +46,7 @@ const query = graphql(`
         function {
           app {
             name
+            externalID
           }
           id
           name
