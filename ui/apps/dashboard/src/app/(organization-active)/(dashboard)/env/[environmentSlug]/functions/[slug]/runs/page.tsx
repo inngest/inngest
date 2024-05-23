@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
 import { SelectGroup } from '@inngest/components/Select/Select';
+import { LoadingMore } from '@inngest/components/Table';
 import {
   type FunctionRunStatus,
   type FunctionRunTimeField,
 } from '@inngest/components/types/functionRun';
-import { getTimestampDaysAgo, toMaybeDate } from '@inngest/components/utils/date';
+import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 import { RiLoopLeftLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
@@ -20,7 +21,7 @@ import { useSearchParam, useStringArraySearchParam } from '@/utils/useSearchPara
 import Page from '../../../runs/[runID]/page';
 import RunsTable from './RunsTable';
 import TimeFilter from './TimeFilter';
-import { toRunStatuses, toTimeField } from './utils';
+import { parseRunsData, toRunStatuses, toTimeField } from './utils';
 
 const GetRunsDocument = graphql(`
   query GetRuns(
@@ -29,11 +30,13 @@ const GetRunsDocument = graphql(`
     $status: [FunctionRunStatus!]
     $timeField: RunsOrderByField!
     $functionSlug: String!
+    $functionRunCursor: String = null
   ) {
     environment: workspace(id: $environmentID) {
       runs(
         filter: { from: $startTime, status: $status, timeField: $timeField, fnSlug: $functionSlug }
         orderBy: [{ field: $timeField, direction: DESC }]
+        after: $functionRunCursor
       ) {
         edges {
           node {
@@ -43,6 +46,12 @@ const GetRunsDocument = graphql(`
             startedAt
             status
           }
+        }
+        pageInfo {
+          hasNextPage
+          hasPreviousPage
+          startCursor
+          endCursor
         }
       }
     }
@@ -79,6 +88,9 @@ export default function RunsPage({
 
   /* TODO: When we have absolute time, the start date will be either coming from the date picker or the relative time */
   const [startTime, setStartTime] = useState<Date>(new Date());
+  const [cursor, setCursor] = useState('');
+  const [runs, setRuns] = useState<any[]>([]);
+  const [isScrollRequest, setIsScrollRequest] = useState(false);
 
   useEffect(() => {
     if (lastDays) {
@@ -116,49 +128,91 @@ export default function RunsPage({
   }
 
   const environment = useEnvironment();
-  const res = useSkippableGraphQLQuery({
+  const firstPageRes = useSkippableGraphQLQuery({
     query: GetRunsDocument,
-    skip: !functionSlug,
+    skip: !functionSlug || isScrollRequest,
     variables: {
       environmentID: environment.id,
       functionSlug,
       startTime: startTime.toISOString(),
       status: filteredStatus.length > 0 ? filteredStatus : null,
       timeField,
+      functionRunCursor: cursor,
     },
   });
 
-  if (res.error) {
-    throw res.error;
+  const nextPageRes = useSkippableGraphQLQuery({
+    query: GetRunsDocument,
+    skip: !functionSlug || !isScrollRequest,
+    variables: {
+      environmentID: environment.id,
+      functionSlug,
+      startTime: startTime.toISOString(),
+      status: filteredStatus.length > 0 ? filteredStatus : null,
+      timeField,
+      functionRunCursor: cursor,
+    },
+  });
+
+  if (firstPageRes.error || nextPageRes.error) {
+    throw firstPageRes.error || nextPageRes.error;
   }
 
-  const runsData = res.data?.environment.runs.edges;
+  const firstPageRunsData = firstPageRes.data?.environment.runs.edges;
+  const nextPageRunsData = nextPageRes.data?.environment.runs.edges;
+  const firstPageInfo = firstPageRes.data?.environment.runs.pageInfo;
+  const nextPageInfo = nextPageRes.data?.environment.runs.pageInfo;
 
-  if (functionSlug && !runsData && !res.isLoading) {
+  if (functionSlug && !firstPageRunsData && !firstPageRes.isLoading && !firstPageRes.isSkipped) {
     throw new Error('missing run');
   }
 
-  {
-    /* TODO: This is a temp parser */
-  }
-  const runs = runsData?.map((edge) => {
-    const startedAt = toMaybeDate(edge.node.startedAt);
-    let durationMS = null;
-    if (startedAt) {
-      durationMS = (toMaybeDate(edge.node.endedAt) ?? new Date()).getTime() - startedAt.getTime();
-    }
+  const firstPageRuns = parseRunsData(firstPageRunsData);
+  const nextPageRuns = useMemo(() => {
+    return parseRunsData(nextPageRunsData);
+  }, [nextPageRunsData]);
 
-    return {
-      id: edge.node.id,
-      queuedAt: edge.node.queuedAt,
-      endedAt: edge.node.endedAt,
-      durationMS,
-      status: edge.node.status,
-    };
-  });
+  useEffect(() => {
+    if (runs.length === 0 && firstPageRuns.length > 0) {
+      setRuns(firstPageRuns);
+    }
+  }, [firstPageRuns, runs]);
+
+  useEffect(() => {
+    if (nextPageRuns.length > 0) {
+      setRuns((prevRuns) => [...prevRuns, ...nextPageRuns]);
+    }
+  }, [nextPageRuns]);
+
+  const fetchMoreOnScroll = useCallback(
+    (containerRefElement?: HTMLDivElement | null) => {
+      if (containerRefElement && runs.length > 0) {
+        const { scrollHeight, scrollTop, clientHeight } = containerRefElement;
+        const lastCursor = nextPageInfo?.endCursor || firstPageInfo?.endCursor;
+        const hasNextPage = nextPageInfo?.hasNextPage || firstPageInfo?.hasNextPage;
+        // Check if scrolled to the bottom
+        const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
+        if (
+          reachedBottom &&
+          !firstPageRes.isLoading &&
+          !nextPageRes.isLoading &&
+          lastCursor &&
+          hasNextPage
+        ) {
+          console.log('caracas');
+          setIsScrollRequest(true);
+          setCursor(lastCursor);
+        }
+      }
+    },
+    [firstPageRes.isLoading, nextPageRes.isLoading, runs, nextPageInfo, firstPageInfo]
+  );
 
   return (
-    <main className="h-full min-h-0 overflow-y-auto bg-white">
+    <main
+      className="h-full min-h-0 overflow-y-auto bg-white"
+      onScroll={(e) => fetchMoreOnScroll(e.target as HTMLDivElement)}
+    >
       <div className="flex items-center justify-between gap-2 bg-slate-50 px-8 py-2">
         <div className="flex items-center gap-2">
           <SelectGroup>
@@ -182,10 +236,11 @@ export default function RunsPage({
       <RunsTable
         //@ts-ignore
         data={runs}
-        isLoading={res.isLoading}
+        isLoading={firstPageRes.isLoading}
         renderSubComponent={renderSubComponent}
         getRowCanExpand={() => true}
       />
+      {nextPageRes.isLoading && <LoadingMore />}
     </main>
   );
 }
