@@ -6,6 +6,7 @@ import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[env
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
+import { pathCreator } from '@/utils/urls';
 import { useRun } from './useRun';
 
 type Props = {
@@ -36,7 +37,10 @@ export default function Page({ params }: Props) {
   return (
     <div className="overflow-y-auto">
       <RunDetails
-        app={run.function.app}
+        app={{
+          url: pathCreator.app({ envSlug: env.slug, externalAppID: run.function.app.externalID }),
+          ...run.function.app,
+        }}
         cancelRun={cancelRun}
         fn={run.function}
         getOutput={getOutput}

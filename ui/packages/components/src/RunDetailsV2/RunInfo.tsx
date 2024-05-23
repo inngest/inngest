@@ -1,7 +1,10 @@
-import { Button } from '../Button';
+import type { UrlObject } from 'url';
+import type { Route } from 'next';
+
 import { CancelRunButton } from '../CancelRunButton';
 import { Card } from '../Card';
 import { CodeBlock } from '../CodeBlock';
+import { Link } from '../Link';
 import { RerunButton } from '../RerunButtonV2';
 import { Time } from '../Time';
 import { cn } from '../utils/classNames';
@@ -12,6 +15,7 @@ type Props = {
   className?: string;
   app: {
     name: string;
+    url: Route | UrlObject;
   };
   fn: {
     id: string;
@@ -42,7 +46,7 @@ export function RunInfo({ app, cancelRun, className, fn, rerun, run }: Props) {
   }
 
   return (
-    <div className={cn('flex flex-col gap-4', className)}>
+    <div className={cn('flex flex-col gap-5', className)}>
       <Card>
         <Card.Header className="flex-row items-center gap-2">
           <div className="grow">Run details</div>
@@ -54,19 +58,15 @@ export function RunInfo({ app, cancelRun, className, fn, rerun, run }: Props) {
         <Card.Content>
           <div>
             <dl className="flex flex-wrap gap-4">
-              <Labeled label="App">{app.name}</Labeled>
-
-              <Labeled label="Function">{fn.name}</Labeled>
-
               <Labeled label="Run ID">
                 <span className="font-mono">{run.id}</span>
               </Labeled>
 
-              <Labeled label="Status">{run.trace.status}</Labeled>
-
-              <Labeled label="Trigger">TODO</Labeled>
-
-              <Labeled label="Event received at">TODO</Labeled>
+              <Labeled label="App">
+                <Link internalNavigation href={app.url} showIcon={false}>
+                  {app.name}
+                </Link>
+              </Labeled>
 
               <Labeled label="Queued at">
                 <Time value={queuedAt} />
@@ -101,7 +101,7 @@ export function RunInfo({ app, cancelRun, className, fn, rerun, run }: Props) {
 function Labeled({ label, children }: React.PropsWithChildren<{ label: string }>) {
   return (
     <div className="w-64 text-sm">
-      <dt className="text-slate-500">{label}</dt>
+      <dt className="pb-2 text-slate-500">{label}</dt>
       <dd className="truncate">{children}</dd>
     </div>
   );

@@ -1,4 +1,6 @@
+import type { UrlObject } from 'url';
 import { useCallback } from 'react';
+import type { Route } from 'next';
 import { toast } from 'sonner';
 
 import { Trace } from '../TimelineV2';
@@ -8,6 +10,7 @@ import { RunInfo } from './RunInfo';
 type Props = {
   app: {
     name: string;
+    url: Route | UrlObject;
   };
   cancelRun: () => Promise<unknown>;
   fn: {
