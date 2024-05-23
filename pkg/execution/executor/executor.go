@@ -2280,10 +2280,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 	startedAt := time.Now()
 	until := startedAt.Add(dur)
 
-	// Create another group for the next item which will run.  We're enqueueing
-	// the function to run again after sleep, so need a new group.
-	groupID := uuid.New().String()
-	ctx = state.WithGroupID(ctx, groupID)
 	ctx, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeStep),
 		telemetry.WithName(consts.OtelSpanSleep),
@@ -2299,13 +2295,18 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 			attribute.String(consts.OtelAttrSDKRunID, i.item.Identifier.RunID.String()),
 			attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
 			attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
-			attribute.String(consts.OtelSysStepGroupID, groupID),
+			attribute.String(consts.OtelSysStepGroupID, i.item.GroupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeSleep.String()),
 			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
 			attribute.Int64(consts.OtelSysStepSleepEndAt, until.UnixMilli()),
 		),
 	)
 	defer span.End(trace.WithTimestamp(until))
+
+	// Create another group for the next item which will run.  We're enqueueing
+	// the function to run again after sleep, so need a new group.
+	groupID := uuid.New().String()
+	ctx = state.WithGroupID(ctx, groupID)
 
 	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
 	// TODO Should this also include a parent step span? It will never have attempts.
