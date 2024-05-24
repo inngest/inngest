@@ -17,7 +17,6 @@ type Props = {
 };
 
 export function TraceInfo({ className, pathCreator, trace }: Props) {
-  console.log(trace);
   const delayText = formatMilliseconds(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
   );
