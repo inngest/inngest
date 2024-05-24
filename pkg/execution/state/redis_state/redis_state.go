@@ -1227,11 +1227,11 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	parseInt := func(v string) (int, error) {
 		str, ok := data[v]
 		if !ok {
-			return 0, fmt.Errorf("no created at stored in run metadata")
+			return 0, fmt.Errorf("no '%s' stored in run metadata", v)
 		}
 		val, err := strconv.Atoi(str)
 		if err != nil {
-			return 0, fmt.Errorf("invalid pending stored in run metadata")
+			return 0, fmt.Errorf("invalid '%s' stored in run metadata", v)
 		}
 		return val, nil
 	}
