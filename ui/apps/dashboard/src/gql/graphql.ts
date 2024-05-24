@@ -448,6 +448,8 @@ export type FunctionRunV2 = {
   __typename?: 'FunctionRunV2';
   accountID: Scalars['UUID'];
   appID: Scalars['UUID'];
+  batchCreatedAt: Maybe<Scalars['Time']>;
+  cronSchedule: Maybe<Scalars['String']>;
   endedAt: Maybe<Scalars['Time']>;
   function: Maybe<Workflow>;
   functionID: Scalars['UUID'];
@@ -517,7 +519,7 @@ export type InvokeStepInfo = {
   functionID: Scalars['String'];
   returnEventID: Maybe<Scalars['ULID']>;
   runID: Maybe<Scalars['ULID']>;
-  timedOut: Scalars['Boolean'];
+  timedOut: Maybe<Scalars['Boolean']>;
   timeout: Scalars['Time'];
   triggeringEventID: Scalars['ULID'];
 };
@@ -1036,10 +1038,12 @@ export type RunTraceSpan = {
   __typename?: 'RunTraceSpan';
   account: Account;
   accountID: Scalars['UUID'];
+  appID: Scalars['UUID'];
   attempts: Maybe<Scalars['Int']>;
   childrenSpans: Array<RunTraceSpan>;
   duration: Maybe<Scalars['Int']>;
   endedAt: Maybe<Scalars['Time']>;
+  functionID: Scalars['UUID'];
   isRoot: Scalars['Boolean'];
   name: Scalars['String'];
   outputID: Maybe<Scalars['String']>;
@@ -1067,7 +1071,6 @@ export enum RunTraceSpanStatus {
   Completed = 'COMPLETED',
   Failed = 'FAILED',
   Running = 'RUNNING',
-  TimedOut = 'TIMED_OUT',
   Waiting = 'WAITING'
 }
 
@@ -1314,7 +1317,7 @@ export type WaitForEventStepInfo = {
   eventName: Scalars['String'];
   expression: Maybe<Scalars['String']>;
   foundEventID: Maybe<Scalars['ULID']>;
-  timedOut: Scalars['Boolean'];
+  timedOut: Maybe<Scalars['Boolean']>;
   timeout: Scalars['Time'];
 };
 
@@ -1435,7 +1438,7 @@ export type Workspace = {
   name: Scalars['String'];
   parentID: Maybe<Scalars['ID']>;
   run: Maybe<FunctionRunV2>;
-  runTraceByRunID: Maybe<RunTraceSpan>;
+  runTraceSpanOutputByID: RunTraceSpanOutput;
   runs: RunsConnection;
   runsMetrics: MetricsResponse;
   signingKeys: Array<SigningKey>;
@@ -1497,8 +1500,8 @@ export type WorkspaceRunArgs = {
 };
 
 
-export type WorkspaceRunTraceByRunIdArgs = {
-  runID: Scalars['String'];
+export type WorkspaceRunTraceSpanOutputByIdArgs = {
+  outputID: Scalars['String'];
 };
 
 
@@ -2158,7 +2161,7 @@ export type GetFunctionSlugQueryVariables = Exact<{
 
 export type GetFunctionSlugQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', slug: string, name: string } | null } };
 
-export type TraceDetailsFragment = { __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: string, startedAt: string | null, endedAt: string | null, isRoot: boolean, outputID: string | null, spanID: string, stepOp: StepOp | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: string, functionID: string, timeout: string, returnEventID: string | null, runID: string | null, timedOut: boolean } | { __typename: 'SleepStepInfo', sleepUntil: string } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: string, foundEventID: string | null, timedOut: boolean } | null } & { ' $fragmentName'?: 'TraceDetailsFragment' };
+export type TraceDetailsFragment = { __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: string, startedAt: string | null, endedAt: string | null, isRoot: boolean, outputID: string | null, spanID: string, stepOp: StepOp | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: string, functionID: string, timeout: string, returnEventID: string | null, runID: string | null, timedOut: boolean | null } | { __typename: 'SleepStepInfo', sleepUntil: string } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: string, foundEventID: string | null, timedOut: boolean | null } | null } & { ' $fragmentName'?: 'TraceDetailsFragment' };
 
 export type GetRunTraceQueryVariables = Exact<{
   envID: Scalars['ID'];
