@@ -913,6 +913,8 @@ Response schemas MUST be versioned using the `schema_version` field. New schema 
 
 The SDK MUST perform request signature validation if the `X-Inngest-Signature` header is present. If validation fails or the header is not present then the SDK MUST return the unauthenticated response (containing no privileged information). If validation succeeds, the SDK MUST return the authenticated response.
 
+The following is schema version `2024-05-24`:
+
 ```ts
 // Unauthenticated response
 {
@@ -926,7 +928,7 @@ The SDK MUST perform request signature validation if the `X-Inngest-Signature` h
 	has_signing_key: boolean
   has_signing_key_fallback: boolean
   mode: "cloud" | "dev"
-  schema_version: string
+  schema_version: "2024-05-24"
 }
 
 // Authenticated response
@@ -950,7 +952,7 @@ The SDK MUST perform request signature validation if the `X-Inngest-Signature` h
 	has_signing_key: boolean
   has_signing_key_fallback: boolean
 	mode: "cloud" | "dev"
-  schema_version: string
+  schema_version: "2024-05-24"
   sdk_language: string
   sdk_version: string
   serve_origin: string | null
