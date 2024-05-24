@@ -150,15 +150,6 @@ func parseResponse(byt []byte) any {
 		}
 	}
 
-	// This isn't a map, so check the first character for json encoding.  If this isn't
-	// a string or array, then the body must be treated as text.
-	//
-	// This is a stop-gap safety check to see if SDKs respond with text that's not JSON,
-	// in the case of an internal issue or a host processing error we can't control.
-	if byt[0] != '[' && byt[0] != '"' {
-		return string(byt)
-	}
-
 	// This may have been a string-encoded object, because encoding generally
 	// sucks.  Sometimes this has happened (by who?  how?).
 	//

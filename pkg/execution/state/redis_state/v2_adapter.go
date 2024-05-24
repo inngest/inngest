@@ -47,7 +47,7 @@ func (v v2) Create(ctx context.Context, s state.CreateState) error {
 			RunID:                 s.Metadata.ID.RunID,
 			WorkflowID:            s.Metadata.ID.FunctionID,
 			WorkflowVersion:       s.Metadata.Config.FunctionVersion,
-			EventID:               s.Metadata.Config.EventIDs[0],
+			EventID:               s.Metadata.Config.FirstEventID(),
 			EventIDs:              s.Metadata.Config.EventIDs,
 			Key:                   s.Metadata.Config.Idempotency,
 			AccountID:             s.Metadata.ID.Tenant.AccountID,

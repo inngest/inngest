@@ -1,8 +1,10 @@
 package inngest
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/expressions"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
@@ -47,6 +49,8 @@ func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
 // - The batch is full
 // - The time to wait is up
 type EventBatchConfig struct {
+	Key *string `json:"key,omitempty"`
+
 	// MaxSize is the maximum number of events that can be
 	// included in a batch
 	MaxSize int `json:"maxSize"`
@@ -61,7 +65,7 @@ func (c EventBatchConfig) IsEnabled() bool {
 	return c.MaxSize > 1 && c.Timeout != ""
 }
 
-func (c EventBatchConfig) IsValid() error {
+func (c EventBatchConfig) IsValid(ctx context.Context) error {
 	if c.MaxSize < 2 {
 		return syscode.Error{
 			Code:    syscode.CodeBatchSizeInvalid,
@@ -77,6 +81,16 @@ func (c EventBatchConfig) IsValid() error {
 
 	if _, err := time.ParseDuration(c.Timeout); err != nil {
 		return fmt.Errorf("invalid timeout string: %v", err)
+	}
+
+	if c.Key != nil {
+		// Ensure the expression is valid if present.
+		if exprErr := expressions.Validate(ctx, *c.Key); exprErr != nil {
+			return syscode.Error{
+				Code:    syscode.CodeBatchKeyExpressionInvalid,
+				Message: fmt.Sprintf("batch key expression is invalid: %s", exprErr),
+			}
+		}
 	}
 
 	return nil

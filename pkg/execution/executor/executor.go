@@ -354,15 +354,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	evtMap := req.Events[0].GetEvent().Map()
 	factor, _ := req.Function.RunPriorityFactor(ctx, evtMap)
 
-	// Grab the cron schedule for function config.  This is necessary for fast
-	// lookups, trace info, etc.
-	var schedule *string
-	if len(req.Events) == 1 && req.Events[0].GetEvent().Name == event.FnCronName {
-		if cron, ok := req.Events[0].GetEvent().Data["cron"].(string); ok {
-			schedule = &cron
-		}
-	}
-
 	metadata := sv2.Metadata{
 		ID: sv2.ID{
 			RunID:      runID,
@@ -376,7 +367,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Config: sv2.Config{
 			FunctionSlug:    req.Function.GetSlug(),
 			FunctionVersion: req.Function.FunctionVersion,
-			CronSchedule:    schedule,
 			SpanID:          telemetry.NewSpanID(ctx).String(),
 			EventIDs:        eventIDs,
 			Idempotency:     key,
@@ -387,6 +377,17 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			Context:         req.Context,
 		},
 	}
+
+	// Grab the cron schedule for function config.  This is necessary for fast
+	// lookups, trace info, etc.
+	var schedule *string
+	if len(req.Events) == 1 && req.Events[0].GetEvent().Name == event.FnCronName {
+		if cron, ok := req.Events[0].GetEvent().Data["cron"].(string); ok {
+			schedule = &cron
+			metadata.Config.SetCronSchedule(cron)
+		}
+	}
+
 	carrier := telemetry.NewTraceCarrier()
 	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 	metadata.Config.Context[consts.OtelPropagationKey] = carrier
@@ -397,6 +398,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		for _, e := range e.lifecycles {
 			go e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
 				CronSchedule: req.Events[0].GetEvent().CronSchedule(),
+				Reason:       enums.SkipReasonFunctionPaused,
 			})
 		}
 		return nil, ErrFunctionSkipped
@@ -422,8 +424,14 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	)
 	defer span.End()
 
+	if schedule != nil {
+		span.SetAttributes(attribute.String(consts.OtelSysCronExpr, *schedule))
+	}
 	if req.BatchID != nil {
-		span.SetAttributes(attribute.String(consts.OtelSysBatchID, req.BatchID.String()))
+		span.SetAttributes(
+			attribute.String(consts.OtelSysBatchID, req.BatchID.String()),
+			attribute.Int64(consts.OtelSysBatchTS, int64(req.BatchID.Time())),
+		)
 	}
 	if req.PreventDebounce {
 		span.SetAttributes(attribute.Bool(consts.OtelSysDebounceTimeout, true))
@@ -572,6 +580,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 					WorkflowID:  req.Function.ID,
 					WorkspaceID: req.WorkspaceID,
 					AccountID:   req.AccountID,
+					AppID:       req.AppID,
 				},
 				ID:                pauseID,
 				Expires:           state.Time(expires),
@@ -616,6 +625,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			WorkflowID:  req.Function.ID,
 			WorkspaceID: req.WorkspaceID,
 			AccountID:   req.AccountID,
+			AppID:       req.AppID,
 		},
 		CustomConcurrencyKeys: metadata.Config.CustomConcurrencyKeys,
 		PriorityFactor:        metadata.Config.PriorityFactor,
@@ -828,8 +838,14 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.String(consts.OtelSysIdempotencyKey, id.IdempotencyKey()),
 		),
 	)
-	if id.BatchID != nil {
-		fnSpan.SetAttributes(attribute.String(consts.OtelSysBatchID, id.BatchID.String()))
+	if md.Config.CronSchedule() != nil {
+		fnSpan.SetAttributes(attribute.String(consts.OtelSysCronExpr, *md.Config.CronSchedule()))
+	}
+	if md.Config.BatchID != nil {
+		fnSpan.SetAttributes(
+			attribute.String(consts.OtelSysBatchID, md.Config.BatchID.String()),
+			attribute.Int64(consts.OtelSysBatchTS, int64(md.Config.BatchID.Time())),
+		)
 	}
 
 	for _, evt := range events {
@@ -981,10 +997,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		} else if resp.IsTraceVisibleFunctionExecution() {
 			spanName := "function success"
 			fnstatus := attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCompleted.ToCode())
+			fnSpan.SetStatus(codes.Ok, "success")
+			span.SetStatus(codes.Ok, "success")
 
 			if resp.StatusCode != 200 {
 				spanName = "function error"
 				fnstatus = attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusFailed.ToCode())
+				fnSpan.SetStatus(codes.Error, resp.Error())
 				span.SetStatus(codes.Error, resp.Error())
 			}
 
@@ -1441,8 +1460,9 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 				}
 				// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
 				err = e.pm.ConsumePause(ctx, pause.ID, nil)
-				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
+				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound || err == state.ErrRunNotFound {
 					// Done. Add to the counter.
+					_ = e.pm.DeletePause(context.Background(), *pause)
 					atomic.AddInt32(&res[1], 1)
 					return
 				}
@@ -1612,7 +1632,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 			// Add to the counter.
 			atomic.AddInt32(&res[1], 1)
 			if err := e.exprAggregator.RemovePause(ctx, pause); err != nil {
-				l.Error("error removing pause from aggregator")
+				l.Warn("error removing pause from aggregator", "error", err)
 			}
 		}()
 	}
@@ -1858,6 +1878,13 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 						)
 						defer span.End()
 						span.SetAttributes(commonAttrs...)
+						if r.With != nil {
+							if byt, err := json.Marshal(r.With); err == nil {
+								span.AddEvent(string(byt), trace.WithAttributes(
+									attribute.Bool(consts.OtelSysStepOutput, true),
+								))
+							}
+						}
 						if r.HasError() {
 							span.SetStatus(codes.Error, r.Error())
 						}
@@ -1895,6 +1922,13 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 						}
 						if pause.Expression != nil {
 							span.SetAttributes(attribute.String(consts.OtelSysStepWaitExpression, *pause.Expression))
+						}
+						if r.With != nil {
+							if byt, err := json.Marshal(r.With); err == nil {
+								span.AddEvent(string(byt), trace.WithAttributes(
+									attribute.Bool(consts.OtelSysStepOutput, true),
+								))
+							}
 						}
 						if r.HasError() {
 							span.SetStatus(codes.Error, r.Error())
@@ -2248,10 +2282,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 	startedAt := time.Now()
 	until := startedAt.Add(dur)
 
-	// Create another group for the next item which will run.  We're enqueueing
-	// the function to run again after sleep, so need a new group.
-	groupID := uuid.New().String()
-	ctx = state.WithGroupID(ctx, groupID)
 	ctx, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeStep),
 		telemetry.WithName(consts.OtelSpanSleep),
@@ -2267,13 +2297,18 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 			attribute.String(consts.OtelAttrSDKRunID, i.item.Identifier.RunID.String()),
 			attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
 			attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
-			attribute.String(consts.OtelSysStepGroupID, groupID),
+			attribute.String(consts.OtelSysStepGroupID, i.item.GroupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeSleep.String()),
 			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
 			attribute.Int64(consts.OtelSysStepSleepEndAt, until.UnixMilli()),
 		),
 	)
 	defer span.End(trace.WithTimestamp(until))
+
+	// Create another group for the next item which will run.  We're enqueueing
+	// the function to run again after sleep, so need a new group.
+	groupID := uuid.New().String()
+	ctx = state.WithGroupID(ctx, groupID)
 
 	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
 	// TODO Should this also include a parent step span? It will never have attempts.
@@ -2675,6 +2710,7 @@ func (e *executor) AppendAndScheduleBatchWithOpts(ctx context.Context, fn innges
 				AppID:           bi.AppID,
 				FunctionID:      bi.FunctionID,
 				FunctionVersion: bi.FunctionVersion,
+				BatchPointer:    result.BatchPointerKey,
 			},
 			At: at,
 		}); err != nil {

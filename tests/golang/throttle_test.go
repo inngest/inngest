@@ -30,7 +30,7 @@ func TestThrottle(t *testing.T) {
 				Name: "throttle test",
 				Throttle: &inngestgo.Throttle{
 					Limit:  1,
-					Period: 3 * time.Second,
+					Period: 5 * time.Second,
 				},
 			},
 			inngestgo.EventTrigger(trigger, nil),
@@ -62,7 +62,7 @@ func TestThrottle(t *testing.T) {
 		// Ensure that each function finishes after 3 seconds.
 		for i := 1; i <= funcs; i++ {
 			require.EqualValues(t, i, total)
-			<-time.After(3 * time.Second)
+			<-time.After(5 * time.Second)
 		}
 	})
 

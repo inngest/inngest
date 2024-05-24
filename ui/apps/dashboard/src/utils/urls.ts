@@ -69,6 +69,9 @@ export const pathCreator = {
   keys({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/manage/keys` as Route;
   },
+  runPopout({ envSlug, runID }: { envSlug: string; runID: string }): Route {
+    return `/env/${envSlug}/runs/${runID}` as Route;
+  },
   unattachedSyncs({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/unattached-syncs` as Route;
   },

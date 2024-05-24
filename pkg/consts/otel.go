@@ -9,6 +9,8 @@ const (
 	OtelSpanInvoke       = "invoke"
 	OtelSpanWaitForEvent = "wait"
 	OtelSpanSleep        = "sleep"
+	OtelSpanExecute      = "execute"
+	OtelSpanRerun        = "rerun"
 
 	// system attributes
 	OtelSysAccountID      = "sys.account.id"
@@ -22,6 +24,7 @@ const (
 	OtelSysEventIDs        = "sys.event.ids"
 
 	OtelSysBatchID      = "sys.batch.id"
+	OtelSysBatchTS      = "sys.batch.timestamp"
 	OtelSysBatchFull    = "sys.batch.full"
 	OtelSysBatchTimeout = "sys.batch.timeout"
 
@@ -89,6 +92,7 @@ const (
 	OtelScopeDebounce  = "debounce.inngest"
 	OtelScopeTrigger   = "trigger.inngest"
 	OtelScopeCron      = "cron.inngest"
+	OtelScopeRerun     = "rerun.inngest"
 	OtelScopeEnv       = "env.inngest"
 	OtelScopeApp       = "app.env.inngest"
 	OtelScopeFunction  = "function.app.env.inngest"

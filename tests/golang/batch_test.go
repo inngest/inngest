@@ -3,6 +3,7 @@ package golang
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -138,5 +139,74 @@ func TestBatchInvoke(t *testing.T) {
 		require.EqualValues(t, 2, atomic.LoadInt32(&counter))
 		require.EqualValues(t, 5, atomic.LoadInt32(&totalEvents))
 		require.EqualValues(t, 5, atomic.LoadInt32(&invokeCounter))
+	})
+}
+
+func TestBatchEventsWithKeys(t *testing.T) {
+	type BatchEventDataWithUserId struct {
+		Time   time.Time `json:"time"`
+		UserId string    `json:"userId"`
+	}
+	type BatchEventWithKey = inngestgo.GenericEvent[BatchEventDataWithUserId, any]
+
+	ctx := context.Background()
+	h, server, registerFuncs := NewSDKHandler(t, "user-notifications")
+	defer server.Close()
+
+	var (
+		totalEvents int32
+	)
+
+	batchInvokedCounter := make(map[string]int32)
+	batchEventsCounter := make(map[string]int)
+	mut := sync.Mutex{}
+
+	batchKey := "event.data.userId"
+
+	a := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{Name: "batch test", BatchEvents: &inngest.EventBatchConfig{MaxSize: 3, Timeout: "5s", Key: &batchKey}},
+		inngestgo.EventTrigger("test/notification.send", nil),
+		func(ctx context.Context, input inngestgo.Input[BatchEventWithKey]) (any, error) {
+			mut.Lock()
+			batchInvokedCounter[input.Events[0].Data.UserId] += 1
+			batchEventsCounter[input.Events[0].Data.UserId] += len(input.Events)
+			mut.Unlock()
+			atomic.AddInt32(&totalEvents, int32(len(input.Events)))
+			return true, nil
+		},
+	)
+	h.Register(a)
+	registerFuncs()
+
+	t.Run("trigger batch", func(t *testing.T) {
+		sequence := []string{"a", "b", "c", "a", "b", "c", "a", "b"}
+		for _, userId := range sequence {
+			_, err := inngestgo.Send(ctx, BatchEventWithKey{
+				Name: "test/notification.send",
+				Data: BatchEventDataWithUserId{Time: time.Now(), UserId: userId},
+			})
+			require.NoError(t, err)
+		}
+
+		// First trigger should be because of batch is full
+		<-time.After(2 * time.Second)
+		require.EqualValues(t, 1, batchInvokedCounter["a"])
+		require.EqualValues(t, 3, batchEventsCounter["a"])
+		require.EqualValues(t, 1, batchInvokedCounter["b"])
+		require.EqualValues(t, 3, batchEventsCounter["b"])
+		require.EqualValues(t, 0, batchInvokedCounter["c"])
+		require.EqualValues(t, 0, batchEventsCounter["c"])
+
+		require.EqualValues(t, 6, atomic.LoadInt32(&totalEvents))
+
+		<-time.After(5 * time.Second)
+		require.EqualValues(t, 1, batchInvokedCounter["a"])
+		require.EqualValues(t, 3, batchEventsCounter["a"])
+		require.EqualValues(t, 1, batchInvokedCounter["b"])
+		require.EqualValues(t, 3, batchEventsCounter["b"])
+		require.EqualValues(t, 1, batchInvokedCounter["c"])
+		require.EqualValues(t, 2, batchEventsCounter["c"])
+
+		require.EqualValues(t, len(sequence), atomic.LoadInt32(&totalEvents))
 	})
 }
