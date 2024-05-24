@@ -113,6 +113,13 @@ type Config struct {
 	Context map[string]any
 }
 
+func (c *Config) EventID() ulid.ULID {
+	if len(c.EventIDs) > 0 {
+		return c.EventIDs[0]
+	}
+	return ulid.ULID{}
+}
+
 func (c *Config) GetSpanID() (*trace.SpanID, error) {
 	if c.SpanID != "" {
 		sid, err := trace.SpanIDFromHex(c.SpanID)
@@ -141,15 +148,6 @@ func (c *Config) CronSchedule() *string {
 	}
 
 	return nil
-}
-
-// FirstEventID returns the first event ID in the list of event IDs.
-// If there are no event IDs, it returns an empty ULID.
-func (c *Config) FirstEventID() ulid.ULID {
-	if len(c.EventIDs) > 0 {
-		return c.EventIDs[0]
-	}
-	return ulid.ULID{}
 }
 
 // RunMetrics stores state-level run metrics.
