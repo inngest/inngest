@@ -907,31 +907,60 @@ The execution of a Function, the returned data, and the tooling available to a D
 
 ## 4.5. Introspection Requests
 
-An SDK MUST respond to an Introspection Request, a `GET` request intended to be used as a health check, ensuring that an HTTP request can be correctly handled by an SDK.
+An SDK MUST respond to an Introspection Request (a `GET` request intended to be used as a health check), ensuring that an HTTP request can be correctly handled by an SDK.
 
-If the request signature validation fails, then the SDK MUST NOT return any sensitive data. The response schema MUST be:
+Response schemas MUST be versioned using the `schema_version` field. New schema versions MUST be added to Inngest Servers before they are used by an SDK.
+
+The SDK MUST perform request signature validation if the `X-Inngest-Signature` header is present. If validation fails or the header is not present then the SDK MUST return the unauthenticated response (containing no privileged information). If validation succeeds, the SDK MUST return the authenticated response.
 
 ```ts
+// Unauthenticated response
 {
+  // Will be null if the request was unsigned and false if the request was
+  // signed but failed validation
+  authentication_succeeded: boolean | null
+  
   extra?: Record<string, any>
 	function_count: number
 	has_event_key: boolean
 	has_signing_key: boolean
+  has_signing_key_fallback: boolean
   mode: "cloud" | "dev"
+  schema_version: string
 }
-```
 
-If the request passes signature validation, then the response schema MUST be:
-
-```ts
+// Authenticated response
 {
+  api_origin: string
+  app_id: string
+  authentication_succeeded: true
+
+  // Inngest environment name
+  env: string | null
+
   extra?: Record<string, any>
+  event_api_origin: string
+
+  // sha256 hash of the event key
+  event_key_hash: string | null
+
+  framework: string
 	function_count: number
 	has_event_key: boolean
 	has_signing_key: boolean
+  has_signing_key_fallback: boolean
 	mode: "cloud" | "dev"
-	signing_key_fallback_hash: string
-	signing_key_hash: string
+  schema_version: string
+  sdk_language: string
+  sdk_version: string
+  serve_origin: string | null
+  serve_path: string | null
+
+  // sha256 hash of the signing key
+	signing_key_fallback_hash: string | null
+
+  // sha256 hash of the signing key fallback
+	signing_key_hash: string | null
 }
 ```
 
