@@ -1086,7 +1086,6 @@ export type RunsFilter = {
 
 export type RunsFilterV2 = {
   appIDs?: InputMaybe<Array<Scalars['UUID']>>;
-  fnSlug?: InputMaybe<Scalars['String']>;
   from: Scalars['Time'];
   functionIDs?: InputMaybe<Array<Scalars['UUID']>>;
   query?: InputMaybe<Scalars['String']>;

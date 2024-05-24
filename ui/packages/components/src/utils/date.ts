@@ -1,4 +1,33 @@
-import { format, formatDistanceToNow, subDays } from 'date-fns';
+import {
+  format,
+  formatDistanceToNow,
+  sub,
+  subDays,
+  type Duration,
+  type DurationUnit,
+} from 'date-fns';
+
+export const DURATION_STRING_REGEX = /^[1-9]\d*[smMhdwy]$/;
+
+export const DURATION_UNITS: { [k: string]: string } = {
+  s: 'seconds',
+  m: 'minutes',
+  h: 'hours',
+  d: 'days',
+  w: 'weeks',
+  M: 'months',
+  y: 'years',
+};
+
+export const longDateFormat = {
+  year: 'numeric' as const,
+  month: 'numeric' as const,
+  day: 'numeric' as const,
+  hour: 'numeric' as const,
+  hour12: true,
+  minute: 'numeric' as const,
+  fractionalSecondDigits: 3 as const,
+};
 
 // Format: 20 Jul 2023, 00:08:42
 export function fullDate(date: Date): string {
@@ -87,3 +116,15 @@ export function toMaybeDate<T extends string | null | undefined>(value: T): Date
 
   return new Date(value);
 }
+
+export const parseDuration = (duration: string): Duration => {
+  if (!DURATION_STRING_REGEX.test(duration)) {
+    throw Error('invalid duration, must be in the form of 1s, 5m, 10h, 12d, 15w, 17M, 20y');
+  }
+  const n = duration.slice(0, duration.length - 1);
+  const u = duration.slice(duration.length - 1);
+
+  return { [DURATION_UNITS[u] as DurationUnit]: Number(n) };
+};
+
+export const subtractDuration = (d: Date, duration: Duration) => sub(d, duration);

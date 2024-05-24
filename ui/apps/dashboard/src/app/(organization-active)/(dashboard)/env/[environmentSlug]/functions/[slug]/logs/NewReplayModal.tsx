@@ -3,11 +3,12 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
-import { DatePicker } from '@inngest/components/DatePicker';
+import { RangePicker } from '@inngest/components/DatePicker';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
 import { IconReplay } from '@inngest/components/icons/Replay';
+import { subtractDuration } from '@inngest/components/utils/date';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
@@ -221,28 +222,21 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
               />
             </div>
           </div>
-          <div className="flex flex-col justify-between gap-2 px-6 py-4">
-            <div className="space-y-0.5">
+          <div className="flex flex-row justify-between px-6 py-4">
+            <div className="w-1/2 space-y-0.5">
               <span className="text-sm font-semibold text-slate-800">Date Range</span>
               <p className="text-xs text-slate-500">Select a specific range of function runs.</p>
             </div>
-            <div className="flex flex-row gap-x-2">
-              <DatePicker
-                placeholder="Start"
-                defaultValue={timeRange?.start}
-                onChange={(d) =>
-                  setTimeRange({ start: d, end: timeRange?.end, key: timeRange?.key })
+            <div className="w-1/2">
+              <RangePicker
+                onChange={(range) =>
+                  setTimeRange(
+                    range.type === 'relative'
+                      ? { start: subtractDuration(new Date(), range.duration), end: new Date() }
+                      : { start: range.start, end: range.end }
+                  )
                 }
-                className="w-1/2"
-              />
-
-              <DatePicker
-                placeholder="End"
-                defaultValue={timeRange?.end}
-                onChange={(d) =>
-                  setTimeRange({ start: timeRange?.start, end: d, key: timeRange?.key })
-                }
-                className="w-1/2"
+                className="w-full"
               />
             </div>
           </div>
