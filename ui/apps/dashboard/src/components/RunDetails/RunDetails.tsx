@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { RunDetails as RunDetailsView } from '@inngest/components/RunDetailsV2';
 import { StatusCell } from '@inngest/components/Table';
 import { cn } from '@inngest/components/utils/classNames';
@@ -20,6 +21,15 @@ export function RunDetails({ runID, standalone = true }: Props) {
   const env = useEnvironment();
   const cancelRun = useCancelRun({ envID: env.id, runID });
   const rerun = useRerun({ envID: env.id, envSlug: env.slug, runID });
+
+  const internalPathCreator = useMemo(() => {
+    return {
+      // The shared component library is environment-agnostic, so it needs a way to
+      // generate URLs without knowing about environments
+      runPopout: (params: { runID: string }) =>
+        pathCreator.runPopout({ envSlug: env.slug, runID: params.runID }),
+    };
+  }, [env.slug]);
 
   const res = useRun({ envID: env.id, runID });
   if (res.error) {
@@ -45,6 +55,7 @@ export function RunDetails({ runID, standalone = true }: Props) {
         </div>
       )}
       <RunDetailsView
+        pathCreator={internalPathCreator}
         standalone={standalone}
         app={{
           url: pathCreator.app({ envSlug: env.slug, externalAppID: run.function.app.externalID }),

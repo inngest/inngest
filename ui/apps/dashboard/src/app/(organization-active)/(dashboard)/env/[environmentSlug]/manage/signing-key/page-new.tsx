@@ -2,12 +2,12 @@
 
 import { Alert } from '@inngest/components/Alert';
 import { Card } from '@inngest/components/Card';
+import { InlineCode } from '@inngest/components/InlineCode';
 import { Link } from '@inngest/components/Link';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { CreateSigningKeyButton } from './CreateSigningKeyButton';
-import { InlineCode } from './InlineCode';
 import { RotateSigningKeyButton } from './RotateSigningKeyButton';
 import { SigningKey } from './SigningKey';
 import { useSigningKeys } from './useSigningKeys';

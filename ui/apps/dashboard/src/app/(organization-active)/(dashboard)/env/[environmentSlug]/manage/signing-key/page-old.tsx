@@ -4,12 +4,12 @@
  */
 
 import { Alert } from '@inngest/components/Alert';
+import { InlineCode } from '@inngest/components/InlineCode';
 
 import { Secret } from '@/components/Secret';
 import { graphql } from '@/gql';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getEnvironment } from '@/queries/server-only/getEnvironment';
-import { InlineCode } from './InlineCode';
 
 const Query = graphql(`
   query GetSigningKey($environmentID: ID!) {
