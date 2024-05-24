@@ -1485,7 +1485,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 				StepName: resumeData.StepName,
 			})
 			if err != nil {
-				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
+				goerr = errors.Join(goerr, fmt.Errorf("error resuming pause: %w", err))
 				return
 			}
 			// Add to the counter.
@@ -1624,7 +1624,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 				StepName: resumeData.StepName,
 			})
 			if err != nil {
-				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
+				goerr = errors.Join(goerr, fmt.Errorf("error resuming pause: %w", err))
 				return
 			}
 			// Add to the counter.
