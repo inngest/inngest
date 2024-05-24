@@ -581,6 +581,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 					WorkspaceID: req.WorkspaceID,
 					AccountID:   req.AccountID,
 					AppID:       req.AppID,
+					EventID:     metadata.Config.EventID(),
+					EventIDs:    metadata.Config.EventIDs,
 				},
 				ID:                pauseID,
 				Expires:           state.Time(expires),
@@ -626,6 +628,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			WorkspaceID: req.WorkspaceID,
 			AccountID:   req.AccountID,
 			AppID:       req.AppID,
+			EventID:     metadata.Config.EventID(),
+			EventIDs:    metadata.Config.EventIDs,
 		},
 		CustomConcurrencyKeys: metadata.Config.CustomConcurrencyKeys,
 		PriorityFactor:        metadata.Config.PriorityFactor,
@@ -728,7 +732,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
 	// for `tools.sleep` within generator functions.
 	if item.Kind == queue.KindSleep && item.Attempt == 0 {
-		if err := e.smv2.SaveStep(ctx, sv2.ID{
+		err := e.smv2.SaveStep(ctx, sv2.ID{
 			RunID:      id.RunID,
 			FunctionID: id.WorkflowID,
 			Tenant: sv2.Tenant{
@@ -736,7 +740,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				EnvID:     id.WorkspaceID,
 				AccountID: id.AccountID,
 			},
-		}, edge.Outgoing, []byte("null")); err != nil {
+		}, edge.Outgoing, []byte("null"))
+		if !errors.Is(err, state.ErrDuplicateResponse) && err != nil {
 			return nil, err
 		}
 		// After the sleep, we start a new step.  This means we also want to start a new

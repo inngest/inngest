@@ -28,7 +28,7 @@ func (l lifecycle) OnFunctionScheduled(
 		RunID:         md.ID.RunID,
 		RunStartedAt:  ulid.Time(md.ID.RunID.Time()),
 		FunctionID:    md.ID.FunctionID,
-		EventID:       md.Config.FirstEventID(),
+		EventID:       md.Config.EventID(),
 		Cron:          md.Config.CronSchedule(),
 		OriginalRunID: md.Config.OriginalRunID,
 	})
