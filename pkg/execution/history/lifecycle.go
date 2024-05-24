@@ -81,7 +81,7 @@ func (l lifecycle) OnFunctionScheduled(
 		Type:            enums.HistoryTypeFunctionScheduled.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  md.IdempotencyKey(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.FirstEventID(),
 		BatchID:         md.Config.BatchID,
 	}
 	for _, d := range l.drivers {
@@ -126,7 +126,7 @@ func (l lifecycle) OnFunctionStarted(
 		Type:            enums.HistoryTypeFunctionStarted.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  md.IdempotencyKey(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.FirstEventID(),
 		LatencyMS:       &latencyMS,
 		BatchID:         md.Config.BatchID,
 	}
@@ -139,11 +139,28 @@ func (l lifecycle) OnFunctionStarted(
 
 // OnFunctionSkipped is called when a function run is skipped.
 func (l lifecycle) OnFunctionSkipped(
-	_ context.Context,
-	_ sv2.Metadata,
-	_ execution.SkipState,
+	ctx context.Context,
+	md sv2.Metadata,
+	s execution.SkipState,
 ) {
-	// no-op for now.
+	h := History{
+		AccountID:   md.ID.Tenant.AccountID,
+		BatchID:     md.Config.BatchID,
+		Cron:        s.CronSchedule,
+		EventID:     md.Config.FirstEventID(),
+		RunID:       md.ID.RunID,
+		CreatedAt:   time.Now(),
+		SkipReason:  &s.Reason,
+		FunctionID:  md.ID.FunctionID,
+		WorkspaceID: md.ID.Tenant.EnvID,
+		Type:        enums.HistoryTypeFunctionSkipped.String(),
+	}
+
+	for _, d := range l.drivers {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
+			l.log.Error("execution lifecycle error", "lifecycle", "onFunctionSkipped", "error", err)
+		}
+	}
 }
 
 // OnFunctionFinished is called when a function finishes.  This will
@@ -183,7 +200,7 @@ func (l lifecycle) OnFunctionFinished(
 		Type:               enums.HistoryTypeFunctionCompleted.String(),
 		Attempt:            int64(item.Attempt),
 		IdempotencyKey:     md.IdempotencyKey(),
-		EventID:            md.Config.EventIDs[0],
+		EventID:            md.Config.FirstEventID(),
 		BatchID:            md.Config.BatchID,
 	}
 
@@ -273,7 +290,7 @@ func (l lifecycle) OnFunctionCancelled(
 		RunID:              md.ID.RunID,
 		Type:               enums.HistoryTypeFunctionCancelled.String(),
 		IdempotencyKey:     md.IdempotencyKey(),
-		EventID:            md.Config.EventIDs[0],
+		EventID:            md.Config.FirstEventID(),
 		Cancel:             &req,
 		BatchID:            md.Config.BatchID,
 	}
@@ -319,7 +336,7 @@ func (l lifecycle) OnStepScheduled(
 		Type:            enums.HistoryTypeStepScheduled.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  md.IdempotencyKey(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.FirstEventID(),
 		StepName:        stepName,
 		StepID:          &edge.Edge.Incoming, // TODO: Add step name to edge.
 		BatchID:         md.Config.BatchID,
@@ -363,7 +380,7 @@ func (l lifecycle) OnStepStarted(
 		Type:            enums.HistoryTypeStepStarted.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  md.IdempotencyKey(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.FirstEventID(),
 		StepName:        &edge.Incoming,
 		StepID:          &edge.Incoming, // TODO: Add step name to edge.
 		URL:             &url,
@@ -407,7 +424,7 @@ func (l lifecycle) OnStepFinished(
 		Type:            enums.HistoryTypeStepCompleted.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  md.IdempotencyKey(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.FirstEventID(),
 		StepName:        &resp.Step.Name,
 		StepID:          &edge.Incoming,
 		URL:             &step.URI,
@@ -497,7 +514,7 @@ func (l lifecycle) OnWaitForEvent(
 		Type:            enums.HistoryTypeStepWaiting.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  md.IdempotencyKey(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.FirstEventID(),
 		StepName:        &stepName,
 		StepID:          &op.ID,
 		WaitForEvent: &WaitForEvent{
@@ -552,7 +569,7 @@ func (l lifecycle) OnWaitForEventResumed(
 		RunID:           md.ID.RunID,
 		Type:            enums.HistoryTypeStepCompleted.String(),
 		IdempotencyKey:  md.IdempotencyKey(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.FirstEventID(),
 		WaitResult: &WaitResult{
 			EventID: req.EventID,
 			Timeout: req.EventID == nil,
@@ -624,7 +641,7 @@ func (l lifecycle) OnInvokeFunction(
 		AccountID:       md.ID.Tenant.AccountID,
 		Attempt:         int64(item.Attempt),
 		CreatedAt:       time.Now(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.FirstEventID(),
 		FunctionID:      md.ID.FunctionID,
 		FunctionVersion: int64(md.Config.FunctionVersion),
 		GroupID:         groupID,
@@ -677,7 +694,7 @@ func (l lifecycle) OnInvokeFunctionResumed(
 		AccountID:       md.ID.Tenant.AccountID,
 		WorkspaceID:     md.ID.Tenant.EnvID,
 		CreatedAt:       time.Now(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.FirstEventID(),
 		FunctionID:      md.ID.FunctionID,
 		FunctionVersion: int64(md.Config.FunctionVersion),
 		GroupID:         groupIDUUID,
@@ -744,7 +761,7 @@ func (l lifecycle) OnSleep(
 		Type:            enums.HistoryTypeStepSleeping.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  md.IdempotencyKey(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.FirstEventID(),
 		StepName:        &stepName,
 		StepID:          &op.ID,
 		Sleep: &Sleep{

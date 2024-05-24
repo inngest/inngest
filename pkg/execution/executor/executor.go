@@ -398,6 +398,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		for _, e := range e.lifecycles {
 			go e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
 				CronSchedule: req.Events[0].GetEvent().CronSchedule(),
+				Reason:       enums.SkipReasonFunctionPaused,
 			})
 		}
 		return nil, ErrFunctionSkipped
@@ -1459,8 +1460,9 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 				}
 				// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
 				err = e.pm.ConsumePause(ctx, pause.ID, nil)
-				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
+				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound || err == state.ErrRunNotFound {
 					// Done. Add to the counter.
+					_ = e.pm.DeletePause(context.Background(), *pause)
 					atomic.AddInt32(&res[1], 1)
 					return
 				}
@@ -1630,7 +1632,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 			// Add to the counter.
 			atomic.AddInt32(&res[1], 1)
 			if err := e.exprAggregator.RemovePause(ctx, pause); err != nil {
-				l.Error("error removing pause from aggregator")
+				l.Warn("error removing pause from aggregator", "error", err)
 			}
 		}()
 	}

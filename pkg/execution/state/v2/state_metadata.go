@@ -143,6 +143,15 @@ func (c *Config) CronSchedule() *string {
 	return nil
 }
 
+// FirstEventID returns the first event ID in the list of event IDs.
+// If there are no event IDs, it returns an empty ULID.
+func (c *Config) FirstEventID() ulid.ULID {
+	if len(c.EventIDs) > 0 {
+		return c.EventIDs[0]
+	}
+	return ulid.ULID{}
+}
+
 // RunMetrics stores state-level run metrics.
 type RunMetrics struct {
 	// StateSize stores the total size, in bytes, of all events and step output.
