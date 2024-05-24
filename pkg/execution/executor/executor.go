@@ -1460,8 +1460,9 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 				}
 				// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
 				err = e.pm.ConsumePause(ctx, pause.ID, nil)
-				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
+				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound || err == state.ErrRunNotFound {
 					// Done. Add to the counter.
+					_ = e.pm.DeletePause(context.Background(), *pause)
 					atomic.AddInt32(&res[1], 1)
 					return
 				}
