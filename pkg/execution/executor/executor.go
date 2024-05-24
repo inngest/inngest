@@ -1632,7 +1632,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 			// Add to the counter.
 			atomic.AddInt32(&res[1], 1)
 			if err := e.exprAggregator.RemovePause(ctx, pause); err != nil {
-				l.Error("error removing pause from aggregator")
+				l.Error("error removing pause from aggregator", "error", err)
 			}
 		}()
 	}
