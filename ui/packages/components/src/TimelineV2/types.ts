@@ -19,7 +19,7 @@ type StepInfoInvoke = {
   timeout: string;
   returnEventID: string | null;
   runID: string | null;
-  timedOut: boolean;
+  timedOut: boolean | null;
 };
 
 type StepInfoSleep = {
@@ -31,7 +31,7 @@ type StepInfoWait = {
   expression: string | null;
   timeout: string;
   foundEventID: string | null;
-  timedOut: boolean;
+  timedOut: boolean | null;
 };
 
 export function isStepInfoInvoke(stepInfo: Trace['stepInfo']): stepInfo is StepInfoInvoke {

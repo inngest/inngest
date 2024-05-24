@@ -60,7 +60,7 @@ export function TraceInfo({ className, pathCreator, trace }: Props) {
           )}
         </Labeled>
         <Labeled label="Timeout">{timeout ? <Time value={timeout} /> : '-'}</Labeled>
-        <Labeled label="Timed out">{booleanToString(trace.stepInfo.timedOut)}</Labeled>
+        <Labeled label="Timed out">{maybeBooleanToString(trace.stepInfo.timedOut)}</Labeled>
       </>
     );
   } else if (isStepInfoSleep(trace.stepInfo)) {
@@ -74,7 +74,7 @@ export function TraceInfo({ className, pathCreator, trace }: Props) {
       <>
         <Labeled label="Event name">{trace.stepInfo.eventName}</Labeled>
         <Labeled label="Timeout">{timeout ? <Time value={timeout} /> : '-'}</Labeled>
-        <Labeled label="Timed out">{booleanToString(trace.stepInfo.timedOut)}</Labeled>
+        <Labeled label="Timed out">{maybeBooleanToString(trace.stepInfo.timedOut)}</Labeled>
         <Labeled className="w-full" label="Match expression">
           {trace.stepInfo.expression ? <InlineCode value={trace.stepInfo.expression} /> : '-'}
         </Labeled>
@@ -124,6 +124,9 @@ function Labeled({
   );
 }
 
-function booleanToString(value: boolean) {
+function maybeBooleanToString(value: boolean | null): string | null {
+  if (value === null) {
+    return null;
+  }
   return value ? 'True' : 'False';
 }
