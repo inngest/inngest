@@ -1201,6 +1201,19 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	var err error
 	m := &runMetadata{}
 
+	// The V1 state identifier is the most important thing to be stored in state.  We must have this
+	// as it contains tenant information.
+	val, ok := data["id"]
+	if !ok || val == "" {
+		return nil, state.ErrRunNotFound
+	}
+	id := state.Identifier{}
+	if err := json.Unmarshal([]byte(val), &id); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal metadata identifier: %s", val)
+	}
+	m.Identifier = id
+
+	// Handle everything else optimistically
 	v, ok := data["status"]
 	if !ok {
 		return nil, fmt.Errorf("no status stored in metadata")
@@ -1214,11 +1227,11 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	parseInt := func(v string) (int, error) {
 		str, ok := data[v]
 		if !ok {
-			return 0, fmt.Errorf("no created at stored in run metadata")
+			return 0, fmt.Errorf("no '%s' stored in run metadata", v)
 		}
 		val, err := strconv.Atoi(str)
 		if err != nil {
-			return 0, fmt.Errorf("invalid pending stored in run metadata")
+			return 0, fmt.Errorf("invalid '%s' stored in run metadata", v)
 		}
 		return val, nil
 	}
