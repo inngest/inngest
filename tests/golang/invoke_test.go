@@ -11,10 +11,12 @@ import (
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
 	"github.com/oklog/ulid/v2"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInvokeRateLimit(t *testing.T) {
 	ctx := context.Background()
+	r := require.New(t)
 	c := client.New(t)
 
 	appID := "InvokeRateLimit-" + ulid.MustNew(ulid.Now(), nil).String()
@@ -62,7 +64,8 @@ func TestInvokeRateLimit(t *testing.T) {
 	registerFuncs()
 
 	// Trigger the main function and successfully invoke the other function
-	inngestgo.Send(ctx, &event.Event{Name: evtName})
+	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
+	r.NoError(err)
 	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID)
 
 	spew.Dump(c.Run(ctx, runID))
@@ -70,6 +73,7 @@ func TestInvokeRateLimit(t *testing.T) {
 	// Trigger the main function. It'll fail because the invoked function is
 	// rate limited
 	runID = ""
-	inngestgo.Send(ctx, &event.Event{Name: evtName})
+	_, err = inngestgo.Send(ctx, &event.Event{Name: evtName})
+	r.NoError(err)
 	c.WaitForRunStatus(ctx, t, "FAILED", &runID)
 }
