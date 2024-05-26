@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
@@ -64,7 +63,7 @@ func TestInvokeRateLimit(t *testing.T) {
 
 	// Trigger the main function and successfully invoke the other function
 	inngestgo.Send(ctx, &event.Event{Name: evtName})
-	c.WaitForRunStatus(ctx, t, enums.RunStatusCompleted.String(), &runID)
+	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID)
 
 	spew.Dump(c.Run(ctx, runID))
 
