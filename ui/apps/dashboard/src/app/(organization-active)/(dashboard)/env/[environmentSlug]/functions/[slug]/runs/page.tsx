@@ -213,7 +213,7 @@ export default function RunsPage({
       className="h-full min-h-0 overflow-y-auto bg-white"
       onScroll={(e) => fetchMoreOnScroll(e.target as HTMLDivElement)}
     >
-      <div className="flex items-center justify-between gap-2 bg-slate-50 px-8 py-2">
+      <div className="sticky top-0 flex items-center justify-between gap-2 bg-slate-50 px-8 py-2">
         <div className="flex items-center gap-2">
           <SelectGroup>
             <TimeFieldFilter
