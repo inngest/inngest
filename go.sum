@@ -629,8 +629,8 @@ github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:
 github.com/imdario/mergo v0.3.11/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
 github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
-github.com/inngest/expr v0.0.0-20240201152704-a643bc6ace48 h1:32YlbLIeO8HOMzYF3DfRLNX8hKeDb8omccWf03PHyh4=
-github.com/inngest/expr v0.0.0-20240201152704-a643bc6ace48/go.mod h1:Evn0nMuDe2NghjynoNzNwwc8ONXuFVzVr1H93tCwPyE=
+github.com/inngest/expr v0.0.0-20240521153320-6f549d6745fd h1:zVlqAmiuWBYO8O5T8Rxin4qfqD0YrFQyK/als0w9LS0=
+github.com/inngest/expr v0.0.0-20240521153320-6f549d6745fd/go.mod h1:Dq8dNC1Q/cZBjl6ltxCoAeNn8fstrBJWWjeSisqTL94=
 github.com/inngest/inngestgo v0.7.3-0.20240521072529-2795f6b14496 h1:IbBHbSimWOhW6vuVoGVZj7AqqQ3BzytE9fDbUdNwTDI=
 github.com/inngest/inngestgo v0.7.3-0.20240521072529-2795f6b14496/go.mod h1:m6ToZlAR8TYHZQnCWq0NRxsFgejCBQk3Wnww4fJfFDk=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=
@@ -1006,6 +1006,8 @@ github.com/tencentcloud/tencentcloud-sdk-go v1.0.191/go.mod h1:asUz5BPXxgoPGaRgZ
 github.com/tencentyun/cos-go-sdk-v5 v0.0.0-20190808065407-f07404cefc8c/go.mod h1:wk2XFUg6egk4tSDNZtXeKfe2G6690UVyt163PuUxBZk=
 github.com/throttled/throttled/v2 v2.11.0 h1:/udbW8pGpm5SutM3OvAk6ygAC3/PbmoVvSkq9xbzjxI=
 github.com/throttled/throttled/v2 v2.11.0/go.mod h1:qT849G1rYAXypqSrqtSCewU1p7lNmWDZNBBBSAZUvj8=
+github.com/tidwall/btree v1.7.0 h1:L1fkJH/AuEh5zBnnBbmTwQ5Lt+bRJ5A8EWecslvo9iI=
+github.com/tidwall/btree v1.7.0/go.mod h1:twD9XRA5jj9VUQGELzDO4HPQTNJsoWWfYEL+EUQ2cKY=
 github.com/tklauser/go-sysconf v0.3.10 h1:IJ1AZGZRWbY8T5Vfk04D9WOA5WSejdflXxP03OUqALw=
 github.com/tklauser/go-sysconf v0.3.10/go.mod h1:C8XykCvCb+Gn0oNCWPIlcb0RuglQTYaQ2hGm7jmxEFk=
 github.com/tklauser/numcpus v0.4.0 h1:E53Dm1HjH1/R2/aoCtXtPgzmElmn51aOkhCFSuZq//o=

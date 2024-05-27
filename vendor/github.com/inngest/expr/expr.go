@@ -78,6 +78,7 @@ func NewAggregateEvaluator(
 		engines: map[EngineType]MatchingEngine{
 			EngineTypeStringHash: newStringEqualityMatcher(),
 			EngineTypeNullMatch:  newNullMatcher(),
+			EngineTypeBTree:      newNumberMatcher(),
 		},
 		lock: &sync.RWMutex{},
 	}
@@ -237,11 +238,14 @@ func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([
 
 	// Validate that groups meet the minimum size.
 	for k, count := range counts {
-		if int(k.Size()) > count {
-			// The GroupID required more comparisons to equate to true than
-			// we had, so this could never evaluate to true.  Skip this.
-			continue
-		}
+		// if int(k.Size()) > count {
+		// 	// The GroupID required more comparisons to equate to true than
+		// 	// we had, so this could never evaluate to true.  Skip this.
+		// 	//
+		// 	// TODO: Optimize and fix.
+		// 	continue
+		// }
+		_ = count
 		result = append(result, found[k]...)
 	}
 
@@ -258,7 +262,7 @@ func (a *aggregator) Add(ctx context.Context, eval Evaluable) (bool, error) {
 		return false, err
 	}
 
-	if eval.GetExpression() == "" {
+	if eval.GetExpression() == "" || parsed.HasMacros {
 		// This is an empty expression which always matches.
 		a.lock.Lock()
 		a.constants = append(a.constants, parsed.EvaluableID)
@@ -266,28 +270,22 @@ func (a *aggregator) Add(ctx context.Context, eval Evaluable) (bool, error) {
 		return false, nil
 	}
 
-	aggregateable := true
 	for _, g := range parsed.RootGroups() {
-		// TODO: Within IterGroup, add recursive parsing of groups.
 		ok, err := a.iterGroup(ctx, g, parsed, a.addNode)
-		if err != nil {
-			return false, err
-		}
-		if !ok && aggregateable {
+
+		if err != nil || !ok {
 			// This is the first time we're seeing a non-aggregateable
-			// group, so add it to the constants list.
+			// group, so add it to the constants list and don't do anything else.
 			a.lock.Lock()
 			a.constants = append(a.constants, parsed.EvaluableID)
 			a.lock.Unlock()
-			aggregateable = false
+			return false, err
 		}
 	}
 
 	// Track the number of added expressions correctly.
-	if aggregateable {
-		atomic.AddInt32(&a.len, 1)
-	}
-	return aggregateable, nil
+	atomic.AddInt32(&a.len, 1)
+	return true, nil
 }
 
 func (a *aggregator) Remove(ctx context.Context, eval Evaluable) error {
@@ -367,7 +365,6 @@ func (a *aggregator) iterGroup(ctx context.Context, node *Node, parsed *ParsedEx
 	}
 
 	all := node.Ands
-
 	if node.Predicate != nil {
 		if !isAggregateable(node) {
 			return false, nil
@@ -401,6 +398,13 @@ func engineType(p Predicate) EngineType {
 	// switch on type of literal AND operator type.  int64/float64 literals require
 	// btrees, texts require ARTs, and so on.
 	switch p.Literal.(type) {
+	case int, int64, float64:
+		if p.Operator == operators.NotEquals {
+			// StringHash is only used for matching on equality.
+			return EngineTypeNone
+		}
+		// return EngineTypeNone
+		return EngineTypeBTree
 	case string:
 		if p.Operator == operators.Equals {
 			// StringHash is only used for matching on equality.
@@ -426,77 +430,54 @@ func (a *aggregator) addNode(ctx context.Context, n *Node, parsed *ParsedExpress
 	if n.Predicate == nil {
 		return nil
 	}
+	e := a.engine(n)
+	if e == nil {
+		return errEngineUnimplemented
+	}
 
 	// Don't allow anything to update in parallel.  This ensures that Add() can be called
 	// concurrently.
 	a.lock.Lock()
 	defer a.lock.Unlock()
-
-	requiredEngine := engineType(*n.Predicate)
-
-	if requiredEngine == EngineTypeNone {
-		return errEngineUnimplemented
-	}
-
-	for _, engine := range a.engines {
-		if engine.Type() != requiredEngine {
-			continue
-		}
-		return engine.Add(ctx, ExpressionPart{
-			GroupID:   n.GroupID,
-			Predicate: n.Predicate,
-			Parsed:    parsed,
-		})
-	}
-	return errEngineUnimplemented
-
-	/*
-		switch engineType(*n.Predicate) {
-		case EngineTypeNullMatch:
-			tree, ok := a.nullLookups[n.Predicate.Ident]
-			if !ok {
-				tree = newNullMatcher()
-			}
-			err := tree.Add(ctx, ExpressionPart{
-				GroupID:   n.GroupID,
-				Predicate: *n.Predicate,
-				Parsed:    parsed,
-			})
-			if err != nil {
-				return err
-			}
-			a.nullLookups[n.Predicate.Ident] = tree
-			return nil
-		}
-		return errEngineUnimplemented
-	*/
+	return e.Add(ctx, ExpressionPart{
+		GroupID:   n.GroupID,
+		Predicate: n.Predicate,
+		Parsed:    parsed,
+	})
 }
 
 func (a *aggregator) removeNode(ctx context.Context, n *Node, parsed *ParsedExpression) error {
 	if n.Predicate == nil {
 		return nil
 	}
+	e := a.engine(n)
+	if e == nil {
+		return errEngineUnimplemented
+	}
 
 	// Don't allow anything to update in parallel.  This enrues that Add() can be called
 	// concurrently.
 	a.lock.Lock()
 	defer a.lock.Unlock()
+	return e.Remove(ctx, ExpressionPart{
+		GroupID:   n.GroupID,
+		Predicate: n.Predicate,
+		Parsed:    parsed,
+	})
+}
 
+func (a *aggregator) engine(n *Node) MatchingEngine {
 	requiredEngine := engineType(*n.Predicate)
 	if requiredEngine == EngineTypeNone {
-		return errEngineUnimplemented
+		return nil
 	}
 	for _, engine := range a.engines {
 		if engine.Type() != requiredEngine {
 			continue
 		}
-		return engine.Remove(ctx, ExpressionPart{
-			GroupID:   n.GroupID,
-			Predicate: n.Predicate,
-			Parsed:    parsed,
-		})
+		return engine
 	}
-	return errEngineUnimplemented
+	return nil
 }
 
 func isAggregateable(n *Node) bool {
@@ -507,6 +488,10 @@ func isAggregateable(n *Node) bool {
 	}
 	if n.Predicate.LiteralIdent != nil {
 		// We're matching idents together, so this is not aggregateable.
+		return false
+	}
+
+	if n.Predicate.Operator == "comprehension" {
 		return false
 	}
 
@@ -522,12 +507,10 @@ func isAggregateable(n *Node) bool {
 			return false
 		}
 		// Right now, we only support equality checking.
-		//
 		// TODO: Add GT(e)/LT(e) matching with tree iteration.
 		return n.Predicate.Operator == operators.Equals
-	case int64, float64:
-		// TODO: Add binary tree matching for ints/floats
-		return false
+	case int, int64, float64:
+		return true
 	case nil:
 		// This is null, which is supported and a simple lookup to check
 		// if the event's key in question is present and is not nil.

@@ -13,8 +13,8 @@ const (
 
 	EngineTypeStringHash
 	EngineTypeNullMatch
+	EngineTypeBTree // TODO
 	// EngineTypeART
-	// EngineTypeBTree
 )
 
 // MatchingEngine represents an engine (such as a b-tree, radix trie, or
@@ -102,6 +102,7 @@ func (p ExpressionPart) ToStored() *StoredExpressionPart {
 		GroupID:     p.GroupID,
 		Parsed:      p.Parsed,
 		PredicateID: p.Hash(),
+		Ident:       &p.Predicate.Ident,
 	}
 }
 
@@ -111,4 +112,5 @@ type StoredExpressionPart struct {
 	GroupID     groupID
 	PredicateID uint64
 	Parsed      *ParsedExpression
+	Ident       *string
 }
