@@ -1492,7 +1492,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 				StepName: resumeData.StepName,
 			})
 			if err != nil {
-				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
+				goerr = errors.Join(goerr, fmt.Errorf("error resuming pause: %w", err))
 				return
 			}
 			// Add to the counter.
@@ -1631,7 +1631,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 				StepName: resumeData.StepName,
 			})
 			if err != nil {
-				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
+				goerr = errors.Join(goerr, fmt.Errorf("error resuming pause: %w", err))
 				return
 			}
 			// Add to the counter.
@@ -1708,7 +1708,7 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 // Cancel cancels an in-progress function.
 func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequest) error {
 	md, err := e.smv2.LoadMetadata(ctx, id)
-	if err == sv2.ErrMetadataNotFound {
+	if err == sv2.ErrMetadataNotFound || err == state.ErrRunNotFound {
 		return nil
 	}
 	if err != nil {
@@ -1758,6 +1758,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			AccountID: pause.Identifier.AccountID,
 		},
 	})
+	if err == state.ErrRunNotFound {
+		return err
+	}
 	if err != nil {
 		return fmt.Errorf("error loading metadata to resume from pause: %w", err)
 	}

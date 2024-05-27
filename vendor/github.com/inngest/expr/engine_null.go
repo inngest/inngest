@@ -33,6 +33,8 @@ func (n *nullLookup) Type() EngineType {
 }
 
 func (n *nullLookup) Match(ctx context.Context, data map[string]any) ([]*StoredExpressionPart, error) {
+
+	l := &sync.Mutex{}
 	found := []*StoredExpressionPart{}
 	eg := errgroup.Group{}
 
@@ -50,8 +52,12 @@ func (n *nullLookup) Match(ctx context.Context, data map[string]any) ([]*StoredE
 				// value to nil.
 				res = []any{nil}
 			}
+
 			// This matches null, nil (as null), and any non-null items.
+			l.Lock()
 			found = append(found, n.Search(ctx, path, res[0])...)
+			l.Unlock()
+
 			return nil
 		})
 	}
