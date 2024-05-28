@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+type months = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+
 const MIN_HOUR_AM = 1;
 const MAX_HOUR_AM = 12;
 const MIN_HOUR_24 = 0;
@@ -12,6 +14,20 @@ function getMinMaxHour(is24Format: boolean) {
     return { minHour: MIN_HOUR_AM, maxHour: MAX_HOUR_AM };
   }
 }
+
+export const daysInMonth = (year: number, month: months) => {
+  switch (month) {
+    case 2:
+      return (year % 4 == 0 && year % 100) || year % 400 == 0 ? 29 : 28;
+    case 9:
+    case 4:
+    case 6:
+    case 11:
+      return 30;
+    default:
+      return 31;
+  }
+};
 
 export const getHourSchema = (is24Format: boolean) => {
   const { minHour, maxHour } = getMinMaxHour(is24Format);
@@ -47,3 +63,15 @@ export const periodSchema = z
   .refine((value) => value === 'am' || value === 'pm', {
     message: 'Period must be "AM" or "PM".',
   });
+
+export const yearSchema = z.coerce
+  .number()
+  .int()
+  .min(1970, { message: 'Year must be a 4 digit number' })
+  .max(3000, { message: 'Year must be a 4 digit number' });
+
+export const monthSchema = z.coerce
+  .number()
+  .int()
+  .min(1, { message: 'Month must be 1 - 12' })
+  .max(12, { message: 'Month must be 1 - 12' });

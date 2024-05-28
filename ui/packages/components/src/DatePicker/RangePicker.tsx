@@ -1,22 +1,19 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
-import { Switch } from '@radix-ui/react-switch';
 import * as Tabs from '@radix-ui/react-tabs';
-import type { Duration } from 'date-fns';
+import { type Duration } from 'date-fns';
 
 import { Button } from '../Button';
 import { Input } from '../Forms/Input';
 import { Popover, PopoverContent, PopoverTrigger } from '../Popover';
-import { SwitchLabel, SwitchWrapper } from '../Switch';
 import {
   DURATION_STRING_REGEX,
-  combineDayAndTime,
   longDateFormat,
   parseDuration,
+  subtractDuration,
 } from '../utils/date';
-import { Calendar } from './Calendar';
 import { DateInputButton, type DateInputButtonProps } from './DateInputButton';
-import { TimeInput } from './TimeInput';
+import { DateTimePicker } from './DateTimePIcker';
 
 type RelativeProps = {
   type: 'relative';
@@ -32,6 +29,8 @@ type RangeChangeProps = RelativeProps | AbsoluteProps;
 type RangePickerProps = Omit<DateInputButtonProps, 'defaultValue' | 'onChange'> & {
   placeholder?: string;
   onChange: (args: RangeChangeProps) => void;
+  defaultStart?: Date;
+  defaultEnd?: Date;
 };
 
 const RELATIVES = {
@@ -52,54 +51,6 @@ const RELATIVES = {
 export type AbsoluteRange = {
   start?: Date;
   end?: Date;
-};
-
-type InternalPickerProps = {
-  defaultValue?: Date;
-  onChange: (value: Date | undefined) => void;
-};
-
-const InternalPicker = ({ defaultValue, onChange }: InternalPickerProps) => {
-  const [day, setDay] = useState<Date | undefined>();
-  const [time, setTime] = useState<Date | undefined>();
-  const [is24HourFormat, setIs24HourFormat] = useState(false);
-  const [isValidTime, setIsValidTime] = useState(true);
-
-  useEffect(() => {
-    if (day && time && isValidTime) {
-      onChange(combineDayAndTime({ day, time }));
-    }
-  }, [day, time]);
-
-  return (
-    <div>
-      <div className="mt-2 p-2">
-        <Calendar selected={day} onSelect={setDay} />
-      </div>
-      <div className="w-full bg-slate-300 p-4">
-        <div className="flex items-center justify-between pb-4">
-          <p className="text-sm font-medium">{Intl.DateTimeFormat().resolvedOptions().timeZone}</p>
-          <SwitchWrapper>
-            <Switch
-              checked={is24HourFormat}
-              onCheckedChange={() => {
-                setIs24HourFormat((prev) => !prev);
-              }}
-              id="24hr"
-            />
-            <SwitchLabel htmlFor="24hr">24hr</SwitchLabel>
-          </SwitchWrapper>
-        </div>
-        <TimeInput
-          is24HourFormat={is24HourFormat}
-          selectedTime={time}
-          onSelect={setTime}
-          setIsValidTime={setIsValidTime}
-          isValidTime={isValidTime}
-        />
-      </div>
-    </div>
-  );
 };
 
 const formatAbsolute = (absoluteRange?: AbsoluteRange) => (
@@ -127,7 +78,13 @@ const RelativeDisplay = ({ duration }: { duration: string }) => (
   <span className="truncate text-slate-500">{duration}</span>
 );
 
-export const RangePicker = ({ placeholder, onChange, ...props }: RangePickerProps) => {
+export const RangePicker = ({
+  placeholder,
+  onChange,
+  defaultStart,
+  defaultEnd,
+  ...props
+}: RangePickerProps) => {
   const durationRef = useRef<HTMLInputElement | null>(null);
   const [open, setOpen] = useState(false);
   const [durationError, setDurationError] = useState<string>('');
@@ -237,9 +194,14 @@ export const RangePicker = ({ placeholder, onChange, ...props }: RangePickerProp
                   </Tabs.Trigger>
                 </Tabs.List>
                 <Tabs.Content className="grow rounded-b-md bg-white outline-none" value="start">
-                  <InternalPicker
+                  <DateTimePicker
                     onChange={(start: Date | undefined) =>
                       start && setAbsoluteRange({ start, end: absoluteRange?.end })
+                    }
+                    defaultValue={
+                      absoluteRange?.start ||
+                      defaultStart ||
+                      subtractDuration(new Date(), { days: 1 })
                     }
                   />
                   <div className="flox-row flex justify-between p-4">
@@ -259,10 +221,11 @@ export const RangePicker = ({ placeholder, onChange, ...props }: RangePickerProp
                   </div>
                 </Tabs.Content>
                 <Tabs.Content className="grow rounded-b-md bg-white outline-none" value="end">
-                  <InternalPicker
+                  <DateTimePicker
                     onChange={(end: Date | undefined) =>
                       end && setAbsoluteRange({ start: absoluteRange?.start, end })
                     }
+                    defaultValue={absoluteRange?.end || defaultEnd || new Date()}
                   />
                   <div className="flox-row flex justify-between p-4">
                     <Button
