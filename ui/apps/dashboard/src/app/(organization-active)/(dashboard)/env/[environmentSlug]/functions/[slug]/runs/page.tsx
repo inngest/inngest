@@ -169,6 +169,8 @@ export default function RunsPage({
   const nextPageRunsData = nextPageRes.data?.environment.runs.edges;
   const firstPageInfo = firstPageRes.data?.environment.runs.pageInfo;
   const nextPageInfo = nextPageRes.data?.environment.runs.pageInfo;
+  const hasNextPage = nextPageInfo?.hasNextPage || firstPageInfo?.hasNextPage;
+  const isLoading = firstPageRes.isLoading || nextPageRes.isLoading;
 
   if (functionSlug && !firstPageRunsData && !firstPageRes.isLoading && !firstPageRes.isSkipped) {
     throw new Error('missing run');
@@ -207,16 +209,9 @@ export default function RunsPage({
       if (containerRefElement && runs.length > 0) {
         const { scrollHeight, scrollTop, clientHeight } = containerRefElement;
         const lastCursor = nextPageInfo?.endCursor || firstPageInfo?.endCursor;
-        const hasNextPage = nextPageInfo?.hasNextPage || firstPageInfo?.hasNextPage;
         // Check if scrolled to the bottom
         const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
-        if (
-          reachedBottom &&
-          !firstPageRes.isLoading &&
-          !nextPageRes.isLoading &&
-          lastCursor &&
-          hasNextPage
-        ) {
+        if (reachedBottom && !isLoading && lastCursor && hasNextPage) {
           setIsScrollRequest(true);
           setCursor(lastCursor);
         }
@@ -259,10 +254,8 @@ export default function RunsPage({
         getRowCanExpand={() => true}
       />
       {nextPageRes.isLoading && <LoadingMore />}
-      {!nextPageInfo?.hasNextPage && !firstPageInfo?.hasNextPage && (
-        <p className="pt-2 text-center align-top font-medium text-slate-600">
-          No more runs to show
-        </p>
+      {!isLoading && !hasNextPage && (
+        <p className="py-8 text-center text-slate-600">No additional runs found.</p>
       )}
     </main>
   );
