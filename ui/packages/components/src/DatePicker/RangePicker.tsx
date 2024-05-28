@@ -87,9 +87,7 @@ const InternalPicker = ({ defaultValue, onChange }: InternalPickerProps) => {
               }}
               id="24hr"
             />
-            <SwitchLabel className="cursor-pointer" htmlFor="24hr">
-              24hr
-            </SwitchLabel>
+            <SwitchLabel htmlFor="24hr">24hr</SwitchLabel>
           </SwitchWrapper>
         </div>
         <TimeInput

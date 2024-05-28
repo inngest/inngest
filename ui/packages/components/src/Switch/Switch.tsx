@@ -26,7 +26,7 @@ interface SwitchLabelProps extends HTMLAttributes<HTMLLabelElement> {
 
 export const SwitchLabel = ({ htmlFor, children }: SwitchLabelProps) => {
   return (
-    <label htmlFor={htmlFor} className="font-medium text-slate-900">
+    <label htmlFor={htmlFor} className="cursor-pointer font-medium text-slate-900">
       {children}
     </label>
   );
