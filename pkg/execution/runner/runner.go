@@ -640,7 +640,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 			return err
 		}
 		if limited {
-			if evt.GetEvent().Name == event.InvokeFnName {
+			if evt.GetEvent().IsInvokeEvent() {
 				// This function was invoked by another function, so we need to
 				// ensure that the invoker fails. If we don't do this, it'll
 				// hang forever
