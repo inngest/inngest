@@ -1491,6 +1491,11 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 				RunID:    resumeData.RunID,
 				StepName: resumeData.StepName,
 			})
+			if errors.Is(err, state.ErrPauseLeased) ||
+				errors.Is(err, state.ErrPauseNotFound) ||
+				errors.Is(err, state.ErrRunNotFound) {
+				return
+			}
 			if err != nil {
 				goerr = errors.Join(goerr, fmt.Errorf("error resuming pause: %w", err))
 				return
@@ -1630,6 +1635,11 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 				RunID:    resumeData.RunID,
 				StepName: resumeData.StepName,
 			})
+			if errors.Is(err, state.ErrPauseLeased) ||
+				errors.Is(err, state.ErrPauseNotFound) ||
+				errors.Is(err, state.ErrRunNotFound) {
+				return
+			}
 			if err != nil {
 				goerr = errors.Join(goerr, fmt.Errorf("error resuming pause: %w", err))
 				return
