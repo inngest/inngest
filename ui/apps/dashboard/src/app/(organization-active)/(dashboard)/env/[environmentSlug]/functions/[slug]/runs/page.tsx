@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
@@ -73,6 +73,7 @@ export default function RunsPage({
     slug: string;
   };
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const functionSlug = decodeURIComponent(params.slug);
 
   const [rawFilteredStatus, setFilteredStatus, removeFilteredStatus] =
@@ -108,6 +109,8 @@ export default function RunsPage({
   }, [rawFilteredStatus]);
 
   function handleStatusesChange(value: FunctionRunStatus[]) {
+    scrollToTop();
+    setIsScrollRequest(false);
     if (value.length > 0) {
       setFilteredStatus(value);
     } else {
@@ -116,12 +119,16 @@ export default function RunsPage({
   }
 
   function handleTimeFieldChange(value: FunctionRunTimeField) {
+    scrollToTop();
+    setIsScrollRequest(false);
     if (value.length > 0) {
       setTimeField(value);
     }
   }
 
   function handleDaysChange(value: string) {
+    scrollToTop();
+    setIsScrollRequest(false);
     if (value) {
       setLastDays(value);
     }
@@ -137,7 +144,7 @@ export default function RunsPage({
       startTime: startTime.toISOString(),
       status: filteredStatus.length > 0 ? filteredStatus : null,
       timeField,
-      functionRunCursor: cursor,
+      functionRunCursor: null,
     },
   });
 
@@ -167,22 +174,33 @@ export default function RunsPage({
     throw new Error('missing run');
   }
 
-  const firstPageRuns = parseRunsData(firstPageRunsData);
+  const firstPageRuns = useMemo(() => {
+    return parseRunsData(firstPageRunsData);
+  }, [firstPageRunsData]);
+
   const nextPageRuns = useMemo(() => {
     return parseRunsData(nextPageRunsData);
   }, [nextPageRunsData]);
 
-  useEffect(() => {
-    if (runs.length === 0 && firstPageRuns.length > 0) {
-      setRuns(firstPageRuns);
+  const scrollToTop = () => {
+    if (containerRef.current) {
+      containerRef.current.scrollTo({
+        top: 0,
+      });
     }
-  }, [firstPageRuns, runs]);
+  };
 
   useEffect(() => {
-    if (nextPageRuns.length > 0) {
+    if (!isScrollRequest && firstPageRuns.length > 0) {
+      setRuns(firstPageRuns);
+    }
+  }, [firstPageRuns, isScrollRequest]);
+
+  useEffect(() => {
+    if (isScrollRequest && nextPageRuns.length > 0) {
       setRuns((prevRuns) => [...prevRuns, ...nextPageRuns]);
     }
-  }, [nextPageRuns]);
+  }, [nextPageRuns, isScrollRequest]);
 
   const fetchMoreOnScroll = useCallback(
     (containerRefElement?: HTMLDivElement | null) => {
@@ -199,7 +217,6 @@ export default function RunsPage({
           lastCursor &&
           hasNextPage
         ) {
-          console.log('caracas');
           setIsScrollRequest(true);
           setCursor(lastCursor);
         }
@@ -212,6 +229,7 @@ export default function RunsPage({
     <main
       className="h-full min-h-0 overflow-y-auto bg-white"
       onScroll={(e) => fetchMoreOnScroll(e.target as HTMLDivElement)}
+      ref={containerRef}
     >
       <div className="sticky top-0 flex items-center justify-between gap-2 bg-slate-50 px-8 py-2">
         <div className="flex items-center gap-2">
