@@ -159,9 +159,9 @@ func WithFinalizer(f execution.FinalizePublisher) ExecutorOpt {
 	}
 }
 
-func WithInvokeNotFoundHandler(f execution.InvokeNotFoundHandler) ExecutorOpt {
+func WithInvokeFailHandler(f execution.InvokeFailHandler) ExecutorOpt {
 	return func(e execution.Executor) error {
-		e.(*executor).invokeNotFoundHandler = f
+		e.(*executor).invokeFailHandler = f
 		return nil
 	}
 }
@@ -241,16 +241,16 @@ type executor struct {
 	pm   state.PauseManager
 	smv2 sv2.RunService
 
-	queue                 queue.Queue
-	debouncer             debounce.Debouncer
-	batcher               batch.BatchManager
-	fl                    state.FunctionLoader
-	evalFactory           func(ctx context.Context, expr string) (expressions.Evaluator, error)
-	runtimeDrivers        map[string]driver.Driver
-	finishHandler         execution.FinalizePublisher
-	invokeNotFoundHandler execution.InvokeNotFoundHandler
-	handleSendingEvent    execution.HandleSendingEvent
-	cancellationChecker   cancellation.Checker
+	queue               queue.Queue
+	debouncer           debounce.Debouncer
+	batcher             batch.BatchManager
+	fl                  state.FunctionLoader
+	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
+	runtimeDrivers      map[string]driver.Driver
+	finishHandler       execution.FinalizePublisher
+	invokeFailHandler   execution.InvokeFailHandler
+	handleSendingEvent  execution.HandleSendingEvent
+	cancellationChecker cancellation.Checker
 
 	lifecycles []execution.LifecycleListener
 
@@ -262,18 +262,18 @@ func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
 	e.finishHandler = f
 }
 
-func (e *executor) SetInvokeNotFoundHandler(f execution.InvokeNotFoundHandler) {
-	e.invokeNotFoundHandler = f
+func (e *executor) SetInvokeFailHandler(f execution.InvokeFailHandler) {
+	e.invokeFailHandler = f
 }
 
-func (e *executor) InvokeNotFoundHandler(ctx context.Context, opts execution.InvokeNotFoundHandlerOpts) error {
-	if e.invokeNotFoundHandler == nil {
+func (e *executor) InvokeFailHandler(ctx context.Context, opts execution.InvokeFailHandlerOpts) error {
+	if e.invokeFailHandler == nil {
 		return nil
 	}
 
-	evt := CreateInvokeNotFoundEvent(ctx, opts)
+	evt := CreateInvokeFailedEvent(ctx, opts)
 
-	return e.invokeNotFoundHandler(ctx, opts, []event.Event{evt})
+	return e.invokeFailHandler(ctx, opts, []event.Event{evt})
 }
 
 func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {

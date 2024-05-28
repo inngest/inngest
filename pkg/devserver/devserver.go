@@ -226,7 +226,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			},
 		),
 		executor.WithStepLimits(func(id sv2.ID) int { return consts.DefaultMaxStepLimit }),
-		executor.WithInvokeNotFoundHandler(getInvokeNotFoundHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
+		executor.WithInvokeFailHandler(getInvokeFailHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
 		executor.WithBatcher(batcher),
@@ -328,8 +328,8 @@ func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic stri
 	}
 }
 
-func getInvokeNotFoundHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.InvokeNotFoundHandler {
-	return func(ctx context.Context, opts execution.InvokeNotFoundHandlerOpts, evts []event.Event) error {
+func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.InvokeFailHandler {
+	return func(ctx context.Context, opts execution.InvokeFailHandlerOpts, evts []event.Event) error {
 		eg := errgroup.Group{}
 
 		for _, e := range evts {

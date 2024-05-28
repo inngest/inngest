@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -137,4 +138,72 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 	}
 
 	return data.Runs.Edges, data.Runs.PageInfo
+}
+
+type run struct {
+	Status string `json:"status"`
+}
+
+func (c *Client) Run(ctx context.Context, runID string) run {
+	c.Helper()
+
+	query := `
+		query GetRun($runID: ID!) {
+			functionRun(query: { functionRunId: $runID }) {
+				status
+			}
+		}`
+
+	resp := c.MustDoGQL(ctx, graphql.RawParams{
+		Query: query,
+		Variables: map[string]any{
+			"runID": runID,
+		},
+	})
+	if len(resp.Errors) > 0 {
+		c.Fatalf("err with gql: %#v", resp.Errors)
+	}
+
+	type response struct {
+		FunctionRun run `json:"functionRun"`
+	}
+
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, data); err != nil {
+		c.Fatalf(err.Error())
+	}
+
+	return data.FunctionRun
+}
+
+func (c *Client) WaitForRunStatus(
+	ctx context.Context,
+	t *testing.T,
+	expectedStatus string,
+	runID *string,
+) {
+	t.Helper()
+
+	start := time.Now()
+	status := ""
+	for {
+		if runID != nil && *runID != "" {
+			status = c.Run(ctx, *runID).Status
+			if status == expectedStatus {
+				break
+			}
+		}
+
+		if time.Since(start) > 5*time.Second {
+			var msg string
+			if runID == nil || *runID == "" {
+				msg = "Run ID is empty"
+			} else {
+				msg = fmt.Sprintf("Expected status %s, got %s", expectedStatus, status)
+			}
+			t.Fatalf(msg)
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
 }
