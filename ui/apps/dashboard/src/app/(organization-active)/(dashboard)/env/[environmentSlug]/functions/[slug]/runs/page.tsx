@@ -259,6 +259,11 @@ export default function RunsPage({
         getRowCanExpand={() => true}
       />
       {nextPageRes.isLoading && <LoadingMore />}
+      {!nextPageInfo?.hasNextPage && !firstPageInfo?.hasNextPage && (
+        <p className="pt-2 text-center align-top font-medium text-slate-600">
+          No more runs to show
+        </p>
+      )}
     </main>
   );
 }

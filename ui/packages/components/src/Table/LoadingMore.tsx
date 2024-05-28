@@ -2,7 +2,7 @@ import { IconSpinner } from '../icons/Spinner';
 
 export function LoadingMore() {
   return (
-    <div className="relative mx-auto	mt-4 h-20 w-[510px] overflow-hidden">
+    <div className="relative mx-auto h-20 w-[510px] overflow-hidden placeholder:mt-4">
       <div
         style={{ borderRadius: '50% / 100% 100% 0 0' }}
         className="absolute top-3 h-24 w-[510px] bg-slate-700/30"
