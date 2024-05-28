@@ -108,9 +108,14 @@ export default function RunsPage({
     return toRunStatuses(rawFilteredStatus ?? []);
   }, [rawFilteredStatus]);
 
-  function handleStatusesChange(value: FunctionRunStatus[]) {
+  function resetScrollPosition() {
+    // This scroll cannot be smooth, has to be instantaneous
     scrollToTop();
     setIsScrollRequest(false);
+  }
+
+  function handleStatusesChange(value: FunctionRunStatus[]) {
+    resetScrollPosition();
     if (value.length > 0) {
       setFilteredStatus(value);
     } else {
@@ -119,16 +124,14 @@ export default function RunsPage({
   }
 
   function handleTimeFieldChange(value: FunctionRunTimeField) {
-    scrollToTop();
-    setIsScrollRequest(false);
+    resetScrollPosition();
     if (value.length > 0) {
       setTimeField(value);
     }
   }
 
   function handleDaysChange(value: string) {
-    scrollToTop();
-    setIsScrollRequest(false);
+    resetScrollPosition();
     if (value) {
       setLastDays(value);
     }
@@ -184,10 +187,11 @@ export default function RunsPage({
     return parseRunsData(nextPageRunsData);
   }, [nextPageRunsData]);
 
-  const scrollToTop = () => {
+  const scrollToTop = (smooth = false) => {
     if (containerRef.current) {
       containerRef.current.scrollTo({
         top: 0,
+        behavior: smooth ? 'smooth' : 'auto',
       });
     }
   };
@@ -255,7 +259,15 @@ export default function RunsPage({
       />
       {nextPageRes.isLoading && <LoadingMore />}
       {!isLoading && !hasNextPage && (
-        <p className="py-8 text-center text-slate-600">No additional runs found.</p>
+        <div className="flex flex-col items-center py-8">
+          <p className="text-slate-600">No additional runs found.</p>
+          <Button
+            label="Back to top"
+            kind="primary"
+            appearance="text"
+            btnAction={() => scrollToTop(true)}
+          />
+        </div>
       )}
     </main>
   );
