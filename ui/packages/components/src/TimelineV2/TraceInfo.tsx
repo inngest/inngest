@@ -83,10 +83,12 @@ export function TraceInfo({ className, pathCreator, trace }: Props) {
   }
 
   return (
-    <div className={cn('flex bg-white', className)}>
+    <div className={cn('flex', className)}>
       <Card>
+        <Card.Header className="h-11 flex-row items-center gap-2">Step information</Card.Header>
+
         <Card.Content>
-          <dl className="flex flex-wrap gap-2">
+          <dl className="flex flex-wrap gap-4">
             <Labeled label="Queued at">
               <Time value={new Date(trace.queuedAt)} />
             </Labeled>

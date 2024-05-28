@@ -1,10 +1,14 @@
+'use client';
+
 import type { UrlObject } from 'url';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { toast } from 'sonner';
 
+import { RunResult } from '../RunResult';
 import { Trace } from '../TimelineV2';
 import { Timeline } from '../TimelineV2/Timeline';
+import type { Result } from '../types/functionRun';
 import { RunInfo } from './RunInfo';
 
 type Props = {
@@ -18,21 +22,29 @@ type Props = {
     id: string;
     name: string;
   };
-  getOutput: (outputID: string) => Promise<string | null>;
+  getResult: (outputID: string) => Promise<Result>;
   pathCreator: {
     runPopout: (params: { runID: string }) => Route;
   };
   rerun: (args: { fnID: string }) => Promise<unknown>;
   run: {
     id: string;
-    output: string | null;
     trace: React.ComponentProps<typeof Trace>['trace'];
     url: Route | UrlObject;
   };
 };
 
 export function RunDetails(props: Props) {
-  const { app, getOutput, fn, pathCreator, rerun, run, standalone } = props;
+  const { app, getResult, fn, pathCreator, rerun, run, standalone } = props;
+  const [result, setResult] = useState<Result>();
+
+  useEffect(() => {
+    if (!result && run.trace.outputID) {
+      getResult(run.trace.outputID).then((data) => {
+        setResult(data);
+      });
+    }
+  }, [result, run.trace.outputID]);
 
   const cancelRun = useCallback(async () => {
     try {
@@ -55,7 +67,10 @@ export function RunDetails(props: Props) {
         run={run}
         standalone={standalone}
       />
-      <Timeline getOutput={getOutput} pathCreator={pathCreator} trace={run.trace} />
+
+      {result && <RunResult className="mb-4" result={result} />}
+
+      <Timeline getResult={getResult} pathCreator={pathCreator} trace={run.trace} />
     </div>
   );
 }

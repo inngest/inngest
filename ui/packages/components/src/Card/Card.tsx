@@ -33,7 +33,7 @@ export function Card({ accentColor, accentPosition = 'top', children, className 
   return (
     <div
       className={cn(
-        'dark:bg-slate-910 w-full overflow-hidden dark:shadow',
+        'dark:bg-slate-910 w-full overflow-hidden rounded-md dark:shadow',
         wrapperClass,
         className
       )}

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { Route } from 'next';
 
-import { CodeBlock } from '../CodeBlock';
+import { RunResult } from '../RunResult';
+import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
 import { InlineSpans } from './InlineSpans';
@@ -12,7 +13,7 @@ import { createSpanWidths } from './utils';
 
 type Props = {
   depth: number;
-  getOutput: (outputID: string) => Promise<string | null>;
+  getResult: (outputID: string) => Promise<Result>;
   isExpandable?: boolean;
   minTime?: Date;
   maxTime?: Date;
@@ -24,7 +25,7 @@ type Props = {
 
 export function Trace({
   depth,
-  getOutput,
+  getResult,
   isExpandable = true,
   maxTime,
   minTime,
@@ -32,15 +33,15 @@ export function Trace({
   trace,
 }: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [output, setOutput] = useState<string>();
+  const [result, setResult] = useState<Result>();
 
   useEffect(() => {
-    if (isExpanded && !output && trace.outputID) {
-      getOutput(trace.outputID).then((data) => {
-        setOutput(data ?? undefined);
+    if (isExpanded && !result && trace.outputID) {
+      getResult(trace.outputID).then((data) => {
+        setResult(data);
       });
     }
-  }, [isExpanded, output]);
+  }, [isExpanded, result]);
 
   if (!minTime) {
     minTime = new Date(trace.queuedAt);
@@ -102,18 +103,7 @@ export function Trace({
         <div className="ml-8">
           <TraceInfo className="my-4 grow" pathCreator={pathCreator} trace={trace} />
 
-          {output && (
-            <div className="mb-4">
-              <CodeBlock
-                tabs={[
-                  {
-                    label: 'Output',
-                    content: output,
-                  },
-                ]}
-              />
-            </div>
-          )}
+          {result && <RunResult className="mb-4" result={result} />}
 
           {trace.childrenSpans?.map((child, i) => {
             return (
@@ -121,7 +111,7 @@ export function Trace({
                 <div className="grow">
                   <Trace
                     depth={depth + 1}
-                    getOutput={getOutput}
+                    getResult={getResult}
                     maxTime={maxTime}
                     minTime={minTime}
                     pathCreator={pathCreator}

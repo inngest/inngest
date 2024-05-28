@@ -33,3 +33,12 @@ export type FunctionRunTimeField = (typeof FunctionRunTimeFields)[number];
 export function isFunctionTimeField(s: string): s is FunctionRunTimeField {
   return FunctionRunTimeFields.includes(s as FunctionRunTimeField);
 }
+
+export type Result = {
+  data: string | null;
+  error: {
+    message: string;
+    name: string | null;
+    stack: string | null;
+  } | null;
+};

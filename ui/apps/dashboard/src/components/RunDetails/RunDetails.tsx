@@ -10,6 +10,7 @@ import { toRunStatus } from '@/app/(organization-active)/(dashboard)/env/[enviro
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
 import { pathCreator } from '@/utils/urls';
+import { useGetTraceResult } from './useGetTraceResult';
 import { useRun } from './useRun';
 
 type Props = {
@@ -21,6 +22,7 @@ export function RunDetails({ runID, standalone = true }: Props) {
   const env = useEnvironment();
   const cancelRun = useCancelRun({ envID: env.id, runID });
   const rerun = useRerun({ envID: env.id, envSlug: env.slug, runID });
+  const getTraceResult = useGetTraceResult();
 
   const internalPathCreator = useMemo(() => {
     return {
@@ -39,10 +41,6 @@ export function RunDetails({ runID, standalone = true }: Props) {
     return <Loading />;
   }
   const { run, trace } = res.data;
-
-  async function getOutput() {
-    return null;
-  }
 
   return (
     <div className={cn('overflow-y-auto', standalone && 'p-5 pt-8')}>
@@ -63,11 +61,10 @@ export function RunDetails({ runID, standalone = true }: Props) {
         }}
         cancelRun={cancelRun}
         fn={run.function}
-        getOutput={getOutput}
+        getResult={getTraceResult}
         rerun={rerun}
         run={{
           id: runID,
-          output: null,
           trace,
           url: pathCreator.runPopout({ envSlug: env.slug, runID: runID }),
         }}
