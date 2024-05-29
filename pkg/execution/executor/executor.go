@@ -972,12 +972,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	if resp == nil && err != nil {
 		span.SetStatus(codes.Error, err.Error())
-		if byt, err := json.Marshal(err.Error()); err == nil {
-			span.AddEvent(string(byt), trace.WithAttributes(
-				attribute.Bool(consts.OtelSysStepOutput, true),
-			))
-		}
-
+		span.SetStepOutput(err.Error())
 		return nil, err
 	}
 
@@ -1002,12 +997,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				attribute.String(consts.OtelSysStepDisplayName, op.UserDefinedName()),
 				attribute.String(consts.OtelSysStepOpcode, foundOp.String()),
 			)
-
-			if byt, err := json.Marshal(resp.Output); err == nil {
-				span.AddEvent(string(byt), trace.WithAttributes(
-					attribute.Bool(consts.OtelSysStepOutput, true),
-				))
-			}
+			span.SetStepOutput(resp.Output)
 		} else if resp.IsTraceVisibleFunctionExecution() {
 			spanName := "function success"
 			fnstatus := attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCompleted.ToCode())
@@ -1023,16 +1013,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 			fnSpan.SetAttributes(fnstatus)
 			span.SetName(spanName)
-
-			if byt, err := json.Marshal(resp.Output); err == nil {
-				fnSpan.AddEvent(string(byt), trace.WithAttributes(
-					attribute.Bool(consts.OtelSysFunctionOutput, true),
-				))
-
-				span.AddEvent(string(byt), trace.WithAttributes(
-					attribute.Bool(consts.OtelSysFunctionOutput, true),
-				))
-			}
+			fnSpan.SetFnOutput(resp.Output)
+			span.SetStepOutput(resp.Output)
 		} else {
 			// if it's not a step or function response that represents either a failed or a successful execution.
 			// Do not record discovery spans and cancel it.
@@ -1906,11 +1888,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 						defer span.End()
 						span.SetAttributes(commonAttrs...)
 						if r.With != nil {
-							if byt, err := json.Marshal(r.With); err == nil {
-								span.AddEvent(string(byt), trace.WithAttributes(
-									attribute.Bool(consts.OtelSysStepOutput, true),
-								))
-							}
+							span.SetStepOutput(r.With)
 						}
 						if r.HasError() {
 							span.SetStatus(codes.Error, r.Error())
@@ -1951,11 +1929,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 							span.SetAttributes(attribute.String(consts.OtelSysStepWaitExpression, *pause.Expression))
 						}
 						if r.With != nil {
-							if byt, err := json.Marshal(r.With); err == nil {
-								span.AddEvent(string(byt), trace.WithAttributes(
-									attribute.Bool(consts.OtelSysStepOutput, true),
-								))
-							}
+							span.SetStepOutput(r.With)
 						}
 						if r.HasError() {
 							span.SetStatus(codes.Error, r.Error())

@@ -4,6 +4,7 @@ import (
 	"context"
 	crand "crypto/rand"
 	"encoding/binary"
+	"encoding/json"
 	"math/rand"
 	"sync"
 	"time"
@@ -537,6 +538,33 @@ func (s *Span) SetAttributes(attrs ...attribute.KeyValue) {
 
 func (s *Span) TracerProvider() trace.TracerProvider {
 	return UserTracer().Provider()
+}
+
+func (s *Span) SetFnOutput(data any) {
+	s.setOutput(data, consts.OtelSysFunctionOutput)
+}
+
+func (s *Span) SetStepOutput(data any) {
+	s.setOutput(data, consts.OtelSysStepOutput)
+}
+
+func (s *Span) setOutput(data any, key string) {
+	attr := []attribute.KeyValue{
+		attribute.Bool(key, true),
+	}
+
+	switch v := data.(type) {
+	case string:
+		s.AddEvent(v, trace.WithAttributes(attr...))
+	case []byte:
+		s.AddEvent(string(v), trace.WithAttributes(attr...))
+	case json.RawMessage:
+		s.AddEvent(string(v), trace.WithAttributes(attr...))
+	case map[string]any:
+		if byt, err := json.Marshal(v); err == nil {
+			s.AddEvent(string(byt), trace.WithAttributes(attr...))
+		}
+	}
 }
 
 func newSpanIDGenerator() *spanIDGenerator {
