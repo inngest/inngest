@@ -805,7 +805,8 @@ func applyResponse(
 		return nil
 	}
 
-	if resp.Error() != "" {
+  // Only set the output to the response error string if there isn't already output. This prevents overriding errors in the user's function
+	if resp.Output == nil && resp.Error() != "" {
 		h.Result.Output = resp.Error()
 		h.Result.SizeBytes = len(h.Result.Output)
 		return nil
