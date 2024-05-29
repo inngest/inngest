@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strconv"
 	"time"
 
-	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/throttled/throttled/v2"
 	"github.com/xhit/go-str2duration/v2"
 )
@@ -49,8 +48,7 @@ func RateLimitKey(ctx context.Context, id uuid.UUID, c inngest.RateLimit, evt ma
 }
 
 func hash(res any, id uuid.UUID) string {
-	ui := xxhash.Sum64String(fmt.Sprintf("%v", res))
-	sum := strconv.FormatUint(ui, 36)
+	sum := util.XXHash(res)
 	return fmt.Sprintf("%s-%s", id, sum)
 }
 
