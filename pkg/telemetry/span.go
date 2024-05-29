@@ -560,7 +560,7 @@ func (s *Span) setOutput(data any, key string) {
 		s.AddEvent(string(v), trace.WithAttributes(attr...))
 	case json.RawMessage:
 		s.AddEvent(string(v), trace.WithAttributes(attr...))
-	case map[string]any:
+	default:
 		if byt, err := json.Marshal(v); err == nil {
 			s.AddEvent(string(byt), trace.WithAttributes(attr...))
 		}
