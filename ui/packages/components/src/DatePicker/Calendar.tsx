@@ -29,7 +29,7 @@ export function Calendar({ selected, onSelect, month, onMonthChange }: CalendarP
 
 const classNames: DayPickerDefaultProps['classNames'] = {
   caption: 'flex justify-center items-center h-6',
-  root: 'text-slate-900',
+  root: 'text-slate-900 dark:bg-white',
   months: 'flex gap-4 relative',
   caption_label: 'text-lg font-medium',
   nav_button:

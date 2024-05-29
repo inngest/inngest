@@ -23,7 +23,7 @@ export const DateTimePicker = ({ defaultValue, onChange }: InternalPickerProps) 
 
   return (
     <div>
-      <div className="mt-2 p-2">
+      <div className="mt-2 p-2 dark:bg-white">
         <Calendar
           month={calendarDate}
           selected={calendarDate}
