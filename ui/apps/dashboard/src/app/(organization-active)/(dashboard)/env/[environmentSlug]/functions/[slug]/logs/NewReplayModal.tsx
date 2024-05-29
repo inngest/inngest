@@ -12,7 +12,7 @@ import { subtractDuration } from '@inngest/components/utils/date';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
-import { useMutation } from 'urql';
+import { useMutation, useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import Input from '@/components/Forms/Input';
@@ -20,6 +20,23 @@ import Placeholder from '@/components/Placeholder';
 import { graphql } from '@/gql';
 import { FunctionRunStatus } from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
+
+const GetBillingPlanDocument = graphql(`
+  query GetBillingPlan {
+    account {
+      plan {
+        id
+        name
+        features
+      }
+    }
+
+    plans {
+      name
+      features
+    }
+  }
+`);
 
 const GetFunctionEndedRunsCountDocument = graphql(`
   query GetFunctionEndedRunsCount(
@@ -115,6 +132,13 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
     FunctionRunStatus.Failed,
   ]);
   const environment = useEnvironment();
+
+  const [{ data: planData }] = useQuery({
+    query: GetBillingPlanDocument,
+  });
+
+  const logRetention = Number(planData?.account.plan?.features?.log_retention);
+  const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
 
   const { data, isLoading } = useSkippableGraphQLQuery({
     query: GetFunctionEndedRunsCountDocument,
@@ -229,6 +253,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
             </div>
             <div className="w-1/2">
               <RangePicker
+                {...(upgradeCutoff && { upgradeCutoff })}
                 onChange={(range) =>
                   setTimeRange(
                     range.type === 'relative'

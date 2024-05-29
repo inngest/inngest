@@ -23,9 +23,14 @@ type TimeInputProps = {
   is24HourFormat?: boolean;
   selectedDateTime?: Date;
   onSelect: React.Dispatch<React.SetStateAction<Date | undefined>>;
-  setIsValidTime: React.Dispatch<React.SetStateAction<boolean>>;
-  isValidTime: boolean;
+  setValid: React.Dispatch<React.SetStateAction<boolean>>;
+  valid: boolean;
+  error?: string;
 };
+
+const isNumeric = (num: any) =>
+  (typeof num === 'number' || (typeof num === 'string' && num.trim() !== '')) &&
+  !isNaN(num as number);
 
 const formatWithDefault = (format: string, defaultValue: string, date?: Date) =>
   date ? formatDate(date, format) : defaultValue;
@@ -34,8 +39,8 @@ export function DateTimeInput({
   selectedDateTime,
   onSelect,
   is24HourFormat = false,
-  setIsValidTime,
-  isValidTime,
+  setValid,
+  valid,
 }: TimeInputProps) {
   const daysRef = useRef<HTMLInputElement | null>(null);
   const yearsRef = useRef<HTMLInputElement | null>(null);
@@ -72,29 +77,33 @@ export function DateTimeInput({
   }, [selectedDateTime]);
 
   useEffect(() => {
-    if (!isValidTime) {
+    if (!valid) {
       onSelect(undefined);
       return;
     }
 
     // Aggregates the multiple input time parts and combines in one date
-    const newTimeDate = new Date(parseInt(yearInput), parseInt(monthInput) - 1, parseInt(dayInput));
-    newTimeDate.setHours(parseInt(hourInput));
-    newTimeDate.setMinutes(parseInt(minuteInput));
-    newTimeDate.setSeconds(parseInt(secondInput));
-    newTimeDate.setMilliseconds(parseInt(millisecondInput));
+    const newDate = new Date(parseInt(yearInput), parseInt(monthInput) - 1, parseInt(dayInput));
+
+    newDate.setHours(parseInt(hourInput));
+    newDate.setMinutes(parseInt(minuteInput));
+    newDate.setSeconds(parseInt(secondInput));
+    newDate.setMilliseconds(parseInt(millisecondInput));
+
     if (periodInput && !is24HourFormat) {
-      const hour = newTimeDate.getHours();
+      const hour = newDate.getHours();
       if (periodInput.toUpperCase() === 'PM' && hour < 12) {
-        newTimeDate.setHours(hour + 12);
+        newDate.setHours(hour + 12);
       } else if (periodInput.toUpperCase() === 'AM' && hour === 12) {
-        newTimeDate.setHours(0);
+        newDate.setHours(0);
       }
     }
-    if (isNaN(newTimeDate.getTime())) {
+
+    if (!isValid(newDate)) {
+      setValid(false);
       return;
     }
-    onSelect(newTimeDate);
+    onSelect(newDate);
   }, [
     monthInput,
     dayInput,
@@ -118,15 +127,15 @@ export function DateTimeInput({
     const value = e.target.value;
     if (value.trim() === '') {
       setInputValue('');
-      setIsValidTime(false);
+      setValid(false);
       return;
     }
     try {
       schema.parse(value);
       setInputValue(value);
-      setIsValidTime(true);
+      setValid(true);
     } catch (error) {
-      setIsValidTime(false);
+      setValid(false);
       if (!(error instanceof ZodError)) {
         return;
       }
@@ -148,12 +157,12 @@ export function DateTimeInput({
     const value = e.target.value;
     if (value.trim() === '') {
       setInputValue('');
-      setIsValidTime(false);
+      setValid(false);
       return;
     }
-    const d = getDaysInMonth(new Date(parseInt(yearInput), parseInt(monthInput) - 1));
+    const days = getDaysInMonth(new Date(parseInt(yearInput), parseInt(monthInput) - 1));
 
-    setIsValidTime(1 <= Number(value) && Number(value) <= d);
+    setValid(isNumeric(value) && Number(value) >= 1 && Number(value) <= days);
     setInputValue(value);
   };
 
@@ -161,16 +170,16 @@ export function DateTimeInput({
     const inputPeriod = e.target.value;
     if (inputPeriod.trim() === '') {
       setPeriodInput('');
-      setIsValidTime(false);
+      setValid(false);
       return;
     }
     const parsedInputPeriod = inputPeriod.toUpperCase();
     try {
       periodSchema.parse(parsedInputPeriod);
       setPeriodInput(parsedInputPeriod);
-      setIsValidTime(true);
+      setValid(true);
     } catch (error) {
-      setIsValidTime(false);
+      setValid(false);
       if (
         parsedInputPeriod.length === 1 &&
         (parsedInputPeriod.startsWith('A') || parsedInputPeriod.startsWith('P'))
@@ -200,7 +209,7 @@ export function DateTimeInput({
     <div
       className={cn(
         'flex h-8 items-center rounded-lg border border-slate-300 bg-white px-3.5 text-sm leading-none text-slate-700 placeholder-slate-300 transition-all has-[:focus]:border-slate-200',
-        !isValidTime && 'has-[:focus]:border-rose-500'
+        !valid && 'border-rose-500 has-[:focus]:border-rose-500'
       )}
       onPaste={(e: React.ClipboardEvent<HTMLDivElement>) => {
         const raw = e?.clipboardData?.getData('text') || '';

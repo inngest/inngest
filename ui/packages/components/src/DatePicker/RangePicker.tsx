@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import * as Tabs from '@radix-ui/react-tabs';
-import { type Duration } from 'date-fns';
+import { isBefore, sub, type Duration } from 'date-fns';
 
+import { Badge } from '../Badge';
 import { Button } from '../Button';
 import { Input } from '../Forms/Input';
 import { Popover, PopoverContent, PopoverTrigger } from '../Popover';
@@ -31,6 +32,7 @@ type RangePickerProps = Omit<DateInputButtonProps, 'defaultValue' | 'onChange'> 
   onChange: (args: RangeChangeProps) => void;
   defaultStart?: Date;
   defaultEnd?: Date;
+  upgradeCutoff?: Date;
 };
 
 const RELATIVES = {
@@ -83,6 +85,7 @@ export const RangePicker = ({
   onChange,
   defaultStart,
   defaultEnd,
+  upgradeCutoff,
   ...props
 }: RangePickerProps) => {
   const durationRef = useRef<HTMLInputElement | null>(null);
@@ -92,6 +95,17 @@ export const RangePicker = ({
   const [showAbsolute, setShowAbsolute] = useState<boolean>();
   const [tab, setTab] = useState('start');
   const [displayValue, setDisplayValue] = useState<ReactNode | null>(null);
+  const [startValid, setStartValid] = useState(true);
+  const [endValid, setEndValid] = useState(true);
+
+  const validateDuration = (duration: string, upgradeCutoff?: Date): boolean => {
+    if (!upgradeCutoff) {
+      return true;
+    }
+
+    const request = subtractDuration(new Date(), parseDuration(duration));
+    return !isBefore(request, upgradeCutoff);
+  };
 
   useEffect(() => {
     return () => {
@@ -106,13 +120,19 @@ export const RangePicker = ({
       return;
     }
 
-    if (DURATION_STRING_REGEX.test(e.target.value)) {
-      setDisplayValue(<RelativeDisplay duration={e.target.value} />);
-      onChange({ type: 'relative', duration: parseDuration(e.target.value) });
-      setOpen(false);
-    } else {
+    if (!DURATION_STRING_REGEX.test(e.target.value)) {
       setDurationError('Invalid duration');
+      return;
     }
+
+    if (!validateDuration(e.target.value, upgradeCutoff)) {
+      setDurationError('Upgrade plan');
+      return;
+    }
+
+    setDisplayValue(<RelativeDisplay duration={e.target.value} />);
+    onChange({ type: 'relative', duration: parseDuration(e.target.value) });
+    setOpen(false);
   };
 
   return (
@@ -140,26 +160,44 @@ export const RangePicker = ({
                 onKeyDown={processDuration}
               />
             </div>
-            {Object.entries(RELATIVES).map(([k, v], i) => (
-              <div
-                key={`duration-${i}`}
-                className="cursor-pointer px-6 py-2 text-sm font-normal text-slate-700 hover:bg-blue-50"
-                onClick={() => {
-                  setDisplayValue(<RelativeDisplay duration={k} />);
-                  onChange({ type: 'relative', duration: parseDuration(k) });
-                  setDurationError('');
-                  setOpen(false);
-                }}
-              >
-                {v}
-              </div>
-            ))}
+            {Object.entries(RELATIVES).map(([k, v], i) => {
+              const planValid = validateDuration(k, upgradeCutoff);
+              return (
+                <div
+                  key={`duration-${i}`}
+                  className={`flex flex-row items-center justify-between py-2 pl-6 pr-3 text-sm font-normal text-slate-700 hover:bg-blue-50 ${
+                    planValid ? 'cursor-pointer' : 'cursor-not-allowed'
+                  }`}
+                  {...(planValid && {
+                    onClick: () => {
+                      setDisplayValue(<RelativeDisplay duration={k} />);
+                      onChange({ type: 'relative', duration: parseDuration(k) });
+                      setDurationError('');
+                      setOpen(false);
+                    },
+                  })}
+                >
+                  {v}
+                  {!planValid && (
+                    <Badge
+                      className="border-indigo-500 px-2 py-0.5 text-xs text-indigo-500"
+                      kind="outlined"
+                    >
+                      Upgrade Plan
+                    </Badge>
+                  )}
+                </div>
+              );
+            })}
             <div className="flex flex-col">
               <div
                 className={`cursor-pointer border-t border-slate-300 px-6 py-3.5 text-sm font-normal text-slate-700 hover:bg-blue-50 ${
                   showAbsolute && 'bg-blue-50'
                 }`}
-                onClick={() => setShowAbsolute(!showAbsolute)}
+                onClick={() => {
+                  setShowAbsolute(!showAbsolute);
+                  setDurationError('');
+                }}
               >
                 Absolute Range
               </div>
@@ -199,6 +237,8 @@ export const RangePicker = ({
                     onChange={(start: Date | undefined) =>
                       start && setAbsoluteRange({ start, end: absoluteRange?.end })
                     }
+                    valid={startValid}
+                    setValid={setStartValid}
                     defaultValue={
                       absoluteRange?.start ||
                       defaultStart ||
@@ -216,7 +256,7 @@ export const RangePicker = ({
                       size="small"
                       label="Next"
                       kind="primary"
-                      disabled={!absoluteRange?.start}
+                      disabled={!absoluteRange?.start || !startValid}
                       btnAction={() => setTab('end')}
                     />
                   </div>
@@ -226,6 +266,8 @@ export const RangePicker = ({
                     onChange={(end: Date | undefined) =>
                       end && setAbsoluteRange({ start: absoluteRange?.start, end })
                     }
+                    valid={endValid}
+                    setValid={setEndValid}
                     defaultValue={absoluteRange?.end || defaultEnd || new Date()}
                   />
                   <div className="flox-row flex justify-between p-4">

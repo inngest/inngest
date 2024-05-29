@@ -8,12 +8,18 @@ import { DateTimeInput } from './DateTimeInput';
 type InternalPickerProps = {
   defaultValue: Date;
   onChange: (value: Date | undefined) => void;
+  setValid: React.Dispatch<React.SetStateAction<boolean>>;
+  valid: boolean;
 };
 
-export const DateTimePicker = ({ defaultValue, onChange }: InternalPickerProps) => {
+export const DateTimePicker = ({
+  defaultValue,
+  onChange,
+  valid,
+  setValid,
+}: InternalPickerProps) => {
   const [dateTime, setDateTime] = useState<Date | undefined>(defaultValue);
   const [is24HourFormat, setIs24HourFormat] = useState(false);
-  const [isValidTime, setIsValidTime] = useState(true);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(defaultValue);
   const [inputDate, setInputDate] = useState<Date | undefined>(defaultValue);
 
@@ -68,8 +74,8 @@ export const DateTimePicker = ({ defaultValue, onChange }: InternalPickerProps) 
               setDateTime(d);
             }
           }}
-          setIsValidTime={setIsValidTime}
-          isValidTime={isValidTime}
+          setValid={setValid}
+          valid={valid}
         />
       </div>
     </div>
