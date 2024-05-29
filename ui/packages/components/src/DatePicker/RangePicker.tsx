@@ -147,6 +147,7 @@ export const RangePicker = ({
                 onClick={() => {
                   setDisplayValue(<RelativeDisplay duration={k} />);
                   onChange({ type: 'relative', duration: parseDuration(k) });
+                  setDurationError('');
                   setOpen(false);
                 }}
               >
