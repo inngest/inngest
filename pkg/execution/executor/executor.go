@@ -159,9 +159,9 @@ func WithFinalizer(f execution.FinalizePublisher) ExecutorOpt {
 	}
 }
 
-func WithInvokeNotFoundHandler(f execution.InvokeNotFoundHandler) ExecutorOpt {
+func WithInvokeFailHandler(f execution.InvokeFailHandler) ExecutorOpt {
 	return func(e execution.Executor) error {
-		e.(*executor).invokeNotFoundHandler = f
+		e.(*executor).invokeFailHandler = f
 		return nil
 	}
 }
@@ -241,16 +241,16 @@ type executor struct {
 	pm   state.PauseManager
 	smv2 sv2.RunService
 
-	queue                 queue.Queue
-	debouncer             debounce.Debouncer
-	batcher               batch.BatchManager
-	fl                    state.FunctionLoader
-	evalFactory           func(ctx context.Context, expr string) (expressions.Evaluator, error)
-	runtimeDrivers        map[string]driver.Driver
-	finishHandler         execution.FinalizePublisher
-	invokeNotFoundHandler execution.InvokeNotFoundHandler
-	handleSendingEvent    execution.HandleSendingEvent
-	cancellationChecker   cancellation.Checker
+	queue               queue.Queue
+	debouncer           debounce.Debouncer
+	batcher             batch.BatchManager
+	fl                  state.FunctionLoader
+	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
+	runtimeDrivers      map[string]driver.Driver
+	finishHandler       execution.FinalizePublisher
+	invokeFailHandler   execution.InvokeFailHandler
+	handleSendingEvent  execution.HandleSendingEvent
+	cancellationChecker cancellation.Checker
 
 	lifecycles []execution.LifecycleListener
 
@@ -262,18 +262,18 @@ func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
 	e.finishHandler = f
 }
 
-func (e *executor) SetInvokeNotFoundHandler(f execution.InvokeNotFoundHandler) {
-	e.invokeNotFoundHandler = f
+func (e *executor) SetInvokeFailHandler(f execution.InvokeFailHandler) {
+	e.invokeFailHandler = f
 }
 
-func (e *executor) InvokeNotFoundHandler(ctx context.Context, opts execution.InvokeNotFoundHandlerOpts) error {
-	if e.invokeNotFoundHandler == nil {
+func (e *executor) InvokeFailHandler(ctx context.Context, opts execution.InvokeFailHandlerOpts) error {
+	if e.invokeFailHandler == nil {
 		return nil
 	}
 
-	evt := CreateInvokeNotFoundEvent(ctx, opts)
+	evt := CreateInvokeFailedEvent(ctx, opts)
 
-	return e.invokeNotFoundHandler(ctx, opts, []event.Event{evt})
+	return e.invokeFailHandler(ctx, opts, []event.Event{evt})
 }
 
 func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
@@ -581,6 +581,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 					WorkspaceID: req.WorkspaceID,
 					AccountID:   req.AccountID,
 					AppID:       req.AppID,
+					EventID:     metadata.Config.EventID(),
+					EventIDs:    metadata.Config.EventIDs,
 				},
 				ID:                pauseID,
 				Expires:           state.Time(expires),
@@ -626,6 +628,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			WorkspaceID: req.WorkspaceID,
 			AccountID:   req.AccountID,
 			AppID:       req.AppID,
+			EventID:     metadata.Config.EventID(),
+			EventIDs:    metadata.Config.EventIDs,
 		},
 		CustomConcurrencyKeys: metadata.Config.CustomConcurrencyKeys,
 		PriorityFactor:        metadata.Config.PriorityFactor,
@@ -728,7 +732,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
 	// for `tools.sleep` within generator functions.
 	if item.Kind == queue.KindSleep && item.Attempt == 0 {
-		if err := e.smv2.SaveStep(ctx, sv2.ID{
+		err := e.smv2.SaveStep(ctx, sv2.ID{
 			RunID:      id.RunID,
 			FunctionID: id.WorkflowID,
 			Tenant: sv2.Tenant{
@@ -736,7 +740,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				EnvID:     id.WorkspaceID,
 				AccountID: id.AccountID,
 			},
-		}, edge.Outgoing, []byte("null")); err != nil {
+		}, edge.Outgoing, []byte("null"))
+		if !errors.Is(err, state.ErrDuplicateResponse) && err != nil {
 			return nil, err
 		}
 		// After the sleep, we start a new step.  This means we also want to start a new
@@ -1486,8 +1491,13 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 				RunID:    resumeData.RunID,
 				StepName: resumeData.StepName,
 			})
+			if errors.Is(err, state.ErrPauseLeased) ||
+				errors.Is(err, state.ErrPauseNotFound) ||
+				errors.Is(err, state.ErrRunNotFound) {
+				return
+			}
 			if err != nil {
-				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
+				goerr = errors.Join(goerr, fmt.Errorf("error resuming pause: %w", err))
 				return
 			}
 			// Add to the counter.
@@ -1625,8 +1635,13 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 				RunID:    resumeData.RunID,
 				StepName: resumeData.StepName,
 			})
+			if errors.Is(err, state.ErrPauseLeased) ||
+				errors.Is(err, state.ErrPauseNotFound) ||
+				errors.Is(err, state.ErrRunNotFound) {
+				return
+			}
 			if err != nil {
-				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
+				goerr = errors.Join(goerr, fmt.Errorf("error resuming pause: %w", err))
 				return
 			}
 			// Add to the counter.
@@ -1703,7 +1718,7 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 // Cancel cancels an in-progress function.
 func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequest) error {
 	md, err := e.smv2.LoadMetadata(ctx, id)
-	if err == sv2.ErrMetadataNotFound {
+	if err == sv2.ErrMetadataNotFound || err == state.ErrRunNotFound {
 		return nil
 	}
 	if err != nil {
@@ -1753,6 +1768,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			AccountID: pause.Identifier.AccountID,
 		},
 	})
+	if err == state.ErrRunNotFound {
+		return err
+	}
 	if err != nil {
 		return fmt.Errorf("error loading metadata to resume from pause: %w", err)
 	}

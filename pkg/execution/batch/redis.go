@@ -163,44 +163,10 @@ func (b redisBatchManager) RetrieveItems(ctx context.Context, batchID ulid.ULID)
 
 // StartExecution sets the status to `started`
 // If it has already started, don't do anything
-func (b redisBatchManager) StartExecutionWithBatchPointer(ctx context.Context, batchID ulid.ULID, batchPointer string) (string, error) {
+func (b redisBatchManager) StartExecution(ctx context.Context, batchID ulid.ULID, batchPointer string) (string, error) {
 	keys := []string{
 		b.k.BatchMetadata(ctx, batchID),
 		batchPointer,
-	}
-	args := []string{
-		enums.BatchStatusStarted.String(),
-		ulid.Make().String(),
-	}
-
-	status, err := scripts["start"].Exec(
-		ctx,
-		b.r,
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return "", fmt.Errorf("failed to start batch execution: %w", err)
-	}
-
-	switch status {
-	case 0: // haven't started, so mark mark it started
-		return enums.BatchStatusReady.String(), nil
-
-	case 1: // Already started
-		return enums.BatchStatusStarted.String(), nil
-
-	default:
-		return "", fmt.Errorf("invalid status for start batch ops: %d", status)
-	}
-}
-
-// StartExecution sets the status to `started`
-// If it has already started, don't do anything
-func (b redisBatchManager) StartExecution(ctx context.Context, fnID uuid.UUID, batchID ulid.ULID) (string, error) {
-	keys := []string{
-		b.k.BatchMetadata(ctx, batchID),
-		b.k.BatchPointer(ctx, fnID),
 	}
 	args := []string{
 		enums.BatchStatusStarted.String(),

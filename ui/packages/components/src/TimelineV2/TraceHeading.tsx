@@ -24,8 +24,10 @@ type Props = {
 };
 
 export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, trace }: Props) {
+  const isAttempt = trace.stepOp === 'RUN' && (trace.childrenSpans?.length ?? 0) === 0;
   let opCodeBadge;
-  if (trace.stepOp && (trace.childrenSpans?.length ?? 0) > 0) {
+  if (trace.stepOp && !isAttempt) {
+    const title = trace.stepOp.split('_')[0]?.toLowerCase();
     const isRetried = (trace.attempts ?? 0) > 1;
 
     opCodeBadge = (
@@ -37,7 +39,7 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
               flatSide={isRetried ? 'right' : undefined}
               kind="solid"
             >
-              <span>{trace.stepOp.toLowerCase()}</span>
+              <span>{title}</span>
             </Badge>
           </TooltipTrigger>
           <TooltipContent>Step method</TooltipContent>

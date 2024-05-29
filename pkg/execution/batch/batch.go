@@ -32,9 +32,7 @@ import (
 type BatchManager interface {
 	Append(ctx context.Context, bi BatchItem, fn inngest.Function) (*BatchAppendResult, error)
 	RetrieveItems(ctx context.Context, batchID ulid.ULID) ([]BatchItem, error)
-	StartExecutionWithBatchPointer(ctx context.Context, batchID ulid.ULID, batchPointer string) (string, error)
-	// deprecated, use StartExecutionWithBatchPointer
-	StartExecution(ctx context.Context, fnID uuid.UUID, batchID ulid.ULID) (string, error)
+	StartExecution(ctx context.Context, batchID ulid.ULID, batchPointer string) (string, error)
 	ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error
 	ExpireKeys(ctx context.Context, batchID ulid.ULID) error
 }

@@ -1,32 +1,85 @@
+import type { Route } from 'next';
+
 import { Card } from '../Card';
+import { InlineCode } from '../InlineCode';
+import { Link } from '../Link';
 import { Time } from '../Time';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
-import type { Trace } from './types';
+import { isStepInfoInvoke, isStepInfoSleep, isStepInfoWait, type Trace } from './types';
 
 type Props = {
   className?: string;
+  pathCreator: {
+    runPopout: (params: { runID: string }) => Route;
+  };
   trace: Trace;
 };
 
-export function TraceInfo({ className, trace }: Props) {
+export function TraceInfo({ className, pathCreator, trace }: Props) {
   const delayText = formatMilliseconds(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
   );
 
   let duration = 0;
-  (trace.childrenSpans ?? []).forEach((child, i) => {
-    if (!child.startedAt) {
-      return;
-    }
+  if (trace.childrenSpans && trace.childrenSpans.length > 0) {
+    trace.childrenSpans.forEach((child, i) => {
+      if (!child.startedAt) {
+        return;
+      }
 
-    duration +=
-      (toMaybeDate(child.endedAt) ?? new Date()).getTime() - new Date(child.startedAt).getTime();
-  });
+      duration +=
+        (toMaybeDate(child.endedAt) ?? new Date()).getTime() - new Date(child.startedAt).getTime();
+    });
+  } else if (trace.startedAt) {
+    duration =
+      (toMaybeDate(trace.endedAt) ?? new Date()).getTime() - new Date(trace.startedAt).getTime();
+  }
 
   let durationText = '-';
   if (duration > 0) {
     durationText = formatMilliseconds(duration);
+  }
+
+  let stepKindInfo = null;
+
+  if (isStepInfoInvoke(trace.stepInfo)) {
+    const timeout = toMaybeDate(trace.stepInfo.timeout);
+    stepKindInfo = (
+      <>
+        <Labeled label="Run">
+          {trace.stepInfo.runID ? (
+            <Link
+              href={pathCreator.runPopout({ runID: trace.stepInfo.runID })}
+              internalNavigation={false}
+            >
+              {trace.stepInfo.runID}
+            </Link>
+          ) : (
+            '-'
+          )}
+        </Labeled>
+        <Labeled label="Timeout">{timeout ? <Time value={timeout} /> : '-'}</Labeled>
+        <Labeled label="Timed out">{maybeBooleanToString(trace.stepInfo.timedOut)}</Labeled>
+      </>
+    );
+  } else if (isStepInfoSleep(trace.stepInfo)) {
+    const sleepUntil = toMaybeDate(trace.stepInfo.sleepUntil);
+    stepKindInfo = (
+      <Labeled label="Sleep until">{sleepUntil ? <Time value={sleepUntil} /> : '-'}</Labeled>
+    );
+  } else if (isStepInfoWait(trace.stepInfo)) {
+    const timeout = toMaybeDate(trace.stepInfo.timeout);
+    stepKindInfo = (
+      <>
+        <Labeled label="Event name">{trace.stepInfo.eventName}</Labeled>
+        <Labeled label="Timeout">{timeout ? <Time value={timeout} /> : '-'}</Labeled>
+        <Labeled label="Timed out">{maybeBooleanToString(trace.stepInfo.timedOut)}</Labeled>
+        <Labeled className="w-full" label="Match expression">
+          {trace.stepInfo.expression ? <InlineCode value={trace.stepInfo.expression} /> : '-'}
+        </Labeled>
+      </>
+    );
   }
 
   return (
@@ -49,6 +102,8 @@ export function TraceInfo({ className, trace }: Props) {
             <Labeled label="Delay">{delayText}</Labeled>
 
             <Labeled label="Duration">{durationText}</Labeled>
+
+            {stepKindInfo}
           </dl>
         </Card.Content>
       </Card>
@@ -56,11 +111,22 @@ export function TraceInfo({ className, trace }: Props) {
   );
 }
 
-function Labeled({ label, children }: React.PropsWithChildren<{ label: string }>) {
+function Labeled({
+  className,
+  label,
+  children,
+}: React.PropsWithChildren<{ className?: string; label: string }>) {
   return (
-    <div className="w-64 text-sm">
+    <div className={cn('w-64 text-sm', className)}>
       <dt className="text-slate-500">{label}</dt>
       <dd className="truncate">{children}</dd>
     </div>
   );
+}
+
+function maybeBooleanToString(value: boolean | null): string | null {
+  if (value === null) {
+    return null;
+  }
+  return value ? 'True' : 'False';
 }
