@@ -80,3 +80,71 @@ func TestFunctionFailureHandling(t *testing.T) {
 	}, 15*time.Second, time.Second)
 	require.EqualValues(t, 0, aCount)
 }
+
+func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
+	ctx := context.Background()
+	h, server, registerFuncs := NewSDKHandler(t, "failed-rate-limit")
+	defer server.Close()
+
+	evtName := "fail/rate-limit"
+
+	var failed, handled int32
+	fun := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name:      "failed",
+			RateLimit: &inngestgo.RateLimit{Limit: 1, Period: 24 * time.Hour, Key: inngestgo.StrPtr("event.data.number")},
+		},
+		inngestgo.EventTrigger(evtName, nil),
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+			atomic.AddInt32(&failed, 1)
+			return nil, inngestgo.NoRetryError(fmt.Errorf("failed"))
+		},
+	)
+	// mimic a `onFailure` handler, with the original function defining rate limits
+	fail := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name:      "failed-failure",
+			RateLimit: &inngestgo.RateLimit{Limit: 1, Period: 24 * time.Hour, Key: inngestgo.StrPtr("event.data.number")},
+		},
+		inngestgo.EventTrigger("inngest/function.failed", inngestgo.StrPtr(`event.data.function_id == "failed-rate-limit-failed"`)),
+		func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[map[string]any, any]]) (any, error) {
+			atomic.AddInt32(&handled, 1)
+			return "handled", nil
+		},
+	)
+	h.Register(fun, fail)
+	registerFuncs()
+
+	_, err := inngestgo.Send(ctx, inngestgo.Event{
+		Name: evtName,
+		Data: map[string]any{"number": 10},
+	})
+	require.NoError(t, err)
+
+	<-time.After(5 * time.Second)
+
+	require.Eventually(t, func() bool { return atomic.LoadInt32(&failed) == 1 }, 10*time.Second, time.Second)
+	require.Equal(t, int32(1), atomic.LoadInt32(&handled))
+
+	// send another, it should be rate limited
+	_, err = inngestgo.Send(ctx, inngestgo.Event{
+		Name: evtName,
+		Data: map[string]any{"number": 10},
+	})
+	require.NoError(t, err)
+	<-time.After(2 * time.Second)
+
+	require.Eventually(t, func() bool { return atomic.LoadInt32(&failed) == 1 }, 10*time.Second, time.Second)
+	require.Equal(t, int32(1), atomic.LoadInt32(&handled))
+
+	// send a different payload
+	_, err = inngestgo.Send(ctx, inngestgo.Event{
+		Name: evtName,
+		Data: map[string]any{"number": 1},
+	})
+	require.NoError(t, err)
+	<-time.After(5 * time.Second)
+
+	require.Eventually(t, func() bool { return atomic.LoadInt32(&failed) == 2 }, 10*time.Second, time.Second)
+	require.Equal(t, int32(2), atomic.LoadInt32(&handled))
+}
