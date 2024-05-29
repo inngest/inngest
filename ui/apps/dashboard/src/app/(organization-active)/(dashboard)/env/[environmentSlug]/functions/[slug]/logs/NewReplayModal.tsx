@@ -137,7 +137,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
     query: GetBillingPlanDocument,
   });
 
-  const logRetention = Number(planData?.account.plan?.features?.log_retention);
+  const logRetention = Number(planData?.account.plan?.features.log_retention);
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
 
   const { data, isLoading } = useSkippableGraphQLQuery({
@@ -253,7 +253,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
             </div>
             <div className="w-1/2">
               <RangePicker
-                {...(upgradeCutoff && { upgradeCutoff })}
+                upgradeCutoff={upgradeCutoff}
                 onChange={(range) =>
                   setTimeRange(
                     range.type === 'relative'
