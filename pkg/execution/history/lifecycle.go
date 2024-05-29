@@ -805,6 +805,12 @@ func applyResponse(
 		return nil
 	}
 
+	if resp.Error() != "" {
+		h.Result.Output = resp.Error()
+		h.Result.SizeBytes = len(h.Result.Output)
+		return nil
+	}
+
 	if outputStr, ok := resp.Output.(string); ok {
 		// If it's a string and doesn't have extractable data, then
 		// assume it's already the stringified JSON for the data
