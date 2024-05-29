@@ -997,7 +997,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				attribute.String(consts.OtelSysStepDisplayName, op.UserDefinedName()),
 				attribute.String(consts.OtelSysStepOpcode, foundOp.String()),
 			)
-			span.SetStepOutput(op.Data)
+
+			if op.Error != nil {
+				span.SetStepOutput(op.Error)
+			} else {
+				span.SetStepOutput(op.Data)
+			}
 		} else if resp.IsTraceVisibleFunctionExecution() {
 			spanName := "function success"
 			fnstatus := attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCompleted.ToCode())
