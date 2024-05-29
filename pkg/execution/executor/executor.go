@@ -1014,7 +1014,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			fnSpan.SetAttributes(fnstatus)
 			span.SetName(spanName)
 			fnSpan.SetFnOutput(resp.Output)
-			span.SetStepOutput(resp.Output)
+			span.SetFnOutput(resp.Output)
 		} else {
 			// if it's not a step or function response that represents either a failed or a successful execution.
 			// Do not record discovery spans and cancel it.
