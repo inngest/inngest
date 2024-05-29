@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/inngest/inngest/pkg/util"
@@ -22,6 +23,10 @@ import (
 func (r *functionRunResolver) PendingSteps(ctx context.Context, obj *models.FunctionRun) (*int, error) {
 	md, err := r.Runner.StateManager().Metadata(ctx, ulid.MustParse(obj.ID))
 	if err != nil {
+		zero := 0
+		if errors.Is(err, statev1.ErrRunNotFound) {
+			return &zero, nil
+		}
 		return nil, fmt.Errorf("Run ID not found: %w", err)
 	}
 	pending, _ := r.Queue.OutstandingJobCount(

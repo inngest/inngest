@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
@@ -67,8 +66,6 @@ func TestInvokeRateLimit(t *testing.T) {
 	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID)
-
-	spew.Dump(c.Run(ctx, runID))
 
 	// Trigger the main function. It'll fail because the invoked function is
 	// rate limited
