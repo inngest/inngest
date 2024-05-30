@@ -3,6 +3,7 @@ package httpdriver
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -22,6 +23,7 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/propagation"
@@ -157,6 +159,10 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 			dr.Step.Name = op.UserDefinedName()
 		}
 
+		if resp.sysErr != nil {
+			dr.SetError(resp.sysErr)
+		}
+
 		return dr, nil
 	}
 
@@ -172,6 +178,9 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 		StatusCode:     resp.statusCode,
 		SDK:            resp.sdk,
 		Header:         resp.header,
+	}
+	if resp.sysErr != nil {
+		dr.SetError(resp.sysErr)
 	}
 	if resp.statusCode < 200 || resp.statusCode > 299 {
 		// Add an error to driver.Response if the status code isn't 2XX.
@@ -269,9 +278,18 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		}
 	}
 
-	byt, err := io.ReadAll(io.LimitReader(resp.Body, consts.MaxBodySize))
+	byt, err := io.ReadAll(io.LimitReader(resp.Body, consts.MaxBodySize+1))
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	var sysErr *syscode.Error
+	if len(byt) > consts.MaxBodySize {
+		sysErr = &syscode.Error{Code: syscode.CodeOutputTooLarge}
+
+		// Override the output so the user sees the syserrV in the UI rather
+		// than a JSON parsing error
+		byt, _ = json.Marshal(sysErr.Code)
 	}
 
 	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
@@ -356,6 +374,7 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		requestVersion: rv,
 		sdk:            headers[headerSDK],
 		header:         resp.Header,
+		sysErr:         sysErr,
 	}, err
 
 }
@@ -377,4 +396,6 @@ type response struct {
 	sdk string
 
 	header http.Header
+
+	sysErr *syscode.Error
 }
