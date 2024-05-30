@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -102,9 +103,9 @@ type CustomConcurrency struct {
 func (i Identifier) IdempotencyKey() string {
 	key := i.Key
 	if i.Key == "" {
-		key = i.RunID.String()
+		return fmt.Sprintf("%s:%s", util.XXHash(i.WorkflowID), util.XXHash(i.RunID.String()))
 	}
-	return fmt.Sprintf("%s:%d:%s", i.WorkflowID, i.WorkflowVersion, key)
+	return key
 }
 
 // Metadata must be stored for each workflow run, allowing the runner to inspect
