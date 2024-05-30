@@ -278,6 +278,8 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		}
 	}
 
+	// Read 1 extra byte above the max so that we can check if the response is
+	// too large
 	byt, err := io.ReadAll(io.LimitReader(resp.Body, consts.MaxBodySize+1))
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
