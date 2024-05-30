@@ -30,7 +30,7 @@ redis.call("EXPIRE", pauseKey, extendedExpiry)
 redis.call("ZADD", keyPauseAddIdx, nowUnixSeconds, pauseID)
 -- Add an index of when the pause expires.  This lets us manually
 -- garbage collect expired pauses from the HSET below.
-redis.call("ZADD", keyPauseExpIdx, nowUnixSeconds+expiry, pauseID)
+redis.call("ZADD", keyPauseExpIdx, nowUnixSeconds+extendedExpiry, pauseID)
 
 if event ~= false and event ~= "" and event ~= nil then
 	redis.call("HSET", pauseEvtKey, pauseID, pause)
