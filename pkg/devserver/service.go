@@ -37,13 +37,14 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
-func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher) *devserver {
+func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher, stepLimitOverrides map[string]int) *devserver {
 	return &devserver{
-		data:        data,
-		runner:      runner,
-		opts:        opts,
-		handlerLock: &sync.Mutex{},
-		publisher:   pb,
+		data:               data,
+		runner:             runner,
+		opts:               opts,
+		handlerLock:        &sync.Mutex{},
+		publisher:          pb,
+		stepLimitOverrides: stepLimitOverrides,
 	}
 }
 
@@ -57,6 +58,8 @@ type devserver struct {
 	opts StartOpts
 
 	data cqrs.Manager
+
+	stepLimitOverrides map[string]int
 
 	// runner stores the runner
 	runner    runner.Runner

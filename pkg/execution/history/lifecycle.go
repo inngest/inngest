@@ -804,7 +804,7 @@ func applyResponse(
 		// writing history for.
 		return nil
 	}
- 
+
 	// Only set the output to the response error string if there isn't already output. This prevents overriding errors in the user's function
 	if resp.Output == nil && resp.Error() != "" {
 		h.Result.Output = resp.Error()

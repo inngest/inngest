@@ -142,6 +142,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 
 type run struct {
 	Status string `json:"status"`
+	Output string `json:"output"`
 }
 
 func (c *Client) Run(ctx context.Context, runID string) run {
@@ -151,6 +152,7 @@ func (c *Client) Run(ctx context.Context, runID string) run {
 		query GetRun($runID: ID!) {
 			functionRun(query: { functionRunId: $runID }) {
 				status
+				output
 			}
 		}`
 
