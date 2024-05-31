@@ -595,6 +595,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		m.kf.Invoke(ctx, p.WorkspaceID),
 		m.kf.PauseIndex(ctx, "add", p.WorkspaceID, evt),
 		m.kf.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
+		m.kf.RunPauses(ctx, p.Identifier.RunID),
 	}
 
 	// Add 1 second because int will truncate the float. Otherwise, timeouts
@@ -699,6 +700,14 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
 		return err
 	}
 
+	// Fetch all pauses for the run
+	if pauseIDs, err := m.r.Do(callCtx, m.r.B().Smembers().Key(m.kf.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
+		for _, id := range pauseIDs {
+			pauseID, _ := uuid.Parse(id)
+			_ = m.DeletePauseByID(ctx, pauseID)
+		}
+	}
+
 	// Clear all other data for a job.
 	keys := []string{
 		m.kf.Actions(ctx, i),
@@ -710,6 +719,7 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
 		m.kf.Event(ctx, i),
 		m.kf.History(ctx, i.RunID),
 		m.kf.Errors(ctx, i),
+		m.kf.RunPauses(ctx, i.RunID),
 	}
 	for _, k := range keys {
 		cmd := m.r.B().Del().Key(k).Build()
@@ -754,6 +764,7 @@ func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
 		m.kf.Invoke(ctx, p.WorkspaceID),
 		m.kf.PauseIndex(ctx, "add", p.WorkspaceID, evt),
 		m.kf.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
+		m.kf.RunPauses(ctx, p.Identifier.RunID),
 	}
 	corrId := ""
 	if p.InvokeCorrelationID != nil && *p.InvokeCorrelationID != "" {
@@ -813,6 +824,7 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		m.kf.RunMetadata(ctx, p.Identifier.RunID),
 		m.kf.PauseIndex(ctx, "add", p.WorkspaceID, evt),
 		m.kf.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
+		m.kf.RunPauses(ctx, p.Identifier.RunID),
 	}
 
 	corrId := ""
