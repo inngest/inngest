@@ -141,8 +141,8 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 }
 
 type Run struct {
-	Status string `json:"status"`
 	Output string `json:"output"`
+	Status string `json:"status"`
 }
 
 func (c *Client) Run(ctx context.Context, runID string) Run {
@@ -151,8 +151,8 @@ func (c *Client) Run(ctx context.Context, runID string) Run {
 	query := `
 		query GetRun($runID: ID!) {
 			functionRun(query: { functionRunId: $runID }) {
-				status
 				output
+				status
 			}
 		}`
 
@@ -183,15 +183,15 @@ func (c *Client) WaitForRunStatus(
 	t *testing.T,
 	expectedStatus string,
 	runID *string,
-) {
+) Run {
 	t.Helper()
 
 	start := time.Now()
-	status := ""
+	var run Run
 	for {
 		if runID != nil && *runID != "" {
-			status = c.Run(ctx, *runID).Status
-			if status == expectedStatus {
+			run = c.Run(ctx, *runID)
+			if run.Status == expectedStatus {
 				break
 			}
 		}
@@ -201,11 +201,13 @@ func (c *Client) WaitForRunStatus(
 			if runID == nil || *runID == "" {
 				msg = "Run ID is empty"
 			} else {
-				msg = fmt.Sprintf("Expected status %s, got %s", expectedStatus, status)
+				msg = fmt.Sprintf("Expected status %s, got %s", expectedStatus, run.Status)
 			}
 			t.Fatalf(msg)
 		}
 
 		time.Sleep(100 * time.Millisecond)
 	}
+
+	return run
 }
