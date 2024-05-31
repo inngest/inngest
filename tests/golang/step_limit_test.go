@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestFunctionStepLimit tests step limit is enforced and surfaces the correct error message
 func TestFunctionStepLimit(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
