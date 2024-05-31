@@ -121,6 +121,12 @@ type EventReader interface {
 		limit int,
 		includeInternal bool,
 	) ([]*Event, error)
+	GetEventsIDbound(
+		ctx context.Context,
+		ids IDBound,
+		limit int,
+		includeInternal bool,
+	) ([]*Event, error)
 	// WorkspaceEvents returns the latest events for a given workspace.
 	WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, opts *WorkspaceEventsOpts) ([]Event, error)
 	// Find returns a specific event given an ID.

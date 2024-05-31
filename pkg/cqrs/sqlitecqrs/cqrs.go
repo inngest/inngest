@@ -445,6 +445,39 @@ func (w wrapper) GetEventsTimebound(
 	return res, nil
 }
 
+func (w wrapper) GetEventsIDbound(
+	ctx context.Context,
+	ids cqrs.IDBound,
+	limit int,
+	includeInternal bool,
+) ([]*cqrs.Event, error) {
+
+	if ids.Before == nil {
+		ids.Before = &endULID
+	}
+
+	if ids.After == nil {
+		ids.After = &nilULID
+	}
+
+	evts, err := w.q.GetEventsIDbound(ctx, sqlc.GetEventsIDboundParams{
+		After:           *ids.After,
+		Before:          *ids.Before,
+		IncludeInternal: strconv.FormatBool(includeInternal),
+		Limit:           int64(limit),
+	})
+	if err != nil {
+		return []*cqrs.Event{}, err
+	}
+
+	var res = make([]*cqrs.Event, len(evts))
+	for n, i := range evts {
+		e := convertEvent(i)
+		res[n] = &e
+	}
+	return res, nil
+}
+
 func convertEvent(obj *sqlc.Event) cqrs.Event {
 	evt := &cqrs.Event{
 		ID:           obj.InternalID,
