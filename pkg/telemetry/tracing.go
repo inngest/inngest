@@ -3,10 +3,7 @@ package telemetry
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
 
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
@@ -59,19 +56,19 @@ func TracerSetup(svc string, ttype TracerType) (func(), error) {
 func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	switch opts.Type {
 	case TracerTypeOTLP:
-		return newOLTPGRPCTraceProvider(ctx, opts.ServiceName)
+		return newOLTPGRPCTraceProvider(ctx, opts)
 	case TracerTypeOTLPHTTP:
-		return newOTLPHTTPTraceProvider(ctx, opts.ServiceName)
+		return newOTLPHTTPTraceProvider(ctx, opts)
 	case TracerTypeJaeger:
-		return newJaegerTraceProvider(ctx, opts.ServiceName)
+		return newJaegerTraceProvider(ctx, opts)
 	case TracerTypeIO:
-		return newIOTraceProvider(ctx, opts.ServiceName)
+		return newIOTraceProvider(ctx, opts)
 	default:
-		return newNoopTraceProvider(ctx, opts.ServiceName)
+		return newNoopTraceProvider(ctx, opts)
 	}
 }
 
-func newJaegerTraceProvider(ctx context.Context, svc string) (Tracer, error) {
+func newJaegerTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	exp, err := jaegerExporter()
 	if err != nil {
 		return nil, fmt.Errorf("error setting up Jaeger exporter: %w", err)
@@ -82,7 +79,7 @@ func newJaegerTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
-			semconv.ServiceNameKey.String(svc),
+			semconv.ServiceNameKey.String(opts.ServiceName),
 			semconv.DeploymentEnvironmentKey.String(env()),
 		)),
 	)
@@ -98,7 +95,7 @@ func newJaegerTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 }
 
 // IOTraceProvider is expected to be used for debugging purposes and not for production usage
-func newIOTraceProvider(ctx context.Context, svc string) (Tracer, error) {
+func newIOTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	exp, err := stdouttrace.New(
 		stdouttrace.WithWriter(log.New(zerolog.TraceLevel)),
 	)
@@ -111,7 +108,7 @@ func newIOTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
-			semconv.ServiceNameKey.String(svc),
+			semconv.ServiceNameKey.String(opts.ServiceName),
 			semconv.DeploymentEnvironmentKey.String(env()),
 		)),
 	)
@@ -128,11 +125,11 @@ func newIOTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	}, nil
 }
 
-func newNoopTraceProvider(ctx context.Context, svc string) (Tracer, error) {
+func newNoopTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	tp := trace.NewTracerProvider(
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
-			semconv.ServiceNameKey.String(svc),
+			semconv.ServiceNameKey.String(opts.ServiceName),
 			semconv.DeploymentEnvironmentKey.String(env()),
 		)),
 	)
@@ -143,16 +140,9 @@ func newNoopTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	}, nil
 }
 
-func newOTLPHTTPTraceProvider(ctx context.Context, svc string) (Tracer, error) {
-	endpoint := os.Getenv("OTEL_TRACE_COLLECTOR_ENDPOINT")
-	if endpoint == "" {
-		endpoint = "localhost:8288"
-	}
-
-	urlpath := os.Getenv("OTEL_TRACE_COLLECTOR_URL_PATH")
-	if urlpath == "" {
-		urlpath = "/dev/traces"
-	}
+func newOTLPHTTPTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
+	endpoint := opts.Endpoint()
+	urlpath := opts.URLPath()
 
 	client := otlptracehttp.NewClient(
 		otlptracehttp.WithEndpoint(endpoint),
@@ -170,7 +160,7 @@ func newOTLPHTTPTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
-			semconv.ServiceNameKey.String(svc),
+			semconv.ServiceNameKey.String(opts.ServiceName),
 		)),
 	)
 
@@ -186,17 +176,9 @@ func newOTLPHTTPTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 	}, nil
 }
 
-func newOLTPGRPCTraceProvider(ctx context.Context, svc string) (Tracer, error) {
-	endpoint := os.Getenv("OTEL_TRACES_COLLECTOR_ENDPOINT")
-	if endpoint == "" {
-		endpoint = "otel-collector:4317"
-	}
-
-	var maxPayloadSize int
-	maxPayloadSize, _ = strconv.Atoi(os.Getenv("OTEL_TRACES_MAX_PAYLOAD_SIZE_BYTES"))
-	if maxPayloadSize == 0 {
-		maxPayloadSize = (consts.AbsoluteMaxEventSize + consts.MaxBodySize) * 2
-	}
+func newOLTPGRPCTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
+	endpoint := opts.Endpoint()
+	maxPayloadSize := opts.MaxPayloadSizeBytes()
 
 	// NOTE:
 	// assuming the otel collector is within the same private network, we can
@@ -225,7 +207,7 @@ func newOLTPGRPCTraceProvider(ctx context.Context, svc string) (Tracer, error) {
 		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
-			semconv.ServiceNameKey.String(svc),
+			semconv.ServiceNameKey.String(opts.ServiceName),
 		)),
 	)
 

@@ -80,8 +80,10 @@ func doDev(cmd *cobra.Command, args []string) {
 	tick, _ := cmd.Flags().GetInt("tick")
 
 	if err := telemetry.NewUserTracer(ctx, telemetry.TracerOpts{
-		ServiceName: "devserver",
-		Type:        telemetry.TracerTypeOTLPHTTP,
+		ServiceName:   "devserver",
+		Type:          telemetry.TracerTypeOTLPHTTP,
+		TraceEndpoint: "localhost:8288",
+		TraceURLPath:  "/dev/traces",
 	}); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
