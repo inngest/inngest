@@ -34,7 +34,7 @@ func TestFunctionStepLimit(t *testing.T) {
 		},
 		inngestgo.EventTrigger("test/step.limit", nil),
 		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {
-			step.Run(ctx, "step1", func(ctx context.Context) (any, error) {
+			_, _ = step.Run(ctx, "step1", func(ctx context.Context) (any, error) {
 				if atomic.LoadInt32(&ok) == 0 {
 					lastRunId = input.InputCtx.RunID
 				}
@@ -43,7 +43,7 @@ func TestFunctionStepLimit(t *testing.T) {
 				return nil, nil
 			})
 
-			step.Run(ctx, "step2", func(ctx context.Context) (any, error) {
+			_, _ = step.Run(ctx, "step2", func(ctx context.Context) (any, error) {
 				if atomic.LoadInt32(&ok) == 0 {
 					lastRunId = input.InputCtx.RunID
 				}
