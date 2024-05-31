@@ -198,6 +198,7 @@ export enum ConcurrencyScope {
 export type CreateFunctionReplayInput = {
   fromRange: Scalars['ULID'];
   name: Scalars['String'];
+  skipReasons?: InputMaybe<Array<Scalars['String']>>;
   statuses?: InputMaybe<Array<FunctionRunStatus>>;
   toRange: Scalars['ULID'];
   workflowID: Scalars['UUID'];
