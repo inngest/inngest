@@ -158,7 +158,7 @@ FROM events AS e
 LEFT OUTER JOIN function_runs AS r ON r.event_id = e.internal_id
 WHERE
 	e.internal_id > @after
-	AND e.internal_id <= @before
+	AND e.internal_id < @before
 	AND (
 		-- Include internal events that triggered a run (e.g. an onFailure
 		-- handler)
