@@ -122,7 +122,7 @@ export default function Stream() {
         return undefined;
       }
 
-      return lastTrigger.createdAt; // Use the createdAt of the last trigger as cursor
+      return lastTrigger.id; // Use the id of the last trigger as cur sor
     },
   });
 
