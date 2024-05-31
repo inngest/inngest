@@ -95,6 +95,7 @@ var (
 	ErrPartitionAlreadyLeased        = fmt.Errorf("partition already leased")
 	ErrPartitionPeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", PartitionPeekMax)
 	ErrPartitionGarbageCollected     = fmt.Errorf("partition garbage collected")
+	ErrPartitionPaused               = fmt.Errorf("partition is paused")
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
 	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
 	ErrPartitionConcurrencyLimit     = fmt.Errorf("At partition concurrency limit")
@@ -547,6 +548,7 @@ type QueuePartition struct {
 	WorkspaceID uuid.UUID `json:"wsID"`
 
 	Priority uint `json:"p"`
+	Paused   bool `json:"off"`
 
 	// Last represents the time that this partition was last leased, as a millisecond
 	// unix epoch.  In essence, we need this to track how frequently we're leasing and
@@ -789,6 +791,13 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 		return 0, fmt.Errorf("error inspecting running job count: %w", err)
 	}
 	return count, nil
+}
+
+// SetFunctionPaused sets the "Paused" flag (represented in JSON as "off") for the given
+// function ID's queue partition.
+func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bool) error {
+	// TODO(cdzombak): unimplemented
+	return nil
 }
 
 // EnqueueItem enqueues a QueueItem.  It creates a QueuePartition for the workspace
