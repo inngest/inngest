@@ -412,39 +412,6 @@ func (w wrapper) WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, opt
 	return out, nil
 }
 
-func (w wrapper) GetEventsTimebound(
-	ctx context.Context,
-	t cqrs.Timebound,
-	limit int,
-	includeInternal bool,
-) ([]*cqrs.Event, error) {
-	after := time.Time{}                           // after the beginning of time, eg all
-	before := time.Now().Add(time.Hour * 24 * 365) // before 1 year in the future, eg all
-	if t.After != nil {
-		after = *t.After
-	}
-	if t.Before != nil {
-		before = *t.Before
-	}
-
-	evts, err := w.q.GetEventsTimebound(ctx, sqlc.GetEventsTimeboundParams{
-		After:           after,
-		Before:          before,
-		IncludeInternal: strconv.FormatBool(includeInternal),
-		Limit:           int64(limit),
-	})
-	if err != nil {
-		return []*cqrs.Event{}, err
-	}
-
-	var res = make([]*cqrs.Event, len(evts))
-	for n, i := range evts {
-		e := convertEvent(i)
-		res[n] = &e
-	}
-	return res, nil
-}
-
 func (w wrapper) GetEventsIDbound(
 	ctx context.Context,
 	ids cqrs.IDBound,
