@@ -59,8 +59,6 @@ func TestFunctionStepLimit(t *testing.T) {
 	h.Register(fn1)
 	registerFuncs()
 
-	<-time.After(2 * time.Second)
-
 	functions, err := c.Functions(ctx)
 	require.NoError(t, err)
 
