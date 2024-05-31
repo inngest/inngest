@@ -145,6 +145,8 @@ func (o GetRunsByEventIDOpts) Validate() error {
 	return nil
 }
 
+const GetRunsWildcard = "*"
+
 type GetRunsOpts struct {
 	AccountID   uuid.UUID
 	WorkspaceID uuid.UUID
@@ -158,6 +160,10 @@ type GetRunsOpts struct {
 	Statuses   []enums.RunStatus
 	// If true returns oldest first.  Defaults to descending/newest first.
 	Ascending bool
+	// Skipped runs are included iff SkipReasons is not empty.
+	// In this case, other (non-skipped, e.g. completed/failed/cancelled) runs are included iff Statuses is not empty.
+	// Including the special value "*" in this slice will query for all skipped runs.
+	SkipReasons []string
 }
 
 func (c GetRunsOpts) Validate() error {
@@ -178,6 +184,17 @@ func (c GetRunsOpts) Validate() error {
 	}
 	if c.Limit < 0 {
 		return errors.New("limit must be positive")
+	}
+	for _, r := range c.SkipReasons {
+		if r == "" {
+			return errors.New("skip reason cannot be empty")
+		}
+		if r == GetRunsWildcard {
+			continue
+		}
+		if _, err := enums.SkipReasonString(r); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -222,7 +239,7 @@ type Run struct {
 	ID              ulid.ULID
 	OriginalRunID   *ulid.ULID
 	Output          *string
-	StartedAt       time.Time
+	StartedAt       time.Time // for skips, this field represents RunSkippedAt
 	Status          enums.RunStatus
 	WorkflowID      uuid.UUID
 	WorkspaceID     uuid.UUID
