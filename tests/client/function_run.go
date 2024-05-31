@@ -140,12 +140,12 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 	return data.Runs.Edges, data.Runs.PageInfo
 }
 
-type run struct {
+type Run struct {
 	Status string `json:"status"`
 	Output string `json:"output"`
 }
 
-func (c *Client) Run(ctx context.Context, runID string) run {
+func (c *Client) Run(ctx context.Context, runID string) Run {
 	c.Helper()
 
 	query := `
@@ -167,7 +167,7 @@ func (c *Client) Run(ctx context.Context, runID string) run {
 	}
 
 	type response struct {
-		FunctionRun run `json:"functionRun"`
+		FunctionRun Run `json:"functionRun"`
 	}
 
 	data := &response{}
