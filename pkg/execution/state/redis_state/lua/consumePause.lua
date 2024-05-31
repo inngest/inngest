@@ -18,6 +18,7 @@ local stackKey      = KEYS[6]
 local keyMetadata   = KEYS[7]
 local keyPauseAddIdx = KEYS[8]
 local keyPauseExpIdx = KEYS[9]
+local keyRunPauses   = KEYS[10]
 
 local pauseID      = ARGV[1]
 local invokeCorrelationId = ARGV[2]
@@ -41,6 +42,8 @@ end
 
 redis.call("DEL", pauseKey)
 redis.call("DEL", pauseStepKey)
+-- SREM to remove the pause for this run
+redis.call("SREM", keyRunPauses, pauseID)
 
 if pauseEventKey ~= "" then
 	redis.call("HDEL", pauseEventKey, pauseID)
