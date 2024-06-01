@@ -1000,8 +1000,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 			if op.IsError() {
 				span.SetStepOutput(op.Error)
+				span.SetStatus(codes.Error, op.Error.Message)
 			} else {
 				span.SetStepOutput(op.Data)
+				span.SetStatus(codes.Ok, string(op.Data))
 			}
 		} else if resp.Retryable() {
 			span.SetStatus(codes.Error, *resp.Err)
