@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { EventDetails } from '@inngest/components/EventDetailsV2';
 import { RunDetails as RunDetailsView } from '@inngest/components/RunDetailsV2';
 import { StatusCell } from '@inngest/components/Table';
 import { cn } from '@inngest/components/utils/classNames';
@@ -44,6 +45,13 @@ export function RunDetails({ runID, standalone = true }: Props) {
     return null;
   }
 
+  const fakeTrigger = {
+    name: 'Event name',
+    id: '01HSHA4GT0FN0NRBKTF92E98H7',
+    receivedAt: '2024-06-02T17:09:55.045Z',
+    output: undefined,
+  };
+
   return (
     <div className={cn('overflow-y-auto', standalone && 'p-5 pt-8')}>
       {standalone && (
@@ -54,24 +62,32 @@ export function RunDetails({ runID, standalone = true }: Props) {
           <p className="font-mono text-slate-500">{runID}</p>
         </div>
       )}
-      <RunDetailsView
-        pathCreator={internalPathCreator}
-        standalone={standalone}
-        app={{
-          url: pathCreator.app({ envSlug: env.slug, externalAppID: run.function.app.externalID }),
-          ...run.function.app,
-        }}
-        cancelRun={cancelRun}
-        fn={run.function}
-        getOutput={getOutput}
-        rerun={rerun}
-        run={{
-          id: runID,
-          output: null,
-          trace,
-          url: pathCreator.runPopout({ envSlug: env.slug, runID: runID }),
-        }}
-      />
+      <div className="flex">
+        <div className="flex-1">
+          <RunDetailsView
+            pathCreator={internalPathCreator}
+            standalone={standalone}
+            app={{
+              url: pathCreator.app({
+                envSlug: env.slug,
+                externalAppID: run.function.app.externalID,
+              }),
+              ...run.function.app,
+            }}
+            cancelRun={cancelRun}
+            fn={run.function}
+            getOutput={getOutput}
+            rerun={rerun}
+            run={{
+              id: runID,
+              output: null,
+              trace,
+              url: pathCreator.runPopout({ envSlug: env.slug, runID: runID }),
+            }}
+          />
+        </div>
+        <EventDetails isLoading trigger={fakeTrigger} />
+      </div>
     </div>
   );
 }
