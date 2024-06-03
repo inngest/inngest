@@ -142,7 +142,7 @@ export const RangePicker = ({
           {displayValue ? (
             displayValue
           ) : (
-            <span className="text-slate-500">{placeholder ? placeholder : 'Date Range'}</span>
+            <span className="text-slate-500">{placeholder ? placeholder : 'Select dates'}</span>
           )}
         </DateInputButton>
       </PopoverTrigger>
