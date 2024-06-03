@@ -41,9 +41,6 @@ export function useGetTraceResult(): (traceID: string) => Promise<Result> {
       if (!res.data) {
         throw new Error('no data returned');
       }
-      if (!res.data.workspace.runTraceSpanOutputByID) {
-        throw new Error('no data returned');
-      }
       return res.data.workspace.runTraceSpanOutputByID;
     },
     [client, envID]
