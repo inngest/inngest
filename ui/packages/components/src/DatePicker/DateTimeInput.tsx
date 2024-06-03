@@ -42,7 +42,7 @@ export function DateTimeInput({
   setValid,
   valid,
 }: TimeInputProps) {
-  const daysRef = useRef<HTMLInputElement | null>(null);
+  const daysRef = useRef<HTMLInputElement>(null);
   const yearsRef = useRef<HTMLInputElement | null>(null);
   const hoursRef = useRef<HTMLInputElement | null>(null);
   const minutesRef = useRef<HTMLInputElement | null>(null);
