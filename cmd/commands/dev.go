@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -23,6 +22,7 @@ func NewCmdDev() *cobra.Command {
 		Run:     doDev,
 	}
 
+	cmd.Flags().String("config", "inngest.yml", "Path to the Dev Server configuration file")
 	cmd.Flags().String("host", "", "host to run the API on")
 	cmd.Flags().StringP("port", "p", "8288", "port to run the API on")
 	cmd.Flags().StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
@@ -58,26 +58,17 @@ func doDev(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	port, err := strconv.Atoi(cmd.Flag("port").Value.String())
+	cfg, err := loadServerConfig(cmd)
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println(err)
 		os.Exit(1)
 	}
-	conf.EventAPI.Port = port
 
-	host := cmd.Flag("host").Value.String()
-	if host != "" {
-		conf.EventAPI.Addr = host
+	conf.EventAPI.Port = cfg.Port
+
+	if cfg.Host != "" {
+		conf.EventAPI.Addr = cfg.Host
 	}
-
-	urls, _ := cmd.Flags().GetStringSlice("sdk-url")
-
-	// Run auto-discovery unless we've explicitly disabled it.
-	noDiscovery, _ := cmd.Flags().GetBool("no-discovery")
-	noPoll, _ := cmd.Flags().GetBool("no-poll")
-	pollInterval, _ := cmd.Flags().GetInt("poll-interval")
-	retryInterval, _ := cmd.Flags().GetInt("retry-interval")
-	tick, _ := cmd.Flags().GetInt("tick")
 
 	if err := telemetry.NewUserTracer(ctx, telemetry.TracerOpts{
 		ServiceName:   "devserver",
@@ -94,12 +85,12 @@ func doDev(cmd *cobra.Command, args []string) {
 
 	opts := devserver.StartOpts{
 		Config:        *conf,
-		URLs:          urls,
-		Autodiscover:  !noDiscovery,
-		Poll:          !noPoll,
-		PollInterval:  pollInterval,
-		RetryInterval: retryInterval,
-		Tick:          time.Duration(tick) * time.Millisecond,
+		URLs:          cfg.URLs,
+		Autodiscover:  cfg.EnableDiscovery,
+		Poll:          cfg.EnablePoll,
+		PollInterval:  cfg.PollInterval,
+		RetryInterval: cfg.RetryInterval,
+		Tick:          time.Duration(cfg.Tick) * time.Millisecond,
 	}
 
 	err = devserver.New(ctx, opts)
