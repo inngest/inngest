@@ -60,7 +60,7 @@ const GetRunsDocument = graphql(`
 
 const renderSubComponent = ({ id }: { id: string }) => {
   return (
-    <div className="border-l-4 border-slate-400 px-5 pb-6">
+    <div className="border-l-4 border-slate-400 pb-6 pl-5">
       <RunDetails standalone={false} runID={id} />
     </div>
   );
