@@ -6,11 +6,11 @@
 -- ]]
 
 local pauseKey    = KEYS[1]
-local stepKey     = KEYS[2]
-local pauseEvtKey = KEYS[3]
-local pauseInvokeKey = KEYS[4]
-local keyPauseAddIdx = KEYS[5]
-local keyPauseExpIdx = KEYS[6]
+local pauseEvtKey = KEYS[2]
+local pauseInvokeKey = KEYS[3]
+local keyPauseAddIdx = KEYS[4]
+local keyPauseExpIdx = KEYS[5]
+local keyRunPauses   = KEYS[6]
 
 local pause          = ARGV[1]
 local pauseID        = ARGV[2]
@@ -26,13 +26,14 @@ if redis.call("SETNX", pauseKey, pause) == 0 then
 end
 
 redis.call("EXPIRE", pauseKey, extendedExpiry)
-redis.call("SETEX", stepKey, expiry, pauseID)
 
 -- Add an index of when the pause was added.
 redis.call("ZADD", keyPauseAddIdx, nowUnixSeconds, pauseID)
 -- Add an index of when the pause expires.  This lets us manually
 -- garbage collect expired pauses from the HSET below.
-redis.call("ZADD", keyPauseExpIdx, nowUnixSeconds+expiry, pauseID)
+redis.call("ZADD", keyPauseExpIdx, nowUnixSeconds+extendedExpiry, pauseID)
+-- SADD to store the pause for this run
+redis.call("SADD", keyRunPauses, pauseID)
 
 if event ~= false and event ~= "" and event ~= nil then
 	redis.call("HSET", pauseEvtKey, pauseID, pause)

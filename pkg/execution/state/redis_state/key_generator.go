@@ -70,6 +70,9 @@ type KeyGenerator interface {
 	// added after the cache was last updated.
 	PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string
 
+	// RunPauses stores pause IDs for each run as a zset
+	RunPauses(ctx context.Context, runID ulid.ULID) string
+
 	// Invoke returns the key used to store the correlation key associated with invoke functions
 	Invoke(ctx context.Context, wsID uuid.UUID) string
 
@@ -138,6 +141,10 @@ func (d DefaultKeyFunc) PauseIndex(ctx context.Context, kind string, wsID uuid.U
 		return fmt.Sprintf("%s:pause-idx:%s:%s:-", d.Prefix, kind, wsID)
 	}
 	return fmt.Sprintf("%s:pause-idx:%s:%s:%s", d.Prefix, kind, wsID, event)
+}
+
+func (d DefaultKeyFunc) RunPauses(ctx context.Context, runID ulid.ULID) string {
+	return fmt.Sprintf("%s:pr:%s", d.Prefix, runID)
 }
 
 func (d DefaultKeyFunc) Invoke(ctx context.Context, wsID uuid.UUID) string {

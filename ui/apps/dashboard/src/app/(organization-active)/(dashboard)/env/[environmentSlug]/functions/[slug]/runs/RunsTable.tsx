@@ -22,7 +22,7 @@ export type Run = {
   durationMS: number | null;
   id: string;
   queuedAt: string;
-  endedAt: string;
+  endedAt: string | null;
 };
 
 type RunsTableProps = {
@@ -207,9 +207,13 @@ const columns = [
 
       return (
         <div className="flex items-center">
-          <TimeCell>
-            <Time value={new Date(time)} />
-          </TimeCell>
+          {time ? (
+            <TimeCell>
+              <Time value={new Date(time)} />
+            </TimeCell>
+          ) : (
+            <TextCell>-</TextCell>
+          )}
         </div>
       );
     },

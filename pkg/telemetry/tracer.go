@@ -2,8 +2,11 @@ package telemetry
 
 import (
 	"context"
+	"os"
+	"strconv"
 	"sync"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -33,8 +36,49 @@ type Tracer interface {
 }
 
 type TracerOpts struct {
-	ServiceName string
-	Type        TracerType
+	Type                     TracerType
+	ServiceName              string
+	TraceEndpoint            string
+	TraceURLPath             string
+	TraceMaxPayloadSizeBytes int
+}
+
+func (o TracerOpts) Endpoint() string {
+	if o.TraceEndpoint != "" {
+		return o.TraceEndpoint
+	}
+	if os.Getenv("OTEL_TRACES_COLLECTOR_ENDPOINT") != "" {
+		return os.Getenv("OTEL_TRACES_COLLECTOR_ENDPOINT")
+	}
+
+	// default
+	return "otel-collector:4317"
+}
+
+func (o TracerOpts) URLPath() string {
+	if o.TraceURLPath != "" {
+		return o.TraceURLPath
+	}
+
+	urlpath := os.Getenv("OTEL_TRACE_COLLECTOR_URL_PATH")
+	if urlpath == "" {
+		return urlpath
+	}
+
+	return "/v1/traces"
+}
+
+func (o TracerOpts) MaxPayloadSizeBytes() int {
+	if o.TraceMaxPayloadSizeBytes != 0 {
+		return o.TraceMaxPayloadSizeBytes
+	}
+
+	size, _ := strconv.Atoi(os.Getenv("OTEL_TRACES_MAX_PAYLOAD_SIZE_BYTES"))
+	if size != 0 {
+		return size
+	}
+
+	return (consts.AbsoluteMaxEventSize + consts.MaxBodySize) * 2
 }
 
 func NewUserTracer(ctx context.Context, opts TracerOpts) error {

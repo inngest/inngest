@@ -133,7 +133,6 @@ func CheckState(t *testing.T, gen Generator) {
 		"PausesByEvent/Multiple":           checkPausesByEvent_multi,
 		"PausesByEvent/ConcurrentCursors":  checkPausesByEvent_concurrent,
 		"PausesByEvent/Consumed":           checkPausesByEvent_consumed,
-		"PauseByStep":                      checkPausesByStep,
 		"PauseByID":                        checkPauseByID,
 		"PausesByID":                       checkPausesByID,
 		"Idempotency":                      checkIdempotency,
@@ -1339,47 +1338,6 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 		require.Equal(t, 1, n)
 	})
 
-}
-
-func checkPausesByStep(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	s := setup(t, m)
-
-	// Save a pause.
-	pause := state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
-	}
-	err := m.SavePause(ctx, pause)
-	require.NoError(t, err)
-
-	second := state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   w.Steps[0].ID,
-		Incoming:   w.Steps[1].ID,
-		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
-	}
-	err = m.SavePause(ctx, second)
-	require.NoError(t, err)
-
-	found, err := m.PauseByStep(ctx, s.Identifier(), "none")
-	require.Nil(t, found)
-	require.NotNil(t, err)
-	require.Error(t, state.ErrPauseNotFound, err)
-
-	found, err = m.PauseByStep(ctx, s.Identifier(), w.Steps[0].ID)
-	require.Nil(t, err)
-	require.NotNil(t, found)
-	require.EqualValues(t, pause, *found)
-
-	found, err = m.PauseByStep(ctx, s.Identifier(), w.Steps[1].ID)
-	require.Nil(t, err)
-	require.NotNil(t, found)
-	require.EqualValues(t, second, *found)
 }
 
 func checkPauseByID(t *testing.T, m state.Manager) {

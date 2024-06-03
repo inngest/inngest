@@ -482,8 +482,8 @@ export type StreamItem = {
 };
 
 export type StreamQuery = {
-  after?: InputMaybe<Scalars['Time']>;
-  before?: InputMaybe<Scalars['Time']>;
+  after?: InputMaybe<Scalars['ID']>;
+  before?: InputMaybe<Scalars['ID']>;
   includeInternalEvents?: InputMaybe<Scalars['Boolean']>;
   limit?: Scalars['Int'];
 };
@@ -550,8 +550,8 @@ export type DeleteAppMutation = { __typename?: 'Mutation', deleteApp: string };
 
 export type GetTriggersStreamQueryVariables = Exact<{
   limit: Scalars['Int'];
-  after: InputMaybe<Scalars['Time']>;
-  before: InputMaybe<Scalars['Time']>;
+  after: InputMaybe<Scalars['ID']>;
+  before: InputMaybe<Scalars['ID']>;
   includeInternalEvents: Scalars['Boolean'];
 }>;
 
@@ -766,7 +766,7 @@ export const DeleteAppDocument = `
 }
     `;
 export const GetTriggersStreamDocument = `
-    query GetTriggersStream($limit: Int!, $after: Time, $before: Time, $includeInternalEvents: Boolean!) {
+    query GetTriggersStream($limit: Int!, $after: ID, $before: ID, $includeInternalEvents: Boolean!) {
   stream(
     query: {limit: $limit, after: $after, before: $before, includeInternalEvents: $includeInternalEvents}
   ) {

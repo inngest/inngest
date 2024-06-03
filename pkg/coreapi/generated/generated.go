@@ -1689,14 +1689,13 @@ input FunctionRunsQuery {
 }
 
 input StreamQuery {
-  # This allows you to query for items after a specific time.  If
-  # not provided this defaults to the most recent items in the stream,
-  # eg now.
-  after: Time
-  # Before allows you to receive items in a stream before a specific time.
-  # This is useful as you can add the last stream item's time as the before
+  # after allows you to query for items after an ID. If not provided this
+  # defaults to the most recent items in the stream, eg now.
+  after: ID
+  # before allows you to receive items in a stream before an ID.
+  # This is useful as you can add the last stream ID as the before
   # field, ensuring that only new items are received.
-  before: Time
+  before: ID
   limit: Int! = 20
   includeInternalEvents: Boolean
 }
@@ -12200,7 +12199,7 @@ func (ec *executionContext) unmarshalInputStreamQuery(ctx context.Context, obj i
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
-			it.After, err = ec.unmarshalOTime2ᚖtimeᚐTime(ctx, v)
+			it.After, err = ec.unmarshalOID2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -12208,7 +12207,7 @@ func (ec *executionContext) unmarshalInputStreamQuery(ctx context.Context, obj i
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
-			it.Before, err = ec.unmarshalOTime2ᚖtimeᚐTime(ctx, v)
+			it.Before, err = ec.unmarshalOID2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}

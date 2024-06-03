@@ -193,10 +193,10 @@ type StreamItem struct {
 }
 
 type StreamQuery struct {
-	After                 *time.Time `json:"after,omitempty"`
-	Before                *time.Time `json:"before,omitempty"`
-	Limit                 int        `json:"limit"`
-	IncludeInternalEvents *bool      `json:"includeInternalEvents,omitempty"`
+	After                 *string `json:"after,omitempty"`
+	Before                *string `json:"before,omitempty"`
+	Limit                 int     `json:"limit"`
+	IncludeInternalEvents *bool   `json:"includeInternalEvents,omitempty"`
 }
 
 type UpdateAppInput struct {

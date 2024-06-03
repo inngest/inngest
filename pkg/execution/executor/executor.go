@@ -31,6 +31,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
 	"github.com/xhit/go-str2duration/v2"
@@ -159,9 +160,9 @@ func WithFinalizer(f execution.FinalizePublisher) ExecutorOpt {
 	}
 }
 
-func WithInvokeNotFoundHandler(f execution.InvokeNotFoundHandler) ExecutorOpt {
+func WithInvokeFailHandler(f execution.InvokeFailHandler) ExecutorOpt {
 	return func(e execution.Executor) error {
-		e.(*executor).invokeNotFoundHandler = f
+		e.(*executor).invokeFailHandler = f
 		return nil
 	}
 }
@@ -241,16 +242,16 @@ type executor struct {
 	pm   state.PauseManager
 	smv2 sv2.RunService
 
-	queue                 queue.Queue
-	debouncer             debounce.Debouncer
-	batcher               batch.BatchManager
-	fl                    state.FunctionLoader
-	evalFactory           func(ctx context.Context, expr string) (expressions.Evaluator, error)
-	runtimeDrivers        map[string]driver.Driver
-	finishHandler         execution.FinalizePublisher
-	invokeNotFoundHandler execution.InvokeNotFoundHandler
-	handleSendingEvent    execution.HandleSendingEvent
-	cancellationChecker   cancellation.Checker
+	queue               queue.Queue
+	debouncer           debounce.Debouncer
+	batcher             batch.BatchManager
+	fl                  state.FunctionLoader
+	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
+	runtimeDrivers      map[string]driver.Driver
+	finishHandler       execution.FinalizePublisher
+	invokeFailHandler   execution.InvokeFailHandler
+	handleSendingEvent  execution.HandleSendingEvent
+	cancellationChecker cancellation.Checker
 
 	lifecycles []execution.LifecycleListener
 
@@ -262,22 +263,47 @@ func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
 	e.finishHandler = f
 }
 
-func (e *executor) SetInvokeNotFoundHandler(f execution.InvokeNotFoundHandler) {
-	e.invokeNotFoundHandler = f
+func (e *executor) SetInvokeFailHandler(f execution.InvokeFailHandler) {
+	e.invokeFailHandler = f
 }
 
-func (e *executor) InvokeNotFoundHandler(ctx context.Context, opts execution.InvokeNotFoundHandlerOpts) error {
-	if e.invokeNotFoundHandler == nil {
+func (e *executor) InvokeFailHandler(ctx context.Context, opts execution.InvokeFailHandlerOpts) error {
+	if e.invokeFailHandler == nil {
 		return nil
 	}
 
-	evt := CreateInvokeNotFoundEvent(ctx, opts)
+	evt := CreateInvokeFailedEvent(ctx, opts)
 
-	return e.invokeNotFoundHandler(ctx, opts, []event.Event{evt})
+	return e.invokeFailHandler(ctx, opts, []event.Event{evt})
 }
 
 func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 	e.lifecycles = append(e.lifecycles, l)
+}
+
+func idempotencyKey(req execution.ScheduleRequest, runID ulid.ULID) string {
+	var key string
+	if req.IdempotencyKey != nil {
+		// Use the given idempotency key
+		key = *req.IdempotencyKey
+	}
+	if req.OriginalRunID != nil {
+		// If this is a rerun then we want to use the run ID as the key. If we
+		// used the event or batch ID as the key then we wouldn't be able to
+		// rerun multiple times.
+		key = runID.String()
+	}
+	if key == "" && len(req.Events) == 1 {
+		// If not provided, use the incoming event ID if there's not a batch.
+		key = req.Events[0].GetInternalID().String()
+	}
+	if key == "" && req.BatchID != nil {
+		// Finally, if there is a batch use the batch ID as the idempotency key.
+		key = req.BatchID.String()
+	}
+
+	// The idempotency key is always prefixed by the function ID.
+	return fmt.Sprintf("%s-%s", util.XXHash(req.Function.ID.String()), util.XXHash(key))
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -308,25 +334,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// this run ID.
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
-	var key string
-	if req.IdempotencyKey != nil {
-		// Use the given idempotency key
-		key = *req.IdempotencyKey
-	}
-	if req.OriginalRunID != nil {
-		// If this is a rerun then we want to use the run ID as the key. If we
-		// used the event or batch ID as the key then we wouldn't be able to
-		// rerun multiple times.
-		key = runID.String()
-	}
-	if key == "" && len(req.Events) == 1 {
-		// If not provided, use the incoming event ID if there's not a batch.
-		key = req.Events[0].GetInternalID().String()
-	}
-	if key == "" && req.BatchID != nil {
-		// Finally, if there is a batch use the batch ID as the idempotency key.
-		key = req.BatchID.String()
-	}
+	key := idempotencyKey(req, runID)
+
 	if req.Context == nil {
 		req.Context = map[string]any{}
 	}
@@ -581,6 +590,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 					WorkspaceID: req.WorkspaceID,
 					AccountID:   req.AccountID,
 					AppID:       req.AppID,
+					EventID:     metadata.Config.EventID(),
+					EventIDs:    metadata.Config.EventIDs,
 				},
 				ID:                pauseID,
 				Expires:           state.Time(expires),
@@ -626,6 +637,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			WorkspaceID: req.WorkspaceID,
 			AccountID:   req.AccountID,
 			AppID:       req.AppID,
+			EventID:     metadata.Config.EventID(),
+			EventIDs:    metadata.Config.EventIDs,
 		},
 		CustomConcurrencyKeys: metadata.Config.CustomConcurrencyKeys,
 		PriorityFactor:        metadata.Config.PriorityFactor,
@@ -728,7 +741,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
 	// for `tools.sleep` within generator functions.
 	if item.Kind == queue.KindSleep && item.Attempt == 0 {
-		if err := e.smv2.SaveStep(ctx, sv2.ID{
+		err := e.smv2.SaveStep(ctx, sv2.ID{
 			RunID:      id.RunID,
 			FunctionID: id.WorkflowID,
 			Tenant: sv2.Tenant{
@@ -736,7 +749,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				EnvID:     id.WorkspaceID,
 				AccountID: id.AccountID,
 			},
-		}, edge.Outgoing, []byte("null")); err != nil {
+		}, edge.Outgoing, []byte("null"))
+		if !errors.Is(err, state.ErrDuplicateResponse) && err != nil {
 			return nil, err
 		}
 		// After the sleep, we start a new step.  This means we also want to start a new
@@ -958,12 +972,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	if resp == nil && err != nil {
 		span.SetStatus(codes.Error, err.Error())
-		if byt, err := json.Marshal(err.Error()); err == nil {
-			span.AddEvent(string(byt), trace.WithAttributes(
-				attribute.Bool(consts.OtelSysStepOutput, true),
-			))
-		}
-
+		span.SetStepOutput(err.Error())
 		return nil, err
 	}
 
@@ -989,10 +998,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				attribute.String(consts.OtelSysStepOpcode, foundOp.String()),
 			)
 
-			if byt, err := json.Marshal(resp.Output); err == nil {
-				span.AddEvent(string(byt), trace.WithAttributes(
-					attribute.Bool(consts.OtelSysStepOutput, true),
-				))
+			if op.Error != nil {
+				span.SetStepOutput(op.Error)
+			} else {
+				span.SetStepOutput(op.Data)
 			}
 		} else if resp.IsTraceVisibleFunctionExecution() {
 			spanName := "function success"
@@ -1009,16 +1018,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 			fnSpan.SetAttributes(fnstatus)
 			span.SetName(spanName)
-
-			if byt, err := json.Marshal(resp.Output); err == nil {
-				fnSpan.AddEvent(string(byt), trace.WithAttributes(
-					attribute.Bool(consts.OtelSysFunctionOutput, true),
-				))
-
-				span.AddEvent(string(byt), trace.WithAttributes(
-					attribute.Bool(consts.OtelSysFunctionOutput, true),
-				))
-			}
+			fnSpan.SetFnOutput(resp.Output)
+			span.SetFnOutput(resp.Output)
 		} else {
 			// if it's not a step or function response that represents either a failed or a successful execution.
 			// Do not record discovery spans and cancel it.
@@ -1486,8 +1487,13 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 				RunID:    resumeData.RunID,
 				StepName: resumeData.StepName,
 			})
+			if errors.Is(err, state.ErrPauseLeased) ||
+				errors.Is(err, state.ErrPauseNotFound) ||
+				errors.Is(err, state.ErrRunNotFound) {
+				return
+			}
 			if err != nil {
-				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
+				goerr = errors.Join(goerr, fmt.Errorf("error resuming pause: %w", err))
 				return
 			}
 			// Add to the counter.
@@ -1625,8 +1631,13 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 				RunID:    resumeData.RunID,
 				StepName: resumeData.StepName,
 			})
+			if errors.Is(err, state.ErrPauseLeased) ||
+				errors.Is(err, state.ErrPauseNotFound) ||
+				errors.Is(err, state.ErrRunNotFound) {
+				return
+			}
 			if err != nil {
-				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
+				goerr = errors.Join(goerr, fmt.Errorf("error resuming pause: %w", err))
 				return
 			}
 			// Add to the counter.
@@ -1703,7 +1714,7 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 // Cancel cancels an in-progress function.
 func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequest) error {
 	md, err := e.smv2.LoadMetadata(ctx, id)
-	if err == sv2.ErrMetadataNotFound {
+	if err == sv2.ErrMetadataNotFound || err == state.ErrRunNotFound {
 		return nil
 	}
 	if err != nil {
@@ -1753,6 +1764,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			AccountID: pause.Identifier.AccountID,
 		},
 	})
+	if err == state.ErrRunNotFound {
+		return err
+	}
 	if err != nil {
 		return fmt.Errorf("error loading metadata to resume from pause: %w", err)
 	}
@@ -1879,11 +1893,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 						defer span.End()
 						span.SetAttributes(commonAttrs...)
 						if r.With != nil {
-							if byt, err := json.Marshal(r.With); err == nil {
-								span.AddEvent(string(byt), trace.WithAttributes(
-									attribute.Bool(consts.OtelSysStepOutput, true),
-								))
-							}
+							span.SetStepOutput(r.With)
 						}
 						if r.HasError() {
 							span.SetStatus(codes.Error, r.Error())
@@ -1924,11 +1934,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 							span.SetAttributes(attribute.String(consts.OtelSysStepWaitExpression, *pause.Expression))
 						}
 						if r.With != nil {
-							if byt, err := json.Marshal(r.With); err == nil {
-								span.AddEvent(string(byt), trace.WithAttributes(
-									attribute.Bool(consts.OtelSysStepOutput, true),
-								))
-							}
+							span.SetStepOutput(r.With)
 						}
 						if r.HasError() {
 							span.SetStatus(codes.Error, r.Error())
