@@ -1,5 +1,3 @@
-import { baseInitialFetchFailed } from '@inngest/components/types/fetch';
-
 import { graphql } from '@/gql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
@@ -33,12 +31,6 @@ export function useTrigger({ envID, runID }: { envID: string; runID: string }) {
   }
 
   const { runTrigger } = res.data.workspace;
-  if (!runTrigger) {
-    return {
-      ...baseInitialFetchFailed,
-      error: new Error('missing run trigger'),
-    };
-  }
 
   return {
     ...res,
