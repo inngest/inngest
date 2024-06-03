@@ -1,6 +1,7 @@
 import { Button } from '@inngest/components/Button';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { RiContractRightFill, RiExpandLeftFill } from '@remixicon/react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -15,16 +16,28 @@ type Props = {
   isLoading: boolean;
   className?: string;
   trigger: {
-    output?: string;
+    payloads?: string[];
+    timestamp: string;
     name: string;
-    receivedAt: string;
-    id: string;
+    IDs: string[];
+    batchID?: string;
+    isBatch: boolean;
+    cron: string;
   };
 };
 
-export function EventDetails({ isLoading, className, trigger }: Props) {
+export function TriggerDetails({ isLoading, className, trigger }: Props) {
   const [showEventPanel, setShowEventPanel] = useLocalStorage('showEventPanel', true);
   /* TODO: Exit animation before unmounting */
+
+  let payload = !trigger.isBatch ? trigger.payloads[0] : trigger.payloads;
+  let prettyPayload = undefined;
+  if (!trigger.isBatch && payload) {
+    prettyPayload = usePrettyJson(payload);
+  } else if (payload) {
+    prettyPayload = payload.map((e) => usePrettyJson(e));
+  }
+
   return (
     <Collapsible.Root
       className={cn(showEventPanel && 'w-2/5', 'flex flex-col gap-5', className)}
@@ -57,7 +70,7 @@ export function EventDetails({ isLoading, className, trigger }: Props) {
           >
             <Card>
               <Card.Header className="h-11 flex-row items-center gap-2">
-                <div className="flex grow items-center gap-2">Event details</div>
+                <div className="flex grow items-center gap-2">Trigger details</div>
                 <Collapsible.Trigger asChild>
                   <Button size="large" appearance="text" icon={<RiContractRightFill />} />
                 </Collapsible.Trigger>
@@ -71,7 +84,7 @@ export function EventDetails({ isLoading, className, trigger }: Props) {
                     </Labeled>
                     <Labeled label="Event ID">
                       <span className="font-mono">
-                        {isLoading ? <Skeleton className="h-5 w-full" /> : trigger.id}
+                        {isLoading ? <Skeleton className="h-5 w-full" /> : trigger.IDs}
                       </span>
                     </Labeled>
 
@@ -79,7 +92,7 @@ export function EventDetails({ isLoading, className, trigger }: Props) {
                       {isLoading ? (
                         <Skeleton className="h-5 w-full" />
                       ) : (
-                        <Time value={new Date(trigger.receivedAt)} />
+                        <Time value={new Date(trigger.timestamp)} />
                       )}
                     </Labeled>
                   </dl>
@@ -87,12 +100,12 @@ export function EventDetails({ isLoading, className, trigger }: Props) {
               </Card.Content>
             </Card>
 
-            {trigger.output && (
+            {trigger.payloads && (
               <CodeBlock
                 tabs={[
                   {
-                    label: 'Payload',
-                    content: trigger.output,
+                    label: trigger.isBatch ? 'Batch' : 'Payload',
+                    content: prettyPayload ?? 'Unknown',
                   },
                 ]}
               />

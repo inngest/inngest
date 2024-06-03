@@ -1,9 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import { EventDetails } from '@inngest/components/EventDetailsV2';
 import { RunDetails as RunDetailsView } from '@inngest/components/RunDetailsV2';
 import { StatusCell } from '@inngest/components/Table';
+import { TriggerDetails } from '@inngest/components/TriggerDetails';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
@@ -12,6 +12,7 @@ import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
 import { pathCreator } from '@/utils/urls';
 import { useRun } from './useRun';
+import { useTrigger } from './useTrigger';
 
 type Props = {
   runID: string;
@@ -32,6 +33,12 @@ export function RunDetails({ runID, standalone = true }: Props) {
     };
   }, [env.slug]);
 
+  const resTrigger = useTrigger({ envID: env.id, runID });
+  if (resTrigger.error) {
+    throw resTrigger.error;
+  }
+  const trigger = resTrigger.data?.trigger;
+
   const res = useRun({ envID: env.id, runID });
   if (res.error) {
     throw res.error;
@@ -44,13 +51,6 @@ export function RunDetails({ runID, standalone = true }: Props) {
   async function getOutput() {
     return null;
   }
-
-  const fakeTrigger = {
-    name: 'Event name',
-    id: '01HSHA4GT0FN0NRBKTF92E98H7',
-    receivedAt: '2024-06-02T17:09:55.045Z',
-    output: undefined,
-  };
 
   return (
     <div className={cn('overflow-y-auto', standalone && 'p-5 pt-8')}>
@@ -86,7 +86,7 @@ export function RunDetails({ runID, standalone = true }: Props) {
             }}
           />
         </div>
-        <EventDetails isLoading trigger={fakeTrigger} />
+        <TriggerDetails isLoading={resTrigger.isLoading} trigger={trigger} />
       </div>
     </div>
   );

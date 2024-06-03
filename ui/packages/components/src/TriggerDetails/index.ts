@@ -1,0 +1,1 @@
+export { TriggerDetails } from './TriggerDetails';
