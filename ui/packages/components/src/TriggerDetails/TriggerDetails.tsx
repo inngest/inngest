@@ -1,5 +1,4 @@
 import { Button } from '@inngest/components/Button';
-import { Skeleton } from '@inngest/components/Skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import * as Collapsible from '@radix-ui/react-collapsible';
@@ -9,7 +8,13 @@ import { useLocalStorage } from 'react-use';
 
 import { Card } from '../Card';
 import { CodeBlock } from '../CodeBlock';
-import { Time } from '../Time';
+import {
+  ElementWrapper,
+  IDElement,
+  SkeletonElement,
+  TextElement,
+  TimeElement,
+} from '../DetailsCard/Element';
 import { cn } from '../utils/classNames';
 
 type Props = {
@@ -79,22 +84,28 @@ export function TriggerDetails({ isLoading, className, trigger }: Props) {
               <Card.Content>
                 <div>
                   <dl className="flex flex-wrap gap-4">
-                    <Labeled label="Event Name">
-                      {isLoading ? <Skeleton className="h-5 w-full" /> : trigger.name}
-                    </Labeled>
-                    <Labeled label="Event ID">
-                      <span className="font-mono">
-                        {isLoading ? <Skeleton className="h-5 w-full" /> : trigger.IDs}
-                      </span>
-                    </Labeled>
-
-                    <Labeled label="Received at">
+                    <ElementWrapper label="Event Name">
                       {isLoading ? (
-                        <Skeleton className="h-5 w-full" />
+                        <SkeletonElement />
                       ) : (
-                        <Time value={new Date(trigger.timestamp)} />
+                        <TextElement>{trigger.name ?? '-'}</TextElement>
                       )}
-                    </Labeled>
+                    </ElementWrapper>
+                    <ElementWrapper label="Event ID">
+                      {isLoading ? (
+                        <SkeletonElement />
+                      ) : (
+                        <IDElement>{trigger.IDs ?? '-'}</IDElement>
+                      )}
+                    </ElementWrapper>
+
+                    <ElementWrapper label="Received at">
+                      {isLoading ? (
+                        <SkeletonElement />
+                      ) : (
+                        <TimeElement date={new Date(trigger.timestamp)} />
+                      )}
+                    </ElementWrapper>
                   </dl>
                 </div>
               </Card.Content>
@@ -114,14 +125,5 @@ export function TriggerDetails({ isLoading, className, trigger }: Props) {
         </Collapsible.Content>
       </AnimatePresence>
     </Collapsible.Root>
-  );
-}
-
-function Labeled({ label, children }: React.PropsWithChildren<{ label: string }>) {
-  return (
-    <div className="w-64 text-sm">
-      <dt className="pb-2 text-slate-500">{label}</dt>
-      <dd className="truncate">{children}</dd>
-    </div>
   );
 }
