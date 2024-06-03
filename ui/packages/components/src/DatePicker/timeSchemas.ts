@@ -15,20 +15,6 @@ function getMinMaxHour(is24Format: boolean) {
   }
 }
 
-export const daysInMonth = (year: number, month: months) => {
-  switch (month) {
-    case 2:
-      return (year % 4 == 0 && year % 100) || year % 400 == 0 ? 29 : 28;
-    case 9:
-    case 4:
-    case 6:
-    case 11:
-      return 30;
-    default:
-      return 31;
-  }
-};
-
 export const getHourSchema = (is24Format: boolean) => {
   const { minHour, maxHour } = getMinMaxHour(is24Format);
 

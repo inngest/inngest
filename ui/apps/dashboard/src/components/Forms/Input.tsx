@@ -52,7 +52,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
         placeholder={placeholder}
         value={props.value}
         className={cn(
-          'border border-slate-400 text-sm leading-none placeholder-slate-400 shadow outline-2 outline-offset-2 outline-indigo-500 transition-all focus:outline',
+          'border border-slate-300 text-sm leading-none placeholder-slate-500 shadow outline-2 outline-offset-2 outline-indigo-500 transition-all focus:outline',
           sizeStyles[size],
           props.readonly &&
             'cursor-not-allowed border-transparent shadow-transparent outline-transparent	',

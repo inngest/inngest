@@ -119,12 +119,14 @@ export function toMaybeDate<T extends string | null | undefined>(value: T): Date
 
 export const parseDuration = (duration: string): Duration => {
   if (!DURATION_STRING_REGEX.test(duration)) {
-    throw Error('Invalid duration format. Please use a format like 1s, 5m, 10h, 12d, 15w, 17M or 20y');
+    throw Error(
+      'Invalid duration format. Please use a format like 1s, 5m, 10h, 12d, 15w, 17M or 20y'
+    );
   }
-  const n = duration.slice(0, duration.length - 1);
-  const u = duration.slice(duration.length - 1);
+  const durationNumber = duration.slice(0, duration.length - 1);
+  const durationUnit = duration.slice(duration.length - 1);
 
-  return { [DURATION_UNITS[u] as DurationUnit]: Number(n) };
+  return { [DURATION_UNITS[durationUnit] as DurationUnit]: Number(durationNumber) };
 };
 
 export const subtractDuration = (d: Date, duration: Duration) => sub(d, duration);

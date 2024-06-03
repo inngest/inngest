@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import * as Tabs from '@radix-ui/react-tabs';
-import { isBefore, sub, type Duration } from 'date-fns';
+import { isBefore, type Duration } from 'date-fns';
 
 import { Badge } from '../Badge';
 import { Button } from '../Button';
@@ -97,6 +97,8 @@ export const RangePicker = ({
   const [displayValue, setDisplayValue] = useState<ReactNode | null>(null);
   const [startValid, setStartValid] = useState(true);
   const [endValid, setEndValid] = useState(true);
+  const [startError, setStartError] = useState('');
+  const [endError, setEndError] = useState('');
 
   const validateDuration = (duration: string, upgradeCutoff?: Date): boolean => {
     if (!upgradeCutoff) {
@@ -105,6 +107,24 @@ export const RangePicker = ({
 
     const request = subtractDuration(new Date(), parseDuration(duration));
     return !isBefore(request, upgradeCutoff);
+  };
+
+  const validateRange = () => {
+    setStartValid(true);
+    setStartError('');
+    setEndValid(true);
+    setEndError('');
+
+    if (
+      absoluteRange?.start &&
+      absoluteRange?.end &&
+      isBefore(absoluteRange?.end, absoluteRange.start)
+    ) {
+      setStartError('Start date is after end date');
+      setEndError('End date is before start date');
+      setStartValid(false);
+      setEndValid(false);
+    }
   };
 
   useEffect(() => {
@@ -216,7 +236,7 @@ export const RangePicker = ({
                   aria-label="Manage your account"
                 >
                   <Tabs.Trigger
-                    className="flex h-[52px] flex-1 cursor-pointer select-none items-center 
+                    className="flex h-11 flex-1 cursor-pointer select-none items-center 
                       justify-center bg-white px-5 text-sm text-slate-500 outline-none 
                       data-[state=active]:text-indigo-500 data-[state=active]:shadow-[inset_0_-1px_0_0,0_1px_0_0]"
                     value="start"
@@ -224,7 +244,7 @@ export const RangePicker = ({
                     Start
                   </Tabs.Trigger>
                   <Tabs.Trigger
-                    className="flex h-[52px] flex-1 cursor-pointer select-none items-center 
+                    className="flex h-11 flex-1 cursor-pointer select-none items-center 
                       justify-center bg-white px-5 text-sm text-slate-500 outline-none 
                       data-[state=active]:text-indigo-500 data-[state=active]:shadow-[inset_0_-1px_0_0,0_1px_0_0]"
                     value="end"
@@ -234,9 +254,15 @@ export const RangePicker = ({
                 </Tabs.List>
                 <Tabs.Content className="grow rounded-b-md bg-white outline-none" value="start">
                   <DateTimePicker
-                    onChange={(start: Date | undefined) =>
-                      start && setAbsoluteRange({ start, end: absoluteRange?.end })
-                    }
+                    onChange={(start: Date | undefined) => {
+                      if (start) {
+                        setAbsoluteRange({
+                          ...absoluteRange,
+                          start,
+                        });
+                        validateRange();
+                      }
+                    }}
                     valid={startValid}
                     setValid={setStartValid}
                     defaultValue={
@@ -245,62 +271,77 @@ export const RangePicker = ({
                       subtractDuration(new Date(), { days: 1 })
                     }
                   />
-                  <div className="flox-row flex justify-between p-4">
-                    <Button
-                      size="small"
-                      label="Cancel"
-                      appearance="text"
-                      btnAction={() => setOpen(false)}
-                    />
-                    <Button
-                      size="small"
-                      label="Next"
-                      kind="primary"
-                      disabled={!absoluteRange?.start || !startValid}
-                      btnAction={() => setTab('end')}
-                    />
+                  <div className="flex flex-col">
+                    {startError && <p className="mx-4 mt-1 text-sm text-red-500">{startError}</p>}
+                    <div className="flox-row flex justify-between p-4">
+                      <Button
+                        size="small"
+                        label="Cancel"
+                        appearance="text"
+                        btnAction={() => setOpen(false)}
+                      />
+                      <Button
+                        size="small"
+                        label="Next"
+                        kind="primary"
+                        disabled={!absoluteRange?.start || !startValid}
+                        btnAction={() => setTab('end')}
+                      />
+                    </div>
                   </div>
                 </Tabs.Content>
                 <Tabs.Content className="grow rounded-b-md bg-white outline-none" value="end">
                   <DateTimePicker
-                    onChange={(end: Date | undefined) =>
-                      end && setAbsoluteRange({ start: absoluteRange?.start, end })
-                    }
+                    onChange={(end: Date | undefined) => {
+                      if (end) {
+                        setAbsoluteRange({
+                          ...absoluteRange,
+
+                          end,
+                        });
+                        validateRange();
+                      }
+                    }}
                     valid={endValid}
                     setValid={setEndValid}
                     defaultValue={absoluteRange?.end || defaultEnd || new Date()}
                   />
-                  <div className="flox-row flex justify-between p-4">
-                    <Button
-                      size="small"
-                      label="Cancel"
-                      appearance="text"
-                      btnAction={() => setOpen(false)}
-                    />
-                    <div className="flex flex-row">
+                  <div className="flex flex-col">
+                    {endError && <p className="mx-4 mt-1 text-sm text-red-500">{endError}</p>}
+                    <div className="flox-row flex justify-between p-4">
                       <Button
                         size="small"
-                        label="Previous"
-                        kind="primary"
-                        appearance="outlined"
-                        btnAction={() => setTab('start')}
-                        className="mr-2"
+                        label="Cancel"
+                        appearance="text"
+                        btnAction={() => setOpen(false)}
                       />
-                      <Button
-                        size="small"
-                        label="Apply"
-                        kind="primary"
-                        disabled={!absoluteRange?.end || !absoluteRange?.start}
-                        btnAction={() => {
-                          setDisplayValue(<AbsoluteDisplay absoluteRange={absoluteRange} />);
-                          onChange({
-                            type: 'absolute',
-                            start: absoluteRange?.start!,
-                            end: absoluteRange?.end!,
-                          });
-                          setOpen(false);
-                        }}
-                      />
+                      <div className="flex flex-row">
+                        <Button
+                          size="small"
+                          label="Previous"
+                          kind="primary"
+                          appearance="outlined"
+                          btnAction={() => setTab('start')}
+                          className="mr-2"
+                        />
+                        <Button
+                          size="small"
+                          label="Apply"
+                          kind="primary"
+                          disabled={
+                            !startValid || !endValid || !absoluteRange?.end || !absoluteRange?.start
+                          }
+                          btnAction={() => {
+                            setDisplayValue(<AbsoluteDisplay absoluteRange={absoluteRange} />);
+                            onChange({
+                              type: 'absolute',
+                              start: absoluteRange?.start!,
+                              end: absoluteRange?.end!,
+                            });
+                            endValid && setOpen(false);
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 </Tabs.Content>

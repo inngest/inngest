@@ -50,14 +50,14 @@ export function DateTimeInput({
   const millisecondsRef = useRef<HTMLInputElement | null>(null);
   const meridiemRef = useRef<HTMLInputElement | null>(null);
 
-  const [dayInput, setDayInput] = useState<string>('00');
-  const [monthInput, setMonthInput] = useState<string>('00');
-  const [yearInput, setYearInput] = useState<string>('0000');
-  const [hourInput, setHourInput] = useState<string>('00');
-  const [minuteInput, setMinuteInput] = useState<string>('00');
-  const [secondInput, setSecondInput] = useState<string>('00');
-  const [millisecondInput, setMillisecondInput] = useState<string>('000');
-  const [periodInput, setPeriodInput] = useState<string>(is24HourFormat ? 'AM' : '');
+  const [dayInput, setDayInput] = useState('00');
+  const [monthInput, setMonthInput] = useState('00');
+  const [yearInput, setYearInput] = useState('0000');
+  const [hourInput, setHourInput] = useState('00');
+  const [minuteInput, setMinuteInput] = useState('00');
+  const [secondInput, setSecondInput] = useState('00');
+  const [millisecondInput, setMillisecondInput] = useState('000');
+  const [periodInput, setPeriodInput] = useState(is24HourFormat ? 'AM' : '');
 
   const populateFields = (date: Date) => {
     setDayInput(formatWithDefault('dd', '00', date));
@@ -77,11 +77,10 @@ export function DateTimeInput({
   }, [selectedDateTime]);
 
   useEffect(() => {
-    if (!valid) {
+    if (yearInput === '0000' || monthInput === '00' || dayInput == '00') {
       onSelect(undefined);
       return;
     }
-
     // Aggregates the multiple input time parts and combines in one date
     const newDate = new Date(parseInt(yearInput), parseInt(monthInput) - 1, parseInt(dayInput));
 
