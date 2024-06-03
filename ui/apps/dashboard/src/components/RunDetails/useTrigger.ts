@@ -10,6 +10,7 @@ const query = graphql(`
         IDs
         payloads
         timestamp
+        eventName
         isBatch
         batchID
         cron
