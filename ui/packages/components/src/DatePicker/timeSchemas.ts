@@ -73,5 +73,5 @@ export const yearSchema = z.coerce
 export const monthSchema = z.coerce
   .number()
   .int()
-  .min(1, { message: 'Month must be 1 - 12' })
+  .min(1, { message: 'Month must be between 1 and 12' })
   .max(12, { message: 'Month must be 1 - 12' });
