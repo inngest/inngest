@@ -951,7 +951,6 @@ The following is schema version `2024-05-24`:
 	has_event_key: boolean
 	has_signing_key: boolean
   has_signing_key_fallback: boolean
-  is_streaming: boolean
 	mode: "cloud" | "dev"
   schema_version: "2024-05-24"
   sdk_language: string
