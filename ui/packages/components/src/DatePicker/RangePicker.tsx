@@ -14,7 +14,7 @@ import {
   subtractDuration,
 } from '../utils/date';
 import { DateInputButton, type DateInputButtonProps } from './DateInputButton';
-import { DateTimePicker } from './DateTimePIcker';
+import { DateTimePicker } from './DateTimePicker';
 
 type RelativeProps = {
   type: 'relative';
