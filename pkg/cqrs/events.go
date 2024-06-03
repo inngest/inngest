@@ -115,9 +115,9 @@ type EventReader interface {
 	GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*Event, error)
 	GetEventBatchesByEventID(ctx context.Context, eventID ulid.ULID) ([]*EventBatch, error)
 	GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*EventBatch, error)
-	GetEventsTimebound(
+	GetEventsIDbound(
 		ctx context.Context,
-		t Timebound,
+		ids IDBound,
 		limit int,
 		includeInternal bool,
 	) ([]*Event, error)

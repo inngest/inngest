@@ -13,9 +13,22 @@ import (
 )
 
 func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*models.StreamItem, error) {
-	tb := cqrs.Timebound{
-		Before: q.Before,
-		After:  q.After,
+	var before *ulid.ULID
+	var after *ulid.ULID
+
+	if q.Before != nil {
+		val := ulid.MustParse(*q.Before)
+		before = &val
+	}
+
+	if q.After != nil {
+		val := ulid.MustParse(*q.After)
+		after = &val
+	}
+
+	bound := cqrs.IDBound{
+		Before: before,
+		After:  after,
 	}
 
 	includeInternalEvents := false
@@ -23,9 +36,9 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 		includeInternalEvents = *q.IncludeInternalEvents
 	}
 
-	evts, err := r.Data.GetEventsTimebound(
+	evts, err := r.Data.GetEventsIDbound(
 		ctx,
-		tb,
+		bound,
 		q.Limit,
 		includeInternalEvents,
 	)
