@@ -1,4 +1,5 @@
 import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcon/RunStatusIcons';
+import { Time } from '@inngest/components/Time';
 import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { cn } from '@inngest/components/utils/classNames';
 
@@ -12,9 +13,12 @@ export function TextCell({ children }: React.PropsWithChildren) {
   return <p className={cn(cellStyles, 'font-medium')}>{children}</p>;
 }
 
-export function TimeCell({ children }: React.PropsWithChildren) {
-  // TODO: Move Time component from Cloud to shared components, to use here
-  return <span className={cn(cellStyles, 'font-medium')}>{children}</span>;
+export function TimeCell({ date }: { date: Date }) {
+  return (
+    <span className={cn(cellStyles, 'font-medium')}>
+      <Time value={date} />
+    </span>
+  );
 }
 
 export function StatusCell({ status }: React.PropsWithChildren<{ status: FunctionRunStatus }>) {

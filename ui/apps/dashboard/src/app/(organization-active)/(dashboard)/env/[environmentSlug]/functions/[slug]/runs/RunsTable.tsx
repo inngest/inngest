@@ -192,9 +192,7 @@ const columns = [
 
       return (
         <div className="flex items-center">
-          <TimeCell>
-            <Time value={new Date(time)} />
-          </TimeCell>
+          <TimeCell date={new Date(time)} />
         </div>
       );
     },
@@ -207,13 +205,7 @@ const columns = [
 
       return (
         <div className="flex items-center">
-          {time ? (
-            <TimeCell>
-              <Time value={new Date(time)} />
-            </TimeCell>
-          ) : (
-            <TextCell>-</TextCell>
-          )}
+          {time ? <TimeCell date={new Date(time)} /> : <TextCell>-</TextCell>}
         </div>
       );
     },
