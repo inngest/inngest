@@ -35,12 +35,26 @@ export function TriggerDetails({ isLoading, className, trigger }: Props) {
   const [showEventPanel, setShowEventPanel] = useLocalStorage('showEventPanel', true);
   /* TODO: Exit animation before unmounting */
 
-  let payload = !trigger.isBatch ? trigger.payloads[0] : trigger.payloads;
+  let type = 'EVENT';
+  if (trigger.isBatch) {
+    type = 'BATCH';
+  } else if (trigger.cron) {
+    type = 'CRON';
+  }
+
   let prettyPayload = undefined;
-  if (!trigger.isBatch && payload) {
-    prettyPayload = usePrettyJson(payload);
-  } else if (payload) {
-    prettyPayload = payload.map((e) => usePrettyJson(e));
+  if (trigger.payloads) {
+    if (trigger.payloads.length === 1 && trigger.payloads[0]) {
+      prettyPayload = usePrettyJson(trigger.payloads[0]);
+    } else {
+      prettyPayload = usePrettyJson(
+        JSON.stringify(
+          trigger.payloads.map((e) => {
+            return JSON.parse(e);
+          })
+        )
+      );
+    }
   }
 
   return (
@@ -84,42 +98,97 @@ export function TriggerDetails({ isLoading, className, trigger }: Props) {
               <Card.Content>
                 <div>
                   <dl className="flex flex-wrap gap-4">
-                    <ElementWrapper label="Event Name">
-                      {isLoading ? (
-                        <SkeletonElement />
-                      ) : (
-                        <TextElement>{trigger.name ?? '-'}</TextElement>
-                      )}
-                    </ElementWrapper>
-                    <ElementWrapper label="Event ID">
-                      {isLoading ? (
-                        <SkeletonElement />
-                      ) : (
-                        <IDElement>{trigger.IDs ?? '-'}</IDElement>
-                      )}
-                    </ElementWrapper>
-
-                    <ElementWrapper label="Received at">
-                      {isLoading ? (
-                        <SkeletonElement />
-                      ) : (
-                        <TimeElement date={new Date(trigger.timestamp)} />
-                      )}
-                    </ElementWrapper>
+                    {type === 'EVENT' && (
+                      <>
+                        <ElementWrapper label="Event name">
+                          {isLoading ? (
+                            <SkeletonElement />
+                          ) : (
+                            <TextElement>{trigger.name ?? '-'}</TextElement>
+                          )}
+                        </ElementWrapper>
+                        <ElementWrapper label="Event ID">
+                          {isLoading ? (
+                            <SkeletonElement />
+                          ) : (
+                            <IDElement>{trigger.IDs[0]}</IDElement>
+                          )}
+                        </ElementWrapper>
+                        <ElementWrapper label="Received at">
+                          {isLoading ? (
+                            <SkeletonElement />
+                          ) : (
+                            <TimeElement date={new Date(trigger.timestamp)} />
+                          )}
+                        </ElementWrapper>
+                      </>
+                    )}
+                    {type === 'CRON' && (
+                      <>
+                        <ElementWrapper label="Trigger type">
+                          {isLoading ? (
+                            <SkeletonElement />
+                          ) : (
+                            <TextElement>Cron schedule</TextElement>
+                          )}
+                        </ElementWrapper>
+                        <ElementWrapper label="Cron ID">
+                          {isLoading ? (
+                            <SkeletonElement />
+                          ) : (
+                            <IDElement>{trigger.IDs[0]}</IDElement>
+                          )}
+                        </ElementWrapper>
+                        <ElementWrapper label="Triggered at">
+                          {isLoading ? (
+                            <SkeletonElement />
+                          ) : (
+                            <TimeElement date={new Date(trigger.timestamp)} />
+                          )}
+                        </ElementWrapper>
+                      </>
+                    )}
+                    {type === 'BATCH' && (
+                      <>
+                        <ElementWrapper label="Trigger type">
+                          {isLoading ? (
+                            <SkeletonElement />
+                          ) : (
+                            <TextElement>Batching events</TextElement>
+                          )}
+                        </ElementWrapper>
+                        <ElementWrapper label="Batch ID">
+                          {isLoading ? (
+                            <SkeletonElement />
+                          ) : (
+                            <IDElement>{trigger.batchID}</IDElement>
+                          )}
+                        </ElementWrapper>
+                        <ElementWrapper label="Received at">
+                          {isLoading ? (
+                            <SkeletonElement />
+                          ) : (
+                            <TimeElement date={new Date(trigger.timestamp)} />
+                          )}
+                        </ElementWrapper>
+                      </>
+                    )}
                   </dl>
                 </div>
               </Card.Content>
             </Card>
 
             {trigger.payloads && (
-              <CodeBlock
-                tabs={[
-                  {
-                    label: trigger.isBatch ? 'Batch' : 'Payload',
-                    content: prettyPayload ?? 'Unknown',
-                  },
-                ]}
-              />
+              <div className="mt-4">
+                <CodeBlock
+                  tabs={[
+                    {
+                      label: trigger.isBatch ? 'Batch' : 'Payload',
+                      content: prettyPayload ?? 'Unknown',
+                    },
+                  ]}
+                />
+              </div>
             )}
           </motion.div>
         </Collapsible.Content>
