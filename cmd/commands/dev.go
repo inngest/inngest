@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/inngest/inngest/cmd/commands/internal/devconfig"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/telemetry"
@@ -58,7 +59,7 @@ func doDev(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	cfg, err := loadServerConfig(cmd)
+	cfg, err := devconfig.Read(cmd)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
