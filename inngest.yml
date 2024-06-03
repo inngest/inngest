@@ -1,5 +1,0 @@
-version: "1.0"
-
-pollInterval: 10
-urls:
-  - "http://localhost:3939/api/inngest"
