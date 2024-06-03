@@ -18,32 +18,38 @@ import {
 import { cn } from '../utils/classNames';
 
 type Props = {
-  isLoading: boolean;
+  isLoading?: false;
   className?: string;
   trigger: {
-    payloads?: string[];
+    payloads: string[];
     timestamp: string;
-    name: string;
+    eventName: string | null;
     IDs: string[];
-    batchID?: string;
+    batchID: string | null;
     isBatch: boolean;
-    cron: string;
+    cron: string | null;
   };
 };
 
-export function TriggerDetails({ isLoading, className, trigger }: Props) {
+type LoadingProps = {
+  isLoading: true;
+  trigger?: undefined;
+  className?: string;
+};
+
+export function TriggerDetails({ isLoading, className, trigger }: Props | LoadingProps) {
   const [showEventPanel, setShowEventPanel] = useLocalStorage('showEventPanel', true);
   /* TODO: Exit animation before unmounting */
 
   let type = 'EVENT';
-  if (trigger.isBatch) {
+  if (trigger?.isBatch) {
     type = 'BATCH';
-  } else if (trigger.cron) {
+  } else if (trigger?.cron) {
     type = 'CRON';
   }
 
   let prettyPayload = undefined;
-  if (trigger.payloads) {
+  if (trigger?.payloads) {
     if (trigger.payloads.length === 1 && trigger.payloads[0]) {
       prettyPayload = usePrettyJson(trigger.payloads[0]);
     } else {
@@ -104,7 +110,7 @@ export function TriggerDetails({ isLoading, className, trigger }: Props) {
                           {isLoading ? (
                             <SkeletonElement />
                           ) : (
-                            <TextElement>{trigger.name ?? '-'}</TextElement>
+                            <TextElement>{trigger.eventName}</TextElement>
                           )}
                         </ElementWrapper>
                         <ElementWrapper label="Event ID">
@@ -125,12 +131,8 @@ export function TriggerDetails({ isLoading, className, trigger }: Props) {
                     )}
                     {type === 'CRON' && (
                       <>
-                        <ElementWrapper label="Trigger type">
-                          {isLoading ? (
-                            <SkeletonElement />
-                          ) : (
-                            <TextElement>Cron schedule</TextElement>
-                          )}
+                        <ElementWrapper label="Cron expression">
+                          {isLoading ? <SkeletonElement /> : <IDElement>{trigger?.cron}</IDElement>}
                         </ElementWrapper>
                         <ElementWrapper label="Cron ID">
                           {isLoading ? (
@@ -150,11 +152,11 @@ export function TriggerDetails({ isLoading, className, trigger }: Props) {
                     )}
                     {type === 'BATCH' && (
                       <>
-                        <ElementWrapper label="Trigger type">
+                        <ElementWrapper label="Event name">
                           {isLoading ? (
                             <SkeletonElement />
                           ) : (
-                            <TextElement>Batching events</TextElement>
+                            <TextElement>{trigger.eventName}</TextElement>
                           )}
                         </ElementWrapper>
                         <ElementWrapper label="Batch ID">
@@ -178,12 +180,12 @@ export function TriggerDetails({ isLoading, className, trigger }: Props) {
               </Card.Content>
             </Card>
 
-            {trigger.payloads && (
+            {trigger?.payloads && type !== 'CRON' && (
               <div className="mt-4">
                 <CodeBlock
                   tabs={[
                     {
-                      label: trigger.isBatch ? 'Batch' : 'Payload',
+                      label: trigger.isBatch ? 'Batch' : 'Event Payload',
                       content: prettyPayload ?? 'Unknown',
                     },
                   ]}
