@@ -4,14 +4,14 @@ import { toMaybeDate } from '../utils/date';
 import { Trace } from './Trace';
 
 type Props = {
-  getOutput: (outputID: string) => Promise<string | null>;
+  getResult: React.ComponentProps<typeof Trace>['getResult'];
   pathCreator: {
     runPopout: (params: { runID: string }) => Route;
   };
   trace: React.ComponentProps<typeof Trace>['trace'];
 };
 
-export function Timeline({ getOutput, pathCreator, trace }: Props) {
+export function Timeline({ getResult, pathCreator, trace }: Props) {
   const minTime = new Date(trace.queuedAt);
   const maxTime = toMaybeDate(trace.endedAt) ?? new Date();
 
@@ -19,7 +19,7 @@ export function Timeline({ getOutput, pathCreator, trace }: Props) {
     <div>
       <Trace
         depth={0}
-        getOutput={getOutput}
+        getResult={getResult}
         isExpandable={false}
         maxTime={maxTime}
         minTime={minTime}
@@ -31,7 +31,7 @@ export function Timeline({ getOutput, pathCreator, trace }: Props) {
         return (
           <Trace
             depth={0}
-            getOutput={getOutput}
+            getResult={getResult}
             key={child.spanID}
             maxTime={maxTime}
             minTime={minTime}

@@ -25,7 +25,6 @@ type Props = {
   rerun: (args: { fnID: string }) => Promise<unknown>;
   run: {
     id: string;
-    output: string | null;
     url: Route | UrlObject;
     trace: {
       childrenSpans?: unknown[];
@@ -87,17 +86,6 @@ export function RunInfo({ app, cancelRun, className, fn, rerun, run, standalone 
           </div>
         </Card.Content>
       </Card>
-
-      {run.output && (
-        <CodeBlock
-          tabs={[
-            {
-              label: 'Run output',
-              content: run.output,
-            },
-          ]}
-        />
-      )}
     </div>
   );
 }

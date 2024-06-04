@@ -30,7 +30,7 @@ type Story = StoryObj<typeof Trace>;
 export const Retry: Story = {
   args: {
     depth: 0,
-    getOutput,
+    getResult: getOutput,
     trace: {
       attempts: 2,
       endedAt: '2024-04-23T11:26:43.260Z',

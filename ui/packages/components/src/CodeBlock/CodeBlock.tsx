@@ -135,6 +135,7 @@ export type CodeBlockAction = {
 };
 
 interface CodeBlockProps {
+  className?: string;
   header?: {
     title?: string;
     description?: string;
@@ -150,7 +151,7 @@ interface CodeBlockProps {
   actions?: CodeBlockAction[];
 }
 
-export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
+export function CodeBlock({ className, header, tabs, actions = [] }: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
   const [activeTab, setActiveTab] = useState(0);
   const editorRef = useRef<MonacoEditorType>(null);
@@ -346,8 +347,8 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
             <div className={classNames(header.color, 'rounded-t-lg pt-3')}>
               {(header.title || header.description) && (
                 <div className="flex flex-col gap-1 px-5 pb-2.5 font-mono text-xs">
-                  <p className="text-white">{header.title}</p>
-                  <p className="text-white/60">{header.description}</p>
+                  <p className="font-medium text-rose-700 dark:text-white">{header.title}</p>
+                  <p className="dark:text-white/60">{header.description}</p>
                 </div>
               )}
             </div>
