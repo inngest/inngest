@@ -85,6 +85,7 @@ export function parseRunsData(runsData: PickedFunctionRunV2EdgeWithNode[] | unde
       return {
         id: edge.node.id,
         queuedAt: edge.node.queuedAt,
+        startedAt: edge.node.startedAt,
         endedAt: edge.node.endedAt,
         durationMS,
         status: edge.node.status,

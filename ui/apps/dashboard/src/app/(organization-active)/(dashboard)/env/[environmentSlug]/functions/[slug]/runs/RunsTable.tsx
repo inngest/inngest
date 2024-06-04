@@ -22,6 +22,7 @@ export type Run = {
   id: string;
   queuedAt: string;
   endedAt: string | null;
+  startedAt: string | null;
 };
 
 type RunsTableProps = {
@@ -198,7 +199,20 @@ const columns = [
         </div>
       );
     },
-    header: 'Queued At',
+    header: 'Queued at',
+    enableSorting: false,
+  }),
+  columnHelper.accessor('startedAt', {
+    cell: (info) => {
+      const time = info.getValue();
+
+      return (
+        <div className="flex items-center">
+          {time ? <TimeCell date={new Date(time)} /> : <TextCell>-</TextCell>}
+        </div>
+      );
+    },
+    header: 'Started at',
     enableSorting: false,
   }),
   columnHelper.accessor('endedAt', {
@@ -211,7 +225,7 @@ const columns = [
         </div>
       );
     },
-    header: 'Ended At',
+    header: 'Ended at',
     enableSorting: false,
   }),
   columnHelper.accessor('durationMS', {
