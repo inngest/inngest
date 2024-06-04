@@ -61,10 +61,10 @@ func doDev(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	devconfig.InitConfig(cmd)
-	// fmt.Println(viper.GetStringSlice("urls"))
-	fmt.Println(viper.GetString("port"))
-	fmt.Println(viper.GetInt("poll-interval"))
+	if err = devconfig.InitConfig(cmd); err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
 
 	port, err := strconv.Atoi(viper.GetString("port"))
 	if err != nil {
