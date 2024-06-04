@@ -428,7 +428,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
           </div>
           {isOutputTooLarge ? (
             <>
-              <div className="bg-amber-500/40 px-5 py-2.5 text-xs text-white">
+              <div className="bg-amber-100 px-6 py-2.5 text-xs text-slate-700 dark:bg-amber-500/40 dark:text-white">
                 Output size is too large to render {`( > 1MB )`}
               </div>
               <div className="flex h-24 items-center justify-center	">
