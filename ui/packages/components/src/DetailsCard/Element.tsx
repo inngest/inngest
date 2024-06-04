@@ -1,3 +1,5 @@
+import { InlineCode } from '@inngest/components/InlineCode';
+import { Link, type LinkProps } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
@@ -31,6 +33,18 @@ export function TimeElement({ date }: { date: Date }) {
       <Time value={date} />
     </span>
   );
+}
+
+export function LinkElement({ children, href, ...props }: LinkProps) {
+  return (
+    <Link href={href} {...props}>
+      {children}
+    </Link>
+  );
+}
+
+export function CodeElement({ value }: { value: string }) {
+  return <InlineCode value={value} />;
 }
 
 export function SkeletonElement() {

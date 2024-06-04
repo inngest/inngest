@@ -4,7 +4,7 @@ import NextLink from 'next/link';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowRightLine, RiExternalLinkLine } from '@remixicon/react';
 
-type LinkProps = {
+export type LinkProps = {
   internalNavigation?: boolean;
   showIcon?: boolean;
   children?: React.ReactNode;

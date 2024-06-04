@@ -8,6 +8,7 @@ import { useLocalStorage } from 'react-use';
 import { Card } from '../Card';
 import { CodeBlock } from '../CodeBlock';
 import {
+  CodeElement,
   ElementWrapper,
   IDElement,
   SkeletonElement,
@@ -131,10 +132,10 @@ export function TriggerDetails({ className, getTrigger }: Props) {
                         </ElementWrapper>
                       </>
                     )}
-                    {type === 'CRON' && (
+                    {type === 'CRON' && trigger?.cron && (
                       <>
                         <ElementWrapper label="Cron expression">
-                          {isLoading ? <SkeletonElement /> : <IDElement>{trigger?.cron}</IDElement>}
+                          {isLoading ? <SkeletonElement /> : <CodeElement value={trigger.cron} />}
                         </ElementWrapper>
                         <ElementWrapper label="Cron ID">
                           {isLoading ? (

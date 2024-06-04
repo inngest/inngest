@@ -3,10 +3,15 @@ import type { Route } from 'next';
 
 import { CancelRunButton } from '../CancelRunButton';
 import { Card } from '../Card';
-import { CodeBlock } from '../CodeBlock';
+import {
+  ElementWrapper,
+  IDElement,
+  LinkElement,
+  TextElement,
+  TimeElement,
+} from '../DetailsCard/Element';
 import { Link } from '../Link';
 import { RerunButton } from '../RerunButtonV2';
-import { Time } from '../Time';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 
@@ -61,40 +66,39 @@ export function RunInfo({ app, cancelRun, className, fn, rerun, run, standalone 
         <Card.Content>
           <div>
             <dl className="flex flex-wrap gap-4">
-              <Labeled label="Run ID">
-                <span className="font-mono">{run.id}</span>
-              </Labeled>
+              <ElementWrapper label="Run ID">
+                <IDElement>{run.id}</IDElement>
+              </ElementWrapper>
 
-              <Labeled label="App">
-                <Link internalNavigation href={app.url} showIcon={false}>
+              <ElementWrapper label="App">
+                <LinkElement internalNavigation href={app.url} showIcon={false}>
                   {app.name}
-                </Link>
-              </Labeled>
+                </LinkElement>
+              </ElementWrapper>
 
-              <Labeled label="Duration">{durationText}</Labeled>
+              <ElementWrapper label="Duration">
+                <TextElement>{durationText}</TextElement>
+              </ElementWrapper>
 
-              <Labeled label="Queued at">
-                <Time value={queuedAt} />
-              </Labeled>
+              <ElementWrapper label="Queued at">
+                <TimeElement date={queuedAt} />
+              </ElementWrapper>
 
-              <Labeled label="Started at">{startedAt ? <Time value={startedAt} /> : '-'}</Labeled>
+              <ElementWrapper label="Started at">
+                {startedAt ? <TimeElement date={startedAt} /> : <TextElement>-</TextElement>}
+              </ElementWrapper>
 
-              <Labeled label="Ended at">{endedAt ? <Time value={endedAt} /> : '-'}</Labeled>
+              <ElementWrapper label="Ended at">
+                {endedAt ? <TimeElement date={endedAt} /> : <TextElement>-</TextElement>}
+              </ElementWrapper>
 
-              <Labeled label="Step count">{run.trace.childrenSpans?.length ?? 0}</Labeled>
+              <ElementWrapper label="Step count">
+                <TextElement>{run.trace.childrenSpans?.length ?? 0}</TextElement>
+              </ElementWrapper>
             </dl>
           </div>
         </Card.Content>
       </Card>
-    </div>
-  );
-}
-
-function Labeled({ label, children }: React.PropsWithChildren<{ label: string }>) {
-  return (
-    <div className="w-64 text-sm">
-      <dt className="pb-2 text-slate-500">{label}</dt>
-      <dd className="truncate">{children}</dd>
     </div>
   );
 }
