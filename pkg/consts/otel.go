@@ -92,6 +92,7 @@ const (
 	OtelScopeDebounce  = "debounce.inngest"
 	OtelScopeTrigger   = "trigger.inngest"
 	OtelScopeCron      = "cron.inngest"
+	OtleScopeInvoke    = "invoke.inngest"
 	OtelScopeRerun     = "rerun.inngest"
 	OtelScopeEnv       = "env.inngest"
 	OtelScopeApp       = "app.env.inngest"
