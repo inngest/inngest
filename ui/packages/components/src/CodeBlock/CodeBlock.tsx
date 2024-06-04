@@ -365,7 +365,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
                   <button
                     key={i}
                     className={classNames(
-                      `px-5 py-2.5 text-xs`,
+                      `px-6 py-2.5 text-sm`,
                       isSingleTab
                         ? 'text-slate-700 dark:text-slate-400'
                         : 'block border-b outline-none transition-all duration-150',
