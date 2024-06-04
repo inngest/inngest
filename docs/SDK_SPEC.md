@@ -920,7 +920,7 @@ The following is schema version `2024-05-24`:
 {
   // Will be null if the request was unsigned and false if the request was
   // signed but failed validation
-  authentication_succeeded: boolean | null
+  authentication_succeeded: false | null
   
   extra?: Record<string, any>
 	function_count: number
