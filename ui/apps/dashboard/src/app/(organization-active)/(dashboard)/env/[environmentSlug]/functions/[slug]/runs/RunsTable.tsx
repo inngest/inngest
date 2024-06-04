@@ -42,7 +42,10 @@ export default function RunsTable({
   renderSubComponent,
 }: RunsTableProps) {
   // Render 8 empty lines for skeletons when data is loading
-  const tableData = useMemo(() => (isLoading ? Array(8).fill({}) : data), [isLoading, data]);
+  const tableData = useMemo(
+    () => (isLoading ? Array(8).fill(loadingRow) : data),
+    [isLoading, data]
+  );
 
   const tableColumns = useMemo(
     () =>
@@ -128,7 +131,7 @@ export default function RunsTable({
                   </td>
                 ))}
               </tr>
-              {row.getIsExpanded() && (
+              {row.getIsExpanded() && !isLoadingRow(row.original) && (
                 // Overrides tableStyles divider color
                 <tr className="!border-transparent">
                   <td colSpan={row.getVisibleCells().length}>
@@ -225,3 +228,15 @@ const columns = [
     enableSorting: false,
   }),
 ];
+
+const loadingRow = {
+  isLoadingRow: true,
+} as const;
+
+/**
+ * Whether a row is a loading skeleton object. This is important because the
+ * loading skeleton rows don't have fields, but the row schema requires them
+ */
+function isLoadingRow(row: Run): boolean {
+  return (row as any).isLoadingRow;
+}

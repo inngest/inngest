@@ -19,7 +19,7 @@ import { graphql } from '@/gql';
 import { RunsOrderByField } from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useSearchParam, useStringArraySearchParam } from '@/utils/useSearchParam';
-import RunsTable from './RunsTable';
+import RunsTable, { type Run } from './RunsTable';
 import TimeFilter from './TimeFilter';
 import { parseRunsData, toRunStatuses, toTimeField } from './utils';
 
@@ -90,7 +90,7 @@ export default function RunsPage({
   /* TODO: When we have absolute time, the start date will be either coming from the date picker or the relative time */
   const [startTime, setStartTime] = useState<Date>(new Date());
   const [cursor, setCursor] = useState('');
-  const [runs, setRuns] = useState<any[]>([]);
+  const [runs, setRuns] = useState<Run[]>([]);
   const [isScrollRequest, setIsScrollRequest] = useState(false);
 
   useEffect(() => {
@@ -251,7 +251,6 @@ export default function RunsPage({
         />
       </div>
       <RunsTable
-        //@ts-ignore
         data={runs}
         isLoading={firstPageRes.isLoading}
         renderSubComponent={renderSubComponent}
