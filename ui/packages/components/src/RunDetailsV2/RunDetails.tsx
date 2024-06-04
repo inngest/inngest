@@ -45,7 +45,7 @@ export function RunDetails(props: Props) {
   }, [props.cancelRun]);
 
   return (
-    <div>
+    <div className="pr-4">
       <RunInfo
         app={app}
         cancelRun={cancelRun}

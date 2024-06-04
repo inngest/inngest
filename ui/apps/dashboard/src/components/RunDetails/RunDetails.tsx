@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { RunDetails as RunDetailsView } from '@inngest/components/RunDetailsV2';
 import { StatusCell } from '@inngest/components/Table';
+import { TriggerDetails } from '@inngest/components/TriggerDetails';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
@@ -10,6 +11,7 @@ import { toRunStatus } from '@/app/(organization-active)/(dashboard)/env/[enviro
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
 import { pathCreator } from '@/utils/urls';
+import { useGetTrigger } from './useGetTrigger';
 import { useRun } from './useRun';
 
 type Props = {
@@ -30,6 +32,8 @@ export function RunDetails({ runID, standalone = true }: Props) {
         pathCreator.runPopout({ envSlug: env.slug, runID: params.runID }),
     };
   }, [env.slug]);
+
+  const getTrigger = useGetTrigger({ runID });
 
   const res = useRun({ envID: env.id, runID });
   if (res.error) {
@@ -54,24 +58,32 @@ export function RunDetails({ runID, standalone = true }: Props) {
           <p className="font-mono text-slate-500">{runID}</p>
         </div>
       )}
-      <RunDetailsView
-        pathCreator={internalPathCreator}
-        standalone={standalone}
-        app={{
-          url: pathCreator.app({ envSlug: env.slug, externalAppID: run.function.app.externalID }),
-          ...run.function.app,
-        }}
-        cancelRun={cancelRun}
-        fn={run.function}
-        getOutput={getOutput}
-        rerun={rerun}
-        run={{
-          id: runID,
-          output: null,
-          trace,
-          url: pathCreator.runPopout({ envSlug: env.slug, runID: runID }),
-        }}
-      />
+      <div className="flex">
+        <div className="flex-1">
+          <RunDetailsView
+            pathCreator={internalPathCreator}
+            standalone={standalone}
+            app={{
+              url: pathCreator.app({
+                envSlug: env.slug,
+                externalAppID: run.function.app.externalID,
+              }),
+              ...run.function.app,
+            }}
+            cancelRun={cancelRun}
+            fn={run.function}
+            getOutput={getOutput}
+            rerun={rerun}
+            run={{
+              id: runID,
+              output: null,
+              trace,
+              url: pathCreator.runPopout({ envSlug: env.slug, runID: runID }),
+            }}
+          />
+        </div>
+        <TriggerDetails getTrigger={getTrigger} />
+      </div>
     </div>
   );
 }

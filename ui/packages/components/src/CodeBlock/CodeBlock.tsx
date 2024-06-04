@@ -103,6 +103,7 @@ const DARK_COLORS = {
   'editorLineNumber.activeForeground': colors.slate['300'], // slate-300
   'editorWidget.background': colors.slate['800'],
   'editorWidget.border': colors.slate['500'],
+  'editorBracketHighlight.foreground1': colors.amber['400'],
 };
 
 const LIGHT_COLORS = {
@@ -111,6 +112,7 @@ const LIGHT_COLORS = {
   'editorLineNumber.activeForeground': colors.slate['600'],
   'editorWidget.background': colors.slate['50'],
   'editorWidget.border': colors.slate['200'],
+  'editorBracketHighlight.foreground1': colors.amber['600'],
 };
 
 const LINE_HEIGHT = 26;
@@ -365,7 +367,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
                   <button
                     key={i}
                     className={classNames(
-                      `px-5 py-2.5 text-xs`,
+                      `px-6 py-2.5 text-sm`,
                       isSingleTab
                         ? 'text-slate-700 dark:text-slate-400'
                         : 'block border-b outline-none transition-all duration-150',
@@ -426,7 +428,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
           </div>
           {isOutputTooLarge ? (
             <>
-              <div className="bg-amber-500/40 px-5 py-2.5 text-xs text-white">
+              <div className="bg-amber-100 px-6 py-2.5 text-xs text-slate-700 dark:bg-amber-500/40 dark:text-white">
                 Output size is too large to render {`( > 1MB )`}
               </div>
               <div className="flex h-24 items-center justify-center	">

@@ -1,7 +1,6 @@
 import { Fragment, useMemo } from 'react';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { IDCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
-import { Time } from '@inngest/components/Time';
 import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { cn } from '@inngest/components/utils/classNames';
 import { formatMilliseconds } from '@inngest/components/utils/date';
@@ -192,9 +191,7 @@ const columns = [
 
       return (
         <div className="flex items-center">
-          <TimeCell>
-            <Time value={new Date(time)} />
-          </TimeCell>
+          <TimeCell date={new Date(time)} />
         </div>
       );
     },
@@ -207,13 +204,7 @@ const columns = [
 
       return (
         <div className="flex items-center">
-          {time ? (
-            <TimeCell>
-              <Time value={new Date(time)} />
-            </TimeCell>
-          ) : (
-            <TextCell>-</TextCell>
-          )}
+          {time ? <TimeCell date={new Date(time)} /> : <TextCell>-</TextCell>}
         </div>
       );
     },
