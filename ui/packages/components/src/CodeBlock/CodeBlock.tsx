@@ -103,6 +103,7 @@ const DARK_COLORS = {
   'editorLineNumber.activeForeground': colors.slate['300'], // slate-300
   'editorWidget.background': colors.slate['800'],
   'editorWidget.border': colors.slate['500'],
+  'editorBracketHighlight.foreground1': colors.amber['400'],
 };
 
 const LIGHT_COLORS = {
@@ -111,6 +112,7 @@ const LIGHT_COLORS = {
   'editorLineNumber.activeForeground': colors.slate['600'],
   'editorWidget.background': colors.slate['50'],
   'editorWidget.border': colors.slate['200'],
+  'editorBracketHighlight.foreground1': colors.amber['600'],
 };
 
 const LINE_HEIGHT = 26;
