@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func NewCmdDev() *cobra.Command {
@@ -59,17 +61,31 @@ func doDev(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	cfg, err := devconfig.Read(cmd)
+	devconfig.InitConfig(cmd)
+	// fmt.Println(viper.GetStringSlice("urls"))
+	fmt.Println(viper.GetString("port"))
+	fmt.Println(viper.GetInt("poll-interval"))
+
+	port, err := strconv.Atoi(viper.GetString("port"))
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println(err.Error())
 		os.Exit(1)
 	}
+	conf.EventAPI.Port = port
 
-	conf.EventAPI.Port = cfg.Port
-
-	if cfg.Host != "" {
-		conf.EventAPI.Addr = cfg.Host
+	host := viper.GetString("host")
+	if host != "" {
+		conf.EventAPI.Addr = host
 	}
+
+	urls := viper.GetStringSlice("urls")
+
+	// Run auto-discovery unless we've explicitly disabled it.
+	noDiscovery := viper.GetBool("no-discovery")
+	noPoll := viper.GetBool("no-poll")
+	pollInterval := viper.GetInt("poll-interval")
+	retryInterval := viper.GetInt("retry-interval")
+	tick := viper.GetInt("tick")
 
 	if err := telemetry.NewUserTracer(ctx, telemetry.TracerOpts{
 		ServiceName:   "devserver",
@@ -86,12 +102,12 @@ func doDev(cmd *cobra.Command, args []string) {
 
 	opts := devserver.StartOpts{
 		Config:        *conf,
-		URLs:          cfg.URLs,
-		Autodiscover:  cfg.EnableDiscovery,
-		Poll:          cfg.EnablePoll,
-		PollInterval:  cfg.PollInterval,
-		RetryInterval: cfg.RetryInterval,
-		Tick:          time.Duration(cfg.Tick) * time.Millisecond,
+		URLs:          urls,
+		Autodiscover:  !noDiscovery,
+		Poll:          !noPoll,
+		PollInterval:  pollInterval,
+		RetryInterval: retryInterval,
+		Tick:          time.Duration(tick) * time.Millisecond,
 	}
 
 	err = devserver.New(ctx, opts)
