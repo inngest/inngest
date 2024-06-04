@@ -179,21 +179,21 @@ export function TriggerDetails({ className, getTrigger }: Props) {
                     )}
                   </dl>
                 </div>
+
+                {trigger?.payloads && type !== 'CRON' && (
+                  <div className="mt-4">
+                    <CodeBlock
+                      tabs={[
+                        {
+                          label: trigger.isBatch ? 'Batch' : 'Event payload',
+                          content: prettyPayload ?? 'Unknown',
+                        },
+                      ]}
+                    />
+                  </div>
+                )}
               </Card.Content>
             </Card>
-
-            {trigger?.payloads && type !== 'CRON' && (
-              <div className="mt-4">
-                <CodeBlock
-                  tabs={[
-                    {
-                      label: trigger.isBatch ? 'Batch' : 'Event payload',
-                      content: prettyPayload ?? 'Unknown',
-                    },
-                  ]}
-                />
-              </div>
-            )}
           </>
         )}
       </Collapsible.Content>
