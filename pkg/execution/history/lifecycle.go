@@ -252,7 +252,7 @@ func (l lifecycle) OnFunctionCancelled(
 
 		_, span := telemetry.NewSpan(ctx,
 			telemetry.WithScope(consts.OtelScopeFunction),
-			telemetry.WithName(md.Config.FunctionSlug),
+			telemetry.WithName(md.Config.FunctionSlug()),
 			telemetry.WithTimestamp(start),
 			telemetry.WithSpanID(*fnSpanID),
 			telemetry.WithSpanAttributes(
@@ -261,7 +261,7 @@ func (l lifecycle) OnFunctionCancelled(
 				attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
 				attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
 				attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
-				attribute.String(consts.OtelSysFunctionSlug, md.Config.FunctionSlug),
+				attribute.String(consts.OtelSysFunctionSlug, md.Config.FunctionSlug()),
 				attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
 				attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()),
 				attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
