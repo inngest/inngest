@@ -5,7 +5,7 @@ const { withSentryConfig } = require('@sentry/nextjs');
 const nextConfig = {
   productionBrowserSourceMaps: true,
   experimental: {
-    typedRoutes: true,
+    // typedRoutes: true,
   },
   images: {
     remotePatterns: [
