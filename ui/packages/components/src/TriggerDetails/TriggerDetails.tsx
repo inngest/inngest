@@ -1,9 +1,8 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
-import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { RiContractRightFill, RiExpandLeftFill } from '@remixicon/react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { useLocalStorage } from 'react-use';
 
 import { Card } from '../Card';
@@ -18,28 +17,55 @@ import {
 import { cn } from '../utils/classNames';
 
 type Props = {
-  isLoading?: false;
   className?: string;
-  trigger: {
-    payloads: string[];
-    timestamp: string;
-    eventName: string | null;
-    IDs: string[];
-    batchID: string | null;
-    isBatch: boolean;
-    cron: string | null;
-  };
+  getTrigger: () => Promise<Trigger>;
 };
 
-type LoadingProps = {
-  isLoading: true;
-  trigger?: undefined;
-  className?: string;
+export type Trigger = {
+  payloads: string[];
+  timestamp: string;
+  eventName: string | null;
+  IDs: string[];
+  batchID: string | null;
+  isBatch: boolean;
+  cron: string | null;
 };
 
-export function TriggerDetails({ isLoading, className, trigger }: Props | LoadingProps) {
+export function TriggerDetails({ className, getTrigger }: Props) {
   const [showEventPanel, setShowEventPanel] = useLocalStorage('showEventPanel', true);
-  /* TODO: Exit animation before unmounting */
+  const [trigger, setTrigger] = useState<Trigger>();
+  const isLoading = !trigger;
+
+  useEffect(() => {
+    getTrigger().then((data) => {
+      setTrigger(data);
+    });
+  }, [getTrigger]);
+
+  const prettyPayload = useMemo(() => {
+    if (!trigger?.payloads) return null;
+    let payload = 'Unknown';
+    if (trigger.payloads.length === 1 && trigger.payloads[0]) {
+      payload = trigger.payloads[0];
+    } else if (trigger.payloads.length > 1) {
+      payload = JSON.stringify(
+        trigger.payloads.map((e) => {
+          return JSON.parse(e);
+        })
+      );
+    }
+    try {
+      const data = JSON.parse(payload);
+      if (data === null) {
+        throw new Error();
+      }
+
+      return JSON.stringify(data, null, 2);
+    } catch (e) {
+      console.warn('Unable to parse content as JSON: ', payload);
+      return '';
+    }
+  }, [trigger?.payloads]);
 
   let type = 'EVENT';
   if (trigger?.isBatch) {
@@ -48,51 +74,27 @@ export function TriggerDetails({ isLoading, className, trigger }: Props | Loadin
     type = 'CRON';
   }
 
-  let prettyPayload = undefined;
-  if (trigger?.payloads) {
-    if (trigger.payloads.length === 1 && trigger.payloads[0]) {
-      prettyPayload = usePrettyJson(trigger.payloads[0]);
-    } else {
-      prettyPayload = usePrettyJson(
-        JSON.stringify(
-          trigger.payloads.map((e) => {
-            return JSON.parse(e);
-          })
-        )
-      );
-    }
-  }
-
   return (
     <Collapsible.Root
       className={cn(showEventPanel && 'w-2/5', 'flex flex-col gap-5', className)}
       open={showEventPanel}
       onOpenChange={setShowEventPanel}
     >
-      <AnimatePresence>
-        {!showEventPanel && (
-          <Collapsible.Trigger asChild>
-            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-400">
-              <Tooltip>
-                <TooltipTrigger>
-                  <RiExpandLeftFill className="text-slate-400" />
-                </TooltipTrigger>
-                <TooltipContent>Show event details</TooltipContent>
-              </Tooltip>
-            </button>
-          </Collapsible.Trigger>
-        )}
-        <Collapsible.Content>
-          <motion.div
-            className=""
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{
-              duration: 0.5,
-              type: 'tween',
-            }}
-          >
+      {!showEventPanel && (
+        <Collapsible.Trigger asChild>
+          <button className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-400">
+            <Tooltip>
+              <TooltipTrigger>
+                <RiExpandLeftFill className="text-slate-400" />
+              </TooltipTrigger>
+              <TooltipContent>Show trigger details</TooltipContent>
+            </Tooltip>
+          </button>
+        </Collapsible.Trigger>
+      )}
+      <Collapsible.Content>
+        {showEventPanel && (
+          <>
             <Card>
               <Card.Header className="h-11 flex-row items-center gap-2">
                 <div className="flex grow items-center gap-2">Trigger details</div>
@@ -185,16 +187,16 @@ export function TriggerDetails({ isLoading, className, trigger }: Props | Loadin
                 <CodeBlock
                   tabs={[
                     {
-                      label: trigger.isBatch ? 'Batch' : 'Event Payload',
+                      label: trigger.isBatch ? 'Batch' : 'Event payload',
                       content: prettyPayload ?? 'Unknown',
                     },
                   ]}
                 />
               </div>
             )}
-          </motion.div>
-        </Collapsible.Content>
-      </AnimatePresence>
+          </>
+        )}
+      </Collapsible.Content>
     </Collapsible.Root>
   );
 }

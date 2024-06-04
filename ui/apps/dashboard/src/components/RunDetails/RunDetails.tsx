@@ -11,8 +11,8 @@ import { toRunStatus } from '@/app/(organization-active)/(dashboard)/env/[enviro
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
 import { pathCreator } from '@/utils/urls';
+import { useGetTrigger } from './useGetTrigger';
 import { useRun } from './useRun';
-import { useTrigger } from './useTrigger';
 
 type Props = {
   runID: string;
@@ -33,11 +33,7 @@ export function RunDetails({ runID, standalone = true }: Props) {
     };
   }, [env.slug]);
 
-  const resTrigger = useTrigger({ envID: env.id, runID });
-  if (resTrigger.error) {
-    throw resTrigger.error;
-  }
-  const trigger = resTrigger.data?.trigger;
+  const getTrigger = useGetTrigger({ runID });
 
   const res = useRun({ envID: env.id, runID });
   if (res.error) {
@@ -86,7 +82,7 @@ export function RunDetails({ runID, standalone = true }: Props) {
             }}
           />
         </div>
-        <TriggerDetails isLoading={resTrigger.isLoading} trigger={trigger} />
+        <TriggerDetails getTrigger={getTrigger} />
       </div>
     </div>
   );
