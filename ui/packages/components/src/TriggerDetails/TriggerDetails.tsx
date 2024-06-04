@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
@@ -18,28 +19,32 @@ import {
 import { cn } from '../utils/classNames';
 
 type Props = {
-  isLoading?: false;
   className?: string;
-  trigger: {
-    payloads: string[];
-    timestamp: string;
-    eventName: string | null;
-    IDs: string[];
-    batchID: string | null;
-    isBatch: boolean;
-    cron: string | null;
-  };
+  getTrigger: () => Promise<Trigger>;
 };
 
-type LoadingProps = {
-  isLoading: true;
-  trigger?: undefined;
-  className?: string;
+export type Trigger = {
+  payloads: string[];
+  timestamp: string;
+  eventName: string | null;
+  IDs: string[];
+  batchID: string | null;
+  isBatch: boolean;
+  cron: string | null;
 };
 
-export function TriggerDetails({ isLoading, className, trigger }: Props | LoadingProps) {
+export function TriggerDetails({ className, getTrigger }: Props) {
   const [showEventPanel, setShowEventPanel] = useLocalStorage('showEventPanel', true);
   /* TODO: Exit animation before unmounting */
+
+  const [trigger, setTrigger] = useState<Trigger>();
+  const isLoading = !trigger;
+
+  useEffect(() => {
+    getTrigger().then((data) => {
+      setTrigger(data);
+    });
+  }, [getTrigger]);
 
   let type = 'EVENT';
   if (trigger?.isBatch) {
