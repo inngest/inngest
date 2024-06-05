@@ -159,7 +159,7 @@ export function TriggerDetails({ className, getTrigger }: Props) {
                           {isLoading ? (
                             <SkeletonElement />
                           ) : (
-                            <TextElement>{trigger.eventName}</TextElement>
+                            <TextElement>{trigger.eventName ?? '-'}</TextElement>
                           )}
                         </ElementWrapper>
                         <ElementWrapper label="Batch ID">
