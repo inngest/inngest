@@ -227,7 +227,7 @@ func start(ctx context.Context, opts StartOpts) error {
 				eventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
 			},
 			executor.NewLifecycleListener(
-				logger.StdlibLogger(ctx),
+				nil,
 				smv2,
 			),
 		),
