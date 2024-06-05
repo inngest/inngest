@@ -125,6 +125,11 @@ export const RangePicker = ({
       setStartValid(false);
       setEndValid(false);
     }
+
+    if (upgradeCutoff && absoluteRange?.start && isBefore(absoluteRange.start, upgradeCutoff)) {
+      setStartError('Upgrade required for requested start date');
+      setStartValid(false);
+    }
   };
 
   useEffect(() => {
