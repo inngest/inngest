@@ -1732,16 +1732,21 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		return fmt.Errorf("unable to load run: %w", err)
 	}
 
-	// We need the function slug.
-	f, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
-	if err != nil {
-		return fmt.Errorf("unable to load function: %w", err)
-	}
-
 	// We need events to finalize the function.
 	evts, err := e.smv2.LoadEvents(ctx, id)
 	if err != nil {
 		return fmt.Errorf("unable to load run events: %w", err)
+	}
+
+	ctx = e.extractTraceCtx(ctx, md, nil)
+	for _, e := range e.lifecycles {
+		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r)
+	}
+
+	// We need the function slug.
+	f, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
+	if err != nil {
+		return fmt.Errorf("unable to load function: %w", err)
 	}
 
 	fnCancelledErr := state.ErrFunctionCancelled.Error()
@@ -1750,11 +1755,6 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	})
 	if err != nil {
 		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-	}
-
-	ctx = e.extractTraceCtx(ctx, md, nil)
-	for _, e := range e.lifecycles {
-		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r)
 	}
 
 	return nil
