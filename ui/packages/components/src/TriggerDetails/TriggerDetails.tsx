@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button } from '@inngest/components/Button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+// import { Button } from '@inngest/components/Button';
+// import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import * as Collapsible from '@radix-ui/react-collapsible';
-import { RiContractRightFill, RiExpandLeftFill } from '@remixicon/react';
+// import { RiContractRightFill, RiExpandLeftFill } from '@remixicon/react';
 import { useLocalStorage } from 'react-use';
 
 import { Card } from '../Card';
@@ -81,27 +81,28 @@ export function TriggerDetails({ className, getTrigger }: Props) {
       open={showEventPanel}
       onOpenChange={setShowEventPanel}
     >
-      {!showEventPanel && (
+      {/* TODO: Enable the collapsed feature */}
+      {/* {!showEventPanel && (
         <Collapsible.Trigger asChild>
-          <button className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-400">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-400">
             <Tooltip>
               <TooltipTrigger>
                 <RiExpandLeftFill className="text-slate-400" />
               </TooltipTrigger>
               <TooltipContent>Show trigger details</TooltipContent>
             </Tooltip>
-          </button>
+          </span>
         </Collapsible.Trigger>
-      )}
+      )} */}
       <Collapsible.Content>
         {showEventPanel && (
           <>
             <Card>
               <Card.Header className="h-11 flex-row items-center gap-2">
                 <div className="flex grow items-center gap-2">Trigger details</div>
-                <Collapsible.Trigger asChild>
+                {/* <Collapsible.Trigger asChild>
                   <Button size="large" appearance="text" icon={<RiContractRightFill />} />
-                </Collapsible.Trigger>
+                </Collapsible.Trigger> */}
               </Card.Header>
 
               <Card.Content>
