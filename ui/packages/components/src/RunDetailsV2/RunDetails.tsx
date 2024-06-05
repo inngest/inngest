@@ -87,6 +87,7 @@ export function RunDetails(props: Props) {
             pathCreator={pathCreator}
             rerun={rerun}
             run={nullishToLazy(run)}
+            runID={runID}
             standalone={standalone}
           />
           {result && <RunResult className="mb-4" result={result} />}

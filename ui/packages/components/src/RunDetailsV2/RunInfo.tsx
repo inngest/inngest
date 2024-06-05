@@ -25,6 +25,7 @@ type Props = {
   };
   rerun: (args: { fnID: string }) => Promise<unknown>;
   run: Lazy<Run>;
+  runID: string;
 };
 
 type Run = {
@@ -46,7 +47,15 @@ type Run = {
   };
 };
 
-export function RunInfo({ cancelRun, className, pathCreator, rerun, run, standalone }: Props) {
+export function RunInfo({
+  cancelRun,
+  className,
+  pathCreator,
+  rerun,
+  run,
+  runID,
+  standalone,
+}: Props) {
   let allowCancel = false;
   if (isLazyDone(run)) {
     allowCancel = !Boolean(run.trace.endedAt);
@@ -57,10 +66,7 @@ export function RunInfo({ cancelRun, className, pathCreator, rerun, run, standal
       <Card>
         <Card.Header className="h-11 flex-row items-center gap-2">
           <div className="flex grow items-center gap-2">
-            Run details{' '}
-            {!standalone && isLazyDone(run) && (
-              <Link href={pathCreator.runPopout({ runID: run.id })} />
-            )}
+            Run details {!standalone && <Link href={pathCreator.runPopout({ runID })} />}
           </div>
 
           <CancelRunButton disabled={!allowCancel} onClick={cancelRun} />

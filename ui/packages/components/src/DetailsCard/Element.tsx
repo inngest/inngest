@@ -32,14 +32,17 @@ export function LazyElementWrapper<T>({
   label: string;
   lazy: Lazy<T>;
 }) {
-  if (!isLazyDone(lazy)) {
-    return <SkeletonElement />;
+  let content;
+  if (isLazyDone(lazy)) {
+    content = children(lazy);
+  } else {
+    content = <SkeletonElement />;
   }
 
   return (
     <div className={cn('w-64 text-sm', className)}>
       <dt className="pb-2 text-slate-500">{label}</dt>
-      <dd className="truncate">{children(lazy)}</dd>
+      <dd className="truncate">{content}</dd>
     </div>
   );
 }
