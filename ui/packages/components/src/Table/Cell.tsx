@@ -1,7 +1,8 @@
 import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcon/RunStatusIcons';
 import { Time } from '@inngest/components/Time';
-import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { cn } from '@inngest/components/utils/classNames';
+
+import { getStatusTextClass } from '../statusClasses';
 
 const cellStyles = 'text-slate-950 text-sm';
 
@@ -21,20 +22,13 @@ export function TimeCell({ date }: { date: Date }) {
   );
 }
 
-export function StatusCell({ status }: React.PropsWithChildren<{ status: FunctionRunStatus }>) {
-  const statusStyles: Record<string, string> = {
-    CANCELLED: 'text-neutral-600',
-    COMPLETED: 'text-teal-700',
-    FAILED: 'text-rose-500',
-    RUNNING: 'text-sky-500',
-    QUEUED: 'text-amber-500',
-  } as const satisfies { [key in FunctionRunStatus]: string };
-  const style = statusStyles[status] ?? statusStyles['CANCELLED'];
+export function StatusCell({ status }: React.PropsWithChildren<{ status: string }>) {
+  const colorClass = getStatusTextClass(status);
 
   return (
     <div className={cn(cellStyles, 'flex items-center gap-2.5 font-medium')}>
       <RunStatusIcon status={status} />
-      <p className={cn(style, 'lowercase first-letter:capitalize')}>{status}</p>
+      <p className={cn(colorClass, 'lowercase first-letter:capitalize')}>{status}</p>
     </div>
   );
 }

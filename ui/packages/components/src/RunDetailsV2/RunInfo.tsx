@@ -1,4 +1,3 @@
-import type { UrlObject } from 'url';
 import type { Route } from 'next';
 
 import { CancelRunButton } from '../CancelRunButton';
@@ -20,17 +19,20 @@ type Props = {
   cancelRun: () => Promise<unknown>;
   className?: string;
   app: {
+    externalID: string;
     name: string;
-    url: Route | UrlObject;
   };
   fn: {
     id: string;
     name: string;
   };
+  pathCreator: {
+    app: (params: { externalAppID: string }) => Route;
+    runPopout: (params: { runID: string }) => Route;
+  };
   rerun: (args: { fnID: string }) => Promise<unknown>;
   run: {
     id: string;
-    url: Route | UrlObject;
     trace: {
       childrenSpans?: unknown[];
       endedAt: string | null;
@@ -41,7 +43,16 @@ type Props = {
   };
 };
 
-export function RunInfo({ app, cancelRun, className, fn, rerun, run, standalone }: Props) {
+export function RunInfo({
+  app,
+  cancelRun,
+  className,
+  fn,
+  pathCreator,
+  rerun,
+  run,
+  standalone,
+}: Props) {
   const queuedAt = new Date(run.trace.queuedAt);
   const startedAt = toMaybeDate(run.trace.startedAt);
   const endedAt = toMaybeDate(run.trace.endedAt);
@@ -56,7 +67,7 @@ export function RunInfo({ app, cancelRun, className, fn, rerun, run, standalone 
       <Card>
         <Card.Header className="h-11 flex-row items-center gap-2">
           <div className="flex grow items-center gap-2">
-            Run details {!standalone && <Link href={run.url} />}
+            Run details {!standalone && <Link href={pathCreator.runPopout({ runID: run.id })} />}
           </div>
 
           <CancelRunButton disabled={Boolean(endedAt)} onClick={cancelRun} />
@@ -71,7 +82,11 @@ export function RunInfo({ app, cancelRun, className, fn, rerun, run, standalone 
               </ElementWrapper>
 
               <ElementWrapper label="App">
-                <LinkElement internalNavigation href={app.url} showIcon={false}>
+                <LinkElement
+                  internalNavigation
+                  href={pathCreator.app({ externalAppID: app.externalID })}
+                  showIcon={false}
+                >
                   {app.name}
                 </LinkElement>
               </ElementWrapper>
