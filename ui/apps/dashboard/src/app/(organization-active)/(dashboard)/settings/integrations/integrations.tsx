@@ -60,8 +60,8 @@ export default function IntegrationsList() {
     <div className="mx-auto mt-16 flex w-[800px] flex-col">
       <div className="mb-7 w-full text-2xl font-medium">All integrations</div>
       <div className="grid w-[800px] grid-cols-2 gap-4">
-        {INTEGRATIONS.map((i: Integration) => (
-          <Card>
+        {INTEGRATIONS.map((i: Integration, n) => (
+          <Card key={`integration-card-${n}`}>
             <div className="flex h-[175px] flex-col p-6">
               <div className="align-center flex flex-row justify-between">
                 <div className="flex h-8 w-8 items-center justify-center rounded bg-black">
