@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+type months = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+
 const MIN_HOUR_AM = 1;
 const MAX_HOUR_AM = 12;
 const MIN_HOUR_24 = 0;
@@ -47,3 +49,15 @@ export const periodSchema = z
   .refine((value) => value === 'am' || value === 'pm', {
     message: 'Period must be "AM" or "PM".',
   });
+
+export const yearSchema = z.coerce
+  .number()
+  .int()
+  .min(1970, { message: 'Year must be a 4 digit number' })
+  .max(3000, { message: 'Year must be a 4 digit number' });
+
+export const monthSchema = z.coerce
+  .number()
+  .int()
+  .min(1, { message: 'Month must be between 1 and 12' })
+  .max(12, { message: 'Month must be 1 - 12' });

@@ -1,20 +1,25 @@
 import {
   DayPicker,
   type DayPickerDefaultProps,
+  type MonthChangeEventHandler,
   type SelectSingleEventHandler,
 } from 'react-day-picker';
 
 type CalendarProps = {
+  month?: Date;
   selected?: Date;
   onSelect?: SelectSingleEventHandler;
+  onMonthChange?: MonthChangeEventHandler;
 };
 
-export function Calendar({ selected, onSelect }: CalendarProps) {
+export function Calendar({ selected, onSelect, month, onMonthChange }: CalendarProps) {
   return (
     <DayPicker
       classNames={classNames}
       selected={selected}
       onSelect={onSelect}
+      month={month}
+      onMonthChange={onMonthChange}
       mode="single"
       showOutsideDays
       fixedWeeks
@@ -24,7 +29,7 @@ export function Calendar({ selected, onSelect }: CalendarProps) {
 
 const classNames: DayPickerDefaultProps['classNames'] = {
   caption: 'flex justify-center items-center h-6',
-  root: 'text-slate-900',
+  root: 'text-slate-900 bg-white',
   months: 'flex gap-4 relative',
   caption_label: 'text-lg font-medium',
   nav_button:

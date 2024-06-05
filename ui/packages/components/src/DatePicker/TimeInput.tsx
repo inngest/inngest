@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ZodError, type ZodSchema } from 'zod';
 
@@ -32,6 +32,10 @@ export function TimeInput({
   setIsValidTime,
   isValidTime,
 }: TimeInputProps) {
+  const minutesRef = useRef<HTMLInputElement | null>(null);
+  const secondsRef = useRef<HTMLInputElement | null>(null);
+  const millisecondsRef = useRef<HTMLInputElement | null>(null);
+  const meridiemRef = useRef<HTMLInputElement | null>(null);
   const [hourInput, setHourInput] = useState(
     selectedTime ? format(selectedTime, is24HourFormat ? 'HH' : 'hh') : '00'
   );
@@ -140,10 +144,21 @@ export function TimeInput({
             setInputValue: setHourInput,
           })
         }
+        onKeyUp={(e: React.SyntheticEvent<HTMLInputElement>) => {
+          const target = e.target as HTMLInputElement;
+          if (
+            target.selectionStart === 2 &&
+            target.selectionEnd === 2 &&
+            target.value?.length === 2
+          ) {
+            minutesRef.current?.focus();
+          }
+        }}
         value={hourInput}
       />
       <span className="px-0.5">:</span>
       <input
+        ref={minutesRef}
         className="w-7 px-0.5 text-center focus:outline-none"
         placeholder="mm"
         aria-label="Point in time (Minutes)"
@@ -151,10 +166,21 @@ export function TimeInput({
         onChange={(e) =>
           handleTimeChange({ e, schema: minutesSchema, setInputValue: setMinuteInput })
         }
+        onKeyUp={(e: React.SyntheticEvent<HTMLInputElement>) => {
+          const target = e.target as HTMLInputElement;
+          if (
+            target.selectionStart === 2 &&
+            target.selectionEnd === 2 &&
+            target.value?.length === 2
+          ) {
+            secondsRef.current?.focus();
+          }
+        }}
         value={minuteInput}
       />
       <span className="px-0.5">:</span>
       <input
+        ref={secondsRef}
         className="w-7 px-0.5 text-center focus:outline-none"
         placeholder="ss"
         aria-label="Point in time (Seconds)"
@@ -162,10 +188,21 @@ export function TimeInput({
         onChange={(e) =>
           handleTimeChange({ e, schema: secondsSchema, setInputValue: setSecondInput })
         }
+        onKeyUp={(e: React.SyntheticEvent<HTMLInputElement>) => {
+          const target = e.target as HTMLInputElement;
+          if (
+            target.selectionStart === 2 &&
+            target.selectionEnd === 2 &&
+            target.value?.length === 2
+          ) {
+            millisecondsRef.current?.focus();
+          }
+        }}
         value={secondInput}
       />
       <span className="px-0.5">.</span>
       <input
+        ref={millisecondsRef}
         className="w-9 px-0.5 text-center focus:outline-none"
         placeholder="sss"
         aria-label="Point in time (Milliseconds)"
@@ -173,10 +210,22 @@ export function TimeInput({
         onChange={(e) =>
           handleTimeChange({ e, schema: millisecondsSchema, setInputValue: setMillisecondInput })
         }
+        onKeyUp={(e: React.SyntheticEvent<HTMLInputElement>) => {
+          const target = e.target as HTMLInputElement;
+          if (
+            !is24HourFormat &&
+            target.selectionStart === 3 &&
+            target.selectionEnd === 3 &&
+            target.value?.length === 3
+          ) {
+            meridiemRef.current?.focus();
+          }
+        }}
         value={millisecondInput}
       />
       {!is24HourFormat && (
         <input
+          ref={meridiemRef}
           className="w-7 pl-0.5 focus:outline-none"
           placeholder="AM"
           aria-label="Point in time (Period)"
