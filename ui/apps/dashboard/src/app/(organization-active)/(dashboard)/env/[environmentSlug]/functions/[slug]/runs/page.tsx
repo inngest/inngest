@@ -60,7 +60,7 @@ const GetRunsDocument = graphql(`
 
 const renderSubComponent = ({ id }: { id: string }) => {
   return (
-    <div className="border-l-4 border-slate-400 pb-6 pl-5">
+    <div className="border-l-4 border-slate-400 pb-6">
       <RunDetails standalone={false} runID={id} />
     </div>
   );
@@ -230,7 +230,7 @@ export default function RunsPage({
       onScroll={(e) => fetchMoreOnScroll(e.target as HTMLDivElement)}
       ref={containerRef}
     >
-      <div className="sticky top-0 flex items-center justify-between gap-2 bg-slate-50 px-8 py-2">
+      <div className="sticky top-0 z-[100] flex items-center justify-between gap-2 bg-slate-50 px-8 py-2">
         <div className="flex items-center gap-2">
           <SelectGroup>
             <TimeFieldFilter

@@ -58,17 +58,18 @@ export function RunDetails(props: Props) {
 
   return (
     <div className="pr-4">
-      <RunInfo
-        app={app}
-        cancelRun={cancelRun}
-        className="mb-4"
-        fn={fn}
-        rerun={rerun}
-        run={run}
-        standalone={standalone}
-      />
-
-      {result && <RunResult className="mb-4" result={result} />}
+      <div className="pl-5">
+        <RunInfo
+          app={app}
+          cancelRun={cancelRun}
+          className="mb-4"
+          fn={fn}
+          rerun={rerun}
+          run={run}
+          standalone={standalone}
+        />
+        {result && <RunResult className="mb-4" result={result} />}
+      </div>
 
       <Timeline getResult={getResult} pathCreator={pathCreator} trace={run.trace} />
     </div>

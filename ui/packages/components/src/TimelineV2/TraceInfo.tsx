@@ -1,8 +1,13 @@
 import type { Route } from 'next';
 
 import { Card } from '../Card';
-import { InlineCode } from '../InlineCode';
-import { Link } from '../Link';
+import {
+  CodeElement,
+  ElementWrapper,
+  LinkElement,
+  TextElement,
+  TimeElement,
+} from '../DetailsCard/Element';
 import { Time } from '../Time';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
@@ -47,37 +52,54 @@ export function TraceInfo({ className, pathCreator, trace }: Props) {
     const timeout = toMaybeDate(trace.stepInfo.timeout);
     stepKindInfo = (
       <>
-        <Labeled label="Run">
+        <ElementWrapper label="Run">
           {trace.stepInfo.runID ? (
-            <Link
+            <LinkElement
               href={pathCreator.runPopout({ runID: trace.stepInfo.runID })}
-              internalNavigation={false}
+              internalNavigation
+              showIcon={false}
             >
               {trace.stepInfo.runID}
-            </Link>
+            </LinkElement>
           ) : (
             '-'
           )}
-        </Labeled>
-        <Labeled label="Timeout">{timeout ? <Time value={timeout} /> : '-'}</Labeled>
-        <Labeled label="Timed out">{maybeBooleanToString(trace.stepInfo.timedOut)}</Labeled>
+        </ElementWrapper>
+        <ElementWrapper label="Timeout">
+          {timeout ? <TimeElement date={timeout} /> : <TextElement>-</TextElement>}
+        </ElementWrapper>
+        <ElementWrapper label="Timed out">
+          <TextElement>{maybeBooleanToString(trace.stepInfo.timedOut)}</TextElement>
+        </ElementWrapper>
       </>
     );
   } else if (isStepInfoSleep(trace.stepInfo)) {
     const sleepUntil = toMaybeDate(trace.stepInfo.sleepUntil);
     stepKindInfo = (
-      <Labeled label="Sleep until">{sleepUntil ? <Time value={sleepUntil} /> : '-'}</Labeled>
+      <ElementWrapper label="Sleep until">
+        {sleepUntil ? <Time value={sleepUntil} /> : <TextElement>-</TextElement>}
+      </ElementWrapper>
     );
   } else if (isStepInfoWait(trace.stepInfo)) {
     const timeout = toMaybeDate(trace.stepInfo.timeout);
     stepKindInfo = (
       <>
-        <Labeled label="Event name">{trace.stepInfo.eventName}</Labeled>
-        <Labeled label="Timeout">{timeout ? <Time value={timeout} /> : '-'}</Labeled>
-        <Labeled label="Timed out">{maybeBooleanToString(trace.stepInfo.timedOut)}</Labeled>
-        <Labeled className="w-full" label="Match expression">
-          {trace.stepInfo.expression ? <InlineCode value={trace.stepInfo.expression} /> : '-'}
-        </Labeled>
+        <ElementWrapper label="Event name">
+          <TextElement>{trace.stepInfo.eventName}</TextElement>
+        </ElementWrapper>
+        <ElementWrapper label="Timeout">
+          {timeout ? <TimeElement date={timeout} /> : <TextElement>-</TextElement>}
+        </ElementWrapper>
+        <ElementWrapper label="Timed out">
+          <TextElement>{maybeBooleanToString(trace.stepInfo.timedOut)}</TextElement>
+        </ElementWrapper>
+        <ElementWrapper className="w-full" label="Match expression">
+          {trace.stepInfo.expression ? (
+            <CodeElement value={trace.stepInfo.expression} />
+          ) : (
+            <TextElement>-</TextElement>
+          )}
+        </ElementWrapper>
       </>
     );
   }
@@ -89,39 +111,38 @@ export function TraceInfo({ className, pathCreator, trace }: Props) {
 
         <Card.Content>
           <dl className="flex flex-wrap gap-4">
-            <Labeled label="Queued at">
-              <Time value={new Date(trace.queuedAt)} />
-            </Labeled>
+            <ElementWrapper label="Queued at">
+              <TimeElement date={new Date(trace.queuedAt)} />
+            </ElementWrapper>
 
-            <Labeled label="Started at">
-              {trace.startedAt ? <Time value={new Date(trace.startedAt)} /> : '-'}
-            </Labeled>
+            <ElementWrapper label="Started at">
+              {trace.startedAt ? (
+                <TimeElement date={new Date(trace.startedAt)} />
+              ) : (
+                <TextElement>-</TextElement>
+              )}
+            </ElementWrapper>
 
-            <Labeled label="Ended at">
-              {trace.endedAt ? <Time value={new Date(trace.endedAt)} /> : '-'}
-            </Labeled>
+            <ElementWrapper label="Ended at">
+              {trace.endedAt ? (
+                <TimeElement date={new Date(trace.endedAt)} />
+              ) : (
+                <TextElement>-</TextElement>
+              )}
+            </ElementWrapper>
 
-            <Labeled label="Delay">{delayText}</Labeled>
+            <ElementWrapper label="Delay">
+              <TextElement>{delayText}</TextElement>
+            </ElementWrapper>
 
-            <Labeled label="Duration">{durationText}</Labeled>
+            <ElementWrapper label="Duration">
+              <TextElement>{durationText}</TextElement>
+            </ElementWrapper>
 
             {stepKindInfo}
           </dl>
         </Card.Content>
       </Card>
-    </div>
-  );
-}
-
-function Labeled({
-  className,
-  label,
-  children,
-}: React.PropsWithChildren<{ className?: string; label: string }>) {
-  return (
-    <div className={cn('w-64 text-sm', className)}>
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="truncate">{children}</dd>
     </div>
   );
 }
