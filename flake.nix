@@ -51,6 +51,9 @@
             # Tools
             sqlite
             sqlc
+            buf
+            protoc-gen-go
+            protoc-gen-connect-go
           ];
         };
       });
