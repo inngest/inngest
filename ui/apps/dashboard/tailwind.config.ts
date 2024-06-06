@@ -16,6 +16,9 @@ export default {
           940: '#080D19',
         },
       },
+      backgroundColor: {
+        success: 'rgb(var(--color-background-success) / <alpha-value>)',
+      },
       gridTemplateColumns: {
         dashboard: '1fr 1fr 1fr 432px',
       },
