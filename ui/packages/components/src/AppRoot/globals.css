@@ -2,31 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  /* sign-in flow custom bg */
+  .mesh-gradient {
+    background-color: hsla(240, 100%, 72%, 1);
+    background-image: radial-gradient(at 62% 96%, hsla(191, 100%, 59%, 0.85) 0px, transparent 50%),
+      radial-gradient(at 48% 9%, hsla(275, 100%, 69%, 1) 0px, transparent 50%),
+      radial-gradient(at 8% 11%, hsla(240, 100%, 69%, 1) 0px, transparent 50%),
+      radial-gradient(at 3% 93%, hsla(0, 78%, 70%, 0.6) 0px, transparent 50%),
+      radial-gradient(at 89% 26%, hsla(266, 100%, 57%, 1) 0px, transparent 50%),
+      radial-gradient(at 84% 79%, hsla(240, 100%, 70%, 1) 0px, transparent 50%);
+  }
+}
+
 /* width */
-::-webkit-scrollbar {
+.dark ::-webkit-scrollbar {
   width: 10px;
 }
 
 /* Track */
-::-webkit-scrollbar-track {
+.dark ::-webkit-scrollbar-track {
   @apply bg-slate-900;
 }
 
 /* Handle */
-::-webkit-scrollbar-thumb {
+.dark ::-webkit-scrollbar-thumb {
   @apply rounded-lg bg-slate-800;
 }
 
 /* Handle on hover */
-::-webkit-scrollbar-thumb:hover {
+.dark ::-webkit-scrollbar-thumb:hover {
   @apply bg-slate-700;
 }
 
-#modals {
+.dark #modals {
   @apply text-sm text-slate-400;
 }
 
-:focus-visible {
+.dark :focus-visible {
   outline-color: white;
 }
 
