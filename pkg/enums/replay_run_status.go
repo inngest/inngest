@@ -9,7 +9,7 @@ const (
 
 	ReplayRunStatusCompleted = ReplayRunStatus(10 + RunStatusCompleted)
 	ReplayRunStatusFailed    = ReplayRunStatus(10 + RunStatusFailed)
-	ReplayRunStatusCcnaclled = ReplayRunStatus(10 + RunStatusCancelled)
+	ReplayRunStatusCancelled = ReplayRunStatus(10 + RunStatusCancelled)
 
 	ReplayRunStatusSkippedPaused = ReplayRunStatus(100 + SkipReasonFunctionPaused)
 )
