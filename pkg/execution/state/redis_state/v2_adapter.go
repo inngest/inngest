@@ -100,6 +100,11 @@ func (v v2) LoadState(ctx context.Context, id state.ID) (state.State, error) {
 	if state.Metadata, err = v.LoadMetadata(ctx, id); err != nil {
 		return state, err
 	}
+
+	// Reassign id since state.Metadata.ID has more complete info. Specifically,
+	// it has the function ID
+	id = state.Metadata.ID
+
 	if state.Events, err = v.LoadEvents(ctx, id); err != nil {
 		return state, err
 	}
