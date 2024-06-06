@@ -39,10 +39,28 @@ func MarshalV1(
 	env string,
 	attempt int,
 ) ([]byte, error) {
+	rawEvts, err := sl.LoadEvents(ctx, md.ID)
+	if err != nil {
+		return nil, fmt.Errorf("error loading events in driver marshaller: %w", err)
+	}
+
+	evts := make([]map[string]any, len(rawEvts))
+	for n, i := range rawEvts {
+		evts[n] = map[string]any{}
+		if err := json.Unmarshal(i, &evts[n]); err != nil {
+			return nil, fmt.Errorf("error unmarshalling event in driver marshaller: %w", err)
+		}
+		// ensure the user object is always an array.
+		if evts[n]["user"] == nil {
+			evts[n]["user"] = map[string]any{}
+		}
+	}
 
 	req := &SDKRequest{
-		Event:   map[string]any{},
-		Events:  []map[string]any{},
+		// For backcompat, we always send `Event`, but `Events` could be made
+		// empty if the overall request size is too large.
+		Event:   evts[0],
+		Events:  evts,
 		Actions: map[string]any{},
 		Context: &SDKRequestContext{
 			UseAPI:     true,
@@ -64,29 +82,13 @@ func MarshalV1(
 	// Ensure that we're not sending data that's too large to the SDK.
 	if md.Metrics.StateSize <= (consts.MaxBodySize - 1024) {
 		// Load the actual function state here.
-		state, err := sl.LoadState(ctx, md.ID)
+		steps, err := sl.LoadSteps(ctx, md.ID)
 		if err != nil {
 			return nil, fmt.Errorf("error loading state in driver marshaller: %w", err)
 		}
 
-		// Unmarshal events.
-		// TODO: Prevent this.  We do not need to do this.
-		evts := make([]map[string]any, len(state.Events))
-		for n, i := range state.Events {
-			evts[n] = map[string]any{}
-			if err := json.Unmarshal(i, &evts[n]); err != nil {
-				return nil, fmt.Errorf("error unmarshalling event in driver marshaller: %w", err)
-			}
-			// ensure the user object is always an array.
-			if evts[n]["user"] == nil {
-				evts[n]["user"] = map[string]any{}
-			}
-		}
-		req.Event = evts[0]
-		req.Events = evts
-
 		// We do not need to unmarshal state, as it's already marshalled.
-		for k, v := range state.Steps {
+		for k, v := range steps {
 			req.Actions[k] = v
 		}
 
@@ -103,7 +105,6 @@ func MarshalV1(
 	// This is because, as Jack points out, for backcompat we send both events and the
 	// first event.  We also may have incorrect state sizes for runs before this is tracked.
 	if len(j) > consts.MaxBodySize {
-		req.Event = map[string]any{}
 		req.Events = []map[string]any{}
 		req.Actions = map[string]any{}
 		req.UseAPI = true
