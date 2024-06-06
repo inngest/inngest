@@ -1832,6 +1832,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			Identifier:            pause.Identifier,
 			PriorityFactor:        md.Config.PriorityFactor,
 			CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+			MaxAttempts:           pause.MaxAttempts,
 			Payload: queue.PayloadEdge{
 				Edge: pause.Edge(),
 			},
@@ -2456,6 +2457,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		InvokeCorrelationID: &correlationID,
 		TriggeringEventID:   &evt.ID,
 		InvokeTargetFnID:    &opts.FunctionID,
+		MaxAttempts:         i.item.MaxAttempts,
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
@@ -2482,6 +2484,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		Identifier:            i.item.Identifier,
 		PriorityFactor:        i.item.PriorityFactor,
 		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
+		MaxAttempts:           i.item.MaxAttempts,
 		Payload: queue.PayloadPauseTimeout{
 			PauseID:   pauseID,
 			OnTimeout: true,
@@ -2610,6 +2613,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		Event:       &opts.Event,
 		Expression:  expr,
 		DataKey:     gen.ID,
+		MaxAttempts: i.item.MaxAttempts,
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
