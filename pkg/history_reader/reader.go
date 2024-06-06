@@ -337,7 +337,7 @@ type GetReplayRunsOpts struct {
 	Cursor      *ulid.ULID
 }
 
-func (c *GetReplayRunsOpts) Validate() error {
+func (c GetReplayRunsOpts) Validate() error {
 	if c.AccountID == uuid.Nil {
 		return errors.New("account ID must be provided")
 	}
@@ -375,15 +375,15 @@ type CountReplayRunsOpts struct {
 	SkipReasons []enums.SkipReason
 }
 
-func (c *CountReplayRunsOpts) Validate() error {
+func (c CountReplayRunsOpts) Validate() error {
 	gRROpts := GetReplayRunsOpts{
 		AccountID:   c.AccountID,
 		WorkspaceID: c.WorkspaceID,
 		WorkflowID:  c.WorkflowID,
 		LowerTime:   c.LowerTime,
 		UpperTime:   c.UpperTime,
-		Statuses:    []enums.RunStatus{enums.RunStatusCompleted, enums.RunStatusFailed, enums.RunStatusCancelled},
-		SkipReasons: []enums.SkipReason{enums.SkipReasonFunctionPaused},
+		Statuses:    c.Statuses,
+		SkipReasons: c.SkipReasons,
 		Limit:       DefaultQueryLimit,
 		Cursor:      nil,
 	}
