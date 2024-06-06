@@ -1,14 +1,13 @@
 import { ClientFeatureFlagProvider } from '@/components/FeatureFlags/ClientFeatureFlagProvider';
 import PageViewTracker from '@/components/PageViewTracker';
 import SentryUserIdentification from './SentryUserIdentification';
-import './globals.css';
+import '@inngest/components/AppRoot/globals.css';
 import React from 'react';
 import { type Metadata } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
+import { AppRoot } from '@inngest/components/AppRoot';
 import { TooltipProvider } from '@inngest/components/Tooltip';
 import colors from 'tailwindcss/colors';
-
-import { BaseWrapper } from './baseWrapper';
 
 export const metadata: Metadata = {
   title: 'Inngest Cloud',
@@ -18,7 +17,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <BaseWrapper>
+    <AppRoot>
       <ClerkProvider
         appearance={{
           layout: {
@@ -66,6 +65,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PageViewTracker />
         </ClientFeatureFlagProvider>
       </ClerkProvider>
-    </BaseWrapper>
+    </AppRoot>
   );
 }
