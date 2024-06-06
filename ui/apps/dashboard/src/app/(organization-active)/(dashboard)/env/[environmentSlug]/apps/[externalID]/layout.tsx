@@ -5,9 +5,11 @@ import { IconApp } from '@inngest/components/icons/App';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { ArchiveButton } from './ArchiveButton';
 import { ResyncButton } from './ResyncButton';
+import { ValidateButton } from './ValidateButton';
 import { useNavData } from './useNavData';
 
 type Props = React.PropsWithChildren<{
@@ -19,6 +21,7 @@ type Props = React.PropsWithChildren<{
 export default function Layout({ children, params: { externalID } }: Props) {
   externalID = decodeURIComponent(externalID);
   const env = useEnvironment();
+  const isAppValidationEnabled = useBooleanFlag('app-validation');
 
   const res = useNavData({
     envID: env.id,
@@ -61,6 +64,10 @@ export default function Layout({ children, params: { externalID } }: Props) {
         latestSyncUrl={res.data.latestSync.url}
       />
     );
+
+    if (isAppValidationEnabled.value) {
+      actions.push(<ValidateButton latestSyncUrl={res.data.latestSync.url} />);
+    }
   }
 
   actions.push(
