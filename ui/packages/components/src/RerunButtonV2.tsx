@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import { RiLoopLeftLine } from '@remixicon/react';
-
-import { cn } from './utils/classNames';
 
 type Props = {
+  disabled?: boolean;
   onClick: () => Promise<unknown>;
 };
 
@@ -21,5 +19,13 @@ export function RerunButton(props: Props) {
     }
   }
 
-  return <Button btnAction={onClick} loading={isLoading} label="Rerun" size="small" />;
+  return (
+    <Button
+      btnAction={onClick}
+      disabled={props.disabled}
+      loading={isLoading}
+      label="Rerun"
+      size="small"
+    />
+  );
 }

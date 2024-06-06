@@ -4,6 +4,8 @@ import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
 
+import { isLazyDone, type Lazy } from '../utils/lazyLoad';
+
 const cellStyles = 'text-slate-700 text-sm';
 
 export function ElementWrapper({
@@ -15,6 +17,32 @@ export function ElementWrapper({
     <div className={cn('w-64 text-sm', className)}>
       <dt className="pb-2 text-slate-500">{label}</dt>
       <dd className="truncate">{children}</dd>
+    </div>
+  );
+}
+
+export function LazyElementWrapper<T>({
+  children,
+  className,
+  label,
+  lazy,
+}: {
+  children: (loaded: T) => React.ReactNode;
+  className?: string;
+  label: string;
+  lazy: Lazy<T>;
+}) {
+  let content;
+  if (isLazyDone(lazy)) {
+    content = children(lazy);
+  } else {
+    content = <SkeletonElement />;
+  }
+
+  return (
+    <div className={cn('w-64 text-sm', className)}>
+      <dt className="pb-2 text-slate-500">{label}</dt>
+      <dd className="truncate">{content}</dd>
     </div>
   );
 }
