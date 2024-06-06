@@ -47,12 +47,15 @@ func TestStepPauseDeadlockRegression(t *testing.T) {
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
 			runID = input.InputCtx.RunID
 
-			step.Invoke[any](ctx, "invoke-step", step.InvokeOpts{
+			_, err := step.Invoke[any](ctx, "invoke-step", step.InvokeOpts{
 				FunctionId: fmt.Sprintf("%s-%s", appID, "invokee-fn"),
 				Data:       map[string]any{},
 			})
+			if err != nil {
+				return nil, err
+			}
 
-			_, err := step.Run(ctx, "after-invoke-step", func(ctx context.Context) (any, error) {
+			_, err = step.Run(ctx, "after-invoke-step", func(ctx context.Context) (any, error) {
 				atomic.AddInt32(&afterStepAttempts, 1)
 				return nil, fmt.Errorf("uh oh")
 			})
