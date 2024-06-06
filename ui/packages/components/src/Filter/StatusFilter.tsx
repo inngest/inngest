@@ -1,5 +1,6 @@
-import { RunStatusIcon, statusStyles } from '../FunctionRunStatusIcon/RunStatusIcons';
+import { RunStatusIcon } from '../FunctionRunStatusIcon/RunStatusIcons';
 import { Select, type Option } from '../Select/Select';
+import { getStatusBackgroundClass, getStatusBorderClass } from '../statusClasses';
 import {
   functionRunStatuses,
   isFunctionRunStatus,
@@ -28,7 +29,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
         key={status}
         className={cn(
           'inline-block h-[9px] w-[9px] flex-shrink-0 rounded-full border border-slate-50 bg-slate-50 ring-1 ring-inset ring-slate-300 group-hover:border-slate-100 [&:not(:first-child)]:-ml-1',
-          isSelected && [statusStyles[status], 'ring-0']
+          isSelected && [getStatusBackgroundClass(status), getStatusBorderClass(status), 'ring-0']
         )}
         aria-hidden="true"
       />

@@ -67,9 +67,9 @@ export function Trace({
   return (
     <div
       className={cn(
-        'py-2',
+        'py-5',
         // We don't want borders or horizontal padding on step attempts
-        depth === 0 && 'px-4',
+        depth === 0 && 'px-9',
         isExpanded && 'bg-blue-50'
       )}
     >

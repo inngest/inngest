@@ -1,4 +1,4 @@
-import { isFunctionRunStatus, type FunctionRunStatus } from '../types/functionRun';
+import { getStatusBackgroundClass, getStatusBorderClass } from '../statusClasses';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
 import { createSpanWidths } from './utils';
@@ -48,7 +48,11 @@ export function Span({ className, isInline, maxTime, minTime, trace }: Props) {
 
       {/* Running part of the span */}
       <div
-        className={cn('h-5 rounded', getStatusColor(trace.status))}
+        className={cn(
+          'h-5 rounded',
+          getStatusBackgroundClass(trace.status),
+          getStatusBorderClass(trace.status)
+        )}
         style={{ flexGrow: widths.running }}
       ></div>
 
@@ -56,20 +60,4 @@ export function Span({ className, isInline, maxTime, minTime, trace }: Props) {
       <div className="h-0.5 bg-slate-200" style={{ flexGrow: widths.after }}></div>
     </div>
   );
-}
-
-const statusColors: { [key in FunctionRunStatus | 'UNKNOWN']: string } = {
-  CANCELLED: 'bg-slate-400',
-  COMPLETED: 'bg-teal-500',
-  FAILED: 'bg-rose-600',
-  QUEUED: 'bg-amber-500',
-  RUNNING: 'bg-sky-500',
-  UNKNOWN: 'bg-slate-500',
-};
-
-function getStatusColor(status: string): string {
-  if (isFunctionRunStatus(status)) {
-    return statusColors[status];
-  }
-  return statusColors['UNKNOWN'];
 }
