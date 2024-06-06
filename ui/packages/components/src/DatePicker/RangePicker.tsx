@@ -161,7 +161,7 @@ export const RangePicker = ({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
         <DateInputButton {...props}>
           {displayValue ? (
