@@ -1089,13 +1089,12 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 			// TODO: Refactor state input
 			if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 				logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-			} else if !performedFinalization {
-				return resp
+			} else if performedFinalization {
+				for _, e := range e.lifecycles {
+					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
+				}
 			}
 
-			for _, e := range e.lifecycles {
-				go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
-			}
 			return resp
 		}
 	}
@@ -1108,13 +1107,12 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 			if strings.Contains(serr.Error(), "error compiling expression") {
 				if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 					logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-				} else if !performedFinalization {
-					return nil
+				} else if performedFinalization {
+					for _, e := range e.lifecycles {
+						go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
+					}
 				}
 
-				for _, e := range e.lifecycles {
-					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
-				}
 				return nil
 			}
 			return fmt.Errorf("error handling generator response: %w", serr)
@@ -1125,12 +1123,10 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 	// This is the function result.
 	if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-	} else if !performedFinalization {
-		return nil
-	}
-
-	for _, e := range e.lifecycles {
-		go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
+	} else if performedFinalization {
+		for _, e := range e.lifecycles {
+			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
+		}
 	}
 
 	return nil
@@ -1765,13 +1761,11 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		Err: &fnCancelledErr,
 	}); err != nil {
 		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-	} else if !performedFinalization {
-		return nil
-	}
-
-	ctx = e.extractTraceCtx(ctx, md, nil)
-	for _, e := range e.lifecycles {
-		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r)
+	} else if performedFinalization {
+		ctx = e.extractTraceCtx(ctx, md, nil)
+		for _, e := range e.lifecycles {
+			go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r)
+		}
 	}
 
 	return nil

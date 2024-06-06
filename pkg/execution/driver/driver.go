@@ -39,22 +39,9 @@ func MarshalV1(
 	env string,
 	attempt int,
 ) ([]byte, error) {
-	// Load the actual function state here.
-	state, err := sl.LoadState(ctx, md.ID)
-	if err != nil {
-		return nil, fmt.Errorf("error loading state in driver marshaller: %w", err)
-	}
-
-	if len(state.Events) == 0 {
-		return nil, fmt.Errorf("no events found in state")
-	}
-	var evt map[string]any
-	if err := json.Unmarshal(state.Events[0], &evt); err != nil {
-		return nil, fmt.Errorf("error unmarshalling event in driver marshaller: %w", err)
-	}
 
 	req := &SDKRequest{
-		Event:   evt,
+		Event:   map[string]any{},
 		Events:  []map[string]any{},
 		Actions: map[string]any{},
 		Context: &SDKRequestContext{
@@ -76,6 +63,12 @@ func MarshalV1(
 
 	// Ensure that we're not sending data that's too large to the SDK.
 	if md.Metrics.StateSize <= (consts.MaxBodySize - 1024) {
+		// Load the actual function state here.
+		state, err := sl.LoadState(ctx, md.ID)
+		if err != nil {
+			return nil, fmt.Errorf("error loading state in driver marshaller: %w", err)
+		}
+
 		// Unmarshal events.
 		// TODO: Prevent this.  We do not need to do this.
 		evts := make([]map[string]any, len(state.Events))

@@ -85,12 +85,10 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 
 		if performedFinalization, err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), resp); err != nil {
 			logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-		} else if !performedFinalization {
-			return nil
-		}
-
-		for _, e := range r.e.lifecycles {
-			go e.OnFunctionFinished(context.WithoutCancel(ctx), r.md, r.item, resp)
+		} else if performedFinalization {
+			for _, e := range r.e.lifecycles {
+				go e.OnFunctionFinished(context.WithoutCancel(ctx), r.md, r.item, resp)
+			}
 		}
 
 		// Stop the function from running, but don't return an error as we don't

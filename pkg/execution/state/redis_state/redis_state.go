@@ -730,9 +730,15 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier) (bool, error) {
 	for _, k := range keys {
 		cmd := m.r.B().Del().Key(k).Build()
 		result := m.r.Do(callCtx, cmd)
-		if count, _ := result.ToInt64(); count > 0 {
-			performedDeletion = true
+
+		// We should check a single key rather than all keys, to avoid races.
+		// We'll somewhat arbitrarily pick RunMetadata
+		if k == m.kf.RunMetadata(ctx, i.RunID) {
+			if count, _ := result.ToInt64(); count > 0 {
+				performedDeletion = true
+			}
 		}
+
 		if err := result.Error(); err != nil {
 			return false, err
 		}
