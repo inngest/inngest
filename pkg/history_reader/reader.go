@@ -33,12 +33,14 @@ const (
 // Reader defines the history reader interface, loading runs and run history
 type Reader interface {
 	CountRuns(ctx context.Context, opts CountRunOpts) (int, error)
+	CountReplayRuns(ctx context.Context, opts CountReplayRunsOpts) (int, error)
 	GetRun(
 		ctx context.Context,
 		runID ulid.ULID,
 		opts GetRunOpts,
 	) (Run, error)
 	GetRuns(ctx context.Context, opts GetRunsOpts) ([]Run, error)
+	GetReplayRuns(ctx context.Context, opts GetReplayRunsOpts) ([]ReplayRun, error)
 	GetRunHistory(
 		ctx context.Context,
 		runID ulid.ULID,
@@ -145,8 +147,6 @@ func (o GetRunsByEventIDOpts) Validate() error {
 	return nil
 }
 
-const GetRunsWildcard = "*"
-
 type GetRunsOpts struct {
 	AccountID   uuid.UUID
 	WorkspaceID uuid.UUID
@@ -160,10 +160,6 @@ type GetRunsOpts struct {
 	Statuses   []enums.RunStatus
 	// If true returns oldest first.  Defaults to descending/newest first.
 	Ascending bool
-	// Skipped runs are included iff SkipReasons is not empty.
-	// In this case, other (non-skipped, e.g. completed/failed/cancelled) runs are included iff Statuses is not empty.
-	// Including the special value "*" in this slice will query for all skipped runs.
-	SkipReasons []string
 }
 
 func (c GetRunsOpts) Validate() error {
@@ -184,17 +180,6 @@ func (c GetRunsOpts) Validate() error {
 	}
 	if c.Limit < 0 {
 		return errors.New("limit must be positive")
-	}
-	for _, r := range c.SkipReasons {
-		if r == "" {
-			return errors.New("skip reason cannot be empty")
-		}
-		if r == GetRunsWildcard {
-			continue
-		}
-		if _, err := enums.SkipReasonString(r); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -330,4 +315,77 @@ type RunHistoryInvokeFunctionResult struct {
 	EventID *ulid.ULID `json:"eventID"`
 	RunID   *ulid.ULID `json:"runID"`
 	Timeout bool       `json:"timeout"`
+}
+
+type ReplayRun struct {
+	ID         ulid.ULID  // run ID
+	BatchID    *ulid.ULID // batch ID
+	EventID    ulid.ULID  // event ID
+	WorkflowID uuid.UUID  // workflow ID
+	Cron       *string    // cron schedule, if this was a cron-triggered run
+}
+
+type GetReplayRunsOpts struct {
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	WorkflowID  *uuid.UUID // if workflow ID is nil, all functions in the env will be queried
+	LowerTime   time.Time
+	UpperTime   time.Time
+	Statuses    []enums.RunStatus  // if empty, no completed/failed/cancelled runs will be included
+	SkipReasons []enums.SkipReason // if empty, no skipped runs will be included
+	Limit       int
+	Cursor      *ulid.ULID
+}
+
+func (c *GetReplayRunsOpts) Validate() error {
+	if c.AccountID == uuid.Nil {
+		return errors.New("account ID must be provided")
+	}
+	if c.WorkspaceID == uuid.Nil {
+		return errors.New("workspace ID must be provided")
+	}
+	if c.WorkflowID != nil && *c.WorkflowID == uuid.Nil {
+		return errors.New("workflow ID must be provided")
+	}
+	if c.LowerTime.IsZero() {
+		return errors.New("lower time must be provided")
+	}
+	if c.UpperTime.IsZero() {
+		return errors.New("upper time must be provided")
+	}
+	if c.Limit < 0 {
+		return errors.New("limit must be positive")
+	}
+	if len(c.Statuses) == 0 && len(c.SkipReasons) == 0 {
+		return errors.New("at least one status or skip reason must be provided")
+	}
+
+	return nil
+}
+
+// CountReplayRunsOpts is used to estimate the number of runs that would match the given criteria for replay.
+// See GetReplayRunsOpts for field documentation.
+type CountReplayRunsOpts struct {
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	WorkflowID  *uuid.UUID
+	LowerTime   time.Time
+	UpperTime   time.Time
+	Statuses    []enums.RunStatus
+	SkipReasons []enums.SkipReason
+}
+
+func (c *CountReplayRunsOpts) Validate() error {
+	gRROpts := GetReplayRunsOpts{
+		AccountID:   c.AccountID,
+		WorkspaceID: c.WorkspaceID,
+		WorkflowID:  c.WorkflowID,
+		LowerTime:   c.LowerTime,
+		UpperTime:   c.UpperTime,
+		Statuses:    []enums.RunStatus{enums.RunStatusCompleted, enums.RunStatusFailed, enums.RunStatusCancelled},
+		SkipReasons: []enums.SkipReason{enums.SkipReasonFunctionPaused},
+		Limit:       DefaultQueryLimit,
+		Cursor:      nil,
+	}
+	return gRROpts.Validate()
 }
