@@ -224,7 +224,7 @@ type Run struct {
 	ID              ulid.ULID
 	OriginalRunID   *ulid.ULID
 	Output          *string
-	StartedAt       time.Time // for skips, this field represents RunSkippedAt
+	StartedAt       time.Time
 	Status          enums.RunStatus
 	WorkflowID      uuid.UUID
 	WorkspaceID     uuid.UUID
