@@ -103,6 +103,7 @@ func MarshalV1(
 	// This is because, as Jack points out, for backcompat we send both events and the
 	// first event.  We also may have incorrect state sizes for runs before this is tracked.
 	if len(j) > consts.MaxBodySize {
+		req.Event = map[string]any{}
 		req.Events = []map[string]any{}
 		req.Actions = map[string]any{}
 		req.UseAPI = true
