@@ -83,8 +83,10 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 		resp.SetError(state.ErrFunctionOverflowed)
 		resp.SetFinal()
 
-		if err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), resp); err != nil {
+		if performedFinalization, err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), resp); err != nil {
 			logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+		} else if !performedFinalization {
+			return nil
 		}
 
 		for _, e := range r.e.lifecycles {
