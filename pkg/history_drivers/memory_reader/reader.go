@@ -188,6 +188,20 @@ func (r *reader) GetUsage(
 	return nil, errors.New("not implemented")
 }
 
+func (r *reader) GetReplayRuns(ctx context.Context, opts history_reader.GetReplayRunsOpts) ([]history_reader.ReplayRun, error) {
+	r.store.Mu.RLock()
+	defer r.store.Mu.RUnlock()
+
+	return nil, errors.New("not implemented")
+}
+
+func (r *reader) CountReplayRuns(ctx context.Context, opts history_reader.CountReplayRunsOpts) (int, error) {
+	r.store.Mu.RLock()
+	defer r.store.Mu.RUnlock()
+
+	return 0, errors.New("not implemented")
+}
+
 func toRunHistory(item history.History) (*history_reader.RunHistory, error) {
 	var cancel *history_reader.RunHistoryCancel
 	if item.Cancel != nil {
