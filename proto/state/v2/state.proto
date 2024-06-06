@@ -20,7 +20,7 @@ message ID {
 }
 
 message Config {
-  string                            function_slug    = 1;
+  // string                            function_slug    = 1; deprecated
   int64                             function_version = 2;
   string                            cron_schedule    = 3;
   string                            span_id          = 4;

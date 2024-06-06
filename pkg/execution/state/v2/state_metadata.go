@@ -12,6 +12,7 @@ import (
 
 const (
 	cronScheduleKey = "__cron"
+	fnslugKey       = "__fnslug"
 )
 
 type ID struct {
@@ -62,8 +63,6 @@ type Tenant struct {
 
 // Config represents run config, stored within metadata.
 type Config struct {
-	// FunctionSlug stores the function slug.
-	FunctionSlug string
 	// FunctionVersion stores the version of the function used when the run is
 	// scheduled.
 	FunctionVersion int
@@ -148,6 +147,28 @@ func (c *Config) CronSchedule() *string {
 	}
 
 	return nil
+}
+
+func (c *Config) SetFunctionSlug(slug string) {
+	if c.Context == nil {
+		c.Context = map[string]any{}
+	}
+	c.Context[fnslugKey] = slug
+}
+
+// FunctionSlug retrieves the stored function slug if available
+func (c *Config) FunctionSlug() string {
+	if c.Context == nil {
+		return ""
+	}
+
+	if v, ok := c.Context[fnslugKey]; ok {
+		if slug, ok := v.(string); ok {
+			return slug
+		}
+	}
+
+	return ""
 }
 
 // RunMetrics stores state-level run metrics.
