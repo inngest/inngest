@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	StateErrorKey = "error"
-	StateDataKey  = "data"
+	StateErrorKey         = "error"
+	StateDataKey          = "data"
+	SdkInvokeTimeoutError = "InngestInvokeTimeoutError"
 )
 
 // Executor manages executing actions.  It interfaces over a state store to save
@@ -216,7 +217,7 @@ func (r *ResumeRequest) SetError(name string, message string) {
 // Set `r.With` to an invoke timeout `error`
 func (r *ResumeRequest) SetInvokeTimeoutError() {
 	r.SetError(
-		"InngestInvokeTimeoutError",
+		SdkInvokeTimeoutError,
 		"Timed out waiting for invoked function to complete",
 	)
 }
