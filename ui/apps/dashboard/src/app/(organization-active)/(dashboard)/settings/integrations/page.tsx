@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
-import LoadingIcon from '@/icons/LoadingIcon';
 import IntegrationsList from './integrations';
 
 export default async function IntegrationsPage() {

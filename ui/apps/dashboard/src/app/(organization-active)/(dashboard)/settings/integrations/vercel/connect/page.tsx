@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { Button } from '@inngest/components/Button';
 import { InfoCallout } from '@inngest/components/Callout';
 import { Link } from '@inngest/components/Link';
@@ -31,7 +30,7 @@ export default function VercelConnect() {
               Install Inngest Integration on Vercel A new window will open with Vercel Integration
             </div>
             <div className="leading-6 text-slate-500">
-              Marketplace. Click the "Add Integration" button.
+              Marketplace. Click the &rdquo;Add Integration&rdquo; button.
             </div>
           </div>
         </div>

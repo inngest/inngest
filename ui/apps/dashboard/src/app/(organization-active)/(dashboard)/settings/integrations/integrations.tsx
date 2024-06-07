@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card';
 import { IconDatadog } from '@inngest/components/icons/platforms/Datadog';
 import { IconNetlify } from '@inngest/components/icons/platforms/Netlify';
@@ -20,11 +20,12 @@ type Integration = {
 const INTEGRATIONS: Integration[] = [
   {
     title: 'Vercel',
-    Icon: <IconVercel className="text-white" />,
+    Icon: <IconVercel className="h-6 w-6 text-white" />,
     actionButton: (enabled: boolean) => (
-      <Button
-        kind="success"
+      <NewButton
+        kind="primary"
         appearance="solid"
+        size="medium"
         href={enabled ? '/settings/integrations/vercel' : '/settings/integrations/vercel/connect'}
         label={enabled ? 'Manage' : 'Connect'}
       />
@@ -34,11 +35,12 @@ const INTEGRATIONS: Integration[] = [
   },
   {
     title: 'Netlify',
-    Icon: <IconNetlify className="text-white" />,
+    Icon: <IconNetlify className="h-6 w-6 text-white" />,
     actionButton: () => (
-      <Button
-        kind="default"
+      <NewButton
+        kind="secondary"
         appearance="outlined"
+        size="medium"
         label="View documentation"
         href="https://www.inngest.com/docs/deploy/netlify"
       />
@@ -48,23 +50,25 @@ const INTEGRATIONS: Integration[] = [
   },
   {
     title: 'Datadog',
-    Icon: <IconDatadog className="text-white" />,
-    actionButton: () => <Button kind="default" appearance="outlined" label="Upvote" />,
+    Icon: <IconDatadog className="h-6 w-6 text-white" />,
+    actionButton: () => (
+      <NewButton kind="secondary" appearance="outlined" size="medium" label="Upvote" />
+    ),
     description: 'Let us know if a Datadog integration is important to you by upvoting!',
   },
 ];
 
 export default function IntegrationsList() {
-  const { data: vercelData, fetching, error } = useVercelIntegration();
+  const { data: vercelData } = useVercelIntegration();
   return (
     <div className="mx-auto mt-16 flex w-[800px] flex-col">
       <div className="mb-7 w-full text-2xl font-medium">All integrations</div>
-      <div className="grid w-[800px] grid-cols-2 gap-4">
+      <div className="grid w-[800px] grid-cols-2 gap-6">
         {INTEGRATIONS.map((i: Integration, n) => (
           <Card key={`integration-card-${n}`}>
-            <div className="flex h-[175px] flex-col p-6">
-              <div className="align-center flex flex-row justify-between">
-                <div className="flex h-8 w-8 items-center justify-center rounded bg-black">
+            <div className="flex h-[189px] w-[388px] flex-col p-6">
+              <div className="align-center flex flex-row items-center justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded bg-black">
                   {i.Icon}
                 </div>
                 {i.actionButton(i.title === 'Vercel' ? vercelData.enabled : false)}
@@ -75,18 +79,19 @@ export default function IntegrationsList() {
           </Card>
         ))}
         <Card>
-          <div className="flex h-[175px] flex-col bg-slate-100 p-6">
-            <div className="text-lg font-medium">Can't find what you need?</div>
+          <div className="bg-subtle flex h-[189px] w-[388px] flex-col p-6">
+            <div className="text-lg font-medium">Can&apos;t find what you need?</div>
             <div className="mt-3 text-sm text-slate-500">
               Write to our team about the integration you are looking for and we will get back to
               you.
             </div>
             <div>
-              <Button
-                kind="default"
+              <NewButton
+                kind="secondary"
                 appearance="outlined"
+                size="medium"
                 label="Request integration"
-                className="mt-3 bg-slate-100"
+                className="border-muted bg-subtle mt-5"
               />
             </div>
           </div>
