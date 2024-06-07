@@ -1,4 +1,4 @@
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { InfoCallout } from '@inngest/components/Callout';
 import { Link } from '@inngest/components/Link';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
@@ -56,13 +56,10 @@ export default function VercelConnect() {
         </div>
       </div>
       <div>
-        <Button
-          kind="success"
+        <NewButton
           appearance="solid"
           href="https://vercel.com/integrations/inngest"
           label="Connect Vercel to Inngest"
-          size="regular"
-          className="w-[180px]"
         />
       </div>
     </div>
