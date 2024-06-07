@@ -127,7 +127,7 @@ export const RangePicker = ({
     }
 
     if (upgradeCutoff && absoluteRange?.start && isBefore(absoluteRange.start, upgradeCutoff)) {
-      setStartError('Upgrade required for requested start date');
+      setStartError('Please upgrade for increased history limits');
       setStartValid(false);
     }
   };
