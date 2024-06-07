@@ -213,6 +213,14 @@ func (r *ResumeRequest) SetError(name string, message string) {
 	}
 }
 
+// Set `r.With` to an invoke timeout `error`
+func (r *ResumeRequest) SetInvokeTimeoutError() {
+	r.SetError(
+		"InngestInvokeTimeoutError",
+		"Timed out waiting for invoked function to complete",
+	)
+}
+
 func (r *ResumeRequest) Data() string {
 	return r.withKey(StateDataKey)
 }
