@@ -125,6 +125,11 @@ export const RangePicker = ({
       setStartValid(false);
       setEndValid(false);
     }
+
+    if (upgradeCutoff && absoluteRange?.start && isBefore(absoluteRange.start, upgradeCutoff)) {
+      setStartError('Please upgrade for increased history limits');
+      setStartValid(false);
+    }
   };
 
   useEffect(() => {
@@ -156,7 +161,7 @@ export const RangePicker = ({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
         <DateInputButton {...props}>
           {displayValue ? (

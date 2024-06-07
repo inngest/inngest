@@ -220,6 +220,7 @@ export function DateTimeInput({
         if (raw.length > 5 && isValid(d)) {
           e.preventDefault();
           populateFields(d);
+          onSelect(d);
         }
       }}
     >
