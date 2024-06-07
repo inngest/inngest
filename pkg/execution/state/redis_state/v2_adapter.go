@@ -69,7 +69,7 @@ func (v v2) Create(ctx context.Context, s state.CreateState) error {
 // Delete deletes state, metadata, and - when pauses are included - associated pauses
 // for the run from the store.  Nothing referencing the run should exist in the state
 // store after.
-func (v v2) Delete(ctx context.Context, id state.ID) error {
+func (v v2) Delete(ctx context.Context, id state.ID) (bool, error) {
 	return v.mgr.Delete(ctx, statev1.Identifier{
 		RunID:      id.RunID,
 		WorkflowID: id.FunctionID,

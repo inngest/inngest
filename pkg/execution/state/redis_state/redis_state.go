@@ -681,7 +681,11 @@ func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 // lifecycle.  Now, state stores must account for deletion directly.  Note that if the
 // state store is queue-aware, it must delete queue items for the run also.  This may
 // not always be the case.
-func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
+//
+// Returns a boolean indicating whether it performed deletion. If the run had
+// parallel steps then it may be false, since parallel steps cause the function
+// end to be reached multiple times in a single run
+func (m mgr) Delete(ctx context.Context, i state.Identifier) (bool, error) {
 	// Ensure this context isn't cancelled;  this is called in a goroutine.
 	callCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -697,7 +701,7 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
 
 	cmd := m.r.B().Expire().Key(key).Seconds(int64(consts.FunctionIdempotencyPeriod.Seconds())).Build()
 	if err := m.r.Do(callCtx, cmd).Error(); err != nil {
-		return err
+		return false, err
 	}
 
 	// Fetch all pauses for the run
@@ -721,14 +725,26 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
 		m.kf.Errors(ctx, i),
 		m.kf.RunPauses(ctx, i.RunID),
 	}
+
+	performedDeletion := false
 	for _, k := range keys {
 		cmd := m.r.B().Del().Key(k).Build()
-		if err := m.r.Do(callCtx, cmd).Error(); err != nil {
-			return err
+		result := m.r.Do(callCtx, cmd)
+
+		// We should check a single key rather than all keys, to avoid races.
+		// We'll somewhat arbitrarily pick RunMetadata
+		if k == m.kf.RunMetadata(ctx, i.RunID) {
+			if count, _ := result.ToInt64(); count > 0 {
+				performedDeletion = true
+			}
+		}
+
+		if err := result.Error(); err != nil {
+			return false, err
 		}
 	}
 
-	return nil
+	return performedDeletion, nil
 }
 
 func (m mgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error {
