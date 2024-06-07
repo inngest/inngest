@@ -1,13 +1,15 @@
 import { Button } from '@inngest/components/Button';
 import { RiCheckLine, RiFileCopy2Line } from '@remixicon/react';
 
+import type { ButtonAppearance, ButtonSize } from '../Button/Button';
+
 type ButtonCopyProps = {
   code?: string;
   iconOnly?: boolean;
   isCopying: boolean;
   handleCopyClick: (code: string) => void;
-  size?: 'small' | 'regular' | 'large';
-  appearance?: 'solid' | 'outlined' | 'text';
+  size?: ButtonSize;
+  appearance?: ButtonAppearance;
 };
 
 export function CopyButton({
@@ -25,10 +27,10 @@ export function CopyButton({
     <Button
       disabled={!code}
       size={size}
-      kind={isCopying ? 'success' : 'default'}
-      btnAction={code ? () => handleCopyClick(code) : undefined}
+      kind={isCopying ? 'secondary' : 'primary'}
+      onClick={code ? () => handleCopyClick(code) : undefined}
       label={iconOnly ? undefined : label}
-      appearance={iconOnly ? 'text' : appearance}
+      appearance={iconOnly ? 'ghost' : appearance}
       icon={iconOnly && icon}
       title="Click to copy"
       aria-label="Copy"

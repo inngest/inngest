@@ -33,7 +33,7 @@ export default function BillingError({ error, reset }: BillingErrorProps) {
         appearance="outlined"
         iconSide="right"
         icon={<RiLoopLeftLine className=" text-slate-700" />}
-        btnAction={() => reset()}
+        onClick={() => reset()}
         label="Reload"
       />
     </div>

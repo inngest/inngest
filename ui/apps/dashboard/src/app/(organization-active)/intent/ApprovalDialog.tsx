@@ -29,14 +29,14 @@ export default function ApprovalDialog({
       <div className="mx-auto max-w-xl">{description}</div>
       <div className="my-12 flex justify-center gap-6">
         <Button
-          btnAction={onCancel}
+          onClick={onCancel}
           appearance="outlined"
           size="large"
           disabled={isLoading}
           label="Cancel"
         />
         <Button
-          btnAction={onApprove}
+          onClick={onApprove}
           kind="primary"
           size="large"
           disabled={isLoading}

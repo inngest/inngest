@@ -68,7 +68,7 @@ export default function CreateKeyButton() {
     <>
       <Button
         icon={<RiAddLine />}
-        btnAction={() => setModalOpen(true)}
+        onClick={() => setModalOpen(true)}
         disabled={!currentContent}
         kind="primary"
         label={`Create ${currentContent.name}`}
@@ -83,7 +83,7 @@ export default function CreateKeyButton() {
             <Button
               appearance="outlined"
               label="Cancel"
-              btnAction={() => {
+              onClick={() => {
                 setModalOpen(false);
               }}
             />
@@ -91,7 +91,7 @@ export default function CreateKeyButton() {
               kind="primary"
               label="Create"
               loading={fetching}
-              btnAction={() => {
+              onClick={() => {
                 handleClick();
                 setModalOpen(false);
               }}

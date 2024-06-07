@@ -29,7 +29,7 @@ export function InvokeButton({
   return (
     <>
       <Button
-        btnAction={() => setIsModalOpen(true)}
+        onClick={() => setIsModalOpen(true)}
         disabled={disabled}
         icon={<RiFlashlightFill className="text-sky-500" />}
         label="Invoke"

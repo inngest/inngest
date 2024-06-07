@@ -26,7 +26,7 @@ export default function Page({ error, reset }: Props) {
         </div>
 
         <Button
-          btnAction={
+          onClick={
             // Attempt to recover by trying to re-render the segment
             () => reset()
           }

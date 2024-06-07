@@ -17,7 +17,7 @@ export default function ArchiveEventButton({ eventName }: ArchiveButtonProps) {
       <Button
         icon={<RiArchive2Line />}
         appearance="outlined"
-        btnAction={() => setIsArchiveEventModalVisible(true)}
+        onClick={() => setIsArchiveEventModalVisible(true)}
         label="Archive Event"
       />
       <ArchiveEventModal

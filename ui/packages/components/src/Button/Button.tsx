@@ -96,7 +96,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     const iconElement = React.isValidElement(icon)
       ? React.cloneElement(icon as React.ReactElement, {
-          className: cn(iconSizes, icon.props.className, loading && 'invisible'),
+          className: cn(
+            iconSizes,
+            iconSide === 'right' ? 'ml-0.5' : 'mr-0.5',
+            icon.props.className,
+            loading && 'invisible'
+          ),
         })
       : null;
 

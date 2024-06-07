@@ -78,7 +78,7 @@ export function AlertModal({
                     kind="danger"
                     label="Yes"
                     loading={isLoading}
-                    btnAction={async () => {
+                    onClick={async () => {
                       try {
                         await onSubmit();
                         onClose();

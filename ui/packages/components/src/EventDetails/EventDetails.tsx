@@ -132,7 +132,7 @@ export function EventDetails({
           {!isInternalEvent && onReplayEvent && SendEventButton && (
             <>
               <div className="flex items-center gap-1">
-                <Button label="Replay" btnAction={onReplayEvent} />
+                <Button label="Replay" onClick={onReplayEvent} />
                 <SendEventButton />
               </div>
             </>

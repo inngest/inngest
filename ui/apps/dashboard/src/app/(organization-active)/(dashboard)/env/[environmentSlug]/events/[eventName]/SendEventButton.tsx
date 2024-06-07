@@ -14,7 +14,7 @@ export default function SendEventButton({ eventName }: SendEventButtonProps) {
 
   return (
     <>
-      <Button btnAction={() => setIsModalVisible(true)} kind="primary" label="Send Event" />
+      <Button onClick={() => setIsModalVisible(true)} kind="primary" label="Send Event" />
       <SendEventModal
         isOpen={isModalVisible}
         eventName={eventName}

@@ -22,7 +22,7 @@ export default function Page({ error, reset }: Props) {
         <div className="my-6 overflow-scroll rounded bg-slate-200 p-2">{error.message}</div>
 
         <Button
-          btnAction={
+          onClick={
             // Attempt to recover by trying to re-render the segment
             () => reset()
           }

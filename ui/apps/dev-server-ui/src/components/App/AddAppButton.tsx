@@ -12,7 +12,7 @@ export default function AddAppButton() {
       <Button
         label="Sync New App"
         icon={<RiAddLine />}
-        btnAction={() => setAddAppModalVisible(true)}
+        onClick={() => setAddAppModalVisible(true)}
       />
       {isAddAppModalVisible && (
         <AddAppModal isOpen={isAddAppModalVisible} onClose={() => setAddAppModalVisible(false)} />

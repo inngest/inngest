@@ -8,7 +8,7 @@ export default function PaymentsButton() {
   }
   return (
     <Button
-      btnAction={scrollToPayments}
+      onClick={scrollToPayments}
       appearance="outlined"
       className="mt-4"
       label="View All Payments"

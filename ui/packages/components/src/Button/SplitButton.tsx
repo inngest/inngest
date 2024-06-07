@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import {
-  Button,
+  OldButton,
   getButtonColors,
   getButtonSizeStyles,
   getDisabledStyles,
@@ -36,7 +36,7 @@ export function SplitButton({ kind = 'default', size = 'small', items }: ButtonC
   const container = document.getElementById('modals');
   return (
     <div className="flex items-center">
-      <Button
+      <OldButton
         btnAction={btnAction}
         label={label}
         isSplit

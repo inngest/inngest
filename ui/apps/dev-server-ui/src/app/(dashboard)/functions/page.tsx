@@ -92,7 +92,7 @@ const columns = [
           disabled={false}
           doesFunctionAcceptPayload={doesFunctionAcceptPayload}
           btnAppearance="outlined"
-          btnAction={(data) => {
+          onClick={(data) => {
             invokeFunction({
               data,
               functionSlug: props.row.original.slug,

@@ -85,7 +85,7 @@ export default function VercelIntegrationForm({
         {hasPages && (
           <nav className="space-x-2 text-right" aria-label="Pagination">
             <Button
-              btnAction={() => setCurrentPage(currentPage - 1)}
+              onClick={() => setCurrentPage(currentPage - 1)}
               appearance="outlined"
               disabled={!hasPreviousPage}
               label="Prev"
@@ -97,7 +97,7 @@ export default function VercelIntegrationForm({
                 const isLastPage = index === totalPages - 1;
                 return (
                   <Button
-                    btnAction={() => setCurrentPage(index + 1)}
+                    onClick={() => setCurrentPage(index + 1)}
                     key={index}
                     appearance="outlined"
                     aria-current={isCurrentPage ? 'page' : undefined}
@@ -117,7 +117,7 @@ export default function VercelIntegrationForm({
             <Button
               appearance="outlined"
               disabled={!hasNextPage}
-              btnAction={() => setCurrentPage(currentPage + 1)}
+              onClick={() => setCurrentPage(currentPage + 1)}
               label="Next"
             />
           </nav>

@@ -29,7 +29,7 @@ export function RerunButton(props: Props) {
 
   return (
     <Button
-      btnAction={onClick}
+      onClick={onClick}
       disabled={isLoading}
       icon={<RiLoopLeftLine className={cn(' text-sky-500', isLoading && 'animate-spin')} />}
       label="Rerun"

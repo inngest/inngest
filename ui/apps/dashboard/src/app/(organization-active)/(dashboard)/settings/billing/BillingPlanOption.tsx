@@ -84,10 +84,10 @@ export default function BillingPlanOption({
       <Button
         href={isPremium ? (`${WEBSITE_CONTACT_URL}?ref=billing-enterprise` as Route) : undefined}
         target={isPremium ? '_blank' : undefined}
-        btnAction={!isPremium ? onClick : undefined}
+        onClick={!isPremium ? onClick : undefined}
         className="mt-5 w-full"
         appearance={!isPremium && (isActive || isLowerTierPlan) ? 'outlined' : 'solid'}
-        kind={isActive && !isPremium ? 'danger' : isLowerTierPlan ? 'default' : 'primary'}
+        kind={isActive && !isPremium ? 'danger' : 'primary'}
         disabled={preventDowngrade && isLowerTierPlan}
         label={
           isActive && isPremium

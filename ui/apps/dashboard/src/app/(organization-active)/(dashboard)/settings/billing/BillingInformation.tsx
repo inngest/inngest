@@ -68,19 +68,19 @@ export default function BillingInformation({
         <>
           {isEditing ? (
             <Button
-              appearance="text"
+              appearance="ghost"
               disabled={isSaveDisabled}
               className="font-semibold"
               type="submit"
-              btnAction={handleSubmit}
+              onClick={handleSubmit}
               label="Save"
             />
           ) : (
             <Button
-              appearance="text"
+              appearance="ghost"
               kind="primary"
               className="font-semibold"
-              btnAction={onEditButtonClick}
+              onClick={onEditButtonClick}
               label="Edit"
             />
           )}

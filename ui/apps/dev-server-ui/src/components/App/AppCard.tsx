@@ -271,8 +271,8 @@ export default function AppCard({ app }: { app: App }) {
             />
             <Button
               kind="danger"
-              appearance="text"
-              btnAction={() => setIsAlertModalOpen(true)}
+              appearance="ghost"
+              onClick={() => setIsAlertModalOpen(true)}
               label="Delete App"
             />
           </div>

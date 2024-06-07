@@ -116,7 +116,7 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
           type="submit"
           className="px-16"
           disabled={!stripe || loading}
-          btnAction={handleSubmit}
+          onClick={handleSubmit}
           kind="primary"
           label="Change Payment Method"
         />

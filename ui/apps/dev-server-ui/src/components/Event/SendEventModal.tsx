@@ -201,11 +201,11 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
       className="w-full max-w-5xl"
       footer={
         <div className="flex items-center justify-between">
-          <Button label="Cancel" appearance="outlined" btnAction={onClose} />
+          <Button label="Cancel" appearance="outlined" onClick={onClose} />
           <Button
             disabled={sendEventState.isLoading}
             label="Send Event"
-            btnAction={() => sendEvent()}
+            onClick={() => sendEvent()}
             keys={[useModifierKey(), '↵']}
           />
         </div>

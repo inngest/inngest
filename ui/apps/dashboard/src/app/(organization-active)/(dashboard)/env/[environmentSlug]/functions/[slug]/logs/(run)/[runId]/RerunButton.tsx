@@ -59,7 +59,7 @@ export default function RerunButton({ environment, functionRunID, func }: RerunB
     <Button
       size="small"
       loading={isMutating}
-      btnAction={() => rerunFunction()}
+      onClick={() => rerunFunction()}
       icon={<RiLoopLeftLine className={cn(' text-sky-500', isMutating && 'animate-spin')} />}
       label={isMutating ? 'Running...' : 'Rerun'}
     />

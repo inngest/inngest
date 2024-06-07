@@ -86,7 +86,7 @@ export default function ConfirmPlanChangeModal({
         <div className="mt-6 flex flex-row justify-end">
           <Button
             kind="primary"
-            btnAction={handlePlanChange}
+            onClick={handlePlanChange}
             label={`Confirm ${capitalCase(action)}`}
           />
         </div>

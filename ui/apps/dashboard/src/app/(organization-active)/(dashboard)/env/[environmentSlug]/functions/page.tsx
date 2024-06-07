@@ -30,7 +30,7 @@ export default function FunctionListPage() {
             <Button
               loading={isLoading}
               appearance="outlined"
-              btnAction={loadMore}
+              onClick={loadMore}
               label={isLoading ? 'Loading' : 'Load More'}
             />
           </div>

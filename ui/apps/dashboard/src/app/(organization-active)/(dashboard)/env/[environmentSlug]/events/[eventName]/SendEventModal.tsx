@@ -222,7 +222,7 @@ await inngest.send({
           )}
         </Tab.Panels>
       </Tab.Group>
-      <Button btnAction={onClose} appearance="outlined" label="Close Modal" />
+      <Button onClick={onClose} appearance="outlined" label="Close Modal" />
     </Modal>
   );
 }

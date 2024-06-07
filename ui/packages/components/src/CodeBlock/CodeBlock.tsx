@@ -390,7 +390,7 @@ export function CodeBlock({ className, header, tabs, actions = [] }: CodeBlockPr
                   <Button
                     key={idx}
                     icon={icon}
-                    btnAction={onClick}
+                    onClick={onClick}
                     size="small"
                     aria-label={label}
                     title={title ?? label}
@@ -408,7 +408,7 @@ export function CodeBlock({ className, header, tabs, actions = [] }: CodeBlockPr
                 />
                 <Button
                   icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
-                  btnAction={handleWrapText}
+                  onClick={handleWrapText}
                   size="small"
                   aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
                   title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
@@ -416,7 +416,7 @@ export function CodeBlock({ className, header, tabs, actions = [] }: CodeBlockPr
                   appearance="outlined"
                 />
                 <Button
-                  btnAction={handleFullHeight}
+                  onClick={handleFullHeight}
                   size="small"
                   icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
                   aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
@@ -436,7 +436,7 @@ export function CodeBlock({ className, header, tabs, actions = [] }: CodeBlockPr
                 <Button
                   label="Download Raw"
                   icon={<RiDownload2Line />}
-                  btnAction={() => downloadJson({ content: content })}
+                  onClick={() => downloadJson({ content: content })}
                   appearance="outlined"
                 />
               </div>

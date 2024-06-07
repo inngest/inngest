@@ -45,12 +45,19 @@ export default function Page() {
               <Button
                 kind="primary"
                 label="Sync App"
-                btnAction={() => router.push(pathCreator.createApp({ envSlug: env.slug }))}
+                onClick={() => router.push(pathCreator.createApp({ envSlug: env.slug }))}
                 icon={<RiAddLine />}
               />
             )}
             <HoverCardRoot>
               <HoverCardTrigger asChild>
+                {/* <Button
+                  appearance="outlined"
+                  href="https://www.inngest.com/docs/apps"
+                  icon={<RiInformationLine />}
+                  iconSide="left"
+                  label="What are Apps?"
+                /> */}
                 <NextLink
                   className="flex cursor-pointer items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-slate-200 hover:border-white hover:text-white"
                   href="https://www.inngest.com/docs/apps"

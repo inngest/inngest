@@ -161,7 +161,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                     {error.toString()}
                   </div>
                   <Button
-                    btnAction={
+                    onClick={
                       // Attempt to recover by trying to re-render the segment
                       () => resetError()
                     }

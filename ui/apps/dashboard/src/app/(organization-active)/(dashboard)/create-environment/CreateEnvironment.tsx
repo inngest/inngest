@@ -87,12 +87,7 @@ export default function CreateEnvironment({}) {
         <Button kind="primary" type="submit" disabled={isDisabled} label="Create Environment" />
       </form>
       <div className="mt-16 flex">
-        <Button
-          href="/env"
-          kind="default"
-          appearance="outlined"
-          label="← Back to all environments"
-        />
+        <Button href="/env" appearance="outlined" label="← Back to all environments" />
       </div>
     </>
   );

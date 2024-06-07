@@ -101,7 +101,7 @@ export function TriggerDetails({ className, getTrigger }: Props) {
               <Card.Header className="h-11 flex-row items-center gap-2">
                 <div className="flex grow items-center gap-2">Trigger details</div>
                 {/* <Collapsible.Trigger asChild>
-                  <Button size="large" appearance="text" icon={<RiContractRightFill />} />
+                  <Button size="large" appearance="ghost" icon={<RiContractRightFill />} />
                 </Collapsible.Trigger> */}
               </Card.Header>
 

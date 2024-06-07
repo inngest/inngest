@@ -175,7 +175,7 @@ function EventTypesListPaginationPage({
       {isLastLoadedPage && hasNextPage && (
         <tr>
           <td colSpan={3} className="py-2.5 text-center">
-            <Button appearance="outlined" btnAction={onLoadMore} label="Load More" />
+            <Button appearance="outlined" onClick={onLoadMore} label="Load More" />
           </td>
         </tr>
       )}

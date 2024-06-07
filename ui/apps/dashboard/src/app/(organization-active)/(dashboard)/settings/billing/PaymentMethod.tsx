@@ -35,9 +35,9 @@ export default function PaymentMethod({
       className="mb-3"
       actions={
         <Button
-          appearance="text"
+          appearance="ghost"
           kind="primary"
-          btnAction={() => setIsEditing(true)}
+          onClick={() => setIsEditing(true)}
           label="Edit"
           className="font-semibold"
         />

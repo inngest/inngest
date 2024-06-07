@@ -16,7 +16,7 @@ export function ResyncButton({ appExternalID, disabled = false, latestSyncUrl, p
   return (
     <>
       <Button
-        btnAction={() => setIsModalVisible(true)}
+        onClick={() => setIsModalVisible(true)}
         disabled={disabled}
         kind="primary"
         label="Resync"

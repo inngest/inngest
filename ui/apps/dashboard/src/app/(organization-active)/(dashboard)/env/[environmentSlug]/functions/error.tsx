@@ -24,7 +24,7 @@ export default function FunctionListError({ error, reset }: FunctionListErrorPro
           {error.message}
         </pre>
       </Alert>
-      <Button btnAction={() => reset()} kind="primary" label="Try Again" />
+      <Button onClick={() => reset()} kind="primary" label="Try Again" />
     </div>
   );
 }

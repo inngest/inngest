@@ -104,13 +104,13 @@ export function EnvironmentArchiveModal(props: Props) {
       {error && <Alert severity="error">{error}</Alert>}
 
       <div className="flex content-center justify-end">
-        <Button appearance="outlined" btnAction={onCancel} label="Cancel" />
+        <Button appearance="outlined" onClick={onCancel} label="Cancel" />
 
         <Button
           disabled={isLoading}
           kind="danger"
-          appearance="text"
-          btnAction={onSubmit}
+          appearance="ghost"
+          onClick={onSubmit}
           label={isArchived ? 'Unarchive' : 'Archive'}
         />
       </div>

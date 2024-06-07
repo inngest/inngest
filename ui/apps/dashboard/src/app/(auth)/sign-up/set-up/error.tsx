@@ -29,7 +29,7 @@ export default function UserSetupError({ error }: UserSetupErrorProps) {
       <Button
         label="Contact Support"
         appearance="outlined"
-        btnAction={() => {
+        onClick={() => {
           signOut(() => router.push('/support'));
         }}
       />

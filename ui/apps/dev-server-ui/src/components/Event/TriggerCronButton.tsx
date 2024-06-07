@@ -21,7 +21,7 @@ export default function TriggerCronButton({
     <Button
       label={label}
       appearance={appearance}
-      btnAction={() => {
+      onClick={() => {
         const id = ulid();
 
         sendEvent({

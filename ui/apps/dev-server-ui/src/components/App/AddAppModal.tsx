@@ -96,7 +96,7 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
         </form>
       </Modal.Body>
       <Modal.Footer className="flex justify-end gap-2">
-        <Button label="Cancel" appearance="outlined" btnAction={onClose} />
+        <Button label="Cancel" appearance="outlined" onClick={onClose} />
         <Button
           disabled={isDisabled || isUrlInvalid}
           label="Sync App"

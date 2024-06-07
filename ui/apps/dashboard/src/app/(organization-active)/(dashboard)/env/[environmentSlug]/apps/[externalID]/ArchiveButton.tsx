@@ -21,7 +21,7 @@ export function ArchiveButton({ appID, disabled = false, isArchived }: Props) {
     <>
       <Button
         appearance="outlined"
-        btnAction={() => setIsModalVisible(true)}
+        onClick={() => setIsModalVisible(true)}
         disabled={disabled}
         kind="danger"
         label={label}

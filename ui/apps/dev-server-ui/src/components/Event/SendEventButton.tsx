@@ -6,7 +6,7 @@ import SendEventModal from '@/components/Event/SendEventModal';
 type SendEventButtonProps = {
   data?: string | null;
   label: string;
-  appearance?: 'solid' | 'outlined' | 'text';
+  appearance?: 'solid' | 'outlined' | 'ghost';
 };
 
 export default function SendEventButton({ data, label, appearance }: SendEventButtonProps) {
@@ -17,7 +17,7 @@ export default function SendEventButton({ data, label, appearance }: SendEventBu
       <Button
         label={label}
         appearance={appearance}
-        btnAction={() => setSendEventModalVisible(true)}
+        onClick={() => setSendEventModalVisible(true)}
       />
       {isSendEventModalVisible && (
         <SendEventModal

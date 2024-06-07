@@ -45,8 +45,8 @@ export function Banner({
       {onDismiss && (
         <Button
           size="small"
-          appearance="text"
-          btnAction={onDismiss}
+          appearance="ghost"
+          onClick={onDismiss}
           icon={<RiCloseLine className="h-5 w-5" />}
         />
       )}

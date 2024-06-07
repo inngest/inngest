@@ -25,7 +25,7 @@ export default function EventError({ error, reset }: EventErrorPops) {
         appearance="outlined"
         iconSide="right"
         icon={<RiLoopLeftLine className=" text-slate-700" />}
-        btnAction={() => reset()}
+        onClick={() => reset()}
         label="Reload"
       />
     </div>

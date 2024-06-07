@@ -145,7 +145,7 @@ function CheckoutForm({ items, onSuccess }: { items: CheckoutItem[]; onSuccess: 
           type="submit"
           className="px-16"
           disabled={!stripe || loading}
-          btnAction={handleSubmit}
+          onClick={handleSubmit}
           label="Complete Upgrade"
         />
       </div>

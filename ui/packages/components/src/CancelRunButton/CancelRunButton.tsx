@@ -26,7 +26,7 @@ export function CancelRunButton({ disabled, hasIcon = false, onClick }: Props) {
   return (
     <>
       <Button
-        btnAction={() => setIsModalOpen(true)}
+        onClick={() => setIsModalOpen(true)}
         disabled={disabled}
         icon={hasIcon && <IconStatusCanceled />}
         label="Cancel"

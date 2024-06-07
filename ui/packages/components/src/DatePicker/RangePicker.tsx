@@ -277,15 +277,15 @@ export const RangePicker = ({
                       <Button
                         size="small"
                         label="Cancel"
-                        appearance="text"
-                        btnAction={() => setOpen(false)}
+                        appearance="ghost"
+                        onClick={() => setOpen(false)}
                       />
                       <Button
                         size="small"
                         label="Next"
                         kind="primary"
                         disabled={!absoluteRange?.start || !startValid}
-                        btnAction={() => setTab('end')}
+                        onClick={() => setTab('end')}
                       />
                     </div>
                   </div>
@@ -312,8 +312,8 @@ export const RangePicker = ({
                       <Button
                         size="small"
                         label="Cancel"
-                        appearance="text"
-                        btnAction={() => setOpen(false)}
+                        appearance="ghost"
+                        onClick={() => setOpen(false)}
                       />
                       <div className="flex flex-row">
                         <Button
@@ -321,7 +321,7 @@ export const RangePicker = ({
                           label="Previous"
                           kind="primary"
                           appearance="outlined"
-                          btnAction={() => setTab('start')}
+                          onClick={() => setTab('start')}
                           className="mr-2"
                         />
                         <Button
@@ -331,7 +331,7 @@ export const RangePicker = ({
                           disabled={
                             !startValid || !endValid || !absoluteRange?.end || !absoluteRange?.start
                           }
-                          btnAction={() => {
+                          onClick={() => {
                             setDisplayValue(<AbsoluteDisplay absoluteRange={absoluteRange} />);
                             onChange({
                               type: 'absolute',

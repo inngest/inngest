@@ -217,7 +217,7 @@ export default function FunctionRunList({
             label="Load More"
             appearance="outlined"
             loading={fetching}
-            btnAction={() => endCursor && setPageCursors([...pageCursors, endCursor])}
+            onClick={() => endCursor && setPageCursors([...pageCursors, endCursor])}
           />
         </div>
       )}

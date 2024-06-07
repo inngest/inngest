@@ -58,7 +58,7 @@ export default function EditKeyModal({ keyID, keyName, isOpen, onClose }: EditKe
           <Button
             appearance="outlined"
             label="Cancel"
-            btnAction={() => {
+            onClick={() => {
               onClose();
             }}
           />
@@ -66,7 +66,7 @@ export default function EditKeyModal({ keyID, keyName, isOpen, onClose }: EditKe
             kind="primary"
             label="Save"
             loading={fetching}
-            btnAction={(e) => {
+            onClick={(e) => {
               handleSubmit(e);
               onClose();
             }}

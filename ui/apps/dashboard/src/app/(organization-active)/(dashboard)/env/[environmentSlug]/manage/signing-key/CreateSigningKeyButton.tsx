@@ -24,7 +24,7 @@ export function CreateSigningKeyButton({ disabled, envID }: Props) {
 
   return (
     <Button
-      btnAction={() => createSigningKey({ envID })}
+      onClick={() => createSigningKey({ envID })}
       disabled={disabled}
       kind="primary"
       icon={<RiAddLine />}

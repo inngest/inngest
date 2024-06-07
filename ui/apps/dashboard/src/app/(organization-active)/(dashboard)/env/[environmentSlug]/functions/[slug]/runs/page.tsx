@@ -244,8 +244,8 @@ export default function RunsPage({
         {/* TODO: wire button */}
         <Button
           label="Refresh"
-          appearance="text"
-          btnAction={() => {}}
+          appearance="ghost"
+          onClick={() => {}}
           icon={<RiLoopLeftLine />}
           disabled
         />
@@ -263,8 +263,8 @@ export default function RunsPage({
           <Button
             label="Back to top"
             kind="primary"
-            appearance="text"
-            btnAction={() => scrollToTop(true)}
+            appearance="ghost"
+            onClick={() => scrollToTop(true)}
           />
         </div>
       )}

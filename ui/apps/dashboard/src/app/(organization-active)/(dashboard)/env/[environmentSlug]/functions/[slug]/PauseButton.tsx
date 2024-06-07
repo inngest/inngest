@@ -152,7 +152,7 @@ export default function PauseFunctionButton({ functionSlug, disabled }: PauseFun
                     <RiPauseLine className=" text-amber-500" />
                   )
                 }
-                btnAction={() => setIsPauseFunctionModalVisible(true)}
+                onClick={() => setIsPauseFunctionModalVisible(true)}
                 disabled={disabled || isFetchingVersions}
                 label={isPaused ? 'Resume' : 'Pause'}
               />

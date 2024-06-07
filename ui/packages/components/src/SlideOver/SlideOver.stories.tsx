@@ -22,7 +22,7 @@ const SlideOverWithHooks = (props) => {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <>
-      <Button label="Open SlideOver" btnAction={() => setIsOpen(true)} />
+      <Button label="Open SlideOver" onClick={() => setIsOpen(true)} />
       {isOpen && (
         <SlideOver onClose={() => setIsOpen(false)} size={props.size}>
           <p className="p-6 text-white">This is the body of the SlideOver</p>

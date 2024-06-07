@@ -29,7 +29,7 @@ export function EnvironmentArchiveButton({ env }: Props) {
     <>
       <Button
         appearance="outlined"
-        btnAction={() => setIsModalOpen(true)}
+        onClick={() => setIsModalOpen(true)}
         kind="danger"
         label={label}
       />

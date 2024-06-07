@@ -136,7 +136,7 @@ export function EventLogsPage({
         <div className="flex justify-center">
           <Button
             className="mt-4"
-            btnAction={() => onLoadMore(lastEvent.id)}
+            onClick={() => onLoadMore(lastEvent.id)}
             appearance="outlined"
             label="Load More"
           />

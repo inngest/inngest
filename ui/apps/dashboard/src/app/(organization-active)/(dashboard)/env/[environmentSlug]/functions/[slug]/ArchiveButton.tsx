@@ -60,7 +60,7 @@ export default function ArchiveFunctionButton({ functionSlug }: ArchiveFunctionP
                     <RiArchive2Line className=" text-slate-300" />
                   )
                 }
-                btnAction={() =>
+                onClick={() =>
                   console.error('manual function archival has been replaced with app archival')
                 }
                 disabled

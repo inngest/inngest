@@ -77,7 +77,7 @@ export default function VercelIntegrationForm({ vercelIntegration }: VercelInteg
           <div className="flex gap-2">
             <Button
               appearance="outlined"
-              btnAction={() => router.refresh()}
+              onClick={() => router.refresh()}
               icon={<RiLoopLeftLine className=" text-slate-500" />}
               label="Refresh Project List"
             />

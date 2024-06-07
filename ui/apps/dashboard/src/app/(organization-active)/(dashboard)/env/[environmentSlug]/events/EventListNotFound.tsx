@@ -136,7 +136,7 @@ export default function EventListNotFound() {
               <Button
                 appearance="outlined"
                 target="_blank"
-                btnAction={() => router.refresh()}
+                onClick={() => router.refresh()}
                 label="Refresh page to check for events"
               />
             </div>

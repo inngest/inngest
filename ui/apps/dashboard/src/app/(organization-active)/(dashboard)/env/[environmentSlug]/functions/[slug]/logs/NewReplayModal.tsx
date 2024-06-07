@@ -333,7 +333,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
         <div className="flex justify-between border-t border-slate-100 px-5 py-4">
           <Link href="https://inngest.com/docs/platform/replay">Learn about Replay</Link>
           <div className="flex gap-2">
-            <Button type="button" appearance="outlined" label="Cancel" btnAction={onClose} />
+            <Button type="button" appearance="outlined" label="Cancel" onClick={onClose} />
             <Button
               label="Replay Function"
               kind="primary"

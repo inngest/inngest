@@ -30,7 +30,7 @@ export function BlankSlate({ imageUrl, title, subtitle, button, link }: BlankSla
             <div>{link.text}</div>
           </Link>
         ) : button ? (
-          <Button btnAction={button.onClick} label={button.text} />
+          <Button onClick={button.onClick} label={button.text} />
         ) : null}
       </div>
     </div>

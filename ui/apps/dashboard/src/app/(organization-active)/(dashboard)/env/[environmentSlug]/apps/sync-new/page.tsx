@@ -79,14 +79,14 @@ export default function Page({ params: { environmentSlug } }: Props) {
                 <div className="flex items-center gap-3">
                   <Button
                     label="Cancel"
-                    btnAction={() => {
+                    onClick={() => {
                       router.push(APPS_URL);
                     }}
                     appearance="outlined"
                   />
                   <Button
                     label="Go To Vercel Configuration"
-                    btnAction={() => {
+                    onClick={() => {
                       router.push('/settings/integrations/vercel' as Route);
                     }}
                     kind="primary"
@@ -129,7 +129,7 @@ export default function Page({ params: { environmentSlug } }: Props) {
                 <div className="flex items-center gap-3">
                   <Button
                     label="Done"
-                    btnAction={() => {
+                    onClick={() => {
                       router.push(APPS_URL);
                     }}
                     kind="primary"

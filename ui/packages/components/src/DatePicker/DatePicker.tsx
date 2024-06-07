@@ -110,7 +110,7 @@ export function DatePicker({ defaultValue, placeholder, onChange, ...props }: Da
                 kind="primary"
                 label="Apply"
                 disabled={!isValidTime || !selectedDay}
-                btnAction={handleApply}
+                onClick={handleApply}
               />
             </div>
           </div>

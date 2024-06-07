@@ -158,14 +158,14 @@ export default function ManualSync({ appsURL }: Props) {
         <div className="flex items-center gap-3">
           <Button
             label="Cancel"
-            btnAction={() => {
+            onClick={() => {
               router.push(appsURL);
             }}
             appearance="outlined"
           />
           <Button
             label="Sync App"
-            btnAction={onSync}
+            onClick={onSync}
             kind="primary"
             disabled={disabled}
             loading={isSyncing}

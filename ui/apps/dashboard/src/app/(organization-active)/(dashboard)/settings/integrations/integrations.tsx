@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { NewButton } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card';
 import { IconDatadog } from '@inngest/components/icons/platforms/Datadog';
 import { IconNetlify } from '@inngest/components/icons/platforms/Netlify';
@@ -22,7 +22,7 @@ const INTEGRATIONS: Integration[] = [
     title: 'Vercel',
     Icon: <IconVercel className="h-6 w-6 text-white" />,
     actionButton: (enabled: boolean) => (
-      <NewButton
+      <Button
         kind="primary"
         appearance="solid"
         size="medium"
@@ -37,7 +37,7 @@ const INTEGRATIONS: Integration[] = [
     title: 'Netlify',
     Icon: <IconNetlify className="h-6 w-6 text-white" />,
     actionButton: () => (
-      <NewButton
+      <Button
         kind="secondary"
         appearance="outlined"
         size="medium"
@@ -52,7 +52,7 @@ const INTEGRATIONS: Integration[] = [
     title: 'Datadog',
     Icon: <IconDatadog className="h-6 w-6 text-white" />,
     actionButton: () => (
-      <NewButton kind="secondary" appearance="outlined" size="medium" label="Upvote" />
+      <Button kind="secondary" appearance="outlined" size="medium" label="Upvote" />
     ),
     description: 'Let us know if a Datadog integration is important to you by upvoting!',
   },
@@ -86,7 +86,7 @@ export default function IntegrationsList() {
               you.
             </div>
             <div>
-              <NewButton
+              <Button
                 kind="secondary"
                 appearance="outlined"
                 size="medium"

@@ -67,7 +67,7 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
     <div className="flex w-72 gap-2">
       {isExpandable && (
         <Button
-          btnAction={onClickExpandToggle}
+          onClick={onClickExpandToggle}
           size="small"
           appearance={isExpanded ? 'solid' : 'outlined'}
           icon={

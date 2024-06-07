@@ -52,7 +52,7 @@ export function Apps({ isArchived = false }: Props) {
                 className="mt-4"
                 kind="primary"
                 label="Sync App"
-                btnAction={() => router.push(pathCreator.createApp({ envSlug: env.slug }))}
+                onClick={() => router.push(pathCreator.createApp({ envSlug: env.slug }))}
                 icon={<RiAddLine />}
               />
             </div>

@@ -79,9 +79,9 @@ export function DeleteSigningKeyModal(props: Props) {
         )}
 
         <div className="flex justify-end gap-2">
-          <Button label="Close" appearance="outlined" btnAction={onClose} />
+          <Button label="Close" appearance="outlined" onClick={onClose} />
           <Button
-            btnAction={onConfirm}
+            onClick={onConfirm}
             disabled={isFetching}
             kind="danger"
             label="Permanently delete"

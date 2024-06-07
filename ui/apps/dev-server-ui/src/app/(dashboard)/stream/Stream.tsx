@@ -234,11 +234,11 @@ export default function Stream() {
       <div className="flex justify-end gap-1 px-5 py-2">
         <Button
           label={`${showInternalEvents ? 'Hide' : 'Show'} Internal Events`}
-          btnAction={() => setShowInternalEvents((prev) => !prev)}
+          onClick={() => setShowInternalEvents((prev) => !prev)}
         />
         <Button
           label={freezeStream ? 'Resume Stream' : 'Freeze Stream'}
-          btnAction={() => setFreezeStream((prev) => !prev)}
+          onClick={() => setFreezeStream((prev) => !prev)}
         />
         <SendEventButton
           label="Test Event"
@@ -289,7 +289,7 @@ export default function Stream() {
       </div>
       {tableScrollTopPosition > 0 && (
         <span className="absolute bottom-5 right-5 animate-bounce">
-          <Button btnAction={scrollToTop} icon={<RiArrowDownSLine className="rotate-180" />} />
+          <Button onClick={scrollToTop} icon={<RiArrowDownSLine className="rotate-180" />} />
         </span>
       )}
     </div>

@@ -18,7 +18,7 @@ export function DeleteSigningKeyButton({ signingKeyID }: Props) {
       <Button
         appearance="outlined"
         aria-label="Delete"
-        btnAction={() => setIsModalOpen(true)}
+        onClick={() => setIsModalOpen(true)}
         icon={<RiDeleteBin2Line />}
         kind="danger"
         size="small"
