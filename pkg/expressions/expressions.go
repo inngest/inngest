@@ -139,7 +139,7 @@ func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluator, 
 	if exprCompiler != nil {
 		ast, issues, vars := exprCompiler.Parse(expression)
 		if issues != nil {
-			return nil, fmt.Errorf("error compiling expression: %w", issues.Err())
+			return nil, NewCompileError(issues.Err())
 		}
 		e, err := env()
 		if err != nil {
@@ -175,7 +175,7 @@ func cachedCompile(ctx context.Context, expression string) (*expressionEvaluator
 	}
 	ast, issues := e.Parse(expression)
 	if issues != nil {
-		return nil, fmt.Errorf("error compiling expression: %w", issues.Err())
+		return nil, NewCompileError(issues.Err())
 	}
 	eval := &expressionEvaluator{
 		ast:        ast,
@@ -333,4 +333,25 @@ func (e *expressionEvaluator) parseAttributes(ctx context.Context) error {
 	}
 	e.attrs = attrs
 	return nil
+}
+
+type CompileError struct {
+	Err error
+}
+
+func NewCompileError(err error) *CompileError {
+	return &CompileError{Err: err}
+}
+
+func (c *CompileError) Error() string {
+	return fmt.Sprintf("error compiling expression: %s", c.Err)
+}
+
+func (c *CompileError) Unwrap() error {
+	return c.Err
+}
+
+func (c *CompileError) Message() *string {
+	msg := c.Err.Error()
+	return &msg
 }

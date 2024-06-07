@@ -752,18 +752,20 @@ func applyResponse(
 			stepName := op.UserDefinedName()
 			h.StepName = &stepName
 		}
-
-		// If we're a generator, exit now to prevent attempting to parse
-		// generator response as an output; the generator response may be in
-		// relation to many parallel steps, not just the one we're currently
-		// writing history for.
-		return nil
 	}
 
 	// Only set the output to the response error string if there isn't already output. This prevents overriding errors in the user's function
 	if resp.Output == nil && resp.Error() != "" {
 		h.Result.Output = resp.Error()
 		h.Result.SizeBytes = len(h.Result.Output)
+		return nil
+	}
+
+	if len(resp.Generator) > 0 {
+		// If we're a generator, exit now to prevent attempting to parse
+		// generator response as an output; the generator response may be in
+		// relation to many parallel steps, not just the one we're currently
+		// writing history for.
 		return nil
 	}
 

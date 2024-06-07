@@ -1103,8 +1103,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 	if len(resp.Generator) > 0 {
 		// Handle generator responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, i, resp); serr != nil {
+			var compileError *expressions.CompileError
+
 			// If this is an error compiling async expressions, fail the function.
-			if strings.Contains(serr.Error(), "error compiling expression") {
+			if errors.As(serr, &compileError) {
+				resp.Output = nil
+				resp.Err = compileError.Message()
+
 				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 					logger.From(ctx).Error().Err(err).Msg("error running finish handler")
 				}
@@ -2556,11 +2561,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 			"event": evt.Map(),
 		})
 		if err != nil {
-			logger.StdlibLogger(ctx).Warn(
-				"error interpolating waitForEvent expression",
-				"error", err,
-				"expression", *opts.If,
-			)
+			return fmt.Errorf("error interpolating wait for event expression: %w", err)
 		}
 		expr = &interpolated
 
