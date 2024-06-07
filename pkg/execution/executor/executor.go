@@ -1904,11 +1904,18 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 						)
 						defer span.End()
 						span.SetAttributes(commonAttrs...)
+
+						var output any
 						if r.With != nil {
-							span.SetStepOutput(r.With)
+							output = r.With
 						}
 						if r.HasError() {
+							output = r.Error()
 							span.SetStatus(codes.Error, r.Error())
+						}
+
+						if output != nil {
+							span.SetStepOutput(output)
 						}
 					}
 				}
