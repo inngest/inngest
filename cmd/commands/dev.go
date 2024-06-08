@@ -25,7 +25,7 @@ func NewCmdDev() *cobra.Command {
 		Run:     doDev,
 	}
 
-	cmd.Flags().String("config", "inngest.yml", "Path to the Dev Server configuration file")
+	cmd.Flags().String("config", "", "Path to the Dev Server configuration file")
 	cmd.Flags().String("host", "", "host to run the API on")
 	cmd.Flags().StringP("port", "p", "8288", "port to run the API on")
 	cmd.Flags().StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
@@ -61,7 +61,7 @@ func doDev(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	if err = devconfig.InitConfig(cmd); err != nil {
+	if err = devconfig.InitConfig(ctx, cmd); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}

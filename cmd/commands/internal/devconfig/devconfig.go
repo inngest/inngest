@@ -1,15 +1,21 @@
 package devconfig
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
 
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-func InitConfig(cmd *cobra.Command) error {
+func InitConfig(ctx context.Context, cmd *cobra.Command) error {
+	l := logger.From(ctx).With().Logger()
+
 	var err error
 	err = errors.Join(err, viper.BindPFlag("host", cmd.Flags().Lookup("host")))
 	err = errors.Join(err, viper.BindPFlag("no-discovery", cmd.Flags().Lookup("no-discovery")))
@@ -25,23 +31,34 @@ func InitConfig(cmd *cobra.Command) error {
 
 	configPath, _ := cmd.Flags().GetString("config")
 	if configPath != "" {
+		// User specified the config file so we'll use that
 		viper.SetConfigFile(configPath)
 	} else {
-		pwd, err := os.Getwd()
-		if err != nil {
-			fmt.Println(err)
+		// First check the current directory
+		viper.AddConfigPath(".")
+
+		if homeDir, err := os.UserHomeDir(); err != nil {
+			l.Warn().Err(err).Msg("error getting home directory")
 		} else {
-			viper.AddConfigPath(pwd)
-			viper.SetConfigName("inngest.yml")
-			if err := viper.ReadInConfig(); err != nil {
-				if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-					return nil
-				}
-				fmt.Println(err)
-			}
-			viper.Set("urls", viper.GetStringSlice("urls"))
+			// Fallback to ~/.config/inngest
+			viper.AddConfigPath(filepath.Join(homeDir, ".config/inngest"))
 		}
+
+		// Don't need to specify the extension since Viper will try to load
+		// various extensions (inngest.json, inngest.yaml, etc.)
+		viper.SetConfigName("inngest")
 	}
+
+	if err := viper.ReadInConfig(); err != nil {
+		if configPath != "" {
+			// User explicitly specified a config file but we couldn't read it
+			log.Fatalf("Error reading config file: %v", err)
+		}
+	} else {
+		l.Info().Msg(fmt.Sprintf("Using config %s", viper.ConfigFileUsed()))
+	}
+
+	viper.Set("urls", viper.GetStringSlice("urls"))
 
 	viper.AutomaticEnv()
 
