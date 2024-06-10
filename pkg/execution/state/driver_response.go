@@ -479,14 +479,6 @@ type StandardError struct {
 	Stack   string `json:"stack,omitempty"`
 }
 
-func (s StandardError) Marshal() (string, error) {
-	marshaled, err := json.Marshal(s)
-	if err != nil {
-		return "", err
-	}
-	return string(marshaled), nil
-}
-
 func (r *DriverResponse) StandardError() StandardError {
 	ret := StandardError{
 		Error:   DefaultErrorMessage,
