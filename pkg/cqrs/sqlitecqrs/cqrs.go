@@ -733,6 +733,14 @@ type traceRunCursorFilter struct {
 	Value int64
 }
 
+func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (w wrapper) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
 	// filters
 	filter := []sq.Expression{}
