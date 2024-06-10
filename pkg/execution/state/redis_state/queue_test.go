@@ -339,6 +339,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.NoError(t, err)
 
 		err = q.SetFunctionPaused(ctx, item.WorkflowID, true)
+		require.NoError(t, err)
 
 		item, err = q.EnqueueItem(ctx, QueueItem{
 			WorkflowID: workflowId,
