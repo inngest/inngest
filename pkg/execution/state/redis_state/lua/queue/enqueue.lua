@@ -88,12 +88,12 @@ if currentScore == false or tonumber(currentScore) > partitionTime then
             -- so unset the forced at field.
             decoded.forceAtMS = 0
         end
-    
+
         partitionItem = cjson.encode(decoded)
     end
 
 
-    -- The only case in which now < forceAtMS is when we want to ensure that a 
+    -- The only case in which now < forceAtMS is when we want to ensure that a
     -- partition has a future time and enqueueing should not bring the partition
     -- earlier, eg. in the case of concurrency limits spinning on partitions.
     if nowMS > decoded.forceAtMS then
