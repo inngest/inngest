@@ -1614,6 +1614,11 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			return nil, fmt.Errorf("error reading partition item: %w", err)
 		}
 
+		if item.Paused {
+			ignored++
+			continue
+		}
+
 		// NOTE: The queue does two conflicting things:  we peek ahead of now() to fetch partitions
 		// shortly available, and we also requeue partitions if there are concurrency conflicts.
 		//
