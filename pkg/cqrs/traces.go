@@ -92,12 +92,12 @@ type TraceWriter interface {
 }
 
 type TraceReader interface {
-	// GetSpansByTraceIDAndRunID retrieves spans based on their traceID and runID
-	GetSpansByTraceIDAndRunID(ctx context.Context, tid string, runID ulid.ULID) ([]*Span, error)
 	// GetTraceRuns retrieves a list of TraceRun based on the options specified
 	GetTraceRuns(ctx context.Context, opt GetTraceRunOpt) ([]*TraceRun, error)
 	// GetTraceRun retrieve the specified run
 	GetTraceRun(ctx context.Context, id TraceRunIdentifier) (*TraceRun, error)
+	// GetTraceSpansByRun retrieves all the spans related to the trace
+	GetTraceSpansByRun(ctx context.Context, id TraceRunIdentifier) ([]*Span, error)
 	// GetSpanOutput retrieves the output for the specified span
 	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
 }

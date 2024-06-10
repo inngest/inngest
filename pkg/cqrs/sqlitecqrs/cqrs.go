@@ -686,10 +686,6 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 	return w.q.InsertTraceRun(ctx, params)
 }
 
-func (w wrapper) GetSpansByTraceIDAndRunID(ctx context.Context, tid string, runID ulid.ULID) ([]*cqrs.Span, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
 // traceRun is a model mapped to the `trace_runs` table
 type traceRun struct {
 	AccountID   uuid.UUID `db:"account_id"`
@@ -731,6 +727,10 @@ func (tr *traceRun) EventIDs() []ulid.ULID {
 type traceRunCursorFilter struct {
 	ID    string
 	Value int64
+}
+
+func (w wrapper) GetTraceSpansByRun(ctx context.Context, id cqrs.TraceRunIdentifier) ([]*cqrs.Span, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
