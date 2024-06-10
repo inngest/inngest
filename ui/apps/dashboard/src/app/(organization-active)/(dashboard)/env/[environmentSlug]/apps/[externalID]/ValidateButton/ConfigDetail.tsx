@@ -15,11 +15,6 @@ type Props = {
 export function ConfigDetail({ data }: Props) {
   return (
     <table className="w-full">
-      <tr className="border-b border-slate-200">
-        <th className="py-1 pr-8 text-left font-medium">Field</th>
-        <th className="py-1 text-left font-medium">Value</th>
-      </tr>
-
       <ConfigRow label="API origin" value={data.apiOrigin} />
       <ConfigRow label="App ID" value={data.appID} />
       <ConfigRow label="Environment" value={data.env} />
@@ -78,7 +73,7 @@ function ConfigRow({
   }
 
   return (
-    <tr className="border-b border-slate-200">
+    <tr className="border-b border-slate-100">
       <td className="py-1 pr-8 align-top">{label}</td>
       <td className="py-1">
         <pre className="text-sm ">{text}</pre>

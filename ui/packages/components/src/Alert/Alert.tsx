@@ -1,11 +1,12 @@
 import { cn } from '@inngest/components/utils/classNames';
 import {
+  RiCheckboxCircleFill,
   RiErrorWarningLine,
   RiInformationLine,
   type RemixiconComponentType,
 } from '@remixicon/react';
 
-type Severity = 'error' | 'info' | 'warning';
+type Severity = 'error' | 'info' | 'success' | 'warning';
 
 type SeveritySpecific = {
   icon: RemixiconComponentType;
@@ -23,6 +24,11 @@ const severityStyles = {
     icon: RiInformationLine,
     iconClassName: 'text-blue-700 dark:text-white',
     wrapperClassName: 'bg-blue-100 dark:bg-blue-600/50 text-blue-700 dark:text-slate-300',
+  },
+  success: {
+    icon: RiCheckboxCircleFill,
+    iconClassName: 'text-emerald-700 dark:text-white',
+    wrapperClassName: 'bg-emerald-100 dark:bg-emerald-600/50 text-emerald-700 dark:text-slate-300',
   },
   warning: {
     icon: RiErrorWarningLine,

@@ -51,7 +51,7 @@ export function Checks({ appInfo }: Props) {
     }
 
     return (
-      <Alert className="mb-4" severity="info">
+      <Alert className="mb-4" severity="success">
         No issues found
       </Alert>
     );

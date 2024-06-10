@@ -14,18 +14,13 @@ export function HTTPInfo({ data }: Props) {
 
       {data.respHeaders && Object.keys(data.respHeaders).length > 0 && (
         <table className="w-full">
-          <tr className="border-b border-slate-200">
-            <th className="py-1 pr-8 text-left font-medium">Header</th>
-            <th className="py-1 text-left font-medium">Value</th>
-          </tr>
-
           {Object.entries(data.respHeaders).map(([k, v]) => {
             if (!isStringArray(v)) {
               return null;
             }
 
             return (
-              <tr className="border-b border-slate-200" key={k}>
+              <tr className="border-b border-slate-100" key={k}>
                 <td className="py-1 pr-8">{k}</td>
                 <td className="py-1">{v.join(', ')}</td>
               </tr>

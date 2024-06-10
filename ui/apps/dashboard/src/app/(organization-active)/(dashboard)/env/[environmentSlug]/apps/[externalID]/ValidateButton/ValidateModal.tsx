@@ -45,8 +45,8 @@ export function ValidateModal(props: Props) {
       setData(appCheck);
       setError(undefined);
     } catch (error) {
+      setData(undefined);
       if (error instanceof Error) {
-        console.log(error.message);
         setError(error);
       } else {
         setError(new Error('unknown error'));
@@ -65,12 +65,14 @@ export function ValidateModal(props: Props) {
 
   return (
     <Modal className="w-[800px]" isOpen={isOpen} onClose={onClose}>
-      <Modal.Header>Validate app configuration</Modal.Header>
+      <Modal.Header>Inspect app</Modal.Header>
 
       <Modal.Body>
-        <p className="my-4">
-          Securely validate the configuration of the app at the given URL. The app will only return
-          privileged information if it is using this {"environment's"} signing key.
+        <p className="mb-2">Securely validate the configuration of the app at the given URL.</p>
+
+        <p className="text-gray-500">
+          The app will only return privileged information if {"it's"} using this {"environment's"}{' '}
+          signing key.
         </p>
 
         <div className="my-4 flex flex-1 gap-4">
@@ -84,8 +86,10 @@ export function ValidateModal(props: Props) {
               }}
             />
           </div>
-          <Button btnAction={check} disabled={isLoading} kind="primary" label="Validate" />
+          <Button btnAction={check} disabled={isLoading} kind="primary" label="Re-inspect" />
         </div>
+
+        <hr className="my-4" />
 
         {error && !isLoading && <Alert severity="error">{error.message}</Alert>}
 

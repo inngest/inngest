@@ -16,7 +16,7 @@ export function ValidateButton({ latestSyncUrl }: Props) {
         appearance="outlined"
         btnAction={() => setIsModalVisible(true)}
         kind="primary"
-        label="Validate"
+        label="Inspect"
       />
 
       <ValidateModal
