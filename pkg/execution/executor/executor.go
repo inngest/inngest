@@ -2908,20 +2908,18 @@ func generateCancelExpression(eventID ulid.ULID, expr *string) string {
 	return res
 }
 
-func gracefulError(name string, message string, stack string) (string, error) {
-	// see ui/packages/components/src/utils/outputRenderer.ts:10
-	type gracefulError struct {
-		Message string `json:"message"`
-		Name    string `json:"name"`
-		Stack   string `json:"stack"`
-	}
+type GracefulError struct {
+	err error
 
+	Message string `json:"message"`
+	Name    string `json:"name"`
+	Stack   string `json:"stack"`
+}
+
+func (g *GracefulError) Serialize() (string, error) {
+	// see ui/packages/components/src/utils/outputRenderer.ts:10
 	data := map[string]any{
-		execution.StateErrorKey: gracefulError{
-			Name:    name,
-			Message: message,
-			Stack:   stack,
-		},
+		execution.StateErrorKey: g,
 	}
 
 	b, err := json.Marshal(data)
@@ -2930,5 +2928,21 @@ func gracefulError(name string, message string, stack string) (string, error) {
 	}
 
 	return string(b), nil
+}
 
+func (g *GracefulError) Unwrap() error {
+	return g.err
+}
+
+func (g *GracefulError) Error() string {
+	return fmt.Sprintf("%s: %s", g.Message, g.err)
+}
+
+func newGracefulError(name string, message string, stack string, err error) error {
+	return &GracefulError{
+		err:     err,
+		Message: message,
+		Name:    name,
+		Stack:   stack,
+	}
 }
