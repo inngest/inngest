@@ -796,8 +796,36 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 // SetFunctionPaused sets the "Paused" flag (represented in JSON as "off") for the given
 // function ID's queue partition.
 func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bool) error {
-	// TODO(cdzombak): unimplemented
-	return nil
+	pausedArg := "0"
+	if paused {
+		pausedArg = "1"
+	}
+	args, err := StrSlice([]any{
+		fnID.String(),
+		pausedArg,
+	})
+	if err != nil {
+		return err
+	}
+
+	keys := []string{q.kg.PartitionItem()}
+	status, err := scripts["queue/partitionSetPaused"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error updating paused state: %w", err)
+	}
+	switch status {
+	case 0:
+		return nil
+	case 1:
+		return ErrPartitionNotFound
+	default:
+		return fmt.Errorf("unknown response updating paused state: %d", status)
+	}
 }
 
 // EnqueueItem enqueues a QueueItem.  It creates a QueuePartition for the workspace
