@@ -1524,6 +1524,8 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		return nil, ErrPartitionNotFound
 	case -3:
 		return nil, ErrPartitionAlreadyLeased
+	case -4:
+		return nil, ErrPartitionPaused
 	default:
 		// Update the partition's last indicator.
 		if result > p.Last {
