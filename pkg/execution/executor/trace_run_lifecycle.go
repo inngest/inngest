@@ -15,7 +15,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func NewLifecycleListener(l *slog.Logger, run sv2.RunService) execution.LifecycleListener {
+func NewTraceRunLifecycleListener(l *slog.Logger, run sv2.RunService) execution.LifecycleListener {
 	if l == nil {
 		l = slog.Default()
 	}
