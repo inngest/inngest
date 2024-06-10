@@ -354,3 +354,8 @@ func (c *CompileError) Unwrap() error {
 func (c *CompileError) Message() string {
 	return c.Err.Error()
 }
+
+func (c *CompileError) Is(tgt error) bool {
+	_, ok := tgt.(*CompileError)
+	return ok
+}
