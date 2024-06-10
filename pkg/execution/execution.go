@@ -264,3 +264,32 @@ func (h HandlePauseResult) Processed() int32 {
 func (h HandlePauseResult) Handled() int32 {
 	return h[1]
 }
+
+type GracefulError struct {
+	Name    string `json:"name"`
+	Message string `json:"message"`
+	Stack   string `json:"stack"`
+}
+
+func NewGracefulError(name string, message string, stack string) GracefulError {
+	return GracefulError{
+		Name:    name,
+		Message: message,
+		Stack:   stack,
+	}
+}
+
+func (g GracefulError) Serialize() (string, error) {
+	// see ui/packages/components/src/utils/outputRenderer.ts:10
+
+	data := map[string]any{
+		StateErrorKey: g,
+	}
+
+	b, err := json.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+
+	return string(b), nil
+}
