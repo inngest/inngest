@@ -1110,10 +1110,9 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 			if shouldFailEarly := errors.Is(serr, &expressions.CompileError{}); shouldFailEarly {
 				var gracefulErr *execution.GracefulError
 				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
-					if serialized, err := gracefulErr.Serialize(); err == nil {
-						resp.Output = nil
-						resp.Err = &serialized
-					}
+					serialized := gracefulErr.Serialize()
+					resp.Output = nil
+					resp.Err = &serialized
 				}
 
 				if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {

@@ -291,7 +291,7 @@ func (g *GracefulError) Unwrap() error {
 	return g.err
 }
 
-func (g *GracefulError) Serialize() (string, error) {
+func (g *GracefulError) Serialize() string {
 	// see ui/packages/components/src/utils/outputRenderer.ts:10
 
 	data := map[string]any{
@@ -300,8 +300,9 @@ func (g *GracefulError) Serialize() (string, error) {
 
 	b, err := json.Marshal(data)
 	if err != nil {
-		return "", err
+		// This should never happen.
+		return fmt.Sprintf("%s: %s", g.Name, g.Message)
 	}
 
-	return string(b), nil
+	return string(b)
 }
