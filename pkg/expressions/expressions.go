@@ -351,7 +351,6 @@ func (c *CompileError) Unwrap() error {
 	return c.Err
 }
 
-func (c *CompileError) Message() *string {
-	msg := c.Err.Error()
-	return &msg
+func (c *CompileError) Message() string {
+	return c.Err.Error()
 }

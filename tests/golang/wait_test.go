@@ -97,5 +97,5 @@ func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
 	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 	run := c.WaitForRunStatus(ctx, t, "FAILED", &runID)
-	assert.Equal(t, "ERROR: <input>:1:21: Syntax error: token recognition error at: '= '\n | event.data.userId === async.data.userId\n | ....................^", run.Output)
+	assert.Equal(t, "{\"error\":{\"message\":\"Could not compile expression\",\"name\":\"CompileError\",\"stack\":\"ERROR: \\u003cinput\\u003e:1:21: Syntax error: token recognition error at: '= '\\n | event.data.userId === async.data.userId\\n | ....................^\"}}", run.Output)
 }

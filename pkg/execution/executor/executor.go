@@ -1109,8 +1109,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 
 			// If this is an error compiling async expressions, fail the function.
 			if errors.As(serr, &compileError) {
+				marshaledErr, err := gracefulError("CompileError", "Could not compile expression", compileError.Message())
+				if err != nil {
+					logger.From(ctx).Error().Err(err).Msg("error marshaling compilation error")
+				}
+
 				resp.Output = nil
-				resp.Err = compileError.Message()
+				resp.Err = &marshaledErr
 
 				if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 					logger.From(ctx).Error().Err(err).Msg("error running finish handler")
@@ -2901,4 +2906,29 @@ func generateCancelExpression(eventID ulid.ULID, expr *string) string {
 		res = *expr + " && " + res
 	}
 	return res
+}
+
+func gracefulError(name string, message string, stack string) (string, error) {
+	// see ui/packages/components/src/utils/outputRenderer.ts:10
+	type gracefulError struct {
+		Message string `json:"message"`
+		Name    string `json:"name"`
+		Stack   string `json:"stack"`
+	}
+
+	data := map[string]any{
+		execution.StateErrorKey: gracefulError{
+			Name:    name,
+			Message: message,
+			Stack:   stack,
+		},
+	}
+
+	b, err := json.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+
+	return string(b), nil
+
 }
