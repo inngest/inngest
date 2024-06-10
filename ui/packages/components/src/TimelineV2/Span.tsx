@@ -41,7 +41,7 @@ export function Span({ className, isInline, maxTime, minTime, trace }: Props) {
       }}
     >
       {/* Gray line to the left of the span */}
-      <div className="h-0.5 bg-slate-200" style={{ flexGrow: widths.before }}></div>
+      <div className="h-px bg-slate-200" style={{ flexGrow: widths.before }}></div>
 
       {/* Queued part of the span */}
       <div className="h-2 bg-slate-500" style={{ flexGrow: widths.queued }}></div>
