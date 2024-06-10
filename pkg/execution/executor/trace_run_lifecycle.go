@@ -86,7 +86,7 @@ func (l lifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata, req
 
 	events, err := l.run.LoadEvents(ctx, md.ID)
 	if err != nil {
-		l.log.Error("error loading events from state",
+		l.log.Error("error loading events from state on function cancelled for trace runs",
 			"err", err,
 			"identifier", md.ID,
 		)
