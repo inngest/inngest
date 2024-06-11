@@ -479,7 +479,7 @@ type StandardWrappedError struct {
 }
 
 func WrapInStandardError(err error, name string, message string, stack string) error {
-	s := StandardWrappedError{
+	s := &StandardWrappedError{
 		err: err,
 		StandardError: StandardError{
 			Name:    name,

@@ -1108,7 +1108,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 
 			// If this is an error compiling async expressions, fail the function.
 			if shouldFailEarly := errors.Is(serr, &expressions.CompileError{}); shouldFailEarly {
-				var gracefulErr state.StandardWrappedError
+				var gracefulErr *state.StandardWrappedError
 				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
 					serialized := gracefulErr.Serialize(execution.StateErrorKey)
 					resp.Output = nil
