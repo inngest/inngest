@@ -472,11 +472,59 @@ func (r *DriverResponse) IsTraceVisibleFunctionExecution() bool {
 	return r.StatusCode != 206
 }
 
+type StandardWrappedError struct {
+	err error
+
+	StandardError
+}
+
+func WrapInStandardError(err error, name string, message string, stack string) error {
+	s := StandardWrappedError{
+		err: err,
+		StandardError: StandardError{
+			Name:    name,
+			Message: message,
+			Stack:   stack,
+		},
+	}
+	s.StandardError.Error = s.Error()
+
+	return s
+}
+
+func (s StandardWrappedError) Unwrap() error {
+	return s.err
+}
+
+func (s StandardWrappedError) Error() string {
+	return s.StandardError.String()
+}
+
 type StandardError struct {
 	Error   string `json:"error"`
 	Name    string `json:"name"`
 	Message string `json:"message"`
 	Stack   string `json:"stack,omitempty"`
+}
+
+func (s StandardError) String() string {
+	return fmt.Sprintf("%s: %s", s.Name, s.Message)
+}
+
+func (s StandardError) Serialize(key string) string {
+	// see ui/packages/components/src/utils/outputRenderer.ts:10
+
+	data := map[string]any{
+		key: s,
+	}
+
+	b, err := json.Marshal(data)
+	if err != nil {
+		// This should never happen.
+		return s.String()
+	}
+
+	return string(b)
 }
 
 func (r *DriverResponse) StandardError() StandardError {

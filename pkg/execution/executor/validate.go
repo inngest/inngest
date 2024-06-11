@@ -81,12 +81,12 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 		// Create a new driver response to map as the function finished error.
 		resp := state.DriverResponse{}
 
-		gracefulErr := execution.WrapInGracefulError(
-			state.ErrFunctionOverflowed,
-			"ErrFunctionOverflowed",
-			fmt.Sprintf("The function run exceeded the step limit of %d steps.", limit),
-			"",
-		).Serialize()
+		gracefulErr := state.StandardError{
+			Error:   state.ErrFunctionOverflowed.Error(),
+			Name:    "ErrFunctionOverflowed",
+			Message: fmt.Sprintf("The function run exceeded the step limit of %d steps.", limit),
+			Stack:   "",
+		}.Serialize(execution.StateErrorKey)
 
 		resp.Err = &gracefulErr
 		resp.SetFinal()

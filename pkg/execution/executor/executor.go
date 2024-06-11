@@ -1108,9 +1108,9 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 
 			// If this is an error compiling async expressions, fail the function.
 			if shouldFailEarly := errors.Is(serr, &expressions.CompileError{}); shouldFailEarly {
-				var gracefulErr *execution.GracefulError
+				var gracefulErr state.StandardWrappedError
 				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
-					serialized := gracefulErr.Serialize()
+					serialized := gracefulErr.Serialize(execution.StateErrorKey)
 					resp.Output = nil
 					resp.Err = &serialized
 				}
@@ -2584,7 +2584,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		if err != nil {
 			var compileError *expressions.CompileError
 			if errors.As(err, &compileError) {
-				return fmt.Errorf("error interpolating wait for event expression: %w", execution.WrapInGracefulError(
+				return fmt.Errorf("error interpolating wait for event expression: %w", state.WrapInStandardError(
 					compileError,
 					"CompileError",
 					"Could not compile expression",

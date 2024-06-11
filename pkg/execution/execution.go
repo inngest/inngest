@@ -3,7 +3,6 @@ package execution
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/inngest/inngest/pkg/execution/batch"
@@ -264,45 +263,4 @@ func (h HandlePauseResult) Processed() int32 {
 // and successfully impacted runs (either by cancellation or continuing).
 func (h HandlePauseResult) Handled() int32 {
 	return h[1]
-}
-
-type GracefulError struct {
-	err error
-
-	Name    string `json:"name"`
-	Message string `json:"message"`
-	Stack   string `json:"stack"`
-}
-
-func WrapInGracefulError(err error, name string, message string, stack string) *GracefulError {
-	return &GracefulError{
-		err:     err,
-		Name:    name,
-		Message: message,
-		Stack:   stack,
-	}
-}
-
-func (g *GracefulError) Error() string {
-	return fmt.Sprintf("%s: %s", g.Name, g.Message)
-}
-
-func (g *GracefulError) Unwrap() error {
-	return g.err
-}
-
-func (g *GracefulError) Serialize() string {
-	// see ui/packages/components/src/utils/outputRenderer.ts:10
-
-	data := map[string]any{
-		StateErrorKey: g,
-	}
-
-	b, err := json.Marshal(data)
-	if err != nil {
-		// This should never happen.
-		return fmt.Sprintf("%s: %s", g.Name, g.Message)
-	}
-
-	return string(b)
 }
