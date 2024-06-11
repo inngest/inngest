@@ -744,16 +744,14 @@ func applyResponse(
 
 	// If it's a completed generator step then some data is stored in the
 	// output. We'll try to extract it.
-	if len(resp.Generator) > 0 {
-		if op := resp.HistoryVisibleStep(); op != nil {
-			h.StepID = &op.ID
-			h.StepType = getStepType(*op)
-			h.Result.Output, _ = op.Output()
-			stepName := op.UserDefinedName()
-			h.StepName = &stepName
-		}
+	if op := resp.HistoryVisibleStep(); op != nil {
+		h.StepID = &op.ID
+		h.StepType = getStepType(*op)
+		h.Result.Output, _ = op.Output()
+		stepName := op.UserDefinedName()
+		h.StepName = &stepName
 	}
-
+	
 	// Only set the output to the response error string if there isn't already output. This prevents overriding errors in the user's function
 	if resp.Output == nil && resp.Error() != "" {
 		h.Result.Output = resp.Error()
