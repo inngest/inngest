@@ -811,6 +811,52 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 	return items, nil
 }
 
+const getTraceSpans = `-- name: GetTraceSpans :many
+SELECT timestamp, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id FROM traces WHERE run_id = ?1 ORDER BY timestamp DESC, duration DESC
+`
+
+func (q *Queries) GetTraceSpans(ctx context.Context, runID ulid.ULID) ([]*Trace, error) {
+	rows, err := q.db.QueryContext(ctx, getTraceSpans, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Trace
+	for rows.Next() {
+		var i Trace
+		if err := rows.Scan(
+			&i.Timestamp,
+			&i.TraceID,
+			&i.SpanID,
+			&i.ParentSpanID,
+			&i.TraceState,
+			&i.SpanName,
+			&i.SpanKind,
+			&i.ServiceName,
+			&i.ResourceAttributes,
+			&i.ScopeName,
+			&i.ScopeVersion,
+			&i.SpanAttributes,
+			&i.Duration,
+			&i.StatusCode,
+			&i.StatusMessage,
+			&i.Events,
+			&i.Links,
+			&i.RunID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const hardDeleteApp = `-- name: HardDeleteApp :exec
 DELETE FROM apps WHERE id = ?
 `
