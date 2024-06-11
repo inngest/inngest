@@ -13,7 +13,10 @@
     "declarationMap": true,
     "esModuleInterop": true,
     "verbatimModuleSyntax": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "paths": {
+      "@inngest/components/*": ["../components/src/*"]
+    }
   },
   "exclude": ["node_modules"]
 }
