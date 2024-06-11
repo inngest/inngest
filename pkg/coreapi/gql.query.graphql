@@ -21,6 +21,10 @@ type Query {
     orderBy: [RunsV2OrderBy!]!
     filter: RunsFilterV2!
   ): RunsV2Connection!
+  # runsMetrics(filter: RunsFilterV2!): MetricsResponse!
+  run(runID: String!): FunctionRunV2
+  runTraceSpanOutputByID(outputID: String!): RunTraceSpanOutput!
+  runTrigger(runID: String!): RunTraceTrigger!
 }
 
 input ActionVersionQuery {

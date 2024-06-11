@@ -1105,8 +1105,16 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 	if len(resp.Generator) > 0 {
 		// Handle generator responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, i, resp); serr != nil {
+
 			// If this is an error compiling async expressions, fail the function.
-			if strings.Contains(serr.Error(), "error compiling expression") {
+			if shouldFailEarly := errors.Is(serr, &expressions.CompileError{}); shouldFailEarly {
+				var gracefulErr *state.WrappedStandardError
+				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
+					serialized := gracefulErr.Serialize(execution.StateErrorKey)
+					resp.Output = nil
+					resp.Err = &serialized
+				}
+
 				if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 					logger.From(ctx).Error().Err(err).Msg("error running finish handler")
 				} else if performedFinalization {
@@ -2574,11 +2582,17 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 			"event": evt.Map(),
 		})
 		if err != nil {
-			logger.StdlibLogger(ctx).Warn(
-				"error interpolating waitForEvent expression",
-				"error", err,
-				"expression", *opts.If,
-			)
+			var compileError *expressions.CompileError
+			if errors.As(err, &compileError) {
+				return fmt.Errorf("error interpolating wait for event expression: %w", state.WrapInStandardError(
+					compileError,
+					"CompileError",
+					"Could not compile expression",
+					compileError.Message(),
+				))
+			}
+
+			return fmt.Errorf("error interpolating wait for event expression: %w", err)
 		}
 		expr = &interpolated
 
