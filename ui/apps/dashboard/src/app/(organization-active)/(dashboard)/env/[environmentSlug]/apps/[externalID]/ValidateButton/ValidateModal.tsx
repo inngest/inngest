@@ -86,7 +86,7 @@ export function ValidateModal(props: Props) {
               }}
             />
           </div>
-          <Button btnAction={check} disabled={isLoading} kind="primary" label="Re-inspect" />
+          <Button btnAction={check} disabled={isLoading} kind="primary" label="Retry" />
         </div>
 
         <hr className="my-4" />
