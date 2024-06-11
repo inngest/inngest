@@ -48,6 +48,7 @@ type ResolverRoot interface {
 	Event() EventResolver
 	Function() FunctionResolver
 	FunctionRun() FunctionRunResolver
+	FunctionRunV2() FunctionRunV2Resolver
 	Mutation() MutationResolver
 	Query() QueryResolver
 	StreamItem() StreamItemResolver
@@ -140,6 +141,7 @@ type ComplexityRoot struct {
 		SourceID   func(childComplexity int) int
 		StartedAt  func(childComplexity int) int
 		Status     func(childComplexity int) int
+		Trace      func(childComplexity int) int
 		TraceID    func(childComplexity int) int
 		TriggerIDs func(childComplexity int) int
 		Triggers   func(childComplexity int) int
@@ -393,6 +395,11 @@ type FunctionRunResolver interface {
 
 	History(ctx context.Context, obj *models.FunctionRun) ([]*history_reader.RunHistory, error)
 	HistoryItemOutput(ctx context.Context, obj *models.FunctionRun, id ulid.ULID) (*string, error)
+}
+type FunctionRunV2Resolver interface {
+	Function(ctx context.Context, obj *models.FunctionRunV2) (*models.Function, error)
+
+	Trace(ctx context.Context, obj *models.FunctionRunV2) (*models.RunTraceSpan, error)
 }
 type MutationResolver interface {
 	CreateApp(ctx context.Context, input models.CreateAppInput) (*cqrs.App, error)
@@ -907,6 +914,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FunctionRunV2.Status(childComplexity), true
+
+	case "FunctionRunV2.trace":
+		if e.complexity.FunctionRunV2.Trace == nil {
+			break
+		}
+
+		return e.complexity.FunctionRunV2.Trace(childComplexity), true
 
 	case "FunctionRunV2.traceID":
 		if e.complexity.FunctionRunV2.TraceID == nil {
@@ -2479,6 +2493,8 @@ type FunctionRunV2 {
   isBatch: Boolean!
 
   output: Bytes
+
+  trace: RunTraceSpan
 }
 
 type RunsV2Connection {
@@ -5690,7 +5706,7 @@ func (ec *executionContext) _FunctionRunV2_function(ctx context.Context, field g
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Function, nil
+		return ec.resolvers.FunctionRunV2().Function(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5711,8 +5727,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_function(ctx context.Cont
 	fc = &graphql.FieldContext{
 		Object:     "FunctionRunV2",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -6168,6 +6184,89 @@ func (ec *executionContext) fieldContext_FunctionRunV2_output(ctx context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _FunctionRunV2_trace(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRunV2) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionRunV2_trace(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.FunctionRunV2().Trace(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.RunTraceSpan)
+	fc.Result = res
+	return ec.marshalORunTraceSpan2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpan(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionRunV2",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "appID":
+				return ec.fieldContext_RunTraceSpan_appID(ctx, field)
+			case "functionID":
+				return ec.fieldContext_RunTraceSpan_functionID(ctx, field)
+			case "runID":
+				return ec.fieldContext_RunTraceSpan_runID(ctx, field)
+			case "run":
+				return ec.fieldContext_RunTraceSpan_run(ctx, field)
+			case "spanID":
+				return ec.fieldContext_RunTraceSpan_spanID(ctx, field)
+			case "traceID":
+				return ec.fieldContext_RunTraceSpan_traceID(ctx, field)
+			case "name":
+				return ec.fieldContext_RunTraceSpan_name(ctx, field)
+			case "status":
+				return ec.fieldContext_RunTraceSpan_status(ctx, field)
+			case "attempts":
+				return ec.fieldContext_RunTraceSpan_attempts(ctx, field)
+			case "duration":
+				return ec.fieldContext_RunTraceSpan_duration(ctx, field)
+			case "outputID":
+				return ec.fieldContext_RunTraceSpan_outputID(ctx, field)
+			case "queuedAt":
+				return ec.fieldContext_RunTraceSpan_queuedAt(ctx, field)
+			case "startedAt":
+				return ec.fieldContext_RunTraceSpan_startedAt(ctx, field)
+			case "endedAt":
+				return ec.fieldContext_RunTraceSpan_endedAt(ctx, field)
+			case "childrenSpans":
+				return ec.fieldContext_RunTraceSpan_childrenSpans(ctx, field)
+			case "stepOp":
+				return ec.fieldContext_RunTraceSpan_stepOp(ctx, field)
+			case "stepInfo":
+				return ec.fieldContext_RunTraceSpan_stepInfo(ctx, field)
+			case "isRoot":
+				return ec.fieldContext_RunTraceSpan_isRoot(ctx, field)
+			case "parentSpanID":
+				return ec.fieldContext_RunTraceSpan_parentSpanID(ctx, field)
+			case "parentSpan":
+				return ec.fieldContext_RunTraceSpan_parentSpan(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _FunctionRunV2Edge_node(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRunV2Edge) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_FunctionRunV2Edge_node(ctx, field)
 	if err != nil {
@@ -6235,6 +6334,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2Edge_node(ctx context.Cont
 				return ec.fieldContext_FunctionRunV2_isBatch(ctx, field)
 			case "output":
 				return ec.fieldContext_FunctionRunV2_output(ctx, field)
+			case "trace":
+				return ec.fieldContext_FunctionRunV2_trace(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRunV2", field.Name)
 		},
@@ -8144,6 +8245,8 @@ func (ec *executionContext) fieldContext_Query_run(ctx context.Context, field gr
 				return ec.fieldContext_FunctionRunV2_isBatch(ctx, field)
 			case "output":
 				return ec.fieldContext_FunctionRunV2_output(ctx, field)
+			case "trace":
+				return ec.fieldContext_FunctionRunV2_trace(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRunV2", field.Name)
 		},
@@ -15781,42 +15884,55 @@ func (ec *executionContext) _FunctionRunV2(ctx context.Context, sel ast.Selectio
 			out.Values[i] = ec._FunctionRunV2_id(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "appID":
 
 			out.Values[i] = ec._FunctionRunV2_appID(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "functionID":
 
 			out.Values[i] = ec._FunctionRunV2_functionID(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "function":
+			field := field
 
-			out.Values[i] = ec._FunctionRunV2_function(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FunctionRunV2_function(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
 			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "traceID":
 
 			out.Values[i] = ec._FunctionRunV2_traceID(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "queuedAt":
 
 			out.Values[i] = ec._FunctionRunV2_queuedAt(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "startedAt":
 
@@ -15831,7 +15947,7 @@ func (ec *executionContext) _FunctionRunV2(ctx context.Context, sel ast.Selectio
 			out.Values[i] = ec._FunctionRunV2_status(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "sourceID":
 
@@ -15842,26 +15958,43 @@ func (ec *executionContext) _FunctionRunV2(ctx context.Context, sel ast.Selectio
 			out.Values[i] = ec._FunctionRunV2_triggerIDs(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "triggers":
 
 			out.Values[i] = ec._FunctionRunV2_triggers(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "isBatch":
 
 			out.Values[i] = ec._FunctionRunV2_isBatch(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "output":
 
 			out.Values[i] = ec._FunctionRunV2_output(ctx, field, obj)
 
+		case "trace":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FunctionRunV2_trace(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -17894,6 +18027,10 @@ func (ec *executionContext) unmarshalNEventQuery2githubᚗcomᚋinngestᚋinnges
 func (ec *executionContext) unmarshalNEventsQuery2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEventsQuery(ctx context.Context, v interface{}) (models.EventsQuery, error) {
 	res, err := ec.unmarshalInputEventsQuery(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNFunction2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunction(ctx context.Context, sel ast.SelectionSet, v models.Function) graphql.Marshaler {
+	return ec._Function(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNFunction2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.Function) graphql.Marshaler {

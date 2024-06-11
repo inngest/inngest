@@ -66,6 +66,12 @@ models:
         resolver: true
       function:
         resolver: true
+  FunctionRunV2:
+    fields:
+      function:
+        resolver: true
+      trace:
+        resolver: true
   HistoryType:
     model: github.com/inngest/inngest/pkg/enums.HistoryType
   HistoryStepType:

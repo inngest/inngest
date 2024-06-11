@@ -30,6 +30,8 @@ func (r *Resolver) Event() generated.EventResolver { return &eventResolver{r} }
 
 func (r *Resolver) FunctionRun() generated.FunctionRunResolver { return &functionRunResolver{r} }
 
+func (r *Resolver) FunctionRunV2() generated.FunctionRunV2Resolver { return &functionRunV2Resolver{r} }
+
 func (r *Resolver) App() generated.AppResolver { return &appResolver{r} }
 
 func (r *Resolver) Function() generated.FunctionResolver { return &functionResolver{r} }
@@ -41,5 +43,6 @@ type queryResolver struct{ *Resolver }
 type eventResolver struct{ *Resolver }
 type appResolver struct{ *Resolver }
 type functionRunResolver struct{ *Resolver }
+type functionRunV2Resolver struct{ *Resolver }
 type functionResolver struct{ *Resolver }
 type streamItemResolver struct{ *Resolver }

@@ -358,6 +358,8 @@ type FunctionRunV2 {
   isBatch: Boolean!
 
   output: Bytes
+
+  trace: RunTraceSpan
 }
 
 type RunsV2Connection {

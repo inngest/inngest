@@ -120,6 +120,7 @@ type FunctionRunV2 struct {
 	Triggers   []string          `json:"triggers"`
 	IsBatch    bool              `json:"isBatch"`
 	Output     *string           `json:"output,omitempty"`
+	Trace      *RunTraceSpan     `json:"trace,omitempty"`
 }
 
 type FunctionRunV2Edge struct {
