@@ -15,7 +15,7 @@ export function ElementWrapper({
 }: React.PropsWithChildren<{ label: string; className?: string }>) {
   return (
     <div className={cn('w-64 text-sm', className)}>
-      <dt className="pb-2 text-slate-500">{label}</dt>
+      <dt className="text-slate-500">{label}</dt>
       <dd className="truncate">{children}</dd>
     </div>
   );
@@ -41,7 +41,7 @@ export function LazyElementWrapper<T>({
 
   return (
     <div className={cn('w-64 text-sm', className)}>
-      <dt className="pb-2 text-slate-500">{label}</dt>
+      <dt className="text-slate-500">{label}</dt>
       <dd className="truncate">{content}</dd>
     </div>
   );

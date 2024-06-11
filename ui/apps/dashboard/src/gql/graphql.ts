@@ -1103,6 +1103,7 @@ export type RunTraceSpanOutput = {
 };
 
 export enum RunTraceSpanStatus {
+  Cancelled = 'CANCELLED',
   Completed = 'COMPLETED',
   Failed = 'FAILED',
   Running = 'RUNNING',

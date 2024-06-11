@@ -49,7 +49,7 @@ export function Span({ className, isInline, maxTime, minTime, trace }: Props) {
       {/* Running part of the span */}
       <div
         className={cn(
-          'h-5 rounded',
+          'h-5 rounded transition-shadow hover:shadow-lg',
           getStatusBackgroundClass(trace.status),
           getStatusBorderClass(trace.status)
         )}
