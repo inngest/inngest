@@ -39,6 +39,11 @@ var (
 	ErrDuplicateResponse  = fmt.Errorf("duplicate response")
 )
 
+const (
+	// InngestErrFunctionOverflowed is the public error code for ErrFunctionOverflowed
+	InngestErrFunctionOverflowed = "InngestErrFunctionOverflowed"
+)
+
 // Identifier represents the unique identifier for a workflow run.
 type Identifier struct {
 	RunID ulid.ULID `json:"runID"`

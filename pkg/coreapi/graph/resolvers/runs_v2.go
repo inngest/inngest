@@ -191,3 +191,15 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 		PageInfo: pageInfo,
 	}, nil
 }
+
+func (r *queryResolver) Run(ctx context.Context, runID string) (*models.FunctionRunV2, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (r *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID string) (*models.RunTraceSpanOutput, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (r *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.RunTraceTrigger, error) {
+	return nil, fmt.Errorf("not implemented")
+}

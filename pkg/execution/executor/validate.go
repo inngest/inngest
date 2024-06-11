@@ -80,7 +80,14 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 	if limit > 0 && r.md.Metrics.StepCount >= limit {
 		// Create a new driver response to map as the function finished error.
 		resp := state.DriverResponse{}
-		resp.SetError(state.ErrFunctionOverflowed)
+
+		gracefulErr := state.StandardError{
+			Error:   state.ErrFunctionOverflowed.Error(),
+			Name:    state.InngestErrFunctionOverflowed,
+			Message: fmt.Sprintf("The function run exceeded the step limit of %d steps.", limit),
+		}.Serialize(execution.StateErrorKey)
+
+		resp.Err = &gracefulErr
 		resp.SetFinal()
 
 		if performedFinalization, err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), resp); err != nil {

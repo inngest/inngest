@@ -70,6 +70,15 @@ type TraceRun struct {
 	Cursor string `json:"cursor"`
 }
 
+type SpanOutput struct {
+	Data             []byte
+	Timestamp        time.Time
+	Attributes       map[string]string
+	IsError          bool
+	IsFunctionOutput bool
+	IsStepOutput     bool
+}
+
 type TraceReadWriter interface {
 	TraceWriter
 	TraceReader
@@ -87,6 +96,10 @@ type TraceReader interface {
 	GetSpansByTraceIDAndRunID(ctx context.Context, tid string, runID ulid.ULID) ([]*Span, error)
 	// GetTraceRuns retrieves a list of TraceRun based on the options specified
 	GetTraceRuns(ctx context.Context, opt GetTraceRunOpt) ([]*TraceRun, error)
+	// GetTraceRun retrieve the specified run
+	GetTraceRun(ctx context.Context, id TraceRunIdentifier) (*TraceRun, error)
+	// GetSpanOutput retrieves the output for the specified span
+	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
 }
 
 type GetTraceRunOpt struct {
@@ -111,6 +124,24 @@ type GetTraceRunFilter struct {
 type GetTraceRunOrder struct {
 	Field     enums.TraceRunTime
 	Direction enums.TraceRunOrder
+}
+
+type TraceRunIdentifier struct {
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	AppID       uuid.UUID
+	FunctionID  uuid.UUID
+	TraceID     string
+	RunID       ulid.ULID
+}
+
+type SpanIdentifier struct {
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	AppID       uuid.UUID
+	FunctionID  uuid.UUID
+	TraceID     string
+	SpanID      string
 }
 
 // TracePageCursor represents the composite cursor used to handle pagination
