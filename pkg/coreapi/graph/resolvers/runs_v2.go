@@ -8,6 +8,7 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/oklog/ulid/v2"
 )
 
 const (
@@ -158,8 +159,15 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 			continue
 		}
 
+		triggerIDS := []ulid.ULID{}
+		for _, tid := range r.TriggerIDs {
+			if id, err := ulid.Parse(tid); err == nil {
+				triggerIDS = append(triggerIDS, id)
+			}
+		}
+
 		node := &models.FunctionRunV2{
-			ID:         r.RunID,
+			ID:         ulid.MustParse(r.RunID),
 			AppID:      r.AppID,
 			FunctionID: r.FunctionID,
 			TraceID:    r.TraceID,
@@ -168,7 +176,7 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 			EndedAt:    ended,
 			SourceID:   sourceID,
 			Status:     status,
-			TriggerIDs: r.TriggerIDs,
+			TriggerIDs: triggerIDS,
 			Triggers:   []string{},
 			Output:     output,
 			IsBatch:    r.IsBatch,

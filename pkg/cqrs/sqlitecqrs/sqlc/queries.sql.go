@@ -1167,7 +1167,7 @@ type InsertTraceRunParams struct {
 	AppID       uuid.UUID
 	FunctionID  uuid.UUID
 	TraceID     []byte
-	RunID       ulid.ULID
+	RunID       interface{}
 	QueuedAt    int64
 	StartedAt   int64
 	EndedAt     int64

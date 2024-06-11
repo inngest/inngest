@@ -675,12 +675,8 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 		IsDebounce:  run.IsDebounce,
 	}
 
-	evtIDs := make([]string, len(run.TriggerIDs))
-	for i, id := range run.TriggerIDs {
-		evtIDs[i] = id.String()
-	}
-	if len(evtIDs) > 0 {
-		params.TriggerIds = []byte(strings.Join(evtIDs, ","))
+	if len(run.TriggerIDs) > 0 {
+		params.TriggerIds = []byte(strings.Join(run.TriggerIDs, ","))
 	}
 
 	return w.q.InsertTraceRun(ctx, params)
@@ -693,7 +689,7 @@ type traceRun struct {
 	AppID       uuid.UUID `db:"app_id"`
 	FunctionID  uuid.UUID `db:"function_id"`
 	TraceID     string    `db:"trace_id"`
-	RunID       ulid.ULID `db:"run_id"`
+	RunID       string    `db:"run_id"`
 	QueuedAt    int64     `db:"queued_at"`
 	StartedAt   int64     `db:"started_at"`
 	EndedAt     int64     `db:"ended_at"`
@@ -705,23 +701,12 @@ type traceRun struct {
 	IsDebounce  bool      `db:"is_debounce"`
 }
 
-func (tr *traceRun) EventIDs() []ulid.ULID {
+func (tr *traceRun) EventIDs() []string {
 	if len(tr.TriggerIDs) == 0 {
-		return []ulid.ULID{}
+		return []string{}
 	}
 
-	list := strings.Split(string(tr.TriggerIDs), ",")
-	if len(list) == 0 {
-		return []ulid.ULID{}
-	}
-
-	res := []ulid.ULID{}
-	for _, s := range list {
-		if id, err := ulid.Parse(s); err == nil {
-			res = append(res, id)
-		}
-	}
-	return res
+	return strings.Split(string(tr.TriggerIDs), ",")
 }
 
 type traceRunCursorFilter struct {
@@ -911,14 +896,14 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		}
 
 		// the cursor target should be skipped
-		if reqcursor != nil && reqcursor.ID == data.RunID.String() {
+		if reqcursor != nil && reqcursor.ID == data.RunID {
 			continue
 		}
 
 		// copy layout
 		pc := resCursorLayout
 		// construct the needed fields to generate a cursor representing this run
-		pc.ID = data.RunID.String()
+		pc.ID = data.RunID
 		for k := range pc.Cursors {
 			switch k {
 			case strings.ToLower(enums.TraceRunTimeQueuedAt.String()):

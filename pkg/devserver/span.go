@@ -70,9 +70,9 @@ func (sh *spanIngestionHandler) Add(span *cqrs.Span) {
 				AppID:       appID,
 				FunctionID:  fnID,
 				TraceID:     span.TraceID,
-				RunID:       *span.RunID,
+				RunID:       span.RunID.String(),
 				QueuedAt:    ulid.Time(span.RunID.Time()),
-				TriggerIDs:  []ulid.ULID{},
+				TriggerIDs:  []string{},
 				Status:      enums.RunStatusUnknown,
 			}
 		}
@@ -81,14 +81,7 @@ func (sh *spanIngestionHandler) Add(span *cqrs.Span) {
 		if len(run.TriggerIDs) == 0 {
 			evtIDs := spanAttr(span.SpanAttributes, consts.OtelSysEventIDs)
 			if evtIDs != "" {
-				triggerIDs := []ulid.ULID{}
-				ids := strings.Split(evtIDs, ",")
-				for _, i := range ids {
-					if val, err := ulid.Parse(i); err == nil {
-						triggerIDs = append(triggerIDs, val)
-					}
-				}
-				run.TriggerIDs = triggerIDs
+				run.TriggerIDs = strings.Split(evtIDs, ",")
 			}
 		}
 

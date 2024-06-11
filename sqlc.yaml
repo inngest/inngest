@@ -111,8 +111,3 @@ sql:
             go_type: "github.com/google/uuid.UUID"
           - column: "trace_runs.function_id"
             go_type: "github.com/google/uuid.UUID"
-          - column: "trace_runs.run_id"
-            go_type:
-              import: "github.com/oklog/ulid/v2"
-              package: "ulid"
-              type: "ULID"
