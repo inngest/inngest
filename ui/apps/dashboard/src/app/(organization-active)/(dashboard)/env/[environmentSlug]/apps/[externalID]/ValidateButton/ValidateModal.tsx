@@ -65,7 +65,7 @@ export function ValidateModal(props: Props) {
 
   return (
     <Modal className="w-[800px]" isOpen={isOpen} onClose={onClose}>
-      <Modal.Header>Inspect app</Modal.Header>
+      <Modal.Header>App diagnostic</Modal.Header>
 
       <Modal.Body>
         <p className="mb-2">Securely validate the configuration of the app at the given URL.</p>
