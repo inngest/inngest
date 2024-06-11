@@ -85,7 +85,6 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 			Error:   state.ErrFunctionOverflowed.Error(),
 			Name:    "ErrFunctionOverflowed",
 			Message: fmt.Sprintf("The function run exceeded the step limit of %d steps.", limit),
-			Stack:   "",
 		}.Serialize(execution.StateErrorKey)
 
 		resp.Err = &gracefulErr
