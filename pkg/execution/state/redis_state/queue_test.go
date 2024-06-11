@@ -330,12 +330,12 @@ func TestQueueEnqueueItem(t *testing.T) {
 	})
 
 	t.Run("Enqueueing to a paused partition does not affect the partition's pause state", func(t *testing.T) {
-		at := time.Now().Truncate(time.Second)
+		now := time.Now()
 		workflowId := uuid.New()
 
 		item, err := q.EnqueueItem(ctx, QueueItem{
 			WorkflowID: workflowId,
-		}, at)
+		}, now.Add(10*time.Second))
 		require.NoError(t, err)
 
 		err = q.SetFunctionPaused(ctx, item.WorkflowID, true)
@@ -343,10 +343,18 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		item, err = q.EnqueueItem(ctx, QueueItem{
 			WorkflowID: workflowId,
-		}, at)
+		}, now)
 		require.NoError(t, err)
 
 		second := getPartition(t, r, item.WorkflowID)
+		require.True(t, second.Paused)
+
+		item, err = q.EnqueueItem(ctx, QueueItem{
+			WorkflowID: workflowId,
+		}, now.Add(-10*time.Second))
+		require.NoError(t, err)
+
+		second = getPartition(t, r, item.WorkflowID)
 		require.True(t, second.Paused)
 	})
 }

@@ -76,12 +76,13 @@ if currentScore == false or tonumber(currentScore) > partitionTime then
     local decoded = cjson.decode(partitionItem)
     local existing = get_partition_item(partitionKey, workflowID)
 
-    -- EnqueuAt doesn't have the latest partition data from the queue, including
+    -- EnqueueAt doesn't have the latest partition data from the queue, including
     -- last fetch/lease time and forceAtMS.  Ensure we get these from the item
     -- atomically here.
     if existing ~= nil then
         decoded.last = existing.last
         decoded.forceAtMS = existing.forceAtMS
+        decoded.off = existing.off
 
         if (nowMS > decoded.forceAtMS) then
             -- we've already passed the time at which this partition was forced,
