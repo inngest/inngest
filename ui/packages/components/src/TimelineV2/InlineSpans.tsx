@@ -25,7 +25,7 @@ export function InlineSpans({ className, minTime, maxTime, spans, widths }: Prop
 
   return (
     <div className={cn('flex h-fit grow items-center', className)}>
-      <div className="h-0.5 bg-slate-400" style={{ flexGrow: widths.before }}></div>
+      <div className="h-px bg-slate-300" style={{ flexGrow: widths.before }}></div>
 
       <div
         className="flex"
@@ -40,7 +40,7 @@ export function InlineSpans({ className, minTime, maxTime, spans, widths }: Prop
         })}
       </div>
 
-      <div className="h-0.5 bg-slate-400" style={{ flexGrow: widths.after }}></div>
+      <div className="h-px bg-slate-300" style={{ flexGrow: widths.after }}></div>
     </div>
   );
 }
