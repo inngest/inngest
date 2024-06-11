@@ -231,6 +231,13 @@ func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
 	}
 }
 
+func WithPreDeleteStateSizeReporter(f execution.PreDeleteStateSizeReporter) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).preDeleteStateSizeReporter = f
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log *zerolog.Logger
@@ -257,6 +264,8 @@ type executor struct {
 
 	// steplimit finds step limits for a given run.
 	steplimit func(sv2.ID) int
+
+	preDeleteStateSizeReporter execution.PreDeleteStateSizeReporter
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -811,6 +820,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, err
 	}
 	if v.stopWithoutRetry {
+		if e.preDeleteStateSizeReporter != nil {
+			e.preDeleteStateSizeReporter(ctx, md)
+		}
+
 		// Validation prevented execution and doesn't want the executor to retry, so
 		// don't return an error - assume the function finishes and delete state.
 		_, err := e.smv2.Delete(ctx, md.ID)
@@ -1177,6 +1190,10 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 			return false, err
 		}
 		inputEvents[n] = *evt
+	}
+
+	if e.preDeleteStateSizeReporter != nil {
+		e.preDeleteStateSizeReporter(ctx, md)
 	}
 
 	// Delete the function state in every case.
