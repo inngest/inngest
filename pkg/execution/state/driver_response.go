@@ -472,14 +472,14 @@ func (r *DriverResponse) IsTraceVisibleFunctionExecution() bool {
 	return r.StatusCode != 206
 }
 
-type StandardWrappedError struct {
+type WrappedStandardError struct {
 	err error
 
 	StandardError
 }
 
 func WrapInStandardError(err error, name string, message string, stack string) error {
-	s := &StandardWrappedError{
+	s := &WrappedStandardError{
 		err: err,
 		StandardError: StandardError{
 			Name:    name,
@@ -492,11 +492,11 @@ func WrapInStandardError(err error, name string, message string, stack string) e
 	return s
 }
 
-func (s StandardWrappedError) Unwrap() error {
+func (s WrappedStandardError) Unwrap() error {
 	return s.err
 }
 
-func (s StandardWrappedError) Error() string {
+func (s WrappedStandardError) Error() string {
 	return s.StandardError.String()
 }
 
