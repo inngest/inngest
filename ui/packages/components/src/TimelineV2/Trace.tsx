@@ -69,11 +69,11 @@ export function Trace({
       className={cn(
         'py-5',
         // We don't want borders or horizontal padding on step attempts
-        depth === 0 && 'px-9',
-        isExpanded && 'bg-blue-50'
+        depth === 0 && 'px-8',
+        isExpanded && 'bg-sky-50'
       )}
     >
-      <div className="flex gap-2">
+      <div className="flex">
         <div
           className={cn(
             // Steps and attempts need different widths, since attempts are
@@ -91,9 +91,9 @@ export function Trace({
         </div>
 
         <InlineSpans
-          className="my-2"
           maxTime={maxTime}
           minTime={minTime}
+          name={trace.name}
           spans={spans}
           widths={widths}
         />

@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react';
 import { RunDetails as RunDetailsView } from '@inngest/components/RunDetailsV2';
-import { TriggerDetails } from '@inngest/components/TriggerDetails';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
@@ -39,21 +38,17 @@ export function RunDetails({ runID, standalone = true }: Props) {
   const getRun = useGetRun();
 
   return (
-    <div className={cn('overflow-y-auto', standalone && 'p-5 pt-8')}>
-      <div className="flex">
-        <div className="flex-1">
-          <RunDetailsView
-            pathCreator={internalPathCreator}
-            standalone={standalone}
-            cancelRun={cancelRun}
-            getResult={getTraceResult}
-            getRun={getRun}
-            rerun={rerun}
-            runID={runID}
-          />
-        </div>
-        <TriggerDetails getTrigger={getTrigger} />
-      </div>
+    <div className={cn('overflow-y-auto', standalone && 'pt-8')}>
+      <RunDetailsView
+        pathCreator={internalPathCreator}
+        standalone={standalone}
+        cancelRun={cancelRun}
+        getResult={getTraceResult}
+        getRun={getRun}
+        getTrigger={getTrigger}
+        rerun={rerun}
+        runID={runID}
+      />
     </div>
   );
 }
