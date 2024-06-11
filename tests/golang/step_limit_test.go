@@ -115,6 +115,6 @@ func TestFunctionStepLimit(t *testing.T) {
 
 		run := c.Run(ctx, lastRunId)
 		assert.Equal(t, "FAILED", run.Status)
-		assert.Equal(t, "{\"error\":{\"name\":\"ErrFunctionOverflowed\",\"message\":\"The function run exceeded the step limit of 1 steps.\",\"stack\":\"\"}}", run.Output)
+		assert.Equal(t, "{\"error\":{\"error\":\"function has too many steps\",\"name\":\"ErrFunctionOverflowed\",\"message\":\"The function run exceeded the step limit of 1 steps.\"}}", run.Output)
 	})
 }
