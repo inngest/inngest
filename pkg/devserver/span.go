@@ -56,6 +56,7 @@ func (sh *spanIngestionHandler) Add(span *cqrs.Span) {
 		sh.dedup[key] = span
 	}
 
+	// TODO: find if there's already an entry in the DB and retrieve that instead
 	if span.RunID != nil {
 		// construct the run
 		var run *cqrs.TraceRun
@@ -113,11 +114,19 @@ func (sh *spanIngestionHandler) Add(span *cqrs.Span) {
 		}
 
 		// Annotate if run is batch or debounce
-		if spanAttr(span.SpanAttributes, consts.OtelSysBatchFull) != "" || spanAttr(span.SpanAttributes, consts.OtelSysBatchTimeout) != "" {
+		batchID := spanAttr(span.SpanAttributes, consts.OtelSysBatchID)
+		if batchID != "" {
+			if id, err := ulid.Parse(batchID); err == nil {
+				run.BatchID = &id
+			}
 			run.IsBatch = true
 		}
 		if spanAttr(span.SpanAttributes, consts.OtelSysDebounceTimeout) != "" {
 			run.IsDebounce = true
+		}
+		cron := spanAttr(span.SpanAttributes, consts.OtelSysCronExpr)
+		if cron != "" {
+			run.CronSchedule = &cron
 		}
 
 		// assign it back
