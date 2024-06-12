@@ -201,7 +201,74 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 }
 
 func (r *queryResolver) Run(ctx context.Context, runID string) (*models.FunctionRunV2, error) {
-	return nil, fmt.Errorf("not implemented")
+	runid, err := ulid.Parse(runID)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing runID: %w", err)
+	}
+
+	run, err := r.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runid})
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving run: %w", err)
+	}
+
+	var (
+		startedAt *time.Time
+		endedAt   *time.Time
+		sourceID  *string
+		output    *string
+		batchTS   *time.Time
+	)
+
+	if run.StartedAt.UnixMilli() > 0 {
+		startedAt = &run.StartedAt
+	}
+	if run.EndedAt.UnixMilli() > 0 {
+		endedAt = &run.EndedAt
+	}
+	if run.SourceID != "" {
+		sourceID = &run.SourceID
+	}
+
+	triggerIDs := []ulid.ULID{}
+	for _, evtID := range run.TriggerIDs {
+		if id, err := ulid.Parse(evtID); err == nil {
+			triggerIDs = append(triggerIDs, id)
+		}
+	}
+
+	triggers := []string{}
+	for _, byt := range run.Triggers {
+		triggers = append(triggers, string(byt))
+	}
+
+	if len(run.Output) > 0 {
+		o := string(run.Output)
+		output = &o
+	}
+
+	if run.BatchID != nil {
+		ts := ulid.Time(run.BatchID.Time())
+		batchTS = &ts
+	}
+
+	res := models.FunctionRunV2{
+		ID:             runid,
+		AppID:          run.AppID,
+		FunctionID:     run.FunctionID,
+		TraceID:        run.TraceID,
+		QueuedAt:       run.QueuedAt,
+		StartedAt:      startedAt,
+		EndedAt:        endedAt,
+		SourceID:       sourceID,
+		TriggerIDs:     triggerIDs,
+		Triggers:       triggers,
+		IsBatch:        run.IsBatch,
+		BatchCreatedAt: batchTS,
+		CronSchedule:   run.CronSchedule,
+		Output:         output,
+	}
+
+	return &res, nil
 }
 
 func (r *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID string) (*models.RunTraceSpanOutput, error) {
