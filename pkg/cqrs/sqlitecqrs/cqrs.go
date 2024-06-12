@@ -658,6 +658,11 @@ func (w wrapper) InsertSpan(ctx context.Context, span *cqrs.Span) error {
 }
 
 func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
+	runid, err := ulid.Parse(run.RunID)
+	if err != nil {
+		return fmt.Errorf("error parsing runID as ULID: %w", err)
+	}
+
 	params := sqlc.InsertTraceRunParams{
 		AccountID:   run.AccountID,
 		WorkspaceID: run.WorkspaceID,
@@ -665,7 +670,7 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 		FunctionID:  run.FunctionID,
 		TraceID:     []byte(run.TraceID),
 		SourceID:    run.SourceID,
-		RunID:       run.RunID,
+		RunID:       runid,
 		QueuedAt:    run.QueuedAt.UnixMilli(),
 		StartedAt:   run.StartedAt.UnixMilli(),
 		EndedAt:     run.EndedAt.UnixMilli(),
@@ -683,33 +688,6 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 	}
 
 	return w.q.InsertTraceRun(ctx, params)
-}
-
-// traceRun is a model mapped to the `trace_runs` table
-type traceRun struct {
-	AccountID   uuid.UUID `db:"account_id"`
-	WorkspaceID uuid.UUID `db:"workspace_id"`
-	AppID       uuid.UUID `db:"app_id"`
-	FunctionID  uuid.UUID `db:"function_id"`
-	TraceID     string    `db:"trace_id"`
-	RunID       string    `db:"run_id"`
-	QueuedAt    int64     `db:"queued_at"`
-	StartedAt   int64     `db:"started_at"`
-	EndedAt     int64     `db:"ended_at"`
-	Status      int64     `db:"status"`
-	SourceID    string    `db:"source_id"`
-	TriggerIDs  []byte    `db:"trigger_ids"`
-	Output      []byte    `db:"output, omitempty"`
-	IsBatch     bool      `db:"is_batch"`
-	IsDebounce  bool      `db:"is_debounce"`
-}
-
-func (tr *traceRun) EventIDs() []string {
-	if len(tr.TriggerIDs) == 0 {
-		return []string{}
-	}
-
-	return strings.Split(string(tr.TriggerIDs), ",")
 }
 
 type traceRunCursorFilter struct {
@@ -811,7 +789,7 @@ func (w wrapper) FindOrCreateTraceRun(ctx context.Context, opts cqrs.FindOrCreat
 
 func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
 
-	run, err := w.q.GetTraceRun(ctx, id.RunID.String())
+	run, err := w.q.GetTraceRun(ctx, id.RunID)
 	if err != nil {
 		return nil, err
 	}
@@ -994,7 +972,6 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			"source_id",
 			"trigger_ids",
 			"output",
-			"is_batch",
 			"is_debounce",
 		).
 		Where(filter...).
@@ -1012,7 +989,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 
 	res := []*cqrs.TraceRun{}
 	for rows.Next() {
-		data := traceRun{}
+		data := sqlc.TraceRun{}
 		err := rows.Scan(
 			&data.AppID,
 			&data.FunctionID,
@@ -1023,9 +1000,8 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			&data.EndedAt,
 			&data.Status,
 			&data.SourceID,
-			&data.TriggerIDs,
+			&data.TriggerIds,
 			&data.Output,
-			&data.IsBatch,
 			&data.IsDebounce,
 		)
 		if err != nil {
@@ -1033,14 +1009,14 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		}
 
 		// the cursor target should be skipped
-		if reqcursor != nil && reqcursor.ID == data.RunID {
+		if reqcursor != nil && reqcursor.ID == data.RunID.String() {
 			continue
 		}
 
 		// copy layout
 		pc := resCursorLayout
 		// construct the needed fields to generate a cursor representing this run
-		pc.ID = data.RunID
+		pc.ID = data.RunID.String()
 		for k := range pc.Cursors {
 			switch k {
 			case strings.ToLower(enums.TraceRunTimeQueuedAt.String()):
@@ -1060,11 +1036,19 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			log.From(ctx).Error().Err(err).Interface("page_cursor", pc).Msg("error encoding cursor")
 		}
 
+		var (
+			isBatch bool
+		)
+
+		if data.BatchID != nilULID {
+			isBatch = true
+		}
+
 		res = append(res, &cqrs.TraceRun{
 			AppID:      data.AppID,
 			FunctionID: data.FunctionID,
-			TraceID:    data.TraceID,
-			RunID:      data.RunID,
+			TraceID:    string(data.TraceID),
+			RunID:      data.RunID.String(),
 			QueuedAt:   time.UnixMilli(data.QueuedAt),
 			StartedAt:  time.UnixMilli(data.StartedAt),
 			EndedAt:    time.UnixMilli(data.EndedAt),
@@ -1073,7 +1057,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			Triggers:   [][]byte{},
 			Output:     data.Output,
 			Status:     enums.RunCodeToStatus(data.Status),
-			IsBatch:    data.IsBatch,
+			IsBatch:    isBatch,
 			IsDebounce: data.IsDebounce,
 			Cursor:     cursor,
 		})

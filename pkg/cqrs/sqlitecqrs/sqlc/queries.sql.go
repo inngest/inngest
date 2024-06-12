@@ -815,7 +815,7 @@ const getTraceRun = `-- name: GetTraceRun :one
 SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule FROM trace_runs WHERE run_id = ?1
 `
 
-func (q *Queries) GetTraceRun(ctx context.Context, runID interface{}) (*TraceRun, error) {
+func (q *Queries) GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error) {
 	row := q.db.QueryRowContext(ctx, getTraceRun, runID)
 	var i TraceRun
 	err := row.Scan(
@@ -1241,7 +1241,7 @@ type InsertTraceRunParams struct {
 	AppID       uuid.UUID
 	FunctionID  uuid.UUID
 	TraceID     []byte
-	RunID       interface{}
+	RunID       ulid.ULID
 	QueuedAt    int64
 	StartedAt   int64
 	EndedAt     int64

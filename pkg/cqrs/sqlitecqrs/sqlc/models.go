@@ -131,7 +131,7 @@ type Trace struct {
 }
 
 type TraceRun struct {
-	RunID        interface{}
+	RunID        ulid.ULID
 	AccountID    uuid.UUID
 	WorkspaceID  uuid.UUID
 	AppID        uuid.UUID
