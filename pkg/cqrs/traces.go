@@ -93,6 +93,11 @@ type TraceWriter interface {
 	InsertTraceRun(ctx context.Context, run *TraceRun) error
 }
 
+type TraceWriterDev interface {
+	// FindOrCreateTraceRun will return a TraceRun by runID, or create a new one if it doesn't exists
+	FindOrCreateTraceRun(ctx context.Context, opts FindOrCreateTraceRunOpt) (*TraceRun, error)
+}
+
 type TraceReader interface {
 	// GetTraceRuns retrieves a list of TraceRun based on the options specified
 	GetTraceRuns(ctx context.Context, opt GetTraceRunOpt) ([]*TraceRun, error)
@@ -109,6 +114,17 @@ type GetTraceRunOpt struct {
 	Order  []GetTraceRunOrder
 	Cursor string
 	Items  uint
+}
+
+type FindOrCreateTraceRunOpt struct {
+	// Only runID is used for search, others fields are considered default values
+	// if the trace run doesn't exists
+	RunID       ulid.ULID
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	AppID       uuid.UUID
+	FunctionID  uuid.UUID
+	TraceID     string
 }
 
 type GetTraceRunFilter struct {

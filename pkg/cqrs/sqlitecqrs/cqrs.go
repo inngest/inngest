@@ -781,6 +781,32 @@ func (w wrapper) GetTraceSpansByRun(ctx context.Context, id cqrs.TraceRunIdentif
 	return res, nil
 }
 
+func (w wrapper) FindOrCreateTraceRun(ctx context.Context, opts cqrs.FindOrCreateTraceRunOpt) (*cqrs.TraceRun, error) {
+	run, err := w.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: opts.RunID})
+	if err == nil {
+		return run, nil
+	}
+
+	new := cqrs.TraceRun{
+		AccountID:   opts.AccountID,
+		WorkspaceID: opts.WorkspaceID,
+		AppID:       opts.AppID,
+		FunctionID:  opts.FunctionID,
+		RunID:       opts.RunID.String(),
+		TraceID:     opts.TraceID,
+		QueuedAt:    ulid.Time(opts.RunID.Time()),
+		TriggerIDs:  []string{},
+		Status:      enums.RunStatusUnknown,
+	}
+
+	// create a new trace run
+	if err := w.InsertTraceRun(ctx, &new); err != nil {
+		return nil, err
+	}
+
+	return &new, nil
+}
+
 func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
 
 	run, err := w.q.GetTraceRun(ctx, id.RunID.String())

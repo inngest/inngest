@@ -1,6 +1,7 @@
 package devserver
 
 import (
+	"context"
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
@@ -20,19 +21,21 @@ type spanIngestionHandler struct {
 
 	dedup map[string]*cqrs.Span
 	runs  map[string]*cqrs.TraceRun
+	data  cqrs.Manager
 }
 
-func newSpanIngestionHandler() *spanIngestionHandler {
+func newSpanIngestionHandler(data cqrs.Manager) *spanIngestionHandler {
 	handler := &spanIngestionHandler{
 		dedup: map[string]*cqrs.Span{},
 		runs:  map[string]*cqrs.TraceRun{},
+		data:  data,
 	}
 
 	return handler
 }
 
 // Add adds the span and dedup it, taking the latest one needed
-func (sh *spanIngestionHandler) Add(span *cqrs.Span) {
+func (sh *spanIngestionHandler) Add(ctx context.Context, span *cqrs.Span) {
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
 
@@ -63,18 +66,17 @@ func (sh *spanIngestionHandler) Add(span *cqrs.Span) {
 		if r, ok := sh.runs[span.RunID.String()]; ok {
 			run = r
 		} else {
-			// New
-			// TODO: set SourceID
-			run = &cqrs.TraceRun{
+			var err error
+			run, err = sh.data.FindOrCreateTraceRun(ctx, cqrs.FindOrCreateTraceRunOpt{
 				AccountID:   acctID,
 				WorkspaceID: wsID,
 				AppID:       appID,
 				FunctionID:  fnID,
 				TraceID:     span.TraceID,
-				RunID:       span.RunID.String(),
-				QueuedAt:    ulid.Time(span.RunID.Time()),
-				TriggerIDs:  []string{},
-				Status:      enums.RunStatusUnknown,
+				RunID:       *span.RunID,
+			})
+			if err != nil {
+				return
 			}
 		}
 
