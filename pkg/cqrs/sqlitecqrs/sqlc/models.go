@@ -144,7 +144,6 @@ type TraceRun struct {
 	SourceID     string
 	TriggerIds   []byte
 	Output       []byte
-	IsBatch      bool
 	IsDebounce   bool
 	BatchID      ulid.ULID
 	CronSchedule sql.NullString
