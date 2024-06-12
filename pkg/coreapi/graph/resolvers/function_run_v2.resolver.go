@@ -47,7 +47,7 @@ func (r *functionRunV2Resolver) Trace(ctx context.Context, fn *models.FunctionRu
 		ctx,
 		loader.FromCtx(ctx).RunTraceLoader,
 		&loader.TraceRequestKey{
-			TraceRunIdentifier: cqrs.TraceRunIdentifier{
+			TraceRunIdentifier: &cqrs.TraceRunIdentifier{
 				AppID:      fn.AppID,
 				FunctionID: fn.FunctionID,
 				RunID:      fn.ID,
