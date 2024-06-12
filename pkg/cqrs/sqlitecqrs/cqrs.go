@@ -782,7 +782,53 @@ func (w wrapper) GetTraceSpansByRun(ctx context.Context, id cqrs.TraceRunIdentif
 }
 
 func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
-	return nil, fmt.Errorf("not implemented")
+
+	run, err := w.q.GetTraceRun(ctx, id.RunID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	start := time.UnixMilli(run.StartedAt)
+	end := time.UnixMilli(run.EndedAt)
+	triggerIDS := strings.Split(string(run.TriggerIds), ",")
+
+	var (
+		isBatch bool
+		batchID *ulid.ULID
+		cron    *string
+	)
+
+	if run.BatchID != nilULID {
+		isBatch = true
+		batchID = &run.BatchID
+	}
+
+	if run.CronSchedule.Valid {
+		cron = &run.CronSchedule.String
+	}
+
+	trun := cqrs.TraceRun{
+		AccountID:    run.AccountID,
+		WorkspaceID:  run.WorkspaceID,
+		AppID:        run.AppID,
+		FunctionID:   run.FunctionID,
+		TraceID:      string(run.TraceID),
+		RunID:        id.RunID.String(),
+		QueuedAt:     time.UnixMilli(run.QueuedAt),
+		StartedAt:    start,
+		EndedAt:      end,
+		Duration:     end.Sub(start),
+		SourceID:     run.SourceID,
+		TriggerIDs:   triggerIDS,
+		Output:       run.Output,
+		Status:       enums.RunCodeToStatus(run.Status),
+		BatchID:      batchID,
+		IsBatch:      isBatch,
+		CronSchedule: cron,
+		// TODO: fill in triggers
+	}
+
+	return &trun, nil
 }
 
 func (w wrapper) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {

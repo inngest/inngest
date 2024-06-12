@@ -187,5 +187,8 @@ INSERT INTO trace_runs
 VALUES
 	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
+-- name: GetTraceRun :one
+SELECT * FROM trace_runs WHERE run_id = @run_id;
+
 -- name: GetTraceSpans :many
 SELECT * FROM traces WHERE run_id = @run_id ORDER BY timestamp DESC, duration DESC;

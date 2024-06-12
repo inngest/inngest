@@ -251,6 +251,11 @@ func (r *queryResolver) Run(ctx context.Context, runID string) (*models.Function
 		batchTS = &ts
 	}
 
+	status, err := models.ToFunctionRunStatus(run.Status)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing status: %w", err)
+	}
+
 	res := models.FunctionRunV2{
 		ID:             runid,
 		AppID:          run.AppID,
@@ -259,6 +264,7 @@ func (r *queryResolver) Run(ctx context.Context, runID string) (*models.Function
 		QueuedAt:       run.QueuedAt,
 		StartedAt:      startedAt,
 		EndedAt:        endedAt,
+		Status:         status,
 		SourceID:       sourceID,
 		TriggerIDs:     triggerIDs,
 		Triggers:       triggers,

@@ -811,6 +811,35 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 	return items, nil
 }
 
+const getTraceRun = `-- name: GetTraceRun :one
+SELECT account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_batch, is_debounce, batch_id, cron_schedule FROM trace_runs WHERE run_id = ?1
+`
+
+func (q *Queries) GetTraceRun(ctx context.Context, runID interface{}) (*TraceRun, error) {
+	row := q.db.QueryRowContext(ctx, getTraceRun, runID)
+	var i TraceRun
+	err := row.Scan(
+		&i.AccountID,
+		&i.WorkspaceID,
+		&i.AppID,
+		&i.FunctionID,
+		&i.TraceID,
+		&i.RunID,
+		&i.QueuedAt,
+		&i.StartedAt,
+		&i.EndedAt,
+		&i.Status,
+		&i.SourceID,
+		&i.TriggerIds,
+		&i.Output,
+		&i.IsBatch,
+		&i.IsDebounce,
+		&i.BatchID,
+		&i.CronSchedule,
+	)
+	return &i, err
+}
+
 const getTraceSpans = `-- name: GetTraceSpans :many
 SELECT timestamp, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id FROM traces WHERE run_id = ?1 ORDER BY timestamp DESC, duration DESC
 `
