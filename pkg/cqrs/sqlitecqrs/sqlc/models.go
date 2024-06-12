@@ -111,10 +111,11 @@ type History struct {
 
 type Trace struct {
 	Timestamp          time.Time
-	TraceID            []byte
-	SpanID             []byte
-	ParentSpanID       []byte
-	TraceState         []byte
+	TimestampUnixMs    int64
+	TraceID            string
+	SpanID             string
+	ParentSpanID       sql.NullString
+	TraceState         sql.NullString
 	SpanName           string
 	SpanKind           string
 	ServiceName        string

@@ -191,4 +191,4 @@ VALUES
 SELECT * FROM trace_runs WHERE run_id = @run_id;
 
 -- name: GetTraceSpans :many
-SELECT * FROM traces WHERE run_id = @run_id ORDER BY timestamp DESC, duration DESC;
+SELECT * FROM traces WHERE trace_id = @trace_id AND run_id = @run_id ORDER BY timestamp_unix_ms DESC, duration DESC;
