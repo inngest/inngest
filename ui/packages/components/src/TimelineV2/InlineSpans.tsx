@@ -68,7 +68,7 @@ export function InlineSpans({ className, minTime, maxTime, name, spans, widths }
       </TooltipTrigger>
       <TooltipContent>
         <div className="text-slate-700">
-          {spans[0] && <Times isDelayVisible={spans.length > 1} name={name} span={spans[0]} />}
+          {spans[0] && <Times isDelayVisible={spans.length === 1} name={name} span={spans[0]} />}
 
           {spans.length > 1 &&
             spans.map((span) => {
