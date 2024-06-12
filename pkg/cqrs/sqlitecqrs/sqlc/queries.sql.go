@@ -1183,13 +1183,14 @@ func (q *Queries) InsertHistory(ctx context.Context, arg InsertHistoryParams) er
 const insertTrace = `-- name: InsertTrace :exec
 
 INSERT INTO traces
-	(timestamp, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id)
+	(timestamp, timestamp_unix_ms, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id)
 VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertTraceParams struct {
 	Timestamp          time.Time
+	TimestampUnixMs    int64
 	TraceID            string
 	SpanID             string
 	ParentSpanID       sql.NullString
@@ -1213,6 +1214,7 @@ type InsertTraceParams struct {
 func (q *Queries) InsertTrace(ctx context.Context, arg InsertTraceParams) error {
 	_, err := q.db.ExecContext(ctx, insertTrace,
 		arg.Timestamp,
+		arg.TimestampUnixMs,
 		arg.TraceID,
 		arg.SpanID,
 		arg.ParentSpanID,

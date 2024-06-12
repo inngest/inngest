@@ -95,7 +95,7 @@ type TraceWriter interface {
 
 type TraceWriterDev interface {
 	// FindOrCreateTraceRun will return a TraceRun by runID, or create a new one if it doesn't exists
-	FindOrCreateTraceRun(ctx context.Context, opts FindOrCreateTraceRunOpt) (*TraceRun, error)
+	FindOrBuildTraceRun(ctx context.Context, opts FindOrCreateTraceRunOpt) (*TraceRun, error)
 }
 
 type TraceReader interface {

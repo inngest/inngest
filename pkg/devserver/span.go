@@ -67,7 +67,7 @@ func (sh *spanIngestionHandler) Add(ctx context.Context, span *cqrs.Span) {
 			run = r
 		} else {
 			var err error
-			run, err = sh.data.FindOrCreateTraceRun(ctx, cqrs.FindOrCreateTraceRunOpt{
+			run, err = sh.data.FindOrBuildTraceRun(ctx, cqrs.FindOrCreateTraceRunOpt{
 				AccountID:   acctID,
 				WorkspaceID: wsID,
 				AppID:       appID,
