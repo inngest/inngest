@@ -33,10 +33,6 @@ export default {
           xIntense: 'rgb(var(--color-tertiary-xIntense) / <alpha-value>)',
           '2xIntense': 'rgb(var(--color-tertiary-2xIntense) / <alpha-value>)',
         },
-        foreground: {
-          onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
-          subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
-        },
       },
       borderColor: {
         subtle: 'rgb(var(--color-border-subtle) / <alpha-value>)',
@@ -51,7 +47,10 @@ export default {
         onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
         subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
       },
-
+      fill: {
+        onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
+        subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
+      },
       gridTemplateColumns: {
         dashboard: '1fr 1fr 1fr 432px',
       },
