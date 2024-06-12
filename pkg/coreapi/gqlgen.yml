@@ -72,6 +72,8 @@ models:
         resolver: true
       trace:
         resolver: true
+      triggers:
+        resolver: true
   HistoryType:
     model: github.com/inngest/inngest/pkg/enums.HistoryType
   HistoryStepType:

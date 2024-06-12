@@ -401,6 +401,8 @@ type FunctionRunResolver interface {
 type FunctionRunV2Resolver interface {
 	Function(ctx context.Context, obj *models.FunctionRunV2) (*models.Function, error)
 
+	Triggers(ctx context.Context, obj *models.FunctionRunV2) ([]string, error)
+
 	Trace(ctx context.Context, obj *models.FunctionRunV2) (*models.RunTraceSpan, error)
 }
 type MutationResolver interface {
@@ -6087,7 +6089,7 @@ func (ec *executionContext) _FunctionRunV2_triggers(ctx context.Context, field g
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Triggers, nil
+		return ec.resolvers.FunctionRunV2().Triggers(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6108,8 +6110,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_triggers(ctx context.Cont
 	fc = &graphql.FieldContext{
 		Object:     "FunctionRunV2",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Bytes does not have child fields")
 		},
@@ -16069,12 +16071,25 @@ func (ec *executionContext) _FunctionRunV2(ctx context.Context, sel ast.Selectio
 				atomic.AddUint32(&invalids, 1)
 			}
 		case "triggers":
+			field := field
 
-			out.Values[i] = ec._FunctionRunV2_triggers(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FunctionRunV2_triggers(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
 			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "isBatch":
 
 			out.Values[i] = ec._FunctionRunV2_isBatch(ctx, field, obj)
