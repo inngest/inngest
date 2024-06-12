@@ -29,6 +29,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gosimple/slug v1.12.0
 	github.com/gowebpki/jcs v1.0.0
+	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/terraform v0.15.3
 	github.com/inngest/expr v0.0.0-20240521153320-6f549d6745fd
@@ -154,6 +155,7 @@ require (
 	github.com/nats-io/nkeys v0.3.0 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/ohler55/ojg v1.21.0 // indirect
+	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pascaldekloe/name v1.0.1 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
