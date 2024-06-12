@@ -138,5 +138,7 @@ CREATE TABLE trace_runs (
 	trigger_ids BLOB NOT NULL,
 	output BLOB,
 	is_batch BOOLEAN NOT NULL,
-	is_debounce BOOLEAN NOT NULL
+	is_debounce BOOLEAN NOT NULL,
+	batch_id BLOB,
+	cron_schedule TEXT
 );

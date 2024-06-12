@@ -131,19 +131,21 @@ type Trace struct {
 }
 
 type TraceRun struct {
-	AccountID   uuid.UUID
-	WorkspaceID uuid.UUID
-	AppID       uuid.UUID
-	FunctionID  uuid.UUID
-	TraceID     []byte
-	RunID       interface{}
-	QueuedAt    int64
-	StartedAt   int64
-	EndedAt     int64
-	Status      int64
-	SourceID    string
-	TriggerIds  []byte
-	Output      []byte
-	IsBatch     bool
-	IsDebounce  bool
+	AccountID    uuid.UUID
+	WorkspaceID  uuid.UUID
+	AppID        uuid.UUID
+	FunctionID   uuid.UUID
+	TraceID      []byte
+	RunID        interface{}
+	QueuedAt     int64
+	StartedAt    int64
+	EndedAt      int64
+	Status       int64
+	SourceID     string
+	TriggerIds   []byte
+	Output       []byte
+	IsBatch      bool
+	IsDebounce   bool
+	BatchID      ulid.ULID
+	CronSchedule sql.NullString
 }
