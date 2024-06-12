@@ -131,12 +131,12 @@ type Trace struct {
 }
 
 type TraceRun struct {
+	RunID        interface{}
 	AccountID    uuid.UUID
 	WorkspaceID  uuid.UUID
 	AppID        uuid.UUID
 	FunctionID   uuid.UUID
 	TraceID      []byte
-	RunID        interface{}
 	QueuedAt     int64
 	StartedAt    int64
 	EndedAt      int64

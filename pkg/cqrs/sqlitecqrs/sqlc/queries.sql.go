@@ -812,19 +812,19 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 }
 
 const getTraceRun = `-- name: GetTraceRun :one
-SELECT account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_batch, is_debounce, batch_id, cron_schedule FROM trace_runs WHERE run_id = ?1
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_batch, is_debounce, batch_id, cron_schedule FROM trace_runs WHERE run_id = ?1
 `
 
 func (q *Queries) GetTraceRun(ctx context.Context, runID interface{}) (*TraceRun, error) {
 	row := q.db.QueryRowContext(ctx, getTraceRun, runID)
 	var i TraceRun
 	err := row.Scan(
+		&i.RunID,
 		&i.AccountID,
 		&i.WorkspaceID,
 		&i.AppID,
 		&i.FunctionID,
 		&i.TraceID,
-		&i.RunID,
 		&i.QueuedAt,
 		&i.StartedAt,
 		&i.EndedAt,
@@ -1230,7 +1230,7 @@ func (q *Queries) InsertTrace(ctx context.Context, arg InsertTraceParams) error 
 }
 
 const insertTraceRun = `-- name: InsertTraceRun :exec
-INSERT INTO trace_runs
+INSERT OR REPLACE INTO trace_runs
 	(account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_batch, is_debounce)
 VALUES
 	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
