@@ -130,21 +130,23 @@ type ComplexityRoot struct {
 	}
 
 	FunctionRunV2 struct {
-		AppID      func(childComplexity int) int
-		EndedAt    func(childComplexity int) int
-		Function   func(childComplexity int) int
-		FunctionID func(childComplexity int) int
-		ID         func(childComplexity int) int
-		IsBatch    func(childComplexity int) int
-		Output     func(childComplexity int) int
-		QueuedAt   func(childComplexity int) int
-		SourceID   func(childComplexity int) int
-		StartedAt  func(childComplexity int) int
-		Status     func(childComplexity int) int
-		Trace      func(childComplexity int) int
-		TraceID    func(childComplexity int) int
-		TriggerIDs func(childComplexity int) int
-		Triggers   func(childComplexity int) int
+		AppID          func(childComplexity int) int
+		BatchCreatedAt func(childComplexity int) int
+		CronSchedule   func(childComplexity int) int
+		EndedAt        func(childComplexity int) int
+		Function       func(childComplexity int) int
+		FunctionID     func(childComplexity int) int
+		ID             func(childComplexity int) int
+		IsBatch        func(childComplexity int) int
+		Output         func(childComplexity int) int
+		QueuedAt       func(childComplexity int) int
+		SourceID       func(childComplexity int) int
+		StartedAt      func(childComplexity int) int
+		Status         func(childComplexity int) int
+		Trace          func(childComplexity int) int
+		TraceID        func(childComplexity int) int
+		TriggerIDs     func(childComplexity int) int
+		Triggers       func(childComplexity int) int
 	}
 
 	FunctionRunV2Edge struct {
@@ -844,6 +846,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FunctionRunV2.AppID(childComplexity), true
+
+	case "FunctionRunV2.batchCreatedAt":
+		if e.complexity.FunctionRunV2.BatchCreatedAt == nil {
+			break
+		}
+
+		return e.complexity.FunctionRunV2.BatchCreatedAt(childComplexity), true
+
+	case "FunctionRunV2.cronSchedule":
+		if e.complexity.FunctionRunV2.CronSchedule == nil {
+			break
+		}
+
+		return e.complexity.FunctionRunV2.CronSchedule(childComplexity), true
 
 	case "FunctionRunV2.endedAt":
 		if e.complexity.FunctionRunV2.EndedAt == nil {
@@ -2491,6 +2507,8 @@ type FunctionRunV2 {
   triggerIDs: [ULID!]!
   triggers: [Bytes!]!
   isBatch: Boolean!
+  batchCreatedAt: Time
+  cronSchedule: String
 
   output: Bytes
 
@@ -6143,6 +6161,88 @@ func (ec *executionContext) fieldContext_FunctionRunV2_isBatch(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _FunctionRunV2_batchCreatedAt(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRunV2) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionRunV2_batchCreatedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.BatchCreatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionRunV2_batchCreatedAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionRunV2",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionRunV2_cronSchedule(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRunV2) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionRunV2_cronSchedule(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CronSchedule, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionRunV2_cronSchedule(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionRunV2",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _FunctionRunV2_output(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRunV2) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_FunctionRunV2_output(ctx, field)
 	if err != nil {
@@ -6332,6 +6432,10 @@ func (ec *executionContext) fieldContext_FunctionRunV2Edge_node(ctx context.Cont
 				return ec.fieldContext_FunctionRunV2_triggers(ctx, field)
 			case "isBatch":
 				return ec.fieldContext_FunctionRunV2_isBatch(ctx, field)
+			case "batchCreatedAt":
+				return ec.fieldContext_FunctionRunV2_batchCreatedAt(ctx, field)
+			case "cronSchedule":
+				return ec.fieldContext_FunctionRunV2_cronSchedule(ctx, field)
 			case "output":
 				return ec.fieldContext_FunctionRunV2_output(ctx, field)
 			case "trace":
@@ -8243,6 +8347,10 @@ func (ec *executionContext) fieldContext_Query_run(ctx context.Context, field gr
 				return ec.fieldContext_FunctionRunV2_triggers(ctx, field)
 			case "isBatch":
 				return ec.fieldContext_FunctionRunV2_isBatch(ctx, field)
+			case "batchCreatedAt":
+				return ec.fieldContext_FunctionRunV2_batchCreatedAt(ctx, field)
+			case "cronSchedule":
+				return ec.fieldContext_FunctionRunV2_cronSchedule(ctx, field)
 			case "output":
 				return ec.fieldContext_FunctionRunV2_output(ctx, field)
 			case "trace":
@@ -15974,6 +16082,14 @@ func (ec *executionContext) _FunctionRunV2(ctx context.Context, sel ast.Selectio
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
+		case "batchCreatedAt":
+
+			out.Values[i] = ec._FunctionRunV2_batchCreatedAt(ctx, field, obj)
+
+		case "cronSchedule":
+
+			out.Values[i] = ec._FunctionRunV2_cronSchedule(ctx, field, obj)
+
 		case "output":
 
 			out.Values[i] = ec._FunctionRunV2_output(ctx, field, obj)

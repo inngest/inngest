@@ -356,6 +356,8 @@ type FunctionRunV2 {
   triggerIDs: [ULID!]!
   triggers: [Bytes!]!
   isBatch: Boolean!
+  batchCreatedAt: Time
+  cronSchedule: String
 
   output: Bytes
 
