@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/vektah/gqlparser/v2/ast"
+
+	//nolint:revive // Validator rules each use dot imports for convenience.
 	. "github.com/vektah/gqlparser/v2/validator"
 )
 

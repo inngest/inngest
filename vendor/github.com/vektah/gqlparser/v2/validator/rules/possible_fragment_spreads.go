@@ -2,12 +2,13 @@ package validator
 
 import (
 	"github.com/vektah/gqlparser/v2/ast"
+
+	//nolint:revive // Validator rules each use dot imports for convenience.
 	. "github.com/vektah/gqlparser/v2/validator"
 )
 
 func init() {
 	AddRule("PossibleFragmentSpreads", func(observers *Events, addError AddErrFunc) {
-
 		validate := func(walker *Walker, parentDef *ast.Definition, fragmentName string, emitError func()) {
 			if parentDef == nil {
 				return

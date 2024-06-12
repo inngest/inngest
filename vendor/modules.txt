@@ -727,8 +727,8 @@ github.com/tklauser/numcpus
 # github.com/urfave/cli/v2 v2.25.1
 ## explicit; go 1.18
 github.com/urfave/cli/v2
-# github.com/vektah/gqlparser/v2 v2.5.1
-## explicit; go 1.16
+# github.com/vektah/gqlparser/v2 v2.5.14
+## explicit; go 1.19
 github.com/vektah/gqlparser/v2
 github.com/vektah/gqlparser/v2/ast
 github.com/vektah/gqlparser/v2/gqlerror

@@ -15,6 +15,67 @@ object types:
                 Name: "world"
                 Type: String
 
+  - name: with comments
+    input: |
+      # Hello
+      # Hello another
+      type Hello {
+        # World
+        # World another
+        world: String
+        # end of type comments
+      }
+      # end of file comments
+    ast: |
+      <SchemaDocument>
+        Definitions: [Definition]
+        - <Definition>
+            Kind: DefinitionKind("OBJECT")
+            Name: "Hello"
+            Fields: [FieldDefinition]
+            - <FieldDefinition>
+                Name: "world"
+                Type: String
+                AfterDescriptionComment: "# World\n# World another\n"
+            AfterDescriptionComment: "# Hello\n# Hello another\n"
+            EndOfDefinitionComment: "# end of type comments\n"
+        Comment: "# end of file comments\n"
+
+  - name: with comments and description
+    input: |
+      # Hello
+      # Hello another
+      "type description"
+      # Hello after description
+      # Hello after description another
+      type Hello {
+        # World
+        # World another
+        "field description"
+        # World after description
+        # World after description another
+        world: String
+        # end of definition coments
+        # end of definition comments another
+      }
+    ast: |
+      <SchemaDocument>
+        Definitions: [Definition]
+        - <Definition>
+            Kind: DefinitionKind("OBJECT")
+            Description: "type description"
+            Name: "Hello"
+            Fields: [FieldDefinition]
+            - <FieldDefinition>
+                Description: "field description"
+                Name: "world"
+                Type: String
+                BeforeDescriptionComment: "# World\n# World another\n"
+                AfterDescriptionComment: "# World after description\n# World after description another\n"
+            BeforeDescriptionComment: "# Hello\n# Hello another\n"
+            AfterDescriptionComment: "# Hello after description\n# Hello after description another\n"
+            EndOfDefinitionComment: "# end of definition coments\n# end of definition comments another\n"
+
   - name: with description
     input: |
       "Description"
@@ -35,6 +96,7 @@ object types:
 
   - name: with block description
     input: |
+      # Before description comment
       """
       Description
       """
@@ -53,6 +115,8 @@ object types:
             - <FieldDefinition>
                 Name: "world"
                 Type: String
+            BeforeDescriptionComment: "# Before description comment\n"
+            AfterDescriptionComment: "# Even with comments between them\n"
   - name: with field arg
     input: |
       type Hello {
@@ -146,8 +210,11 @@ object types:
 type extensions:
   - name: Object extension
     input: |
+      # comment
       extend type Hello {
+        # comment world
         world: String
+        # end of definition comment
       }
     ast: |
       <SchemaDocument>
@@ -159,6 +226,9 @@ type extensions:
             - <FieldDefinition>
                 Name: "world"
                 Type: String
+                AfterDescriptionComment: "# comment world\n"
+            AfterDescriptionComment: "# comment\n"
+            EndOfDefinitionComment: "# end of definition comment\n"
 
   - name: without any fields
     input: "extend type Hello implements Greeting"
@@ -277,6 +347,30 @@ schema definition:
                 Operation: Operation("query")
                 Type: "Query"
 
+  - name: with comments and description
+    input: |
+      # before description comment
+      "description"
+      # after description comment
+      schema {
+        # before field comment
+        query: Query
+        # after field comment
+      }
+    ast: |
+      <SchemaDocument>
+        Schema: [SchemaDefinition]
+        - <SchemaDefinition>
+            Description: "description"
+            OperationTypes: [OperationTypeDefinition]
+            - <OperationTypeDefinition>
+                Operation: Operation("query")
+                Type: "Query"
+                Comment: "# before field comment\n"
+            BeforeDescriptionComment: "# before description comment\n"
+            AfterDescriptionComment: "# after description comment\n"
+            EndOfDefinitionComment: "# after field comment\n"
+
 schema extensions:
   - name: simple
     input: |
@@ -291,6 +385,26 @@ schema extensions:
             - <OperationTypeDefinition>
                 Operation: Operation("mutation")
                 Type: "Mutation"
+
+  - name: with comment and description
+    input: |
+      # before extend comment
+       extend schema {
+         # before field comment
+         mutation: Mutation
+         # after field comment
+       }
+    ast: |
+      <SchemaDocument>
+        SchemaExtension: [SchemaDefinition]
+        - <SchemaDefinition>
+            OperationTypes: [OperationTypeDefinition]
+            - <OperationTypeDefinition>
+                Operation: Operation("mutation")
+                Type: "Mutation"
+                Comment: "# before field comment\n"
+            AfterDescriptionComment: "# before extend comment\n"
+            EndOfDefinitionComment: "# after field comment\n"
 
   - name: directive only
     input: "extend schema @directive"

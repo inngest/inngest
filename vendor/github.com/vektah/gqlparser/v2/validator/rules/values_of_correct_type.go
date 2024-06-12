@@ -6,6 +6,8 @@ import (
 	"strconv"
 
 	"github.com/vektah/gqlparser/v2/ast"
+
+	//nolint:revive // Validator rules each use dot imports for convenience.
 	. "github.com/vektah/gqlparser/v2/validator"
 )
 
@@ -157,7 +159,7 @@ func unexpectedTypeMessageOnly(v *ast.Value) ErrorOption {
 		return Message(`Float cannot represent non numeric value: %s`, v.String())
 	case "ID", "ID!":
 		return Message(`ID cannot represent a non-string and non-integer value: %s`, v.String())
-	//case "Enum":
+	// case "Enum":
 	//		return Message(`Enum "%s" cannot represent non-enum value: %s`, v.ExpectedType.String(), v.String())
 	default:
 		if v.Definition.Kind == ast.Enum {

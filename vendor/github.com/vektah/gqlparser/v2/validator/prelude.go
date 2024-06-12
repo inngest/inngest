@@ -2,6 +2,7 @@ package validator
 
 import (
 	_ "embed"
+
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
