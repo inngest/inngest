@@ -122,12 +122,13 @@ CREATE TABLE traces (
 );
 
 CREATE TABLE trace_runs (
+	run_id CHAR(26) PRIMARY KEY,
+
 	account_id CHAR(36) NOT NULL,
 	workspace_id CHAR(36) NOT NULL,
 	app_id CHAR(36) NOT NULL,
 	function_id CHAR(36) NOT NULL,
 	trace_id BLOB NOT NULL,
-	run_id CHAR(26) NOT NULL,
 
 	queued_at INT NOT NULL,
 	started_at INT NOT NULL,
@@ -137,6 +138,7 @@ CREATE TABLE trace_runs (
 	source_id VARCHAR NOT NULL,
 	trigger_ids BLOB NOT NULL,
 	output BLOB,
-	is_batch BOOLEAN NOT NULL,
-	is_debounce BOOLEAN NOT NULL
+	is_debounce BOOLEAN NOT NULL,
+	batch_id BLOB,
+	cron_schedule TEXT
 );
