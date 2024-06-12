@@ -34,6 +34,11 @@ const nextConfig = {
         permanent: false,
       },
       {
+        source: '/settings/integrations',
+        destination: '/settings/integrations/vercel',
+        permanent: false,
+      },
+      {
         source: '/login',
         destination: '/sign-in',
         permanent: false,
