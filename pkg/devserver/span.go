@@ -118,8 +118,8 @@ func (sh *spanIngestionHandler) Add(ctx context.Context, span *cqrs.Span) {
 		// Annotate if run is batch or debounce
 		batchID := spanAttr(span.SpanAttributes, consts.OtelSysBatchID)
 		if batchID != "" {
-			if id, err := ulid.Parse(batchID); err == nil {
-				run.BatchID = &id
+			if bid, err := ulid.Parse(batchID); err == nil {
+				run.BatchID = &bid
 			}
 			run.IsBatch = true
 		}

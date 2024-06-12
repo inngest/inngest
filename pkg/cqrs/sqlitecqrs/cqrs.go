@@ -672,10 +672,12 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 		Status:      run.Status.ToCode(),
 		TriggerIds:  []byte{},
 		Output:      run.Output,
-		IsBatch:     run.IsBatch,
 		IsDebounce:  run.IsDebounce,
 	}
 
+	if run.BatchID != nil {
+		params.BatchID = *run.BatchID
+	}
 	if len(run.TriggerIDs) > 0 {
 		params.TriggerIds = []byte(strings.Join(run.TriggerIDs, ","))
 	}
