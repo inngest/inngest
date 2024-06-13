@@ -43,6 +43,9 @@ func (r *functionRunV2Resolver) Triggers(ctx context.Context, fn *models.Functio
 }
 
 func (r *functionRunV2Resolver) Trace(ctx context.Context, fn *models.FunctionRunV2) (*models.RunTraceSpan, error) {
+	// TODO: handle the case when it's Scheduled
+	// there's no run so it should return empty but not error
+
 	return loader.LoadOne[models.RunTraceSpan](
 		ctx,
 		loader.FromCtx(ctx).RunTraceLoader,

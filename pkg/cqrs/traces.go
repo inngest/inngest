@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,7 +35,7 @@ type Span struct {
 	Links              []SpanLink        `json:"links"`
 	RunID              *ulid.ULID        `json:"run_id"`
 
-	// Spans is a virtual field used for reconstructing the trace tree.
+	// Children is a virtual field used for reconstructing the trace tree.
 	// This field is not expected to be stored in the DB
 	Children []*Span `json:"spans"`
 }
@@ -44,6 +45,51 @@ func (s *Span) GroupID() *string {
 		return &groupID
 	}
 	return nil
+}
+
+func (s *Span) AccountID() *uuid.UUID {
+	if str, ok := s.SpanAttributes[consts.OtelSysAccountID]; ok {
+		if id, err := uuid.Parse(str); err == nil {
+			return &id
+		}
+	}
+	return nil
+}
+
+func (s *Span) WorkspaceID() *uuid.UUID {
+	if str, ok := s.SpanAttributes[consts.OtelSysWorkspaceID]; ok {
+		if id, err := uuid.Parse(str); err == nil {
+			return &id
+		}
+	}
+	return nil
+}
+
+func (s *Span) AppID() *uuid.UUID {
+	if str, ok := s.SpanAttributes[consts.OtelSysAppID]; ok {
+		if id, err := uuid.Parse(str); err == nil {
+			return &id
+		}
+	}
+	return nil
+}
+
+func (s *Span) FunctionID() *uuid.UUID {
+	if str, ok := s.SpanAttributes[consts.OtelSysFunctionID]; ok {
+		if id, err := uuid.Parse(str); err == nil {
+			return &id
+		}
+	}
+	return nil
+}
+
+func (s *Span) FunctionStatus() enums.RunStatus {
+	if str, ok := s.SpanAttributes[consts.OtelSysFunctionStatusCode]; ok {
+		if code, err := strconv.ParseInt(str, 10, 64); err == nil {
+			return enums.RunCodeToStatus(code)
+		}
+	}
+	return enums.RunStatusUnknown
 }
 
 type SpanEvent struct {

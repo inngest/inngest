@@ -121,6 +121,7 @@ func LoadManyWithString[T interface{}](
 
 type loaders struct {
 	RunTraceLoader *dataloader.Loader
+	RunSpanLoader  *dataloader.Loader
 }
 
 func newLoaders(params LoaderParams) *loaders {
@@ -128,6 +129,7 @@ func newLoaders(params LoaderParams) *loaders {
 	tr := &traceReader{loaders: loaders, reader: params.DB}
 
 	loaders.RunTraceLoader = dataloader.NewBatchedLoader(tr.GetRunTrace)
+	loaders.RunSpanLoader = dataloader.NewBatchedLoader(tr.GetSpanRun)
 
 	return loaders
 }

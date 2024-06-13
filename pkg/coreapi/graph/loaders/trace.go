@@ -3,6 +3,7 @@ package loader
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/google/uuid"
@@ -10,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -22,7 +24,7 @@ func (k *TraceRequestKey) Raw() any {
 }
 
 func (k *TraceRequestKey) String() string {
-	return fmt.Sprintf("%s-%s", k.TraceID, k.RunID)
+	return fmt.Sprintf("%s:%s", k.TraceID, k.RunID)
 }
 
 type traceReader struct {
@@ -70,13 +72,36 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 				return
 			}
 
-			_, err = tb.Build()
+			tree, err := tb.Build()
 			if err != nil {
 				res.Error = fmt.Errorf("error run details: %w", err)
 				return
 			}
 
-			// TODO: prime tree
+			res.Data = tree
+			var primeTree func(context.Context, []*models.RunTraceSpan)
+			primeTree = func(ctx context.Context, tspans []*models.RunTraceSpan) {
+				for _, span := range tspans {
+					if span != nil {
+						if span.SpanID != "" {
+							tr.loaders.RunSpanLoader.Prime(
+								ctx,
+								&SpanRequestKey{
+									TraceRunIdentifier: req.TraceRunIdentifier,
+									SpanID:             span.SpanID,
+								},
+								span,
+							)
+						}
+
+						if span.ChildrenSpans != nil && len(span.ChildrenSpans) > 0 {
+							primeTree(ctx, span.ChildrenSpans)
+						}
+					}
+				}
+			}
+
+			primeTree(ctx, []*models.RunTraceSpan{tree})
 		}(ctx, results[i])
 	}
 
@@ -85,6 +110,81 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 	return results
 }
 
+type SpanRequestKey struct {
+	*cqrs.TraceRunIdentifier `json:"trident,omitempty"`
+	SpanID                   string `json:"sid"`
+}
+
+func (k *SpanRequestKey) Raw() any {
+	return k
+}
+
+func (k *SpanRequestKey) String() string {
+	return fmt.Sprintf("%s:%s:%s", k.TraceID, k.RunID, k.SpanID)
+}
+
+func (tr *traceReader) GetSpanRun(ctx context.Context, keys dataloader.Keys) []*dataloader.Result {
+	results := make([]*dataloader.Result, len(keys))
+
+	var wg sync.WaitGroup
+	for i, key := range keys {
+		results[i] = &dataloader.Result{}
+
+		req, ok := key.Raw().(*SpanRequestKey)
+		if !ok {
+			results[i].Error = fmt.Errorf("unexpected type for span %T", key.Raw())
+			continue
+		}
+
+		wg.Add(1)
+		go func(ctx context.Context, res *dataloader.Result) {
+			defer wg.Done()
+
+			// If we're here, we're requested a span ID that wasn't primed by
+			// GetRunTrace. Span IDs can sometimes be virtualized based on the
+			// entire trace, so here we refetch the entire trace for each key and
+			// pick out the spans we need.
+			//
+			// Because this is calling another loader, duplicate requests will
+			// still be filtered out.
+			rootSpan, err := LoadOne[models.RunTraceSpan](
+				ctx,
+				tr.loaders.RunTraceLoader,
+				&TraceRequestKey{TraceRunIdentifier: req.TraceRunIdentifier},
+			)
+			if err != nil {
+				res.Error = fmt.Errorf("failed to get run trace: %w", err)
+			}
+
+			var findNestedSpan func([]*models.RunTraceSpan) *models.RunTraceSpan
+			findNestedSpan = func(spans []*models.RunTraceSpan) *models.RunTraceSpan {
+				for _, span := range spans {
+					if span == nil {
+						continue
+					}
+					if span.SpanID == req.SpanID {
+						return span
+					}
+
+					if len(span.ChildrenSpans) > 0 {
+						nestedSpan := findNestedSpan(span.ChildrenSpans)
+						if nestedSpan != nil {
+							return nestedSpan
+						}
+					}
+				}
+				return nil
+			}
+
+			res.Data = findNestedSpan([]*models.RunTraceSpan{rootSpan})
+		}(ctx, results[i])
+	}
+
+	wg.Wait()
+	return results
+}
+
+// TraceTreeBuilder builds the span tree used for the API
 type TraceTreeBuilder struct {
 	// root is the root span of the tree
 	root *cqrs.Span
@@ -171,6 +271,82 @@ func NewTraceTreeBuilder(opts TraceTreeBuilderOpts) (*TraceTreeBuilder, error) {
 	return ttb, nil
 }
 
+// Build goes through the tree and construct the trace for API to be consumed
 func (tb *TraceTreeBuilder) Build() (*models.RunTraceSpan, error) {
-	return nil, fmt.Errorf("not implemented")
+	root, err := tb.toRunTraceSpan(tb.root)
+	if err != nil {
+		return nil, fmt.Errorf("error converting function span: %w", err)
+	}
+
+	// sort it in asc order before proceeding
+	spans := tb.root.Children
+	sort.Slice(spans, func(i, j int) bool {
+		return spans[i].Timestamp.UnixMilli() < spans[j].Timestamp.UnixMilli()
+	})
+
+	// these are the execution or steps for the function run
+	for _, span := range spans {
+		tspan, err := tb.toRunTraceSpan(span)
+		if err != nil {
+			return nil, fmt.Errorf("error converting execution span: %w", err)
+		}
+		root.ChildrenSpans = append(root.ChildrenSpans, tspan)
+	}
+
+	return root, nil
+}
+
+func (tb *TraceTreeBuilder) toRunTraceSpan(s *cqrs.Span) (*models.RunTraceSpan, error) {
+	var (
+		appID  uuid.UUID
+		fnID   uuid.UUID
+		runID  ulid.ULID
+		status models.RunTraceSpanStatus
+		stepOp *models.StepOp
+	)
+
+	if s.RunID != nil {
+		runID = *s.RunID
+	}
+
+	if id := s.AppID(); id != nil {
+		appID = *id
+	}
+	if id := s.FunctionID(); id != nil {
+		fnID = *id
+	}
+
+	// TODO: assign step status
+	if s.ScopeName == consts.OtelScopeFunction {
+		fnstatus := s.FunctionStatus()
+		switch fnstatus {
+		case enums.RunStatusRunning:
+			status = models.RunTraceSpanStatusRunning
+		case enums.RunStatusCompleted:
+			status = models.RunTraceSpanStatusCompleted
+		case enums.RunStatusCancelled:
+			status = models.RunTraceSpanStatusCancelled
+		case enums.RunStatusFailed, enums.RunStatusOverflowed:
+			status = models.RunTraceSpanStatusFailed
+		default:
+			return nil, fmt.Errorf("unexpected run status: %v", fnstatus.String())
+		}
+	}
+
+	res := models.RunTraceSpan{
+		AppID:         appID,
+		FunctionID:    fnID,
+		RunID:         runID,
+		TraceID:       s.TraceID,
+		ParentSpanID:  s.ParentSpanID,
+		SpanID:        s.SpanID,
+		IsRoot:        s.ParentSpanID == nil,
+		Name:          s.SpanName,
+		Status:        status,
+		QueuedAt:      ulid.Time(runID.Time()),
+		ChildrenSpans: []*models.RunTraceSpan{},
+		StepOp:        stepOp,
+	}
+
+	return &res, nil
 }
