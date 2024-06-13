@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/graph-gophers/dataloader"
@@ -314,9 +316,10 @@ func (tb *TraceTreeBuilder) toRunTraceSpan(ctx context.Context, s *cqrs.Span) (*
 	}
 
 	var (
-		appID uuid.UUID
-		fnID  uuid.UUID
-		runID ulid.ULID
+		appID         uuid.UUID
+		fnID          uuid.UUID
+		runID         ulid.ULID
+		defaulAttempt int
 	)
 
 	// TODO:
@@ -347,7 +350,9 @@ func (tb *TraceTreeBuilder) toRunTraceSpan(ctx context.Context, s *cqrs.Span) (*
 		ParentSpanID: s.ParentSpanID,
 		SpanID:       s.SpanID,
 		Name:         name,
+		Status:       models.RunTraceSpanStatusRunning,
 		QueuedAt:     ulid.Time(runID.Time()),
+		Attempts:     &defaulAttempt,
 	}
 
 	// TODO: assign step status
@@ -403,6 +408,37 @@ func (tb *TraceTreeBuilder) processStepRun(ctx context.Context, span *cqrs.Span,
 }
 
 func (tb *TraceTreeBuilder) processSleep(ctx context.Context, span *cqrs.Span, mod *models.RunTraceSpan) error {
+	// sleep span always have a nested span that stores the details of the sleep itself
+	if len(span.Children) != 1 {
+		return fmt.Errorf("missing sleep details")
+	}
+	stepOp := models.StepOpSleep
+
+	sleep := span.Children[0]
+	dur := sleep.DurationMS()
+	until := sleep.Timestamp.Add(sleep.Duration)
+	if v, ok := sleep.SpanAttributes[consts.OtelSysStepSleepEndAt]; ok {
+		if unixms, err := strconv.ParseInt(v, 10, 64); err == nil {
+			until = time.UnixMilli(unixms)
+		}
+	}
+
+	mod.StepOp = &stepOp
+	mod.Duration = &dur
+	mod.StartedAt = &sleep.Timestamp
+	mod.StepInfo = &models.SleepStepInfo{
+		SleepUntil: until,
+	}
+
+	if until.Before(time.Now()) {
+		mod.Status = models.RunTraceSpanStatusCompleted
+		mod.EndedAt = &until
+	}
+
+	// mark as processed
+	tb.processed[span.SpanID] = true
+	tb.processed[sleep.SpanID] = true
+
 	return nil
 }
 

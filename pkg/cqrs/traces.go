@@ -116,6 +116,10 @@ func (s *Span) StepOpCode() enums.Opcode {
 	return enums.OpcodeNone
 }
 
+func (s *Span) DurationMS() int {
+	return int(s.Duration / time.Millisecond)
+}
+
 type SpanEvent struct {
 	Timestamp  time.Time         `json:"ts"`
 	Name       string            `json:"name"`

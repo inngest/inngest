@@ -626,7 +626,7 @@ func (w wrapper) InsertSpan(ctx context.Context, span *cqrs.Span) error {
 		ServiceName:     span.ServiceName,
 		ScopeName:       span.ScopeName,
 		ScopeVersion:    span.ScopeVersion,
-		Duration:        int64(span.Duration),
+		Duration:        int64(span.Duration / time.Millisecond),
 		StatusCode:      span.StatusCode,
 	}
 
