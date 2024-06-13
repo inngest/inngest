@@ -72,7 +72,7 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 				return
 			}
 
-			tree, err := tb.Build()
+			tree, err := tb.Build(ctx)
 			if err != nil {
 				res.Error = fmt.Errorf("error run details: %w", err)
 				return
@@ -278,8 +278,8 @@ func NewTraceTreeBuilder(opts TraceTreeBuilderOpts) (*TraceTreeBuilder, error) {
 }
 
 // Build goes through the tree and construct the trace for API to be consumed
-func (tb *TraceTreeBuilder) Build() (*models.RunTraceSpan, error) {
-	root, _, err := tb.toRunTraceSpan(tb.root)
+func (tb *TraceTreeBuilder) Build(ctx context.Context) (*models.RunTraceSpan, error) {
+	root, _, err := tb.toRunTraceSpan(ctx, tb.root)
 	if err != nil {
 		return nil, fmt.Errorf("error converting function span: %w", err)
 	}
@@ -293,7 +293,7 @@ func (tb *TraceTreeBuilder) Build() (*models.RunTraceSpan, error) {
 
 	// these are the execution or steps for the function run
 	for _, span := range spans {
-		tspan, skipped, err := tb.toRunTraceSpan(span)
+		tspan, skipped, err := tb.toRunTraceSpan(ctx, span)
 		if err != nil {
 			return nil, fmt.Errorf("error converting execution span: %w", err)
 		}
@@ -307,7 +307,7 @@ func (tb *TraceTreeBuilder) Build() (*models.RunTraceSpan, error) {
 	return root, nil
 }
 
-func (tb *TraceTreeBuilder) toRunTraceSpan(s *cqrs.Span) (*models.RunTraceSpan, bool, error) {
+func (tb *TraceTreeBuilder) toRunTraceSpan(ctx context.Context, s *cqrs.Span) (*models.RunTraceSpan, bool, error) {
 	// already processed skip it
 	if _, ok := tb.processed[s.SpanID]; ok {
 		return nil, true, nil
@@ -371,14 +371,49 @@ func (tb *TraceTreeBuilder) toRunTraceSpan(s *cqrs.Span) (*models.RunTraceSpan, 
 	// process stepinfo based on stepOp
 	switch s.StepOpCode() {
 	case enums.OpcodeStepRun:
+		if err := tb.processStepRun(ctx, s, &res); err != nil {
+			return nil, false, fmt.Errorf("error parsing step run span: %w", err)
+		}
 	case enums.OpcodeSleep:
+		if err := tb.processSleep(ctx, s, &res); err != nil {
+			return nil, false, fmt.Errorf("error parsing sleep span: %w", err)
+		}
 	case enums.OpcodeWaitForEvent:
+		if err := tb.processWaitForEvent(ctx, s, &res); err != nil {
+			return nil, false, fmt.Errorf("error parsing waitForEvent span: %w", err)
+		}
 	case enums.OpcodeInvokeFunction:
+		if err := tb.processInvoke(ctx, s, &res); err != nil {
+			return nil, false, fmt.Errorf("error parsing invoke span: %w", err)
+		}
 	default: // these are likely execution spans
+		if err := tb.processExec(ctx, s, &res); err != nil {
+			return nil, false, fmt.Errorf("error parsing execution span: %w", err)
+		}
 	}
 
 	// mark the span as processed
 	tb.processed[s.SpanID] = true
 
 	return &res, false, nil
+}
+
+func (tb *TraceTreeBuilder) processStepRun(ctx context.Context, span *cqrs.Span, mod *models.RunTraceSpan) error {
+	return nil
+}
+
+func (tb *TraceTreeBuilder) processSleep(ctx context.Context, span *cqrs.Span, mod *models.RunTraceSpan) error {
+	return nil
+}
+
+func (tb *TraceTreeBuilder) processWaitForEvent(ctx context.Context, span *cqrs.Span, mod *models.RunTraceSpan) error {
+	return nil
+}
+
+func (tb *TraceTreeBuilder) processInvoke(ctx context.Context, span *cqrs.Span, mod *models.RunTraceSpan) error {
+	return nil
+}
+
+func (tb *TraceTreeBuilder) processExec(ctx context.Context, span *cqrs.Span, mod *models.RunTraceSpan) error {
+	return nil
 }
