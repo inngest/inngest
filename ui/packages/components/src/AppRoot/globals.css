@@ -197,6 +197,14 @@
     --color-foreground-btn-danger: var(--color-ruby-600);
     --color-foreground-btn-dangerDisabled: var(--color-ruby-300);
 
+    --color-secondary-2xSubtle: var(--color-breeze-200);
+    --color-secondary-xSubtle: var(--color-breeze-300);
+    --color-secondary-subtle: var(--color-breeze-400);
+    --color-secondary-moderate: var(--color-breeze-500);
+    --color-secondary-intense: var(--color-breeze-600);
+    --color-secondary-xIntense: var(--color-breeze-700);
+    --color-secondary-2xIntense: var(--color-breeze-800);
+
     --color-tertiary-2xSubtle: var(--color-ruby-200);
     --color-tertiary-xSubtle: var(--color-ruby-300);
     --color-tertiary-subtle: var(--color-ruby-400);
@@ -266,6 +274,14 @@
     --color-foreground-btn-primaryDisabled: var(--color-matcha-800);
     --color-foreground-btn-danger: var(--color-ruby-500);
     --color-foreground-btn-dangerDisabled: var(--color-ruby-900);
+
+    --color-secondary-2xSubtle: var(--color-breeze-800);
+    --color-secondary-xSubtle: var(--color-breeze-700);
+    --color-secondary-subtle: var(--color-breeze-600);
+    --color-secondary-moderate: var(--color-breeze-500);
+    --color-secondary-intense: var(--color-breeze-400);
+    --color-secondary-xIntense: var(--color-breeze-300);
+    --color-secondary-2xIntense: var(--color-breeze-200);
 
     --color-tertiary-2xSubtle: var(--color-ruby-800);
     --color-tertiary-xSubtle: var(--color-ruby-700);

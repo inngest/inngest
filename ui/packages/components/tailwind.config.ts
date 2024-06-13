@@ -24,6 +24,15 @@ export default {
           xIntense: 'rgb(var(--color-primary-xIntense) / <alpha-value>)',
           '2xIntense': 'rgb(var(--color-primary-2xIntense) / <alpha-value>)',
         },
+        secondary: {
+          '2xSubtle': 'rgb(var(--color-secondary-2xSubtle) / <alpha-value>)',
+          xSubtle: 'rgb(var(--color-secondary-xSubtle) / <alpha-value>)',
+          subtle: 'rgb(var(--color-secondary-subtle) / <alpha-value>)',
+          moderate: 'rgb(var(--color-secondary-moderate) / <alpha-value>)',
+          intense: 'rgb(var(--color-secondary-intense) / <alpha-value>)',
+          xIntense: 'rgb(var(--color-secondary-xIntense) / <alpha-value>)',
+          '2xIntense': 'rgb(var(--color-secondary-2xIntense) / <alpha-value>)',
+        },
         tertiary: {
           '2xSubtle': 'rgb(var(--color-tertiary-2xSubtle) / <alpha-value>)',
           xSubtle: 'rgb(var(--color-tertiary-xSubtle) / <alpha-value>)',
@@ -36,6 +45,7 @@ export default {
         status: {
           failed: 'rgb(var(--color-tertiary-intense) / <alpha-value>)',
           complete: 'rgb(var(--color-primary-intense) / <alpha-value>)',
+          cancelled: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
         },
       },
       borderColor: {
