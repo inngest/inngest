@@ -423,13 +423,13 @@ func (tb *TraceTreeBuilder) processSleep(ctx context.Context, span *cqrs.Span, m
 		}
 	}
 
+	// set sleep details
 	mod.StepOp = &stepOp
 	mod.Duration = &dur
 	mod.StartedAt = &sleep.Timestamp
-	mod.StepInfo = &models.SleepStepInfo{
+	mod.StepInfo = models.SleepStepInfo{
 		SleepUntil: until,
 	}
-
 	if until.Before(time.Now()) {
 		mod.Status = models.RunTraceSpanStatusCompleted
 		mod.EndedAt = &until
@@ -447,6 +447,104 @@ func (tb *TraceTreeBuilder) processWaitForEvent(ctx context.Context, span *cqrs.
 }
 
 func (tb *TraceTreeBuilder) processInvoke(ctx context.Context, span *cqrs.Span, mod *models.RunTraceSpan) error {
+	// invoke span always have a nested span that stores the details of the invoke
+	if len(span.Children) != 1 {
+		return fmt.Errorf("missing invoke details")
+	}
+	invoke := span.Children[0]
+
+	stepOp := models.StepOpInvoke
+	var (
+		runID         *ulid.ULID
+		returnEventID *ulid.ULID
+		timedOut      *bool
+	)
+
+	// timeout
+	expstr, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeExpires]
+	if !ok {
+		fmt.Errorf("missing invoke expiration time")
+	}
+	exp, err := strconv.ParseInt(expstr, 10, 64)
+	if err != nil {
+	}
+	timeout := time.UnixMilli(exp)
+
+	// triggering event ID
+	evtIDstr, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeTriggeringEventID]
+	if !ok {
+		return fmt.Errorf("missing invoke triggering event ID")
+	}
+	triggeringEventID, err := ulid.Parse(evtIDstr)
+	if err != nil {
+		return fmt.Errorf("error parsing invoke triggering event ID: %w", err)
+	}
+
+	// target function ID
+	fnID, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeTargetFnID]
+	if !ok {
+		return fmt.Errorf("missing invoke target function ID for invoke")
+	}
+
+	// run ID
+	if str, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeRunID]; ok {
+		id, err := ulid.Parse(str)
+		if err != nil {
+			return fmt.Errorf("error parsing invoke run ID: %w", err)
+		}
+		runID = &id
+	}
+
+	// return event ID
+	if str, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeReturnedEventID]; ok {
+		evtID, err := ulid.Parse(str)
+		if err != nil {
+			return fmt.Errorf("error parsing invoke return event ID: %w", err)
+		}
+		returnEventID = &evtID
+
+		exp := false
+		timedOut = &exp
+	}
+
+	// final timed out check
+	if timeout.Before(time.Now()) {
+		var exp bool
+		if str, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeExpired]; ok {
+			exp = str == "true"
+		}
+		timedOut = &exp
+	}
+
+	// set invoke details
+	mod.StepOp = &stepOp
+	mod.StepInfo = models.InvokeStepInfo{
+		TriggeringEventID: triggeringEventID,
+		FunctionID:        fnID,
+		RunID:             runID,
+		ReturnEventID:     returnEventID,
+		Timeout:           timeout,
+		TimedOut:          timedOut,
+	}
+
+	if returnEventID != nil {
+		status := models.RunTraceSpanStatusCompleted
+		if invoke.StatusCode == "STATUS_CODE_ERROR" {
+			status = models.RunTraceSpanStatusFailed
+		}
+		mod.Status = status
+	} else {
+		if timedOut != nil && *timedOut {
+			mod.Status = models.RunTraceSpanStatusFailed
+		}
+	}
+
+	// TODO: output
+
+	// mark as processed
+	tb.processed[span.SpanID] = true
+	tb.processed[invoke.SpanID] = true
+
 	return nil
 }
 
