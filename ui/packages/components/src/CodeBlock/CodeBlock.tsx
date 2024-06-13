@@ -9,7 +9,7 @@ import { IconExpandText } from '@inngest/components/icons/ExpandText';
 import { IconOverflowText } from '@inngest/components/icons/OverflowText';
 import { IconShrinkText } from '@inngest/components/icons/ShrinkText';
 import { IconWrapText } from '@inngest/components/icons/WrapText';
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { RiDownload2Line } from '@remixicon/react';
 import { type editor } from 'monaco-editor';
@@ -151,7 +151,7 @@ interface CodeBlockProps {
   actions?: CodeBlockAction[];
 }
 
-export function CodeBlock({ className, header, tabs, actions = [] }: CodeBlockProps) {
+export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
   const [activeTab, setActiveTab] = useState(0);
   const editorRef = useRef<MonacoEditorType>(null);
@@ -344,7 +344,7 @@ export function CodeBlock({ className, header, tabs, actions = [] }: CodeBlockPr
              bg-slate-50 text-slate-700 dark:border-slate-700/30 dark:bg-slate-800/40 dark:shadow"
         >
           {header && (
-            <div className={classNames(header.color, 'rounded-t-lg pt-3')}>
+            <div className={cn(header.color, 'rounded-t-lg pt-3')}>
               {(header.title || header.description) && (
                 <div className="flex flex-col gap-1 px-5 pb-2.5 font-mono text-xs">
                   <p className="font-medium text-rose-700 dark:text-white">{header.title}</p>
@@ -354,7 +354,7 @@ export function CodeBlock({ className, header, tabs, actions = [] }: CodeBlockPr
             </div>
           )}
           <div
-            className={classNames(
+            className={cn(
               !header && 'rounded-t-lg',
               'flex justify-between border-b border-slate-200 dark:border-slate-700/20 dark:bg-slate-800/40 dark:shadow'
             )}
@@ -367,7 +367,7 @@ export function CodeBlock({ className, header, tabs, actions = [] }: CodeBlockPr
                 return (
                   <button
                     key={i}
-                    className={classNames(
+                    className={cn(
                       `px-6 py-2.5 text-sm`,
                       isSingleTab
                         ? 'text-slate-700 dark:text-slate-400'
