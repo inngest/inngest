@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
 )
@@ -32,6 +33,17 @@ type Span struct {
 	Events             []SpanEvent       `json:"events"`
 	Links              []SpanLink        `json:"links"`
 	RunID              *ulid.ULID        `json:"run_id"`
+
+	// Spans is a virtual field used for reconstructing the trace tree.
+	// This field is not expected to be stored in the DB
+	Children []*Span `json:"spans"`
+}
+
+func (s *Span) GroupID() *string {
+	if groupID, ok := s.SpanAttributes[consts.OtelSysStepGroupID]; ok {
+		return &groupID
+	}
+	return nil
 }
 
 type SpanEvent struct {
