@@ -55,7 +55,7 @@ function normalizeWidth({ totalWidth, width }: { totalWidth: number; width: numb
   }
 
   // Ensure the width is between the min and max
-  const minWidth = 1;
-  const maxWidth = 1000;
+  const minWidth = 2;
+  const maxWidth = 200;
   return Math.max(Math.floor((width / totalWidth) * maxWidth), minWidth);
 }
