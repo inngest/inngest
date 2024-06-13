@@ -169,7 +169,6 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
   const handleChange = tabs[0]?.handleChange ?? undefined;
 
   useEffect(() => {
-    //
     // We don't have a DOM ref until we're rendered, so check for dark theme parent classes then
     if (wrapperRef.current) {
       setDark(isDark(wrapperRef.current));
@@ -334,21 +333,15 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
   return (
     <>
       {monaco && (
-        <div
-          ref={wrapperRef}
-          className="dark:bg-slate-910 w-full rounded-lg border border-slate-200 
-             bg-slate-50 text-slate-700 dark:border-slate-700/30 dark:bg-slate-800/40 dark:shadow"
-        >
+        <CodeBlock.Wrapper>
           {header && (
-            <div className={cn(header.color, 'rounded-t-lg pt-3')}>
-              {(header.title || header.description) && (
-                <div className="flex flex-col gap-1 px-5 pb-2.5 font-mono text-xs">
-                  <p className="font-medium text-rose-700 dark:text-white">{header.title}</p>
-                  <p className="dark:text-white/60">{header.description}</p>
-                </div>
-              )}
-            </div>
+            <CodeBlock.Header
+              color={header.color}
+              description={header.description}
+              title={header.title}
+            />
           )}
+          {/* Title */}
           <div
             className={cn(
               !header && 'rounded-t-lg',
@@ -399,68 +392,101 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
               </div>
             )}
           </div>
-          {isOutputTooLarge ? (
-            <>
-              <div className="bg-amber-100 px-6 py-2.5 text-xs text-slate-700 dark:bg-amber-500/40 dark:text-white">
-                Output size is too large to render {`( > 1MB )`}
-              </div>
-              <div className="flex h-24 items-center justify-center	">
-                <Button
-                  label="Download Raw"
-                  icon={<RiDownload2Line />}
-                  btnAction={() => downloadJson({ content: content })}
-                  appearance="outlined"
-                />
-              </div>
-            </>
-          ) : (
-            <Editor
-              defaultLanguage={language}
-              value={content}
-              theme="inngest-theme"
-              options={{
-                extraEditorClassName: 'rounded-b-lg !w-full',
-                readOnly: readOnly,
-                minimap: {
-                  enabled: false,
-                },
-                lineNumbers: 'on',
-                contextmenu: false,
-                scrollBeyondLastLine: false,
-                fontFamily: FONT.font,
-                fontSize: FONT.size,
-                fontWeight: 'light',
-                lineHeight: LINE_HEIGHT,
-                renderLineHighlight: 'none',
-                renderWhitespace: 'none',
-                guides: {
-                  indentation: false,
-                  highlightActiveBracketPair: false,
-                  highlightActiveIndentation: false,
-                },
-                scrollbar: {
-                  verticalScrollbarSize: 10,
-                  alwaysConsumeMouseWheel: false,
-                },
-                padding: {
-                  top: 10,
-                  bottom: 10,
-                },
-                wordWrap: isWordWrap ? 'on' : 'off',
-              }}
-              onMount={(editor) => {
-                updateEditorLayout(editor);
-              }}
-              onChange={(value) => {
-                if (value !== undefined) {
-                  handleChange && handleChange(value);
-                  updateEditorLayout(editorRef.current);
-                }
-              }}
-            />
-          )}
-        </div>
+          {/* Content */}
+          <div ref={wrapperRef}>
+            {isOutputTooLarge ? (
+              <>
+                <div className="bg-amber-100 px-6 py-2.5 text-xs text-slate-700 dark:bg-amber-500/40 dark:text-white">
+                  Output size is too large to render {`( > 1MB )`}
+                </div>
+                <div className="flex h-24 items-center justify-center	">
+                  <Button
+                    label="Download Raw"
+                    icon={<RiDownload2Line />}
+                    btnAction={() => downloadJson({ content: content })}
+                    appearance="outlined"
+                  />
+                </div>
+              </>
+            ) : (
+              <Editor
+                defaultLanguage={language}
+                value={content}
+                theme="inngest-theme"
+                options={{
+                  extraEditorClassName: 'rounded-b-lg !w-full',
+                  readOnly: readOnly,
+                  minimap: {
+                    enabled: false,
+                  },
+                  lineNumbers: 'on',
+                  contextmenu: false,
+                  scrollBeyondLastLine: false,
+                  fontFamily: FONT.font,
+                  fontSize: FONT.size,
+                  fontWeight: 'light',
+                  lineHeight: LINE_HEIGHT,
+                  renderLineHighlight: 'none',
+                  renderWhitespace: 'none',
+                  guides: {
+                    indentation: false,
+                    highlightActiveBracketPair: false,
+                    highlightActiveIndentation: false,
+                  },
+                  scrollbar: {
+                    verticalScrollbarSize: 10,
+                    alwaysConsumeMouseWheel: false,
+                  },
+                  padding: {
+                    top: 10,
+                    bottom: 10,
+                  },
+                  wordWrap: isWordWrap ? 'on' : 'off',
+                }}
+                onMount={(editor) => {
+                  updateEditorLayout(editor);
+                }}
+                onChange={(value) => {
+                  if (value !== undefined) {
+                    handleChange && handleChange(value);
+                    updateEditorLayout(editorRef.current);
+                  }
+                }}
+              />
+            )}
+          </div>
+        </CodeBlock.Wrapper>
       )}
     </>
   );
 }
+
+CodeBlock.Wrapper = ({ children }: React.PropsWithChildren) => {
+  return (
+    <div
+      className="dark:bg-slate-910 w-full rounded-lg border border-slate-200 
+     bg-slate-50 text-slate-700 dark:border-slate-700/30 dark:bg-slate-800/40 dark:shadow"
+    >
+      {children}
+    </div>
+  );
+};
+
+interface CodeBlockHeaderProps {
+  title?: string;
+  description?: string;
+  color?: string;
+}
+
+CodeBlock.Header = ({ color, title, description }: CodeBlockHeaderProps) => {
+  return (
+    <div className={cn(color, 'rounded-t-lg pt-3')}>
+      {(title || description) && (
+        <div className="flex flex-col gap-1 px-5 pb-2.5 font-mono text-xs">
+          <p className="font-medium text-rose-700 dark:text-white">{title}</p>
+          <p className="dark:text-white/60">{description}</p>
+        </div>
+      )}
+    </div>
+  );
+};
