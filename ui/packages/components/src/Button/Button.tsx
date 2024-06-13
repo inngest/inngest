@@ -15,7 +15,7 @@ import {
   getSpinnerStyles,
 } from './buttonStyles';
 
-type ButtonProps<PassedHref extends string> = {
+export type ButtonProps<PassedHref extends string> = {
   kind?: 'default' | 'primary' | 'success' | 'danger';
   appearance?: 'solid' | 'outlined' | 'text';
   size?: 'small' | 'regular' | 'large';
