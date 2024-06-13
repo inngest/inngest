@@ -107,7 +107,7 @@ const CreateFunctionReplayDocument = graphql(`
   }
 `);
 
-type FunctionRunEndStatus =
+type SelectableStatuses =
   | ReplayRunStatus.Failed
   | ReplayRunStatus.Cancelled
   | ReplayRunStatus.Completed
@@ -129,7 +129,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
   const router = useRouter();
   const [name, setName] = useState<string>('');
   const [timeRange, setTimeRange] = useState<DateRange>();
-  const [selectedStatuses, setSelectedStatuses] = useState<FunctionRunEndStatus[]>([
+  const [selectedStatuses, setSelectedStatuses] = useState<SelectableStatuses[]>([
     ReplayRunStatus.Failed,
   ]);
   const environment = useEnvironment();
@@ -161,7 +161,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
   // const pausedRunsCount = data?.environment.function?.pausedRuns?.totalCount ?? 0;
   const pausedRunsCount = 0; // TODO(cdzombak): real paused runs count
 
-  const statusCounts: Record<FunctionRunEndStatus, number> = {
+  const statusCounts: Record<SelectableStatuses, number> = {
     [ReplayRunStatus.Failed]: failedRunsCount,
     [ReplayRunStatus.Cancelled]: cancelledRunsCount,
     [ReplayRunStatus.Completed]: succeededRunsCount,
@@ -279,7 +279,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
           <ToggleGroup.Root
             type="multiple"
             value={selectedStatuses}
-            onValueChange={(selectedStatuses: FunctionRunEndStatus[]) => {
+            onValueChange={(selectedStatuses: SelectableStatuses[]) => {
               if (selectedStatuses.length === 0) return; // Must have at least one status selected
               setSelectedStatuses(selectedStatuses);
             }}
