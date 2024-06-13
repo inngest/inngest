@@ -443,6 +443,65 @@ func (tb *TraceTreeBuilder) processSleep(ctx context.Context, span *cqrs.Span, m
 }
 
 func (tb *TraceTreeBuilder) processWaitForEvent(ctx context.Context, span *cqrs.Span, mod *models.RunTraceSpan) error {
+	// wait span always have a nested span that stores the details of the wait
+	if len(span.Children) != 1 {
+		return fmt.Errorf("missing waitForEvent details")
+	}
+	wait := span.Children[0]
+
+	stepOp := models.StepOpWaitForEvent
+	dur := wait.DurationMS()
+	var (
+		evtName    string
+		expr       *string
+		timeout    time.Time
+		foundEvtID *ulid.ULID
+		expired    *bool
+	)
+	if v, ok := wait.SpanAttributes[consts.OtelSysStepWaitEventName]; ok {
+		evtName = v
+	}
+	if v, ok := wait.SpanAttributes[consts.OtelSysStepWaitExpression]; ok {
+		expr = &v
+	}
+	if v, ok := wait.SpanAttributes[consts.OtelSysStepWaitExpires]; ok {
+		if ts, err := strconv.ParseInt(v, 10, 64); err == nil {
+			timeout = time.UnixMilli(ts)
+		}
+	}
+	if v, ok := wait.SpanAttributes[consts.OtelSysStepWaitMatchedEventID]; ok {
+		if evtID, err := ulid.Parse(v); err == nil {
+			foundEvtID = &evtID
+			mod.Status = models.RunTraceSpanStatusCompleted
+			exp := false
+			expired = &exp
+		}
+	}
+	if !timeout.IsZero() && timeout.Before(time.Now()) {
+		mod.Status = models.RunTraceSpanStatusCompleted
+		if v, ok := wait.SpanAttributes[consts.OtelSysStepWaitExpired]; ok {
+			if exp, err := strconv.ParseBool(v); err == nil {
+				expired = &exp
+			}
+		}
+	}
+
+	// set wait details
+	mod.StepOp = &stepOp
+	mod.Duration = &dur
+	mod.StepInfo = models.WaitForEventStepInfo{
+		EventName:    evtName,
+		Expression:   expr,
+		Timeout:      timeout,
+		FoundEventID: foundEvtID,
+		TimedOut:     expired,
+	}
+
+	// TODO: output
+
+	tb.processed[span.SpanID] = true
+	tb.processed[wait.SpanID] = true
+
 	return nil
 }
 
@@ -511,7 +570,7 @@ func (tb *TraceTreeBuilder) processInvoke(ctx context.Context, span *cqrs.Span, 
 	if timeout.Before(time.Now()) {
 		var exp bool
 		if str, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeExpired]; ok {
-			exp = str == "true"
+			exp, _ = strconv.ParseBool(str)
 		}
 		timedOut = &exp
 	}
