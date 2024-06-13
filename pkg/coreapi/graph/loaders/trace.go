@@ -199,6 +199,11 @@ type TraceTreeBuilder struct {
 	// - key: groupID
 	groups map[string][]*cqrs.Span
 
+	// processed is used for tracking already processed spans
+	// this helps with skipping work for spans that already have been processed
+	// because they were in a group
+	processed map[string]bool
+
 	// identifiers
 	accID uuid.UUID
 	wsID  uuid.UUID
@@ -220,13 +225,14 @@ type SpanConverter func(*cqrs.Span)
 
 func NewTraceTreeBuilder(opts TraceTreeBuilderOpts) (*TraceTreeBuilder, error) {
 	ttb := &TraceTreeBuilder{
-		accID:  opts.AccountID,
-		wsID:   opts.WorkspaceID,
-		appID:  opts.AppID,
-		fnID:   opts.FunctionID,
-		runID:  opts.RunID,
-		spans:  map[string]*cqrs.Span{},
-		groups: map[string][]*cqrs.Span{},
+		accID:     opts.AccountID,
+		wsID:      opts.WorkspaceID,
+		appID:     opts.AppID,
+		fnID:      opts.FunctionID,
+		runID:     opts.RunID,
+		spans:     map[string]*cqrs.Span{},
+		groups:    map[string][]*cqrs.Span{},
+		processed: map[string]bool{},
 	}
 
 	for _, s := range opts.Spans {
@@ -273,10 +279,11 @@ func NewTraceTreeBuilder(opts TraceTreeBuilderOpts) (*TraceTreeBuilder, error) {
 
 // Build goes through the tree and construct the trace for API to be consumed
 func (tb *TraceTreeBuilder) Build() (*models.RunTraceSpan, error) {
-	root, err := tb.toRunTraceSpan(tb.root)
+	root, _, err := tb.toRunTraceSpan(tb.root)
 	if err != nil {
 		return nil, fmt.Errorf("error converting function span: %w", err)
 	}
+	root.IsRoot = true
 
 	// sort it in asc order before proceeding
 	spans := tb.root.Children
@@ -286,9 +293,13 @@ func (tb *TraceTreeBuilder) Build() (*models.RunTraceSpan, error) {
 
 	// these are the execution or steps for the function run
 	for _, span := range spans {
-		tspan, err := tb.toRunTraceSpan(span)
+		tspan, skipped, err := tb.toRunTraceSpan(span)
 		if err != nil {
 			return nil, fmt.Errorf("error converting execution span: %w", err)
+		}
+		// means this span was already processed so no-op here
+		if skipped {
+			continue
 		}
 		root.ChildrenSpans = append(root.ChildrenSpans, tspan)
 	}
@@ -296,19 +307,31 @@ func (tb *TraceTreeBuilder) Build() (*models.RunTraceSpan, error) {
 	return root, nil
 }
 
-func (tb *TraceTreeBuilder) toRunTraceSpan(s *cqrs.Span) (*models.RunTraceSpan, error) {
+func (tb *TraceTreeBuilder) toRunTraceSpan(s *cqrs.Span) (*models.RunTraceSpan, bool, error) {
+	// already processed skip it
+	if _, ok := tb.processed[s.SpanID]; ok {
+		return nil, true, nil
+	}
+
 	var (
-		appID  uuid.UUID
-		fnID   uuid.UUID
-		runID  ulid.ULID
-		status models.RunTraceSpanStatus
-		stepOp *models.StepOp
+		appID uuid.UUID
+		fnID  uuid.UUID
+		runID ulid.ULID
 	)
+
+	// TODO:
+	// - check for group
+	// - if there are multiple entries, construct a grouping with all the spans in the group
+	// - mark the spans as converted so they don't get processed again
+
+	name := s.SpanName
+	if s.StepDisplayName() != nil {
+		name = *s.StepDisplayName()
+	}
 
 	if s.RunID != nil {
 		runID = *s.RunID
 	}
-
 	if id := s.AppID(); id != nil {
 		appID = *id
 	}
@@ -316,37 +339,46 @@ func (tb *TraceTreeBuilder) toRunTraceSpan(s *cqrs.Span) (*models.RunTraceSpan, 
 		fnID = *id
 	}
 
+	res := models.RunTraceSpan{
+		AppID:        appID,
+		FunctionID:   fnID,
+		RunID:        runID,
+		TraceID:      s.TraceID,
+		ParentSpanID: s.ParentSpanID,
+		SpanID:       s.SpanID,
+		Name:         name,
+		QueuedAt:     ulid.Time(runID.Time()),
+	}
+
 	// TODO: assign step status
 	if s.ScopeName == consts.OtelScopeFunction {
-		fnstatus := s.FunctionStatus()
-		switch fnstatus {
+		switch s.FunctionStatus() {
 		case enums.RunStatusRunning:
-			status = models.RunTraceSpanStatusRunning
+			res.Status = models.RunTraceSpanStatusRunning
 		case enums.RunStatusCompleted:
-			status = models.RunTraceSpanStatusCompleted
+			res.Status = models.RunTraceSpanStatusCompleted
 		case enums.RunStatusCancelled:
-			status = models.RunTraceSpanStatusCancelled
+			res.Status = models.RunTraceSpanStatusCancelled
 		case enums.RunStatusFailed, enums.RunStatusOverflowed:
-			status = models.RunTraceSpanStatusFailed
+			res.Status = models.RunTraceSpanStatusFailed
 		default:
-			return nil, fmt.Errorf("unexpected run status: %v", fnstatus.String())
+			return nil, false, fmt.Errorf("unexpected run status: %v", s.FunctionStatus())
 		}
+	} else { // step or execution status
 	}
 
-	res := models.RunTraceSpan{
-		AppID:         appID,
-		FunctionID:    fnID,
-		RunID:         runID,
-		TraceID:       s.TraceID,
-		ParentSpanID:  s.ParentSpanID,
-		SpanID:        s.SpanID,
-		IsRoot:        s.ParentSpanID == nil,
-		Name:          s.SpanName,
-		Status:        status,
-		QueuedAt:      ulid.Time(runID.Time()),
-		ChildrenSpans: []*models.RunTraceSpan{},
-		StepOp:        stepOp,
+	// handle each opcode separately
+	// process stepinfo based on stepOp
+	switch s.StepOpCode() {
+	case enums.OpcodeStepRun:
+	case enums.OpcodeSleep:
+	case enums.OpcodeWaitForEvent:
+	case enums.OpcodeInvokeFunction:
+	default: // these are likely execution spans
 	}
 
-	return &res, nil
+	// mark the span as processed
+	tb.processed[s.SpanID] = true
+
+	return &res, false, nil
 }

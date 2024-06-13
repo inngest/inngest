@@ -83,6 +83,13 @@ func (s *Span) FunctionID() *uuid.UUID {
 	return nil
 }
 
+func (s *Span) StepDisplayName() *string {
+	if name, ok := s.SpanAttributes[consts.OtelSysStepDisplayName]; ok {
+		return &name
+	}
+	return nil
+}
+
 func (s *Span) FunctionStatus() enums.RunStatus {
 	if str, ok := s.SpanAttributes[consts.OtelSysFunctionStatusCode]; ok {
 		if code, err := strconv.ParseInt(str, 10, 64); err == nil {
@@ -90,6 +97,23 @@ func (s *Span) FunctionStatus() enums.RunStatus {
 		}
 	}
 	return enums.RunStatusUnknown
+}
+
+func (s *Span) StepOpCode() enums.Opcode {
+	if op, ok := s.SpanAttributes[consts.OtelSysStepOpcode]; ok {
+		switch op {
+		case enums.OpcodeStep.String(), enums.OpcodeStepRun.String(), enums.OpcodeStepError.String():
+			return enums.OpcodeStepRun
+		case enums.OpcodeSleep.String():
+			return enums.OpcodeSleep
+		case enums.OpcodeInvokeFunction.String():
+			return enums.OpcodeInvokeFunction
+		case enums.OpcodeWaitForEvent.String():
+			return enums.OpcodeWaitForEvent
+		}
+	}
+
+	return enums.OpcodeNone
 }
 
 type SpanEvent struct {
