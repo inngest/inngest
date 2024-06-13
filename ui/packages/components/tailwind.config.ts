@@ -42,8 +42,17 @@ export default {
           xIntense: 'rgb(var(--color-tertiary-xIntense) / <alpha-value>)',
           '2xIntense': 'rgb(var(--color-tertiary-2xIntense) / <alpha-value>)',
         },
+        quaternary: {
+          coolxSubtle: 'rgb(var(--color-quaternary-cool-xSubtle) / <alpha-value>)',
+          coolModerate: 'rgb(var(--color-quaternary-cool-moderate) / <alpha-value>)',
+          coolxIntense: 'rgb(var(--color-quaternary-cool-xIntense) / <alpha-value>)',
+        },
         status: {
           failed: 'rgb(var(--color-tertiary-intense) / <alpha-value>)',
+          running: 'rgb(var(--color-secondary-intense) / <alpha-value>)',
+          runningSubtle: 'rgb(var(--color-secondary-xSubtle) / <alpha-value>)',
+          queued: 'rgb(var(--color-quaternary-cool-xIntense) / <alpha-value>)',
+          queuedSubtle: 'rgb(var(--color-quaternary-cool-xSubtle) / <alpha-value>)',
           complete: 'rgb(var(--color-primary-intense) / <alpha-value>)',
           cancelled: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
         },

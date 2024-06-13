@@ -212,6 +212,10 @@
     --color-tertiary-intense: var(--color-ruby-600);
     --color-tertiary-xIntense: var(--color-ruby-700);
     --color-tertiary-2xIntense: var(--color-ruby-800);
+
+    --color-quaternary-cool-xSubtle: var(--color-purplehaze-300);
+    --color-quaternary-cool-moderate: var(--color-purplehaze-500);
+    --color-quaternary-cool-xIntense: var(--color-purplehaze-700);
   }
 
   .dark {
@@ -290,5 +294,9 @@
     --color-tertiary-intense: var(--color-ruby-400);
     --color-tertiary-xIntense: var(--color-ruby-300);
     --color-tertiary-2xIntense: var(--color-ruby-200);
+
+    --color-quaternary-cool-xSubtle: var(--color-purplehaze-700);
+    --color-quaternary-cool-moderate: var(--color-purplehaze-500);
+    --color-quaternary-cool-xIntense: var(--color-purplehaze-300);
   }
 }
