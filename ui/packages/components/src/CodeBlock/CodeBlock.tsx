@@ -153,7 +153,6 @@ interface CodeBlockProps {
 
 export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
-  const [activeTab, setActiveTab] = useState(0);
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -163,10 +162,11 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
   const { handleCopyClick, isCopying } = useCopyToClipboard();
 
   const monaco = useMonaco();
-  const content = tabs[activeTab]?.content;
-  const readOnly = tabs[activeTab]?.readOnly ?? true;
-  const language = tabs[activeTab]?.language ?? 'json';
-  const handleChange = tabs[activeTab]?.handleChange ?? undefined;
+  const label = tabs[0]?.label;
+  const content = tabs[0]?.content;
+  const readOnly = tabs[0]?.readOnly ?? true;
+  const language = tabs[0]?.language ?? 'json';
+  const handleChange = tabs[0]?.handleChange ?? undefined;
 
   useEffect(() => {
     //
@@ -194,10 +194,6 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
       updateEditorLayout(editorRef.current);
     }
   }, [isWordWrap, isFullHeight]);
-
-  const handleTabClick = (index: number) => {
-    setActiveTab(index);
-  };
 
   function getTextWidth(text: string, font: string) {
     const canvas = document.createElement('canvas');
@@ -356,34 +352,10 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
           <div
             className={cn(
               !header && 'rounded-t-lg',
-              'flex justify-between border-b border-slate-200 dark:border-slate-700/20 dark:bg-slate-800/40 dark:shadow'
+              'flex items-center justify-between border-b border-slate-200 dark:border-slate-700/20 dark:bg-slate-800/40 dark:shadow'
             )}
           >
-            <div className="-mb-px flex">
-              {tabs.map((tab, i) => {
-                const isSingleTab = tabs.length === 1;
-                const isActive = i === activeTab && !isSingleTab;
-
-                return (
-                  <button
-                    key={i}
-                    className={cn(
-                      `px-6 py-2.5 text-sm`,
-                      isSingleTab
-                        ? 'text-slate-700 dark:text-slate-400'
-                        : 'block border-b outline-none transition-all duration-150',
-                      isActive && 'border-indigo-400 text-indigo-500 dark:text-white',
-                      !isActive &&
-                        !isSingleTab &&
-                        'border-transparent text-slate-700 dark:text-slate-400'
-                    )}
-                    onClick={() => handleTabClick(i)}
-                  >
-                    {tab?.label}
-                  </button>
-                );
-              })}
-            </div>
+            <p className="px-6 py-2.5 text-sm text-slate-700 dark:text-slate-400">{label}</p>
             {!isOutputTooLarge && (
               <div className="mr-2 flex items-center gap-2 py-2">
                 {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
