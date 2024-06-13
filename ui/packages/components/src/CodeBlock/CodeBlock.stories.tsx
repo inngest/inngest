@@ -25,6 +25,9 @@ type Story = StoryObj<typeof CodeBlock>;
 
 export const Default: Story = {
   args: {
+    header: {
+      title: 'Output',
+    },
     tabs: [
       {
         label: 'Output',
@@ -34,8 +37,12 @@ export const Default: Story = {
   },
 };
 
-export const MultipleTabs: Story = {
+export const ErrorCode: Story = {
   args: {
+    header: {
+      title: 'Error: Unable to downgrade plan',
+      status: 'error',
+    },
     tabs: [
       {
         label: 'Output',

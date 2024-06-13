@@ -136,10 +136,11 @@ export type CodeBlockAction = {
 
 interface CodeBlockProps {
   className?: string;
-  header?: {
+  header: {
     title?: string;
     description?: string;
     color?: string;
+    status?: 'success' | 'error';
   };
   tabs: {
     label?: string;
@@ -334,63 +335,68 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
     <>
       {monaco && (
         <CodeBlock.Wrapper>
-          {header && (
-            <CodeBlock.Header
-              color={header.color}
-              description={header.description}
-              title={header.title}
-            />
-          )}
-          {/* Title */}
           <div
             className={cn(
-              !header && 'rounded-t-lg',
-              'flex items-center justify-between border-b border-slate-200 dark:border-slate-700/20 dark:bg-slate-800/40 dark:shadow'
+              'border-b border-b-slate-200 dark:border-slate-700/20 dark:bg-slate-800/40 dark:shadow'
             )}
           >
-            <p className="px-6 py-2.5 text-sm text-slate-700 dark:text-slate-400">{label}</p>
-            {!isOutputTooLarge && (
-              <div className="mr-2 flex items-center gap-2 py-2">
-                {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
-                  <Button
-                    key={idx}
-                    icon={icon}
-                    btnAction={onClick}
+            <div
+              className={cn(
+                'flex items-center justify-between ',
+                header?.status && 'border-l-4 border-l-rose-400'
+              )}
+            >
+              <p
+                className={cn(
+                  ' px-6 py-2.5 text-sm text-slate-700 dark:text-slate-400',
+                  header?.status === 'error' && 'text-rose-400'
+                )}
+              >
+                {header.title}
+              </p>
+              {!isOutputTooLarge && (
+                <div className="mr-2 flex items-center gap-2 py-2">
+                  {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
+                    <Button
+                      key={idx}
+                      icon={icon}
+                      btnAction={onClick}
+                      size="small"
+                      aria-label={label}
+                      title={title ?? label}
+                      label={label}
+                      disabled={disabled}
+                      appearance="outlined"
+                    />
+                  ))}
+                  <CopyButton
                     size="small"
-                    aria-label={label}
-                    title={title ?? label}
-                    label={label}
-                    disabled={disabled}
+                    code={content}
+                    isCopying={isCopying}
+                    handleCopyClick={handleCopyClick}
                     appearance="outlined"
                   />
-                ))}
-                <CopyButton
-                  size="small"
-                  code={content}
-                  isCopying={isCopying}
-                  handleCopyClick={handleCopyClick}
-                  appearance="outlined"
-                />
-                <Button
-                  icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
-                  btnAction={handleWrapText}
-                  size="small"
-                  aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
-                  title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
-                  tooltip={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
-                  appearance="outlined"
-                />
-                <Button
-                  btnAction={handleFullHeight}
-                  size="small"
-                  icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
-                  aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
-                  title={isFullHeight ? 'Shrink text' : 'Expand text'}
-                  tooltip={isFullHeight ? 'Shrink text' : 'Expand text'}
-                  appearance="outlined"
-                />
-              </div>
-            )}
+                  <Button
+                    icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
+                    btnAction={handleWrapText}
+                    size="small"
+                    aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                    title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                    tooltip={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                    appearance="outlined"
+                  />
+                  <Button
+                    btnAction={handleFullHeight}
+                    size="small"
+                    icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
+                    aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
+                    title={isFullHeight ? 'Shrink text' : 'Expand text'}
+                    tooltip={isFullHeight ? 'Shrink text' : 'Expand text'}
+                    appearance="outlined"
+                  />
+                </div>
+              )}
+            </div>
           </div>
           {/* Content */}
           <div ref={wrapperRef}>
@@ -468,25 +474,6 @@ CodeBlock.Wrapper = ({ children }: React.PropsWithChildren) => {
      bg-slate-50 text-slate-700 dark:border-slate-700/30 dark:bg-slate-800/40 dark:shadow"
     >
       {children}
-    </div>
-  );
-};
-
-interface CodeBlockHeaderProps {
-  title?: string;
-  description?: string;
-  color?: string;
-}
-
-CodeBlock.Header = ({ color, title, description }: CodeBlockHeaderProps) => {
-  return (
-    <div className={cn(color, 'rounded-t-lg pt-3')}>
-      {(title || description) && (
-        <div className="flex flex-col gap-1 px-5 pb-2.5 font-mono text-xs">
-          <p className="font-medium text-rose-700 dark:text-white">{title}</p>
-          <p className="dark:text-white/60">{description}</p>
-        </div>
-      )}
     </div>
   );
 };
