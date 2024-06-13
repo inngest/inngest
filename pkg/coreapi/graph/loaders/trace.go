@@ -314,6 +314,10 @@ func (tb *TraceTreeBuilder) toRunTraceSpan(ctx context.Context, s *cqrs.Span) (*
 	if _, ok := tb.processed[s.SpanID]; ok {
 		return nil, true, nil
 	}
+	// NOTE: is this check sufficient?
+	if s.SpanName == "function success" {
+		return nil, true, nil
+	}
 
 	var (
 		appID         uuid.UUID
@@ -342,6 +346,9 @@ func (tb *TraceTreeBuilder) toRunTraceSpan(ctx context.Context, s *cqrs.Span) (*
 		fnID = *id
 	}
 
+	dur := s.DurationMS()
+	endedAt := s.Timestamp.Add(s.Duration)
+
 	res := models.RunTraceSpan{
 		AppID:        appID,
 		FunctionID:   fnID,
@@ -352,6 +359,9 @@ func (tb *TraceTreeBuilder) toRunTraceSpan(ctx context.Context, s *cqrs.Span) (*
 		Name:         name,
 		Status:       models.RunTraceSpanStatusRunning,
 		QueuedAt:     ulid.Time(runID.Time()),
+		StartedAt:    &s.Timestamp,
+		EndedAt:      &endedAt,
+		Duration:     &dur,
 		Attempts:     &defaulAttempt,
 	}
 
