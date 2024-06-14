@@ -139,20 +139,18 @@ interface CodeBlockProps {
   header: {
     title?: string;
     description?: string;
-    color?: string;
     status?: 'success' | 'error';
   };
-  tabs: {
-    label?: string;
+  tab: {
     content: string;
     readOnly?: boolean;
     language?: string;
     handleChange?: (value: string) => void;
-  }[];
+  };
   actions?: CodeBlockAction[];
 }
 
-export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
+export function CodeBlock({ header, tab, actions = [] }: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -163,11 +161,7 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
   const { handleCopyClick, isCopying } = useCopyToClipboard();
 
   const monaco = useMonaco();
-  const label = tabs[0]?.label;
-  const content = tabs[0]?.content;
-  const readOnly = tabs[0]?.readOnly ?? true;
-  const language = tabs[0]?.language ?? 'json';
-  const handleChange = tabs[0]?.handleChange ?? undefined;
+  const { content, readOnly = true, language = 'json', handleChange = undefined } = tab;
 
   useEffect(() => {
     // We don't have a DOM ref until we're rendered, so check for dark theme parent classes then
@@ -343,13 +337,15 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
             <div
               className={cn(
                 'flex items-center justify-between ',
-                header?.status && 'border-l-4 border-l-rose-400'
+                header?.status && 'border-l-4',
+                header?.status === 'error' && 'border-l-status-failed',
+                header?.status === 'success' && 'border-l-status-complete'
               )}
             >
               <p
                 className={cn(
-                  ' px-6 py-2.5 text-sm text-slate-700 dark:text-slate-400',
-                  header?.status === 'error' && 'text-rose-400'
+                  header?.status === 'error' ? 'text-status-failed' : 'text-muted',
+                  ' px-6 py-2.5 text-sm'
                 )}
               >
                 {header.title}
@@ -470,8 +466,8 @@ export function CodeBlock({ header, tabs, actions = [] }: CodeBlockProps) {
 CodeBlock.Wrapper = ({ children }: React.PropsWithChildren) => {
   return (
     <div
-      className="dark:bg-slate-910 w-full rounded-lg border border-slate-200 
-     bg-slate-50 text-slate-700 dark:border-slate-700/30 dark:bg-slate-800/40 dark:shadow"
+      className="dark:bg-slate-910 w-full overflow-hidden rounded-lg border 
+     border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700/30 dark:bg-slate-800/40 dark:shadow"
     >
       {children}
     </div>
