@@ -437,6 +437,8 @@ func (tb *TraceTreeBuilder) processStepRun(ctx context.Context, span *cqrs.Span,
 
 	// not need to provide nesting if it's just itself and it's successful
 	if len(peers) == 1 && span.Status() == cqrs.SpanStatusOk {
+		attempt := 1
+		mod.Attempts = &attempt
 		mod.Status = models.RunTraceSpanStatusCompleted
 		tb.processed[span.SpanID] = true
 		return nil
@@ -489,6 +491,7 @@ func (tb *TraceTreeBuilder) processStepRun(ctx context.Context, span *cqrs.Span,
 
 			// TODO: check if the span has already completed or not
 			dur := int(pend.Sub(span.Timestamp) / time.Millisecond)
+			mod.Attempts = &attempt
 			mod.Duration = &dur
 			mod.EndedAt = &pend
 

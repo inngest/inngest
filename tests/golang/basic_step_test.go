@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -51,8 +52,7 @@ func TestFunctionSteps(t *testing.T) {
 
 			step.Sleep(ctx, "delay", 2*time.Second)
 
-			_, err = step.WaitForEvent[any](ctx, "wait", step.WaitForEventOpts{
-				Name:    "step name",
+			_, err = step.WaitForEvent[any](ctx, "wait1", step.WaitForEventOpts{
 				Event:   "api/new.event",
 				Timeout: time.Minute,
 			})
@@ -61,8 +61,7 @@ func TestFunctionSteps(t *testing.T) {
 			}
 
 			// Wait for an event with an expression
-			_, err = step.WaitForEvent[any](ctx, "wait", step.WaitForEventOpts{
-				Name:    "step name",
+			_, err = step.WaitForEvent[any](ctx, "wait2", step.WaitForEventOpts{
 				Event:   "api/new.event",
 				If:      inngestgo.StrPtr(`async.data.ok == "yes" && async.data.id == event.data.id`),
 				Timeout: time.Minute,
@@ -162,7 +161,87 @@ func TestFunctionSteps(t *testing.T) {
 			require.False(t, run.IsBatch)
 			require.Nil(t, run.BatchCreatedAt)
 
-			// TODO: add traces
+			require.NotNil(t, run.Trace)
+			require.True(t, run.Trace.IsRoot)
+			require.Equal(t, 5, len(run.Trace.ChildSpans))
+			require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
+
+			rootSpanID := run.Trace.SpanID
+			// TODO: output test
+
+			// first step
+			one := run.Trace.ChildSpans[0]
+			assert.Equal(t, "1", one.Name)
+			assert.Equal(t, 1, one.Attempts)
+			assert.False(t, one.IsRoot)
+			assert.Equal(t, rootSpanID, one.ParentSpanID)
+			assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), one.Status)
+			// output test
+			// assert.NotNil(t, one.OutputID)
+			// oneOutput := c.RunTraceSpanOutput(*one.OutputID)
+			// assert.NotNil(t, oneOutput)
+			// assert.NotNil(t, oneOutput.Data)
+			// assert.Contains(t, *oneOutput.Data, "hello 1")
+
+			// second step
+			sec := run.Trace.ChildSpans[1]
+			assert.Equal(t, "2", sec.Name)
+			assert.Equal(t, 1, sec.Attempts)
+			assert.False(t, sec.IsRoot)
+			assert.Equal(t, rootSpanID, sec.ParentSpanID)
+			assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), sec.Status)
+			// output test
+			// assert.NotNil(t, sec.OutputID)
+			// secOutput := c.RunTraceSpanOutput(*sec.OutputID)
+			// assert.NotNil(t, secOutput)
+			// assert.NotNil(t, secOutput.Data)
+			// assert.Contains(t, *secOutput.Data, "hello 2")
+
+			// third step
+			thr := run.Trace.ChildSpans[2]
+			assert.Equal(t, "delay", thr.Name)
+			assert.Equal(t, 0, thr.Attempts)
+			assert.False(t, thr.IsRoot)
+			assert.Equal(t, rootSpanID, thr.ParentSpanID)
+			assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), thr.Status)
+			require.NotNil(t, thr.StartedAt)
+			require.NotNil(t, thr.EndedAt)
+			// check sleep duration
+			expectedDur := (2 * time.Second).Milliseconds()
+			assert.Equal(t, expectedDur, thr.Duration)
+
+			// forth
+			forth := run.Trace.ChildSpans[3]
+			assert.Equal(t, "wait1", forth.Name)
+			assert.Equal(t, 0, forth.Attempts)
+			assert.False(t, forth.IsRoot)
+			assert.Equal(t, rootSpanID, forth.ParentSpanID)
+			assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), forth.Status)
+			assert.NotNil(t, forth.StartedAt)
+			assert.NotNil(t, forth.EndedAt)
+			{
+				var stepInfo models.WaitForEventStepInfo
+				byt, err := json.Marshal(forth.StepInfo)
+				assert.NoError(t, err)
+				assert.NoError(t, json.Unmarshal(byt, &stepInfo))
+
+				assert.False(t, *stepInfo.TimedOut)
+				assert.NotNil(t, stepInfo.FoundEventID)
+			}
+
+			// check trigger
+			// trigger := c.RunTrigger(runID)
+			// assert.NotNil(t, trigger)
+			// assert.NotNil(t, trigger.EventName)
+			// assert.Equal(t, "test/sdk", *trigger.EventName)
+			// assert.Equal(t, 1, len(trigger.IDs))
+			// assert.False(t, trigger.Timestamp.IsZero())
+			// assert.False(t, trigger.IsBatch)
+			// assert.Nil(t, trigger.BatchID)
+			// assert.Nil(t, trigger.Cron)
+
+			// rid := ulid.MustParse(runID)
+			// assert.True(t, trigger.Timestamp.Before(ulid.Time(rid.Time())))
 
 			return true
 		}, 10*time.Second, 2*time.Second)
