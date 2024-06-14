@@ -1,6 +1,5 @@
 'use client';
 
-import colors from 'tailwindcss/colors';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
