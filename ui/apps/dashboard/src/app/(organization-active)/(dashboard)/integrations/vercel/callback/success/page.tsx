@@ -1,19 +1,9 @@
-import { start } from 'repl';
-import { pages } from 'next/dist/build/templates/app-page';
 import { NewButton } from '@inngest/components/Button/index';
 import { Card } from '@inngest/components/Card/Card';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
-import {
-  RiArrowLeftSLine,
-  RiArrowRightSLine,
-  RiCheckLine,
-  RiCheckboxBlankFill,
-  RiCheckboxCircleLine,
-  RiInformationLine,
-} from '@remixicon/react';
+import { RiCheckLine, RiInformationLine } from '@remixicon/react';
 
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
-import page from '../page';
 import VercelIntegrationCallbackSuccessPage from './oldPage';
 
 type SuccessProps = {
