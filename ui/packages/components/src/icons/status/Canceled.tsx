@@ -3,7 +3,7 @@ import { cn } from '@inngest/components/utils/classNames';
 export function IconStatusCanceled({ className, title }: { className?: string; title?: string }) {
   return (
     <svg
-      className={cn('text-slate-500 dark:text-slate-300', className)}
+      className={cn('text-status-cancelled', className)}
       width="24"
       height="24"
       viewBox="0 0 24 24"

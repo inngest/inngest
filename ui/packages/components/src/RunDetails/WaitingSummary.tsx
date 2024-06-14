@@ -28,7 +28,7 @@ export function WaitingSummary({ history }: Props) {
 
         return (
           <Card
-            accentColor="bg-sky-400"
+            accentColor="bg-status-running"
             className={i < waits.length - 1 ? 'mb-4' : undefined}
             key={wait.groupID}
           >

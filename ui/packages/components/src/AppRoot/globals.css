@@ -192,6 +192,7 @@
     --color-foreground-error: var(--color-ruby-600);
     --color-foreground-warning: var(--color-honey-600);
     --color-foreground-info: var(--color-purplehaze-700);
+    --color-foreground-cancelled: var(--color-carbon-300);
     --color-foreground-btn-primary: var(--color-matcha-600);
     --color-foreground-btn-primaryDisabled: var(--color-matcha-300);
     --color-foreground-btn-danger: var(--color-ruby-600);
@@ -274,6 +275,7 @@
     --color-foreground-error: var(--color-ruby-300);
     --color-foreground-warning: var(--color-honey-300);
     --color-foreground-info: var(--color-purplehaze-300);
+    --color-foreground-cancelled: var(--color-carbon-400);
     --color-foreground-btn-primary: var(--color-matcha-500);
     --color-foreground-btn-primaryDisabled: var(--color-matcha-800);
     --color-foreground-btn-danger: var(--color-ruby-500);

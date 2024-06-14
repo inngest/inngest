@@ -338,7 +338,7 @@ export function CodeBlock({ header, tab, actions = [] }: CodeBlockProps) {
               className={cn(
                 'flex items-center justify-between border-l-4 border-l-transparent',
                 header?.status === 'error' && 'border-l-status-failed',
-                header?.status === 'success' && 'border-l-status-complete'
+                header?.status === 'success' && 'border-l-status-completed'
               )}
             >
               <p

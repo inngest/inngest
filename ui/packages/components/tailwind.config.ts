@@ -53,8 +53,8 @@ export default {
           runningSubtle: 'rgb(var(--color-secondary-xSubtle) / <alpha-value>)',
           queued: 'rgb(var(--color-quaternary-cool-xIntense) / <alpha-value>)',
           queuedSubtle: 'rgb(var(--color-quaternary-cool-xSubtle) / <alpha-value>)',
-          complete: 'rgb(var(--color-primary-intense) / <alpha-value>)',
-          cancelled: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
+          completed: 'rgb(var(--color-primary-intense) / <alpha-value>)',
+          cancelled: 'rgb(var(--color-foreground-cancelled) / <alpha-value>)',
         },
       },
       borderColor: {
