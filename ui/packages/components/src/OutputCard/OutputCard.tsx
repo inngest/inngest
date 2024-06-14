@@ -15,14 +15,16 @@ export function OutputCard({ isSuccess, content }: OutputCardProps) {
   output = (isSuccess && usePrettyJson(output)) || output;
 
   return (
-    <CodeBlock
-      header={{
-        title: isSuccess ? 'Output' : errorName + ': ' + message,
-        status: isSuccess ? 'success' : 'error',
-      }}
-      tab={{
-        content: output,
-      }}
-    />
+    <CodeBlock.Wrapper>
+      <CodeBlock
+        header={{
+          title: isSuccess ? 'Output' : errorName + ': ' + message,
+          status: isSuccess ? 'success' : 'error',
+        }}
+        tab={{
+          content: output,
+        }}
+      />
+    </CodeBlock.Wrapper>
   );
 }

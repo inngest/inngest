@@ -144,11 +144,13 @@ export function EventDetails({
     >
       {!loading && (
         <div className="px-5 pt-4">
-          <CodeBlock
-            header={{ title: batch ? 'Batch' : 'Payload' }}
-            tab={{ content: prettyPayload ?? 'Unknown' }}
-            actions={codeBlockActions}
-          />
+          <CodeBlock.Wrapper>
+            <CodeBlock
+              header={{ title: batch ? 'Batch' : 'Payload' }}
+              tab={{ content: prettyPayload ?? 'Unknown' }}
+              actions={codeBlockActions}
+            />
+          </CodeBlock.Wrapper>
         </div>
       )}
 

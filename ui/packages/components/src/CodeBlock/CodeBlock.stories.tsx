@@ -34,6 +34,17 @@ export const Default: Story = {
   },
 };
 
+export const DefaultWithWrapper: Story = {
+  render: () => (
+    <CodeBlock.Wrapper>
+      <CodeBlock
+        header={{ title: 'Output' }}
+        tab={{ content: '{\n  "customerId": "cus_1234"\n}' }}
+      />
+    </CodeBlock.Wrapper>
+  ),
+};
+
 export const Error: Story = {
   args: {
     header: {

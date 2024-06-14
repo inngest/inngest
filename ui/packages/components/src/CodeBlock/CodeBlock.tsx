@@ -328,10 +328,10 @@ export function CodeBlock({ header, tab, actions = [] }: CodeBlockProps) {
   return (
     <>
       {monaco && (
-        <CodeBlock.Wrapper>
+        <>
           <div
             className={cn(
-              'border-b border-b-slate-200 dark:border-slate-700/20 dark:bg-slate-800/40 dark:shadow'
+              'border-b border-b-slate-300 bg-slate-50 dark:border-slate-700/20 dark:bg-slate-800/40 dark:shadow'
             )}
           >
             <div
@@ -455,7 +455,7 @@ export function CodeBlock({ header, tab, actions = [] }: CodeBlockProps) {
               />
             )}
           </div>
-        </CodeBlock.Wrapper>
+        </>
       )}
     </>
   );
@@ -464,8 +464,8 @@ export function CodeBlock({ header, tab, actions = [] }: CodeBlockProps) {
 CodeBlock.Wrapper = ({ children }: React.PropsWithChildren) => {
   return (
     <div
-      className="dark:bg-slate-910 w-full overflow-hidden rounded-lg border 
-     border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700/30 dark:bg-slate-800/40 dark:shadow"
+      className="w-full overflow-hidden rounded-lg border 
+     border-slate-300 dark:border-slate-700/30 dark:shadow"
     >
       {children}
     </div>
