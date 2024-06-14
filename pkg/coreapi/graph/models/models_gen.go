@@ -18,6 +18,10 @@ type FunctionRunEvent interface {
 	IsFunctionRunEvent()
 }
 
+type StepInfo interface {
+	IsStepInfo()
+}
+
 type ActionVersionQuery struct {
 	Dsn          string `json:"dsn"`
 	VersionMajor *int   `json:"versionMajor,omitempty"`
@@ -102,20 +106,23 @@ type FunctionRunQuery struct {
 }
 
 type FunctionRunV2 struct {
-	ID         ulid.ULID         `json:"id"`
-	AppID      uuid.UUID         `json:"appID"`
-	FunctionID uuid.UUID         `json:"functionID"`
-	Function   *Function         `json:"function"`
-	TraceID    string            `json:"traceID"`
-	QueuedAt   time.Time         `json:"queuedAt"`
-	StartedAt  *time.Time        `json:"startedAt,omitempty"`
-	EndedAt    *time.Time        `json:"endedAt,omitempty"`
-	Status     FunctionRunStatus `json:"status"`
-	SourceID   *string           `json:"sourceID,omitempty"`
-	TriggerIDs []ulid.ULID       `json:"triggerIDs"`
-	Triggers   []string          `json:"triggers"`
-	IsBatch    bool              `json:"isBatch"`
-	Output     *string           `json:"output,omitempty"`
+	ID             ulid.ULID         `json:"id"`
+	AppID          uuid.UUID         `json:"appID"`
+	FunctionID     uuid.UUID         `json:"functionID"`
+	Function       *Function         `json:"function"`
+	TraceID        string            `json:"traceID"`
+	QueuedAt       time.Time         `json:"queuedAt"`
+	StartedAt      *time.Time        `json:"startedAt,omitempty"`
+	EndedAt        *time.Time        `json:"endedAt,omitempty"`
+	Status         FunctionRunStatus `json:"status"`
+	SourceID       *string           `json:"sourceID,omitempty"`
+	TriggerIDs     []ulid.ULID       `json:"triggerIDs"`
+	Triggers       []string          `json:"triggers"`
+	IsBatch        bool              `json:"isBatch"`
+	BatchCreatedAt *time.Time        `json:"batchCreatedAt,omitempty"`
+	CronSchedule   *string           `json:"cronSchedule,omitempty"`
+	Output         *string           `json:"output,omitempty"`
+	Trace          *RunTraceSpan     `json:"trace,omitempty"`
 }
 
 type FunctionRunV2Edge struct {
@@ -132,6 +139,17 @@ type FunctionTrigger struct {
 	Value string               `json:"value"`
 }
 
+type InvokeStepInfo struct {
+	TriggeringEventID ulid.ULID  `json:"triggeringEventID"`
+	FunctionID        string     `json:"functionID"`
+	Timeout           time.Time  `json:"timeout"`
+	ReturnEventID     *ulid.ULID `json:"returnEventID,omitempty"`
+	RunID             *ulid.ULID `json:"runID,omitempty"`
+	TimedOut          *bool      `json:"timedOut,omitempty"`
+}
+
+func (InvokeStepInfo) IsStepInfo() {}
+
 // The pagination information in a connection.
 type PageInfo struct {
 	// Indicates if there are any pages subsequent to the current page.
@@ -142,6 +160,44 @@ type PageInfo struct {
 	StartCursor *string `json:"startCursor,omitempty"`
 	// When paginating forward, the cursor to query the next page.
 	EndCursor *string `json:"endCursor,omitempty"`
+}
+
+type RunTraceSpan struct {
+	AppID         uuid.UUID          `json:"appID"`
+	FunctionID    uuid.UUID          `json:"functionID"`
+	RunID         ulid.ULID          `json:"runID"`
+	Run           *FunctionRun       `json:"run"`
+	SpanID        string             `json:"spanID"`
+	TraceID       string             `json:"traceID"`
+	Name          string             `json:"name"`
+	Status        RunTraceSpanStatus `json:"status"`
+	Attempts      *int               `json:"attempts,omitempty"`
+	Duration      *int               `json:"duration,omitempty"`
+	OutputID      *string            `json:"outputID,omitempty"`
+	QueuedAt      time.Time          `json:"queuedAt"`
+	StartedAt     *time.Time         `json:"startedAt,omitempty"`
+	EndedAt       *time.Time         `json:"endedAt,omitempty"`
+	ChildrenSpans []*RunTraceSpan    `json:"childrenSpans"`
+	StepOp        *StepOp            `json:"stepOp,omitempty"`
+	StepInfo      StepInfo           `json:"stepInfo,omitempty"`
+	IsRoot        bool               `json:"isRoot"`
+	ParentSpanID  *string            `json:"parentSpanID,omitempty"`
+	ParentSpan    *RunTraceSpan      `json:"parentSpan,omitempty"`
+}
+
+type RunTraceSpanOutput struct {
+	Data  *string    `json:"data,omitempty"`
+	Error *StepError `json:"error,omitempty"`
+}
+
+type RunTraceTrigger struct {
+	EventName *string     `json:"eventName,omitempty"`
+	IDs       []ulid.ULID `json:"IDs"`
+	Payloads  []string    `json:"payloads"`
+	Timestamp time.Time   `json:"timestamp"`
+	IsBatch   bool        `json:"isBatch"`
+	BatchID   *ulid.ULID  `json:"batchID,omitempty"`
+	Cron      *string     `json:"cron,omitempty"`
 }
 
 type RunsFilterV2 struct {
@@ -162,6 +218,18 @@ type RunsV2Connection struct {
 type RunsV2OrderBy struct {
 	Field     RunsV2OrderByField   `json:"field"`
 	Direction RunsOrderByDirection `json:"direction"`
+}
+
+type SleepStepInfo struct {
+	SleepUntil time.Time `json:"sleepUntil"`
+}
+
+func (SleepStepInfo) IsStepInfo() {}
+
+type StepError struct {
+	Message string  `json:"message"`
+	Name    *string `json:"name,omitempty"`
+	Stack   *string `json:"stack,omitempty"`
 }
 
 type StepEvent struct {
@@ -203,6 +271,16 @@ type UpdateAppInput struct {
 	ID  string `json:"id"`
 	URL string `json:"url"`
 }
+
+type WaitForEventStepInfo struct {
+	EventName    string     `json:"eventName"`
+	Expression   *string    `json:"expression,omitempty"`
+	Timeout      time.Time  `json:"timeout"`
+	FoundEventID *ulid.ULID `json:"foundEventID,omitempty"`
+	TimedOut     *bool      `json:"timedOut,omitempty"`
+}
+
+func (WaitForEventStepInfo) IsStepInfo() {}
 
 type Workspace struct {
 	ID string `json:"id"`
@@ -478,6 +556,53 @@ func (e FunctionTriggerTypes) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
+type RunTraceSpanStatus string
+
+const (
+	RunTraceSpanStatusFailed    RunTraceSpanStatus = "FAILED"
+	RunTraceSpanStatusRunning   RunTraceSpanStatus = "RUNNING"
+	RunTraceSpanStatusCompleted RunTraceSpanStatus = "COMPLETED"
+	RunTraceSpanStatusWaiting   RunTraceSpanStatus = "WAITING"
+	RunTraceSpanStatusCancelled RunTraceSpanStatus = "CANCELLED"
+)
+
+var AllRunTraceSpanStatus = []RunTraceSpanStatus{
+	RunTraceSpanStatusFailed,
+	RunTraceSpanStatusRunning,
+	RunTraceSpanStatusCompleted,
+	RunTraceSpanStatusWaiting,
+	RunTraceSpanStatusCancelled,
+}
+
+func (e RunTraceSpanStatus) IsValid() bool {
+	switch e {
+	case RunTraceSpanStatusFailed, RunTraceSpanStatusRunning, RunTraceSpanStatusCompleted, RunTraceSpanStatusWaiting, RunTraceSpanStatusCancelled:
+		return true
+	}
+	return false
+}
+
+func (e RunTraceSpanStatus) String() string {
+	return string(e)
+}
+
+func (e *RunTraceSpanStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = RunTraceSpanStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid RunTraceSpanStatus", str)
+	}
+	return nil
+}
+
+func (e RunTraceSpanStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
 type RunsOrderByDirection string
 
 const (
@@ -608,6 +733,51 @@ func (e *StepEventType) UnmarshalGQL(v interface{}) error {
 }
 
 func (e StepEventType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type StepOp string
+
+const (
+	StepOpInvoke       StepOp = "INVOKE"
+	StepOpRun          StepOp = "RUN"
+	StepOpSleep        StepOp = "SLEEP"
+	StepOpWaitForEvent StepOp = "WAIT_FOR_EVENT"
+)
+
+var AllStepOp = []StepOp{
+	StepOpInvoke,
+	StepOpRun,
+	StepOpSleep,
+	StepOpWaitForEvent,
+}
+
+func (e StepOp) IsValid() bool {
+	switch e {
+	case StepOpInvoke, StepOpRun, StepOpSleep, StepOpWaitForEvent:
+		return true
+	}
+	return false
+}
+
+func (e StepOp) String() string {
+	return string(e)
+}
+
+func (e *StepOp) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = StepOp(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid StepOp", str)
+	}
+	return nil
+}
+
+func (e StepOp) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

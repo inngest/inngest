@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -19,10 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/inngest/log"
-	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
-	"go.opentelemetry.io/otel/attribute"
 )
 
 func NewLifecycleListener(l *slog.Logger, d ...Driver) execution.LifecycleListener {
@@ -233,47 +229,6 @@ func (l lifecycle) OnFunctionCancelled(
 	md sv2.Metadata,
 	req execution.CancelRequest,
 ) {
-	go func(ctx context.Context) {
-		start := time.Now()
-		if !md.Config.StartedAt.IsZero() {
-			start = md.Config.StartedAt
-		}
-
-		fnSpanID, err := md.Config.GetSpanID()
-		if err != nil {
-			log.From(ctx).Error().Err(err).Interface("identifier", md.ID).Msg("error retrieving spanID for cancelled function run")
-			return
-		}
-
-		evtIDs := make([]string, len(md.Config.EventIDs))
-		for i, eid := range md.Config.EventIDs {
-			evtIDs[i] = eid.String()
-		}
-
-		_, span := telemetry.NewSpan(ctx,
-			telemetry.WithScope(consts.OtelScopeFunction),
-			telemetry.WithName(md.Config.FunctionSlug),
-			telemetry.WithTimestamp(start),
-			telemetry.WithSpanID(*fnSpanID),
-			telemetry.WithSpanAttributes(
-				attribute.Bool(consts.OtelUserTraceFilterKey, true),
-				attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
-				attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
-				attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
-				attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
-				attribute.String(consts.OtelSysFunctionSlug, md.Config.FunctionSlug),
-				attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
-				attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()),
-				attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
-				attribute.String(consts.OtelSysIdempotencyKey, md.IdempotencyKey()),
-				attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCancelled.ToCode()),
-			),
-		)
-		if md.Config.BatchID != nil {
-			span.SetAttributes(attribute.String(consts.OtelSysBatchID, md.Config.BatchID.String()))
-		}
-		defer span.End()
-	}(ctx)
 	completedStepCount := int64(md.Metrics.StepCount)
 	groupID := uuid.New()
 
@@ -789,26 +744,26 @@ func applyResponse(
 
 	// If it's a completed generator step then some data is stored in the
 	// output. We'll try to extract it.
-	if len(resp.Generator) > 0 {
-		if op := resp.HistoryVisibleStep(); op != nil {
-			h.StepID = &op.ID
-			h.StepType = getStepType(*op)
-			h.Result.Output, _ = op.Output()
-			stepName := op.UserDefinedName()
-			h.StepName = &stepName
-		}
-
-		// If we're a generator, exit now to prevent attempting to parse
-		// generator response as an output; the generator response may be in
-		// relation to many parallel steps, not just the one we're currently
-		// writing history for.
-		return nil
+	if op := resp.HistoryVisibleStep(); op != nil {
+		h.StepID = &op.ID
+		h.StepType = getStepType(*op)
+		h.Result.Output, _ = op.Output()
+		stepName := op.UserDefinedName()
+		h.StepName = &stepName
 	}
-
+	
 	// Only set the output to the response error string if there isn't already output. This prevents overriding errors in the user's function
 	if resp.Output == nil && resp.Error() != "" {
 		h.Result.Output = resp.Error()
 		h.Result.SizeBytes = len(h.Result.Output)
+		return nil
+	}
+
+	if len(resp.Generator) > 0 {
+		// If we're a generator, exit now to prevent attempting to parse
+		// generator response as an output; the generator response may be in
+		// relation to many parallel steps, not just the one we're currently
+		// writing history for.
 		return nil
 	}
 

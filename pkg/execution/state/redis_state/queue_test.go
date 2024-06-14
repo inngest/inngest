@@ -328,6 +328,35 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, len(keys))
 	})
+
+	t.Run("Enqueueing to a paused partition does not affect the partition's pause state", func(t *testing.T) {
+		now := time.Now()
+		workflowId := uuid.New()
+
+		item, err := q.EnqueueItem(ctx, QueueItem{
+			WorkflowID: workflowId,
+		}, now.Add(10*time.Second))
+		require.NoError(t, err)
+
+		err = q.SetFunctionPaused(ctx, item.WorkflowID, true)
+		require.NoError(t, err)
+
+		item, err = q.EnqueueItem(ctx, QueueItem{
+			WorkflowID: workflowId,
+		}, now)
+		require.NoError(t, err)
+
+		second := getPartition(t, r, item.WorkflowID)
+		require.True(t, second.Paused)
+
+		item, err = q.EnqueueItem(ctx, QueueItem{
+			WorkflowID: workflowId,
+		}, now.Add(-10*time.Second))
+		require.NoError(t, err)
+
+		second = getPartition(t, r, item.WorkflowID)
+		require.True(t, second.Paused)
+	})
 }
 
 func TestQueueEnqueueItemIdempotency(t *testing.T) {
@@ -498,7 +527,6 @@ func TestQueuePeek(t *testing.T) {
 			require.EqualValues(t, []*QueueItem{&ia, &ib, &ic, &id}, items)
 		})
 	})
-
 }
 
 func TestQueueLease(t *testing.T) {
@@ -1134,6 +1162,42 @@ func TestQueuePartitionLease(t *testing.T) {
 		requirePartitionScoreEquals(t, r, idA, time.Now().Add(time.Second*5))
 	})
 
+	t.Run("Partition pausing", func(t *testing.T) {
+		r.FlushAll() // reset everything
+		q := NewQueue(rc)
+		ctx := context.Background()
+
+		_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, atA)
+		require.NoError(t, err)
+		_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idB}, atB)
+		require.NoError(t, err)
+		_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idC}, atC)
+		require.NoError(t, err)
+
+		t.Run("Fails to lease a paused partition", func(t *testing.T) {
+			// pause fn A's partition:
+			err = q.SetFunctionPaused(ctx, idA, true)
+			require.NoError(t, err)
+
+			// attempt to lease the paused partition:
+			id, err := q.PartitionLease(ctx, &pA, time.Second*5)
+			require.Nil(t, id)
+			require.Error(t, err)
+			require.ErrorIs(t, err, ErrPartitionPaused)
+		})
+
+		t.Run("Succeeds to lease a previously paused partition", func(t *testing.T) {
+			// unpause fn A's partition:
+			err = q.SetFunctionPaused(ctx, idA, false)
+			require.NoError(t, err)
+
+			// attempt to lease the unpaused partition:
+			id, err := q.PartitionLease(ctx, &pA, time.Second*5)
+			require.NotNil(t, id)
+			require.NoError(t, err)
+		})
+	})
+
 	// TODO: Capacity checks
 }
 
@@ -1259,7 +1323,6 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defer rc.Close()
 		q := NewQueue(
 			rc,
 			WithPriorityFinder(func(ctx context.Context, qi QueueItem) uint {
@@ -1290,6 +1353,49 @@ func TestQueuePartitionPeek(t *testing.T) {
 		items, err = q.PartitionPeek(ctx, false, time.Now().Add(time.Hour), PartitionPeekMax)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
+	})
+
+	t.Run("Peeking ignores paused partitions", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		q := NewQueue(
+			rc,
+			WithPriorityFinder(func(ctx context.Context, qi QueueItem) uint {
+				return PriorityDefault
+			}),
+		)
+		enqueue(q)
+
+		// Pause A, excluding it from peek:
+		err = q.SetFunctionPaused(ctx, idA, true)
+		require.NoError(t, err)
+
+		// This should only select B and C, as id A is ignored:
+		items, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), PartitionPeekMax)
+		require.NoError(t, err)
+		require.Len(t, items, 2)
+		require.EqualValues(t, []*QueuePartition{
+			{WorkflowID: idB, Priority: PriorityDefault},
+			{WorkflowID: idC, Priority: PriorityDefault},
+		}, items)
+
+		// After unpausing A, it should be included in the peek:
+		err = q.SetFunctionPaused(ctx, idA, false)
+		require.NoError(t, err)
+		items, err = q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), PartitionPeekMax)
+		require.NoError(t, err)
+		require.Len(t, items, 3)
+		require.EqualValues(t, []*QueuePartition{
+			{WorkflowID: idA, Priority: PriorityDefault},
+			{WorkflowID: idB, Priority: PriorityDefault},
+			{WorkflowID: idC, Priority: PriorityDefault},
+		}, items)
 	})
 }
 
@@ -1384,6 +1490,58 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		err = q.PartitionRequeue(ctx, &p, time.Now().Add(time.Minute), false)
 		require.Equal(t, ErrPartitionNotFound, err)
 	})
+
+	t.Run("Requeueing a paused partition does not affect the partition's pause state", func(t *testing.T) {
+		_, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, now)
+		require.NoError(t, err)
+
+		_, err = q.PartitionLease(ctx, &QueuePartition{WorkflowID: idA}, time.Minute)
+		require.NoError(t, err)
+
+		err = q.SetFunctionPaused(ctx, idA, true)
+		require.NoError(t, err)
+
+		err = q.PartitionRequeue(ctx, &p, next, true)
+		require.NoError(t, err)
+
+		loaded := getPartition(t, r, idA)
+		require.True(t, loaded.Paused)
+	})
+}
+
+func TestQueuePartitionPause(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	q := NewQueue(
+		rc,
+		WithPriorityFinder(func(ctx context.Context, item QueueItem) uint {
+			return PriorityDefault
+		}),
+	)
+	ctx := context.Background()
+
+	now := time.Now().Truncate(time.Second)
+	idA := uuid.New()
+	_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, now)
+	require.NoError(t, err)
+
+	err = q.SetFunctionPaused(ctx, idA, true)
+	require.NoError(t, err)
+
+	loaded := getPartition(t, r, idA)
+	require.True(t, loaded.Paused)
+
+	err = q.SetFunctionPaused(ctx, idA, false)
+	require.NoError(t, err)
+
+	loaded = getPartition(t, r, idA)
+	require.False(t, loaded.Paused)
 }
 
 func TestQueuePartitionReprioritize(t *testing.T) {
@@ -1426,6 +1584,17 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 	t.Run("It doesn't accept min priorities", func(t *testing.T) {
 		err = q.PartitionReprioritize(ctx, idA.String(), PriorityMin+1)
 		require.Equal(t, ErrPriorityTooLow, err)
+	})
+
+	t.Run("Changing priority does not affect the partition's pause state", func(t *testing.T) {
+		err = q.SetFunctionPaused(ctx, idA, true)
+		require.NoError(t, err)
+
+		err = q.PartitionReprioritize(ctx, idA.String(), PriorityDefault)
+		require.NoError(t, err)
+
+		second := getPartition(t, r, idA)
+		require.True(t, second.Paused)
 	})
 }
 

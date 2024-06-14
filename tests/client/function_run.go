@@ -211,3 +211,73 @@ func (c *Client) WaitForRunStatus(
 
 	return run
 }
+
+// retrieve run with traces
+// TODO: add the traces once implemented
+func (c *Client) RunTraces(ctx context.Context, runID string) *RunV2 {
+	c.Helper()
+
+	if runID == "" {
+		return nil
+	}
+
+	query := `
+		query GetTraceRun($runID: String!) {
+	  	run(runID: $runID) {
+				status
+				traceID
+				isBatch
+				batchCreatedAt
+				cronSchedule
+			}
+		}
+	`
+
+	resp := c.MustDoGQL(ctx, graphql.RawParams{
+		Query: query,
+		Variables: map[string]any{
+			"runID": runID,
+		},
+	})
+	if len(resp.Errors) > 0 {
+		c.Fatalf("err with fnrun trace query: %#v", resp.Errors)
+	}
+
+	type response struct {
+		Run RunV2
+	}
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, data); err != nil {
+		c.Fatalf(err.Error())
+	}
+
+	return &data.Run
+}
+
+type RunV2 struct {
+	TraceID string `json:"traceID"`
+	// RunID   string        `json:"runID"`
+	Status         string        `json:"status"`
+	Trace          *runTraceSpan `json:"trace,omitempty"`
+	IsBatch        bool          `json:"isBatch"`
+	BatchCreatedAt *time.Time    `json:"batchCreatedAt,omitempty"`
+	CronSchedule   *string       `json:"cronSchedule,omitempty"`
+}
+
+type runTraceSpan struct {
+	Name         string         `json:"name"`
+	RunID        string         `json:"runID"`
+	Status       string         `json:"status"`
+	Attempts     int            `json:"attempts"`
+	IsRoot       bool           `json:"isRoot"`
+	TraceID      string         `json:"traceID"`
+	ParentSpanID string         `json:"parentSpanID"`
+	SpanID       string         `json:"spanID"`
+	Duration     int64          `json:"duration"`
+	StartedAt    *time.Time     `json:"startedAt,omitempty"`
+	EndedAt      *time.Time     `json:"endedAt,omitempty"`
+	ChildSpans   []runTraceSpan `json:"childrenSpans"`
+	OutputID     *string        `json:"outputID,omitempty"`
+	StepOp       string         `json:"stepOp"`
+	StepInfo     any            `json:"stepInfo,omitempty"`
+}

@@ -811,6 +811,80 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 	return items, nil
 }
 
+const getTraceRun = `-- name: GetTraceRun :one
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule FROM trace_runs WHERE run_id = ?1
+`
+
+func (q *Queries) GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error) {
+	row := q.db.QueryRowContext(ctx, getTraceRun, runID)
+	var i TraceRun
+	err := row.Scan(
+		&i.RunID,
+		&i.AccountID,
+		&i.WorkspaceID,
+		&i.AppID,
+		&i.FunctionID,
+		&i.TraceID,
+		&i.QueuedAt,
+		&i.StartedAt,
+		&i.EndedAt,
+		&i.Status,
+		&i.SourceID,
+		&i.TriggerIds,
+		&i.Output,
+		&i.IsDebounce,
+		&i.BatchID,
+		&i.CronSchedule,
+	)
+	return &i, err
+}
+
+const getTraceSpans = `-- name: GetTraceSpans :many
+SELECT timestamp, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id FROM traces WHERE run_id = ?1 ORDER BY timestamp DESC, duration DESC
+`
+
+func (q *Queries) GetTraceSpans(ctx context.Context, runID ulid.ULID) ([]*Trace, error) {
+	rows, err := q.db.QueryContext(ctx, getTraceSpans, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Trace
+	for rows.Next() {
+		var i Trace
+		if err := rows.Scan(
+			&i.Timestamp,
+			&i.TraceID,
+			&i.SpanID,
+			&i.ParentSpanID,
+			&i.TraceState,
+			&i.SpanName,
+			&i.SpanKind,
+			&i.ServiceName,
+			&i.ResourceAttributes,
+			&i.ScopeName,
+			&i.ScopeVersion,
+			&i.SpanAttributes,
+			&i.Duration,
+			&i.StatusCode,
+			&i.StatusMessage,
+			&i.Events,
+			&i.Links,
+			&i.RunID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const hardDeleteApp = `-- name: HardDeleteApp :exec
 DELETE FROM apps WHERE id = ?
 `
@@ -1155,8 +1229,8 @@ func (q *Queries) InsertTrace(ctx context.Context, arg InsertTraceParams) error 
 }
 
 const insertTraceRun = `-- name: InsertTraceRun :exec
-INSERT INTO trace_runs
-	(account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_batch, is_debounce)
+INSERT OR REPLACE INTO trace_runs
+	(account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce)
 VALUES
 	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
@@ -1175,7 +1249,7 @@ type InsertTraceRunParams struct {
 	SourceID    string
 	TriggerIds  []byte
 	Output      []byte
-	IsBatch     bool
+	BatchID     ulid.ULID
 	IsDebounce  bool
 }
 
@@ -1194,7 +1268,7 @@ func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) 
 		arg.SourceID,
 		arg.TriggerIds,
 		arg.Output,
-		arg.IsBatch,
+		arg.BatchID,
 		arg.IsDebounce,
 	)
 	return err

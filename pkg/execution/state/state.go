@@ -37,6 +37,12 @@ var (
 	ErrFunctionFailed     = fmt.Errorf("function failed")
 	ErrFunctionOverflowed = fmt.Errorf("function has too many steps")
 	ErrDuplicateResponse  = fmt.Errorf("duplicate response")
+	ErrEventNotFound      = fmt.Errorf("event not found in state store")
+)
+
+const (
+	// InngestErrFunctionOverflowed is the public error code for ErrFunctionOverflowed
+	InngestErrFunctionOverflowed = "InngestErrFunctionOverflowed"
 )
 
 // Identifier represents the unique identifier for a workflow run.
@@ -305,7 +311,7 @@ type Mutater interface {
 	UpdateMetadata(ctx context.Context, runID ulid.ULID, md MetadataUpdate) error
 
 	// Delete removes state from the state store.
-	Delete(ctx context.Context, i Identifier) error
+	Delete(ctx context.Context, i Identifier) (bool, error)
 
 	// Cancel sets a function run metadata status to RunStatusCancelled, which prevents
 	// future execution of steps.

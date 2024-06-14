@@ -226,6 +226,10 @@ func start(ctx context.Context, opts StartOpts) error {
 				pb:         pb,
 				eventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
 			},
+			executor.NewTraceRunLifecycleListener(
+				nil,
+				smv2,
+			),
 		),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
