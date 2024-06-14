@@ -28,8 +28,8 @@ export function RunResult({ className, result, isSuccess }: Props) {
         <CodeBlock
           header={{
             title:
-              result.error.name ??
-              'Error' + (result.error.message ? ': ' + result.error.message : ''),
+              (result.error.name || 'Error') +
+              (result.error.message ? ': ' + result.error.message : ''),
             status: 'error',
           }}
           tab={{
