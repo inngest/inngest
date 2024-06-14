@@ -20,21 +20,6 @@ type SDKRequest struct {
 	UseAPI bool `json:"use_api"`
 }
 
-func (m *SDKRequestContext) preMarshal() {
-	stack := m.Stack.Stack
-	if stack == nil {
-		stack = make([]string, 0)
-	}
-
-	m.Stack.Stack = stack
-}
-
-func (m SDKRequestContext) MarshalJSON() ([]byte, error) {
-	m.preMarshal()
-	type alias SDKRequestContext // Avoid infinite recursion
-	return json.Marshal(alias(m))
-}
-
 type SDKRequestContext struct {
 	// FunctionID is used within entrypoints to SDK-based functions in
 	// order to specify the ID of the function to run via RPC.
@@ -74,4 +59,13 @@ type SDKRequestContext struct {
 type FunctionStack struct {
 	Stack   []string `json:"stack"`
 	Current int      `json:"current"`
+}
+
+func (m FunctionStack) MarshalJSON() ([]byte, error) {
+	if m.Stack == nil {
+		m.Stack = make([]string, 0)
+	}
+
+	type alias FunctionStack // Avoid infinite recursion
+	return json.Marshal(alias(m))
 }
