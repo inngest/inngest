@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { toast } from 'sonner';
 
-import { RunResult } from '../RunResult';
 import { StatusCell } from '../Table';
 import { Trace } from '../TimelineV2';
 import { Timeline } from '../TimelineV2/Timeline';
@@ -93,15 +92,7 @@ export function RunDetails(props: Props) {
               run={nullishToLazy(run)}
               runID={runID}
               standalone={standalone}
-              result={
-                result && (
-                  <RunResult
-                    className="border-t border-slate-300"
-                    result={result}
-                    isSuccess={run?.trace.status === 'COMPLETED'}
-                  />
-                )
-              }
+              result={result}
             />
           </div>
 

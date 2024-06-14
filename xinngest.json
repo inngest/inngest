@@ -1,0 +1,5 @@
+{
+  "no-discovery": true,
+  "no-poll": true,
+  "urls": ["http://localhost:8002/api/inngest"]
+}

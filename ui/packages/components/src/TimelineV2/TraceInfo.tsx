@@ -8,7 +8,9 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
+import { RunResult } from '../RunResult';
 import { Time } from '../Time';
+import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { isStepInfoInvoke, isStepInfoSleep, isStepInfoWait, type Trace } from './types';
@@ -19,7 +21,7 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   trace: Trace;
-  result?: React.ReactNode;
+  result?: Result;
 };
 
 export function TraceInfo({ className, pathCreator, trace, result }: Props) {
@@ -143,7 +145,7 @@ export function TraceInfo({ className, pathCreator, trace, result }: Props) {
             {stepKindInfo}
           </dl>
         </Card.Content>
-        {result}
+        {result && <RunResult className="border-t border-slate-300" result={result} />}
       </Card>
     </div>
   );

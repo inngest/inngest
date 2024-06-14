@@ -11,6 +11,8 @@ import {
 } from '../DetailsCard/Element';
 import { Link } from '../Link';
 import { RerunButton } from '../RerunButtonV2';
+import { RunResult } from '../RunResult';
+import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
@@ -26,7 +28,7 @@ type Props = {
   rerun: (args: { fnID: string }) => Promise<unknown>;
   run: Lazy<Run>;
   runID: string;
-  result?: React.ReactNode;
+  result?: Result;
 };
 
 type Run = {
@@ -59,8 +61,10 @@ export function RunInfo({
   result,
 }: Props) {
   let allowCancel = false;
+  let isSuccess = false;
   if (isLazyDone(run)) {
     allowCancel = !Boolean(run.trace.endedAt);
+    isSuccess = run.trace.status === 'COMPLETED';
   }
 
   return (
@@ -149,7 +153,9 @@ export function RunInfo({
             </dl>
           </div>
         </Card.Content>
-        {result}
+        {result && (
+          <RunResult className="border-t border-slate-300" result={result} isSuccess={isSuccess} />
+        )}
       </Card>
     </div>
   );

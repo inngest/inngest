@@ -37,6 +37,7 @@ var (
 	ErrFunctionFailed     = fmt.Errorf("function failed")
 	ErrFunctionOverflowed = fmt.Errorf("function has too many steps")
 	ErrDuplicateResponse  = fmt.Errorf("duplicate response")
+	ErrEventNotFound      = fmt.Errorf("event not found in state store")
 )
 
 const (
