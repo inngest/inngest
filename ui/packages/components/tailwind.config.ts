@@ -95,7 +95,7 @@ export default {
         btnDangerDisabled: 'rgb(var(--color-background-btn-dangerDisabled) / <alpha-value>)',
       },
       textColor: {
-        base: 'rgb(var(--color-foreground-base) / <alpha-value>)',
+        basis: 'rgb(var(--color-foreground-base) / <alpha-value>)',
         subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
         muted: 'rgb(var(--color-foreground-muted) / <alpha-value>)',
         onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
