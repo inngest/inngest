@@ -1,5 +1,7 @@
 'use client';
 
+import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
+
 import { CodeBlock } from './CodeBlock';
 import type { Result } from './types/functionRun';
 
@@ -10,6 +12,8 @@ type Props = {
 };
 
 export function RunResult({ className, result, isSuccess }: Props) {
+  let output = (result.data && usePrettyJson(result.data)) || '';
+
   return (
     <div className={className}>
       {result.data && (
@@ -19,7 +23,7 @@ export function RunResult({ className, result, isSuccess }: Props) {
             status: isSuccess ? 'success' : undefined,
           }}
           tab={{
-            content: result.data,
+            content: output,
           }}
         />
       )}
