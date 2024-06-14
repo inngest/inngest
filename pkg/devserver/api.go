@@ -355,7 +355,7 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 	}
 	log.From(ctx).Trace().Int("len", traces.SpanCount()).Msg("recording otel trace spans")
 
-	handler := newSpanIngestionHandler()
+	handler := newSpanIngestionHandler(a.devserver.data)
 
 	for i := 0; i < traces.ResourceSpans().Len(); i++ {
 		rs := traces.ResourceSpans().At(i)
@@ -454,7 +454,7 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 
-				handler.Add(cqrsspan)
+				handler.Add(ctx, cqrsspan)
 			}
 		}
 	}

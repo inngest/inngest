@@ -1,0 +1,4 @@
+no-discovery: true
+no-poll: true
+urls:
+  - http://localhost:8001/api/inngest

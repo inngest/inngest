@@ -8,6 +8,7 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/oklog/ulid/v2"
 )
 
 const (
@@ -158,8 +159,15 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 			continue
 		}
 
+		triggerIDS := []ulid.ULID{}
+		for _, tid := range r.TriggerIDs {
+			if id, err := ulid.Parse(tid); err == nil {
+				triggerIDS = append(triggerIDS, id)
+			}
+		}
+
 		node := &models.FunctionRunV2{
-			ID:         r.RunID,
+			ID:         ulid.MustParse(r.RunID),
 			AppID:      r.AppID,
 			FunctionID: r.FunctionID,
 			TraceID:    r.TraceID,
@@ -168,7 +176,7 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 			EndedAt:    ended,
 			SourceID:   sourceID,
 			Status:     status,
-			TriggerIDs: r.TriggerIDs,
+			TriggerIDs: triggerIDS,
 			Triggers:   []string{},
 			Output:     output,
 			IsBatch:    r.IsBatch,
@@ -193,7 +201,80 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 }
 
 func (r *queryResolver) Run(ctx context.Context, runID string) (*models.FunctionRunV2, error) {
-	return nil, fmt.Errorf("not implemented")
+	runid, err := ulid.Parse(runID)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing runID: %w", err)
+	}
+
+	run, err := r.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runid})
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving run: %w", err)
+	}
+
+	var (
+		startedAt *time.Time
+		endedAt   *time.Time
+		sourceID  *string
+		output    *string
+		batchTS   *time.Time
+	)
+
+	if run.StartedAt.UnixMilli() > 0 {
+		startedAt = &run.StartedAt
+	}
+	if run.EndedAt.UnixMilli() > 0 {
+		endedAt = &run.EndedAt
+	}
+	if run.SourceID != "" {
+		sourceID = &run.SourceID
+	}
+
+	triggerIDs := []ulid.ULID{}
+	for _, evtID := range run.TriggerIDs {
+		if id, err := ulid.Parse(evtID); err == nil {
+			triggerIDs = append(triggerIDs, id)
+		}
+	}
+
+	triggers := []string{}
+	for _, byt := range run.Triggers {
+		triggers = append(triggers, string(byt))
+	}
+
+	if len(run.Output) > 0 {
+		o := string(run.Output)
+		output = &o
+	}
+
+	if run.BatchID != nil {
+		ts := ulid.Time(run.BatchID.Time())
+		batchTS = &ts
+	}
+
+	status, err := models.ToFunctionRunStatus(run.Status)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing status: %w", err)
+	}
+
+	res := models.FunctionRunV2{
+		ID:             runid,
+		AppID:          run.AppID,
+		FunctionID:     run.FunctionID,
+		TraceID:        run.TraceID,
+		QueuedAt:       run.QueuedAt,
+		StartedAt:      startedAt,
+		EndedAt:        endedAt,
+		Status:         status,
+		SourceID:       sourceID,
+		TriggerIDs:     triggerIDs,
+		Triggers:       triggers,
+		IsBatch:        run.IsBatch,
+		BatchCreatedAt: batchTS,
+		CronSchedule:   run.CronSchedule,
+		Output:         output,
+	}
+
+	return &res, nil
 }
 
 func (r *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID string) (*models.RunTraceSpanOutput, error) {

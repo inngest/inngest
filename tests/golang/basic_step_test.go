@@ -9,13 +9,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFunctionSteps(t *testing.T) {
+	ctx := context.Background()
+
+	c := client.New(t)
 	h, server, registerFuncs := NewSDKHandler(t, "my-app")
 	defer server.Close()
 
@@ -81,7 +86,7 @@ func TestFunctionSteps(t *testing.T) {
 			"id":   "1",
 		},
 	}
-	_, err := inngestgo.Send(context.Background(), evt)
+	_, err := inngestgo.Send(ctx, evt)
 	require.NoError(t, err)
 
 	<-time.After(3 * time.Second)
@@ -120,7 +125,7 @@ func TestFunctionSteps(t *testing.T) {
 
 	t.Run("waitForEvents succeed", func(t *testing.T) {
 		// Send the first event to trigger the wait.
-		_, err = inngestgo.Send(context.Background(), inngestgo.Event{
+		_, err = inngestgo.Send(ctx, inngestgo.Event{
 			Name: "api/new.event",
 			Data: map[string]any{
 				"test": true,
@@ -131,7 +136,7 @@ func TestFunctionSteps(t *testing.T) {
 		<-time.After(time.Second)
 
 		// And the second event to trigger the next wait.
-		_, err = inngestgo.Send(context.Background(), inngestgo.Event{
+		_, err = inngestgo.Send(ctx, inngestgo.Event{
 			Name: "api/new.event",
 			Data: map[string]any{
 				"ok": "yes",
@@ -147,4 +152,19 @@ func TestFunctionSteps(t *testing.T) {
 		}, 15*time.Second, time.Second)
 	})
 
+	t.Run("trace run should have appropriate data", func(t *testing.T) {
+		<-time.After(3 * time.Second)
+
+		require.Eventually(t, func() bool {
+			run := c.RunTraces(ctx, runID)
+			require.NotNil(t, run)
+			require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Status)
+			require.False(t, run.IsBatch)
+			require.Nil(t, run.BatchCreatedAt)
+
+			// TODO: add traces
+
+			return true
+		}, 10*time.Second, 2*time.Second)
+	})
 }

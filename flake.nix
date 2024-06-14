@@ -12,7 +12,7 @@
         pkgs = import nixpkgs { inherit system; };
         corepack = pkgs.stdenv.mkDerivation {
           name = "corepack";
-          buildInputs = [ pkgs.nodejs-18_x ];
+          buildInputs = [ pkgs.nodejs_20 ];
           phases = [ "installPhase" ];
           installPhase = ''
             mkdir -p $out/bin
@@ -40,7 +40,7 @@
 
             # Node
             typescript
-            nodejs-18_x
+            nodejs_20
 
             # LSPs
             gopls

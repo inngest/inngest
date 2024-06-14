@@ -9,10 +9,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/inngest/inngest/cmd/commands/internal/devconfig"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func NewCmdDev() *cobra.Command {
@@ -23,6 +25,7 @@ func NewCmdDev() *cobra.Command {
 		Run:     doDev,
 	}
 
+	cmd.Flags().String("config", "", "Path to the Dev Server configuration file")
 	cmd.Flags().String("host", "", "host to run the API on")
 	cmd.Flags().StringP("port", "p", "8288", "port to run the API on")
 	cmd.Flags().StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
@@ -58,26 +61,31 @@ func doDev(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	port, err := strconv.Atoi(cmd.Flag("port").Value.String())
+	if err = devconfig.InitConfig(ctx, cmd); err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+
+	port, err := strconv.Atoi(viper.GetString("port"))
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 	conf.EventAPI.Port = port
 
-	host := cmd.Flag("host").Value.String()
+	host := viper.GetString("host")
 	if host != "" {
 		conf.EventAPI.Addr = host
 	}
 
-	urls, _ := cmd.Flags().GetStringSlice("sdk-url")
+	urls := viper.GetStringSlice("urls")
 
 	// Run auto-discovery unless we've explicitly disabled it.
-	noDiscovery, _ := cmd.Flags().GetBool("no-discovery")
-	noPoll, _ := cmd.Flags().GetBool("no-poll")
-	pollInterval, _ := cmd.Flags().GetInt("poll-interval")
-	retryInterval, _ := cmd.Flags().GetInt("retry-interval")
-	tick, _ := cmd.Flags().GetInt("tick")
+	noDiscovery := viper.GetBool("no-discovery")
+	noPoll := viper.GetBool("no-poll")
+	pollInterval := viper.GetInt("poll-interval")
+	retryInterval := viper.GetInt("retry-interval")
+	tick := viper.GetInt("tick")
 
 	if err := telemetry.NewUserTracer(ctx, telemetry.TracerOpts{
 		ServiceName:   "devserver",
