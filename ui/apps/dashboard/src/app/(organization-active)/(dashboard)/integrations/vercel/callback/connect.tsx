@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, type ChangeEvent } from 'react';
-import { Button, NewButton } from '@inngest/components/Button/index';
+import { NewButton } from '@inngest/components/Button/index';
 import { Card } from '@inngest/components/Card/Card';
-import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowLeftSLine, RiArrowRightSLine, RiInformationLine } from '@remixicon/react';
 
 import type VercelIntegration from '../../../settings/integrations/vercel/VercelIntegration';
@@ -13,7 +12,6 @@ import type { VercelCallbackProps } from './page';
 const PAGE_SIZE = 4;
 
 export default function Connect({
-  searchParams,
   integrations,
 }: VercelCallbackProps & { integrations: VercelIntegration }) {
   const [projects, setProjects] = useState(integrations.projects);
@@ -32,8 +30,9 @@ export default function Connect({
   //     ? projects[0]
   //     : { ...projects[0], id: `id-${i}`, name: `project-${i}`, isEnabled: false }
   // );
-  const pages = Math.ceil(projects?.length / PAGE_SIZE);
-  const end = Math.min(start + PAGE_SIZE, projects?.length);
+
+  const pages = Math.ceil(projects.length / PAGE_SIZE);
+  const end = Math.min(start + PAGE_SIZE, projects.length);
 
   const submit = async () => {
     await updateVercelIntegration({
@@ -41,6 +40,8 @@ export default function Connect({
       projects,
     });
     setSaving(false);
+    //
+    // TODO: next stop
   };
 
   return (
@@ -56,14 +57,15 @@ export default function Connect({
         </Card.Header>
 
         <Card.Content className="p-0">
-          {[...projects?.slice(start, end)]?.map((p: any, i) => (
+          {[...projects.slice(start, end)].map((p: any, i) => (
             <div
+              key={`project-list-${i}`}
               className={`flow-row flex h-[72px] items-center justify-start ${
                 i !== end && 'border-b'
               } border-slate-200 px-6`}
             >
               <input
-                id={p!.id}
+                id={p.id}
                 type="checkbox"
                 className="mr-2 h-4 w-4 text-indigo-600 focus:outline-0 focus:ring-0"
                 onChange={check}
@@ -73,7 +75,7 @@ export default function Connect({
               <div className="text-base font-normal leading-7 text-slate-700">{p.name}</div>
             </div>
           ))}
-          {projects?.length > PAGE_SIZE && (
+          {projects.length > PAGE_SIZE && (
             <div className="row flex flex items-center justify-center p-2">
               <NewButton
                 appearance="ghost"
