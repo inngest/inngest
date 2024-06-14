@@ -484,6 +484,8 @@ func (tb *TraceTreeBuilder) processStepRun(ctx context.Context, span *cqrs.Span,
 		nested.Attempts = &attempt
 		nested.Status = status
 
+		// TODO: output
+
 		// last one
 		// update end time of the group as well
 		if i == len(peers)-1 {
@@ -512,7 +514,6 @@ func (tb *TraceTreeBuilder) processStepRun(ctx context.Context, span *cqrs.Span,
 		mod.ChildrenSpans = append(mod.ChildrenSpans, nested)
 		tb.processed[p.SpanID] = true
 	}
-	tb.processed[span.SpanID] = true
 
 	return nil
 }
