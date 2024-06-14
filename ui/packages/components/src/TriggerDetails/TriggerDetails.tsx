@@ -181,20 +181,19 @@ export function TriggerDetails({ className, getTrigger }: Props) {
                     )}
                   </dl>
                 </div>
-
-                {trigger?.payloads && type !== 'CRON' && (
-                  <div className="mt-4">
-                    <CodeBlock
-                      header={{
-                        title: trigger.isBatch ? 'Batch' : 'Event payload',
-                      }}
-                      tab={{
-                        content: prettyPayload ?? 'Unknown',
-                      }}
-                    />
-                  </div>
-                )}
               </Card.Content>
+              {trigger?.payloads && type !== 'CRON' && (
+                <div className="border-t border-slate-300">
+                  <CodeBlock
+                    header={{
+                      title: trigger.isBatch ? 'Batch' : 'Event payload',
+                    }}
+                    tab={{
+                      content: prettyPayload ?? 'Unknown',
+                    }}
+                  />
+                </div>
+              )}
             </Card>
           </>
         )}

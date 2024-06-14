@@ -414,7 +414,7 @@ export function CodeBlock({ header, tab, actions = [] }: CodeBlockProps) {
                 value={content}
                 theme="inngest-theme"
                 options={{
-                  extraEditorClassName: 'rounded-b-lg !w-full',
+                  extraEditorClassName: '!w-full',
                   readOnly: readOnly,
                   minimap: {
                     enabled: false,
