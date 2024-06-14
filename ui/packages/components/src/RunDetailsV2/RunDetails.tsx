@@ -93,8 +93,8 @@ export function RunDetails(props: Props) {
               run={nullishToLazy(run)}
               runID={runID}
               standalone={standalone}
+              result={result && <RunResult className="border-t border-slate-300" result={result} />}
             />
-            {result && <RunResult className="mb-4" result={result} />}
           </div>
 
           {run && <Timeline getResult={getResult} pathCreator={pathCreator} trace={run.trace} />}

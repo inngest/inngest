@@ -26,6 +26,7 @@ type Props = {
   rerun: (args: { fnID: string }) => Promise<unknown>;
   run: Lazy<Run>;
   runID: string;
+  result?: React.ReactNode;
 };
 
 type Run = {
@@ -55,6 +56,7 @@ export function RunInfo({
   run,
   runID,
   standalone,
+  result,
 }: Props) {
   let allowCancel = false;
   if (isLazyDone(run)) {
@@ -147,6 +149,7 @@ export function RunInfo({
             </dl>
           </div>
         </Card.Content>
+        {result}
       </Card>
     </div>
   );

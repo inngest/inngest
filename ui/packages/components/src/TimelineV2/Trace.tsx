@@ -101,9 +101,12 @@ export function Trace({
 
       {isExpanded && (
         <div className="ml-8">
-          <TraceInfo className="my-4 grow" pathCreator={pathCreator} trace={trace} />
-
-          {result && <RunResult className="mb-4" result={result} />}
+          <TraceInfo
+            className="my-4 grow"
+            pathCreator={pathCreator}
+            trace={trace}
+            result={result && <RunResult className="border-t border-slate-300" result={result} />}
+          />
 
           {trace.childrenSpans?.map((child, i) => {
             return (

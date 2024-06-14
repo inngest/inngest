@@ -19,9 +19,10 @@ type Props = {
     runPopout: (params: { runID: string }) => Route;
   };
   trace: Trace;
+  result?: React.ReactNode;
 };
 
-export function TraceInfo({ className, pathCreator, trace }: Props) {
+export function TraceInfo({ className, pathCreator, trace, result }: Props) {
   const delayText = formatMilliseconds(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
   );
@@ -142,6 +143,7 @@ export function TraceInfo({ className, pathCreator, trace }: Props) {
             {stepKindInfo}
           </dl>
         </Card.Content>
+        {result}
       </Card>
     </div>
   );
