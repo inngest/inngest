@@ -13,6 +13,61 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestInvokeTimeout(t *testing.T) {
+	ctx := context.Background()
+	r := require.New(t)
+	c := client.New(t)
+
+	appID := "InvokeTimeout-" + ulid.MustNew(ulid.Now(), nil).String()
+	h, server, registerFuncs := NewSDKHandler(t, appID)
+	defer server.Close()
+
+	invokedFnName := "invoked-fn"
+	invokedFn := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name:    invokedFnName,
+			Retries: inngestgo.IntPtr(0),
+		},
+		inngestgo.EventTrigger("none", nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			step.Sleep(ctx, "sleep", 5*time.Second)
+
+			return nil, nil
+		},
+	)
+
+	// This function will invoke the other function
+	runID := ""
+	evtName := "my-event"
+	mainFn := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name: "main-fn",
+		},
+		inngestgo.EventTrigger(evtName, nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			runID = input.InputCtx.RunID
+
+			_, _ = step.Invoke[any](
+				ctx,
+				"invoke",
+				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName, Timeout: 1 * time.Second},
+			)
+
+			return nil, nil
+		},
+	)
+
+	h.Register(invokedFn, mainFn)
+	registerFuncs()
+
+	// Trigger the main function and successfully invoke the other function
+	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
+	r.NoError(err)
+
+	// The invoke target times out and should fail the main run
+	c.WaitForRunStatus(ctx, t, "FAILED", &runID)
+}
+
 func TestInvokeRateLimit(t *testing.T) {
 	ctx := context.Background()
 	r := require.New(t)

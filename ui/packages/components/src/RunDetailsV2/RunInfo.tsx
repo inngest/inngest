@@ -144,12 +144,6 @@ export function RunInfo({
                   return <TimeElement date={endedAt} />;
                 }}
               </LazyElementWrapper>
-
-              <LazyElementWrapper label="Step count" lazy={run}>
-                {(run: Run) => {
-                  return <TextElement>{run.trace.childrenSpans?.length ?? 0}</TextElement>;
-                }}
-              </LazyElementWrapper>
             </dl>
           </div>
         </Card.Content>

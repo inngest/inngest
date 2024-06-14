@@ -230,7 +230,7 @@ export default function RunsPage({
       onScroll={(e) => fetchMoreOnScroll(e.target as HTMLDivElement)}
       ref={containerRef}
     >
-      <div className="sticky top-0 z-[100] flex items-center justify-between gap-2 bg-slate-50 px-8 py-2">
+      <div className="sticky top-0 z-[5] flex items-center justify-between gap-2 bg-slate-50 px-8 py-2">
         <div className="flex items-center gap-2">
           <SelectGroup>
             <TimeFieldFilter

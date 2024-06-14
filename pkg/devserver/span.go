@@ -1,6 +1,7 @@
 package devserver
 
 import (
+	"context"
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
@@ -20,19 +21,21 @@ type spanIngestionHandler struct {
 
 	dedup map[string]*cqrs.Span
 	runs  map[string]*cqrs.TraceRun
+	data  cqrs.Manager
 }
 
-func newSpanIngestionHandler() *spanIngestionHandler {
+func newSpanIngestionHandler(data cqrs.Manager) *spanIngestionHandler {
 	handler := &spanIngestionHandler{
 		dedup: map[string]*cqrs.Span{},
 		runs:  map[string]*cqrs.TraceRun{},
+		data:  data,
 	}
 
 	return handler
 }
 
 // Add adds the span and dedup it, taking the latest one needed
-func (sh *spanIngestionHandler) Add(span *cqrs.Span) {
+func (sh *spanIngestionHandler) Add(ctx context.Context, span *cqrs.Span) {
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
 
@@ -56,24 +59,24 @@ func (sh *spanIngestionHandler) Add(span *cqrs.Span) {
 		sh.dedup[key] = span
 	}
 
+	// TODO: find if there's already an entry in the DB and retrieve that instead
 	if span.RunID != nil {
 		// construct the run
 		var run *cqrs.TraceRun
 		if r, ok := sh.runs[span.RunID.String()]; ok {
 			run = r
 		} else {
-			// New
-			// TODO: set SourceID
-			run = &cqrs.TraceRun{
+			var err error
+			run, err = sh.data.FindOrCreateTraceRun(ctx, cqrs.FindOrCreateTraceRunOpt{
 				AccountID:   acctID,
 				WorkspaceID: wsID,
 				AppID:       appID,
 				FunctionID:  fnID,
 				TraceID:     span.TraceID,
 				RunID:       *span.RunID,
-				QueuedAt:    ulid.Time(span.RunID.Time()),
-				TriggerIDs:  []ulid.ULID{},
-				Status:      enums.RunStatusUnknown,
+			})
+			if err != nil {
+				return
 			}
 		}
 
@@ -81,14 +84,7 @@ func (sh *spanIngestionHandler) Add(span *cqrs.Span) {
 		if len(run.TriggerIDs) == 0 {
 			evtIDs := spanAttr(span.SpanAttributes, consts.OtelSysEventIDs)
 			if evtIDs != "" {
-				triggerIDs := []ulid.ULID{}
-				ids := strings.Split(evtIDs, ",")
-				for _, i := range ids {
-					if val, err := ulid.Parse(i); err == nil {
-						triggerIDs = append(triggerIDs, val)
-					}
-				}
-				run.TriggerIDs = triggerIDs
+				run.TriggerIDs = strings.Split(evtIDs, ",")
 			}
 		}
 
@@ -120,11 +116,19 @@ func (sh *spanIngestionHandler) Add(span *cqrs.Span) {
 		}
 
 		// Annotate if run is batch or debounce
-		if spanAttr(span.SpanAttributes, consts.OtelSysBatchFull) != "" || spanAttr(span.SpanAttributes, consts.OtelSysBatchTimeout) != "" {
+		batchID := spanAttr(span.SpanAttributes, consts.OtelSysBatchID)
+		if batchID != "" {
+			if bid, err := ulid.Parse(batchID); err == nil {
+				run.BatchID = &bid
+			}
 			run.IsBatch = true
 		}
 		if spanAttr(span.SpanAttributes, consts.OtelSysDebounceTimeout) != "" {
 			run.IsDebounce = true
+		}
+		cron := spanAttr(span.SpanAttributes, consts.OtelSysCronExpr)
+		if cron != "" {
+			run.CronSchedule = &cron
 		}
 
 		// assign it back

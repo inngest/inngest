@@ -231,6 +231,13 @@ func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
 	}
 }
 
+func WithPreDeleteStateSizeReporter(f execution.PreDeleteStateSizeReporter) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).preDeleteStateSizeReporter = f
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log *zerolog.Logger
@@ -257,6 +264,8 @@ type executor struct {
 
 	// steplimit finds step limits for a given run.
 	steplimit func(sv2.ID) int
+
+	preDeleteStateSizeReporter execution.PreDeleteStateSizeReporter
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -374,7 +383,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			},
 		},
 		Config: sv2.Config{
-			FunctionSlug:    req.Function.GetSlug(),
 			FunctionVersion: req.Function.FunctionVersion,
 			SpanID:          telemetry.NewSpanID(ctx).String(),
 			EventIDs:        eventIDs,
@@ -396,6 +404,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			metadata.Config.SetCronSchedule(cron)
 		}
 	}
+
+	// FunctionSlug is not stored in V1 format, so needs to be stored in Context
+	metadata.Config.SetFunctionSlug(req.Function.GetSlug())
 
 	carrier := telemetry.NewTraceCarrier()
 	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
@@ -809,9 +820,14 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, err
 	}
 	if v.stopWithoutRetry {
+		if e.preDeleteStateSizeReporter != nil {
+			e.preDeleteStateSizeReporter(ctx, md)
+		}
+
 		// Validation prevented execution and doesn't want the executor to retry, so
 		// don't return an error - assume the function finishes and delete state.
-		return nil, e.smv2.Delete(ctx, md.ID)
+		_, err := e.smv2.Delete(ctx, md.ID)
+		return nil, err
 	}
 
 	// Store the metadata in context for future use and propagate trace
@@ -1086,13 +1102,14 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 		// Check if this step permanently failed.  If so, the function is a failure.
 		if !resp.Retryable() {
 			// TODO: Refactor state input
-			if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+			if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 				logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+			} else if performedFinalization {
+				for _, e := range e.lifecycles {
+					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
+				}
 			}
 
-			for _, e := range e.lifecycles {
-				go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
-			}
 			return resp
 		}
 	}
@@ -1101,14 +1118,24 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 	if len(resp.Generator) > 0 {
 		// Handle generator responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, i, resp); serr != nil {
+
 			// If this is an error compiling async expressions, fail the function.
-			if strings.Contains(serr.Error(), "error compiling expression") {
-				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+			if shouldFailEarly := errors.Is(serr, &expressions.CompileError{}); shouldFailEarly {
+				var gracefulErr *state.WrappedStandardError
+				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
+					serialized := gracefulErr.Serialize(execution.StateErrorKey)
+					resp.Output = nil
+					resp.Err = &serialized
+				}
+
+				if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 					logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+				} else if performedFinalization {
+					for _, e := range e.lifecycles {
+						go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
+					}
 				}
-				for _, e := range e.lifecycles {
-					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
-				}
+
 				return nil
 			}
 			return fmt.Errorf("error handling generator response: %w", serr)
@@ -1117,12 +1144,12 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 	}
 
 	// This is the function result.
-	if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+	if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-	}
-
-	for _, e := range e.lifecycles {
-		go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
+	} else if performedFinalization {
+		for _, e := range e.lifecycles {
+			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
+		}
 	}
 
 	return nil
@@ -1156,26 +1183,40 @@ func (f functionFinishedData) Map() map[string]any {
 	return s.Map()
 }
 
-func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, resp state.DriverResponse) error {
+// finalize performs run finalization, which involves sending the function
+// finished/failed event and deleting state.
+//
+// Returns a boolean indicating whether it performed finalization. If the run
+// had parallel steps then it may be false, since parallel steps cause the
+// function end to be reached multiple times in a single run
+func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, resp state.DriverResponse) (bool, error) {
 	// Parse events for the fail handler before deleting state.
 	inputEvents := make([]event.Event, len(evts))
 	for n, e := range evts {
 		evt, err := event.NewEvent(e)
 		if err != nil {
-			return err
+			return false, err
 		}
 		inputEvents[n] = *evt
 	}
 
+	if e.preDeleteStateSizeReporter != nil {
+		e.preDeleteStateSizeReporter(ctx, md)
+	}
+
 	// Delete the function state in every case.
-	if err := e.smv2.Delete(ctx, md.ID); err != nil {
+	performedFinalization, err := e.smv2.Delete(ctx, md.ID)
+	if err != nil {
 		logger.StdlibLogger(ctx).Error("error deleting state in finalize", "error", err)
+	}
+	if err == nil && !performedFinalization {
+		return performedFinalization, nil
 	}
 
 	// TODO: Load all pauses for the function and remove, once we index pauses.
 
 	if e.finishHandler == nil {
-		return nil
+		return performedFinalization, nil
 	}
 
 	// Prepare events that we must send
@@ -1228,7 +1269,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		}
 	}
 
-	return e.finishHandler(ctx, md.ID, freshEvents)
+	return performedFinalization, e.finishHandler(ctx, md.ID, freshEvents)
 }
 
 func correlationID(event event.Event) *string {
@@ -1730,29 +1771,33 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		return fmt.Errorf("unable to load run: %w", err)
 	}
 
-	// We need the function slug.
-	f, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
-	if err != nil {
-		return fmt.Errorf("unable to load function: %w", err)
-	}
-
 	// We need events to finalize the function.
 	evts, err := e.smv2.LoadEvents(ctx, id)
 	if err != nil {
 		return fmt.Errorf("unable to load run events: %w", err)
 	}
 
-	fnCancelledErr := state.ErrFunctionCancelled.Error()
-	err = e.finalize(ctx, md, evts, f.GetSlug(), state.DriverResponse{
-		Err: &fnCancelledErr,
-	})
-	if err != nil {
-		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-	}
-
 	ctx = e.extractTraceCtx(ctx, md, nil)
 	for _, e := range e.lifecycles {
 		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r)
+	}
+
+	// We need the function slug.
+	f, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
+	if err != nil {
+		return fmt.Errorf("unable to load function: %w", err)
+	}
+
+	fnCancelledErr := state.ErrFunctionCancelled.Error()
+	if performedFinalization, err := e.finalize(ctx, md, evts, f.GetSlug(), state.DriverResponse{
+		Err: &fnCancelledErr,
+	}); err != nil {
+		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+	} else if performedFinalization {
+		ctx = e.extractTraceCtx(ctx, md, nil)
+		for _, e := range e.lifecycles {
+			go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r)
+		}
 	}
 
 	return nil
@@ -1832,6 +1877,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			Identifier:            pause.Identifier,
 			PriorityFactor:        md.Config.PriorityFactor,
 			CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+			MaxAttempts:           pause.MaxAttempts,
 			Payload: queue.PayloadEdge{
 				Edge: pause.Edge(),
 			},
@@ -1901,11 +1947,18 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 						)
 						defer span.End()
 						span.SetAttributes(commonAttrs...)
+
+						var output any
 						if r.With != nil {
-							span.SetStepOutput(r.With)
+							output = r.With
 						}
 						if r.HasError() {
+							output = r.Error()
 							span.SetStatus(codes.Error, r.Error())
+						}
+
+						if output != nil {
+							span.SetStepOutput(output)
 						}
 					}
 				}
@@ -2424,7 +2477,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 			attribute.String(consts.OtelSysWorkspaceID, i.item.Identifier.WorkspaceID.String()),
 			attribute.String(consts.OtelSysAppID, i.item.Identifier.AppID.String()),
 			attribute.String(consts.OtelSysFunctionID, i.item.Identifier.WorkflowID.String()),
-			attribute.String(consts.OtelSysFunctionSlug, i.md.Config.FunctionSlug),
+			attribute.String(consts.OtelSysFunctionSlug, i.md.Config.FunctionSlug()),
 			attribute.Int(consts.OtelSysFunctionVersion, i.item.Identifier.WorkflowVersion),
 			attribute.String(consts.OtelAttrSDKRunID, i.item.Identifier.RunID.String()),
 			attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
@@ -2456,6 +2509,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		InvokeCorrelationID: &correlationID,
 		TriggeringEventID:   &evt.ID,
 		InvokeTargetFnID:    &opts.FunctionID,
+		MaxAttempts:         i.item.MaxAttempts,
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
@@ -2482,6 +2536,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		Identifier:            i.item.Identifier,
 		PriorityFactor:        i.item.PriorityFactor,
 		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
+		MaxAttempts:           i.item.MaxAttempts,
 		Payload: queue.PayloadPauseTimeout{
 			PauseID:   pauseID,
 			OnTimeout: true,
@@ -2544,11 +2599,17 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 			"event": evt.Map(),
 		})
 		if err != nil {
-			logger.StdlibLogger(ctx).Warn(
-				"error interpolating waitForEvent expression",
-				"error", err,
-				"expression", *opts.If,
-			)
+			var compileError *expressions.CompileError
+			if errors.As(err, &compileError) {
+				return fmt.Errorf("error interpolating wait for event expression: %w", state.WrapInStandardError(
+					compileError,
+					"CompileError",
+					"Could not compile expression",
+					compileError.Message(),
+				))
+			}
+
+			return fmt.Errorf("error interpolating wait for event expression: %w", err)
 		}
 		expr = &interpolated
 
@@ -2610,6 +2671,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		Event:       &opts.Event,
 		Expression:  expr,
 		DataKey:     gen.ID,
+		MaxAttempts: i.item.MaxAttempts,
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},

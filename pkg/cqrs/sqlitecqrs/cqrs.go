@@ -3,6 +3,7 @@ package sqlitecqrs
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -657,6 +658,11 @@ func (w wrapper) InsertSpan(ctx context.Context, span *cqrs.Span) error {
 }
 
 func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
+	runid, err := ulid.Parse(run.RunID)
+	if err != nil {
+		return fmt.Errorf("error parsing runID as ULID: %w", err)
+	}
+
 	params := sqlc.InsertTraceRunParams{
 		AccountID:   run.AccountID,
 		WorkspaceID: run.WorkspaceID,
@@ -664,73 +670,175 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 		FunctionID:  run.FunctionID,
 		TraceID:     []byte(run.TraceID),
 		SourceID:    run.SourceID,
-		RunID:       run.RunID,
+		RunID:       runid,
 		QueuedAt:    run.QueuedAt.UnixMilli(),
 		StartedAt:   run.StartedAt.UnixMilli(),
 		EndedAt:     run.EndedAt.UnixMilli(),
 		Status:      run.Status.ToCode(),
 		TriggerIds:  []byte{},
 		Output:      run.Output,
-		IsBatch:     run.IsBatch,
 		IsDebounce:  run.IsDebounce,
 	}
 
-	evtIDs := make([]string, len(run.TriggerIDs))
-	for i, id := range run.TriggerIDs {
-		evtIDs[i] = id.String()
+	if run.BatchID != nil {
+		params.BatchID = *run.BatchID
 	}
-	if len(evtIDs) > 0 {
-		params.TriggerIds = []byte(strings.Join(evtIDs, ","))
+	if len(run.TriggerIDs) > 0 {
+		params.TriggerIds = []byte(strings.Join(run.TriggerIDs, ","))
 	}
 
 	return w.q.InsertTraceRun(ctx, params)
 }
 
-func (w wrapper) GetSpansByTraceIDAndRunID(ctx context.Context, tid string, runID ulid.ULID) ([]*cqrs.Span, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-// traceRun is a model mapped to the `trace_runs` table
-type traceRun struct {
-	AccountID   uuid.UUID `db:"account_id"`
-	WorkspaceID uuid.UUID `db:"workspace_id"`
-	AppID       uuid.UUID `db:"app_id"`
-	FunctionID  uuid.UUID `db:"function_id"`
-	TraceID     string    `db:"trace_id"`
-	RunID       ulid.ULID `db:"run_id"`
-	QueuedAt    int64     `db:"queued_at"`
-	StartedAt   int64     `db:"started_at"`
-	EndedAt     int64     `db:"ended_at"`
-	Status      int64     `db:"status"`
-	SourceID    string    `db:"source_id"`
-	TriggerIDs  []byte    `db:"trigger_ids"`
-	Output      []byte    `db:"output, omitempty"`
-	IsBatch     bool      `db:"is_batch"`
-	IsDebounce  bool      `db:"is_debounce"`
-}
-
-func (tr *traceRun) EventIDs() []ulid.ULID {
-	if len(tr.TriggerIDs) == 0 {
-		return []ulid.ULID{}
-	}
-
-	list := strings.Split(string(tr.TriggerIDs), ",")
-	if len(list) == 0 {
-		return []ulid.ULID{}
-	}
-
-	res := []ulid.ULID{}
-	for _, s := range list {
-		if id, err := ulid.Parse(s); err == nil {
-			res = append(res, id)
-		}
-	}
-	return res
-}
-
 type traceRunCursorFilter struct {
 	ID    string
 	Value int64
+}
+
+func (w wrapper) GetTraceSpansByRun(ctx context.Context, id cqrs.TraceRunIdentifier) ([]*cqrs.Span, error) {
+	spans, err := w.q.GetTraceSpans(ctx, id.RunID)
+	if err != nil {
+		return nil, err
+	}
+
+	res := []*cqrs.Span{}
+	seen := map[string]bool{}
+	for _, s := range spans {
+		// identifier to used for checking if this span is seen already
+		m := map[string]any{
+			"ts":  s.Timestamp.UnixMilli(),
+			"tid": string(s.TraceID),
+			"sid": string(s.SpanID),
+		}
+		byt, err := json.Marshal(m)
+		if err != nil {
+			return nil, err
+		}
+		ident := base64.StdEncoding.EncodeToString(byt)
+		if _, ok := seen[ident]; ok {
+			// already seen, so continue
+			continue
+		}
+
+		span := &cqrs.Span{
+			Timestamp:    s.Timestamp,
+			TraceID:      string(s.TraceID),
+			SpanID:       string(s.SpanID),
+			SpanName:     s.SpanName,
+			SpanKind:     s.SpanKind,
+			ServiceName:  s.ServiceName,
+			ScopeName:    s.ScopeName,
+			ScopeVersion: s.ScopeVersion,
+			Duration:     time.Duration(s.Duration * int64(time.Millisecond)),
+			StatusCode:   s.StatusCode,
+			RunID:        &s.RunID,
+		}
+
+		if s.StatusMessage.Valid {
+			span.StatusMessage = &s.StatusMessage.String
+		}
+
+		if len(s.ParentSpanID) > 0 {
+			psid := string(s.ParentSpanID)
+			span.ParentSpanID = &psid
+		}
+		if len(s.TraceState) > 0 {
+			state := string(s.TraceState)
+			span.TraceState = &state
+		}
+
+		var resourceAttr, spanAttr map[string]string
+		if err := json.Unmarshal(s.ResourceAttributes, &resourceAttr); err == nil {
+			span.ResourceAttributes = resourceAttr
+		}
+		if err := json.Unmarshal(s.SpanAttributes, &spanAttr); err == nil {
+			span.SpanAttributes = spanAttr
+		}
+
+		res = append(res, span)
+	}
+
+	return res, nil
+}
+
+func (w wrapper) FindOrCreateTraceRun(ctx context.Context, opts cqrs.FindOrCreateTraceRunOpt) (*cqrs.TraceRun, error) {
+	run, err := w.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: opts.RunID})
+	if err == nil {
+		return run, nil
+	}
+
+	new := cqrs.TraceRun{
+		AccountID:   opts.AccountID,
+		WorkspaceID: opts.WorkspaceID,
+		AppID:       opts.AppID,
+		FunctionID:  opts.FunctionID,
+		RunID:       opts.RunID.String(),
+		TraceID:     opts.TraceID,
+		QueuedAt:    ulid.Time(opts.RunID.Time()),
+		TriggerIDs:  []string{},
+		Status:      enums.RunStatusUnknown,
+	}
+
+	// create a new trace run
+	if err := w.InsertTraceRun(ctx, &new); err != nil {
+		return nil, err
+	}
+
+	return &new, nil
+}
+
+func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
+
+	run, err := w.q.GetTraceRun(ctx, id.RunID)
+	if err != nil {
+		return nil, err
+	}
+
+	start := time.UnixMilli(run.StartedAt)
+	end := time.UnixMilli(run.EndedAt)
+	triggerIDS := strings.Split(string(run.TriggerIds), ",")
+
+	var (
+		isBatch bool
+		batchID *ulid.ULID
+		cron    *string
+	)
+
+	if run.BatchID != nilULID {
+		isBatch = true
+		batchID = &run.BatchID
+	}
+
+	if run.CronSchedule.Valid {
+		cron = &run.CronSchedule.String
+	}
+
+	trun := cqrs.TraceRun{
+		AccountID:    run.AccountID,
+		WorkspaceID:  run.WorkspaceID,
+		AppID:        run.AppID,
+		FunctionID:   run.FunctionID,
+		TraceID:      string(run.TraceID),
+		RunID:        id.RunID.String(),
+		QueuedAt:     time.UnixMilli(run.QueuedAt),
+		StartedAt:    start,
+		EndedAt:      end,
+		Duration:     end.Sub(start),
+		SourceID:     run.SourceID,
+		TriggerIDs:   triggerIDS,
+		Output:       run.Output,
+		Status:       enums.RunCodeToStatus(run.Status),
+		BatchID:      batchID,
+		IsBatch:      isBatch,
+		CronSchedule: cron,
+		// TODO: fill in triggers
+	}
+
+	return &trun, nil
+}
+
+func (w wrapper) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
@@ -864,7 +972,6 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			"source_id",
 			"trigger_ids",
 			"output",
-			"is_batch",
 			"is_debounce",
 		).
 		Where(filter...).
@@ -882,7 +989,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 
 	res := []*cqrs.TraceRun{}
 	for rows.Next() {
-		data := traceRun{}
+		data := sqlc.TraceRun{}
 		err := rows.Scan(
 			&data.AppID,
 			&data.FunctionID,
@@ -893,9 +1000,8 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			&data.EndedAt,
 			&data.Status,
 			&data.SourceID,
-			&data.TriggerIDs,
+			&data.TriggerIds,
 			&data.Output,
-			&data.IsBatch,
 			&data.IsDebounce,
 		)
 		if err != nil {
@@ -930,11 +1036,19 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			log.From(ctx).Error().Err(err).Interface("page_cursor", pc).Msg("error encoding cursor")
 		}
 
+		var (
+			isBatch bool
+		)
+
+		if data.BatchID != nilULID {
+			isBatch = true
+		}
+
 		res = append(res, &cqrs.TraceRun{
 			AppID:      data.AppID,
 			FunctionID: data.FunctionID,
-			TraceID:    data.TraceID,
-			RunID:      data.RunID,
+			TraceID:    string(data.TraceID),
+			RunID:      data.RunID.String(),
 			QueuedAt:   time.UnixMilli(data.QueuedAt),
 			StartedAt:  time.UnixMilli(data.StartedAt),
 			EndedAt:    time.UnixMilli(data.EndedAt),
@@ -943,7 +1057,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			Triggers:   [][]byte{},
 			Output:     data.Output,
 			Status:     enums.RunCodeToStatus(data.Status),
-			IsBatch:    data.IsBatch,
+			IsBatch:    isBatch,
 			IsDebounce: data.IsDebounce,
 			Cursor:     cursor,
 		})

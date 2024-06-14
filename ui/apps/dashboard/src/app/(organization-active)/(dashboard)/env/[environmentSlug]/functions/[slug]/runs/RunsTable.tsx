@@ -113,7 +113,10 @@ export default function RunsTable({
         {isEmpty && (
           <tr>
             {/* TODO: when we introduce column visibility options, this colSpan has to be dinamically calculated depending on # visible columns */}
-            <td className="pt-28 text-center align-top font-medium text-slate-600" colSpan={5}>
+            <td
+              className="pt-28 text-center align-top font-medium text-slate-600"
+              colSpan={table.getAllColumns().length}
+            >
               No results were found.
             </td>
           </tr>

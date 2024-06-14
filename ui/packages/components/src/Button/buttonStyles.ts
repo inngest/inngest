@@ -113,11 +113,11 @@ export const getIconSizeStyles = ({ size }: ButtonSizeParams) => {
 export const getSpinnerStyles = ({ appearance, kind }: ButtonColorParams) => {
   const defaultSpinnerStyles = {
     primary: 'fill-primary-moderate',
-    secondary: 'fill-foreground-subtle',
+    secondary: 'fill-subtle',
     danger: 'fill-tertiary-moderate',
   };
   if (appearance === 'outlined') {
     return defaultSpinnerStyles[kind];
   }
-  return 'fill-foreground-onContrast';
+  return 'fill-onContrast';
 };

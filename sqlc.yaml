@@ -103,6 +103,11 @@ sql:
               package: "ulid"
               type: "ULID"
 
+          - column: "trace_runs.run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
           - column: "trace_runs.account_id"
             go_type: "github.com/google/uuid.UUID"
           - column: "trace_runs.workspace_id"
@@ -111,7 +116,7 @@ sql:
             go_type: "github.com/google/uuid.UUID"
           - column: "trace_runs.function_id"
             go_type: "github.com/google/uuid.UUID"
-          - column: "trace_runs.run_id"
+          - column: "trace_runs.batch_id"
             go_type:
               import: "github.com/oklog/ulid/v2"
               package: "ulid"
