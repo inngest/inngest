@@ -18,17 +18,17 @@ const syncStatusText: Record<string, string> = {
 } as const satisfies { [key in SyncStatus]: unknown };
 
 const syncStatusColor: Record<string, string> = {
-  duplicate: 'bg-teal-100 text-teal-800 border-teal-500',
-  error: 'bg-rose-100 text-rose-800 border-rose-500',
-  pending: 'bg-sky-100 text-sky-800 border-sky-500',
-  success: 'bg-teal-100 text-teal-800 border-teal-500',
+  duplicate: 'bg-canvasBase text-status-completed border-status-completed',
+  error: 'bg-canvasBase text-status-failed border-status-failed',
+  pending: 'bg-canvasBase text-status-running border-status-running',
+  success: 'bg-canvasBase text-status-completed border-status-completed',
 } as const satisfies { [key in SyncStatus]: unknown };
 
 const syncStatusIconColor: Record<string, string> = {
-  duplicate: 'text-teal-500',
-  error: 'text-rose-700',
-  pending: 'text-sky-500',
-  success: 'text-teal-500',
+  duplicate: 'text-status-completed',
+  error: 'text-status-failed',
+  pending: 'text-status-running',
+  success: 'text-status-completed',
 } as const satisfies { [key in SyncStatus]: unknown };
 
 type Props = {
@@ -39,8 +39,9 @@ type Props = {
 export function SyncStatusPill({ status, iconOnly = false }: Props) {
   const Icon = syncStatusIcons[status] ?? RiSubtractLine;
   const text = syncStatusText[status] ?? 'Unknown';
-  const color = syncStatusColor[status] ?? 'bg-slate-100 text-slate-800 border-slate-500';
-  const iconColor = syncStatusIconColor[status] ?? 'text-slate-500';
+  const color =
+    syncStatusColor[status] ?? 'bg-canvasBase text-status-cancelled border-status-cancelled';
+  const iconColor = syncStatusIconColor[status] ?? 'text-status-cancelled';
 
   const iconProps = {
     className: cn(iconColor, 'h-4 w-4'),
