@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, type ChangeEvent } from 'react';
+import { type Route } from 'next';
+import { useRouter } from 'next/navigation';
 import { NewButton } from '@inngest/components/Button/index';
 import { Card } from '@inngest/components/Card/Card';
 import { RiArrowLeftSLine, RiArrowRightSLine, RiInformationLine } from '@remixicon/react';
@@ -12,8 +14,10 @@ import type { VercelCallbackProps } from './page';
 const PAGE_SIZE = 4;
 
 export default function Connect({
+  searchParams,
   integrations,
 }: VercelCallbackProps & { integrations: VercelIntegration }) {
+  const router = useRouter();
   const [projects, setProjects] = useState(integrations.projects);
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
@@ -40,8 +44,9 @@ export default function Connect({
       projects,
     });
     setSaving(false);
-    //
-    // TODO: next stop
+    router.push(
+      `/integrations/vercel/callback/success?onSuccessRedirectURL=${searchParams.next}` as Route
+    );
   };
 
   return (
@@ -51,7 +56,7 @@ export default function Connect({
           <div className="flex flex-row items-center justify-between">
             <div className="text-base text-gray-900">Project list</div>
             <div className="text-sm font-medium text-slate-400">
-              {projects.length || 0} projects selected
+              {projects.filter((p) => p.isEnabled).length || 0} projects selected
             </div>
           </div>
         </Card.Header>
@@ -60,7 +65,7 @@ export default function Connect({
           {[...projects.slice(start, end)].map((p: any, i) => (
             <div
               key={`project-list-${i}`}
-              className={`flow-row flex h-[72px] items-center justify-start ${
+              className={`flex flex h-[72px] flex-row items-center justify-start ${
                 i !== end && 'border-b'
               } border-slate-200 px-6`}
             >
