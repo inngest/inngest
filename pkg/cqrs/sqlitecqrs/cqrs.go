@@ -711,8 +711,8 @@ func (w wrapper) GetTraceSpansByRun(ctx context.Context, id cqrs.TraceRunIdentif
 		// identifier to used for checking if this span is seen already
 		m := map[string]any{
 			"ts":  s.Timestamp.UnixMilli(),
-			"tid": string(s.TraceID),
-			"sid": string(s.SpanID),
+			"tid": s.TraceID,
+			"sid": s.SpanID,
 		}
 		byt, err := json.Marshal(m)
 		if err != nil {
@@ -758,6 +758,7 @@ func (w wrapper) GetTraceSpansByRun(ctx context.Context, id cqrs.TraceRunIdentif
 		}
 
 		res = append(res, span)
+		seen[ident] = true
 	}
 
 	return res, nil

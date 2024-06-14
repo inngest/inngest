@@ -1,6 +1,8 @@
 package sqlc
 
-import "strings"
+import (
+	"strings"
+)
 
 func (tr *TraceRun) EventIDs() []string {
 	if len(tr.TriggerIds) == 0 {

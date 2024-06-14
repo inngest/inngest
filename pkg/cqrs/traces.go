@@ -14,6 +14,14 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+type SpanStatus int
+
+const (
+	SpanStatusUnknown = iota
+	SpanStatusOk
+	SpanStatusError
+)
+
 // Span represents an distributed span in a function execution flow
 type Span struct {
 	Timestamp          time.Time         `json:"ts"`
@@ -88,6 +96,17 @@ func (s *Span) StepDisplayName() *string {
 		return &name
 	}
 	return nil
+}
+
+func (s *Span) Status() SpanStatus {
+	switch strings.ToUpper(s.StatusCode) {
+	case "OK", "STATUS_CODE_OK":
+		return SpanStatusOk
+	case "ERROR", "STATUS_CODE_ERROR":
+		return SpanStatusError
+	}
+
+	return SpanStatusUnknown
 }
 
 func (s *Span) FunctionStatus() enums.RunStatus {

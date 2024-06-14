@@ -55,7 +55,7 @@ func (sh *spanIngestionHandler) Add(ctx context.Context, span *cqrs.Span) {
 	_, _ = h.Write([]byte(id))
 	key := base64.StdEncoding.EncodeToString(h.Sum(nil))
 
-	if s, ok := sh.dedup[key]; !ok || span.Duration >= s.Duration {
+	if s, ok := sh.dedup[key]; !ok || (ok && span.Duration >= s.Duration) {
 		sh.dedup[key] = span
 	}
 

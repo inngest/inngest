@@ -310,13 +310,66 @@ func (tb *TraceTreeBuilder) Build(ctx context.Context) (*models.RunTraceSpan, er
 }
 
 func (tb *TraceTreeBuilder) toRunTraceSpan(ctx context.Context, s *cqrs.Span) (*models.RunTraceSpan, bool, error) {
+	res, skipped := tb.constructSpan(ctx, s)
+	if skipped {
+		return nil, skipped, nil
+	}
+
+	// NOTE: step status will be updated in the individual opcode updates
+	if s.ScopeName == consts.OtelScopeFunction {
+		switch s.FunctionStatus() {
+		case enums.RunStatusRunning:
+			res.Status = models.RunTraceSpanStatusRunning
+		case enums.RunStatusCompleted:
+			res.Status = models.RunTraceSpanStatusCompleted
+		case enums.RunStatusCancelled:
+			res.Status = models.RunTraceSpanStatusCancelled
+		case enums.RunStatusFailed, enums.RunStatusOverflowed:
+			res.Status = models.RunTraceSpanStatusFailed
+		default:
+			return nil, false, fmt.Errorf("unexpected run status: %v", s.FunctionStatus())
+		}
+	}
+
+	// handle each opcode separately
+	// process stepinfo based on stepOp
+	switch s.StepOpCode() {
+	case enums.OpcodeStepRun:
+		if err := tb.processStepRun(ctx, s, res); err != nil {
+			return nil, false, fmt.Errorf("error parsing step run span: %w", err)
+		}
+	case enums.OpcodeSleep:
+		if err := tb.processSleep(ctx, s, res); err != nil {
+			return nil, false, fmt.Errorf("error parsing sleep span: %w", err)
+		}
+	case enums.OpcodeWaitForEvent:
+		if err := tb.processWaitForEvent(ctx, s, res); err != nil {
+			return nil, false, fmt.Errorf("error parsing waitForEvent span: %w", err)
+		}
+	case enums.OpcodeInvokeFunction:
+		if err := tb.processInvoke(ctx, s, res); err != nil {
+			return nil, false, fmt.Errorf("error parsing invoke span: %w", err)
+		}
+	default: // these are likely execution spans
+		if err := tb.processExec(ctx, s, res); err != nil {
+			return nil, false, fmt.Errorf("error parsing execution span: %w", err)
+		}
+	}
+
+	// mark the span as processed
+	tb.processed[s.SpanID] = true
+
+	return res, false, nil
+}
+
+func (tb *TraceTreeBuilder) constructSpan(ctx context.Context, s *cqrs.Span) (*models.RunTraceSpan, bool) {
 	// already processed skip it
 	if _, ok := tb.processed[s.SpanID]; ok {
-		return nil, true, nil
+		return nil, true
 	}
 	// NOTE: is this check sufficient?
 	if s.SpanName == "function success" {
-		return nil, true, nil
+		return nil, true
 	}
 
 	var (
@@ -325,11 +378,6 @@ func (tb *TraceTreeBuilder) toRunTraceSpan(ctx context.Context, s *cqrs.Span) (*
 		runID         ulid.ULID
 		defaulAttempt int
 	)
-
-	// TODO:
-	// - check for group
-	// - if there are multiple entries, construct a grouping with all the spans in the group
-	// - mark the spans as converted so they don't get processed again
 
 	name := s.SpanName
 	if s.StepDisplayName() != nil {
@@ -349,7 +397,7 @@ func (tb *TraceTreeBuilder) toRunTraceSpan(ctx context.Context, s *cqrs.Span) (*
 	dur := s.DurationMS()
 	endedAt := s.Timestamp.Add(s.Duration)
 
-	res := models.RunTraceSpan{
+	return &models.RunTraceSpan{
 		AppID:        appID,
 		FunctionID:   fnID,
 		RunID:        runID,
@@ -363,57 +411,106 @@ func (tb *TraceTreeBuilder) toRunTraceSpan(ctx context.Context, s *cqrs.Span) (*
 		EndedAt:      &endedAt,
 		Duration:     &dur,
 		Attempts:     &defaulAttempt,
-	}
-
-	// TODO: assign step status
-	if s.ScopeName == consts.OtelScopeFunction {
-		switch s.FunctionStatus() {
-		case enums.RunStatusRunning:
-			res.Status = models.RunTraceSpanStatusRunning
-		case enums.RunStatusCompleted:
-			res.Status = models.RunTraceSpanStatusCompleted
-		case enums.RunStatusCancelled:
-			res.Status = models.RunTraceSpanStatusCancelled
-		case enums.RunStatusFailed, enums.RunStatusOverflowed:
-			res.Status = models.RunTraceSpanStatusFailed
-		default:
-			return nil, false, fmt.Errorf("unexpected run status: %v", s.FunctionStatus())
-		}
-	} else { // step or execution status
-	}
-
-	// handle each opcode separately
-	// process stepinfo based on stepOp
-	switch s.StepOpCode() {
-	case enums.OpcodeStepRun:
-		if err := tb.processStepRun(ctx, s, &res); err != nil {
-			return nil, false, fmt.Errorf("error parsing step run span: %w", err)
-		}
-	case enums.OpcodeSleep:
-		if err := tb.processSleep(ctx, s, &res); err != nil {
-			return nil, false, fmt.Errorf("error parsing sleep span: %w", err)
-		}
-	case enums.OpcodeWaitForEvent:
-		if err := tb.processWaitForEvent(ctx, s, &res); err != nil {
-			return nil, false, fmt.Errorf("error parsing waitForEvent span: %w", err)
-		}
-	case enums.OpcodeInvokeFunction:
-		if err := tb.processInvoke(ctx, s, &res); err != nil {
-			return nil, false, fmt.Errorf("error parsing invoke span: %w", err)
-		}
-	default: // these are likely execution spans
-		if err := tb.processExec(ctx, s, &res); err != nil {
-			return nil, false, fmt.Errorf("error parsing execution span: %w", err)
-		}
-	}
-
-	// mark the span as processed
-	tb.processed[s.SpanID] = true
-
-	return &res, false, nil
+	}, false
 }
 
 func (tb *TraceTreeBuilder) processStepRun(ctx context.Context, span *cqrs.Span, mod *models.RunTraceSpan) error {
+	// step runs should always have groupIDs
+	groupID := span.GroupID()
+	if groupID == nil {
+		return fmt.Errorf("step run missing group ID")
+	}
+
+	maxAttempts, err := strconv.Atoi(span.SpanAttributes[consts.OtelSysStepMaxAttempt])
+	if err != nil {
+		return fmt.Errorf("error parsing max attempts: %w", err)
+	}
+
+	// check how many peers are there in the group
+	peers, ok := tb.groups[*groupID]
+	if !ok {
+		return fmt.Errorf("internal error: groupID not registered: %s", *groupID)
+	}
+
+	stepOp := models.StepOpRun
+	mod.StepOp = &stepOp
+
+	// not need to provide nesting if it's just itself and it's successful
+	if len(peers) == 1 && span.Status() == cqrs.SpanStatusOk {
+		mod.Status = models.RunTraceSpanStatusCompleted
+		tb.processed[span.SpanID] = true
+		return nil
+	}
+
+	// modify the span as a group, and nest each peer under it instead
+	mod.SpanID = fmt.Sprintf("steprun-%s", *groupID)
+	if mod.ChildrenSpans == nil {
+		mod.ChildrenSpans = []*models.RunTraceSpan{}
+	}
+
+	// sort the peers in asc order before proceeding
+	sort.Slice(peers, func(i, j int) bool {
+		return peers[i].Timestamp.UnixMilli() < peers[j].Timestamp.UnixMilli()
+	})
+
+	for i, p := range peers {
+		nested, skipped := tb.constructSpan(ctx, p)
+		// NOTE: might be able to handle this better
+		if skipped {
+			continue
+		}
+
+		attempt := 1
+		if str, ok := p.SpanAttributes[consts.OtelSysStepAttempt]; ok {
+			if count, err := strconv.Atoi(str); err == nil {
+				attempt = count + 1
+			}
+		}
+
+		status := models.RunTraceSpanStatusRunning
+		switch p.Status() {
+		case cqrs.SpanStatusOk:
+			status = models.RunTraceSpanStatusCompleted
+		case cqrs.SpanStatusError:
+			status = models.RunTraceSpanStatusFailed
+		default:
+			nested.EndedAt = nil
+		}
+
+		nested.Name = fmt.Sprintf("Attempt %d", attempt)
+		nested.StepOp = &stepOp
+		nested.Attempts = &attempt
+		nested.Status = status
+
+		// last one
+		// update end time of the group as well
+		if i == len(peers)-1 {
+			pend := p.Timestamp.Add(p.Duration)
+
+			// TODO: check if the span has already completed or not
+			dur := int(pend.Sub(span.Timestamp) / time.Millisecond)
+			mod.Duration = &dur
+			mod.EndedAt = &pend
+
+			switch status {
+			case models.RunTraceSpanStatusRunning:
+				mod.EndedAt = nil
+			case models.RunTraceSpanStatusCompleted:
+				mod.Status = models.RunTraceSpanStatusCompleted
+			case models.RunTraceSpanStatusFailed:
+				// check if this failure is the final failure of all attempts
+				if attempt == maxAttempts {
+					mod.Status = models.RunTraceSpanStatusFailed
+					mod.Attempts = &maxAttempts
+				}
+			}
+		}
+
+		mod.ChildrenSpans = append(mod.ChildrenSpans, nested)
+		tb.processed[p.SpanID] = true
+	}
+	tb.processed[span.SpanID] = true
+
 	return nil
 }
 
@@ -532,10 +629,11 @@ func (tb *TraceTreeBuilder) processInvoke(ctx context.Context, span *cqrs.Span, 
 	// timeout
 	expstr, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeExpires]
 	if !ok {
-		fmt.Errorf("missing invoke expiration time")
+		return fmt.Errorf("missing invoke expiration time")
 	}
 	exp, err := strconv.ParseInt(expstr, 10, 64)
 	if err != nil {
+		return fmt.Errorf("error parsing expiration timestamp")
 	}
 	timeout := time.UnixMilli(exp)
 
