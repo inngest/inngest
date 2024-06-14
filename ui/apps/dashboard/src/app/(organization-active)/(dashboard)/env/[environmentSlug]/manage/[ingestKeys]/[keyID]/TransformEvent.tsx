@@ -171,15 +171,15 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
       </div>
       <div className="mb-6">
         <DashboardCodeBlock
-          tabs={[
-            {
-              label: 'Payload',
-              content: rawTransform ?? defaultTransform,
-              readOnly: false,
-              language: 'javascript',
-              handleChange: handleTransformCodeChange,
-            },
-          ]}
+          header={{
+            title: 'Payload',
+          }}
+          tab={{
+            content: rawTransform ?? defaultTransform,
+            readOnly: false,
+            language: 'javascript',
+            handleChange: handleTransformCodeChange,
+          }}
         />
       </div>
       <div className="mb-5 flex gap-5">
@@ -189,28 +189,28 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
             Paste the incoming JSON payload here to test your transform.
           </p>
           <DashboardCodeBlock
-            tabs={[
-              {
-                label: 'Payload',
-                content: incoming,
-                readOnly: false,
-                language: 'json',
-                handleChange: handleIncomingCodeChange,
-              },
-            ]}
+            header={{
+              title: 'Payload',
+            }}
+            tab={{
+              content: incoming,
+              readOnly: false,
+              language: 'json',
+              handleChange: handleIncomingCodeChange,
+            }}
           />
         </div>
         <div className="w-6/12">
           <h2 className="pb-1 text-lg font-semibold">Transformed Event</h2>
           <p className="mb-6 text-sm text-slate-700">Preview the transformed JSON payload here.</p>
           <DashboardCodeBlock
-            tabs={[
-              {
-                label: 'Payload',
-                content: output,
-                language: 'json',
-              },
-            ]}
+            header={{
+              title: 'Payload',
+            }}
+            tab={{
+              content: output,
+              language: 'json',
+            }}
           />
         </div>
       </div>

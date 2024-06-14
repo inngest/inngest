@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { toast } from 'sonner';
 
-import { RunResult } from '../RunResult';
 import { StatusCell } from '../Table';
 import { Trace } from '../TimelineV2';
 import { Timeline } from '../TimelineV2/Timeline';
@@ -93,8 +92,8 @@ export function RunDetails(props: Props) {
               run={nullishToLazy(run)}
               runID={runID}
               standalone={standalone}
+              result={result}
             />
-            {result && <RunResult className="mb-4" result={result} />}
           </div>
 
           {run && <Timeline getResult={getResult} pathCreator={pathCreator} trace={run.trace} />}

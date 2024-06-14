@@ -16,5 +16,9 @@ export default function DashboardCodeBlock(props: ComponentProps<typeof CodeBloc
 
   if (!clerk.loaded) return;
 
-  return <CodeBlock {...props} />;
+  return (
+    <CodeBlock.Wrapper>
+      <CodeBlock {...props} />
+    </CodeBlock.Wrapper>
+  );
 }
