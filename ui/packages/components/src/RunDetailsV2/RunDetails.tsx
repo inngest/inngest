@@ -93,7 +93,15 @@ export function RunDetails(props: Props) {
               run={nullishToLazy(run)}
               runID={runID}
               standalone={standalone}
-              result={result && <RunResult className="border-t border-slate-300" result={result} />}
+              result={
+                result && (
+                  <RunResult
+                    className="border-t border-slate-300"
+                    result={result}
+                    isSuccess={run?.trace.status === 'COMPLETED'}
+                  />
+                )
+              }
             />
           </div>
 

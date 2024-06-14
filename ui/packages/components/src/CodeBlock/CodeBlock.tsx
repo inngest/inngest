@@ -336,8 +336,7 @@ export function CodeBlock({ header, tab, actions = [] }: CodeBlockProps) {
           >
             <div
               className={cn(
-                'flex items-center justify-between ',
-                header?.status && 'border-l-4',
+                'flex items-center justify-between border-l-4 border-l-transparent',
                 header?.status === 'error' && 'border-l-status-failed',
                 header?.status === 'success' && 'border-l-status-complete'
               )}
@@ -345,7 +344,7 @@ export function CodeBlock({ header, tab, actions = [] }: CodeBlockProps) {
               <p
                 className={cn(
                   header?.status === 'error' ? 'text-status-failed' : 'text-muted',
-                  ' px-6 py-2.5 text-sm'
+                  ' px-5 py-2.5 text-sm'
                 )}
               >
                 {header?.title}

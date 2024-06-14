@@ -6,15 +6,17 @@ import type { Result } from './types/functionRun';
 type Props = {
   className?: string;
   result: Result;
+  isSuccess?: boolean;
 };
 
-export function RunResult({ className, result }: Props) {
+export function RunResult({ className, result, isSuccess }: Props) {
   return (
     <div className={className}>
       {result.data && (
         <CodeBlock
           header={{
             title: 'Output',
+            status: isSuccess ? 'success' : undefined,
           }}
           tab={{
             content: result.data,
