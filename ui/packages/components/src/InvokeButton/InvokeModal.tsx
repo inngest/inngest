@@ -52,6 +52,7 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
             handleChange: setRawPayload,
           },
         ]}
+        minLines={10}
       />
     );
   } else {

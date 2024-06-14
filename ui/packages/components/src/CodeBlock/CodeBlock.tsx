@@ -149,9 +149,10 @@ interface CodeBlockProps {
     handleChange?: (value: string) => void;
   }[];
   actions?: CodeBlockAction[];
+  minLines?: number;
 }
 
-export function CodeBlock({ className, header, tabs, actions = [] }: CodeBlockProps) {
+export function CodeBlock({ className, header, tabs, actions = [], minLines = 0 }: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
   const [activeTab, setActiveTab] = useState(0);
   const editorRef = useRef<MonacoEditorType>(null);
@@ -245,7 +246,8 @@ export function CodeBlock({ className, header, tabs, actions = [] }: CodeBlockPr
       if (isFullHeight) {
         editor.layout({ height: newHeight, width: containerWidthWithLineNumbers });
       } else {
-        const height = Math.min(MAX_HEIGHT, contentHeight);
+        const minHeight = minLines * LINE_HEIGHT + 20;
+        const height = Math.max(Math.min(MAX_HEIGHT, contentHeight), minHeight);
         editor.layout({ height: height, width: containerWidthWithLineNumbers });
       }
     }
