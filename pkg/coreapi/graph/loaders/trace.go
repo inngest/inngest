@@ -560,6 +560,7 @@ func (tb *TraceTreeBuilder) processWaitForEvent(ctx context.Context, span *cqrs.
 	wait := span.Children[0]
 
 	stepOp := models.StepOpWaitForEvent
+	status := models.RunTraceSpanStatusWaiting
 	dur := wait.DurationMS()
 	var (
 		evtName    string
@@ -582,13 +583,13 @@ func (tb *TraceTreeBuilder) processWaitForEvent(ctx context.Context, span *cqrs.
 	if v, ok := wait.SpanAttributes[consts.OtelSysStepWaitMatchedEventID]; ok {
 		if evtID, err := ulid.Parse(v); err == nil {
 			foundEvtID = &evtID
-			mod.Status = models.RunTraceSpanStatusCompleted
+			status = models.RunTraceSpanStatusCompleted
 			exp := false
 			expired = &exp
 		}
 	}
 	if !timeout.IsZero() && timeout.Before(time.Now()) {
-		mod.Status = models.RunTraceSpanStatusCompleted
+		status = models.RunTraceSpanStatusCompleted
 		if v, ok := wait.SpanAttributes[consts.OtelSysStepWaitExpired]; ok {
 			if exp, err := strconv.ParseBool(v); err == nil {
 				expired = &exp
@@ -599,6 +600,7 @@ func (tb *TraceTreeBuilder) processWaitForEvent(ctx context.Context, span *cqrs.
 	// set wait details
 	mod.StepOp = &stepOp
 	mod.Duration = &dur
+	mod.Status = status
 	mod.StepInfo = models.WaitForEventStepInfo{
 		EventName:    evtName,
 		Expression:   expr,

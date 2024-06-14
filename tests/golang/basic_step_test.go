@@ -157,7 +157,7 @@ func TestFunctionSteps(t *testing.T) {
 		require.Eventually(t, func() bool {
 			run := c.RunTraces(ctx, runID)
 			require.NotNil(t, run)
-			require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Status)
+			require.Equal(t, models.FunctionStatusCompleted.String(), run.Status)
 			require.False(t, run.IsBatch)
 			require.Nil(t, run.BatchCreatedAt)
 
@@ -169,57 +169,66 @@ func TestFunctionSteps(t *testing.T) {
 			rootSpanID := run.Trace.SpanID
 			// TODO: output test
 
-			// first step
-			one := run.Trace.ChildSpans[0]
-			assert.Equal(t, "1", one.Name)
-			assert.Equal(t, 1, one.Attempts)
-			assert.False(t, one.IsRoot)
-			assert.Equal(t, rootSpanID, one.ParentSpanID)
-			assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), one.Status)
-			// output test
-			// assert.NotNil(t, one.OutputID)
-			// oneOutput := c.RunTraceSpanOutput(*one.OutputID)
-			// assert.NotNil(t, oneOutput)
-			// assert.NotNil(t, oneOutput.Data)
-			// assert.Contains(t, *oneOutput.Data, "hello 1")
+			t.Run("step 1", func(t *testing.T) {
+				one := run.Trace.ChildSpans[0]
+				assert.Equal(t, "1", one.Name)
+				assert.Equal(t, 1, one.Attempts)
+				assert.False(t, one.IsRoot)
+				assert.Equal(t, rootSpanID, one.ParentSpanID)
+				assert.Equal(t, models.StepOpRun.String(), one.StepOp)
+				assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), one.Status)
+				// output test
+				// assert.NotNil(t, one.OutputID)
+				// oneOutput := c.RunTraceSpanOutput(*one.OutputID)
+				// assert.NotNil(t, oneOutput)
+				// assert.NotNil(t, oneOutput.Data)
+				// assert.Contains(t, *oneOutput.Data, "hello 1")
+			})
 
-			// second step
-			sec := run.Trace.ChildSpans[1]
-			assert.Equal(t, "2", sec.Name)
-			assert.Equal(t, 1, sec.Attempts)
-			assert.False(t, sec.IsRoot)
-			assert.Equal(t, rootSpanID, sec.ParentSpanID)
-			assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), sec.Status)
-			// output test
-			// assert.NotNil(t, sec.OutputID)
-			// secOutput := c.RunTraceSpanOutput(*sec.OutputID)
-			// assert.NotNil(t, secOutput)
-			// assert.NotNil(t, secOutput.Data)
-			// assert.Contains(t, *secOutput.Data, "hello 2")
+			t.Run("step 2", func(t *testing.T) {
+				sec := run.Trace.ChildSpans[1]
+				assert.Equal(t, "2", sec.Name)
+				assert.Equal(t, 1, sec.Attempts)
+				assert.False(t, sec.IsRoot)
+				assert.Equal(t, rootSpanID, sec.ParentSpanID)
+				assert.Equal(t, models.StepOpRun.String(), sec.StepOp)
+				assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), sec.Status)
+				// output test
+				// assert.NotNil(t, sec.OutputID)
+				// secOutput := c.RunTraceSpanOutput(*sec.OutputID)
+				// assert.NotNil(t, secOutput)
+				// assert.NotNil(t, secOutput.Data)
+				// assert.Contains(t, *secOutput.Data, "hello 2")
+			})
 
 			// third step
-			thr := run.Trace.ChildSpans[2]
-			assert.Equal(t, "delay", thr.Name)
-			assert.Equal(t, 0, thr.Attempts)
-			assert.False(t, thr.IsRoot)
-			assert.Equal(t, rootSpanID, thr.ParentSpanID)
-			assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), thr.Status)
-			require.NotNil(t, thr.StartedAt)
-			require.NotNil(t, thr.EndedAt)
-			// check sleep duration
-			expectedDur := (2 * time.Second).Milliseconds()
-			assert.Equal(t, expectedDur, thr.Duration)
+			t.Run("step sleep", func(t *testing.T) {
+				thr := run.Trace.ChildSpans[2]
+				assert.Equal(t, "delay", thr.Name)
+				assert.Equal(t, 0, thr.Attempts)
+				assert.False(t, thr.IsRoot)
+				assert.Equal(t, rootSpanID, thr.ParentSpanID)
+				assert.Equal(t, models.StepOpSleep.String(), thr.StepOp)
+				assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), thr.Status)
+				require.NotNil(t, thr.StartedAt)
+				require.NotNil(t, thr.EndedAt)
+				// check sleep duration
+				expectedDur := (2 * time.Second).Milliseconds()
+				assert.Equal(t, expectedDur, thr.Duration)
+			})
 
 			// forth
-			forth := run.Trace.ChildSpans[3]
-			assert.Equal(t, "wait1", forth.Name)
-			assert.Equal(t, 0, forth.Attempts)
-			assert.False(t, forth.IsRoot)
-			assert.Equal(t, rootSpanID, forth.ParentSpanID)
-			assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), forth.Status)
-			assert.NotNil(t, forth.StartedAt)
-			assert.NotNil(t, forth.EndedAt)
-			{
+			t.Run("wait step", func(t *testing.T) {
+				forth := run.Trace.ChildSpans[3]
+				assert.Equal(t, "wait1", forth.Name)
+				assert.Equal(t, 0, forth.Attempts)
+				assert.False(t, forth.IsRoot)
+				assert.Equal(t, rootSpanID, forth.ParentSpanID)
+				assert.Equal(t, models.StepOpWaitForEvent.String(), forth.StepOp)
+				assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), forth.Status)
+				assert.NotNil(t, forth.StartedAt)
+				assert.NotNil(t, forth.EndedAt)
+
 				var stepInfo models.WaitForEventStepInfo
 				byt, err := json.Marshal(forth.StepInfo)
 				assert.NoError(t, err)
@@ -227,7 +236,8 @@ func TestFunctionSteps(t *testing.T) {
 
 				assert.False(t, *stepInfo.TimedOut)
 				assert.NotNil(t, stepInfo.FoundEventID)
-			}
+
+			})
 
 			// check trigger
 			// trigger := c.RunTrigger(runID)

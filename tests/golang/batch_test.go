@@ -76,11 +76,15 @@ func TestBatchEvents(t *testing.T) {
 		require.Eventually(t, func() bool {
 			run := c.RunTraces(ctx, runID)
 			require.NotNil(t, run)
-			require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Status)
+			require.Equal(t, models.FunctionStatusCompleted.String(), run.Status)
 			require.True(t, run.IsBatch)
 			require.NotNil(t, run.BatchCreatedAt)
 
-			// TODO: add traces
+			require.NotNil(t, run.Trace)
+			require.True(t, run.Trace.IsRoot)
+			require.Equal(t, 0, len(run.Trace.ChildSpans))
+			require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
+			// TODO: output test
 
 			return true
 		}, 10*time.Second, 2*time.Second)
