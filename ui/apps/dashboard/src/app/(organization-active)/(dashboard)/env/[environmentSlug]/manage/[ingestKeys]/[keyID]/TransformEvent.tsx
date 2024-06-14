@@ -171,15 +171,15 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
       </div>
       <div className="mb-6">
         <DashboardCodeBlock
-          tabs={[
-            {
-              label: 'Payload',
-              content: rawTransform ?? defaultTransform,
-              readOnly: false,
-              language: 'javascript',
-              handleChange: handleTransformCodeChange,
-            },
-          ]}
+          header={{
+            title: 'Payload',
+          }}
+          tab={{
+            content: rawTransform ?? defaultTransform,
+            readOnly: false,
+            language: 'javascript',
+            handleChange: handleTransformCodeChange,
+          }}
         />
       </div>
       <div className="mb-5 flex gap-5">

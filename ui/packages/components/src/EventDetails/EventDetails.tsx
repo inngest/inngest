@@ -145,7 +145,8 @@ export function EventDetails({
       {!loading && (
         <div className="px-5 pt-4">
           <CodeBlock
-            tabs={[{ label: batch ? 'Batch' : 'Payload', content: prettyPayload ?? 'Unknown' }]}
+            header={{ title: batch ? 'Batch' : 'Payload' }}
+            tab={{ content: prettyPayload ?? 'Unknown' }}
             actions={codeBlockActions}
           />
         </div>

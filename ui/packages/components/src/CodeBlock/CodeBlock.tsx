@@ -136,9 +136,8 @@ export type CodeBlockAction = {
 
 interface CodeBlockProps {
   className?: string;
-  header: {
+  header?: {
     title?: string;
-    description?: string;
     status?: 'success' | 'error';
   };
   tab: {

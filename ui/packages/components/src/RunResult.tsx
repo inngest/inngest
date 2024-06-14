@@ -13,28 +13,26 @@ export function RunResult({ className, result }: Props) {
     <div className={className}>
       {result.data && (
         <CodeBlock
-          tabs={[
-            {
-              label: 'Output',
-              content: result.data,
-            },
-          ]}
+          header={{
+            title: 'Output',
+          }}
+          tab={{
+            content: result.data,
+          }}
         />
       )}
 
       {result.error?.stack && (
         <CodeBlock
           header={{
-            color: 'bg-rose-50',
-            description: result.error.message,
-            title: result.error.name ?? 'Error',
+            title:
+              result.error.name ??
+              'Error' + (result.error.message ? ': ' + result.error.message : ''),
+            status: 'error',
           }}
-          tabs={[
-            {
-              label: 'Stack',
-              content: result.error.stack,
-            },
-          ]}
+          tab={{
+            content: result.error.stack,
+          }}
         />
       )}
     </div>

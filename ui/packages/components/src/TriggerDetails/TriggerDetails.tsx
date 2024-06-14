@@ -185,12 +185,12 @@ export function TriggerDetails({ className, getTrigger }: Props) {
                 {trigger?.payloads && type !== 'CRON' && (
                   <div className="mt-4">
                     <CodeBlock
-                      tabs={[
-                        {
-                          label: trigger.isBatch ? 'Batch' : 'Event payload',
-                          content: prettyPayload ?? 'Unknown',
-                        },
-                      ]}
+                      header={{
+                        title: trigger.isBatch ? 'Batch' : 'Event payload',
+                      }}
+                      tab={{
+                        content: prettyPayload ?? 'Unknown',
+                      }}
                     />
                   </div>
                 )}

@@ -44,14 +44,12 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
   if (doesFunctionAcceptPayload) {
     content = (
       <CodeBlock
-        tabs={[
-          {
-            content: rawPayload,
-            language: 'json',
-            readOnly: false,
-            handleChange: setRawPayload,
-          },
-        ]}
+        tab={{
+          content: rawPayload,
+          language: 'json',
+          readOnly: false,
+          handleChange: setRawPayload,
+        }}
       />
     );
   } else {
