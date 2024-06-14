@@ -53,8 +53,8 @@ export default {
           runningSubtle: 'rgb(var(--color-secondary-xSubtle) / <alpha-value>)',
           queued: 'rgb(var(--color-quaternary-cool-xIntense) / <alpha-value>)',
           queuedSubtle: 'rgb(var(--color-quaternary-cool-xSubtle) / <alpha-value>)',
-          complete: 'rgb(var(--color-primary-intense) / <alpha-value>)',
-          cancelled: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
+          completed: 'rgb(var(--color-primary-intense) / <alpha-value>)',
+          cancelled: 'rgb(var(--color-foreground-cancelled) / <alpha-value>)',
         },
       },
       borderColor: {
@@ -95,7 +95,7 @@ export default {
         btnDangerDisabled: 'rgb(var(--color-background-btn-dangerDisabled) / <alpha-value>)',
       },
       textColor: {
-        base: 'rgb(var(--color-foreground-base) / <alpha-value>)',
+        basis: 'rgb(var(--color-foreground-base) / <alpha-value>)',
         subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
         muted: 'rgb(var(--color-foreground-muted) / <alpha-value>)',
         onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
