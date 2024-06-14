@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { CopyButton } from '@inngest/components/CopyButton';
 import { maxRenderedOutputSizeBytes } from '@inngest/components/constants';
@@ -347,10 +348,10 @@ export function CodeBlock({ header, tab, actions = [] }: CodeBlockProps) {
                   ' px-6 py-2.5 text-sm'
                 )}
               >
-                {header.title}
+                {header?.title}
               </p>
               {!isOutputTooLarge && (
-                <div className="mr-2 flex items-center gap-2 py-2">
+                <div className="mr-4 flex items-center gap-2 py-2">
                   {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
                     <Button
                       key={idx}
@@ -397,9 +398,7 @@ export function CodeBlock({ header, tab, actions = [] }: CodeBlockProps) {
           <div ref={wrapperRef}>
             {isOutputTooLarge ? (
               <>
-                <div className="bg-amber-100 px-6 py-2.5 text-xs text-slate-700 dark:bg-amber-500/40 dark:text-white">
-                  Output size is too large to render {`( > 1MB )`}
-                </div>
+                <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
                 <div className="flex h-24 items-center justify-center	">
                   <Button
                     label="Download Raw"
