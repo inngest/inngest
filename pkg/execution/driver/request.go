@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
 )
@@ -17,6 +18,21 @@ type SDKRequest struct {
 
 	// DEPRECATED: NOTE: This is moved into SDKRequestContext for V3+/Non-TS SDKs
 	UseAPI bool `json:"use_api"`
+}
+
+func (m *SDKRequestContext) preMarshal() {
+	stack := m.Stack.Stack
+	if stack == nil {
+		stack = make([]string, 0)
+	}
+
+	m.Stack.Stack = stack
+}
+
+func (m SDKRequestContext) MarshalJSON() ([]byte, error) {
+	m.preMarshal()
+	type alias SDKRequestContext // Avoid infinite recursion
+	return json.Marshal(alias(m))
 }
 
 type SDKRequestContext struct {

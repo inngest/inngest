@@ -56,11 +56,6 @@ func MarshalV1(
 		}
 	}
 
-	stack := md.Stack
-	if stack == nil {
-		stack = make([]string, 0)
-	}
-
 	req := &SDKRequest{
 		// For backcompat, we always send `Event`, but `Events` could be made
 		// empty if the overall request size is too large.
@@ -74,7 +69,7 @@ func MarshalV1(
 			StepID:     step.ID,
 			RunID:      md.ID.RunID,
 			Stack: &FunctionStack{
-				Stack:   stack,
+				Stack:   md.Stack,
 				Current: stackIndex,
 			},
 			Attempt:                   attempt,
