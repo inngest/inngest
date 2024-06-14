@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
 )
@@ -58,4 +59,13 @@ type SDKRequestContext struct {
 type FunctionStack struct {
 	Stack   []string `json:"stack"`
 	Current int      `json:"current"`
+}
+
+func (m FunctionStack) MarshalJSON() ([]byte, error) {
+	if m.Stack == nil {
+		m.Stack = make([]string, 0)
+	}
+
+	type alias FunctionStack // Avoid infinite recursion
+	return json.Marshal(alias(m))
 }
