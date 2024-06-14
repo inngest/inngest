@@ -1118,27 +1118,27 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 	if len(resp.Generator) > 0 {
 		// Handle generator responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, i, resp); serr != nil {
-
-			// If this is an error compiling async expressions, fail the function.
-			if shouldFailEarly := errors.Is(serr, &expressions.CompileError{}); shouldFailEarly {
+			if errors.Is(serr, &expressions.CompileError{}) {
 				var gracefulErr *state.WrappedStandardError
 				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
 					serialized := gracefulErr.Serialize(execution.StateErrorKey)
 					resp.Output = nil
 					resp.Err = &serialized
 				}
-
-				if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
-					logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-				} else if performedFinalization {
-					for _, e := range e.lifecycles {
-						go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
-					}
-				}
-
-				return nil
+			} else if resp.Err == nil {
+				resp.Output = nil
+				resp.Err = util.StrPtr(serr.Error())
 			}
-			return fmt.Errorf("error handling generator response: %w", serr)
+
+			if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+				logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+			} else if performedFinalization {
+				for _, e := range e.lifecycles {
+					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
+				}
+			}
+
+			return nil
 		}
 		return nil
 	}

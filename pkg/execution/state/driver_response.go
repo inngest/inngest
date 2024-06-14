@@ -252,6 +252,12 @@ func (w *WaitForEventOpts) UnmarshalAny(a any) error {
 }
 
 func (w WaitForEventOpts) Expires() (time.Time, error) {
+	if w.Timeout == "" {
+		// The TypeScript SDK sets timeout to an empty string when the duration
+		// is negative
+		return time.Now(), nil
+	}
+
 	dur, err := str2duration.ParseDuration(w.Timeout)
 	if err != nil {
 		return time.Time{}, err
