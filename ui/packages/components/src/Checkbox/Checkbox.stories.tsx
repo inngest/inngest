@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { Checkbox } from './Checkbox';
+import { Checkbox, LabeledCheckbox } from './Checkbox';
 
 const meta = {
   title: 'Components/Checkbox',
@@ -35,22 +35,14 @@ export const Disabled: Story = {
 };
 
 export const DefaultWithLabel: Story = {
-  render: () => (
-    <Checkbox.Wrapper>
-      <Checkbox />
-      <Checkbox.Label>Title goes here</Checkbox.Label>
-    </Checkbox.Wrapper>
-  ),
+  render: () => <LabeledCheckbox label="Title goes here" />,
 };
 
 export const DefaultWithLabelAndDescription: Story = {
   render: () => (
-    <Checkbox.Wrapper>
-      <Checkbox />
-      <Checkbox.Label>
-        Title goes here
-        <Checkbox.Description>Description goes here</Checkbox.Description>
-      </Checkbox.Label>
-    </Checkbox.Wrapper>
+    <LabeledCheckbox
+      label="Title goes here"
+      description={<LabeledCheckbox.Description>Description goes here</LabeledCheckbox.Description>}
+    />
   ),
 };
