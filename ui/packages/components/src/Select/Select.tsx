@@ -1,6 +1,7 @@
 import { Listbox } from '@headlessui/react';
 import { RiArrowDownSLine } from '@remixicon/react';
 
+import { Checkbox } from '../Checkbox';
 import { cn } from '../utils/classNames';
 
 type SelectProps = {
@@ -114,13 +115,11 @@ function CheckboxOption({ children, option }: React.PropsWithChildren<{ option: 
       {({ selected }: { selected: boolean }) => (
         <span className="inline-flex items-center">
           <span className="inline-flex items-center gap-2">
-            <input
-              type="checkbox"
+            <Checkbox
               id={option.id}
               checked={selected}
               disabled={option.disabled}
-              readOnly
-              className="h-[15px] w-[15px] rounded border-slate-300 text-indigo-500 drop-shadow-sm checked:border-indigo-500 checked:drop-shadow-none"
+              className="h-4 w-4"
             />
             {children}
           </span>
