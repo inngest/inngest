@@ -371,8 +371,6 @@ type CountReplayRunsOpts struct {
 	WorkflowID  *uuid.UUID
 	LowerTime   time.Time
 	UpperTime   time.Time
-	Statuses    []enums.RunStatus
-	SkipReasons []enums.SkipReason
 }
 
 func (c CountReplayRunsOpts) Validate() error {
@@ -382,8 +380,8 @@ func (c CountReplayRunsOpts) Validate() error {
 		WorkflowID:  c.WorkflowID,
 		LowerTime:   c.LowerTime,
 		UpperTime:   c.UpperTime,
-		Statuses:    c.Statuses,
-		SkipReasons: c.SkipReasons,
+		Statuses:    enums.ReplayableFunctionRunStatuses(),
+		SkipReasons: enums.ReplayableSkipReasons(),
 		Limit:       DefaultQueryLimit,
 		Cursor:      nil,
 	}
