@@ -19,7 +19,6 @@ type FnRunTestEvtData struct{}
 type FnRunTestEvt inngestgo.GenericEvent[FnRunTestEvtData, any]
 
 func TestFunctionRunList(t *testing.T) {
-	t.Parallel()
 	ctx := context.Background()
 
 	c := client.New(t)
