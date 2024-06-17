@@ -48,27 +48,10 @@ export function LabeledCheckbox({
           <RiCheckLine className="text-alwaysWhite h-4 w-4" />
         </CheckboxPrimitive.Indicator>
       </CheckboxPrimitive.Root>
-      <Label htmlFor={id}>
+      <label className="text-basis text-sm" htmlFor={id}>
         {label}
-        {description}
-      </Label>
+        {description && <span className="text-subtle block pt-0.5">{description}</span>}
+      </label>
     </div>
   );
 }
-
-function Label({
-  children,
-  ...props
-}: React.PropsWithChildren<React.LabelHTMLAttributes<HTMLLabelElement>>) {
-  return (
-    <label className="text-basis text-sm" {...props}>
-      {children}
-    </label>
-  );
-}
-
-function Description({ children }: React.PropsWithChildren) {
-  return <span className="text-subtle block pt-0.5">{children}</span>;
-}
-
-LabeledCheckbox.Description = Description;

@@ -39,10 +39,5 @@ export const DefaultWithLabel: Story = {
 };
 
 export const DefaultWithLabelAndDescription: Story = {
-  render: () => (
-    <LabeledCheckbox
-      label="Title goes here"
-      description={<LabeledCheckbox.Description>Description goes here</LabeledCheckbox.Description>}
-    />
-  ),
+  render: () => <LabeledCheckbox label="Title goes here" description="Description goes here" />,
 };
