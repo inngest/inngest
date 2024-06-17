@@ -73,10 +73,10 @@ function ConfigRow({
   }
 
   return (
-    <tr className="border-b border-slate-100">
-      <td className="py-1 pr-8 align-top">{label}</td>
-      <td className="py-1">
-        <pre className="text-sm ">{text}</pre>
+    <tr className="border-subtle text-basis border-b text-sm">
+      <td className="px-3 py-1.5 align-top">{label}</td>
+      <td className="py-1.5">
+        <pre>{text}</pre>
       </td>
     </tr>
   );

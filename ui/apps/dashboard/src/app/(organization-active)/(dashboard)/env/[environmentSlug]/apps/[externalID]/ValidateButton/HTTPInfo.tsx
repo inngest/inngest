@@ -8,9 +8,11 @@ type Props = {
 export function HTTPInfo({ data }: Props) {
   return (
     <>
-      {!data.isReachable && <div>No HTTP response since the app is unreachable</div>}
+      {!data.isReachable && (
+        <div className="pl-3">No HTTP response since the app is unreachable</div>
+      )}
 
-      {data.respStatusCode && <div className="mb-4">Status code: {data.respStatusCode}</div>}
+      {data.respStatusCode && <div className="mb-4 pl-3">Status code: {data.respStatusCode}</div>}
 
       {data.respHeaders && Object.keys(data.respHeaders).length > 0 && (
         <table className="w-full">
@@ -20,9 +22,9 @@ export function HTTPInfo({ data }: Props) {
             }
 
             return (
-              <tr className="border-b border-slate-100" key={k}>
-                <td className="py-1 pr-8">{k}</td>
-                <td className="py-1">{v.join(', ')}</td>
+              <tr className="border-subtle text-basis border-b text-sm" key={k}>
+                <td className="px-3 py-1.5">{k}</td>
+                <td className="py-1.5">{v.join(', ')}</td>
               </tr>
             );
           })}
