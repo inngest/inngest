@@ -5,6 +5,7 @@ import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@headlessui/react';
 import { Button } from '@inngest/components/Button';
+import { Link } from '@inngest/components/Link';
 import { RiErrorWarningLine, RiLoopLeftLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
@@ -12,7 +13,6 @@ import {
   VercelDeploymentProtection,
   type VercelIntegration,
 } from '@/app/(organization-active)/(dashboard)/settings/integrations/vercel/VercelIntegration';
-import AppLink from '@/components/AppLink';
 import Input from '@/components/Forms/Input';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
 import VercelWordmark from '@/logos/vercel-wordmark.svg';
@@ -108,12 +108,12 @@ export default function VercelIntegrationForm({ vercelIntegration }: VercelInteg
                 <div className="flex items-center gap-2 text-sm">
                   <RiErrorWarningLine className="h-4 text-amber-500" /> Deployment protection
                   enabled -{' '}
-                  <AppLink
+                  <Link
                     href="https://www.inngest.com/docs/deploy/vercel#bypassing-deployment-protection"
-                    target="_blank"
+                    className="inline-flex"
                   >
                     Learn more
-                  </AppLink>
+                  </Link>
                 </div>
               )}
             </li>

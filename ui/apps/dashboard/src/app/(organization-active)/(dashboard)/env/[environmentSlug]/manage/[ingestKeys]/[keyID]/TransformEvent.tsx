@@ -4,6 +4,7 @@ import { useContext, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
+import { Link } from '@inngest/components/Link';
 import { toast } from 'sonner';
 
 import DashboardCodeBlock from '@/components/DashboardCodeBlock/DashboardCodeBlock';
@@ -152,13 +153,12 @@ export default function TransformEvents({ keyID, metadata }: FilterEventsProps) 
           <h2 className="pb-1 text-lg font-semibold">Transform Event</h2>
           <p className="mb-6 text-sm text-slate-700">
             An optional JavaScript transform used to alter incoming events into our{' '}
-            <a
-              className="font-semibold text-indigo-500"
+            <Link
+              className="inline-flex"
               href="https://www.inngest.com/docs/events/event-format-and-structure"
-              target="_blank noreferrer"
             >
               event format
-            </a>
+            </Link>
             .
           </p>
         </div>

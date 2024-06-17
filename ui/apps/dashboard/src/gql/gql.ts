@@ -72,7 +72,6 @@ const documents = {
     "\n  mutation CreateSigningKey($envID: UUID!) {\n    createSigningKey(envID: $envID) {\n      createdAt\n    }\n  }\n": types.CreateSigningKeyDocument,
     "\n  mutation DeleteSigningKey($signingKeyID: UUID!) {\n    deleteSigningKey(id: $signingKeyID) {\n      createdAt\n    }\n  }\n": types.DeleteSigningKeyDocument,
     "\n  mutation RotateSigningKey($envID: UUID!) {\n    rotateSigningKey(envID: $envID) {\n      createdAt\n    }\n  }\n": types.RotateSigningKeyDocument,
-    "\n  query GetSigningKey($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      webhookSigningKey\n    }\n  }\n": types.GetSigningKeyDocument,
     "\n  query GetSigningKeys($envID: ID!) {\n    environment: workspace(id: $envID) {\n      signingKeys {\n        createdAt\n        decryptedValue\n        id\n        isActive\n        user {\n          email\n          name\n        }\n      }\n    }\n  }\n": types.GetSigningKeysDocument,
     "\n  query UnattachedSync($syncID: ID!) {\n    sync: deploy(id: $syncID) {\n      commitAuthor\n      commitHash\n      commitMessage\n      commitRef\n      error\n      framework\n      id\n      lastSyncedAt\n      platform\n      repoURL\n      sdkLanguage\n      sdkVersion\n      status\n      removedFunctions: removedFunctions {\n        id\n        name\n        slug\n      }\n      syncedFunctions: deployedFunctions {\n        id\n        name\n        slug\n      }\n      url\n      vercelDeploymentID\n      vercelDeploymentURL\n      vercelProjectID\n      vercelProjectURL\n    }\n  }\n": types.UnattachedSyncDocument,
     "\n  query UnattachedSyncs($envID: ID!) {\n    environment: workspace(id: $envID) {\n      syncs: unattachedSyncs(first: 40) {\n        commitAuthor\n        commitHash\n        commitMessage\n        commitRef\n        framework\n        id\n        lastSyncedAt\n        platform\n        repoURL\n        sdkLanguage\n        sdkVersion\n        status\n        url\n        vercelDeploymentID\n        vercelDeploymentURL\n        vercelProjectID\n        vercelProjectURL\n      }\n    }\n  }\n": types.UnattachedSyncsDocument,
@@ -359,10 +358,6 @@ export function graphql(source: "\n  mutation DeleteSigningKey($signingKeyID: UU
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation RotateSigningKey($envID: UUID!) {\n    rotateSigningKey(envID: $envID) {\n      createdAt\n    }\n  }\n"): (typeof documents)["\n  mutation RotateSigningKey($envID: UUID!) {\n    rotateSigningKey(envID: $envID) {\n      createdAt\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query GetSigningKey($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      webhookSigningKey\n    }\n  }\n"): (typeof documents)["\n  query GetSigningKey($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      webhookSigningKey\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
