@@ -51,6 +51,7 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
             readOnly: false,
             handleChange: setRawPayload,
           }}
+          minLines={10}
         />
       </CodeBlock.Wrapper>
     );

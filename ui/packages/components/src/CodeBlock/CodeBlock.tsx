@@ -148,9 +148,10 @@ interface CodeBlockProps {
     handleChange?: (value: string) => void;
   };
   actions?: CodeBlockAction[];
+  minLines?: number;
 }
 
-export function CodeBlock({ header, tab, actions = [] }: CodeBlockProps) {
+export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -235,7 +236,8 @@ export function CodeBlock({ header, tab, actions = [] }: CodeBlockProps) {
       if (isFullHeight) {
         editor.layout({ height: newHeight, width: containerWidthWithLineNumbers });
       } else {
-        const height = Math.min(MAX_HEIGHT, contentHeight);
+        const minHeight = minLines * LINE_HEIGHT + 20;
+        const height = Math.max(Math.min(MAX_HEIGHT, contentHeight), minHeight);
         editor.layout({ height: height, width: containerWidthWithLineNumbers });
       }
     }
@@ -463,7 +465,7 @@ export function CodeBlock({ header, tab, actions = [] }: CodeBlockProps) {
 CodeBlock.Wrapper = ({ children }: React.PropsWithChildren) => {
   return (
     <div
-      className="w-full overflow-hidden rounded-lg border 
+      className="w-full overflow-hidden rounded-lg border
      border-slate-300 dark:border-slate-700/30 dark:shadow"
     >
       {children}
