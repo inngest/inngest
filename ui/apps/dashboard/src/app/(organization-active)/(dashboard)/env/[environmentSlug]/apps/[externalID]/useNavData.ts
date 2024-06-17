@@ -27,7 +27,7 @@ export function useNavData({ envID, externalAppID }: { envID: string; externalAp
   if (res.data) {
     const { latestSync } = res.data.environment.app;
     if (latestSync?.url) {
-      latestSync.url = removeSyncIDFromUrl(latestSync.url);
+      latestSync.url = removeSyncIDFromURL(latestSync.url);
     }
 
     return {
@@ -46,7 +46,11 @@ export function useNavData({ envID, externalAppID }: { envID: string; externalAp
  * Removes the sync ID from the URL. This is important since we want the sync to
  * be 100% new.
  */
-function removeSyncIDFromUrl(url: string): string {
+function removeSyncIDFromURL(url: string): string {
+  if (!url.startsWith('http')) {
+    url = 'https://' + url;
+  }
+
   const urlObj = new URL(url);
   urlObj.searchParams.delete('deployId');
   return urlObj.toString();
