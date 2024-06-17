@@ -35,3 +35,10 @@ export const Info: Story = {
     children: 'This is an info message',
   },
 };
+
+export const Success: Story = {
+  args: {
+    severity: 'success',
+    children: 'This is a success message',
+  },
+};
