@@ -78,3 +78,24 @@ message StepInfoWaitForEvent {
   optional string found_event_id = 4;
   optional bool timed_out = 5;
 }
+
+message RunSpanOutput {
+  optional bytes data = 1;
+  optional StepError error = 2;
+}
+
+message StepError {
+  string message = 1;
+  optional string name = 2;
+  optional string stack = 3;
+}
+
+message RunTrigger {
+  string event_name = 1;
+  repeated string ids = 2;
+  repeated bytes payloads = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  bool is_batch = 5;
+  optional string batch_id = 6;
+  optional string cron = 7;
+}
