@@ -1,8 +1,8 @@
 import { cn } from '@inngest/components/utils/classNames';
 import {
   RiCheckboxCircleFill,
-  RiErrorWarningLine,
-  RiInformationLine,
+  RiErrorWarningFill,
+  RiInformationFill,
   type RemixiconComponentType,
 } from '@remixicon/react';
 
@@ -16,24 +16,24 @@ type SeveritySpecific = {
 
 const severityStyles = {
   error: {
-    icon: RiErrorWarningLine,
-    iconClassName: 'text-rose-700 dark:text-white',
-    wrapperClassName: 'bg-rose-100 dark:bg-rose-600/50 text-rose-700 dark:text-slate-300',
+    icon: RiErrorWarningFill,
+    iconClassName: 'text-error',
+    wrapperClassName: 'bg-error text-error',
   },
   info: {
-    icon: RiInformationLine,
-    iconClassName: 'text-blue-700 dark:text-white',
-    wrapperClassName: 'bg-blue-100 dark:bg-blue-600/50 text-blue-700 dark:text-slate-300',
+    icon: RiInformationFill,
+    iconClassName: 'text-info',
+    wrapperClassName: 'bg-info text-info',
   },
   success: {
     icon: RiCheckboxCircleFill,
-    iconClassName: 'text-emerald-700 dark:text-white',
-    wrapperClassName: 'bg-emerald-100 dark:bg-emerald-600/50 text-emerald-700 dark:text-slate-300',
+    iconClassName: 'text-success',
+    wrapperClassName: 'bg-success text-success',
   },
   warning: {
-    icon: RiErrorWarningLine,
-    iconClassName: 'text-amber-700 dark:text-white',
-    wrapperClassName: 'bg-amber-100 dark:bg-amber-600/50 text-amber-700 dark:text-slate-300',
+    icon: RiErrorWarningFill,
+    iconClassName: 'text-warning',
+    wrapperClassName: 'bg-warning text-warning',
   },
 } as const satisfies { [key in Severity]: SeveritySpecific };
 
