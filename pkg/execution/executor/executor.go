@@ -1777,11 +1777,6 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		return fmt.Errorf("unable to load run events: %w", err)
 	}
 
-	ctx = e.extractTraceCtx(ctx, md, nil)
-	for _, e := range e.lifecycles {
-		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r)
-	}
-
 	// We need the function slug.
 	f, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
 	if err != nil {
@@ -1796,7 +1791,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	} else if performedFinalization {
 		ctx = e.extractTraceCtx(ctx, md, nil)
 		for _, e := range e.lifecycles {
-			go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r)
+			go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
 		}
 	}
 

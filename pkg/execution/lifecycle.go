@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -70,9 +71,10 @@ type LifecycleListener interface {
 	// the cancellation request, detailing either the event that cancelled the
 	// function or the API request information.
 	OnFunctionCancelled(
-		context.Context,
-		state.Metadata,
-		CancelRequest,
+		ctx context.Context,
+		md state.Metadata,
+		cr CancelRequest,
+		fnEvents []json.RawMessage, // All triggering function events, for tracing.
 	)
 
 	// OnStepScheduled is called when a new step is scheduled.  It contains the
@@ -214,6 +216,7 @@ func (NoopLifecyceListener) OnFunctionCancelled(
 	context.Context,
 	state.Metadata,
 	CancelRequest,
+	[]json.RawMessage,
 ) {
 }
 
