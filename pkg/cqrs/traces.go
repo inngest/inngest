@@ -135,8 +135,8 @@ func (s *Span) StepOpCode() enums.Opcode {
 	return enums.OpcodeNone
 }
 
-func (s *Span) DurationMS() int {
-	return int(s.Duration / time.Millisecond)
+func (s *Span) DurationMS() int64 {
+	return int64(s.Duration / time.Millisecond)
 }
 
 type SpanEvent struct {
