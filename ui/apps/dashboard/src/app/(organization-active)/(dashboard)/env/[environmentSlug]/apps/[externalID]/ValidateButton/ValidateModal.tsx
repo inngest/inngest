@@ -65,14 +65,16 @@ export function ValidateModal(props: Props) {
 
   return (
     <Modal className="w-[800px]" isOpen={isOpen} onClose={onClose}>
-      <Modal.Header>App diagnostic</Modal.Header>
+      <Modal.Header>App diagnostics</Modal.Header>
 
       <Modal.Body>
-        <p className="mb-2">Securely validate the configuration of the app at the given URL.</p>
+        <p className="text-basis mb-2">
+          Securely validate the configuration of the app at the given URL.
+        </p>
 
-        <p className="text-gray-500">
-          The app will only return privileged information if {"it's"} using this {"environment's"}{' '}
-          signing key.
+        <p className="text-subtle text-sm">
+          Note: The app will only return privileged information if {"it's"} using this{' '}
+          {"environment's"} signing key.
         </p>
 
         <div className="my-4 flex flex-1 gap-4">
@@ -89,7 +91,7 @@ export function ValidateModal(props: Props) {
           <Button btnAction={check} disabled={isLoading} kind="primary" label="Retry" />
         </div>
 
-        <hr className="my-4" />
+        <hr className="border-subtle my-4" />
 
         {error && !isLoading && <Alert severity="error">{error.message}</Alert>}
 
