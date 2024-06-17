@@ -948,6 +948,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		// always one less than attempts.
 		retries := f.Steps[0].RetryCount() + 1
 		item.MaxAttempts = &retries
+		span.SetAttributes(attribute.Int(consts.OtelSysStepMaxAttempt, retries))
 
 		// Only just starting:  run lifecycles on first attempt.
 		if item.Attempt == 0 {

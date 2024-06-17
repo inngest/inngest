@@ -145,18 +145,17 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 
 	// NOTE: step status will be updated in the individual opcode updates
 	if s.ScopeName == consts.OtelScopeFunction {
+		// default to running, since in-progress spans don't have status codes
+		fnstatus := rpbv2.SpanStatus_RUNNING
 		switch s.FunctionStatus() {
-		case enums.RunStatusRunning:
-			res.Status = rpbv2.SpanStatus_RUNNING
 		case enums.RunStatusCompleted:
-			res.Status = rpbv2.SpanStatus_COMPLETED
+			fnstatus = rpbv2.SpanStatus_COMPLETED
 		case enums.RunStatusCancelled:
-			res.Status = rpbv2.SpanStatus_CANCELLED
+			fnstatus = rpbv2.SpanStatus_CANCELLED
 		case enums.RunStatusFailed, enums.RunStatusOverflowed:
-			res.Status = rpbv2.SpanStatus_FAILED
-		default:
-			return nil, false, fmt.Errorf("unexpected run status: %v", s.FunctionStatus())
+			fnstatus = rpbv2.SpanStatus_FAILED
 		}
+		res.Status = fnstatus
 	}
 
 	// handle each opcode separately
@@ -178,9 +177,12 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 		if err := tb.processInvoke(ctx, s, res); err != nil {
 			return nil, false, fmt.Errorf("error parsing invoke span: %w", err)
 		}
-	default: // these are likely execution spans
-		if err := tb.processExec(ctx, s, res); err != nil {
-			return nil, false, fmt.Errorf("error parsing execution span: %w", err)
+	default:
+		// execution spans
+		if s.ScopeName == consts.OtelScopeExecution {
+			if err := tb.processExec(ctx, s, res); err != nil {
+				return nil, false, fmt.Errorf("error parsing execution span: %w", err)
+			}
 		}
 	}
 
@@ -565,11 +567,99 @@ func (tb *runTree) processInvoke(ctx context.Context, span *cqrs.Span, mod *rpbv
 }
 
 func (tb *runTree) processExec(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
-	switch span.Status() {
-	case cqrs.SpanStatusOk:
+	// check groupIDs
+	groupID := span.GroupID()
+	if groupID == nil {
+		return fmt.Errorf("execution missing group ID")
+	}
+
+	var maxAttempts int32
+	ma, err := strconv.ParseInt(span.SpanAttributes[consts.OtelSysStepMaxAttempt], 10, 32)
+	if err != nil {
+		return fmt.Errorf("error parsing max attempts: %w", err)
+	}
+	maxAttempts = int32(ma)
+
+	// check how many peers are there in the group
+	peers, ok := tb.groups[*groupID]
+	if !ok {
+		return fmt.Errorf("internal error: groupID not registered: %s", *groupID)
+	}
+
+	if len(peers) == 1 && span.Status() == cqrs.SpanStatusOk {
+		mod.Attempts = 1
 		mod.Status = rpbv2.SpanStatus_COMPLETED
-	case cqrs.SpanStatusError:
-		mod.Status = rpbv2.SpanStatus_FAILED
+		tb.processed[span.SpanID] = true
+		return nil
+	}
+
+	mod.SpanId = fmt.Sprintf("exec-%s", *groupID)
+	if mod.Children == nil {
+		mod.Children = []*rpbv2.RunSpan{}
+	}
+
+	sort.Slice(peers, func(i, j int) bool {
+		return peers[i].Timestamp.UnixMilli() < peers[j].Timestamp.UnixMilli()
+	})
+
+	for i, p := range peers {
+		nested, skipped := tb.constructSpan(ctx, p)
+		// NOTE: might be able to handle this better
+		if skipped {
+			continue
+		}
+
+		var attempt int32
+		attempt = 1
+		if str, ok := p.SpanAttributes[consts.OtelSysStepAttempt]; ok {
+			if count, err := strconv.ParseInt(str, 10, 32); err == nil {
+				attempt = int32(count) + 1
+			}
+		}
+
+		status := rpbv2.SpanStatus_RUNNING
+		switch p.Status() {
+		case cqrs.SpanStatusOk:
+			status = rpbv2.SpanStatus_COMPLETED
+		case cqrs.SpanStatusError:
+			status = rpbv2.SpanStatus_FAILED
+		default:
+			nested.EndedAt = nil
+		}
+
+		nested.Name = fmt.Sprintf("Attempt %d", attempt)
+		nested.Attempts = attempt
+		nested.Status = status
+
+		// TODO: output
+
+		// last one
+		// update end time of the group as well
+		if i == len(peers)-1 {
+			pend := p.Timestamp.Add(p.Duration)
+
+			// TODO: check if the span has already completed or not
+			dur := int64(pend.Sub(span.Timestamp) / time.Millisecond)
+			mod.Attempts = attempt
+			mod.DurationMs = dur
+			mod.EndedAt = timestamppb.New(pend)
+
+			switch status {
+			case rpbv2.SpanStatus_RUNNING:
+				mod.EndedAt = nil
+			case rpbv2.SpanStatus_COMPLETED:
+				mod.Status = rpbv2.SpanStatus_COMPLETED
+			case rpbv2.SpanStatus_FAILED:
+				// check if this failure is the final failure of all attempts
+				if attempt == maxAttempts {
+					mod.Status = rpbv2.SpanStatus_FAILED
+					mod.Attempts = maxAttempts
+				}
+			}
+		}
+
+		mod.Children = append(mod.Children, nested)
+		tb.processed[p.SpanID] = true
 	}
 
 	return nil
