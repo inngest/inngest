@@ -172,6 +172,7 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 		ParentSpanID: pb.ParentSpanId,
 		SpanID:       pb.GetSpanId(),
 		RunID:        ulid.MustParse(pb.GetRunId()),
+		IsRoot:       pb.GetIsRoot(),
 		Name:         pb.GetName(),
 		Status:       status,
 		Attempts:     &attempts,
