@@ -1,6 +1,7 @@
 'use client';
 
 import type React from 'react';
+import { type Route } from 'next';
 import { Link } from '@inngest/components/Link';
 import { useQuery } from 'urql';
 
@@ -66,7 +67,7 @@ export default function Payments() {
               payment.amountLabel
             ),
           url: payment.invoiceURL ? (
-            <Link href={payment.invoiceURL}>
+            <Link href={payment.invoiceURL as Route}>
               {payment.status === 'requires_confirmation' ? 'Pay' : 'View'}
             </Link>
           ) : null,
