@@ -35,14 +35,14 @@ export default function EventPayload({ event }: EventPayloadProps) {
 
   return (
     <DashboardCodeBlock
-      tabs={[
-        {
-          label: 'Payload',
-          content: formattedPayload,
-          language: 'json',
-          readOnly: true,
-        },
-      ]}
+      header={{
+        title: 'Payload',
+      }}
+      tab={{
+        content: formattedPayload,
+        language: 'json',
+        readOnly: true,
+      }}
       actions={[
         {
           label: 'Send to Dev Server',

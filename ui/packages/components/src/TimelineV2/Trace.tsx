@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Route } from 'next';
 
-import { RunResult } from '../RunResult';
 import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
@@ -101,9 +100,12 @@ export function Trace({
 
       {isExpanded && (
         <div className="ml-8">
-          <TraceInfo className="my-4 grow" pathCreator={pathCreator} trace={trace} />
-
-          {result && <RunResult className="mb-4" result={result} />}
+          <TraceInfo
+            className="my-4 grow"
+            pathCreator={pathCreator}
+            trace={trace}
+            result={result}
+          />
 
           {trace.childrenSpans?.map((child, i) => {
             return (

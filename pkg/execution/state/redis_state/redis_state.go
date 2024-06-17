@@ -478,6 +478,9 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 		cmd := m.r.B().Get().Key(m.kf.Event(ctx, id)).Build()
 		byt, err := m.r.Do(ctx, cmd).AsBytes()
 		if err != nil {
+			if err == rueidis.Nil {
+				return nil, state.ErrEventNotFound
+			}
 			return nil, fmt.Errorf("failed to get event; %w", err)
 		}
 		event := map[string]any{}

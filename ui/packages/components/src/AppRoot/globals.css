@@ -145,7 +145,7 @@
     --color-background-surface-muted: var(--color-carbon-300);
     --color-background-disabled: var(--color-carbon-400);
     --color-background-contrast: var(--color-matcha-1000);
-    --color-background-success: var(--color-matcha-100);
+    --color-background-success: var(--color-matcha-0);
     --color-background-successContrast: var(--color-matcha-800);
     --color-background-error: var(--color-ruby-0);
     --color-background-errorContrast: var(--color-ruby-800);
@@ -191,7 +191,8 @@
     --color-foreground-success: var(--color-matcha-600);
     --color-foreground-error: var(--color-ruby-600);
     --color-foreground-warning: var(--color-honey-600);
-    --color-foreground-info: var(--color-purplehaze-700);
+    --color-foreground-info: var(--color-breeze-600);
+    --color-foreground-cancelled: var(--color-carbon-300);
     --color-foreground-btn-primary: var(--color-matcha-600);
     --color-foreground-btn-primaryDisabled: var(--color-matcha-300);
     --color-foreground-btn-danger: var(--color-ruby-600);
@@ -270,10 +271,11 @@
     --color-foreground-alwaysBlack: var(--color-carbon-1000);
     --color-foreground-disabled: var(--color-carbon-600);
     --color-foreground-link: var(--color-breeze-400);
-    --color-foreground-success: var(--color-matcha-500);
+    --color-foreground-success: var(--color-matcha-300);
     --color-foreground-error: var(--color-ruby-300);
     --color-foreground-warning: var(--color-honey-300);
-    --color-foreground-info: var(--color-purplehaze-300);
+    --color-foreground-info: var(--color-breeze-300);
+    --color-foreground-cancelled: var(--color-carbon-400);
     --color-foreground-btn-primary: var(--color-matcha-500);
     --color-foreground-btn-primaryDisabled: var(--color-matcha-800);
     --color-foreground-btn-danger: var(--color-ruby-500);
