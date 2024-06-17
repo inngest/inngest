@@ -246,10 +246,12 @@ func (tb *runTreeBuilder) processStepRun(ctx context.Context, span *cqrs.Span, m
 		return fmt.Errorf("step run missing group ID")
 	}
 
-	maxAttempts, err := strconv.Atoi(span.SpanAttributes[consts.OtelSysStepMaxAttempt])
+	var maxAttempts int32
+	ma, err := strconv.ParseInt(span.SpanAttributes[consts.OtelSysStepMaxAttempt], 10, 32)
 	if err != nil {
 		return fmt.Errorf("error parsing max attempts: %w", err)
 	}
+	maxAttempts = int32(ma)
 
 	// check how many peers are there in the group
 	peers, ok := tb.groups[*groupID]
@@ -286,10 +288,11 @@ func (tb *runTreeBuilder) processStepRun(ctx context.Context, span *cqrs.Span, m
 			continue
 		}
 
-		attempt := 1
+		var attempt int32
+		attempt = 1
 		if str, ok := p.SpanAttributes[consts.OtelSysStepAttempt]; ok {
-			if count, err := strconv.Atoi(str); err == nil {
-				attempt = count + 1
+			if count, err := strconv.ParseInt(str, 10, 32); err == nil {
+				attempt = int32(count) + 1
 			}
 		}
 
@@ -305,7 +308,7 @@ func (tb *runTreeBuilder) processStepRun(ctx context.Context, span *cqrs.Span, m
 
 		nested.Name = fmt.Sprintf("Attempt %d", attempt)
 		nested.StepOp = &stepOp
-		nested.Attempts = int32(attempt)
+		nested.Attempts = attempt
 		nested.Status = status
 
 		// TODO: output
@@ -317,7 +320,7 @@ func (tb *runTreeBuilder) processStepRun(ctx context.Context, span *cqrs.Span, m
 
 			// TODO: check if the span has already completed or not
 			dur := int64(pend.Sub(span.Timestamp) / time.Millisecond)
-			mod.Attempts = int32(attempt)
+			mod.Attempts = attempt
 			mod.DurationMs = dur
 			mod.EndedAt = timestamppb.New(pend)
 
@@ -330,7 +333,7 @@ func (tb *runTreeBuilder) processStepRun(ctx context.Context, span *cqrs.Span, m
 				// check if this failure is the final failure of all attempts
 				if attempt == maxAttempts {
 					mod.Status = rpbv2.SpanStatus_FAILED
-					mod.Attempts = int32(maxAttempts)
+					mod.Attempts = maxAttempts
 				}
 			}
 		}
