@@ -49,25 +49,36 @@ type SpanLink struct {
 
 // TraceRun represents a function run backed by a trace
 type TraceRun struct {
-	AccountID   uuid.UUID       `json:"account_id"`
-	WorkspaceID uuid.UUID       `json:"workspace_id"`
-	AppID       uuid.UUID       `json:"app_id"`
-	FunctionID  uuid.UUID       `json:"function_id"`
-	TraceID     string          `json:"trace_id"`
-	RunID       ulid.ULID       `json:"run_id"`
-	QueuedAt    time.Time       `json:"queued_at"`
-	StartedAt   time.Time       `json:"started_at,omitempty"`
-	EndedAt     time.Time       `json:"ended_at,omitempty"`
-	Duration    time.Duration   `json:"duration"`
-	SourceID    string          `json:"source_id,omitempty"`
-	TriggerIDs  []ulid.ULID     `json:"trigger_ids"`
-	Triggers    [][]byte        `json:"triggers"`
-	Output      []byte          `json:"output,omitempty"`
-	Status      enums.RunStatus `json:"status"`
-	IsBatch     bool            `json:"is_batch"`
-	IsDebounce  bool            `json:"is_debounce"`
+	AccountID    uuid.UUID       `json:"account_id"`
+	WorkspaceID  uuid.UUID       `json:"workspace_id"`
+	AppID        uuid.UUID       `json:"app_id"`
+	FunctionID   uuid.UUID       `json:"function_id"`
+	TraceID      string          `json:"trace_id"`
+	RunID        string          `json:"run_id"`
+	QueuedAt     time.Time       `json:"queued_at"`
+	StartedAt    time.Time       `json:"started_at,omitempty"`
+	EndedAt      time.Time       `json:"ended_at,omitempty"`
+	Duration     time.Duration   `json:"duration"`
+	SourceID     string          `json:"source_id,omitempty"`
+	TriggerIDs   []string        `json:"trigger_ids"`
+	Triggers     [][]byte        `json:"triggers"`
+	Output       []byte          `json:"output,omitempty"`
+	Status       enums.RunStatus `json:"status"`
+	IsBatch      bool            `json:"is_batch"`
+	IsDebounce   bool            `json:"is_debounce"`
+	BatchID      *ulid.ULID      `json:"batch_id,omitempty"`
+	CronSchedule *string         `json:"cron_schedule,omitempty"`
 	// Cursor is a composite cursor used for pagination
 	Cursor string `json:"cursor"`
+}
+
+type SpanOutput struct {
+	Data             []byte
+	Timestamp        time.Time
+	Attributes       map[string]string
+	IsError          bool
+	IsFunctionOutput bool
+	IsStepOutput     bool
 }
 
 type TraceReadWriter interface {
@@ -82,11 +93,20 @@ type TraceWriter interface {
 	InsertTraceRun(ctx context.Context, run *TraceRun) error
 }
 
+type TraceWriterDev interface {
+	// FindOrCreateTraceRun will return a TraceRun by runID, or create a new one if it doesn't exists
+	FindOrCreateTraceRun(ctx context.Context, opts FindOrCreateTraceRunOpt) (*TraceRun, error)
+}
+
 type TraceReader interface {
-	// GetSpansByTraceIDAndRunID retrieves spans based on their traceID and runID
-	GetSpansByTraceIDAndRunID(ctx context.Context, tid string, runID ulid.ULID) ([]*Span, error)
 	// GetTraceRuns retrieves a list of TraceRun based on the options specified
 	GetTraceRuns(ctx context.Context, opt GetTraceRunOpt) ([]*TraceRun, error)
+	// GetTraceRun retrieve the specified run
+	GetTraceRun(ctx context.Context, id TraceRunIdentifier) (*TraceRun, error)
+	// GetTraceSpansByRun retrieves all the spans related to the trace
+	GetTraceSpansByRun(ctx context.Context, id TraceRunIdentifier) ([]*Span, error)
+	// GetSpanOutput retrieves the output for the specified span
+	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
 }
 
 type GetTraceRunOpt struct {
@@ -94,6 +114,17 @@ type GetTraceRunOpt struct {
 	Order  []GetTraceRunOrder
 	Cursor string
 	Items  uint
+}
+
+type FindOrCreateTraceRunOpt struct {
+	// Only runID is used for search, others fields are considered default values
+	// if the trace run doesn't exists
+	RunID       ulid.ULID
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	AppID       uuid.UUID
+	FunctionID  uuid.UUID
+	TraceID     string
 }
 
 type GetTraceRunFilter struct {
@@ -111,6 +142,24 @@ type GetTraceRunFilter struct {
 type GetTraceRunOrder struct {
 	Field     enums.TraceRunTime
 	Direction enums.TraceRunOrder
+}
+
+type TraceRunIdentifier struct {
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	AppID       uuid.UUID
+	FunctionID  uuid.UUID
+	TraceID     string
+	RunID       ulid.ULID
+}
+
+type SpanIdentifier struct {
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	AppID       uuid.UUID
+	FunctionID  uuid.UUID
+	TraceID     string
+	SpanID      string
 }
 
 // TracePageCursor represents the composite cursor used to handle pagination

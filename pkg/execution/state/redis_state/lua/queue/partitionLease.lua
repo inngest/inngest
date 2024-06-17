@@ -35,6 +35,11 @@ if existing.leaseID ~= nil and existing.leaseID ~= cjson.null and decode_ulid_ti
     return -3
 end
 
+-- Check whether the partition is currently paused.
+if existing.off == true then
+    return -4
+end
+
 local capacity = concurrency -- initialize as the default concurrency limit
 
 local existingTime = existing.last

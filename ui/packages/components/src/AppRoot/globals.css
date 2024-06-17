@@ -46,3 +46,259 @@
 .monaco-editor .overflow-guard {
   @apply rounded-b-lg;
 }
+
+@layer base {
+  :root {
+    /* Carbon Colors */
+    --color-carbon-0: 254 254 254;
+    --color-carbon-50: 246 246 246;
+    --color-carbon-100: 226 226 226;
+    --color-carbon-200: 204 204 204;
+    --color-carbon-300: 176 176 176;
+    --color-carbon-400: 155 155 155;
+    --color-carbon-500: 124 124 124;
+    --color-carbon-600: 99 99 99;
+    --color-carbon-700: 75 75 75;
+    --color-carbon-800: 53 53 53;
+    --color-carbon-900: 36 36 36;
+    --color-carbon-950: 18 18 18;
+    --color-carbon-1000: 2 2 2;
+
+    /* Matcha Colors */
+    --color-matcha-0: 239 249 242;
+    --color-matcha-100: 223 245 230;
+    --color-matcha-200: 196 239 212;
+    --color-matcha-300: 154 218 179;
+    --color-matcha-400: 102 189 139;
+    --color-matcha-500: 44 155 99;
+    --color-matcha-600: 2 122 72;
+    --color-matcha-700: 1 98 57;
+    --color-matcha-800: 1 84 48;
+    --color-matcha-900: 0 77 43;
+
+    /* Breeze Colors */
+    --color-breeze-0: 239 247 255;
+    --color-breeze-100: 224 242 255;
+    --color-breeze-200: 206 233 255;
+    --color-breeze-300: 156 210 255;
+    --color-breeze-400: 82 178 253;
+    --color-breeze-500: 35 137 241;
+    --color-breeze-600: 19 101 214;
+    --color-breeze-700: 20 80 177;
+    --color-breeze-800: 23 67 155;
+    --color-breeze-900: 19 64 133;
+
+    /* Ruby Colors */
+    --color-ruby-0: 254 244 243;
+    --color-ruby-100: 254 235 233;
+    --color-ruby-200: 254 222 220;
+    --color-ruby-300: 253 188 184;
+    --color-ruby-400: 250 141 134;
+    --color-ruby-500: 245 74 63;
+    --color-ruby-600: 203 42 29;
+    --color-ruby-700: 165 32 21;
+    --color-ruby-800: 139 30 22;
+    --color-ruby-900: 120 38 25;
+
+    /* Honey Colors */
+    --color-honey-0: 255 246 223;
+    --color-honey-100: 255 238 196;
+    --color-honey-200: 255 227 155;
+    --color-honey-300: 252 196 63;
+    --color-honey-400: 236 153 35;
+    --color-honey-500: 213 107 19;
+    --color-honey-600: 186 66 16;
+    --color-honey-700: 149 54 15;
+    --color-honey-800: 120 52 15;
+    --color-honey-900: 99 55 17;
+
+    /* Blush Colors */
+    --color-blush-0: 255 244 245;
+    --color-blush-100: 255 234 237;
+    --color-blush-200: 255 221 226;
+    --color-blush-300: 255 186 199;
+    --color-blush-400: 253 136 160;
+    --color-blush-500: 249 62 106;
+    --color-blush-600: 207 22 75;
+    --color-blush-700: 169 11 63;
+    --color-blush-800: 145 10 59;
+    --color-blush-900: 131 16 56;
+
+    /* Purplehaze Colors */
+    --color-purplehaze-0: 247 245 255;
+    --color-purplehaze-100: 240 237 255;
+    --color-purplehaze-200: 230 226 254;
+    --color-purplehaze-300: 206 198 253;
+    --color-purplehaze-400: 173 159 252;
+    --color-purplehaze-500: 139 116 249;
+    --color-purplehaze-600: 113 71 241;
+    --color-purplehaze-700: 98 34 223;
+    --color-purplehaze-800: 77 31 196;
+    --color-purplehaze-900: 67 34 175;
+
+    /* Token Colors */
+    --color-background-canvas-base: var(--color-carbon-0);
+    --color-background-canvas-subtle: var(--color-carbon-50);
+    --color-background-canvas-muted: var(--color-carbon-100);
+    --color-background-surface-base: var(--color-carbon-0);
+    --color-background-surface-subtle: var(--color-carbon-200);
+    --color-background-surface-muted: var(--color-carbon-300);
+    --color-background-disabled: var(--color-carbon-400);
+    --color-background-contrast: var(--color-matcha-1000);
+    --color-background-success: var(--color-matcha-100);
+    --color-background-successContrast: var(--color-matcha-800);
+    --color-background-error: var(--color-ruby-0);
+    --color-background-errorContrast: var(--color-ruby-800);
+    --color-background-warning: var(--color-honey-0);
+    --color-background-warningContrast: var(--color-honey-800);
+    --color-background-info: var(--color-breeze-0);
+    --color-background-infoContrast: var(--color-breeze-900);
+    --color-background-codeEditor: var(--color-carbon-100);
+    --color-background-btn-primary: var(--color-matcha-600);
+    --color-background-btn-primaryHover: var(--color-matcha-700);
+    --color-background-btn-primaryPressed: var(--color-matcha-900);
+    --color-background-btn-primaryDisabled: var(--color-matcha-300);
+    --color-background-btn-danger: var(--color-ruby-700);
+    --color-background-btn-dangerHover: var(--color-ruby-800);
+    --color-background-btn-dangerPressed: var(--color-ruby-900);
+    --color-background-btn-dangerDisabled: var(--color-ruby-300);
+
+    --color-border-subtle: var(--color-carbon-100);
+    --color-border-muted: var(--color-carbon-200);
+    --color-border-contrast: var(--color-carbon-600);
+    --color-border-disabled: var(--color-carbon-100);
+    --color-border-success: var(--color-matcha-700);
+    --color-border-error: var(--color-ruby-600);
+    --color-border-warning: var(--color-honey-600);
+    --color-border-info: var(--color-purplehaze-700);
+
+    --color-primary-2xSubtle: var(--color-matcha-200);
+    --color-primary-xSubtle: var(--color-matcha-300);
+    --color-primary-subtle: var(--color-matcha-400);
+    --color-primary-moderate: var(--color-matcha-500);
+    --color-primary-intense: var(--color-matcha-600);
+    --color-primary-xIntense: var(--color-matcha-700);
+    --color-primary-2xIntense: var(--color-matcha-800);
+
+    --color-foreground-base: var(--color-carbon-900);
+    --color-foreground-subtle: var(--color-carbon-600);
+    --color-foreground-muted: var(--color-carbon-700);
+    --color-foreground-onContrast: var(--color-carbon-0);
+    --color-foreground-alwaysWhite: var(--color-carbon-0);
+    --color-foreground-alwaysBlack: var(--color-carbon-1000);
+    --color-foreground-disabled: var(--color-carbon-300);
+    --color-foreground-link: var(--color-breeze-600);
+    --color-foreground-success: var(--color-matcha-600);
+    --color-foreground-error: var(--color-ruby-600);
+    --color-foreground-warning: var(--color-honey-600);
+    --color-foreground-info: var(--color-breeze-600);
+    --color-foreground-cancelled: var(--color-carbon-300);
+    --color-foreground-btn-primary: var(--color-matcha-600);
+    --color-foreground-btn-primaryDisabled: var(--color-matcha-300);
+    --color-foreground-btn-danger: var(--color-ruby-600);
+    --color-foreground-btn-dangerDisabled: var(--color-ruby-300);
+
+    --color-secondary-2xSubtle: var(--color-breeze-200);
+    --color-secondary-xSubtle: var(--color-breeze-300);
+    --color-secondary-subtle: var(--color-breeze-400);
+    --color-secondary-moderate: var(--color-breeze-500);
+    --color-secondary-intense: var(--color-breeze-600);
+    --color-secondary-xIntense: var(--color-breeze-700);
+    --color-secondary-2xIntense: var(--color-breeze-800);
+
+    --color-tertiary-2xSubtle: var(--color-ruby-200);
+    --color-tertiary-xSubtle: var(--color-ruby-300);
+    --color-tertiary-subtle: var(--color-ruby-400);
+    --color-tertiary-moderate: var(--color-ruby-500);
+    --color-tertiary-intense: var(--color-ruby-600);
+    --color-tertiary-xIntense: var(--color-ruby-700);
+    --color-tertiary-2xIntense: var(--color-ruby-800);
+
+    --color-quaternary-cool-xSubtle: var(--color-purplehaze-300);
+    --color-quaternary-cool-moderate: var(--color-purplehaze-500);
+    --color-quaternary-cool-xIntense: var(--color-purplehaze-700);
+  }
+
+  .dark {
+    --color-background-canvas-base: var(--color-carbon-1000);
+    --color-background-canvas-subtle: var(--color-carbon-900);
+    --color-background-canvas-muted: var(--color-carbon-900);
+    --color-background-surface-base: var(--color-carbon-1000);
+    --color-background-surface-subtle: var(--color-carbon-800);
+    --color-background-surface-muted: var(--color-carbon-700);
+    --color-background-disabled: var(--color-carbon-400);
+    --color-background-contrast: var(--color-matcha-0);
+    --color-background-success: var(--color-matcha-800);
+    --color-background-successContrast: var(--color-matcha-100);
+    --color-background-error: var(--color-ruby-800);
+    --color-background-errorContrast: var(--color-ruby-100);
+    --color-background-warning: var(--color-honey-800);
+    --color-background-warningContrast: var(--color-honey-100);
+    --color-background-info: var(--color-breeze-900);
+    --color-background-infoContrast: var(--color-breeze-100);
+    --color-background-codeEditor: var(--color-carbon-800);
+    --color-background-btn-primary: var(--color-matcha-600);
+    --color-background-btn-primaryHover: var(--color-matcha-700);
+    --color-background-btn-primaryPressed: var(--color-matcha-900);
+    --color-background-btn-primaryDisabled: var(--color-matcha-300);
+    --color-background-btn-danger: var(--color-ruby-700);
+    --color-background-btn-dangerHover: var(--color-ruby-800);
+    --color-background-btn-dangerPressed: var(--color-ruby-900);
+    --color-background-btn-dangerDisabled: var(--color-ruby-300);
+
+    --color-border-subtle: var(--color-carbon-800);
+    --color-border-muted: var(--color-carbon-700);
+    --color-border-contrast: var(--color-carbon-300);
+    --color-border-disabled: var(--color-carbon-800);
+    --color-border-success: var(--color-matcha-500);
+    --color-border-error: var(--color-ruby-300);
+    --color-border-warning: var(--color-honey-300);
+    --color-border-info: var(--color-purplehaze-300);
+
+    --color-primary-2xSubtle: var(--color-matcha-800);
+    --color-primary-xSubtle: var(--color-matcha-700);
+    --color-primary-subtle: var(--color-matcha-600);
+    --color-primary-moderate: var(--color-matcha-500);
+    --color-primary-intense: var(--color-matcha-400);
+    --color-primary-xIntense: var(--color-matcha-300);
+    --color-primary-2xIntense: var(--color-matcha-200);
+
+    --color-foreground-base: var(--color-carbon-100);
+    --color-foreground-subtle: var(--color-carbon-500);
+    --color-foreground-muted: var(--color-carbon-400);
+    --color-foreground-onContrast: var(--color-carbon-1000);
+    --color-foreground-alwaysWhite: var(--color-carbon-0);
+    --color-foreground-alwaysBlack: var(--color-carbon-1000);
+    --color-foreground-disabled: var(--color-carbon-600);
+    --color-foreground-link: var(--color-breeze-400);
+    --color-foreground-success: var(--color-matcha-500);
+    --color-foreground-error: var(--color-ruby-300);
+    --color-foreground-warning: var(--color-honey-300);
+    --color-foreground-info: var(--color-breeze-300);
+    --color-foreground-cancelled: var(--color-carbon-400);
+    --color-foreground-btn-primary: var(--color-matcha-500);
+    --color-foreground-btn-primaryDisabled: var(--color-matcha-800);
+    --color-foreground-btn-danger: var(--color-ruby-500);
+    --color-foreground-btn-dangerDisabled: var(--color-ruby-900);
+
+    --color-secondary-2xSubtle: var(--color-breeze-800);
+    --color-secondary-xSubtle: var(--color-breeze-700);
+    --color-secondary-subtle: var(--color-breeze-600);
+    --color-secondary-moderate: var(--color-breeze-500);
+    --color-secondary-intense: var(--color-breeze-400);
+    --color-secondary-xIntense: var(--color-breeze-300);
+    --color-secondary-2xIntense: var(--color-breeze-200);
+
+    --color-tertiary-2xSubtle: var(--color-ruby-800);
+    --color-tertiary-xSubtle: var(--color-ruby-700);
+    --color-tertiary-subtle: var(--color-ruby-600);
+    --color-tertiary-moderate: var(--color-ruby-500);
+    --color-tertiary-intense: var(--color-ruby-400);
+    --color-tertiary-xIntense: var(--color-ruby-300);
+    --color-tertiary-2xIntense: var(--color-ruby-200);
+
+    --color-quaternary-cool-xSubtle: var(--color-purplehaze-700);
+    --color-quaternary-cool-moderate: var(--color-purplehaze-500);
+    --color-quaternary-cool-xIntense: var(--color-purplehaze-300);
+  }
+}

@@ -4,10 +4,10 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { toast } from 'sonner';
 
-import { RunResult } from '../RunResult';
 import { StatusCell } from '../Table';
 import { Trace } from '../TimelineV2';
 import { Timeline } from '../TimelineV2/Timeline';
+import { TriggerDetails } from '../TriggerDetails';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
 import { RunInfo } from './RunInfo';
@@ -17,6 +17,7 @@ type Props = {
   cancelRun: () => Promise<unknown>;
   getResult: (outputID: string) => Promise<Result>;
   getRun: (runID: string) => Promise<Run>;
+  getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pathCreator: {
     app: (params: { externalAppID: string }) => Route;
     runPopout: (params: { runID: string }) => Route;
@@ -39,7 +40,7 @@ type Run = {
 };
 
 export function RunDetails(props: Props) {
-  const { getResult, getRun, pathCreator, rerun, runID, standalone } = props;
+  const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
 
   const [run, setRun] = useState<Run>();
   useEffect(() => {
@@ -71,30 +72,35 @@ export function RunDetails(props: Props) {
   }, [props.cancelRun]);
 
   return (
-    <>
+    <div>
       {standalone && run && (
-        <div className="flex flex-col gap-2 pb-6">
+        <div className="mx-8 flex flex-col gap-1 pb-6">
           <StatusCell status={run.trace.status} />
           <p className="text-2xl font-medium">{run.fn.name}</p>
           <p className="font-mono text-slate-500">{runID}</p>
         </div>
       )}
-      <div className="pr-4">
-        <div className="pl-5">
-          <RunInfo
-            cancelRun={cancelRun}
-            className="mb-4"
-            pathCreator={pathCreator}
-            rerun={rerun}
-            run={nullishToLazy(run)}
-            runID={runID}
-            standalone={standalone}
-          />
-          {result && <RunResult className="mb-4" result={result} />}
+
+      <div className="flex gap-4">
+        <div className="grow">
+          <div className="ml-8">
+            <RunInfo
+              cancelRun={cancelRun}
+              className="mb-4"
+              pathCreator={pathCreator}
+              rerun={rerun}
+              run={nullishToLazy(run)}
+              runID={runID}
+              standalone={standalone}
+              result={result}
+            />
+          </div>
+
+          {run && <Timeline getResult={getResult} pathCreator={pathCreator} trace={run.trace} />}
         </div>
 
-        {run && <Timeline getResult={getResult} pathCreator={pathCreator} trace={run.trace} />}
+        <TriggerDetails getTrigger={getTrigger} />
       </div>
-    </>
+    </div>
   );
 }

@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
 	"github.com/stretchr/testify/require"
@@ -22,18 +24,24 @@ type BatchEvent = inngestgo.GenericEvent[BatchEventData, any]
 
 func TestBatchEvents(t *testing.T) {
 	ctx := context.Background()
+	c := client.New(t)
 	h, server, registerFuncs := NewSDKHandler(t, "batch")
 	defer server.Close()
 
 	var (
 		counter     int32
 		totalEvents int32
+		runID       string
 	)
 
 	a := inngestgo.CreateFunction(
 		inngestgo.FunctionOpts{Name: "batch test", BatchEvents: &inngest.EventBatchConfig{MaxSize: 5, Timeout: "5s"}},
 		inngestgo.EventTrigger("test/batch", nil),
 		func(ctx context.Context, input inngestgo.Input[BatchEvent]) (any, error) {
+			if runID == "" {
+				runID = input.InputCtx.RunID
+			}
+
 			atomic.AddInt32(&counter, 1)
 			atomic.AddInt32(&totalEvents, int32(len(input.Events)))
 			return true, nil
@@ -60,6 +68,22 @@ func TestBatchEvents(t *testing.T) {
 		<-time.After(5 * time.Second)
 		require.EqualValues(t, 2, atomic.LoadInt32(&counter))
 		require.EqualValues(t, 8, atomic.LoadInt32(&totalEvents))
+	})
+
+	t.Run("trace run should have appropriate data", func(t *testing.T) {
+		<-time.After(3 * time.Second)
+
+		require.Eventually(t, func() bool {
+			run := c.RunTraces(ctx, runID)
+			require.NotNil(t, run)
+			require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Status)
+			require.True(t, run.IsBatch)
+			require.NotNil(t, run.BatchCreatedAt)
+
+			// TODO: add traces
+
+			return true
+		}, 10*time.Second, 2*time.Second)
 	})
 }
 

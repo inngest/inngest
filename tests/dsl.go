@@ -170,6 +170,8 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			err = json.Unmarshal(byt, er)
 			require.NoError(t.test, err)
 
+			require.NotNil(t.test, er.Ctx.Stack.Stack)
+
 			require.NotZero(t.test, er.Event.Timestamp)
 			// Zero out the TS and ID
 			ts := er.Event.Timestamp

@@ -35,7 +35,7 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
         <Tooltip>
           <TooltipTrigger>
             <Badge
-              className="bg-slate-200 px-1.5 font-mono"
+              className="border border-slate-400 bg-white px-1.5"
               flatSide={isRetried ? 'right' : undefined}
               kind="solid"
             >
@@ -49,7 +49,7 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
           <Tooltip>
             <TooltipTrigger>
               <Badge
-                className="bg-amber-100 px-1.5 font-mono text-amber-700"
+                className="border-r-1 border-l-0 border-slate-400 bg-white px-1.5"
                 flatSide="left"
                 kind="solid"
               >
@@ -68,6 +68,7 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
       {isExpandable && (
         <Button
           btnAction={onClickExpandToggle}
+          className="flex-none"
           size="small"
           appearance={isExpanded ? 'solid' : 'outlined'}
           icon={
@@ -79,11 +80,13 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
       )}
 
       <div className="grow">
-        <div className="flex gap-2">
-          <span className="grow text-sm">{trace.name}</span>
-          {opCodeBadge}
+        <div className="flex">
+          <span className="mt-1 h-fit self-start text-sm">{trace.name}</span>
+          <div className="flex h-8 grow items-center">
+            {opCodeBadge}
+            <div className="ml-2 h-px grow bg-slate-100" />
+          </div>
         </div>
-
         <TimeWithText trace={trace} />
       </div>
     </div>

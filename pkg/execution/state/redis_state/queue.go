@@ -95,6 +95,7 @@ var (
 	ErrPartitionAlreadyLeased        = fmt.Errorf("partition already leased")
 	ErrPartitionPeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", PartitionPeekMax)
 	ErrPartitionGarbageCollected     = fmt.Errorf("partition garbage collected")
+	ErrPartitionPaused               = fmt.Errorf("partition is paused")
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
 	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
 	ErrPartitionConcurrencyLimit     = fmt.Errorf("At partition concurrency limit")
@@ -547,6 +548,7 @@ type QueuePartition struct {
 	WorkspaceID uuid.UUID `json:"wsID"`
 
 	Priority uint `json:"p"`
+	Paused   bool `json:"off"`
 
 	// Last represents the time that this partition was last leased, as a millisecond
 	// unix epoch.  In essence, we need this to track how frequently we're leasing and
@@ -789,6 +791,41 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 		return 0, fmt.Errorf("error inspecting running job count: %w", err)
 	}
 	return count, nil
+}
+
+// SetFunctionPaused sets the "Paused" flag (represented in JSON as "off") for the given
+// function ID's queue partition.
+func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bool) error {
+	pausedArg := "0"
+	if paused {
+		pausedArg = "1"
+	}
+	args, err := StrSlice([]any{
+		fnID.String(),
+		pausedArg,
+	})
+	if err != nil {
+		return err
+	}
+
+	keys := []string{q.kg.PartitionItem()}
+	status, err := scripts["queue/partitionSetPaused"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error updating paused state: %w", err)
+	}
+	switch status {
+	case 0:
+		return nil
+	case 1:
+		return ErrPartitionNotFound
+	default:
+		return fmt.Errorf("unknown response updating paused state: %d", status)
+	}
 }
 
 // EnqueueItem enqueues a QueueItem.  It creates a QueuePartition for the workspace
@@ -1421,7 +1458,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 	}
 }
 
-// PartitionLease leases a parititon for a given workflow ID.  It returns the new lease ID.
+// PartitionLease leases a partition for a given workflow ID.  It returns the new lease ID.
 //
 // NOTE: This does not check the queue/partition name against allow or denylists;  it assumes
 // that the worker always wants to lease the given queue.  Filtering must be done when peeking
@@ -1487,6 +1524,8 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		return nil, ErrPartitionNotFound
 	case -3:
 		return nil, ErrPartitionAlreadyLeased
+	case -4:
+		return nil, ErrPartitionPaused
 	default:
 		// Update the partition's last indicator.
 		if result > p.Last {
@@ -1528,7 +1567,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		limit = PartitionPeekMax
 	}
 
-	// TODO: If this is an allowlist, only peek the given partitions.  Use ZMSCORE
+	// TODO(tony): If this is an allowlist, only peek the given partitions.  Use ZMSCORE
 	// to fetch the scores for all allowed partitions, then filter where score <= until.
 	// Call an HMGET to get the partitions.
 	ms := until.UnixMilli()
@@ -1573,6 +1612,11 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		item := &QueuePartition{}
 		if err = json.Unmarshal([]byte(i), item); err != nil {
 			return nil, fmt.Errorf("error reading partition item: %w", err)
+		}
+
+		if item.Paused {
+			ignored++
+			continue
 		}
 
 		// NOTE: The queue does two conflicting things:  we peek ahead of now() to fetch partitions

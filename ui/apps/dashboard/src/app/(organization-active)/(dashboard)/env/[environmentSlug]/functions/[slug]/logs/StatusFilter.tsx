@@ -19,11 +19,11 @@ const orderedStatuses = getOrderedEnumValues(FunctionRunStatus, [
 ]);
 
 const statusColors = {
-  [FunctionRunStatus.Queued]: 'bg-amber-500',
-  [FunctionRunStatus.Running]: 'bg-sky-500',
-  [FunctionRunStatus.Cancelled]: 'bg-slate-300',
-  [FunctionRunStatus.Completed]: 'bg-teal-500',
-  [FunctionRunStatus.Failed]: 'bg-rose-500',
+  [FunctionRunStatus.Queued]: 'bg-status-queued',
+  [FunctionRunStatus.Running]: 'bg-status-running',
+  [FunctionRunStatus.Cancelled]: 'bg-status-cancelled',
+  [FunctionRunStatus.Completed]: 'bg-status-completed',
+  [FunctionRunStatus.Failed]: 'bg-status-failed',
 } as const satisfies Record<FunctionRunStatus, `bg-${string}`>;
 
 type StatusFilterProps = {

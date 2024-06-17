@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { CopyButton } from '@inngest/components/CopyButton';
 import { maxRenderedOutputSizeBytes } from '@inngest/components/constants';
@@ -9,7 +10,7 @@ import { IconExpandText } from '@inngest/components/icons/ExpandText';
 import { IconOverflowText } from '@inngest/components/icons/OverflowText';
 import { IconShrinkText } from '@inngest/components/icons/ShrinkText';
 import { IconWrapText } from '@inngest/components/icons/WrapText';
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { RiDownload2Line } from '@remixicon/react';
 import { type editor } from 'monaco-editor';
@@ -138,22 +139,19 @@ interface CodeBlockProps {
   className?: string;
   header?: {
     title?: string;
-    description?: string;
-    color?: string;
+    status?: 'success' | 'error';
   };
-  tabs: {
-    label?: string;
+  tab: {
     content: string;
     readOnly?: boolean;
     language?: string;
     handleChange?: (value: string) => void;
-  }[];
+  };
   actions?: CodeBlockAction[];
 }
 
-export function CodeBlock({ className, header, tabs, actions = [] }: CodeBlockProps) {
+export function CodeBlock({ header, tab, actions = [] }: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
-  const [activeTab, setActiveTab] = useState(0);
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -163,13 +161,9 @@ export function CodeBlock({ className, header, tabs, actions = [] }: CodeBlockPr
   const { handleCopyClick, isCopying } = useCopyToClipboard();
 
   const monaco = useMonaco();
-  const content = tabs[activeTab]?.content;
-  const readOnly = tabs[activeTab]?.readOnly ?? true;
-  const language = tabs[activeTab]?.language ?? 'json';
-  const handleChange = tabs[activeTab]?.handleChange ?? undefined;
+  const { content, readOnly = true, language = 'json', handleChange = undefined } = tab;
 
   useEffect(() => {
-    //
     // We don't have a DOM ref until we're rendered, so check for dark theme parent classes then
     if (wrapperRef.current) {
       setDark(isDark(wrapperRef.current));
@@ -194,10 +188,6 @@ export function CodeBlock({ className, header, tabs, actions = [] }: CodeBlockPr
       updateEditorLayout(editorRef.current);
     }
   }, [isWordWrap, isFullHeight]);
-
-  const handleTabClick = (index: number) => {
-    setActiveTab(index);
-  };
 
   function getTextWidth(text: string, font: string) {
     const canvas = document.createElement('canvas');
@@ -338,157 +328,145 @@ export function CodeBlock({ className, header, tabs, actions = [] }: CodeBlockPr
   return (
     <>
       {monaco && (
-        <div
-          ref={wrapperRef}
-          className="dark:bg-slate-910 w-full rounded-lg border border-slate-200 
-             bg-slate-50 text-slate-700 dark:border-slate-700/30 dark:bg-slate-800/40 dark:shadow"
-        >
-          {header && (
-            <div className={classNames(header.color, 'rounded-t-lg pt-3')}>
-              {(header.title || header.description) && (
-                <div className="flex flex-col gap-1 px-5 pb-2.5 font-mono text-xs">
-                  <p className="font-medium text-rose-700 dark:text-white">{header.title}</p>
-                  <p className="dark:text-white/60">{header.description}</p>
+        <>
+          <div
+            className={cn(
+              'border-b border-b-slate-300 bg-slate-50 dark:border-slate-700/20 dark:bg-slate-800/40 dark:shadow'
+            )}
+          >
+            <div
+              className={cn(
+                'flex items-center justify-between border-l-4 border-l-transparent',
+                header?.status === 'error' && 'border-l-status-failed',
+                header?.status === 'success' && 'border-l-status-completed'
+              )}
+            >
+              <p
+                className={cn(
+                  header?.status === 'error' ? 'text-status-failed' : 'text-muted',
+                  ' px-5 py-2.5 text-sm'
+                )}
+              >
+                {header?.title}
+              </p>
+              {!isOutputTooLarge && (
+                <div className="mr-4 flex items-center gap-2 py-2">
+                  {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
+                    <Button
+                      key={idx}
+                      icon={icon}
+                      btnAction={onClick}
+                      size="small"
+                      aria-label={label}
+                      title={title ?? label}
+                      label={label}
+                      disabled={disabled}
+                      appearance="outlined"
+                    />
+                  ))}
+                  <CopyButton
+                    size="small"
+                    code={content}
+                    isCopying={isCopying}
+                    handleCopyClick={handleCopyClick}
+                    appearance="outlined"
+                  />
+                  <Button
+                    icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
+                    btnAction={handleWrapText}
+                    size="small"
+                    aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                    title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                    tooltip={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                    appearance="outlined"
+                  />
+                  <Button
+                    btnAction={handleFullHeight}
+                    size="small"
+                    icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
+                    aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
+                    title={isFullHeight ? 'Shrink text' : 'Expand text'}
+                    tooltip={isFullHeight ? 'Shrink text' : 'Expand text'}
+                    appearance="outlined"
+                  />
                 </div>
               )}
             </div>
-          )}
-          <div
-            className={classNames(
-              !header && 'rounded-t-lg',
-              'flex justify-between border-b border-slate-200 dark:border-slate-700/20 dark:bg-slate-800/40 dark:shadow'
-            )}
-          >
-            <div className="-mb-px flex">
-              {tabs.map((tab, i) => {
-                const isSingleTab = tabs.length === 1;
-                const isActive = i === activeTab && !isSingleTab;
-
-                return (
-                  <button
-                    key={i}
-                    className={classNames(
-                      `px-6 py-2.5 text-sm`,
-                      isSingleTab
-                        ? 'text-slate-700 dark:text-slate-400'
-                        : 'block border-b outline-none transition-all duration-150',
-                      isActive && 'border-indigo-400 text-indigo-500 dark:text-white',
-                      !isActive &&
-                        !isSingleTab &&
-                        'border-transparent text-slate-700 dark:text-slate-400'
-                    )}
-                    onClick={() => handleTabClick(i)}
-                  >
-                    {tab?.label}
-                  </button>
-                );
-              })}
-            </div>
-            {!isOutputTooLarge && (
-              <div className="mr-2 flex items-center gap-2 py-2">
-                {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
+          </div>
+          {/* Content */}
+          <div ref={wrapperRef}>
+            {isOutputTooLarge ? (
+              <>
+                <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
+                <div className="flex h-24 items-center justify-center	">
                   <Button
-                    key={idx}
-                    icon={icon}
-                    btnAction={onClick}
-                    size="small"
-                    aria-label={label}
-                    title={title ?? label}
-                    label={label}
-                    disabled={disabled}
+                    label="Download Raw"
+                    icon={<RiDownload2Line />}
+                    btnAction={() => downloadJson({ content: content })}
                     appearance="outlined"
                   />
-                ))}
-                <CopyButton
-                  size="small"
-                  code={content}
-                  isCopying={isCopying}
-                  handleCopyClick={handleCopyClick}
-                  appearance="outlined"
-                />
-                <Button
-                  icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
-                  btnAction={handleWrapText}
-                  size="small"
-                  aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
-                  title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
-                  tooltip={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
-                  appearance="outlined"
-                />
-                <Button
-                  btnAction={handleFullHeight}
-                  size="small"
-                  icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
-                  aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
-                  title={isFullHeight ? 'Shrink text' : 'Expand text'}
-                  tooltip={isFullHeight ? 'Shrink text' : 'Expand text'}
-                  appearance="outlined"
-                />
-              </div>
+                </div>
+              </>
+            ) : (
+              <Editor
+                defaultLanguage={language}
+                value={content}
+                theme="inngest-theme"
+                options={{
+                  extraEditorClassName: '!w-full',
+                  readOnly: readOnly,
+                  minimap: {
+                    enabled: false,
+                  },
+                  lineNumbers: 'on',
+                  contextmenu: false,
+                  scrollBeyondLastLine: false,
+                  fontFamily: FONT.font,
+                  fontSize: FONT.size,
+                  fontWeight: 'light',
+                  lineHeight: LINE_HEIGHT,
+                  renderLineHighlight: 'none',
+                  renderWhitespace: 'none',
+                  guides: {
+                    indentation: false,
+                    highlightActiveBracketPair: false,
+                    highlightActiveIndentation: false,
+                  },
+                  scrollbar: {
+                    verticalScrollbarSize: 10,
+                    alwaysConsumeMouseWheel: false,
+                  },
+                  padding: {
+                    top: 10,
+                    bottom: 10,
+                  },
+                  wordWrap: isWordWrap ? 'on' : 'off',
+                }}
+                onMount={(editor) => {
+                  updateEditorLayout(editor);
+                }}
+                onChange={(value) => {
+                  if (value !== undefined) {
+                    handleChange && handleChange(value);
+                    updateEditorLayout(editorRef.current);
+                  }
+                }}
+              />
             )}
           </div>
-          {isOutputTooLarge ? (
-            <>
-              <div className="bg-amber-100 px-6 py-2.5 text-xs text-slate-700 dark:bg-amber-500/40 dark:text-white">
-                Output size is too large to render {`( > 1MB )`}
-              </div>
-              <div className="flex h-24 items-center justify-center	">
-                <Button
-                  label="Download Raw"
-                  icon={<RiDownload2Line />}
-                  btnAction={() => downloadJson({ content: content })}
-                  appearance="outlined"
-                />
-              </div>
-            </>
-          ) : (
-            <Editor
-              defaultLanguage={language}
-              value={content}
-              theme="inngest-theme"
-              options={{
-                extraEditorClassName: 'rounded-b-lg !w-full',
-                readOnly: readOnly,
-                minimap: {
-                  enabled: false,
-                },
-                lineNumbers: 'on',
-                contextmenu: false,
-                scrollBeyondLastLine: false,
-                fontFamily: FONT.font,
-                fontSize: FONT.size,
-                fontWeight: 'light',
-                lineHeight: LINE_HEIGHT,
-                renderLineHighlight: 'none',
-                renderWhitespace: 'none',
-                guides: {
-                  indentation: false,
-                  highlightActiveBracketPair: false,
-                  highlightActiveIndentation: false,
-                },
-                scrollbar: {
-                  verticalScrollbarSize: 10,
-                  alwaysConsumeMouseWheel: false,
-                },
-                padding: {
-                  top: 10,
-                  bottom: 10,
-                },
-                wordWrap: isWordWrap ? 'on' : 'off',
-              }}
-              onMount={(editor) => {
-                updateEditorLayout(editor);
-              }}
-              onChange={(value) => {
-                if (value !== undefined) {
-                  handleChange && handleChange(value);
-                  updateEditorLayout(editorRef.current);
-                }
-              }}
-            />
-          )}
-        </div>
+        </>
       )}
     </>
   );
 }
+
+CodeBlock.Wrapper = ({ children }: React.PropsWithChildren) => {
+  return (
+    <div
+      className="w-full overflow-hidden rounded-lg border 
+     border-slate-300 dark:border-slate-700/30 dark:shadow"
+    >
+      {children}
+    </div>
+  );
+};

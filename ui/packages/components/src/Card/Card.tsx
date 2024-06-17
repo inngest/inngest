@@ -67,7 +67,7 @@ Card.Header = ({ children, className }: PropsWithChildren<{ className?: string }
   return (
     <div
       className={cn(
-        'flex flex-col gap-1 border-b border-slate-300 bg-white px-6 py-3 text-sm text-slate-700 dark:border-slate-800/50 dark:bg-slate-800/40 dark:text-slate-400',
+        'flex flex-col gap-1 border-b border-slate-300 bg-white py-3 pl-6 pr-4 text-sm text-slate-700 dark:border-slate-800/50 dark:bg-slate-800/40 dark:text-slate-400',
         className
       )}
     >
