@@ -229,6 +229,51 @@ func (c *Client) RunTraces(ctx context.Context, runID string) *RunV2 {
 				isBatch
 				batchCreatedAt
 				cronSchedule
+
+				trace {
+					...TraceDetails
+					childrenSpans {
+						...TraceDetails
+						childrenSpans {
+							...TraceDetails
+						}
+					}
+				}
+			}
+		}
+		fragment TraceDetails on RunTraceSpan {
+			name
+			runID
+			status
+			attempts
+			isRoot
+			parentSpanID
+			spanID
+			startedAt
+			endedAt
+			duration
+			outputID
+			stepOp
+			stepInfo {
+				__typename
+				... on InvokeStepInfo {
+					triggeringEventID
+					functionID
+					timeout
+					returnEventID
+  				runID
+					timedOut
+				}
+				... on SleepStepInfo {
+					sleepUntil
+				}
+				... on WaitForEventStepInfo {
+					eventName
+					expression
+					timeout
+					foundEventID
+					timedOut
+				}
 			}
 		}
 	`

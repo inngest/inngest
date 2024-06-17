@@ -177,9 +177,9 @@ SELECT * FROM history WHERE run_id = ? ORDER BY created_at ASC;
 
 -- name: InsertTrace :exec
 INSERT INTO traces
-	(timestamp, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id)
+	(timestamp, timestamp_unix_ms, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id)
 VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: InsertTraceRun :exec
 INSERT OR REPLACE INTO trace_runs
@@ -191,4 +191,4 @@ VALUES
 SELECT * FROM trace_runs WHERE run_id = @run_id;
 
 -- name: GetTraceSpans :many
-SELECT * FROM traces WHERE run_id = @run_id ORDER BY timestamp DESC, duration DESC;
+SELECT * FROM traces WHERE trace_id = @trace_id AND run_id = @run_id ORDER BY timestamp_unix_ms DESC, duration DESC;

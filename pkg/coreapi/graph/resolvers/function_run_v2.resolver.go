@@ -6,7 +6,9 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/inngest/inngest/pkg/cqrs"
 )
 
 func (r *functionRunV2Resolver) Function(ctx context.Context, fn *models.FunctionRunV2) (*models.Function, error) {
@@ -41,5 +43,19 @@ func (r *functionRunV2Resolver) Triggers(ctx context.Context, fn *models.Functio
 }
 
 func (r *functionRunV2Resolver) Trace(ctx context.Context, fn *models.FunctionRunV2) (*models.RunTraceSpan, error) {
-	return nil, fmt.Errorf("not implemented")
+	// TODO: handle the case when it's Scheduled
+	// there's no run so it should return empty but not error
+
+	return loader.LoadOne[models.RunTraceSpan](
+		ctx,
+		loader.FromCtx(ctx).RunTraceLoader,
+		&loader.TraceRequestKey{
+			TraceRunIdentifier: &cqrs.TraceRunIdentifier{
+				AppID:      fn.AppID,
+				FunctionID: fn.FunctionID,
+				RunID:      fn.ID,
+				TraceID:    fn.TraceID,
+			},
+		},
+	)
 }
