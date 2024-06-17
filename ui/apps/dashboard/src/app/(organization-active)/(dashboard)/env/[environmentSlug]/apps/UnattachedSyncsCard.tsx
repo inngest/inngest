@@ -26,7 +26,7 @@ export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Prop
       <div className={cardLeftPanelStyles}>
         <h2>
           <Link
-            className="transition-color flex cursor-pointer items-center gap-1 text-white underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-300 hover:decoration-indigo-300"
+            className="transition-color hover:text-link hover:decoration-link flex cursor-pointer items-center gap-1 text-white underline decoration-transparent decoration-2 underline-offset-4 duration-300"
             href={pathCreator.unattachedSyncs({ envSlug })}
           >
             Unattached Syncs

@@ -112,6 +112,9 @@ export default {
         btnDanger: 'rgb(var(--color-foreground-btn-danger) / <alpha-value>)',
         btnDangerDisabled: 'rgb(var(--color-foreground-btn-dangerDisabled) / <alpha-value>)',
       },
+      textDecorationColor: {
+        link: 'rgb(var(--color-foreground-link) / <alpha-value>)',
+      },
       fill: {
         onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
         subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',

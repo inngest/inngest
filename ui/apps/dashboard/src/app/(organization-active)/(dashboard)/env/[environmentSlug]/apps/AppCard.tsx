@@ -50,7 +50,7 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
       <div className={cn(cardLeftPanelStyles, isArchived && 'bg-slate-700')}>
         <h2>
           <Link
-            className="transition-color flex cursor-pointer items-center gap-1 text-white underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-400 hover:decoration-indigo-400"
+            className="transition-color hover:text-link hover:decoration-link flex cursor-pointer items-center gap-1 text-white underline decoration-transparent decoration-2 underline-offset-4 duration-300"
             href={pathCreator.app({ envSlug, externalAppID: app.externalID })}
           >
             {isArchived && <RiArchive2Line className="h-4 w-4" />}
