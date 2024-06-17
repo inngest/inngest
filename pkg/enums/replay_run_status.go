@@ -7,9 +7,9 @@ type ReplayRunStatus int
 const (
 	ReplayRunStatusAll ReplayRunStatus = 0
 
-	ReplayRunStatusCompleted = ReplayRunStatus(10 + RunStatusCompleted)
-	ReplayRunStatusFailed    = ReplayRunStatus(10 + RunStatusFailed)
-	ReplayRunStatusCancelled = ReplayRunStatus(10 + RunStatusCancelled)
+	ReplayRunStatusCompleted = ReplayRunStatus(RunStatusCompleted)
+	ReplayRunStatusFailed    = ReplayRunStatus(RunStatusFailed)
+	ReplayRunStatusCancelled = ReplayRunStatus(RunStatusCancelled)
 
-	ReplayRunStatusSkippedPaused = ReplayRunStatus(100 + SkipReasonFunctionPaused)
+	ReplayRunStatusSkippedPaused = ReplayRunStatus(10 + SkipReasonFunctionPaused)
 )
