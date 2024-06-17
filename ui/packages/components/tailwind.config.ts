@@ -47,6 +47,15 @@ export default {
           coolModerate: 'rgb(var(--color-quaternary-cool-moderate) / <alpha-value>)',
           coolxIntense: 'rgb(var(--color-quaternary-cool-xIntense) / <alpha-value>)',
         },
+        accent: {
+          '2xSubtle': 'rgb(var(--color-accent-2xSubtle) / <alpha-value>)',
+          xSubtle: 'rgb(var(--color-accent-xSubtle) / <alpha-value>)',
+          subtle: 'rgb(var(--color-accent-subtle) / <alpha-value>)',
+          moderate: 'rgb(var(--color-accent-moderate) / <alpha-value>)',
+          intense: 'rgb(var(--color-accent-intense) / <alpha-value>)',
+          xIntense: 'rgb(var(--color-accent-xIntense) / <alpha-value>)',
+          '2xIntense': 'rgb(var(--color-accent-2xIntense) / <alpha-value>)',
+        },
         status: {
           failed: 'rgb(var(--color-tertiary-intense) / <alpha-value>)',
           running: 'rgb(var(--color-secondary-intense) / <alpha-value>)',

@@ -217,6 +217,14 @@
     --color-quaternary-cool-xSubtle: var(--color-purplehaze-300);
     --color-quaternary-cool-moderate: var(--color-purplehaze-500);
     --color-quaternary-cool-xIntense: var(--color-purplehaze-700);
+
+    --color-accent-2xSubtle: var(--color-honey-200);
+    --color-accent-xSubtle: var(--color-honey-300);
+    --color-accent-subtle: var(--color-honey-400);
+    --color-accent-moderate: var(--color-honey-500);
+    --color-accent-intense: var(--color-honey-600);
+    --color-accent-xIntense: var(--color-honey-700);
+    --color-accent-2xIntense: var(--color-honey-800);
   }
 
   .dark {
@@ -300,5 +308,13 @@
     --color-quaternary-cool-xSubtle: var(--color-purplehaze-700);
     --color-quaternary-cool-moderate: var(--color-purplehaze-500);
     --color-quaternary-cool-xIntense: var(--color-purplehaze-300);
+
+    --color-accent-2xSubtle: var(--color-honey-800);
+    --color-accent-xSubtle: var(--color-honey-700);
+    --color-accent-subtle: var(--color-honey-600);
+    --color-accent-moderate: var(--color-honey-500);
+    --color-accent-intense: var(--color-honey-400);
+    --color-accent-xIntense: var(--color-honey-300);
+    --color-accent-2xIntense: var(--color-honey-200);
   }
 }
