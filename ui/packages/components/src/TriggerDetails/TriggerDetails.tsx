@@ -142,7 +142,7 @@ export function TriggerDetails({ className, getTrigger }: Props) {
           <>
             <Card>
               <Card.Header className="h-11 flex-row items-center gap-2">
-                <div className="flex grow items-center gap-2">Trigger details</div>
+                <div className="text-basis flex grow items-center gap-2">Trigger details</div>
                 {/* <Collapsible.Trigger asChild>
                   <Button size="large" appearance="text" icon={<RiContractRightFill />} />
                 </Collapsible.Trigger> */}
@@ -226,7 +226,7 @@ export function TriggerDetails({ className, getTrigger }: Props) {
                 </div>
               </Card.Content>
               {trigger?.payloads && type !== 'CRON' && (
-                <div className="border-t border-slate-300">
+                <div className="border-muted border-t">
                   <CodeBlock
                     actions={codeBlockActions}
                     header={{
