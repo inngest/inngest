@@ -30,39 +30,25 @@ func loadConfigFile(ctx context.Context, cmd *cobra.Command) {
 	if configPath != "" {
 		// User specified the config file so we'll use that
 		viper.SetConfigFile(configPath)
-
-		if err := viper.ReadInConfig(); err != nil {
-			// User explicitly specified a config file but we couldn't read it
-			log.Fatalf("Error reading config file: %v", err)
-		}
 	} else {
 		// Don't need to specify the extension since Viper will try to load
 		// various extensions (inngest.json, inngest.yaml, etc.)
 		viper.SetConfigName("inngest")
 
-		found := false
 		if cwd, err := os.Getwd(); err != nil {
 			l.Warn().Err(err).Msg("error getting current directory")
 		} else {
 			// Walk up the directory tree looking for a config file
 			for dir := cwd; dir != "/"; dir = filepath.Dir(dir) {
 				viper.AddConfigPath(dir)
-				if err := viper.ReadInConfig(); err == nil {
-					found = true
-					break
-				}
 			}
 		}
 
-		if !found {
-			if homeDir, err := os.UserHomeDir(); err != nil {
-				l.Warn().Err(err).Msg("error getting home directory")
-			} else {
-				// Fallback to ~/.config/inngest
-				viper.AddConfigPath(filepath.Join(homeDir, ".config/inngest"))
-
-				viper.ReadInConfig()
-			}
+		if homeDir, err := os.UserHomeDir(); err != nil {
+			l.Warn().Err(err).Msg("error getting home directory")
+		} else {
+			// Fallback to ~/.config/inngest
+			viper.AddConfigPath(filepath.Join(homeDir, ".config/inngest"))
 		}
 	}
 
