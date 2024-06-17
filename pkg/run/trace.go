@@ -17,8 +17,8 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-// runTreeBuilder builds the span tree used for the API
-type runTreeBuilder struct {
+// runTree builds the span tree used for the API
+type runTree struct {
 	// root is the root span of the tree
 	root *cqrs.Span
 	// trigger is the trigger span of the tree
@@ -53,8 +53,8 @@ type RunTreeOpts struct {
 	Spans       []*cqrs.Span
 }
 
-func NewRunTreeBuilder(opts RunTreeOpts) (*runTreeBuilder, error) {
-	b := &runTreeBuilder{
+func NewRunTree(opts RunTreeOpts) (*runTree, error) {
+	b := &runTree{
 		acctID:    opts.AccountID,
 		wsID:      opts.WorkspaceID,
 		appID:     opts.AppID,
@@ -107,11 +107,12 @@ func NewRunTreeBuilder(opts RunTreeOpts) (*runTreeBuilder, error) {
 	return b, nil
 }
 
-func (tb *runTreeBuilder) Build(ctx context.Context) (*rpbv2.RunSpan, error) {
-	root, _, err := tb.toRunTraceSpan(ctx, tb.root)
+func (tb *runTree) ToRunSpan(ctx context.Context) (*rpbv2.RunSpan, error) {
+	root, _, err := tb.toRunSpan(ctx, tb.root)
 	if err != nil {
 		return nil, fmt.Errorf("error converting function span: %w", err)
 	}
+	root.ParentSpanId = nil
 	root.IsRoot = true
 
 	// sort it in asc order before proceeding
@@ -122,7 +123,7 @@ func (tb *runTreeBuilder) Build(ctx context.Context) (*rpbv2.RunSpan, error) {
 
 	// these are the execution or steps for the function run
 	for _, span := range spans {
-		tspan, skipped, err := tb.toRunTraceSpan(ctx, span)
+		tspan, skipped, err := tb.toRunSpan(ctx, span)
 		if err != nil {
 			return nil, fmt.Errorf("error converting execution span: %w", err)
 		}
@@ -136,7 +137,7 @@ func (tb *runTreeBuilder) Build(ctx context.Context) (*rpbv2.RunSpan, error) {
 	return root, nil
 }
 
-func (tb *runTreeBuilder) toRunTraceSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan, bool, error) {
+func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan, bool, error) {
 	res, skipped := tb.constructSpan(ctx, s)
 	if skipped {
 		return nil, skipped, nil
@@ -152,7 +153,7 @@ func (tb *runTreeBuilder) toRunTraceSpan(ctx context.Context, s *cqrs.Span) (*rp
 		case enums.RunStatusCancelled:
 			res.Status = rpbv2.SpanStatus_CANCELLED
 		case enums.RunStatusFailed, enums.RunStatusOverflowed:
-			res.Status = rpbv2.SpanStatus_CANCELLED
+			res.Status = rpbv2.SpanStatus_FAILED
 		default:
 			return nil, false, fmt.Errorf("unexpected run status: %v", s.FunctionStatus())
 		}
@@ -189,7 +190,7 @@ func (tb *runTreeBuilder) toRunTraceSpan(ctx context.Context, s *cqrs.Span) (*rp
 	return res, false, nil
 }
 
-func (tb *runTreeBuilder) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan, bool) {
+func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan, bool) {
 	// already processed skip it
 	if _, ok := tb.processed[s.SpanID]; ok {
 		return nil, true
@@ -239,7 +240,7 @@ func (tb *runTreeBuilder) constructSpan(ctx context.Context, s *cqrs.Span) (*rpb
 	}, false
 }
 
-func (tb *runTreeBuilder) processStepRun(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+func (tb *runTree) processStepRun(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
 	// step runs should always have groupIDs
 	groupID := span.GroupID()
 	if groupID == nil {
@@ -345,7 +346,7 @@ func (tb *runTreeBuilder) processStepRun(ctx context.Context, span *cqrs.Span, m
 	return nil
 }
 
-func (tb *runTreeBuilder) processSleep(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+func (tb *runTree) processSleep(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
 	// sleep span always have a nested span that stores the details of the sleep itself
 	if len(span.Children) != 1 {
 		return fmt.Errorf("missing sleep details")
@@ -384,7 +385,7 @@ func (tb *runTreeBuilder) processSleep(ctx context.Context, span *cqrs.Span, mod
 	return nil
 }
 
-func (tb *runTreeBuilder) processWaitForEvent(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+func (tb *runTree) processWaitForEvent(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
 	// wait span always have a nested span that stores the details of the wait
 	if len(span.Children) != 1 {
 		return fmt.Errorf("missing waitForEvent details")
@@ -454,7 +455,7 @@ func (tb *runTreeBuilder) processWaitForEvent(ctx context.Context, span *cqrs.Sp
 	return nil
 }
 
-func (tb *runTreeBuilder) processInvoke(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+func (tb *runTree) processInvoke(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
 	// invoke span always have a nested span that stores the details of the invoke
 	if len(span.Children) != 1 {
 		return fmt.Errorf("missing invoke details")
@@ -563,6 +564,13 @@ func (tb *runTreeBuilder) processInvoke(ctx context.Context, span *cqrs.Span, mo
 	return nil
 }
 
-func (tb *runTreeBuilder) processExec(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+func (tb *runTree) processExec(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+	switch span.Status() {
+	case cqrs.SpanStatusOk:
+		mod.Status = rpbv2.SpanStatus_COMPLETED
+	case cqrs.SpanStatusError:
+		mod.Status = rpbv2.SpanStatus_FAILED
+	}
+
 	return nil
 }

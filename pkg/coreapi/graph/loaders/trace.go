@@ -58,8 +58,8 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 				return
 			}
 
-			// TODO: build tree from spans
-			tb, err := run.NewRunTreeBuilder(run.RunTreeOpts{
+			// build tree from spans
+			tree, err := run.NewRunTree(run.RunTreeOpts{
 				AccountID:   req.AccountID,
 				WorkspaceID: req.WorkspaceID,
 				AppID:       req.AppID,
@@ -72,12 +72,13 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 				return
 			}
 
-			tree, err := tb.Build(ctx)
+			// convert the tree to a span tree structure for the API
+			root, err := tree.ToRunSpan(ctx)
 			if err != nil {
 				res.Error = fmt.Errorf("error building run tree: %w", err)
 				return
 			}
-			data, err := convertRunTreeToGQLModel(tree)
+			data, err := convertRunTreeToGQLModel(root)
 			if err != nil {
 				res.Error = fmt.Errorf("error parsing run tree: %w", err)
 				return
