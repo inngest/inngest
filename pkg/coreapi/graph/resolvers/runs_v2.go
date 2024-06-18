@@ -2,6 +2,7 @@ package resolvers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -278,7 +279,36 @@ func (r *queryResolver) Run(ctx context.Context, runID string) (*models.Function
 }
 
 func (r *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID string) (*models.RunTraceSpanOutput, error) {
-	return nil, fmt.Errorf("not implemented")
+	id := &cqrs.SpanIdentifier{}
+	if err := id.Decode(outputID); err != nil {
+		return nil, fmt.Errorf("error parsing span identifier: %w", err)
+	}
+
+	output, err := r.Data.GetSpanOutput(ctx, *id)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := models.RunTraceSpanOutput{}
+	if output.IsError {
+		var stepErr models.StepError
+		err := json.Unmarshal(output.Data, &stepErr)
+		if err != nil {
+			return nil, fmt.Errorf("error deserializing step error: %w", err)
+		}
+
+		if stepErr.Message == "" {
+			stack := string(output.Data)
+			stepErr.Stack = &stack
+		}
+
+		resp.Error = &stepErr
+	} else {
+		d := string(output.Data)
+		resp.Data = &d
+	}
+
+	return &resp, nil
 }
 
 func (r *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.RunTraceTrigger, error) {
