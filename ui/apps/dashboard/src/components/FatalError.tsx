@@ -19,7 +19,7 @@ export function FatalError({ error, reset }: Props) {
   }, [error]);
 
   return (
-    <div className="mt-32 flex w-full flex-col items-center justify-center gap-4">
+    <div className="m-auto mt-32 flex w-fit flex-col gap-4">
       <Alert severity="error">
         <p className="mb-4 font-semibold">{error.message}</p>
 
@@ -29,7 +29,7 @@ export function FatalError({ error, reset }: Props) {
         </p>
       </Alert>
 
-      <div className="flex gap-4">
+      <div className="flex gap-4 px-4">
         <Button btnAction={() => reset()} kind="primary" label="Try again" />
 
         <Link href={pathCreator.support()}>Contact support</Link>
