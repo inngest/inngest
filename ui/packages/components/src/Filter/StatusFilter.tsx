@@ -57,13 +57,9 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
       label="Status"
     >
       <Select.Button>
-        <div className="w-8">
-          {selectedStatuses.length > 0 && !areAllStatusesSelected && (
-            <span className="pr-2">{statusDots}</span>
-          )}
-          {(selectedStatuses.length === 0 || areAllStatusesSelected) && (
-            <span className="pr-2">All</span>
-          )}
+        <div className="w-7 text-left">
+          {selectedStatuses.length > 0 && !areAllStatusesSelected && <span>{statusDots}</span>}
+          {(selectedStatuses.length === 0 || areAllStatusesSelected) && <span>All</span>}
         </div>
       </Select.Button>
       <Select.Options>
