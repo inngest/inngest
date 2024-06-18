@@ -889,7 +889,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	ctx, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeExecution),
-		telemetry.WithName("execute"),
+		telemetry.WithName(consts.OtelExecPlaceholder),
 		telemetry.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, id.AccountID.String()),
@@ -1033,13 +1033,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			)
 			span.SetStepOutput(resp.Output)
 		} else if resp.IsTraceVisibleFunctionExecution() {
-			spanName := "function success"
+			spanName := consts.OtelExecFnOk
 			fnstatus := attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCompleted.ToCode())
 			fnSpan.SetStatus(codes.Ok, "success")
 			span.SetStatus(codes.Ok, "success")
 
 			if resp.StatusCode != 200 {
-				spanName = "function error"
+				spanName = consts.OtelExecFnErr
 				fnstatus = attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusFailed.ToCode())
 				fnSpan.SetStatus(codes.Error, resp.Error())
 				span.SetStatus(codes.Error, resp.Error())

@@ -106,4 +106,9 @@ const (
 
 	OtelPropagationKey     = "sys.trace"
 	OtelPropagationLinkKey = "sys.trace.link"
+
+	// execution copies
+	OtelExecPlaceholder = "execute"
+	OtelExecFnOk        = "function success"
+	OtelExecFnErr       = "function error"
 )

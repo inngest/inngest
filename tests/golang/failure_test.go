@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
@@ -81,7 +82,7 @@ func TestFunctionFailure(t *testing.T) {
 
 			t.Run("failed run", func(t *testing.T) {
 				span := run.Trace.ChildSpans[0]
-				assert.Equal(t, "function error", span.Name)
+				assert.Equal(t, consts.OtelExecFnErr, span.Name)
 				assert.False(t, span.IsRoot)
 				assert.Equal(t, rootSpanID, span.ParentSpanID)
 				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
@@ -207,7 +208,7 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 			// first attempt
 			t.Run("failed run", func(t *testing.T) {
 				span := run.Trace.ChildSpans[0]
-				assert.Equal(t, "execute", span.Name)
+				assert.Equal(t, consts.OtelExecPlaceholder, span.Name)
 				assert.False(t, span.IsRoot)
 				assert.Equal(t, rootSpanID, span.ParentSpanID)
 				assert.Equal(t, 2, len(span.ChildSpans))
