@@ -17,7 +17,7 @@ type Props = {
 };
 
 export const cardLeftPanelStyles =
-  'h-24 bg-slate-500 md:h-44 flex md:w-[410px] flex-col justify-center gap-2 px-10';
+  'h-24 bg-canvasSubtle md:h-44 flex md:w-[410px] flex-col justify-center gap-2 px-10';
 export const cardRightPanelStyles = 'h-44 flex-1 flex flex-col justify-center px-8';
 
 export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Props) {
@@ -26,7 +26,7 @@ export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Prop
       <div className={cardLeftPanelStyles}>
         <h2>
           <Link
-            className="transition-color hover:text-link hover:decoration-link flex cursor-pointer items-center gap-1 text-white underline decoration-transparent decoration-2 underline-offset-4 duration-300"
+            className="transition-color hover:text-link hover:decoration-link text-basis flex cursor-pointer items-center gap-1 underline decoration-transparent decoration-2 underline-offset-4 duration-300"
             href={pathCreator.unattachedSyncs({ envSlug })}
           >
             Unattached Syncs
