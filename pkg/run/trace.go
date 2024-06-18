@@ -121,6 +121,12 @@ func (tb *runTree) ToRunSpan(ctx context.Context) (*rpbv2.RunSpan, error) {
 		return spans[i].Timestamp.UnixMilli() < spans[j].Timestamp.UnixMilli()
 	})
 
+	var finished bool
+	switch root.Status {
+	case rpbv2.SpanStatus_COMPLETED, rpbv2.SpanStatus_FAILED:
+		finished = true
+	}
+
 	// these are the execution or steps for the function run
 	for _, span := range spans {
 		tspan, skipped, err := tb.toRunSpan(ctx, span)
@@ -130,6 +136,10 @@ func (tb *runTree) ToRunSpan(ctx context.Context) (*rpbv2.RunSpan, error) {
 		// means this span was already processed so no-op here
 		if skipped {
 			continue
+		}
+		// the last output is the run's output
+		if finished {
+			root.OutputId = tspan.OutputId
 		}
 		root.Children = append(root.Children, tspan)
 	}
@@ -197,10 +207,6 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 	if _, ok := tb.processed[s.SpanID]; ok {
 		return nil, true
 	}
-	// NOTE: is this check sufficient?
-	if s.SpanName == "function success" {
-		return nil, true
-	}
 
 	var (
 		appID uuid.UUID
@@ -226,6 +232,20 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 	dur := s.DurationMS()
 	endedAt := s.Timestamp.Add(s.Duration)
 
+	queuedAt := ulid.Time(runID.Time())
+	// non function scope need to calculate from delay
+	if s.ScopeName != consts.OtelScopeFunction {
+		queuedAt = s.Timestamp
+		if str, ok := s.SpanAttributes[consts.OtelSysDelaySystem]; ok {
+			if ms, err := strconv.Atoi(str); err == nil {
+				if ms > 0 {
+					dur := time.Duration(ms) * time.Millisecond
+					queuedAt = s.Timestamp.Add(-1 * dur)
+				}
+			}
+		}
+	}
+
 	return &rpbv2.RunSpan{
 		AppId:        appID.String(),
 		FunctionId:   fnID.String(),
@@ -235,7 +255,7 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 		SpanId:       s.SpanID,
 		Name:         name,
 		Status:       rpbv2.SpanStatus_RUNNING,
-		QueuedAt:     timestamppb.New(ulid.Time(runID.Time())),
+		QueuedAt:     timestamppb.New(queuedAt),
 		StartedAt:    timestamppb.New(s.Timestamp),
 		EndedAt:      timestamppb.New(endedAt),
 		DurationMs:   dur,
@@ -267,8 +287,23 @@ func (tb *runTree) processStepRun(ctx context.Context, span *cqrs.Span, mod *rpb
 
 	// not need to provide nesting if it's just itself and it's successful
 	if len(peers) == 1 && span.Status() == cqrs.SpanStatusOk {
+		ident := &cqrs.SpanIdentifier{
+			AccountID:   tb.acctID,
+			WorkspaceID: tb.wsID,
+			AppID:       tb.appID,
+			FunctionID:  tb.fnID,
+			TraceID:     span.TraceID,
+			SpanID:      span.SpanID,
+		}
+		outputID, err := ident.Encode()
+		if err != nil {
+			return err
+		}
+
 		mod.Attempts = 1
 		mod.Status = rpbv2.SpanStatus_COMPLETED
+		mod.OutputId = &outputID
+
 		tb.processed[span.SpanID] = true
 		return nil
 	}
@@ -309,15 +344,34 @@ func (tb *runTree) processStepRun(ctx context.Context, span *cqrs.Span, mod *rpb
 			nested.EndedAt = nil
 		}
 
+		// output
+		ident := &cqrs.SpanIdentifier{
+			AccountID:   tb.acctID,
+			WorkspaceID: tb.wsID,
+			AppID:       tb.appID,
+			FunctionID:  tb.fnID,
+			TraceID:     nested.TraceId,
+			SpanID:      nested.SpanId,
+		}
+
+		var outputID *string
+		switch status { // only set outputID if the span is already finished
+		case rpbv2.SpanStatus_COMPLETED, rpbv2.SpanStatus_FAILED:
+			id, err := ident.Encode()
+			if err != nil {
+				return err
+			}
+			outputID = &id
+		}
+
 		nested.Name = fmt.Sprintf("Attempt %d", attempt)
 		nested.StepOp = &stepOp
 		nested.Attempts = attempt
 		nested.Status = status
-
-		// TODO: output
+		nested.OutputId = outputID
 
 		// last one
-		// update end time of the group as well
+		// update end time and status of the group as well
 		if i == len(peers)-1 {
 			pend := p.Timestamp.Add(p.Duration)
 
@@ -332,11 +386,13 @@ func (tb *runTree) processStepRun(ctx context.Context, span *cqrs.Span, mod *rpb
 				mod.EndedAt = nil
 			case rpbv2.SpanStatus_COMPLETED:
 				mod.Status = rpbv2.SpanStatus_COMPLETED
+				mod.OutputId = outputID
 			case rpbv2.SpanStatus_FAILED:
 				// check if this failure is the final failure of all attempts
 				if attempt == maxAttempts {
 					mod.Status = rpbv2.SpanStatus_FAILED
 					mod.Attempts = maxAttempts
+					mod.OutputId = outputID
 				}
 			}
 		}
@@ -449,7 +505,22 @@ func (tb *runTree) processWaitForEvent(ctx context.Context, span *cqrs.Span, mod
 		},
 	}
 
-	// TODO: output
+	// output
+	if foundEvtID != nil && mod.Status == rpbv2.SpanStatus_COMPLETED {
+		ident := &cqrs.SpanIdentifier{
+			AccountID:   tb.acctID,
+			WorkspaceID: tb.wsID,
+			AppID:       tb.appID,
+			FunctionID:  tb.fnID,
+			TraceID:     wait.TraceID,
+			SpanID:      wait.SpanID,
+		}
+		id, err := ident.Encode()
+		if err != nil {
+			return err
+		}
+		mod.OutputId = &id
+	}
 
 	tb.processed[span.SpanID] = true
 	tb.processed[wait.SpanID] = true
@@ -489,27 +560,27 @@ func (tb *runTree) processInvoke(ctx context.Context, span *cqrs.Span, mod *rpbv
 	}
 	triggeringEventID, err := ulid.Parse(evtIDstr)
 	if err != nil {
-		return fmt.Errorf("error parsing invoke triggering event ID: %w", err)
+		return fmt.Errorf("error parsing triggering event ID: %w", err)
 	}
 
 	// target function ID
 	fnID, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeTargetFnID]
 	if !ok {
-		return fmt.Errorf("missing invoke target function ID for invoke")
+		return fmt.Errorf("missing target function ID")
 	}
 
 	// run ID
-	if str, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeRunID]; ok {
+	if str, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeRunID]; ok && str != "" {
 		runid, err := ulid.Parse(str)
 		if err != nil {
-			return fmt.Errorf("error parsing invoke run ID: %w", err)
+			return fmt.Errorf("error parsing run ID: %w", err)
 		}
 		id := runid.String()
 		runID = &id
 	}
 
 	// return event ID
-	if str, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeReturnedEventID]; ok {
+	if str, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeReturnedEventID]; ok && str != "" {
 		evtID, err := ulid.Parse(str)
 		if err != nil {
 			return fmt.Errorf("error parsing invoke return event ID: %w", err)
@@ -547,7 +618,7 @@ func (tb *runTree) processInvoke(ctx context.Context, span *cqrs.Span, mod *rpbv
 
 	if returnEventID != nil {
 		status := rpbv2.SpanStatus_COMPLETED
-		if invoke.StatusCode == "STATUS_CODE_ERROR" {
+		if invoke.Status() == cqrs.SpanStatusError {
 			status = rpbv2.SpanStatus_FAILED
 		}
 		mod.Status = status
@@ -557,7 +628,22 @@ func (tb *runTree) processInvoke(ctx context.Context, span *cqrs.Span, mod *rpbv
 		}
 	}
 
-	// TODO: output
+	// output
+	if returnEventID != nil || mod.Status == rpbv2.SpanStatus_FAILED {
+		ident := &cqrs.SpanIdentifier{
+			AccountID:   tb.acctID,
+			WorkspaceID: tb.wsID,
+			AppID:       tb.appID,
+			FunctionID:  tb.fnID,
+			TraceID:     invoke.TraceID,
+			SpanID:      invoke.SpanID,
+		}
+		id, err := ident.Encode()
+		if err != nil {
+			return err
+		}
+		mod.OutputId = &id
+	}
 
 	// mark as processed
 	tb.processed[span.SpanID] = true
@@ -587,8 +673,23 @@ func (tb *runTree) processExec(ctx context.Context, span *cqrs.Span, mod *rpbv2.
 	}
 
 	if len(peers) == 1 && span.Status() == cqrs.SpanStatusOk {
+		ident := &cqrs.SpanIdentifier{
+			AccountID:   tb.acctID,
+			WorkspaceID: tb.wsID,
+			AppID:       tb.appID,
+			FunctionID:  tb.fnID,
+			TraceID:     span.TraceID,
+			SpanID:      span.SpanID,
+		}
+		outputID, err := ident.Encode()
+		if err != nil {
+			return err
+		}
+
 		mod.Attempts = 1
 		mod.Status = rpbv2.SpanStatus_COMPLETED
+		mod.OutputId = &outputID
+
 		tb.processed[span.SpanID] = true
 		return nil
 	}
@@ -627,11 +728,24 @@ func (tb *runTree) processExec(ctx context.Context, span *cqrs.Span, mod *rpbv2.
 			nested.EndedAt = nil
 		}
 
+		// output
+		ident := &cqrs.SpanIdentifier{
+			AccountID:   tb.acctID,
+			WorkspaceID: tb.wsID,
+			AppID:       tb.appID,
+			FunctionID:  tb.fnID,
+			TraceID:     span.TraceID,
+			SpanID:      span.SpanID,
+		}
+		outputID, err := ident.Encode()
+		if err != nil {
+			return err
+		}
+
 		nested.Name = fmt.Sprintf("Attempt %d", attempt)
 		nested.Attempts = attempt
 		nested.Status = status
-
-		// TODO: output
+		nested.OutputId = &outputID
 
 		// last one
 		// update end time of the group as well
@@ -649,12 +763,21 @@ func (tb *runTree) processExec(ctx context.Context, span *cqrs.Span, mod *rpbv2.
 				mod.EndedAt = nil
 			case rpbv2.SpanStatus_COMPLETED:
 				mod.Status = rpbv2.SpanStatus_COMPLETED
+				mod.OutputId = &outputID
 			case rpbv2.SpanStatus_FAILED:
 				// check if this failure is the final failure of all attempts
 				if attempt == maxAttempts {
 					mod.Status = rpbv2.SpanStatus_FAILED
 					mod.Attempts = maxAttempts
+					mod.OutputId = &outputID
 				}
+			}
+
+			// if the name is `function error`, it's already finished
+			// and mark it as failed
+			if mod.Name == "function error" {
+				mod.Status = rpbv2.SpanStatus_FAILED
+				mod.OutputId = &outputID
 			}
 		}
 

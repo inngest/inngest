@@ -72,12 +72,10 @@ func TestFunctionFailure(t *testing.T) {
 			require.Equal(t, 1, len(run.Trace.ChildSpans))
 			require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
 			// output test
-			// require.NotNil(t, run.Trace.OutputID)
-			// runOutput := c.RunTraceSpanOutput(*run.Trace.OutputID)
-			// require.NotNil(t, runOutput)
-			// require.Nil(t, runOutput.Data)
-			// require.NotNil(t, runOutput.StepError)
-			// require.Contains(t, *runOutput.StepError.Stack, "nope!")
+			require.NotNil(t, run.Trace.OutputID)
+			runOutput := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+			require.NotNil(t, runOutput)
+			c.ExpectSpanErrorOutput(t, "", "nope!", runOutput)
 
 			rootSpanID := run.Trace.SpanID
 
@@ -87,14 +85,12 @@ func TestFunctionFailure(t *testing.T) {
 				assert.False(t, span.IsRoot)
 				assert.Equal(t, rootSpanID, span.ParentSpanID)
 				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
-				// assert.NotNil(t, span.OutputID)
+				assert.NotNil(t, span.OutputID)
 
 				// output test
-				// output := c.RunTraceSpanOutput(*failed.OutputID)
-				// assert.NotNil(t, output)
-				// assert.Nil(t, output.Data)
-				// assert.NotNil(t, output.StepError)
-				// assert.Contains(t, *output.StepError.Stack, "nope!")
+				output := c.RunSpanOutput(ctx, *span.OutputID)
+				assert.NotNil(t, output)
+				c.ExpectSpanErrorOutput(t, "", "nope!", output)
 			})
 
 			return true
@@ -179,6 +175,10 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 					assert.Equal(t, models.RunTraceSpanStatusFailed.String(), failed.Status)
 
 					// output test
+					assert.NotNil(t, failed.OutputID)
+					output := c.RunSpanOutput(ctx, *failed.OutputID)
+					assert.NotNil(t, output)
+					c.ExpectSpanErrorOutput(t, "", "nope!", output)
 				})
 			})
 
@@ -198,12 +198,9 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 			require.Equal(t, 1, len(run.Trace.ChildSpans))
 			require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
 			// output test
-			// require.NotNil(t, run.Trace.OutputID)
-			// runOutput := c.RunTraceSpanOutput(*run.Trace.OutputID)
-			// require.NotNil(t, runOutput)
-			// require.Nil(t, runOutput.Data)
-			// require.NotNil(t, runOutput.StepError)
-			// require.Contains(t, *runOutput.StepError.Stack, "nope!")
+			require.NotNil(t, run.Trace.OutputID)
+			runOutput := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+			c.ExpectSpanErrorOutput(t, "", "nope!", runOutput)
 
 			rootSpanID := run.Trace.SpanID
 
@@ -216,14 +213,12 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 				assert.Equal(t, 2, len(span.ChildSpans))
 				assert.Equal(t, 2, span.Attempts)
 				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
-				// assert.NotNil(t, span.OutputID)
+				assert.NotNil(t, span.OutputID)
 
 				// output test
-				// output := c.RunTraceSpanOutput(*failed.OutputID)
-				// assert.NotNil(t, output)
-				// assert.Nil(t, output.Data)
-				// assert.NotNil(t, output.StepError)
-				// assert.Contains(t, *output.StepError.Stack, "nope!")
+				output := c.RunSpanOutput(ctx, *span.OutputID)
+				assert.NotNil(t, output)
+				c.ExpectSpanErrorOutput(t, "", "nope!", output)
 
 				t.Run("attempt 1", func(t *testing.T) {
 					one := span.ChildSpans[0]
@@ -232,14 +227,11 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 					assert.Equal(t, rootSpanID, one.ParentSpanID)
 					assert.Equal(t, 1, one.Attempts)
 					assert.Equal(t, models.RunTraceSpanStatusFailed.String(), one.Status)
-					// assert.NotNil(t, span.OutputID)
+					assert.NotNil(t, one.OutputID)
 
 					// output test
-					// output := c.RunTraceSpanOutput(*failed.OutputID)
-					// assert.NotNil(t, output)
-					// assert.Nil(t, output.Data)
-					// assert.NotNil(t, output.StepError)
-					// assert.Contains(t, *output.StepError.Stack, "nope!")
+					oneOutput := c.RunSpanOutput(ctx, *one.OutputID)
+					c.ExpectSpanErrorOutput(t, "", "nope!", oneOutput)
 				})
 
 				// second attempt
@@ -250,14 +242,11 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 					assert.Equal(t, rootSpanID, two.ParentSpanID)
 					assert.Equal(t, 2, two.Attempts)
 					assert.Equal(t, models.RunTraceSpanStatusFailed.String(), two.Status)
-					// assert.NotNil(t, span.OutputID)
+					assert.NotNil(t, two.OutputID)
 
 					// output test
-					// output := c.RunTraceSpanOutput(*failed.OutputID)
-					// assert.NotNil(t, output)
-					// assert.Nil(t, output.Data)
-					// assert.NotNil(t, output.StepError)
-					// assert.Contains(t, *output.StepError.Stack, "nope!")
+					twoOutput := c.RunSpanOutput(ctx, *two.OutputID)
+					c.ExpectSpanErrorOutput(t, "", "nope!", twoOutput)
 				})
 			})
 

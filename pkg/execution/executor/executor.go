@@ -877,6 +877,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.Int64(consts.OtelSysBatchTS, int64(md.Config.BatchID.Time())),
 		)
 	}
+	if md.Config.TraceLink() != nil {
+		fnSpan.SetAttributes(attribute.String(consts.OtelSysFunctionLink, *md.Config.TraceLink()))
+	}
 
 	for _, evt := range events {
 		fnSpan.AddEvent(string(evt), trace.WithAttributes(

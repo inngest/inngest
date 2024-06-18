@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -265,6 +266,22 @@ type SpanIdentifier struct {
 	FunctionID  uuid.UUID
 	TraceID     string
 	SpanID      string
+}
+
+func (si *SpanIdentifier) Encode() (string, error) {
+	byt, err := json.Marshal(si)
+	if err != nil {
+		return "", fmt.Errorf("error encoding span identifier: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(byt), nil
+}
+
+func (si *SpanIdentifier) Decode(data string) error {
+	byt, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(byt, si)
 }
 
 // TracePageCursor represents the composite cursor used to handle pagination

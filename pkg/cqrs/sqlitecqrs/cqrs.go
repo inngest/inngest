@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc"
 	"github.com/inngest/inngest/pkg/enums"
@@ -684,6 +685,9 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 	if run.BatchID != nil {
 		params.BatchID = *run.BatchID
 	}
+	if run.CronSchedule != nil {
+		params.CronSchedule = sql.NullString{String: *run.CronSchedule, Valid: true}
+	}
 	if len(run.TriggerIDs) > 0 {
 		params.TriggerIds = []byte(strings.Join(run.TriggerIDs, ","))
 	}
@@ -829,14 +833,61 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		BatchID:      batchID,
 		IsBatch:      isBatch,
 		CronSchedule: cron,
-		// TODO: fill in triggers
 	}
 
 	return &trun, nil
 }
 
-func (w wrapper) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
-	return nil, fmt.Errorf("not implemented")
+func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
+	if opts.TraceID == "" {
+		return nil, fmt.Errorf("traceID is required to retrieve output")
+	}
+	if opts.SpanID == "" {
+		return nil, fmt.Errorf("spanID is required to retrieve output")
+	}
+
+	// query spans in descending order
+	spans, err := w.q.GetTraceSpanOutput(ctx, sqlc.GetTraceSpanOutputParams{
+		TraceID: opts.TraceID,
+		SpanID:  opts.SpanID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving spans for output: %w", err)
+	}
+
+	var output *cqrs.SpanOutput
+	for _, s := range spans {
+		var evts []cqrs.SpanEvent
+		err := json.Unmarshal(s.Events, &evts)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing span outputs: %w", err)
+		}
+
+		for _, evt := range evts {
+			_, isFnOutput := evt.Attributes[consts.OtelSysFunctionOutput]
+			_, isStepOutput := evt.Attributes[consts.OtelSysStepOutput]
+			if isFnOutput || isStepOutput {
+				var isError bool
+				switch strings.ToUpper(s.StatusCode) {
+				case "ERROR", "STATUS_CODE_ERROR":
+					isError = true
+				}
+
+				output = &cqrs.SpanOutput{
+					Data:             []byte(evt.Name),
+					Timestamp:        evt.Timestamp,
+					Attributes:       evt.Attributes,
+					IsError:          isError,
+					IsFunctionOutput: isFnOutput,
+					IsStepOutput:     isStepOutput,
+				}
+
+				break
+			}
+		}
+	}
+
+	return output, nil
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
