@@ -209,9 +209,11 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 	}
 
 	var (
-		appID uuid.UUID
-		fnID  uuid.UUID
-		runID ulid.ULID
+		acctID uuid.UUID
+		wsID   uuid.UUID
+		appID  uuid.UUID
+		fnID   uuid.UUID
+		runID  ulid.ULID
 	)
 
 	name := s.SpanName
@@ -221,6 +223,12 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 
 	if s.RunID != nil {
 		runID = *s.RunID
+	}
+	if id := s.AccountID(); id != nil {
+		acctID = *id
+	}
+	if id := s.WorkspaceID(); id != nil {
+		wsID = *id
 	}
 	if id := s.AppID(); id != nil {
 		appID = *id
@@ -247,6 +255,8 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 	}
 
 	return &rpbv2.RunSpan{
+		AccountId:    acctID.String(),
+		WorkspaceId:  wsID.String(),
 		AppId:        appID.String(),
 		FunctionId:   fnID.String(),
 		RunId:        runID.String(),
@@ -773,9 +783,13 @@ func (tb *runTree) processExec(ctx context.Context, span *cqrs.Span, mod *rpbv2.
 				}
 			}
 
+			if p.SpanName == consts.OtelExecFnOk && status == rpbv2.SpanStatus_COMPLETED {
+				mod.Name = consts.OtelExecFnOk
+			}
+
 			// if the name is `function error`, it's already finished
 			// and mark it as failed
-			if mod.Name == "function error" {
+			if mod.Name == consts.OtelExecFnErr {
 				mod.Status = rpbv2.SpanStatus_FAILED
 				mod.OutputId = &outputID
 			}
