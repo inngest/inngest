@@ -1,0 +1,63 @@
+import { NewButton } from '@inngest/components/Button';
+import { Canvas, Meta, Story } from '@storybook/blocks';
+
+import * as ButtonStories from './NewButton.stories';
+
+<Meta of={ButtonStories} />
+
+# Button
+
+## By Kind
+
+<div style={{ padding: '3rem 1rem' }} className="dark:bg-slate-940 bg-white">
+  <p className="text-slate-500 dark:text-white">Primary</p>
+  <div className="align-center flex gap-1">
+    <Story of={ButtonStories.PrimarySolid} />
+    <Story of={ButtonStories.PrimarySolidWithIcon} />
+    <Story of={ButtonStories.PrimarySolidOnlyIcon} />
+    <Story of={ButtonStories.PrimarySolidLoading} />
+    <Story of={ButtonStories.PrimarySolidWithShortcut} />
+    <Story of={ButtonStories.PrimarySolidDisabled} />
+    <Story of={ButtonStories.PrimaryOutlined} />
+    <Story of={ButtonStories.PrimaryOutlinedWithIcon} />
+    <Story of={ButtonStories.PrimaryOutlinedOnlyIcon} />
+    <Story of={ButtonStories.PrimaryOutlinedLoading} />
+    <Story of={ButtonStories.PrimaryOutlinedWithShortcut} />
+    <Story of={ButtonStories.PrimaryOutlinedDisabled} />
+  </div>
+  <p className="text-slate-500 dark:text-white">Secondary</p>
+  <div className="align-center flex gap-1">
+    <Story of={ButtonStories.SecondaryOutlined} />
+    <Story of={ButtonStories.SecondaryOutlinedWithIcon} />
+    <Story of={ButtonStories.SecondaryOutlinedOnlyIcon} />
+    <Story of={ButtonStories.SecondaryOutlinedLoading} />
+    <Story of={ButtonStories.SecondaryOutlinedWithShortcut} />
+    <Story of={ButtonStories.SecondaryOutlinedDisabled} />
+  </div>
+  <p className="text-slate-500 dark:text-white">Danger</p>
+  <div className="align-center flex gap-1">
+    <Story of={ButtonStories.DangerSolid} />
+    <Story of={ButtonStories.DangerSolidWithIcon} />
+    <Story of={ButtonStories.DangerSolidOnlyIcon} />
+    <Story of={ButtonStories.DangerSolidLoading} />
+    <Story of={ButtonStories.DangerSolidWithShortcut} />
+    <Story of={ButtonStories.DangerSolidDisabled} />
+    <Story of={ButtonStories.DangerOutlined} />
+    <Story of={ButtonStories.DangerOutlinedWithIcon} />
+    <Story of={ButtonStories.DangerOutlinedOnlyIcon} />
+    <Story of={ButtonStories.DangerOutlinedLoading} />
+    <Story of={ButtonStories.DangerOutlinedWithShortcut} />
+    <Story of={ButtonStories.DangerOutlinedDisabled} />
+  </div>
+</div>
+
+## By Size
+
+<div
+  style={{ padding: '3rem' }}
+  className="dark:bg-slate-940 flex items-center justify-center gap-1 bg-white"
+>
+  <Story of={ButtonStories.SmallSize} />
+  <Story of={ButtonStories.RegularSize} />
+  <Story of={ButtonStories.LargeSize} />
+</div>

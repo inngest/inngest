@@ -1,11 +1,11 @@
 import { IconFunction } from '@inngest/components/icons/Function';
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { Button } from './index';
+import { NewButton } from './index';
 
 const meta = {
-  title: 'Components/OldButton',
-  component: Button,
+  title: 'Components/Button',
+  component: NewButton,
   parameters: {
     layout: 'centered',
   },
@@ -23,11 +23,11 @@ const meta = {
       control: { type: 'select' },
     },
   },
-} satisfies Meta<typeof Button>;
+} satisfies Meta<typeof NewButton>;
 
 export default meta;
 
-type Story = StoryObj<typeof Button>;
+type Story = StoryObj<typeof NewButton>;
 
 export const PrimarySolid: Story = {
   args: {
@@ -64,6 +64,13 @@ export const PrimarySolidWithShortcut: Story = {
     kind: 'primary',
     appearance: 'solid',
     keys: ['A'],
+  },
+};
+export const PrimarySolidDisabled: Story = {
+  args: {
+    kind: 'primary',
+    appearance: 'solid',
+    disabled: true,
   },
 };
 export const PrimaryOutlined: Story = {
@@ -104,183 +111,56 @@ export const PrimaryOutlinedWithShortcut: Story = {
   },
 };
 
-export const PrimaryDisabled: Story = {
+export const PrimaryOutlinedDisabled: Story = {
   args: {
     kind: 'primary',
+    appearance: 'outlined',
     disabled: true,
   },
 };
 
-export const Default: Story = {
+export const SecondaryOutlined: Story = {
   args: {
-    kind: 'default',
-  },
-};
-export const DefaultSolid: Story = {
-  args: {
-    kind: 'default',
-    appearance: 'solid',
-  },
-};
-export const DefaultSolidWithIcon: Story = {
-  args: {
-    kind: 'default',
-    appearance: 'solid',
-    icon: <IconFunction />,
-  },
-};
-export const DefaultSolidOnlyIcon: Story = {
-  args: {
-    kind: 'default',
-    appearance: 'solid',
-    icon: <IconFunction />,
-    label: null,
-  },
-};
-export const DefaultSolidLoading: Story = {
-  args: {
-    kind: 'default',
-    appearance: 'solid',
-    icon: <IconFunction />,
-    loading: true,
-    label: 'Loading...',
-  },
-};
-export const DefaultSolidWithShortcut: Story = {
-  args: {
-    kind: 'default',
-    appearance: 'solid',
-    keys: ['A'],
-  },
-};
-export const DefaultOutlined: Story = {
-  args: {
-    kind: 'default',
+    kind: 'secondary',
     appearance: 'outlined',
   },
 };
-export const DefaultOutlinedWithIcon: Story = {
+export const SecondaryOutlinedWithIcon: Story = {
   args: {
-    kind: 'default',
+    kind: 'secondary',
     appearance: 'outlined',
     icon: <IconFunction />,
   },
 };
-export const DefaultOutlinedOnlyIcon: Story = {
+export const SecondaryOutlinedOnlyIcon: Story = {
   args: {
-    kind: 'default',
+    kind: 'secondary',
     appearance: 'outlined',
     icon: <IconFunction />,
     label: null,
   },
 };
-export const DefaultOutlinedLoading: Story = {
+export const SecondaryOutlinedLoading: Story = {
   args: {
-    kind: 'default',
+    kind: 'secondary',
     appearance: 'outlined',
     icon: <IconFunction />,
     loading: true,
     label: 'Loading...',
   },
 };
-export const DefaultOutlinedWithShortcut: Story = {
+export const SecondaryOutlinedWithShortcut: Story = {
   args: {
-    kind: 'default',
+    kind: 'secondary',
     appearance: 'outlined',
     keys: ['A'],
   },
 };
 
-export const DefaultDisabled: Story = {
+export const SecondaryOutlinedDisabled: Story = {
   args: {
-    kind: 'default',
-    disabled: true,
-  },
-};
-
-export const Success: Story = {
-  args: {
-    kind: 'success',
-  },
-};
-export const SuccessSolid: Story = {
-  args: {
-    kind: 'success',
-    appearance: 'solid',
-  },
-};
-export const SuccessSolidWithIcon: Story = {
-  args: {
-    kind: 'success',
-    appearance: 'solid',
-    icon: <IconFunction />,
-  },
-};
-export const SuccessSolidOnlyIcon: Story = {
-  args: {
-    kind: 'success',
-    appearance: 'solid',
-    icon: <IconFunction />,
-    label: null,
-  },
-};
-export const SuccessSolidLoading: Story = {
-  args: {
-    kind: 'success',
-    appearance: 'solid',
-    icon: <IconFunction />,
-    loading: true,
-    label: 'Loading...',
-  },
-};
-export const SuccessSolidWithShortcut: Story = {
-  args: {
-    kind: 'success',
-    appearance: 'solid',
-    keys: ['A'],
-  },
-};
-export const SuccessOutlined: Story = {
-  args: {
-    kind: 'success',
+    kind: 'secondary',
     appearance: 'outlined',
-  },
-};
-export const SuccessOutlinedWithIcon: Story = {
-  args: {
-    kind: 'success',
-    appearance: 'outlined',
-    icon: <IconFunction />,
-  },
-};
-export const SuccessOutlinedOnlyIcon: Story = {
-  args: {
-    kind: 'success',
-    appearance: 'outlined',
-    icon: <IconFunction />,
-    label: null,
-  },
-};
-export const SuccessOutlinedLoading: Story = {
-  args: {
-    kind: 'success',
-    appearance: 'outlined',
-    icon: <IconFunction />,
-    loading: true,
-    label: 'Loading...',
-  },
-};
-export const SuccessOutlinedWithShortcut: Story = {
-  args: {
-    kind: 'success',
-    appearance: 'outlined',
-    keys: ['A'],
-  },
-};
-
-export const SuccessDisabled: Story = {
-  args: {
-    kind: 'success',
     disabled: true,
   },
 };
@@ -327,6 +207,13 @@ export const DangerSolidWithShortcut: Story = {
     keys: ['A'],
   },
 };
+export const DangerSolidDisabled: Story = {
+  args: {
+    kind: 'danger',
+    appearance: 'solid',
+    disabled: true,
+  },
+};
 export const DangerOutlined: Story = {
   args: {
     kind: 'danger',
@@ -365,30 +252,31 @@ export const DangerOutlinedWithShortcut: Story = {
   },
 };
 
-export const DangerDisabled: Story = {
+export const DangerOutlinedDisabled: Story = {
   args: {
     kind: 'danger',
+    appearance: 'outlined',
     disabled: true,
   },
 };
 
 export const SmallSize: Story = {
   args: {
-    kind: 'default',
+    kind: 'primary',
     size: 'small',
   },
 };
 
 export const RegularSize: Story = {
   args: {
-    kind: 'default',
-    size: 'regular',
+    kind: 'primary',
+    size: 'medium',
   },
 };
 
 export const LargeSize: Story = {
   args: {
-    kind: 'default',
+    kind: 'primary',
     size: 'large',
   },
 };
