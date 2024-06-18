@@ -181,7 +181,7 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 		QueuedAt:     pb.GetQueuedAt().AsTime(),
 		StartedAt:    startedAt,
 		EndedAt:      endedAt,
-		OutputID:     nil, // TODO
+		OutputID:     pb.OutputId,
 		StepOp:       stepOp,
 	}
 
