@@ -69,7 +69,7 @@ export function Trace({
         'py-5',
         // We don't want borders or horizontal padding on step attempts
         depth === 0 && 'px-8',
-        isExpanded && 'bg-sky-50'
+        isExpanded && 'bg-secondary-4xSubtle'
       )}
     >
       <div className="flex">

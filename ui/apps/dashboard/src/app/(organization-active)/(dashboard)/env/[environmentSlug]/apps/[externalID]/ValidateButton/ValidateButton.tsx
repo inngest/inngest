@@ -12,12 +12,7 @@ export function ValidateButton({ latestSyncUrl }: Props) {
 
   return (
     <>
-      <Button
-        appearance="outlined"
-        btnAction={() => setIsModalVisible(true)}
-        kind="primary"
-        label="Start app diagnostic"
-      />
+      <Button btnAction={() => setIsModalVisible(true)} label="Start app diagnostic" />
 
       <ValidateModal
         isOpen={isModalVisible}

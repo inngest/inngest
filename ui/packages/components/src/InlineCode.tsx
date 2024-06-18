@@ -9,7 +9,7 @@ export function InlineCode({ className, value }: Props) {
   return (
     <code
       className={cn(
-        'inline-flex items-center rounded-sm bg-slate-200 px-1 py-1 font-mono text-xs font-semibold leading-none',
+        'bg-canvasMuted text-basis inline-flex items-center rounded-sm px-1 py-1 font-mono text-xs font-semibold leading-none',
         className
       )}
     >

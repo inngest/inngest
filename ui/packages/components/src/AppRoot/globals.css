@@ -87,6 +87,7 @@
     --color-breeze-700: 20 80 177;
     --color-breeze-800: 23 67 155;
     --color-breeze-900: 19 64 133;
+    --color-breeze-1000: 0 5 11;
 
     /* Ruby Colors */
     --color-ruby-0: 254 244 243;
@@ -198,6 +199,8 @@
     --color-foreground-btn-danger: var(--color-ruby-600);
     --color-foreground-btn-dangerDisabled: var(--color-ruby-300);
 
+    --color-secondary-4xSubtle: var(--color-breeze-0);
+    --color-secondary-3xSubtle: var(--color-breeze-100);
     --color-secondary-2xSubtle: var(--color-breeze-200);
     --color-secondary-xSubtle: var(--color-breeze-300);
     --color-secondary-subtle: var(--color-breeze-400);
@@ -289,6 +292,8 @@
     --color-foreground-btn-danger: var(--color-ruby-500);
     --color-foreground-btn-dangerDisabled: var(--color-ruby-900);
 
+    --color-secondary-4xSubtle: var(--color-breeze-1000);
+    --color-secondary-3xSubtle: var(--color-breeze-900);
     --color-secondary-2xSubtle: var(--color-breeze-800);
     --color-secondary-xSubtle: var(--color-breeze-700);
     --color-secondary-subtle: var(--color-breeze-600);

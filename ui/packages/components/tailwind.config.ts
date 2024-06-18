@@ -25,6 +25,8 @@ export default {
           '2xIntense': 'rgb(var(--color-primary-2xIntense) / <alpha-value>)',
         },
         secondary: {
+          '4xSubtle': 'rgb(var(--color-secondary-4xSubtle) / <alpha-value>)',
+          '3xSubtle': 'rgb(var(--color-secondary-3xSubtle) / <alpha-value>)',
           '2xSubtle': 'rgb(var(--color-secondary-2xSubtle) / <alpha-value>)',
           xSubtle: 'rgb(var(--color-secondary-xSubtle) / <alpha-value>)',
           subtle: 'rgb(var(--color-secondary-subtle) / <alpha-value>)',

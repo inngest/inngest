@@ -44,14 +44,12 @@ export function Select({
     <Listbox value={defaultValue} onChange={onChange} multiple={multiple}>
       <span
         className={cn(
-          isLabelVisible && 'divide-x divide-slate-300',
-          'flex items-center rounded-md border border-slate-300 bg-slate-50 text-sm',
+          isLabelVisible && 'divide-muted divide-x',
+          'border-muted flex items-center rounded-md border text-sm',
           className
         )}
       >
-        <Listbox.Label
-          className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2 text-slate-600')}
-        >
+        <Listbox.Label className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2')}>
           {label}
         </Listbox.Label>
         <span className="relative w-full">{children}</span>
@@ -68,12 +66,12 @@ function Button({
     <Listbox.Button
       className={cn(
         !isLabelVisible && 'rounded-l-[5px]',
-        'flex h-10 w-full items-center justify-between rounded-r-[5px] bg-white px-2'
+        'bg-surfaceBase flex h-10 w-full items-center justify-between rounded-r-[5px] px-2'
       )}
     >
       {children}
       <RiArrowDownSLine
-        className="ui-open:-rotate-180 h-4 w-4 text-slate-500 transition-transform duration-500"
+        className="ui-open:-rotate-180 text-subtle h-4 w-4 transition-transform duration-500"
         aria-hidden="true"
       />
     </Listbox.Button>
@@ -83,7 +81,7 @@ function Button({
 function Options({ children }: React.PropsWithChildren) {
   return (
     <Listbox.Options className="absolute mt-1 min-w-max">
-      <div className="overflow-hidden rounded-md border border-slate-200 bg-white py-1 drop-shadow-lg">
+      <div className="border-muted bg-surfaceBase overflow-hidden rounded-md border py-1 drop-shadow-lg">
         {children}
       </div>
     </Listbox.Options>
@@ -93,12 +91,12 @@ function Options({ children }: React.PropsWithChildren) {
 function Option({ children, option }: React.PropsWithChildren<{ option: Option }>) {
   return (
     <Listbox.Option
-      className=" ui-selected:text-indigo-500 ui-selected:font-medium ui-active:bg-blue-50 flex select-none items-center justify-between focus:outline-none"
+      className=" ui-selected:text-success ui-selected:font-medium ui-active:bg-canvasSubtle/50 flex select-none items-center justify-between focus:outline-none"
       key={option.id}
       value={option}
       disabled={option.disabled}
     >
-      <div className="ui-selected:border-indigo-500 my-2 w-full border-l-2 border-transparent pl-5 pr-4">
+      <div className="ui-selected:border-success my-2 w-full border-l-2 border-transparent pl-5 pr-4">
         {children}
       </div>
     </Listbox.Option>
@@ -108,7 +106,7 @@ function Option({ children, option }: React.PropsWithChildren<{ option: Option }
 function CheckboxOption({ children, option }: React.PropsWithChildren<{ option: Option }>) {
   return (
     <Listbox.Option
-      className=" ui-active:bg-blue-50 flex select-none items-center justify-between py-1.5 pl-2 pr-4 focus:outline-none"
+      className=" ui-active:bg-canvasSubtle/50 flex select-none items-center justify-between py-1.5 pl-2 pr-4 focus:outline-none"
       key={option.id}
       value={option}
     >

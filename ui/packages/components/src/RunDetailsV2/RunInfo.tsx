@@ -71,7 +71,7 @@ export function RunInfo({
     <div className={cn('flex flex-col gap-5', className)}>
       <Card>
         <Card.Header className="h-11 flex-row items-center gap-2">
-          <div className="flex grow items-center gap-2">
+          <div className="text-basis flex grow items-center gap-2">
             Run details {!standalone && <Link href={pathCreator.runPopout({ runID })} />}
           </div>
 
@@ -154,7 +154,7 @@ export function RunInfo({
           </div>
         </Card.Content>
         {result && (
-          <RunResult className="border-t border-slate-300" result={result} isSuccess={isSuccess} />
+          <RunResult className="border-muted border-t" result={result} isSuccess={isSuccess} />
         )}
       </Card>
     </div>
