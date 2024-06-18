@@ -237,11 +237,6 @@ func (r *queryResolver) Run(ctx context.Context, runID string) (*models.Function
 		}
 	}
 
-	triggers := []string{}
-	for _, byt := range run.Triggers {
-		triggers = append(triggers, string(byt))
-	}
-
 	if len(run.Output) > 0 {
 		o := string(run.Output)
 		output = &o
@@ -268,7 +263,6 @@ func (r *queryResolver) Run(ctx context.Context, runID string) (*models.Function
 		Status:         status,
 		SourceID:       sourceID,
 		TriggerIDs:     triggerIDs,
-		Triggers:       triggers,
 		IsBatch:        run.IsBatch,
 		BatchCreatedAt: batchTS,
 		CronSchedule:   run.CronSchedule,
@@ -312,5 +306,86 @@ func (r *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID str
 }
 
 func (r *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.RunTraceTrigger, error) {
-	return nil, fmt.Errorf("not implemented")
+	runid, err := ulid.Parse(runID)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing runID: %w", err)
+	}
+
+	run, err := r.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runid})
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving run: %w", err)
+	}
+
+	var (
+		evtName *string
+		ts      time.Time
+	)
+
+	evtIDs := []ulid.ULID{}
+	for _, id := range run.TriggerIDs {
+		if evtID, err := ulid.Parse(id); err == nil {
+			evtIDs = append(evtIDs, evtID)
+
+			// use the earliest
+			evtTime := ulid.Time(evtID.Time())
+			if ts.IsZero() {
+				ts = evtTime
+			}
+			if evtTime.Before(ts) {
+				ts = evtTime
+			}
+		}
+	}
+
+	events, err := r.Data.GetEventsByInternalIDs(ctx, evtIDs)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving events: %w", err)
+	}
+
+	payloads := []string{}
+	for _, evt := range events {
+		byt, err := json.Marshal(evt.GetEvent())
+		if err != nil {
+			return nil, fmt.Errorf("error parsing event payload: %w", err)
+		}
+		payloads = append(payloads, string(byt))
+	}
+
+	// only parse event name if it's not cron
+	if run.CronSchedule == nil {
+		// just need the first one
+		var name string
+		for _, evt := range events {
+			if name == "" {
+				name = evt.EventName
+			}
+			// finish early if  it's not a batch and there's already a value
+			if run.BatchID == nil && name != "" {
+				break
+			}
+
+			// if there are multiple events and they are not identical,
+			// set event name to nil
+			if evt.EventName != name {
+				name = ""
+				break
+			}
+		}
+
+		if name != "" {
+			evtName = &name
+		}
+	}
+
+	resp := models.RunTraceTrigger{
+		EventName: evtName,
+		Timestamp: ts,
+		IDs:       evtIDs,
+		Payloads:  payloads,
+		BatchID:   run.BatchID,
+		IsBatch:   run.BatchID != nil,
+		Cron:      run.CronSchedule,
+	}
+
+	return &resp, nil
 }

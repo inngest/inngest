@@ -685,6 +685,9 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 	if run.BatchID != nil {
 		params.BatchID = *run.BatchID
 	}
+	if run.CronSchedule != nil {
+		params.CronSchedule = sql.NullString{String: *run.CronSchedule, Valid: true}
+	}
 	if len(run.TriggerIDs) > 0 {
 		params.TriggerIds = []byte(strings.Join(run.TriggerIDs, ","))
 	}
@@ -830,7 +833,6 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		BatchID:      batchID,
 		IsBatch:      isBatch,
 		CronSchedule: cron,
-		// TODO: fill in triggers
 	}
 
 	return &trun, nil

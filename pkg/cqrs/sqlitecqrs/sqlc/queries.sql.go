@@ -1290,27 +1290,28 @@ func (q *Queries) InsertTrace(ctx context.Context, arg InsertTraceParams) error 
 
 const insertTraceRun = `-- name: InsertTraceRun :exec
 INSERT OR REPLACE INTO trace_runs
-	(account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce)
+	(account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce, cron_schedule)
 VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertTraceRunParams struct {
-	AccountID   uuid.UUID
-	WorkspaceID uuid.UUID
-	AppID       uuid.UUID
-	FunctionID  uuid.UUID
-	TraceID     []byte
-	RunID       ulid.ULID
-	QueuedAt    int64
-	StartedAt   int64
-	EndedAt     int64
-	Status      int64
-	SourceID    string
-	TriggerIds  []byte
-	Output      []byte
-	BatchID     ulid.ULID
-	IsDebounce  bool
+	AccountID    uuid.UUID
+	WorkspaceID  uuid.UUID
+	AppID        uuid.UUID
+	FunctionID   uuid.UUID
+	TraceID      []byte
+	RunID        ulid.ULID
+	QueuedAt     int64
+	StartedAt    int64
+	EndedAt      int64
+	Status       int64
+	SourceID     string
+	TriggerIds   []byte
+	Output       []byte
+	BatchID      ulid.ULID
+	IsDebounce   bool
+	CronSchedule sql.NullString
 }
 
 func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) error {
@@ -1330,6 +1331,7 @@ func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) 
 		arg.Output,
 		arg.BatchID,
 		arg.IsDebounce,
+		arg.CronSchedule,
 	)
 	return err
 }

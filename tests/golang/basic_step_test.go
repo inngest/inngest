@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -246,19 +247,21 @@ func TestFunctionSteps(t *testing.T) {
 				c.ExpectSpanOutput(t, "api/new.event", forthOutput)
 			})
 
-			// check trigger
-			// trigger := c.RunTrigger(runID)
-			// assert.NotNil(t, trigger)
-			// assert.NotNil(t, trigger.EventName)
-			// assert.Equal(t, "test/sdk", *trigger.EventName)
-			// assert.Equal(t, 1, len(trigger.IDs))
-			// assert.False(t, trigger.Timestamp.IsZero())
-			// assert.False(t, trigger.IsBatch)
-			// assert.Nil(t, trigger.BatchID)
-			// assert.Nil(t, trigger.Cron)
+			t.Run("trigger", func(t *testing.T) {
+				// check trigger
+				trigger := c.RunTrigger(ctx, runID)
+				assert.NotNil(t, trigger)
+				assert.NotNil(t, trigger.EventName)
+				assert.Equal(t, "test/sdk-steps", *trigger.EventName)
+				assert.Equal(t, 1, len(trigger.IDs))
+				assert.False(t, trigger.Timestamp.IsZero())
+				assert.False(t, trigger.IsBatch)
+				assert.Nil(t, trigger.BatchID)
+				assert.Nil(t, trigger.Cron)
 
-			// rid := ulid.MustParse(runID)
-			// assert.True(t, trigger.Timestamp.Before(ulid.Time(rid.Time())))
+				rid := ulid.MustParse(runID)
+				assert.True(t, trigger.Timestamp.Before(ulid.Time(rid.Time())))
+			})
 
 			return true
 		}, 10*time.Second, 2*time.Second)
