@@ -72,9 +72,9 @@ export default function RunsTable({
     },
   });
 
-  const tableStyles = 'w-full border-y border-slate-200';
-  const tableHeadStyles = 'border-b border-slate-200';
-  const tableBodyStyles = 'divide-y divide-slate-200';
+  const tableStyles = 'w-full border-y border-subtle';
+  const tableHeadStyles = 'border-b border-subtle';
+  const tableBodyStyles = 'divide-y divide-subtle';
   const tableColumnStyles = 'px-4';
 
   const isEmpty = data.length < 1 && !isLoading;
@@ -87,7 +87,7 @@ export default function RunsTable({
             {headerGroup.headers.map((header) => (
               <th
                 key={header.id}
-                className={cn(tableColumnStyles, 'text-left text-sm font-semibold text-slate-500')}
+                className={cn(tableColumnStyles, 'text-subtle text-left text-sm font-semibold')}
               >
                 {header.isPlaceholder ? null : (
                   <div
@@ -114,7 +114,7 @@ export default function RunsTable({
           <tr>
             {/* TODO: when we introduce column visibility options, this colSpan has to be dinamically calculated depending on # visible columns */}
             <td
-              className="pt-28 text-center align-top font-medium text-slate-600"
+              className="text-subtle pt-28 text-center align-top font-medium"
               colSpan={table.getAllColumns().length}
             >
               No results were found.
@@ -126,7 +126,7 @@ export default function RunsTable({
             <Fragment key={row.original.id}>
               <tr
                 key={row.original.id}
-                className="h-12 cursor-pointer hover:bg-sky-50"
+                className="hover:bg-canvasSubtle/50 h-12 cursor-pointer"
                 onClick={row.getToggleExpandedHandler()}
               >
                 {row.getVisibleCells().map((cell) => (

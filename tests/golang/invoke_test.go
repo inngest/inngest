@@ -2,16 +2,115 @@ package golang
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
 	"github.com/oklog/ulid/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestInvoke(t *testing.T) {
+	ctx := context.Background()
+	r := require.New(t)
+	c := client.New(t)
+
+	appID := "Invoke-" + ulid.MustNew(ulid.Now(), nil).String()
+	h, server, registerFuncs := NewSDKHandler(t, appID)
+	defer server.Close()
+
+	invokedFnName := "invoked-fn"
+	invokedFn := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name:    invokedFnName,
+			Retries: inngestgo.IntPtr(0),
+		},
+		inngestgo.EventTrigger("none", nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			return "invoked!", nil
+		},
+	)
+
+	// This function will invoke the other function
+	runID := ""
+	evtName := "invoke-me"
+	mainFn := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name: "main-fn",
+		},
+		inngestgo.EventTrigger(evtName, nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			runID = input.InputCtx.RunID
+
+			_, _ = step.Invoke[any](
+				ctx,
+				"invoke",
+				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName},
+			)
+
+			return "success", nil
+		},
+	)
+
+	h.Register(invokedFn, mainFn)
+	registerFuncs()
+
+	// Trigger the main function and successfully invoke the other function
+	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
+	r.NoError(err)
+
+	t.Run("trace run should have appropriate data", func(t *testing.T) {
+		<-time.After(3 * time.Second)
+
+		require.Eventually(t, func() bool {
+			run := c.RunTraces(ctx, runID)
+			require.NotNil(t, run)
+			require.Equal(t, models.FunctionStatusCompleted.String(), run.Status)
+			require.NotNil(t, run.Trace)
+			require.Equal(t, 1, len(run.Trace.ChildSpans))
+			require.True(t, run.Trace.IsRoot)
+			require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
+
+			// output test
+			require.NotNil(t, run.Trace.OutputID)
+			output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+			c.ExpectSpanOutput(t, "success", output)
+
+			rootSpanID := run.Trace.SpanID
+
+			t.Run("invoke", func(t *testing.T) {
+				invoke := run.Trace.ChildSpans[0]
+				assert.Equal(t, "invoke", invoke.Name)
+				assert.Equal(t, 0, invoke.Attempts)
+				assert.False(t, invoke.IsRoot)
+				assert.Equal(t, rootSpanID, invoke.ParentSpanID)
+				assert.Equal(t, models.StepOpInvoke.String(), invoke.StepOp)
+
+				// output test
+				assert.NotNil(t, invoke.OutputID)
+				invokeOutput := c.RunSpanOutput(ctx, *invoke.OutputID)
+				c.ExpectSpanOutput(t, "invoked!", invokeOutput)
+
+				var stepInfo models.InvokeStepInfo
+				byt, err := json.Marshal(invoke.StepInfo)
+				assert.NoError(t, err)
+				assert.NoError(t, json.Unmarshal(byt, &stepInfo))
+
+				assert.False(t, *stepInfo.TimedOut)
+				assert.NotNil(t, stepInfo.ReturnEventID)
+				assert.NotNil(t, stepInfo.RunID)
+			})
+
+			return true
+		}, 10*time.Second, 2*time.Second)
+	})
+}
 
 func TestInvokeTimeout(t *testing.T) {
 	ctx := context.Background()
@@ -66,6 +165,53 @@ func TestInvokeTimeout(t *testing.T) {
 
 	// The invoke target times out and should fail the main run
 	c.WaitForRunStatus(ctx, t, "FAILED", &runID)
+
+	t.Run("trace run should have appropriate data", func(t *testing.T) {
+		<-time.After(3 * time.Second)
+		errMsg := "Timed out waiting for invoked function to complete"
+
+		require.Eventually(t, func() bool {
+			run := c.RunTraces(ctx, runID)
+			require.NotNil(t, run)
+			require.Equal(t, models.FunctionStatusFailed.String(), run.Status)
+			require.NotNil(t, run.Trace)
+			require.True(t, run.Trace.IsRoot)
+			require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
+
+			// output test
+			require.NotNil(t, run.Trace.OutputID)
+			output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+			require.NotNil(t, output)
+			// c.ExpectSpanErrorOutput(t, errMsg, "", output)
+
+			rootSpanID := run.Trace.SpanID
+
+			t.Run("invoke", func(t *testing.T) {
+				invoke := run.Trace.ChildSpans[0]
+				assert.Equal(t, "invoke", invoke.Name)
+				assert.Equal(t, 0, invoke.Attempts)
+				assert.False(t, invoke.IsRoot)
+				assert.Equal(t, rootSpanID, invoke.ParentSpanID)
+				assert.Equal(t, models.StepOpInvoke.String(), invoke.StepOp)
+
+				// output test
+				assert.NotNil(t, invoke.OutputID)
+				invokeOutput := c.RunSpanOutput(ctx, *invoke.OutputID)
+				c.ExpectSpanErrorOutput(t, errMsg, "", invokeOutput)
+
+				var stepInfo models.InvokeStepInfo
+				byt, err := json.Marshal(invoke.StepInfo)
+				assert.NoError(t, err)
+				assert.NoError(t, json.Unmarshal(byt, &stepInfo))
+
+				assert.True(t, *stepInfo.TimedOut)
+				assert.Nil(t, stepInfo.ReturnEventID)
+				assert.Nil(t, stepInfo.RunID)
+			})
+
+			return true
+		}, 10*time.Second, 2*time.Second)
+	})
 }
 
 func TestInvokeRateLimit(t *testing.T) {

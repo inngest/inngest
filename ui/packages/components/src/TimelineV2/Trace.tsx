@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Route } from 'next';
 
-import { RunResult } from '../RunResult';
 import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
@@ -70,7 +69,7 @@ export function Trace({
         'py-5',
         // We don't want borders or horizontal padding on step attempts
         depth === 0 && 'px-8',
-        isExpanded && 'bg-sky-50'
+        isExpanded && 'bg-secondary-4xSubtle'
       )}
     >
       <div className="flex">
@@ -101,9 +100,12 @@ export function Trace({
 
       {isExpanded && (
         <div className="ml-8">
-          <TraceInfo className="my-4 grow" pathCreator={pathCreator} trace={trace} />
-
-          {result && <RunResult className="mb-4" result={result} />}
+          <TraceInfo
+            className="my-4 grow"
+            pathCreator={pathCreator}
+            trace={trace}
+            result={result}
+          />
 
           {trace.childrenSpans?.map((child, i) => {
             return (

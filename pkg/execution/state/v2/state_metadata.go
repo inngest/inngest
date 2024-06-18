@@ -13,6 +13,7 @@ import (
 const (
 	cronScheduleKey = "__cron"
 	fnslugKey       = "__fnslug"
+	traceLinkKey    = "__tracelink"
 )
 
 type ID struct {
@@ -169,6 +170,27 @@ func (c *Config) FunctionSlug() string {
 	}
 
 	return ""
+}
+
+func (c *Config) SetTraceLink(link string) {
+	if c.Context == nil {
+		c.Context = map[string]any{}
+	}
+	c.Context[traceLinkKey] = link
+}
+
+func (c *Config) TraceLink() *string {
+	if c.Context == nil {
+		return nil
+	}
+
+	if v, ok := c.Context[traceLinkKey]; ok {
+		if link, ok := v.(string); ok {
+			return &link
+		}
+	}
+
+	return nil
 }
 
 // RunMetrics stores state-level run metrics.

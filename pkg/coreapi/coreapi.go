@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coreapi/apiutil"
 	"github.com/inngest/inngest/pkg/coreapi/generated"
+	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/resolvers"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution"
@@ -60,8 +61,13 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: false,
 	})
-	a.Use(cors.Handler)
-	a.Use(headers.StaticHeadersMiddleware(headers.ServerKindDev))
+	a.Use(
+		cors.Handler,
+		headers.StaticHeadersMiddleware(headers.ServerKindDev),
+		loader.Middleware(loader.LoaderParams{
+			DB: o.Data,
+		}),
+	)
 
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{
 		Data:          o.Data,

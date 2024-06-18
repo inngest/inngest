@@ -25,38 +25,72 @@ type Story = StoryObj<typeof CodeBlock>;
 
 export const Default: Story = {
   args: {
-    tabs: [
-      {
-        label: 'Output',
-        content: '{\n  "customerId": "cus_1234"\n}',
-      },
-    ],
+    header: {
+      title: 'Output',
+    },
+    tab: {
+      content: '{\n  "customerId": "cus_1234"\n}',
+    },
   },
 };
 
-export const MultipleTabs: Story = {
+export const DefaultWithWrapper: Story = {
+  render: () => (
+    <CodeBlock.Wrapper>
+      <CodeBlock
+        header={{ title: 'Output' }}
+        tab={{ content: '{\n  "customerId": "cus_1234"\n}' }}
+      />
+    </CodeBlock.Wrapper>
+  ),
+};
+
+export const Error: Story = {
   args: {
-    tabs: [
-      {
-        label: 'Output',
-        content: '{\n  "customerId": "cus_1234"\n}',
-      },
-      {
-        label: 'Error',
-        content: '{\n  "error": "invalid status code: 500"\n}',
-      },
-    ],
+    header: {
+      title: 'Error: Unable to downgrade plan',
+      status: 'error',
+    },
+    tab: {
+      content: '{\n  "error": "invalid status code: 500"\n}',
+    },
+  },
+};
+
+export const LongError: Story = {
+  args: {
+    header: {
+      title:
+        'Error: Unable to downgrade plan. This is a long message to say that there was an error.',
+      status: 'error',
+    },
+    tab: {
+      content: '{\n  "error": "invalid status code: 500"\n}',
+    },
+  },
+};
+
+export const Success: Story = {
+  args: {
+    header: {
+      title: 'Output',
+      status: 'success',
+    },
+    tab: {
+      content: '{\n  "customerId": "cus_1234"\n}',
+    },
   },
 };
 
 export const Actions: Story = {
   args: {
-    tabs: [
-      {
-        label: 'Output',
-        content: '{\n  "customerId": "cus_1234"\n}',
-      },
-    ],
+    header: {
+      title: 'Output',
+    },
+    tab: {
+      content: '{\n  "customerId": "cus_1234"\n}',
+    },
+
     actions: [
       {
         label: 'Send to Dev Server',

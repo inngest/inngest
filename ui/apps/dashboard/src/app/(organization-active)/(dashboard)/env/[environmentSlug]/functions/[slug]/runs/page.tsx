@@ -60,7 +60,7 @@ const GetRunsDocument = graphql(`
 
 const renderSubComponent = ({ id }: { id: string }) => {
   return (
-    <div className="border-l-4 border-slate-400 pb-6">
+    <div className="border-subtle border-l-4 pb-6">
       <RunDetails standalone={false} runID={id} />
     </div>
   );
@@ -226,11 +226,11 @@ export default function RunsPage({
 
   return (
     <main
-      className="h-full min-h-0 overflow-y-auto bg-white"
+      className="bg-canvasBase text-basis h-full min-h-0 overflow-y-auto"
       onScroll={(e) => fetchMoreOnScroll(e.target as HTMLDivElement)}
       ref={containerRef}
     >
-      <div className="sticky top-0 z-[5] flex items-center justify-between gap-2 bg-slate-50 px-8 py-2">
+      <div className="bg-canvasBase sticky top-0 z-[5] flex items-center justify-between gap-2 px-8 py-2">
         <div className="flex items-center gap-2">
           <SelectGroup>
             <TimeFieldFilter
@@ -259,7 +259,7 @@ export default function RunsPage({
       {nextPageRes.isLoading && <LoadingMore />}
       {!isLoading && !hasNextPage && (
         <div className="flex flex-col items-center py-8">
-          <p className="text-slate-600">No additional runs found.</p>
+          <p className="text-subtle">No additional runs found.</p>
           <Button
             label="Back to top"
             kind="primary"

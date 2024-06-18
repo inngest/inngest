@@ -2,12 +2,12 @@ import { isFunctionRunStatus, type FunctionRunStatus } from './types/functionRun
 import { cn } from './utils/classNames';
 
 const backgroundClasses: { [key in FunctionRunStatus | 'UNKNOWN']: string } = {
-  CANCELLED: 'bg-slate-300',
-  COMPLETED: 'bg-teal-500',
-  FAILED: 'bg-rose-500',
-  QUEUED: 'bg-amber-100',
-  RUNNING: 'bg-blue-200',
-  UNKNOWN: 'bg-slate-300',
+  CANCELLED: 'bg-status-cancelled',
+  COMPLETED: 'bg-status-completed',
+  FAILED: 'bg-status-failed',
+  QUEUED: 'bg-status-queued',
+  RUNNING: 'bg-status-running',
+  UNKNOWN: 'bg-status-cancelled',
 };
 
 export function getStatusBackgroundClass(status: string): string {
@@ -19,12 +19,12 @@ export function getStatusBackgroundClass(status: string): string {
 }
 
 const borderClasses: { [key in FunctionRunStatus | 'UNKNOWN']: string } = {
-  CANCELLED: 'border-slate-300',
-  COMPLETED: 'border-teal-500',
-  FAILED: 'border-rose-500',
-  QUEUED: 'border-amber-500',
-  RUNNING: 'border-sky-500',
-  UNKNOWN: 'border-slate-300',
+  CANCELLED: 'border-status-cancelled',
+  COMPLETED: 'border-status-completed',
+  FAILED: 'border-status-failed',
+  QUEUED: 'border-status-queued',
+  RUNNING: 'border-status-running',
+  UNKNOWN: 'border-status-cancelled',
 };
 
 export function getStatusBorderClass(status: string): string {
@@ -36,12 +36,12 @@ export function getStatusBorderClass(status: string): string {
 }
 
 const textClasses: { [key in FunctionRunStatus | 'UNKNOWN']: string } = {
-  CANCELLED: 'text-neutral-600',
-  COMPLETED: 'text-teal-700',
-  FAILED: 'text-rose-500',
-  RUNNING: 'text-sky-500',
-  QUEUED: 'text-amber-500',
-  UNKNOWN: 'text-neutral-600',
+  CANCELLED: 'text-status-cancelled',
+  COMPLETED: 'text-status-completed',
+  FAILED: 'text-status-failed',
+  QUEUED: 'text-status-queued',
+  RUNNING: 'text-status-running',
+  UNKNOWN: 'text-status-cancelled',
 };
 
 export function getStatusTextClass(status: string): string {

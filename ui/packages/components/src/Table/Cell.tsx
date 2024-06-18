@@ -4,7 +4,7 @@ import { cn } from '@inngest/components/utils/classNames';
 
 import { getStatusTextClass } from '../statusClasses';
 
-const cellStyles = 'text-slate-950 text-sm';
+const cellStyles = 'text-basis text-sm';
 
 export function IDCell({ children }: React.PropsWithChildren) {
   return <p className={cn(cellStyles, 'font-mono')}>{children}</p>;

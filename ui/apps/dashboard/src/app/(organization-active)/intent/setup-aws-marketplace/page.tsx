@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Link } from '@inngest/components/Link';
 import { useMutation } from 'urql';
 
-import AppLink from '@/components/AppLink';
 import { graphql } from '@/gql';
 import { type AwsMarketplaceSetupInput } from '@/gql/graphql';
 import AWSLogo from '@/icons/aws-logo.svg';
@@ -57,8 +57,15 @@ export default function Page() {
         const cleanError = result.error.message.replace('[GraphQL]', '').trim();
         setError(
           <>
-            {cleanError}. <AppLink href="/support">Contact support</AppLink> or{' '}
-            <AppLink href="/settings/billing">manage billing</AppLink>.
+            {cleanError}.{' '}
+            <Link internalNavigation className="inline-flex" href="/support">
+              Contact support
+            </Link>{' '}
+            or{' '}
+            <Link internalNavigation className="inline-flex" href="/settings/billing">
+              manage billing
+            </Link>
+            .
           </>
         );
         console.log('error', result.error);

@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"strings"
 	"time"
@@ -33,7 +34,7 @@ type lifecycle struct {
 	run sv2.RunService
 }
 
-func (l lifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata, req execution.CancelRequest) {
+func (l lifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata, req execution.CancelRequest, evts []json.RawMessage) {
 	start := time.Now()
 	if !md.Config.StartedAt.IsZero() {
 		start = md.Config.StartedAt
@@ -84,15 +85,7 @@ func (l lifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata, req
 		)
 	}
 
-	events, err := l.run.LoadEvents(ctx, md.ID)
-	if err != nil {
-		l.log.Error("error loading events from state on function cancelled for trace runs",
-			"err", err,
-			"identifier", md.ID,
-		)
-	}
-
-	for _, evt := range events {
+	for _, evt := range evts {
 		span.AddEvent(string(evt), trace.WithAttributes(
 			attribute.Bool(consts.OtelSysEventData, true),
 		))

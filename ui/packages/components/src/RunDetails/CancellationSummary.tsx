@@ -16,7 +16,7 @@ export function CancellationSummary({ history }: Props) {
   }
 
   return (
-    <Card accentColor="bg-gray-400">
+    <Card accentColor="bg-status-cancelled">
       <Card.Header>Cancelled</Card.Header>
 
       <Card.Content>

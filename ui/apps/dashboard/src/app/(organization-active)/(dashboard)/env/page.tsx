@@ -3,9 +3,9 @@
 import { type Route } from 'next';
 import Link from 'next/link';
 import { Button } from '@inngest/components/Button';
+import { Link as InngestLink } from '@inngest/components/Link';
 import { RiErrorWarningLine } from '@remixicon/react';
 
-import AppLink from '@/components/AppLink';
 import AppNavigation from '@/components/Navigation/AppNavigation';
 import Toaster from '@/components/Toaster';
 import LoadingIcon from '@/icons/LoadingIcon';
@@ -169,13 +169,12 @@ export default function Envs() {
               </div>
               <p className="mt-2 text-sm font-medium text-slate-600">
                 Create a shared, non-production environment like staging, QA, or canary.{' '}
-                <AppLink
+                <InngestLink
+                  className="inline-flex"
                   href="https://www.inngest.com/docs/platform/environments#custom-environments"
-                  target="_blank"
                 >
                   Read the docs to learn more
-                </AppLink>
-                .
+                </InngestLink>
               </p>
             </div>
           </div>

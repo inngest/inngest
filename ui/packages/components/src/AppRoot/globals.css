@@ -87,6 +87,7 @@
     --color-breeze-700: 20 80 177;
     --color-breeze-800: 23 67 155;
     --color-breeze-900: 19 64 133;
+    --color-breeze-1000: 0 5 11;
 
     /* Ruby Colors */
     --color-ruby-0: 254 244 243;
@@ -145,7 +146,7 @@
     --color-background-surface-muted: var(--color-carbon-300);
     --color-background-disabled: var(--color-carbon-400);
     --color-background-contrast: var(--color-matcha-1000);
-    --color-background-success: var(--color-matcha-100);
+    --color-background-success: var(--color-matcha-0);
     --color-background-successContrast: var(--color-matcha-800);
     --color-background-error: var(--color-ruby-0);
     --color-background-errorContrast: var(--color-ruby-800);
@@ -191,12 +192,15 @@
     --color-foreground-success: var(--color-matcha-600);
     --color-foreground-error: var(--color-ruby-600);
     --color-foreground-warning: var(--color-honey-600);
-    --color-foreground-info: var(--color-purplehaze-700);
+    --color-foreground-info: var(--color-breeze-600);
+    --color-foreground-cancelled: var(--color-carbon-300);
     --color-foreground-btn-primary: var(--color-matcha-600);
     --color-foreground-btn-primaryDisabled: var(--color-matcha-300);
     --color-foreground-btn-danger: var(--color-ruby-600);
     --color-foreground-btn-dangerDisabled: var(--color-ruby-300);
 
+    --color-secondary-4xSubtle: var(--color-breeze-0);
+    --color-secondary-3xSubtle: var(--color-breeze-100);
     --color-secondary-2xSubtle: var(--color-breeze-200);
     --color-secondary-xSubtle: var(--color-breeze-300);
     --color-secondary-subtle: var(--color-breeze-400);
@@ -216,6 +220,14 @@
     --color-quaternary-cool-xSubtle: var(--color-purplehaze-300);
     --color-quaternary-cool-moderate: var(--color-purplehaze-500);
     --color-quaternary-cool-xIntense: var(--color-purplehaze-700);
+
+    --color-accent-2xSubtle: var(--color-honey-200);
+    --color-accent-xSubtle: var(--color-honey-300);
+    --color-accent-subtle: var(--color-honey-400);
+    --color-accent-moderate: var(--color-honey-500);
+    --color-accent-intense: var(--color-honey-600);
+    --color-accent-xIntense: var(--color-honey-700);
+    --color-accent-2xIntense: var(--color-honey-800);
   }
 
   .dark {
@@ -270,15 +282,18 @@
     --color-foreground-alwaysBlack: var(--color-carbon-1000);
     --color-foreground-disabled: var(--color-carbon-600);
     --color-foreground-link: var(--color-breeze-400);
-    --color-foreground-success: var(--color-matcha-500);
+    --color-foreground-success: var(--color-matcha-300);
     --color-foreground-error: var(--color-ruby-300);
     --color-foreground-warning: var(--color-honey-300);
-    --color-foreground-info: var(--color-purplehaze-300);
+    --color-foreground-info: var(--color-breeze-300);
+    --color-foreground-cancelled: var(--color-carbon-400);
     --color-foreground-btn-primary: var(--color-matcha-500);
     --color-foreground-btn-primaryDisabled: var(--color-matcha-800);
     --color-foreground-btn-danger: var(--color-ruby-500);
     --color-foreground-btn-dangerDisabled: var(--color-ruby-900);
 
+    --color-secondary-4xSubtle: var(--color-breeze-1000);
+    --color-secondary-3xSubtle: var(--color-breeze-900);
     --color-secondary-2xSubtle: var(--color-breeze-800);
     --color-secondary-xSubtle: var(--color-breeze-700);
     --color-secondary-subtle: var(--color-breeze-600);
@@ -298,5 +313,13 @@
     --color-quaternary-cool-xSubtle: var(--color-purplehaze-700);
     --color-quaternary-cool-moderate: var(--color-purplehaze-500);
     --color-quaternary-cool-xIntense: var(--color-purplehaze-300);
+
+    --color-accent-2xSubtle: var(--color-honey-800);
+    --color-accent-xSubtle: var(--color-honey-700);
+    --color-accent-subtle: var(--color-honey-600);
+    --color-accent-moderate: var(--color-honey-500);
+    --color-accent-intense: var(--color-honey-400);
+    --color-accent-xIntense: var(--color-honey-300);
+    --color-accent-2xIntense: var(--color-honey-200);
   }
 }

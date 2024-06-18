@@ -5,12 +5,12 @@ import { type Route } from 'next';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { Button } from '@inngest/components/Button';
+import { Link } from '@inngest/components/Link';
 import { RiArrowLeftLine, RiGithubFill } from '@remixicon/react';
 import { ThreadStatus, type ThreadPartsFragment } from '@team-plain/typescript-sdk';
 import { useQuery } from 'urql';
 
 import { isEnterprisePlan } from '@/app/(organization-active)/(dashboard)/settings/billing/utils';
-import AppLink from '@/components/AppLink';
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import cn from '@/utils/cn';
@@ -64,7 +64,7 @@ export default function Page() {
             <a
               href={status.url}
               target="_blank"
-              className="flex items-center gap-2 rounded bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100 hover:text-indigo-500"
+              className="hover:text-link flex items-center gap-2 rounded bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100"
             >
               <span
                 className={`mx-1 inline-flex h-2.5 w-2.5 rounded-full`}
@@ -125,9 +125,9 @@ export default function Page() {
               <p>
                 Enterprise plans include live chat support including dedicated Slack channel and
                 support SLAs. To chat with someone about our enterprise plans,{' '}
-                <AppLink href="https://inngest.com/contact" target="_blank" className="text-base">
+                <Link href="https://inngest.com/contact" className="inline-flex">
                   fill out the form here
-                </AppLink>
+                </Link>
                 .
               </p>
             )}
@@ -136,19 +136,16 @@ export default function Page() {
           <SupportChannel title="Community">
             <p>
               Chat with other developers and the Inngest team in our{' '}
-              <AppLink
-                href="https://www.inngest.com/discord"
-                target="_blank"
-                label="Discord community"
-                className="text-base"
-              />
+              <Link href="https://www.inngest.com/discord" className="inline-flex">
+                Discord community
+              </Link>
               . Search for topics and questions in our{' '}
-              <AppLink
+              <Link
                 href="https://discord.com/channels/842170679536517141/1051516534029291581"
-                target="_blank"
-                label="#help-forum"
-                className="text-base"
-              />{' '}
+                className="inline-flex"
+              >
+                #help-forum
+              </Link>{' '}
               channel or submit your own question.
             </p>
             <Button
