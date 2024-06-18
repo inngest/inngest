@@ -372,5 +372,19 @@ func (c *Client) RunSpanOutput(ctx context.Context, outputID string) *models.Run
 func (c *Client) ExpectSpanOutput(t *testing.T, expected string, output *models.RunTraceSpanOutput) {
 	require.NotNil(t, output)
 	require.NotNil(t, output.Data)
+	require.Nil(t, output.Error)
 	require.Contains(t, *output.Data, expected)
+}
+
+func (c *Client) ExpectSpanErrorOutput(t *testing.T, msg string, stack string, output *models.RunTraceSpanOutput) {
+	require.NotNil(t, output)
+	require.Nil(t, output.Data)
+	require.NotNil(t, output.Error)
+	if msg != "" {
+		require.Contains(t, output.Error.Message, msg)
+	}
+	if stack != "" {
+		require.NotNil(t, output.Error.Stack)
+		require.Contains(t, *output.Error.Stack, stack)
+	}
 }

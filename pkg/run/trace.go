@@ -121,6 +121,12 @@ func (tb *runTree) ToRunSpan(ctx context.Context) (*rpbv2.RunSpan, error) {
 		return spans[i].Timestamp.UnixMilli() < spans[j].Timestamp.UnixMilli()
 	})
 
+	var finished bool
+	switch root.Status {
+	case rpbv2.SpanStatus_COMPLETED, rpbv2.SpanStatus_FAILED:
+		finished = true
+	}
+
 	// these are the execution or steps for the function run
 	for _, span := range spans {
 		tspan, skipped, err := tb.toRunSpan(ctx, span)
@@ -132,7 +138,9 @@ func (tb *runTree) ToRunSpan(ctx context.Context) (*rpbv2.RunSpan, error) {
 			continue
 		}
 		// the last output is the run's output
-		root.OutputId = tspan.OutputId
+		if finished {
+			root.OutputId = tspan.OutputId
+		}
 		root.Children = append(root.Children, tspan)
 	}
 
@@ -358,18 +366,19 @@ func (tb *runTree) processStepRun(ctx context.Context, span *cqrs.Span, mod *rpb
 			mod.Attempts = attempt
 			mod.DurationMs = dur
 			mod.EndedAt = timestamppb.New(pend)
-			mod.OutputId = outputID
 
 			switch status {
 			case rpbv2.SpanStatus_RUNNING:
 				mod.EndedAt = nil
 			case rpbv2.SpanStatus_COMPLETED:
 				mod.Status = rpbv2.SpanStatus_COMPLETED
+				mod.OutputId = outputID
 			case rpbv2.SpanStatus_FAILED:
 				// check if this failure is the final failure of all attempts
 				if attempt == maxAttempts {
 					mod.Status = rpbv2.SpanStatus_FAILED
 					mod.Attempts = maxAttempts
+					mod.OutputId = outputID
 				}
 			}
 		}
@@ -537,27 +546,28 @@ func (tb *runTree) processInvoke(ctx context.Context, span *cqrs.Span, mod *rpbv
 	}
 	triggeringEventID, err := ulid.Parse(evtIDstr)
 	if err != nil {
-		return fmt.Errorf("error parsing invoke triggering event ID: %w", err)
+		return fmt.Errorf("error parsing triggering event ID: %w", err)
 	}
 
 	// target function ID
 	fnID, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeTargetFnID]
 	if !ok {
-		return fmt.Errorf("missing invoke target function ID for invoke")
+		return fmt.Errorf("missing target function ID")
 	}
 
 	// run ID
-	if str, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeRunID]; ok {
+	if str, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeRunID]; ok && str != "" {
+		fmt.Println("RunID: ", str)
 		runid, err := ulid.Parse(str)
 		if err != nil {
-			return fmt.Errorf("error parsing invoke run ID: %w", err)
+			return fmt.Errorf("error parsing run ID: %w", err)
 		}
 		id := runid.String()
 		runID = &id
 	}
 
 	// return event ID
-	if str, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeReturnedEventID]; ok {
+	if str, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeReturnedEventID]; ok && str != "" {
 		evtID, err := ulid.Parse(str)
 		if err != nil {
 			return fmt.Errorf("error parsing invoke return event ID: %w", err)
@@ -734,18 +744,19 @@ func (tb *runTree) processExec(ctx context.Context, span *cqrs.Span, mod *rpbv2.
 			mod.Attempts = attempt
 			mod.DurationMs = dur
 			mod.EndedAt = timestamppb.New(pend)
-			mod.OutputId = &outputID
 
 			switch status {
 			case rpbv2.SpanStatus_RUNNING:
 				mod.EndedAt = nil
 			case rpbv2.SpanStatus_COMPLETED:
 				mod.Status = rpbv2.SpanStatus_COMPLETED
+				mod.OutputId = &outputID
 			case rpbv2.SpanStatus_FAILED:
 				// check if this failure is the final failure of all attempts
 				if attempt == maxAttempts {
 					mod.Status = rpbv2.SpanStatus_FAILED
 					mod.Attempts = maxAttempts
+					mod.OutputId = &outputID
 				}
 			}
 		}
