@@ -22,6 +22,9 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
   const selectedValues = options.filter((option) =>
     selectedStatuses.some((status) => isFunctionRunStatus(status) && status === option.id)
   );
+  const areAllStatusesSelected = functionRunStatuses.every((status) =>
+    selectedStatuses.includes(status)
+  );
   const statusDots = selectedStatuses.map((status) => {
     const isSelected = selectedStatuses.includes(status);
     return (
@@ -54,7 +57,14 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
       label="Status"
     >
       <Select.Button>
-        {selectedStatuses.length > 0 && <span className="pr-2">{statusDots}</span>}
+        <div className="w-8">
+          {selectedStatuses.length > 0 && !areAllStatusesSelected && (
+            <span className="pr-2">{statusDots}</span>
+          )}
+          {(selectedStatuses.length === 0 || areAllStatusesSelected) && (
+            <span className="pr-2">All</span>
+          )}
+        </div>
       </Select.Button>
       <Select.Options>
         {options.map((option) => {
