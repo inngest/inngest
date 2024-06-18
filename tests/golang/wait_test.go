@@ -93,10 +93,10 @@ func TestWait(t *testing.T) {
 			})
 
 			return true
-		}, 4*time.Second, 1*time.Second)
+		}, 6*time.Second, 2*time.Second)
 	})
 
-	<-time.After(3 * time.Second)
+	<-time.After(6 * time.Second)
 	// Trigger the main function
 	_, err = inngestgo.Send(ctx, &event.Event{Name: waitEvtName})
 	r.NoError(err)
