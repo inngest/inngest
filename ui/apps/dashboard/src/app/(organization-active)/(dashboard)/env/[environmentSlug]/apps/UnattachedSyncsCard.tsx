@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Link as InngestLink } from '@inngest/components/Link';
 import { Time } from '@inngest/components/Time';
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
@@ -22,11 +22,11 @@ export const cardRightPanelStyles = 'h-44 flex-1 flex flex-col justify-center px
 
 export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Props) {
   return (
-    <div className={classNames(cardWrapperStyles, className)}>
+    <div className={cn(cardWrapperStyles, className)}>
       <div className={cardLeftPanelStyles}>
         <h2>
           <Link
-            className="transition-color hover:text-link hover:decoration-link text-basis flex cursor-pointer items-center gap-1 underline decoration-transparent decoration-2 underline-offset-4 duration-300"
+            className="transition-color hover:text-link hover:decoration-link text-basis flex cursor-pointer items-center gap-1 font-medium underline decoration-transparent decoration-2 underline-offset-4 duration-300"
             href={pathCreator.unattachedSyncs({ envSlug })}
           >
             Unattached Syncs
