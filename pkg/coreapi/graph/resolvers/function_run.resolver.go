@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -16,8 +17,10 @@ import (
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/history_reader"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func (r *functionRunResolver) PendingSteps(ctx context.Context, obj *models.FunctionRun) (*int, error) {
@@ -293,6 +296,16 @@ func (r *mutationResolver) Rerun(
 	if err != nil {
 		return zero, fmt.Errorf("failed to get run event: %w", err)
 	}
+
+	ctx, span := telemetry.NewSpan(ctx,
+		telemetry.WithName(consts.OtelSpanRerun),
+		telemetry.WithScope(consts.OtelScopeRerun),
+		telemetry.WithNewRoot(),
+		telemetry.WithSpanAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+		),
+	)
+	defer span.End()
 
 	identifier, err := r.Executor.Schedule(ctx, execution.ScheduleRequest{
 		Function: *fn,

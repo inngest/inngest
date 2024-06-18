@@ -98,10 +98,11 @@ CREATE TABLE event_batches (
 
 CREATE TABLE traces (
 	timestamp TIMESTAMP NOT NULL,
-	trace_id BLOB NOT NULL,
-	span_id BLOB NOT NULL,
-	parent_span_id BLOB,
-	trace_state BLOB,
+	timestamp_unix_ms INT NOT NULL,
+	trace_id VARCHAR NOT NULL,
+	span_id VARCHAR NOT NULL,
+	parent_span_id VARCHAR,
+	trace_state VARCHAR,
 	span_name VARCHAR NOT NULL,
 	span_kind VARCHAR NOT NULL,
 	service_name VARCHAR NOT NULL,

@@ -948,6 +948,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		// always one less than attempts.
 		retries := f.Steps[0].RetryCount() + 1
 		item.MaxAttempts = &retries
+		span.SetAttributes(attribute.Int(consts.OtelSysStepMaxAttempt, retries))
 
 		// Only just starting:  run lifecycles on first attempt.
 		if item.Attempt == 0 {
@@ -1777,11 +1778,6 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		return fmt.Errorf("unable to load run events: %w", err)
 	}
 
-	ctx = e.extractTraceCtx(ctx, md, nil)
-	for _, e := range e.lifecycles {
-		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r)
-	}
-
 	// We need the function slug.
 	f, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
 	if err != nil {
@@ -1796,7 +1792,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	} else if performedFinalization {
 		ctx = e.extractTraceCtx(ctx, md, nil)
 		for _, e := range e.lifecycles {
-			go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r)
+			go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
 		}
 	}
 
