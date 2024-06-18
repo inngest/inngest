@@ -165,6 +165,53 @@ func TestInvokeTimeout(t *testing.T) {
 
 	// The invoke target times out and should fail the main run
 	c.WaitForRunStatus(ctx, t, "FAILED", &runID)
+
+	t.Run("trace run should have appropriate data", func(t *testing.T) {
+		<-time.After(3 * time.Second)
+		errMsg := "Timed out waiting for invoked function to complete"
+
+		require.Eventually(t, func() bool {
+			run := c.RunTraces(ctx, runID)
+			require.NotNil(t, run)
+			require.Equal(t, models.FunctionStatusFailed.String(), run.Status)
+			require.NotNil(t, run.Trace)
+			require.True(t, run.Trace.IsRoot)
+			require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
+
+			// output test
+			require.NotNil(t, run.Trace.OutputID)
+			output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+			require.NotNil(t, output)
+			// c.ExpectSpanErrorOutput(t, errMsg, "", output)
+
+			rootSpanID := run.Trace.SpanID
+
+			t.Run("invoke", func(t *testing.T) {
+				invoke := run.Trace.ChildSpans[0]
+				assert.Equal(t, "invoke", invoke.Name)
+				assert.Equal(t, 0, invoke.Attempts)
+				assert.False(t, invoke.IsRoot)
+				assert.Equal(t, rootSpanID, invoke.ParentSpanID)
+				assert.Equal(t, models.StepOpInvoke.String(), invoke.StepOp)
+
+				// output test
+				assert.NotNil(t, invoke.OutputID)
+				invokeOutput := c.RunSpanOutput(ctx, *invoke.OutputID)
+				c.ExpectSpanErrorOutput(t, errMsg, "", invokeOutput)
+
+				var stepInfo models.InvokeStepInfo
+				byt, err := json.Marshal(invoke.StepInfo)
+				assert.NoError(t, err)
+				assert.NoError(t, json.Unmarshal(byt, &stepInfo))
+
+				assert.True(t, *stepInfo.TimedOut)
+				assert.Nil(t, stepInfo.ReturnEventID)
+				assert.Nil(t, stepInfo.RunID)
+			})
+
+			return true
+		}, 10*time.Second, 2*time.Second)
+	})
 }
 
 func TestInvokeRateLimit(t *testing.T) {

@@ -759,6 +759,13 @@ func (tb *runTree) processExec(ctx context.Context, span *cqrs.Span, mod *rpbv2.
 					mod.OutputId = &outputID
 				}
 			}
+
+			// if the name is `function error`, it's already finished
+			// and mark it as failed
+			if mod.Name == "function error" {
+				mod.Status = rpbv2.SpanStatus_FAILED
+				mod.OutputId = &outputID
+			}
 		}
 
 		mod.Children = append(mod.Children, nested)
