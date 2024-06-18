@@ -260,12 +260,12 @@ type TraceRunIdentifier struct {
 }
 
 type SpanIdentifier struct {
-	AccountID   uuid.UUID
-	WorkspaceID uuid.UUID
-	AppID       uuid.UUID
-	FunctionID  uuid.UUID
-	TraceID     string
-	SpanID      string
+	AccountID   uuid.UUID `json:"acctID"`
+	WorkspaceID uuid.UUID `json:"wsID"`
+	AppID       uuid.UUID `json:"appID"`
+	FunctionID  uuid.UUID `json:"fnID"`
+	TraceID     string    `json:"tid"`
+	SpanID      string    `json:"sid"`
 }
 
 func (si *SpanIdentifier) Encode() (string, error) {
