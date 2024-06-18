@@ -744,8 +744,8 @@ func (tb *runTree) processExec(ctx context.Context, span *cqrs.Span, mod *rpbv2.
 			WorkspaceID: tb.wsID,
 			AppID:       tb.appID,
 			FunctionID:  tb.fnID,
-			TraceID:     span.TraceID,
-			SpanID:      span.SpanID,
+			TraceID:     nested.TraceId,
+			SpanID:      nested.SpanId,
 		}
 		outputID, err := ident.Encode()
 		if err != nil {
@@ -774,6 +774,10 @@ func (tb *runTree) processExec(ctx context.Context, span *cqrs.Span, mod *rpbv2.
 			case rpbv2.SpanStatus_COMPLETED:
 				mod.Status = rpbv2.SpanStatus_COMPLETED
 				mod.OutputId = &outputID
+
+				if p.SpanName == consts.OtelExecFnOk {
+					mod.Name = consts.OtelExecFnOk
+				}
 			case rpbv2.SpanStatus_FAILED:
 				// check if this failure is the final failure of all attempts
 				if attempt == maxAttempts {
@@ -781,10 +785,6 @@ func (tb *runTree) processExec(ctx context.Context, span *cqrs.Span, mod *rpbv2.
 					mod.Attempts = maxAttempts
 					mod.OutputId = &outputID
 				}
-			}
-
-			if p.SpanName == consts.OtelExecFnOk && status == rpbv2.SpanStatus_COMPLETED {
-				mod.Name = consts.OtelExecFnOk
 			}
 
 			// if the name is `function error`, it's already finished
