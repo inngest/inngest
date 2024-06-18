@@ -39,7 +39,7 @@ func TestFunctionSteps(t *testing.T) {
 			_, err := step.Run(ctx, "1", func(ctx context.Context) (any, error) {
 				fmt.Println("1")
 				atomic.AddInt32(&counter, 1)
-				return input.Event, nil
+				return "hello 1", nil
 			})
 			require.NoError(t, err)
 
@@ -166,8 +166,14 @@ func TestFunctionSteps(t *testing.T) {
 			require.Equal(t, 5, len(run.Trace.ChildSpans))
 			require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
 
+			// output test
+			require.NotNil(t, run.Trace.OutputID)
+			output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+			require.NotNil(t, output)
+			require.NotNil(t, output.Data)
+			require.Contains(t, *output.Data, "true")
+
 			rootSpanID := run.Trace.SpanID
-			// TODO: output test
 
 			t.Run("step 1", func(t *testing.T) {
 				one := run.Trace.ChildSpans[0]
@@ -178,11 +184,9 @@ func TestFunctionSteps(t *testing.T) {
 				assert.Equal(t, models.StepOpRun.String(), one.StepOp)
 				assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), one.Status)
 				// output test
-				// assert.NotNil(t, one.OutputID)
-				// oneOutput := c.RunTraceSpanOutput(*one.OutputID)
-				// assert.NotNil(t, oneOutput)
-				// assert.NotNil(t, oneOutput.Data)
-				// assert.Contains(t, *oneOutput.Data, "hello 1")
+				assert.NotNil(t, one.OutputID)
+				oneOutput := c.RunSpanOutput(ctx, *one.OutputID)
+				c.ExpectSpanOutput(t, "hello 1", oneOutput)
 			})
 
 			t.Run("step 2", func(t *testing.T) {
@@ -194,11 +198,9 @@ func TestFunctionSteps(t *testing.T) {
 				assert.Equal(t, models.StepOpRun.String(), sec.StepOp)
 				assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), sec.Status)
 				// output test
-				// assert.NotNil(t, sec.OutputID)
-				// secOutput := c.RunTraceSpanOutput(*sec.OutputID)
-				// assert.NotNil(t, secOutput)
-				// assert.NotNil(t, secOutput.Data)
-				// assert.Contains(t, *secOutput.Data, "hello 2")
+				assert.NotNil(t, sec.OutputID)
+				secOutput := c.RunSpanOutput(ctx, *sec.OutputID)
+				c.ExpectSpanOutput(t, "test", secOutput)
 			})
 
 			// third step
@@ -210,8 +212,9 @@ func TestFunctionSteps(t *testing.T) {
 				assert.Equal(t, rootSpanID, thr.ParentSpanID)
 				assert.Equal(t, models.StepOpSleep.String(), thr.StepOp)
 				assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), thr.Status)
-				require.NotNil(t, thr.StartedAt)
-				require.NotNil(t, thr.EndedAt)
+				assert.NotNil(t, thr.StartedAt)
+				assert.NotNil(t, thr.EndedAt)
+				assert.Nil(t, thr.OutputID)
 				// check sleep duration
 				expectedDur := (2 * time.Second).Milliseconds()
 				assert.Equal(t, expectedDur, thr.Duration)
@@ -237,6 +240,10 @@ func TestFunctionSteps(t *testing.T) {
 				assert.False(t, *stepInfo.TimedOut)
 				assert.NotNil(t, stepInfo.FoundEventID)
 
+				// output test
+				assert.NotNil(t, forth.OutputID)
+				forthOutput := c.RunSpanOutput(ctx, *forth.OutputID)
+				c.ExpectSpanOutput(t, "api/new.event", forthOutput)
 			})
 
 			// check trigger

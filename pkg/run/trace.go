@@ -131,6 +131,8 @@ func (tb *runTree) ToRunSpan(ctx context.Context) (*rpbv2.RunSpan, error) {
 		if skipped {
 			continue
 		}
+		// the last output is the run's output
+		root.OutputId = tspan.OutputId
 		root.Children = append(root.Children, tspan)
 	}
 
@@ -195,10 +197,6 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan, bool) {
 	// already processed skip it
 	if _, ok := tb.processed[s.SpanID]; ok {
-		return nil, true
-	}
-	// NOTE: is this check sufficient?
-	if s.SpanName == "function success" {
 		return nil, true
 	}
 

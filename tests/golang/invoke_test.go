@@ -33,7 +33,7 @@ func TestInvoke(t *testing.T) {
 		},
 		inngestgo.EventTrigger("none", nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-			return "hello", nil
+			return "invoked!", nil
 		},
 	)
 
@@ -54,7 +54,7 @@ func TestInvoke(t *testing.T) {
 				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName},
 			)
 
-			return nil, nil
+			return "success", nil
 		},
 	)
 
@@ -77,26 +77,35 @@ func TestInvoke(t *testing.T) {
 			require.True(t, run.Trace.IsRoot)
 			require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
 
+			// output test
+			require.NotNil(t, run.Trace.OutputID)
+			output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+			c.ExpectSpanOutput(t, "success", output)
+
 			rootSpanID := run.Trace.SpanID
-			// TODO: output test
 
-			invoke := run.Trace.ChildSpans[0]
-			assert.Equal(t, "invoke", invoke.Name)
-			assert.Equal(t, 0, invoke.Attempts)
-			assert.False(t, invoke.IsRoot)
-			assert.Equal(t, rootSpanID, invoke.ParentSpanID)
-			assert.Equal(t, models.StepOpInvoke.String(), invoke.StepOp)
+			t.Run("invoke", func(t *testing.T) {
+				invoke := run.Trace.ChildSpans[0]
+				assert.Equal(t, "invoke", invoke.Name)
+				assert.Equal(t, 0, invoke.Attempts)
+				assert.False(t, invoke.IsRoot)
+				assert.Equal(t, rootSpanID, invoke.ParentSpanID)
+				assert.Equal(t, models.StepOpInvoke.String(), invoke.StepOp)
 
-			// TODO: output test
+				// output test
+				assert.NotNil(t, invoke.OutputID)
+				invokeOutput := c.RunSpanOutput(ctx, *invoke.OutputID)
+				c.ExpectSpanOutput(t, "invoked!", invokeOutput)
 
-			var stepInfo models.InvokeStepInfo
-			byt, err := json.Marshal(invoke.StepInfo)
-			assert.NoError(t, err)
-			assert.NoError(t, json.Unmarshal(byt, &stepInfo))
+				var stepInfo models.InvokeStepInfo
+				byt, err := json.Marshal(invoke.StepInfo)
+				assert.NoError(t, err)
+				assert.NoError(t, json.Unmarshal(byt, &stepInfo))
 
-			assert.False(t, *stepInfo.TimedOut)
-			assert.NotNil(t, stepInfo.ReturnEventID)
-			assert.NotNil(t, stepInfo.RunID)
+				assert.False(t, *stepInfo.TimedOut)
+				assert.NotNil(t, stepInfo.ReturnEventID)
+				assert.NotNil(t, stepInfo.RunID)
+			})
 
 			return true
 		}, 10*time.Second, 2*time.Second)

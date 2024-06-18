@@ -15,6 +15,10 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+var (
+	ErrSkipSuccess = fmt.Errorf("skip success span")
+)
+
 type TraceRequestKey struct {
 	*cqrs.TraceRunIdentifier
 }
@@ -117,6 +121,11 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 }
 
 func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
+	// no need to show the function success span
+	if pb.GetName() == "function success" && pb.GetStatus() == rpbv2.SpanStatus_COMPLETED {
+		return nil, ErrSkipSuccess
+	}
+
 	var (
 		startedAt *time.Time
 		endedAt   *time.Time
@@ -244,6 +253,9 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 
 		for _, cp := range pb.Children {
 			cspan, err := convertRunTreeToGQLModel(cp)
+			if err == ErrSkipSuccess {
+				continue
+			}
 			if err != nil {
 				return nil, err
 			}

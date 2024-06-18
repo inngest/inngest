@@ -48,7 +48,7 @@ func TestWait(t *testing.T) {
 				},
 			)
 
-			return nil, nil
+			return "DONE", nil
 		},
 	)
 
@@ -68,6 +68,7 @@ func TestWait(t *testing.T) {
 			require.NotNil(t, run.Trace)
 			require.Equal(t, 1, len(run.Trace.ChildSpans))
 			require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
+			require.Nil(t, run.Trace.OutputID)
 
 			rootSpanID := run.Trace.SpanID
 
@@ -79,6 +80,7 @@ func TestWait(t *testing.T) {
 				assert.False(t, span.IsRoot)
 				assert.Equal(t, models.RunTraceSpanStatusWaiting.String(), span.Status)
 				assert.Equal(t, models.StepOpWaitForEvent.String(), span.StepOp)
+				assert.Nil(t, span.OutputID)
 
 				var stepInfo models.WaitForEventStepInfo
 				byt, err := json.Marshal(span.StepInfo)
@@ -100,7 +102,7 @@ func TestWait(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		<-time.After(3 * time.Second)
+		<-time.After(5 * time.Second)
 
 		require.Eventually(t, func() bool {
 			run := c.RunTraces(ctx, runID)
@@ -110,8 +112,12 @@ func TestWait(t *testing.T) {
 			require.Equal(t, 1, len(run.Trace.ChildSpans))
 			require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
 
+			// output test
+			require.NotNil(t, run.Trace.OutputID)
+			output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+			c.ExpectSpanOutput(t, "DONE", output)
+
 			rootSpanID := run.Trace.SpanID
-			// TODO: output test
 
 			t.Run("wait step", func(t *testing.T) {
 				span := run.Trace.ChildSpans[0]
@@ -122,7 +128,10 @@ func TestWait(t *testing.T) {
 				assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), span.Status)
 				assert.Equal(t, models.StepOpWaitForEvent.String(), span.StepOp)
 
-				// TODO: output test
+				// output test
+				assert.NotNil(t, span.OutputID)
+				spanOutput := c.RunSpanOutput(ctx, *span.OutputID)
+				c.ExpectSpanOutput(t, "resume", spanOutput)
 
 				var stepInfo models.WaitForEventStepInfo
 				byt, err := json.Marshal(span.StepInfo)

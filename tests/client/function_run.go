@@ -10,6 +10,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/stretchr/testify/require"
 )
 
 type FunctionRunOpt struct {
@@ -325,4 +326,51 @@ type runTraceSpan struct {
 	OutputID     *string        `json:"outputID,omitempty"`
 	StepOp       string         `json:"stepOp"`
 	StepInfo     any            `json:"stepInfo,omitempty"`
+}
+
+func (c *Client) RunSpanOutput(ctx context.Context, outputID string) *models.RunTraceSpanOutput {
+	c.Helper()
+
+	if outputID == "" {
+		return nil
+	}
+
+	query := `
+		query GetTraceSpanOutput($outputID: String!) {
+			output: runTraceSpanOutputByID(outputID: $outputID) {
+				data
+				error {
+					name
+					message
+					stack
+				}
+			}
+		}
+	`
+
+	resp := c.MustDoGQL(ctx, graphql.RawParams{
+		Query: query,
+		Variables: map[string]any{
+			"outputID": outputID,
+		},
+	})
+	if len(resp.Errors) > 0 {
+		c.Fatalf("err with fnrun trace query: %#v", resp.Errors)
+	}
+
+	type response struct {
+		Output *models.RunTraceSpanOutput
+	}
+	data := response{}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		c.Fatalf(err.Error())
+	}
+
+	return data.Output
+}
+
+func (c *Client) ExpectSpanOutput(t *testing.T, expected string, output *models.RunTraceSpanOutput) {
+	require.NotNil(t, output)
+	require.NotNil(t, output.Data)
+	require.Contains(t, *output.Data, expected)
 }

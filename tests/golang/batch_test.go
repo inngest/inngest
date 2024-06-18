@@ -44,7 +44,7 @@ func TestBatchEvents(t *testing.T) {
 
 			atomic.AddInt32(&counter, 1)
 			atomic.AddInt32(&totalEvents, int32(len(input.Events)))
-			return true, nil
+			return "batched!!", nil
 		},
 	)
 	h.Register(a)
@@ -84,7 +84,10 @@ func TestBatchEvents(t *testing.T) {
 			require.True(t, run.Trace.IsRoot)
 			require.Equal(t, 0, len(run.Trace.ChildSpans))
 			require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
-			// TODO: output test
+			// output test
+			require.NotNil(t, run.Trace.OutputID)
+			output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+			c.ExpectSpanOutput(t, "batched!!", output)
 
 			return true
 		}, 10*time.Second, 2*time.Second)
