@@ -232,6 +232,20 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 	dur := s.DurationMS()
 	endedAt := s.Timestamp.Add(s.Duration)
 
+	queuedAt := ulid.Time(runID.Time())
+	// non function scope need to calculate from delay
+	if s.ScopeName != consts.OtelScopeFunction {
+		queuedAt = s.Timestamp
+		if str, ok := s.SpanAttributes[consts.OtelSysDelaySystem]; ok {
+			if ms, err := strconv.Atoi(str); err == nil {
+				if ms > 0 {
+					dur := time.Duration(ms) * time.Millisecond
+					queuedAt = s.Timestamp.Add(-1 * dur)
+				}
+			}
+		}
+	}
+
 	return &rpbv2.RunSpan{
 		AppId:        appID.String(),
 		FunctionId:   fnID.String(),
@@ -241,7 +255,7 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 		SpanId:       s.SpanID,
 		Name:         name,
 		Status:       rpbv2.SpanStatus_RUNNING,
-		QueuedAt:     timestamppb.New(ulid.Time(runID.Time())), // TODO: need to be different values for steps
+		QueuedAt:     timestamppb.New(queuedAt),
 		StartedAt:    timestamppb.New(s.Timestamp),
 		EndedAt:      timestamppb.New(endedAt),
 		DurationMs:   dur,
@@ -557,7 +571,6 @@ func (tb *runTree) processInvoke(ctx context.Context, span *cqrs.Span, mod *rpbv
 
 	// run ID
 	if str, ok := invoke.SpanAttributes[consts.OtelSysStepInvokeRunID]; ok && str != "" {
-		fmt.Println("RunID: ", str)
 		runid, err := ulid.Parse(str)
 		if err != nil {
 			return fmt.Errorf("error parsing run ID: %w", err)
