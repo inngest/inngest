@@ -6,8 +6,6 @@ import { IconStatusQueued } from '@inngest/components/icons/status/Queued';
 import { IconStatusRunning } from '@inngest/components/icons/status/Running';
 import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 
-import { ReplayRunStatus } from '@/gql/graphql';
-
 // Explicitly assign the Record type but use satisfies to ensure:
 // - Accessing an unexpected status gives an undefined
 // - Keys must be exhaustive of all known statuses
@@ -20,7 +18,7 @@ const icons: Record<string, React.ComponentType> = {
 } as const satisfies { [key in FunctionRunStatus]: React.ComponentType };
 
 type Props = {
-  status: FunctionRunStatus | ReplayRunStatus;
+  status: string;
   className?: string;
 };
 
