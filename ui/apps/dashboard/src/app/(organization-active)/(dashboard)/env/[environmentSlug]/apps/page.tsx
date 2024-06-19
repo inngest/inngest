@@ -79,7 +79,7 @@ export default function Page() {
           </div>
         }
       />
-      <div className="relative h-full overflow-y-auto bg-slate-100">
+      <div className="bg-canvasBase relative h-full overflow-y-auto">
         <Apps isArchived={isArchived} />
       </div>
     </>

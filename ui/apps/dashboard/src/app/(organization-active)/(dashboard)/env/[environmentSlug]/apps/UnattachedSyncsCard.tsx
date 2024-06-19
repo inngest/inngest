@@ -23,17 +23,17 @@ export const cardRightPanelStyles = 'h-44 flex-1 flex flex-col justify-center px
 export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Props) {
   return (
     <div className={cn(cardWrapperStyles, className)}>
-      <div className={cardLeftPanelStyles}>
+      <Link
+        href={pathCreator.unattachedSyncs({ envSlug })}
+        className={cn(cardLeftPanelStyles, 'hover:bg-canvasMuted transition-colors duration-300')}
+      >
         <h2>
-          <Link
-            className="transition-color hover:text-link hover:decoration-link text-basis flex cursor-pointer items-center gap-1 font-medium underline decoration-transparent decoration-2 underline-offset-4 duration-300"
-            href={pathCreator.unattachedSyncs({ envSlug })}
-          >
+          <div className="text-basis flex items-center gap-1 font-medium">
             Unattached Syncs
             <RiArrowRightSLine className="h-4 w-4" />
-          </Link>
+          </div>
         </h2>
-      </div>
+      </Link>
       <div className={cardRightPanelStyles}>
         <dl className="grid grid-cols-2 gap-4 min-[900px]:grid-cols-3">
           <p className="col-span-2 md:col-span-3">
