@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -10,16 +11,10 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-var (
-	defaultQueueKey = DefaultQueueKeyGenerator{}
-)
+// TODO Set this properly
+var switchover = time.Date(2024, 07, 10, 0, 0, 0, 0, time.UTC)
 
-// KeyFunc returns a unique string based off of given data, which is used
-// as the key for data stored in redis for workflows, events, actions, and
-// errors.
-type KeyGenerator interface {
-	// Workflow returns the key for the current workflow ID and version.
-	Workflow(ctx context.Context, workflowID uuid.UUID, version int) string
+type ShardedKeyGenerator interface {
 
 	// Idempotency stores the idempotency key for atomic lookup.
 	Idempotency(context.Context, state.Identifier) string
@@ -44,6 +39,91 @@ type KeyGenerator interface {
 	// for given workflow run.
 	Errors(context.Context, state.Identifier) string
 
+	// PauseStep returns the prefix of the key used within PauseStep.  This lets us
+	// iterate through all pauses for a given identifier
+	PauseStepPrefix(context.Context, state.Identifier) string
+
+	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
+	PauseStep(context.Context, state.Identifier, string) string
+
+	// RunPauses stores pause IDs for each run as a zset
+	RunPauses(ctx context.Context, runID ulid.ULID) string
+
+	// History returns the key used to store a log entry for run hisotry
+	History(ctx context.Context, runID ulid.ULID) string
+
+	// Stack returns the key used to store the stack for a given run
+	Stack(ctx context.Context, runID ulid.ULID) string
+}
+
+type shardedKeyGenerator struct {
+}
+
+func (s shardedKeyGenerator) Prefix(defaultPrefix string, runID ulid.ULID) string {
+	if ulid.Time(runID.Time()).After(switchover) {
+		return fmt.Sprintf("{%s}", runID)
+	}
+	return defaultPrefix
+}
+
+const stateDefaultKey = "{state}"
+const queueDefaultKey = "{queue}"
+
+func (s shardedKeyGenerator) Idempotency(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:key:%s", s.Prefix(stateDefaultKey, id.RunID), id.IdempotencyKey())
+}
+
+func (s shardedKeyGenerator) RunMetadata(ctx context.Context, runID ulid.ULID) string {
+	return fmt.Sprintf("%s:metadata:%s", s.Prefix(stateDefaultKey, runID), runID)
+}
+
+func (s shardedKeyGenerator) Event(ctx context.Context, identifier state.Identifier) string {
+	return fmt.Sprintf("%s:events:%s:%s", s.Prefix(stateDefaultKey, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+}
+
+func (s shardedKeyGenerator) Events(ctx context.Context, identifier state.Identifier) string {
+	return fmt.Sprintf("%s:bulk-events:%s:%s", s.Prefix(stateDefaultKey, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+}
+
+func (s shardedKeyGenerator) Actions(ctx context.Context, identifier state.Identifier) string {
+	return fmt.Sprintf("%s:actions:%s:%s", s.Prefix(stateDefaultKey, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+}
+
+func (s shardedKeyGenerator) Errors(ctx context.Context, identifier state.Identifier) string {
+	return fmt.Sprintf("%s:errors:%s:%s", s.Prefix(stateDefaultKey, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+}
+
+func (s shardedKeyGenerator) PauseStepPrefix(ctx context.Context, identifier state.Identifier) string {
+	return fmt.Sprintf("%s:pause-steps:%s", s.Prefix(stateDefaultKey, identifier.RunID), identifier.RunID)
+}
+
+func (s shardedKeyGenerator) PauseStep(ctx context.Context, identifier state.Identifier, s2 string) string {
+	prefix := s.PauseStepPrefix(ctx, identifier)
+	return fmt.Sprintf("%s-%s", prefix, s2)
+}
+
+func (s shardedKeyGenerator) RunPauses(ctx context.Context, runID ulid.ULID) string {
+	return fmt.Sprintf("%s:pr:%s", s.Prefix(stateDefaultKey, runID), runID)
+}
+
+func (s shardedKeyGenerator) History(ctx context.Context, runID ulid.ULID) string {
+	return fmt.Sprintf("%s:history:%s", s.Prefix(stateDefaultKey, runID), runID)
+}
+
+func (s shardedKeyGenerator) Stack(ctx context.Context, runID ulid.ULID) string {
+	return fmt.Sprintf("%s:stack:%s", s.Prefix(stateDefaultKey, runID), runID)
+}
+
+func newShardedKeyGenerator() ShardedKeyGenerator {
+	return &shardedKeyGenerator{}
+}
+
+type UnshardedKeyGenerator interface {
+	QueueKeyGenerator
+
+	// Workflow returns the key for the current workflow ID and version.
+	Workflow(ctx context.Context, workflowID uuid.UUID, version int) string
+
 	// PauseLease stores the key which references a pause's lease.
 	//
 	// This is stored independently as we may store more than one copy of a pause
@@ -56,13 +136,6 @@ type KeyGenerator interface {
 	// PauseEvent returns the key used to store data for loading pauses by events.
 	PauseEvent(context.Context, uuid.UUID, string) string
 
-	// PauseStep returns the prefix of the key used within PauseStep.  This lets us
-	// iterate through all pauses for a given identifier
-	PauseStepPrefix(context.Context, state.Identifier) string
-
-	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
-	PauseStep(context.Context, state.Identifier, string) string
-
 	// PauseIndex is a key that's used to index added/expired times for pauses.
 	//
 	// Added times are necessary to load pauses after a specific point in time,
@@ -70,93 +143,42 @@ type KeyGenerator interface {
 	// added after the cache was last updated.
 	PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string
 
-	// RunPauses stores pause IDs for each run as a zset
-	RunPauses(ctx context.Context, runID ulid.ULID) string
-
 	// Invoke returns the key used to store the correlation key associated with invoke functions
 	Invoke(ctx context.Context, wsID uuid.UUID) string
-
-	// History returns the key used to store a log entry for run hisotry
-	History(ctx context.Context, runID ulid.ULID) string
-
-	// Stack returns the key used to store the stack for a given run
-	Stack(ctx context.Context, runID ulid.ULID) string
 }
 
-type DefaultKeyFunc struct {
-	Prefix string
+type unshardedKeyGenerator struct {
 }
 
-func (d DefaultKeyFunc) Idempotency(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:key:%s", d.Prefix, id.IdempotencyKey())
+func (u unshardedKeyGenerator) Workflow(ctx context.Context, workflowID uuid.UUID, version int) string {
+	return fmt.Sprintf("{%s}:workflows:%s-%d", stateDefaultKey, workflowID, version)
 }
 
-func (d DefaultKeyFunc) RunMetadata(ctx context.Context, runID ulid.ULID) string {
-	return fmt.Sprintf("%s:metadata:%s", d.Prefix, runID)
+func (u unshardedKeyGenerator) PauseLease(ctx context.Context, id uuid.UUID) string {
+	return fmt.Sprintf("{%s}:pause-lease:%s", stateDefaultKey, id.String())
 }
 
-func (d DefaultKeyFunc) Workflow(ctx context.Context, id uuid.UUID, version int) string {
-	return fmt.Sprintf("%s:workflows:%s-%d", d.Prefix, id, version)
+func (u unshardedKeyGenerator) PauseID(ctx context.Context, id uuid.UUID) string {
+	return fmt.Sprintf("{%s}:pauses:%s", stateDefaultKey, id.String())
 }
 
-func (d DefaultKeyFunc) Event(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:events:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
+func (u unshardedKeyGenerator) PauseEvent(ctx context.Context, id uuid.UUID, s string) string {
+	return fmt.Sprintf("{%s}:pause-events:%s:%s", stateDefaultKey, id, s)
 }
 
-func (d DefaultKeyFunc) Events(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:bulk-events:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
-}
-
-func (d DefaultKeyFunc) Actions(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:actions:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
-}
-
-func (d DefaultKeyFunc) Errors(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:errors:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
-}
-
-func (d DefaultKeyFunc) PauseID(ctx context.Context, id uuid.UUID) string {
-	return fmt.Sprintf("%s:pauses:%s", d.Prefix, id.String())
-}
-
-func (d DefaultKeyFunc) PauseLease(ctx context.Context, id uuid.UUID) string {
-	return fmt.Sprintf("%s:pause-lease:%s", d.Prefix, id.String())
-}
-
-func (d DefaultKeyFunc) PauseEvent(ctx context.Context, workspaceID uuid.UUID, event string) string {
-	return fmt.Sprintf("%s:pause-events:%s:%s", d.Prefix, workspaceID, event)
-}
-
-func (d DefaultKeyFunc) PauseStepPrefix(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:pause-steps:%s", d.Prefix, id.RunID)
-}
-
-func (d DefaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step string) string {
-	prefix := d.PauseStepPrefix(ctx, id)
-	return fmt.Sprintf("%s-%s", prefix, step)
-}
-
-func (d DefaultKeyFunc) PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string {
+func (u unshardedKeyGenerator) PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string {
 	if event == "" {
-		return fmt.Sprintf("%s:pause-idx:%s:%s:-", d.Prefix, kind, wsID)
+		return fmt.Sprintf("{%s}:pause-idx:%s:%s:-", stateDefaultKey, kind, wsID)
 	}
-	return fmt.Sprintf("%s:pause-idx:%s:%s:%s", d.Prefix, kind, wsID, event)
+	return fmt.Sprintf("{%s}:pause-idx:%s:%s:%s", stateDefaultKey, kind, wsID, event)
 }
 
-func (d DefaultKeyFunc) RunPauses(ctx context.Context, runID ulid.ULID) string {
-	return fmt.Sprintf("%s:pr:%s", d.Prefix, runID)
+func (u unshardedKeyGenerator) Invoke(ctx context.Context, wsID uuid.UUID) string {
+	return fmt.Sprintf("{%s}:invoke:%s", stateDefaultKey, wsID)
 }
 
-func (d DefaultKeyFunc) Invoke(ctx context.Context, wsID uuid.UUID) string {
-	return fmt.Sprintf("%s:invoke:%s", d.Prefix, wsID)
-}
-
-func (d DefaultKeyFunc) History(ctx context.Context, runID ulid.ULID) string {
-	return fmt.Sprintf("%s:history:%s", d.Prefix, runID)
-}
-
-func (d DefaultKeyFunc) Stack(ctx context.Context, runID ulid.ULID) string {
-	return fmt.Sprintf("%s:stack:%s", d.Prefix, runID)
+func newUnshardedKeyGenerator() UnshardedKeyGenerator {
+	return &unshardedKeyGenerator{}
 }
 
 type QueueKeyGenerator interface {
@@ -253,116 +275,112 @@ type BatchKeyGenerator interface {
 	BatchMetadata(context.Context, ulid.ULID) string
 }
 
-type DefaultQueueKeyGenerator struct {
-	Prefix string
+func (u *unshardedKeyGenerator) Shards() string {
+	return fmt.Sprintf("%s:queue:shards", queueDefaultKey)
 }
 
-func (d DefaultQueueKeyGenerator) Shards() string {
-	return fmt.Sprintf("%s:queue:shards", d.Prefix)
+func (u *unshardedKeyGenerator) QueueItem() string {
+	return fmt.Sprintf("%s:queue:item", queueDefaultKey)
 }
 
-func (d DefaultQueueKeyGenerator) QueueItem() string {
-	return fmt.Sprintf("%s:queue:item", d.Prefix)
+func (u *unshardedKeyGenerator) QueueIndex(id string) string {
+	return fmt.Sprintf("%s:queue:sorted:%s", queueDefaultKey, id)
 }
 
-func (d DefaultQueueKeyGenerator) QueueIndex(id string) string {
-	return fmt.Sprintf("%s:queue:sorted:%s", d.Prefix, id)
-}
-
-func (d DefaultQueueKeyGenerator) PartitionItem() string {
-	return fmt.Sprintf("%s:partition:item", d.Prefix)
+func (u *unshardedKeyGenerator) PartitionItem() string {
+	return fmt.Sprintf("%s:partition:item", queueDefaultKey)
 }
 
 // GlobalPartitionIndex returns the sorted index for the partition group, which stores the earliest
 // time for each function/queue in the partition.
 //
 // This is grouped so that we can make N partitions independently.
-func (d DefaultQueueKeyGenerator) GlobalPartitionIndex() string {
-	return fmt.Sprintf("%s:partition:sorted", d.Prefix)
+func (u *unshardedKeyGenerator) GlobalPartitionIndex() string {
+	return fmt.Sprintf("%s:partition:sorted", queueDefaultKey)
 }
 
 // GlobalPartitionIndex returns the sorted index for the partition group, which stores the earliest
 // time for each function/queue in the partition.
 //
 // This is grouped so that we can make N partitions independently.
-func (d DefaultQueueKeyGenerator) ShardPartitionIndex(shard string) string {
+func (u *unshardedKeyGenerator) ShardPartitionIndex(shard string) string {
 	if shard == "" {
-		return fmt.Sprintf("%s:shard:-", d.Prefix)
+		return fmt.Sprintf("%s:shard:-", queueDefaultKey)
 	}
-	return fmt.Sprintf("%s:shard:%s", d.Prefix, shard)
+	return fmt.Sprintf("%s:shard:%s", queueDefaultKey, shard)
 }
 
-func (d DefaultQueueKeyGenerator) ThrottleKey(t *osqueue.Throttle) string {
+func (u *unshardedKeyGenerator) ThrottleKey(t *osqueue.Throttle) string {
 	if t == nil || t.Key == "" {
-		return fmt.Sprintf("%s:throttle:-", d.Prefix)
+		return fmt.Sprintf("%s:throttle:-", queueDefaultKey)
 	}
-	return fmt.Sprintf("%s:throttle:%s", d.Prefix, t.Key)
+	return fmt.Sprintf("%s:throttle:%s", queueDefaultKey, t.Key)
 }
 
-func (d DefaultQueueKeyGenerator) PartitionMeta(id string) string {
-	return fmt.Sprintf("%s:partition:meta:%s", d.Prefix, id)
+func (u *unshardedKeyGenerator) PartitionMeta(id string) string {
+	return fmt.Sprintf("%s:partition:meta:%s", queueDefaultKey, id)
 }
 
-func (d DefaultQueueKeyGenerator) Sequential() string {
-	return fmt.Sprintf("%s:queue:sequential", d.Prefix)
+func (u *unshardedKeyGenerator) Sequential() string {
+	return fmt.Sprintf("%s:queue:sequential", queueDefaultKey)
 }
 
-func (d DefaultQueueKeyGenerator) Scavenger() string {
-	return fmt.Sprintf("%s:queue:scavenger", d.Prefix)
+func (u *unshardedKeyGenerator) Scavenger() string {
+	return fmt.Sprintf("%s:queue:scavenger", queueDefaultKey)
 }
 
-func (d DefaultQueueKeyGenerator) Idempotency(key string) string {
-	return fmt.Sprintf("%s:queue:seen:%s", d.Prefix, key)
+func (u *unshardedKeyGenerator) Idempotency(key string) string {
+	return fmt.Sprintf("%s:queue:seen:%s", queueDefaultKey, key)
 }
 
-func (d DefaultQueueKeyGenerator) Concurrency(prefix, key string) string {
+func (u *unshardedKeyGenerator) Concurrency(prefix, key string) string {
 	if key == "" {
 		// None supplied; this means ignore.
-		return fmt.Sprintf("%s:-", d.Prefix)
+		return fmt.Sprintf("%s:-", queueDefaultKey)
 	}
-	return fmt.Sprintf("%s:concurrency:%s:%s", d.Prefix, prefix, key)
+	return fmt.Sprintf("%s:concurrency:%s:%s", queueDefaultKey, prefix, key)
 }
 
-func (d DefaultQueueKeyGenerator) ConcurrencyIndex() string {
-	return fmt.Sprintf("%s:concurrency:sorted", d.Prefix)
+func (u *unshardedKeyGenerator) ConcurrencyIndex() string {
+	return fmt.Sprintf("%s:concurrency:sorted", queueDefaultKey)
 }
 
-func (d DefaultQueueKeyGenerator) QueuePrefix() string {
-	return d.Prefix
+func (u *unshardedKeyGenerator) QueuePrefix() string {
+	return queueDefaultKey
 }
 
-func (d DefaultQueueKeyGenerator) BatchPointer(ctx context.Context, workflowID uuid.UUID) string {
-	return fmt.Sprintf("%s:workflows:%s:batch", d.Prefix, workflowID)
+func (u *unshardedKeyGenerator) BatchPointer(ctx context.Context, workflowID uuid.UUID) string {
+	return fmt.Sprintf("%s:workflows:%s:batch", queueDefaultKey, workflowID)
 }
 
-func (d DefaultQueueKeyGenerator) BatchPointerWithKey(ctx context.Context, workflowID uuid.UUID, batchKey string) string {
-	return fmt.Sprintf("%s:%s", d.BatchPointer(ctx, workflowID), batchKey)
+func (u *unshardedKeyGenerator) BatchPointerWithKey(ctx context.Context, workflowID uuid.UUID, batchKey string) string {
+	return fmt.Sprintf("%s:%s", u.BatchPointer(ctx, workflowID), batchKey)
 }
 
-func (d DefaultQueueKeyGenerator) Batch(ctx context.Context, batchID ulid.ULID) string {
-	return fmt.Sprintf("%s:batches:%s", d.Prefix, batchID)
+func (u *unshardedKeyGenerator) Batch(ctx context.Context, batchID ulid.ULID) string {
+	return fmt.Sprintf("%s:batches:%s", queueDefaultKey, batchID)
 }
 
-func (d DefaultQueueKeyGenerator) BatchMetadata(ctx context.Context, batchID ulid.ULID) string {
-	return fmt.Sprintf("%s:metadata", d.Batch(ctx, batchID))
+func (u *unshardedKeyGenerator) BatchMetadata(ctx context.Context, batchID ulid.ULID) string {
+	return fmt.Sprintf("%s:metadata", u.Batch(ctx, batchID))
 }
 
 // DebouncePointer returns the key which stores the pointer to the current debounce
 // for a given function.
-func (d DefaultQueueKeyGenerator) DebouncePointer(ctx context.Context, fnID uuid.UUID, key string) string {
-	return fmt.Sprintf("%s:debounce-ptrs:%s:%s", d.Prefix, fnID, key)
+func (u *unshardedKeyGenerator) DebouncePointer(ctx context.Context, fnID uuid.UUID, key string) string {
+	return fmt.Sprintf("%s:debounce-ptrs:%s:%s", queueDefaultKey, fnID, key)
 }
 
 // Debounce returns the key for storing debounce-related data given a debounce ID.
 // This is a hash of debounce IDs -> debounces.
-func (d DefaultQueueKeyGenerator) Debounce(ctx context.Context) string {
-	return fmt.Sprintf("%s:debounce-hash", d.Prefix)
+func (u *unshardedKeyGenerator) Debounce(ctx context.Context) string {
+	return fmt.Sprintf("%s:debounce-hash", queueDefaultKey)
 }
 
-func (d DefaultQueueKeyGenerator) RunIndex(runID ulid.ULID) string {
-	return fmt.Sprintf("%s:idx:run:%s", d.Prefix, runID)
+func (u *unshardedKeyGenerator) RunIndex(runID ulid.ULID) string {
+	return fmt.Sprintf("%s:idx:run:%s", queueDefaultKey, runID)
 }
 
-func (d DefaultQueueKeyGenerator) Status(status string, fnID uuid.UUID) string {
-	return fmt.Sprintf("%s:queue:status:%s:%s", d.Prefix, fnID, status)
+func (u *unshardedKeyGenerator) Status(status string, fnID uuid.UUID) string {
+	return fmt.Sprintf("%s:queue:status:%s:%s", queueDefaultKey, fnID, status)
 }

@@ -199,10 +199,17 @@ func WithKeyPrefix(prefix string) Opt {
 	}
 }
 
-// WithRedisClient uses an already connected redis client.
-func WithRedisClient(r rueidis.Client) Opt {
+// WithShardedClient uses an already connected redis client.
+func WithShardedClient(s *ShardedClient) Opt {
 	return func(m *mgr) {
-		m.r = r
+		m.s = s
+	}
+}
+
+// WithUnshardedClient uses an already connected redis client.
+func WithUnshardedClient(u *UnshardedClient) Opt {
+	return func(m *mgr) {
+		m.u = u
 	}
 }
 
@@ -213,19 +220,10 @@ func WithPauseRedisClient(r rueidis.Client) Opt {
 	}
 }
 
-// WithKeyGenerator specifies the function to use when creating keys for
-// each stored data type.
-func WithKeyGenerator(kf KeyGenerator) Opt {
-	return func(m *mgr) {
-		m.kf = kf
-	}
-}
-
 type mgr struct {
-	kf KeyGenerator
+	s *ShardedClient
+	u *UnshardedClient
 
-	// this is the standard redis client for the state store.
-	r rueidis.Client
 	// this is the redis client for managing pauses.
 	pauseR rueidis.Client
 }
@@ -268,26 +266,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
 	}
 
-	args, err := StrSlice([]any{
-		events,
-		metadataByt,
-		stepsByt,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	status, err := scripts["new"].Exec(
-		ctx,
-		m.r,
-		[]string{
-			m.kf.Idempotency(ctx, input.Identifier),
-			m.kf.Events(ctx, input.Identifier),
-			m.kf.RunMetadata(ctx, input.Identifier.RunID),
-			m.kf.Actions(ctx, input.Identifier),
-		},
-		args,
-	).AsInt64()
+	status, err := m.s.newScript(ctx, events, metadataByt, stepsByt, input)
 
 	if err != nil {
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
@@ -322,14 +301,7 @@ func (m mgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.Metad
 	if !md.StartedAt.IsZero() {
 		input[2] = strconv.FormatInt(md.StartedAt.UnixMilli(), 10)
 	}
-	status, err := scripts["updateMetadata"].Exec(
-		ctx,
-		m.r,
-		[]string{
-			m.kf.RunMetadata(ctx, runID),
-		},
-		input,
-	).AsInt64()
+	status, err := m.s.updateMetadataScript(ctx, input, runID)
 	if err != nil {
 		return err
 	}
