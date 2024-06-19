@@ -100,6 +100,7 @@ var (
 	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
 	ErrPartitionConcurrencyLimit     = fmt.Errorf("At partition concurrency limit")
 	ErrAccountConcurrencyLimit       = fmt.Errorf("At account concurrency limit")
+	ErrNoWorkerCapacity              = fmt.Errorf("worker has no capacity")
 
 	// ErrConcurrencyLimitCustomKeyN represents a concurrency limit being hit for *some*, but *not all*
 	// jobs in a queue, via custom concurrency keys which are evaluated to a specific string.
