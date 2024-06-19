@@ -1,3 +1,4 @@
+import { NewButton } from '@inngest/components/Button';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { Alert } from '.';
@@ -40,5 +41,15 @@ export const Success: Story = {
   args: {
     severity: 'success',
     children: 'This is a success message',
+  },
+};
+
+export const AlertWithButton: Story = {
+  args: {
+    severity: 'error',
+    children: 'This is an error message',
+    button: (
+      <NewButton onClick={() => {}} kind="secondary" appearance="outlined" label="Refresh Page" />
+    ),
   },
 };

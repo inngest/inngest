@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
 import * as Sentry from '@sentry/nextjs';
 
@@ -27,10 +27,21 @@ export function FatalError({ error, reset }: Props) {
           An error occurred! Refresh the page to try again. If the problem persists, contact
           support.
         </p>
+        <NewButton
+          onClick={() => reset()}
+          kind="secondary"
+          appearance="outlined"
+          label="Refresh Page"
+        />
       </Alert>
 
       <div className="flex gap-4 px-4">
-        <Button btnAction={() => reset()} kind="primary" label="Try again" />
+        <NewButton
+          onClick={() => reset()}
+          kind="secondary"
+          appearance="outlined"
+          label="Refresh Page"
+        />
 
         <Link href={pathCreator.support()}>Contact support</Link>
       </div>
