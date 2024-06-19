@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import type { Route } from 'next/types';
+import { useParams } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
 import { Button } from '@inngest/components/Button/Button';
 import { NewButton } from '@inngest/components/Button/index';
@@ -12,20 +11,14 @@ import { RiAddLine, RiDeleteBinLine, RiInformationLine } from '@remixicon/react'
 
 import Input from '@/components/Forms/Input';
 import { VercelDeploymentProtection } from '../../VercelIntegration';
-import useUpdateVercelIntegration from '../../useUpdateVercelIntegration';
 import { useVercelIntegration } from '../../useVercelIntegration';
 
 export default function VercelConfigure() {
-  const { data, fetching, error } = useVercelIntegration();
-  const updateVercelIntegration = useUpdateVercelIntegration(data);
-  const router = useRouter();
-  const [filter, setFilter] = useState('all');
+  const { data, fetching } = useVercelIntegration();
   const { projects } = data;
   const { id } = useParams<{ id: string }>();
   const project = projects.find((p) => p.id === id);
   const [paths, setPaths] = useState(['']);
-  console.log('project', project);
-  console.log('project paths', paths);
 
   useEffect(() => {
     if (project?.servePath) {
@@ -55,13 +48,7 @@ export default function VercelConfigure() {
               This determines whether or not Inngest will communicate with your Vercel application.
             </div>
             <SwitchWrapper>
-              <Switch
-                checked={project.isEnabled}
-                onCheckedChange={() => {
-                  console.log('shit enabling');
-                }}
-                className="data-[state=checked]:bg-green-600"
-              />
+              <Switch checked={project.isEnabled} className="data-[state=checked]:bg-green-600" />
               <SwitchLabel htmlFor="override" className="text-sm font-normal text-slate-500 ">
                 {project.isEnabled ? 'Enabled' : 'Disabled'}
               </SwitchLabel>

@@ -8,16 +8,13 @@ import { Card } from '@inngest/components/Card/Card';
 import { Select } from '@inngest/components/Select/Select';
 import { RiRefreshLine } from '@remixicon/react';
 
-import useUpdateVercelIntegration from './useUpdateVercelIntegration';
 import { useVercelIntegration } from './useVercelIntegration';
 
 export default function VercelProjects() {
-  const { data, fetching, error } = useVercelIntegration();
+  const { data } = useVercelIntegration();
   const router = useRouter();
-  const updateVercelIntegration = useUpdateVercelIntegration(data);
   const { projects } = data;
   const [filter, setFilter] = useState('all');
-  console.log('shit projects', projects);
 
   return (
     <div className="mt-8 flex flex-col">
@@ -60,8 +57,13 @@ export default function VercelProjects() {
         .filter((p) =>
           filter === 'all' ? true : filter === 'enabled' ? p.isEnabled : !p.isEnabled
         )
-        .map((p) => (
-          <Card className="mt-4" accentPosition="left" accentColor="bg-indigo-400">
+        .map((p, i) => (
+          <Card
+            key={`vercel-projects-${i}`}
+            className="mt-4"
+            accentPosition="left"
+            accentColor="bg-indigo-400"
+          >
             <Card.Content className="h-36 p-6">
               <div className="flex flex-row items-center justify-between">
                 <div className="flex flex-col">
