@@ -734,6 +734,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		}
 		wg.Wait()
 
+		// then process them sequentially
 		res, err := q.handleQueueItems(ctx, p, shard, items, batcher, denies)
 		results.Accumulate(res)
 		if err != nil {
