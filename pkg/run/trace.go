@@ -194,7 +194,7 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 		// process stepinfo based on stepOp
 		switch last.StepOpCode() {
 		case enums.OpcodeStepRun:
-			if err := tb.processStepRun(ctx, s, res); err != nil {
+			if err := tb.processStepRunGroup(ctx, s, res); err != nil {
 				return nil, false, fmt.Errorf("error parsing step run span: %w", err)
 			}
 		case enums.OpcodeSleep:
@@ -206,13 +206,13 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 				return nil, false, fmt.Errorf("error parsing waitForEvent span: %w", err)
 			}
 		case enums.OpcodeInvokeFunction:
-			if err := tb.processInvoke(ctx, s, res); err != nil {
+			if err := tb.processInvokeGroup(ctx, s, res); err != nil {
 				return nil, false, fmt.Errorf("error parsing invoke span: %w", err)
 			}
 		default:
 			// execution spans
 			if s.ScopeName == consts.OtelScopeExecution {
-				if err := tb.processExec(ctx, s, res); err != nil {
+				if err := tb.processExecGroup(ctx, s, res); err != nil {
 					return nil, false, fmt.Errorf("error parsing execution span: %w", err)
 				}
 			}
@@ -309,7 +309,7 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 	}, false
 }
 
-func (tb *runTree) processStepRun(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
 	// step runs should always have groupIDs
 	groupID := span.GroupID()
 	if groupID == nil {
@@ -452,13 +452,12 @@ func (tb *runTree) processSleepGroup(ctx context.Context, span *cqrs.Span, mod *
 		return err
 	}
 
-	stepOp := rpbv2.SpanStepOp_SLEEP
-	mod.StepOp = &stepOp
-
 	if len(group) == 1 {
 		return tb.processSleep(ctx, span, mod)
 	}
 
+	stepOp := rpbv2.SpanStepOp_SLEEP
+	mod.StepOp = &stepOp
 	// if there are more than one, that means this is not the first attempt to execute
 	var startedAt time.Time
 
@@ -697,6 +696,69 @@ func (tb *runTree) processWaitForEvent(ctx context.Context, span *cqrs.Span, mod
 	return nil
 }
 
+func (tb *runTree) processInvokeGroup(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+	group, err := tb.findGroup(span)
+	if err != nil {
+		return err
+	}
+
+	if len(group) == 1 {
+		return tb.processInvoke(ctx, span, mod)
+	}
+
+	stepOp := rpbv2.SpanStepOp_INVOKE
+	mod.StepOp = &stepOp
+	// if there are more than one, that means this is not the first attempt to execute
+	var startedAt time.Time
+
+	for _, peer := range group {
+		if startedAt.IsZero() {
+			startedAt = peer.Timestamp
+		}
+
+		nested, skipped := tb.constructSpan(ctx, peer)
+		if skipped {
+			continue
+		}
+
+		status := toProtoStatus(peer)
+		if status == rpbv2.SpanStatus_RUNNING {
+			nested.EndedAt = nil
+		}
+
+		outputID, err := tb.outputID(nested)
+		if err != nil {
+			return err
+		}
+
+		nested.Status = status
+		nested.OutputId = &outputID
+
+		// process sleep span
+		if peer.StepOpCode() == enums.OpcodeInvokeFunction {
+			if err := tb.processInvoke(ctx, peer, mod); err != nil {
+				return err
+			}
+			nested.OutputId = mod.OutputId
+			nested.StepInfo = mod.StepInfo
+			nested.DurationMs = mod.DurationMs
+			nested.StartedAt = mod.StartedAt
+			nested.Status = mod.Status
+		}
+
+		mod.Children = append(mod.Children, nested)
+		// mark as processed
+		tb.processed[peer.SpanID] = true
+	}
+	mod.StartedAt = timestamppb.New(startedAt)
+	if mod.EndedAt != nil {
+		dur := mod.EndedAt.AsTime().Sub(startedAt)
+		mod.DurationMs = int64(dur / time.Millisecond)
+	}
+
+	return nil
+}
+
 func (tb *runTree) processInvoke(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
 	// invoke span always have a nested span that stores the details of the invoke
 	if len(span.Children) != 1 {
@@ -772,6 +834,7 @@ func (tb *runTree) processInvoke(ctx context.Context, span *cqrs.Span, mod *rpbv
 
 	// set invoke details
 	mod.StepOp = &stepOp
+	mod.Name = *span.StepDisplayName()
 	mod.StepInfo = &rpbv2.StepInfo{
 		Info: &rpbv2.StepInfo_Invoke{
 			Invoke: &rpbv2.StepInfoInvoke{
@@ -821,7 +884,7 @@ func (tb *runTree) processInvoke(ctx context.Context, span *cqrs.Span, mod *rpbv
 	return nil
 }
 
-func (tb *runTree) processExec(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+func (tb *runTree) processExecGroup(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
 	// check groupIDs
 	groupID := span.GroupID()
 	if groupID == nil {
