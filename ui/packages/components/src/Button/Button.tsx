@@ -73,7 +73,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       size = 'medium',
       label,
       icon,
-      iconSide = 'left',
+      iconSide,
       loading = false,
       href,
       type = 'button',

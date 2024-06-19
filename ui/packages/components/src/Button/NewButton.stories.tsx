@@ -40,6 +40,7 @@ export const PrimarySolidWithIcon: Story = {
     kind: 'primary',
     appearance: 'solid',
     icon: <IconFunction />,
+    iconSide: 'left',
   },
 };
 export const PrimarySolidOnlyIcon: Story = {
@@ -84,6 +85,7 @@ export const PrimaryOutlinedWithIcon: Story = {
     kind: 'primary',
     appearance: 'outlined',
     icon: <IconFunction />,
+    iconSide: 'left',
   },
 };
 export const PrimaryOutlinedOnlyIcon: Story = {
@@ -119,6 +121,53 @@ export const PrimaryOutlinedDisabled: Story = {
   },
 };
 
+export const PrimaryGhost: Story = {
+  args: {
+    kind: 'primary',
+    appearance: 'ghost',
+  },
+};
+export const PrimaryGhostWithIcon: Story = {
+  args: {
+    kind: 'primary',
+    appearance: 'ghost',
+    icon: <IconFunction />,
+    iconSide: 'left',
+  },
+};
+export const PrimaryGhostOnlyIcon: Story = {
+  args: {
+    kind: 'primary',
+    appearance: 'ghost',
+    icon: <IconFunction />,
+    label: null,
+  },
+};
+export const PrimaryGhostLoading: Story = {
+  args: {
+    kind: 'primary',
+    appearance: 'ghost',
+    icon: <IconFunction />,
+    loading: true,
+    label: 'Loading...',
+  },
+};
+export const PrimaryGhostWithShortcut: Story = {
+  args: {
+    kind: 'primary',
+    appearance: 'ghost',
+    keys: ['A'],
+  },
+};
+
+export const PrimaryGhostDisabled: Story = {
+  args: {
+    kind: 'primary',
+    appearance: 'ghost',
+    disabled: true,
+  },
+};
+
 export const SecondaryOutlined: Story = {
   args: {
     kind: 'secondary',
@@ -130,6 +179,7 @@ export const SecondaryOutlinedWithIcon: Story = {
     kind: 'secondary',
     appearance: 'outlined',
     icon: <IconFunction />,
+    iconSide: 'left',
   },
 };
 export const SecondaryOutlinedOnlyIcon: Story = {
@@ -156,7 +206,6 @@ export const SecondaryOutlinedWithShortcut: Story = {
     keys: ['A'],
   },
 };
-
 export const SecondaryOutlinedDisabled: Story = {
   args: {
     kind: 'secondary',
@@ -164,12 +213,53 @@ export const SecondaryOutlinedDisabled: Story = {
     disabled: true,
   },
 };
-
-export const Danger: Story = {
+export const SecondaryGhost: Story = {
   args: {
-    kind: 'danger',
+    kind: 'secondary',
+    appearance: 'ghost',
   },
 };
+export const SecondaryGhostWithIcon: Story = {
+  args: {
+    kind: 'secondary',
+    appearance: 'ghost',
+    icon: <IconFunction />,
+    iconSide: 'left',
+  },
+};
+export const SecondaryGhostOnlyIcon: Story = {
+  args: {
+    kind: 'secondary',
+    appearance: 'ghost',
+    icon: <IconFunction />,
+    label: null,
+  },
+};
+export const SecondaryGhostLoading: Story = {
+  args: {
+    kind: 'secondary',
+    appearance: 'ghost',
+    icon: <IconFunction />,
+    loading: true,
+    label: 'Loading...',
+  },
+};
+export const SecondaryGhostWithShortcut: Story = {
+  args: {
+    kind: 'secondary',
+    appearance: 'ghost',
+    keys: ['A'],
+  },
+};
+
+export const SecondaryGhostDisabled: Story = {
+  args: {
+    kind: 'secondary',
+    appearance: 'ghost',
+    disabled: true,
+  },
+};
+
 export const DangerSolid: Story = {
   args: {
     kind: 'danger',
@@ -181,6 +271,7 @@ export const DangerSolidWithIcon: Story = {
     kind: 'danger',
     appearance: 'solid',
     icon: <IconFunction />,
+    iconSide: 'left',
   },
 };
 export const DangerSolidOnlyIcon: Story = {
@@ -225,6 +316,7 @@ export const DangerOutlinedWithIcon: Story = {
     kind: 'danger',
     appearance: 'outlined',
     icon: <IconFunction />,
+    iconSide: 'left',
   },
 };
 export const DangerOutlinedOnlyIcon: Story = {
@@ -251,11 +343,56 @@ export const DangerOutlinedWithShortcut: Story = {
     keys: ['A'],
   },
 };
-
 export const DangerOutlinedDisabled: Story = {
   args: {
     kind: 'danger',
     appearance: 'outlined',
+    disabled: true,
+  },
+};
+export const DangerGhost: Story = {
+  args: {
+    kind: 'danger',
+    appearance: 'ghost',
+  },
+};
+export const DangerGhostWithIcon: Story = {
+  args: {
+    kind: 'danger',
+    appearance: 'ghost',
+    icon: <IconFunction />,
+    iconSide: 'left',
+  },
+};
+export const DangerGhostOnlyIcon: Story = {
+  args: {
+    kind: 'danger',
+    appearance: 'ghost',
+    icon: <IconFunction />,
+    label: null,
+  },
+};
+export const DangerGhostLoading: Story = {
+  args: {
+    kind: 'danger',
+    appearance: 'ghost',
+    icon: <IconFunction />,
+    loading: true,
+    label: 'Loading...',
+  },
+};
+export const DangerGhostWithShortcut: Story = {
+  args: {
+    kind: 'danger',
+    appearance: 'ghost',
+    keys: ['A'],
+  },
+};
+
+export const DangerGhostDisabled: Story = {
+  args: {
+    kind: 'danger',
+    appearance: 'ghost',
     disabled: true,
   },
 };

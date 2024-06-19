@@ -40,14 +40,14 @@ export const getButtonColors = ({ kind, appearance, loading }: ButtonColorParams
 
   const ghostButtonStyles = {
     primary: loading
-      ? 'text-primary-moderate'
-      : 'text-primary-intense focus:bg-subtle hover:bg-subtle active:bg-muted disabled:text-primary-xSubtle',
+      ? 'text-btnPrimaryDisabled'
+      : 'text-btnPrimary focus:bg-subtle hover:bg-subtle active:bg-muted disabled:bg-disabled disabled:text-btnPrimaryDisabled',
     secondary: loading
       ? 'text-foreground-subtle'
-      : 'text-foreground-base focus:bg-subtle hover:bg-subtle active:bg-muted disabled:text-foreground-disabled',
+      : 'text-basis focus:bg-subtle hover:bg-subtle active:bg-muted disabled:bg-disabled disabled:text-disabled',
     danger: loading
-      ? 'text-tertiary-moderate'
-      : 'text-tertiary-intense focus:bg-subtle hover:bg-subtle active:bg-muted disabled:bg-disabled disabled:text-tertiary-xSubtle',
+      ? 'text-btnDangerDisabled'
+      : 'text-btnDanger focus:bg-subtle hover:bg-subtle active:bg-muted disabled:bg-disabled disabled:text-btnDangerDisabled',
   };
 
   if (appearance === 'solid') {
@@ -107,7 +107,7 @@ export const getSpinnerStyles = ({ appearance, kind }: ButtonColorParams) => {
     secondary: 'fill-subtle',
     danger: 'fill-btnDanger',
   };
-  if (appearance === 'outlined') {
+  if (appearance === 'outlined' || appearance === 'ghost') {
     return defaultSpinnerStyles[kind];
   }
   return 'fill-alwaysWhite';
