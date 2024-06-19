@@ -19,7 +19,7 @@ var (
 		8_000, 15_000,
 	}
 
-	peekSizeBoundaries = []float64{10, 50, 100, 500, 1000, 3000, 5000, 10000}
+	peekSizeBoundaries = []float64{10, 30, 50, 100, 250, 500, 1000}
 )
 
 func HistogramQueueItemLatency(ctx context.Context, value int64, opts HistogramOpt) {
