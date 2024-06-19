@@ -1,12 +1,9 @@
 package commands
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/inngest/inngest/cmd/commands/internal/devconfig"
@@ -40,20 +37,6 @@ func NewCmdDev() *cobra.Command {
 }
 
 func doDev(cmd *cobra.Command, args []string) {
-
-	go func() {
-		ctx, cleanup := signal.NotifyContext(
-			context.Background(),
-			os.Interrupt,
-			syscall.SIGTERM,
-			syscall.SIGINT,
-			syscall.SIGQUIT,
-		)
-		defer cleanup()
-		<-ctx.Done()
-		os.Exit(0)
-	}()
-
 	ctx := cmd.Context()
 	conf, err := config.Dev(ctx)
 	if err != nil {
