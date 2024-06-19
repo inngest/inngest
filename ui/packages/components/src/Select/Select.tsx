@@ -44,7 +44,7 @@ export function Select({
     <Listbox value={defaultValue} onChange={onChange} multiple={multiple}>
       <span
         className={cn(
-          isLabelVisible && 'divide-muted divide-x',
+          isLabelVisible && 'divide-muted bg-canvasSubtle divide-x',
           'border-muted flex items-center rounded-md border text-sm',
           className
         )}

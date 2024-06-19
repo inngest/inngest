@@ -13,6 +13,8 @@ import (
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
+	"github.com/oklog/ulid/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,7 +46,7 @@ func TestBatchEvents(t *testing.T) {
 
 			atomic.AddInt32(&counter, 1)
 			atomic.AddInt32(&totalEvents, int32(len(input.Events)))
-			return true, nil
+			return "batched!!", nil
 		},
 	)
 	h.Register(a)
@@ -84,7 +86,26 @@ func TestBatchEvents(t *testing.T) {
 			require.True(t, run.Trace.IsRoot)
 			require.Equal(t, 0, len(run.Trace.ChildSpans))
 			require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
-			// TODO: output test
+			// output test
+			require.NotNil(t, run.Trace.OutputID)
+			output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+			c.ExpectSpanOutput(t, "batched!!", output)
+
+			t.Run("trigger", func(t *testing.T) {
+				// check trigger
+				trigger := c.RunTrigger(ctx, runID)
+				assert.NotNil(t, trigger)
+				assert.NotNil(t, trigger.EventName)
+				assert.Equal(t, "test/batch", *trigger.EventName)
+				assert.Equal(t, 5, len(trigger.IDs))
+				assert.False(t, trigger.Timestamp.IsZero())
+				assert.True(t, trigger.IsBatch)
+				assert.NotNil(t, trigger.BatchID)
+				assert.Nil(t, trigger.Cron)
+
+				rid := ulid.MustParse(runID)
+				assert.True(t, trigger.Timestamp.Before(ulid.Time(rid.Time())))
+			})
 
 			return true
 		}, 10*time.Second, 2*time.Second)
