@@ -353,6 +353,9 @@ func (c GetReplayRunsOpts) Validate() error {
 	if c.UpperTime.IsZero() {
 		return errors.New("upper time must be provided")
 	}
+	if c.UpperTime.Before(c.LowerTime) {
+		return errors.New("upper/end time must be after lower/start time")
+	}
 	if c.Limit < 0 {
 		return errors.New("limit must be positive")
 	}
