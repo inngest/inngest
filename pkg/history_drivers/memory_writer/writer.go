@@ -47,6 +47,9 @@ type writer struct {
 }
 
 func (w *writer) Close(ctx context.Context) error {
+	w.store.Mu.Lock()
+	// never unlock
+
 	l := log.From(ctx).With().Str("caller", "memory_writer").Logger()
 
 	b, err := json.Marshal(w.store.Data)
