@@ -461,7 +461,7 @@ func (tb *runTree) processSleepGroup(ctx context.Context, span *cqrs.Span, mod *
 	// if there are more than one, that means this is not the first attempt to execute
 	var startedAt time.Time
 
-	for _, peer := range group {
+	for i, peer := range group {
 		if startedAt.IsZero() {
 			startedAt = peer.Timestamp
 		}
@@ -481,6 +481,7 @@ func (tb *runTree) processSleepGroup(ctx context.Context, span *cqrs.Span, mod *
 			return err
 		}
 
+		nested.Name = fmt.Sprintf("Attempt %d", i+1)
 		nested.Status = status
 		nested.OutputId = &outputID
 
@@ -563,7 +564,7 @@ func (tb *runTree) processWaitForEventGroup(ctx context.Context, span *cqrs.Span
 	// if there are more than one, that means this is not the first attempt to execute
 	var startedAt time.Time
 
-	for _, peer := range group {
+	for i, peer := range group {
 		if startedAt.IsZero() {
 			startedAt = peer.Timestamp
 		}
@@ -583,6 +584,7 @@ func (tb *runTree) processWaitForEventGroup(ctx context.Context, span *cqrs.Span
 			return err
 		}
 
+		nested.Name = fmt.Sprintf("Attempt %d", i+1)
 		nested.Status = status
 		nested.OutputId = &outputID
 
@@ -711,7 +713,7 @@ func (tb *runTree) processInvokeGroup(ctx context.Context, span *cqrs.Span, mod 
 	// if there are more than one, that means this is not the first attempt to execute
 	var startedAt time.Time
 
-	for _, peer := range group {
+	for i, peer := range group {
 		if startedAt.IsZero() {
 			startedAt = peer.Timestamp
 		}
@@ -731,6 +733,7 @@ func (tb *runTree) processInvokeGroup(ctx context.Context, span *cqrs.Span, mod 
 			return err
 		}
 
+		nested.Name = fmt.Sprintf("Attempt %d", i+1)
 		nested.Status = status
 		nested.OutputId = &outputID
 
@@ -741,19 +744,18 @@ func (tb *runTree) processInvokeGroup(ctx context.Context, span *cqrs.Span, mod 
 			}
 			nested.OutputId = mod.OutputId
 			nested.StepInfo = mod.StepInfo
-			nested.DurationMs = mod.DurationMs
 			nested.StartedAt = mod.StartedAt
 			nested.Status = mod.Status
+
+			if nested.EndedAt != nil {
+				dur := nested.EndedAt.AsTime().Sub(startedAt)
+				mod.DurationMs = int64(dur / time.Millisecond)
+			}
 		}
 
 		mod.Children = append(mod.Children, nested)
 		// mark as processed
 		tb.processed[peer.SpanID] = true
-	}
-	mod.StartedAt = timestamppb.New(startedAt)
-	if mod.EndedAt != nil {
-		dur := mod.EndedAt.AsTime().Sub(startedAt)
-		mod.DurationMs = int64(dur / time.Millisecond)
 	}
 
 	return nil

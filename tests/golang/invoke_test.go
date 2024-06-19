@@ -211,7 +211,7 @@ func TestInvokeGroup(t *testing.T) {
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		<-time.After(5 * time.Second)
+		<-time.After(3 * time.Second)
 
 		require.Eventually(t, func() bool {
 			run := c.RunTraces(ctx, runID)
