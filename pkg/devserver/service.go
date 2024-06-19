@@ -63,11 +63,11 @@ type devserver struct {
 	stepLimitOverrides map[string]int
 
 	// runner stores the runner
-	runner    runner.Runner
-	tracker   *runner.Tracker
-	state     state.Manager
-	queue     queue.Queue
-	executor  execution.Executor
+	runner      runner.Runner
+	tracker     *runner.Tracker
+	state       state.Manager
+	queue       queue.Queue
+	executor    execution.Executor
 	publisher   pubsub.Publisher
 	redisClient rueidis.Client
 
@@ -284,6 +284,255 @@ func (d *devserver) handleEvent(ctx context.Context, e *event.Event) (string, er
 	)
 
 	return trackedEvent.GetInternalID().String(), err
+}
+
+type SnapshotValue struct {
+	Type  string      `json:"type"`
+	Value interface{} `json:"value"`
+}
+
+func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
+	d.snapshotLock.Lock()
+	defer d.snapshotLock.Unlock()
+
+	snapshot := make(map[string]SnapshotValue)
+
+	l := logger.From(ctx).With().Str("caller", "devserver").Logger()
+	l.Info().Msg("exporting Redis snapshot")
+	defer func() {
+		if err != nil {
+			l.Error().Err(err).Msg("error exporting Redis snapshot")
+		} else {
+			jsonData, _ := json.Marshal(snapshot)
+			humanSize := fmt.Sprintf("%.2fKB", float64(len(jsonData))/1024)
+			l.Info().Str("size", humanSize).Msg("exported Redis snapshot")
+		}
+	}()
+
+	// Get a dedicated client for this operation, which should block all other
+	// operations if we only have a pool size of 1.
+	rc, _ := d.redisClient.Dedicate()
+	defer func() {
+		// We'd usually call `done()` to release the client to the pool, but
+		// let's just close the entire connection here to ensure nothing else
+		// can write.
+		rc.Close()
+	}()
+
+	// Give an arbitrary amount of time to allow for any writes to finish
+	<-time.After(150 * time.Millisecond)
+
+	cmd := rc.B().Keys().Pattern("*").Build()
+	keys, err := rc.Do(ctx, cmd).AsStrSlice()
+	if err != nil {
+		err = fmt.Errorf("error getting keys: %w", err)
+		return
+	}
+
+	for _, key := range keys {
+		typeCmd := rc.B().Type().Key(key).Build()
+		var typ string
+		typ, err = rc.Do(ctx, typeCmd).ToString()
+		if err != nil {
+			err = fmt.Errorf("error getting type for key %s: %w", key, err)
+			return
+		}
+
+		switch typ {
+		case "string":
+			getCmd := rc.B().Get().Key(key).Build()
+			var val string
+			val, err = rc.Do(ctx, getCmd).ToString()
+			if err != nil {
+				err = fmt.Errorf("error getting value for string key %s: %w", key, err)
+				return
+			}
+			snapshot[key] = SnapshotValue{
+				Type:  typ,
+				Value: val,
+			}
+		case "list":
+			lrangeCmd := rc.B().Lrange().Key(key).Start(0).Stop(-1).Build()
+			var vals []string
+			vals, err = rc.Do(ctx, lrangeCmd).AsStrSlice()
+			if err != nil {
+				err = fmt.Errorf("error getting values for list key %s: %w", key, err)
+				return
+			}
+			snapshot[key] = SnapshotValue{
+				Type:  typ,
+				Value: vals,
+			}
+		case "set":
+			smembersCmd := rc.B().Smembers().Key(key).Build()
+			var vals []string
+			vals, err = rc.Do(ctx, smembersCmd).AsStrSlice()
+			if err != nil {
+				err = fmt.Errorf("error getting values for set key %s: %w", key, err)
+				return
+			}
+			snapshot[key] = SnapshotValue{
+				Type:  typ,
+				Value: vals,
+			}
+		case "zset":
+			zrangeCmd := rc.B().Zrange().Key(key).Min("-inf").Max("+inf").Byscore().Withscores().Build()
+			var vals []string
+			vals, err = rc.Do(ctx, zrangeCmd).AsStrSlice()
+			if err != nil {
+				err = fmt.Errorf("error getting values for zset key %s: %w", key, err)
+				return
+			}
+			snapshot[key] = SnapshotValue{
+				Type:  typ,
+				Value: vals,
+			}
+		case "hash":
+			hgetallCmd := rc.B().Hgetall().Key(key).Build()
+			var rawVals map[string]rueidis.RedisMessage
+			rawVals, err = rc.Do(ctx, hgetallCmd).AsMap()
+			if err != nil {
+				err = fmt.Errorf("error getting values for hash key %s: %w", key, err)
+				return
+			}
+			vals := make(map[string]string, len(rawVals))
+			for k, v := range rawVals {
+				strVal, _ := v.ToString()
+				vals[k] = strVal
+			}
+			snapshot[key] = SnapshotValue{
+				Type:  typ,
+				Value: vals,
+			}
+		case "none":
+			// the key was deleted between fetching keys and fetching its
+			// type. For now we continue and ignore it; we should make sure
+			// the client is read-only before we try to dump.
+		default:
+			err = fmt.Errorf("unsupported type: %s", typ)
+			return
+		}
+	}
+
+	var file *os.File
+	file, err = os.Create(fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerRdbFile))
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	err = encoder.Encode(snapshot)
+	if err != nil {
+		return
+	}
+
+	return nil
+}
+
+func (d *devserver) importRedisSnapshot(ctx context.Context) (err error, imported bool) {
+	file, err := os.Open(fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerRdbFile))
+	if err != nil && os.IsNotExist(err) {
+		err = nil
+		return
+	}
+	defer file.Close()
+
+	var snapshot map[string]SnapshotValue
+
+	l := logger.From(ctx).With().Str("caller", "devserver").Logger()
+	l.Info().Msg("importing Redis snapshot")
+	defer func() {
+		if err != nil {
+			l.Error().Err(err).Msg("error importing Redis snapshot")
+		} else {
+			jsonData, _ := json.Marshal(snapshot)
+			humanSize := fmt.Sprintf("%.2fKB", float64(len(jsonData))/1024)
+			l.Info().Str("size", humanSize).Msg("imported Redis snapshot")
+		}
+	}()
+
+	decoder := json.NewDecoder(file)
+	err = decoder.Decode(&snapshot)
+	if err != nil {
+		err = fmt.Errorf("error decoding snapshot: %w", err)
+		return
+	}
+
+	rc, done := d.redisClient.Dedicate()
+	defer done()
+
+	for key, data := range snapshot {
+		switch data.Type {
+		case "string":
+			strVal := data.Value.(string)
+			setCmd := rc.B().Set().Key(key).Value(strVal).Build()
+			err = rc.Do(ctx, setCmd).Error()
+			if err != nil {
+				err = fmt.Errorf("error setting string key %s: %w", key, err)
+				return
+			}
+
+		case "list":
+			vals := data.Value.([]interface{})
+			strValues := make([]string, len(vals))
+			for i, v := range vals {
+				strVal, _ := v.(string)
+				strValues[i] = strVal
+			}
+			rpushCmd := rc.B().Rpush().Key(key).Element(strValues...).Build()
+			err = rc.Do(ctx, rpushCmd).Error()
+			if err != nil {
+				err = fmt.Errorf("error pushing to list key %s: %w", key, err)
+				return
+			}
+
+		case "set":
+			strValues := data.Value.([]string)
+			// err = rc.SAdd(ctx, key, strValues...).Err()
+			saddCmd := rc.B().Sadd().Key(key).Member(strValues...).Build()
+			err = rc.Do(ctx, saddCmd).Error()
+			if err != nil {
+				err = fmt.Errorf("error adding to set key %s: %w", key, err)
+				return
+			}
+
+		case "zset":
+			vals := data.Value.([]interface{})
+			zaddCmd := rc.B().Zadd().Key(key).ScoreMember()
+			for i := 0; i < len(vals); i += 2 {
+				member := vals[i].(string)
+				score, _ := strconv.ParseFloat(vals[i+1].(string), 64)
+				zaddCmd = zaddCmd.ScoreMember(score, member)
+			}
+			err = rc.Do(ctx, zaddCmd.Build()).Error()
+			if err != nil {
+				err = fmt.Errorf("error adding to zset key %s: %w", key, err)
+				return
+			}
+
+		case "hash":
+			values := data.Value.(map[string]interface{})
+			hmsetCmd := rc.B().Hmset().Key(key).FieldValue()
+			for k, v := range values {
+				strVal, _ := v.(string)
+				hmsetCmd = hmsetCmd.FieldValue(k, strVal)
+			}
+			err = rc.Do(ctx, hmsetCmd.Build()).Error()
+			if err != nil {
+				err = fmt.Errorf("error setting hash key %s: %w", key, err)
+				return
+			}
+
+		default:
+			err = fmt.Errorf("unsupported key type: %s", data.Type)
+			return
+		}
+	}
+
+	imported = true
+
+	return
 }
 
 // SDKHandler represents a handler that has registered with the dev server.
