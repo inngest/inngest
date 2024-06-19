@@ -2480,7 +2480,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 			attribute.String(consts.OtelAttrSDKRunID, i.item.Identifier.RunID.String()),
 			attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
 			attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
-			attribute.String(consts.OtelSysStepGroupID, i.item.GroupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
 			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
 
@@ -2644,7 +2643,6 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 			attribute.String(consts.OtelAttrSDKRunID, i.item.Identifier.RunID.String()),
 			attribute.Int(consts.OtelSysStepAttempt, 0),
 			attribute.Int(consts.OtelSysStepMaxAttempt, 1),
-			// attribute.String(consts.OtelSysStepGroupID, i.item.GroupID),
 			attribute.String(consts.OtelSysStepWaitEventName, opts.Event),
 			attribute.Int64(consts.OtelSysStepWaitExpires, expires.UnixMilli()),
 			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),

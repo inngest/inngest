@@ -458,12 +458,11 @@ func (tb *runTree) processSleepGroup(ctx context.Context, span *cqrs.Span, mod *
 
 	stepOp := rpbv2.SpanStepOp_SLEEP
 	mod.StepOp = &stepOp
-	// if there are more than one, that means this is not the first attempt to execute
-	var startedAt time.Time
 
+	// if there are more than one, that means this is not the first attempt to execute
 	for i, peer := range group {
-		if startedAt.IsZero() {
-			startedAt = peer.Timestamp
+		if i == 0 {
+			mod.StartedAt = timestamppb.New(peer.Timestamp)
 		}
 
 		nested, skipped := tb.constructSpan(ctx, peer)
@@ -481,30 +480,30 @@ func (tb *runTree) processSleepGroup(ctx context.Context, span *cqrs.Span, mod *
 			return err
 		}
 
-		nested.Name = fmt.Sprintf("Attempt %d", i+1)
 		nested.Status = status
 		nested.OutputId = &outputID
 
 		// process sleep span
 		if peer.StepOpCode() == enums.OpcodeSleep {
-			if err := tb.processSleep(ctx, peer, mod); err != nil {
+			if err := tb.processSleep(ctx, peer, nested); err != nil {
 				return err
 			}
-			nested.OutputId = nil
-			nested.StepInfo = mod.StepInfo
-			nested.DurationMs = mod.DurationMs
-			nested.StartedAt = mod.StartedAt
-			nested.Status = mod.Status
+			mod.Name = nested.Name
+			mod.OutputId = nil
+			mod.StepInfo = nested.StepInfo
+			mod.EndedAt = nested.EndedAt
+			mod.Status = nested.Status
+
+			if mod.EndedAt != nil {
+				dur := mod.EndedAt.AsTime().Sub(mod.StartedAt.AsTime())
+				mod.DurationMs = int64(dur / time.Millisecond)
+			}
 		}
+		nested.Name = fmt.Sprintf("Attempt %d", i+1)
 
 		mod.Children = append(mod.Children, nested)
 		// mark as processed
 		tb.processed[peer.SpanID] = true
-	}
-	mod.StartedAt = timestamppb.New(startedAt)
-	if mod.EndedAt != nil {
-		dur := mod.EndedAt.AsTime().Sub(startedAt)
-		mod.DurationMs = int64(dur / time.Millisecond)
 	}
 
 	return nil
@@ -517,6 +516,7 @@ func (tb *runTree) processSleep(ctx context.Context, span *cqrs.Span, mod *rpbv2
 	}
 	stepOp := rpbv2.SpanStepOp_SLEEP
 	sleep := span.Children[0]
+
 	dur := sleep.DurationMS()
 	until := sleep.Timestamp.Add(sleep.Duration)
 	if v, ok := sleep.SpanAttributes[consts.OtelSysStepSleepEndAt]; ok {
@@ -561,12 +561,11 @@ func (tb *runTree) processWaitForEventGroup(ctx context.Context, span *cqrs.Span
 
 	stepOp := rpbv2.SpanStepOp_WAIT_FOR_EVENT
 	mod.StepOp = &stepOp
-	// if there are more than one, that means this is not the first attempt to execute
-	var startedAt time.Time
 
+	// if there are more than one, that means this is not the first attempt to execute
 	for i, peer := range group {
-		if startedAt.IsZero() {
-			startedAt = peer.Timestamp
+		if i == 0 {
+			mod.StartedAt = timestamppb.New(peer.Timestamp)
 		}
 
 		nested, skipped := tb.constructSpan(ctx, peer)
@@ -584,29 +583,32 @@ func (tb *runTree) processWaitForEventGroup(ctx context.Context, span *cqrs.Span
 			return err
 		}
 
-		nested.Name = fmt.Sprintf("Attempt %d", i+1)
 		nested.Status = status
 		nested.OutputId = &outputID
 
 		// process wait span
 		if peer.StepOpCode() == enums.OpcodeWaitForEvent {
-			if err := tb.processWaitForEvent(ctx, peer, mod); err != nil {
+			if err := tb.processWaitForEvent(ctx, peer, nested); err != nil {
 				return err
 			}
-			nested.OutputId = mod.OutputId
-			nested.StepInfo = mod.StepInfo
-			nested.StartedAt = mod.StartedAt
-			nested.Status = mod.Status
+
+			// update group
+			mod.Name = nested.Name
+			mod.OutputId = nested.OutputId
+			mod.StepInfo = nested.StepInfo
+			mod.EndedAt = nested.EndedAt
+			mod.Status = nested.Status
+
+			if mod.EndedAt != nil {
+				dur := mod.EndedAt.AsTime().Sub(mod.StartedAt.AsTime())
+				mod.DurationMs = int64(dur / time.Millisecond)
+			}
 		}
+		nested.Name = fmt.Sprintf("Attempt %d", i+1)
 
 		mod.Children = append(mod.Children, nested)
 		// mark as processed
 		tb.processed[peer.SpanID] = true
-	}
-	mod.StartedAt = timestamppb.New(startedAt)
-	if mod.EndedAt != nil {
-		dur := mod.EndedAt.AsTime().Sub(startedAt)
-		mod.DurationMs = int64(dur / time.Millisecond)
 	}
 
 	return nil
@@ -658,10 +660,13 @@ func (tb *runTree) processWaitForEvent(ctx context.Context, span *cqrs.Span, mod
 		}
 	}
 
+	endedAt := wait.Timestamp.Add(time.Duration(dur * int64(time.Millisecond)))
+
 	// set wait details
 	mod.StepOp = &stepOp
 	mod.Name = *span.StepDisplayName()
 	mod.DurationMs = dur
+	mod.EndedAt = timestamppb.New(endedAt)
 	mod.Status = status
 	mod.StepInfo = &rpbv2.StepInfo{
 		Info: &rpbv2.StepInfo_Wait{
@@ -710,12 +715,11 @@ func (tb *runTree) processInvokeGroup(ctx context.Context, span *cqrs.Span, mod 
 
 	stepOp := rpbv2.SpanStepOp_INVOKE
 	mod.StepOp = &stepOp
-	// if there are more than one, that means this is not the first attempt to execute
-	var startedAt time.Time
 
+	// if there are more than one, that means this is not the first attempt to execute
 	for i, peer := range group {
-		if startedAt.IsZero() {
-			startedAt = peer.Timestamp
+		if i == 0 {
+			mod.StartedAt = timestamppb.New(peer.Timestamp)
 		}
 
 		nested, skipped := tb.constructSpan(ctx, peer)
@@ -733,25 +737,26 @@ func (tb *runTree) processInvokeGroup(ctx context.Context, span *cqrs.Span, mod 
 			return err
 		}
 
-		nested.Name = fmt.Sprintf("Attempt %d", i+1)
 		nested.Status = status
 		nested.OutputId = &outputID
 
 		// process sleep span
 		if peer.StepOpCode() == enums.OpcodeInvokeFunction {
-			if err := tb.processInvoke(ctx, peer, mod); err != nil {
+			if err := tb.processInvoke(ctx, peer, nested); err != nil {
 				return err
 			}
-			nested.OutputId = mod.OutputId
-			nested.StepInfo = mod.StepInfo
-			nested.StartedAt = mod.StartedAt
-			nested.Status = mod.Status
+			mod.Name = nested.Name
+			mod.OutputId = nested.OutputId
+			mod.StepInfo = nested.StepInfo
+			mod.EndedAt = nested.EndedAt
+			mod.Status = nested.Status
 
-			if nested.EndedAt != nil {
-				dur := nested.EndedAt.AsTime().Sub(startedAt)
+			if mod.EndedAt != nil {
+				dur := mod.EndedAt.AsTime().Sub(mod.StartedAt.AsTime())
 				mod.DurationMs = int64(dur / time.Millisecond)
 			}
 		}
+		nested.Name = fmt.Sprintf("Attempt %d", i+1)
 
 		mod.Children = append(mod.Children, nested)
 		// mark as processed

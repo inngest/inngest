@@ -45,7 +45,7 @@ func TestSleep(t *testing.T) {
 			if atomic.LoadInt32(&started) == 0 {
 				// Throw an immediate error
 				atomic.AddInt32(&started, 1)
-				return nil, inngestgo.RetryAtError(fmt.Errorf("throwing an initial error"), time.Now())
+				return nil, inngestgo.RetryAtError(fmt.Errorf("throwing an initial error"), time.Now().Add(5*time.Second))
 			}
 
 			if atomic.LoadInt32(&started) == 1 {
@@ -97,23 +97,30 @@ func TestSleep(t *testing.T) {
 			require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
 			require.Nil(t, run.Trace.OutputID)
 
-			t.Run("sleep", func(t *testing.T) {
-				sleep := run.Trace.ChildSpans[0]
-				assert.Equal(t, models.RunTraceSpanStatusRunning.String(), sleep.Status)
-				assert.Equal(t, "nap", sleep.Name)
-				assert.Equal(t, models.StepOpSleep.String(), sleep.StepOp)
+			rootSpanID := run.Trace.SpanID
 
-				// verify step info
-				info := &models.SleepStepInfo{}
-				byt, err := json.Marshal(sleep.StepInfo)
-				assert.NoError(t, err)
-				assert.NoError(t, json.Unmarshal(byt, info))
+			span := run.Trace.ChildSpans[0]
+			assert.Equal(t, consts.OtelExecPlaceholder, span.Name)
+			assert.Equal(t, rootSpanID, span.ParentSpanID)
+			assert.False(t, span.IsRoot)
+			assert.Equal(t, 1, len(span.ChildSpans))
+			assert.Equal(t, models.RunTraceSpanStatusRunning.String(), span.Status)
+			assert.Equal(t, "", span.StepOp)
+			assert.Nil(t, span.OutputID)
 
-				assert.True(t, time.Now().Before(info.SleepUntil))
+			t.Run("failed", func(t *testing.T) {
+				exec := span.ChildSpans[0]
+				assert.Equal(t, "Attempt 1", exec.Name)
+				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), exec.Status)
+				assert.NotNil(t, exec.OutputID)
+
+				execOutput := c.RunSpanOutput(ctx, *exec.OutputID)
+				assert.NotNil(t, execOutput)
+				c.ExpectSpanErrorOutput(t, "", "initial error", execOutput)
 			})
 
 			return true
-		}, 10*time.Second, 2*time.Second)
+		}, 10*time.Second, 1*time.Second)
 	})
 
 	t.Run("expected values", func(t *testing.T) {
@@ -160,7 +167,7 @@ func TestSleep(t *testing.T) {
 				t.Run("failed execution", func(t *testing.T) {
 					exec := sleep.ChildSpans[0]
 					assert.Equal(t, models.RunTraceSpanStatusFailed.String(), exec.Status)
-					assert.Equal(t, consts.OtelExecPlaceholder, exec.Name)
+					assert.Equal(t, "Attempt 1", exec.Name)
 					assert.NotNil(t, exec.OutputID)
 
 					execOutput := c.RunSpanOutput(ctx, *exec.OutputID)
