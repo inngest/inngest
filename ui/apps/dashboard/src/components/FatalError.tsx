@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { NewButton } from '@inngest/components/Button';
-import { Link } from '@inngest/components/Link';
 import * as Sentry from '@sentry/nextjs';
 
 import { pathCreator } from '@/utils/urls';
@@ -20,31 +19,27 @@ export function FatalError({ error, reset }: Props) {
 
   return (
     <div className="m-auto mt-32 flex w-fit flex-col gap-4">
-      <Alert severity="error">
+      <Alert
+        severity="error"
+        button={
+          <NewButton
+            onClick={() => reset()}
+            kind="secondary"
+            appearance="outlined"
+            label="Refresh page"
+          />
+        }
+      >
         <p className="mb-4 font-semibold">{error.message}</p>
 
         <p>
-          An error occurred! Refresh the page to try again. If the problem persists, contact
-          support.
+          An error occurred! Refresh the page to try again. If the problem persists, contact{' '}
+          <Alert.Link severity="error" className="inline-flex" href={pathCreator.support()}>
+            Inngest support
+          </Alert.Link>
+          .
         </p>
-        <NewButton
-          onClick={() => reset()}
-          kind="secondary"
-          appearance="outlined"
-          label="Refresh Page"
-        />
       </Alert>
-
-      <div className="flex gap-4 px-4">
-        <NewButton
-          onClick={() => reset()}
-          kind="secondary"
-          appearance="outlined"
-          label="Refresh Page"
-        />
-
-        <Link href={pathCreator.support()}>Contact support</Link>
-      </div>
     </div>
   );
 }
