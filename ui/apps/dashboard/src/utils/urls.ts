@@ -72,6 +72,9 @@ export const pathCreator = {
   runPopout({ envSlug, runID }: { envSlug: string; runID: string }): Route {
     return `/env/${envSlug}/runs/${runID}` as Route;
   },
+  support(): Route {
+    return '/support' as Route;
+  },
   unattachedSyncs({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/unattached-syncs` as Route;
   },
