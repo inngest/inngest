@@ -53,3 +53,17 @@ export const AlertWithButton: Story = {
     ),
   },
 };
+
+export const AlertWithLinkInDescription: Story = {
+  args: {
+    severity: 'error',
+    children: (
+      <p>
+        This is an error message.{' '}
+        <Alert.Link href="" className="inline-flex" severity="error">
+          This is a link inline
+        </Alert.Link>
+      </p>
+    ),
+  },
+};

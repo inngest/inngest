@@ -1,3 +1,4 @@
+import { Link, type LinkProps } from '@inngest/components/Link';
 import { cn } from '@inngest/components/utils/classNames';
 import {
   RiCheckboxCircleFill,
@@ -12,6 +13,7 @@ type SeveritySpecific = {
   icon: RemixiconComponentType;
   iconClassName: string;
   wrapperClassName: string;
+  linkClassName: string;
 };
 
 const severityStyles = {
@@ -19,21 +21,29 @@ const severityStyles = {
     icon: RiErrorWarningFill,
     iconClassName: 'text-error',
     wrapperClassName: 'bg-error dark:bg-error/40 text-error',
+    linkClassName:
+      'text-error decoration-error hover:text-tertiary-2xIntense hover:decoration-tertiary-2xIntense',
   },
   info: {
     icon: RiInformationFill,
     iconClassName: 'text-info',
     wrapperClassName: 'bg-info dark:bg-info/40 text-info',
+    linkClassName:
+      'text-info decoration-info  hover:text-secondary-2xIntense hover:decoration-secondary-2xIntense',
   },
   success: {
     icon: RiCheckboxCircleFill,
     iconClassName: 'text-success',
     wrapperClassName: 'bg-success dark:bg-success/40 text-success',
+    linkClassName:
+      'text-success decoration-success hover:text-primary-2xIntense hover:decoration-primary-2xIntense',
   },
   warning: {
     icon: RiErrorWarningFill,
     iconClassName: 'text-warning',
     wrapperClassName: 'bg-warning dark:bg-warning/40 text-warning',
+    linkClassName:
+      'text-warning decoration-warning hover:text-accent-2xIntense hover:decoration-accent-2xIntense',
   },
 } as const satisfies { [key in Severity]: SeveritySpecific };
 
@@ -82,3 +92,12 @@ export function Alert({ children, className, severity, showIcon = true, button }
     </div>
   );
 }
+
+function AlertLink({ href, severity, ...props }: LinkProps & { severity: Severity }) {
+  const styles = severityStyles[severity].linkClassName;
+  return (
+    <Link href={href} {...props} className={cn(props.className, styles)} showIcon={false}></Link>
+  );
+}
+
+Alert.Link = AlertLink;
