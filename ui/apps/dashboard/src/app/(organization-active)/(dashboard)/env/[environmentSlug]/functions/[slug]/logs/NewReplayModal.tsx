@@ -38,45 +38,16 @@ const GetBillingPlanDocument = graphql(`
   }
 `);
 
-const GetFunctionEndedRunsCountDocument = graphql(`
-  query GetFunctionEndedRunsCount(
-    $environmentID: ID!
-    $functionSlug: String!
-    $timeRangeStart: Time!
-    $timeRangeEnd: Time!
-  ) {
+const GetReplayRunCountsDocument = graphql(`
+  query GetReplayRunCounts($environmentID: ID!, $functionSlug: String!, $from: Time!, $to: Time!) {
     environment: workspace(id: $environmentID) {
       function: workflowBySlug(slug: $functionSlug) {
         id
-        failedRuns: runsV2(
-          filter: {
-            status: [FAILED]
-            lowerTime: $timeRangeStart
-            upperTime: $timeRangeEnd
-            timeField: STARTED_AT
-          }
-        ) {
-          totalCount
-        }
-        canceledRuns: runsV2(
-          filter: {
-            status: [CANCELLED]
-            lowerTime: $timeRangeStart
-            upperTime: $timeRangeEnd
-            timeField: STARTED_AT
-          }
-        ) {
-          totalCount
-        }
-        succeededRuns: runsV2(
-          filter: {
-            status: [COMPLETED]
-            lowerTime: $timeRangeStart
-            upperTime: $timeRangeEnd
-            timeField: STARTED_AT
-          }
-        ) {
-          totalCount
+        replayCounts: replayCounts(from: $from, to: $to) {
+          completedCount
+          failedCount
+          cancelledCount
+          skippedPausedCount
         }
       }
     }
@@ -142,24 +113,23 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
 
   const { data, isLoading } = useSkippableGraphQLQuery({
-    query: GetFunctionEndedRunsCountDocument,
+    query: GetReplayRunCountsDocument,
     variables: {
       environmentID: environment.id,
       functionSlug,
-      timeRangeStart: timeRange?.start ? timeRange.start.toISOString() : '',
-      timeRangeEnd: timeRange?.end ? timeRange.end.toISOString() : '',
+      from: timeRange?.start ? timeRange.start.toISOString() : '',
+      to: timeRange?.end ? timeRange.end.toISOString() : '',
     },
-    skip: !timeRange,
+    skip: !timeRange || !timeRange.start || !timeRange.end,
   });
   const [{ fetching: isCreatingFunctionReplay }, createFunctionReplayMutation] = useMutation(
     CreateFunctionReplayDocument
   );
 
-  const failedRunsCount = data?.environment.function?.failedRuns?.totalCount ?? 0;
-  const cancelledRunsCount = data?.environment.function?.canceledRuns?.totalCount ?? 0;
-  const succeededRunsCount = data?.environment.function?.succeededRuns?.totalCount ?? 0;
-  // const pausedRunsCount = data?.environment.function?.pausedRuns?.totalCount ?? 0;
-  const pausedRunsCount = 0; // TODO(cdzombak): real paused runs count
+  const failedRunsCount = data?.environment.function?.replayCounts.failedCount ?? 0;
+  const cancelledRunsCount = data?.environment.function?.replayCounts.cancelledCount ?? 0;
+  const succeededRunsCount = data?.environment.function?.replayCounts.completedCount ?? 0;
+  const pausedRunsCount = data?.environment.function?.replayCounts?.skippedPausedCount ?? 0;
 
   const statusCounts: Record<SelectableStatuses, number> = {
     [ReplayRunStatus.Failed]: failedRunsCount,
