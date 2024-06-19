@@ -25,7 +25,7 @@ export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Prop
     <div className={cn(cardWrapperStyles, className)}>
       <Link
         href={pathCreator.unattachedSyncs({ envSlug })}
-        className={cn(cardLeftPanelStyles, 'hover:bg-canvasMuted')}
+        className={cn(cardLeftPanelStyles, 'hover:bg-canvasMuted transition-colors duration-300')}
       >
         <h2>
           <div className="text-basis flex items-center gap-1 font-medium">
