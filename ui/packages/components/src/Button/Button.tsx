@@ -103,13 +103,17 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {loading && (
           <IconSpinner className={cn(spinnerStyles, iconSizes, 'top-50% left-50% absolute')} />
         )}
-        {icon && iconSide === 'left' && iconElement}
+        {icon && iconSide === 'left' && (
+          <span className={cn(size === 'small' ? 'pr-1' : 'pr-1.5')}>{iconElement}</span>
+        )}
         {label ? (
           <span className={loading ? 'invisible' : 'visible'}>{label}</span>
         ) : (
           icon && !iconSide && iconElement
         )}
-        {icon && iconSide === 'right' && iconElement}
+        {icon && iconSide === 'right' && (
+          <span className={cn(size === 'small' ? 'pl-1' : 'pl-1.5')}>{iconElement}</span>
+        )}
         {/* {keys && (
           <kbd className="ml-auto flex items-center gap-1">
             {keys.map((key, i) => (
