@@ -21,6 +21,9 @@ func NewWriter(ctx context.Context) history.Driver {
 		// read data from file and populate memory_store.Singleton
 		file, err := os.ReadFile(fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerHistoryFile))
 		if err != nil {
+			if os.IsNotExist(err) {
+				goto end
+			}
 			l.Error().Err(err).Msg("failed to read history file")
 		}
 
@@ -33,6 +36,7 @@ func NewWriter(ctx context.Context) history.Driver {
 		l.Info().Str("size", humanSize).Msg("imported history snapshot")
 	}
 
+end:
 	return &writer{
 		store: memory_store.Singleton,
 	}
