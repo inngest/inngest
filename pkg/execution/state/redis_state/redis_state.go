@@ -831,7 +831,7 @@ func (m unshardedMgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) 
 	// to keep the same cluster key.
 	eventKey := m.u.kg.PauseEvent(ctx, p.WorkspaceID, "-")
 	if p.Event != nil {
-		eventKey = m.kf.PauseEvent(ctx, p.WorkspaceID, *p.Event)
+		eventKey = m.u.kg.PauseEvent(ctx, p.WorkspaceID, *p.Event)
 	}
 
 	// For pause indexes.
