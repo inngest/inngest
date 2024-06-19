@@ -96,4 +96,9 @@ const (
 	// FutureQueeueFudgeLimit is the inclusive time range between [now, now() + FutureAtLimit]
 	// in which priority factors are taken into account.
 	FutureAtLimit = 2 * time.Second
+
+	DevServerTempDir     = ".inngest"
+	DevServerDbFile      = "dev_db.db"
+	DevServerRdbFile     = "dev_state.rdb"
+	DevServerHistoryFile = "dev_history.json"
 )
