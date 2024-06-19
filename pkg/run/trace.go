@@ -202,7 +202,7 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 				return nil, false, fmt.Errorf("error parsing sleep span: %w", err)
 			}
 		case enums.OpcodeWaitForEvent:
-			if err := tb.processWaitForEvent(ctx, s, res); err != nil {
+			if err := tb.processWaitForEventGroup(ctx, s, res); err != nil {
 				return nil, false, fmt.Errorf("error parsing waitForEvent span: %w", err)
 			}
 		case enums.OpcodeInvokeFunction:
@@ -452,16 +452,15 @@ func (tb *runTree) processSleepGroup(ctx context.Context, span *cqrs.Span, mod *
 		return err
 	}
 
-	// if there are more than one, that means this is not the first attempt to execute
+	stepOp := rpbv2.SpanStepOp_SLEEP
+	mod.StepOp = &stepOp
+
 	if len(group) == 1 {
 		return tb.processSleep(ctx, span, mod)
 	}
 
-	var (
-		startedAt time.Time
-	)
-	stepOp := rpbv2.SpanStepOp_SLEEP
-	mod.StepOp = &stepOp
+	// if there are more than one, that means this is not the first attempt to execute
+	var startedAt time.Time
 
 	for _, peer := range group {
 		if startedAt.IsZero() {
@@ -516,7 +515,7 @@ func (tb *runTree) processSleep(ctx context.Context, span *cqrs.Span, mod *rpbv2
 	if len(span.Children) != 1 {
 		return fmt.Errorf("missing sleep details")
 	}
-
+	stepOp := rpbv2.SpanStepOp_SLEEP
 	sleep := span.Children[0]
 	dur := sleep.DurationMS()
 	until := sleep.Timestamp.Add(sleep.Duration)
@@ -528,6 +527,7 @@ func (tb *runTree) processSleep(ctx context.Context, span *cqrs.Span, mod *rpbv2
 
 	// set sleep details
 	mod.Name = *sleep.StepDisplayName()
+	mod.StepOp = &stepOp
 	mod.DurationMs = dur
 	mod.StartedAt = timestamppb.New(sleep.Timestamp)
 	mod.StepInfo = &rpbv2.StepInfo{
@@ -545,6 +545,68 @@ func (tb *runTree) processSleep(ctx context.Context, span *cqrs.Span, mod *rpbv2
 	// mark as processed
 	tb.processed[span.SpanID] = true
 	tb.processed[sleep.SpanID] = true
+
+	return nil
+}
+
+func (tb *runTree) processWaitForEventGroup(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+	group, err := tb.findGroup(span)
+	if err != nil {
+		return err
+	}
+
+	if len(group) == 1 {
+		return tb.processWaitForEvent(ctx, span, mod)
+	}
+
+	stepOp := rpbv2.SpanStepOp_WAIT_FOR_EVENT
+	mod.StepOp = &stepOp
+	// if there are more than one, that means this is not the first attempt to execute
+	var startedAt time.Time
+
+	for _, peer := range group {
+		if startedAt.IsZero() {
+			startedAt = peer.Timestamp
+		}
+
+		nested, skipped := tb.constructSpan(ctx, peer)
+		if skipped {
+			continue
+		}
+
+		status := toProtoStatus(peer)
+		if status == rpbv2.SpanStatus_RUNNING {
+			nested.EndedAt = nil
+		}
+
+		outputID, err := tb.outputID(nested)
+		if err != nil {
+			return err
+		}
+
+		nested.Status = status
+		nested.OutputId = &outputID
+
+		// process wait span
+		if peer.StepOpCode() == enums.OpcodeWaitForEvent {
+			if err := tb.processWaitForEvent(ctx, peer, mod); err != nil {
+				return err
+			}
+			nested.OutputId = mod.OutputId
+			nested.StepInfo = mod.StepInfo
+			nested.StartedAt = mod.StartedAt
+			nested.Status = mod.Status
+		}
+
+		mod.Children = append(mod.Children, nested)
+		// mark as processed
+		tb.processed[peer.SpanID] = true
+	}
+	mod.StartedAt = timestamppb.New(startedAt)
+	if mod.EndedAt != nil {
+		dur := mod.EndedAt.AsTime().Sub(startedAt)
+		mod.DurationMs = int64(dur / time.Millisecond)
+	}
 
 	return nil
 }
@@ -597,6 +659,7 @@ func (tb *runTree) processWaitForEvent(ctx context.Context, span *cqrs.Span, mod
 
 	// set wait details
 	mod.StepOp = &stepOp
+	mod.Name = *span.StepDisplayName()
 	mod.DurationMs = dur
 	mod.Status = status
 	mod.StepInfo = &rpbv2.StepInfo{
