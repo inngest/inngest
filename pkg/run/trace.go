@@ -17,6 +17,11 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+var (
+	ErrNoGroupFound = fmt.Errorf("no group execution found for span")
+	ErrStepNoGroup  = fmt.Errorf("span is not part of group")
+)
+
 // runTree builds the span tree used for the API
 type runTree struct {
 	// root is the root span of the tree
@@ -97,6 +102,15 @@ func NewRunTree(opts RunTreeOpts) (*runTree, error) {
 		}
 	}
 
+	// sort it
+	for _, g := range b.groups {
+		if len(g) > 1 {
+			sort.Slice(g, func(i, j int) bool {
+				return g[i].Timestamp.UnixMilli() < g[j].Timestamp.UnixMilli()
+			})
+		}
+	}
+
 	if b.root == nil {
 		return nil, fmt.Errorf("no function run span found")
 	}
@@ -166,32 +180,41 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 			fnstatus = rpbv2.SpanStatus_FAILED
 		}
 		res.Status = fnstatus
-	}
+	} else {
+		// NOTE:
+		// check last item in group for op code
+		// due to how we wrap up function errors with the next step execution, first item might not hold the accurate op code
+		group, err := tb.findGroup(s)
+		if err != nil {
+			return nil, false, err
+		}
+		last := group[len(group)-1]
 
-	// handle each opcode separately
-	// process stepinfo based on stepOp
-	switch s.StepOpCode() {
-	case enums.OpcodeStepRun:
-		if err := tb.processStepRun(ctx, s, res); err != nil {
-			return nil, false, fmt.Errorf("error parsing step run span: %w", err)
-		}
-	case enums.OpcodeSleep:
-		if err := tb.processSleep(ctx, s, res); err != nil {
-			return nil, false, fmt.Errorf("error parsing sleep span: %w", err)
-		}
-	case enums.OpcodeWaitForEvent:
-		if err := tb.processWaitForEvent(ctx, s, res); err != nil {
-			return nil, false, fmt.Errorf("error parsing waitForEvent span: %w", err)
-		}
-	case enums.OpcodeInvokeFunction:
-		if err := tb.processInvoke(ctx, s, res); err != nil {
-			return nil, false, fmt.Errorf("error parsing invoke span: %w", err)
-		}
-	default:
-		// execution spans
-		if s.ScopeName == consts.OtelScopeExecution {
-			if err := tb.processExec(ctx, s, res); err != nil {
-				return nil, false, fmt.Errorf("error parsing execution span: %w", err)
+		// handle each opcode separately
+		// process stepinfo based on stepOp
+		switch last.StepOpCode() {
+		case enums.OpcodeStepRun:
+			if err := tb.processStepRun(ctx, s, res); err != nil {
+				return nil, false, fmt.Errorf("error parsing step run span: %w", err)
+			}
+		case enums.OpcodeSleep:
+			if err := tb.processSleepGroup(ctx, s, res); err != nil {
+				return nil, false, fmt.Errorf("error parsing sleep span: %w", err)
+			}
+		case enums.OpcodeWaitForEvent:
+			if err := tb.processWaitForEvent(ctx, s, res); err != nil {
+				return nil, false, fmt.Errorf("error parsing waitForEvent span: %w", err)
+			}
+		case enums.OpcodeInvokeFunction:
+			if err := tb.processInvoke(ctx, s, res); err != nil {
+				return nil, false, fmt.Errorf("error parsing invoke span: %w", err)
+			}
+		default:
+			// execution spans
+			if s.ScopeName == consts.OtelScopeExecution {
+				if err := tb.processExec(ctx, s, res); err != nil {
+					return nil, false, fmt.Errorf("error parsing execution span: %w", err)
+				}
 			}
 		}
 	}
@@ -200,6 +223,20 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 	tb.processed[s.SpanID] = true
 
 	return res, false, nil
+}
+
+func (tb *runTree) findGroup(s *cqrs.Span) ([]*cqrs.Span, error) {
+	groupID := s.GroupID()
+	if groupID == nil {
+		return nil, ErrStepNoGroup
+	}
+
+	group, ok := tb.groups[*groupID]
+	if !ok {
+		return nil, ErrNoGroupFound
+	}
+
+	return group, nil
 }
 
 func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan, bool) {
@@ -324,11 +361,6 @@ func (tb *runTree) processStepRun(ctx context.Context, span *cqrs.Span, mod *rpb
 		mod.Children = []*rpbv2.RunSpan{}
 	}
 
-	// sort the peers in asc order before proceeding
-	sort.Slice(peers, func(i, j int) bool {
-		return peers[i].Timestamp.UnixMilli() < peers[j].Timestamp.UnixMilli()
-	})
-
 	for i, p := range peers {
 		nested, skipped := tb.constructSpan(ctx, p)
 		// NOTE: might be able to handle this better
@@ -414,12 +446,76 @@ func (tb *runTree) processStepRun(ctx context.Context, span *cqrs.Span, mod *rpb
 	return nil
 }
 
+func (tb *runTree) processSleepGroup(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+	group, err := tb.findGroup(span)
+	if err != nil {
+		return err
+	}
+
+	// if there are more than one, that means this is not the first attempt to execute
+	if len(group) == 1 {
+		return tb.processSleep(ctx, span, mod)
+	}
+
+	var (
+		startedAt time.Time
+	)
+	stepOp := rpbv2.SpanStepOp_SLEEP
+	mod.StepOp = &stepOp
+
+	for _, peer := range group {
+		if startedAt.IsZero() {
+			startedAt = peer.Timestamp
+		}
+
+		nested, skipped := tb.constructSpan(ctx, peer)
+		if skipped {
+			continue
+		}
+
+		status := toProtoStatus(peer)
+		if status == rpbv2.SpanStatus_RUNNING {
+			nested.EndedAt = nil
+		}
+
+		outputID, err := tb.outputID(nested)
+		if err != nil {
+			return err
+		}
+
+		nested.Status = status
+		nested.OutputId = &outputID
+
+		// process sleep span
+		if peer.StepOpCode() == enums.OpcodeSleep {
+			if err := tb.processSleep(ctx, peer, mod); err != nil {
+				return err
+			}
+			nested.OutputId = nil
+			nested.StepInfo = mod.StepInfo
+			nested.DurationMs = mod.DurationMs
+			nested.StartedAt = mod.StartedAt
+			nested.Status = mod.Status
+		}
+
+		mod.Children = append(mod.Children, nested)
+		// mark as processed
+		tb.processed[peer.SpanID] = true
+	}
+	mod.StartedAt = timestamppb.New(startedAt)
+	if mod.EndedAt != nil {
+		dur := mod.EndedAt.AsTime().Sub(startedAt)
+		mod.DurationMs = int64(dur / time.Millisecond)
+	}
+
+	return nil
+}
+
 func (tb *runTree) processSleep(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
 	// sleep span always have a nested span that stores the details of the sleep itself
 	if len(span.Children) != 1 {
 		return fmt.Errorf("missing sleep details")
 	}
-	stepOp := rpbv2.SpanStepOp_SLEEP
 
 	sleep := span.Children[0]
 	dur := sleep.DurationMS()
@@ -431,7 +527,7 @@ func (tb *runTree) processSleep(ctx context.Context, span *cqrs.Span, mod *rpbv2
 	}
 
 	// set sleep details
-	mod.StepOp = &stepOp
+	mod.Name = *sleep.StepDisplayName()
 	mod.DurationMs = dur
 	mod.StartedAt = timestamppb.New(sleep.Timestamp)
 	mod.StepInfo = &rpbv2.StepInfo{
@@ -709,10 +805,6 @@ func (tb *runTree) processExec(ctx context.Context, span *cqrs.Span, mod *rpbv2.
 		mod.Children = []*rpbv2.RunSpan{}
 	}
 
-	sort.Slice(peers, func(i, j int) bool {
-		return peers[i].Timestamp.UnixMilli() < peers[j].Timestamp.UnixMilli()
-	})
-
 	for i, p := range peers {
 		nested, skipped := tb.constructSpan(ctx, p)
 		// NOTE: might be able to handle this better
@@ -728,26 +820,13 @@ func (tb *runTree) processExec(ctx context.Context, span *cqrs.Span, mod *rpbv2.
 			}
 		}
 
-		status := rpbv2.SpanStatus_RUNNING
-		switch p.Status() {
-		case cqrs.SpanStatusOk:
-			status = rpbv2.SpanStatus_COMPLETED
-		case cqrs.SpanStatusError:
-			status = rpbv2.SpanStatus_FAILED
-		default:
+		status := toProtoStatus(p)
+		if status == rpbv2.SpanStatus_FAILED {
 			nested.EndedAt = nil
 		}
 
 		// output
-		ident := &cqrs.SpanIdentifier{
-			AccountID:   tb.acctID,
-			WorkspaceID: tb.wsID,
-			AppID:       tb.appID,
-			FunctionID:  tb.fnID,
-			TraceID:     nested.TraceId,
-			SpanID:      nested.SpanId,
-		}
-		outputID, err := ident.Encode()
+		outputID, err := tb.outputID(nested)
 		if err != nil {
 			return err
 		}
@@ -800,4 +879,26 @@ func (tb *runTree) processExec(ctx context.Context, span *cqrs.Span, mod *rpbv2.
 	}
 
 	return nil
+}
+
+func (tb *runTree) outputID(span *rpbv2.RunSpan) (string, error) {
+	ident := &cqrs.SpanIdentifier{
+		AccountID:   tb.acctID,
+		WorkspaceID: tb.wsID,
+		AppID:       tb.appID,
+		FunctionID:  tb.fnID,
+		TraceID:     span.TraceId,
+		SpanID:      span.SpanId,
+	}
+	return ident.Encode()
+}
+
+func toProtoStatus(span *cqrs.Span) rpbv2.SpanStatus {
+	switch span.Status() {
+	case cqrs.SpanStatusOk:
+		return rpbv2.SpanStatus_COMPLETED
+	case cqrs.SpanStatusError:
+		return rpbv2.SpanStatus_FAILED
+	}
+	return rpbv2.SpanStatus_RUNNING
 }

@@ -32,9 +32,11 @@ func TestRetry(t *testing.T) {
 		runID       string
 	)
 
+	evtName := "test/retry"
+
 	fn := inngestgo.CreateFunction(
 		inngestgo.FunctionOpts{Name: "test retry"},
-		inngestgo.EventTrigger("test/executor-retry", nil),
+		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			if runID == "" {
 				runID = input.InputCtx.RunID
@@ -81,7 +83,7 @@ func TestRetry(t *testing.T) {
 	registerFuncs()
 
 	_, err := inngestgo.Send(ctx, inngestgo.Event{
-		Name: "test/executor-retry",
+		Name: evtName,
 		Data: map[string]interface{}{
 			"name": "retry",
 		},

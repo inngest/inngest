@@ -2364,7 +2364,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 			attribute.String(consts.OtelAttrSDKRunID, i.item.Identifier.RunID.String()),
 			attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
 			attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
-			attribute.String(consts.OtelSysStepGroupID, i.item.GroupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeSleep.String()),
 			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
 			attribute.Int64(consts.OtelSysStepSleepEndAt, until.UnixMilli()),
