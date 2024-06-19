@@ -57,9 +57,9 @@ func TestSleep(t *testing.T) {
 			step.Sleep(ctx, "nap", 10*time.Second)
 
 			// Ensure any time we're here it's 15 seconds after the sleep.
-			require.GreaterOrEqual(t, int(time.Now().Sub(startedAt).Seconds()), 10)
+			require.GreaterOrEqual(t, int(time.Since(startedAt).Seconds()), 10)
 
-			step.Run(ctx, "test", func(ctx context.Context) (any, error) {
+			_, _ = step.Run(ctx, "test", func(ctx context.Context) (any, error) {
 				if input.InputCtx.Attempt == 0 {
 					return nil, inngestgo.RetryAtError(fmt.Errorf("throwing a step error"), time.Now())
 				}
