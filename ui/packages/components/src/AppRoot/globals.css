@@ -144,7 +144,7 @@
     --color-background-surface-base: var(--color-carbon-0);
     --color-background-surface-subtle: var(--color-carbon-200);
     --color-background-surface-muted: var(--color-carbon-300);
-    --color-background-disabled: var(--color-carbon-400);
+    --color-background-disabled: var(--color-carbon-50);
     --color-background-contrast: var(--color-matcha-1000);
     --color-background-success: var(--color-matcha-0);
     --color-background-successContrast: var(--color-matcha-800);
@@ -237,7 +237,7 @@
     --color-background-surface-base: var(--color-carbon-1000);
     --color-background-surface-subtle: var(--color-carbon-800);
     --color-background-surface-muted: var(--color-carbon-700);
-    --color-background-disabled: var(--color-carbon-400);
+    --color-background-disabled: var(--color-carbon-900);
     --color-background-contrast: var(--color-matcha-0);
     --color-background-success: var(--color-matcha-800);
     --color-background-successContrast: var(--color-matcha-100);
