@@ -129,7 +129,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
   const failedRunsCount = data?.environment.function?.replayCounts.failedCount ?? 0;
   const cancelledRunsCount = data?.environment.function?.replayCounts.cancelledCount ?? 0;
   const succeededRunsCount = data?.environment.function?.replayCounts.completedCount ?? 0;
-  const pausedRunsCount = data?.environment.function?.replayCounts?.skippedPausedCount ?? 0;
+  const pausedRunsCount = data?.environment.function?.replayCounts.skippedPausedCount ?? 0;
 
   const statusCounts: Record<SelectableStatuses, number> = {
     [ReplayRunStatus.Failed]: failedRunsCount,
