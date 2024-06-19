@@ -33,7 +33,7 @@ const (
 // Reader defines the history reader interface, loading runs and run history
 type Reader interface {
 	CountRuns(ctx context.Context, opts CountRunOpts) (int, error)
-	CountReplayRuns(ctx context.Context, opts CountReplayRunsOpts) (int, error)
+	CountReplayRuns(ctx context.Context, opts CountReplayRunsOpts) (ReplayRunCounts, error)
 	GetRun(
 		ctx context.Context,
 		runID ulid.ULID,
@@ -371,6 +371,13 @@ type CountReplayRunsOpts struct {
 	WorkflowID  *uuid.UUID
 	LowerTime   time.Time
 	UpperTime   time.Time
+}
+
+type ReplayRunCounts struct {
+	CompletedCount     int
+	FailedCount        int
+	CancelledCount     int
+	SkippedPausedCount int
 }
 
 func (c CountReplayRunsOpts) Validate() error {
