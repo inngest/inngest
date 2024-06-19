@@ -16,6 +16,14 @@ func NewShardedClient(r rueidis.Client) *ShardedClient {
 	}
 }
 
+func (s *ShardedClient) KeyGenerator() ShardedKeyGenerator {
+	return s.kg
+}
+
+func (s *ShardedClient) Client() rueidis.Client {
+	return s.r
+}
+
 type UnshardedClient struct {
 	kg UnshardedKeyGenerator
 	r  rueidis.Client
@@ -23,6 +31,10 @@ type UnshardedClient struct {
 
 func (u *UnshardedClient) KeyGenerator() UnshardedKeyGenerator {
 	return u.kg
+}
+
+func (u *UnshardedClient) Client() rueidis.Client {
+	return u.r
 }
 
 func NewUnshardedClient(r rueidis.Client) *UnshardedClient {

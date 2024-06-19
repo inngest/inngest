@@ -20,20 +20,17 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/oklog/ulid/v2"
-	"github.com/redis/rueidis"
 )
 
-func NewRedisBatchManager(r rueidis.Client, k redis_state.BatchKeyGenerator, q redis_state.QueueManager) BatchManager {
+func NewRedisBatchManager(u *redis_state.UnshardedClient, q redis_state.QueueManager) BatchManager {
 	return redisBatchManager{
-		r: r,
-		k: k,
+		u: u,
 		q: q,
 	}
 }
 
 type redisBatchManager struct {
-	r rueidis.Client
-	k redis_state.BatchKeyGenerator
+	u *redis_state.UnshardedClient
 	q redis_state.QueueManager
 }
 
@@ -57,7 +54,7 @@ func (b redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inn
 }
 
 func (b redisBatchManager) batchPointer(ctx context.Context, fn inngest.Function, evt event.Event) (string, error) {
-	batchPointer := b.k.BatchPointer(ctx, fn.ID)
+	batchPointer := b.u.KeyGenerator().BatchPointer(ctx, fn.ID)
 
 	if fn.EventBatch.Key != nil {
 		batchKey, err := b.batchKey(ctx, evt, fn)
@@ -68,7 +65,7 @@ func (b redisBatchManager) batchPointer(ctx context.Context, fn inngest.Function
 		hashedBatchKey := sha256.Sum256([]byte(batchKey))
 		encodedBatchKey := base64.StdEncoding.EncodeToString(hashedBatchKey[:])
 
-		batchPointer = b.k.BatchPointerWithKey(ctx, fn.ID, encodedBatchKey)
+		batchPointer = b.u.KeyGenerator().BatchPointerWithKey(ctx, fn.ID, encodedBatchKey)
 	}
 
 	return batchPointer, nil
@@ -109,7 +106,7 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 		config.MaxSize,
 		bi,
 		newULID,
-		b.k.QueuePrefix(),
+		b.u.KeyGenerator().QueuePrefix(),
 		enums.BatchStatusPending,
 		enums.BatchStatusStarted,
 	})
@@ -119,7 +116,7 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 
 	resp, err := scripts["append"].Exec(
 		ctx,
-		b.r,
+		b.u.Client(),
 		keys,
 		args,
 	).AsBytes()
@@ -141,8 +138,8 @@ func (b redisBatchManager) RetrieveItems(ctx context.Context, batchID ulid.ULID)
 
 	itemStrList, err := scripts["retrieve"].Exec(
 		ctx,
-		b.r,
-		[]string{b.k.Batch(ctx, batchID)},
+		b.u.Client(),
+		[]string{b.u.KeyGenerator().Batch(ctx, batchID)},
 		[]string{},
 	).AsStrSlice()
 	if err != nil {
@@ -165,7 +162,7 @@ func (b redisBatchManager) RetrieveItems(ctx context.Context, batchID ulid.ULID)
 // If it has already started, don't do anything
 func (b redisBatchManager) StartExecution(ctx context.Context, batchID ulid.ULID, batchPointer string) (string, error) {
 	keys := []string{
-		b.k.BatchMetadata(ctx, batchID),
+		b.u.KeyGenerator().BatchMetadata(ctx, batchID),
 		batchPointer,
 	}
 	args := []string{
@@ -175,7 +172,7 @@ func (b redisBatchManager) StartExecution(ctx context.Context, batchID ulid.ULID
 
 	status, err := scripts["start"].Exec(
 		ctx,
-		b.r,
+		b.u.Client(),
 		keys,
 		args,
 	).AsInt64()
@@ -234,8 +231,8 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 // ExpireKeys sets the TTL for the keys related to the provided batchID.
 func (b redisBatchManager) ExpireKeys(ctx context.Context, batchID ulid.ULID) error {
 	keys := []string{
-		b.k.Batch(ctx, batchID),
-		b.k.BatchMetadata(ctx, batchID),
+		b.u.KeyGenerator().Batch(ctx, batchID),
+		b.u.KeyGenerator().BatchMetadata(ctx, batchID),
 	}
 
 	timeout := consts.MaxBatchTTL.Seconds()
@@ -247,7 +244,7 @@ func (b redisBatchManager) ExpireKeys(ctx context.Context, batchID ulid.ULID) er
 
 	if _, err = scripts["expire"].Exec(
 		ctx,
-		b.r,
+		b.u.Client(),
 		keys,
 		args,
 	).AsInt64(); err != nil {

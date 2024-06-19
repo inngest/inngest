@@ -197,19 +197,6 @@ func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
 	return m, nil
 }
 
-// WithConnectOpts allows you to customize the options used to connect to Redis.
-//
-// This panics if the client cannot connect.
-func WithConnectOpts(o rueidis.ClientOption) Opt {
-	return func(m *mgr) {
-		var err error
-		m.r, err = rueidis.NewClient(o)
-		if err != nil {
-			panic(fmt.Errorf("unable to connect to redis with client opts: %w", err))
-		}
-	}
-}
-
 // WithShardedClient uses an already connected redis client.
 func WithShardedClient(s *ShardedClient) Opt {
 	return func(m *mgr) {

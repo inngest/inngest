@@ -120,6 +120,8 @@ func newShardedKeyGenerator() ShardedKeyGenerator {
 
 type UnshardedKeyGenerator interface {
 	QueueKeyGenerator
+	DebounceKeyGenerator
+	BatchKeyGenerator
 
 	// Workflow returns the key for the current workflow ID and version.
 	Workflow(ctx context.Context, workflowID uuid.UUID, version int) string
