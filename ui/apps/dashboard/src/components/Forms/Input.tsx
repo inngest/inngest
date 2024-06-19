@@ -34,7 +34,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
   const placeholder = props.placeholder === undefined ? '' : props.placeholder;
   const className = props.className === undefined ? '' : props.className;
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col">
       {props.label && (
         <label htmlFor={props.name} className="text-sm font-medium text-slate-700">
           {props.label}
@@ -65,7 +65,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
         readOnly={props.readonly}
       />
 
-      {props.error && <p className="text-sm text-red-500">{props.error}</p>}
+      <p className="text-sm text-red-500">{props.error}</p>
     </div>
   );
 });

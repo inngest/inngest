@@ -44,13 +44,11 @@ export function Select({
       <span
         className={cn(
           isLabelVisible && 'divide-x divide-slate-300',
-          'flex items-center rounded-md border border-slate-300 bg-slate-50 text-sm',
+          'flex items-center rounded-md border border-slate-300 bg-slate-50 text-sm text-slate-600',
           className
         )}
       >
-        <Listbox.Label
-          className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2 text-slate-600')}
-        >
+        <Listbox.Label className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2')}>
           {label}
         </Listbox.Label>
         <span className="relative w-full">{children}</span>
@@ -62,12 +60,14 @@ export function Select({
 function Button({
   children,
   isLabelVisible,
-}: React.PropsWithChildren<{ isLabelVisible?: boolean }>) {
+  className,
+}: React.PropsWithChildren<{ isLabelVisible?: boolean }> & { className?: string }) {
   return (
     <Listbox.Button
       className={cn(
         !isLabelVisible && 'rounded-l-[5px]',
-        'flex h-10 w-full items-center justify-between rounded-r-[5px] bg-white px-2'
+        'flex h-10 w-full items-center justify-between rounded-r-[5px] bg-white px-2',
+        className
       )}
     >
       {children}

@@ -29,14 +29,14 @@ export default function Connect({
     setProjects(projects.map((p) => ({ ...p, isEnabled: p.id === id ? !!checked : p.isEnabled })));
   };
 
-  // const dummy = [...Array(20)].map((_, i) =>
-  //   i === 0
-  //     ? projects[0]
-  //     : { ...projects[0], id: `id-${i}`, name: `project-${i}`, isEnabled: false }
-  // );
+  const dummy = [...Array(20)].map((_, i) =>
+    i === 0
+      ? projects[0]
+      : { ...projects[0], id: `id-${i}`, name: `project-${i}`, isEnabled: false }
+  );
 
-  const pages = Math.ceil(projects.length / PAGE_SIZE);
-  const end = Math.min(start + PAGE_SIZE, projects.length);
+  const pages = Math.ceil(dummy.length / PAGE_SIZE);
+  const end = Math.min(start + PAGE_SIZE, dummy.length);
 
   const submit = async () => {
     await updateVercelIntegration({
@@ -62,7 +62,7 @@ export default function Connect({
         </Card.Header>
 
         <Card.Content className="p-0">
-          {[...projects.slice(start, end)].map((p: any, i) => (
+          {[...dummy.slice(start, end)].map((p: any, i) => (
             <div
               key={`project-list-${i}`}
               className={`flex flex h-[72px] flex-row items-center justify-start ${
@@ -80,7 +80,7 @@ export default function Connect({
               <div className="text-base font-normal leading-7 text-slate-700">{p.name}</div>
             </div>
           ))}
-          {projects.length > PAGE_SIZE && (
+          {dummy.length > PAGE_SIZE && (
             <div className="row flex flex items-center justify-center p-2">
               <NewButton
                 appearance="ghost"
