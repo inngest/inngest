@@ -102,6 +102,8 @@ type Executor interface {
 	// always add to a list of listeners vs replace listeners.
 	AddLifecycleListener(l LifecycleListener)
 
+	CloseLifecycleListeners(ctx context.Context)
+
 	// SetFinalizer sets the function which publishes finalization events on
 	// run completion
 	SetFinalizer(f FinalizePublisher)
