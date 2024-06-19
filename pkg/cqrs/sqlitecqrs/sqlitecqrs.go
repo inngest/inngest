@@ -4,11 +4,13 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/inngest/inngest/pkg/consts"
 	_ "modernc.org/sqlite"
 )
 
@@ -20,7 +22,15 @@ var (
 func New() (*sql.DB, error) {
 	var err error
 	o.Do(func() {
-		db, err = sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
+		// make the dir if it doesn't exist
+		if _, err := os.Stat(consts.DevServerTempDir); os.IsNotExist(err) {
+			err = os.Mkdir(consts.DevServerTempDir, 0755)
+			if err != nil {
+				return
+			}
+		}
+
+		db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerDbFile)))
 	})
 
 	if err := db.Ping(); err != nil {
@@ -56,7 +66,7 @@ func up(db *sql.DB) error {
 		return err
 	}
 
-	m, err := migrate.NewWithInstance("iofs", source, "file:inngest?mode=memory&cache=shared", driver)
+	m, err := migrate.NewWithInstance("iofs", source, fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerDbFile)), driver)
 	if err != nil {
 		return err
 	}
