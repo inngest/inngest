@@ -31,11 +31,22 @@ func HistogramQueueItemLatency(ctx context.Context, value int64, opts HistogramO
 	})
 }
 
-func HistogramProcessPartitionDration(ctx context.Context, value int64, opts HistogramOpt) {
+func HistogramProcessPartitionDuration(ctx context.Context, value int64, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, value, HistogramOpt{
 		PkgName:     opts.PkgName,
 		MetricName:  "queue_process_partition_duration",
 		Description: "Distribution of how long it takes to process a partition",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  processPartitionBoundaries,
+	})
+}
+
+func HistogramQueueOperationDuration(ctx context.Context, value int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, value, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_operation_duration",
+		Description: "Distribution of atomic queueing operation durations",
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  processPartitionBoundaries,
