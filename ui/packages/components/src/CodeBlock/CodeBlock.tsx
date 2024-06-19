@@ -13,6 +13,7 @@ import { IconWrapText } from '@inngest/components/icons/WrapText';
 import { cn } from '@inngest/components/utils/classNames';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { RiDownload2Line } from '@remixicon/react';
+import { set } from 'date-fns';
 import { type editor } from 'monaco-editor';
 import { useLocalStorage } from 'react-use';
 import colors from 'tailwindcss/colors';
@@ -153,6 +154,7 @@ interface CodeBlockProps {
 
 export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
+  const [editorHeight, setEditorHeight] = useState(0);
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -205,6 +207,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
   function updateEditorLayout(editor: MonacoEditorType) {
     const container = editor?.getDomNode();
     if (!editor || !container) return;
+    setEditorHeight(editor.getScrollHeight());
     const containerWidthWithLineNumbers = container.getBoundingClientRect().width;
 
     if (!isWordWrap) {
@@ -235,10 +238,12 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
 
       if (isFullHeight) {
         editor.layout({ height: newHeight, width: containerWidthWithLineNumbers });
+        setEditorHeight(newHeight);
       } else {
         const minHeight = minLines * LINE_HEIGHT + 20;
         const height = Math.max(Math.min(MAX_HEIGHT, contentHeight), minHeight);
         editor.layout({ height: height, width: containerWidthWithLineNumbers });
+        setEditorHeight(height);
       }
     }
 
@@ -287,11 +292,13 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
 
       if (totalLinesThatFit > MAX_LINES && !isFullHeight) {
         editor.layout({ height: MAX_HEIGHT, width: containerWidthWithLineNumbers });
+        setEditorHeight(MAX_HEIGHT);
       } else {
         editor.layout({
           height: totalLinesThatFit * LINE_HEIGHT + 20,
           width: containerWidthWithLineNumbers,
         });
+        setEditorHeight(totalLinesThatFit * LINE_HEIGHT + 20);
       }
     }
   }
@@ -411,10 +418,17 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
               </>
             ) : (
               <Editor
+                className="absolute"
+                height={editorHeight}
                 defaultLanguage={language}
                 value={content}
                 theme="inngest-theme"
                 options={{
+                  // Need to set automaticLayout to true to avoid a resizing bug
+                  // (code block never narrows). This is combined with the
+                  // `absolute` class and explicit height prop
+                  automaticLayout: true,
+
                   extraEditorClassName: '!w-full',
                   readOnly: readOnly,
                   minimap: {
