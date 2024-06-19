@@ -7,26 +7,20 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/coocood/freecache"
-	"github.com/eko/gocache/lib/v4/cache"
-	freecachestore "github.com/eko/gocache/store/freecache/v4"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/api"
-	"github.com/inngest/inngest/pkg/api/apiv1"
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/devserver/discovery"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -37,17 +31,21 @@ import (
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/mattn/go-isatty"
+	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
 )
 
-func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher, stepLimitOverrides map[string]int) *devserver {
+func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher, stepLimitOverrides map[string]int, rc rueidis.Client, hw history.Driver) *devserver {
 	return &devserver{
 		data:               data,
 		runner:             runner,
 		opts:               opts,
 		handlerLock:        &sync.Mutex{},
+		snapshotLock:       &sync.Mutex{},
 		publisher:          pb,
 		stepLimitOverrides: stepLimitOverrides,
+		redisClient:        rc,
+		historyWriter:      hw,
 	}
 }
 
@@ -70,13 +68,19 @@ type devserver struct {
 	state     state.Manager
 	queue     queue.Queue
 	executor  execution.Executor
-	publisher pubsub.Publisher
+	publisher   pubsub.Publisher
+	redisClient rueidis.Client
 
 	apiservice service.Service
+
+	historyWriter history.Driver
 
 	// handlers are updated by the API (d.apiservice) when registering functions.
 	handlers    []SDKHandler
 	handlerLock *sync.Mutex
+
+	// Used to lock the snapshotting process.
+	snapshotLock *sync.Mutex
 }
 
 func (devserver) Name() string {
@@ -84,58 +88,13 @@ func (devserver) Name() string {
 }
 
 func (d *devserver) Pre(ctx context.Context) error {
-	// Create a new API endpoint which hosts SDK-related functionality for
-	// registering functions.
-	devAPI := newDevAPI(d)
-
-	devAPI.Route("/v1", func(r chi.Router) {
-		// Add the V1 API to our dev server API.
-		cache := cache.New[[]byte](freecachestore.NewFreecache(freecache.NewCache(1024 * 1024)))
-		caching := apiv1.NewCacheMiddleware(cache)
-
-		apiv1.AddRoutes(r, apiv1.Opts{
-			CachingMiddleware: caching,
-			EventReader:       d.data,
-			FunctionReader:    d.data,
-			FunctionRunReader: d.data,
-			JobQueueReader:    d.queue.(queue.JobQueueReader),
-			Executor:          d.executor,
-		})
-	})
-
-	// d.opts.Config.EventStream.Service.TopicName()
-
-	core, err := coreapi.NewCoreApi(coreapi.Options{
-		Data:         d.data,
-		Config:       d.opts.Config,
-		Logger:       logger.From(ctx),
-		Runner:       d.runner,
-		Tracker:      d.tracker,
-		State:        d.state,
-		Queue:        d.queue,
-		EventHandler: d.handleEvent,
-		Executor:     d.executor,
-	})
-	if err != nil {
-		return err
-	}
-	// Create a new data API directly in the devserver.  This allows us to inject
-	// the data API into the dev server port, providing a single router for the dev
-	// server UI, events, and API for loading data.
-	//
-	// Merge the dev server API (for handling files & registration) with the data
-	// API into the event API router.
-	d.apiservice = api.NewService(
-		d.opts.Config,
-		api.Mount{At: "/", Router: devAPI},
-		api.Mount{At: "/v0", Router: core.Router},
-		api.Mount{At: "/debug", Handler: middleware.Profiler()},
-	)
+	// Import Redis if we can
+	d.importRedisSnapshot(ctx)
 
 	// Autodiscover the URLs that are hosting Inngest SDKs on the local machine.
 	go d.runDiscovery(ctx)
 
-	return d.apiservice.Pre(ctx)
+	return nil
 }
 
 func (d *devserver) Run(ctx context.Context) error {
@@ -172,11 +131,15 @@ func (d *devserver) Run(ctx context.Context) error {
 		}()
 	}
 
-	return d.apiservice.Run(ctx)
+	<-ctx.Done()
+
+	return nil
 }
 
 func (d *devserver) Stop(ctx context.Context) error {
-	return d.apiservice.Stop(ctx)
+	d.exportRedisSnapshot(ctx)
+
+	return nil
 }
 
 // runDiscovery attempts to run autodiscovery while the dev server is running.

@@ -7,11 +7,19 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/coocood/freecache"
+	"github.com/eko/gocache/lib/v4/cache"
+	freecachestore "github.com/eko/gocache/store/freecache/v4"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/api"
+	"github.com/inngest/inngest/pkg/api/apiv1"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/event"
@@ -182,12 +190,12 @@ func start(ctx context.Context, opts StartOpts) error {
 			backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval)*time.Second),
 		))
 	}
-	queue := redis_state.NewQueue(rc, queueOpts...)
+	rq := redis_state.NewQueue(rc, queueOpts...)
 
 	rl := ratelimit.New(ctx, rc, "{ratelimit}:")
 
-	batcher := batch.NewRedisBatchManager(rc, queueKG, queue)
-	debouncer := debounce.NewRedisDebouncer(rc, queueKG, queue)
+	batcher := batch.NewRedisBatchManager(rc, queueKG, rq)
+	debouncer := debounce.NewRedisDebouncer(rc, queueKG, rq)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, sm.(expressions.EvaluableLoader), nil)
@@ -205,6 +213,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create publisher: %w", err)
 	}
 
+	hmw := memory_writer.NewWriter(ctx)
+
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(sm),
@@ -212,14 +222,14 @@ func start(ctx context.Context, opts StartOpts) error {
 			drivers...,
 		),
 		executor.WithExpressionAggregator(agg),
-		executor.WithQueue(queue),
+		executor.WithQueue(rq),
 		executor.WithLogger(logger.From(ctx)),
 		executor.WithFunctionLoader(loader),
 		executor.WithLifecycleListeners(
 			history.NewLifecycleListener(
 				nil,
 				hd,
-				memory_writer.NewWriter(),
+				hmw,
 			),
 			lifecycle{
 				cqrs:       dbcqrs,
@@ -253,7 +263,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		opts.Config,
 		executor.WithExecutionManager(dbcqrs),
 		executor.WithState(sm),
-		executor.WithServiceQueue(queue),
+		executor.WithServiceQueue(rq),
 		executor.WithServiceExecutor(exec),
 		executor.WithServiceBatcher(batcher),
 		executor.WithServiceDebouncer(debouncer),
@@ -266,7 +276,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithExecutionManager(dbcqrs),
 		runner.WithEventManager(event.NewManager()),
 		runner.WithStateManager(sm),
-		runner.WithRunnerQueue(queue),
+		runner.WithRunnerQueue(rq),
 		runner.WithTracker(t),
 		runner.WithRateLimiter(rl),
 		runner.WithBatchManager(batcher),
@@ -274,14 +284,62 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	// The devserver embeds the event API.
-	ds := newService(opts, runner, dbcqrs, pb, stepLimitOverrides)
+	ds := newService(opts, runner, dbcqrs, pb, stepLimitOverrides, rc, hmw)
 	// embed the tracker
 	ds.tracker = t
 	ds.state = sm
-	ds.queue = queue
+	ds.queue = rq
 	ds.executor = exec
+	// start the API
+	// Create a new API endpoint which hosts SDK-related functionality for
+	// registering functions.
+	devAPI := newDevAPI(ds)
 
-	return service.StartAll(ctx, ds, runner, executorSvc)
+	devAPI.Route("/v1", func(r chi.Router) {
+		// Add the V1 API to our dev server API.
+		cache := cache.New[[]byte](freecachestore.NewFreecache(freecache.NewCache(1024 * 1024)))
+		caching := apiv1.NewCacheMiddleware(cache)
+
+		apiv1.AddRoutes(r, apiv1.Opts{
+			CachingMiddleware: caching,
+			EventReader:       ds.data,
+			FunctionReader:    ds.data,
+			FunctionRunReader: ds.data,
+			JobQueueReader:    ds.queue.(queue.JobQueueReader),
+			Executor:          ds.executor,
+		})
+	})
+
+	// ds.opts.Config.EventStream.Service.TopicName()
+
+	core, err := coreapi.NewCoreApi(coreapi.Options{
+		Data:         ds.data,
+		Config:       ds.opts.Config,
+		Logger:       logger.From(ctx),
+		Runner:       ds.runner,
+		Tracker:      ds.tracker,
+		State:        ds.state,
+		Queue:        ds.queue,
+		EventHandler: ds.handleEvent,
+		Executor:     ds.executor,
+	})
+	if err != nil {
+		return err
+	}
+	// Create a new data API directly in the devserver.  This allows us to inject
+	// the data API into the dev server port, providing a single router for the dev
+	// server UI, events, and API for loading data.
+	//
+	// Merge the dev server API (for handling files & registration) with the data
+	// API into the event API router.
+	ds.apiservice = api.NewService(
+		ds.opts.Config,
+		api.Mount{At: "/", Router: devAPI},
+		api.Mount{At: "/v0", Router: core.Router},
+		api.Mount{At: "/debug", Handler: middleware.Profiler()},
+	)
+
+	return service.StartAll(ctx, ds, runner, executorSvc, ds.apiservice)
 }
 
 func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, error) {
