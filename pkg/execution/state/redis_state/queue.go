@@ -61,11 +61,14 @@ const (
 	PartitionConcurrencyLimitRequeueExtension = 2 * time.Second
 	PartitionLookahead                        = time.Second
 
-	QueuePeekMax        int64 = 1000
-	QueuePeekDefault    int64 = 250
-	QueueLeaseDuration        = 10 * time.Second
-	ConfigLeaseDuration       = 10 * time.Second
-	ConfigLeaseMax            = 20 * time.Second
+	QueuePeekMax          int64   = 500
+	QueuePeekDefault      int64   = 250
+	QueuePeekMaxIter      int     = 4
+	QueuePeekMaxItems     int64   = 500
+	QueuePeekSkippedRatio float32 = 0.5
+	QueueLeaseDuration            = 10 * time.Second
+	ConfigLeaseDuration           = 10 * time.Second
+	ConfigLeaseMax                = 20 * time.Second
 
 	PriorityMax     uint = 0
 	PriorityDefault uint = 5
@@ -92,6 +95,7 @@ var (
 	ErrPriorityTooHigh               = fmt.Errorf("priority is too high")
 	ErrWeightedSampleRead            = fmt.Errorf("error reading from weighted sample")
 	ErrPartitionNotFound             = fmt.Errorf("partition not found")
+	ErrPartitionNotLeased            = fmt.Errorf("partition not leased")
 	ErrPartitionAlreadyLeased        = fmt.Errorf("partition already leased")
 	ErrPartitionPeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", PartitionPeekMax)
 	ErrPartitionGarbageCollected     = fmt.Errorf("partition garbage collected")
@@ -201,6 +205,27 @@ func WithNumWorkers(n int32) QueueOpt {
 func WithPeekSize(n int64) QueueOpt {
 	return func(q *queue) {
 		q.peek = n
+	}
+}
+
+func WithPeekMaxIterations(n int) QueueOpt {
+	return func(q *queue) {
+		q.peekMaxIter = n
+	}
+}
+
+func WithPeekMaxItems(n int64) QueueOpt {
+	return func(q *queue) {
+		q.peekMaxItems = n
+	}
+}
+
+func WithPeekSkipRatio(r float32) QueueOpt {
+	return func(q *queue) {
+		// it should be always between 0 and 1
+		if r > 0 && r < 1 {
+			q.peekSkipRatio = r
+		}
 	}
 }
 
@@ -450,7 +475,10 @@ type queue struct {
 	// numWorkers stores the number of workers available to concurrently process jobs.
 	numWorkers int32
 	// peek sets the number of items to check on queue peeks
-	peek int64
+	peek          int64
+	peekMaxItems  int64
+	peekMaxIter   int
+	peekSkipRatio float32
 	// workers is a buffered channel which allows scanners to send queue items
 	// to workers to be processed
 	workers chan processItem
@@ -965,7 +993,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 //
 // If limit is -1, this will return the first unleased item - representing the next available item in the
 // queue.
-func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, limit int64) ([]*QueueItem, error) {
+func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, offset int64, limit int64) ([]*QueueItem, error) {
 	// Check whether limit is -1, peeking next available time
 	isPeekNext := limit == -1
 
@@ -980,6 +1008,7 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 
 	args, err := StrSlice([]any{
 		until.UnixMilli(),
+		offset,
 		limit,
 	})
 	if err != nil {
@@ -1544,6 +1573,69 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 
 		// result is the available concurrency within this partition
 		return &leaseID, nil
+	}
+}
+
+// ExtendPartitionLease extends a lease for a partition, and returns the new leaseID
+func (q *queue) ExtendPartitionLease(ctx context.Context, p *QueuePartition, leaseID *ulid.ULID, dur time.Duration) (*ulid.ULID, error) {
+	var (
+		concurrencyKey string
+		concurrency    = defaultPartitionConcurrency
+	)
+	if q.partitionConcurrencyGen != nil {
+		concurrencyKey, concurrency = q.partitionConcurrencyGen(ctx, *p)
+	}
+
+	extendedTS := getNow().Add(dur).UTC()
+	newLeaseID, err := ulid.New(ulid.Timestamp(extendedTS), rnd)
+	if err != nil {
+		return nil, fmt.Errorf("error generating ID to extend partition lease: %w", err)
+	}
+
+	var shardName string
+	if q.sf != nil {
+		if shard := q.sf(ctx, p.Queue(), p.WorkspaceID); shard != nil {
+			shardName = shard.Name
+		}
+	}
+
+	keys := []string{
+		q.kg.PartitionItem(),
+		q.kg.GlobalPartitionIndex(),
+		q.kg.ShardPartitionIndex(shardName),
+		q.kg.Concurrency("p", concurrencyKey),
+	}
+
+	args, err := StrSlice([]any{
+		p.Queue(),
+		leaseID.String(),
+		newLeaseID.String(),
+		concurrency,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := scripts["queue/extendPartitionLease"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error extending partition lease: %w", err)
+	}
+	switch result {
+	case 0:
+		return &newLeaseID, nil
+	case 1:
+		return nil, ErrPartitionNotFound
+	case 2:
+		return nil, ErrPartitionNotLeased
+	case 3:
+		return nil, ErrPartitionAlreadyLeased
+	default:
+		return nil, fmt.Errorf("unknown response extending partition lease: %w", err)
 	}
 }
 
