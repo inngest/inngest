@@ -2194,10 +2194,7 @@ type leaseResult struct {
 }
 
 func (qb *queueItemBatcher) HasNext() bool {
-	if qb.idx >= qb.size {
-		return false
-	}
-	return true
+	return qb.idx < qb.size
 }
 
 func (qb *queueItemBatcher) GetItems() []*QueueItem {

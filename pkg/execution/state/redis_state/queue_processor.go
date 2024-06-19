@@ -728,7 +728,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 				})
 
 				if err := batcher.SetLeaseResult(qi.ID, leaseID, err); err != nil {
-					q.logger.Err(err).Msg("error setting lease result")
+					q.logger.Err(err).Interface("queue item", qi).Msg("error setting lease result")
 				}
 			}(ctx, item)
 		}
