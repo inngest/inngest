@@ -47,18 +47,18 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
   const latestSyncURL = app.latestSync?.url?.replace(/^https:\/\//, '').replace(/\?.+$/, '');
   return (
     <div className={cn(cardWrapperStyles, className)}>
-      <div className={cardLeftPanelStyles}>
+      <Link
+        href={pathCreator.app({ envSlug, externalAppID: app.externalID })}
+        className={cn(cardLeftPanelStyles, 'hover:bg-canvasMuted')}
+      >
         <h2>
-          <Link
-            className="transition-color hover:text-link hover:decoration-link text-basis flex cursor-pointer items-center gap-1 font-medium underline decoration-transparent decoration-2 underline-offset-4 duration-300"
-            href={pathCreator.app({ envSlug, externalAppID: app.externalID })}
-          >
+          <div className="text-basis flex items-center gap-1 font-medium">
             {isArchived && <RiArchive2Line className="h-4 w-4" />}
             <span className="truncate" title={app.name}>
               {app.name}
             </span>
             <RiArrowRightSLine className="h-4 w-4" />
-          </Link>
+          </div>
         </h2>
         {latestSyncURL && (
           <dl>
@@ -68,7 +68,7 @@ export function AppCard({ app, className, envSlug, isArchived }: Props) {
             </dd>
           </dl>
         )}
-      </div>
+      </Link>
       <div className="flex h-56 flex-1 flex-col">
         {app.latestSync?.error && (
           <div className="bg-red-100 px-8 py-2 text-red-800">{app.latestSync.error}</div>
