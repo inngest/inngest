@@ -2159,3 +2159,78 @@ func (l *leaseDenies) denyThrottle(key string) bool {
 	l.lock.RUnlock()
 	return ok
 }
+
+func newQueueItemBatcher(items []*QueueItem, batchSize int) *queueItemBatcher {
+	leases := map[string]*leaseResult{}
+	for _, qi := range items {
+		leases[qi.ID] = &leaseResult{Item: qi}
+	}
+
+	return &queueItemBatcher{
+		mu:        &sync.Mutex{},
+		items:     items,
+		size:      len(items),
+		idx:       0,
+		batchSize: batchSize,
+		leases:    leases,
+	}
+}
+
+type queueItemBatcher struct {
+	mu *sync.Mutex
+
+	items     []*QueueItem
+	size      int
+	idx       int
+	batchSize int
+	leases    map[string]*leaseResult
+}
+
+type leaseResult struct {
+	LeaseID *ulid.ULID
+	Item    *QueueItem
+	Error   error
+}
+
+func (qb *queueItemBatcher) HasNext() bool {
+	if qb.idx >= qb.size {
+		return false
+	}
+	return true
+}
+
+func (qb *queueItemBatcher) GetItems() []*QueueItem {
+	low := qb.idx
+	high := low + qb.batchSize
+	if high > qb.size {
+		high = qb.size
+	}
+
+	items := qb.items[low:high]
+	qb.idx = high // update the index
+
+	return items
+}
+
+func (qb *queueItemBatcher) SetLeaseResult(qiID string, leaseID *ulid.ULID, err error) error {
+	qb.mu.Lock()
+	defer qb.mu.Unlock()
+
+	res, ok := qb.leases[qiID]
+	if !ok {
+		return fmt.Errorf("no queue item registered with ID")
+	}
+	res.LeaseID = leaseID
+	res.Error = err
+
+	return nil
+}
+
+func (qb *queueItemBatcher) GetLeaseResult(qiID string) (*ulid.ULID, error) {
+	res, ok := qb.leases[qiID]
+	if !ok {
+		return nil, fmt.Errorf("no result registered for queue item: %s", qiID)
+	}
+
+	return res.LeaseID, res.Error
+}

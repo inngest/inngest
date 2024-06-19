@@ -716,141 +716,163 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	staticTime := getNow()
 
 	denies := newLeaseDenyList()
+	batcher := newQueueItemBatcher(queue, 50) // TODO: make size configurable
 
-ProcessLoop:
-	for _, item := range queue {
-		// TODO: Create an in-memory mapping of rate limit keys that have been hit,
-		//       and don't bother to process if the queue item has a limited key.  This
-		//       lessens work done in the queue, as we can `continue` immediately.
-		if item.IsLeased(getNow()) {
-			telemetry.IncrQueueItemLeaseContentionCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
-			continue
+	for batcher.HasNext() {
+		items := batcher.GetItems()
+
+		// lease all items in the batch concurrently
+		var wg sync.WaitGroup
+		for _, item := range items {
+			wg.Add(1)
+			go func(ctx context.Context, qi *QueueItem) {
+				defer wg.Done()
+
+				// lease queue item
+				leaseID, err := duration(ctx, "lease", func(ctx context.Context) (*ulid.ULID, error) {
+					return q.Lease(ctx, *p, *qi, QueueLeaseDuration, staticTime, denies)
+				})
+
+				if err := batcher.SetLeaseResult(qi.ID, leaseID, err); err != nil {
+					q.logger.Err(err).Msg("error setting lease result")
+				}
+			}(ctx, item)
 		}
+		wg.Wait()
 
-		// Cbeck if there's capacity from our local workers atomically prior to leasing our tiems.
-		if !q.sem.TryAcquire(1) {
-			telemetry.IncrQueuePartitionProcessNoCapacityCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
-			// Break the entire loop to prevent out of order work.
-			break ProcessLoop
-		}
+	ProcessLoop:
+		for _, item := range items {
+			// TODO: Create an in-memory mapping of rate limit keys that have been hit,
+			//       and don't bother to process if the queue item has a limited key.  This
+			//       lessens work done in the queue, as we can `continue` immediately.
+			if item.IsLeased(getNow()) {
+				telemetry.IncrQueueItemLeaseContentionCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+				continue
+			}
 
-		// Attempt to lease this item before passing this to a worker.  We have to do this
-		// synchronously as we need to lease prior to requeueing the partition pointer. If
-		// we don't do this here, the workers may not lease the items before calling Peek
-		// to re-enqeueu the pointer, which then increases contention - as we requeue a
-		// pointer too early.
-		//
-		// This is safe:  only one process runs scan(), and we guard the total number of
-		// available workers with the above semaphore.
-		leaseID, err := duration(ctx, "lease", func(ctx context.Context) (*ulid.ULID, error) {
-			return q.Lease(ctx, *p, *item, QueueLeaseDuration, staticTime, denies)
-		})
+			// Cbeck if there's capacity from our local workers atomically prior to leasing our tiems.
+			if !q.sem.TryAcquire(1) {
+				telemetry.IncrQueuePartitionProcessNoCapacityCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+				// Break the entire loop to prevent out of order work.
+				break ProcessLoop
+			}
 
-		// NOTE: If this loop ends in an error, we must _always_ release an item from the
-		// semaphore to free capacity.  This will happen automatically when the worker
-		// finishes processing a queue item on success.
-		if err != nil {
-			// Continue on and handle the error below.
-			q.sem.Release(1)
-		}
-
-		// Check the sojourn delay for this item in the queue. Tracking system latency vs
-		// sojourn latency from concurrency is important.
-		//
-		// Firstly, we check:  does the job store the first peek time?  If so, the
-		// delta between now and that time is the sojourn latency.  If not, this is either
-		// one of two cases:
-		//   - This is a new job in the queue, and we're peeking it for the first time.
-		//     Sojourn latency is 0.  Easy.
-		//   - We've peeked the queue since adding the job.  At this point, the only
-		//     conclusion is that the job wasn't peeked because of concurrency/capacity
-		//     issues, so the delta between now - job added is sojourn latency.
-		//
-		// NOTE: You might see that we use tracking semaphores and the worker itself has
-		// a maximum capacity.  We must ALWAYS peek the available capacity in our worker
-		// via the above Peek() call so that worker capacity doesn't prevent us from accessing
-		// all jobs in a peek.  This would break sojourn latency:  it only works if we know
-		// we're quitting early because of concurrency issues in a user's function, NOT because
-		// of capacity issues in our system.
-		//
-		// Anyway, here we set the first peek item to the item's start time if there was a
-		// peek since the job was added.
-		if p.Last > 0 && p.Last > item.AtMS {
-			// Fudge the earliest peek time because we know this wasn't peeked and so
-			// the peek time wasn't set;  but, as we were still processing jobs after
-			// the job was added this item was concurrency-limited.
-			item.EarliestPeekTime = item.AtMS
-		}
-
-		// We may return a keyError, which masks the actual error underneath.  If so,
-		// grab the cause.
-		cause := err
-		var key keyError
-		if errors.As(err, &key) {
-			cause = key.cause
-		}
-
-		switch cause {
-		case ErrQueueItemThrottled:
-			// Here we denylist each throttled key that's been limited here, then ignore
-			// any other jobs from being leased as we continue to iterate through the loop.
-			// This maintains FIFO ordering amongst all custom concurrency keys.
-			denies.addThrottled(err)
-
-			ctrRateLimit++
-			processErr = nil
-			telemetry.IncrQueueThrottledCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
-			continue
-		case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
-			ctrConcurrency++
-			// Since the queue is at capacity on a fn or account level, no
-			// more jobs in this loop should be worked on - so break.
+			// Attempt to lease this item before passing this to a worker.  We have to do this
+			// synchronously as we need to lease prior to requeueing the partition pointer. If
+			// we don't do this here, the workers may not lease the items before calling Peek
+			// to re-enqeueu the pointer, which then increases contention - as we requeue a
+			// pointer too early.
 			//
-			// Even if we have capacity for the next job in the loop we do NOT
-			// want to claim the job, as this breaks ordering guarantees.  The
-			// only safe thing to do when we hit a function or account level
-			// concurrency key.
-			processErr = nil
-			break ProcessLoop
-		case ErrConcurrencyLimitCustomKey0, ErrConcurrencyLimitCustomKey1:
-			ctrConcurrency++
-			// Custom concurrency keys are different.  Each job may have a different key,
-			// so we cannot break the loop in case the next job has a different key and
-			// has capacity.
+			// This is safe:  only one process runs scan(), and we guard the total number of
+			// available workers with the above semaphore.
+			leaseID, err := batcher.GetLeaseResult(item.ID)
+
+			// NOTE: If this loop ends in an error, we must _always_ release an item from the
+			// semaphore to free capacity.  This will happen automatically when the worker
+			// finishes processing a queue item on success.
+			if err != nil {
+				// Continue on and handle the error below.
+				q.sem.Release(1)
+			}
+
+			// Check the sojourn delay for this item in the queue. Tracking system latency vs
+			// sojourn latency from concurrency is important.
 			//
-			// Here we denylist each concurrency key that's been limited here, then ignore
-			// any other jobs from being leased as we continue to iterate through the loop.
-			// This maintains FIFO ordering amongst all custom concurrency keys.
-			denies.addConcurrency(err)
+			// Firstly, we check:  does the job store the first peek time?  If so, the
+			// delta between now and that time is the sojourn latency.  If not, this is either
+			// one of two cases:
+			//   - This is a new job in the queue, and we're peeking it for the first time.
+			//     Sojourn latency is 0.  Easy.
+			//   - We've peeked the queue since adding the job.  At this point, the only
+			//     conclusion is that the job wasn't peeked because of concurrency/capacity
+			//     issues, so the delta between now - job added is sojourn latency.
+			//
+			// NOTE: You might see that we use tracking semaphores and the worker itself has
+			// a maximum capacity.  We must ALWAYS peek the available capacity in our worker
+			// via the above Peek() call so that worker capacity doesn't prevent us from accessing
+			// all jobs in a peek.  This would break sojourn latency:  it only works if we know
+			// we're quitting early because of concurrency issues in a user's function, NOT because
+			// of capacity issues in our system.
+			//
+			// Anyway, here we set the first peek item to the item's start time if there was a
+			// peek since the job was added.
+			if p.Last > 0 && p.Last > item.AtMS {
+				// Fudge the earliest peek time because we know this wasn't peeked and so
+				// the peek time wasn't set;  but, as we were still processing jobs after
+				// the job was added this item was concurrency-limited.
+				item.EarliestPeekTime = item.AtMS
+			}
 
-			processErr = nil
-			continue
-		case ErrQueueItemNotFound:
-			// This is an okay error.  Move to the next job item.
-			ctrSuccess++ // count as a success for stats purposes.
-			processErr = nil
-			continue
-		case ErrQueueItemAlreadyLeased:
-			// This is an okay error.  Move to the next job item.
-			ctrSuccess++ // count as a success for stats purposes.
-			processErr = nil
-			continue
+			// We may return a keyError, which masks the actual error underneath.  If so,
+			// grab the cause.
+			cause := err
+			var key keyError
+			if errors.As(err, &key) {
+				cause = key.cause
+			}
+
+			switch cause {
+			case ErrQueueItemThrottled:
+				// Here we denylist each throttled key that's been limited here, then ignore
+				// any other jobs from being leased as we continue to iterate through the loop.
+				// This maintains FIFO ordering amongst all custom concurrency keys.
+				denies.addThrottled(err)
+
+				ctrRateLimit++
+				processErr = nil
+				telemetry.IncrQueueThrottledCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+				continue
+			case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
+				ctrConcurrency++
+				// Since the queue is at capacity on a fn or account level, no
+				// more jobs in this loop should be worked on - so break.
+				//
+				// Even if we have capacity for the next job in the loop we do NOT
+				// want to claim the job, as this breaks ordering guarantees.  The
+				// only safe thing to do when we hit a function or account level
+				// concurrency key.
+				processErr = nil
+				break ProcessLoop
+			case ErrConcurrencyLimitCustomKey0, ErrConcurrencyLimitCustomKey1:
+				ctrConcurrency++
+				// Custom concurrency keys are different.  Each job may have a different key,
+				// so we cannot break the loop in case the next job has a different key and
+				// has capacity.
+				//
+				// Here we denylist each concurrency key that's been limited here, then ignore
+				// any other jobs from being leased as we continue to iterate through the loop.
+				// This maintains FIFO ordering amongst all custom concurrency keys.
+				denies.addConcurrency(err)
+
+				processErr = nil
+				continue
+			case ErrQueueItemNotFound:
+				// This is an okay error.  Move to the next job item.
+				ctrSuccess++ // count as a success for stats purposes.
+				processErr = nil
+				continue
+			case ErrQueueItemAlreadyLeased:
+				// This is an okay error.  Move to the next job item.
+				ctrSuccess++ // count as a success for stats purposes.
+				processErr = nil
+				continue
+			}
+
+			// Handle other errors.
+			if err != nil {
+				processErr = fmt.Errorf("error leasing in process: %w", err)
+				break ProcessLoop
+			}
+
+			// Assign the lease ID and pass this to be handled by the available worker.
+			// There should always be capacity on this queue as we track capacity via
+			// a semaphore.
+			item.LeaseID = leaseID
+
+			// increase success counter.
+			ctrSuccess++
+			q.workers <- processItem{P: *p, I: *item, S: shard}
 		}
-
-		// Handle other errors.
-		if err != nil {
-			processErr = fmt.Errorf("error leasing in process: %w", err)
-			break ProcessLoop
-		}
-
-		// Assign the lease ID and pass this to be handled by the available worker.
-		// There should always be capacity on this queue as we track capacity via
-		// a semaphore.
-		item.LeaseID = leaseID
-
-		// increase success counter.
-		ctrSuccess++
-		q.workers <- processItem{P: *p, I: *item, S: shard}
 	}
 
 	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
