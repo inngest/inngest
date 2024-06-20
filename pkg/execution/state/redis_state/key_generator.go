@@ -156,16 +156,16 @@ func (u unshardedKeyGenerator) Workflow(ctx context.Context, workflowID uuid.UUI
 	return fmt.Sprintf("{%s}:workflows:%s-%d", stateDefaultKey, workflowID, version)
 }
 
-func (u unshardedKeyGenerator) PauseLease(ctx context.Context, id uuid.UUID) string {
-	return fmt.Sprintf("{%s}:pause-lease:%s", stateDefaultKey, id.String())
+func (u unshardedKeyGenerator) PauseLease(ctx context.Context, pauseId uuid.UUID) string {
+	return fmt.Sprintf("{%s}:pause-lease:%s", stateDefaultKey, pauseId.String())
 }
 
-func (u unshardedKeyGenerator) PauseID(ctx context.Context, id uuid.UUID) string {
-	return fmt.Sprintf("{%s}:pauses:%s", stateDefaultKey, id.String())
+func (u unshardedKeyGenerator) PauseID(ctx context.Context, pauseId uuid.UUID) string {
+	return fmt.Sprintf("{%s}:pauses:%s", stateDefaultKey, pauseId.String())
 }
 
-func (u unshardedKeyGenerator) PauseEvent(ctx context.Context, id uuid.UUID, s string) string {
-	return fmt.Sprintf("{%s}:pause-events:%s:%s", stateDefaultKey, id, s)
+func (u unshardedKeyGenerator) PauseEvent(ctx context.Context, workspaceId uuid.UUID, eventName string) string {
+	return fmt.Sprintf("{%s}:pause-events:%s:%s", stateDefaultKey, workspaceId, eventName)
 }
 
 func (u unshardedKeyGenerator) PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string {
