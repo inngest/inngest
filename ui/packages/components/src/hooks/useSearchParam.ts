@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { isStringArray } from '../utils/array';
@@ -83,6 +83,102 @@ export function useStringArraySearchParam(
       console.error(`invalid type for search param ${name}`);
     }
   }
+
+  return [value, upsert, remove];
+}
+
+type TypeGuard<T> = (value: any) => value is T;
+
+/**
+ * Use a search param that is validated with a type guard
+ */
+export function useValidatedSearchParam<T>(
+  name: string,
+  typeGuard: TypeGuard<T>
+): [T | undefined, SetParam<string>] {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const upsert = useCallback(
+    (value: string) => {
+      const params = new URLSearchParams(searchParams);
+      params.set(name, value);
+      router.replace(pathname + '?' + params.toString());
+    },
+    [name, pathname, router, searchParams]
+  );
+
+  const value = searchParams.get(name) ?? undefined;
+  if (value === undefined) {
+    return [undefined, upsert];
+  }
+
+  if (!typeGuard(value)) {
+    return [undefined, upsert];
+  }
+
+  return [value, upsert];
+}
+
+/**
+ * Use a search param that is an array of values that are validated with a type
+ * guard
+ */
+export function useValidatedArraySearchParam<T>(
+  name: string,
+  typeGuard: TypeGuard<T>
+): [Array<T> | undefined, SetParam<Array<string>>, () => void] {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const upsert = useCallback(
+    (value: Array<string>) => {
+      const params = new URLSearchParams(searchParams);
+      params.set(name, JSON.stringify(value));
+      router.replace(pathname + '?' + params.toString());
+    },
+    [name, pathname, router, searchParams]
+  );
+
+  const remove = useCallback(() => {
+    const params = new URLSearchParams(searchParams);
+    params.delete(name);
+    router.replace(pathname + '?' + params.toString());
+  }, [name, pathname, router, searchParams]);
+
+  const rawValue = searchParams.get(name);
+  const value = useMemo(() => {
+    if (typeof rawValue !== 'string') {
+      console.error(`invalid type for search param ${name}: ${rawValue}`);
+      return undefined;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawValue);
+    } catch {
+      console.error(`invalid JSON for search param ${name}: ${rawValue}`);
+      return undefined;
+    }
+
+    if (!Array.isArray(parsed)) {
+      console.error(`invalid type for search param ${name}: ${rawValue}`);
+      return undefined;
+    }
+
+    const arr: T[] = [];
+    for (const item of parsed) {
+      if (typeGuard(item)) {
+        arr.push(item);
+      } else {
+        console.error(`invalid type for search param ${name}: ${item}`);
+      }
+    }
+
+    return arr;
+  }, [rawValue]);
 
   return [value, upsert, remove];
 }

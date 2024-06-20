@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, type UIEventHandler } from 'react';
+import { useCallback, useRef, type UIEventHandler } from 'react';
 import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
@@ -16,7 +16,11 @@ import {
 import { RiLoopLeftLine } from '@remixicon/react';
 
 import { RunDetails } from '../RunDetailsV2';
-import { useSearchParam, useStringArraySearchParam } from '../hooks/useSearchParam';
+import {
+  useSearchParam,
+  useValidatedArraySearchParam,
+  useValidatedSearchParam,
+} from '../hooks/useSearchParam';
 import type { Features } from '../types/features';
 import { TimeFilter } from './TimeFilter';
 
@@ -54,68 +58,55 @@ export function RunsPage({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const [rawFilteredStatus, setFilteredStatus, removeFilteredStatus] =
-    useStringArraySearchParam('filterStatus');
-  const [rawTimeField = FunctionRunTimeField.QueuedAt, setTimeField] = useSearchParam('timeField');
+  const [filteredStatus = [], setFilteredStatus, removeFilteredStatus] =
+    useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
+
+  const [timeField = FunctionRunTimeField.QueuedAt, setTimeField] = useValidatedSearchParam(
+    'timeField',
+    isFunctionTimeField
+  );
   const [lastDays = '3', setLastDays] = useSearchParam('last');
 
-  let timeField: FunctionRunTimeField;
-  if (isFunctionTimeField(rawTimeField)) {
-    timeField = rawTimeField;
-  } else {
-    timeField = FunctionRunTimeField.QueuedAt;
-  }
-
-  const filteredStatus = useMemo(() => {
-    if (!rawFilteredStatus) {
-      return [];
-    }
-
-    const out: FunctionRunStatus[] = [];
-    for (const status of rawFilteredStatus) {
-      if (isFunctionRunStatus(status)) {
-        out.push(status);
-      } else {
-        console.error(`unexpected status: ${status}`);
+  const scrollToTop = useCallback(
+    (smooth = false) => {
+      if (containerRef.current) {
+        containerRef.current.scrollTo({
+          top: 0,
+          behavior: smooth ? 'smooth' : 'auto',
+        });
+        onScrollToTop();
       }
-    }
+    },
+    [containerRef.current, onScrollToTop]
+  );
 
-    return out;
-  }, [rawFilteredStatus]);
+  const onStatusFilterChange = useCallback(
+    (value: FunctionRunStatus[]) => {
+      scrollToTop();
+      if (value.length > 0) {
+        setFilteredStatus(value);
+      } else {
+        removeFilteredStatus();
+      }
+    },
+    [removeFilteredStatus, scrollToTop, setFilteredStatus]
+  );
 
-  function onStatusFilterChange(value: FunctionRunStatus[]) {
-    scrollToTop();
-    if (value.length > 0) {
-      setFilteredStatus(value);
-    } else {
-      removeFilteredStatus();
-    }
-  }
-
-  function onTimeFieldChange(value: FunctionRunTimeField) {
-    console.log(value);
-    scrollToTop();
-    if (value.length > 0) {
+  const onTimeFieldChange = useCallback(
+    (value: FunctionRunTimeField) => {
+      scrollToTop();
       setTimeField(value);
-    }
-  }
+    },
+    [scrollToTop, setTimeField]
+  );
 
-  function onDaysChange(value: string) {
-    scrollToTop();
-    if (value) {
+  const onDaysChange = useCallback(
+    (value: string) => {
+      scrollToTop();
       setLastDays(value);
-    }
-  }
-
-  const scrollToTop = (smooth = false) => {
-    if (containerRef.current) {
-      containerRef.current.scrollTo({
-        top: 0,
-        behavior: smooth ? 'smooth' : 'auto',
-      });
-      onScrollToTop();
-    }
-  };
+    },
+    [scrollToTop, setLastDays]
+  );
 
   const renderSubComponent = useCallback(({ id }: { id: string }) => {
     return (
