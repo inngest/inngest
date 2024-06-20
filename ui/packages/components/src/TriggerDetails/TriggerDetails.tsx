@@ -125,13 +125,15 @@ export function TriggerDetails({ className, getTrigger }: Props) {
     >
       {!showEventPanel && (
         <Collapsible.Trigger asChild>
-          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-400">
-            <Tooltip>
-              <TooltipTrigger>
-                <RiExpandLeftFill className="h-5 w-5	text-slate-400" />
-              </TooltipTrigger>
-              <TooltipContent>Show trigger details</TooltipContent>
-            </Tooltip>
+          <span className="pt-2">
+            <span className="border-muted flex h-7 w-7 items-center justify-center rounded-full border">
+              <Tooltip>
+                <TooltipTrigger>
+                  <RiExpandLeftFill className="text-subtle hover:text-muted	h-5 w-5" />
+                </TooltipTrigger>
+                <TooltipContent>Show trigger details</TooltipContent>
+              </Tooltip>
+            </span>
           </span>
         </Collapsible.Trigger>
       )}
@@ -142,7 +144,12 @@ export function TriggerDetails({ className, getTrigger }: Props) {
               <Card.Header className="h-11 flex-row items-center gap-2">
                 <div className="text-basis flex grow items-center gap-2">Trigger details</div>
                 <Collapsible.Trigger asChild>
-                  <Button size="large" appearance="text" icon={<RiContractRightFill />} />
+                  <Button
+                    size="large"
+                    appearance="text"
+                    icon={<RiContractRightFill />}
+                    className="text-subtle hover:text-muted"
+                  />
                 </Collapsible.Trigger>
               </Card.Header>
 
