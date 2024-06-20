@@ -1,18 +1,20 @@
 package redis_state
 
 import (
+	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
 
 type ShardedClient struct {
-	kg ShardedKeyGenerator
-	r  rueidis.Client
+	kg        ShardedKeyGenerator
+	shardedRc rueidis.Client
+	u         *UnshardedClient
 }
 
-func NewShardedClient(r rueidis.Client) *ShardedClient {
+func NewShardedClient(u *UnshardedClient, r rueidis.Client) *ShardedClient {
 	return &ShardedClient{
-		kg: newShardedKeyGenerator(),
-		r:  r,
+		kg:        newShardedKeyGenerator(),
+		shardedRc: r,
 	}
 }
 
@@ -20,13 +22,16 @@ func (s *ShardedClient) KeyGenerator() ShardedKeyGenerator {
 	return s.kg
 }
 
-func (s *ShardedClient) Client() rueidis.Client {
-	return s.r
+func (s *ShardedClient) Client(runID ulid.ULID) rueidis.Client {
+	if s.KeyGenerator().IsSharded(runID) {
+		return s.shardedRc
+	}
+	return s.u.Client()
 }
 
 type UnshardedClient struct {
-	kg UnshardedKeyGenerator
-	r  rueidis.Client
+	kg          UnshardedKeyGenerator
+	unshardedRc rueidis.Client
 }
 
 func (u *UnshardedClient) KeyGenerator() UnshardedKeyGenerator {
@@ -34,12 +39,12 @@ func (u *UnshardedClient) KeyGenerator() UnshardedKeyGenerator {
 }
 
 func (u *UnshardedClient) Client() rueidis.Client {
-	return u.r
+	return u.unshardedRc
 }
 
 func NewUnshardedClient(r rueidis.Client) *UnshardedClient {
 	return &UnshardedClient{
-		kg: newUnshardedKeyGenerator(),
-		r:  r,
+		kg:          newUnshardedKeyGenerator(),
+		unshardedRc: r,
 	}
 }
