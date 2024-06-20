@@ -130,13 +130,13 @@ type UnshardedKeyGenerator interface {
 	//
 	// This is stored independently as we may store more than one copy of a pause
 	// for easy iteration.
-	PauseLease(context.Context, uuid.UUID) string
+	PauseLease(ctx context.Context, pauseId uuid.UUID) string
 
 	// PauseID returns the key used to store an individual pause from its ID.
-	PauseID(context.Context, uuid.UUID) string
+	PauseID(ctx context.Context, pauseId uuid.UUID) string
 
 	// PauseEvent returns the key used to store data for loading pauses by events.
-	PauseEvent(context.Context, uuid.UUID, string) string
+	PauseEvent(ctx context.Context, workspaceId uuid.UUID, event string) string
 
 	// PauseIndex is a key that's used to index added/expired times for pauses.
 	//
