@@ -74,6 +74,8 @@ export function useStringArraySearchParam(
   const remove = useCallback(() => {
     const params = new URLSearchParams(searchParams);
     params.delete(name);
+
+    // @ts-expect-error Router doesn't like strings
     router.replace(pathname + '?' + params.toString());
   }, [name, pathname, router, searchParams]);
 
@@ -145,6 +147,8 @@ export function useValidatedArraySearchParam<T>(
     (value: Array<string>) => {
       const params = new URLSearchParams(searchParams);
       params.set(name, JSON.stringify(value));
+
+      // @ts-expect-error Router doesn't like strings
       router.replace(pathname + '?' + params.toString());
     },
     [name, pathname, router, searchParams]
