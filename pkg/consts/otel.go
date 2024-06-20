@@ -70,11 +70,8 @@ const (
 	OtelSysStepInvokeRunID             = "sys.step.invoke.run.id"
 	OtelSysStepInvokeExpired           = "sys.step.invoke.expired"
 
-	OtelSysStepRetry         = "sys.step.retry"
-	OtelSysStepNextOpcode    = "sys.step.next.opcode"
-	OtelSysStepNextTimestamp = "sys.step.next.time"
-	OtelSysStepNextExpires   = "sys.step.next.expires"
-	OtelSysStepDelete        = "sys.step.delete"
+	OtelSysStepRetry  = "sys.step.retry"
+	OtelSysStepDelete = "sys.step.delete"
 
 	OtelSysCronTimestamp = "sys.cron.timestamp"
 	OtelSysCronExpr      = "sys.cron.expr"
