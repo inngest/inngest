@@ -9,8 +9,6 @@ import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { Select } from '@inngest/components/Select/Select';
 import { RiRefreshLine } from '@remixicon/react';
 
-import type { VercelProject } from './VercelIntegration';
-import useUpdateVercelIntegration from './useUpdateVercelIntegration';
 import { useVercelIntegration } from './useVercelIntegration';
 
 type DisableProjectProps = {
@@ -39,14 +37,6 @@ export default function VercelProjects() {
   const router = useRouter();
   const { projects } = data;
   const [filter, setFilter] = useState('all');
-  const updateVercelIntegration = useUpdateVercelIntegration(data);
-
-  const dummy =
-    projects && projects.length
-      ? ([...new Array(3)].map((_, i) =>
-          i === 0 ? projects[0] : { ...projects[0], id: `project-id-${i}`, name: `project-${i}` }
-        ) as VercelProject[])
-      : [];
 
   return (
     <div className="mt-8 flex flex-col">
