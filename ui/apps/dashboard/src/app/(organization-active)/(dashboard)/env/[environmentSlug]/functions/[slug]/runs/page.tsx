@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
+import RunsTable, { type Run } from '@inngest/components/RunsPage/RunsTable';
 import { SelectGroup } from '@inngest/components/Select/Select';
 import { LoadingMore } from '@inngest/components/Table';
 import {
@@ -19,7 +20,6 @@ import { graphql } from '@/gql';
 import { RunsOrderByField } from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useSearchParam, useStringArraySearchParam } from '@/utils/useSearchParam';
-import RunsTable, { type Run } from './RunsTable';
 import TimeFilter from './TimeFilter';
 import { parseRunsData, toRunStatuses, toTimeField } from './utils';
 
