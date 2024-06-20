@@ -5,16 +5,48 @@ import { useRouter } from 'next/navigation';
 import { Badge } from '@inngest/components/Badge/Badge';
 import { NewButton } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
+import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { Select } from '@inngest/components/Select/Select';
 import { RiRefreshLine } from '@remixicon/react';
 
+import type { VercelProject } from './VercelIntegration';
+import useUpdateVercelIntegration from './useUpdateVercelIntegration';
 import { useVercelIntegration } from './useVercelIntegration';
+
+type DisableProjectProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+};
+
+const DisableVercel = ({ isOpen, onClose, onConfirm }: DisableProjectProps) => (
+  <AlertModal
+    className="w-1/3"
+    isOpen={isOpen}
+    onClose={onClose}
+    onSubmit={onConfirm}
+    title="Confirm disable"
+  >
+    <p className="px-6 pb-0 pt-4 dark:text-white">
+      Are you sure you want to disable Vercel Integration?
+    </p>
+  </AlertModal>
+);
 
 export default function VercelProjects() {
   const { data } = useVercelIntegration();
+  const [disable, setDisable] = useState(false);
   const router = useRouter();
   const { projects } = data;
   const [filter, setFilter] = useState('all');
+  const updateVercelIntegration = useUpdateVercelIntegration(data);
+
+  const dummy =
+    projects && projects.length
+      ? ([...new Array(3)].map((_, i) =>
+          i === 0 ? projects[0] : { ...projects[0], id: `project-id-${i}`, name: `project-${i}` }
+        ) as VercelProject[])
+      : [];
 
   return (
     <div className="mt-8 flex flex-col">
@@ -93,13 +125,29 @@ export default function VercelProjects() {
             </Card.Content>
           </Card>
         ))}
+
       <div className="mt-10 flex flex-col gap-4 border-t border-slate-200 py-7">
         <div className="text-lg font-medium text-gray-900">Disable Vercel integration</div>
         <div className="text-base font-normal leading-snug text-slate-600">
           This action disables API key and stops webhooks.
         </div>
         <div>
-          <NewButton kind="danger" appearance="outlined" label="Disable Vercel" />
+          {disable && (
+            <DisableVercel
+              isOpen={disable}
+              onClose={() => setDisable(false)}
+              onConfirm={async () => {
+                //
+                // TODO: implement this on the backend
+              }}
+            />
+          )}
+          <NewButton
+            kind="danger"
+            appearance="outlined"
+            label="Disable Vercel"
+            onClick={() => setDisable(true)}
+          />
         </div>
       </div>
     </div>
