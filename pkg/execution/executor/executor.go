@@ -707,10 +707,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 								attribute.String(consts.OtelAttrSDKRunID, mrunID.String()),
 								attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
 								attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
-								attribute.String(consts.OtelSysStepGroupID, meta.InvokeGroupID),
 								attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
 								attribute.String(consts.OtelSysStepDisplayName, meta.InvokeDisplayName),
-
 								attribute.String(consts.OtelSysStepInvokeTargetFnID, req.Function.ID.String()),
 								attribute.Int64(consts.OtelSysStepInvokeExpires, meta.InvokeExpiresAt),
 								attribute.String(consts.OtelSysStepInvokeTriggeringEventID, evt.ID),
@@ -1902,7 +1900,6 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		attribute.String(consts.OtelAttrSDKRunID, pause.Identifier.RunID.String()),
 		attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
 		attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
-		attribute.String(consts.OtelSysStepGroupID, pause.GroupID),
 		attribute.String(consts.OtelSysStepDisplayName, pause.StepName),
 	}
 
@@ -2457,7 +2454,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		CorrelationID:   &correlationID,
 		TraceCarrier:    carrier,
 		ExpiresAt:       expires.UnixMilli(),
-		GroupID:         i.item.GroupID,
 		DisplayName:     gen.UserDefinedName(),
 		SourceAppID:     i.item.Identifier.AppID.String(),
 		SourceFnID:      i.item.Identifier.WorkflowID.String(),

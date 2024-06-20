@@ -148,7 +148,6 @@ type InngestMetadata struct {
 	InvokeCorrelationId string                  `json:"correlation_id,omitempty"`
 	InvokeTraceCarrier  *telemetry.TraceCarrier `json:"tc,omitempty"`
 	InvokeExpiresAt     int64                   `json:"expire"`
-	InvokeGroupID       string                  `json:"gid"`
 	InvokeDisplayName   string                  `json:"name"`
 }
 
@@ -247,7 +246,6 @@ type NewInvocationEventOpts struct {
 	CorrelationID   *string
 	TraceCarrier    *telemetry.TraceCarrier
 	ExpiresAt       int64
-	GroupID         string
 	DisplayName     string
 }
 
@@ -275,7 +273,6 @@ func NewInvocationEvent(opts NewInvocationEventOpts) Event {
 		InvokeCorrelationId: correlationID,
 		InvokeTraceCarrier:  opts.TraceCarrier,
 		InvokeExpiresAt:     opts.ExpiresAt,
-		InvokeGroupID:       opts.GroupID,
 		InvokeDisplayName:   opts.DisplayName,
 		SourceAppID:         opts.SourceAppID,
 		SourceFnID:          opts.SourceFnID,
