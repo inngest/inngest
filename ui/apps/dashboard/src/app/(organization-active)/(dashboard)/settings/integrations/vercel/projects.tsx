@@ -44,12 +44,15 @@ export default function VercelProjects() {
         <div className="text-slate-500">
           Projects (<span className="mx-[2px]">{projects.length}</span>)
         </div>
-        <div
-          className="flex cursor-pointer flex-row items-center justify-between text-xs text-indigo-600"
-          onClick={() => router.refresh()}
-        >
-          <RiRefreshLine className="mr-1 h-4 w-4" />
-          Refresh list
+        <div className="flex cursor-pointer flex-row items-center justify-between text-xs text-indigo-600">
+          <NewButton
+            onClick={() => router.refresh()}
+            appearance="ghost"
+            icon={<RiRefreshLine className="h-4 w-4" />}
+            iconSide="left"
+            label="Refresh list"
+          />
+
           <Select
             defaultValue={{ id: 'all', name: 'All' }}
             onChange={(o) => setFilter(o.name)}

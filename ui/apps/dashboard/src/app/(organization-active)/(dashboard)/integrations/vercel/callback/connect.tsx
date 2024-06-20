@@ -5,8 +5,15 @@ import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { NewButton } from '@inngest/components/Button/index';
 import { Card } from '@inngest/components/Card/Card';
-import { RiArrowLeftSLine, RiArrowRightSLine, RiInformationLine } from '@remixicon/react';
+import { Checkbox } from '@inngest/components/Checkbox/Checkbox';
+import {
+  RiArrowLeftSLine,
+  RiArrowRightSLine,
+  RiCloseLine,
+  RiInformationLine,
+} from '@remixicon/react';
 
+import Input from '@/components/Forms/Input';
 import type VercelIntegration from '../../../settings/integrations/vercel/VercelIntegration';
 import useUpdateVercelIntegration from '../../../settings/integrations/vercel/useUpdateVercelIntegration';
 import type { VercelCallbackProps } from './page';
@@ -22,12 +29,16 @@ export default function Connect({
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
   const start = (page - 1) * PAGE_SIZE;
+  const [hover, setHover] = useState(null);
+  const [custom, setCustom] = useState<string[]>([]);
 
   const updateVercelIntegration = useUpdateVercelIntegration(integrations);
 
-  const check = ({ target: { id, checked } }: ChangeEvent<HTMLInputElement>) => {
+  const check = ({ target: { id, checked } }: ChangeEvent<HTMLInputElement>) =>
     setProjects(projects.map((p) => ({ ...p, isEnabled: p.id === id ? !!checked : p.isEnabled })));
-  };
+
+  const setPath = (id: string, value: string) =>
+    setProjects(projects.map((p) => ({ ...p, servePath: p.id === id ? value : p.servePath })));
 
   const pages = Math.ceil(projects.length / PAGE_SIZE);
   const end = Math.min(start + PAGE_SIZE, projects.length);
@@ -59,28 +70,60 @@ export default function Connect({
           {[...projects.slice(start, end)].map((p: any, i) => (
             <div
               key={`project-list-${i}`}
-              className={`flex flex h-[72px] flex-row items-center justify-start ${
+              className={`flex flex h-[72px] flex-row items-center justify-between ${
                 i !== end && 'border-b'
               } border-slate-200 px-6`}
+              onMouseOver={() => setHover(p.id)}
+              onMouseLeave={() => setHover(null)}
             >
-              <input
-                id={p.id}
-                type="checkbox"
-                className="mr-2 h-4 w-4 text-indigo-600 focus:outline-0 focus:ring-0"
-                onChange={check}
-                checked={p.isEnabled}
-              />
-
-              <div className="text-base font-normal leading-7 text-slate-700">{p.name}</div>
+              <div className="flex flex-row items-center justify-start">
+                <Checkbox
+                  id={p.id}
+                  className="mr-2 h-4 w-4"
+                  onChange={check}
+                  checked={p.isEnabled}
+                />
+                <div className="text-base font-normal leading-7 text-slate-700">{p.name}</div>
+              </div>
+              {custom.includes(p.id) ? (
+                <div className="relative">
+                  <Input
+                    required={true}
+                    placeholder="Add custom path"
+                    className="h-10 w-96"
+                    showError={false}
+                    onChange={(e) => setPath(p.id, e.target.value)}
+                  />
+                  <NewButton
+                    size="small"
+                    appearance="ghost"
+                    kind="secondary"
+                    icon={<RiCloseLine />}
+                    className="absolute right-1 top-2"
+                    onClick={() => setCustom(custom.filter((c) => c !== p.id))}
+                  />
+                </div>
+              ) : (
+                hover === p.id && (
+                  <NewButton
+                    appearance="outlined"
+                    label="Add custom path"
+                    onClick={() => {
+                      setCustom([...custom, p.id]);
+                    }}
+                  />
+                )
+              )}
             </div>
           ))}
           {projects.length > PAGE_SIZE && (
             <div className="row flex flex items-center justify-center p-2">
               <NewButton
                 appearance="ghost"
-                icon={<RiArrowLeftSLine className="mr disabled: h-7 w-7" />}
+                icon={<RiArrowLeftSLine className="disabled:text-disabled text-basis" />}
                 disabled={page === 1}
                 onClick={() => setPage(1)}
+                className="mr-1 h-6"
               />
               {[...Array(pages)].map((_, i) => (
                 <NewButton
@@ -89,13 +132,15 @@ export default function Connect({
                   disabled={page === i + 1}
                   label={i + 1}
                   onClick={() => setPage(i + 1)}
+                  className="text-basis bg-contrast mr-1 h-6 text-sm disabled:bg-black disabled:text-white"
                 />
               ))}
               <NewButton
                 appearance="ghost"
-                icon={<RiArrowRightSLine className="h-7 w-7" />}
+                icon={<RiArrowRightSLine className="disabled:text-disabled text-basis " />}
                 disabled={page === pages}
                 onClick={() => setPage(pages)}
+                className="h-6"
               />
             </div>
           )}
