@@ -18,6 +18,8 @@ export function useSearchParam(name: string): [string | undefined, SetParam<stri
     (value: string) => {
       const params = new URLSearchParams(searchParams);
       params.set(name, value);
+
+      // @ts-expect-error Router doesn't like strings
       router.replace(pathname + '?' + params.toString());
     },
     [name, pathname, router, searchParams]
@@ -36,6 +38,8 @@ export function useBooleanSearchParam(name: string): [boolean | undefined, SetPa
     (value: boolean) => {
       const params = new URLSearchParams(searchParams);
       params.set(name, value ? 'true' : 'false');
+
+      // @ts-expect-error Router doesn't like strings
       router.replace(pathname + '?' + params.toString());
     },
     [name, pathname, router, searchParams]
@@ -60,6 +64,8 @@ export function useStringArraySearchParam(
     (value: Array<string>) => {
       const params = new URLSearchParams(searchParams);
       params.set(name, JSON.stringify(value));
+
+      // @ts-expect-error Router doesn't like strings
       router.replace(pathname + '?' + params.toString());
     },
     [name, pathname, router, searchParams]
@@ -104,6 +110,8 @@ export function useValidatedSearchParam<T>(
     (value: string) => {
       const params = new URLSearchParams(searchParams);
       params.set(name, value);
+
+      // @ts-expect-error Router doesn't like strings
       router.replace(pathname + '?' + params.toString());
     },
     [name, pathname, router, searchParams]
@@ -145,6 +153,8 @@ export function useValidatedArraySearchParam<T>(
   const remove = useCallback(() => {
     const params = new URLSearchParams(searchParams);
     params.delete(name);
+
+    // @ts-expect-error Router doesn't like strings
     router.replace(pathname + '?' + params.toString());
   }, [name, pathname, router, searchParams]);
 
@@ -178,7 +188,7 @@ export function useValidatedArraySearchParam<T>(
     }
 
     return arr;
-  }, [rawValue]);
+  }, [name, rawValue, typeGuard]);
 
   return [value, upsert, remove];
 }
