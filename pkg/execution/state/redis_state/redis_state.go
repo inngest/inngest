@@ -120,15 +120,23 @@ type Config struct {
 
 func (c Config) StateName() string { return "redis" }
 
-func (c Config) Manager(ctx context.Context) (state.Manager, error) {
+// SingleClusterManager returns a state manager connecting to just one Redis instance. Do not use this when separate instances
+// should be used for sharded/unsharded data
+func (c Config) SingleClusterManager(ctx context.Context) (state.Manager, error) {
 	opts, err := c.ConnectOpts()
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := rueidis.NewClient(opts)
 	if err != nil {
 		return nil, err
 	}
 
 	return New(
 		ctx,
-		WithConnectOpts(opts),
+		WithShardedClient(NewShardedClient(r)),
+		WithUnshardedClient(NewUnshardedClient(r)),
 	)
 }
 
@@ -155,30 +163,6 @@ func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
 
 	for _, opt := range opts {
 		opt(m)
-	}
-
-	if m.s == nil {
-		r, err := rueidis.NewClient(rueidis.ClientOption{
-			InitAddress: []string{"localhost:6379"},
-			Password:    "",
-		})
-		if err != nil {
-			return m, err
-		}
-
-		m.s = NewShardedClient(r)
-	}
-
-	if m.u == nil {
-		r, err := rueidis.NewClient(rueidis.ClientOption{
-			InitAddress: []string{"localhost:6379"},
-			Password:    "",
-		})
-		if err != nil {
-			return m, err
-		}
-
-		m.u = NewUnshardedClient(r)
 	}
 
 	if m.pauseR == nil {
@@ -208,13 +192,6 @@ func WithShardedClient(s *ShardedClient) Opt {
 func WithUnshardedClient(u *UnshardedClient) Opt {
 	return func(m *mgr) {
 		m.u = u
-	}
-}
-
-// WithPauseRedisClient uses an already connected redis client for managing pauses.
-func WithPauseRedisClient(r rueidis.Client) Opt {
-	return func(m *mgr) {
-		m.pauseR = r
 	}
 }
 

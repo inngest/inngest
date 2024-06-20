@@ -162,7 +162,7 @@ func (s *svc) Pre(ctx context.Context) error {
 	}
 
 	if s.state == nil {
-		s.state, err = s.config.State.Service.Concrete.Manager(ctx)
+		s.state, err = s.config.State.Service.Concrete.SingleClusterManager(ctx)
 		if err != nil {
 			return err
 		}
