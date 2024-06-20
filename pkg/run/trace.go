@@ -209,6 +209,8 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 			if err := tb.processInvokeGroup(ctx, s, res); err != nil {
 				return nil, false, fmt.Errorf("error parsing invoke span: %w", err)
 			}
+		case enums.OpcodeStepPlanned: // don't bother
+			return nil, true, nil
 		default:
 			// execution spans
 			if s.ScopeName == consts.OtelScopeExecution {

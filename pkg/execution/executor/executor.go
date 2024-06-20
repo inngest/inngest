@@ -900,6 +900,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
 			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
 			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
+			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
 		),
 	)
 	if item.RunInfo != nil {
@@ -1023,9 +1024,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				span.SetStepOutput(op.Data)
 				span.SetStatus(codes.Ok, string(op.Data))
 			}
-		} else if resp.Retryable() {
+		} else if resp.Retryable() { // these are function retries
 			span.SetStatus(codes.Error, *resp.Err)
 			span.SetAttributes(
+				attribute.String(consts.OtelSysStepOpcode, enums.OpcodeNone.String()),
 				attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
 				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
 			)
@@ -1044,6 +1046,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			}
 
 			fnSpan.SetAttributes(fnstatus)
+			span.SetAttributes(attribute.String(consts.OtelSysStepOpcode, enums.OpcodeNone.String()))
 			span.SetName(spanName)
 			fnSpan.SetFnOutput(resp.Output)
 			span.SetFnOutput(resp.Output)
@@ -2319,6 +2322,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 		return nil
 	}
 	span.SetAttributes(
+		attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
 		attribute.String(consts.OtelSysStepNextOpcode, enums.OpcodeStepPlanned.String()),
 		attribute.Int64(consts.OtelSysStepNextTimestamp, now.UnixMilli()),
 	)
