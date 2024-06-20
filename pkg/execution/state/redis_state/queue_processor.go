@@ -695,9 +695,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	if err != nil {
 		return err
 	}
-	peekedSize := len(queue)
-	telemetry.IncrQueuePeekedCounter(ctx, int64(peekedSize), telemetry.CounterOpt{PkgName: pkgName})
-	telemetry.HistogramQueuePeekSize(ctx, int64(peekedSize), telemetry.HistogramOpt{PkgName: pkgName})
+	telemetry.HistogramQueuePeekSize(ctx, int64(len(queue)), telemetry.HistogramOpt{PkgName: pkgName})
 
 	var (
 		processErr error

@@ -2,15 +2,6 @@ package telemetry
 
 import "context"
 
-func IncrQueuePeekedCounter(ctx context.Context, incr int64, opts CounterOpt) {
-	RecordCounterMetric(ctx, incr, CounterOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "queue_peeked_total",
-		Description: "The total number of queues peeked",
-		Tags:        opts.Tags,
-	})
-}
-
 func IncrQueuePartitionLeasedCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
