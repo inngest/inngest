@@ -110,7 +110,7 @@ func TestSleep(t *testing.T) {
 
 			t.Run("failed", func(t *testing.T) {
 				exec := span.ChildSpans[0]
-				assert.Equal(t, "Attempt 1", exec.Name)
+				assert.Equal(t, "Attempt 0", exec.Name)
 				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), exec.Status)
 				assert.NotNil(t, exec.OutputID)
 
