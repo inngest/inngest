@@ -1,11 +1,11 @@
 'use client';
 
 import { IconCloudArrowDown } from '@inngest/components/icons/CloudArrowDown';
+import { devServerURL, useDevServer } from '@inngest/components/utils/useDevServer';
 import { type JsonValue } from 'type-fest';
 
 import DashboardCodeBlock from '@/components/DashboardCodeBlock/DashboardCodeBlock';
 import { getFragmentData, graphql, type FragmentType } from '@/gql';
-import { devServerURL, useDevServer } from '@/utils/useDevServer';
 
 const EventPayloadFragment = graphql(`
   fragment EventPayload on ArchivedEvent {
@@ -35,14 +35,14 @@ export default function EventPayload({ event }: EventPayloadProps) {
 
   return (
     <DashboardCodeBlock
-      tabs={[
-        {
-          label: 'Payload',
-          content: formattedPayload,
-          language: 'json',
-          readOnly: true,
-        },
-      ]}
+      header={{
+        title: 'Payload',
+      }}
+      tab={{
+        content: formattedPayload,
+        language: 'json',
+        readOnly: true,
+      }}
       actions={[
         {
           label: 'Send to Dev Server',

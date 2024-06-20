@@ -1,40 +1,44 @@
 'use client';
 
+import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
+
 import { CodeBlock } from './CodeBlock';
 import type { Result } from './types/functionRun';
 
 type Props = {
   className?: string;
   result: Result;
+  isSuccess?: boolean;
 };
 
-export function RunResult({ className, result }: Props) {
+export function RunResult({ className, result, isSuccess }: Props) {
+  const prettyResult = result.data && usePrettyJson(result.data);
+
   return (
     <div className={className}>
       {result.data && (
         <CodeBlock
-          tabs={[
-            {
-              label: 'Output',
-              content: result.data,
-            },
-          ]}
+          header={{
+            title: 'Output',
+            status: isSuccess ? 'success' : undefined,
+          }}
+          tab={{
+            content: prettyResult || result.data,
+          }}
         />
       )}
 
       {result.error?.stack && (
         <CodeBlock
           header={{
-            color: 'bg-rose-50',
-            description: result.error.message,
-            title: result.error.name ?? 'Error',
+            title:
+              (result.error.name || 'Error') +
+              (result.error.message ? ': ' + result.error.message : ''),
+            status: 'error',
           }}
-          tabs={[
-            {
-              label: 'Stack',
-              content: result.error.stack,
-            },
-          ]}
+          tab={{
+            content: result.error.stack,
+          }}
         />
       )}
     </div>

@@ -4,12 +4,23 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
+)
+
+type SpanStatus int
+
+const (
+	SpanStatusUnknown = iota
+	SpanStatusOk
+	SpanStatusError
 )
 
 // Span represents an distributed span in a function execution flow
@@ -32,6 +43,101 @@ type Span struct {
 	Events             []SpanEvent       `json:"events"`
 	Links              []SpanLink        `json:"links"`
 	RunID              *ulid.ULID        `json:"run_id"`
+
+	// Children is a virtual field used for reconstructing the trace tree.
+	// This field is not expected to be stored in the DB
+	Children []*Span `json:"spans"`
+}
+
+func (s *Span) GroupID() *string {
+	if groupID, ok := s.SpanAttributes[consts.OtelSysStepGroupID]; ok {
+		return &groupID
+	}
+	return nil
+}
+
+func (s *Span) AccountID() *uuid.UUID {
+	if str, ok := s.SpanAttributes[consts.OtelSysAccountID]; ok {
+		if id, err := uuid.Parse(str); err == nil {
+			return &id
+		}
+	}
+	return nil
+}
+
+func (s *Span) WorkspaceID() *uuid.UUID {
+	if str, ok := s.SpanAttributes[consts.OtelSysWorkspaceID]; ok {
+		if id, err := uuid.Parse(str); err == nil {
+			return &id
+		}
+	}
+	return nil
+}
+
+func (s *Span) AppID() *uuid.UUID {
+	if str, ok := s.SpanAttributes[consts.OtelSysAppID]; ok {
+		if id, err := uuid.Parse(str); err == nil {
+			return &id
+		}
+	}
+	return nil
+}
+
+func (s *Span) FunctionID() *uuid.UUID {
+	if str, ok := s.SpanAttributes[consts.OtelSysFunctionID]; ok {
+		if id, err := uuid.Parse(str); err == nil {
+			return &id
+		}
+	}
+	return nil
+}
+
+func (s *Span) StepDisplayName() *string {
+	if name, ok := s.SpanAttributes[consts.OtelSysStepDisplayName]; ok {
+		return &name
+	}
+	return nil
+}
+
+func (s *Span) Status() SpanStatus {
+	switch strings.ToUpper(s.StatusCode) {
+	case "OK", "STATUS_CODE_OK":
+		return SpanStatusOk
+	case "ERROR", "STATUS_CODE_ERROR":
+		return SpanStatusError
+	}
+
+	return SpanStatusUnknown
+}
+
+func (s *Span) FunctionStatus() enums.RunStatus {
+	if str, ok := s.SpanAttributes[consts.OtelSysFunctionStatusCode]; ok {
+		if code, err := strconv.ParseInt(str, 10, 64); err == nil {
+			return enums.RunCodeToStatus(code)
+		}
+	}
+	return enums.RunStatusUnknown
+}
+
+func (s *Span) StepOpCode() enums.Opcode {
+	if op, ok := s.SpanAttributes[consts.OtelSysStepOpcode]; ok {
+		switch op {
+		case enums.OpcodeStep.String(), enums.OpcodeStepRun.String(), enums.OpcodeStepError.String():
+			return enums.OpcodeStepRun
+		case enums.OpcodeSleep.String():
+			return enums.OpcodeSleep
+		case enums.OpcodeInvokeFunction.String():
+			return enums.OpcodeInvokeFunction
+		case enums.OpcodeWaitForEvent.String():
+			return enums.OpcodeWaitForEvent
+		}
+	}
+
+	return enums.OpcodeNone
+}
+
+func (s *Span) DurationMS() int64 {
+	return int64(s.Duration / time.Millisecond)
 }
 
 type SpanEvent struct {
@@ -95,7 +201,7 @@ type TraceWriter interface {
 
 type TraceWriterDev interface {
 	// FindOrCreateTraceRun will return a TraceRun by runID, or create a new one if it doesn't exists
-	FindOrCreateTraceRun(ctx context.Context, opts FindOrCreateTraceRunOpt) (*TraceRun, error)
+	FindOrBuildTraceRun(ctx context.Context, opts FindOrCreateTraceRunOpt) (*TraceRun, error)
 }
 
 type TraceReader interface {
@@ -154,12 +260,28 @@ type TraceRunIdentifier struct {
 }
 
 type SpanIdentifier struct {
-	AccountID   uuid.UUID
-	WorkspaceID uuid.UUID
-	AppID       uuid.UUID
-	FunctionID  uuid.UUID
-	TraceID     string
-	SpanID      string
+	AccountID   uuid.UUID `json:"acctID"`
+	WorkspaceID uuid.UUID `json:"wsID"`
+	AppID       uuid.UUID `json:"appID"`
+	FunctionID  uuid.UUID `json:"fnID"`
+	TraceID     string    `json:"tid"`
+	SpanID      string    `json:"sid"`
+}
+
+func (si *SpanIdentifier) Encode() (string, error) {
+	byt, err := json.Marshal(si)
+	if err != nil {
+		return "", fmt.Errorf("error encoding span identifier: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(byt), nil
+}
+
+func (si *SpanIdentifier) Decode(data string) error {
+	byt, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(byt, si)
 }
 
 // TracePageCursor represents the composite cursor used to handle pagination

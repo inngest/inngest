@@ -8,10 +8,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateAppInput) (*cqrs.App, error) {
@@ -101,6 +104,17 @@ func (r *mutationResolver) InvokeFunction(
 		},
 		FnID: functionSlug,
 	})
+
+	ctx, span := telemetry.NewSpan(ctx,
+		telemetry.WithName(consts.OtelSpanInvoke),
+		telemetry.WithScope(consts.OtelScopeInvoke),
+		telemetry.WithNewRoot(),
+		telemetry.WithSpanAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysFunctionSlug, functionSlug),
+		),
+	)
+	defer span.End()
 
 	sent := false
 	_, err := r.EventHandler(ctx, &evt)

@@ -25,6 +25,8 @@ export default {
           '2xIntense': 'rgb(var(--color-primary-2xIntense) / <alpha-value>)',
         },
         secondary: {
+          '4xSubtle': 'rgb(var(--color-secondary-4xSubtle) / <alpha-value>)',
+          '3xSubtle': 'rgb(var(--color-secondary-3xSubtle) / <alpha-value>)',
           '2xSubtle': 'rgb(var(--color-secondary-2xSubtle) / <alpha-value>)',
           xSubtle: 'rgb(var(--color-secondary-xSubtle) / <alpha-value>)',
           subtle: 'rgb(var(--color-secondary-subtle) / <alpha-value>)',
@@ -47,14 +49,23 @@ export default {
           coolModerate: 'rgb(var(--color-quaternary-cool-moderate) / <alpha-value>)',
           coolxIntense: 'rgb(var(--color-quaternary-cool-xIntense) / <alpha-value>)',
         },
+        accent: {
+          '2xSubtle': 'rgb(var(--color-accent-2xSubtle) / <alpha-value>)',
+          xSubtle: 'rgb(var(--color-accent-xSubtle) / <alpha-value>)',
+          subtle: 'rgb(var(--color-accent-subtle) / <alpha-value>)',
+          moderate: 'rgb(var(--color-accent-moderate) / <alpha-value>)',
+          intense: 'rgb(var(--color-accent-intense) / <alpha-value>)',
+          xIntense: 'rgb(var(--color-accent-xIntense) / <alpha-value>)',
+          '2xIntense': 'rgb(var(--color-accent-2xIntense) / <alpha-value>)',
+        },
         status: {
           failed: 'rgb(var(--color-tertiary-intense) / <alpha-value>)',
           running: 'rgb(var(--color-secondary-intense) / <alpha-value>)',
           runningSubtle: 'rgb(var(--color-secondary-xSubtle) / <alpha-value>)',
           queued: 'rgb(var(--color-quaternary-cool-xIntense) / <alpha-value>)',
           queuedSubtle: 'rgb(var(--color-quaternary-cool-xSubtle) / <alpha-value>)',
-          complete: 'rgb(var(--color-primary-intense) / <alpha-value>)',
-          cancelled: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
+          completed: 'rgb(var(--color-primary-intense) / <alpha-value>)',
+          cancelled: 'rgb(var(--color-foreground-cancelled) / <alpha-value>)',
         },
       },
       borderColor: {
@@ -95,7 +106,7 @@ export default {
         btnDangerDisabled: 'rgb(var(--color-background-btn-dangerDisabled) / <alpha-value>)',
       },
       textColor: {
-        base: 'rgb(var(--color-foreground-base) / <alpha-value>)',
+        basis: 'rgb(var(--color-foreground-base) / <alpha-value>)',
         subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
         muted: 'rgb(var(--color-foreground-muted) / <alpha-value>)',
         onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
@@ -112,9 +123,15 @@ export default {
         btnDanger: 'rgb(var(--color-foreground-btn-danger) / <alpha-value>)',
         btnDangerDisabled: 'rgb(var(--color-foreground-btn-dangerDisabled) / <alpha-value>)',
       },
+      textDecorationColor: {
+        link: 'rgb(var(--color-foreground-link) / <alpha-value>)',
+      },
       fill: {
         onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
         subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
+        alwaysWhite: 'rgb(var(--color-foreground-alwaysWhite) / <alpha-value>)',
+        btnPrimary: 'rgb(var(--color-foreground-btn-primary) / <alpha-value>)',
+        btnDanger: 'rgb(var(--color-foreground-btn-danger) / <alpha-value>)',
       },
       gridTemplateColumns: {
         dashboard: '1fr 1fr 1fr 432px',

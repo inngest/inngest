@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Link as InngestLink } from '@inngest/components/Link';
 import { Time } from '@inngest/components/Time';
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
@@ -17,23 +17,23 @@ type Props = {
 };
 
 export const cardLeftPanelStyles =
-  'h-24 bg-slate-500 md:h-44 flex md:w-[410px] flex-col justify-center gap-2 px-10';
+  'h-24 bg-canvasSubtle md:h-44 flex md:w-[410px] flex-col justify-center gap-2 px-10';
 export const cardRightPanelStyles = 'h-44 flex-1 flex flex-col justify-center px-8';
 
 export function UnattachedSyncsCard({ className, envSlug, latestSyncTime }: Props) {
   return (
-    <div className={classNames(cardWrapperStyles, className)}>
-      <div className={cardLeftPanelStyles}>
+    <div className={cn(cardWrapperStyles, className)}>
+      <Link
+        href={pathCreator.unattachedSyncs({ envSlug })}
+        className={cn(cardLeftPanelStyles, 'hover:bg-canvasMuted transition-colors duration-300')}
+      >
         <h2>
-          <Link
-            className="transition-color flex cursor-pointer items-center gap-1 text-white underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-300 hover:decoration-indigo-300"
-            href={pathCreator.unattachedSyncs({ envSlug })}
-          >
+          <div className="text-basis flex items-center gap-1 font-medium">
             Unattached Syncs
             <RiArrowRightSLine className="h-4 w-4" />
-          </Link>
+          </div>
         </h2>
-      </div>
+      </Link>
       <div className={cardRightPanelStyles}>
         <dl className="grid grid-cols-2 gap-4 min-[900px]:grid-cols-3">
           <p className="col-span-2 md:col-span-3">

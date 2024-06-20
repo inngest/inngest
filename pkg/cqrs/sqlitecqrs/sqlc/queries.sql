@@ -177,18 +177,21 @@ SELECT * FROM history WHERE run_id = ? ORDER BY created_at ASC;
 
 -- name: InsertTrace :exec
 INSERT INTO traces
-	(timestamp, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id)
+	(timestamp, timestamp_unix_ms, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id)
 VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: InsertTraceRun :exec
 INSERT OR REPLACE INTO trace_runs
-	(account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce)
+	(account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce, cron_schedule)
 VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetTraceRun :one
 SELECT * FROM trace_runs WHERE run_id = @run_id;
 
 -- name: GetTraceSpans :many
-SELECT * FROM traces WHERE run_id = @run_id ORDER BY timestamp DESC, duration DESC;
+SELECT * FROM traces WHERE trace_id = @trace_id AND run_id = @run_id ORDER BY timestamp_unix_ms DESC, duration DESC;
+
+-- name: GetTraceSpanOutput :many
+select * from traces where trace_id = @trace_id AND span_id = @span_id ORDER BY timestamp_unix_ms DESC, duration DESC;

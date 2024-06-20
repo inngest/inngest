@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useClient } from 'urql';
 
 import { graphql } from '@/gql';
+import { fetchWithTimeout } from '@/queries/fetch';
 import { useEnvironment } from '../../../environment-context';
 
 const query = graphql(`
@@ -65,13 +66,20 @@ export function useGetAppInfo() {
           envID: env.id,
           url,
         },
-        { requestPolicy: 'network-only' }
+        {
+          fetch: fetchWithTimeout(5_000),
+          requestPolicy: 'network-only',
+        }
       );
       if (res.error) {
+        if (res.error.message.includes('signal is aborted')) {
+          throw new Error(`Request timed out`);
+        }
+
         throw res.error;
       }
       if (!res.data) {
-        throw new Error('no data');
+        throw new Error('No data');
       }
       return res.data.env.appCheck;
     },

@@ -839,12 +839,17 @@ func (q *Queries) GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, 
 	return &i, err
 }
 
-const getTraceSpans = `-- name: GetTraceSpans :many
-SELECT timestamp, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id FROM traces WHERE run_id = ?1 ORDER BY timestamp DESC, duration DESC
+const getTraceSpanOutput = `-- name: GetTraceSpanOutput :many
+select timestamp, timestamp_unix_ms, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id from traces where trace_id = ?1 AND span_id = ?2 ORDER BY timestamp_unix_ms DESC, duration DESC
 `
 
-func (q *Queries) GetTraceSpans(ctx context.Context, runID ulid.ULID) ([]*Trace, error) {
-	rows, err := q.db.QueryContext(ctx, getTraceSpans, runID)
+type GetTraceSpanOutputParams struct {
+	TraceID string
+	SpanID  string
+}
+
+func (q *Queries) GetTraceSpanOutput(ctx context.Context, arg GetTraceSpanOutputParams) ([]*Trace, error) {
+	rows, err := q.db.QueryContext(ctx, getTraceSpanOutput, arg.TraceID, arg.SpanID)
 	if err != nil {
 		return nil, err
 	}
@@ -854,6 +859,59 @@ func (q *Queries) GetTraceSpans(ctx context.Context, runID ulid.ULID) ([]*Trace,
 		var i Trace
 		if err := rows.Scan(
 			&i.Timestamp,
+			&i.TimestampUnixMs,
+			&i.TraceID,
+			&i.SpanID,
+			&i.ParentSpanID,
+			&i.TraceState,
+			&i.SpanName,
+			&i.SpanKind,
+			&i.ServiceName,
+			&i.ResourceAttributes,
+			&i.ScopeName,
+			&i.ScopeVersion,
+			&i.SpanAttributes,
+			&i.Duration,
+			&i.StatusCode,
+			&i.StatusMessage,
+			&i.Events,
+			&i.Links,
+			&i.RunID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTraceSpans = `-- name: GetTraceSpans :many
+SELECT timestamp, timestamp_unix_ms, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id FROM traces WHERE trace_id = ?1 AND run_id = ?2 ORDER BY timestamp_unix_ms DESC, duration DESC
+`
+
+type GetTraceSpansParams struct {
+	TraceID string
+	RunID   ulid.ULID
+}
+
+func (q *Queries) GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([]*Trace, error) {
+	rows, err := q.db.QueryContext(ctx, getTraceSpans, arg.TraceID, arg.RunID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Trace
+	for rows.Next() {
+		var i Trace
+		if err := rows.Scan(
+			&i.Timestamp,
+			&i.TimestampUnixMs,
 			&i.TraceID,
 			&i.SpanID,
 			&i.ParentSpanID,
@@ -1177,17 +1235,18 @@ func (q *Queries) InsertHistory(ctx context.Context, arg InsertHistoryParams) er
 const insertTrace = `-- name: InsertTrace :exec
 
 INSERT INTO traces
-	(timestamp, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id)
+	(timestamp, timestamp_unix_ms, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id)
 VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertTraceParams struct {
 	Timestamp          time.Time
-	TraceID            []byte
-	SpanID             []byte
-	ParentSpanID       []byte
-	TraceState         []byte
+	TimestampUnixMs    int64
+	TraceID            string
+	SpanID             string
+	ParentSpanID       sql.NullString
+	TraceState         sql.NullString
 	SpanName           string
 	SpanKind           string
 	ServiceName        string
@@ -1207,6 +1266,7 @@ type InsertTraceParams struct {
 func (q *Queries) InsertTrace(ctx context.Context, arg InsertTraceParams) error {
 	_, err := q.db.ExecContext(ctx, insertTrace,
 		arg.Timestamp,
+		arg.TimestampUnixMs,
 		arg.TraceID,
 		arg.SpanID,
 		arg.ParentSpanID,
@@ -1230,27 +1290,28 @@ func (q *Queries) InsertTrace(ctx context.Context, arg InsertTraceParams) error 
 
 const insertTraceRun = `-- name: InsertTraceRun :exec
 INSERT OR REPLACE INTO trace_runs
-	(account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce)
+	(account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce, cron_schedule)
 VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertTraceRunParams struct {
-	AccountID   uuid.UUID
-	WorkspaceID uuid.UUID
-	AppID       uuid.UUID
-	FunctionID  uuid.UUID
-	TraceID     []byte
-	RunID       ulid.ULID
-	QueuedAt    int64
-	StartedAt   int64
-	EndedAt     int64
-	Status      int64
-	SourceID    string
-	TriggerIds  []byte
-	Output      []byte
-	BatchID     ulid.ULID
-	IsDebounce  bool
+	AccountID    uuid.UUID
+	WorkspaceID  uuid.UUID
+	AppID        uuid.UUID
+	FunctionID   uuid.UUID
+	TraceID      []byte
+	RunID        ulid.ULID
+	QueuedAt     int64
+	StartedAt    int64
+	EndedAt      int64
+	Status       int64
+	SourceID     string
+	TriggerIds   []byte
+	Output       []byte
+	BatchID      ulid.ULID
+	IsDebounce   bool
+	CronSchedule sql.NullString
 }
 
 func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) error {
@@ -1270,6 +1331,7 @@ func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) 
 		arg.Output,
 		arg.BatchID,
 		arg.IsDebounce,
+		arg.CronSchedule,
 	)
 	return err
 }

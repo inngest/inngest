@@ -39,6 +39,7 @@ const (
 	OtelSysFunctionEndAt      = "sys.function.time.end"
 	OtelSysFunctionStatusCode = "sys.function.status.code"
 	OtelSysFunctionOutput     = "sys.function.output"
+	OtelSysFunctionLink       = "sys.function.link"
 
 	OtelSysStepDisplayName     = "sys.step.display.name"
 	OtelSysStepOpcode          = "sys.step.opcode"

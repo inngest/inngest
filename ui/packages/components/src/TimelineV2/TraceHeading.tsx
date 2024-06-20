@@ -119,7 +119,7 @@ function TimeWithText({ trace }: { trace: Props['trace'] }) {
   }
 
   return (
-    <div className="text-xs text-slate-600">
+    <div className="text-basis text-xs">
       {text}: <Time value={value} />
     </div>
   );

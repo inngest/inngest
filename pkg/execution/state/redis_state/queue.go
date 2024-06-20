@@ -1209,7 +1209,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	case 7:
 		return nil, newKeyError(ErrQueueItemThrottled, item.Data.Throttle.Key)
 	default:
-		return nil, fmt.Errorf("unknown response enqueueing item: %d", status)
+		return nil, fmt.Errorf("unknown response leasing item: %d", status)
 	}
 }
 
@@ -1286,7 +1286,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 	case 3:
 		return nil, ErrQueueItemLeaseMismatch
 	default:
-		return nil, fmt.Errorf("unknown response enqueueing item: %d", status)
+		return nil, fmt.Errorf("unknown response extending lease: %d", status)
 	}
 }
 
@@ -1453,8 +1453,12 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 	switch status {
 	case 0:
 		return nil
+	case 1:
+		// This should only ever happen if a run is cancelled and all queue items
+		// are deleted before requeueing.
+		return ErrQueueItemNotFound
 	default:
-		return fmt.Errorf("unknown response enqueueing item: %d", status)
+		return fmt.Errorf("unknown response requeueing item: %v (%T)", status, status)
 	}
 }
 

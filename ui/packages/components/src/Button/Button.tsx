@@ -9,7 +9,6 @@ import { cn } from '../utils/classNames';
 import {
   getButtonColors,
   getButtonSizeStyles,
-  getDisabledStyles,
   getIconSizeStyles,
   getKeyColor,
   getSpinnerStyles,
@@ -89,7 +88,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const buttonColors = getButtonColors({ kind, appearance, loading });
     const buttonSizes = getButtonSizeStyles({ size, icon, label });
-    const disabledStyles = getDisabledStyles({ kind, appearance });
     const spinnerStyles = getSpinnerStyles({ kind, appearance });
     const iconSizes = getIconSizeStyles({ size });
     const keyColor = getKeyColor({ kind, appearance });
@@ -105,13 +103,17 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {loading && (
           <IconSpinner className={cn(spinnerStyles, iconSizes, 'top-50% left-50% absolute')} />
         )}
-        {icon && iconSide === 'left' && iconElement}
+        {icon && iconSide === 'left' && (
+          <span className={cn(size === 'small' ? 'pr-1' : 'pr-1.5')}>{iconElement}</span>
+        )}
         {label ? (
           <span className={loading ? 'invisible' : 'visible'}>{label}</span>
         ) : (
           icon && !iconSide && iconElement
         )}
-        {icon && iconSide === 'right' && iconElement}
+        {icon && iconSide === 'right' && (
+          <span className={cn(size === 'small' ? 'pl-1' : 'pl-1.5')}>{iconElement}</span>
+        )}
         {/* {keys && (
           <kbd className="ml-auto flex items-center gap-1">
             {keys.map((key, i) => (
@@ -140,8 +142,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             className={cn(
               buttonColors,
               buttonSizes,
-              disabledStyles,
-              'flex items-center justify-center whitespace-nowrap rounded-md',
+              'flex items-center justify-center whitespace-nowrap rounded-md disabled:cursor-not-allowed',
               className
             )}
             type={type}

@@ -228,6 +228,7 @@ func (l lifecycle) OnFunctionCancelled(
 	ctx context.Context,
 	md sv2.Metadata,
 	req execution.CancelRequest,
+	evts []json.RawMessage,
 ) {
 	completedStepCount := int64(md.Metrics.StepCount)
 	groupID := uuid.New()
@@ -751,7 +752,7 @@ func applyResponse(
 		stepName := op.UserDefinedName()
 		h.StepName = &stepName
 	}
-	
+
 	// Only set the output to the response error string if there isn't already output. This prevents overriding errors in the user's function
 	if resp.Output == nil && resp.Error() != "" {
 		h.Result.Output = resp.Error()

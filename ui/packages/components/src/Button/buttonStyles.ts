@@ -18,36 +18,36 @@ interface ButtonSizeStyleParams extends ButtonSizeParams {
 export const getButtonColors = ({ kind, appearance, loading }: ButtonColorParams) => {
   const solidButtonStyles = {
     primary: loading
-      ? 'bg-primary-xSubtle text-onContrast'
-      : 'bg-primary-intense focus:bg-primary-xIntense hover:bg-primary-xIntense active:bg-primary-2xIntense disabled:bg-primary-xSubtle text-onContrast',
+      ? 'bg-btnPrimaryDisabled text-alwaysWhite'
+      : 'bg-btnPrimary focus:bg-btnPrimaryPressed hover:bg-btnPrimaryHover active:bg-btnPrimaryPressed disabled:bg-btnPrimaryDisabled text-alwaysWhite',
     secondary: '', // NOOP: there are no designs for secondary solid buttons,
     danger: loading
-      ? 'bg-tertiary-xSubtle text-onContrast'
-      : 'bg-tertiary-intense focus:bg-primary-xIntense hover:bg-tertiary-xIntense active:bg-tertiary-2xIntense disabled:bg-tertiary-xSubtle text-onContrast',
+      ? 'bg-btnDangerDisabled text-alwaysWhite'
+      : 'bg-btnDanger focus:bg-btnDangerPressed hover:bg-btnDangerHover active:bg-btnDangerPressed disabled:bg-btnDangerDisabled text-alwaysWhite',
   };
 
   const outlinedButtonStyles = {
     primary: loading
-      ? 'border border-subtle text-primary-moderate'
-      : 'border border-muted text-primary-intense focus:bg-subtle hover:bg-subtle active:bg-muted disabled:bg-disabled disabled:text-primary-xSubtle',
+      ? 'border border-subtle text-btnPrimaryDisabled'
+      : 'border border-muted text-btnPrimary focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnPrimaryDisabled',
     secondary: loading
       ? 'border border-subtle text-foreground-subtle'
-      : 'border border-muted text-foreground-base focus:bg-subtle hover:bg-subtle active:bg-muted disabled:bg-disabled disabled:text-foreground-disabled',
+      : 'border border-muted text-basis focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-disabled',
     danger: loading
-      ? 'border border-subtle text-tertiary-moderate'
-      : 'border border-muted text-tertiary-intense focus:bg-subtle hover:bg-subtle active:bg-muted disabled:bg-disabled disabled:text-tertiary-xSubtle',
+      ? 'border border-subtle text-btnDangerDisabled'
+      : 'border border-muted text-btnDanger focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnDangerDisabled',
   };
 
   const ghostButtonStyles = {
     primary: loading
-      ? 'text-primary-moderate'
-      : 'text-primary-intense focus:bg-subtle hover:bg-subtle active:bg-muted disabled:text-primary-xSubtle',
+      ? 'text-btnPrimaryDisabled'
+      : 'text-btnPrimary focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:bg-disabled disabled:text-btnPrimaryDisabled',
     secondary: loading
       ? 'text-foreground-subtle'
-      : 'text-foreground-base focus:bg-subtle hover:bg-subtle active:bg-muted disabled:text-foreground-disabled',
+      : 'text-basis focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:bg-disabled disabled:text-disabled',
     danger: loading
-      ? 'text-tertiary-moderate'
-      : 'text-tertiary-intense focus:bg-subtle hover:bg-subtle active:bg-muted disabled:bg-disabled disabled:text-tertiary-xSubtle',
+      ? 'text-btnDangerDisabled'
+      : 'text-btnDanger focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:bg-disabled disabled:text-btnDangerDisabled',
   };
 
   if (appearance === 'solid') {
@@ -91,15 +91,6 @@ export const getButtonSizeStyles = ({ size, icon, label }: ButtonSizeStyleParams
   return icon && !label ? iconOnlySizeStyles[size] : sizeStyles[size];
 };
 
-export const getDisabledStyles = ({ appearance }: ButtonColorParams) => {
-  if (appearance === 'solid') {
-    return 'disabled:cursor-not-allowed disabled:text-slate-400 disabled:bg-slate-200 dark:disabled:text-slate-500 dark:disabled:bg-slate-800 ';
-  } else if (appearance === 'outlined') {
-    return 'disabled:cursor-not-allowed disabled:text-slate-400 disabled:border-slate-200 disabled:bg-slate-100 dark:disabled:text-slate-500 dark:disabled:border-slate-800 dark:disabled:bg-slate-900';
-  }
-  return 'disabled:cursor-not-allowed disabled:text-slate-400 dark:disabled:text-slate-500 disabled:hover:no-underline';
-};
-
 export const getIconSizeStyles = ({ size }: ButtonSizeParams) => {
   const sizeStyles = {
     small: 'h-4 w-4',
@@ -112,12 +103,12 @@ export const getIconSizeStyles = ({ size }: ButtonSizeParams) => {
 
 export const getSpinnerStyles = ({ appearance, kind }: ButtonColorParams) => {
   const defaultSpinnerStyles = {
-    primary: 'fill-primary-moderate',
+    primary: 'fill-btnPrimary',
     secondary: 'fill-subtle',
-    danger: 'fill-tertiary-moderate',
+    danger: 'fill-btnDanger',
   };
-  if (appearance === 'outlined') {
+  if (appearance === 'outlined' || appearance === 'ghost') {
     return defaultSpinnerStyles[kind];
   }
-  return 'fill-onContrast';
+  return 'fill-alwaysWhite';
 };

@@ -11,6 +11,8 @@ import {
 } from '../DetailsCard/Element';
 import { Link } from '../Link';
 import { RerunButton } from '../RerunButtonV2';
+import { RunResult } from '../RunResult';
+import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
@@ -26,6 +28,7 @@ type Props = {
   rerun: (args: { fnID: string }) => Promise<unknown>;
   run: Lazy<Run>;
   runID: string;
+  result?: Result;
 };
 
 type Run = {
@@ -55,17 +58,20 @@ export function RunInfo({
   run,
   runID,
   standalone,
+  result,
 }: Props) {
   let allowCancel = false;
+  let isSuccess = false;
   if (isLazyDone(run)) {
     allowCancel = !Boolean(run.trace.endedAt);
+    isSuccess = run.trace.status === 'COMPLETED';
   }
 
   return (
     <div className={cn('flex flex-col gap-5', className)}>
       <Card>
         <Card.Header className="h-11 flex-row items-center gap-2">
-          <div className="flex grow items-center gap-2">
+          <div className="text-basis flex grow items-center gap-2">
             Run details {!standalone && <Link href={pathCreator.runPopout({ runID })} />}
           </div>
 
@@ -147,6 +153,9 @@ export function RunInfo({
             </dl>
           </div>
         </Card.Content>
+        {result && (
+          <RunResult className="border-muted border-t" result={result} isSuccess={isSuccess} />
+        )}
       </Card>
     </div>
   );

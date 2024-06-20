@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { GSP_NO_RETURNED_VALUE } from 'next/dist/lib/constants';
 // import { Button } from '@inngest/components/Button';
 // import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import * as Collapsible from '@radix-ui/react-collapsible';
@@ -15,7 +16,9 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
+import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import { cn } from '../utils/classNames';
+import { devServerURL, useDevServer } from '../utils/useDevServer';
 
 type Props = {
   className?: string;
@@ -36,6 +39,7 @@ export function TriggerDetails({ className, getTrigger }: Props) {
   const [showEventPanel, setShowEventPanel] = useLocalStorage('showEventPanel', true);
   const [trigger, setTrigger] = useState<Trigger>();
   const isLoading = !trigger;
+  const { isRunning, send } = useDevServer();
 
   useEffect(() => {
     getTrigger().then((data) => {
@@ -75,6 +79,45 @@ export function TriggerDetails({ className, getTrigger }: Props) {
     type = 'CRON';
   }
 
+  const codeBlockActions = useMemo(() => {
+    let disabled = true;
+    let onClick = () => {};
+    let title: string;
+
+    if (!trigger) {
+      title = 'Loading trigger';
+    } else if (trigger.isBatch) {
+      title = "Can't send a batch";
+    } else if (trigger.cron) {
+      title = "Can't send a cron";
+    } else {
+      const payload = trigger.payloads[0];
+
+      if (!payload) {
+        // Unreachable
+        title = 'Trigger has no payloads';
+        console.error(title);
+      } else {
+        disabled = !isRunning;
+        onClick = () => send(payload);
+
+        title = isRunning
+          ? 'Send event payload to running Dev Server'
+          : `Dev Server is not running at ${devServerURL}`;
+      }
+    }
+
+    return [
+      {
+        label: 'Send to Dev Server',
+        title,
+        icon: <IconCloudArrowDown />,
+        onClick,
+        disabled,
+      },
+    ];
+  }, [trigger]);
+
   return (
     <Collapsible.Root
       className={cn(showEventPanel && 'w-2/5', 'flex flex-col gap-5', className)}
@@ -99,7 +142,7 @@ export function TriggerDetails({ className, getTrigger }: Props) {
           <>
             <Card>
               <Card.Header className="h-11 flex-row items-center gap-2">
-                <div className="flex grow items-center gap-2">Trigger details</div>
+                <div className="text-basis flex grow items-center gap-2">Trigger details</div>
                 {/* <Collapsible.Trigger asChild>
                   <Button size="large" appearance="text" icon={<RiContractRightFill />} />
                 </Collapsible.Trigger> */}
@@ -181,20 +224,20 @@ export function TriggerDetails({ className, getTrigger }: Props) {
                     )}
                   </dl>
                 </div>
-
-                {trigger?.payloads && type !== 'CRON' && (
-                  <div className="mt-4">
-                    <CodeBlock
-                      tabs={[
-                        {
-                          label: trigger.isBatch ? 'Batch' : 'Event payload',
-                          content: prettyPayload ?? 'Unknown',
-                        },
-                      ]}
-                    />
-                  </div>
-                )}
               </Card.Content>
+              {trigger?.payloads && type !== 'CRON' && (
+                <div className="border-muted border-t">
+                  <CodeBlock
+                    actions={codeBlockActions}
+                    header={{
+                      title: trigger.isBatch ? 'Batch' : 'Event payload',
+                    }}
+                    tab={{
+                      content: prettyPayload ?? 'Unknown',
+                    }}
+                  />
+                </div>
+              )}
             </Card>
           </>
         )}
