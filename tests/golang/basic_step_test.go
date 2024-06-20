@@ -179,7 +179,7 @@ func TestFunctionSteps(t *testing.T) {
 			t.Run("step 1", func(t *testing.T) {
 				one := run.Trace.ChildSpans[0]
 				assert.Equal(t, "1", one.Name)
-				assert.Equal(t, 1, one.Attempts)
+				assert.Equal(t, 0, one.Attempts)
 				assert.False(t, one.IsRoot)
 				assert.Equal(t, rootSpanID, one.ParentSpanID)
 				assert.Equal(t, models.StepOpRun.String(), one.StepOp)
@@ -193,7 +193,7 @@ func TestFunctionSteps(t *testing.T) {
 			t.Run("step 2", func(t *testing.T) {
 				sec := run.Trace.ChildSpans[1]
 				assert.Equal(t, "2", sec.Name)
-				assert.Equal(t, 1, sec.Attempts)
+				assert.Equal(t, 0, sec.Attempts)
 				assert.False(t, sec.IsRoot)
 				assert.Equal(t, rootSpanID, sec.ParentSpanID)
 				assert.Equal(t, models.StepOpRun.String(), sec.StepOp)

@@ -167,7 +167,7 @@ func TestSleep(t *testing.T) {
 				t.Run("failed execution", func(t *testing.T) {
 					exec := sleep.ChildSpans[0]
 					assert.Equal(t, models.RunTraceSpanStatusFailed.String(), exec.Status)
-					assert.Equal(t, "Attempt 1", exec.Name)
+					assert.Equal(t, "Attempt 0", exec.Name)
 					assert.NotNil(t, exec.OutputID)
 
 					execOutput := c.RunSpanOutput(ctx, *exec.OutputID)

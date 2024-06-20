@@ -187,7 +187,7 @@ func TestInvokeGroup(t *testing.T) {
 
 			span := run.Trace.ChildSpans[0]
 			assert.Equal(t, consts.OtelExecPlaceholder, span.Name)
-			assert.Equal(t, 1, span.Attempts)
+			assert.Equal(t, 0, span.Attempts)
 			assert.Equal(t, rootSpanID, span.ParentSpanID)
 			assert.False(t, span.IsRoot)
 			assert.Equal(t, 1, len(span.ChildSpans))
@@ -197,7 +197,7 @@ func TestInvokeGroup(t *testing.T) {
 
 			t.Run("failed", func(t *testing.T) {
 				exec := span.ChildSpans[0]
-				assert.Equal(t, "Attempt 1", exec.Name)
+				assert.Equal(t, "Attempt 0", exec.Name)
 				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), exec.Status)
 				assert.NotNil(t, exec.OutputID)
 
