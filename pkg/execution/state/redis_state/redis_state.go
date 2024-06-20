@@ -710,31 +710,30 @@ func (m unshardedMgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 // Returns a boolean indicating whether it performed deletion. If the run had
 // parallel steps then it may be false, since parallel steps cause the function
 // end to be reached multiple times in a single run
-func (m shardedMgr) Delete(ctx context.Context, i state.Identifier) (bool, error) {
+func (m mgr) Delete(ctx context.Context, i state.Identifier) (bool, error) {
 	// Ensure this context isn't cancelled;  this is called in a goroutine.
 	callCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	key := i.Key
 	if i.Key == "" {
-		if md, err := m.Metadata(ctx, i.RunID); err == nil {
-			key = m.s.kg.Idempotency(ctx, md.Identifier)
+		if md, err := m.shardedMgr.Metadata(ctx, i.RunID); err == nil {
+			key = m.shardedMgr.s.kg.Idempotency(ctx, md.Identifier)
 		}
 	} else {
-		key = m.s.kg.Idempotency(ctx, i)
+		key = m.shardedMgr.s.kg.Idempotency(ctx, i)
 	}
 
-	cmd := m.s.r.B().Expire().Key(key).Seconds(int64(consts.FunctionIdempotencyPeriod.Seconds())).Build()
-	if err := m.s.r.Do(callCtx, cmd).Error(); err != nil {
+	cmd := m.shardedMgr.s.r.B().Expire().Key(key).Seconds(int64(consts.FunctionIdempotencyPeriod.Seconds())).Build()
+	if err := m.shardedMgr.s.r.Do(callCtx, cmd).Error(); err != nil {
 		return false, err
 	}
 
 	// Fetch all pauses for the run
-	if pauseIDs, err := m.s.r.Do(callCtx, m.s.r.B().Smembers().Key(m.s.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
+	if pauseIDs, err := m.shardedMgr.s.r.Do(callCtx, m.shardedMgr.s.r.B().Smembers().Key(m.shardedMgr.s.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
 		for _, id := range pauseIDs {
 			pauseID, _ := uuid.Parse(id)
-			// TODO We could make this possible by lifting this up. This isn't running atomically anyway
-			_ = m.DeletePauseByID(ctx, pauseID)
+			_ = m.unshardedMgr.DeletePauseByID(ctx, pauseID)
 		}
 	}
 
