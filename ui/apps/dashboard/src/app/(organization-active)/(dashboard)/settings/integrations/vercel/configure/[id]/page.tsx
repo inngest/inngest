@@ -35,8 +35,8 @@ export default function VercelConfigure() {
           <div className="mb-2 text-2xl font-medium text-gray-900">{project.name}</div>
           {project.ssoProtection?.deploymentType ===
             VercelDeploymentProtection.ProdDeploymentURLsAndAllPreviews && (
-            <div className="mb-7 flex flex-row items-center justify-start text-sm font-normal leading-snug text-yellow-700">
-              <RiInformationLine className="mr-2 h-4 w-4 text-yellow-700" />
+            <div className="mb-7 flex flex-row items-center justify-start text-sm font-normal leading-snug text-amber-700">
+              <RiInformationLine className="mr-2 h-4 w-4 text-amber-500" />
               Vercel Deployment Protection might block syncing. Use the deployment protection key
               option below to bypass.
             </div>

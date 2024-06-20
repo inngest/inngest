@@ -5,10 +5,13 @@ import { useRouter } from 'next/navigation';
 import { Badge } from '@inngest/components/Badge/Badge';
 import { NewButton } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
+import { Link } from '@inngest/components/Link/Link';
 import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { Select } from '@inngest/components/Select/Select';
-import { RiRefreshLine } from '@remixicon/react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
+import { RiInformationLine, RiRefreshLine } from '@remixicon/react';
 
+import { VercelDeploymentProtection } from './VercelIntegration';
 import { useVercelIntegration } from './useVercelIntegration';
 
 type DisableProjectProps = {
@@ -102,7 +105,33 @@ export default function VercelProjects() {
                       {p.isEnabled ? 'enabled' : 'disabled'}
                     </Badge>
                   </div>
-                  <div className="mt-4 text-xl font-medium text-gray-900">{p.name}</div>
+                  <div className="mt-4 flex flex-row items-center justify-start">
+                    <div className="text-xl font-medium text-gray-900">{p.name}</div>
+                    {p.ssoProtection?.deploymentType ===
+                      VercelDeploymentProtection.ProdDeploymentURLsAndAllPreviews && (
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <RiInformationLine className="ml-2 h-4 w-4 cursor-pointer text-amber-500" />
+                        </TooltipTrigger>
+                        <TooltipContent className="rounded p-0">
+                          <div className="border border-slate-200">
+                            <div className="px-4 pt-2 text-sm font-medium text-slate-700">
+                              Deployment protection is enabled
+                            </div>
+                            <div className="my-2 px-4 text-sm font-normal text-slate-500">
+                              Inngest may not be able to communicate with your application by
+                              default.
+                            </div>
+                            <div className="w-full bg-slate-200 px-4 py-2">
+                              <Link href="https://www.inngest.com/docs/deploy/vercel#bypassing-deployment-protection">
+                                Learn more
+                              </Link>
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
                   <div className="mt-2 text-base font-normal leading-snug text-slate-500">
                     {p.servePath}
                   </div>

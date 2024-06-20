@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ChangeEvent } from 'react';
+import { useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { NewButton } from '@inngest/components/Button/index';
@@ -34,8 +34,8 @@ export default function Connect({
 
   const updateVercelIntegration = useUpdateVercelIntegration(integrations);
 
-  const check = ({ target: { id, checked } }: ChangeEvent<HTMLInputElement>) =>
-    setProjects(projects.map((p) => ({ ...p, isEnabled: p.id === id ? !!checked : p.isEnabled })));
+  const check = (id: string, enabled: boolean) =>
+    setProjects(projects.map((p) => ({ ...p, isEnabled: p.id === id ? enabled : p.isEnabled })));
 
   const setPath = (id: string, value: string) =>
     setProjects(projects.map((p) => ({ ...p, servePath: p.id === id ? value : p.servePath })));
@@ -80,7 +80,7 @@ export default function Connect({
                 <Checkbox
                   id={p.id}
                   className="mr-2 h-4 w-4"
-                  onChange={check}
+                  onCheckedChange={() => check(p.id, !p.isEnabled)}
                   checked={p.isEnabled}
                 />
                 <div className="text-base font-normal leading-7 text-slate-700">{p.name}</div>
