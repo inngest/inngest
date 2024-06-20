@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@inngest/components/Button';
-import { useBooleanSearchParam } from '@inngest/components/hooks/useSearchParam.js';
+import { useBooleanSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { IconFunction } from '@inngest/components/icons/Function';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
