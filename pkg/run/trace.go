@@ -388,7 +388,6 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 			return err
 		}
 
-		nested.Name = fmt.Sprintf("Attempt %d", attempt)
 		nested.StepOp = &stepOp
 		nested.Attempts = attempt
 		nested.Status = status
@@ -400,6 +399,7 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 		// last one
 		// update end time and status of the group as well
 		if i == len(peers)-1 {
+			mod.Name = nested.Name
 			mod.Attempts = attempt
 
 			switch status {
@@ -422,7 +422,7 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 				mod.DurationMs = int64(dur / time.Millisecond)
 			}
 		}
-
+		nested.Name = fmt.Sprintf("Attempt %d", attempt)
 		mod.Children = append(mod.Children, nested)
 		tb.processed[p.SpanID] = true
 	}
