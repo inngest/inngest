@@ -13,7 +13,6 @@ import { IconWrapText } from '@inngest/components/icons/WrapText';
 import { cn } from '@inngest/components/utils/classNames';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { RiDownload2Line } from '@remixicon/react';
-import { set } from 'date-fns';
 import { type editor } from 'monaco-editor';
 import { useLocalStorage } from 'react-use';
 import colors from 'tailwindcss/colors';
