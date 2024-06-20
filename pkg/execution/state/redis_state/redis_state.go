@@ -584,7 +584,7 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 	return nil
 }
 
-func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
+func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 	packed, err := json.Marshal(p)
 	if err != nil {
 		return err
@@ -600,12 +600,14 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
 	}
 
 	keys := []string{
-		m.u.kg.PauseID(ctx, p.ID),
-		m.u.kg.PauseEvent(ctx, p.WorkspaceID, evt),
-		m.u.kg.Invoke(ctx, p.WorkspaceID),
-		m.u.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
-		m.u.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
-		m.u.kg.RunPauses(ctx, p.Identifier.RunID),
+		m.unshardedMgr.u.kg.PauseID(ctx, p.ID),
+		m.unshardedMgr.u.kg.PauseEvent(ctx, p.WorkspaceID, evt),
+		m.unshardedMgr.u.kg.Invoke(ctx, p.WorkspaceID),
+		m.unshardedMgr.u.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
+		m.unshardedMgr.u.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
+		// This key uses sharding, so it cannot be included in the Lua script.
+		// Instead, we execute the command separately below.
+		// 		m.u.kg.RunPauses(ctx, p.Identifier.RunID),
 	}
 
 	// Add 1 second because int will truncate the float. Otherwise, timeouts
@@ -624,6 +626,9 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
 		corrId = *p.InvokeCorrelationID
 	}
 
+	extendedExpiry := time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()
+	nowUnixSeconds := time.Now().Unix()
+
 	args, err := StrSlice([]any{
 		string(packed),
 		p.ID.String(),
@@ -632,8 +637,8 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
 		ttl,
 		// Add at least 10 minutes to this pause, allowing us to process the
 		// pause by ID for 10 minutes past expiry.
-		int(time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()),
-		time.Now().Unix(),
+		int(extendedExpiry),
+		nowUnixSeconds,
 	})
 	if err != nil {
 		return err
@@ -641,13 +646,23 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
 
 	status, err := scripts["savePause"].Exec(
 		ctx,
-		m.pauseR,
+		m.unshardedMgr.pauseR,
 		keys,
 		args,
 	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error finalizing: %w", err)
 	}
+
+	// Add an index of when the pause expires.  This lets us manually
+	// garbage collect expired pauses from the HSET below.
+	// Note: This command was extracted from savePause. SADD is idempotent, so this can run without a lock, outside the Lua script
+	cmd := m.shardedMgr.s.r.B().Sadd().Key(m.shardedMgr.s.kg.RunPauses(ctx, p.Identifier.RunID)).Member(p.ID.String()).Build()
+	err = m.shardedMgr.s.r.Do(ctx, cmd).Error()
+	if err != nil {
+		return fmt.Errorf("error finalizing: %w", err)
+	}
+
 	switch status {
 	case 0:
 		return nil
@@ -718,6 +733,7 @@ func (m shardedMgr) Delete(ctx context.Context, i state.Identifier) (bool, error
 	if pauseIDs, err := m.s.r.Do(callCtx, m.s.r.B().Smembers().Key(m.s.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
 		for _, id := range pauseIDs {
 			pauseID, _ := uuid.Parse(id)
+			// TODO We could make this possible by lifting this up. This isn't running atomically anyway
 			_ = m.DeletePauseByID(ctx, pauseID)
 		}
 	}
@@ -757,7 +773,7 @@ func (m shardedMgr) Delete(ctx context.Context, i state.Identifier) (bool, error
 	return performedDeletion, nil
 }
 
-func (m shardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error {
+func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error {
 	// Attempt to fetch this pause.
 	pause, err := m.PauseByID(ctx, pauseID)
 	if err == nil && pause != nil {

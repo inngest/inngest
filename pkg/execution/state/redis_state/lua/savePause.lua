@@ -10,7 +10,9 @@ local pauseEvtKey = KEYS[2]
 local pauseInvokeKey = KEYS[3]
 local keyPauseAddIdx = KEYS[4]
 local keyPauseExpIdx = KEYS[5]
-local keyRunPauses   = KEYS[6]
+
+-- This key uses sharding, so it cannot be included in this Lua script
+--local keyRunPauses   = KEYS[6]
 
 local pause          = ARGV[1]
 local pauseID        = ARGV[2]
@@ -32,8 +34,10 @@ redis.call("ZADD", keyPauseAddIdx, nowUnixSeconds, pauseID)
 -- Add an index of when the pause expires.  This lets us manually
 -- garbage collect expired pauses from the HSET below.
 redis.call("ZADD", keyPauseExpIdx, nowUnixSeconds+extendedExpiry, pauseID)
+
+-- This requires a different shard, so we run the command right after invoking this script.
 -- SADD to store the pause for this run
-redis.call("SADD", keyRunPauses, pauseID)
+-- redis.call("SADD", keyRunPauses, pauseID)
 
 if event ~= false and event ~= "" and event ~= nil then
 	redis.call("HSET", pauseEvtKey, pauseID, pause)
