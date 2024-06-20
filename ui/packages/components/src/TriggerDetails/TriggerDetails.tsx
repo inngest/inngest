@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { GSP_NO_RETURNED_VALUE } from 'next/dist/lib/constants';
-// import { Button } from '@inngest/components/Button';
-// import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import { Button } from '@inngest/components/Button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import * as Collapsible from '@radix-ui/react-collapsible';
-// import { RiContractRightFill, RiExpandLeftFill } from '@remixicon/react';
+import { RiContractRightFill, RiExpandLeftFill } from '@remixicon/react';
 import { useLocalStorage } from 'react-use';
 
 import { Card } from '../Card';
@@ -124,8 +123,7 @@ export function TriggerDetails({ className, getTrigger }: Props) {
       open={showEventPanel}
       onOpenChange={setShowEventPanel}
     >
-      {/* TODO: Enable the collapsed feature */}
-      {/* {!showEventPanel && (
+      {!showEventPanel && (
         <Collapsible.Trigger asChild>
           <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-400">
             <Tooltip>
@@ -136,16 +134,16 @@ export function TriggerDetails({ className, getTrigger }: Props) {
             </Tooltip>
           </span>
         </Collapsible.Trigger>
-      )} */}
+      )}
       <Collapsible.Content>
         {showEventPanel && (
           <>
             <Card>
               <Card.Header className="h-11 flex-row items-center gap-2">
                 <div className="text-basis flex grow items-center gap-2">Trigger details</div>
-                {/* <Collapsible.Trigger asChild>
+                <Collapsible.Trigger asChild>
                   <Button size="large" appearance="text" icon={<RiContractRightFill />} />
-                </Collapsible.Trigger> */}
+                </Collapsible.Trigger>
               </Card.Header>
 
               <Card.Content>
