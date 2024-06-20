@@ -128,7 +128,7 @@ export function TriggerDetails({ className, getTrigger }: Props) {
           <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-400">
             <Tooltip>
               <TooltipTrigger>
-                <RiExpandLeftFill className="text-slate-400" />
+                <RiExpandLeftFill className="h-5 w-5	text-slate-400" />
               </TooltipTrigger>
               <TooltipContent>Show trigger details</TooltipContent>
             </Tooltip>
