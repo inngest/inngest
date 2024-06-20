@@ -39,21 +39,14 @@ type ShardedKeyGenerator interface {
 	// for given workflow run.
 	Errors(context.Context, state.Identifier) string
 
-	// PauseStep returns the prefix of the key used within PauseStep.  This lets us
-	// iterate through all pauses for a given identifier
-	PauseStepPrefix(context.Context, state.Identifier) string
-
-	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
-	PauseStep(context.Context, state.Identifier, string) string
-
-	// RunPauses stores pause IDs for each run as a zset
-	RunPauses(ctx context.Context, runID ulid.ULID) string
-
 	// History returns the key used to store a log entry for run hisotry
 	History(ctx context.Context, runID ulid.ULID) string
 
 	// Stack returns the key used to store the stack for a given run
 	Stack(ctx context.Context, runID ulid.ULID) string
+
+	// PauseID returns the key used to store an individual pause from its ID.
+	PauseID(ctx context.Context, pauseID uuid.UUID, runID ulid.ULID) string
 }
 
 type shardedKeyGenerator struct {
@@ -61,12 +54,12 @@ type shardedKeyGenerator struct {
 
 func (s shardedKeyGenerator) Prefix(defaultPrefix string, runID ulid.ULID) string {
 	if ulid.Time(runID.Time()).After(switchover) {
-		return fmt.Sprintf("{%s}", runID)
+		return fmt.Sprintf("{%s:%s}", defaultPrefix, runID)
 	}
-	return defaultPrefix
+	return fmt.Sprintf("{%s}", defaultPrefix)
 }
 
-const stateDefaultKey = "{state}"
+const stateDefaultKey = "estate"
 const queueDefaultKey = "{queue}"
 
 func (s shardedKeyGenerator) Idempotency(ctx context.Context, id state.Identifier) string {
@@ -93,25 +86,16 @@ func (s shardedKeyGenerator) Errors(ctx context.Context, identifier state.Identi
 	return fmt.Sprintf("%s:errors:%s:%s", s.Prefix(stateDefaultKey, identifier.RunID), identifier.WorkflowID, identifier.RunID)
 }
 
-func (s shardedKeyGenerator) PauseStepPrefix(ctx context.Context, identifier state.Identifier) string {
-	return fmt.Sprintf("%s:pause-steps:%s", s.Prefix(stateDefaultKey, identifier.RunID), identifier.RunID)
-}
-
-func (s shardedKeyGenerator) PauseStep(ctx context.Context, identifier state.Identifier, s2 string) string {
-	prefix := s.PauseStepPrefix(ctx, identifier)
-	return fmt.Sprintf("%s-%s", prefix, s2)
-}
-
-func (s shardedKeyGenerator) RunPauses(ctx context.Context, runID ulid.ULID) string {
-	return fmt.Sprintf("%s:pr:%s", s.Prefix(stateDefaultKey, runID), runID)
-}
-
 func (s shardedKeyGenerator) History(ctx context.Context, runID ulid.ULID) string {
 	return fmt.Sprintf("%s:history:%s", s.Prefix(stateDefaultKey, runID), runID)
 }
 
 func (s shardedKeyGenerator) Stack(ctx context.Context, runID ulid.ULID) string {
 	return fmt.Sprintf("%s:stack:%s", s.Prefix(stateDefaultKey, runID), runID)
+}
+
+func (s shardedKeyGenerator) PauseID(ctx context.Context, pauseID uuid.UUID, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:pauses:%s", s.Prefix(stateDefaultKey, runID), pauseID.String())
 }
 
 func newShardedKeyGenerator() ShardedKeyGenerator {
@@ -132,9 +116,6 @@ type UnshardedKeyGenerator interface {
 	// for easy iteration.
 	PauseLease(ctx context.Context, pauseId uuid.UUID) string
 
-	// PauseID returns the key used to store an individual pause from its ID.
-	PauseID(ctx context.Context, pauseId uuid.UUID) string
-
 	// PauseEvent returns the key used to store data for loading pauses by events.
 	PauseEvent(ctx context.Context, workspaceId uuid.UUID, event string) string
 
@@ -147,6 +128,16 @@ type UnshardedKeyGenerator interface {
 
 	// Invoke returns the key used to store the correlation key associated with invoke functions
 	Invoke(ctx context.Context, wsID uuid.UUID) string
+
+	// PauseStep returns the prefix of the key used within PauseStep.  This lets us
+	// iterate through all pauses for a given identifier
+	PauseStepPrefix(context.Context, state.Identifier) string
+
+	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
+	PauseStep(context.Context, state.Identifier, string) string
+
+	// RunPauses stores pause IDs for each run as a zset
+	RunPauses(ctx context.Context, runID ulid.ULID) string
 }
 
 type unshardedKeyGenerator struct {
@@ -156,16 +147,12 @@ func (u unshardedKeyGenerator) Workflow(ctx context.Context, workflowID uuid.UUI
 	return fmt.Sprintf("{%s}:workflows:%s-%d", stateDefaultKey, workflowID, version)
 }
 
-func (u unshardedKeyGenerator) PauseLease(ctx context.Context, pauseId uuid.UUID) string {
-	return fmt.Sprintf("{%s}:pause-lease:%s", stateDefaultKey, pauseId.String())
+func (u unshardedKeyGenerator) PauseLease(ctx context.Context, pauseID uuid.UUID) string {
+	return fmt.Sprintf("{%s}:pause-lease:%s", stateDefaultKey, pauseID.String())
 }
 
-func (u unshardedKeyGenerator) PauseID(ctx context.Context, pauseId uuid.UUID) string {
-	return fmt.Sprintf("{%s}:pauses:%s", stateDefaultKey, pauseId.String())
-}
-
-func (u unshardedKeyGenerator) PauseEvent(ctx context.Context, workspaceId uuid.UUID, eventName string) string {
-	return fmt.Sprintf("{%s}:pause-events:%s:%s", stateDefaultKey, workspaceId, eventName)
+func (u unshardedKeyGenerator) PauseEvent(ctx context.Context, workspaceID uuid.UUID, s string) string {
+	return fmt.Sprintf("{%s}:pause-events:%s:%s", stateDefaultKey, workspaceID, s)
 }
 
 func (u unshardedKeyGenerator) PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string {
@@ -177,6 +164,19 @@ func (u unshardedKeyGenerator) PauseIndex(ctx context.Context, kind string, wsID
 
 func (u unshardedKeyGenerator) Invoke(ctx context.Context, wsID uuid.UUID) string {
 	return fmt.Sprintf("{%s}:invoke:%s", stateDefaultKey, wsID)
+}
+
+func (u unshardedKeyGenerator) PauseStepPrefix(ctx context.Context, identifier state.Identifier) string {
+	return fmt.Sprintf("%s:pause-steps:%s", stateDefaultKey, identifier.RunID)
+}
+
+func (u unshardedKeyGenerator) PauseStep(ctx context.Context, identifier state.Identifier, s2 string) string {
+	prefix := u.PauseStepPrefix(ctx, identifier)
+	return fmt.Sprintf("%s-%s", prefix, s2)
+}
+
+func (u unshardedKeyGenerator) RunPauses(ctx context.Context, runID ulid.ULID) string {
+	return fmt.Sprintf("%s:pr:%s", stateDefaultKey, runID)
 }
 
 func newUnshardedKeyGenerator() UnshardedKeyGenerator {

@@ -234,6 +234,11 @@ type unshardedMgr struct {
 	pauseR rueidis.Client
 }
 
+type CompositePauseID struct {
+	PauseID uuid.UUID
+	RunID   *ulid.ULID
+}
+
 func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, error) {
 	// We marshal this ahead of creating a redis transaction as it's necessary
 	// every time and reduces the duration that the lock is held.
@@ -845,20 +850,10 @@ func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
 	}
 }
 
-func (m unshardedMgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
-	p, err := m.PauseByID(ctx, id)
-	if err != nil {
-		return err
-	}
-
-	marshalledData, err := json.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("cannot marshal data to store in state: %w", err)
-	}
-
-	// Add a default event here, which is null and overwritten by everything.  This is necessary
-	// to keep the same cluster key.
-	eventKey := m.u.kg.PauseEvent(ctx, p.WorkspaceID, "-")
+func (m *unshardedMgr) CleanUpPause(ctx context.Context, p *state.Pause, runID ulid.ULID) error {
+	// Add a default event here, which is null and overwritten by everything.
+	// This is necessary to keep the same cluster key.
+	eventKey := u.u.kg.PauseEvent(ctx, p.WorkspaceID, "-")
 	if p.Event != nil {
 		eventKey = m.u.kg.PauseEvent(ctx, p.WorkspaceID, *p.Event)
 	}
@@ -870,13 +865,9 @@ func (m unshardedMgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) 
 	}
 
 	keys := []string{
-		m.u.kg.PauseID(ctx, id),
 		m.u.kg.PauseStep(ctx, p.Identifier, p.Incoming),
 		eventKey,
 		m.u.kg.Invoke(ctx, p.WorkspaceID),
-		m.u.kg.Actions(ctx, p.Identifier),
-		m.u.kg.Stack(ctx, p.Identifier.RunID),
-		m.u.kg.RunMetadata(ctx, p.Identifier.RunID),
 		m.u.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
 		m.u.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 		m.u.kg.RunPauses(ctx, p.Identifier.RunID),
@@ -886,33 +877,83 @@ func (m unshardedMgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) 
 	if p.InvokeCorrelationID != nil && *p.InvokeCorrelationID != "" {
 		corrId = *p.InvokeCorrelationID
 	}
+
 	args, err := StrSlice([]any{
-		id.String(),
+		p.ID.String(),
 		corrId,
+	})
+	if err != nil {
+		return fmt.Errorf("error generating arguments for running cleanUpPause script: %w", err)
+	}
+
+	err = scripts["cleanUpPause"].Exec(
+		ctx,
+		m.u.r,
+		keys,
+		args,
+	).Error()
+	if err != nil {
+		return fmt.Errorf("error running cleanUpPause script: %w", err)
+	}
+
+	return nil
+}
+
+func (m *shardedMgr) ConsumePause(ctx context.Context, pauseID uuid.UUID, runID ulid.ULID, data any) (*state.Pause, error) {
+	p, err := m.PauseByID(ctx, pauseID, runID)
+	if err != nil {
+		return p, err
+	}
+
+	marshalledData, err := json.Marshal(data)
+	if err != nil {
+		return p, fmt.Errorf("cannot marshal data to store in state: %w", err)
+	}
+
+	keys := []string{
+		m.s.kg.PauseID(ctx, pauseID, runID),
+		m.s.kg.Actions(ctx, p.Identifier),
+		m.s.kg.Stack(ctx, p.Identifier.RunID),
+		m.s.kg.RunMetadata(ctx, p.Identifier.RunID),
+	}
+
+	args, err := StrSlice([]any{
+		// pauseID.String(),
+		// corrId,
 		p.DataKey,
 		string(marshalledData),
 	})
 	if err != nil {
-		return err
+		return p, err
 	}
 
 	status, err := scripts["consumePause"].Exec(
 		ctx,
-		m.pauseR,
+		m.s.r,
 		keys,
 		args,
 	).AsInt64()
 	if err != nil {
-		return fmt.Errorf("error consuming pause: %w", err)
+		return p, fmt.Errorf("error consuming pause: %w", err)
 	}
 	switch status {
 	case 0:
-		return nil
+		return p, nil
 	case 1:
-		return state.ErrPauseNotFound
+		return p, state.ErrPauseNotFound // 🤔
 	default:
-		return fmt.Errorf("unknown response leasing pause: %d", status)
+		return p, fmt.Errorf("unknown response leasing pause: %d", status)
 	}
+}
+
+func (m mgr) ConsumePause(ctx context.Context, pauseID uuid.UUID, runID ulid.ULID, data any) error {
+	p, err := m.shardedMgr.ConsumePause(ctx, pauseID, runID, data)
+	if err != nil {
+		return err
+	}
+
+	// The pause was now consumed, so let's clean up
+	return m.unshardedMgr.CleanUpPause(ctx, p, runID)
 }
 
 func (m unshardedMgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID, event string) (bool, error) {
@@ -921,9 +962,9 @@ func (m unshardedMgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID,
 	return m.pauseR.Do(ctx, cmd).AsBool()
 }
 
-func (m unshardedMgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) {
-	cmd := m.pauseR.B().Get().Key(m.u.kg.PauseID(ctx, id)).Build()
-	str, err := m.pauseR.Do(ctx, cmd).ToString()
+func (m *shardedMgr) PauseByID(ctx context.Context, pauseID uuid.UUID, runID ulid.ULID) (*state.Pause, error) {
+	cmd := m.s.r.B().Get().Key(m.s.kg.PauseID(ctx, pauseID, runID)).Build()
+	str, err := m.s.r.Do(ctx, cmd).ToString()
 	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
 	}
