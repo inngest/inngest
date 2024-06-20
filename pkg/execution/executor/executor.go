@@ -2482,7 +2482,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 			attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
 			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
-
 			attribute.String(consts.OtelSysStepInvokeTargetFnID, opts.FunctionID),
 			attribute.Int64(consts.OtelSysStepInvokeExpires, expires.UnixMilli()),
 			attribute.String(consts.OtelSysStepInvokeTriggeringEventID, evt.ID),

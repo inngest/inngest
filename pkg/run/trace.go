@@ -347,7 +347,6 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 			return err
 		}
 
-		mod.Attempts = 1
 		mod.Status = rpbv2.SpanStatus_COMPLETED
 		mod.OutputId = &outputID
 
@@ -355,6 +354,7 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 		return nil
 	}
 
+	mod.EndedAt = nil
 	// modify the span as a group, and nest each peer under it instead
 	mod.SpanId = fmt.Sprintf("steprun-%s", *groupID)
 	if mod.Children == nil {
@@ -362,6 +362,12 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 	}
 
 	for i, p := range peers {
+		if i == 0 {
+			mod.StartedAt = timestamppb.New(p.Timestamp)
+			dur := time.Since(mod.StartedAt.AsTime())
+			mod.DurationMs = int64(dur / time.Millisecond)
+		}
+
 		nested, skipped := tb.constructSpan(ctx, p)
 		// NOTE: might be able to handle this better
 		if skipped {
@@ -369,73 +375,51 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 		}
 
 		var attempt int32
-		attempt = 1
 		if str, ok := p.SpanAttributes[consts.OtelSysStepAttempt]; ok {
 			if count, err := strconv.ParseInt(str, 10, 32); err == nil {
-				attempt = int32(count) + 1
+				attempt = int32(count)
 			}
 		}
 
-		status := rpbv2.SpanStatus_RUNNING
-		switch p.Status() {
-		case cqrs.SpanStatusOk:
-			status = rpbv2.SpanStatus_COMPLETED
-		case cqrs.SpanStatusError:
-			status = rpbv2.SpanStatus_FAILED
-		default:
-			nested.EndedAt = nil
-		}
-
+		status := toProtoStatus(p)
 		// output
-		ident := &cqrs.SpanIdentifier{
-			AccountID:   tb.acctID,
-			WorkspaceID: tb.wsID,
-			AppID:       tb.appID,
-			FunctionID:  tb.fnID,
-			TraceID:     nested.TraceId,
-			SpanID:      nested.SpanId,
-		}
-
-		var outputID *string
-		switch status { // only set outputID if the span is already finished
-		case rpbv2.SpanStatus_COMPLETED, rpbv2.SpanStatus_FAILED:
-			id, err := ident.Encode()
-			if err != nil {
-				return err
-			}
-			outputID = &id
+		outputID, err := tb.outputID(nested)
+		if err != nil {
+			return err
 		}
 
 		nested.Name = fmt.Sprintf("Attempt %d", attempt)
 		nested.StepOp = &stepOp
 		nested.Attempts = attempt
 		nested.Status = status
-		nested.OutputId = outputID
+		switch status { // only set outputID if the span is already finished
+		case rpbv2.SpanStatus_COMPLETED, rpbv2.SpanStatus_FAILED:
+			nested.OutputId = &outputID
+		}
 
 		// last one
 		// update end time and status of the group as well
 		if i == len(peers)-1 {
-			pend := p.Timestamp.Add(p.Duration)
-
-			// TODO: check if the span has already completed or not
-			dur := int64(pend.Sub(span.Timestamp) / time.Millisecond)
 			mod.Attempts = attempt
-			mod.DurationMs = dur
-			mod.EndedAt = timestamppb.New(pend)
 
 			switch status {
-			case rpbv2.SpanStatus_RUNNING:
-				mod.EndedAt = nil
 			case rpbv2.SpanStatus_COMPLETED:
 				mod.Status = rpbv2.SpanStatus_COMPLETED
-				mod.OutputId = outputID
+				mod.OutputId = &outputID
+				mod.EndedAt = nested.EndedAt
 			case rpbv2.SpanStatus_FAILED:
 				// check if this failure is the final failure of all attempts
-				if attempt == maxAttempts {
+				if attempt == maxAttempts-1 {
+					mod.EndedAt = nested.EndedAt
 					mod.Status = rpbv2.SpanStatus_FAILED
 					mod.Attempts = maxAttempts
-					mod.OutputId = outputID
+					mod.OutputId = &outputID
 				}
+			}
+
+			if mod.EndedAt != nil {
+				dur := mod.EndedAt.AsTime().Sub(mod.StartedAt.AsTime())
+				mod.DurationMs = int64(dur / time.Millisecond)
 			}
 		}
 
@@ -499,7 +483,7 @@ func (tb *runTree) processSleepGroup(ctx context.Context, span *cqrs.Span, mod *
 				mod.DurationMs = int64(dur / time.Millisecond)
 			}
 		}
-		nested.Name = fmt.Sprintf("Attempt %d", i+1)
+		nested.Name = fmt.Sprintf("Attempt %d", i)
 
 		mod.Children = append(mod.Children, nested)
 		// mark as processed
@@ -604,7 +588,7 @@ func (tb *runTree) processWaitForEventGroup(ctx context.Context, span *cqrs.Span
 				mod.DurationMs = int64(dur / time.Millisecond)
 			}
 		}
-		nested.Name = fmt.Sprintf("Attempt %d", i+1)
+		nested.Name = fmt.Sprintf("Attempt %d", i)
 
 		mod.Children = append(mod.Children, nested)
 		// mark as processed
@@ -756,7 +740,7 @@ func (tb *runTree) processInvokeGroup(ctx context.Context, span *cqrs.Span, mod 
 				mod.DurationMs = int64(dur / time.Millisecond)
 			}
 		}
-		nested.Name = fmt.Sprintf("Attempt %d", i+1)
+		nested.Name = fmt.Sprintf("Attempt %d", i)
 
 		mod.Children = append(mod.Children, nested)
 		// mark as processed
@@ -925,7 +909,6 @@ func (tb *runTree) processExecGroup(ctx context.Context, span *cqrs.Span, mod *r
 			return err
 		}
 
-		mod.Attempts = 1
 		mod.Status = rpbv2.SpanStatus_COMPLETED
 		mod.OutputId = &outputID
 
@@ -933,12 +916,19 @@ func (tb *runTree) processExecGroup(ctx context.Context, span *cqrs.Span, mod *r
 		return nil
 	}
 
+	mod.EndedAt = nil
 	mod.SpanId = fmt.Sprintf("exec-%s", *groupID)
 	if mod.Children == nil {
 		mod.Children = []*rpbv2.RunSpan{}
 	}
 
 	for i, p := range peers {
+		if i == 0 {
+			mod.StartedAt = timestamppb.New(p.Timestamp)
+			dur := time.Since(mod.StartedAt.AsTime())
+			mod.DurationMs = int64(dur / time.Millisecond)
+		}
+
 		nested, skipped := tb.constructSpan(ctx, p)
 		// NOTE: might be able to handle this better
 		if skipped {
@@ -946,18 +936,13 @@ func (tb *runTree) processExecGroup(ctx context.Context, span *cqrs.Span, mod *r
 		}
 
 		var attempt int32
-		attempt = 1
 		if str, ok := p.SpanAttributes[consts.OtelSysStepAttempt]; ok {
 			if count, err := strconv.ParseInt(str, 10, 32); err == nil {
-				attempt = int32(count) + 1
+				attempt = int32(count)
 			}
 		}
 
 		status := toProtoStatus(p)
-		if status == rpbv2.SpanStatus_FAILED {
-			nested.EndedAt = nil
-		}
-
 		// output
 		outputID, err := tb.outputID(nested)
 		if err != nil {
@@ -967,32 +952,29 @@ func (tb *runTree) processExecGroup(ctx context.Context, span *cqrs.Span, mod *r
 		nested.Name = fmt.Sprintf("Attempt %d", attempt)
 		nested.Attempts = attempt
 		nested.Status = status
-		nested.OutputId = &outputID
+		switch status {
+		case rpbv2.SpanStatus_CANCELLED, rpbv2.SpanStatus_FAILED:
+			nested.OutputId = &outputID
+		}
 
 		// last one
 		// update end time of the group as well
 		if i == len(peers)-1 {
-			pend := p.Timestamp.Add(p.Duration)
-
-			// TODO: check if the span has already completed or not
-			dur := int64(pend.Sub(span.Timestamp) / time.Millisecond)
 			mod.Attempts = attempt
-			mod.DurationMs = dur
-			mod.EndedAt = timestamppb.New(pend)
 
 			switch status {
-			case rpbv2.SpanStatus_RUNNING:
-				mod.EndedAt = nil
 			case rpbv2.SpanStatus_COMPLETED:
 				mod.Status = rpbv2.SpanStatus_COMPLETED
 				mod.OutputId = &outputID
+				mod.EndedAt = nested.EndedAt
 
 				if p.SpanName == consts.OtelExecFnOk {
 					mod.Name = consts.OtelExecFnOk
 				}
 			case rpbv2.SpanStatus_FAILED:
 				// check if this failure is the final failure of all attempts
-				if attempt == maxAttempts {
+				if attempt == maxAttempts-1 {
+					mod.EndedAt = nested.EndedAt
 					mod.Status = rpbv2.SpanStatus_FAILED
 					mod.Attempts = maxAttempts
 					mod.OutputId = &outputID
@@ -1002,8 +984,14 @@ func (tb *runTree) processExecGroup(ctx context.Context, span *cqrs.Span, mod *r
 			// if the name is `function error`, it's already finished
 			// and mark it as failed
 			if mod.Name == consts.OtelExecFnErr {
+				mod.EndedAt = nested.EndedAt
 				mod.Status = rpbv2.SpanStatus_FAILED
 				mod.OutputId = &outputID
+			}
+
+			if mod.EndedAt != nil {
+				dur := mod.EndedAt.AsTime().Sub(mod.StartedAt.AsTime())
+				mod.DurationMs = int64(dur / time.Millisecond)
 			}
 		}
 

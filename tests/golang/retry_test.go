@@ -121,7 +121,7 @@ func TestRetry(t *testing.T) {
 			t.Run("step retries", func(t *testing.T) {
 				step := run.Trace.ChildSpans[0]
 				assert.Equal(t, "Log input, increase counter", step.Name)
-				assert.Equal(t, 3, step.Attempts)
+				assert.Equal(t, 2, step.Attempts)
 				assert.Equal(t, rootSpanID, step.ParentSpanID)
 				assert.Equal(t, 3, len(step.ChildSpans))
 				assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), step.Status)
@@ -135,16 +135,16 @@ func TestRetry(t *testing.T) {
 				for i, span := range step.ChildSpans {
 					testName := fmt.Sprintf("step retry %d", i)
 					t.Run(testName, func(t *testing.T) {
-						attempt := i + 1
+						attempt := i
 						switch attempt {
+						case 0:
+							assert.Equal(t, fmt.Sprintf("Attempt %d", attempt), span.Name)
+							assert.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
 						case 1:
 							assert.Equal(t, fmt.Sprintf("Attempt %d", attempt), span.Name)
 							assert.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
-						case 2:
-							assert.Equal(t, fmt.Sprintf("Attempt %d", attempt), span.Name)
-							assert.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
 						// last
-						case 3:
+						case 2:
 							assert.Equal(t, fmt.Sprintf("Attempt %d", attempt), span.Name)
 							assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), span.Status)
 						}
@@ -168,13 +168,13 @@ func TestRetry(t *testing.T) {
 				for i, span := range exec.ChildSpans {
 					testName := fmt.Sprintf("fn retry %d", i)
 					t.Run(testName, func(t *testing.T) {
-						attempt := i + 1
+						attempt := i
 						switch attempt {
-						case 1:
+						case 0:
 							assert.Equal(t, fmt.Sprintf("Attempt %d", attempt), span.Name)
 							assert.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
 						// last
-						case 2:
+						case 1:
 							assert.Equal(t, fmt.Sprintf("Attempt %d", attempt), span.Name)
 							assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), span.Status)
 						}
