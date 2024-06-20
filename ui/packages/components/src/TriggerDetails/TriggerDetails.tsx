@@ -125,7 +125,7 @@ export function TriggerDetails({ className, getTrigger }: Props) {
     >
       {!showEventPanel && (
         <Collapsible.Trigger asChild>
-          <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-400">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-400">
             <Tooltip>
               <TooltipTrigger>
                 <RiExpandLeftFill className="h-5 w-5	text-slate-400" />
