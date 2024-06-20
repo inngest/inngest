@@ -21,7 +21,7 @@ export function usePlanFeatures() {
       history: 7,
     };
 
-    const rawHistory = res.data.account?.plan?.features?.log_retention;
+    const rawHistory = res.data.account.plan?.features.log_retention;
     if (typeof rawHistory === 'number') {
       features.history = rawHistory;
     }
