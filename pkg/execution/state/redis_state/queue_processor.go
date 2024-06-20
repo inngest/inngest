@@ -95,9 +95,12 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		queueName = item.QueueName
 	}
 
-	telemetry.IncrQueueItemEnqueuedCounter(ctx, telemetry.CounterOpt{
+	telemetry.IncrQueueItemStatusCounter(ctx, telemetry.CounterOpt{
 		PkgName: pkgName,
-		Tags:    map[string]any{"kind": item.Kind},
+		Tags: map[string]any{
+			"status": "enqueued",
+			"kind":   item.Kind,
+		},
 	})
 
 	qi := QueueItem{
@@ -692,7 +695,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	if err != nil {
 		return err
 	}
-	telemetry.IncrQueuePeekedCounter(ctx, int64(len(queue)), telemetry.CounterOpt{PkgName: pkgName})
+	telemetry.HistogramQueuePeekSize(ctx, int64(len(queue)), telemetry.HistogramOpt{PkgName: pkgName})
 
 	var (
 		processErr error
@@ -723,7 +726,10 @@ ProcessLoop:
 		//       and don't bother to process if the queue item has a limited key.  This
 		//       lessens work done in the queue, as we can `continue` immediately.
 		if item.IsLeased(getNow()) {
-			telemetry.IncrQueueItemLeaseContentionCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": "lease_contention"},
+			})
 			continue
 		}
 
@@ -799,7 +805,10 @@ ProcessLoop:
 
 			ctrRateLimit++
 			processErr = nil
-			telemetry.IncrQueueThrottledCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": "throttled"},
+			})
 			continue
 		case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
 			ctrConcurrency++
@@ -810,7 +819,19 @@ ProcessLoop:
 			// want to claim the job, as this breaks ordering guarantees.  The
 			// only safe thing to do when we hit a function or account level
 			// concurrency key.
+			var status string
+			switch cause {
+			case ErrPartitionConcurrencyLimit:
+				status = "partition_concurrency_limit"
+			case ErrAccountConcurrencyLimit:
+				status = "account_concurrency_limit"
+			}
+
 			processErr = nil
+			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": status},
+			})
 			break ProcessLoop
 		case ErrConcurrencyLimitCustomKey0, ErrConcurrencyLimitCustomKey1:
 			ctrConcurrency++
@@ -823,23 +844,39 @@ ProcessLoop:
 			// This maintains FIFO ordering amongst all custom concurrency keys.
 			denies.addConcurrency(err)
 
+			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": "custom_key_concurrency_limit"},
+			})
 			processErr = nil
 			continue
 		case ErrQueueItemNotFound:
 			// This is an okay error.  Move to the next job item.
 			ctrSuccess++ // count as a success for stats purposes.
 			processErr = nil
+			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": "success"},
+			})
 			continue
 		case ErrQueueItemAlreadyLeased:
 			// This is an okay error.  Move to the next job item.
 			ctrSuccess++ // count as a success for stats purposes.
 			processErr = nil
+			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": "success"},
+			})
 			continue
 		}
 
 		// Handle other errors.
 		if err != nil {
 			processErr = fmt.Errorf("error leasing in process: %w", err)
+			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": "error"},
+			})
 			break ProcessLoop
 		}
 
@@ -850,6 +887,10 @@ ProcessLoop:
 
 		// increase success counter.
 		ctrSuccess++
+		telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": "success"},
+		})
 		q.workers <- processItem{P: *p, I: *item, S: shard}
 	}
 
@@ -997,7 +1038,10 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 			})
 		}()
 
-		telemetry.IncrQueueItemStartedCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+		telemetry.IncrQueueItemStatusCounter(ctx, telemetry.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": "started"},
+		})
 
 		runInfo := osqueue.RunInfo{
 			Latency:      latency,
@@ -1013,11 +1057,17 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 		err := f(jobCtx, runInfo, qi.Data)
 		extendLeaseTick.Stop()
 		if err != nil {
-			telemetry.IncrQueueItemErroredCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+			telemetry.IncrQueueItemStatusCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": "errored"},
+			})
 			errCh <- err
 			return
 		}
-		telemetry.IncrQueueItemCompletedCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+		telemetry.IncrQueueItemStatusCounter(ctx, telemetry.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": "completed"},
+		})
 
 		// Closing this channel prevents the goroutine which extends lease from leaking,
 		// and dequeues the job
