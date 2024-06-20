@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { GSP_NO_RETURNED_VALUE } from 'next/dist/lib/constants';
-// import { Button } from '@inngest/components/Button';
-// import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import { Button } from '@inngest/components/Button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import * as Collapsible from '@radix-ui/react-collapsible';
-// import { RiContractRightFill, RiExpandLeftFill } from '@remixicon/react';
+import { RiContractRightFill, RiExpandLeftFill } from '@remixicon/react';
 import { useLocalStorage } from 'react-use';
 
 import { Card } from '../Card';
@@ -120,32 +119,38 @@ export function TriggerDetails({ className, getTrigger }: Props) {
 
   return (
     <Collapsible.Root
-      className={cn(showEventPanel && 'w-2/5', 'flex flex-col gap-5', className)}
+      className={cn(showEventPanel && 'w-3/4 2xl:w-2/5', 'flex flex-col gap-5', className)}
       open={showEventPanel}
       onOpenChange={setShowEventPanel}
     >
-      {/* TODO: Enable the collapsed feature */}
-      {/* {!showEventPanel && (
+      {!showEventPanel && (
         <Collapsible.Trigger asChild>
-          <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-400">
-            <Tooltip>
-              <TooltipTrigger>
-                <RiExpandLeftFill className="text-slate-400" />
-              </TooltipTrigger>
-              <TooltipContent>Show trigger details</TooltipContent>
-            </Tooltip>
+          <span className="pt-2">
+            <span className="border-muted flex h-7 w-7 items-center justify-center rounded-full border">
+              <Tooltip>
+                <TooltipTrigger>
+                  <RiExpandLeftFill className="text-subtle hover:text-muted	h-5 w-5" />
+                </TooltipTrigger>
+                <TooltipContent>Show trigger details</TooltipContent>
+              </Tooltip>
+            </span>
           </span>
         </Collapsible.Trigger>
-      )} */}
+      )}
       <Collapsible.Content>
         {showEventPanel && (
           <>
             <Card>
               <Card.Header className="h-11 flex-row items-center gap-2">
                 <div className="text-basis flex grow items-center gap-2">Trigger details</div>
-                {/* <Collapsible.Trigger asChild>
-                  <Button size="large" appearance="text" icon={<RiContractRightFill />} />
-                </Collapsible.Trigger> */}
+                <Collapsible.Trigger asChild>
+                  <Button
+                    size="large"
+                    appearance="text"
+                    icon={<RiContractRightFill />}
+                    className="text-subtle hover:text-muted"
+                  />
+                </Collapsible.Trigger>
               </Card.Header>
 
               <Card.Content>
