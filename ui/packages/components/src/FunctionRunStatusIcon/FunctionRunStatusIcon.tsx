@@ -18,7 +18,7 @@ const icons: Record<string, React.ComponentType> = {
 } as const satisfies { [key in FunctionRunStatus]: React.ComponentType };
 
 type Props = {
-  status: FunctionRunStatus;
+  status: string;
   className?: string;
 };
 
