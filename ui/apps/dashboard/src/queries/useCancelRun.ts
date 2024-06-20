@@ -10,10 +10,10 @@ const mutation = graphql(`
   }
 `);
 
-export function useCancelRun({ envID, runID }: { envID: string; runID: string }) {
+export function useCancelRun({ envID }: { envID: string }) {
   const [, mutate] = useMutation(mutation);
 
-  return async () => {
+  return async (runID: string) => {
     const res = await mutate({ envID, runID });
     if (res.error) {
       // Throw error so that the modal can catch and display it
