@@ -437,6 +437,9 @@ func (m shardedMgr) LoadEvents(ctx context.Context, fnID uuid.UUID, runID ulid.U
 	cmd = r.B().Get().Key(m.s.kg.Event(ctx, v1id)).Build()
 	byt, err = r.Do(ctx, cmd).AsBytes()
 	if err != nil {
+		if err == rueidis.Nil {
+			return nil, state.ErrEventNotFound
+		}
 		return nil, fmt.Errorf("failed to get event; %w", err)
 	}
 	return []json.RawMessage{byt}, nil

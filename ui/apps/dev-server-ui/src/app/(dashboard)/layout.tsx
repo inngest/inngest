@@ -37,7 +37,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <NavbarLink icon={<IconFunction />} href="/functions" tabName="Functions" />
         </Navbar>
       </Header>
-      <TooltipProvider>{children}</TooltipProvider>
+      <TooltipProvider delayDuration={0}>{children}</TooltipProvider>
       <Toaster
         theme="dark"
         toastOptions={{

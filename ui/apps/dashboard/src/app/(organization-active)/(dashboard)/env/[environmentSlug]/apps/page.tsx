@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { HoverCardContent, HoverCardRoot, HoverCardTrigger } from '@inngest/components/HoverCard';
 import { Link } from '@inngest/components/Link';
+import { useBooleanSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { IconApp } from '@inngest/components/icons/App';
 import { RiAddLine, RiInformationLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { pathCreator } from '@/utils/urls';
-import { useBooleanSearchParam } from '@/utils/useSearchParam';
 import { Apps } from './Apps';
 
 export default function Page() {
@@ -79,7 +79,7 @@ export default function Page() {
           </div>
         }
       />
-      <div className="relative h-full overflow-y-auto bg-slate-100">
+      <div className="bg-canvasBase relative h-full overflow-y-auto">
         <Apps isArchived={isArchived} />
       </div>
     </>

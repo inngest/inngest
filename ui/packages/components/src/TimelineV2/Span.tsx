@@ -41,10 +41,10 @@ export function Span({ className, isInline, maxTime, minTime, trace }: Props) {
       }}
     >
       {/* Gray line to the left of the span */}
-      <div className="h-px bg-slate-300" style={{ flexGrow: widths.before }}></div>
+      <div className="bg-contrast h-px" style={{ flexGrow: widths.before }}></div>
 
       {/* Queued part of the span */}
-      <div className="h-2 bg-slate-500" style={{ flexGrow: widths.queued }}></div>
+      <div className="bg-surfaceSubtle h-2" style={{ flexGrow: widths.queued }}></div>
 
       {/* Running part of the span */}
       <div
@@ -57,7 +57,7 @@ export function Span({ className, isInline, maxTime, minTime, trace }: Props) {
       ></div>
 
       {/* Gray line to the right of the span */}
-      <div className="h-px bg-slate-300" style={{ flexGrow: widths.after }}></div>
+      <div className="bg-contrast h-px" style={{ flexGrow: widths.after }}></div>
     </div>
   );
 }

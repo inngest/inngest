@@ -173,7 +173,7 @@ export const RangePicker = ({
       </PopoverTrigger>
       <PopoverContent>
         <div className="flex flex-row bg-white">
-          <div className={`${showAbsolute && 'min-h-[589px]'} w-[250px] border-r border-slate-300`}>
+          <div className={`${showAbsolute && 'min-h-[589px]'} border-muted w-[250px] border-r`}>
             <div className="m-2">
               <Input
                 ref={durationRef}
@@ -216,7 +216,7 @@ export const RangePicker = ({
             })}
             <div className="flex flex-col">
               <div
-                className={`cursor-pointer border-t border-slate-300 px-6 py-3.5 text-sm font-normal text-slate-700 hover:bg-blue-50 ${
+                className={`border-muted cursor-pointer border-t px-6 py-3.5 text-sm font-normal text-slate-700 hover:bg-blue-50 ${
                   showAbsolute && 'bg-blue-50'
                 }`}
                 onClick={() => {

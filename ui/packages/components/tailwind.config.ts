@@ -127,11 +127,20 @@ export default {
         link: 'rgb(var(--color-foreground-link) / <alpha-value>)',
       },
       fill: {
+        // temporary tooltip token
+        tooltipArrow: 'rgb(var(--color-background-canvas-base) / <alpha-value>)',
         onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
         subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
+        alwaysWhite: 'rgb(var(--color-foreground-alwaysWhite) / <alpha-value>)',
+        btnPrimary: 'rgb(var(--color-foreground-btn-primary) / <alpha-value>)',
+        btnDanger: 'rgb(var(--color-foreground-btn-danger) / <alpha-value>)',
       },
       gridTemplateColumns: {
         dashboard: '1fr 1fr 1fr 432px',
+      },
+      boxShadowColor: {
+        // temporary tooltip token
+        tooltip: 'rgb(var(--color-background-canvas-muted) / <alpha-value>)',
       },
       boxShadow: {
         'outline-primary-light':

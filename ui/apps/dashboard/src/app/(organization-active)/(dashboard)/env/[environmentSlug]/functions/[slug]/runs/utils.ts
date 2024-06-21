@@ -1,3 +1,4 @@
+import { type Run } from '@inngest/components/RunsPage/RunsTable';
 import { isFunctionRunStatus, type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { toMaybeDate } from '@inngest/components/utils/date';
 
@@ -6,7 +7,6 @@ import {
   RunsOrderByField as FunctionRunTimeFieldEnum,
   type FunctionRunV2,
 } from '@/gql/graphql';
-import { type Run } from './RunsTable';
 
 /**
  * Convert a run status union type into an enum. This is necessary because

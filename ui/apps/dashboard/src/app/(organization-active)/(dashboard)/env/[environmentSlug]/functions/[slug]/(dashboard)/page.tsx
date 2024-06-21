@@ -7,6 +7,7 @@ import { Button } from '@inngest/components/Button';
 import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { useCron } from '@inngest/components/hooks/useCron';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
 import {
@@ -25,7 +26,6 @@ import Block from '@/components/Block';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
 import { relativeTime } from '@/utils/date';
-import { useSearchParam } from '@/utils/useSearchParam';
 import DashboardTimeRangeFilter, {
   defaultTimeRange,
   getTimeRangeByKey,

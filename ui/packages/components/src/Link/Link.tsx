@@ -13,7 +13,7 @@ export type LinkProps = {
 };
 
 export const defaultLinkStyles =
-  'text-link hover:decoration-link decoration-transparent decoration-2 underline underline-offset-4 cursor-pointer transition-color duration-300';
+  'text-link hover:decoration-link decoration-transparent decoration-1 underline underline-offset-2 cursor-pointer transition-color duration-300';
 
 export function Link({
   href,
@@ -26,7 +26,7 @@ export function Link({
     return (
       <NextLink
         href={href}
-        className={cn(className, showIcon && 'group flex items-center gap-1', defaultLinkStyles)}
+        className={cn(showIcon && 'group flex items-center gap-1', defaultLinkStyles, className)}
       >
         {children}
         {showIcon && (

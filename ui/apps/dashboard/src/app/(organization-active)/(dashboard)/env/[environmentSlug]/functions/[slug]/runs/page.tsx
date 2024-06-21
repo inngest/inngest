@@ -1,26 +1,25 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button } from '@inngest/components/Button';
-import StatusFilter from '@inngest/components/Filter/StatusFilter';
-import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
-import { SelectGroup } from '@inngest/components/Select/Select';
-import { LoadingMore } from '@inngest/components/Table';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
+import { type Run } from '@inngest/components/RunsPage/RunsTable';
 import {
-  type FunctionRunStatus,
-  type FunctionRunTimeField,
-} from '@inngest/components/types/functionRun';
+  useSearchParam,
+  useStringArraySearchParam,
+} from '@inngest/components/hooks/useSearchParam';
 import { getTimestampDaysAgo } from '@inngest/components/utils/date';
-import { RiLoopLeftLine } from '@remixicon/react';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { RunDetails } from '@/components/RunDetails/RunDetails';
+import { useGetRun } from '@/components/RunDetails/useGetRun';
+import { useGetTraceResult } from '@/components/RunDetails/useGetTraceResult';
+import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
 import { graphql } from '@/gql';
 import { RunsOrderByField } from '@/gql/graphql';
+import { useCancelRun } from '@/queries/useCancelRun';
+import { useRerun } from '@/queries/useRerun';
+import { pathCreator } from '@/utils/urls';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
-import { useSearchParam, useStringArraySearchParam } from '@/utils/useSearchParam';
-import RunsTable, { type Run } from './RunsTable';
-import TimeFilter from './TimeFilter';
+import { usePlanFeatures } from './usePlanFeatures';
 import { parseRunsData, toRunStatuses, toTimeField } from './utils';
 
 const GetRunsDocument = graphql(`
@@ -58,28 +57,18 @@ const GetRunsDocument = graphql(`
   }
 `);
 
-const renderSubComponent = ({ id }: { id: string }) => {
-  return (
-    <div className="border-subtle border-l-4 pb-6">
-      <RunDetails standalone={false} runID={id} />
-    </div>
-  );
-};
-
-export default function RunsPage({
+export default function Page({
   params,
 }: {
   params: {
     slug: string;
   };
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
   const functionSlug = decodeURIComponent(params.slug);
 
-  const [rawFilteredStatus, setFilteredStatus, removeFilteredStatus] =
-    useStringArraySearchParam('filterStatus');
-  const [rawTimeField = RunsOrderByField.QueuedAt, setTimeField] = useSearchParam('timeField');
-  const [lastDays = '3', setLastDays] = useSearchParam('last');
+  const [rawFilteredStatus] = useStringArraySearchParam('filterStatus');
+  const [rawTimeField = RunsOrderByField.QueuedAt] = useSearchParam('timeField');
+  const [lastDays = '3'] = useSearchParam('last');
 
   const timeField = toTimeField(rawTimeField) ?? RunsOrderByField.QueuedAt;
 
@@ -92,6 +81,25 @@ export default function RunsPage({
   const [cursor, setCursor] = useState('');
   const [runs, setRuns] = useState<Run[]>([]);
   const [isScrollRequest, setIsScrollRequest] = useState(false);
+
+  const env = useEnvironment();
+  const cancelRun = useCancelRun({ envID: env.id });
+  const rerun = useRerun({ envID: env.id, envSlug: env.slug });
+  const getTraceResult = useGetTraceResult();
+  const getTrigger = useGetTrigger();
+  const getRun = useGetRun();
+  const features = usePlanFeatures();
+
+  const internalPathCreator = useMemo(() => {
+    return {
+      // The shared component library is environment-agnostic, so it needs a way to
+      // generate URLs without knowing about environments
+      app: (params: { externalAppID: string }) =>
+        pathCreator.app({ envSlug: env.slug, externalAppID: params.externalAppID }),
+      runPopout: (params: { runID: string }) =>
+        pathCreator.runPopout({ envSlug: env.slug, runID: params.runID }),
+    };
+  }, [env.slug]);
 
   useEffect(() => {
     if (lastDays) {
@@ -107,35 +115,6 @@ export default function RunsPage({
   const filteredStatus = useMemo(() => {
     return toRunStatuses(rawFilteredStatus ?? []);
   }, [rawFilteredStatus]);
-
-  function resetScrollPosition() {
-    // This scroll cannot be smooth, has to be instantaneous
-    scrollToTop();
-    setIsScrollRequest(false);
-  }
-
-  function handleStatusesChange(value: FunctionRunStatus[]) {
-    resetScrollPosition();
-    if (value.length > 0) {
-      setFilteredStatus(value);
-    } else {
-      removeFilteredStatus();
-    }
-  }
-
-  function handleTimeFieldChange(value: FunctionRunTimeField) {
-    resetScrollPosition();
-    if (value.length > 0) {
-      setTimeField(value);
-    }
-  }
-
-  function handleDaysChange(value: string) {
-    resetScrollPosition();
-    if (value) {
-      setLastDays(value);
-    }
-  }
 
   const environment = useEnvironment();
   const firstPageRes = useSkippableGraphQLQuery({
@@ -187,15 +166,6 @@ export default function RunsPage({
     return parseRunsData(nextPageRunsData);
   }, [nextPageRunsData]);
 
-  const scrollToTop = (smooth = false) => {
-    if (containerRef.current) {
-      containerRef.current.scrollTo({
-        top: 0,
-        behavior: smooth ? 'smooth' : 'auto',
-      });
-    }
-  };
-
   useEffect(() => {
     if (!isScrollRequest && firstPageRuns.length > 0) {
       setRuns(firstPageRuns);
@@ -208,10 +178,10 @@ export default function RunsPage({
     }
   }, [nextPageRuns, isScrollRequest]);
 
-  const fetchMoreOnScroll = useCallback(
-    (containerRefElement?: HTMLDivElement | null) => {
-      if (containerRefElement && runs.length > 0) {
-        const { scrollHeight, scrollTop, clientHeight } = containerRefElement;
+  const fetchMoreOnScroll: React.ComponentProps<typeof RunsPage>['onScroll'] = useCallback(
+    (event) => {
+      if (runs.length > 0) {
+        const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
         const lastCursor = nextPageInfo?.endCursor || firstPageInfo?.endCursor;
         // Check if scrolled to the bottom
         const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
@@ -224,50 +194,28 @@ export default function RunsPage({
     [firstPageRes.isLoading, nextPageRes.isLoading, runs, nextPageInfo, firstPageInfo]
   );
 
+  const onScrollToTop = useCallback(() => {
+    setIsScrollRequest(false);
+  }, []);
+
   return (
-    <main
-      className="bg-canvasBase text-basis h-full min-h-0 overflow-y-auto"
-      onScroll={(e) => fetchMoreOnScroll(e.target as HTMLDivElement)}
-      ref={containerRef}
-    >
-      <div className="bg-canvasBase sticky top-0 z-[5] flex items-center justify-between gap-2 px-8 py-2">
-        <div className="flex items-center gap-2">
-          <SelectGroup>
-            <TimeFieldFilter
-              selectedTimeField={timeField}
-              onTimeFieldChange={handleTimeFieldChange}
-            />
-            <TimeFilter selectedDays={lastDays} onDaysChange={handleDaysChange} />
-          </SelectGroup>
-          <StatusFilter selectedStatuses={filteredStatus} onStatusesChange={handleStatusesChange} />
-        </div>
-        {/* TODO: wire button */}
-        <Button
-          label="Refresh"
-          appearance="text"
-          btnAction={() => {}}
-          icon={<RiLoopLeftLine />}
-          disabled
-        />
-      </div>
-      <RunsTable
-        data={runs}
-        isLoading={firstPageRes.isLoading}
-        renderSubComponent={renderSubComponent}
-        getRowCanExpand={() => true}
-      />
-      {nextPageRes.isLoading && <LoadingMore />}
-      {!isLoading && !hasNextPage && (
-        <div className="flex flex-col items-center py-8">
-          <p className="text-subtle">No additional runs found.</p>
-          <Button
-            label="Back to top"
-            kind="primary"
-            appearance="text"
-            btnAction={() => scrollToTop(true)}
-          />
-        </div>
-      )}
-    </main>
+    <RunsPage
+      cancelRun={cancelRun}
+      data={runs}
+      features={{
+        history: features.data?.history ?? 7,
+      }}
+      functionSlug={functionSlug}
+      hasMore={hasNextPage ?? false}
+      isLoadingInitial={firstPageRes.isLoading}
+      isLoadingMore={nextPageRes.isLoading}
+      getRun={getRun}
+      onScroll={fetchMoreOnScroll}
+      onScrollToTop={onScrollToTop}
+      getTraceResult={getTraceResult}
+      getTrigger={getTrigger}
+      pathCreator={internalPathCreator}
+      rerun={rerun}
+    />
   );
 }

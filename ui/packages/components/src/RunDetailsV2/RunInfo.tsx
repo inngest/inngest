@@ -25,7 +25,7 @@ type Props = {
     app: (params: { externalAppID: string }) => Route;
     runPopout: (params: { runID: string }) => Route;
   };
-  rerun: (args: { fnID: string }) => Promise<unknown>;
+  rerun: (args: { fnID: string; runID: string }) => Promise<unknown>;
   run: Lazy<Run>;
   runID: string;
   result?: Result;
@@ -82,7 +82,7 @@ export function RunInfo({
               if (!isLazyDone(run)) {
                 return;
               }
-              await rerun({ fnID: run.fn.id });
+              await rerun({ fnID: run.fn.id, runID });
             }}
           />
         </Card.Header>
