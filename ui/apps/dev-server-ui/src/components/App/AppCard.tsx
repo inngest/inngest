@@ -5,7 +5,7 @@ import { CodeLine } from '@inngest/components/CodeLine';
 import { Link } from '@inngest/components/Link/Link';
 import { AlertModal } from '@inngest/components/Modal';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
-import { IconStatusCanceled } from '@inngest/components/icons/status/Canceled';
+import { IconStatusCancelled } from '@inngest/components/icons/status/Cancelled';
 import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
 import { IconStatusFailed } from '@inngest/components/icons/status/Failed';
 import { cn } from '@inngest/components/utils/classNames';
@@ -208,14 +208,14 @@ export default function AppCard({ app }: { app: App }) {
                 {app.functionCount > 0 && (
                   <>
                     {app.connected && <IconStatusCompleted />}
-                    {!app.connected && <IconStatusCanceled />}
+                    {!app.connected && <IconStatusCancelled />}
                     {app.functionCount} function
                     {app.functionCount === 1 ? '' : 's'} registered
                   </>
                 )}
                 {app.functionCount < 1 && (
                   <>
-                    <IconStatusCanceled />
+                    <IconStatusCancelled />
                     No functions found
                   </>
                 )}
