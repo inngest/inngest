@@ -19,8 +19,8 @@ type Props = {
 
 export function RunDetails({ runID, standalone = true }: Props) {
   const env = useEnvironment();
-  const cancelRun = useCancelRun({ envID: env.id, runID });
-  const rerun = useRerun({ envID: env.id, envSlug: env.slug, runID });
+  const cancelRun = useCancelRun({ envID: env.id });
+  const rerun = useRerun({ envID: env.id, envSlug: env.slug });
   const getTraceResult = useGetTraceResult();
 
   const internalPathCreator = useMemo(() => {
@@ -34,7 +34,7 @@ export function RunDetails({ runID, standalone = true }: Props) {
     };
   }, [env.slug]);
 
-  const getTrigger = useGetTrigger({ runID });
+  const getTrigger = useGetTrigger();
   const getRun = useGetRun();
 
   return (

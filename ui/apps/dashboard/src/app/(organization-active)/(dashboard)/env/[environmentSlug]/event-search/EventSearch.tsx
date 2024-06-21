@@ -3,12 +3,12 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { RiInformationLine } from '@remixicon/react';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import Input from '@/components/Forms/Input';
-import { useSearchParam } from '@/utils/useSearchParam';
 import { Details } from './Details';
 import { EventTable } from './EventTable';
 import { searchEvents } from './searchEvents';

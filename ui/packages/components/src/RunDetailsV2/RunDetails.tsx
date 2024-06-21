@@ -14,7 +14,7 @@ import { RunInfo } from './RunInfo';
 
 type Props = {
   standalone: boolean;
-  cancelRun: () => Promise<unknown>;
+  cancelRun: (runID: string) => Promise<unknown>;
   getResult: (outputID: string) => Promise<Result>;
   getRun: (runID: string) => Promise<Run>;
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
@@ -22,7 +22,7 @@ type Props = {
     app: (params: { externalAppID: string }) => Route;
     runPopout: (params: { runID: string }) => Route;
   };
-  rerun: (args: { fnID: string }) => Promise<unknown>;
+  rerun: React.ComponentProps<typeof RunInfo>['rerun'];
   runID: string;
 };
 
@@ -63,7 +63,7 @@ export function RunDetails(props: Props) {
 
   const cancelRun = useCallback(async () => {
     try {
-      await props.cancelRun();
+      await props.cancelRun(runID);
       toast.success('Cancelled run');
     } catch (e) {
       toast.error('Failed to cancel run');
@@ -99,7 +99,7 @@ export function RunDetails(props: Props) {
           {run && <Timeline getResult={getResult} pathCreator={pathCreator} trace={run.trace} />}
         </div>
 
-        <TriggerDetails getTrigger={getTrigger} />
+        <TriggerDetails getTrigger={getTrigger} runID={runID} />
       </div>
     </div>
   );
