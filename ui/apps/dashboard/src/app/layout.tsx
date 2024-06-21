@@ -61,7 +61,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <SentryUserIdentification />
         <ClientFeatureFlagProvider>
-          <TooltipProvider>{children}</TooltipProvider>
+          <TooltipProvider delayDuration={0}>{children}</TooltipProvider>
           <PageViewTracker />
         </ClientFeatureFlagProvider>
       </ClerkProvider>
