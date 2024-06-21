@@ -467,6 +467,12 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 		tb.processed[p.SpanID] = true
 	}
 
+	// check if the nested span is the same one, if so discard it
+	if len(mod.Children) == 1 && span.SpanID == mod.Children[0].SpanId {
+		mod.SpanId = span.SpanID // reset the spanID
+		mod.Children = nil
+	}
+
 	return nil
 }
 
@@ -1088,6 +1094,12 @@ func (tb *runTree) processExecGroup(ctx context.Context, span *cqrs.Span, mod *r
 
 		mod.Children = append(mod.Children, nested)
 		tb.markProcessed(p)
+	}
+
+	// check if the nested span is the same one, if so discard it
+	if len(mod.Children) == 1 && span.SpanID == mod.Children[0].SpanId {
+		mod.SpanId = span.SpanID // reset the spanID
+		mod.Children = nil
 	}
 
 	return nil
