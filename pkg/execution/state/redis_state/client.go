@@ -13,6 +13,7 @@ type ShardedClient struct {
 
 func NewShardedClient(u *UnshardedClient, r rueidis.Client) *ShardedClient {
 	return &ShardedClient{
+		u:         u,
 		kg:        newShardedKeyGenerator(),
 		shardedRc: r,
 	}

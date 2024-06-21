@@ -16,8 +16,8 @@ local pause          = ARGV[1]
 local pauseID        = ARGV[2]
 local event          = ARGV[3]
 local invokeCorrelationID = ARGV[4]
-local extendedExpiry = tonumber(ARGV[6])
-local nowUnixSeconds = tonumber(ARGV[7])
+local extendedExpiry = tonumber(ARGV[5])
+local nowUnixSeconds = tonumber(ARGV[6])
 
 
 if redis.call("SETNX", pauseKey, pause) == 0 then

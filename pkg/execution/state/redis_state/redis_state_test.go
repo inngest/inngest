@@ -68,13 +68,20 @@ func TestNewRunMetadata(t *testing.T) {
 
 func TestStateHarness(t *testing.T) {
 	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	unshardedClient := NewUnshardedClient(rc)
+	shardedClient := NewShardedClient(unshardedClient, rc)
+
 	sm, err := New(
 		context.Background(),
-		WithKeyPrefix("{test}:"),
-		WithConnectOpts(rueidis.ClientOption{
-			InitAddress:  []string{r.Addr()},
-			DisableCache: true,
-		}),
+		WithUnshardedClient(unshardedClient),
+		WithShardedClient(shardedClient),
 	)
 	require.NoError(t, err)
 
@@ -165,12 +172,27 @@ func TestBufIter(t *testing.T) {
 
 func BenchmarkNew(b *testing.B) {
 	r := miniredis.RunT(b)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(b, err)
+
+	unshardedClient := NewUnshardedClient(rc)
+	shardedClient := NewShardedClient(unshardedClient, rc)
+
 	sm, err := New(
 		context.Background(),
-		WithConnectOpts(rueidis.ClientOption{
-			InitAddress:  []string{r.Addr()},
-			DisableCache: true,
-		}),
+		WithUnshardedClient(unshardedClient),
+		WithShardedClient(shardedClient),
+	)
+	require.NoError(b, err)
+
+	sm, err = New(
+		context.Background(),
+		WithUnshardedClient(unshardedClient),
+		WithShardedClient(shardedClient),
 	)
 	require.NoError(b, err)
 
