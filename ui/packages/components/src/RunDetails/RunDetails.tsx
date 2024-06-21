@@ -2,7 +2,7 @@
 
 import { Badge } from '@inngest/components/Badge';
 import { ContentCard } from '@inngest/components/ContentCard';
-import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
 import { MetadataGrid } from '@inngest/components/Metadata';
 import { OutputCard } from '@inngest/components/OutputCard';
 import { Timeline } from '@inngest/components/Timeline';
@@ -80,7 +80,7 @@ export function RunDetails({
         )
       }
       title={func?.name || '...'}
-      icon={run?.status && <FunctionRunStatusIcon status={run?.status} className="h-5 w-5" />}
+      icon={run?.status && <RunStatusIcon status={run?.status} className="h-5 w-5" />}
       type="run"
       badge={
         cron ? (

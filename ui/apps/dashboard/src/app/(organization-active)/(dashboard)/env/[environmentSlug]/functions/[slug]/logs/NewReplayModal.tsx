@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { RangePicker } from '@inngest/components/DatePicker';
-import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
 import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
 import { IconReplay } from '@inngest/components/icons/Replay';
@@ -261,7 +261,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
                   className="flex w-full flex-col items-center gap-1 rounded-md bg-slate-100 py-6 text-sm font-semibold text-slate-800 hover:bg-slate-200 focus:outline-1 focus:outline-indigo-500 data-[state=on]:ring data-[state=on]:ring-indigo-500 data-[state=on]:ring-offset-2"
                   value={value}
                 >
-                  <FunctionRunStatusIcon status={value} className="mx-auto h-8" />
+                  <RunStatusIcon status={value} className="mx-auto h-8" />
                   {label}
                 </ToggleGroup.Item>
                 {timeRange && (

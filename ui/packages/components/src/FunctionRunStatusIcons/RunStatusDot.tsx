@@ -6,7 +6,7 @@ type Props = {
   className?: string;
 };
 
-export function RunStatusIcon({ status, className }: Props) {
+export function RunStatusDot({ status, className }: Props) {
   const backgroundClass = getStatusBackgroundClass(status);
   const borderClass = getStatusBorderClass(status);
 
