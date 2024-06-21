@@ -14,6 +14,12 @@ export function isFunctionRunStatus(s: string): s is FunctionRunStatus {
   return functionRunStatuses.includes(s as FunctionRunStatus);
 }
 
+export const replayRunStatuses = ['COMPLETED', 'FAILED', 'CANCELLED', 'SKIPPED_PAUSED'] as const;
+export type ReplayRunStatus = (typeof replayRunStatuses)[number];
+export function isReplayRunStatus(s: string): s is ReplayRunStatus {
+  return replayRunStatuses.includes(s as ReplayRunStatus);
+}
+
 export type FunctionRun = {
   batchCreatedAt: Date | null;
   batchID: string | null;

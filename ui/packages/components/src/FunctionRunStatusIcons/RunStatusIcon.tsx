@@ -4,6 +4,11 @@ import { IconStatusCompleted } from '@inngest/components/icons/status/Completed'
 import { IconStatusFailed } from '@inngest/components/icons/status/Failed';
 import { IconStatusQueued } from '@inngest/components/icons/status/Queued';
 import { IconStatusRunning } from '@inngest/components/icons/status/Running';
+import { IconStatusSkipped } from '@inngest/components/icons/status/Skipped';
+
+import { getStatusTextClass } from '../statusClasses';
+import { cn } from '../utils/classNames';
+import { statusTitles } from './statusTitles';
 
 const icons: Record<string, React.ComponentType> = {
   CANCELED: IconStatusCancelled,
@@ -12,6 +17,7 @@ const icons: Record<string, React.ComponentType> = {
   FAILED: IconStatusFailed,
   RUNNING: IconStatusRunning,
   QUEUED: IconStatusQueued,
+  SKIPPED_PAUSED: IconStatusSkipped,
 } as const;
 
 type Props = {
@@ -20,8 +26,8 @@ type Props = {
 };
 
 export function RunStatusIcon({ status, className }: Props) {
+  const txtClass = getStatusTextClass(status);
+  const title = statusTitles[status] || 'Unknown';
   const Icon = icons[status] ?? IconStatusQueued;
-
-  const title = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
-  return <Icon className={className} title={title} />;
+  return <Icon className={cn('h-6 w-6', txtClass, className)} title={title} />;
 }
