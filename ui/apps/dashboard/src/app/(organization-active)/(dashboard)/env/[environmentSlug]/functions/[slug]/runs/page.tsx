@@ -194,6 +194,10 @@ export default function Page({
     [firstPageRes.isLoading, nextPageRes.isLoading, runs, nextPageInfo, firstPageInfo]
   );
 
+  const onScrollToTop = useCallback(() => {
+    setIsScrollRequest(false);
+  }, []);
+
   return (
     <RunsPage
       cancelRun={cancelRun}
@@ -207,7 +211,7 @@ export default function Page({
       isLoadingMore={nextPageRes.isLoading}
       getRun={getRun}
       onScroll={fetchMoreOnScroll}
-      onScrollToTop={console.log}
+      onScrollToTop={onScrollToTop}
       getTraceResult={getTraceResult}
       getTrigger={getTrigger}
       pathCreator={internalPathCreator}
