@@ -9,7 +9,7 @@ Output:
 
 ]]
 
--- The pauseID is always provided as a key, as is the lease ID.
+-- The pause ID is always provided as a key, as is the lease ID.
 local pauseID = KEYS[1]
 local leaseID = KEYS[2]
 
