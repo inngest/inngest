@@ -113,12 +113,6 @@ func NewRunTree(opts RunTreeOpts) (*runTree, error) {
 		}
 	}
 
-	// for _, s := range opts.Spans {
-	// 	if s.ParentSpanID != nil {
-	// 		fmt.Printf("Span - Name: %s, Scope: %s, Op: %s, ID: %s, Parent: %s, Child: %d, TS: %d\n    %#v\n\n", s.SpanName, s.ScopeName, s.StepOpCode().String(), s.SpanID, *s.ParentSpanID, len(s.Children), s.Timestamp.UnixMilli(), s.SpanAttributes)
-	// 	}
-	// }
-
 	// sort it
 	for _, g := range b.groups {
 		if len(g) > 1 {
