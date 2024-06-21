@@ -88,12 +88,9 @@ export function AppInfoCard({ app, className, sync, linkToSyncs, loading }: Prop
   return (
     <>
       <div
-        className={classNames(
-          'overflow-hidden rounded-lg border border-slate-300 bg-white',
-          className
-        )}
+        className={classNames('border-muted overflow-hidden rounded-lg border bg-white', className)}
       >
-        <h2 className="border-b border-slate-300 px-6 py-3 text-sm font-medium text-slate-600">
+        <h2 className="border-muted border-b px-6 py-3 text-sm font-medium text-slate-600">
           App Information
         </h2>
 

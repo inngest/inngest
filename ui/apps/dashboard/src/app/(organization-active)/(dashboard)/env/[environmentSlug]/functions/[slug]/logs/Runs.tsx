@@ -120,7 +120,7 @@ export default function RunsPage({ params }: RunsPageProps) {
 
   return (
     <>
-      <div className="flex items-center justify-between gap-2 border-b border-slate-300 px-5 py-2">
+      <div className="border-muted flex items-center justify-between gap-2 border-b px-5 py-2">
         <div className="gap flex items-center gap-1.5">
           <StatusFilter
             selectedStatuses={selectedStatuses}

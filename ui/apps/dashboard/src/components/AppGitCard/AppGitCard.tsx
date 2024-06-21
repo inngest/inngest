@@ -62,12 +62,9 @@ export function AppGitCard({ className, sync }: Props) {
 
   return (
     <div
-      className={classNames(
-        'overflow-hidden rounded-lg border border-slate-300 bg-white',
-        className
-      )}
+      className={classNames('border-muted overflow-hidden rounded-lg border bg-white', className)}
     >
-      <div className="border-b border-slate-300 px-6 py-3 text-sm font-medium text-slate-600">
+      <div className="border-muted border-b px-6 py-3 text-sm font-medium text-slate-600">
         Commit Information
       </div>
 

@@ -102,7 +102,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
                             id={status}
                             checked={selected}
                             readOnly
-                            className="h-[15px] w-[15px] rounded border-slate-300 text-indigo-500 drop-shadow-sm checked:border-indigo-500 checked:drop-shadow-none"
+                            className="border-muted h-[15px] w-[15px] rounded text-indigo-500 drop-shadow-sm checked:border-indigo-500 checked:drop-shadow-none"
                           />
                         </>
                       )}
