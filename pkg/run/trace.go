@@ -239,6 +239,9 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 			}
 		case enums.OpcodeWaitForEvent:
 			if err := tb.processWaitForEventGroup(ctx, s, res); err != nil {
+				if err == ErrRedundantExecSpan {
+					return nil, true, nil // no-op
+				}
 				return nil, false, fmt.Errorf("error grouping waitForEvent: %w", err)
 			}
 		case enums.OpcodeInvokeFunction:
