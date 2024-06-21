@@ -2,6 +2,7 @@
 
 import { Fragment, useRef } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
+import { getStatusBackgroundClass, getStatusBorderClass } from '@inngest/components/statusClasses';
 import { RiArrowDownSLine, RiCloseLine } from '@remixicon/react';
 import { noCase } from 'change-case';
 import { titleCase } from 'title-case';
@@ -17,14 +18,6 @@ const orderedStatuses = getOrderedEnumValues(FunctionRunStatus, [
   FunctionRunStatus.Completed,
   FunctionRunStatus.Failed,
 ]);
-
-const statusColors = {
-  [FunctionRunStatus.Queued]: 'bg-status-queued',
-  [FunctionRunStatus.Running]: 'bg-status-running',
-  [FunctionRunStatus.Cancelled]: 'bg-status-cancelled',
-  [FunctionRunStatus.Completed]: 'bg-status-completed',
-  [FunctionRunStatus.Failed]: 'bg-status-failed',
-} as const satisfies Record<FunctionRunStatus, `bg-${string}`>;
 
 type StatusFilterProps = {
   selectedStatuses: FunctionRunStatus[];
@@ -47,7 +40,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
         key={status}
         className={cn(
           'inline-block h-[9px] w-[9px] flex-shrink-0 rounded-full border border-slate-50 bg-slate-50 ring-1 ring-inset ring-slate-300 group-hover:border-slate-100 [&:not(:first-child)]:-ml-1',
-          isSelected && [statusColors[status], 'ring-0']
+          isSelected && [getStatusBackgroundClass(status), getStatusBorderClass(status), 'ring-0']
         )}
         aria-hidden="true"
       />
@@ -91,7 +84,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
                             <span
                               className={cn(
                                 'inline-block h-[9px] w-[9px] flex-shrink-0 rounded-full',
-                                statusColors[status]
+                                [getStatusBackgroundClass(status), getStatusBorderClass(status)]
                               )}
                               aria-hidden="true"
                             />
