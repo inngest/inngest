@@ -30,8 +30,7 @@ e2e:
 .PHONY: gen
 gen:
 	go generate ./...
-	sqlc generate
-	buf generate
+	make gql queries
 
 # $GOBIN must be set and be in your path for this to work
 .PHONY: queries
