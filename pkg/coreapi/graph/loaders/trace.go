@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/graph-gophers/dataloader"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/run"
@@ -121,8 +122,9 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 }
 
 func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
-	// no need to show the function success span
-	if pb.GetName() == "function success" && pb.GetStatus() == rpbv2.SpanStatus_COMPLETED {
+	// no need to show the function success span, if it's the only one and has no children
+	// meaning, there were no function level retries
+	if pb.GetName() == consts.OtelExecFnOk && pb.GetStatus() == rpbv2.SpanStatus_COMPLETED && len(pb.GetChildren()) < 1 {
 		return nil, ErrSkipSuccess
 	}
 
