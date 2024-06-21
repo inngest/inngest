@@ -168,15 +168,15 @@ func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
 	}
 
 	if m.pauseR == nil {
-		m.pauseR = m.u.Client()
+		m.pauseR = m.unsafeUnshardedClientDoNotUse.Client()
 	}
 
 	m.shardedMgr = shardedMgr{
-		s: m.s,
+		s: m.unsafeShardedClientDoNotUse,
 	}
 
 	m.unshardedMgr = unshardedMgr{
-		u:      m.u,
+		u:      m.unsafeUnshardedClientDoNotUse,
 		pauseR: m.pauseR,
 	}
 
@@ -186,20 +186,23 @@ func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
 // WithShardedClient uses an already connected redis client.
 func WithShardedClient(s *ShardedClient) Opt {
 	return func(m *mgr) {
-		m.s = s
+		m.unsafeShardedClientDoNotUse = s
 	}
 }
 
 // WithUnshardedClient uses an already connected redis client.
 func WithUnshardedClient(u *UnshardedClient) Opt {
 	return func(m *mgr) {
-		m.u = u
+		m.unsafeUnshardedClientDoNotUse = u
 	}
 }
 
 type mgr struct {
-	unshardedClient *UnshardedClient
-	shardedClient   *ShardedClient
+	// unsafe: Operate on sharded manager instead.
+	unsafeShardedClientDoNotUse *ShardedClient
+
+	// unsafe: Operate on unsharded manager instead.
+	unsafeUnshardedClientDoNotUse *UnshardedClient
 
 	shardedMgr
 	unshardedMgr
