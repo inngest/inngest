@@ -238,7 +238,7 @@ function SupportTickets({ isSignedIn }: { isSignedIn?: boolean }) {
   ) : (
     <div className="w-full">
       <h3 className="mb-2 text-base font-semibold">Recent tickets</h3>
-      <div className="grid w-full grid-cols-1 divide-y divide-slate-300 rounded-md border border-slate-300 text-sm">
+      <div className="border-muted grid w-full grid-cols-1 divide-y divide-slate-300 rounded-md border text-sm">
         {tickets.length > 0
           ? tickets.map((ticket) => (
               <div key={ticket.id} className="flex items-center gap-2 px-2 py-2">
