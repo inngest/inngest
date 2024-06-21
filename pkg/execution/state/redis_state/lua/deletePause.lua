@@ -1,4 +1,4 @@
-  --[[
+--[[
 
 Deletes a pause.
 
@@ -20,9 +20,7 @@ local invokeCorrelationId = ARGV[2]
 
 redis.call("HDEL", pauseEventKey, pauseID)
 redis.call("DEL", pauseKey)
-
 redis.call("DEL", pauseStepKey)
-
 -- SREM to remove the pause for this run
 redis.call("SREM", keyRunPauses, pauseID)
 
