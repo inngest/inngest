@@ -103,8 +103,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
-	shardedClient := redis_state.NewShardedClient(shardedRc)
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc)
+	shardedClient := redis_state.NewShardedClient(unshardedClient, shardedRc)
 
 	var sm state.Manager
 	t := runner.NewTracker()

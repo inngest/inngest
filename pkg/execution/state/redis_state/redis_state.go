@@ -835,7 +835,7 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 }
 
 func (m mgr) ConsumePause(ctx context.Context, pauseID uuid.UUID, runID ulid.ULID, data any) error {
-	p, err := m.PauseByID(ctx, pauseID)
+	p, err := m.unshardedMgr.PauseByID(ctx, pauseID)
 	if err != nil {
 		return err
 	}
@@ -1065,7 +1065,7 @@ func (m unshardedMgr) EvaluablesByID(ctx context.Context, ids ...uuid.UUID) ([]e
 	return evaluables, nil
 }
 
-func (m mgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {
+func (m unshardedMgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {
 
 	// Keep a list of pauses that should be deleted because they've expired.
 	//
