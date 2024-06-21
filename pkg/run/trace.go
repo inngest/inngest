@@ -471,7 +471,7 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 	}
 
 	// check if the nested span is the same one, if so discard it
-	if len(mod.Children) == 1 && span.SpanID == mod.Children[0].SpanId {
+	if hasFinished(mod) && hasIdenticalChild(mod, span) {
 		mod.SpanId = span.SpanID // reset the spanID
 		mod.Children = nil
 	}
@@ -554,7 +554,7 @@ func (tb *runTree) processSleepGroup(ctx context.Context, span *cqrs.Span, mod *
 	// if the total number of children span end up with just one, it means
 	// redundant spans has been excluded, so it's basically the same span
 	// as the parent. We can discard it in this case
-	if len(mod.Children) == 1 {
+	if hasFinished(mod) && hasIdenticalChild(mod, span) {
 		mod.Children = nil
 	}
 
@@ -675,7 +675,7 @@ func (tb *runTree) processWaitForEventGroup(ctx context.Context, span *cqrs.Span
 	// if the total number of children span end up with just one, it means
 	// redundant spans has been excluded, so it's basically the same span
 	// as the parent. We can discard it in this case
-	if len(mod.Children) == 1 {
+	if len(mod.Children) == 1 && mod.StepOp.String() == mod.Children[0].StepOp.String() {
 		mod.Children = nil
 	}
 
@@ -846,7 +846,7 @@ func (tb *runTree) processInvokeGroup(ctx context.Context, span *cqrs.Span, mod 
 	// if the total number of children span end up with just one, it means
 	// redundant spans has been excluded, so it's basically the same span
 	// as the parent. We can discard it in this case
-	if len(mod.Children) == 1 {
+	if hasFinished(mod) && hasIdenticalChild(mod, span) {
 		mod.Children = nil
 	}
 
@@ -1100,7 +1100,7 @@ func (tb *runTree) processExecGroup(ctx context.Context, span *cqrs.Span, mod *r
 	}
 
 	// check if the nested span is the same one, if so discard it
-	if len(mod.Children) == 1 && span.SpanID == mod.Children[0].SpanId {
+	if hasFinished(mod) && hasIdenticalChild(mod, span) {
 		mod.SpanId = span.SpanID // reset the spanID
 		mod.Children = nil
 	}
@@ -1132,4 +1132,17 @@ func toProtoStatus(span *cqrs.Span) rpbv2.SpanStatus {
 		return rpbv2.SpanStatus_FAILED
 	}
 	return rpbv2.SpanStatus_RUNNING
+}
+
+func hasFinished(rs *rpbv2.RunSpan) bool {
+	switch rs.Status {
+	case rpbv2.SpanStatus_CANCELLED, rpbv2.SpanStatus_COMPLETED, rpbv2.SpanStatus_FAILED:
+		return true
+	default:
+		return false
+	}
+}
+
+func hasIdenticalChild(rs *rpbv2.RunSpan, s *cqrs.Span) bool {
+	return len(rs.Children) == 1 && rs.SpanId == s.SpanID && rs.Name == s.SpanName
 }

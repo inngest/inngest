@@ -63,7 +63,7 @@ func TestWait(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("in progress wait", func(t *testing.T) {
-		<-time.After(3 * time.Second)
+		<-time.After(5 * time.Second)
 
 		require.Eventually(t, func() bool {
 			run := c.RunTraces(ctx, runID)
@@ -100,7 +100,7 @@ func TestWait(t *testing.T) {
 		}, 5*time.Second, 1*time.Second)
 	})
 
-	<-time.After(5 * time.Second)
+	<-time.After(10 * time.Second)
 	// Trigger the main function
 	_, err = inngestgo.Send(ctx, &event.Event{Name: waitEvtName})
 	r.NoError(err)

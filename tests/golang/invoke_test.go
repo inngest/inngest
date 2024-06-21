@@ -91,6 +91,7 @@ func TestInvoke(t *testing.T) {
 				invoke := run.Trace.ChildSpans[0]
 				assert.Equal(t, "invoke", invoke.Name)
 				assert.Equal(t, 0, invoke.Attempts)
+				assert.Equal(t, 0, len(invoke.ChildSpans))
 				assert.False(t, invoke.IsRoot)
 				assert.Equal(t, rootSpanID, invoke.ParentSpanID)
 				assert.Equal(t, models.StepOpInvoke.String(), invoke.StepOp)
