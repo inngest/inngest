@@ -244,11 +244,6 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunSpan,
 				return nil, false, fmt.Errorf("error grouping sleeps: %w", err)
 			}
 		case enums.OpcodeWaitForEvent:
-			fmt.Println("IN WAIT")
-			for _, gs := range group {
-				fmt.Printf("Attr: %s\n  %#v\n", gs.SpanName, gs.SpanAttributes)
-			}
-
 			if err := tb.processWaitForEventGroup(ctx, s, res); err != nil {
 				return nil, false, fmt.Errorf("error grouping waitForEvent: %w", err)
 			}
@@ -752,6 +747,7 @@ func (tb *runTree) processWaitForEvent(ctx context.Context, span *cqrs.Span, mod
 	}
 
 	// output
+	var outputID *string
 	if foundEvtID != nil && mod.Status == rpbv2.SpanStatus_COMPLETED {
 		ident := &cqrs.SpanIdentifier{
 			AccountID:   tb.acctID,
@@ -765,8 +761,9 @@ func (tb *runTree) processWaitForEvent(ctx context.Context, span *cqrs.Span, mod
 		if err != nil {
 			return err
 		}
-		mod.OutputId = &id
+		outputID = &id
 	}
+	mod.OutputId = outputID
 
 	return nil
 }
