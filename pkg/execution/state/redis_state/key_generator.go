@@ -45,27 +45,8 @@ type ShardedKeyGenerator interface {
 	// Stack returns the key used to store the stack for a given run
 	Stack(ctx context.Context, runID ulid.ULID) string
 
-	// Pause returns the key used to store an individual pause from its ID.
-	Pause(ctx context.Context, pauseID uuid.UUID, runID ulid.ULID) string
-
 	// IsSharded returns whether keys related to a given Run ID should be sharded
 	IsSharded(runID ulid.ULID) bool
-
-	// RunPauses stores pause IDs for each run as a zset
-	RunPauses(ctx context.Context, runID ulid.ULID) string
-
-	// PauseLease stores the key which references a pause's lease.
-	//
-	// This is stored independently as we may store more than one copy of a pause
-	// for easy iteration.
-	PauseLease(ctx context.Context, pauseId uuid.UUID, runID ulid.ULID) string
-
-	// PauseStep returns the prefix of the key used within PauseStep.  This lets us
-	// iterate through all pauses for a given identifier
-	PauseStepPrefix(context.Context, state.Identifier) string
-
-	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
-	PauseStep(context.Context, state.Identifier, string) string
 }
 
 type shardedKeyGenerator struct {
@@ -117,27 +98,6 @@ func (s shardedKeyGenerator) Stack(ctx context.Context, runID ulid.ULID) string 
 	return fmt.Sprintf("{%s}:stack:%s", s.Prefix(stateDefaultKey, runID), runID)
 }
 
-func (s shardedKeyGenerator) Pause(ctx context.Context, pauseID uuid.UUID, runID ulid.ULID) string {
-	return fmt.Sprintf("{%s}:pauses:%s", s.Prefix(stateDefaultKey, runID), pauseID.String())
-}
-
-func (s shardedKeyGenerator) RunPauses(ctx context.Context, runID ulid.ULID) string {
-	return fmt.Sprintf("{%s}:pr:%s", s.Prefix(stateDefaultKey, runID), runID)
-}
-
-func (s shardedKeyGenerator) PauseLease(ctx context.Context, pauseID uuid.UUID, runID ulid.ULID) string {
-	return fmt.Sprintf("{%s}:pause-lease:%s", s.Prefix(stateDefaultKey, runID), pauseID.String())
-}
-
-func (s shardedKeyGenerator) PauseStepPrefix(ctx context.Context, identifier state.Identifier) string {
-	return fmt.Sprintf("{%s}:pause-steps:%s", s.Prefix(stateDefaultKey, identifier.RunID), identifier.RunID)
-}
-
-func (s shardedKeyGenerator) PauseStep(ctx context.Context, identifier state.Identifier, stepId string) string {
-	prefix := s.PauseStepPrefix(ctx, identifier)
-	return fmt.Sprintf("%s-%s", prefix, stepId)
-}
-
 func newShardedKeyGenerator() ShardedKeyGenerator {
 	return &shardedKeyGenerator{}
 }
@@ -146,6 +106,25 @@ type UnshardedKeyGenerator interface {
 	QueueKeyGenerator
 	DebounceKeyGenerator
 	BatchKeyGenerator
+
+	// Pause returns the key used to store an individual pause from its ID.
+	Pause(ctx context.Context, pauseID uuid.UUID) string
+
+	// RunPauses stores pause IDs for each run as a zset
+	RunPauses(ctx context.Context, runID ulid.ULID) string
+
+	// PauseLease stores the key which references a pause's lease.
+	//
+	// This is stored independently as we may store more than one copy of a pause
+	// for easy iteration.
+	PauseLease(ctx context.Context, pauseId uuid.UUID) string
+
+	// PauseStep returns the prefix of the key used within PauseStep.  This lets us
+	// iterate through all pauses for a given identifier
+	PauseStepPrefix(context.Context, state.Identifier) string
+
+	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
+	PauseStep(context.Context, state.Identifier, string) string
 
 	// Workflow returns the key for the current workflow ID and version.
 	Workflow(ctx context.Context, workflowID uuid.UUID, version int) string
@@ -392,4 +371,25 @@ func (u *unshardedKeyGenerator) RunIndex(runID ulid.ULID) string {
 
 func (u *unshardedKeyGenerator) Status(status string, fnID uuid.UUID) string {
 	return fmt.Sprintf("{%s}:queue:status:%s:%s", queueDefaultKey, fnID, status)
+}
+
+func (u unshardedKeyGenerator) Pause(ctx context.Context, pauseID uuid.UUID) string {
+	return fmt.Sprintf("{%s}:pauses:%s", stateDefaultKey, pauseID.String())
+}
+
+func (u unshardedKeyGenerator) RunPauses(ctx context.Context, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:pr:%s", stateDefaultKey, runID)
+}
+
+func (u unshardedKeyGenerator) PauseLease(ctx context.Context, pauseID uuid.UUID) string {
+	return fmt.Sprintf("{%s}:pause-lease:%s", stateDefaultKey, pauseID.String())
+}
+
+func (u unshardedKeyGenerator) PauseStepPrefix(ctx context.Context, identifier state.Identifier) string {
+	return fmt.Sprintf("{%s}:pause-steps:%s", stateDefaultKey, identifier.RunID)
+}
+
+func (u unshardedKeyGenerator) PauseStep(ctx context.Context, identifier state.Identifier, stepId string) string {
+	prefix := u.PauseStepPrefix(ctx, identifier)
+	return fmt.Sprintf("%s-%s", prefix, stepId)
 }
