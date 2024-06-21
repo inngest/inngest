@@ -183,7 +183,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
 
   const statusOptions = [
     { label: 'Failed', value: ReplayRunStatus.Failed, count: failedRunsCount },
-    { label: 'Cancelled', value: ReplayRunStatus.Cancelled, count: cancelledRunsCount },
+    { label: 'Canceled', value: ReplayRunStatus.Cancelled, count: cancelledRunsCount },
     { label: 'Succeeded', value: ReplayRunStatus.Completed, count: succeededRunsCount },
     { label: 'Skipped', value: ReplayRunStatus.SkippedPaused, count: pausedRunsCount },
   ];
