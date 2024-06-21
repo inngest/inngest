@@ -70,7 +70,7 @@ const CreateFunctionReplayDocument = graphql(`
         name: $name
         fromRange: $fromRange
         toRange: $toRange
-        statuses: $statuses
+        statusesV2: $statuses
       }
     ) {
       id
