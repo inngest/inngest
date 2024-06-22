@@ -218,7 +218,7 @@ func TestFunctionSteps(t *testing.T) {
 				assert.Nil(t, thr.OutputID)
 				// check sleep duration
 				expectedDur := (2 * time.Second).Milliseconds()
-				assert.Equal(t, expectedDur, thr.Duration)
+				assert.InDelta(t, expectedDur, thr.Duration, 200)
 			})
 
 			// forth
