@@ -492,8 +492,9 @@ func (tb *runTree) processSleepGroup(ctx context.Context, span *cqrs.Span, mod *
 	stepOp := rpbv2.SpanStepOp_SLEEP
 	mod.StepOp = &stepOp
 
+	var i int
 	// if there are more than one, that means this is not the first attempt to execute
-	for i, peer := range group {
+	for _, peer := range group {
 		if i == 0 {
 			mod.StartedAt = timestamppb.New(peer.Timestamp)
 		}
@@ -549,6 +550,7 @@ func (tb *runTree) processSleepGroup(ctx context.Context, span *cqrs.Span, mod *
 		nested.Name = fmt.Sprintf("Attempt %d", i)
 		mod.Children = append(mod.Children, nested)
 		tb.markProcessed(peer)
+		i++
 	}
 
 	// if the total number of children span end up with just one, it means
@@ -581,6 +583,7 @@ func (tb *runTree) processSleep(ctx context.Context, span *cqrs.Span, mod *rpbv2
 
 	// set sleep details
 	mod.Name = *span.StepDisplayName()
+	mod.OutputId = nil
 	mod.StepOp = &stepOp
 	mod.DurationMs = dur
 	mod.StartedAt = timestamppb.New(span.Timestamp)
@@ -612,8 +615,9 @@ func (tb *runTree) processWaitForEventGroup(ctx context.Context, span *cqrs.Span
 	stepOp := rpbv2.SpanStepOp_WAIT_FOR_EVENT
 	mod.StepOp = &stepOp
 
+	var i int
 	// if there are more than one, that means this is not the first attempt to execute
-	for i, peer := range group {
+	for _, peer := range group {
 		if i == 0 {
 			mod.StartedAt = timestamppb.New(peer.Timestamp)
 		}
@@ -670,6 +674,7 @@ func (tb *runTree) processWaitForEventGroup(ctx context.Context, span *cqrs.Span
 		nested.Name = fmt.Sprintf("Attempt %d", i)
 		mod.Children = append(mod.Children, nested)
 		tb.markProcessed(peer)
+		i++
 	}
 
 	// if the total number of children span end up with just one, it means
@@ -784,8 +789,9 @@ func (tb *runTree) processInvokeGroup(ctx context.Context, span *cqrs.Span, mod 
 	stepOp := rpbv2.SpanStepOp_INVOKE
 	mod.StepOp = &stepOp
 
+	var i int
 	// if there are more than one, that means this is not the first attempt to execute
-	for i, peer := range group {
+	for _, peer := range group {
 		if i == 0 {
 			mod.StartedAt = timestamppb.New(peer.Timestamp)
 		}
@@ -841,6 +847,7 @@ func (tb *runTree) processInvokeGroup(ctx context.Context, span *cqrs.Span, mod 
 		nested.Name = fmt.Sprintf("Attempt %d", i)
 		mod.Children = append(mod.Children, nested)
 		tb.markProcessed(peer)
+		i++
 	}
 
 	// if the total number of children span end up with just one, it means
