@@ -64,7 +64,7 @@ const (
 
 	// default values
 	QueuePeekMin            int64 = 300
-	QueuePeekMax            int64 = 2500
+	QueuePeekMax            int64 = 5000
 	QueuePeekCurrMultiplier int64 = 4 // threshold 25%
 	QueuePeekEWMALen        int   = 10
 	QueueLeaseDuration            = 20 * time.Second

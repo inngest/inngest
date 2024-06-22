@@ -64,3 +64,13 @@ func HistogramQueuePeekSize(ctx context.Context, value int64, opts HistogramOpt)
 		Boundaries:  peekSizeBoundaries,
 	})
 }
+
+func HistogramPeekEWMA(ctx context.Context, value int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, value, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_peek_ewma",
+		Description: "Distribution of the EWMA values for peeks",
+		Tags:        opts.Tags,
+		Boundaries:  peekSizeBoundaries,
+	})
+}

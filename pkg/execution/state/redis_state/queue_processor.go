@@ -692,12 +692,10 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	fetch := getNow().Truncate(time.Second).Add(PartitionLookahead)
 
 	queue, err := duration(peekCtx, "peek", func(ctx context.Context) ([]*QueueItem, error) {
+		peek := q.peekSize(ctx, p.WorkflowID)
 		// NOTE: would love to instrument this value to see it over time per function but
 		// it's likely too high of a cardinality
-		//
-		// TODO: instrument it as a distribution at least, so we get a rough idea how well the
-		// multiplier is working
-		peek := q.peekSize(ctx, p.WorkflowID)
+		go telemetry.HistogramPeekEWMA(ctx, peek, telemetry.HistogramOpt{PkgName: pkgName})
 		return q.Peek(peekCtx, p.Queue(), fetch, peek)
 	})
 	if err != nil {
