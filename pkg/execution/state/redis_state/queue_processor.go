@@ -902,7 +902,7 @@ ProcessLoop:
 		q.workers <- processItem{P: *p, I: *item, S: shard}
 	}
 
-	if err := q.setPeekEWMA(ctx, int64(ctrConcurrency+ctrRateLimit)); err != nil {
+	if err := q.setPeekEWMA(ctx, p.WorkflowID, int64(ctrConcurrency+ctrRateLimit)); err != nil {
 		log.From(ctx).Warn().Msg("error recording concurrency limit for EWMA")
 	}
 

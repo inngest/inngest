@@ -14,6 +14,7 @@ import (
 
 	"golang.org/x/sync/semaphore"
 
+	"github.com/VividCortex/ewma"
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
@@ -65,6 +66,7 @@ const (
 	QueuePeekMin            int64 = 300
 	QueuePeekMax            int64 = 2500
 	QueuePeekCurrMultiplier int64 = 4 // threshold 25%
+	QueuePeekEWMALen        int   = 10
 	QueueLeaseDuration            = 20 * time.Second
 	ConfigLeaseDuration           = 10 * time.Second
 	ConfigLeaseMax                = 20 * time.Second
@@ -210,6 +212,12 @@ func WithPeekSizeRange(min int64, max int64) QueueOpt {
 func WithPeekConcurrencyMultiplier(m int64) QueueOpt {
 	return func(q *queue) {
 		q.peekCurrMultiplier = m
+	}
+}
+
+func WithPeekEWMALength(l int) QueueOpt {
+	return func(q *queue) {
+		q.peekEWMALen = l
 	}
 }
 
@@ -464,6 +472,8 @@ type queue struct {
 	// peekCurrMultiplier is a multiplier used for calculating the dynamic peek size
 	// based on the EWMA values
 	peekCurrMultiplier int64
+	// peekEWMALen is the size of the list to hold the most recent values
+	peekEWMALen int
 	// workers is a buffered channel which allows scanners to send queue items
 	// to workers to be processed
 	workers chan processItem
@@ -2074,18 +2084,55 @@ func (q *queue) getShardLeases() []leasedShard {
 	return existingLeases
 }
 
+// peekEWMA returns the calculated EWMA value from the list
 func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
-	// TODO:
-	// - retrieves the list from redis
-	// - create a simple EWMA, add all the numbers in it and get the final value
+	// retrieves the list from redis
+	cmd := q.r.B().Lrange().Key(q.kg.ConcurrencyFnEWMA(fnID)).Start(0).Stop(-1).Build()
+	currVals, err := q.r.Do(ctx, cmd).AsIntSlice()
+	if err != nil {
+		return 0, fmt.Errorf("error reading function concurrency EWMA values: %w", err)
+	}
 
-	return 0, nil
+	// create a simple EWMA, add all the numbers in it and get the final value
+	// NOTE: we don't need variable since we don't want to maintain this in memory
+	mavg := ewma.NewMovingAverage()
+	for _, v := range currVals {
+		mavg.Add(float64(v))
+	}
+
+	// round up to the nearest integer
+	return int64(math.Round(mavg.Value())), nil
 }
 
-func (q *queue) setPeekEWMA(ctx context.Context, val int64) error {
-	// TODO:
-	// - add the new value to the existing list
-	// - if the length of the list exceeds the predetermined size, pop out the first item
+// setPeekEWMA add the new value to the existing list.
+// if the length of the list exceeds the predetermined size, pop out the first item
+func (q *queue) setPeekEWMA(ctx context.Context, fnID uuid.UUID, val int64) error {
+	listSize := q.peekEWMALen
+	if listSize == 0 {
+		listSize = QueuePeekEWMALen
+	}
+
+	keys := []string{
+		q.kg.ConcurrencyFnEWMA(fnID),
+	}
+	args, err := StrSlice([]any{
+		val,
+		listSize,
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = scripts["queue/setPeekEWMA"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error updating function concurrency EWMA: %w", err)
+	}
+
 	return nil
 }
 
