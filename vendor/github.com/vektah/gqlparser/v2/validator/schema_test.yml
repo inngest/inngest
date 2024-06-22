@@ -80,6 +80,15 @@ object types:
       message: 'Name "__id" must not begin with "__", which is reserved by GraphQL introspection.'
       locations: [{line: 2, column: 3}]
 
+  - name: field argument list must not be empty
+    input: |
+      type FooBar {
+        foo(): ID
+      }
+    error:
+      message: 'expected at least one definition, found )'
+      locations: [{line: 2, column: 7}]
+
   - name: check reserved names on type field argument
     input: |
       type FooBar {
@@ -528,7 +537,16 @@ directives:
       directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
       directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
 
-  - name: must be declared
+  - name: must be declared (type)
+    input: |
+      type User @foo {
+        name: String
+      }
+    error:
+      message: "Undefined directive foo."
+      locations: [{line: 1, column: 12}]
+
+  - name: must be declared (field)
     input: |
       type User {
         name: String @foo
@@ -536,6 +554,15 @@ directives:
     error:
       message: "Undefined directive foo."
       locations: [{line: 2, column: 17}]
+
+  - name: must be declared (enum)
+    input: |
+      enum Unit {
+        METER @foo
+      }
+    error:
+      message: "Undefined directive foo."
+      locations: [{line: 2, column: 10}]
 
   - name: cannot be self-referential
     input: |
@@ -604,6 +631,32 @@ directives:
       type P { name: String @testField }
       interface I { id: ID @testField }
 
+  - name: Invalid directive argument not allowed
+    input: |
+      directive @foo(bla: Int!) on FIELD_DEFINITION
+      type P {f: Int @foo(foobla: 11)}
+    
+    error:
+      message: 'Undefined argument foobla for directive foo.'
+      locations: [{line: 2, column: 21}]
+
+  - name: non-null argument must be provided
+    input: |
+      directive @foo(bla: Int!) on FIELD_DEFINITION
+      type P {f: Int @foo }
+    
+    error:
+      message: 'Argument bla for directive foo cannot be null.'
+      locations: [{line: 2, column: 17}]
+
+  - name: non-null argument must not be null
+    input: |
+      directive @foo(bla: Int!) on FIELD_DEFINITION
+      type P {f: Int @foo(bla: null) }
+    
+    error:
+      message: 'Argument bla for directive foo cannot be null.'
+      locations: [{line: 2, column: 17}]
 
 entry points:
   - name: multiple schema entry points
