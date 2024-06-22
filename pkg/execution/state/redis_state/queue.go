@@ -204,6 +204,13 @@ func WithPeekSize(n int64) QueueOpt {
 	}
 }
 
+func WithPeekRange(min int64, max int64) QueueOpt {
+	return func(q *queue) {
+		q.peekMin = min
+		q.peekMax = max
+	}
+}
+
 // WithPollTick specifies the interval at which the queue will poll the backing store
 // for available partitions.
 func WithPollTick(t time.Duration) QueueOpt {
@@ -451,6 +458,9 @@ type queue struct {
 	numWorkers int32
 	// peek sets the number of items to check on queue peeks
 	peek int64
+	// peek min & max sets the range for partitions to peek for items
+	peekMin int64
+	peekMax int64
 	// workers is a buffered channel which allows scanners to send queue items
 	// to workers to be processed
 	workers chan processItem
