@@ -167,6 +167,7 @@ func BenchmarkNew(b *testing.B) {
 	r := miniredis.RunT(b)
 	sm, err := New(
 		context.Background(),
+		WithKeyGenerator(DefaultKeyFunc{Prefix: "{state}"}),
 		WithConnectOpts(rueidis.ClientOption{
 			InitAddress:  []string{r.Addr()},
 			DisableCache: true,
