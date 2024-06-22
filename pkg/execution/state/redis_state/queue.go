@@ -61,11 +61,13 @@ const (
 	PartitionConcurrencyLimitRequeueExtension = 2 * time.Second
 	PartitionLookahead                        = time.Second
 
-	QueuePeekMax        int64 = 1000
-	QueuePeekDefault    int64 = 250
-	QueueLeaseDuration        = 20 * time.Second
-	ConfigLeaseDuration       = 10 * time.Second
-	ConfigLeaseMax            = 20 * time.Second
+	// default values
+	QueuePeekMin            int64 = 300
+	QueuePeekMax            int64 = 2500
+	QueuePeekCurrMultiplier int64 = 4 // threshold 25%
+	QueueLeaseDuration            = 20 * time.Second
+	ConfigLeaseDuration           = 10 * time.Second
+	ConfigLeaseMax                = 20 * time.Second
 
 	PriorityMax     uint = 0
 	PriorityDefault uint = 5
@@ -198,16 +200,16 @@ func WithNumWorkers(n int32) QueueOpt {
 	}
 }
 
-func WithPeekSize(n int64) QueueOpt {
-	return func(q *queue) {
-		q.peek = n
-	}
-}
-
-func WithPeekRange(min int64, max int64) QueueOpt {
+func WithPeekSizeRange(min int64, max int64) QueueOpt {
 	return func(q *queue) {
 		q.peekMin = min
 		q.peekMax = max
+	}
+}
+
+func WithPeekConcurrencyMultiplier(m int64) QueueOpt {
+	return func(q *queue) {
+		q.peekCurrMultiplier = m
 	}
 }
 
@@ -456,11 +458,12 @@ type queue struct {
 	wg *sync.WaitGroup
 	// numWorkers stores the number of workers available to concurrently process jobs.
 	numWorkers int32
-	// peek sets the number of items to check on queue peeks
-	peek int64
 	// peek min & max sets the range for partitions to peek for items
 	peekMin int64
 	peekMax int64
+	// peekCurrMultiplier is a multiplier used for calculating the dynamic peek size
+	// based on the EWMA values
+	peekCurrMultiplier int64
 	// workers is a buffered channel which allows scanners to send queue items
 	// to workers to be processed
 	workers chan processItem
@@ -2069,6 +2072,21 @@ func (q *queue) getShardLeases() []leasedShard {
 	}
 	q.shardLeaseLock.Unlock()
 	return existingLeases
+}
+
+func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
+	// TODO:
+	// - retrieves the list from redis
+	// - create a simple EWMA, add all the numbers in it and get the final value
+
+	return 0, nil
+}
+
+func (q *queue) setPeekEWMA(ctx context.Context, val int64) error {
+	// TODO:
+	// - add the new value to the existing list
+	// - if the length of the list exceeds the predetermined size, pop out the first item
+	return nil
 }
 
 func HashID(ctx context.Context, id string) string {

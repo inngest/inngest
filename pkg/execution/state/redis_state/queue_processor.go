@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/VividCortex/ewma"
+	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest/log"
@@ -691,7 +692,13 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	fetch := getNow().Truncate(time.Second).Add(PartitionLookahead)
 
 	queue, err := duration(peekCtx, "peek", func(ctx context.Context) ([]*QueueItem, error) {
-		return q.Peek(peekCtx, p.Queue(), fetch, q.peekSize())
+		// NOTE: would love to instrument this value to see it over time per function but
+		// it's likely too high of a cardinality
+		//
+		// TODO: instrument it as a distribution at least, so we get a rough idea how well the
+		// multiplier is working
+		peek := q.peekSize(ctx, p.WorkflowID)
+		return q.Peek(peekCtx, p.Queue(), fetch, peek)
 	})
 	if err != nil {
 		return err
@@ -893,6 +900,10 @@ ProcessLoop:
 			Tags:    map[string]any{"status": "success"},
 		})
 		q.workers <- processItem{P: *p, I: *item, S: shard}
+	}
+
+	if err := q.setPeekEWMA(ctx, int64(ctrConcurrency+ctrRateLimit)); err != nil {
+		log.From(ctx).Warn().Msg("error recording concurrency limit for EWMA")
 	}
 
 	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
@@ -1165,12 +1176,41 @@ func (q *queue) capacity() int64 {
 	return int64(q.numWorkers) - atomic.LoadInt64(&q.sem.counter)
 }
 
-// peekSize returns the total number of available workers which can consume individual
-// queue items.
-func (q *queue) peekSize() int64 {
-	size := q.peek
-	if size == 0 {
-		size = QueuePeekMax
+// peekSize returns the number of items to peek for the queue based on a couple of factors
+// 1. EWMA of concurrency limit hits
+// 2. configured min, max of peek size range
+// 3. worker capacity
+func (q *queue) peekSize(ctx context.Context, fnID uuid.UUID) int64 {
+	// retrieve the EWMA value
+	ewma, err := q.peekEWMA(ctx, fnID)
+	if err != nil {
+		// return the minimum if there's an error
+		return q.peekMin
+	}
+
+	// set multiplier
+	multiplier := q.peekCurrMultiplier
+	if multiplier == 0 {
+		multiplier = QueuePeekCurrMultiplier
+	}
+
+	// set ranges
+	min := q.peekMin
+	if min == 0 {
+		min = QueuePeekMin
+	}
+	max := q.peekMax
+	if max == 0 {
+		max = QueuePeekMax
+	}
+
+	// calculate size with EWMA and multiplier
+	size := ewma * multiplier
+	switch {
+	case size < min:
+		size = min
+	case size > max:
+		size = max
 	}
 
 	cap := q.capacity()
