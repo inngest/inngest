@@ -695,7 +695,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		peek := q.peekSize(ctx, p.WorkflowID)
 		// NOTE: would love to instrument this value to see it over time per function but
 		// it's likely too high of a cardinality
-		go telemetry.HistogramPeekEWMA(ctx, peek, telemetry.HistogramOpt{PkgName: pkgName})
+		go telemetry.HistogramQueuePeekEWMA(ctx, peek, telemetry.HistogramOpt{PkgName: pkgName})
 		return q.Peek(peekCtx, p.Queue(), fetch, peek)
 	})
 	if err != nil {
