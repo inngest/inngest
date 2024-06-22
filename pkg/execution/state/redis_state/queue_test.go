@@ -462,7 +462,7 @@ func BenchmarkPeekTiming(b *testing.B) {
 			panic(err)
 		}
 		if len(items) != int(QueuePeekMax) {
-			panic(err)
+			panic(fmt.Sprintf("expected %d, got %d", QueuePeekMax, len(items)))
 		}
 	}
 }
