@@ -2093,6 +2093,11 @@ func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
 		return 0, fmt.Errorf("error reading function concurrency EWMA values: %w", err)
 	}
 
+	// return early
+	if len(currVals) == 0 {
+		return 0, nil
+	}
+
 	// create a simple EWMA, add all the numbers in it and get the final value
 	// NOTE: we don't need variable since we don't want to maintain this in memory
 	mavg := ewma.NewMovingAverage()
