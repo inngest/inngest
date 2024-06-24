@@ -59,13 +59,18 @@ export default {
           '2xIntense': 'rgb(var(--color-accent-2xIntense) / <alpha-value>)',
         },
         status: {
-          failed: 'rgb(var(--color-tertiary-intense) / <alpha-value>)',
-          running: 'rgb(var(--color-secondary-intense) / <alpha-value>)',
-          runningSubtle: 'rgb(var(--color-secondary-xSubtle) / <alpha-value>)',
-          queued: 'rgb(var(--color-quaternary-cool-xIntense) / <alpha-value>)',
+          failed: 'rgb(var(--color-tertiary-subtle) / <alpha-value>)',
+          failedText: 'rgb(var(--color-tertiary-intense) / <alpha-value>)',
+          running: 'rgb(var(--color-secondary-subtle) / <alpha-value>)',
+          runningSubtle: 'rgb(var(--color-secondary-2xSubtle) / <alpha-value>)',
+          runningText: 'rgb(var(--color-secondary-intense) / <alpha-value>)',
+          queued: 'rgb(var(--color-quaternary-cool-moderate) / <alpha-value>)',
           queuedSubtle: 'rgb(var(--color-quaternary-cool-xSubtle) / <alpha-value>)',
-          completed: 'rgb(var(--color-primary-intense) / <alpha-value>)',
+          queuedText: 'rgb(var(--color-quaternary-cool-xIntense) / <alpha-value>)',
+          completed: 'rgb(var(--color-primary-subtle) / <alpha-value>)',
+          completedText: 'rgb(var(--color-primary-intense) / <alpha-value>)',
           cancelled: 'rgb(var(--color-foreground-cancelled) / <alpha-value>)',
+          cancelledText: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
         },
       },
       borderColor: {
@@ -127,6 +132,8 @@ export default {
         link: 'rgb(var(--color-foreground-link) / <alpha-value>)',
       },
       fill: {
+        // temporary tooltip token
+        tooltipArrow: 'rgb(var(--color-background-canvas-base) / <alpha-value>)',
         onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
         subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
         alwaysWhite: 'rgb(var(--color-foreground-alwaysWhite) / <alpha-value>)',
@@ -135,6 +142,10 @@ export default {
       },
       gridTemplateColumns: {
         dashboard: '1fr 1fr 1fr 432px',
+      },
+      boxShadowColor: {
+        // temporary tooltip token
+        tooltip: 'rgb(var(--color-background-canvas-muted) / <alpha-value>)',
       },
       boxShadow: {
         'outline-primary-light':

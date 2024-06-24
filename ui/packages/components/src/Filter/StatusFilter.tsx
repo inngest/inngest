@@ -1,4 +1,4 @@
-import { RunStatusIcon } from '../FunctionRunStatusIcon/RunStatusIcons';
+import { RunStatusDot } from '../FunctionRunStatusIcons';
 import { Select, type Option } from '../Select/Select';
 import { getStatusBackgroundClass, getStatusBorderClass } from '../statusClasses';
 import {
@@ -69,7 +69,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
           return (
             <Select.CheckboxOption key={option.id} option={option}>
               <span className="flex items-center gap-1 lowercase">
-                <RunStatusIcon status={option.id} className="h-2 w-2" />
+                <RunStatusDot status={option.id} className="h-2 w-2" />
                 <label className="text-sm first-letter:capitalize">{option.name}</label>
               </span>
             </Select.CheckboxOption>

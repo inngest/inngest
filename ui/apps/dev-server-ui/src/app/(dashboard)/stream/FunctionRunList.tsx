@@ -1,6 +1,5 @@
-import { Badge } from '@inngest/components/Badge';
 import { BatchSize } from '@inngest/components/BatchSize';
-import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
 
 import { useGetFunctionRunStatusQuery, type FunctionRun } from '@/store/generated';
 
@@ -65,7 +64,7 @@ export function FunctionRunItem({
 
   return (
     <li key={functionRun?.id} data-key={functionRun?.id} className="flex items-center gap-2">
-      <FunctionRunStatusIcon status={functionRun.status} className="h-5 w-5" />
+      <RunStatusIcon status={functionRun.status} className="h-5 w-5" />
       {functionRun?.function?.name}
       {batchSize && <BatchSize eventCount={batchSize} />}
     </li>

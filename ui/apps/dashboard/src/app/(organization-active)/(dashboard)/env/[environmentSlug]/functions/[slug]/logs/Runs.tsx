@@ -35,6 +35,7 @@ const GetFunctionRunsCountDocument = graphql(`
     environment: workspace(id: $environmentID) {
       function: workflowBySlug(slug: $functionSlug) {
         id
+        isPaused
         runs: runsV2(
           filter: {
             status: $functionRunStatuses
@@ -73,6 +74,7 @@ export default function RunsPage({ params }: RunsPageProps) {
   const { organization } = useOrganization();
 
   const functionRunsCount = data?.environment.function?.runs?.totalCount;
+  const functionIsPaused = data?.environment.function?.isPaused || false;
 
   function handleStatusesChange(statuses: FunctionRunStatus[]) {
     setSelectedStatuses(statuses);
@@ -120,7 +122,7 @@ export default function RunsPage({ params }: RunsPageProps) {
 
   return (
     <>
-      <div className="flex items-center justify-between gap-2 border-b border-slate-300 px-5 py-2">
+      <div className="border-muted flex items-center justify-between gap-2 border-b px-5 py-2">
         <div className="gap flex items-center gap-1.5">
           <StatusFilter
             selectedStatuses={selectedStatuses}
@@ -137,7 +139,9 @@ export default function RunsPage({ params }: RunsPageProps) {
           )}
         </div>
         <ClientFeatureFlag flag="function-replay">
-          {!environment.isArchived && <NewReplayButton functionSlug={functionSlug} />}
+          {!environment.isArchived && !functionIsPaused && (
+            <NewReplayButton functionSlug={functionSlug} />
+          )}
         </ClientFeatureFlag>
       </div>
       <div className="flex min-h-0 flex-1">

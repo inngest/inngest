@@ -48,7 +48,7 @@ export function InlineSpans({ className, minTime, maxTime, name, spans, widths }
     <Tooltip>
       <TooltipTrigger className="h-fit grow">
         <div className={cn('flex h-8 grow items-center', className)}>
-          <div className="h-px bg-slate-300" style={{ flexGrow: widths.before }}></div>
+          <div className="bg-contrast h-px" style={{ flexGrow: widths.before }}></div>
 
           <div
             className="flex"
@@ -63,11 +63,11 @@ export function InlineSpans({ className, minTime, maxTime, name, spans, widths }
             })}
           </div>
 
-          <div className="h-px bg-slate-300" style={{ flexGrow: widths.after }}></div>
+          <div className="bg-contrast h-px" style={{ flexGrow: widths.after }}></div>
         </div>
       </TooltipTrigger>
       <TooltipContent>
-        <div className="text-slate-700">
+        <div className="text-basis">
           {spans[0] && <Times isDelayVisible={spans.length === 1} name={name} span={spans[0]} />}
 
           {spans.length > 1 &&
