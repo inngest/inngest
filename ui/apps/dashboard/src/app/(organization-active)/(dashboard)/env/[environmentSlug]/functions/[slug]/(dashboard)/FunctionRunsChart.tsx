@@ -94,8 +94,8 @@ export default function FunctionRunsChart({ functionSlug, timeRange }: FunctionR
       title="Function Runs"
       data={metrics}
       legend={[
-        { name: 'Completed', dataKey: 'completed', color: 'rgb(var(--color-primary-intense) / 1)' },
-        { name: 'Failed', dataKey: 'failed', color: 'rgb(var(--color-tertiary-intense) / 1)' },
+        { name: 'Completed', dataKey: 'completed', color: 'rgb(var(--color-primary-subtle) / 1)' },
+        { name: 'Failed', dataKey: 'failed', color: 'rgb(var(--color-tertiary-subtle) / 1)' },
         {
           name: 'Cancelled',
           dataKey: 'canceled',

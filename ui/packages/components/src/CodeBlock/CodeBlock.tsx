@@ -351,7 +351,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
             >
               <p
                 className={cn(
-                  header?.status === 'error' ? 'text-status-failed' : 'text-muted',
+                  header?.status === 'error' ? 'text-status-failedText' : 'text-muted',
                   ' px-5 py-2.5 text-sm'
                 )}
               >
@@ -478,8 +478,8 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
 CodeBlock.Wrapper = ({ children }: React.PropsWithChildren) => {
   return (
     <div
-      className="w-full overflow-hidden rounded-lg border
-     border-slate-300 dark:border-slate-700/30 dark:shadow"
+      className="border-muted w-full overflow-hidden rounded-lg
+     border dark:border-slate-700/30 dark:shadow"
     >
       {children}
     </div>

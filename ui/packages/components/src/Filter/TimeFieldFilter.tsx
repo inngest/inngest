@@ -1,16 +1,16 @@
 import { Select, type Option } from '../Select/Select';
-import {
-  FunctionRunTimeFields,
-  isFunctionTimeField,
-  type FunctionRunTimeField,
-} from '../types/functionRun';
+import { FunctionRunTimeField, isFunctionTimeField } from '../types/functionRun';
 
 type TimeFieldFilterProps = {
   selectedTimeField: FunctionRunTimeField;
   onTimeFieldChange: (value: FunctionRunTimeField) => void;
 };
 
-const options: Option[] = FunctionRunTimeFields.map((field) => ({
+const options: Option[] = [
+  FunctionRunTimeField.QueuedAt,
+  FunctionRunTimeField.StartedAt,
+  FunctionRunTimeField.EndedAt,
+].map((field) => ({
   id: field,
   name: field.replace(/_/g, ' '),
 }));

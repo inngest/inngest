@@ -31,9 +31,9 @@ export function SleepingSummary({ history }: Props) {
             className={i < sleeps.length - 1 ? 'mb-4' : undefined}
             key={sleep.groupID}
           >
-            <Card.Header>Sleeping</Card.Header>
+            <Card.Header className="bg-white dark:bg-slate-800/40">Sleeping</Card.Header>
 
-            <Card.Content>
+            <Card.Content className="bg-white dark:bg-slate-800/40">
               <MetadataItem label="Sleep Until" value={config.until.toLocaleString()} />
             </Card.Content>
           </Card>

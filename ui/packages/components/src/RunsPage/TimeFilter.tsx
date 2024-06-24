@@ -1,49 +1,19 @@
 import RelativeTimeFilter from '@inngest/components/Filter/RelativeTimeFilter';
 import { type Option } from '@inngest/components/Select/Select';
-import { useQuery } from 'urql';
-
-import { graphql } from '@/gql';
-
-const GetBillingPlanDocument = graphql(`
-  query GetBillingPlan {
-    account {
-      plan {
-        id
-        name
-        features
-      }
-    }
-
-    plans {
-      name
-      features
-    }
-  }
-`);
-
-type RelativeTimeFilterProps = {
-  selectedDays: string;
-  onDaysChange: (value: string) => void;
-};
 
 const daysAgoArray = ['1', '3', '7', '14', '30'];
 
-export default function TimeFilter({ selectedDays, onDaysChange }: RelativeTimeFilterProps) {
-  const [{ data }] = useQuery({
-    query: GetBillingPlanDocument,
-  });
+type Props = {
+  daysAgoMax: number;
+  onDaysChange: (value: string) => void;
+  selectedDays: string;
+};
 
-  // Since "features" is a map, we can't be 100% sure that there's a log
-  // retention value. So default to 7 days.
-  let logRetention = 7;
-  if (typeof data?.account.plan?.features.log_retention === 'number') {
-    logRetention = data.account.plan.features.log_retention;
-  }
-
+export function TimeFilter({ daysAgoMax, onDaysChange, selectedDays }: Props) {
   const options: Option[] = daysAgoArray.map((date) => ({
     id: date,
     name: date === '1' ? `Last ${date} day` : `Last ${date} days`,
-    disabled: parseInt(date) > logRetention,
+    disabled: parseInt(date) > daysAgoMax,
   }));
 
   const selectedValue = options.find((option) => option.id === selectedDays.toString());

@@ -436,6 +436,9 @@ func (m mgr) LoadEvents(ctx context.Context, fnID uuid.UUID, runID ulid.ULID) ([
 	cmd = m.r.B().Get().Key(m.kf.Event(ctx, v1id)).Build()
 	byt, err = m.r.Do(ctx, cmd).AsBytes()
 	if err != nil {
+		if err == rueidis.Nil {
+			return nil, state.ErrEventNotFound
+		}
 		return nil, fmt.Errorf("failed to get event; %w", err)
 	}
 	return []json.RawMessage{byt}, nil

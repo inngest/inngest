@@ -21,7 +21,8 @@ import { devServerURL, useDevServer } from '../utils/useDevServer';
 
 type Props = {
   className?: string;
-  getTrigger: () => Promise<Trigger>;
+  getTrigger: (runID: string) => Promise<Trigger>;
+  runID: string;
 };
 
 export type Trigger = {
@@ -34,14 +35,14 @@ export type Trigger = {
   cron: string | null;
 };
 
-export function TriggerDetails({ className, getTrigger }: Props) {
+export function TriggerDetails({ className, getTrigger, runID }: Props) {
   const [showEventPanel, setShowEventPanel] = useLocalStorage('showEventPanel', true);
   const [trigger, setTrigger] = useState<Trigger>();
   const isLoading = !trigger;
   const { isRunning, send } = useDevServer();
 
   useEffect(() => {
-    getTrigger().then((data) => {
+    getTrigger(runID).then((data) => {
       setTrigger(data);
     });
   }, [getTrigger]);

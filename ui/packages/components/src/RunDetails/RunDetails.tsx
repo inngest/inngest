@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback } from 'react';
 import { Badge } from '@inngest/components/Badge';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
@@ -20,7 +21,7 @@ import { WaitingSummary } from './WaitingSummary';
 import { renderRunMetadata } from './runMetadataRenderer';
 
 type FuncProps = {
-  cancelRun?: () => Promise<unknown>;
+  cancelRun?: (runID: string) => Promise<unknown>;
   functionVersion?: Pick<FunctionVersion, 'url' | 'version'>;
   rerun?: () => Promise<unknown>;
 };
@@ -44,17 +45,26 @@ type WithRun = {
 
 type Props = FuncProps & (WithRun | LoadingRun);
 
-export function RunDetails({
-  cancelRun,
-  func,
-  functionVersion,
-  getHistoryItemOutput,
-  history,
-  rerun,
-  run,
-  navigateToRun,
-  loading = false,
-}: Props) {
+export function RunDetails(props: Props) {
+  const {
+    func,
+    functionVersion,
+    getHistoryItemOutput,
+    history,
+    rerun,
+    run,
+    navigateToRun,
+    loading = false,
+  } = props;
+
+  const runID = run?.id;
+  const cancelRun = useCallback(async () => {
+    if (!props.cancelRun || !runID) {
+      return;
+    }
+    await props.cancelRun(runID);
+  }, [props.cancelRun, runID]);
+
   const firstTrigger = (func?.triggers && func.triggers[0]) ?? null;
   const cron = firstTrigger && firstTrigger.type === 'CRON';
 

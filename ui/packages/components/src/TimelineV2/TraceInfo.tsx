@@ -145,7 +145,7 @@ export function TraceInfo({ className, pathCreator, trace, result }: Props) {
             {stepKindInfo}
           </dl>
         </Card.Content>
-        {result && <RunResult className="border-t border-slate-300" result={result} />}
+        {result && <RunResult className="border-subtle border-t" result={result} />}
       </Card>
     </div>
   );

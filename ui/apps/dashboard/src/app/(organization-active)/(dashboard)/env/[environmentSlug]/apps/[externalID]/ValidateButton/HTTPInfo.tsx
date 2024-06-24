@@ -1,5 +1,6 @@
+import { isStringArray } from '@inngest/components/utils/array';
+
 import type { AppCheckResult } from '@/gql/graphql';
-import isStringArray from '@/utils/isStringArray';
 
 type Props = {
   data: AppCheckResult;

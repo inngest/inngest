@@ -39,7 +39,7 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
   return (
     <>
       {!env.isArchived && !functionIsPaused && (
-        <div className="flex items-center justify-end border-b border-slate-300 px-5 py-2">
+        <div className="border-muted flex items-center justify-end border-b px-5 py-2">
           <NewReplayButton functionSlug={functionSlug} />
         </div>
       )}

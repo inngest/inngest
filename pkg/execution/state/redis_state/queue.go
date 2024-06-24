@@ -63,7 +63,7 @@ const (
 
 	QueuePeekMax        int64 = 1000
 	QueuePeekDefault    int64 = 250
-	QueueLeaseDuration        = 10 * time.Second
+	QueueLeaseDuration        = 20 * time.Second
 	ConfigLeaseDuration       = 10 * time.Second
 	ConfigLeaseMax            = 20 * time.Second
 
