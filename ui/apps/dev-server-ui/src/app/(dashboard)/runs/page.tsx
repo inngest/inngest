@@ -48,7 +48,6 @@ export default function Page({
 
   const queryFn = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
-      console.log(pageParam);
       const data: GetRunsQuery = await client.request(GetRunsDocument, {
         functionRunCursor: pageParam,
         startTime,
