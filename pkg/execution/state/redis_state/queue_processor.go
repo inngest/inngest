@@ -746,6 +746,7 @@ ProcessLoop:
 			// Break the entire loop to prevent out of order work.
 			break ProcessLoop
 		}
+		telemetry.WorkerQueueCapacityCounter(ctx, 1, telemetry.CounterOpt{PkgName: pkgName})
 
 		// Attempt to lease this item before passing this to a worker.  We have to do this
 		// synchronously as we need to lease prior to requeueing the partition pointer. If
@@ -765,6 +766,7 @@ ProcessLoop:
 		if err != nil {
 			// Continue on and handle the error below.
 			q.sem.Release(1)
+			telemetry.WorkerQueueCapacityCounter(ctx, -1, telemetry.CounterOpt{PkgName: pkgName})
 		}
 
 		// Check the sojourn delay for this item in the queue. Tracking system latency vs
@@ -899,7 +901,6 @@ ProcessLoop:
 			Tags:    map[string]any{"status": "success"},
 		})
 		q.workers <- processItem{P: *p, I: *item, S: shard}
-		telemetry.WorkerQueueCapacityCounter(ctx, 1, telemetry.CounterOpt{PkgName: pkgName})
 	}
 
 	if err := q.setPeekEWMA(ctx, p.WorkflowID, int64(ctrConcurrency+ctrRateLimit)); err != nil {
