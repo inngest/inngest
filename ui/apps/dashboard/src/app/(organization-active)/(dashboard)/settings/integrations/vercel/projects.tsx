@@ -6,7 +6,6 @@ import { Badge } from '@inngest/components/Badge/Badge';
 import { NewButton } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 import { Link } from '@inngest/components/Link/Link';
-import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { Select } from '@inngest/components/Select/Select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiInformationLine, RiRefreshLine } from '@remixicon/react';
@@ -14,25 +13,25 @@ import { RiInformationLine, RiRefreshLine } from '@remixicon/react';
 import { VercelDeploymentProtection } from './VercelIntegration';
 import { useVercelIntegration } from './useVercelIntegration';
 
-type DisableProjectProps = {
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-};
+// type DisableProjectProps = {
+//   isOpen: boolean;
+//   onClose: () => void;
+//   onConfirm: () => void;
+// };
 
-const DisableVercel = ({ isOpen, onClose, onConfirm }: DisableProjectProps) => (
-  <AlertModal
-    className="w-1/3"
-    isOpen={isOpen}
-    onClose={onClose}
-    onSubmit={onConfirm}
-    title="Confirm disable"
-  >
-    <p className="px-6 pb-0 pt-4 dark:text-white">
-      Are you sure you want to disable Vercel Integration?
-    </p>
-  </AlertModal>
-);
+// const DisableVercel = ({ isOpen, onClose, onConfirm }: DisableProjectProps) => (
+//   <AlertModal
+//     className="w-1/3"
+//     isOpen={isOpen}
+//     onClose={onClose}
+//     onSubmit={onConfirm}
+//     title="Confirm disable"
+//   >
+//     <p className="px-6 pb-0 pt-4 dark:text-white">
+//       Are you sure you want to disable Vercel Integration?
+//     </p>
+//   </AlertModal>
+// );
 
 export default function VercelProjects() {
   const { data } = useVercelIntegration();

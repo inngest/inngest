@@ -18,7 +18,7 @@ import { useVercelIntegration } from '../../useVercelIntegration';
 
 export default function VercelConfigure() {
   const { data, fetching } = useVercelIntegration();
-  const [_, updateVercelApp] = useMutation(UpdateVercelAppDocument);
+  const [, updateVercelApp] = useMutation(UpdateVercelAppDocument);
   const { projects } = data;
   const { id } = useParams<{ id: string }>();
   const [project, setProject] = useState<VercelProject & { updated?: boolean }>();
@@ -28,7 +28,7 @@ export default function VercelConfigure() {
   const [mutating, setMutating] = useState(false);
 
   useEffect(() => {
-    if (projects && !project) {
+    if (!project) {
       const p = projects.find((p) => p.id === id);
       setProject(p);
       p?.servePath && setPaths(p.servePath.split(','));
