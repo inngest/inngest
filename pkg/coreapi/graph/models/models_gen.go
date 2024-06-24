@@ -201,13 +201,13 @@ type RunTraceTrigger struct {
 }
 
 type RunsFilterV2 struct {
-	From        time.Time               `json:"from"`
-	Until       *time.Time              `json:"until,omitempty"`
-	TimeField   *FunctionRunTimeFieldV2 `json:"timeField,omitempty"`
-	Status      []FunctionRunStatus     `json:"status,omitempty"`
-	FunctionIDs []uuid.UUID             `json:"functionIDs,omitempty"`
-	AppIDs      []uuid.UUID             `json:"appIDs,omitempty"`
-	Query       *string                 `json:"query,omitempty"`
+	From        time.Time           `json:"from"`
+	Until       *time.Time          `json:"until,omitempty"`
+	TimeField   *RunsV2OrderByField `json:"timeField,omitempty"`
+	Status      []FunctionRunStatus `json:"status,omitempty"`
+	FunctionIDs []uuid.UUID         `json:"functionIDs,omitempty"`
+	AppIDs      []uuid.UUID         `json:"appIDs,omitempty"`
+	Query       *string             `json:"query,omitempty"`
 }
 
 type RunsV2Connection struct {
@@ -424,49 +424,6 @@ func (e *FunctionRunStatus) UnmarshalGQL(v interface{}) error {
 }
 
 func (e FunctionRunStatus) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
-}
-
-type FunctionRunTimeFieldV2 string
-
-const (
-	FunctionRunTimeFieldV2QueuedAt  FunctionRunTimeFieldV2 = "QUEUED_AT"
-	FunctionRunTimeFieldV2StartedAt FunctionRunTimeFieldV2 = "STARTED_AT"
-	FunctionRunTimeFieldV2EndedAt   FunctionRunTimeFieldV2 = "ENDED_AT"
-)
-
-var AllFunctionRunTimeFieldV2 = []FunctionRunTimeFieldV2{
-	FunctionRunTimeFieldV2QueuedAt,
-	FunctionRunTimeFieldV2StartedAt,
-	FunctionRunTimeFieldV2EndedAt,
-}
-
-func (e FunctionRunTimeFieldV2) IsValid() bool {
-	switch e {
-	case FunctionRunTimeFieldV2QueuedAt, FunctionRunTimeFieldV2StartedAt, FunctionRunTimeFieldV2EndedAt:
-		return true
-	}
-	return false
-}
-
-func (e FunctionRunTimeFieldV2) String() string {
-	return string(e)
-}
-
-func (e *FunctionRunTimeFieldV2) UnmarshalGQL(v interface{}) error {
-	str, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("enums must be strings")
-	}
-
-	*e = FunctionRunTimeFieldV2(str)
-	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid FunctionRunTimeFieldV2", str)
-	}
-	return nil
-}
-
-func (e FunctionRunTimeFieldV2) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

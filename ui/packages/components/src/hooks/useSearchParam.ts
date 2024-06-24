@@ -164,6 +164,10 @@ export function useValidatedArraySearchParam<T>(
 
   const rawValue = searchParams.get(name);
   const value = useMemo(() => {
+    if (rawValue === null) {
+      return undefined;
+    }
+
     if (typeof rawValue !== 'string') {
       console.error(`invalid type for search param ${name}: ${rawValue}`);
       return undefined;

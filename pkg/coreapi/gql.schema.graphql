@@ -308,19 +308,13 @@ type RunHistoryInvokeFunctionResult {
 input RunsFilterV2 {
   from: Time!
   until: Time
-  timeField: FunctionRunTimeFieldV2 = QUEUED_AT
+  timeField: RunsV2OrderByField = QUEUED_AT
 
   status: [FunctionRunStatus!]
   functionIDs: [UUID!]
   appIDs: [UUID!]
 
   query: String # CEL query string
-}
-
-enum FunctionRunTimeFieldV2 {
-  QUEUED_AT
-  STARTED_AT
-  ENDED_AT
 }
 
 input RunsV2OrderBy {
