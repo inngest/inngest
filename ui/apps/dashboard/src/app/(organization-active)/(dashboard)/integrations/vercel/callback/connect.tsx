@@ -70,7 +70,7 @@ export default function Connect({
           {[...projects.slice(start, end)].map((p: any, i) => (
             <div
               key={`project-list-${i}`}
-              className={`flex flex h-[72px] flex-row items-center justify-between ${
+              className={`flex h-[72px] flex-row items-center justify-between ${
                 i !== end && 'border-b'
               } border-slate-200 px-6`}
               onMouseOver={() => setHover(p.id)}
@@ -117,7 +117,7 @@ export default function Connect({
             </div>
           ))}
           {projects.length > PAGE_SIZE && (
-            <div className="row flex flex items-center justify-center p-2">
+            <div className="row flex items-center justify-center p-2">
               <NewButton
                 appearance="ghost"
                 icon={<RiArrowLeftSLine className="disabled:text-disabled text-basis" />}

@@ -36,7 +36,6 @@ const DisableVercel = ({ isOpen, onClose, onConfirm }: DisableProjectProps) => (
 
 export default function VercelProjects() {
   const { data } = useVercelIntegration();
-  const [disable, setDisable] = useState(false);
   const router = useRouter();
   const { projects } = data;
   const [filter, setFilter] = useState('all');
@@ -148,7 +147,7 @@ export default function VercelProjects() {
           </Card>
         ))}
 
-      <div className="mt-10 flex flex-col gap-4 border-t border-slate-200 py-7">
+      {/* <div className="mt-10 flex flex-col gap-4 border-t border-slate-200 py-7">
         <div className="text-lg font-medium text-gray-900">Disable Vercel integration</div>
         <div className="text-base font-normal leading-snug text-slate-600">
           This action disables API key and stops webhooks.
@@ -171,7 +170,7 @@ export default function VercelProjects() {
             onClick={() => setDisable(true)}
           />
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }

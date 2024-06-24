@@ -12,6 +12,8 @@ export type VercelProject = {
   ssoProtection?: {
     deploymentType: VercelDeploymentProtection;
   };
+  originOverride?: string;
+  protectionBypassSecret?: string;
 };
 
 export type VercelProjectViaAPI = {
