@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Time } from '@inngest/components/Time';
 import { IconFunction } from '@inngest/components/icons/Function';
-import { IconStatusCanceled } from '@inngest/components/icons/status/Canceled';
+import { IconStatusCancelled } from '@inngest/components/icons/status/Cancelled';
 import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
 import { IconStatusFailed } from '@inngest/components/icons/status/Failed';
 import { IconStatusQueued } from '@inngest/components/icons/status/Queued';
@@ -15,7 +15,7 @@ import { FunctionRunStatus } from '@/gql/graphql';
 import graphqlAPI from '@/queries/graphqlAPI';
 
 const functionRunStatusIcons = {
-  [FunctionRunStatus.Cancelled]: IconStatusCanceled,
+  [FunctionRunStatus.Cancelled]: IconStatusCancelled,
   [FunctionRunStatus.Completed]: IconStatusCompleted,
   [FunctionRunStatus.Failed]: IconStatusFailed,
   [FunctionRunStatus.Running]: IconStatusRunning,

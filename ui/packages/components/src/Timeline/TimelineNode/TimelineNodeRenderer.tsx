@@ -1,4 +1,4 @@
-import { IconStatusCanceled } from '@inngest/components/icons/status/Canceled';
+import { IconStatusCancelled } from '@inngest/components/icons/status/Cancelled';
 import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
 import { IconStatusErrored } from '@inngest/components/icons/status/Errored';
 import { IconStatusFailed } from '@inngest/components/icons/status/Failed';
@@ -21,7 +21,7 @@ function getIconForStatus(node: HistoryNode) {
   if (node.scope === 'function' && node.status === 'started') {
     icon = <IconStatusCompleted />;
   } else if (node.status === 'cancelled') {
-    icon = <IconStatusCanceled />;
+    icon = <IconStatusCancelled />;
   } else if (node.status === 'completed') {
     icon = <IconStatusCompleted />;
   } else if (node.status === 'errored') {
