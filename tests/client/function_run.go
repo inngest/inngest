@@ -80,7 +80,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 	query GetFunctionRunsV2(
 		$startTime: Time!,
 		$endTime: Time!,
-		$timeField: FunctionRunTimeFieldV2 = QUEUED_AT,
+		$timeField: RunsV2OrderByField = QUEUED_AT,
 		$status: [FunctionRunStatus!],
 		$first: Int = 40
 	) {
