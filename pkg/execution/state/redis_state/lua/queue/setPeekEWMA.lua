@@ -7,8 +7,8 @@ old values will be discarded as the size exceeds the limit
 
 local ewmaKey = KEYS[1]
 
-local newValue = ARGV[1]
-local maxSize  = ARGV[2]
+local newValue = tonumber(ARGV[1])
+local maxSize  = tonumber(ARGV[2])
 
 redis.call("RPUSH", ewmaKey)
 
