@@ -543,6 +543,7 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 			processCtx, cancel := context.WithCancel(context.Background())
 			err := q.process(processCtx, i.P, i.I, i.S, f)
 			q.sem.Release(1)
+			telemetry.WorkerQueueCapacityCounter(ctx, -1, telemetry.CounterOpt{PkgName: pkgName})
 			cancel()
 			if err == nil {
 				continue
@@ -898,6 +899,7 @@ ProcessLoop:
 			Tags:    map[string]any{"status": "success"},
 		})
 		q.workers <- processItem{P: *p, I: *item, S: shard}
+		telemetry.WorkerQueueCapacityCounter(ctx, 1, telemetry.CounterOpt{PkgName: pkgName})
 	}
 
 	if err := q.setPeekEWMA(ctx, p.WorkflowID, int64(ctrConcurrency+ctrRateLimit)); err != nil {

@@ -244,7 +244,7 @@ func WithAsyncInstrumentation() QueueOpt {
 	return func(q *queue) {
 		telemetry.GaugeWorkerQueueCapacity(ctx, telemetry.GaugeOpt{
 			PkgName:  pkgName,
-			Callback: func(ctx context.Context) (int64, error) { return q.capacity(), nil },
+			Callback: func(ctx context.Context) (int64, error) { return int64(q.numWorkers), nil },
 		})
 
 		telemetry.GaugeGlobalQueuePartitionCount(ctx, telemetry.GaugeOpt{
