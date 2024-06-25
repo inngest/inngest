@@ -10,7 +10,7 @@ local ewmaKey = KEYS[1]
 local newValue = tonumber(ARGV[1])
 local maxSize  = tonumber(ARGV[2])
 
-redis.call("RPUSH", ewmaKey)
+redis.call("RPUSH", ewmaKey, newValue)
 
 local len = redis.call("LLEN", ewmaKey)
 -- take out the oldest one when exceeded
