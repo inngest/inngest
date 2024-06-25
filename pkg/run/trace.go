@@ -964,6 +964,12 @@ func (tb *runTree) processInvoke(ctx context.Context, span *cqrs.Span, mod *rpbv
 		}
 	}
 
+	if hasFinished(mod) {
+		end := mod.StartedAt.AsTime().Add(span.Duration)
+		mod.DurationMs = span.DurationMS()
+		mod.EndedAt = timestamppb.New(end)
+	}
+
 	// output
 	if returnEventID != nil || mod.Status == rpbv2.SpanStatus_FAILED {
 		ident := &cqrs.SpanIdentifier{
