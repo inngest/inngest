@@ -75,8 +75,8 @@ func TestStateHarness(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	unshardedClient := NewUnshardedClient(rc)
-	shardedClient := NewShardedClient(unshardedClient, rc)
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(unshardedClient, rc, StateDefaultKey)
 
 	sm, err := New(
 		context.Background(),
@@ -179,8 +179,8 @@ func BenchmarkNew(b *testing.B) {
 	})
 	require.NoError(b, err)
 
-	unshardedClient := NewUnshardedClient(rc)
-	shardedClient := NewShardedClient(unshardedClient, rc)
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(unshardedClient, rc, StateDefaultKey)
 
 	sm, err := New(
 		context.Background(),

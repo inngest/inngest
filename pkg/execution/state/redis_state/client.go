@@ -11,10 +11,13 @@ type ShardedClient struct {
 	u         *UnshardedClient
 }
 
-func NewShardedClient(u *UnshardedClient, r rueidis.Client) *ShardedClient {
+const StateDefaultKey = "estate"
+const QueueDefaultKey = "queue"
+
+func NewShardedClient(u *UnshardedClient, r rueidis.Client, stateDefaultKey string) *ShardedClient {
 	return &ShardedClient{
 		u:         u,
-		kg:        newShardedKeyGenerator(),
+		kg:        newShardedKeyGenerator(stateDefaultKey),
 		shardedRc: r,
 	}
 }
@@ -47,9 +50,9 @@ func (u *UnshardedClient) Client() rueidis.Client {
 	return u.unshardedRc
 }
 
-func NewUnshardedClient(r rueidis.Client) *UnshardedClient {
+func NewUnshardedClient(r rueidis.Client, stateDefaultKey, queueDefaultKey string) *UnshardedClient {
 	return &UnshardedClient{
-		kg:          newUnshardedKeyGenerator(),
+		kg:          newUnshardedKeyGenerator(stateDefaultKey, queueDefaultKey),
 		unshardedRc: r,
 	}
 }

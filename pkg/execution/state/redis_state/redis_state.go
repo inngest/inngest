@@ -133,12 +133,12 @@ func (c Config) SingleClusterManager(ctx context.Context) (state.Manager, error)
 		return nil, err
 	}
 
-	u := NewUnshardedClient(r)
+	u := NewUnshardedClient(r, StateDefaultKey, QueueDefaultKey)
 
 	return New(
 		ctx,
 		WithUnshardedClient(u),
-		WithShardedClient(NewShardedClient(u, r)),
+		WithShardedClient(NewShardedClient(u, r, StateDefaultKey)),
 	)
 }
 
