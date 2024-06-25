@@ -20,10 +20,10 @@ const CURRENT_RUN_HANDLING_STRATEGY_SUSPEND = 'suspend';
 const CURRENT_RUN_HANDLING_STRATEGY_CANCEL = 'cancel';
 const currentRunHandlingOptions: CurrentRunHandlingOption[] = [
   {
-    label: 'Paused immediately, then canceled after 7 days',
+    label: 'Paused immediately, then cancelled after 7 days',
     value: CURRENT_RUN_HANDLING_STRATEGY_SUSPEND,
   },
-  { label: 'Canceled immediately', value: CURRENT_RUN_HANDLING_STRATEGY_CANCEL },
+  { label: 'Cancelled immediately', value: CURRENT_RUN_HANDLING_STRATEGY_CANCEL },
 ];
 type CurrentRunHandlingStrategy = (typeof currentRunHandlingOptions)[number]['value'];
 
