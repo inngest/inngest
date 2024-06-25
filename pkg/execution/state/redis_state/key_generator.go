@@ -334,7 +334,7 @@ func (u *unshardedKeyGenerator) ConcurrencyIndex() string {
 }
 
 func (u *unshardedKeyGenerator) QueuePrefix() string {
-	return queueDefaultKey
+	return fmt.Sprintf("{%s}", queueDefaultKey)
 }
 
 func (u *unshardedKeyGenerator) BatchPointer(ctx context.Context, workflowID uuid.UUID) string {

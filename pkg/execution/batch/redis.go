@@ -106,6 +106,7 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 		config.MaxSize,
 		bi,
 		newULID,
+		// This is used within the Lua script to create the batch metadata key
 		b.u.KeyGenerator().QueuePrefix(),
 		enums.BatchStatusPending,
 		enums.BatchStatusStarted,
