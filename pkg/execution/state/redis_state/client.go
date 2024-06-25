@@ -30,6 +30,10 @@ func (s *ShardedClient) Client(runID ulid.ULID) rueidis.Client {
 	return s.u.Client()
 }
 
+func (s *ShardedClient) ForceShardedClient() rueidis.Client {
+	return s.shardedRc
+}
+
 type UnshardedClient struct {
 	kg          UnshardedKeyGenerator
 	unshardedRc rueidis.Client
