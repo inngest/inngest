@@ -220,16 +220,6 @@ func (r *queryResolver) Run(ctx context.Context, runID string) (*models.Function
 		batchTS   *time.Time
 	)
 
-	if run.StartedAt.UnixMilli() > 0 {
-		startedAt = &run.StartedAt
-	}
-	if run.EndedAt.UnixMilli() > 0 {
-		endedAt = &run.EndedAt
-	}
-	if run.SourceID != "" {
-		sourceID = &run.SourceID
-	}
-
 	triggerIDs := []ulid.ULID{}
 	for _, evtID := range run.TriggerIDs {
 		if id, err := ulid.Parse(evtID); err == nil {
@@ -250,6 +240,20 @@ func (r *queryResolver) Run(ctx context.Context, runID string) (*models.Function
 	status, err := models.ToFunctionRunStatus(run.Status)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing status: %w", err)
+	}
+
+	if run.StartedAt.UnixMilli() > 0 {
+		startedAt = &run.StartedAt
+	}
+	if run.SourceID != "" {
+		sourceID = &run.SourceID
+	}
+
+	switch status {
+	case models.FunctionRunStatusCompleted, models.FunctionRunStatusFailed, models.FunctionRunStatusCancelled:
+		if run.EndedAt.UnixMilli() > 0 {
+			endedAt = &run.EndedAt
+		}
 	}
 
 	res := models.FunctionRunV2{
