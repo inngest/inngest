@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unsafe"
 
 	"golang.org/x/sync/semaphore"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/rs/zerolog"
@@ -1000,6 +1002,9 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 	if limit <= 0 {
 		limit = QueuePeekMax
 	}
+	if isPeekNext {
+		limit = 1
+	}
 
 	args, err := StrSlice([]any{
 		until.UnixMilli(),
@@ -1008,7 +1013,7 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 	if err != nil {
 		return nil, err
 	}
-	items, err := scripts["queue/peek"].Exec(
+	res, err := scripts["queue/peek"].Exec(
 		ctx,
 		q.r,
 		[]string{
@@ -1016,38 +1021,45 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 			q.kg.QueueItem(),
 		},
 		args,
-	).AsStrSlice()
+	).ToAny()
 	if err != nil {
 		return nil, fmt.Errorf("error peeking queue items: %w", err)
 	}
-
-	// Create a slice up to items in length.  We're going to remove any items that are
-	// leased here, so we may end up returning less than the total length.
-	result := make([]*QueueItem, len(items))
-	n := 0
-	now := getNow()
-
-	for _, str := range items {
-		qi := &QueueItem{}
-		if err := json.Unmarshal([]byte(str), qi); err != nil {
-			return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
-		}
-		if qi.IsLeased(now) {
-			// Leased item, don't return.
-			continue
-		}
-
-		// The nested osqueue.Item never has an ID set;  always re-set it
-		qi.Data.JobID = &qi.ID
-		result[n] = qi
-		n++
-
-		if isPeekNext {
-			return []*QueueItem{qi}, nil
-		}
+	items, ok := res.([]any)
+	if !ok {
+		return nil, nil
+	}
+	if len(items) == 0 {
+		return nil, nil
 	}
 
-	return result[0:n], nil
+	if isPeekNext {
+		i, err := q.decodeQueueItemFromPeek(items[0].(string), getNow())
+		if err != nil {
+			return nil, err
+		}
+		return []*QueueItem{i}, nil
+	}
+
+	now := getNow()
+	return util.ParallelDecode(items, func(val any) (*QueueItem, error) {
+		str, _ := val.(string)
+		return q.decodeQueueItemFromPeek(str, now)
+	})
+}
+
+func (q *queue) decodeQueueItemFromPeek(str string, now time.Time) (*QueueItem, error) {
+	qi := &QueueItem{}
+	if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), qi); err != nil {
+		return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
+	}
+	if qi.IsLeased(now) {
+		// Leased item, don't return.
+		return nil, nil
+	}
+	// The nested osqueue.Item never has an ID set;  always re-set it
+	qi.Data.JobID = &qi.ID
+	return qi, nil
 }
 
 // RequeueByJobID requeues a job for a specific time given a partition name and job ID.
