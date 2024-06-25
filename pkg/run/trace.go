@@ -148,6 +148,8 @@ func (tb *runTree) ToRunSpan(ctx context.Context) (*rpbv2.RunSpan, error) {
 
 	var finished bool
 	switch root.Status {
+	case rpbv2.SpanStatus_RUNNING:
+		root.EndedAt = nil
 	case rpbv2.SpanStatus_COMPLETED, rpbv2.SpanStatus_FAILED:
 		finished = true
 	}
