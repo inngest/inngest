@@ -25,7 +25,7 @@ const currentRunHandlingOptions: CurrentRunHandlingOption[] = [
   },
   { label: 'Canceled immediately', value: CURRENT_RUN_HANDLING_STRATEGY_CANCEL },
 ];
-type CurrentRunHandlingStrategy = (typeof currentRunHandlingOptions)[string]['value'];
+type CurrentRunHandlingStrategy = (typeof currentRunHandlingOptions)[number]['value'];
 
 const FunctionVersionNumberDocument = graphql(`
   query GetFunctionVersionNumber($slug: String!, $environmentID: ID!) {
