@@ -846,7 +846,7 @@ func (m mgr) ConsumePause(ctx context.Context, pauseID uuid.UUID, runID ulid.ULI
 		return err
 	}
 
-	err = m.shardedMgr.consumePause(ctx, p, runID, data)
+	err = m.shardedMgr.consumePause(ctx, p, data)
 	if err != nil {
 		return err
 	}
@@ -855,7 +855,7 @@ func (m mgr) ConsumePause(ctx context.Context, pauseID uuid.UUID, runID ulid.ULI
 	return m.unshardedMgr.DeletePause(ctx, *p)
 }
 
-func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, runID ulid.ULID, data any) error {
+func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) error {
 	marshalledData, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("cannot marshal data to store in state: %w", err)
@@ -875,9 +875,11 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, runID ulid
 		return err
 	}
 
+	client := m.s.Client(p.Identifier.RunID)
+
 	status, err := scripts["consumePause"].Exec(
 		ctx,
-		m.s.Client(runID),
+		client,
 		keys,
 		args,
 	).AsInt64()
@@ -888,7 +890,7 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, runID ulid
 	case 0:
 		return nil
 	case 1:
-		return state.ErrPauseNotFound // 🤔
+		return nil // Pause already consumed
 	default:
 		return fmt.Errorf("unknown response leasing pause: %d", status)
 	}
