@@ -230,6 +230,7 @@ func (c *Client) RunTraces(ctx context.Context, runID string) *RunV2 {
 				isBatch
 				batchCreatedAt
 				cronSchedule
+        endedAt
 
 				trace {
 					...TraceDetails
@@ -308,6 +309,7 @@ type RunV2 struct {
 	IsBatch        bool          `json:"isBatch"`
 	BatchCreatedAt *time.Time    `json:"batchCreatedAt,omitempty"`
 	CronSchedule   *string       `json:"cronSchedule,omitempty"`
+	EndedAt        *time.Time    `json:"endedAt,omitempty"`
 }
 
 type runTraceSpan struct {
