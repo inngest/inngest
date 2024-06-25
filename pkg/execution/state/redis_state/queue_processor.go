@@ -904,7 +904,7 @@ ProcessLoop:
 	}
 
 	if err := q.setPeekEWMA(ctx, p.WorkflowID, int64(ctrConcurrency+ctrRateLimit)); err != nil {
-		log.From(ctx).Warn().Msg("error recording concurrency limit for EWMA")
+		log.From(ctx).Warn().Err(err).Msg("error recording concurrency limit for EWMA")
 	}
 
 	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
