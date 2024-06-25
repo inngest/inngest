@@ -139,12 +139,14 @@ function PauseFunctionModal({
             <li>Functions can be resumed at any time.</li>
             <li>
               Function runs that are currently running will be:
-              <SelectInput
-                value={currentRunHandlingStrategy}
-                options={currentRunHandlingOptions}
-                onChange={setCurrentRunHandlingStrategy}
-                placeholder="How should currently-running runs be handled?"
-              />
+              <div style={{ marginTop: 4, marginLeft: 14 }}>
+                <SelectInput
+                  value={currentRunHandlingStrategy}
+                  options={currentRunHandlingOptions}
+                  onChange={setCurrentRunHandlingStrategy}
+                  placeholder="How should currently-running runs be handled?"
+                />
+              </div>
             </li>
           </ul>
           <p className="p-6 pb-0">
