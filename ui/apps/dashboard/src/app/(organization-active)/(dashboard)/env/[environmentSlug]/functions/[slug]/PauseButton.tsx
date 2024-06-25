@@ -9,7 +9,23 @@ import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { SelectInput } from '@/components/Forms/SelectInput';
 import { graphql } from '@/gql';
+
+type CurrentRunHandlingOption = {
+  label: string;
+  value: string;
+};
+const CURRENT_RUN_HANDLING_STRATEGY_SUSPEND = 'suspend';
+const CURRENT_RUN_HANDLING_STRATEGY_CANCEL = 'cancel';
+const currentRunHandlingOptions: CurrentRunHandlingOption[] = [
+  {
+    label: 'Paused immediately, then canceled after 7 days',
+    value: CURRENT_RUN_HANDLING_STRATEGY_SUSPEND,
+  },
+  { label: 'Canceled immediately', value: CURRENT_RUN_HANDLING_STRATEGY_CANCEL },
+];
+type CurrentRunHandlingStrategy = (typeof currentRunHandlingOptions)[string]['value'];
 
 const FunctionVersionNumberDocument = graphql(`
   query GetFunctionVersionNumber($slug: String!, $environmentID: ID!) {
@@ -31,8 +47,8 @@ const FunctionVersionNumberDocument = graphql(`
 `);
 
 const PauseFunctionDocument = graphql(`
-  mutation PauseFunction($fnID: ID!) {
-    pauseFunction(fnID: $fnID) {
+  mutation PauseFunction($fnID: ID!, $cancelRunning: Boolean) {
+    pauseFunction(fnID: $fnID, cancelRunning: $cancelRunning) {
       id
     }
   }
@@ -63,50 +79,80 @@ function PauseFunctionModal({
 }: PauseFunctionModalProps) {
   const [, pauseFunction] = useMutation(PauseFunctionDocument);
   const [, unpauseFunction] = useMutation(UnpauseFunctionDocument);
+  const [currentRunHandlingStrategy, setCurrentRunHandlingStrategy] =
+    useState<CurrentRunHandlingStrategy>(CURRENT_RUN_HANDLING_STRATEGY_SUSPEND);
 
-  function handlePause() {
-    pauseFunction({ fnID: functionID }).then((result) => {
-      if (result.error) {
-        toast.error(`${functionName} could not be paused: ${result.error.message}`);
-      } else {
-        toast.success(`${functionName} was successfully paused`);
-      }
-    });
+  function onCloseWrapper() {
+    setCurrentRunHandlingStrategy(CURRENT_RUN_HANDLING_STRATEGY_SUSPEND);
     onClose();
   }
-
+  function handlePause() {
+    pauseFunction({
+      fnID: functionID,
+      cancelRunning: currentRunHandlingStrategy == CURRENT_RUN_HANDLING_STRATEGY_CANCEL,
+    }).then((result) => {
+      if (result.error) {
+        toast.error(`“${functionName}” could not be paused: ${result.error.message}`);
+      } else {
+        toast.success(`“${functionName}” was successfully paused`);
+      }
+    });
+    onCloseWrapper();
+  }
   function handleResume() {
     unpauseFunction({ fnID: functionID }).then((result) => {
       if (result.error) {
-        toast.error(`${functionName} could not be resumed: ${result.error.message}`);
+        toast.error(`“${functionName}” could not be resumed: ${result.error.message}`);
       } else {
-        toast.success(`${functionName} was successfully resumed`);
+        toast.success(`“${functionName}” was successfully resumed`);
       }
     });
-    onClose();
+    onCloseWrapper();
   }
 
   return (
     <AlertModal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={onCloseWrapper}
       onSubmit={isPaused ? handleResume : handlePause}
-      title={`Are you sure you want to ${isPaused ? 'resume' : 'pause'} this function?`}
+      title={`${isPaused ? 'Resume' : 'Pause'} “${functionName}”`}
       className="w-1/3"
     >
       {isPaused && (
-        <p className="p-6 pb-0">
-          This function will resume normal functionality and will be invoked as new events are
-          received. Events received during pause will not be automatically replayed.
-        </p>
+        <div>
+          <p className="p-6 pb-0">
+            This function will resume normal functionality and will be invoked as new events are
+            received. Events received during pause will not be automatically replayed.
+          </p>
+          <p className="p-6 pb-0">
+            <strong>
+              Are you sure you want to resume <code>{functionName}</code>?
+            </strong>
+          </p>
+        </div>
       )}
       {!isPaused && (
-        <ul className="list-inside list-disc p-6 pb-0 leading-8">
-          <li>No new runs will be queued or invoked.</li>
-          <li>Existing runs will continue to run to completion.</li>
-          <li>Events will continue to be received, but they will not trigger new runs.</li>
-          <li>Functions can be resumed at any time.</li>
-        </ul>
+        <div>
+          <ul className="list-inside list-disc p-6 pb-0 leading-8">
+            <li>No new runs will be queued or invoked.</li>
+            <li>Events will continue to be received, but they will not trigger new runs.</li>
+            <li>Functions can be resumed at any time.</li>
+            <li>
+              Function runs that are currently running will be:
+              <SelectInput
+                value={currentRunHandlingStrategy}
+                options={currentRunHandlingOptions}
+                onChange={setCurrentRunHandlingStrategy}
+                placeholder="How should currently-running runs be handled?"
+              />
+            </li>
+          </ul>
+          <p className="p-6 pb-0">
+            <strong>
+              Are you sure you want to pause <code>{functionName}</code>?
+            </strong>
+          </p>
+        </div>
       )}
     </AlertModal>
   );
