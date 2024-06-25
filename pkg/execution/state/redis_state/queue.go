@@ -2100,21 +2100,28 @@ func (q *queue) getShardLeases() []leasedShard {
 func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
 	// retrieves the list from redis
 	cmd := q.r.B().Lrange().Key(q.kg.ConcurrencyFnEWMA(fnID)).Start(0).Stop(-1).Build()
-	currVals, err := q.r.Do(ctx, cmd).AsIntSlice()
+	strlist, err := q.r.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return 0, fmt.Errorf("error reading function concurrency EWMA values: %w", err)
 	}
 
 	// return early
-	if len(currVals) == 0 {
+	if len(strlist) == 0 {
 		return 0, nil
+	}
+
+	// convert to float for
+	vals := make([]float64, len(strlist))
+	for i, s := range strlist {
+		v, _ := strconv.ParseFloat(s, 64)
+		vals[i] = v
 	}
 
 	// create a simple EWMA, add all the numbers in it and get the final value
 	// NOTE: we don't need variable since we don't want to maintain this in memory
 	mavg := ewma.NewMovingAverage()
-	for _, v := range currVals {
-		mavg.Add(float64(v))
+	for _, v := range vals {
+		mavg.Add(v)
 	}
 
 	// round up to the nearest integer
