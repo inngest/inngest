@@ -20,9 +20,9 @@ const (
 func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []*models.RunsV2OrderBy, filter models.RunsFilterV2) (*models.RunsV2Connection, error) {
 	tsfield := enums.TraceRunTimeQueuedAt
 	switch *filter.TimeField {
-	case models.FunctionRunTimeFieldV2StartedAt:
+	case models.RunsV2OrderByFieldStartedAt:
 		tsfield = enums.TraceRunTimeStartedAt
-	case models.FunctionRunTimeFieldV2EndedAt:
+	case models.RunsV2OrderByFieldEndedAt:
 		tsfield = enums.TraceRunTimeEndedAt
 	}
 

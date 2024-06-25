@@ -1,4 +1,7 @@
+'use client';
+
 import { useCallback, useMemo } from 'react';
+import type { Route } from 'next';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { isStringArray } from '../utils/array';
@@ -19,8 +22,7 @@ export function useSearchParam(name: string): [string | undefined, SetParam<stri
       const params = new URLSearchParams(searchParams);
       params.set(name, value);
 
-      // @ts-expect-error Router doesn't like strings
-      router.replace(pathname + '?' + params.toString());
+      router.replace((pathname + '?' + params.toString()) as Route);
     },
     [name, pathname, router, searchParams]
   );
@@ -39,8 +41,7 @@ export function useBooleanSearchParam(name: string): [boolean | undefined, SetPa
       const params = new URLSearchParams(searchParams);
       params.set(name, value ? 'true' : 'false');
 
-      // @ts-expect-error Router doesn't like strings
-      router.replace(pathname + '?' + params.toString());
+      router.replace((pathname + '?' + params.toString()) as Route);
     },
     [name, pathname, router, searchParams]
   );
@@ -65,8 +66,7 @@ export function useStringArraySearchParam(
       const params = new URLSearchParams(searchParams);
       params.set(name, JSON.stringify(value));
 
-      // @ts-expect-error Router doesn't like strings
-      router.replace(pathname + '?' + params.toString());
+      router.replace((pathname + '?' + params.toString()) as Route);
     },
     [name, pathname, router, searchParams]
   );
@@ -75,8 +75,7 @@ export function useStringArraySearchParam(
     const params = new URLSearchParams(searchParams);
     params.delete(name);
 
-    // @ts-expect-error Router doesn't like strings
-    router.replace(pathname + '?' + params.toString());
+    router.replace((pathname + '?' + params.toString()) as Route);
   }, [name, pathname, router, searchParams]);
 
   let value = undefined;
@@ -113,8 +112,7 @@ export function useValidatedSearchParam<T>(
       const params = new URLSearchParams(searchParams);
       params.set(name, value);
 
-      // @ts-expect-error Router doesn't like strings
-      router.replace(pathname + '?' + params.toString());
+      router.replace((pathname + '?' + params.toString()) as Route);
     },
     [name, pathname, router, searchParams]
   );
@@ -148,8 +146,7 @@ export function useValidatedArraySearchParam<T>(
       const params = new URLSearchParams(searchParams);
       params.set(name, JSON.stringify(value));
 
-      // @ts-expect-error Router doesn't like strings
-      router.replace(pathname + '?' + params.toString());
+      router.replace((pathname + '?' + params.toString()) as Route);
     },
     [name, pathname, router, searchParams]
   );
@@ -158,12 +155,15 @@ export function useValidatedArraySearchParam<T>(
     const params = new URLSearchParams(searchParams);
     params.delete(name);
 
-    // @ts-expect-error Router doesn't like strings
-    router.replace(pathname + '?' + params.toString());
+    router.replace((pathname + '?' + params.toString()) as Route);
   }, [name, pathname, router, searchParams]);
 
   const rawValue = searchParams.get(name);
   const value = useMemo(() => {
+    if (rawValue === null) {
+      return undefined;
+    }
+
     if (typeof rawValue !== 'string') {
       console.error(`invalid type for search param ${name}: ${rawValue}`);
       return undefined;

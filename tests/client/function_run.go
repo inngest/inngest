@@ -17,7 +17,7 @@ type FunctionRunOpt struct {
 	Cursor    string
 	Items     int
 	Status    []string
-	TimeField models.FunctionRunTimeFieldV2
+	TimeField models.RunsV2OrderByField
 	Order     []models.RunsV2OrderBy
 	Start     time.Time
 	End       time.Time
@@ -71,7 +71,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 		cursor = fmt.Sprintf(`"%s"`, opts.Cursor)
 	}
 
-	timeField := models.FunctionRunTimeFieldV2QueuedAt
+	timeField := models.RunsV2OrderByFieldQueuedAt
 	if opts.TimeField.IsValid() {
 		timeField = opts.TimeField
 	}
@@ -80,7 +80,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 	query GetFunctionRunsV2(
 		$startTime: Time!,
 		$endTime: Time!,
-		$timeField: FunctionRunTimeFieldV2 = QUEUED_AT,
+		$timeField: RunsV2OrderByField = QUEUED_AT,
 		$status: [FunctionRunStatus!],
 		$first: Int = 40
 	) {

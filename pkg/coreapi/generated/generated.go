@@ -2461,19 +2461,13 @@ type RunHistoryInvokeFunctionResult {
 input RunsFilterV2 {
   from: Time!
   until: Time
-  timeField: FunctionRunTimeFieldV2 = QUEUED_AT
+  timeField: RunsV2OrderByField = QUEUED_AT
 
   status: [FunctionRunStatus!]
   functionIDs: [UUID!]
   appIDs: [UUID!]
 
   query: String # CEL query string
-}
-
-enum FunctionRunTimeFieldV2 {
-  QUEUED_AT
-  STARTED_AT
-  ENDED_AT
 }
 
 input RunsV2OrderBy {
@@ -15080,7 +15074,7 @@ func (ec *executionContext) unmarshalInputRunsFilterV2(ctx context.Context, obj 
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("timeField"))
-			it.TimeField, err = ec.unmarshalOFunctionRunTimeFieldV22ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionRunTimeFieldV2(ctx, v)
+			it.TimeField, err = ec.unmarshalORunsV2OrderByField2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunsV2OrderByField(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -19397,22 +19391,6 @@ func (ec *executionContext) marshalOFunctionRunStatus2ᚖgithubᚗcomᚋinngest�
 	return v
 }
 
-func (ec *executionContext) unmarshalOFunctionRunTimeFieldV22ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionRunTimeFieldV2(ctx context.Context, v interface{}) (*models.FunctionRunTimeFieldV2, error) {
-	if v == nil {
-		return nil, nil
-	}
-	var res = new(models.FunctionRunTimeFieldV2)
-	err := res.UnmarshalGQL(v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalOFunctionRunTimeFieldV22ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionRunTimeFieldV2(ctx context.Context, sel ast.SelectionSet, v *models.FunctionRunTimeFieldV2) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return v
-}
-
 func (ec *executionContext) marshalOFunctionRunV22ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionRunV2(ctx context.Context, sel ast.SelectionSet, v *models.FunctionRunV2) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -19585,6 +19563,22 @@ func (ec *executionContext) marshalORunTraceSpan2ᚖgithubᚗcomᚋinngestᚋinn
 		return graphql.Null
 	}
 	return ec._RunTraceSpan(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalORunsV2OrderByField2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunsV2OrderByField(ctx context.Context, v interface{}) (*models.RunsV2OrderByField, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(models.RunsV2OrderByField)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalORunsV2OrderByField2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunsV2OrderByField(ctx context.Context, sel ast.SelectionSet, v *models.RunsV2OrderByField) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
 }
 
 func (ec *executionContext) marshalOStepError2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStepError(ctx context.Context, sel ast.SelectionSet, v *models.StepError) graphql.Marshaler {
