@@ -29,7 +29,7 @@ export function RunResult({ className, result, isSuccess }: Props) {
         />
       )}
 
-      {!isNullish(result.error?.stack) && (
+      {result.error && !isNullish(result.error.stack) && (
         <CodeBlock
           header={{
             title:
