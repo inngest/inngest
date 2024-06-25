@@ -100,3 +100,12 @@ func IncrQueueSequentialLeaseClaimsCounter(ctx context.Context, opts CounterOpt)
 		Tags:        opts.Tags,
 	})
 }
+
+func WorkerQueueCapacityCounter(ctx context.Context, incr int64, opts CounterOpt) {
+	RecordUpDownCounterMetric(ctx, incr, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_worker_capacity_in_use",
+		Description: "Capacity of current worker",
+		Tags:        opts.Tags,
+	})
+}

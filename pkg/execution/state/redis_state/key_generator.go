@@ -215,6 +215,10 @@ type QueueKeyGenerator interface {
 	// Status returns the key used for status queue for the provided function.
 	Status(status string, fnID uuid.UUID) string
 
+	// ConcurrencyFnEWMA returns the key storing the amount of times of concurrency hits, used for
+	// calculating the EWMA value for the function
+	ConcurrencyFnEWMA(fnID uuid.UUID) string
+
 	// ***************** Deprecated ************************
 	BatchPointer(context.Context, uuid.UUID) string
 	Batch(context.Context, ulid.ULID) string
@@ -365,4 +369,8 @@ func (d DefaultQueueKeyGenerator) RunIndex(runID ulid.ULID) string {
 
 func (d DefaultQueueKeyGenerator) Status(status string, fnID uuid.UUID) string {
 	return fmt.Sprintf("%s:queue:status:%s:%s", d.Prefix, fnID, status)
+}
+
+func (d DefaultQueueKeyGenerator) ConcurrencyFnEWMA(fnID uuid.UUID) string {
+	return fmt.Sprintf("%s:queue:concurrency-ewma:%s", d.Prefix, fnID)
 }
