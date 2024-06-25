@@ -18,17 +18,17 @@ const syncStatusText: Record<string, string> = {
 } as const satisfies { [key in SyncStatus]: unknown };
 
 const syncStatusColor: Record<string, string> = {
-  duplicate: 'bg-canvasBase text-status-completed border-status-completed',
-  error: 'bg-canvasBase text-status-failed border-status-failed',
-  pending: 'bg-canvasBase text-status-running border-status-running',
-  success: 'bg-canvasBase text-status-completed border-status-completed',
+  duplicate: 'bg-canvasBase text-status-completedText border-status-completed',
+  error: 'bg-canvasBase text-status-failedText border-status-failed',
+  pending: 'bg-canvasBase text-status-runningText border-status-running',
+  success: 'bg-canvasBase text-status-completedText border-status-completed',
 } as const satisfies { [key in SyncStatus]: unknown };
 
 const syncStatusIconColor: Record<string, string> = {
-  duplicate: 'text-status-completed',
-  error: 'text-status-failed',
-  pending: 'text-status-running',
-  success: 'text-status-completed',
+  duplicate: 'text-status-completedText',
+  error: 'text-status-failedText',
+  pending: 'text-status-runningText',
+  success: 'text-status-completedText',
 } as const satisfies { [key in SyncStatus]: unknown };
 
 type Props = {
@@ -40,8 +40,8 @@ export function SyncStatusPill({ status, iconOnly = false }: Props) {
   const Icon = syncStatusIcons[status] ?? RiSubtractLine;
   const text = syncStatusText[status] ?? 'Unknown';
   const color =
-    syncStatusColor[status] ?? 'bg-canvasBase text-status-cancelled border-status-cancelled';
-  const iconColor = syncStatusIconColor[status] ?? 'text-status-cancelled';
+    syncStatusColor[status] ?? 'bg-canvasBase text-status-cancelledText border-status-cancelled';
+  const iconColor = syncStatusIconColor[status] ?? 'text-status-cancelledText';
 
   const iconProps = {
     className: cn(iconColor, 'h-4 w-4'),

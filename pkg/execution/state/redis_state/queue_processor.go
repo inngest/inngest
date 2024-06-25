@@ -13,6 +13,7 @@ import (
 	"github.com/VividCortex/ewma"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
@@ -954,6 +955,11 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 			case <-extendLeaseTick.C:
 				if ctx.Err() != nil {
 					// Don't extend lease when the ctx is done.
+					return
+				}
+				if leaseID == nil {
+					log.From(ctx).Error().Msg("cannot extend lease since lease ID is nil")
+					// Don't extend lease since one doesn't exist
 					return
 				}
 				leaseID, err = q.ExtendLease(ctx, p, qi, *leaseID, QueueLeaseDuration)

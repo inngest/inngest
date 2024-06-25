@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type Route } from 'next';
 import { Button } from '@inngest/components/Button';
-import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
 import { Link } from '@inngest/components/Link';
 import { Table } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
@@ -89,7 +89,7 @@ function createColumns({
       header: () => <span>Status</span>,
       cell: (props) => (
         <div className="flex items-center gap-2 lowercase">
-          <FunctionRunStatusIcon status={props.getValue()} className="h-5 w-5" />
+          <RunStatusIcon status={props.getValue()} className="h-5 w-5" />
           <p className="first-letter:capitalize">{props.getValue()}</p>
         </div>
       ),
