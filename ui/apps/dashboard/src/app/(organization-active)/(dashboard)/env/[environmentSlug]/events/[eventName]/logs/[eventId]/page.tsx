@@ -70,7 +70,7 @@ export default async function EventPage({ params }: EventPageProps) {
           <div className="absolute top-5 h-full border-r border-slate-200" />
         </div>
         <div className="w-2/6 flex-shrink-0 space-y-4 overflow-y-auto p-5">
-          <h3 className="font-medium text-slate-800">Triggered functions</h3>
+          <h3 className="font-medium text-slate-800">Triggered Functions</h3>
           <ul className="space-y-3">
             {event.functionRuns.map((functionRun) => (
               <li key={functionRun.id}>
