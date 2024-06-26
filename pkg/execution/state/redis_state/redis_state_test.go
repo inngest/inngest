@@ -189,13 +189,6 @@ func BenchmarkNew(b *testing.B) {
 	)
 	require.NoError(b, err)
 
-	sm, err = New(
-		context.Background(),
-		WithUnshardedClient(unshardedClient),
-		WithShardedClient(shardedClient),
-	)
-	require.NoError(b, err)
-
 	id := state.Identifier{
 		WorkflowID: uuid.New(),
 	}

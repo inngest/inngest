@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -410,6 +411,61 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 		found = getQueueItem(t, r, item.ID)
 		require.Equal(t, item, found)
 	})
+}
+
+func BenchmarkPeekTiming(b *testing.B) {
+
+	//
+	// Setup
+	//
+	address := os.Getenv("REDIS_ADDR")
+	if address == "" {
+		r, err := miniredis.Run()
+		if err != nil {
+			panic(err)
+		}
+		address = r.Addr()
+		defer r.Close()
+		fmt.Println("using miniredis")
+	}
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{address},
+		DisableCache: true,
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer rc.Close()
+
+	//
+	// Tests
+	//
+
+	// Enqueue 500 items into one queue.
+
+	q := NewQueue(rc)
+	ctx := context.Background()
+
+	enqueue := func(id uuid.UUID, n int) {
+		for i := 0; i < n; i++ {
+			_, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: id}, time.Now())
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	for i := 0; i < b.N; i++ {
+		id := uuid.New()
+		enqueue(id, int(QueuePeekMax))
+		items, err := q.Peek(ctx, id.String(), time.Now(), QueuePeekMax)
+		if err != nil {
+			panic(err)
+		}
+		if len(items) != int(QueuePeekMax) {
+			panic(fmt.Sprintf("expected %d, got %d", QueuePeekMax, len(items)))
+		}
+	}
 }
 
 func TestQueuePeek(t *testing.T) {

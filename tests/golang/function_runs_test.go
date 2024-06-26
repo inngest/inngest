@@ -117,7 +117,7 @@ func TestFunctionRunList(t *testing.T) {
 			edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:     start,
 				End:       end,
-				TimeField: models.FunctionRunTimeFieldV2StartedAt,
+				TimeField: models.RunsV2OrderByFieldStartedAt,
 				Order: []models.RunsV2OrderBy{
 					{Field: models.RunsV2OrderByFieldStartedAt, Direction: models.RunsOrderByDirectionDesc},
 				},
@@ -144,7 +144,7 @@ func TestFunctionRunList(t *testing.T) {
 			edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:     start,
 				End:       end,
-				TimeField: models.FunctionRunTimeFieldV2EndedAt,
+				TimeField: models.RunsV2OrderByFieldEndedAt,
 				Order: []models.RunsV2OrderBy{
 					{Field: models.RunsV2OrderByFieldEndedAt, Direction: models.RunsOrderByDirectionAsc},
 				},
@@ -222,7 +222,7 @@ func TestFunctionRunList(t *testing.T) {
 			edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:     start,
 				End:       end,
-				TimeField: models.FunctionRunTimeFieldV2EndedAt,
+				TimeField: models.RunsV2OrderByFieldEndedAt,
 				Status:    []string{models.FunctionRunStatusFailed.String()},
 				Order: []models.RunsV2OrderBy{
 					{Field: models.RunsV2OrderByFieldEndedAt, Direction: models.RunsOrderByDirectionDesc},
@@ -237,7 +237,7 @@ func TestFunctionRunList(t *testing.T) {
 			edges, pageInfo = c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:     start,
 				End:       end,
-				TimeField: models.FunctionRunTimeFieldV2EndedAt,
+				TimeField: models.RunsV2OrderByFieldEndedAt,
 				Status:    []string{models.FunctionRunStatusFailed.String()},
 				Items:     items,
 				Order: []models.RunsV2OrderBy{

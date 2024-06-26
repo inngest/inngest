@@ -228,6 +228,10 @@ type QueueKeyGenerator interface {
 	// Status returns the key used for status queue for the provided function.
 	Status(status string, fnID uuid.UUID) string
 
+	// ConcurrencyFnEWMA returns the key storing the amount of times of concurrency hits, used for
+	// calculating the EWMA value for the function
+	ConcurrencyFnEWMA(fnID uuid.UUID) string
+
 	// ***************** Deprecated ************************
 	BatchPointer(context.Context, uuid.UUID) string
 	Batch(context.Context, ulid.ULID) string
@@ -395,4 +399,8 @@ func (u unshardedKeyGenerator) PauseStepPrefix(ctx context.Context, identifier s
 func (u unshardedKeyGenerator) PauseStep(ctx context.Context, identifier state.Identifier, stepId string) string {
 	prefix := u.PauseStepPrefix(ctx, identifier)
 	return fmt.Sprintf("%s-%s", prefix, stepId)
+}
+
+func (d DefaultQueueKeyGenerator) ConcurrencyFnEWMA(fnID uuid.UUID) string {
+	return fmt.Sprintf("%s:queue:concurrency-ewma:%s", d.Prefix, fnID)
 }
