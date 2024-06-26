@@ -167,7 +167,7 @@ export default function Page({
   }, [nextPageRunsData]);
 
   useEffect(() => {
-    if (!isScrollRequest && firstPageRuns.length > 0) {
+    if (!isScrollRequest) {
       setRuns(firstPageRuns);
     }
   }, [firstPageRuns, isScrollRequest]);
