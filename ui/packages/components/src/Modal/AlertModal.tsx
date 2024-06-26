@@ -28,7 +28,7 @@ export function AlertModal({
   className = 'w-1/4',
 }: AlertModalProps) {
   let container = null;
-  if (global.document) {
+  if (globalThis.document) {
     container = document.getElementById('modals');
   }
 
