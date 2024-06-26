@@ -81,25 +81,6 @@ export function RunDetails(props: Props) {
 
   if (error) {
     throw error;
-    // return (
-    //   <div className="m-auto mt-32 flex w-fit flex-col gap-4">
-    //     <Alert
-    //       severity="error"
-    //       button={
-    //         <NewButton
-    //           onClick={() => window.location.reload()}
-    //           kind="secondary"
-    //           appearance="outlined"
-    //           label="Refresh page"
-    //         />
-    //       }
-    //     >
-    //       <p className="mb-4 font-semibold">{error.message}</p>
-
-    //       <p>An error occurred! Refresh the page to try again.</p>
-    //     </Alert>
-    //   </div>
-    // );
   }
 
   return (
