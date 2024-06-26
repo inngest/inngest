@@ -179,8 +179,9 @@ func BenchmarkNew(b *testing.B) {
 	})
 	require.NoError(b, err)
 
-	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
-	shardedClient := NewShardedClient(unshardedClient, rc, StateDefaultKey)
+	statePrefix := "state"
+	unshardedClient := NewUnshardedClient(rc, statePrefix, QueueDefaultKey)
+	shardedClient := NewShardedClient(unshardedClient, rc, statePrefix)
 
 	sm, err := New(
 		context.Background(),
