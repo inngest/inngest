@@ -13,7 +13,7 @@ import { useVercelIntegration } from './vercel/useVercelIntegration';
 type Integration = {
   title: string;
   Icon: ReactNode;
-  actionButton: (enabled: boolean) => ReactNode;
+  actionButton: (enabled: boolean, loading?: boolean) => ReactNode;
   description: string;
   upvoteId?: string;
 };
@@ -21,12 +21,13 @@ type Integration = {
 const INTEGRATIONS: Integration[] = [
   {
     title: 'Vercel',
-    Icon: <IconVercel className="h-6 w-6 text-white" />,
-    actionButton: (enabled: boolean) => (
+    Icon: <IconVercel className="text-onContrast h-6 w-6" />,
+    actionButton: (enabled, loading) => (
       <NewButton
         kind="primary"
         appearance="solid"
         size="medium"
+        loading={loading}
         href={enabled ? '/settings/integrations/vercel' : '/settings/integrations/vercel/connect'}
         label={enabled ? 'Manage' : 'Connect'}
       />
@@ -36,7 +37,7 @@ const INTEGRATIONS: Integration[] = [
   },
   {
     title: 'Netlify',
-    Icon: <IconNetlify className="h-6 w-6 text-white" />,
+    Icon: <IconNetlify className="text-onContrast h-6 w-6" />,
     actionButton: () => (
       <NewButton
         icon={<RiExternalLinkLine />}
@@ -44,7 +45,7 @@ const INTEGRATIONS: Integration[] = [
         kind="secondary"
         appearance="outlined"
         size="medium"
-        label="View documentation"
+        label="View docs"
         href="https://www.inngest.com/docs/deploy/netlify"
       />
     ),
@@ -53,7 +54,7 @@ const INTEGRATIONS: Integration[] = [
   },
   {
     title: 'Datadog',
-    Icon: <IconDatadog className="h-6 w-6 text-white" />,
+    Icon: <IconDatadog className="text-onContrast h-6 w-6" />,
     actionButton: () => (
       <NewButton
         icon={<RiExternalLinkLine />}
@@ -71,7 +72,7 @@ const INTEGRATIONS: Integration[] = [
 ];
 
 export default function IntegrationsList() {
-  const { data: vercelData } = useVercelIntegration();
+  const { data: vercelData, fetching } = useVercelIntegration();
   return (
     <div className="mx-auto mt-16 flex w-[800px] flex-col">
       <div className="mb-7 w-full text-2xl font-medium">All integrations</div>
@@ -80,20 +81,20 @@ export default function IntegrationsList() {
           <Card key={`integration-card-${n}`}>
             <div className="flex h-[189px] w-[388px] flex-col p-6">
               <div className="align-center flex flex-row items-center justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded bg-black">
+                <div className="bg-contrast flex h-12 w-12 items-center justify-center rounded">
                   {i.Icon}
                 </div>
-                {i.actionButton(i.title === 'Vercel' ? vercelData.enabled : false)}
+                {i.actionButton(i.title === 'Vercel' ? vercelData.enabled : false, fetching)}
               </div>
-              <div className="mt-[18px] text-lg font-medium">{i.title}</div>
-              <div className="mt-2 text-sm text-slate-500">{i.description}</div>
+              <div className="text-basis mt-[18px] text-lg font-medium">{i.title}</div>
+              <div className="text-subtle mt-2 text-sm leading-tight">{i.description}</div>
             </div>
           </Card>
         ))}
         <Card>
           <div className="bg-canvasSubtle flex h-[189px] w-[388px] flex-col p-6">
-            <div className="text-lg font-medium">Can&apos;t find what you need?</div>
-            <div className="mt-3 text-sm text-slate-500">
+            <div className="text-basis text-lg font-medium">Can&apos;t find what you need?</div>
+            <div className="text-basis mt-3 text-sm leading-tight">
               Write to our team about the integration you are looking for and we will get back to
               you.
             </div>

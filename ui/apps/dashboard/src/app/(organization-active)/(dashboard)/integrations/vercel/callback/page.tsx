@@ -41,10 +41,10 @@ export default async function VercelCallbackPage({ searchParams }: VercelCallbac
   ) : (
     <div className="mx-auto mt-8 flex w-[800px] flex-col p-8">
       <div className="mb-7 flex h-12 w-12 items-center justify-center rounded bg-black">
-        <IconVercel className="h-6 w-6 text-white" />
+        <IconVercel className="text-alwaysWhite h-6 w-6" />
       </div>
-      <div className="mb-2 text-xl font-medium text-slate-950">Connect Vercel to Inngest</div>
-      <div className="mb-7 text-slate-600">
+      <div className="text-basis mb-2 text-2xl leading-loose">Connect Vercel to Inngest</div>
+      <div className="text-subtle mb-7 text-base">
         Select the Vercel projects that have Inngest functions. You can optionally specify server
         route other than the default <span className="font-semibold">(`/api/inngest`)</span>.{' '}
         <Link showIcon={false} href={'/create-organization/set-up' as Route}>

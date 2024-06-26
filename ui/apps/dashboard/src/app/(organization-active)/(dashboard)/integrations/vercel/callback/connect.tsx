@@ -56,11 +56,11 @@ export default function Connect({
 
   return (
     <>
-      <Card className="w-full border-slate-200">
-        <Card.Header className="bg-slate-100">
+      <Card className="w-full">
+        <Card.Header className="bg-canvasSubtle">
           <div className="flex flex-row items-center justify-between">
-            <div className="text-base text-gray-900">Project list</div>
-            <div className="text-sm font-medium text-slate-400">
+            <div className="text-basis text-base">Project list</div>
+            <div className="text-disabled text-sm font-medium">
               {projects.filter((p) => p.isEnabled).length || 0} projects selected
             </div>
           </div>
@@ -72,7 +72,7 @@ export default function Connect({
               key={`project-list-${i}`}
               className={`flex h-[72px] flex-row items-center justify-between ${
                 i !== end && 'border-b'
-              } border-slate-200 px-6`}
+              } border-subtle px-6`}
               onMouseOver={() => setHover(p.id)}
               onMouseLeave={() => setHover(null)}
             >
@@ -83,7 +83,7 @@ export default function Connect({
                   onCheckedChange={() => check(p.id, !p.isEnabled)}
                   checked={p.isEnabled}
                 />
-                <div className="text-base font-normal leading-7 text-slate-700">{p.name}</div>
+                <div className="text-basis text-base font-normal">{p.name}</div>
               </div>
               {custom.includes(p.id) ? (
                 <div className="relative">
@@ -116,7 +116,7 @@ export default function Connect({
               )}
             </div>
           ))}
-          {projects.length > PAGE_SIZE && (
+          {projects.length > 0 && (
             <div className="row flex items-center justify-center p-2">
               <NewButton
                 appearance="ghost"
