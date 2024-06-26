@@ -25,6 +25,10 @@ func (f *FunctionRunStateClient) Client(runID ulid.ULID) rueidis.Client {
 	return f.unshardedClient.unshardedConn
 }
 
+func (f *FunctionRunStateClient) ForceShardedClient() rueidis.Client {
+	return f.client
+}
+
 func NewFunctionRunStateClient(r rueidis.Client, u *UnshardedClient, stateDefaultKey string) *FunctionRunStateClient {
 	return &FunctionRunStateClient{
 		kg:              &runStateKeyGenerator{stateDefaultKey: stateDefaultKey},
