@@ -14,10 +14,6 @@ import (
 // TODO Set this properly, don't start sharding any time soon before we are sure everything works
 var switchover = time.Date(2100, 07, 10, 0, 0, 0, 0, time.UTC)
 
-type ShardedKeyGenerator interface {
-	RunStateKeyGenerator
-}
-
 func IsSharded(runID ulid.ULID) bool {
 	return ulid.Time(runID.Time()).After(switchover)
 }
@@ -94,14 +90,6 @@ func (s runStateKeyGenerator) History(ctx context.Context, runID ulid.ULID) stri
 
 func (s runStateKeyGenerator) Stack(ctx context.Context, runID ulid.ULID) string {
 	return fmt.Sprintf("{%s}:stack:%s", s.Prefix(s.stateDefaultKey, runID), runID)
-}
-
-type UnshardedKeyGenerator interface {
-	QueueKeyGenerator
-	DebounceKeyGenerator
-	BatchKeyGenerator
-	PauseKeyGenerator
-	GlobalKeyGenerator
 }
 
 type GlobalKeyGenerator interface {
