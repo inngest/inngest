@@ -20,10 +20,10 @@ const CURRENT_RUN_HANDLING_STRATEGY_SUSPEND = 'suspend';
 const CURRENT_RUN_HANDLING_STRATEGY_CANCEL = 'cancel';
 const currentRunHandlingOptions: CurrentRunHandlingOption[] = [
   {
-    label: 'Paused immediately, then cancelled after 7 days',
+    label: 'Pause immediately, then cancel after 7 days',
     value: CURRENT_RUN_HANDLING_STRATEGY_SUSPEND,
   },
-  { label: 'Cancelled immediately', value: CURRENT_RUN_HANDLING_STRATEGY_CANCEL },
+  { label: 'Cancel immediately', value: CURRENT_RUN_HANDLING_STRATEGY_CANCEL },
 ];
 type CurrentRunHandlingStrategy = (typeof currentRunHandlingOptions)[number]['value'];
 
@@ -115,45 +115,47 @@ function PauseFunctionModal({
       isOpen={isOpen}
       onClose={onCloseWrapper}
       onSubmit={isPaused ? handleResume : handlePause}
-      title={`${isPaused ? 'Resume' : 'Pause'} “${functionName}”`}
+      title={`${isPaused ? 'Resume' : 'Pause'} function “${functionName}”`}
       className="w-1/3"
+      confirmButtonLabel={isPaused ? 'Resume' : 'Pause'}
+      confirmButtonKind={isPaused ? 'success' : 'danger'}
+      cancelButtonLabel="Cancel"
     >
       {isPaused && (
         <div>
-          <p className="p-6 pb-0">
+          <p className="p-6 pb-0 text-base">
+            Are you sure you want to resume “<strong>{functionName}</strong>”?
+          </p>
+          <p className="text-subtle p-6 pb-0 pt-3 text-sm">
             This function will resume normal functionality and will be invoked as new events are
             received. Events received during pause will not be automatically replayed.
-          </p>
-          <p className="p-6 pb-0">
-            <strong>
-              Are you sure you want to resume <code>{functionName}</code>?
-            </strong>
           </p>
         </div>
       )}
       {!isPaused && (
         <div>
-          <ul className="list-inside list-disc p-6 pb-0 leading-8">
+          <p className="p-6 pb-0 text-base">
+            Are you sure you want to pause “<strong>{functionName}</strong>”?
+          </p>
+          <ul className="text-subtle list-inside list-disc p-6 pb-0 pt-3 text-sm leading-6">
+            <li>Functions can be resumed at any time.</li>
             <li>No new runs will be queued or invoked.</li>
             <li>Events will continue to be received, but they will not trigger new runs.</li>
-            <li>Functions can be resumed at any time.</li>
-            <li>
-              Function runs that are currently running will be:
-              <div style={{ marginTop: 4, marginLeft: 14 }}>
-                <SelectInput
-                  value={currentRunHandlingStrategy}
-                  options={currentRunHandlingOptions}
-                  onChange={setCurrentRunHandlingStrategy}
-                  placeholder="How should currently-running runs be handled?"
-                />
-              </div>
-            </li>
           </ul>
-          <p className="p-6 pb-0">
-            <strong>
-              Are you sure you want to pause <code>{functionName}</code>?
-            </strong>
-          </p>
+          <div className="p-6 pb-0">
+            <hr className="border-muted" />
+          </div>
+          <label className="flex w-full flex-col gap-2 p-6 pb-5 pt-3 text-sm leading-6">
+            <span className="text-subtle">
+              Choose what to do with currently-running function runs:
+            </span>
+            <SelectInput
+              value={currentRunHandlingStrategy}
+              options={currentRunHandlingOptions}
+              onChange={setCurrentRunHandlingStrategy}
+              placeholder="How should currently-running runs be handled?"
+            />
+          </label>
         </div>
       )}
     </AlertModal>
