@@ -1008,8 +1008,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			// The op changes based on the current state of the step, so we
 			// are required to normalize here.
 			switch foundOp {
-			case enums.OpcodeStep, enums.OpcodeStepError:
+			case enums.OpcodeStep, enums.OpcodeStepRun, enums.OpcodeStepError:
 				foundOp = enums.OpcodeStepRun
+				ctx = trace.ContextWithSpan(ctx, span)
 			}
 
 			span.SetAttributes(
@@ -1055,7 +1056,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		} else {
 			// if it's not a step or function response that represents either a failed or a successful execution.
 			// Do not record discovery spans and cancel it.
-			ctx = span.Cancel(ctx)
+			_ = span.Cancel(ctx)
 		}
 	}
 
