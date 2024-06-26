@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -13,6 +14,10 @@ type AlertModalProps = {
   description?: string;
   className?: string;
   onSubmit: () => void | Promise<void>;
+  confirmButtonLabel?: string | React.ReactNode;
+  cancelButtonLabel?: string | React.ReactNode;
+  confirmButtonKind?: 'default' | 'primary' | 'success' | 'danger';
+  cancelButtonKind?: 'default' | 'primary' | 'success' | 'danger';
 };
 
 export function AlertModal({
@@ -24,6 +29,10 @@ export function AlertModal({
   title = 'Are you sure you want to delete?',
   description,
   className = 'w-1/4',
+  confirmButtonLabel = 'Yes',
+  cancelButtonLabel = 'No',
+  confirmButtonKind = 'danger',
+  cancelButtonKind = 'default',
 }: AlertModalProps) {
   const container = document.getElementById('modals');
   return (
@@ -71,12 +80,17 @@ export function AlertModal({
                 {children}
                 <div className="flex justify-end gap-2 p-6 dark:border-slate-800">
                   <AlertDialog.Cancel asChild>
-                    <Button appearance="outlined" disabled={isLoading} label="No" />
+                    <Button
+                      appearance="outlined"
+                      disabled={isLoading}
+                      kind={cancelButtonKind}
+                      label={cancelButtonLabel}
+                    />
                   </AlertDialog.Cancel>
                   <Button
                     disabled={isLoading}
-                    kind="danger"
-                    label="Yes"
+                    kind={confirmButtonKind}
+                    label={confirmButtonLabel}
                     loading={isLoading}
                     btnAction={async () => {
                       try {
