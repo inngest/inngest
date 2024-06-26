@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import NextLink from 'next/link';
 import { useParams } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
 import { Button } from '@inngest/components/Button/Button';
 import { NewButton } from '@inngest/components/Button/index';
 import { Link } from '@inngest/components/Link/Link';
 import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch/Switch';
-import { RiAddLine, RiDeleteBinLine, RiInformationLine } from '@remixicon/react';
+import { RiAddLine, RiArrowRightSLine, RiDeleteBinLine, RiInformationLine } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
@@ -62,12 +63,23 @@ export default function VercelConfigure() {
   };
 
   return (
-    <div className="mx-auto mt-8 flex w-[800px] flex-col p-8">
+    <div className="mx-auto mt-6 flex w-[800px] flex-col p-8">
       {fetching ? null : !project ? (
         <Alert severity="error">Vercel project not found!</Alert>
       ) : (
         <div className="flex flex-col">
-          <div className="mb-2 text-2xl font-medium text-gray-900">{project.name}</div>
+          <div className="flex flex-row items-center justify-start">
+            <NextLink href="/settings/integrations">
+              <div className="text-subtle text-base">All integrations</div>
+            </NextLink>
+            <RiArrowRightSLine className="text-disabled h-4" />
+            <NextLink href="/settings/integrations/vercel">
+              <div className="text-subtle text-base">Vercel</div>
+            </NextLink>
+            <RiArrowRightSLine className="text-disabled h-4" />
+            <div className="text-basis text-base">{project.name}</div>
+          </div>
+          <div className="mb-2 mt-6 text-2xl font-medium text-gray-900">{project.name}</div>
           {project.ssoProtection?.deploymentType ===
             VercelDeploymentProtection.ProdDeploymentURLsAndAllPreviews && (
             <div className="mb-7 flex flex-row items-center justify-start text-sm font-normal leading-snug text-amber-700">

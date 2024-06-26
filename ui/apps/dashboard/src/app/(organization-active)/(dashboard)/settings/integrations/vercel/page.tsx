@@ -1,8 +1,9 @@
 import type { Route } from 'next';
+import NextLink from 'next/link';
 import { NewButton } from '@inngest/components/Button/index';
 import { Link } from '@inngest/components/Link/Link';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
-import { RiExternalLinkLine } from '@remixicon/react';
+import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import OldVercelIntegrationPage from './oldPage';
@@ -14,8 +15,15 @@ export default async function VercelIntegrationPage() {
   return !newIntegrations ? (
     <OldVercelIntegrationPage />
   ) : (
-    <div className="mx-auto mt-8 flex w-[800px] flex-col p-8">
-      <div className="flex flex-row items-center justify-between">
+    <div className="mx-auto mt-6 flex w-[800px] flex-col p-8">
+      <div className="flex flex-row items-center justify-start">
+        <NextLink href="/settings/integrations">
+          <div className="text-subtle text-base">All integrations</div>
+        </NextLink>
+        <RiArrowRightSLine className="text-disabled h-4" />
+        <div className="text-basis text-base">Vercel</div>
+      </div>
+      <div className="mt-6 flex flex-row items-center justify-between">
         <div className="flex flex-row items-center justify-start">
           <div className="mb-7 mr-4 flex h-[52px] w-[52px] items-center justify-center rounded bg-black">
             <IconVercel className="h-6 w-6 text-white" />
