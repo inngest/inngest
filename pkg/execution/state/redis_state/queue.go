@@ -11,9 +11,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unsafe"
 
 	"golang.org/x/sync/semaphore"
 
+	"github.com/VividCortex/ewma"
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
@@ -23,6 +25,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/rs/zerolog"
@@ -61,11 +64,14 @@ const (
 	PartitionConcurrencyLimitRequeueExtension = 2 * time.Second
 	PartitionLookahead                        = time.Second
 
-	QueuePeekMax        int64 = 1000
-	QueuePeekDefault    int64 = 250
-	QueueLeaseDuration        = 20 * time.Second
-	ConfigLeaseDuration       = 10 * time.Second
-	ConfigLeaseMax            = 20 * time.Second
+	// default values
+	QueuePeekMin            int64 = 300
+	QueuePeekMax            int64 = 5000
+	QueuePeekCurrMultiplier int64 = 4 // threshold 25%
+	QueuePeekEWMALen        int   = 10
+	QueueLeaseDuration            = 20 * time.Second
+	ConfigLeaseDuration           = 10 * time.Second
+	ConfigLeaseMax                = 20 * time.Second
 
 	PriorityMax     uint = 0
 	PriorityDefault uint = 5
@@ -198,9 +204,22 @@ func WithNumWorkers(n int32) QueueOpt {
 	}
 }
 
-func WithPeekSize(n int64) QueueOpt {
+func WithPeekSizeRange(min int64, max int64) QueueOpt {
 	return func(q *queue) {
-		q.peek = n
+		q.peekMin = min
+		q.peekMax = max
+	}
+}
+
+func WithPeekConcurrencyMultiplier(m int64) QueueOpt {
+	return func(q *queue) {
+		q.peekCurrMultiplier = m
+	}
+}
+
+func WithPeekEWMALength(l int) QueueOpt {
+	return func(q *queue) {
+		q.peekEWMALen = l
 	}
 }
 
@@ -227,7 +246,7 @@ func WithAsyncInstrumentation() QueueOpt {
 	return func(q *queue) {
 		telemetry.GaugeWorkerQueueCapacity(ctx, telemetry.GaugeOpt{
 			PkgName:  pkgName,
-			Callback: func(ctx context.Context) (int64, error) { return q.capacity(), nil },
+			Callback: func(ctx context.Context) (int64, error) { return int64(q.numWorkers), nil },
 		})
 
 		telemetry.GaugeGlobalQueuePartitionCount(ctx, telemetry.GaugeOpt{
@@ -449,8 +468,14 @@ type queue struct {
 	wg *sync.WaitGroup
 	// numWorkers stores the number of workers available to concurrently process jobs.
 	numWorkers int32
-	// peek sets the number of items to check on queue peeks
-	peek int64
+	// peek min & max sets the range for partitions to peek for items
+	peekMin int64
+	peekMax int64
+	// peekCurrMultiplier is a multiplier used for calculating the dynamic peek size
+	// based on the EWMA values
+	peekCurrMultiplier int64
+	// peekEWMALen is the size of the list to hold the most recent values
+	peekEWMALen int
 	// workers is a buffered channel which allows scanners to send queue items
 	// to workers to be processed
 	workers chan processItem
@@ -977,6 +1002,9 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 	if limit <= 0 {
 		limit = QueuePeekMax
 	}
+	if isPeekNext {
+		limit = 1
+	}
 
 	args, err := StrSlice([]any{
 		until.UnixMilli(),
@@ -985,7 +1013,7 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 	if err != nil {
 		return nil, err
 	}
-	items, err := scripts["queue/peek"].Exec(
+	res, err := scripts["queue/peek"].Exec(
 		ctx,
 		q.r,
 		[]string{
@@ -993,38 +1021,45 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 			q.kg.QueueItem(),
 		},
 		args,
-	).AsStrSlice()
+	).ToAny()
 	if err != nil {
 		return nil, fmt.Errorf("error peeking queue items: %w", err)
 	}
-
-	// Create a slice up to items in length.  We're going to remove any items that are
-	// leased here, so we may end up returning less than the total length.
-	result := make([]*QueueItem, len(items))
-	n := 0
-	now := getNow()
-
-	for _, str := range items {
-		qi := &QueueItem{}
-		if err := json.Unmarshal([]byte(str), qi); err != nil {
-			return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
-		}
-		if qi.IsLeased(now) {
-			// Leased item, don't return.
-			continue
-		}
-
-		// The nested osqueue.Item never has an ID set;  always re-set it
-		qi.Data.JobID = &qi.ID
-		result[n] = qi
-		n++
-
-		if isPeekNext {
-			return []*QueueItem{qi}, nil
-		}
+	items, ok := res.([]any)
+	if !ok {
+		return nil, nil
+	}
+	if len(items) == 0 {
+		return nil, nil
 	}
 
-	return result[0:n], nil
+	if isPeekNext {
+		i, err := q.decodeQueueItemFromPeek(items[0].(string), getNow())
+		if err != nil {
+			return nil, err
+		}
+		return []*QueueItem{i}, nil
+	}
+
+	now := getNow()
+	return util.ParallelDecode(items, func(val any) (*QueueItem, error) {
+		str, _ := val.(string)
+		return q.decodeQueueItemFromPeek(str, now)
+	})
+}
+
+func (q *queue) decodeQueueItemFromPeek(str string, now time.Time) (*QueueItem, error) {
+	qi := &QueueItem{}
+	if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), qi); err != nil {
+		return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
+	}
+	if qi.IsLeased(now) {
+		// Leased item, don't return.
+		return nil, nil
+	}
+	// The nested osqueue.Item never has an ID set;  always re-set it
+	qi.Data.JobID = &qi.ID
+	return qi, nil
 }
 
 // RequeueByJobID requeues a job for a specific time given a partition name and job ID.
@@ -2059,6 +2094,70 @@ func (q *queue) getShardLeases() []leasedShard {
 	}
 	q.shardLeaseLock.Unlock()
 	return existingLeases
+}
+
+// peekEWMA returns the calculated EWMA value from the list
+func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
+	// retrieves the list from redis
+	cmd := q.r.B().Lrange().Key(q.kg.ConcurrencyFnEWMA(fnID)).Start(0).Stop(-1).Build()
+	strlist, err := q.r.Do(ctx, cmd).AsStrSlice()
+	if err != nil {
+		return 0, fmt.Errorf("error reading function concurrency EWMA values: %w", err)
+	}
+
+	// return early
+	if len(strlist) == 0 {
+		return 0, nil
+	}
+
+	// convert to float for
+	vals := make([]float64, len(strlist))
+	for i, s := range strlist {
+		v, _ := strconv.ParseFloat(s, 64)
+		vals[i] = v
+	}
+
+	// create a simple EWMA, add all the numbers in it and get the final value
+	// NOTE: we don't need variable since we don't want to maintain this in memory
+	mavg := ewma.NewMovingAverage()
+	for _, v := range vals {
+		mavg.Add(v)
+	}
+
+	// round up to the nearest integer
+	return int64(math.Round(mavg.Value())), nil
+}
+
+// setPeekEWMA add the new value to the existing list.
+// if the length of the list exceeds the predetermined size, pop out the first item
+func (q *queue) setPeekEWMA(ctx context.Context, fnID uuid.UUID, val int64) error {
+	listSize := q.peekEWMALen
+	if listSize == 0 {
+		listSize = QueuePeekEWMALen
+	}
+
+	keys := []string{
+		q.kg.ConcurrencyFnEWMA(fnID),
+	}
+	args, err := StrSlice([]any{
+		val,
+		listSize,
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = scripts["queue/setPeekEWMA"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error updating function concurrency EWMA: %w", err)
+	}
+
+	return nil
 }
 
 func HashID(ctx context.Context, id string) string {

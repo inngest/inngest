@@ -102,10 +102,9 @@ function PauseFunctionModal({
       )}
       {!isPaused && (
         <ul className="list-inside list-disc p-6 pb-0 leading-8">
-          <li>Existing runs will continue to run to completion.</li>
           <li>No new runs will be queued or invoked.</li>
+          <li>Existing runs will continue to run to completion.</li>
           <li>Events will continue to be received, but they will not trigger new runs.</li>
-          <li>Paused functions will be unpaused when you resync your app.</li>
           <li>Functions can be resumed at any time.</li>
         </ul>
       )}

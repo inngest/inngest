@@ -148,6 +148,8 @@ func (tb *runTree) ToRunSpan(ctx context.Context) (*rpbv2.RunSpan, error) {
 
 	var finished bool
 	switch root.Status {
+	case rpbv2.SpanStatus_RUNNING:
+		root.EndedAt = nil
 	case rpbv2.SpanStatus_COMPLETED, rpbv2.SpanStatus_FAILED:
 		finished = true
 	}
@@ -960,6 +962,12 @@ func (tb *runTree) processInvoke(ctx context.Context, span *cqrs.Span, mod *rpbv
 		if timedOut != nil && *timedOut {
 			mod.Status = rpbv2.SpanStatus_FAILED
 		}
+	}
+
+	if hasFinished(mod) {
+		end := mod.StartedAt.AsTime().Add(span.Duration)
+		mod.DurationMs = span.DurationMS()
+		mod.EndedAt = timestamppb.New(end)
 	}
 
 	// output

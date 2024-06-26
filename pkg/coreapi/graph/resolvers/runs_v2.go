@@ -20,9 +20,9 @@ const (
 func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []*models.RunsV2OrderBy, filter models.RunsFilterV2) (*models.RunsV2Connection, error) {
 	tsfield := enums.TraceRunTimeQueuedAt
 	switch *filter.TimeField {
-	case models.FunctionRunTimeFieldV2StartedAt:
+	case models.RunsV2OrderByFieldStartedAt:
 		tsfield = enums.TraceRunTimeStartedAt
-	case models.FunctionRunTimeFieldV2EndedAt:
+	case models.RunsV2OrderByFieldEndedAt:
 		tsfield = enums.TraceRunTimeEndedAt
 	}
 
@@ -220,16 +220,6 @@ func (r *queryResolver) Run(ctx context.Context, runID string) (*models.Function
 		batchTS   *time.Time
 	)
 
-	if run.StartedAt.UnixMilli() > 0 {
-		startedAt = &run.StartedAt
-	}
-	if run.EndedAt.UnixMilli() > 0 {
-		endedAt = &run.EndedAt
-	}
-	if run.SourceID != "" {
-		sourceID = &run.SourceID
-	}
-
 	triggerIDs := []ulid.ULID{}
 	for _, evtID := range run.TriggerIDs {
 		if id, err := ulid.Parse(evtID); err == nil {
@@ -250,6 +240,20 @@ func (r *queryResolver) Run(ctx context.Context, runID string) (*models.Function
 	status, err := models.ToFunctionRunStatus(run.Status)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing status: %w", err)
+	}
+
+	if run.StartedAt.UnixMilli() > 0 {
+		startedAt = &run.StartedAt
+	}
+	if run.SourceID != "" {
+		sourceID = &run.SourceID
+	}
+
+	switch status {
+	case models.FunctionRunStatusCompleted, models.FunctionRunStatusFailed, models.FunctionRunStatusCancelled:
+		if run.EndedAt.UnixMilli() > 0 {
+			endedAt = &run.EndedAt
+		}
 	}
 
 	res := models.FunctionRunV2{
