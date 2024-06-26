@@ -155,6 +155,7 @@ func (tb *runTree) ToRunSpan(ctx context.Context) (*rpbv2.RunSpan, error) {
 		finished = true
 	}
 
+	var last *rpbv2.RunSpan
 	// these are the execution or steps for the function run
 	for _, span := range spans {
 		tspan, skipped, err := tb.toRunSpan(ctx, span)
@@ -170,6 +171,25 @@ func (tb *runTree) ToRunSpan(ctx context.Context) (*rpbv2.RunSpan, error) {
 			root.OutputId = tspan.OutputId
 		}
 		root.Children = append(root.Children, tspan)
+		last = tspan
+	}
+
+	// append a queued span if function is not done yet
+	if !hasFinished(root) && hasFinished(last) {
+		queued := &rpbv2.RunSpan{
+			AccountId:    tb.acctID.String(),
+			WorkspaceId:  tb.wsID.String(),
+			AppId:        tb.appID.String(),
+			FunctionId:   tb.fnID.String(),
+			RunId:        tb.runID.String(),
+			TraceId:      last.TraceId,
+			ParentSpanId: &root.SpanId,
+			SpanId:       "queued",
+			Name:         "Queued step",
+			Status:       rpbv2.SpanStatus_QUEUED,
+			QueuedAt:     last.EndedAt,
+		}
+		root.Children = append(root.Children, queued)
 	}
 
 	return root, nil
