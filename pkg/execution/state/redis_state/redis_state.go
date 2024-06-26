@@ -167,17 +167,12 @@ func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
 		opt(m)
 	}
 
-	if m.pauseR == nil {
-		m.pauseR = m.unsafeUnshardedClientDoNotUse.unshardedConn
-	}
-
 	m.shardedMgr = shardedMgr{
 		s: m.unsafeShardedClientDoNotUse,
 	}
 
 	m.unshardedMgr = unshardedMgr{
-		u:      m.unsafeUnshardedClientDoNotUse,
-		pauseR: m.pauseR,
+		u: m.unsafeUnshardedClientDoNotUse,
 	}
 
 	return m, nil
@@ -214,9 +209,6 @@ type shardedMgr struct {
 
 type unshardedMgr struct {
 	u *UnshardedClient
-
-	// this is the redis client for managing pauses.
-	pauseR rueidis.Client
 }
 
 type CompositePauseID struct {
@@ -664,7 +656,7 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
 
 	status, err := scripts["savePause"].Exec(
 		ctx,
-		m.pauseR,
+		pause.Client(),
 		keys,
 		args,
 	).AsInt64()
@@ -694,7 +686,7 @@ func (m unshardedMgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 
 	status, err := scripts["leasePause"].Exec(
 		ctx,
-		m.pauseR,
+		pause.Client(),
 		// keys will be sharded/unsharded depending on RunID
 		[]string{pause.kg.Pause(ctx, id), pause.kg.PauseLease(ctx, id)},
 		args,
@@ -797,14 +789,14 @@ func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Co
 	pause := m.u.Pauses()
 
 	// Fetch all pauses for the run
-	if pauseIDs, err := m.pauseR.Do(callCtx, m.pauseR.B().Smembers().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
+	if pauseIDs, err := pause.Client().Do(callCtx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
 		for _, id := range pauseIDs {
 			pauseID, _ := uuid.Parse(id)
 			_ = m.DeletePauseByID(ctx, pauseID)
 		}
 	}
 
-	return m.pauseR.Do(callCtx, m.pauseR.B().Del().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).Error()
+	return pause.Client().Do(callCtx, pause.Client().B().Del().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).Error()
 }
 
 func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error {
@@ -859,7 +851,7 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 
 	status, err := scripts["deletePause"].Exec(
 		ctx,
-		m.pauseR,
+		pause.Client(),
 		keys,
 		[]string{
 			p.ID.String(),
@@ -939,14 +931,14 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 func (m unshardedMgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID, event string) (bool, error) {
 	pause := m.u.Pauses()
 	key := pause.kg.PauseEvent(ctx, workspaceID, event)
-	cmd := m.pauseR.B().Exists().Key(key).Build()
-	return m.pauseR.Do(ctx, cmd).AsBool()
+	cmd := pause.Client().B().Exists().Key(key).Build()
+	return pause.Client().Do(ctx, cmd).AsBool()
 }
 
 func (m unshardedMgr) PauseByID(ctx context.Context, pauseID uuid.UUID) (*state.Pause, error) {
 	pauses := m.u.Pauses()
-	cmd := m.pauseR.B().Get().Key(pauses.kg.Pause(ctx, pauseID)).Build()
-	str, err := m.pauseR.Do(ctx, cmd).ToString()
+	cmd := pauses.Client().B().Get().Key(pauses.kg.Pause(ctx, pauseID)).Build()
+	str, err := pauses.Client().Do(ctx, cmd).ToString()
 	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
 	}
@@ -961,9 +953,8 @@ func (m unshardedMgr) PauseByID(ctx context.Context, pauseID uuid.UUID) (*state.
 func (m unshardedMgr) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*state.Pause, error) {
 	global := m.u.Global()
 	key := global.kg.Invoke(ctx, wsID)
-	cmd := m.pauseR.B().Hget().Key(key).Field(correlationID).Build()
-	// Warning: We need to access global keys, which must be colocated on the same Redis cluster (pauseR == global.Client())
-	pauseIDstr, err := m.pauseR.Do(ctx, cmd).ToString()
+	cmd := global.Client().B().Hget().Key(key).Field(correlationID).Build()
+	pauseIDstr, err := global.Client().Do(ctx, cmd).ToString()
 	if err == rueidis.Nil {
 		return nil, state.ErrInvokePauseNotFound
 	}
@@ -989,8 +980,8 @@ func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*stat
 		keys[n] = pause.kg.Pause(ctx, id)
 	}
 
-	cmd := m.pauseR.B().Mget().Key(keys...).Build()
-	strings, err := m.pauseR.Do(ctx, cmd).AsStrSlice()
+	cmd := pause.Client().B().Mget().Key(keys...).Build()
+	strings, err := pause.Client().Do(ctx, cmd).AsStrSlice()
 	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
 	}
@@ -1027,8 +1018,8 @@ func (m unshardedMgr) PauseByStep(ctx context.Context, i state.Identifier, actio
 	pauses := m.u.Pauses()
 
 	// Access sharded value first
-	cmd := m.pauseR.B().Get().Key(pauses.kg.PauseStep(ctx, i, actionID)).Build()
-	str, err := m.pauseR.Do(ctx, cmd).ToString()
+	cmd := pauses.Client().B().Get().Key(pauses.kg.PauseStep(ctx, i, actionID)).Build()
+	str, err := pauses.Client().Do(ctx, cmd).ToString()
 
 	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
@@ -1043,8 +1034,8 @@ func (m unshardedMgr) PauseByStep(ctx context.Context, i state.Identifier, actio
 	}
 
 	// Then access value
-	cmd = m.pauseR.B().Get().Key(pauses.kg.Pause(ctx, id)).Build()
-	byt, err := m.pauseR.Do(ctx, cmd).AsBytes()
+	cmd = pauses.Client().B().Get().Key(pauses.kg.Pause(ctx, id)).Build()
+	byt, err := pauses.Client().Do(ctx, cmd).AsBytes()
 
 	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
@@ -1072,7 +1063,7 @@ func (m unshardedMgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, 
 		key := pauses.kg.PauseEvent(ctx, workspaceID, event)
 		iter := &scanIter{
 			count: cnt,
-			r:     m.pauseR,
+			r:     pauses.Client(),
 		}
 		err := iter.init(ctx, key, 1000)
 		return iter, err
@@ -1080,7 +1071,7 @@ func (m unshardedMgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, 
 
 	// If there are less than a thousand items, query the keys
 	// for iteration.
-	iter := &bufIter{r: m.pauseR}
+	iter := &bufIter{r: pauses.Client()}
 	err = iter.init(ctx, key)
 	return iter, err
 }
@@ -1093,19 +1084,19 @@ func (m unshardedMgr) PausesByEventSince(ctx context.Context, workspaceID uuid.U
 	pauses := m.u.Pauses()
 
 	// Load all items in the set.
-	cmd := m.pauseR.B().
+	cmd := pauses.Client().B().
 		Zrangebyscore().
 		Key(pauses.kg.PauseIndex(ctx, "add", workspaceID, event)).
 		Min(strconv.Itoa(int(since.Unix()))).
 		Max("+inf").
 		Build()
-	ids, err := m.pauseR.Do(ctx, cmd).AsStrSlice()
+	ids, err := pauses.Client().Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return nil, err
 	}
 
 	iter := &keyIter{
-		r:  m.pauseR,
+		r:  pauses.Client(),
 		kf: pauses.kg,
 	}
 	err = iter.init(ctx, ids, 100)
