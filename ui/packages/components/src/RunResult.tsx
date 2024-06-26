@@ -4,6 +4,7 @@ import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 
 import { CodeBlock } from './CodeBlock';
 import type { Result } from './types/functionRun';
+import { isNullish } from './utils/object';
 
 type Props = {
   className?: string;
@@ -28,7 +29,7 @@ export function RunResult({ className, result, isSuccess }: Props) {
         />
       )}
 
-      {result.error?.stack && (
+      {result.error && !isNullish(result.error.stack) && (
         <CodeBlock
           header={{
             title:
