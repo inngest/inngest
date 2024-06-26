@@ -145,6 +145,8 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 
 	status := models.RunTraceSpanStatusRunning
 	switch pb.GetStatus() {
+	case rpbv2.SpanStatus_QUEUED, rpbv2.SpanStatus_SCHEDULED:
+		status = models.RunTraceSpanStatusQueued
 	case rpbv2.SpanStatus_RUNNING:
 		status = models.RunTraceSpanStatusRunning
 	case rpbv2.SpanStatus_WAITING:
