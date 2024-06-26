@@ -36,6 +36,7 @@ message RunSpan {
 enum SpanStatus {
   UNKNOWN = 0;
   SCHEDULED = 100;
+  QUEUED = 110;
   RUNNING = 200;
   WAITING = 210;
   COMPLETED = 300;
