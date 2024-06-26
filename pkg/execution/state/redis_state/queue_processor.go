@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/VividCortex/ewma"
-	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest/log"
@@ -693,7 +692,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	fetch := getNow().Truncate(time.Second).Add(PartitionLookahead)
 
 	queue, err := duration(peekCtx, "peek", func(ctx context.Context) ([]*QueueItem, error) {
-		peek := q.peekSize(ctx, p.WorkflowID)
+		peek := q.peekSize(ctx, p)
 		// NOTE: would love to instrument this value to see it over time per function but
 		// it's likely too high of a cardinality
 		go telemetry.HistogramQueuePeekEWMA(ctx, peek, telemetry.HistogramOpt{PkgName: pkgName})
@@ -1181,9 +1180,9 @@ func (q *queue) capacity() int64 {
 // 1. EWMA of concurrency limit hits
 // 2. configured min, max of peek size range
 // 3. worker capacity
-func (q *queue) peekSize(ctx context.Context, fnID uuid.UUID) int64 {
+func (q *queue) peekSize(ctx context.Context, p *QueuePartition) int64 {
 	// retrieve the EWMA value
-	ewma, err := q.peekEWMA(ctx, fnID)
+	ewma, err := q.peekEWMA(ctx, p.WorkflowID)
 	if err != nil {
 		// return the minimum if there's an error
 		return q.peekMin
@@ -1196,22 +1195,28 @@ func (q *queue) peekSize(ctx context.Context, fnID uuid.UUID) int64 {
 	}
 
 	// set ranges
-	min := q.peekMin
-	if min == 0 {
-		min = QueuePeekMin
+	pmin := q.peekMin
+	if pmin == 0 {
+		pmin = QueuePeekMin
 	}
-	max := q.peekMax
-	if max == 0 {
-		max = QueuePeekMax
+	pmax := q.peekMax
+	if pmax == 0 {
+		pmax = QueuePeekMax
 	}
 
 	// calculate size with EWMA and multiplier
 	size := ewma * multiplier
 	switch {
-	case size < min:
-		size = min
-	case size > max:
-		size = max
+	case size < pmin:
+		size = pmin
+	case size > pmax:
+		size = pmax
+	}
+
+	dur := time.Hour * 24
+	qsize, _ := q.partitionSize(ctx, q.kg.QueueIndex(p.Queue()), time.Now().Add(dur))
+	if qsize > size {
+		size = qsize
 	}
 
 	cap := q.capacity()
