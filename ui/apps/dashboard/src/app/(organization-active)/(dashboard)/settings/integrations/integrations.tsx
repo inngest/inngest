@@ -6,6 +6,7 @@ import { Card } from '@inngest/components/Card';
 import { IconDatadog } from '@inngest/components/icons/platforms/Datadog';
 import { IconNetlify } from '@inngest/components/icons/platforms/Netlify';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
+import { RiArrowRightLine, RiExternalLinkLine } from '@remixicon/react';
 
 import { useVercelIntegration } from './vercel/useVercelIntegration';
 
@@ -38,6 +39,8 @@ const INTEGRATIONS: Integration[] = [
     Icon: <IconNetlify className="h-6 w-6 text-white" />,
     actionButton: () => (
       <NewButton
+        icon={<RiExternalLinkLine />}
+        iconSide="left"
         kind="secondary"
         appearance="outlined"
         size="medium"
@@ -52,7 +55,16 @@ const INTEGRATIONS: Integration[] = [
     title: 'Datadog',
     Icon: <IconDatadog className="h-6 w-6 text-white" />,
     actionButton: () => (
-      <NewButton kind="secondary" appearance="outlined" size="medium" label="Upvote" />
+      <NewButton
+        icon={<RiExternalLinkLine />}
+        iconSide="left"
+        kind="secondary"
+        appearance="outlined"
+        size="medium"
+        label="Upvote"
+        href="https://roadmap.inngest.com/roadmap?id=b9303313-0234-4ece-8376-df862364c16b"
+        target="_blank"
+      />
     ),
     description: 'Let us know if a Datadog integration is important to you by upvoting!',
   },
@@ -87,11 +99,15 @@ export default function IntegrationsList() {
             </div>
             <div>
               <NewButton
+                icon={<RiExternalLinkLine />}
+                iconSide="left"
                 kind="secondary"
                 appearance="outlined"
                 size="medium"
                 label="Request integration"
                 className="border-muted bg-subtle mt-5"
+                href="https://roadmap.inngest.com/roadmap"
+                target="_blank"
               />
             </div>
           </div>
