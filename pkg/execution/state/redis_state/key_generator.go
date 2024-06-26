@@ -152,6 +152,7 @@ type PauseKeyGenerator interface {
 type unshardedKeyGenerator struct {
 	queueDefaultKey string
 	stateDefaultKey string
+	queueItemKg     queueItemKeyGenerator
 
 	QueueKeyGenerator
 	PauseKeyGenerator
@@ -168,7 +169,13 @@ func newUnshardedKeyGenerator(stateDefaultKey, queueDefaultKey string) Unsharded
 		PauseKeyGenerator:    &pauseKeyGenerator{stateDefaultKey},
 		BatchKeyGenerator:    &batchKeyGenerator{queueDefaultKey, queueItemKg},
 		DebounceKeyGenerator: &debounceKeyGenerator{queueDefaultKey, queueItemKg},
+		queueItemKg:          queueItemKg,
 	}
+}
+
+func (u unshardedKeyGenerator) QueueItem() string {
+	// Forward to proper generator to prevent ambiguity
+	return u.queueItemKg.QueueItem()
 }
 
 func (u unshardedKeyGenerator) Workflow(ctx context.Context, workflowID uuid.UUID, version int) string {
