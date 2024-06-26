@@ -26,11 +26,9 @@ export default function VercelConnect() {
       <div className="text-lg font-normal text-slate-800">
         <div className="ml-3 border-l border-slate-300">
           <div className="relative ml-[32px] pb-7 before:absolute before:left-[-46px] before:h-[28px] before:w-[28px] before:rounded-full before:border before:border-slate-300 before:bg-white before:text-center before:align-middle before:text-[13px] before:text-slate-700 before:content-['1']">
-            <div className="leading-6 text-slate-950">
-              Install Inngest Integration on Vercel A new window will open with Vercel Integration
-            </div>
+            <div className="leading-6 text-slate-950">Install Inngest Integration on Vercel.</div>
             <div className="leading-6 text-slate-500">
-              Marketplace. Click the &rdquo;Add Integration&rdquo; button.
+              Click the &rdquo;Add Integration&rdquo; button.
             </div>
           </div>
         </div>

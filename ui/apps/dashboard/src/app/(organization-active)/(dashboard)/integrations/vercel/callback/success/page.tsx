@@ -66,8 +66,8 @@ export default async function SuccessPage({ searchParams }: SuccessProps) {
             kind="primary"
             appearance="solid"
             size="medium"
-            label="Continue to Vercel"
-            href={searchParams.onSuccessRedirectURL}
+            label="Continue to Inngest Vercel Dashbaord"
+            href="/settings/integrations/vercel"
           />
         </div>
       </>
