@@ -32,7 +32,7 @@ func (f *FunctionRunStateClient) ForceShardedClient() rueidis.Client {
 func NewFunctionRunStateClient(r rueidis.Client, u *UnshardedClient, stateDefaultKey string) *FunctionRunStateClient {
 	return &FunctionRunStateClient{
 		kg:              &runStateKeyGenerator{stateDefaultKey: stateDefaultKey},
-		client:          r,
+		client:          newRetryClusterDownClient(r),
 		unshardedClient: u,
 	}
 }

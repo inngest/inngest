@@ -18,6 +18,7 @@ func (r retryClusterDownClient) do(ctx context.Context, cmd rueidis.Completed, a
 	resp := r.r.Do(ctx, cmd)
 	if err := resp.Error(); err == nil {
 		if ret, ok := rueidis.IsRedisErr(err); ok {
+			// retry on CLUSTERDOWN (in case we're scaling up/down)
 			if ret.IsClusterDown() {
 				if attempts == 5 {
 					return resp
@@ -37,7 +38,7 @@ func (r retryClusterDownClient) Do(ctx context.Context, cmd rueidis.Completed) (
 }
 
 func (r retryClusterDownClient) DoMulti(ctx context.Context, multi ...rueidis.Completed) (resp []rueidis.RedisResult) {
-	return r.r.DoMulti(ctx, multi...)
+	panic("this operation is not cluster-safe")
 }
 
 func (r retryClusterDownClient) Receive(ctx context.Context, subscribe rueidis.Completed, fn func(msg rueidis.PubSubMessage)) error {
@@ -49,12 +50,11 @@ func (r retryClusterDownClient) Close() {
 }
 
 func (r retryClusterDownClient) DoCache(ctx context.Context, cmd rueidis.Cacheable, ttl time.Duration) (resp rueidis.RedisResult) {
-	return r.r.DoCache(ctx, cmd, ttl)
-
+	panic("this operation is not cluster-safe")
 }
 
 func (r retryClusterDownClient) DoMultiCache(ctx context.Context, multi ...rueidis.CacheableTTL) (resp []rueidis.RedisResult) {
-	return r.r.DoMultiCache(ctx, multi...)
+	panic("this operation is not cluster-safe")
 }
 
 func (r retryClusterDownClient) Dedicated(fn func(rueidis.DedicatedClient) error) (err error) {
