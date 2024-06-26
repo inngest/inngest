@@ -82,10 +82,7 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
       <div className="grow">
         <div className="flex">
           <span className="mt-1 h-fit self-start text-sm">{trace.name}</span>
-          <div className="flex h-8 grow items-center">
-            {opCodeBadge}
-            <div className="bg-canvasMuted ml-2 h-px grow" />
-          </div>
+          <div className="h-8">{opCodeBadge}</div>
         </div>
         <TimeWithText trace={trace} />
       </div>
