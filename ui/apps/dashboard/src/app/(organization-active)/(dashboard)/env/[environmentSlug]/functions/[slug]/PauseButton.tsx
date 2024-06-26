@@ -124,7 +124,7 @@ function PauseFunctionModal({
       {isPaused && (
         <div>
           <p className="p-6 pb-0 text-base">
-            Are you sure you want to resume “<strong>{functionName}</strong>”?
+            Are you sure you want to resume “<span className="font-semibold">{functionName}</span>”?
           </p>
           <p className="text-subtle p-6 pb-0 pt-3 text-sm">
             This function will resume normal functionality and will be invoked as new events are
@@ -135,7 +135,7 @@ function PauseFunctionModal({
       {!isPaused && (
         <div>
           <p className="p-6 pb-0 text-base">
-            Are you sure you want to pause “<strong>{functionName}</strong>”?
+            Are you sure you want to pause “<span className="font-semibold">{functionName}</span>”?
           </p>
           <ul className="text-subtle list-inside list-disc p-6 pb-0 pt-3 text-sm leading-6">
             <li>Functions can be resumed at any time.</li>
