@@ -2091,8 +2091,8 @@ func (q *queue) getShardLeases() []leasedShard {
 // peekEWMA returns the calculated EWMA value from the list
 func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
 	// retrieves the list from redis
-	cmd := q.r.B().Lrange().Key(q.kg.ConcurrencyFnEWMA(fnID)).Start(0).Stop(-1).Build()
-	strlist, err := q.r.Do(ctx, cmd).AsStrSlice()
+	cmd := q.u.Client().B().Lrange().Key(q.u.KeyGenerator().ConcurrencyFnEWMA(fnID)).Start(0).Stop(-1).Build()
+	strlist, err := q.u.Client().Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return 0, fmt.Errorf("error reading function concurrency EWMA values: %w", err)
 	}
@@ -2129,7 +2129,7 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID uuid.UUID, val int64) erro
 	}
 
 	keys := []string{
-		q.kg.ConcurrencyFnEWMA(fnID),
+		q.u.KeyGenerator().ConcurrencyFnEWMA(fnID),
 	}
 	args, err := StrSlice([]any{
 		val,
@@ -2141,7 +2141,7 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID uuid.UUID, val int64) erro
 
 	_, err = scripts["queue/setPeekEWMA"].Exec(
 		ctx,
-		q.r,
+		q.u.Client(),
 		keys,
 		args,
 	).AsInt64()
