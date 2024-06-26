@@ -6,7 +6,7 @@ import { Card } from '@inngest/components/Card';
 import { IconDatadog } from '@inngest/components/icons/platforms/Datadog';
 import { IconNetlify } from '@inngest/components/icons/platforms/Netlify';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
-import { RiArrowRightLine, RiExternalLinkLine } from '@remixicon/react';
+import { RiExternalLinkLine } from '@remixicon/react';
 
 import { useVercelIntegration } from './vercel/useVercelIntegration';
 
