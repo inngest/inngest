@@ -402,5 +402,5 @@ func (u unshardedKeyGenerator) PauseStep(ctx context.Context, identifier state.I
 }
 
 func (u unshardedKeyGenerator) ConcurrencyFnEWMA(fnID uuid.UUID) string {
-	return fmt.Sprintf("{%s}:queue:concurrency-ewma:%s", u.stateDefaultKey, fnID)
+	return fmt.Sprintf("{%s}:queue:concurrency-ewma:%s", u.queueDefaultKey, fnID)
 }
