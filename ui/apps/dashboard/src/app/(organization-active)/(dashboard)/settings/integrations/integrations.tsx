@@ -91,7 +91,7 @@ export default function IntegrationsList() {
           </Card>
         ))}
         <Card>
-          <div className="bg-subtle flex h-[189px] w-[388px] flex-col p-6">
+          <div className="bg-canvasSubtle flex h-[189px] w-[388px] flex-col p-6">
             <div className="text-lg font-medium">Can&apos;t find what you need?</div>
             <div className="mt-3 text-sm text-slate-500">
               Write to our team about the integration you are looking for and we will get back to
