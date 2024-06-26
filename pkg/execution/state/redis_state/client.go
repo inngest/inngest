@@ -1,81 +1,12 @@
 package redis_state
 
 import (
-	"context"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
-	"time"
 )
 
 const StateDefaultKey = "estate"
 const QueueDefaultKey = "queue"
-
-type retryClusterDownClient struct {
-	r rueidis.Client
-}
-
-func (r retryClusterDownClient) B() rueidis.Builder {
-	return r.r.B()
-}
-
-func (r retryClusterDownClient) do(ctx context.Context, cmd rueidis.Completed, attempts int) rueidis.RedisResult {
-	resp := r.r.Do(ctx, cmd)
-	if err := resp.Error(); err == nil {
-		if ret, ok := rueidis.IsRedisErr(err); ok {
-			if ret.IsClusterDown() {
-				if attempts == 5 {
-					return resp
-				}
-
-				time.Sleep(100 * time.Millisecond)
-				return r.do(ctx, cmd, attempts+1)
-			}
-		}
-	}
-
-	return resp
-}
-
-func (r retryClusterDownClient) Do(ctx context.Context, cmd rueidis.Completed) (resp rueidis.RedisResult) {
-	return r.do(ctx, cmd, 0)
-}
-
-func (r retryClusterDownClient) DoMulti(ctx context.Context, multi ...rueidis.Completed) (resp []rueidis.RedisResult) {
-	return r.r.DoMulti(ctx, multi...)
-}
-
-func (r retryClusterDownClient) Receive(ctx context.Context, subscribe rueidis.Completed, fn func(msg rueidis.PubSubMessage)) error {
-	return r.r.Receive(ctx, subscribe, fn)
-}
-
-func (r retryClusterDownClient) Close() {
-	r.r.Close()
-}
-
-func (r retryClusterDownClient) DoCache(ctx context.Context, cmd rueidis.Cacheable, ttl time.Duration) (resp rueidis.RedisResult) {
-	return r.r.DoCache(ctx, cmd, ttl)
-
-}
-
-func (r retryClusterDownClient) DoMultiCache(ctx context.Context, multi ...rueidis.CacheableTTL) (resp []rueidis.RedisResult) {
-	return r.r.DoMultiCache(ctx, multi...)
-}
-
-func (r retryClusterDownClient) Dedicated(fn func(rueidis.DedicatedClient) error) (err error) {
-	return r.r.Dedicated(fn)
-}
-
-func (r retryClusterDownClient) Dedicate() (client rueidis.DedicatedClient, cancel func()) {
-	return r.r.Dedicate()
-}
-
-func (r retryClusterDownClient) Nodes() map[string]rueidis.Client {
-	return r.r.Nodes()
-}
-
-func newRetryClusterDownClient(r rueidis.Client) rueidis.Client {
-	return &retryClusterDownClient{r: r}
-}
 
 type FunctionRunStateClient struct {
 	kg              RunStateKeyGenerator
@@ -91,7 +22,7 @@ func (f *FunctionRunStateClient) Client(runID ulid.ULID) rueidis.Client {
 	if IsSharded(runID) {
 		return f.client
 	}
-	return f.unshardedClient.Client()
+	return f.unshardedClient.unshardedConn
 }
 
 func NewFunctionRunStateClient(r rueidis.Client, u *UnshardedClient, stateDefaultKey string) *FunctionRunStateClient {
@@ -116,22 +47,143 @@ func (s *ShardedClient) FunctionRunState() *FunctionRunStateClient {
 	return s.fnRunState
 }
 
-type UnshardedClient struct {
-	kg          UnshardedKeyGenerator
+type PauseClient struct {
+	kg          PauseKeyGenerator
 	unshardedRc rueidis.Client
 }
 
-func (u *UnshardedClient) KeyGenerator() UnshardedKeyGenerator {
-	return u.kg
+func (p *PauseClient) KeyGenerator() PauseKeyGenerator {
+	return p.kg
 }
 
-func (u *UnshardedClient) Client() rueidis.Client {
-	return u.unshardedRc
+func (p *PauseClient) Client() rueidis.Client {
+	return p.unshardedRc
+}
+
+func NewPauseClient(r rueidis.Client, stateDefaultKey string) *PauseClient {
+	return &PauseClient{
+		kg:          pauseKeyGenerator{stateDefaultKey: stateDefaultKey},
+		unshardedRc: r,
+	}
+}
+
+type QueueClient struct {
+	kg          QueueKeyGenerator
+	unshardedRc rueidis.Client
+}
+
+func (q *QueueClient) KeyGenerator() QueueKeyGenerator {
+	return q.kg
+}
+
+func (q *QueueClient) Client() rueidis.Client {
+	return q.unshardedRc
+}
+
+func NewQueueClient(r rueidis.Client, queueDefaultKey string) *QueueClient {
+	return &QueueClient{
+		kg:          queueKeyGenerator{queueDefaultKey: queueDefaultKey},
+		unshardedRc: r,
+	}
+}
+
+type BatchClient struct {
+	kg          BatchKeyGenerator
+	unshardedRc rueidis.Client
+}
+
+func (b *BatchClient) KeyGenerator() BatchKeyGenerator {
+	return b.kg
+}
+
+func (b *BatchClient) Client() rueidis.Client {
+	return b.unshardedRc
+}
+
+func NewBatchClient(r rueidis.Client, queueDefaultKey string) *BatchClient {
+	return &BatchClient{
+		kg:          batchKeyGenerator{queueDefaultKey: queueDefaultKey},
+		unshardedRc: r,
+	}
+}
+
+type DebounceClient struct {
+	kg          DebounceKeyGenerator
+	unshardedRc rueidis.Client
+}
+
+func (d *DebounceClient) KeyGenerator() DebounceKeyGenerator {
+	return d.kg
+}
+
+func (d *DebounceClient) Client() rueidis.Client {
+	return d.unshardedRc
+}
+
+func NewDebounceClient(r rueidis.Client, queueDefaultKey string) *DebounceClient {
+	return &DebounceClient{
+		kg:          debounceKeyGenerator{queueDefaultKey: queueDefaultKey},
+		unshardedRc: r,
+	}
+}
+
+type GlobalClient struct {
+	kg          GlobalKeyGenerator
+	unshardedRc rueidis.Client
+}
+
+func (g *GlobalClient) KeyGenerator() GlobalKeyGenerator {
+	return g.kg
+}
+
+func (g *GlobalClient) Client() rueidis.Client {
+	return g.unshardedRc
+}
+
+func NewGlobalClient(r rueidis.Client, stateDefaultKey string) *GlobalClient {
+	return &GlobalClient{
+		kg:          globalKeyGenerator{stateDefaultKey: stateDefaultKey},
+		unshardedRc: r,
+	}
+}
+
+type UnshardedClient struct {
+	unshardedConn rueidis.Client
+
+	pauses   *PauseClient
+	queue    *QueueClient
+	batch    *BatchClient
+	debounce *DebounceClient
+	global   *GlobalClient
+}
+
+func (u *UnshardedClient) Pauses() *PauseClient {
+	return u.pauses
+}
+
+func (u *UnshardedClient) Queue() *QueueClient {
+	return u.queue
+}
+
+func (u *UnshardedClient) Batch() *BatchClient {
+	return u.batch
+}
+
+func (u *UnshardedClient) Debounce() *DebounceClient {
+	return u.debounce
+}
+
+func (u *UnshardedClient) Global() *GlobalClient {
+	return u.global
 }
 
 func NewUnshardedClient(r rueidis.Client, stateDefaultKey, queueDefaultKey string) *UnshardedClient {
 	return &UnshardedClient{
-		kg:          newUnshardedKeyGenerator(stateDefaultKey, queueDefaultKey),
-		unshardedRc: r,
+		pauses:        NewPauseClient(r, stateDefaultKey),
+		queue:         NewQueueClient(r, queueDefaultKey),
+		batch:         NewBatchClient(r, queueDefaultKey),
+		debounce:      NewDebounceClient(r, queueDefaultKey),
+		global:        NewGlobalClient(r, stateDefaultKey),
+		unshardedConn: r,
 	}
 }

@@ -168,7 +168,7 @@ func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
 	}
 
 	if m.pauseR == nil {
-		m.pauseR = m.unsafeUnshardedClientDoNotUse.Client()
+		m.pauseR = m.unsafeUnshardedClientDoNotUse.unshardedConn
 	}
 
 	m.shardedMgr = shardedMgr{
@@ -634,13 +634,18 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
 	extendedExpiry := time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()
 	nowUnixSeconds := time.Now().Unix()
 
+	pause := m.u.Pauses()
+
+	// Warning: We need to access global keys, which must be colocated on the same Redis cluster
+	global := m.u.Global()
+
 	keys := []string{
-		m.u.kg.Pause(ctx, p.ID),
-		m.u.kg.PauseEvent(ctx, p.WorkspaceID, evt),
-		m.u.kg.Invoke(ctx, p.WorkspaceID),
-		m.u.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
-		m.u.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
-		m.u.kg.RunPauses(ctx, p.Identifier.RunID),
+		pause.kg.Pause(ctx, p.ID),
+		pause.kg.PauseEvent(ctx, p.WorkspaceID, evt),
+		global.kg.Invoke(ctx, p.WorkspaceID),
+		pause.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
+		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
+		pause.kg.RunPauses(ctx, p.Identifier.RunID),
 	}
 
 	args, err := StrSlice([]any{
@@ -685,11 +690,13 @@ func (m unshardedMgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 
+	pause := m.u.Pauses()
+
 	status, err := scripts["leasePause"].Exec(
 		ctx,
 		m.pauseR,
 		// keys will be sharded/unsharded depending on RunID
-		[]string{m.u.kg.Pause(ctx, id), m.u.kg.PauseLease(ctx, id)},
+		[]string{pause.kg.Pause(ctx, id), pause.kg.PauseLease(ctx, id)},
 		args,
 	).AsInt64()
 	if err != nil {
@@ -787,15 +794,17 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 }
 
 func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Context, i state.Identifier) error {
+	pause := m.u.Pauses()
+
 	// Fetch all pauses for the run
-	if pauseIDs, err := m.pauseR.Do(callCtx, m.pauseR.B().Smembers().Key(m.u.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
+	if pauseIDs, err := m.pauseR.Do(callCtx, m.pauseR.B().Smembers().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
 		for _, id := range pauseIDs {
 			pauseID, _ := uuid.Parse(id)
 			_ = m.DeletePauseByID(ctx, pauseID)
 		}
 	}
 
-	return m.pauseR.Do(callCtx, m.pauseR.B().Del().Key(m.u.kg.RunPauses(ctx, i.RunID)).Build()).Error()
+	return m.pauseR.Do(callCtx, m.pauseR.B().Del().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).Error()
 }
 
 func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error {
@@ -812,11 +821,15 @@ func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) er
 }
 
 func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
+	pause := m.u.Pauses()
+
+	global := m.u.Global()
+
 	// Add a default event here, which is null and overwritten by everything.  This is necessary
 	// to keep the same cluster key.
-	eventKey := m.u.kg.PauseEvent(ctx, p.WorkspaceID, "-")
+	eventKey := pause.kg.PauseEvent(ctx, p.WorkspaceID, "-")
 	if p.Event != nil {
-		eventKey = m.u.kg.PauseEvent(ctx, p.WorkspaceID, *p.Event)
+		eventKey = pause.kg.PauseEvent(ctx, p.WorkspaceID, *p.Event)
 	}
 
 	evt := ""
@@ -829,17 +842,18 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 		corrId = *p.InvokeCorrelationID
 	}
 
-	pauseKey := m.u.kg.Pause(ctx, p.ID)
-	pauseStepKey := m.u.kg.PauseStep(ctx, p.Identifier, p.Incoming)
-	runPausesKey := m.u.kg.RunPauses(ctx, p.Identifier.RunID)
+	pauseKey := pause.kg.Pause(ctx, p.ID)
+	pauseStepKey := pause.kg.PauseStep(ctx, p.Identifier, p.Incoming)
+	runPausesKey := pause.kg.RunPauses(ctx, p.Identifier.RunID)
 
 	keys := []string{
 		pauseKey,
 		pauseStepKey,
 		eventKey,
-		m.u.kg.Invoke(ctx, p.WorkspaceID),
-		m.u.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
-		m.u.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
+		// Warning: We need to access global keys, which must be colocated on the same Redis cluster
+		global.kg.Invoke(ctx, p.WorkspaceID),
+		pause.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
+		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 		runPausesKey,
 	}
 
@@ -923,13 +937,15 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 }
 
 func (m unshardedMgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID, event string) (bool, error) {
-	key := m.u.kg.PauseEvent(ctx, workspaceID, event)
+	pause := m.u.Pauses()
+	key := pause.kg.PauseEvent(ctx, workspaceID, event)
 	cmd := m.pauseR.B().Exists().Key(key).Build()
 	return m.pauseR.Do(ctx, cmd).AsBool()
 }
 
 func (m unshardedMgr) PauseByID(ctx context.Context, pauseID uuid.UUID) (*state.Pause, error) {
-	cmd := m.pauseR.B().Get().Key(m.u.kg.Pause(ctx, pauseID)).Build()
+	pauses := m.u.Pauses()
+	cmd := m.pauseR.B().Get().Key(pauses.kg.Pause(ctx, pauseID)).Build()
 	str, err := m.pauseR.Do(ctx, cmd).ToString()
 	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
@@ -943,8 +959,10 @@ func (m unshardedMgr) PauseByID(ctx context.Context, pauseID uuid.UUID) (*state.
 }
 
 func (m unshardedMgr) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*state.Pause, error) {
-	key := m.u.kg.Invoke(ctx, wsID)
+	global := m.u.Global()
+	key := global.kg.Invoke(ctx, wsID)
 	cmd := m.pauseR.B().Hget().Key(key).Field(correlationID).Build()
+	// Warning: We need to access global keys, which must be colocated on the same Redis cluster (pauseR == global.Client())
 	pauseIDstr, err := m.pauseR.Do(ctx, cmd).ToString()
 	if err == rueidis.Nil {
 		return nil, state.ErrInvokePauseNotFound
@@ -961,13 +979,14 @@ func (m unshardedMgr) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.
 }
 
 func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {
+	pause := m.u.Pauses()
 	if len(ids) == 0 {
 		return nil, nil
 	}
 
 	keys := make([]string, len(ids))
 	for n, id := range ids {
-		keys[n] = m.u.kg.Pause(ctx, id)
+		keys[n] = pause.kg.Pause(ctx, id)
 	}
 
 	cmd := m.pauseR.B().Mget().Key(keys...).Build()
@@ -1005,8 +1024,10 @@ func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*stat
 // has deferred results which must be continued by resuming the specific pause set
 // up for the given step ID.
 func (m unshardedMgr) PauseByStep(ctx context.Context, i state.Identifier, actionID string) (*state.Pause, error) {
+	pauses := m.u.Pauses()
+
 	// Access sharded value first
-	cmd := m.pauseR.B().Get().Key(m.u.kg.PauseStep(ctx, i, actionID)).Build()
+	cmd := m.pauseR.B().Get().Key(pauses.kg.PauseStep(ctx, i, actionID)).Build()
 	str, err := m.pauseR.Do(ctx, cmd).ToString()
 
 	if err == rueidis.Nil {
@@ -1022,7 +1043,7 @@ func (m unshardedMgr) PauseByStep(ctx context.Context, i state.Identifier, actio
 	}
 
 	// Then access value
-	cmd = m.pauseR.B().Get().Key(m.u.kg.Pause(ctx, id)).Build()
+	cmd = m.pauseR.B().Get().Key(pauses.kg.Pause(ctx, id)).Build()
 	byt, err := m.pauseR.Do(ctx, cmd).AsBytes()
 
 	if err == rueidis.Nil {
@@ -1039,14 +1060,16 @@ func (m unshardedMgr) PauseByStep(ctx context.Context, i state.Identifier, actio
 
 // PausesByEvent returns all pauses for a given event within a workspace.
 func (m unshardedMgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
-	key := m.u.kg.PauseEvent(ctx, workspaceID, event)
+	pauses := m.u.Pauses()
+
+	key := pauses.kg.PauseEvent(ctx, workspaceID, event)
 	// If there are > 1000 keys in the hmap, use scanning
 
-	cntCmd := m.u.unshardedRc.B().Hlen().Key(key).Build()
-	cnt, err := m.u.unshardedRc.Do(ctx, cntCmd).AsInt64()
+	cntCmd := pauses.Client().B().Hlen().Key(key).Build()
+	cnt, err := pauses.Client().Do(ctx, cntCmd).AsInt64()
 
 	if err != nil || cnt > 1000 {
-		key := m.u.kg.PauseEvent(ctx, workspaceID, event)
+		key := pauses.kg.PauseEvent(ctx, workspaceID, event)
 		iter := &scanIter{
 			count: cnt,
 			r:     m.pauseR,
@@ -1067,10 +1090,12 @@ func (m unshardedMgr) PausesByEventSince(ctx context.Context, workspaceID uuid.U
 		return m.PausesByEvent(ctx, workspaceID, event)
 	}
 
+	pauses := m.u.Pauses()
+
 	// Load all items in the set.
 	cmd := m.pauseR.B().
 		Zrangebyscore().
-		Key(m.u.kg.PauseIndex(ctx, "add", workspaceID, event)).
+		Key(pauses.kg.PauseIndex(ctx, "add", workspaceID, event)).
 		Min(strconv.Itoa(int(since.Unix()))).
 		Max("+inf").
 		Build()
@@ -1081,7 +1106,7 @@ func (m unshardedMgr) PausesByEventSince(ctx context.Context, workspaceID uuid.U
 
 	iter := &keyIter{
 		r:  m.pauseR,
-		kf: m.u.kg,
+		kf: pauses.kg,
 	}
 	err = iter.init(ctx, ids, 100)
 	return iter, err
@@ -1415,7 +1440,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 // keyIter loads all pauses in batches given a list of IDs
 type keyIter struct {
 	r  rueidis.Client
-	kf UnshardedKeyGenerator
+	kf PauseKeyGenerator
 	// chunk is the size of scans to load in one.
 	chunk int64
 	// keys stores pause IDs to fetch in batches

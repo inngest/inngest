@@ -418,7 +418,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 	}
 
 	// Attempt to claim the lease immediately.
-	leaseID, err := q.ConfigLease(ctx, q.u.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
+	leaseID, err := q.ConfigLease(ctx, q.u.Queue().kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -435,7 +435,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 			tick.Stop()
 			return
 		case <-tick.C:
-			leaseID, err := q.ConfigLease(ctx, q.u.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
+			leaseID, err := q.ConfigLease(ctx, q.u.Queue().kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
 			if err == ErrConfigAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
@@ -466,7 +466,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 
 func (q *queue) runScavenger(ctx context.Context) {
 	// Attempt to claim the lease immediately.
-	leaseID, err := q.ConfigLease(ctx, q.u.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
+	leaseID, err := q.ConfigLease(ctx, q.u.Queue().kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -498,7 +498,7 @@ func (q *queue) runScavenger(ctx context.Context) {
 			}
 		case <-tick.C:
 			// Attempt to re-lease the lock.
-			leaseID, err := q.ConfigLease(ctx, q.u.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
+			leaseID, err := q.ConfigLease(ctx, q.u.Queue().kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
 			if err == ErrConfigAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
@@ -570,7 +570,7 @@ func (q *queue) scan(ctx context.Context) error {
 	)
 
 	// By default, use the global partition
-	partitionKey := q.u.kg.GlobalPartitionIndex()
+	partitionKey := q.u.Queue().kg.GlobalPartitionIndex()
 
 	// If this worker has leased shards, those take priority 95% of the time.  There's a 5% chance that the
 	// worker still works on the global queue.
@@ -581,7 +581,7 @@ func (q *queue) scan(ctx context.Context) error {
 		i := rand.Intn(len(existingLeases))
 		shard = &existingLeases[i].Shard
 		// Use the shard partition
-		partitionKey = q.u.kg.ShardPartitionIndex(shard.Name)
+		partitionKey = q.u.Queue().kg.ShardPartitionIndex(shard.Name)
 		metricShardName = "<shard>:" + shard.Name
 	}
 

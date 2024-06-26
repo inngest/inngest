@@ -110,7 +110,10 @@ type UnshardedKeyGenerator interface {
 	DebounceKeyGenerator
 	BatchKeyGenerator
 	PauseKeyGenerator
+	GlobalKeyGenerator
+}
 
+type GlobalKeyGenerator interface {
 	// Workflow returns the key for the current workflow ID and version.
 	Workflow(ctx context.Context, workflowID uuid.UUID, version int) string
 
@@ -149,40 +152,15 @@ type PauseKeyGenerator interface {
 	PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string
 }
 
-type unshardedKeyGenerator struct {
-	queueDefaultKey string
+type globalKeyGenerator struct {
 	stateDefaultKey string
-	queueItemKg     queueItemKeyGenerator
-
-	QueueKeyGenerator
-	PauseKeyGenerator
-	BatchKeyGenerator
-	DebounceKeyGenerator
 }
 
-func newUnshardedKeyGenerator(stateDefaultKey, queueDefaultKey string) UnshardedKeyGenerator {
-	queueItemKg := queueItemKeyGenerator{queueDefaultKey}
-	return &unshardedKeyGenerator{
-		queueDefaultKey:      queueDefaultKey,
-		stateDefaultKey:      stateDefaultKey,
-		QueueKeyGenerator:    &queueKeyGenerator{queueDefaultKey, queueItemKg},
-		PauseKeyGenerator:    &pauseKeyGenerator{stateDefaultKey},
-		BatchKeyGenerator:    &batchKeyGenerator{queueDefaultKey, queueItemKg},
-		DebounceKeyGenerator: &debounceKeyGenerator{queueDefaultKey, queueItemKg},
-		queueItemKg:          queueItemKg,
-	}
-}
-
-func (u unshardedKeyGenerator) QueueItem() string {
-	// Forward to proper generator to prevent ambiguity
-	return u.queueItemKg.QueueItem()
-}
-
-func (u unshardedKeyGenerator) Workflow(ctx context.Context, workflowID uuid.UUID, version int) string {
+func (u globalKeyGenerator) Workflow(ctx context.Context, workflowID uuid.UUID, version int) string {
 	return fmt.Sprintf("{%s}:workflows:%s-%d", u.stateDefaultKey, workflowID, version)
 }
 
-func (u unshardedKeyGenerator) Invoke(ctx context.Context, wsID uuid.UUID) string {
+func (u globalKeyGenerator) Invoke(ctx context.Context, wsID uuid.UUID) string {
 	return fmt.Sprintf("{%s}:invoke:%s", u.stateDefaultKey, wsID)
 }
 

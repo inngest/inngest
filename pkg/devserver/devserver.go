@@ -188,8 +188,8 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
-	batcher := batch.NewRedisBatchManager(unshardedClient, queue)
-	debouncer := debounce.NewRedisDebouncer(unshardedClient, queue)
+	batcher := batch.NewRedisBatchManager(unshardedClient.Batch(), queue)
+	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queue)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, sm.(expressions.EvaluableLoader), nil)
