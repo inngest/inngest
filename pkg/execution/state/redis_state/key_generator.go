@@ -15,7 +15,23 @@ import (
 var switchover = time.Date(2100, 07, 10, 0, 0, 0, 0, time.UTC)
 
 type ShardedKeyGenerator interface {
+	RunStateKeyGenerator
+}
 
+type shardedKeyGenerator struct {
+	stateDefaultKey string
+	RunStateKeyGenerator
+}
+
+func newShardedKeyGenerator(stateDefaultKey string) ShardedKeyGenerator {
+	return &shardedKeyGenerator{stateDefaultKey: stateDefaultKey, RunStateKeyGenerator: &runStateKeyGenerator{stateDefaultKey}}
+}
+
+func IsSharded(runID ulid.ULID) bool {
+	return ulid.Time(runID.Time()).After(switchover)
+}
+
+type RunStateKeyGenerator interface {
 	// Idempotency stores the idempotency key for atomic lookup.
 	Idempotency(context.Context, state.Identifier) string
 
@@ -44,59 +60,48 @@ type ShardedKeyGenerator interface {
 
 	// Stack returns the key used to store the stack for a given run
 	Stack(ctx context.Context, runID ulid.ULID) string
-
-	// IsSharded returns whether keys related to a given Run ID should be sharded
-	IsSharded(runID ulid.ULID) bool
 }
 
-type shardedKeyGenerator struct {
+type runStateKeyGenerator struct {
 	stateDefaultKey string
 }
 
-func newShardedKeyGenerator(stateDefaultKey string) ShardedKeyGenerator {
-	return &shardedKeyGenerator{stateDefaultKey}
-}
-
-func (s shardedKeyGenerator) IsSharded(runID ulid.ULID) bool {
-	return ulid.Time(runID.Time()).After(switchover)
-}
-
-func (s shardedKeyGenerator) Prefix(defaultPrefix string, runID ulid.ULID) string {
-	if s.IsSharded(runID) {
+func (s runStateKeyGenerator) Prefix(defaultPrefix string, runID ulid.ULID) string {
+	if IsSharded(runID) {
 		return fmt.Sprintf("%s:%s", defaultPrefix, runID)
 	}
 	return defaultPrefix
 }
 
-func (s shardedKeyGenerator) Idempotency(ctx context.Context, id state.Identifier) string {
+func (s runStateKeyGenerator) Idempotency(ctx context.Context, id state.Identifier) string {
 	return fmt.Sprintf("{%s}:key:%s", s.Prefix(s.stateDefaultKey, id.RunID), id.IdempotencyKey())
 }
 
-func (s shardedKeyGenerator) RunMetadata(ctx context.Context, runID ulid.ULID) string {
+func (s runStateKeyGenerator) RunMetadata(ctx context.Context, runID ulid.ULID) string {
 	return fmt.Sprintf("{%s}:metadata:%s", s.Prefix(s.stateDefaultKey, runID), runID)
 }
 
-func (s shardedKeyGenerator) Event(ctx context.Context, identifier state.Identifier) string {
+func (s runStateKeyGenerator) Event(ctx context.Context, identifier state.Identifier) string {
 	return fmt.Sprintf("{%s}:events:%s:%s", s.Prefix(s.stateDefaultKey, identifier.RunID), identifier.WorkflowID, identifier.RunID)
 }
 
-func (s shardedKeyGenerator) Events(ctx context.Context, identifier state.Identifier) string {
+func (s runStateKeyGenerator) Events(ctx context.Context, identifier state.Identifier) string {
 	return fmt.Sprintf("{%s}:bulk-events:%s:%s", s.Prefix(s.stateDefaultKey, identifier.RunID), identifier.WorkflowID, identifier.RunID)
 }
 
-func (s shardedKeyGenerator) Actions(ctx context.Context, identifier state.Identifier) string {
+func (s runStateKeyGenerator) Actions(ctx context.Context, identifier state.Identifier) string {
 	return fmt.Sprintf("{%s}:actions:%s:%s", s.Prefix(s.stateDefaultKey, identifier.RunID), identifier.WorkflowID, identifier.RunID)
 }
 
-func (s shardedKeyGenerator) Errors(ctx context.Context, identifier state.Identifier) string {
+func (s runStateKeyGenerator) Errors(ctx context.Context, identifier state.Identifier) string {
 	return fmt.Sprintf("{%s}:errors:%s:%s", s.Prefix(s.stateDefaultKey, identifier.RunID), identifier.WorkflowID, identifier.RunID)
 }
 
-func (s shardedKeyGenerator) History(ctx context.Context, runID ulid.ULID) string {
+func (s runStateKeyGenerator) History(ctx context.Context, runID ulid.ULID) string {
 	return fmt.Sprintf("{%s}:history:%s", s.Prefix(s.stateDefaultKey, runID), runID)
 }
 
-func (s shardedKeyGenerator) Stack(ctx context.Context, runID ulid.ULID) string {
+func (s runStateKeyGenerator) Stack(ctx context.Context, runID ulid.ULID) string {
 	return fmt.Sprintf("{%s}:stack:%s", s.Prefix(s.stateDefaultKey, runID), runID)
 }
 

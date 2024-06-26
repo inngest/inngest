@@ -27,7 +27,7 @@ func (s *ShardedClient) KeyGenerator() ShardedKeyGenerator {
 }
 
 func (s *ShardedClient) Client(runID ulid.ULID) rueidis.Client {
-	if s.KeyGenerator().IsSharded(runID) {
+	if IsSharded(runID) {
 		return s.shardedRc
 	}
 	return s.u.Client()
