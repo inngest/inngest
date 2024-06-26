@@ -1219,7 +1219,8 @@ func (q *queue) peekSize(ctx context.Context, p *QueuePartition) int64 {
 		size = qsize
 	}
 
-	cap := q.capacity()
+	// add 10% expecting for some workflow that will finish in the mean time
+	cap := int64(float64(q.capacity()) * 1.1)
 	if size > cap {
 		size = cap
 	}
