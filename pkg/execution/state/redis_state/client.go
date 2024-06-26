@@ -9,31 +9,31 @@ const StateDefaultKey = "estate"
 const QueueDefaultKey = "queue"
 
 type FunctionRunStateClient struct {
-	kg              RunStateKeyGenerator
-	client          rueidis.Client
-	unshardedClient *UnshardedClient
+	kg            RunStateKeyGenerator
+	client        RetriableClient
+	unshardedConn RetriableClient
 }
 
 func (f *FunctionRunStateClient) KeyGenerator() RunStateKeyGenerator {
 	return f.kg
 }
 
-func (f *FunctionRunStateClient) Client(runID ulid.ULID) rueidis.Client {
+func (f *FunctionRunStateClient) Client(runID ulid.ULID) RetriableClient {
 	if IsSharded(runID) {
 		return f.client
 	}
-	return f.unshardedClient.unshardedConn
+	return f.unshardedConn
 }
 
-func (f *FunctionRunStateClient) ForceShardedClient() rueidis.Client {
+func (f *FunctionRunStateClient) ForceShardedClient() RetriableClient {
 	return f.client
 }
 
 func NewFunctionRunStateClient(r rueidis.Client, u *UnshardedClient, stateDefaultKey string) *FunctionRunStateClient {
 	return &FunctionRunStateClient{
-		kg:              &runStateKeyGenerator{stateDefaultKey: stateDefaultKey},
-		client:          newRetryClusterDownClient(r),
-		unshardedClient: u,
+		kg:            &runStateKeyGenerator{stateDefaultKey: stateDefaultKey},
+		client:        newRetryClusterDownClient(r),
+		unshardedConn: newNoopRetriableClient(u.unshardedConn),
 	}
 }
 

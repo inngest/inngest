@@ -2,9 +2,32 @@ package redis_state
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"github.com/redis/rueidis"
+	"runtime"
 	"time"
 )
+
+type RetriableClient interface {
+	Do(ctx context.Context, cmd func(client rueidis.Client) rueidis.Completed) (resp rueidis.RedisResult)
+}
+
+type noopRetriableClient struct {
+	r rueidis.Client
+}
+
+func (r noopRetriableClient) B() rueidis.Builder {
+	return r.r.B()
+}
+
+func (r noopRetriableClient) Do(ctx context.Context, cmd func(client rueidis.Client) rueidis.Completed) (resp rueidis.RedisResult) {
+	return r.r.Do(ctx, cmd(r.r))
+}
+
+func newNoopRetriableClient(client rueidis.Client) RetriableClient {
+	return noopRetriableClient{client}
+}
 
 type retryClusterDownClient struct {
 	r rueidis.Client
@@ -14,9 +37,10 @@ func (r retryClusterDownClient) B() rueidis.Builder {
 	return r.r.B()
 }
 
-func (r retryClusterDownClient) do(ctx context.Context, cmd rueidis.Completed, attempts int) rueidis.RedisResult {
-	resp := r.r.Do(ctx, cmd)
-	if err := resp.Error(); err == nil {
+func (r retryClusterDownClient) do(ctx context.Context, cmd func(client rueidis.Client) rueidis.Completed, attempts int) rueidis.RedisResult {
+	resp := r.r.Do(ctx, cmd(r.r))
+
+	if err := resp.Error(); err != nil {
 		if ret, ok := rueidis.IsRedisErr(err); ok {
 			// retry on CLUSTERDOWN (in case we're scaling up/down)
 			if ret.IsClusterDown() {
@@ -33,42 +57,51 @@ func (r retryClusterDownClient) do(ctx context.Context, cmd rueidis.Completed, a
 	return resp
 }
 
-func (r retryClusterDownClient) Do(ctx context.Context, cmd rueidis.Completed) (resp rueidis.RedisResult) {
+func (r retryClusterDownClient) Do(ctx context.Context, cmd func(client rueidis.Client) rueidis.Completed) (resp rueidis.RedisResult) {
 	return r.do(ctx, cmd, 0)
 }
 
-func (r retryClusterDownClient) DoMulti(ctx context.Context, multi ...rueidis.Completed) (resp []rueidis.RedisResult) {
-	panic("this operation is not cluster-safe")
-}
-
-func (r retryClusterDownClient) Receive(ctx context.Context, subscribe rueidis.Completed, fn func(msg rueidis.PubSubMessage)) error {
-	return r.r.Receive(ctx, subscribe, fn)
-}
-
-func (r retryClusterDownClient) Close() {
-	r.r.Close()
-}
-
-func (r retryClusterDownClient) DoCache(ctx context.Context, cmd rueidis.Cacheable, ttl time.Duration) (resp rueidis.RedisResult) {
-	panic("this operation is not cluster-safe")
-}
-
-func (r retryClusterDownClient) DoMultiCache(ctx context.Context, multi ...rueidis.CacheableTTL) (resp []rueidis.RedisResult) {
-	panic("this operation is not cluster-safe")
-}
-
-func (r retryClusterDownClient) Dedicated(fn func(rueidis.DedicatedClient) error) (err error) {
-	return r.r.Dedicated(fn)
-}
-
-func (r retryClusterDownClient) Dedicate() (client rueidis.DedicatedClient, cancel func()) {
-	return r.r.Dedicate()
-}
-
-func (r retryClusterDownClient) Nodes() map[string]rueidis.Client {
-	return r.r.Nodes()
-}
-
-func newRetryClusterDownClient(r rueidis.Client) rueidis.Client {
+func newRetryClusterDownClient(r rueidis.Client) RetriableClient {
 	return &retryClusterDownClient{r: r}
+}
+
+// NewClusterLuaScript creates a Lua instance whose Lua.Exec uses EVALSHA and EVAL.
+func NewClusterLuaScript(script string) *RetriableLua {
+	sum := sha1.Sum([]byte(script))
+	return &RetriableLua{script: script, sha1: hex.EncodeToString(sum[:]), maxp: runtime.GOMAXPROCS(0)}
+}
+
+// Lua represents a redis lua script. It should be created from the NewLuaScript() or NewLuaScriptReadOnly()
+type RetriableLua struct {
+	script   string
+	sha1     string
+	maxp     int
+	readonly bool
+}
+
+// Exec the script to the given Client.
+// It will first try with the EVALSHA/EVALSHA_RO and then EVAL/EVAL_RO if first try failed.
+// Cross slot keys are prohibited if the Client is a cluster client.
+func (s *RetriableLua) Exec(ctx context.Context, c RetriableClient, keys, args []string) (resp rueidis.RedisResult) {
+	if s.readonly {
+		resp = c.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+			return client.B().EvalshaRo().Sha1(s.sha1).Numkeys(int64(len(keys))).Key(keys...).Arg(args...).Build()
+		})
+	} else {
+		resp = c.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+			return client.B().Evalsha().Sha1(s.sha1).Numkeys(int64(len(keys))).Key(keys...).Arg(args...).Build()
+		})
+	}
+	if err, ok := rueidis.IsRedisErr(resp.Error()); ok && err.IsNoScript() {
+		if s.readonly {
+			resp = c.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+				return client.B().EvalRo().Script(s.script).Numkeys(int64(len(keys))).Key(keys...).Arg(args...).Build()
+			})
+		} else {
+			resp = c.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+				return client.B().Eval().Script(s.script).Numkeys(int64(len(keys))).Key(keys...).Arg(args...).Build()
+			})
+		}
+	}
+	return resp
 }
