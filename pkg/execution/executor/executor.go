@@ -1517,7 +1517,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 					return
 				}
 				// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
-				err = e.pm.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, nil)
+				err = e.pm.ConsumePause(ctx, pause.ID, nil)
 				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound || err == state.ErrRunNotFound {
 					// Done. Add to the counter.
 					_ = e.pm.DeletePause(context.Background(), *pause)
@@ -1669,7 +1669,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 					return
 				}
 				// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
-				err = e.pm.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, nil)
+				err = e.pm.ConsumePause(ctx, pause.ID, nil)
 				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
 					// Done. Add to the counter.
 					atomic.AddInt32(&res[1], 1)
@@ -1841,14 +1841,14 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		// Delete this pause, as an event has occured which matches
 		// the timeout.  We can do this prior to leasing a pause as it's the
 		// only work that needs to happen
-		err := e.pm.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, nil)
+		err := e.pm.ConsumePause(ctx, pause.ID, nil)
 		if err == nil || err == state.ErrPauseNotFound {
 			return nil
 		}
 		return err
 	}
 
-	if err = e.pm.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, r.With); err != nil {
+	if err = e.pm.ConsumePause(ctx, pause.ID, r.With); err != nil {
 		return fmt.Errorf("error consuming pause via event: %w", err)
 	}
 

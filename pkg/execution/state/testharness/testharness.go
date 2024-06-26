@@ -665,7 +665,7 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 	s := setup(t, m)
 
 	// Consuming a non-existent pause should error.
-	err := m.ConsumePause(ctx, uuid.New(), ulid.MustNew(ulid.Now(), rand.Reader), nil)
+	err := m.ConsumePause(ctx, uuid.New(), nil)
 	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
 
 	// Save a pause.
@@ -686,12 +686,12 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 		// and without this there's a small but real chance of flakiness.
 		<-time.After(time.Millisecond)
 		// Consuming the pause should work.
-		err = m.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, nil)
+		err = m.ConsumePause(ctx, pause.ID, nil)
 		require.NoError(t, err)
 	})
 
 	t.Run("Consuming a pause again fails", func(t *testing.T) {
-		err = m.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, nil)
+		err = m.ConsumePause(ctx, pause.ID, nil)
 		require.NotNil(t, err)
 		require.Error(t, state.ErrPauseNotFound, err)
 	})
@@ -707,7 +707,7 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
 	}
 	<-time.After(15 * time.Millisecond)
-	err = m.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, nil)
+	err = m.ConsumePause(ctx, pause.ID, nil)
 	require.NotNil(t, err, "Consuming an expired pause should error")
 	require.Error(t, state.ErrPauseNotFound, err)
 }
@@ -721,7 +721,7 @@ func checkConsumePauseWithData(t *testing.T, m state.Manager) {
 	}
 
 	// Consuming a non-existent pause should error.
-	err := m.ConsumePause(ctx, uuid.New(), ulid.MustNew(ulid.Now(), rand.Reader), pauseData)
+	err := m.ConsumePause(ctx, uuid.New(), pauseData)
 	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
 
 	// Save a pause.
@@ -737,10 +737,10 @@ func checkConsumePauseWithData(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 
 	// Consuming the pause should work.
-	err = m.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, pauseData)
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
 	require.NoError(t, err)
 
-	err = m.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, pauseData)
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
 	require.NotNil(t, err)
 	require.Error(t, state.ErrPauseNotFound, err)
 
@@ -756,7 +756,7 @@ func checkConsumePauseWithData(t *testing.T, m state.Manager) {
 		DataKey:    "my-pause-data-stored-for-eternity",
 	}
 	<-time.After(15 * time.Millisecond)
-	err = m.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, pauseData)
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
 	require.NotNil(t, err, "Consuming an expired pause should error")
 	require.Error(t, state.ErrPauseNotFound, err)
 
@@ -786,7 +786,7 @@ func checkConsumePauseWithDataIndex(t *testing.T, m state.Manager) {
 		require.NoError(t, err)
 
 		// Consuming the pause should work.
-		err = m.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, nil)
+		err = m.ConsumePause(ctx, pause.ID, nil)
 		require.NoError(t, err)
 
 		// Load function state and assert we have the pause stored in state.
@@ -824,7 +824,7 @@ func checkConsumePauseWithDataIndex(t *testing.T, m state.Manager) {
 		data := map[string]any{"allo": "guvna"}
 
 		// Consuming the pause should work.
-		err = m.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, data)
+		err = m.ConsumePause(ctx, pause.ID, data)
 		require.NoError(t, err)
 
 		// Load function state and assert we have the pause stored in state.
@@ -844,7 +844,7 @@ func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager) {
 	s := setup(t, m)
 
 	// Consuming a non-existent pause should error.
-	err := m.ConsumePause(ctx, uuid.New(), ulid.MustNew(ulid.Now(), rand.Reader), nil)
+	err := m.ConsumePause(ctx, uuid.New(), nil)
 	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
 
 	// Save a pause.
@@ -860,10 +860,10 @@ func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 
 	// Consuming the pause should work.
-	err = m.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, nil)
+	err = m.ConsumePause(ctx, pause.ID, nil)
 	require.NoError(t, err)
 
-	err = m.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, nil)
+	err = m.ConsumePause(ctx, pause.ID, nil)
 	require.NotNil(t, err)
 	require.Error(t, state.ErrPauseNotFound, err)
 
@@ -879,7 +879,7 @@ func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager) {
 		DataKey:    "my-pause-data-stored-for-eternity",
 	}
 	<-time.After(15 * time.Millisecond)
-	err = m.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, nil)
+	err = m.ConsumePause(ctx, pause.ID, nil)
 	require.NotNil(t, err, "Consuming an expired pause should error")
 	require.Error(t, state.ErrPauseNotFound, err)
 
@@ -898,7 +898,7 @@ func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager) {
 	}
 
 	// Consuming a non-existent pause should error.
-	err := m.ConsumePause(ctx, uuid.New(), ulid.MustNew(ulid.Now(), rand.Reader), pauseData)
+	err := m.ConsumePause(ctx, uuid.New(), pauseData)
 	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
 
 	// Save a pause.
@@ -913,10 +913,10 @@ func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 
 	// Consuming the pause should work.
-	err = m.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, pauseData)
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
 	require.NoError(t, err)
 
-	err = m.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, pauseData)
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
 	require.NotNil(t, err)
 	require.Error(t, state.ErrPauseNotFound, err)
 
@@ -931,7 +931,7 @@ func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager) {
 		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
 	}
 	<-time.After(15 * time.Millisecond)
-	err = m.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, pauseData)
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
 	require.NotNil(t, err, "Consuming an expired pause should error")
 	require.Error(t, state.ErrPauseNotFound, err)
 
@@ -1241,7 +1241,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 
 	// Consume the first pause, and assert that it doesn't show up in
 	// an iterator.
-	err = m.ConsumePause(ctx, pauses[0].ID, pauses[0].Identifier.RunID, nil)
+	err = m.ConsumePause(ctx, pauses[0].ID, nil)
 	require.NoError(t, err)
 
 	iter, err = m.PausesByEvent(ctx, uuid.UUID{}, evtA)
@@ -1318,7 +1318,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 		// There should be two pauses.
 		require.Equal(t, 2, n)
 
-		err = m.ConsumePause(ctx, p1.ID, p1.Identifier.RunID, map[string]any{"ok": true})
+		err = m.ConsumePause(ctx, p1.ID, map[string]any{"ok": true})
 		require.NoError(t, err)
 
 		//
@@ -1367,7 +1367,7 @@ func checkPauseByID(t *testing.T, m state.Manager) {
 	require.EqualValues(t, pause, *found)
 
 	// Consume.
-	err = m.ConsumePause(ctx, pause.ID, pause.Identifier.RunID, nil)
+	err = m.ConsumePause(ctx, pause.ID, nil)
 	require.Nil(t, err, "Consuming an expired pause should work")
 
 	found, err = m.PauseByID(ctx, pause.ID)
@@ -1418,7 +1418,7 @@ func checkPausesByID(t *testing.T, m state.Manager) {
 	require.EqualValues(t, 2, len(found))
 
 	// Consume.
-	err = m.ConsumePause(ctx, a.ID, a.Identifier.RunID, nil)
+	err = m.ConsumePause(ctx, a.ID, nil)
 	require.Nil(t, err, "Consuming an expired pause should work")
 
 	found, err = m.PausesByID(ctx, a.ID)

@@ -870,7 +870,7 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 	}
 }
 
-func (m mgr) ConsumePause(ctx context.Context, pauseID uuid.UUID, runID ulid.ULID, data any) error {
+func (m mgr) ConsumePause(ctx context.Context, pauseID uuid.UUID, data any) error {
 	p, err := m.unshardedMgr.PauseByID(ctx, pauseID)
 	if err != nil {
 		return err
