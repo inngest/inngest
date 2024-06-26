@@ -10,6 +10,7 @@ import { Timeline } from '../TimelineV2/Timeline';
 import { TriggerDetails } from '../TriggerDetails';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
+import { withRetry } from '../utils/retry';
 import { RunInfo } from './RunInfo';
 
 type Props = {
@@ -41,23 +42,30 @@ type Run = {
 
 export function RunDetails(props: Props) {
   const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
+  const [error, setError] = useState<Error>();
 
   const [run, setRun] = useState<Run>();
   useEffect(() => {
     if (!run) {
-      getRun(runID).then((data) => {
-        setRun(data);
-      });
+      withRetry(() => getRun(runID))
+        .then((data) => {
+          setRun(data);
+        })
+        .catch(setError);
     }
-  }, [run, runID]);
+  }, []);
 
   const [result, setResult] = useState<Result>();
   const outputID = run?.trace?.outputID;
   useEffect(() => {
     if (!result && outputID) {
-      getResult(outputID).then((data) => {
-        setResult(data);
-      });
+      withRetry(() => getResult(outputID))
+        .then((data) => {
+          setResult(data);
+        })
+        .catch(() => {
+          toast.error('Failed to fetch run result');
+        });
     }
   }, [result, outputID]);
 
@@ -70,6 +78,29 @@ export function RunDetails(props: Props) {
       console.error(e);
     }
   }, [props.cancelRun]);
+
+  if (error) {
+    throw error;
+    // return (
+    //   <div className="m-auto mt-32 flex w-fit flex-col gap-4">
+    //     <Alert
+    //       severity="error"
+    //       button={
+    //         <NewButton
+    //           onClick={() => window.location.reload()}
+    //           kind="secondary"
+    //           appearance="outlined"
+    //           label="Refresh page"
+    //         />
+    //       }
+    //     >
+    //       <p className="mb-4 font-semibold">{error.message}</p>
+
+    //       <p>An error occurred! Refresh the page to try again.</p>
+    //     </Alert>
+    //   </div>
+    // );
+  }
 
   return (
     <div>

@@ -217,8 +217,10 @@ export type CreateUserPayload = {
 };
 
 export type CreateVercelAppInput = {
+  originOverride?: InputMaybe<Scalars['String']>;
   path?: InputMaybe<Scalars['String']>;
   projectID: Scalars['String'];
+  protectionBypassSecret?: InputMaybe<Scalars['String']>;
   workspaceID: Scalars['ID'];
 };
 
@@ -1335,8 +1337,10 @@ export type UpdateIngestKey = {
 };
 
 export type UpdateVercelAppInput = {
+  originOverride?: InputMaybe<Scalars['String']>;
   path: Scalars['String'];
   projectID: Scalars['String'];
+  protectionBypassSecret?: InputMaybe<Scalars['String']>;
 };
 
 export type UpdateVercelAppResponse = {
@@ -1383,8 +1387,10 @@ export type User = {
 export type VercelApp = {
   __typename?: 'VercelApp';
   id: Scalars['UUID'];
+  originOverride: Maybe<Scalars['String']>;
   path: Maybe<Scalars['String']>;
   projectID: Scalars['String'];
+  protectionBypassSecret: Maybe<Scalars['String']>;
   workspaceID: Scalars['UUID'];
 };
 
