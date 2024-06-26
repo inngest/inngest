@@ -18,15 +18,6 @@ type ShardedKeyGenerator interface {
 	RunStateKeyGenerator
 }
 
-type shardedKeyGenerator struct {
-	stateDefaultKey string
-	RunStateKeyGenerator
-}
-
-func newShardedKeyGenerator(stateDefaultKey string) ShardedKeyGenerator {
-	return &shardedKeyGenerator{stateDefaultKey: stateDefaultKey, RunStateKeyGenerator: &runStateKeyGenerator{stateDefaultKey}}
-}
-
 func IsSharded(runID ulid.ULID) bool {
 	return ulid.Time(runID.Time()).After(switchover)
 }
