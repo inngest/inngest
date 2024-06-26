@@ -184,7 +184,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval)*time.Second),
 		))
 	}
-	queue := redis_state.NewQueue(unshardedClient, queueOpts...)
+	queue := redis_state.NewQueue(unshardedClient.Queue(), queueOpts...)
 
 	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 

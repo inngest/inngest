@@ -37,11 +37,11 @@ func TestQueueRunSequential(t *testing.T) {
 	defer q2cancel()
 
 	q1 := NewQueue(
-		NewUnshardedClient(rc),
+		NewQueueClient(rc, QueueDefaultKey),
 		WithNumWorkers(10),
 	)
 	q2 := NewQueue(
-		NewUnshardedClient(rc),
+		NewQueueClient(rc, QueueDefaultKey),
 		WithNumWorkers(10),
 	)
 
@@ -104,7 +104,7 @@ func TestQueueRunBasic(t *testing.T) {
 	defer rc.Close()
 
 	q := NewQueue(
-		NewUnshardedClient(rc),
+		NewQueueClient(rc, QueueDefaultKey),
 		// We can't add more than 8128 goroutines when detecting race conditions.
 		WithNumWorkers(10),
 		// Test custom queue names
@@ -197,7 +197,7 @@ func TestQueueRunRetry(t *testing.T) {
 	defer rc.Close()
 
 	q := NewQueue(
-		NewUnshardedClient(rc),
+		NewQueueClient(rc, QueueDefaultKey),
 		// We can't add more than 8128 goroutines when detecting race conditions.
 		WithNumWorkers(10),
 	)
@@ -288,7 +288,7 @@ func TestQueueRunExtended(t *testing.T) {
 	}
 
 	q := NewQueue(
-		NewUnshardedClient(rc),
+		NewQueueClient(rc, QueueDefaultKey),
 		// We can't add more than 8128 goroutines when detecting race conditions,
 		// so lower the number of workers.
 		WithNumWorkers(200),
@@ -316,7 +316,7 @@ func TestQueueRunExtended(t *testing.T) {
 				// randomly, between 1 and 10 seconds in.
 				ctx, cancel := context.WithCancel(context.Background())
 				q := NewQueue(
-					NewUnshardedClient(rc),
+					NewQueueClient(rc, QueueDefaultKey),
 					// We can't add more than 8128 goroutines when detecting race conditions,
 					// so lower the number of workers.
 					WithNumWorkers(200),
@@ -466,7 +466,7 @@ func TestRunPriorityFactor(t *testing.T) {
 	defer rc.Close()
 
 	q := NewQueue(
-		NewUnshardedClient(rc),
+		NewQueueClient(rc, QueueDefaultKey),
 		// We can't add more than 8128 goroutines when detecting race conditions.
 		WithNumWorkers(10),
 	)

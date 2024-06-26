@@ -82,7 +82,7 @@ func (q *QueueClient) Client() rueidis.Client {
 
 func NewQueueClient(r rueidis.Client, queueDefaultKey string) *QueueClient {
 	return &QueueClient{
-		kg:          queueKeyGenerator{queueDefaultKey: queueDefaultKey},
+		kg:          queueKeyGenerator{queueDefaultKey: queueDefaultKey, queueItemKeyGenerator: queueItemKeyGenerator{queueDefaultKey: queueDefaultKey}},
 		unshardedRc: r,
 	}
 }
@@ -102,7 +102,7 @@ func (b *BatchClient) Client() rueidis.Client {
 
 func NewBatchClient(r rueidis.Client, queueDefaultKey string) *BatchClient {
 	return &BatchClient{
-		kg:          batchKeyGenerator{queueDefaultKey: queueDefaultKey},
+		kg:          batchKeyGenerator{queueDefaultKey: queueDefaultKey, queueItemKeyGenerator: queueItemKeyGenerator{queueDefaultKey: queueDefaultKey}},
 		unshardedRc: r,
 	}
 }
@@ -122,7 +122,7 @@ func (d *DebounceClient) Client() rueidis.Client {
 
 func NewDebounceClient(r rueidis.Client, queueDefaultKey string) *DebounceClient {
 	return &DebounceClient{
-		kg:          debounceKeyGenerator{queueDefaultKey: queueDefaultKey},
+		kg:          debounceKeyGenerator{queueDefaultKey: queueDefaultKey, queueItemKeyGenerator: queueItemKeyGenerator{queueDefaultKey: queueDefaultKey}},
 		unshardedRc: r,
 	}
 }

@@ -213,7 +213,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(NewUnshardedClient(rc))
+	q := NewQueue(NewQueueClient(rc, QueueDefaultKey))
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
@@ -372,7 +372,7 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 	defer rc.Close()
 
 	// Set idempotency to a second
-	q := NewQueue(NewUnshardedClient(rc), WithIdempotencyTTL(dur))
+	q := NewQueue(NewQueueClient(rc, QueueDefaultKey), WithIdempotencyTTL(dur))
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
@@ -443,7 +443,7 @@ func BenchmarkPeekTiming(b *testing.B) {
 
 	// Enqueue 500 items into one queue.
 
-	q := NewQueue(rc)
+	q := NewQueue(NewQueueClient(rc, QueueDefaultKey))
 	ctx := context.Background()
 
 	enqueue := func(id uuid.UUID, n int) {
@@ -478,7 +478,7 @@ func TestQueuePeek(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(NewUnshardedClient(rc))
+	q := NewQueue(NewQueueClient(rc, QueueDefaultKey))
 	ctx := context.Background()
 
 	// The default blank UUID
@@ -596,9 +596,9 @@ func TestQueueLease(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	unshardedClient := NewUnshardedClient(rc)
-	defaultQueueKey := unshardedClient.kg.(QueueKeyGenerator)
-	q := NewQueue(unshardedClient)
+	queueClient := NewQueueClient(rc, QueueDefaultKey)
+	defaultQueueKey := queueClient.kg
+	q := NewQueue(queueClient)
 
 	ctx := context.Background()
 
@@ -850,8 +850,8 @@ func TestQueueExtendLease(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	unshardedClient := NewUnshardedClient(rc)
-	q := NewQueue(unshardedClient)
+	queueClient := NewQueueClient(rc, QueueDefaultKey)
+	q := NewQueue(queueClient)
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
@@ -886,7 +886,7 @@ func TestQueueExtendLease(t *testing.T) {
 		t.Run("It extends the score of the partition concurrency queue", func(t *testing.T) {
 			at := ulid.Time(nextID.Time())
 			pkey, _ := q.partitionConcurrencyGen(ctx, p)
-			scores := concurrencyQueueScores(t, r, unshardedClient.kg.Concurrency("p", pkey), time.Now())
+			scores := concurrencyQueueScores(t, r, queueClient.kg.Concurrency("p", pkey), time.Now())
 			require.Len(t, scores, 1)
 			// Ensure that the score matches the lease.
 			require.Equal(t, at, scores[item.ID])
@@ -929,9 +929,9 @@ func TestQueueDequeue(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	unshardedClient := NewUnshardedClient(rc)
-	defaultQueueKey := unshardedClient.kg.(QueueKeyGenerator)
-	q := NewQueue(unshardedClient)
+	queueClient := NewQueueClient(rc, QueueDefaultKey)
+	defaultQueueKey := queueClient.kg
+	q := NewQueue(queueClient)
 	ctx := context.Background()
 
 	t.Run("It should remove a queue item", func(t *testing.T) {
@@ -1032,7 +1032,7 @@ func TestQueueRequeue(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(NewUnshardedClient(rc))
+	q := NewQueue(NewQueueClient(rc, QueueDefaultKey))
 	ctx := context.Background()
 
 	t.Run("Re-enqueuing a leased item should succeed", func(t *testing.T) {
@@ -1146,7 +1146,7 @@ func TestQueuePartitionLease(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(NewUnshardedClient(rc))
+	q := NewQueue(NewQueueClient(rc, QueueDefaultKey))
 	ctx := context.Background()
 
 	_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, atA)
@@ -1227,7 +1227,7 @@ func TestQueuePartitionLease(t *testing.T) {
 
 	t.Run("Partition pausing", func(t *testing.T) {
 		r.FlushAll() // reset everything
-		q := NewQueue(NewUnshardedClient(rc))
+		q := NewQueue(NewQueueClient(rc, QueueDefaultKey))
 		ctx := context.Background()
 
 		_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, atA)
@@ -1293,7 +1293,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 	defer rc.Close()
 
 	q := NewQueue(
-		NewUnshardedClient(rc),
+		NewQueueClient(rc, QueueDefaultKey),
 		WithPriorityFinder(func(ctx context.Context, qi QueueItem) uint {
 			switch qi.Data.Identifier.WorkflowID {
 			case idB, idC:
@@ -1387,7 +1387,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 		defer rc.Close()
 
 		q := NewQueue(
-			NewUnshardedClient(rc),
+			NewQueueClient(rc, QueueDefaultKey),
 			WithPriorityFinder(func(ctx context.Context, qi QueueItem) uint {
 				switch qi.Data.Identifier.WorkflowID {
 				case idA:
@@ -1428,7 +1428,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 		defer rc.Close()
 
 		q := NewQueue(
-			NewUnshardedClient(rc),
+			NewQueueClient(rc, QueueDefaultKey),
 			WithPriorityFinder(func(ctx context.Context, qi QueueItem) uint {
 				return PriorityDefault
 			}),
@@ -1472,7 +1472,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(NewUnshardedClient(rc))
+	q := NewQueue(NewQueueClient(rc, QueueDefaultKey))
 	ctx := context.Background()
 	idA := uuid.New()
 	now := time.Now()
@@ -1582,7 +1582,7 @@ func TestQueuePartitionPause(t *testing.T) {
 	defer rc.Close()
 
 	q := NewQueue(
-		NewUnshardedClient(rc),
+		NewQueueClient(rc, QueueDefaultKey),
 		WithPriorityFinder(func(ctx context.Context, item QueueItem) uint {
 			return PriorityDefault
 		}),
@@ -1623,7 +1623,7 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 
 	defer rc.Close()
 	q := NewQueue(
-		NewUnshardedClient(rc),
+		NewQueueClient(rc, QueueDefaultKey),
 		WithPriorityFinder(func(ctx context.Context, item QueueItem) uint {
 			return priority
 		}),
@@ -1673,7 +1673,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 	defer rc.Close()
 
 	q := queue{
-		u: NewUnshardedClient(rc),
+		u: NewQueueClient(rc, QueueDefaultKey),
 		pf: func(ctx context.Context, item QueueItem) uint {
 			return PriorityMin
 		},
@@ -1917,7 +1917,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 	defer rc.Close()
 
 	q := queue{
-		u: NewUnshardedClient(rc),
+		u: NewQueueClient(rc, QueueDefaultKey),
 		pf: func(ctx context.Context, item QueueItem) uint {
 			return PriorityMin
 		},
@@ -1996,7 +1996,7 @@ func TestSharding(t *testing.T) {
 		}
 		return shard
 	}
-	q := NewQueue(NewUnshardedClient(rc), WithShardFinder(sf))
+	q := NewQueue(NewQueueClient(rc, QueueDefaultKey), WithShardFinder(sf))
 	require.NotNil(t, sf(ctx, "", uuid.UUID{}))
 
 	t.Run("QueueItem which shards", func(t *testing.T) {
@@ -2217,7 +2217,7 @@ func TestShardLease(t *testing.T) {
 			GuaranteedCapacity: 1,
 		}
 	}
-	q := NewQueue(NewUnshardedClient(rc), WithShardFinder(sf))
+	q := NewQueue(NewQueueClient(rc, QueueDefaultKey), WithShardFinder(sf))
 
 	t.Run("Leasing a non-existent shard fails", func(t *testing.T) {
 		shard := sf(ctx, "", uuid.UUID{})
@@ -2333,7 +2333,7 @@ func TestQueueRateLimit(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 	ctx := context.Background()
-	q := NewQueue(NewUnshardedClient(rc))
+	q := NewQueue(NewQueueClient(rc, QueueDefaultKey))
 
 	idA, idB := uuid.New(), uuid.New()
 
@@ -2502,7 +2502,7 @@ func TestQueueRateLimit(t *testing.T) {
 
 func getQueueItem(t *testing.T, r *miniredis.Miniredis, id string) QueueItem {
 	t.Helper()
-	kg := newUnshardedKeyGenerator().(QueueKeyGenerator)
+	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
 	// Ensure that our data is set up correctly.
 	val := r.HGet(kg.QueueItem(), id)
 	require.NotEmpty(t, val)
@@ -2522,7 +2522,7 @@ func requirePartitionInProgress(t *testing.T, q *queue, workflowID uuid.UUID, co
 
 func getPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) QueuePartition {
 	t.Helper()
-	kg := newUnshardedKeyGenerator().(QueueKeyGenerator)
+	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
 	val := r.HGet(kg.PartitionItem(), id.String())
 	qp := QueuePartition{}
 	err := json.Unmarshal([]byte(val), &qp)
@@ -2532,7 +2532,7 @@ func getPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) QueueParti
 
 func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item QueueItem, expected time.Time) {
 	t.Helper()
-	kg := newUnshardedKeyGenerator().(QueueKeyGenerator)
+	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
 	score, err := r.ZScore(kg.QueueIndex(item.WorkflowID.String()), item.ID)
 	parsed := time.UnixMilli(int64(score))
 	require.NoError(t, err)
@@ -2541,7 +2541,7 @@ func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item QueueItem
 
 func requirePartitionScoreEquals(t *testing.T, r *miniredis.Miniredis, wid uuid.UUID, expected time.Time) {
 	t.Helper()
-	kg := newUnshardedKeyGenerator().(QueueKeyGenerator)
+	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
 	score, err := r.ZScore(kg.GlobalPartitionIndex(), wid.String())
 	parsed := time.Unix(int64(score), 0)
 	require.NoError(t, err)

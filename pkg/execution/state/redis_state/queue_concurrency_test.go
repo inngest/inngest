@@ -55,7 +55,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	}
 
 	q := NewQueue(
-		NewUnshardedClient(rc),
+		NewQueueClient(rc, QueueDefaultKey),
 		WithNumWorkers(100),
 		WithPartitionConcurrencyKeyGenerator(pkf),
 		WithQueueLifecycles(ll),
