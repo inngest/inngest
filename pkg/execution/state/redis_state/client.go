@@ -94,10 +94,11 @@ func (f *FunctionRunStateClient) Client(runID ulid.ULID) rueidis.Client {
 	return f.unshardedClient.Client()
 }
 
-func NewFunctionRunStateClient(r rueidis.Client, stateDefaultKey string) *FunctionRunStateClient {
+func NewFunctionRunStateClient(r rueidis.Client, u *UnshardedClient,stateDefaultKey string) *FunctionRunStateClient {
 	return &FunctionRunStateClient{
 		kg:     &runStateKeyGenerator{stateDefaultKey: stateDefaultKey},
 		client: r,
+		unshardedClient:
 	}
 }
 
@@ -105,9 +106,9 @@ type ShardedClient struct {
 	fnRunState *FunctionRunStateClient
 }
 
-func NewShardedClient(u *UnshardedClient, r rueidis.Client, stateDefaultKey string) *ShardedClient {
+func NewShardedClient(u *UnshardedClient, functionRunStateClient rueidis.Client, stateDefaultKey string) *ShardedClient {
 	return &ShardedClient{
-		fnRunState: NewFunctionRunStateClient(r, stateDefaultKey),
+		fnRunState: NewFunctionRunStateClient(functionRunStateClient, u,stateDefaultKey),
 	}
 }
 
