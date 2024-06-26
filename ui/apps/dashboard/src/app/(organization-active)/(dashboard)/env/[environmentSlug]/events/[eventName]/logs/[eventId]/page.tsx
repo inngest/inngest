@@ -72,16 +72,22 @@ export default async function EventPage({ params }: EventPageProps) {
         <div className="w-2/6 flex-shrink-0 space-y-4 overflow-y-auto p-5">
           <h3 className="font-medium text-slate-800">Triggered Functions</h3>
           <ul className="space-y-3">
-            {event.functionRuns.map((functionRun) => (
-              <li key={functionRun.id}>
-                <TriggeredFunctionCard
-                  environmentSlug={params.environmentSlug}
-                  environmentID={environment.id}
-                  functionID={functionRun.function.id}
-                  functionRunID={functionRun.id}
-                />
-              </li>
-            ))}
+            {event.functionRuns.length === 0 ? (
+              <p className="my-4 text-sm leading-6 text-slate-700">
+                No functions triggered by this event.
+              </p>
+            ) : (
+              event.functionRuns.map((functionRun) => (
+                <li key={functionRun.id}>
+                  <TriggeredFunctionCard
+                    environmentSlug={params.environmentSlug}
+                    environmentID={environment.id}
+                    functionID={functionRun.function.id}
+                    functionRunID={functionRun.id}
+                  />
+                </li>
+              ))
+            )}
           </ul>
         </div>
       </main>
