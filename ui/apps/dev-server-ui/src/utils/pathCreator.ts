@@ -6,6 +6,6 @@ export const pathCreator = {
     return '/apps' as Route;
   },
   runPopout({ runID }: { runID: string }): Route {
-    return `/runs?runID=${runID}` as Route;
+    return `/run?runID=${runID}` as Route;
   },
 };

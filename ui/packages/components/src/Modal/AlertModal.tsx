@@ -1,3 +1,5 @@
+'use client';
+
 import { cn } from '@inngest/components/utils/classNames';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -25,7 +27,11 @@ export function AlertModal({
   description,
   className = 'w-1/4',
 }: AlertModalProps) {
-  const container = document.getElementById('modals');
+  let container = null;
+  if (global.document) {
+    container = document.getElementById('modals');
+  }
+
   return (
     <AlertDialog.Root open={isOpen} onOpenChange={onClose}>
       <AnimatePresence>
