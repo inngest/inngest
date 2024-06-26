@@ -95,7 +95,9 @@ func TestClusterSafeClient(t *testing.T) {
 	c := newRetryClusterDownClient(fc)
 
 	r.SetError("CLUSTERDOWN")
-	err = c.Do(ctx, c.B().Set().Key("test").Value("value").Build()).Error()
+	err = c.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Set().Key("test").Value("value").Build()
+	}).Error()
 	rerr, ok = rueidis.IsRedisErr(err)
 	require.Error(t, err)
 	require.True(t, ok)
