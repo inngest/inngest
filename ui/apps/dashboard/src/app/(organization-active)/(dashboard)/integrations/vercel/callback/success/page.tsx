@@ -31,26 +31,23 @@ export default async function SuccessPage({ searchParams }: SuccessProps) {
       <>
         <Card className="w-full border-slate-200">
           <Card.Content className="rounded-0 p-0">
-            <div className="flex h-[72px] flex-row flex-row items-start justify-start border-b border-slate-200 p-4">
+            <div className="flex h-[72px] flex-row items-start justify-start border-b border-slate-200 p-4">
               <div className="mr-3 mt-1 flex h-4 w-4 items-center justify-center rounded-[50%] bg-green-600">
                 <RiCheckLine size={12} className="text-white" />
               </div>
               <div className="text-slate-700">
                 Each Vercel project will have{' '}
                 <span className="font-semibold">INNGEST_SIGNING_KEY</span> and{' '}
-                <span className="font-semibold">INNGEST_EVENT_KEY</span>
-                environment variables set.
+                <span className="font-semibold">INNGEST_EVENT_KEY</span> environment variables set.
               </div>
             </div>
-            <div className="flex h-[72px] flex-row flex-row items-start justify-start p-4">
+            <div className="flex h-[72px] flex-row  items-start justify-start p-4">
               <div className="mr-3 mt-1 flex h-4 w-4 items-center justify-center rounded-[50%] bg-green-600">
                 <RiCheckLine size={12} className="text-white" />
               </div>
               <div className="text-slate-700">
-                Each Vercel project will have{' '}
-                <span className="font-semibold">INNGEST_SIGNING_KEY</span> and{' '}
-                <span className="font-semibold">INNGEST_EVENT_KEY</span>
-                environment variables set.
+                The next time you deploy your project to Vercel your functions will automatically
+                appear in the Inngest dashboard.
               </div>
             </div>
           </Card.Content>
