@@ -274,11 +274,11 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 
 	status, err := retriableScripts["new"].Exec(
 		ctx,
-		fnRunState.Client(input.Identifier),
+		fnRunState.Client(ctx, input.Identifier.AccountID, input.Identifier.RunID),
 		[]string{
 			fnRunState.kg.Idempotency(ctx, input.Identifier),
 			fnRunState.kg.Events(ctx, input.Identifier),
-			fnRunState.kg.RunMetadata(ctx, input.Identifier),
+			fnRunState.kg.RunMetadata(ctx, input.Identifier.AccountID, input.Identifier.RunID),
 			fnRunState.kg.Actions(ctx, input.Identifier),
 		},
 		args,
@@ -337,11 +337,11 @@ func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, run
 	return nil
 }
 
-func (m shardedMgr) IsComplete(ctx context.Context, runID ulid.ULID) (bool, error) {
+func (m shardedMgr) IsComplete(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (bool, error) {
 	fnRunState := m.s.FunctionRunState()
-	r := fnRunState.Client(runID)
+	r := fnRunState.Client(ctx, accountId, runID)
 	val, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Hget().Key(fnRunState.kg.RunMetadata(ctx, runID)).Field("status").Build()
+		return client.B().Hget().Key(fnRunState.kg.RunMetadata(ctx, accountId, runID)).Field("status").Build()
 	}).AsBytes()
 	if err != nil {
 		return false, err
@@ -349,19 +349,19 @@ func (m shardedMgr) IsComplete(ctx context.Context, runID ulid.ULID) (bool, erro
 	return !bytes.Equal(val, []byte("0")), nil
 }
 
-func (m shardedMgr) Exists(ctx context.Context, runID ulid.ULID) (bool, error) {
+func (m shardedMgr) Exists(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (bool, error) {
 	fnRunState := m.s.FunctionRunState()
-	r := fnRunState.Client(runID)
+	r := fnRunState.Client(ctx, accountId, runID)
 	return r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Exists().Key(fnRunState.kg.RunMetadata(ctx, runID)).Build()
+		return client.B().Exists().Key(fnRunState.kg.RunMetadata(ctx, accountId, runID)).Build()
 	}).AsBool()
 }
 
-func (m shardedMgr) metadata(ctx context.Context, runID ulid.ULID) (*runMetadata, error) {
+func (m shardedMgr) metadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (*runMetadata, error) {
 	fnRunState := m.s.FunctionRunState()
-	r := fnRunState.Client(runID)
+	r := fnRunState.Client(ctx, accountId, runID)
 	val, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Hgetall().Key(fnRunState.kg.RunMetadata(ctx, runID)).Build()
+		return client.B().Hgetall().Key(fnRunState.kg.RunMetadata(ctx, accountId, runID)).Build()
 	}).AsStrMap()
 	if err != nil {
 		return nil, err
@@ -371,11 +371,11 @@ func (m shardedMgr) metadata(ctx context.Context, runID ulid.ULID) (*runMetadata
 
 func (m shardedMgr) Cancel(ctx context.Context, id state.Identifier) error {
 	fnRunState := m.s.FunctionRunState()
-	r := fnRunState.Client(id.RunID)
+	r := fnRunState.Client(ctx, id.AccountID, id.RunID)
 	status, err := retriableScripts["cancel"].Exec(
 		ctx,
 		r,
-		[]string{fnRunState.kg.RunMetadata(ctx, id.RunID)},
+		[]string{fnRunState.kg.RunMetadata(ctx, id.AccountID, id.RunID)},
 		[]string{},
 	).AsInt64()
 	if err != nil && !rueidis.IsRedisNil(err) {
@@ -396,7 +396,7 @@ func (m shardedMgr) Cancel(ctx context.Context, id state.Identifier) error {
 
 func (m shardedMgr) SetStatus(ctx context.Context, id state.Identifier, status enums.RunStatus) error {
 	fnRunState := m.s.FunctionRunState()
-	r := fnRunState.Client(id.RunID)
+	r := fnRunState.Client(ctx, id.AccountID, id.RunID)
 	args, err := StrSlice([]any{
 		int(status),
 	})
@@ -407,7 +407,7 @@ func (m shardedMgr) SetStatus(ctx context.Context, id state.Identifier, status e
 	_, err = retriableScripts["setStatus"].Exec(
 		ctx,
 		r,
-		[]string{fnRunState.kg.RunMetadata(ctx, id.RunID)},
+		[]string{fnRunState.kg.RunMetadata(ctx, id.AccountID, id.RunID)},
 		args,
 	).AsInt64()
 	if err != nil {
@@ -416,8 +416,8 @@ func (m shardedMgr) SetStatus(ctx context.Context, id state.Identifier, status e
 	return nil
 }
 
-func (m shardedMgr) Metadata(ctx context.Context, runID ulid.ULID) (*state.Metadata, error) {
-	metadata, err := m.metadata(ctx, runID)
+func (m shardedMgr) Metadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (*state.Metadata, error) {
+	metadata, err := m.metadata(ctx, accountId, runID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load metadata: %w", err)
 	}
@@ -425,7 +425,7 @@ func (m shardedMgr) Metadata(ctx context.Context, runID ulid.ULID) (*state.Metad
 	return &meta, nil
 }
 
-func (m shardedMgr) LoadEvents(ctx context.Context, fnID uuid.UUID, runID ulid.ULID) ([]json.RawMessage, error) {
+func (m shardedMgr) LoadEvents(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) ([]json.RawMessage, error) {
 	fnRunState := m.s.FunctionRunState()
 
 	var (
@@ -436,7 +436,7 @@ func (m shardedMgr) LoadEvents(ctx context.Context, fnID uuid.UUID, runID ulid.U
 		}
 	)
 
-	r := fnRunState.Client(runID)
+	r := fnRunState.Client(ctx, accountId, runID)
 
 	byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
 		return client.B().Get().Key(fnRunState.kg.Events(ctx, v1id)).Build()
@@ -461,7 +461,7 @@ func (m shardedMgr) LoadEvents(ctx context.Context, fnID uuid.UUID, runID ulid.U
 	return []json.RawMessage{byt}, nil
 }
 
-func (m shardedMgr) LoadSteps(ctx context.Context, fnID uuid.UUID, runID ulid.ULID) (map[string]json.RawMessage, error) {
+func (m shardedMgr) LoadSteps(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (map[string]json.RawMessage, error) {
 	fnRunState := m.s.FunctionRunState()
 
 	var (
@@ -472,7 +472,7 @@ func (m shardedMgr) LoadSteps(ctx context.Context, fnID uuid.UUID, runID ulid.UL
 		}
 	)
 
-	r := fnRunState.Client(runID)
+	r := fnRunState.Client(ctx, accountId, runID)
 
 	// Load the actions.  This is a map of step IDs to JSON-encoded results.
 	rmap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
@@ -487,18 +487,18 @@ func (m shardedMgr) LoadSteps(ctx context.Context, fnID uuid.UUID, runID ulid.UL
 	return steps, nil
 }
 
-func (m shardedMgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
+func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (state.State, error) {
 	fnRunState := m.s.FunctionRunState()
 
 	// XXX: Use a pipeliner to improve speed.
-	metadata, err := m.metadata(ctx, runID)
+	metadata, err := m.metadata(ctx, accountId, runID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load metadata; %w", err)
 	}
 
 	id := metadata.Identifier
 
-	r := fnRunState.Client(runID)
+	r := fnRunState.Client(ctx, accountId, runID)
 
 	// Load events.
 	events := []map[string]any{}
@@ -550,7 +550,7 @@ func (m shardedMgr) Load(ctx context.Context, runID ulid.ULID) (state.State, err
 
 	meta := metadata.Metadata()
 
-	stack, err := m.stack(ctx, id.RunID)
+	stack, err := m.stack(ctx, id.AccountID, id.RunID)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching stack: %w", err)
 	}
@@ -558,12 +558,12 @@ func (m shardedMgr) Load(ctx context.Context, runID ulid.ULID) (state.State, err
 	return state.NewStateInstance(id, meta, events, actions, stack), nil
 }
 
-func (m shardedMgr) stack(ctx context.Context, runID ulid.ULID) ([]string, error) {
+func (m shardedMgr) stack(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) ([]string, error) {
 	fnRunState := m.s.FunctionRunState()
 
-	r := fnRunState.Client(runID)
+	r := fnRunState.Client(ctx, accountId, runID)
 	stack, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Lrange().Key(fnRunState.kg.Stack(ctx, runID)).Start(0).Stop(-1).Build()
+		return client.B().Lrange().Key(fnRunState.kg.Stack(ctx, accountId, runID)).Start(0).Stop(-1).Build()
 	}).AsStrSlice()
 	if err != nil {
 		return nil, fmt.Errorf("error fetching stack: %w", err)
@@ -571,12 +571,12 @@ func (m shardedMgr) stack(ctx context.Context, runID ulid.ULID) ([]string, error
 	return stack, nil
 }
 
-func (m shardedMgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error) {
+func (m shardedMgr) StackIndex(ctx context.Context, accountId uuid.UUID, runID ulid.ULID, stepID string) (int, error) {
 	fnRunState := m.s.FunctionRunState()
 
-	r := fnRunState.Client(runID)
+	r := fnRunState.Client(ctx, accountId, runID)
 	stack, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Lrange().Key(fnRunState.kg.Stack(ctx, runID)).Start(0).Stop(-1).Build()
+		return client.B().Lrange().Key(fnRunState.kg.Stack(ctx, accountId, runID)).Start(0).Stop(-1).Build()
 	}).AsStrSlice()
 	if err != nil {
 		return 0, err
@@ -596,12 +596,12 @@ func (m shardedMgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID stri
 func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) error {
 	fnRunState := m.s.FunctionRunState()
 
-	r := fnRunState.Client(i.RunID)
+	r := fnRunState.Client(ctx, i.AccountID, i.RunID)
 
 	keys := []string{
 		fnRunState.kg.Actions(ctx, i),
-		fnRunState.kg.RunMetadata(ctx, i.RunID),
-		fnRunState.kg.Stack(ctx, i.RunID),
+		fnRunState.kg.RunMetadata(ctx, i.AccountID, i.RunID),
+		fnRunState.kg.Stack(ctx, i.AccountID, i.RunID),
 	}
 	args := []string{stepID, marshalledOuptut}
 
@@ -755,14 +755,14 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 
 	key := i.Key
 	if i.Key == "" {
-		if md, err := m.Metadata(ctx, i.RunID); err == nil {
+		if md, err := m.Metadata(ctx, i.AccountID, i.RunID); err == nil {
 			key = fnRunState.kg.Idempotency(ctx, md.Identifier)
 		}
 	} else {
 		key = fnRunState.kg.Idempotency(ctx, i)
 	}
 
-	r := fnRunState.Client(i.RunID)
+	r := fnRunState.Client(ctx, i.AccountID, i.RunID)
 
 	if err := r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
 		return client.B().Expire().Key(key).Seconds(int64(consts.FunctionIdempotencyPeriod.Seconds())).Build()
@@ -773,13 +773,13 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 	// Clear all other data for a job.
 	keys := []string{
 		fnRunState.kg.Actions(ctx, i),
-		fnRunState.kg.RunMetadata(ctx, i.RunID),
+		fnRunState.kg.RunMetadata(ctx, i.AccountID, i.RunID),
 		fnRunState.kg.Events(ctx, i),
-		fnRunState.kg.Stack(ctx, i.RunID),
+		fnRunState.kg.Stack(ctx, i.AccountID, i.RunID),
 
 		// XXX: remove these in a state store refactor.
 		fnRunState.kg.Event(ctx, i),
-		fnRunState.kg.History(ctx, i.RunID),
+		fnRunState.kg.History(ctx, i.AccountID, i.RunID),
 		fnRunState.kg.Errors(ctx, i),
 	}
 
@@ -791,7 +791,7 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 
 		// We should check a single key rather than all keys, to avoid races.
 		// We'll somewhat arbitrarily pick RunMetadata
-		if k == fnRunState.kg.RunMetadata(ctx, i.RunID) {
+		if k == fnRunState.kg.RunMetadata(ctx, i.AccountID, i.RunID) {
 			if count, _ := result.ToInt64(); count > 0 {
 				performedDeletion = true
 			}
@@ -915,8 +915,8 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 
 	keys := []string{
 		fnRunState.kg.Actions(ctx, p.Identifier),
-		fnRunState.kg.Stack(ctx, p.Identifier.RunID),
-		fnRunState.kg.RunMetadata(ctx, p.Identifier.RunID),
+		fnRunState.kg.Stack(ctx, p.Identifier.AccountID, p.Identifier.RunID),
+		fnRunState.kg.RunMetadata(ctx, p.Identifier.AccountID, p.Identifier.RunID),
 	}
 
 	args, err := StrSlice([]any{
@@ -927,7 +927,7 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 		return err
 	}
 
-	client := fnRunState.Client(p.Identifier.RunID)
+	client := fnRunState.Client(ctx, p.Identifier.AccountID, p.Identifier.RunID)
 
 	status, err := retriableScripts["consumePause"].Exec(
 		ctx,

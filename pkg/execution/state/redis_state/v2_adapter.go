@@ -77,17 +77,17 @@ func (v v2) Delete(ctx context.Context, id state.ID) (bool, error) {
 }
 
 func (v v2) Exists(ctx context.Context, id state.ID) (bool, error) {
-	return v.mgr.Exists(ctx, id.RunID)
+	return v.mgr.Exists(ctx, id.Tenant.AccountID, id.RunID)
 }
 
 // LoadEvents returns all events for a run.
 func (v v2) LoadEvents(ctx context.Context, id state.ID) ([]json.RawMessage, error) {
-	return v.mgr.LoadEvents(ctx, id.FunctionID, id.RunID)
+	return v.mgr.LoadEvents(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
 }
 
 // LoadEvents returns all events for a run.
 func (v v2) LoadSteps(ctx context.Context, id state.ID) (map[string]json.RawMessage, error) {
-	return v.mgr.LoadSteps(ctx, id.FunctionID, id.RunID)
+	return v.mgr.LoadSteps(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
 }
 
 // LoadState returns all state for a run.
@@ -122,12 +122,12 @@ func (v v2) StreamState(ctx context.Context, id state.ID) (io.Reader, error) {
 
 // Metadata returns metadata for a given run
 func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, error) {
-	md, err := v.mgr.metadata(ctx, id.RunID)
+	md, err := v.mgr.metadata(ctx, id.Tenant.AccountID, id.RunID)
 	if err != nil {
 		return state.Metadata{}, err
 	}
 
-	stack, err := v.mgr.stack(ctx, id.RunID)
+	stack, err := v.mgr.stack(ctx, id.Tenant.AccountID, id.RunID)
 	if err != nil {
 		return state.Metadata{}, err
 	}
@@ -174,7 +174,7 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 // Update updates configuration on the state, eg. setting the execution
 // version after communicating with the SDK.
 func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.MutableConfig) error {
-	return v.mgr.UpdateMetadata(ctx, id, statev1.MetadataUpdate{
+	return v.mgr.UpdateMetadata(ctx, id.Tenant.AccountID, id.RunID, statev1.MetadataUpdate{
 		DisableImmediateExecution: mutation.ForceStepPlan,
 		RequestVersion:            mutation.RequestVersion,
 		StartedAt:                 mutation.StartedAt,
