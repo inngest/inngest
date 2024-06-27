@@ -1125,7 +1125,10 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 				unwrapped = errors.Unwrap(unwrapped)
 			}
 
-			qi.Data.Attempt += 1
+			if !osqueue.IsAlwaysRetryable(err) {
+				qi.Data.Attempt += 1
+			}
+
 			qi.AtMS = at.UnixMilli()
 			if err := q.Requeue(context.WithoutCancel(ctx), p, qi, at); err != nil {
 				q.logger.Error().Err(err).Interface("item", qi).Msg("error requeuing job")

@@ -82,14 +82,15 @@ func FunctionLoader() state.FunctionLoader {
 
 type loader struct{}
 
-func (loader) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*inngest.Function, error) {
+func (loader) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*inngest.Function, *state.FnMetadata, error) {
+	fm := &state.FnMetadata{Paused: false}
 	if fnID == w.ID {
-		return &w, nil
+		return &w, fm, nil
 	}
 	if fnID == n100.ID {
-		return &n100, nil
+		return &n100, fm, nil
 	}
-	return nil, fmt.Errorf("workflow not found: %s", fnID)
+	return nil, fm, fmt.Errorf("workflow not found: %s", fnID)
 }
 
 func init() {

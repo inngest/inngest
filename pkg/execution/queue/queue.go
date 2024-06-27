@@ -126,6 +126,7 @@ type nonRetryable struct {
 func (nonRetryable) Retryable() bool { return false }
 
 // AlwaysRetryError always retries, ignoring max retry counts
+// This will not increase the job's attempt count
 func AlwaysRetryError(err error) error {
 	return alwaysRetry{error: err}
 }
@@ -135,6 +136,10 @@ type alwaysRetry struct {
 }
 
 func (a alwaysRetry) AlwaysRetryable() {}
+
+func IsAlwaysRetryable(err error) bool {
+	return errors.Is(err, alwaysRetry{})
+}
 
 type JobResponse struct {
 	// At represents the time the job is scheduled for.
