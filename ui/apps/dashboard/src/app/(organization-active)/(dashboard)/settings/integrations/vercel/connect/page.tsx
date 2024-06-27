@@ -56,7 +56,7 @@ export default function VercelConnect() {
       <div>
         <NewButton
           appearance="solid"
-          href="https://vercel.com/integrations/inngest"
+          href="https://vercel.com/integrations/inngest/new"
           label="Connect Vercel to Inngest"
         />
       </div>
