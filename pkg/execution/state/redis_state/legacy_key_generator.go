@@ -9,7 +9,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-type LegacyKeyGenerator interface {
+type legacyKeyGenerator interface {
 	// Workflow returns the key for the current workflow ID and version.
 	Workflow(ctx context.Context, workflowID uuid.UUID, version int) string
 
@@ -75,83 +75,83 @@ type LegacyKeyGenerator interface {
 	Stack(ctx context.Context, runID ulid.ULID) string
 }
 
-type LegacyDefaultKeyFunc struct {
+type legacyDefaultKeyFunc struct {
 	Prefix string
 }
 
-func (d LegacyDefaultKeyFunc) Idempotency(ctx context.Context, id state.Identifier) string {
+func (d legacyDefaultKeyFunc) Idempotency(ctx context.Context, id state.Identifier) string {
 	return fmt.Sprintf("%s:key:%s", d.Prefix, id.IdempotencyKey())
 }
 
-func (d LegacyDefaultKeyFunc) RunMetadata(ctx context.Context, runID ulid.ULID) string {
+func (d legacyDefaultKeyFunc) RunMetadata(ctx context.Context, runID ulid.ULID) string {
 	return fmt.Sprintf("%s:metadata:%s", d.Prefix, runID)
 }
 
-func (d LegacyDefaultKeyFunc) Workflow(ctx context.Context, id uuid.UUID, version int) string {
+func (d legacyDefaultKeyFunc) Workflow(ctx context.Context, id uuid.UUID, version int) string {
 	return fmt.Sprintf("%s:workflows:%s-%d", d.Prefix, id, version)
 }
 
-func (d LegacyDefaultKeyFunc) Event(ctx context.Context, id state.Identifier) string {
+func (d legacyDefaultKeyFunc) Event(ctx context.Context, id state.Identifier) string {
 	return fmt.Sprintf("%s:events:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
 }
 
-func (d LegacyDefaultKeyFunc) Events(ctx context.Context, id state.Identifier) string {
+func (d legacyDefaultKeyFunc) Events(ctx context.Context, id state.Identifier) string {
 	return fmt.Sprintf("%s:bulk-events:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
 }
 
-func (d LegacyDefaultKeyFunc) Actions(ctx context.Context, id state.Identifier) string {
+func (d legacyDefaultKeyFunc) Actions(ctx context.Context, id state.Identifier) string {
 	return fmt.Sprintf("%s:actions:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
 }
 
-func (d LegacyDefaultKeyFunc) Errors(ctx context.Context, id state.Identifier) string {
+func (d legacyDefaultKeyFunc) Errors(ctx context.Context, id state.Identifier) string {
 	return fmt.Sprintf("%s:errors:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
 }
 
-func (d LegacyDefaultKeyFunc) PauseID(ctx context.Context, id uuid.UUID) string {
+func (d legacyDefaultKeyFunc) PauseID(ctx context.Context, id uuid.UUID) string {
 	return fmt.Sprintf("%s:pauses:%s", d.Prefix, id.String())
 }
 
-func (d LegacyDefaultKeyFunc) PauseLease(ctx context.Context, id uuid.UUID) string {
+func (d legacyDefaultKeyFunc) PauseLease(ctx context.Context, id uuid.UUID) string {
 	return fmt.Sprintf("%s:pause-lease:%s", d.Prefix, id.String())
 }
 
-func (d LegacyDefaultKeyFunc) PauseEvent(ctx context.Context, workspaceID uuid.UUID, event string) string {
+func (d legacyDefaultKeyFunc) PauseEvent(ctx context.Context, workspaceID uuid.UUID, event string) string {
 	return fmt.Sprintf("%s:pause-events:%s:%s", d.Prefix, workspaceID, event)
 }
 
-func (d LegacyDefaultKeyFunc) PauseStepPrefix(ctx context.Context, id state.Identifier) string {
+func (d legacyDefaultKeyFunc) PauseStepPrefix(ctx context.Context, id state.Identifier) string {
 	return fmt.Sprintf("%s:pause-steps:%s", d.Prefix, id.RunID)
 }
 
-func (d LegacyDefaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step string) string {
+func (d legacyDefaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step string) string {
 	prefix := d.PauseStepPrefix(ctx, id)
 	return fmt.Sprintf("%s-%s", prefix, step)
 }
 
-func (d LegacyDefaultKeyFunc) PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string {
+func (d legacyDefaultKeyFunc) PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string {
 	if event == "" {
 		return fmt.Sprintf("%s:pause-idx:%s:%s:-", d.Prefix, kind, wsID)
 	}
 	return fmt.Sprintf("%s:pause-idx:%s:%s:%s", d.Prefix, kind, wsID, event)
 }
 
-func (d LegacyDefaultKeyFunc) RunPauses(ctx context.Context, runID ulid.ULID) string {
+func (d legacyDefaultKeyFunc) RunPauses(ctx context.Context, runID ulid.ULID) string {
 	return fmt.Sprintf("%s:pr:%s", d.Prefix, runID)
 }
 
-func (d LegacyDefaultKeyFunc) Invoke(ctx context.Context, wsID uuid.UUID) string {
+func (d legacyDefaultKeyFunc) Invoke(ctx context.Context, wsID uuid.UUID) string {
 	return fmt.Sprintf("%s:invoke:%s", d.Prefix, wsID)
 }
 
-func (d LegacyDefaultKeyFunc) History(ctx context.Context, runID ulid.ULID) string {
+func (d legacyDefaultKeyFunc) History(ctx context.Context, runID ulid.ULID) string {
 	return fmt.Sprintf("%s:history:%s", d.Prefix, runID)
 }
 
-func (d LegacyDefaultKeyFunc) Stack(ctx context.Context, runID ulid.ULID) string {
+func (d legacyDefaultKeyFunc) Stack(ctx context.Context, runID ulid.ULID) string {
 	return fmt.Sprintf("%s:stack:%s", d.Prefix, runID)
 }
 
-type LegacyQueueKeyGenerator interface {
+type legacyQueueKeyGenerator interface {
 	// QueueItem returns the key for the hash containing all items within a
 	// queue for a function.
 	QueueItem() string
@@ -217,7 +217,7 @@ type LegacyQueueKeyGenerator interface {
 	BatchMetadata(context.Context, ulid.ULID) string
 }
 
-type LegacyDebounceKeyGenerator interface {
+type legacyDebounceKeyGenerator interface {
 	// QueueItem returns the key for the hash containing all items within a
 	// queue for a function.  This is used to check leases on debounce jobs.
 	QueueItem() string
@@ -228,7 +228,7 @@ type LegacyDebounceKeyGenerator interface {
 	Debounce(ctx context.Context) string
 }
 
-type LegacyBatchKeyGenerator interface {
+type legacyBatchKeyGenerator interface {
 	// QueuePrefix returns the hash prefix used in the queue.
 	// This is likely going to be a redis specific requirement.
 	QueuePrefix() string
@@ -249,23 +249,23 @@ type LegacyBatchKeyGenerator interface {
 	BatchMetadata(context.Context, ulid.ULID) string
 }
 
-type LegacyDefaultQueueKeyGenerator struct {
+type legacyDefaultQueueKeyGenerator struct {
 	Prefix string
 }
 
-func (d LegacyDefaultQueueKeyGenerator) Shards() string {
+func (d legacyDefaultQueueKeyGenerator) Shards() string {
 	return fmt.Sprintf("%s:queue:shards", d.Prefix)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) QueueItem() string {
+func (d legacyDefaultQueueKeyGenerator) QueueItem() string {
 	return fmt.Sprintf("%s:queue:item", d.Prefix)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) QueueIndex(id string) string {
+func (d legacyDefaultQueueKeyGenerator) QueueIndex(id string) string {
 	return fmt.Sprintf("%s:queue:sorted:%s", d.Prefix, id)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) PartitionItem() string {
+func (d legacyDefaultQueueKeyGenerator) PartitionItem() string {
 	return fmt.Sprintf("%s:partition:item", d.Prefix)
 }
 
@@ -273,7 +273,7 @@ func (d LegacyDefaultQueueKeyGenerator) PartitionItem() string {
 // time for each function/queue in the partition.
 //
 // This is grouped so that we can make N partitions independently.
-func (d LegacyDefaultQueueKeyGenerator) GlobalPartitionIndex() string {
+func (d legacyDefaultQueueKeyGenerator) GlobalPartitionIndex() string {
 	return fmt.Sprintf("%s:partition:sorted", d.Prefix)
 }
 
@@ -281,37 +281,37 @@ func (d LegacyDefaultQueueKeyGenerator) GlobalPartitionIndex() string {
 // time for each function/queue in the partition.
 //
 // This is grouped so that we can make N partitions independently.
-func (d LegacyDefaultQueueKeyGenerator) ShardPartitionIndex(shard string) string {
+func (d legacyDefaultQueueKeyGenerator) ShardPartitionIndex(shard string) string {
 	if shard == "" {
 		return fmt.Sprintf("%s:shard:-", d.Prefix)
 	}
 	return fmt.Sprintf("%s:shard:%s", d.Prefix, shard)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) ThrottleKey(t *osqueue.Throttle) string {
+func (d legacyDefaultQueueKeyGenerator) ThrottleKey(t *osqueue.Throttle) string {
 	if t == nil || t.Key == "" {
 		return fmt.Sprintf("%s:throttle:-", d.Prefix)
 	}
 	return fmt.Sprintf("%s:throttle:%s", d.Prefix, t.Key)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) PartitionMeta(id string) string {
+func (d legacyDefaultQueueKeyGenerator) PartitionMeta(id string) string {
 	return fmt.Sprintf("%s:partition:meta:%s", d.Prefix, id)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) Sequential() string {
+func (d legacyDefaultQueueKeyGenerator) Sequential() string {
 	return fmt.Sprintf("%s:queue:sequential", d.Prefix)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) Scavenger() string {
+func (d legacyDefaultQueueKeyGenerator) Scavenger() string {
 	return fmt.Sprintf("%s:queue:scavenger", d.Prefix)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) Idempotency(key string) string {
+func (d legacyDefaultQueueKeyGenerator) Idempotency(key string) string {
 	return fmt.Sprintf("%s:queue:seen:%s", d.Prefix, key)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) Concurrency(prefix, key string) string {
+func (d legacyDefaultQueueKeyGenerator) Concurrency(prefix, key string) string {
 	if key == "" {
 		// None supplied; this means ignore.
 		return fmt.Sprintf("%s:-", d.Prefix)
@@ -319,50 +319,50 @@ func (d LegacyDefaultQueueKeyGenerator) Concurrency(prefix, key string) string {
 	return fmt.Sprintf("%s:concurrency:%s:%s", d.Prefix, prefix, key)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) ConcurrencyIndex() string {
+func (d legacyDefaultQueueKeyGenerator) ConcurrencyIndex() string {
 	return fmt.Sprintf("%s:concurrency:sorted", d.Prefix)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) QueuePrefix() string {
+func (d legacyDefaultQueueKeyGenerator) QueuePrefix() string {
 	return d.Prefix
 }
 
-func (d LegacyDefaultQueueKeyGenerator) BatchPointer(ctx context.Context, workflowID uuid.UUID) string {
+func (d legacyDefaultQueueKeyGenerator) BatchPointer(ctx context.Context, workflowID uuid.UUID) string {
 	return fmt.Sprintf("%s:workflows:%s:batch", d.Prefix, workflowID)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) BatchPointerWithKey(ctx context.Context, workflowID uuid.UUID, batchKey string) string {
+func (d legacyDefaultQueueKeyGenerator) BatchPointerWithKey(ctx context.Context, workflowID uuid.UUID, batchKey string) string {
 	return fmt.Sprintf("%s:%s", d.BatchPointer(ctx, workflowID), batchKey)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) Batch(ctx context.Context, batchID ulid.ULID) string {
+func (d legacyDefaultQueueKeyGenerator) Batch(ctx context.Context, batchID ulid.ULID) string {
 	return fmt.Sprintf("%s:batches:%s", d.Prefix, batchID)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) BatchMetadata(ctx context.Context, batchID ulid.ULID) string {
+func (d legacyDefaultQueueKeyGenerator) BatchMetadata(ctx context.Context, batchID ulid.ULID) string {
 	return fmt.Sprintf("%s:metadata", d.Batch(ctx, batchID))
 }
 
 // DebouncePointer returns the key which stores the pointer to the current debounce
 // for a given function.
-func (d LegacyDefaultQueueKeyGenerator) DebouncePointer(ctx context.Context, fnID uuid.UUID, key string) string {
+func (d legacyDefaultQueueKeyGenerator) DebouncePointer(ctx context.Context, fnID uuid.UUID, key string) string {
 	return fmt.Sprintf("%s:debounce-ptrs:%s:%s", d.Prefix, fnID, key)
 }
 
 // Debounce returns the key for storing debounce-related data given a debounce ID.
 // This is a hash of debounce IDs -> debounces.
-func (d LegacyDefaultQueueKeyGenerator) Debounce(ctx context.Context) string {
+func (d legacyDefaultQueueKeyGenerator) Debounce(ctx context.Context) string {
 	return fmt.Sprintf("%s:debounce-hash", d.Prefix)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) RunIndex(runID ulid.ULID) string {
+func (d legacyDefaultQueueKeyGenerator) RunIndex(runID ulid.ULID) string {
 	return fmt.Sprintf("%s:idx:run:%s", d.Prefix, runID)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) Status(status string, fnID uuid.UUID) string {
+func (d legacyDefaultQueueKeyGenerator) Status(status string, fnID uuid.UUID) string {
 	return fmt.Sprintf("%s:queue:status:%s:%s", d.Prefix, fnID, status)
 }
 
-func (d LegacyDefaultQueueKeyGenerator) ConcurrencyFnEWMA(fnID uuid.UUID) string {
+func (d legacyDefaultQueueKeyGenerator) ConcurrencyFnEWMA(fnID uuid.UUID) string {
 	return fmt.Sprintf("%s:queue:concurrency-ewma:%s", d.Prefix, fnID)
 }
