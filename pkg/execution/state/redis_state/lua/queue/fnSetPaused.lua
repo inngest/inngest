@@ -8,14 +8,16 @@
 
 ]]
 
-local fnMetaKey = KEYS[1]
+local keyFnMeta = KEYS[1]
 
 local isPaused     = tonumber(ARGV[1])
+local defaultMeta  = ARGV[2]
 
 -- $include(get_fn_meta.lua)
-local existing = get_fn_meta(fnMetaKey)
+local existing = get_fn_meta(keyFnMeta)
 if existing == nil then
-	return 1
+	redis.call("SET", keyFnMeta, defaultMeta)
+	return 0
 end
 
 if isPaused == 1 then
@@ -23,6 +25,6 @@ if isPaused == 1 then
 else
     existing.off = false
 end
-redis.call("SET", fnMetaKey, cjson.encode(existing))
+redis.call("SET", keyFnMeta, cjson.encode(existing))
 
 return 0

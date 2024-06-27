@@ -917,9 +917,16 @@ func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bo
 		pausedArg = "1"
 	}
 
+	// This is written to the store if fn metadata doesn't exist.
+	defaultFnMetadata := FnMetadata{
+		FnID:   fnID,
+		Paused: true,
+	}
+
 	keys := []string{q.kg.FnMetadata(fnID)}
 	args, err := StrSlice([]any{
 		pausedArg,
+		defaultFnMetadata,
 	})
 	if err != nil {
 		return err
@@ -937,8 +944,6 @@ func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bo
 	switch status {
 	case 0:
 		return nil
-	case 1:
-		return ErrPartitionNotFound
 	default:
 		return fmt.Errorf("unknown response updating paused state: %d", status)
 	}
