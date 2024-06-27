@@ -1621,11 +1621,17 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		}
 	}
 
+	fnMetaKey := uuid.Nil
+	if p.FunctionID != nil {
+		fnMetaKey = *p.FunctionID
+	}
+
 	keys := []string{
 		q.kg.PartitionItem(),
 		q.kg.GlobalPartitionIndex(),
 		q.kg.ShardPartitionIndex(shardName),
 		q.kg.Concurrency("p", concurrencyKey),
+		q.kg.FnMetadata(fnMetaKey),
 	}
 
 	args, err := StrSlice([]any{
@@ -1644,7 +1650,6 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		keys,
 		args,
 		// TODO: Partition concurrency defer amount
-
 	).AsInt64()
 	if err != nil {
 		return nil, fmt.Errorf("error leasing partition: %w", err)
