@@ -197,7 +197,7 @@ func (c *Client) WaitForRunStatus(
 			}
 		}
 
-		if time.Since(start) > 5*time.Second {
+		if time.Since(start) > 10*time.Second {
 			var msg string
 			if runID == nil || *runID == "" {
 				msg = "Run ID is empty"
