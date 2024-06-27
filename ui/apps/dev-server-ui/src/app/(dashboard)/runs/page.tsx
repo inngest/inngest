@@ -24,15 +24,7 @@ import { client } from '@/store/baseApi';
 import { GetRunsDocument, type GetRunsQuery } from '@/store/generated';
 import { pathCreator } from '@/utils/pathCreator';
 
-export default function Page({
-  params,
-}: {
-  params: {
-    slug: string;
-  };
-}) {
-  const functionSlug = decodeURIComponent(params.slug);
-
+export default function Page() {
   const [filteredStatus] = useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
   const [timeField = FunctionRunTimeField.QueuedAt] = useValidatedSearchParam(
     'timeField',
@@ -130,6 +122,9 @@ export default function Page({
   const onScrollToTop = useCallback(() => {
     // TODO: What should this do?
   }, []);
+
+  // Doesn't matter for the Dev Server
+  const functionSlug = '';
 
   return (
     <RunsPage

@@ -19,6 +19,8 @@ export default function mergeVercelProjectData({
       servePath: savedProject?.path ?? undefined,
       isEnabled: isProjectEnabled,
       ssoProtection: project.ssoProtection,
+      originOverride: savedProject?.originOverride ?? undefined,
+      protectionBypassSecret: savedProject?.protectionBypassSecret ?? undefined,
     };
   });
 
