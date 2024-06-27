@@ -12,7 +12,7 @@
   "main": "n/a",
   "scripts": {
     "dev": "pnpm install && concurrently --prefix-colors \"green.inverse,magenta.inverse,blue.inverse\" pnpm:dev:*",
-    "dev:next": "next dev",
+    "dev:next": "next dev --turbo",
     "dev:graphql-codegen": "graphql-codegen -w",
     "build": "if test \"$VERCEL_ENV\" = \"production\"; then pnpm graphql-codegen && next build; else next build; fi",
     "start": "next start",
@@ -111,7 +111,7 @@
     "vercel": "32.4.1"
   },
   "engines": {
-    "node": "18.x",
+    "node": "20.x",
     "pnpm": "8.15.8"
   },
   "packageManager": "pnpm@8.15.8",
