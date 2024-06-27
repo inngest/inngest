@@ -54,10 +54,10 @@ export default function RunsTable({
             // Need an ID to avoid "missing key" errors when rendering rows
             id: index,
           };
-        });
+        }) as unknown as Run[]; // Casting is bad but we need to do this for the loading skeleton
     }
 
-    return isLoading ? Array(8).fill(loadingRow) : data;
+    return data;
   }, [isLoading, data]);
 
   const tableColumns = useMemo(
