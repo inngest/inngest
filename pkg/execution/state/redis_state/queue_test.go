@@ -6,14 +6,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
@@ -357,6 +361,51 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		fnMeta = getFnMetadata(t, r, item.FunctionID)
 		require.True(t, fnMeta.Paused)
+	})
+
+	createConcurrencyKey := func(cfg inngest.Concurrency, id uuid.UUID) state.CustomConcurrency {
+		k := cfg.Evaluate(context.Background(), id, make(map[string]any))
+		return state.CustomConcurrency{
+			Key:   k,
+			Hash:  strconv.FormatUint(xxhash.Sum64String(k), 36),
+			Limit: cfg.Limit,
+		}
+	}
+
+	t.Run("enqueueing to a function with concurrency keys should create partitions for concurrency keys", func(t *testing.T) {
+		now := time.Now()
+		workflowId := uuid.New()
+
+		concurrencyConfigKey := "data.a"
+		c := inngest.Concurrency{
+			Limit: 10,
+			Key:   &concurrencyConfigKey,
+			Scope: enums.ConcurrencyScopeFn,
+		}
+		ck := createConcurrencyKey(c, workflowId)
+
+		_, err := q.EnqueueItem(ctx, QueueItem{
+			FunctionID: workflowId,
+			Data: osqueue.Item{
+				CustomConcurrencyKeys: []state.CustomConcurrency{
+					ck,
+				},
+			},
+		}, now.Add(10*time.Second))
+		require.NoError(t, err)
+
+		fnDefaultPartition := getPartition(t, r, workflowId) // nb. also asserts that the partition exists
+		require.Equal(t, QueuePartition{
+			FunctionID:    &workflowId,
+			PartitionType: int(enums.PartitionTypeDefault),
+		}, fnDefaultPartition)
+
+		concurrencyPartition := getPartition(t, r, uuid.New()) // TODO(cdzombak): generate & pass the correct key here
+		require.Equal(t, QueuePartition{
+			FunctionID:       &workflowId,
+			PartitionType:    int(enums.PartitionTypeConcurrency),
+			ConcurrencyScope: int(enums.ConcurrencyScopeFn),
+		}, concurrencyPartition)
 	})
 }
 
