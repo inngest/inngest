@@ -159,7 +159,7 @@ export function RunsPage({
         getRowCanExpand={() => true}
       />
       {isLoadingMore && <LoadingMore />}
-      {!hasMore && (
+      {!hasMore && !isLoadingMore && (
         <div className="flex flex-col items-center py-8">
           <p className="text-subtle">No additional runs found.</p>
           <Button

@@ -193,7 +193,7 @@ func TestInvokeGroup(t *testing.T) {
 			assert.Equal(t, 0, span.Attempts)
 			assert.Equal(t, rootSpanID, span.ParentSpanID)
 			assert.False(t, span.IsRoot)
-			assert.Equal(t, 1, len(span.ChildSpans))
+			assert.Equal(t, 2, len(span.ChildSpans)) // include queued retry span
 			assert.Equal(t, models.RunTraceSpanStatusRunning.String(), span.Status)
 			assert.Equal(t, "", span.StepOp)
 			assert.Nil(t, span.OutputID)

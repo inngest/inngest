@@ -44,17 +44,21 @@ export function Span({ className, isInline, maxTime, minTime, trace }: Props) {
       <div className="bg-contrast h-px" style={{ flexGrow: widths.before }}></div>
 
       {/* Queued part of the span */}
-      <div className="bg-surfaceSubtle h-2" style={{ flexGrow: widths.queued }}></div>
+      {widths.queued > 0 && (
+        <div className="bg-surfaceSubtle h-2" style={{ flexGrow: widths.queued }}></div>
+      )}
 
       {/* Running part of the span */}
-      <div
-        className={cn(
-          'h-5 rounded transition-shadow hover:shadow-lg',
-          getStatusBackgroundClass(trace.status),
-          getStatusBorderClass(trace.status)
-        )}
-        style={{ flexGrow: widths.running }}
-      ></div>
+      {widths.running > 0 && (
+        <div
+          className={cn(
+            'h-5 rounded transition-shadow hover:shadow-lg',
+            getStatusBackgroundClass(trace.status),
+            getStatusBorderClass(trace.status)
+          )}
+          style={{ flexGrow: widths.running }}
+        ></div>
+      )}
 
       {/* Gray line to the right of the span */}
       <div className="bg-contrast h-px" style={{ flexGrow: widths.after }}></div>
