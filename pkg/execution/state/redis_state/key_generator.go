@@ -171,12 +171,17 @@ type QueueKeyGenerator interface {
 
 	// PartitionItem returns the key for the hash containing all partition items.
 	// This key points to a map of key → (QueuePartition{} structs stored as JSON)
+	// For default partitions, the keys are the function IDs (UUIDv4 represented as strings).
+	// For other partitions, the keys are exactly as returned by PartitionQueueSet(...).
 	PartitionItem() string
 
 	// GlobalPartitionIndex returns the sorted set for the partition queue;  the
 	// earliest time that each function is available.  This is a global queue of
 	// all functions across every partition, used for minimum latency.
 	// Returns: string key, pointing to ZSET.
+	// Members of this set are:
+	// - for default partitions, the function ID (UUIDv4 represented as strings).
+	// - for other partitions, exactly as returned by PartitionQueueSet(...).
 	GlobalPartitionIndex() string
 
 	// PartitionQueueSet returns the key containing the sorted ZSET for a function's custom concurrency,
