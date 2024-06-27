@@ -766,7 +766,6 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem, priority uint) 
 		QueuePartition{
 			QueueName:  i.QueueName,
 			FunctionID: &i.FunctionID,
-			EnvID:      &i.WorkspaceID,
 			Priority:   priority,
 		},
 	}
@@ -917,16 +916,16 @@ func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bo
 	if paused {
 		pausedArg = "1"
 	}
+
+	keys := []string{q.kg.FnMetadata(fnID)}
 	args, err := StrSlice([]any{
-		fnID.String(),
 		pausedArg,
 	})
 	if err != nil {
 		return err
 	}
 
-	keys := []string{q.kg.PartitionItem()}
-	status, err := scripts["queue/partitionSetPaused"].Exec(
+	status, err := scripts["queue/fnSetPaused"].Exec(
 		ctx,
 		q.r,
 		keys,
