@@ -652,10 +652,11 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 			// scanning of jobs altogether.
 			if p.FunctionID != nil {
 				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
-			} else {
-				// TODO(cdzombak): lifecycles/metrics for other concurrency scopes
-				// https://linear.app/inngest/issue/INN-3246/lifecycles-add-new-lifecycles-for-fn-env-account-concurrency-limits
 			}
+			// else {
+			// TODO(cdzombak): lifecycles/metrics for other concurrency scopes
+			// https://linear.app/inngest/issue/INN-3246/lifecycles-add-new-lifecycles-for-fn-env-account-concurrency-limits
+			// }
 		}
 		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 		return q.PartitionRequeue(ctx, p, getNow().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
@@ -917,10 +918,11 @@ ProcessLoop:
 		for _, l := range q.lifecycles {
 			if p.FunctionID != nil {
 				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
-			} else {
-				// TODO(cdzombak): lifecycles/metrics for other concurrency scopes
-				// https://linear.app/inngest/issue/INN-3246/lifecycles-add-new-lifecycles-for-fn-env-account-concurrency-limits
 			}
+			//else {
+			// TODO(cdzombak): lifecycles/metrics for other concurrency scopes
+			// https://linear.app/inngest/issue/INN-3246/lifecycles-add-new-lifecycles-for-fn-env-account-concurrency-limits
+			//}
 		}
 		// Requeue this partition as we hit concurrency limits.
 		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})

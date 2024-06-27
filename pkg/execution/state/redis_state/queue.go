@@ -763,7 +763,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem, priority uint) 
 	// Right now queue items *always* add into a partition for the overall function ID.
 	// In the future this will change.
 	partitions := []QueuePartition{
-		QueuePartition{
+		{
 			QueueName:  i.QueueName,
 			FunctionID: &i.FunctionID,
 			Priority:   priority,
@@ -801,7 +801,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem, priority uint) 
 				partition.AccountID = &id
 			}
 
-			partitions = append(partitions)
+			partitions = append(partitions, partition)
 		}
 	}
 
@@ -1797,7 +1797,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	for n, item := range partitions {
 		// check pause
 		if item.FunctionID != nil {
-			if paused, _ := fnIDs[*item.FunctionID]; paused {
+			if paused := fnIDs[*item.FunctionID]; paused {
 				ignored++
 				continue
 			}
@@ -2309,6 +2309,7 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) err
 	return nil
 }
 
+//nolint:all
 func (q *queue) readFnMetadata(ctx context.Context, fnID uuid.UUID) (*FnMetadata, error) {
 	cmd := q.r.B().Get().Key(q.kg.FnMetadata(fnID)).Build()
 	retv := FnMetadata{}
