@@ -1,5 +1,5 @@
+import { Alert } from '@inngest/components/Alert/Alert';
 import { NewButton } from '@inngest/components/Button';
-import { InfoCallout } from '@inngest/components/Callout';
 import { Link } from '@inngest/components/Link';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 
@@ -20,7 +20,9 @@ export default function VercelConnect() {
         </Link>
       </div>
       <div className="mb-7">
-        <InfoCallout text="Please note that each Vercel account can only be linked to one Inngest account at a time." />
+        <Alert severity="info">
+          Please note that each Vercel account can only be linked to one Inngest account at a time.
+        </Alert>
       </div>
       <div className="text-basis mb-7 text-lg font-normal">Installation overview</div>
       <div className="text-basis text-lg font-normal">
