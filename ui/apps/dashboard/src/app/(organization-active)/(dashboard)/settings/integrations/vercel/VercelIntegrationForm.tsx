@@ -19,7 +19,7 @@ import VercelWordmark from '@/logos/vercel-wordmark.svg';
 import cn from '@/utils/cn';
 import useUpdateVercelIntegration from './useUpdateVercelIntegration';
 
-type VercelIntegrationFormProps = {
+export type VercelIntegrationFormProps = {
   vercelIntegration: VercelIntegration;
 };
 

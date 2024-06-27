@@ -8,6 +8,8 @@ export const GetSavedVercelProjectsDocument = graphql(`
         projectID
         path
         workspaceID
+        originOverride
+        protectionBypassSecret
       }
     }
   }

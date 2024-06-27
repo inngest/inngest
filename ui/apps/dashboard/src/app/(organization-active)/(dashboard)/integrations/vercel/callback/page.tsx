@@ -1,8 +1,13 @@
-import InngestLogo from '@/icons/InngestLogo';
-import VercelIntegrationForm from './VercelIntegrationForm';
-import createVercelIntegration from './createVercelIntegration';
+import type { Route } from 'next';
+import { Link } from '@inngest/components/Link/Link';
+import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 
-type VercelIntegrationCallbackPageProps = {
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import VercelConnect from './connect';
+import createVercelIntegration from './createVercelIntegration';
+import VercelIntegrationCallbackPage from './oldPage';
+
+export type VercelCallbackProps = {
   searchParams: {
     // OAuth 2.0 authorization code issued by Vercel’s authorization server. This code is valid for
     // 30 minutes and can be only exchanged once for a long-lived access token.
@@ -19,9 +24,8 @@ type VercelIntegrationCallbackPageProps = {
   };
 };
 
-export default async function VercelIntegrationCallbackPage({
-  searchParams,
-}: VercelIntegrationCallbackPageProps) {
+export default async function VercelCallbackPage({ searchParams }: VercelCallbackProps) {
+  const newIntegrations = await getBooleanFlag('new-integrations');
   if (!searchParams.code) {
     throw new Error('Missing Vercel authorization code');
   }
@@ -29,27 +33,25 @@ export default async function VercelIntegrationCallbackPage({
     vercelAuthorizationCode: searchParams.code,
   });
 
-  return (
-    <div className="mx-auto flex h-full max-w-3xl flex-col justify-center gap-8 px-6">
-      <header className="space-y-1">
-        <InngestLogo />
-        <p className="text-sm">
-          Let’s connect your Vercel account to Inngest! Select which Vercel projects to enable.
-        </p>
-      </header>
-      <main className="space-y-6">
-        <header className="space-y-2">
-          <h2 className="font-medium text-slate-700">Projects</h2>
-          <p className="max-w-lg text-sm">
-            Toggle each project that you have Inngest functions. You can optionally specify a custom
-            serve route (see docs) other than the default.
-          </p>
-        </header>
-        <VercelIntegrationForm
-          vercelIntegration={vercelIntegration}
-          onSuccessRedirectURL={searchParams.next}
-        />
-      </main>
+  return !newIntegrations ? (
+    <VercelIntegrationCallbackPage
+      searchParams={searchParams}
+      vercelIntegration={vercelIntegration}
+    />
+  ) : (
+    <div className="mx-auto mt-8 flex w-[800px] flex-col p-8">
+      <div className="mb-7 flex h-12 w-12 items-center justify-center rounded bg-black">
+        <IconVercel className="text-alwaysWhite h-6 w-6" />
+      </div>
+      <div className="text-basis mb-2 text-2xl leading-loose">Connect Vercel to Inngest</div>
+      <div className="text-subtle mb-7 text-base">
+        Select the Vercel projects that have Inngest functions. You can optionally specify server
+        route other than the default <span className="font-semibold">(`/api/inngest`)</span>.{' '}
+        <Link showIcon={false} href={'/create-organization/set-up' as Route}>
+          Learn more
+        </Link>
+      </div>
+      <VercelConnect searchParams={searchParams} integrations={vercelIntegration} />
     </div>
   );
 }
