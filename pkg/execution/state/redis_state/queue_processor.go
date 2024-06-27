@@ -1214,7 +1214,7 @@ func (q *queue) peekSize(ctx context.Context, p *QueuePartition) int64 {
 	}
 
 	dur := time.Hour * 24
-	qsize, _ := q.partitionSize(ctx, q.kg.QueueIndex(p.Queue()), time.Now().Add(dur))
+	qsize, _ := q.partitionSize(ctx, q.u.kg.QueueIndex(p.Queue()), time.Now().Add(dur))
 	if qsize > size {
 		size = qsize
 	}
