@@ -104,7 +104,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	shardedClient := redis_state.NewShardedClient(unshardedClient, shardedRc, redis_state.StateDefaultKey)
+	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: shardedRc,
+		StateDefaultKey:        redis_state.StateDefaultKey,
+		FnRunIsSharded:         redis_state.NeverShard,
+	})
 
 	var sm state.Manager
 	t := runner.NewTracker()

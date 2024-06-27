@@ -3,20 +3,11 @@ package redis_state
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
 )
-
-// TODO Set this properly, don't start sharding any time soon before we are sure everything works
-var switchover = time.Date(2100, 07, 10, 0, 0, 0, 0, time.UTC)
-
-func IsSharded(runID ulid.ULID) bool {
-	return ulid.Time(runID.Time()).After(switchover)
-}
 
 type RunStateKeyGenerator interface {
 	// Idempotency stores the idempotency key for atomic lookup.
@@ -24,72 +15,73 @@ type RunStateKeyGenerator interface {
 
 	// RunMetadata stores state regarding the current run identifier, such
 	// as the workflow version, the time the run started, etc.
-	RunMetadata(ctx context.Context, runID ulid.ULID) string
+	RunMetadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) string
 
 	// Event returns the key used to store the specific event for the
 	// given workflow run.
-	Event(context.Context, state.Identifier) string
+	Event(ctx context.Context, identifier state.Identifier) string
 
 	// Events returns the key used to store the specific batch for the
 	// given workflow run.
-	Events(context.Context, state.Identifier) string
+	Events(ctx context.Context, identifier state.Identifier) string
 
 	// Actions returns the key used to store the action response map used
 	// for given workflow run - ie. the results for individual steps.
-	Actions(context.Context, state.Identifier) string
+	Actions(ctx context.Context, identifier state.Identifier) string
 
 	// Errors returns the key used to store the error hash map used
 	// for given workflow run.
-	Errors(context.Context, state.Identifier) string
+	Errors(ctx context.Context, identifier state.Identifier) string
 
 	// History returns the key used to store a log entry for run hisotry
-	History(ctx context.Context, runID ulid.ULID) string
+	History(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) string
 
 	// Stack returns the key used to store the stack for a given run
-	Stack(ctx context.Context, runID ulid.ULID) string
+	Stack(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) string
 }
 
 type runStateKeyGenerator struct {
 	stateDefaultKey string
+	isSharded       IsShardedFn
 }
 
-func (s runStateKeyGenerator) Prefix(defaultPrefix string, runID ulid.ULID) string {
-	if IsSharded(runID) {
-		return fmt.Sprintf("%s:%s", defaultPrefix, runID)
+func (s runStateKeyGenerator) Prefix(ctx context.Context, defaultPrefix string, accountId uuid.UUID, runId ulid.ULID) string {
+	if s.isSharded(ctx, accountId, runId) {
+		return fmt.Sprintf("%s:%s", defaultPrefix, runId)
 	}
 	return defaultPrefix
 }
 
-func (s runStateKeyGenerator) Idempotency(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("{%s}:key:%s", s.Prefix(s.stateDefaultKey, id.RunID), id.IdempotencyKey())
+func (s runStateKeyGenerator) Idempotency(ctx context.Context, identifier state.Identifier) string {
+	return fmt.Sprintf("{%s}:key:%s", s.Prefix(ctx, s.stateDefaultKey, identifier.AccountID, identifier.RunID), identifier.IdempotencyKey())
 }
 
-func (s runStateKeyGenerator) RunMetadata(ctx context.Context, runID ulid.ULID) string {
-	return fmt.Sprintf("{%s}:metadata:%s", s.Prefix(s.stateDefaultKey, runID), runID)
+func (s runStateKeyGenerator) RunMetadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:metadata:%s", s.Prefix(ctx, s.stateDefaultKey, accountId, runID), runID)
 }
 
 func (s runStateKeyGenerator) Event(ctx context.Context, identifier state.Identifier) string {
-	return fmt.Sprintf("{%s}:events:%s:%s", s.Prefix(s.stateDefaultKey, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+	return fmt.Sprintf("{%s}:events:%s:%s", s.Prefix(ctx, s.stateDefaultKey, identifier.AccountID, identifier.RunID), identifier.WorkflowID, identifier.RunID)
 }
 
 func (s runStateKeyGenerator) Events(ctx context.Context, identifier state.Identifier) string {
-	return fmt.Sprintf("{%s}:bulk-events:%s:%s", s.Prefix(s.stateDefaultKey, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+	return fmt.Sprintf("{%s}:bulk-events:%s:%s", s.Prefix(ctx, s.stateDefaultKey, identifier.AccountID, identifier.RunID), identifier.WorkflowID, identifier.RunID)
 }
 
 func (s runStateKeyGenerator) Actions(ctx context.Context, identifier state.Identifier) string {
-	return fmt.Sprintf("{%s}:actions:%s:%s", s.Prefix(s.stateDefaultKey, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+	return fmt.Sprintf("{%s}:actions:%s:%s", s.Prefix(ctx, s.stateDefaultKey, identifier.AccountID, identifier.RunID), identifier.WorkflowID, identifier.RunID)
 }
 
 func (s runStateKeyGenerator) Errors(ctx context.Context, identifier state.Identifier) string {
-	return fmt.Sprintf("{%s}:errors:%s:%s", s.Prefix(s.stateDefaultKey, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+	return fmt.Sprintf("{%s}:errors:%s:%s", s.Prefix(ctx, s.stateDefaultKey, identifier.AccountID, identifier.RunID), identifier.WorkflowID, identifier.RunID)
 }
 
-func (s runStateKeyGenerator) History(ctx context.Context, runID ulid.ULID) string {
-	return fmt.Sprintf("{%s}:history:%s", s.Prefix(s.stateDefaultKey, runID), runID)
+func (s runStateKeyGenerator) History(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:history:%s", s.Prefix(ctx, s.stateDefaultKey, accountId, runID), runID)
 }
 
-func (s runStateKeyGenerator) Stack(ctx context.Context, runID ulid.ULID) string {
-	return fmt.Sprintf("{%s}:stack:%s", s.Prefix(s.stateDefaultKey, runID), runID)
+func (s runStateKeyGenerator) Stack(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:stack:%s", s.Prefix(ctx, s.stateDefaultKey, accountId, runID), runID)
 }
 
 type GlobalKeyGenerator interface {

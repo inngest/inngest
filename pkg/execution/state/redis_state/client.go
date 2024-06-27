@@ -1,6 +1,8 @@
 package redis_state
 
 import (
+	"context"
+	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
@@ -12,14 +14,15 @@ type FunctionRunStateClient struct {
 	kg            RunStateKeyGenerator
 	client        RetriableClient
 	unshardedConn RetriableClient
+	isSharded     IsShardedFn
 }
 
 func (f *FunctionRunStateClient) KeyGenerator() RunStateKeyGenerator {
 	return f.kg
 }
 
-func (f *FunctionRunStateClient) Client(runID ulid.ULID) RetriableClient {
-	if IsSharded(runID) {
+func (f *FunctionRunStateClient) Client(ctx context.Context, accountId uuid.UUID, runId ulid.ULID) RetriableClient {
+	if f.isSharded(ctx, accountId, runId) {
 		return f.client
 	}
 	return f.unshardedConn
@@ -29,11 +32,12 @@ func (f *FunctionRunStateClient) ForceShardedClient() RetriableClient {
 	return f.client
 }
 
-func NewFunctionRunStateClient(r rueidis.Client, u *UnshardedClient, stateDefaultKey string) *FunctionRunStateClient {
+func NewFunctionRunStateClient(r rueidis.Client, u *UnshardedClient, stateDefaultKey string, isSharded IsShardedFn) *FunctionRunStateClient {
 	return &FunctionRunStateClient{
-		kg:            &runStateKeyGenerator{stateDefaultKey: stateDefaultKey},
+		kg:            &runStateKeyGenerator{stateDefaultKey: stateDefaultKey, isSharded: isSharded},
 		client:        newRetryClusterDownClient(r),
 		unshardedConn: newNoopRetriableClient(u.unshardedConn),
+		isSharded:     isSharded,
 	}
 }
 
@@ -41,9 +45,26 @@ type ShardedClient struct {
 	fnRunState *FunctionRunStateClient
 }
 
-func NewShardedClient(u *UnshardedClient, functionRunStateClient rueidis.Client, stateDefaultKey string) *ShardedClient {
+type IsShardedFn func(ctx context.Context, accountId uuid.UUID, runId ulid.ULID) bool
+
+func AlwaysShard(ctx context.Context, accountId uuid.UUID, runId ulid.ULID) bool {
+	return true
+}
+
+func NeverShard(ctx context.Context, accountId uuid.UUID, runId ulid.ULID) bool {
+	return false
+}
+
+type ShardedClientOpts struct {
+	UnshardedClient        *UnshardedClient
+	FunctionRunStateClient rueidis.Client
+	StateDefaultKey        string
+	FnRunIsSharded         IsShardedFn
+}
+
+func NewShardedClient(opts ShardedClientOpts) *ShardedClient {
 	return &ShardedClient{
-		fnRunState: NewFunctionRunStateClient(functionRunStateClient, u, stateDefaultKey),
+		fnRunState: NewFunctionRunStateClient(opts.FunctionRunStateClient, opts.UnshardedClient, opts.StateDefaultKey, opts.FnRunIsSharded),
 	}
 }
 

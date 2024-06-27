@@ -76,7 +76,12 @@ func TestStateHarness(t *testing.T) {
 	require.NoError(t, err)
 
 	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
-	shardedClient := NewShardedClient(unshardedClient, rc, StateDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		StateDefaultKey:        StateDefaultKey,
+		FnRunIsSharded:         NeverShard,
+	})
 
 	sm, err := New(
 		context.Background(),
@@ -181,7 +186,12 @@ func BenchmarkNew(b *testing.B) {
 
 	statePrefix := "state"
 	unshardedClient := NewUnshardedClient(rc, statePrefix, QueueDefaultKey)
-	shardedClient := NewShardedClient(unshardedClient, rc, statePrefix)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		StateDefaultKey:        statePrefix,
+		FnRunIsSharded:         NeverShard,
+	})
 
 	sm, err := New(
 		context.Background(),

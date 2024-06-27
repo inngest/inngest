@@ -140,7 +140,12 @@ func (c Config) SingleClusterManager(ctx context.Context) (state.Manager, error)
 	return New(
 		ctx,
 		WithUnshardedClient(u),
-		WithShardedClient(NewShardedClient(u, r, StateDefaultKey)),
+		WithShardedClient(NewShardedClient(ShardedClientOpts{
+			UnshardedClient:        u,
+			FunctionRunStateClient: r,
+			StateDefaultKey:        StateDefaultKey,
+			FnRunIsSharded:         NeverShard,
+		})),
 	)
 }
 
@@ -269,11 +274,11 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 
 	status, err := retriableScripts["new"].Exec(
 		ctx,
-		fnRunState.Client(input.Identifier.RunID),
+		fnRunState.Client(input.Identifier),
 		[]string{
 			fnRunState.kg.Idempotency(ctx, input.Identifier),
 			fnRunState.kg.Events(ctx, input.Identifier),
-			fnRunState.kg.RunMetadata(ctx, input.Identifier.RunID),
+			fnRunState.kg.RunMetadata(ctx, input.Identifier),
 			fnRunState.kg.Actions(ctx, input.Identifier),
 		},
 		args,
@@ -297,7 +302,7 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		nil
 }
 
-func (m shardedMgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.MetadataUpdate) error {
+func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, md state.MetadataUpdate) error {
 	input := []string{
 		"0", // Force planning / disable immediate execution
 		strconv.Itoa(consts.RequestVersionUnknown), // Request version
@@ -317,9 +322,9 @@ func (m shardedMgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md stat
 
 	status, err := retriableScripts["updateMetadata"].Exec(
 		ctx,
-		fnRunState.Client(runID),
+		fnRunState.Client(ctx, accountID, runID),
 		[]string{
-			fnRunState.kg.RunMetadata(ctx, runID),
+			fnRunState.kg.RunMetadata(ctx, accountID, runID),
 		},
 		input,
 	).AsInt64()

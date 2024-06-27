@@ -174,7 +174,7 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 // Update updates configuration on the state, eg. setting the execution
 // version after communicating with the SDK.
 func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.MutableConfig) error {
-	return v.mgr.UpdateMetadata(ctx, id.RunID, statev1.MetadataUpdate{
+	return v.mgr.UpdateMetadata(ctx, id, statev1.MetadataUpdate{
 		DisableImmediateExecution: mutation.ForceStepPlan,
 		RequestVersion:            mutation.RequestVersion,
 		StartedAt:                 mutation.StartedAt,
