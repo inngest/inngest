@@ -725,7 +725,7 @@ func TestQueueLease(t *testing.T) {
 			_, err = q.Lease(ctx, p, item, time.Minute, getNow(), nil)
 			require.NoError(t, err)
 
-			_, err = r.ZScore(defaultQueueKey.QueueIndex(item.FunctionID.String()), item.ID)
+			_, err = r.ZScore(defaultQueueKey.FnQueueSet(item.FunctionID.String()), item.ID)
 			require.Error(t, err, "no such key")
 		})
 	})
@@ -2584,7 +2584,7 @@ func getFnMetadata(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) FnMetadat
 
 func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item QueueItem, expected time.Time) {
 	t.Helper()
-	score, err := r.ZScore(defaultQueueKey.QueueIndex(item.FunctionID.String()), item.ID)
+	score, err := r.ZScore(defaultQueueKey.FnQueueSet(item.FunctionID.String()), item.ID)
 	parsed := time.UnixMilli(int64(score))
 	require.NoError(t, err)
 	require.WithinDuration(t, expected.Truncate(time.Millisecond), parsed, 15*time.Millisecond)

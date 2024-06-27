@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
@@ -163,32 +164,26 @@ type QueueKeyGenerator interface {
 	// QueueItem returns the key for the hash containing all items within a
 	// queue for a function.
 	QueueItem() string
-	// QueueIndex returns the key containing the sorted zset for a function
-	// queue.
-	QueueIndex(id string) string
 
 	//
 	// Partition keys
 	//
 
-	// Shards is a key to a hashmap of shards available.  The values of this
-	// key are JSON-encoded shards.
-	Shards() string
 	// PartitionItem returns the key for the hash containing all partition items.
+	// This key points to a map of key → (QueuePartition{} structs stored as JSON)
 	PartitionItem() string
-	// PartitionMeta returns the key to store metadata for partitions, eg.
-	// the number of items enqueued, number in progress, etc.
-	PartitionMeta(id string) string
+
 	// GlobalPartitionIndex returns the sorted set for the partition queue;  the
 	// earliest time that each function is available.  This is a global queue of
 	// all functions across every partition, used for minimum latency.
+	// Returns: string key, pointing to ZSET.
 	GlobalPartitionIndex() string
-	// ShardPartitionIndex returns the sorted set for the shard's partition queue.
-	ShardPartitionIndex(shard string) string
-	// ThrottleKey returns the throttle key for a given queue item.
-	ThrottleKey(t *osqueue.Throttle) string
 
-	FnMetadata(fnID uuid.UUID) string
+	// PartitionQueueSet returns the key containing the sorted ZSET for a function's custom concurrency,
+	// throttling, or (future) other custom key-based queues.
+	// Returns: string key, pointing to a ZSET. This is a partition; the partition data is stored in
+	// the partition item (see PartitionItem()).
+	PartitionQueueSet(pType enums.PartitionType, id string) string
 
 	//
 	// Queue metadata keys
@@ -210,9 +205,14 @@ type QueueKeyGenerator interface {
 	// have in-progress work.  This allows us to scan and scavenge jobs in concurrency queues where
 	// leases have expired (in the case of failed workers)
 	ConcurrencyIndex() string
+	// ThrottleKey returns the throttle key for a given queue item.
+	ThrottleKey(t *osqueue.Throttle) string
 	// RunIndex returns the index for storing job IDs associated with run IDs.
 	RunIndex(runID ulid.ULID) string
 
+	// FnMetadata returns the key for a function's metadata.
+	// This is a JSON object; see queue.FnMetadata.
+	FnMetadata(fnID uuid.UUID) string
 	// Status returns the key used for status queue for the provided function.
 	Status(status string, fnID uuid.UUID) string
 
@@ -220,10 +220,26 @@ type QueueKeyGenerator interface {
 	// calculating the EWMA value for the function
 	ConcurrencyFnEWMA(fnID uuid.UUID) string
 
-	// ***************** Deprecated ************************
-	BatchPointer(context.Context, uuid.UUID) string
-	Batch(context.Context, ulid.ULID) string
-	BatchMetadata(context.Context, ulid.ULID) string
+	// Shards is a key to a hashmap of shards available.  The values of this
+	// key are JSON-encoded shards.
+	Shards() string
+	// ShardPartitionIndex returns the sorted set for the shard's partition queue.
+	ShardPartitionIndex(shard string) string
+
+	//
+	// ***************** Deprecated *****************
+	//
+
+	// FnQueueSet returns the key containing the sorted zset for a function's default queue.
+	// Returns: string key, pointing to ZSET. This is a partition; the partition data is stored in
+	// the partition item (see PartitionItem()).
+	FnQueueSet(id string) string // deprecated
+	// PartitionMeta returns the key to store metadata for partitions, eg.
+	// the number of items enqueued, number in progress, etc.
+	PartitionMeta(id string) string                  // deprecated
+	BatchPointer(context.Context, uuid.UUID) string  // deprecated
+	Batch(context.Context, ulid.ULID) string         // deprecated
+	BatchMetadata(context.Context, ulid.ULID) string // deprecated
 }
 
 type DebounceKeyGenerator interface {
@@ -273,8 +289,19 @@ func (d DefaultQueueKeyGenerator) QueueItem() string {
 	return fmt.Sprintf("%s:queue:item", d.Prefix)
 }
 
-func (d DefaultQueueKeyGenerator) QueueIndex(id string) string {
-	return fmt.Sprintf("%s:queue:sorted:%s", d.Prefix, id)
+func (d DefaultQueueKeyGenerator) FnQueueSet(id string) string {
+	return d.PartitionQueueSet(enums.PartitionTypeDefault, id)
+}
+
+func (d DefaultQueueKeyGenerator) PartitionQueueSet(pType enums.PartitionType, id string) string {
+	switch pType {
+	case enums.PartitionTypeDefault:
+		return fmt.Sprintf("%s:queue:sorted:%s", d.Prefix, id)
+	case enums.PartitionTypeConcurrency:
+		return "TODO" // TODO(cdzombak):
+	case enums.PartitionTypeThrottle:
+		return "TODO" // TODO(cdzombak):
+	}
 }
 
 func (d DefaultQueueKeyGenerator) PartitionItem() string {

@@ -843,7 +843,7 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 		if qi.Data.Identifier.WorkspaceID != workspaceID {
 			continue
 		}
-		cmd := q.r.B().Zrank().Key(q.kg.QueueIndex(workflowID.String())).Member(qi.ID).Build()
+		cmd := q.r.B().Zrank().Key(q.kg.FnQueueSet(workflowID.String())).Member(qi.ID).Build()
 		pos, err := q.r.Do(ctx, cmd).AsInt64()
 		if !rueidis.IsRedisNil(err) && err != nil {
 			return nil, fmt.Errorf("error reading queue position: %w", err)
@@ -1027,7 +1027,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 
 	keys := []string{
 		q.kg.QueueItem(),                    // Queue item
-		q.kg.QueueIndex(qn),                 // Queue sorted set
+		q.kg.FnQueueSet(qn),                 // Queue sorted set
 		q.kg.PartitionItem(),                // Partition item, map
 		q.kg.PartitionMeta(qn),              // Partition item
 		q.kg.GlobalPartitionIndex(),         // Global partition queue
@@ -1116,7 +1116,7 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 		ctx,
 		q.r,
 		[]string{
-			q.kg.QueueIndex(queueName),
+			q.kg.FnQueueSet(queueName),
 			q.kg.QueueItem(),
 		},
 		args,
@@ -1182,7 +1182,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 	}
 
 	keys := []string{
-		q.kg.QueueIndex(partitionName),
+		q.kg.FnQueueSet(partitionName),
 		q.kg.QueueItem(),
 		q.kg.GlobalPartitionIndex(),         // Global partition queue
 		q.kg.ShardPartitionIndex(shardName), // Shard partition queue
@@ -1291,7 +1291,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 
 	keys := []string{
 		q.kg.QueueItem(),
-		q.kg.QueueIndex(item.Queue()),
+		q.kg.FnQueueSet(item.Queue()),
 		q.kg.PartitionMeta(item.Queue()),
 		q.kg.Concurrency("account", ak),
 		q.kg.Concurrency("p", pk),
@@ -1384,7 +1384,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 
 	keys := []string{
 		q.kg.QueueItem(),
-		q.kg.QueueIndex(i.Queue()),
+		q.kg.FnQueueSet(i.Queue()),
 		q.kg.GlobalPartitionIndex(),
 		q.kg.Concurrency("account", ak),
 		q.kg.Concurrency("p", pk),
@@ -1450,7 +1450,7 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 	qn := i.Queue()
 	keys := []string{
 		q.kg.QueueItem(),
-		q.kg.QueueIndex(qn),
+		q.kg.FnQueueSet(qn),
 		q.kg.PartitionMeta(qn),
 		q.kg.Idempotency(i.ID),
 		q.kg.Concurrency("account", ak),
@@ -1549,7 +1549,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 
 	keys := []string{
 		q.kg.QueueItem(),
-		q.kg.QueueIndex(i.Queue()),
+		q.kg.FnQueueSet(i.Queue()),
 		q.kg.PartitionMeta(i.Queue()),
 		q.kg.GlobalPartitionIndex(),
 		q.kg.Concurrency("account", ak),
@@ -1902,7 +1902,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		q.kg.GlobalPartitionIndex(),
 		q.kg.ShardPartitionIndex(shardName),
 		q.kg.PartitionMeta(p.Queue()),
-		q.kg.QueueIndex(p.Queue()),
+		q.kg.FnQueueSet(p.Queue()),
 		q.kg.QueueItem(),
 		q.kg.Concurrency("p", p.Queue()),
 	}

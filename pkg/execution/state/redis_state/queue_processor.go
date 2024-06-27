@@ -919,10 +919,10 @@ ProcessLoop:
 			if p.FunctionID != nil {
 				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
 			}
-			//else {
+			// else {
 			// TODO(cdzombak): lifecycles/metrics for other concurrency scopes
 			// https://linear.app/inngest/issue/INN-3246/lifecycles-add-new-lifecycles-for-fn-env-account-concurrency-limits
-			//}
+			// }
 		}
 		// Requeue this partition as we hit concurrency limits.
 		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
@@ -1233,7 +1233,7 @@ func (q *queue) peekSize(ctx context.Context, p *QueuePartition) int64 {
 	}
 
 	dur := time.Hour * 24
-	qsize, _ := q.partitionSize(ctx, q.kg.QueueIndex(p.Queue()), time.Now().Add(dur))
+	qsize, _ := q.partitionSize(ctx, q.kg.FnQueueSet(p.Queue()), time.Now().Add(dur))
 	if qsize > size {
 		size = qsize
 	}
