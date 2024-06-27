@@ -79,38 +79,38 @@ export default function VercelConfigure() {
             <RiArrowRightSLine className="text-disabled h-4" />
             <div className="text-basis text-base">{project.name}</div>
           </div>
-          <div className="mb-2 mt-6 text-2xl font-medium text-gray-900">{project.name}</div>
+          <div className="text-basis mb-2 mt-6 text-2xl font-medium">{project.name}</div>
           {project.ssoProtection?.deploymentType ===
             VercelDeploymentProtection.ProdDeploymentURLsAndAllPreviews && (
-            <div className="mb-7 flex flex-row items-center justify-start text-sm font-normal leading-snug text-amber-700">
-              <RiInformationLine className="mr-1 h-4 w-4 text-amber-500" />
+            <div className="text-accent-intense mb-7 flex flex-row items-center justify-start text-sm leading-tight">
+              <RiInformationLine className="mr-1 h-4 w-4" />
               Vercel Deployment Protection might block syncing. Use the deployment protection key
               option below to bypass.
             </div>
           )}
 
-          <div className="flex flex-col gap-2 rounded-lg border border-slate-200 p-6">
-            <div className="text-lg font-medium text-gray-900">Project status</div>
-            <div className="text-base font-normal text-slate-500">
+          <div className="border-subtle flex flex-col gap-2 rounded-lg border p-6">
+            <div className="text-basis text-lg font-medium">Project status</div>
+            <div className="text-subtle text-base font-normal">
               This determines whether or not Inngest will communicate with your Vercel application.
             </div>
             <SwitchWrapper>
               <Switch
                 checked={project.isEnabled}
-                className="data-[state=checked]:bg-green-600"
+                className="data-[state=checked]:bg-primary-moderate"
                 onCheckedChange={(checked) =>
                   setProject({ ...project, isEnabled: checked, updated: true })
                 }
               />
-              <SwitchLabel htmlFor="override" className="text-sm font-normal text-slate-500 ">
+              <SwitchLabel htmlFor="override" className="text-subtle text-sm leading-tight">
                 {project.isEnabled ? 'Enabled' : 'Disabled'}
               </SwitchLabel>
             </SwitchWrapper>
           </div>
 
-          <div className="mt-4 flex flex-col gap-2 rounded-lg border border-slate-200 p-6">
-            <div className="text-lg font-medium text-gray-900">Path information</div>
-            <div className="text-base font-normal text-slate-500">
+          <div className="border-subtle mt-4 flex flex-col gap-2 rounded-lg border p-6">
+            <div className="text-basis text-lg font-medium">Path information</div>
+            <div className="text-subtle text-base font-normal">
               Each Vercel project can serve one or more Inngest apps available on different URL
               paths.
             </div>
@@ -119,7 +119,7 @@ export default function VercelConfigure() {
                 <div className="mr-2 w-full">
                   <Input
                     defaultValue={path}
-                    className="h-10 w-full px-2 py-2 text-base text-gray-900"
+                    className="text-basis h-10 w-full px-2 py-2 text-base"
                     onChange={({ target: { value } }) => {
                       setPaths(paths.map((p, n) => (i === n ? value : p)));
                       setProject({ ...project, updated: true });
@@ -154,23 +154,23 @@ export default function VercelConfigure() {
           </div>
           <div className="flex flex-row gap-4">
             <div
-              className={`mt-4 flex w-full flex-col gap-2 rounded-lg border border-slate-200 p-6 ${
+              className={`border-subtle mt-4 flex w-full flex-col gap-2 rounded-lg border p-6 ${
                 project.ssoProtection?.deploymentType !==
-                  VercelDeploymentProtection.ProdDeploymentURLsAndAllPreviews && 'bg-neutral-100'
+                  VercelDeploymentProtection.ProdDeploymentURLsAndAllPreviews && 'bg-disabled'
               }`}
             >
-              <div className=" text-lg font-medium text-gray-900">Deployment protection key</div>
-              <div className="text-base font-normal text-slate-500">
+              <div className="text-basis text-lg font-medium">Deployment protection key</div>
+              <div className="text-subtle text-base font-normal">
                 Used to bypass deployment protection.{' '}
                 <Link href="https://www.inngest.com/docs/deploy/vercel#bypassing-deployment-protection">
                   Learn more
                 </Link>
               </div>
               <Input
-                className={`mt-4 h-10 px-2 py-2 text-base text-gray-900 ${
+                className={`text-basis mt-4 h-10 px-2 py-2 text-base ${
                   project.ssoProtection?.deploymentType !==
                     VercelDeploymentProtection.ProdDeploymentURLsAndAllPreviews &&
-                  'border-slate-300 bg-neutral-100'
+                  'border-subtle bg-disabled'
                 }`}
                 readonly={
                   project.ssoProtection?.deploymentType !==
@@ -182,15 +182,15 @@ export default function VercelConfigure() {
                 value={project.protectionBypassSecret ?? ''}
               />
             </div>
-            <div className="mt-4 flex w-full flex-col gap-2 rounded-lg border border-slate-200 p-6">
-              <div className="text-lg font-medium text-gray-900">
-                Custom Production Domain <span className="text-xs text-slate-500">(optional)</span>
+            <div className="border-subtle mt-4 flex w-full flex-col gap-2 rounded-lg border p-6">
+              <div className="text-basis text-lg font-medium">
+                Custom Production Domain <span className="text-sublte text-xs">(optional)</span>
               </div>
-              <div className="text-base font-normal text-slate-500">
+              <div className="text-subtle text-base font-normal">
                 Set a custom domain to use for production instead of the URL generated by Vercel.
               </div>
               <Input
-                className="mt-4 h-10 px-2 py-2 text-base text-gray-900"
+                className="text-basis mt-4 h-10 px-2 py-2 text-base"
                 placeholder="Add custom domain"
                 value={project.originOverride ?? ''}
                 onChange={({ target: { value } }) =>
@@ -207,7 +207,7 @@ export default function VercelConfigure() {
               loading={mutating}
             />
             {project.updated && (
-              <div className="ml-4 text-[13px] leading-tight text-slate-500">Unsaved changes</div>
+              <div className="text-subtle ml-4 text-[13px] leading-tight">Unsaved changes</div>
             )}
           </div>
         </div>
