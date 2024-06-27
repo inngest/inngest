@@ -295,12 +295,12 @@ func (d DefaultQueueKeyGenerator) FnQueueSet(id string) string {
 
 func (d DefaultQueueKeyGenerator) PartitionQueueSet(pType enums.PartitionType, id string) string {
 	switch pType {
-	case enums.PartitionTypeDefault:
-		return fmt.Sprintf("%s:queue:sorted:%s", d.Prefix, id)
 	case enums.PartitionTypeConcurrency:
-		return "TODO" // TODO(cdzombak):
+		return fmt.Sprintf("%s:sorted:c:%s", d.Prefix, id)
 	case enums.PartitionTypeThrottle:
-		return "TODO" // TODO(cdzombak):
+		return fmt.Sprintf("%s:sorted:t:%s", d.Prefix, id)
+	default:
+		return fmt.Sprintf("%s:queue:sorted:%s", d.Prefix, id)
 	}
 }
 
