@@ -323,3 +323,9 @@
     --color-accent-2xIntense: var(--color-honey-200);
   }
 }
+
+/* Fix Maze.co pop up interactions when overlays are visible */
+#maze-contextual-widget-host,
+#maze-media-host {
+  pointer-events: auto;
+}
