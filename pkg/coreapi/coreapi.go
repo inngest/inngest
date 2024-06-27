@@ -150,6 +150,7 @@ func (a CoreAPI) GetActions(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	l.Info("state api: fetched metadata", "state", state, "run_id", runID)
 
 	actions := state.Actions()
 	_ = json.NewEncoder(w).Encode(actions)
@@ -191,6 +192,7 @@ func (a CoreAPI) GetEventBatch(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	l.Info("state api: fetched metadata", "state", state, "run_id", runID)
 
 	events := state.Events()
 	_ = json.NewEncoder(w).Encode(events)
