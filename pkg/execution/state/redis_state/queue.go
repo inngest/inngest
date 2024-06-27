@@ -1030,6 +1030,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		q.kg.ShardPartitionIndex(shardName), // Shard queue
 		q.kg.Shards(),
 		q.kg.Idempotency(i.ID),
+		q.kg.FnMetadata(i.FunctionID),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.kg) {
@@ -1048,6 +1049,11 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		shard,
 		shardName,
 		getNow().UnixMilli(),
+		FnMetadata{
+			// enqueue.lua only writes function metadata if it doesn't already exist.
+			// if it doesn't exist, and we're enqueuing something, this implies the fn is not currently paused.
+			Paused: false,
+		},
 	})
 
 	if err != nil {
@@ -1741,10 +1747,13 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			return nil, fmt.Errorf("error reading partition item: %w", err)
 		}
 
-		if item.Paused {
-			ignored++
-			continue
-		}
+		// TODO(cdzombak): will do this in partition peek Lua script
+		// if item.Paused {
+		// 	ignored++
+		// 	continue
+		// }
+
+		// add fn id to a set
 
 		// NOTE: The queue does two conflicting things:  we peek ahead of now() to fetch partitions
 		// shortly available, and we also requeue partitions if there are concurrency conflicts.
@@ -1776,6 +1785,9 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		items[n-ignored] = item
 		weights = append(weights, float64(10-item.Priority))
 	}
+
+	// mget all fn metas
+	// check pause
 
 	// Remove any ignored items from the slice.
 	items = items[0 : len(items)-ignored]
@@ -2252,7 +2264,17 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) err
 	return nil
 }
 
-func HashID(ctx context.Context, id string) string {
+func (q *queue) readFnMetadata(ctx context.Context, fnID uuid.UUID) (*FnMetadata, error) {
+	cmd := q.r.B().Get().Key(q.kg.FnMetadata(fnID)).Build()
+	retv := FnMetadata{}
+	err := q.r.Do(ctx, cmd).DecodeJSON(&retv)
+	if err != nil {
+		return nil, fmt.Errorf("error reading function metadata: %w", err)
+	}
+	return &retv, nil
+}
+
+func HashID(_ context.Context, id string) string {
 	ui := xxhash.Sum64String(id)
 	return strconv.FormatUint(ui, 36)
 }

@@ -347,16 +347,16 @@ func TestQueueEnqueueItem(t *testing.T) {
 		}, now)
 		require.NoError(t, err)
 
-		second := getPartition(t, r, item.FunctionID)
-		require.True(t, second.Paused)
+		fnMeta := getFnMetadata(t, r, item.FunctionID)
+		require.True(t, fnMeta.Paused)
 
 		item, err = q.EnqueueItem(ctx, QueueItem{
 			FunctionID: workflowId,
 		}, now.Add(-10*time.Second))
 		require.NoError(t, err)
 
-		second = getPartition(t, r, item.FunctionID)
-		require.True(t, second.Paused)
+		fnMeta = getFnMetadata(t, r, item.FunctionID)
+		require.True(t, fnMeta.Paused)
 	})
 }
 
@@ -1560,8 +1560,8 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		err = q.PartitionRequeue(ctx, &p, next, true)
 		require.NoError(t, err)
 
-		loaded := getPartition(t, r, idA)
-		require.True(t, loaded.Paused)
+		fnMeta := getFnMetadata(t, r, idA)
+		require.True(t, fnMeta.Paused)
 	})
 }
 
@@ -1590,14 +1590,14 @@ func TestQueuePartitionPause(t *testing.T) {
 	err = q.SetFunctionPaused(ctx, idA, true)
 	require.NoError(t, err)
 
-	loaded := getPartition(t, r, idA)
-	require.True(t, loaded.Paused)
+	fnMeta := getFnMetadata(t, r, idA)
+	require.True(t, fnMeta.Paused)
 
 	err = q.SetFunctionPaused(ctx, idA, false)
 	require.NoError(t, err)
 
-	loaded = getPartition(t, r, idA)
-	require.False(t, loaded.Paused)
+	fnMeta = getFnMetadata(t, r, idA)
+	require.False(t, fnMeta.Paused)
 }
 
 func TestQueuePartitionReprioritize(t *testing.T) {
@@ -1649,8 +1649,8 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 		err = q.PartitionReprioritize(ctx, idA.String(), PriorityDefault)
 		require.NoError(t, err)
 
-		second := getPartition(t, r, idA)
-		require.True(t, second.Paused)
+		fnMeta := getFnMetadata(t, r, idA)
+		require.True(t, fnMeta.Paused)
 	})
 }
 
@@ -2521,6 +2521,16 @@ func getPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) QueueParti
 	err := json.Unmarshal([]byte(val), &qp)
 	require.NoError(t, err)
 	return qp
+}
+
+func getFnMetadata(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) FnMetadata {
+	t.Helper()
+	valJSON, err := r.Get(defaultQueueKey.FnMetadata(id))
+	require.NoError(t, err)
+	retv := FnMetadata{}
+	err = json.Unmarshal([]byte(valJSON), &retv)
+	require.NoError(t, err)
+	return retv
 }
 
 func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item QueueItem, expected time.Time) {
