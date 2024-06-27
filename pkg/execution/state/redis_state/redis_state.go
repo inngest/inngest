@@ -433,6 +433,7 @@ func (m shardedMgr) LoadEvents(ctx context.Context, accountId uuid.UUID, fnID uu
 		v1id   = state.Identifier{
 			RunID:      runID,
 			WorkflowID: fnID,
+			AccountID:  accountId,
 		}
 	)
 
@@ -469,6 +470,7 @@ func (m shardedMgr) LoadSteps(ctx context.Context, accountId uuid.UUID, fnID uui
 		v1id  = state.Identifier{
 			RunID:      runID,
 			WorkflowID: fnID,
+			AccountID:  accountId,
 		}
 	)
 
