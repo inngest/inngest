@@ -3,6 +3,7 @@ package state
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -102,6 +103,50 @@ type CustomConcurrency struct {
 	// NOTE: If the value is removed from the last deployed function we could also disregard
 	// this concurrency key.
 	Limit int `json:"l"`
+}
+
+func (c CustomConcurrency) Validate() error {
+	// Keys must always be in the format of "$prefix:$id:$key", in which prefix
+	// is one of "f" | "e" | "a", depending on function, env, or account-level scopes.
+	if len(c.Key) < 5 {
+		return fmt.Errorf("invalid custom concurrency key length")
+	}
+	switch c.Key[0] {
+	case 'f', 'e', 'a':
+	default:
+		return fmt.Errorf("unknown concurrency key scope: %v", c.Key[0])
+	}
+	return nil
+}
+
+func (c CustomConcurrency) ParseKey() (scope enums.ConcurrencyScope, id uuid.UUID, err error) {
+	// Keys must always be in the format of "$prefix:$id:$key", in which prefix
+	// is one of "f" | "e" | "a", depending on function, env, or account-level scopes.
+	//
+	// An example key is `f:${uuid}:${hash}`.
+	if len(c.Key) < 5 {
+		return enums.ConcurrencyScopeFn, id, err
+	}
+
+	// TODO: Dont allocate, get index of colons and use offsets
+	parts := strings.Split(c.Key, ":")
+	if len(parts) != 3 {
+		// Invalid by default
+		return enums.ConcurrencyScopeFn, id, err
+	}
+
+	id, err = uuid.Parse(parts[1])
+
+	switch parts[0] {
+	case "f":
+		return enums.ConcurrencyScopeFn, id, err
+	case "e":
+		return enums.ConcurrencyScopeEnv, id, err
+	case "a":
+		return enums.ConcurrencyScopeAccount, id, err
+	default:
+		return enums.ConcurrencyScopeFn, id, err
+	}
 }
 
 // IdempotencyKey returns the unique key used to represent this single

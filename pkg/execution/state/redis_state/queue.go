@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -564,30 +565,55 @@ func (q QueueShard) Partition() string {
 	return q.Name
 }
 
+// FnMetadata is stored within the queue for retrieving
+type FnMetadata struct {
+	// NOTE: This is not encoded via JSON as we should always have the function
+	// ID prior to doing a lookup, or should be able to retrieve the function ID
+	// via the key.
+	// FnID uuid.UUID `json:"-"` // TODO: Do we need this?
+
+	// Paused represents whether the fn is paused.  This allows us to prevent leases
+	// to a given partition if the partition belongs to a fn.
+	Paused bool `json:"off"`
+}
+
 // QueuePartition represents an individual queue for a workflow.  It stores the
 // time of the earliest job within the workflow.
 type QueuePartition struct {
+	// TODO: CAN WE REMOVE THIS?
 	QueueName *string `json:"queue,omitempty"`
 
-	WorkflowID  uuid.UUID `json:"wid"`
-	WorkspaceID uuid.UUID `json:"wsID"`
-
+	// PartitionType is the int-value of the enums.PartitionType for this
+	// partition.  By default, partitions are function-scoped without any
+	// custom keys.
+	PartitionType int `json:"pt,omitempty"`
+	// ConcurrencyScope is the int-value representation of the enums.ConcurrencyScope,
+	// if this is a concurrency-scoped partition.
+	ConcurrencyScope int `json:"cs,omitempty"`
+	// FunctionID represents the function ID that this partition manages.
+	// NOTE: This may be nil for account and environment-scoped concurrency
+	// keys which make partitions of many functions.
+	FunctionID *uuid.UUID `json:"wid"`
+	// EnvID represents the environment ID for the partition, either from the
+	// function ID or the environment scope itself.
+	EnvID *uuid.UUID `json:"wsID"`
+	// AccountID represents the account ID for the partition.  This ONLY exists
+	// if the partition represents an account-level concurrency key.
+	AccountID *uuid.UUID `json:"aID"`
+	// Priority represents the partition's priority.  This currently exists
+	// on the partition (instead of fn metadata) to reduce lookups when peeking
+	// many partitions.
 	Priority uint `json:"p"`
-	Paused   bool `json:"off"`
-
 	// Last represents the time that this partition was last leased, as a millisecond
 	// unix epoch.  In essence, we need this to track how frequently we're leasing and
 	// attempting to run items in the partition's queue.
-	//
 	// Without this, we cannot track sojourn latency.
 	Last int64 `json:"last"`
-
 	// ForcedAtMS records the time that the partition is forced to, in milliseconds, if
 	// the partition has been forced into the future via concurrency issues. This means
 	// that it was requeued due to concurrency issues and should not be brought forward
 	// when a new step is enqueued, if now < ForcedAtMS.
 	ForceAtMS int64 `json:"forceAtMS"`
-
 	// LeaseID represents a lease on this partition.  If the LeaseID is not nil,
 	// this partition can be claimed by a shared-nothing worker to work on the
 	// queue items within this partition.
@@ -595,11 +621,26 @@ type QueuePartition struct {
 	// A lease is shortly held (eg seconds).  It should last long enough for
 	// workers to claim QueueItems only.
 	LeaseID *ulid.ULID `json:"leaseID"`
+
+	//
+	// OPTIMIZATIONS
+	//
+
+	// Max represents the max concurrency for the queue partition.  This allows
+	// us to optimize the queue by checking for the max when leasing partitions
+	// directly.
+	Max int `json:"max,omitempty"`
+	// MaxOwner represents the function ID that set the max concurrency limit for
+	// this function.  This allows us to lower the max if the owner/enqueueing function
+	// ID matches - otherwise, once set, the max can never lower.
+	MaxOwner uuid.UUID `json:"maxID,omitempty"`
+
+	// TODO: Throttling;  embed max limit/period/etc?
 }
 
 func (q QueuePartition) Queue() string {
 	if q.QueueName == nil {
-		return q.WorkflowID.String()
+		return q.FunctionID.String()
 	}
 	return *q.QueueName
 }
@@ -716,6 +757,57 @@ func (q QueueItem) Queue() string {
 // based on the time passed in.
 func (q QueueItem) IsLeased(time time.Time) bool {
 	return q.LeaseID != nil && ulid.Time(q.LeaseID.Time()).After(time)
+}
+
+func (q *queue) ItemPartitions(ctx context.Context, i QueueItem, priority uint) []QueuePartition {
+	// Right now queue items *always* add into a partition for the overall function ID.
+	// In the future this will change.
+	partitions := []QueuePartition{
+		QueuePartition{
+			QueueName:  i.QueueName,
+			FunctionID: &i.WorkflowID,
+			EnvID:      &i.WorkspaceID,
+			Priority:   priority,
+		},
+	}
+
+	// Check if we have custom concurrency keys for the given function.  If so,
+	// we're going to create new partitions for each of the custom keys.  This allows
+	// us to create queues of queues for each concurrency key.
+	//
+	// See the 'key queues' spec for more information (internally).
+	if q.customConcurrencyGen != nil {
+		customKeys := q.customConcurrencyGen(ctx, i)
+		for _, key := range customKeys {
+			scope, id, _ := key.ParseKey()
+
+			partition := QueuePartition{
+				PartitionType:    int(enums.PartitionTypeConcurrency),
+				ConcurrencyScope: int(scope),
+				FunctionID:       &i.WorkflowID,
+				// XXX: Priority may cause an issue in the future;
+				// if we allow users to set custom priorities on functions
+				// and we have a non-function scope, all priorities are
+				// broken.
+				Priority: priority,
+			}
+
+			switch scope {
+			case enums.ConcurrencyScopeFn:
+				partition.FunctionID = &i.WorkflowID
+			case enums.ConcurrencyScopeEnv:
+				partition.EnvID = &i.WorkspaceID
+			case enums.ConcurrencyScopeAccount:
+				// AccountID comes from the concurrency key in this case
+				partition.AccountID = &id
+			}
+
+			partitions = append(partitions)
+		}
+	}
+
+	// TODO: check for throttle keys
+	return partitions
 }
 
 func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
@@ -914,12 +1006,8 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	// workflow IDs in every case.
 	qn := i.Queue()
 
-	qp := QueuePartition{
-		QueueName:   i.QueueName,
-		WorkflowID:  i.WorkflowID,
-		WorkspaceID: i.WorkspaceID,
-		Priority:    priority,
-	}
+	parts := q.ItemPartitions(ctx, i, priority)
+	qp := parts[0]
 
 	var (
 		shard     *QueueShard
