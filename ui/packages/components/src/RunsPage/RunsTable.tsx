@@ -43,10 +43,22 @@ export default function RunsTable({
   renderSubComponent,
 }: RunsTableProps) {
   // Render 8 empty lines for skeletons when data is loading
-  const tableData = useMemo(
-    () => (isLoading ? Array(8).fill(loadingRow) : data),
-    [isLoading, data]
-  );
+  const tableData = useMemo(() => {
+    if (isLoading) {
+      return Array(8)
+        .fill(null)
+        .map((_, index) => {
+          return {
+            ...loadingRow,
+
+            // Need an ID to avoid "missing key" errors when rendering rows
+            id: index,
+          };
+        }) as unknown as Run[]; // Casting is bad but we need to do this for the loading skeleton
+    }
+
+    return data;
+  }, [isLoading, data]);
 
   const tableColumns = useMemo(
     () =>
