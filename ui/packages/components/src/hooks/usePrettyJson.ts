@@ -7,9 +7,9 @@ import { useMemo } from 'react';
 export const usePrettyJson = (json: string): string | null => {
   return useMemo(() => {
     try {
-      const data = JSON.parse(json);
+      const data: unknown = JSON.parse(json);
       if (data === null) {
-        throw new Error();
+        return data;
       }
 
       return JSON.stringify(data, null, 2);
