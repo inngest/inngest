@@ -73,6 +73,7 @@ func (v v2) Delete(ctx context.Context, id state.ID) (bool, error) {
 	return v.mgr.Delete(ctx, statev1.Identifier{
 		RunID:      id.RunID,
 		WorkflowID: id.FunctionID,
+		AccountID:  id.Tenant.AccountID,
 	})
 }
 
@@ -186,6 +187,7 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 	v1id := statev1.Identifier{
 		RunID:      id.RunID,
 		WorkflowID: id.FunctionID,
+		AccountID:  id.Tenant.AccountID,
 	}
 	return v.mgr.SaveResponse(ctx, v1id, stepID, string(data))
 }
