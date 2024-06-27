@@ -1011,7 +1011,20 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	qn := i.Queue()
 
 	parts := q.ItemPartitions(ctx, i, priority)
-	qp := parts[0]
+	var b, c, d QueuePartition
+	for idx, p := range parts {
+		if idx == 0 {
+			continue
+		} else if idx == 1 {
+			b = p
+		} else if idx == 2 {
+			c = p
+		} else if idx == 3 {
+			d = p
+		} else {
+			return i, fmt.Errorf("too many partitions (%d) for queue item %s", len(parts), i.ID)
+		}
+	}
 
 	var (
 		shard     *QueueShard
@@ -1027,14 +1040,16 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 
 	keys := []string{
 		q.kg.QueueItem(),                    // Queue item
-		q.kg.FnQueueSet(qn),                 // Queue sorted set
 		q.kg.PartitionItem(),                // Partition item, map
-		q.kg.PartitionMeta(qn),              // Partition item
 		q.kg.GlobalPartitionIndex(),         // Global partition queue
 		q.kg.ShardPartitionIndex(shardName), // Shard queue
 		q.kg.Shards(),
 		q.kg.Idempotency(i.ID),
 		q.kg.FnMetadata(i.FunctionID),
+		q.kg.PartitionQueueSet(enums.PartitionTypeDefault, qn), // Queue sorted set
+		q.kg.PartitionQueueSet(enums.PartitionType(b.PartitionType), b.Queue()),
+		q.kg.PartitionQueueSet(enums.PartitionType(c.PartitionType), c.Queue()),
+		q.kg.PartitionQueueSet(enums.PartitionType(d.PartitionType), d.Queue()),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.kg) {
@@ -1048,7 +1063,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		i.ID,
 		at.UnixMilli(),
 		qn,
-		qp,
+		parts[0],
 		partitionTime.Unix(),
 		shard,
 		shardName,
@@ -1059,6 +1074,9 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 			FnID:   i.FunctionID,
 			Paused: false,
 		},
+		b,
+		c,
+		d,
 	})
 
 	if err != nil {

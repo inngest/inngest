@@ -6,27 +6,32 @@ Enqueus an item within the queue.
 --]]
 
 local queueKey            = KEYS[1]           -- queue:item - hash: { $itemID: $item }
-local queueIndexKey       = KEYS[2]           -- queue:sorted:$workflowID - zset
-local partitionKey        = KEYS[3]           -- partition:item - hash: { $workflowID: $partition }
-local partitionCounterKey = KEYS[4]           -- partition:item:$workflowID - hash
-local partitionIndexKey   = KEYS[5]           -- partition:sorted - zset
-local shardIndexKey       = KEYS[6]           -- shard:$name:sorted - zset
-local shardMapKey         = KEYS[7]           -- shards - hmap of shards
-local idempotencyKey      = KEYS[8]           -- seen:$key
-local keyFnMetadata       = KEYS[9]          -- fnMeta:$id - hash
-local keyItemIndexA       = KEYS[10]           -- custom item index 1
-local keyItemIndexB       = KEYS[11]          -- custom item index 2
+local partitionKey        = KEYS[2]           -- partition:item - hash: { $workflowID: $partition }
+local partitionIndexKey   = KEYS[3]           -- partition:sorted - zset
+local shardIndexKey       = KEYS[4]           -- shard:$name:sorted - zset
+local shardMapKey         = KEYS[5]           -- shards - hmap of shards
+local idempotencyKey      = KEYS[6]           -- seen:$key
+local keyFnMetadata       = KEYS[7]           -- fnMeta:$id - hash
+local keyPartitionA       = KEYS[8]           -- queue:sorted:$workflowID - zset
+local keyPartitionB       = KEYS[9]           -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionC       = KEYS[10]          -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionD       = KEYS[11]          -- e.g. sorted:c|t:$workflowID - zset
+local keyItemIndexA       = KEYS[12]          -- custom item index 1
+local keyItemIndexB       = KEYS[13]          -- custom item index 2
 
 local queueItem           = ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID             = ARGV[2]           -- id
 local queueScore          = tonumber(ARGV[3]) -- vesting time, in milliseconds
 local workflowID          = ARGV[4]           -- $workflowID
-local partitionItem       = ARGV[5]           -- {workflow, priority, leasedAt, etc}
+local partitionItemA       = ARGV[5]           -- {workflow, priority, leasedAt, etc}
 local partitionTime       = tonumber(ARGV[6]) -- score for partition, lower bounded to now in seconds
 local shard               = ARGV[7]
 local shardName           = ARGV[8]
 local nowMS               = tonumber(ARGV[9]) -- now in ms
 local fnMetadata          = ARGV[10]          -- function meta: {paused}
+local partitionItemB      = ARGV[11]
+local partitionItemC      = ARGV[12]
+local partitionItemD      = ARGV[13]
 
 -- $include(get_partition_item.lua)
 
@@ -45,14 +50,15 @@ end
 -- when adding leases.  Doing so means we can't ZADD to update sorted sets, as each
 -- time the lease ID changes the data structure changes; zsets require static members
 -- when updating scores.
-redis.call("ZADD", queueIndexKey, queueScore, queueID)
+redis.call("ZADD", keyPartitionA, queueScore, queueID)
+redis.call("ZADD", keyPartitionB, queueScore, queueID)
+redis.call("ZADD", keyPartitionC, queueScore, queueID)
+redis.call("ZADD", keyPartitionD, queueScore, queueID)
 
 -- We store partitions and their leases separately from the queue-partition ZSET
 -- as we want a static member excluding eg. lease IDs.  This allows us to update
 -- scores idempotently.
 redis.call("HSETNX", partitionKey, workflowID, partitionItem)
-redis.call("HSETNX", partitionCounterKey, "n", 0)    -- Atomic counter, currently leased (in progress) items.
-redis.call("HINCRBY", partitionCounterKey, "len", 1) -- Atomic counter, length of enqueued items, set to 1 or increased.
 
 -- note to future devs: if updating metadata, be sure you do not change the "off" (i.e. "paused") boolean in the function's metadata.
 redis.call("SET", keyFnMetadata, fnMetadata, "NX")
