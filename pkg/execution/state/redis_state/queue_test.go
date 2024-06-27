@@ -233,7 +233,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, item, found)
 
 		// Ensure the partition is inserted.
-		qp := getPartition(t, r, item.FunctionID)
+		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
 			FunctionID: &item.FunctionID,
 			Priority:   testPriority,
@@ -255,7 +255,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		// Ensure the partition is inserted, and the earliest time is still
 		// the start time.
-		qp := getPartition(t, r, item.FunctionID)
+		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
 			FunctionID: &item.FunctionID,
 			Priority:   testPriority,
@@ -279,7 +279,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		// Ensure the partition is inserted, and the earliest time is updated
 		// inside the partition item.
-		qp := getPartition(t, r, item.FunctionID)
+		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
 			FunctionID: &item.FunctionID,
 			Priority:   testPriority,
@@ -308,7 +308,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		// Ensure the partition is inserted, and the earliest time is updated
 		// inside the partition item.
-		qp := getPartition(t, r, item.FunctionID)
+		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
 			FunctionID: &item.FunctionID,
 			Priority:   testPriority,
@@ -394,13 +394,13 @@ func TestQueueEnqueueItem(t *testing.T) {
 		}, now.Add(10*time.Second))
 		require.NoError(t, err)
 
-		fnDefaultPartition := getPartition(t, r, workflowId) // nb. also asserts that the partition exists
+		fnDefaultPartition := getDefaultPartition(t, r, workflowId) // nb. also asserts that the partition exists
 		require.Equal(t, QueuePartition{
 			FunctionID:    &workflowId,
 			PartitionType: int(enums.PartitionTypeDefault),
 		}, fnDefaultPartition)
 
-		concurrencyPartition := getPartition(t, r, uuid.New()) // TODO(cdzombak): generate & pass the correct key here
+		concurrencyPartition := getPartition(t, r, enums.PartitionTypeConcurrency, workflowId) // nb. also asserts that the partition exists
 		require.Equal(t, QueuePartition{
 			FunctionID:       &workflowId,
 			PartitionType:    int(enums.PartitionTypeConcurrency),
@@ -1542,19 +1542,19 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		require.NoError(t, err)
 		requirePartitionScoreEquals(t, r, &idA, next)
 
-		loaded := getPartition(t, r, idA)
+		loaded := getDefaultPartition(t, r, idA)
 		require.Nil(t, loaded.LeaseID)
 
 		// Forcing should set a ForceAtMS field.
 		require.NotEmpty(t, loaded.ForceAtMS)
 
 		t.Run("Enqueueing with a force at time should not update the score", func(t *testing.T) {
-			loaded := getPartition(t, r, idA)
+			loaded := getDefaultPartition(t, r, idA)
 			require.NotEmpty(t, loaded.ForceAtMS)
 
 			qi, err := q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, now)
 
-			loaded = getPartition(t, r, idA)
+			loaded = getDefaultPartition(t, r, idA)
 			require.NotEmpty(t, loaded.ForceAtMS)
 
 			require.NoError(t, err)
@@ -1581,7 +1581,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		err = q.PartitionRequeue(ctx, &p, next, false)
 		require.Error(t, ErrPartitionGarbageCollected, err)
 
-		loaded := getPartition(t, r, idA)
+		loaded := getDefaultPartition(t, r, idA)
 
 		// This should unset the force at field.
 		require.Empty(t, loaded.ForceAtMS)
@@ -1675,14 +1675,14 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 	_, err = q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, now)
 	require.NoError(t, err)
 
-	first := getPartition(t, r, idA)
+	first := getDefaultPartition(t, r, idA)
 	require.Equal(t, first.Priority, PriorityMin)
 
 	t.Run("It updates priority", func(t *testing.T) {
 		priority = PriorityMax
 		err = q.PartitionReprioritize(ctx, idA.String(), PriorityMax)
 		require.NoError(t, err)
-		second := getPartition(t, r, idA)
+		second := getDefaultPartition(t, r, idA)
 		require.Equal(t, second.Priority, PriorityMax)
 	})
 
@@ -2563,9 +2563,18 @@ func requirePartitionInProgress(t *testing.T, q *queue, workflowID uuid.UUID, co
 	require.EqualValues(t, count, actual)
 }
 
-func getPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) QueuePartition {
+func getDefaultPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) QueuePartition {
 	t.Helper()
 	val := r.HGet(defaultQueueKey.PartitionItem(), id.String())
+	qp := QueuePartition{}
+	err := json.Unmarshal([]byte(val), &qp)
+	require.NoError(t, err)
+	return qp
+}
+
+func getPartition(t *testing.T, r *miniredis.Miniredis, pType enums.PartitionType, id uuid.UUID) QueuePartition {
+	t.Helper()
+	val := r.HGet(defaultQueueKey.PartitionItem(), defaultQueueKey.PartitionQueueSet(pType, id.String()))
 	qp := QueuePartition{}
 	err := json.Unmarshal([]byte(val), &qp)
 	require.NoError(t, err)
