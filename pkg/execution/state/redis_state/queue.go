@@ -570,7 +570,7 @@ type FnMetadata struct {
 	// NOTE: This is not encoded via JSON as we should always have the function
 	// ID prior to doing a lookup, or should be able to retrieve the function ID
 	// via the key.
-	// FnID uuid.UUID `json:"-"` // TODO: Do we need this?
+	FnID uuid.UUID `json:"fnID"`
 
 	// Paused represents whether the fn is paused.  This allows us to prevent leases
 	// to a given partition if the partition belongs to a fn.
@@ -1051,6 +1051,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		FnMetadata{
 			// enqueue.lua only writes function metadata if it doesn't already exist.
 			// if it doesn't exist, and we're enqueuing something, this implies the fn is not currently paused.
+			FnID:   i.FunctionID,
 			Paused: false,
 		},
 	})
@@ -1723,7 +1724,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		return nil, err
 	}
 
-	encoded, err := scripts["queue/partitionPeek"].Exec(
+	peekRet, err := scripts["queue/partitionPeek"].Exec(
 		ctx,
 		q.r,
 		[]string{
@@ -1731,33 +1732,76 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			q.kg.PartitionItem(),
 		},
 		args,
-	).AsStrSlice()
+	).ToAny()
+	// NOTE: We use ToAny to force return a []any, allowing us to update the slice value with
+	// a JSON-decoded item without allocations
 	if err != nil {
 		return nil, fmt.Errorf("error peeking partition items: %w", err)
+	}
+	encoded, ok := peekRet.([]any)
+	if !ok {
+		return nil, fmt.Errorf("unknown return type from partitionPeek: %T", peekRet)
 	}
 
 	weights := []float64{}
 	items := make([]*QueuePartition, len(encoded))
+	fnIDs := make(map[uuid.UUID]bool)
+	fnIDsMu := sync.Mutex{}
 
-	ignored := 0
-	for n, i := range encoded {
-		if i == "" {
-			ignored++
-			continue
-		}
-
+	// Use parallel decoding as per Peek
+	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
+		str, _ := val.(string)
 		item := &QueuePartition{}
-		if err = json.Unmarshal([]byte(i), item); err != nil {
+		if err = json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), item); err != nil {
 			return nil, fmt.Errorf("error reading partition item: %w", err)
 		}
+		// Track the fn ID for partitions seen.  This allows us to do fast lookups of paused functions
+		// to prevent peeking/working on these items as an optimization.
+		if item.FunctionID != nil {
+			fnIDsMu.Lock()
+			fnIDs[*item.FunctionID] = false // default not paused
+			fnIDsMu.Unlock()
+		}
+		return item, nil
 
-		// TODO(cdzombak): will do this in partition peek Lua script
-		// if item.Paused {
-		// 	ignored++
-		// 	continue
-		// }
+	})
 
-		// add fn id to a set
+	// mget all fn metas
+	if len(fnIDs) > 0 {
+		keys := make([]string, len(fnIDs))
+		n := 0
+		for k := range fnIDs {
+			keys[n] = q.kg.FnMetadata(k)
+			n++
+		}
+		vals, err := q.r.Do(ctx, q.r.B().Mget().Key(keys...).Build()).ToAny()
+		if err == nil {
+			// If this is an error, just ignore the error and continue.  The executor should gracefully handle
+			// accidental attempts at paused functions, as we cannot do this optimization for account or env-level
+			// partitions.
+			vals, _ := vals.([]any)
+			_, _ = util.ParallelDecode(vals, func(i any) (any, error) {
+				str, _ := i.(string)
+				fnMeta := &FnMetadata{}
+				if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), fnMeta); err == nil {
+					fnIDsMu.Lock()
+					fnIDs[fnMeta.FnID] = fnMeta.Paused
+					fnIDsMu.Unlock()
+				}
+				return nil, nil
+			})
+		}
+	}
+
+	ignored := 0
+	for n, item := range partitions {
+		// check pause
+		if item.FunctionID != nil {
+			if paused, _ := fnIDs[*item.FunctionID]; paused {
+				ignored++
+				continue
+			}
+		}
 
 		// NOTE: The queue does two conflicting things:  we peek ahead of now() to fetch partitions
 		// shortly available, and we also requeue partitions if there are concurrency conflicts.
@@ -1789,9 +1833,6 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		items[n-ignored] = item
 		weights = append(weights, float64(10-item.Priority))
 	}
-
-	// mget all fn metas
-	// check pause
 
 	// Remove any ignored items from the slice.
 	items = items[0 : len(items)-ignored]

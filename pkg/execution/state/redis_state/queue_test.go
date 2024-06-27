@@ -1324,7 +1324,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 			items, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), 1)
 			require.NoError(t, err)
 			require.Len(t, items, 1)
-			require.Equal(t, idA, items[0].FunctionID)
+			require.Equal(t, &idA, items[0].FunctionID)
 		}
 	})
 
