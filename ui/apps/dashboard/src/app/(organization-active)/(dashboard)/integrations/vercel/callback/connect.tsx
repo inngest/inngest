@@ -112,7 +112,7 @@ export default function Connect({
               )}
             </div>
           ))}
-          {projects.length > 0 && (
+          {projects.length > PAGE_SIZE && (
             <div className="row flex items-center justify-center p-2">
               <NewButton
                 appearance="ghost"
