@@ -593,13 +593,13 @@ type QueuePartition struct {
 	// FunctionID represents the function ID that this partition manages.
 	// NOTE: This may be nil for account and environment-scoped concurrency
 	// keys which make partitions of many functions.
-	FunctionID *uuid.UUID `json:"wid"`
+	FunctionID *uuid.UUID `json:"wid,omitempty"`
 	// EnvID represents the environment ID for the partition, either from the
 	// function ID or the environment scope itself.
-	EnvID *uuid.UUID `json:"wsID"`
+	EnvID *uuid.UUID `json:"wsID,omitempty"`
 	// AccountID represents the account ID for the partition.  This ONLY exists
 	// if the partition represents an account-level concurrency key.
-	AccountID *uuid.UUID `json:"aID"`
+	AccountID *uuid.UUID `json:"aID,omitempty"`
 	// Priority represents the partition's priority.  This currently exists
 	// on the partition (instead of fn metadata) to reduce lookups when peeking
 	// many partitions.
