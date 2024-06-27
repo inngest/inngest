@@ -36,7 +36,7 @@ func NewFunctionRunStateClient(r rueidis.Client, u *UnshardedClient, stateDefaul
 	return &FunctionRunStateClient{
 		kg:            &runStateKeyGenerator{stateDefaultKey: stateDefaultKey, isSharded: isSharded},
 		client:        newRetryClusterDownClient(r),
-		unshardedConn: newNoopRetriableClient(u.unshardedConn),
+		unshardedConn: NewNoopRetriableClient(u.unshardedConn),
 		isSharded:     isSharded,
 	}
 }

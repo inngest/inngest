@@ -25,7 +25,7 @@ func (r noopRetriableClient) Do(ctx context.Context, cmd func(client rueidis.Cli
 	return r.r.Do(ctx, cmd(r.r))
 }
 
-func newNoopRetriableClient(client rueidis.Client) RetriableClient {
+func NewNoopRetriableClient(client rueidis.Client) RetriableClient {
 	return noopRetriableClient{client}
 }
 
