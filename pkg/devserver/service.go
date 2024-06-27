@@ -20,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/apiv1"
 	"github.com/inngest/inngest/pkg/cli"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
@@ -34,16 +35,19 @@ import (
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/mattn/go-isatty"
+	"go.opentelemetry.io/otel/propagation"
 )
 
-func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher) *devserver {
+func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher, stepLimitOverrides map[string]int) *devserver {
 	return &devserver{
-		data:        data,
-		runner:      runner,
-		opts:        opts,
-		handlerLock: &sync.Mutex{},
-		publisher:   pb,
+		data:               data,
+		runner:             runner,
+		opts:               opts,
+		handlerLock:        &sync.Mutex{},
+		publisher:          pb,
+		stepLimitOverrides: stepLimitOverrides,
 	}
 }
 
@@ -57,6 +61,8 @@ type devserver struct {
 	opts StartOpts
 
 	data cqrs.Manager
+
+	stepLimitOverrides map[string]int
 
 	// runner stores the runner
 	runner    runner.Runner
@@ -298,6 +304,9 @@ func (d *devserver) handleEvent(ctx context.Context, e *event.Event) (string, er
 		Interface("event", trackedEvent.GetEvent()).
 		Msg("publishing event")
 
+	carrier := telemetry.NewTraceCarrier()
+	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+
 	err = d.publisher.Publish(
 		ctx,
 		d.opts.Config.EventStream.Service.TopicName(),
@@ -305,6 +314,9 @@ func (d *devserver) handleEvent(ctx context.Context, e *event.Event) (string, er
 			Name:      event.EventReceivedName,
 			Data:      string(byt),
 			Timestamp: time.Now(),
+			Metadata: map[string]any{
+				consts.OtelPropagationKey: carrier,
+			},
 		},
 	)
 

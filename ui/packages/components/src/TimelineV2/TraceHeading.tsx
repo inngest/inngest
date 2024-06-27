@@ -24,8 +24,10 @@ type Props = {
 };
 
 export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, trace }: Props) {
+  const isAttempt = trace.stepOp === 'RUN' && (trace.childrenSpans?.length ?? 0) === 0;
   let opCodeBadge;
-  if (trace.stepOp && (trace.childrenSpans?.length ?? 0) > 0) {
+  if (trace.stepOp && !isAttempt) {
+    const title = trace.stepOp.split('_')[0]?.toLowerCase();
     const isRetried = (trace.attempts ?? 0) > 1;
 
     opCodeBadge = (
@@ -33,11 +35,11 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
         <Tooltip>
           <TooltipTrigger>
             <Badge
-              className="bg-slate-200 px-1.5 font-mono"
+              className="border-muted text-muted border px-1.5"
               flatSide={isRetried ? 'right' : undefined}
               kind="solid"
             >
-              <span>{trace.stepOp.toLowerCase()}</span>
+              <span>{title}</span>
             </Badge>
           </TooltipTrigger>
           <TooltipContent>Step method</TooltipContent>
@@ -47,7 +49,7 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
           <Tooltip>
             <TooltipTrigger>
               <Badge
-                className="bg-amber-100 px-1.5 font-mono text-amber-700"
+                className="border-r-1 border-muted text-muted border-l-0 px-1.5"
                 flatSide="left"
                 kind="solid"
               >
@@ -66,6 +68,7 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
       {isExpandable && (
         <Button
           btnAction={onClickExpandToggle}
+          className="flex-none"
           size="small"
           appearance={isExpanded ? 'solid' : 'outlined'}
           icon={
@@ -77,11 +80,10 @@ export function TraceHeading({ isExpanded, isExpandable, onClickExpandToggle, tr
       )}
 
       <div className="grow">
-        <div className="flex gap-2">
-          <span className="grow text-sm">{trace.name}</span>
-          {opCodeBadge}
+        <div className="flex">
+          <span className="mt-1 h-fit self-start text-sm">{trace.name}</span>
+          <div className="h-8">{opCodeBadge}</div>
         </div>
-
         <TimeWithText trace={trace} />
       </div>
     </div>
@@ -114,7 +116,7 @@ function TimeWithText({ trace }: { trace: Props['trace'] }) {
   }
 
   return (
-    <div className="text-xs text-slate-600">
+    <div className="text-basis text-xs">
       {text}: <Time value={value} />
     </div>
   );

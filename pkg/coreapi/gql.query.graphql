@@ -21,6 +21,10 @@ type Query {
     orderBy: [RunsV2OrderBy!]!
     filter: RunsFilterV2!
   ): RunsV2Connection!
+  # runsMetrics(filter: RunsFilterV2!): MetricsResponse!
+  run(runID: String!): FunctionRunV2
+  runTraceSpanOutputByID(outputID: String!): RunTraceSpanOutput!
+  runTrigger(runID: String!): RunTraceTrigger!
 }
 
 input ActionVersionQuery {
@@ -49,14 +53,13 @@ input FunctionRunsQuery {
 }
 
 input StreamQuery {
-  # This allows you to query for items after a specific time.  If
-  # not provided this defaults to the most recent items in the stream,
-  # eg now.
-  after: Time
-  # Before allows you to receive items in a stream before a specific time.
-  # This is useful as you can add the last stream item's time as the before
+  # after allows you to query for items after an ID. If not provided this
+  # defaults to the most recent items in the stream, eg now.
+  after: ID
+  # before allows you to receive items in a stream before an ID.
+  # This is useful as you can add the last stream ID as the before
   # field, ensuring that only new items are received.
-  before: Time
+  before: ID
   limit: Int! = 20
   includeInternalEvents: Boolean
 }

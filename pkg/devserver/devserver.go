@@ -91,6 +91,8 @@ func start(ctx context.Context, opts StartOpts) error {
 	hd := sqlitecqrs.NewHistoryDriver(db)
 	loader := dbcqrs.(state.FunctionLoader)
 
+	stepLimitOverrides := make(map[string]int)
+
 	rc, err := createInmemoryRedis(ctx, opts.Tick)
 	if err != nil {
 		return err
@@ -224,9 +226,20 @@ func start(ctx context.Context, opts StartOpts) error {
 				pb:         pb,
 				eventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
 			},
+			executor.NewTraceRunLifecycleListener(
+				nil,
+				smv2,
+			),
 		),
-		executor.WithStepLimits(func(id sv2.ID) int { return consts.DefaultMaxStepLimit }),
-		executor.WithInvokeNotFoundHandler(getInvokeNotFoundHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
+		executor.WithStepLimits(func(id sv2.ID) int {
+			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
+				logger.From(ctx).Warn().Msgf("Using step limit override of %d for %q\n", override, id.FunctionID)
+				return override
+			}
+
+			return consts.DefaultMaxStepLimit
+		}),
+		executor.WithInvokeFailHandler(getInvokeFailHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
 		executor.WithBatcher(batcher),
@@ -261,7 +274,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	// The devserver embeds the event API.
-	ds := newService(opts, runner, dbcqrs, pb)
+	ds := newService(opts, runner, dbcqrs, pb, stepLimitOverrides)
 	// embed the tracker
 	ds.tracker = t
 	ds.state = sm
@@ -328,8 +341,8 @@ func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic stri
 	}
 }
 
-func getInvokeNotFoundHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.InvokeNotFoundHandler {
-	return func(ctx context.Context, opts execution.InvokeNotFoundHandlerOpts, evts []event.Event) error {
+func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.InvokeFailHandler {
+	return func(ctx context.Context, opts execution.InvokeFailHandlerOpts, evts []event.Event) error {
 		eg := errgroup.Group{}
 
 		for _, e := range evts {

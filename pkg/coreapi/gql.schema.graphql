@@ -308,19 +308,13 @@ type RunHistoryInvokeFunctionResult {
 input RunsFilterV2 {
   from: Time!
   until: Time
-  timeField: FunctionRunTimeFieldV2 = QUEUED_AT
+  timeField: RunsV2OrderByField = QUEUED_AT
 
   status: [FunctionRunStatus!]
   functionIDs: [UUID!]
   appIDs: [UUID!]
 
   query: String # CEL query string
-}
-
-enum FunctionRunTimeFieldV2 {
-  QUEUED_AT
-  STARTED_AT
-  ENDED_AT
 }
 
 input RunsV2OrderBy {
@@ -356,8 +350,12 @@ type FunctionRunV2 {
   triggerIDs: [ULID!]!
   triggers: [Bytes!]!
   isBatch: Boolean!
+  batchCreatedAt: Time
+  cronSchedule: String
 
   output: Bytes
+
+  trace: RunTraceSpan
 }
 
 type RunsV2Connection {
@@ -368,4 +366,95 @@ type RunsV2Connection {
 type FunctionRunV2Edge {
   node: FunctionRunV2!
   cursor: String!
+}
+
+enum RunTraceSpanStatus {
+  FAILED # step completed with an error
+  QUEUED # step of run is queued but not started
+  RUNNING # actively being executed right now
+  COMPLETED # step completed successfully
+  # TIMED_OUT # wait for event timed out waiting
+  WAITING # sleeping, waiting for an event
+  CANCELLED # cancelled run
+}
+
+enum StepOp {
+  INVOKE # invoke another function
+  RUN # run a function
+  SLEEP # sleep for a duration
+  WAIT_FOR_EVENT # wait for an event
+}
+
+union StepInfo = InvokeStepInfo | SleepStepInfo | WaitForEventStepInfo
+
+type InvokeStepInfo {
+  triggeringEventID: ULID!
+  functionID: String!
+  timeout: Time!
+  returnEventID: ULID
+  runID: ULID
+  timedOut: Boolean
+}
+
+type SleepStepInfo {
+  sleepUntil: Time!
+}
+
+type WaitForEventStepInfo {
+  eventName: String!
+  expression: String
+  timeout: Time!
+  foundEventID: ULID
+  timedOut: Boolean
+}
+
+type RunTraceSpan {
+  appID: UUID!
+  functionID: UUID!
+
+  runID: ULID!
+  run: FunctionRun! # the run that generated this span <== links should be here
+  # Internal
+  spanID: String! # internal span ID, or a virtual span ID
+  traceID: String! # the internal ID of the trace this span belongs to
+  # Required
+  name: String! # the name of the span
+  status: RunTraceSpanStatus! # the status of the span
+  attempts: Int # if this node contains retry attempts, this is the current attempt number
+  # groupID: String!
+
+  # cursor: String! # used for "pagination", is just a hash to the user
+  duration: Int # the duration of the span in milliseconds (calculated), if null, it's still running
+  outputID: String
+  queuedAt: Time!
+  startedAt: Time # the start time of the span
+  endedAt: Time # the end time of the span, only present if it's ended
+  childrenSpans: [RunTraceSpan!]! # the children spans of this span - invoke
+  stepOp: StepOp # the operation this span represents; nil means it can't be attributed to a step yet
+  stepInfo: StepInfo # info about the step - use fragments to access appropriately
+  # Nice-to-haves for navigating the trace
+  isRoot: Boolean! # whether this span is the root span of the trace (shortcut for presence of rootspan)
+  parentSpanID: String
+  parentSpan: RunTraceSpan # the parent span of this span
+}
+
+type RunTraceSpanOutput {
+  data: Bytes
+  error: StepError
+}
+
+type StepError {
+  message: String!
+  name: String
+  stack: String
+}
+
+type RunTraceTrigger {
+  eventName: String
+  IDs: [ULID!]! # the ULIDs of all events associated with this run
+  payloads: [Bytes!]! # a list of event objects
+  timestamp: Time! # the timestamp of the single event or the batch
+  isBatch: Boolean! # indicates if this trigger is a batch trigger
+  batchID: ULID # the batchID of this list of events if available
+  cron: String # The cron expression if available
 }

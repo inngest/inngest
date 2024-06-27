@@ -3,7 +3,7 @@ import { cn } from '@inngest/components/utils/classNames';
 export function IconStatusQueued({ className, title }: { className?: string; title?: string }) {
   return (
     <svg
-      className={cn('text-amber-500', className)}
+      className={cn('text-status-queued', className)}
       width="24"
       height="24"
       viewBox="0 0 24 24"

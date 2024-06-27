@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import type { Route } from 'next';
 
-import { CodeBlock } from '../CodeBlock';
+import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
 import { InlineSpans } from './InlineSpans';
@@ -11,24 +12,35 @@ import { createSpanWidths } from './utils';
 
 type Props = {
   depth: number;
-  getOutput: (outputID: string) => Promise<string | null>;
+  getResult: (outputID: string) => Promise<Result>;
   isExpandable?: boolean;
   minTime?: Date;
   maxTime?: Date;
+  pathCreator: {
+    runPopout: (params: { runID: string }) => Route;
+  };
   trace: Trace;
 };
 
-export function Trace({ depth, getOutput, isExpandable = true, maxTime, minTime, trace }: Props) {
+export function Trace({
+  depth,
+  getResult,
+  isExpandable = true,
+  maxTime,
+  minTime,
+  pathCreator,
+  trace,
+}: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [output, setOutput] = useState<string>();
+  const [result, setResult] = useState<Result>();
 
   useEffect(() => {
-    if (isExpanded && !output && trace.outputID) {
-      getOutput(trace.outputID).then((data) => {
-        setOutput(data ?? undefined);
+    if (isExpanded && !result && trace.outputID) {
+      getResult(trace.outputID).then((data) => {
+        setResult(data);
       });
     }
-  }, [isExpanded, output]);
+  }, [isExpanded, result]);
 
   if (!minTime) {
     minTime = new Date(trace.queuedAt);
@@ -54,13 +66,13 @@ export function Trace({ depth, getOutput, isExpandable = true, maxTime, minTime,
   return (
     <div
       className={cn(
-        'py-2',
+        'py-5',
         // We don't want borders or horizontal padding on step attempts
-        depth === 0 && 'px-4',
-        isExpanded && 'bg-blue-50'
+        depth === 0 && 'px-8',
+        isExpanded && 'bg-secondary-4xSubtle'
       )}
     >
-      <div className="flex gap-2">
+      <div className="flex">
         <div
           className={cn(
             // Steps and attempts need different widths, since attempts are
@@ -78,9 +90,9 @@ export function Trace({ depth, getOutput, isExpandable = true, maxTime, minTime,
         </div>
 
         <InlineSpans
-          className="my-2"
           maxTime={maxTime}
           minTime={minTime}
+          name={trace.name}
           spans={spans}
           widths={widths}
         />
@@ -88,20 +100,12 @@ export function Trace({ depth, getOutput, isExpandable = true, maxTime, minTime,
 
       {isExpanded && (
         <div className="ml-8">
-          <TraceInfo className="my-4 grow" trace={trace} />
-
-          {output && (
-            <div className="mb-4">
-              <CodeBlock
-                tabs={[
-                  {
-                    label: 'Output',
-                    content: output,
-                  },
-                ]}
-              />
-            </div>
-          )}
+          <TraceInfo
+            className="my-4 grow"
+            pathCreator={pathCreator}
+            trace={trace}
+            result={result}
+          />
 
           {trace.childrenSpans?.map((child, i) => {
             return (
@@ -109,9 +113,10 @@ export function Trace({ depth, getOutput, isExpandable = true, maxTime, minTime,
                 <div className="grow">
                   <Trace
                     depth={depth + 1}
-                    getOutput={getOutput}
+                    getResult={getResult}
                     maxTime={maxTime}
                     minTime={minTime}
+                    pathCreator={pathCreator}
                     trace={child}
                   />
                 </div>

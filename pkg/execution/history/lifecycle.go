@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -19,10 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/inngest/log"
-	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
-	"go.opentelemetry.io/otel/attribute"
 )
 
 func NewLifecycleListener(l *slog.Logger, d ...Driver) execution.LifecycleListener {
@@ -81,7 +77,7 @@ func (l lifecycle) OnFunctionScheduled(
 		Type:            enums.HistoryTypeFunctionScheduled.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  md.IdempotencyKey(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.EventID(),
 		BatchID:         md.Config.BatchID,
 	}
 	for _, d := range l.drivers {
@@ -126,7 +122,7 @@ func (l lifecycle) OnFunctionStarted(
 		Type:            enums.HistoryTypeFunctionStarted.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  md.IdempotencyKey(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.EventID(),
 		LatencyMS:       &latencyMS,
 		BatchID:         md.Config.BatchID,
 	}
@@ -139,11 +135,28 @@ func (l lifecycle) OnFunctionStarted(
 
 // OnFunctionSkipped is called when a function run is skipped.
 func (l lifecycle) OnFunctionSkipped(
-	_ context.Context,
-	_ sv2.Metadata,
-	_ execution.SkipState,
+	ctx context.Context,
+	md sv2.Metadata,
+	s execution.SkipState,
 ) {
-	// no-op for now.
+	h := History{
+		AccountID:   md.ID.Tenant.AccountID,
+		BatchID:     md.Config.BatchID,
+		Cron:        s.CronSchedule,
+		EventID:     md.Config.EventID(),
+		RunID:       md.ID.RunID,
+		CreatedAt:   time.Now(),
+		SkipReason:  &s.Reason,
+		FunctionID:  md.ID.FunctionID,
+		WorkspaceID: md.ID.Tenant.EnvID,
+		Type:        enums.HistoryTypeFunctionSkipped.String(),
+	}
+
+	for _, d := range l.drivers {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
+			l.log.Error("execution lifecycle error", "lifecycle", "onFunctionSkipped", "error", err)
+		}
+	}
 }
 
 // OnFunctionFinished is called when a function finishes.  This will
@@ -183,7 +196,7 @@ func (l lifecycle) OnFunctionFinished(
 		Type:               enums.HistoryTypeFunctionCompleted.String(),
 		Attempt:            int64(item.Attempt),
 		IdempotencyKey:     md.IdempotencyKey(),
-		EventID:            md.Config.EventIDs[0],
+		EventID:            md.Config.EventID(),
 		BatchID:            md.Config.BatchID,
 	}
 
@@ -215,48 +228,8 @@ func (l lifecycle) OnFunctionCancelled(
 	ctx context.Context,
 	md sv2.Metadata,
 	req execution.CancelRequest,
+	evts []json.RawMessage,
 ) {
-	go func(ctx context.Context) {
-		start := time.Now()
-		if !md.Config.StartedAt.IsZero() {
-			start = md.Config.StartedAt
-		}
-
-		fnSpanID, err := md.Config.GetSpanID()
-		if err != nil {
-			log.From(ctx).Error().Err(err).Interface("identifier", md.ID).Msg("error retrieving spanID for cancelled function run")
-			return
-		}
-
-		evtIDs := make([]string, len(md.Config.EventIDs))
-		for i, eid := range md.Config.EventIDs {
-			evtIDs[i] = eid.String()
-		}
-
-		_, span := telemetry.NewSpan(ctx,
-			telemetry.WithScope(consts.OtelScopeFunction),
-			telemetry.WithName(md.Config.FunctionSlug),
-			telemetry.WithTimestamp(start),
-			telemetry.WithSpanID(*fnSpanID),
-			telemetry.WithSpanAttributes(
-				attribute.Bool(consts.OtelUserTraceFilterKey, true),
-				attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
-				attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
-				attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
-				attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
-				attribute.String(consts.OtelSysFunctionSlug, md.Config.FunctionSlug),
-				attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
-				attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()),
-				attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
-				attribute.String(consts.OtelSysIdempotencyKey, md.IdempotencyKey()),
-				attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCancelled.ToCode()),
-			),
-		)
-		if md.Config.BatchID != nil {
-			span.SetAttributes(attribute.String(consts.OtelSysBatchID, md.Config.BatchID.String()))
-		}
-		defer span.End()
-	}(ctx)
 	completedStepCount := int64(md.Metrics.StepCount)
 	groupID := uuid.New()
 
@@ -273,7 +246,7 @@ func (l lifecycle) OnFunctionCancelled(
 		RunID:              md.ID.RunID,
 		Type:               enums.HistoryTypeFunctionCancelled.String(),
 		IdempotencyKey:     md.IdempotencyKey(),
-		EventID:            md.Config.EventIDs[0],
+		EventID:            md.Config.EventID(),
 		Cancel:             &req,
 		BatchID:            md.Config.BatchID,
 	}
@@ -319,7 +292,7 @@ func (l lifecycle) OnStepScheduled(
 		Type:            enums.HistoryTypeStepScheduled.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  md.IdempotencyKey(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.EventID(),
 		StepName:        stepName,
 		StepID:          &edge.Edge.Incoming, // TODO: Add step name to edge.
 		BatchID:         md.Config.BatchID,
@@ -363,7 +336,7 @@ func (l lifecycle) OnStepStarted(
 		Type:            enums.HistoryTypeStepStarted.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  md.IdempotencyKey(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.EventID(),
 		StepName:        &edge.Incoming,
 		StepID:          &edge.Incoming, // TODO: Add step name to edge.
 		URL:             &url,
@@ -407,7 +380,7 @@ func (l lifecycle) OnStepFinished(
 		Type:            enums.HistoryTypeStepCompleted.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  md.IdempotencyKey(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.EventID(),
 		StepName:        &resp.Step.Name,
 		StepID:          &edge.Incoming,
 		URL:             &step.URI,
@@ -497,7 +470,7 @@ func (l lifecycle) OnWaitForEvent(
 		Type:            enums.HistoryTypeStepWaiting.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  md.IdempotencyKey(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.EventID(),
 		StepName:        &stepName,
 		StepID:          &op.ID,
 		WaitForEvent: &WaitForEvent{
@@ -552,7 +525,7 @@ func (l lifecycle) OnWaitForEventResumed(
 		RunID:           md.ID.RunID,
 		Type:            enums.HistoryTypeStepCompleted.String(),
 		IdempotencyKey:  md.IdempotencyKey(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.EventID(),
 		WaitResult: &WaitResult{
 			EventID: req.EventID,
 			Timeout: req.EventID == nil,
@@ -624,7 +597,7 @@ func (l lifecycle) OnInvokeFunction(
 		AccountID:       md.ID.Tenant.AccountID,
 		Attempt:         int64(item.Attempt),
 		CreatedAt:       time.Now(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.EventID(),
 		FunctionID:      md.ID.FunctionID,
 		FunctionVersion: int64(md.Config.FunctionVersion),
 		GroupID:         groupID,
@@ -677,7 +650,7 @@ func (l lifecycle) OnInvokeFunctionResumed(
 		AccountID:       md.ID.Tenant.AccountID,
 		WorkspaceID:     md.ID.Tenant.EnvID,
 		CreatedAt:       time.Now(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.EventID(),
 		FunctionID:      md.ID.FunctionID,
 		FunctionVersion: int64(md.Config.FunctionVersion),
 		GroupID:         groupIDUUID,
@@ -744,7 +717,7 @@ func (l lifecycle) OnSleep(
 		Type:            enums.HistoryTypeStepSleeping.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  md.IdempotencyKey(),
-		EventID:         md.Config.EventIDs[0],
+		EventID:         md.Config.EventID(),
 		StepName:        &stepName,
 		StepID:          &op.ID,
 		Sleep: &Sleep{
@@ -772,15 +745,22 @@ func applyResponse(
 
 	// If it's a completed generator step then some data is stored in the
 	// output. We'll try to extract it.
-	if len(resp.Generator) > 0 {
-		if op := resp.HistoryVisibleStep(); op != nil {
-			h.StepID = &op.ID
-			h.StepType = getStepType(*op)
-			h.Result.Output, _ = op.Output()
-			stepName := op.UserDefinedName()
-			h.StepName = &stepName
-		}
+	if op := resp.HistoryVisibleStep(); op != nil {
+		h.StepID = &op.ID
+		h.StepType = getStepType(*op)
+		h.Result.Output, _ = op.Output()
+		stepName := op.UserDefinedName()
+		h.StepName = &stepName
+	}
 
+	// Only set the output to the response error string if there isn't already output. This prevents overriding errors in the user's function
+	if resp.Output == nil && resp.Error() != "" {
+		h.Result.Output = resp.Error()
+		h.Result.SizeBytes = len(h.Result.Output)
+		return nil
+	}
+
+	if len(resp.Generator) > 0 {
 		// If we're a generator, exit now to prevent attempting to parse
 		// generator response as an output; the generator response may be in
 		// relation to many parallel steps, not just the one we're currently

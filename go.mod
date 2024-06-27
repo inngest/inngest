@@ -29,10 +29,11 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gosimple/slug v1.12.0
 	github.com/gowebpki/jcs v1.0.0
+	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/terraform v0.15.3
-	github.com/inngest/expr v0.0.0-20240201152704-a643bc6ace48
-	github.com/inngest/inngestgo v0.7.3-0.20240521072529-2795f6b14496
+	github.com/inngest/expr v0.0.0-20240521153320-6f549d6745fd
+	github.com/inngest/inngestgo v0.7.3-0.20240607055345-4b87df508283
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5
 	github.com/karlseguin/ccache/v2 v2.0.8
@@ -154,6 +155,7 @@ require (
 	github.com/nats-io/nkeys v0.3.0 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/ohler55/ojg v1.21.0 // indirect
+	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pascaldekloe/name v1.0.1 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -171,6 +173,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
+	github.com/tidwall/btree v1.7.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.10 // indirect
 	github.com/tklauser/numcpus v0.4.0 // indirect
 	github.com/urfave/cli/v2 v2.25.1 // indirect

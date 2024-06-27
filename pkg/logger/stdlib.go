@@ -33,6 +33,8 @@ func WithStdlib(ctx context.Context, logger *slog.Logger) context.Context {
 
 func StdlibLevel() slog.Level {
 	switch strings.ToLower(Level()) {
+	case "trace":
+		return slog.LevelDebug
 	case "debug":
 		return slog.LevelDebug
 	case "info":

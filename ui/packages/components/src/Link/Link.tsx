@@ -4,16 +4,16 @@ import NextLink from 'next/link';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowRightLine, RiExternalLinkLine } from '@remixicon/react';
 
-type LinkProps = {
+export type LinkProps = {
   internalNavigation?: boolean;
   showIcon?: boolean;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   className?: string;
   href: Route | UrlObject;
 };
 
 export const defaultLinkStyles =
-  'text-indigo-500 hover:text-indigo-800 hover:decoration-indigo-800 dark:text-indigo-400 dark:hover:decoration-indigo-400 decoration-transparent decoration-2 underline underline-offset-4 cursor-pointer transition-color duration-300';
+  'text-link hover:decoration-link decoration-transparent decoration-1 underline underline-offset-2 cursor-pointer transition-color duration-300';
 
 export function Link({
   href,
@@ -26,7 +26,7 @@ export function Link({
     return (
       <NextLink
         href={href}
-        className={cn(className, showIcon && 'group flex items-center gap-1', defaultLinkStyles)}
+        className={cn(showIcon && 'group flex items-center gap-1', defaultLinkStyles, className)}
       >
         {children}
         {showIcon && (
@@ -37,7 +37,7 @@ export function Link({
   } else if (typeof href === 'string') {
     return (
       <a
-        className={cn(className, showIcon && 'group flex items-center gap-1', defaultLinkStyles)}
+        className={cn(showIcon && 'group flex items-center gap-1', defaultLinkStyles, className)}
         target="_blank"
         rel="noopener noreferrer"
         href={href}

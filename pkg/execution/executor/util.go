@@ -67,7 +67,7 @@ func (g OpcodeGroups) All() []OpcodeGroup {
 	return []OpcodeGroup{g.PriorityGroup, g.OtherGroup}
 }
 
-func CreateInvokeNotFoundEvent(ctx context.Context, opts execution.InvokeNotFoundHandlerOpts) event.Event {
+func CreateInvokeFailedEvent(ctx context.Context, opts execution.InvokeFailHandlerOpts) event.Event {
 	now := time.Now()
 	data := map[string]interface{}{
 		"function_id": opts.FunctionID,

@@ -1,12 +1,23 @@
+import type { Route } from 'next';
+
 import { toMaybeDate } from '../utils/date';
+import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 import { Trace } from './Trace';
 
 type Props = {
-  getOutput: (outputID: string) => Promise<string | null>;
-  trace: React.ComponentProps<typeof Trace>['trace'];
+  getResult: React.ComponentProps<typeof Trace>['getResult'];
+  pathCreator: {
+    runPopout: (params: { runID: string }) => Route;
+  };
+  trace: Lazy<React.ComponentProps<typeof Trace>['trace']>;
 };
 
-export function Timeline({ getOutput, trace }: Props) {
+export function Timeline({ getResult, pathCreator, trace }: Props) {
+  if (!isLazyDone(trace)) {
+    // TODO: Properly handle loading state
+    return null;
+  }
+
   const minTime = new Date(trace.queuedAt);
   const maxTime = toMaybeDate(trace.endedAt) ?? new Date();
 
@@ -14,10 +25,11 @@ export function Timeline({ getOutput, trace }: Props) {
     <div>
       <Trace
         depth={0}
-        getOutput={getOutput}
+        getResult={getResult}
         isExpandable={false}
         maxTime={maxTime}
         minTime={minTime}
+        pathCreator={pathCreator}
         trace={{ ...trace, childrenSpans: [], name: 'Run' }}
       />
 
@@ -25,10 +37,11 @@ export function Timeline({ getOutput, trace }: Props) {
         return (
           <Trace
             depth={0}
-            getOutput={getOutput}
+            getResult={getResult}
             key={child.spanID}
             maxTime={maxTime}
             minTime={minTime}
+            pathCreator={pathCreator}
             trace={child}
           />
         );

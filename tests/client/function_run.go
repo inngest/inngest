@@ -5,17 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/stretchr/testify/require"
 )
 
 type FunctionRunOpt struct {
 	Cursor    string
 	Items     int
 	Status    []string
-	TimeField models.FunctionRunTimeFieldV2
+	TimeField models.RunsV2OrderByField
 	Order     []models.RunsV2OrderBy
 	Start     time.Time
 	End       time.Time
@@ -69,7 +71,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 		cursor = fmt.Sprintf(`"%s"`, opts.Cursor)
 	}
 
-	timeField := models.FunctionRunTimeFieldV2QueuedAt
+	timeField := models.RunsV2OrderByFieldQueuedAt
 	if opts.TimeField.IsValid() {
 		timeField = opts.TimeField
 	}
@@ -78,7 +80,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 	query GetFunctionRunsV2(
 		$startTime: Time!,
 		$endTime: Time!,
-		$timeField: FunctionRunTimeFieldV2 = QUEUED_AT,
+		$timeField: RunsV2OrderByField = QUEUED_AT,
 		$status: [FunctionRunStatus!],
 		$first: Int = 40
 	) {
@@ -137,4 +139,296 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 	}
 
 	return data.Runs.Edges, data.Runs.PageInfo
+}
+
+type Run struct {
+	Output string `json:"output"`
+	Status string `json:"status"`
+}
+
+func (c *Client) Run(ctx context.Context, runID string) Run {
+	c.Helper()
+
+	query := `
+		query GetRun($runID: ID!) {
+			functionRun(query: { functionRunId: $runID }) {
+				output
+				status
+			}
+		}`
+
+	resp := c.MustDoGQL(ctx, graphql.RawParams{
+		Query: query,
+		Variables: map[string]any{
+			"runID": runID,
+		},
+	})
+	if len(resp.Errors) > 0 {
+		c.Fatalf("err with gql: %#v", resp.Errors)
+	}
+
+	type response struct {
+		FunctionRun Run `json:"functionRun"`
+	}
+
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, data); err != nil {
+		c.Fatalf(err.Error())
+	}
+
+	return data.FunctionRun
+}
+
+func (c *Client) WaitForRunStatus(
+	ctx context.Context,
+	t *testing.T,
+	expectedStatus string,
+	runID *string,
+) Run {
+	t.Helper()
+
+	start := time.Now()
+	var run Run
+	for {
+		if runID != nil && *runID != "" {
+			run = c.Run(ctx, *runID)
+			if run.Status == expectedStatus {
+				break
+			}
+		}
+
+		if time.Since(start) > 5*time.Second {
+			var msg string
+			if runID == nil || *runID == "" {
+				msg = "Run ID is empty"
+			} else {
+				msg = fmt.Sprintf("Expected status %s, got %s", expectedStatus, run.Status)
+			}
+			t.Fatalf(msg)
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	return run
+}
+
+// retrieve run with traces
+// TODO: add the traces once implemented
+func (c *Client) RunTraces(ctx context.Context, runID string) *RunV2 {
+	c.Helper()
+
+	if runID == "" {
+		return nil
+	}
+
+	query := `
+		query GetTraceRun($runID: String!) {
+	  	run(runID: $runID) {
+				status
+				traceID
+				isBatch
+				batchCreatedAt
+				cronSchedule
+        endedAt
+
+				trace {
+					...TraceDetails
+					childrenSpans {
+						...TraceDetails
+						childrenSpans {
+							...TraceDetails
+						}
+					}
+				}
+			}
+		}
+		fragment TraceDetails on RunTraceSpan {
+			name
+			runID
+			status
+			attempts
+			isRoot
+			parentSpanID
+			spanID
+			startedAt
+			endedAt
+			duration
+			outputID
+			stepOp
+			stepInfo {
+				__typename
+				... on InvokeStepInfo {
+					triggeringEventID
+					functionID
+					timeout
+					returnEventID
+  				runID
+					timedOut
+				}
+				... on SleepStepInfo {
+					sleepUntil
+				}
+				... on WaitForEventStepInfo {
+					eventName
+					expression
+					timeout
+					foundEventID
+					timedOut
+				}
+			}
+		}
+	`
+
+	resp := c.MustDoGQL(ctx, graphql.RawParams{
+		Query: query,
+		Variables: map[string]any{
+			"runID": runID,
+		},
+	})
+	if len(resp.Errors) > 0 {
+		c.Fatalf("err with fnrun trace query: %#v", resp.Errors)
+	}
+
+	type response struct {
+		Run RunV2
+	}
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, data); err != nil {
+		c.Fatalf(err.Error())
+	}
+
+	return &data.Run
+}
+
+type RunV2 struct {
+	TraceID string `json:"traceID"`
+	// RunID   string        `json:"runID"`
+	Status         string        `json:"status"`
+	Trace          *runTraceSpan `json:"trace,omitempty"`
+	IsBatch        bool          `json:"isBatch"`
+	BatchCreatedAt *time.Time    `json:"batchCreatedAt,omitempty"`
+	CronSchedule   *string       `json:"cronSchedule,omitempty"`
+	EndedAt        *time.Time    `json:"endedAt,omitempty"`
+}
+
+type runTraceSpan struct {
+	Name         string         `json:"name"`
+	RunID        string         `json:"runID"`
+	Status       string         `json:"status"`
+	Attempts     int            `json:"attempts"`
+	IsRoot       bool           `json:"isRoot"`
+	TraceID      string         `json:"traceID"`
+	ParentSpanID string         `json:"parentSpanID"`
+	SpanID       string         `json:"spanID"`
+	Duration     int64          `json:"duration"`
+	StartedAt    *time.Time     `json:"startedAt,omitempty"`
+	EndedAt      *time.Time     `json:"endedAt,omitempty"`
+	ChildSpans   []runTraceSpan `json:"childrenSpans"`
+	OutputID     *string        `json:"outputID,omitempty"`
+	StepOp       string         `json:"stepOp"`
+	StepInfo     any            `json:"stepInfo,omitempty"`
+}
+
+func (c *Client) RunSpanOutput(ctx context.Context, outputID string) *models.RunTraceSpanOutput {
+	c.Helper()
+
+	if outputID == "" {
+		return nil
+	}
+
+	query := `
+		query GetTraceSpanOutput($outputID: String!) {
+			output: runTraceSpanOutputByID(outputID: $outputID) {
+				data
+				error {
+					name
+					message
+					stack
+				}
+			}
+		}
+	`
+
+	resp := c.MustDoGQL(ctx, graphql.RawParams{
+		Query: query,
+		Variables: map[string]any{
+			"outputID": outputID,
+		},
+	})
+	if len(resp.Errors) > 0 {
+		c.Fatalf("err with span output query: %#v", resp.Errors)
+	}
+
+	type response struct {
+		Output *models.RunTraceSpanOutput
+	}
+	data := response{}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		c.Fatalf(err.Error())
+	}
+
+	return data.Output
+}
+
+func (c *Client) ExpectSpanOutput(t *testing.T, expected string, output *models.RunTraceSpanOutput) {
+	require.NotNil(t, output)
+	require.NotNil(t, output.Data)
+	require.Nil(t, output.Error)
+	require.Contains(t, *output.Data, expected)
+}
+
+func (c *Client) ExpectSpanErrorOutput(t *testing.T, msg string, stack string, output *models.RunTraceSpanOutput) {
+	require.NotNil(t, output)
+	require.Nil(t, output.Data)
+	require.NotNil(t, output.Error)
+	if msg != "" {
+		require.Contains(t, output.Error.Message, msg)
+	}
+	if stack != "" {
+		require.NotNil(t, output.Error.Stack)
+		require.Contains(t, *output.Error.Stack, stack)
+	}
+}
+
+func (c *Client) RunTrigger(ctx context.Context, runID string) *models.RunTraceTrigger {
+	c.Helper()
+
+	if runID == "" {
+		return nil
+	}
+
+	query := `
+		query GetTraceRunTrigger($runID: String!) {
+			runTrigger(runID: $runID) {
+				eventName
+				IDs
+				timestamp
+				payloads
+				isBatch
+				batchID
+				cron
+			}
+		}
+	`
+
+	resp := c.MustDoGQL(ctx, graphql.RawParams{
+		Query: query,
+		Variables: map[string]any{
+			"runID": runID,
+		},
+	})
+	if len(resp.Errors) > 0 {
+		c.Fatalf("err with fnrun trace query: %#v", resp.Errors)
+	}
+
+	type response struct {
+		RunTrigger *models.RunTraceTrigger
+	}
+	data := response{}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		c.Fatalf("err with run trigger query: %#v", err)
+	}
+
+	return data.RunTrigger
 }

@@ -33,13 +33,13 @@ export function Card({ accentColor, accentPosition = 'top', children, className 
   return (
     <div
       className={cn(
-        'dark:bg-slate-910 w-full overflow-hidden dark:shadow',
+        'dark:bg-slate-910 w-full overflow-hidden rounded-md dark:shadow',
         wrapperClass,
         className
       )}
     >
       {accentColor && <div className={cn('p-0.5', accentClass, accentColor)} />}
-      <div className={cn('w-full grow overflow-hidden border border-slate-300', contentClass)}>
+      <div className={cn('border-muted w-full grow overflow-hidden border', contentClass)}>
         {children}
       </div>
     </div>
@@ -47,19 +47,12 @@ export function Card({ accentColor, accentPosition = 'top', children, className 
 }
 
 Card.Content = ({ children, className }: PropsWithChildren<{ className?: string }>) => {
-  return <div className={cn('bg-white px-6 py-4 dark:bg-slate-800/40', className)}>{children}</div>;
+  return <div className={cn('bg-canvasBase px-6 py-4 ', className)}>{children}</div>;
 };
 
 Card.Footer = ({ children, className }: PropsWithChildren<{ className?: string }>) => {
   return (
-    <div
-      className={cn(
-        'border-t border-slate-300 bg-white px-6 py-3 dark:border-slate-800/50 dark:bg-slate-800/40',
-        className
-      )}
-    >
-      {children}
-    </div>
+    <div className={cn('border-muted bg-canvasBase border-t px-6 py-3', className)}>{children}</div>
   );
 };
 
@@ -67,7 +60,7 @@ Card.Header = ({ children, className }: PropsWithChildren<{ className?: string }
   return (
     <div
       className={cn(
-        'flex flex-col gap-1 border-b border-slate-300 bg-white px-6 py-3 text-sm text-slate-700 dark:border-slate-800/50 dark:bg-slate-800/40 dark:text-slate-400',
+        'border-muted bg-canvasBase text-basis flex flex-col gap-1 border-b py-3 pl-6 pr-4 text-sm',
         className
       )}
     >

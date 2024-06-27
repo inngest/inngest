@@ -4,6 +4,7 @@ import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card';
+import { InlineCode } from '@inngest/components/InlineCode';
 import { RiErrorWarningLine } from '@remixicon/react';
 import { useQuery } from 'urql';
 
@@ -12,7 +13,6 @@ import { Secret } from '@/components/Secret';
 import { graphql } from '@/gql';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
 import { pathCreator } from '@/utils/urls';
-import { InlineCode } from '../manage/signing-key/InlineCode';
 
 const GetEventKeysForBlankSlateDocument = graphql(`
   query GetEventKeysForBlankSlate($environmentID: ID!) {

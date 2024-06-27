@@ -252,6 +252,12 @@ func (w *WaitForEventOpts) UnmarshalAny(a any) error {
 }
 
 func (w WaitForEventOpts) Expires() (time.Time, error) {
+	if w.Timeout == "" {
+		// The TypeScript SDK sets timeout to an empty string when the duration
+		// is negative
+		return time.Now(), nil
+	}
+
 	dur, err := str2duration.ParseDuration(w.Timeout)
 	if err != nil {
 		return time.Time{}, err
@@ -472,11 +478,59 @@ func (r *DriverResponse) IsTraceVisibleFunctionExecution() bool {
 	return r.StatusCode != 206
 }
 
+type WrappedStandardError struct {
+	err error
+
+	StandardError
+}
+
+func WrapInStandardError(err error, name string, message string, stack string) error {
+	s := &WrappedStandardError{
+		err: err,
+		StandardError: StandardError{
+			Name:    name,
+			Message: message,
+			Stack:   stack,
+		},
+	}
+	s.StandardError.Error = s.Error()
+
+	return s
+}
+
+func (s WrappedStandardError) Unwrap() error {
+	return s.err
+}
+
+func (s WrappedStandardError) Error() string {
+	return s.StandardError.String()
+}
+
 type StandardError struct {
 	Error   string `json:"error"`
 	Name    string `json:"name"`
 	Message string `json:"message"`
 	Stack   string `json:"stack,omitempty"`
+}
+
+func (s StandardError) String() string {
+	return fmt.Sprintf("%s: %s", s.Name, s.Message)
+}
+
+func (s StandardError) Serialize(key string) string {
+	// see ui/packages/components/src/utils/outputRenderer.ts:10
+
+	data := map[string]any{
+		key: s,
+	}
+
+	b, err := json.Marshal(data)
+	if err != nil {
+		// This should never happen.
+		return s.String()
+	}
+
+	return string(b)
 }
 
 func (r *DriverResponse) StandardError() StandardError {

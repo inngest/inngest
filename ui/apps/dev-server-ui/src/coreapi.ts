@@ -170,12 +170,7 @@ export const DELETE_APP = gql`
 `;
 
 export const TRIGGERS_STREAM = gql`
-  query GetTriggersStream(
-    $limit: Int!
-    $after: Time
-    $before: Time
-    $includeInternalEvents: Boolean!
-  ) {
+  query GetTriggersStream($limit: Int!, $after: ID, $before: ID, $includeInternalEvents: Boolean!) {
     stream(
       query: {
         limit: $limit
@@ -250,5 +245,122 @@ export const CANCEL_RUN = gql`
 export const RERUN = gql`
   mutation Rerun($runID: ULID!) {
     rerun(runID: $runID)
+  }
+`;
+
+export const GET_RUNS = gql`
+  query GetRuns(
+    $startTime: Time!
+    $status: [FunctionRunStatus!]
+    $timeField: RunsV2OrderByField!
+    $functionRunCursor: String = null
+  ) {
+    runs(
+      filter: { from: $startTime, status: $status, timeField: $timeField }
+      orderBy: [{ field: $timeField, direction: DESC }]
+      after: $functionRunCursor
+    ) {
+      edges {
+        node {
+          id
+          queuedAt
+          endedAt
+          startedAt
+          status
+        }
+      }
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+    }
+  }
+`;
+
+export const TRACE_DETAILS_FRAGMENT = gql`
+  fragment TraceDetails on RunTraceSpan {
+    name
+    status
+    attempts
+    queuedAt
+    startedAt
+    endedAt
+    isRoot
+    outputID
+    spanID
+    stepOp
+    stepInfo {
+      __typename
+      ... on InvokeStepInfo {
+        triggeringEventID
+        functionID
+        timeout
+        returnEventID
+        runID
+        timedOut
+      }
+      ... on SleepStepInfo {
+        sleepUntil
+      }
+      ... on WaitForEventStepInfo {
+        eventName
+        expression
+        timeout
+        foundEventID
+        timedOut
+      }
+    }
+  }
+`;
+
+export const GET_RUN = gql`
+  query GetRun($runID: String!) {
+    run(runID: $runID) {
+      function {
+        app {
+          name
+        }
+        id
+        name
+      }
+      trace {
+        ...TraceDetails
+        childrenSpans {
+          ...TraceDetails
+          childrenSpans {
+            ...TraceDetails
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const GET_TRACE_RESULT = gql`
+  query GetTraceResult($traceID: String!) {
+    runTraceSpanOutputByID(outputID: $traceID) {
+      data
+      error {
+        message
+        name
+        stack
+      }
+    }
+  }
+`;
+
+export const GET_TRIGGER = gql`
+  query GetTrigger($runID: String!) {
+    runTrigger(runID: $runID) {
+      IDs
+      payloads
+      timestamp
+      eventName
+      isBatch
+      batchID
+      cron
+    }
   }
 `;

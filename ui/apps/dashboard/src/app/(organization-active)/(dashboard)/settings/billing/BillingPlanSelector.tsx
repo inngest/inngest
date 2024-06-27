@@ -59,7 +59,7 @@ export default function BillingPlanSelector({
         const className = cn(
           `rounded-lg border`,
           plan.isActive
-            ? 'bg-white border-slate-300 outline outline-2 outline-offset-4 outline-indigo-500'
+            ? 'bg-white border-muted outline outline-2 outline-offset-4 outline-indigo-500'
             : 'bg-slate-100 border-transparent',
           plan.isPremium ? 'bg-slate-900 text-white' : 'text-slate-900'
         );

@@ -1,34 +1,69 @@
-import { useCallback } from 'react';
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import type { Route } from 'next';
 import { toast } from 'sonner';
 
+import { StatusCell } from '../Table';
 import { Trace } from '../TimelineV2';
 import { Timeline } from '../TimelineV2/Timeline';
+import { TriggerDetails } from '../TriggerDetails';
+import type { Result } from '../types/functionRun';
+import { nullishToLazy } from '../utils/lazyLoad';
 import { RunInfo } from './RunInfo';
 
 type Props = {
+  standalone: boolean;
+  cancelRun: (runID: string) => Promise<unknown>;
+  getResult: (outputID: string) => Promise<Result>;
+  getRun: (runID: string) => Promise<Run>;
+  getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
+  pathCreator: {
+    app: (params: { externalAppID: string }) => Route;
+    runPopout: (params: { runID: string }) => Route;
+  };
+  rerun: React.ComponentProps<typeof RunInfo>['rerun'];
+  runID: string;
+};
+
+type Run = {
   app: {
+    externalID: string;
     name: string;
   };
-  cancelRun: () => Promise<unknown>;
   fn: {
     id: string;
     name: string;
   };
-  getOutput: (outputID: string) => Promise<string | null>;
-  rerun: (args: { fnID: string }) => Promise<unknown>;
-  run: {
-    id: string;
-    output: string | null;
-    trace: React.ComponentProps<typeof Trace>['trace'];
-  };
+  id: string;
+  trace: React.ComponentProps<typeof Trace>['trace'];
 };
 
 export function RunDetails(props: Props) {
-  const { app, getOutput, fn, rerun, run } = props;
+  const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
+
+  const [run, setRun] = useState<Run>();
+  useEffect(() => {
+    if (!run) {
+      getRun(runID).then((data) => {
+        setRun(data);
+      });
+    }
+  }, [run, runID]);
+
+  const [result, setResult] = useState<Result>();
+  const outputID = run?.trace?.outputID;
+  useEffect(() => {
+    if (!result && outputID) {
+      getResult(outputID).then((data) => {
+        setResult(data);
+      });
+    }
+  }, [result, outputID]);
 
   const cancelRun = useCallback(async () => {
     try {
-      await props.cancelRun();
+      await props.cancelRun(runID);
       toast.success('Cancelled run');
     } catch (e) {
       toast.error('Failed to cancel run');
@@ -38,8 +73,34 @@ export function RunDetails(props: Props) {
 
   return (
     <div>
-      <RunInfo app={app} cancelRun={cancelRun} className="mb-4" fn={fn} rerun={rerun} run={run} />
-      <Timeline getOutput={getOutput} trace={run.trace} />
+      {standalone && run && (
+        <div className="mx-8 flex flex-col gap-1 pb-6">
+          <StatusCell status={run.trace.status} />
+          <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
+          <p className="text-muted font-mono">{runID}</p>
+        </div>
+      )}
+
+      <div className="flex gap-4">
+        <div className="grow">
+          <div className="ml-8">
+            <RunInfo
+              cancelRun={cancelRun}
+              className="mb-4"
+              pathCreator={pathCreator}
+              rerun={rerun}
+              run={nullishToLazy(run)}
+              runID={runID}
+              standalone={standalone}
+              result={result}
+            />
+          </div>
+
+          {run && <Timeline getResult={getResult} pathCreator={pathCreator} trace={run.trace} />}
+        </div>
+
+        <TriggerDetails getTrigger={getTrigger} runID={runID} />
+      </div>
     </div>
   );
 }

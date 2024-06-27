@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	StateErrorKey = "error"
-	StateDataKey  = "data"
+	StateErrorKey         = "error"
+	StateDataKey          = "data"
+	SdkInvokeTimeoutError = "InngestInvokeTimeoutError"
 )
 
 // Executor manages executing actions.  It interfaces over a state store to save
@@ -105,8 +106,8 @@ type Executor interface {
 	// run completion
 	SetFinalizer(f FinalizePublisher)
 
-	// InvokeNotFoundHandler invokes the invoke not found handler.
-	InvokeNotFoundHandler(context.Context, InvokeNotFoundHandlerOpts) error
+	// InvokeFailHandler invokes the invoke fail handler.
+	InvokeFailHandler(context.Context, InvokeFailHandlerOpts) error
 
 	AppendAndScheduleBatchWithOpts(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *BatchExecOpts) error
 	// deprecated; use AppendAndScheduleBatchWithOpts in new code
@@ -118,7 +119,7 @@ type Executor interface {
 }
 
 // PublishFinishedEventOpts represents the options for publishing a finished event.
-type InvokeNotFoundHandlerOpts struct {
+type InvokeFailHandlerOpts struct {
 	OriginalEvent event.TrackedEvent
 	FunctionID    string
 	RunID         string
@@ -136,13 +137,17 @@ type BatchExecOpts struct {
 // It should be used to send the given events.
 type FinalizePublisher func(context.Context, sv2.ID, []event.Event) error
 
-// InvokeNotFoundHandler is a function that handles invocations failing due to
-// the function not being found. It is passed a list of events to send.
-type InvokeNotFoundHandler func(context.Context, InvokeNotFoundHandlerOpts, []event.Event) error
+// InvokeFailHandler is a function that handles invocations failing due to the
+// function failing to run (not found, rate-limited). It is passed a list of
+// events to send.
+type InvokeFailHandler func(context.Context, InvokeFailHandlerOpts, []event.Event) error
 
 // HandleSendingEvent handles sending an event given an event and the queue
 // item.
 type HandleSendingEvent func(context.Context, event.Event, queue.Item) error
+
+// PreDeleteStateSizeReporter reports the state size before deleting state
+type PreDeleteStateSizeReporter func(context.Context, sv2.Metadata)
 
 // ScheduleRequest represents all data necessary to schedule a new function.
 type ScheduleRequest struct {
@@ -210,6 +215,14 @@ func (r *ResumeRequest) SetError(name string, message string) {
 			Error:   name + ": " + message,
 		},
 	}
+}
+
+// Set `r.With` to an invoke timeout `error`
+func (r *ResumeRequest) SetInvokeTimeoutError() {
+	r.SetError(
+		SdkInvokeTimeoutError,
+		"Timed out waiting for invoked function to complete",
+	)
 }
 
 func (r *ResumeRequest) Data() string {

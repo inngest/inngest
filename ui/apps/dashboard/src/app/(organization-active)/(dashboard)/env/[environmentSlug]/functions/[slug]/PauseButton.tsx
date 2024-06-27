@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { AlertModal } from '@inngest/components/Modal';
-import * as Tooltip from '@radix-ui/react-tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { RiPauseLine, RiPlayFill } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
@@ -102,10 +102,9 @@ function PauseFunctionModal({
       )}
       {!isPaused && (
         <ul className="list-inside list-disc p-6 pb-0 leading-8">
-          <li>Existing runs will continue to run to completion.</li>
           <li>No new runs will be queued or invoked.</li>
+          <li>Existing runs will continue to run to completion.</li>
           <li>Events will continue to be received, but they will not trigger new runs.</li>
-          <li>Paused functions will be unpaused when you resync your app.</li>
           <li>Functions can be resumed at any time.</li>
         </ul>
       )}
@@ -140,32 +139,29 @@ export default function PauseFunctionButton({ functionSlug, disabled }: PauseFun
 
   return (
     <>
-      <Tooltip.Provider>
-        <Tooltip.Root delayDuration={0}>
-          <Tooltip.Trigger asChild>
-            <span tabIndex={0}>
-              <Button
-                icon={
-                  isPaused ? (
-                    <RiPlayFill className=" text-green-600" />
-                  ) : (
-                    <RiPauseLine className=" text-amber-500" />
-                  )
-                }
-                btnAction={() => setIsPauseFunctionModalVisible(true)}
-                disabled={disabled || isFetchingVersions}
-                label={isPaused ? 'Resume' : 'Pause'}
-              />
-            </span>
-          </Tooltip.Trigger>
-          <Tooltip.Content className="align-center rounded-md bg-slate-800 px-2 text-xs text-slate-300">
-            {isPaused
-              ? 'Begin running this function after a temporary pause'
-              : 'Temporarily stop a function from being run'}
-            <Tooltip.Arrow className="fill-slate-800" />
-          </Tooltip.Content>
-        </Tooltip.Root>
-      </Tooltip.Provider>
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>
+          <span tabIndex={0}>
+            <Button
+              icon={
+                isPaused ? (
+                  <RiPlayFill className=" text-green-600" />
+                ) : (
+                  <RiPauseLine className=" text-amber-500" />
+                )
+              }
+              btnAction={() => setIsPauseFunctionModalVisible(true)}
+              disabled={disabled || isFetchingVersions}
+              label={isPaused ? 'Resume' : 'Pause'}
+            />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="align-center rounded-md px-2 text-xs">
+          {isPaused
+            ? 'Begin running this function after a temporary pause'
+            : 'Temporarily stop a function from being run'}
+        </TooltipContent>
+      </Tooltip>
       <PauseFunctionModal
         functionID={fn.id}
         functionName={fn.name}

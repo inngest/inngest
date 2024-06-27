@@ -40,7 +40,7 @@ export function SyncList({
   return (
     <div
       className={classNames(
-        'w-2/5 max-w-2xl flex-shrink-0 overflow-y-auto border-r border-slate-300 bg-white sm:w-1/3',
+        'border-muted w-2/5 max-w-2xl flex-shrink-0 overflow-y-auto border-r bg-white sm:w-1/3',
         className
       )}
     >
@@ -60,7 +60,7 @@ export function SyncList({
             return (
               <li
                 className={classNames(
-                  'flex cursor-pointer items-center justify-between border-b border-slate-300 text-slate-800 hover:bg-slate-100',
+                  'border-muted flex cursor-pointer items-center justify-between border-b text-slate-800 hover:bg-slate-100',
                   bgColor
                 )}
                 key={sync.id}

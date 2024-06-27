@@ -1,5 +1,6 @@
-import { RunStatusIcon, statusStyles } from '../FunctionRunStatusIcon/RunStatusIcons';
+import { RunStatusDot } from '../FunctionRunStatusIcons';
 import { Select, type Option } from '../Select/Select';
+import { getStatusBackgroundClass, getStatusBorderClass } from '../statusClasses';
 import {
   functionRunStatuses,
   isFunctionRunStatus,
@@ -21,6 +22,9 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
   const selectedValues = options.filter((option) =>
     selectedStatuses.some((status) => isFunctionRunStatus(status) && status === option.id)
   );
+  const areAllStatusesSelected = functionRunStatuses.every((status) =>
+    selectedStatuses.includes(status)
+  );
   const statusDots = selectedStatuses.map((status) => {
     const isSelected = selectedStatuses.includes(status);
     return (
@@ -28,7 +32,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
         key={status}
         className={cn(
           'inline-block h-[9px] w-[9px] flex-shrink-0 rounded-full border border-slate-50 bg-slate-50 ring-1 ring-inset ring-slate-300 group-hover:border-slate-100 [&:not(:first-child)]:-ml-1',
-          isSelected && [statusStyles[status], 'ring-0']
+          isSelected && [getStatusBackgroundClass(status), getStatusBorderClass(status), 'ring-0']
         )}
         aria-hidden="true"
       />
@@ -51,9 +55,13 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
         onStatusesChange(newValue);
       }}
       label="Status"
+      isLabelVisible
     >
-      <Select.Button>
-        {selectedStatuses.length > 0 && <span className="pr-2">{statusDots}</span>}
+      <Select.Button isLabelVisible>
+        <div className="w-7 text-left">
+          {selectedStatuses.length > 0 && !areAllStatusesSelected && <span>{statusDots}</span>}
+          {(selectedStatuses.length === 0 || areAllStatusesSelected) && <span>All</span>}
+        </div>
       </Select.Button>
       <Select.Options>
         {options.map((option) => {
@@ -61,7 +69,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
           return (
             <Select.CheckboxOption key={option.id} option={option}>
               <span className="flex items-center gap-1 lowercase">
-                <RunStatusIcon status={option.id} className="h-2 w-2" />
+                <RunStatusDot status={option.id} className="h-2 w-2" />
                 <label className="text-sm first-letter:capitalize">{option.name}</label>
               </span>
             </Select.CheckboxOption>

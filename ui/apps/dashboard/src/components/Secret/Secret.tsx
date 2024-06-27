@@ -25,7 +25,7 @@ export function Secret({ className, kind, secret }: Props) {
   return (
     <div
       className={cn(
-        'flex overflow-hidden rounded-md border border-slate-300 bg-slate-50 text-slate-500',
+        'border-muted flex overflow-hidden rounded-md border bg-slate-50 text-slate-500',
         className
       )}
     >
@@ -34,7 +34,7 @@ export function Secret({ className, kind, secret }: Props) {
       </div>
 
       <RevealButton
-        className="border-r border-slate-300"
+        className="border-muted border-r"
         isRevealed={isRevealed}
         onClick={() => setIsRevealed((prev) => !prev)}
       />

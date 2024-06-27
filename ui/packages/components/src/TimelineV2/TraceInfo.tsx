@@ -1,66 +1,159 @@
+import type { Route } from 'next';
+
 import { Card } from '../Card';
+import {
+  CodeElement,
+  ElementWrapper,
+  LinkElement,
+  TextElement,
+  TimeElement,
+} from '../DetailsCard/Element';
+import { RunResult } from '../RunResult';
 import { Time } from '../Time';
+import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
-import type { Trace } from './types';
+import { isStepInfoInvoke, isStepInfoSleep, isStepInfoWait, type Trace } from './types';
 
 type Props = {
   className?: string;
+  pathCreator: {
+    runPopout: (params: { runID: string }) => Route;
+  };
   trace: Trace;
+  result?: Result;
 };
 
-export function TraceInfo({ className, trace }: Props) {
+export function TraceInfo({ className, pathCreator, trace, result }: Props) {
   const delayText = formatMilliseconds(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
   );
 
   let duration = 0;
-  (trace.childrenSpans ?? []).forEach((child, i) => {
-    if (!child.startedAt) {
-      return;
-    }
+  if (trace.childrenSpans && trace.childrenSpans.length > 0) {
+    trace.childrenSpans.forEach((child, i) => {
+      if (!child.startedAt) {
+        return;
+      }
 
-    duration +=
-      (toMaybeDate(child.endedAt) ?? new Date()).getTime() - new Date(child.startedAt).getTime();
-  });
+      duration +=
+        (toMaybeDate(child.endedAt) ?? new Date()).getTime() - new Date(child.startedAt).getTime();
+    });
+  } else if (trace.startedAt) {
+    duration =
+      (toMaybeDate(trace.endedAt) ?? new Date()).getTime() - new Date(trace.startedAt).getTime();
+  }
 
   let durationText = '-';
   if (duration > 0) {
     durationText = formatMilliseconds(duration);
   }
 
+  let stepKindInfo = null;
+
+  if (isStepInfoInvoke(trace.stepInfo)) {
+    const timeout = toMaybeDate(trace.stepInfo.timeout);
+    stepKindInfo = (
+      <>
+        <ElementWrapper label="Run">
+          {trace.stepInfo.runID ? (
+            <LinkElement
+              href={pathCreator.runPopout({ runID: trace.stepInfo.runID })}
+              internalNavigation
+              showIcon={false}
+            >
+              {trace.stepInfo.runID}
+            </LinkElement>
+          ) : (
+            '-'
+          )}
+        </ElementWrapper>
+        <ElementWrapper label="Timeout">
+          {timeout ? <TimeElement date={timeout} /> : <TextElement>-</TextElement>}
+        </ElementWrapper>
+        <ElementWrapper label="Timed out">
+          <TextElement>{maybeBooleanToString(trace.stepInfo.timedOut)}</TextElement>
+        </ElementWrapper>
+      </>
+    );
+  } else if (isStepInfoSleep(trace.stepInfo)) {
+    const sleepUntil = toMaybeDate(trace.stepInfo.sleepUntil);
+    stepKindInfo = (
+      <ElementWrapper label="Sleep until">
+        {sleepUntil ? <Time value={sleepUntil} /> : <TextElement>-</TextElement>}
+      </ElementWrapper>
+    );
+  } else if (isStepInfoWait(trace.stepInfo)) {
+    const timeout = toMaybeDate(trace.stepInfo.timeout);
+    stepKindInfo = (
+      <>
+        <ElementWrapper label="Event name">
+          <TextElement>{trace.stepInfo.eventName}</TextElement>
+        </ElementWrapper>
+        <ElementWrapper label="Timeout">
+          {timeout ? <TimeElement date={timeout} /> : <TextElement>-</TextElement>}
+        </ElementWrapper>
+        <ElementWrapper label="Timed out">
+          <TextElement>{maybeBooleanToString(trace.stepInfo.timedOut)}</TextElement>
+        </ElementWrapper>
+        <ElementWrapper className="w-full" label="Match expression">
+          {trace.stepInfo.expression ? (
+            <CodeElement value={trace.stepInfo.expression} />
+          ) : (
+            <TextElement>-</TextElement>
+          )}
+        </ElementWrapper>
+      </>
+    );
+  }
+
   return (
-    <div className={cn('flex bg-white', className)}>
+    <div className={cn('flex', className)}>
       <Card>
+        <Card.Header className="h-11 flex-row items-center gap-2">Step information</Card.Header>
+
         <Card.Content>
-          <dl className="flex flex-wrap gap-2">
-            <Labeled label="Queued at">
-              <Time value={new Date(trace.queuedAt)} />
-            </Labeled>
+          <dl className="flex flex-wrap gap-4">
+            <ElementWrapper label="Queued at">
+              <TimeElement date={new Date(trace.queuedAt)} />
+            </ElementWrapper>
 
-            <Labeled label="Started at">
-              {trace.startedAt ? <Time value={new Date(trace.startedAt)} /> : '-'}
-            </Labeled>
+            <ElementWrapper label="Started at">
+              {trace.startedAt ? (
+                <TimeElement date={new Date(trace.startedAt)} />
+              ) : (
+                <TextElement>-</TextElement>
+              )}
+            </ElementWrapper>
 
-            <Labeled label="Ended at">
-              {trace.endedAt ? <Time value={new Date(trace.endedAt)} /> : '-'}
-            </Labeled>
+            <ElementWrapper label="Ended at">
+              {trace.endedAt ? (
+                <TimeElement date={new Date(trace.endedAt)} />
+              ) : (
+                <TextElement>-</TextElement>
+              )}
+            </ElementWrapper>
 
-            <Labeled label="Delay">{delayText}</Labeled>
+            <ElementWrapper label="Delay">
+              <TextElement>{delayText}</TextElement>
+            </ElementWrapper>
 
-            <Labeled label="Duration">{durationText}</Labeled>
+            <ElementWrapper label="Duration">
+              <TextElement>{durationText}</TextElement>
+            </ElementWrapper>
+
+            {stepKindInfo}
           </dl>
         </Card.Content>
+        {result && <RunResult className="border-subtle border-t" result={result} />}
       </Card>
     </div>
   );
 }
 
-function Labeled({ label, children }: React.PropsWithChildren<{ label: string }>) {
-  return (
-    <div className="w-64 text-sm">
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="truncate">{children}</dd>
-    </div>
-  );
+function maybeBooleanToString(value: boolean | null): string | null {
+  if (value === null) {
+    return null;
+  }
+  return value ? 'True' : 'False';
 }

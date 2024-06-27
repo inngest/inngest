@@ -436,6 +436,9 @@ func (m mgr) LoadEvents(ctx context.Context, fnID uuid.UUID, runID ulid.ULID) ([
 	cmd = m.r.B().Get().Key(m.kf.Event(ctx, v1id)).Build()
 	byt, err = m.r.Do(ctx, cmd).AsBytes()
 	if err != nil {
+		if err == rueidis.Nil {
+			return nil, state.ErrEventNotFound
+		}
 		return nil, fmt.Errorf("failed to get event; %w", err)
 	}
 	return []json.RawMessage{byt}, nil
@@ -478,6 +481,9 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 		cmd := m.r.B().Get().Key(m.kf.Event(ctx, id)).Build()
 		byt, err := m.r.Do(ctx, cmd).AsBytes()
 		if err != nil {
+			if err == rueidis.Nil {
+				return nil, state.ErrEventNotFound
+			}
 			return nil, fmt.Errorf("failed to get event; %w", err)
 		}
 		event := map[string]any{}
@@ -591,11 +597,11 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 
 	keys := []string{
 		m.kf.PauseID(ctx, p.ID),
-		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 		m.kf.PauseEvent(ctx, p.WorkspaceID, evt),
 		m.kf.Invoke(ctx, p.WorkspaceID),
 		m.kf.PauseIndex(ctx, "add", p.WorkspaceID, evt),
 		m.kf.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
+		m.kf.RunPauses(ctx, p.Identifier.RunID),
 	}
 
 	// Add 1 second because int will truncate the float. Otherwise, timeouts
@@ -681,17 +687,35 @@ func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 // lifecycle.  Now, state stores must account for deletion directly.  Note that if the
 // state store is queue-aware, it must delete queue items for the run also.  This may
 // not always be the case.
-func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
+//
+// Returns a boolean indicating whether it performed deletion. If the run had
+// parallel steps then it may be false, since parallel steps cause the function
+// end to be reached multiple times in a single run
+func (m mgr) Delete(ctx context.Context, i state.Identifier) (bool, error) {
 	// Ensure this context isn't cancelled;  this is called in a goroutine.
 	callCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	// Ensure function idempotency exists for the defined period.
-	key := m.kf.Idempotency(ctx, i)
+	key := i.Key
+	if i.Key == "" {
+		if md, err := m.Metadata(ctx, i.RunID); err == nil {
+			key = m.kf.Idempotency(ctx, md.Identifier)
+		}
+	} else {
+		key = m.kf.Idempotency(ctx, i)
+	}
 
 	cmd := m.r.B().Expire().Key(key).Seconds(int64(consts.FunctionIdempotencyPeriod.Seconds())).Build()
 	if err := m.r.Do(callCtx, cmd).Error(); err != nil {
-		return err
+		return false, err
+	}
+
+	// Fetch all pauses for the run
+	if pauseIDs, err := m.r.Do(callCtx, m.r.B().Smembers().Key(m.kf.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
+		for _, id := range pauseIDs {
+			pauseID, _ := uuid.Parse(id)
+			_ = m.DeletePauseByID(ctx, pauseID)
+		}
 	}
 
 	// Clear all other data for a job.
@@ -705,14 +729,41 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
 		m.kf.Event(ctx, i),
 		m.kf.History(ctx, i.RunID),
 		m.kf.Errors(ctx, i),
+		m.kf.RunPauses(ctx, i.RunID),
 	}
+
+	performedDeletion := false
 	for _, k := range keys {
 		cmd := m.r.B().Del().Key(k).Build()
-		if err := m.r.Do(callCtx, cmd).Error(); err != nil {
-			return err
+		result := m.r.Do(callCtx, cmd)
+
+		// We should check a single key rather than all keys, to avoid races.
+		// We'll somewhat arbitrarily pick RunMetadata
+		if k == m.kf.RunMetadata(ctx, i.RunID) {
+			if count, _ := result.ToInt64(); count > 0 {
+				performedDeletion = true
+			}
+		}
+
+		if err := result.Error(); err != nil {
+			return false, err
 		}
 	}
-	return nil
+
+	return performedDeletion, nil
+}
+
+func (m mgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error {
+	// Attempt to fetch this pause.
+	pause, err := m.PauseByID(ctx, pauseID)
+	if err == nil && pause != nil {
+		return m.DeletePause(ctx, *pause)
+	}
+
+	// This won't delete event keys nicely, but still gets the pause yeeted.
+	return m.DeletePause(ctx, state.Pause{
+		ID: pauseID,
+	})
 }
 
 func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
@@ -722,11 +773,20 @@ func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
 	if p.Event != nil {
 		eventKey = m.kf.PauseEvent(ctx, p.WorkspaceID, *p.Event)
 	}
+
+	evt := ""
+	if p.Event != nil && (p.InvokeCorrelationID == nil || *p.InvokeCorrelationID == "") {
+		evt = *p.Event
+	}
+
 	keys := []string{
 		m.kf.PauseID(ctx, p.ID),
 		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 		eventKey,
 		m.kf.Invoke(ctx, p.WorkspaceID),
+		m.kf.PauseIndex(ctx, "add", p.WorkspaceID, evt),
+		m.kf.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
+		m.kf.RunPauses(ctx, p.Identifier.RunID),
 	}
 	corrId := ""
 	if p.InvokeCorrelationID != nil && *p.InvokeCorrelationID != "" {
@@ -769,6 +829,13 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 	if p.Event != nil {
 		eventKey = m.kf.PauseEvent(ctx, p.WorkspaceID, *p.Event)
 	}
+
+	// For pause indexes.
+	evt := ""
+	if p.Event != nil && (p.InvokeCorrelationID == nil || *p.InvokeCorrelationID == "") {
+		evt = *p.Event
+	}
+
 	keys := []string{
 		m.kf.PauseID(ctx, id),
 		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
@@ -777,6 +844,9 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		m.kf.Actions(ctx, p.Identifier),
 		m.kf.Stack(ctx, p.Identifier.RunID),
 		m.kf.RunMetadata(ctx, p.Identifier.RunID),
+		m.kf.PauseIndex(ctx, "add", p.WorkspaceID, evt),
+		m.kf.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
+		m.kf.RunPauses(ctx, p.Identifier.RunID),
 	}
 
 	corrId := ""
@@ -1201,6 +1271,19 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	var err error
 	m := &runMetadata{}
 
+	// The V1 state identifier is the most important thing to be stored in state.  We must have this
+	// as it contains tenant information.
+	val, ok := data["id"]
+	if !ok || val == "" {
+		return nil, state.ErrRunNotFound
+	}
+	id := state.Identifier{}
+	if err := json.Unmarshal([]byte(val), &id); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal metadata identifier: %s", val)
+	}
+	m.Identifier = id
+
+	// Handle everything else optimistically
 	v, ok := data["status"]
 	if !ok {
 		return nil, fmt.Errorf("no status stored in metadata")
@@ -1214,11 +1297,11 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	parseInt := func(v string) (int, error) {
 		str, ok := data[v]
 		if !ok {
-			return 0, fmt.Errorf("no created at stored in run metadata")
+			return 0, fmt.Errorf("no '%s' stored in run metadata", v)
 		}
 		val, err := strconv.Atoi(str)
 		if err != nil {
-			return 0, fmt.Errorf("invalid pending stored in run metadata")
+			return 0, fmt.Errorf("invalid '%s' stored in run metadata", v)
 		}
 		return val, nil
 	}

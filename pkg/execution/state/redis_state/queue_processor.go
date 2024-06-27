@@ -13,6 +13,7 @@ import (
 	"github.com/VividCortex/ewma"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
@@ -95,9 +96,12 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		queueName = item.QueueName
 	}
 
-	telemetry.IncrQueueItemEnqueuedCounter(ctx, telemetry.CounterOpt{
+	telemetry.IncrQueueItemStatusCounter(ctx, telemetry.CounterOpt{
 		PkgName: pkgName,
-		Tags:    map[string]any{"kind": item.Kind},
+		Tags: map[string]any{
+			"status": "enqueued",
+			"kind":   item.Kind,
+		},
 	})
 
 	qi := QueueItem{
@@ -538,6 +542,7 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 			processCtx, cancel := context.WithCancel(context.Background())
 			err := q.process(processCtx, i.P, i.I, i.S, f)
 			q.sem.Release(1)
+			telemetry.WorkerQueueCapacityCounter(ctx, -1, telemetry.CounterOpt{PkgName: pkgName})
 			cancel()
 			if err == nil {
 				continue
@@ -580,7 +585,9 @@ func (q *queue) scan(ctx context.Context) error {
 	}
 
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
-	partitions, err := q.partitionPeek(ctx, partitionKey, q.isSequential(), getNow().Add(PartitionLookahead), PartitionPeekMax)
+	partitions, err := duration(ctx, "partition_peek", func(ctx context.Context) ([]*QueuePartition, error) {
+		return q.partitionPeek(ctx, partitionKey, q.isSequential(), getNow().Add(PartitionLookahead), PartitionPeekMax)
+	})
 	if err != nil {
 		return err
 	}
@@ -635,7 +642,9 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	// items are dynamic generators).  This means that we have to delay
 	// processing the partition by N seconds, meaning the latency is increased by
 	// up to this period for scheduled items behind the concurrency limits.
-	_, err := q.PartitionLease(ctx, p, PartitionLeaseDuration)
+	_, err := duration(ctx, "partition_lease", func(ctx context.Context) (*ulid.ULID, error) {
+		return q.PartitionLease(ctx, p, PartitionLeaseDuration)
+	})
 	if err == ErrPartitionConcurrencyLimit {
 		for _, l := range q.lifecycles {
 			// Track lifecycles; this function hit a partition limit ahead of
@@ -663,7 +672,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 
 	begin := time.Now()
 	defer func() {
-		telemetry.HistogramProcessPartitionDration(ctx, time.Since(begin).Milliseconds(), telemetry.HistogramOpt{
+		telemetry.HistogramProcessPartitionDuration(ctx, time.Since(begin).Milliseconds(), telemetry.HistogramOpt{
 			PkgName: pkgName,
 		})
 	}()
@@ -681,11 +690,18 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	// order, depending on how long it takes for the item to pass through the channel
 	// to the worker, how long Redis takes to lease the item, etc.
 	fetch := getNow().Truncate(time.Second).Add(PartitionLookahead)
-	queue, err := q.Peek(peekCtx, p.Queue(), fetch, q.peekSize())
+
+	queue, err := duration(peekCtx, "peek", func(ctx context.Context) ([]*QueueItem, error) {
+		peek := q.peekSize(ctx, p)
+		// NOTE: would love to instrument this value to see it over time per function but
+		// it's likely too high of a cardinality
+		go telemetry.HistogramQueuePeekEWMA(ctx, peek, telemetry.HistogramOpt{PkgName: pkgName})
+		return q.Peek(peekCtx, p.Queue(), fetch, peek)
+	})
 	if err != nil {
 		return err
 	}
-	telemetry.IncrQueuePeekedCounter(ctx, int64(len(queue)), telemetry.CounterOpt{PkgName: pkgName})
+	telemetry.HistogramQueuePeekSize(ctx, int64(len(queue)), telemetry.HistogramOpt{PkgName: pkgName})
 
 	var (
 		processErr error
@@ -716,7 +732,10 @@ ProcessLoop:
 		//       and don't bother to process if the queue item has a limited key.  This
 		//       lessens work done in the queue, as we can `continue` immediately.
 		if item.IsLeased(getNow()) {
-			telemetry.IncrQueueItemLeaseContentionCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": "lease_contention"},
+			})
 			continue
 		}
 
@@ -726,6 +745,7 @@ ProcessLoop:
 			// Break the entire loop to prevent out of order work.
 			break ProcessLoop
 		}
+		telemetry.WorkerQueueCapacityCounter(ctx, 1, telemetry.CounterOpt{PkgName: pkgName})
 
 		// Attempt to lease this item before passing this to a worker.  We have to do this
 		// synchronously as we need to lease prior to requeueing the partition pointer. If
@@ -735,7 +755,9 @@ ProcessLoop:
 		//
 		// This is safe:  only one process runs scan(), and we guard the total number of
 		// available workers with the above semaphore.
-		leaseID, err := q.Lease(ctx, *p, *item, QueueLeaseDuration, staticTime, denies)
+		leaseID, err := duration(ctx, "lease", func(ctx context.Context) (*ulid.ULID, error) {
+			return q.Lease(ctx, *p, *item, QueueLeaseDuration, staticTime, denies)
+		})
 
 		// NOTE: If this loop ends in an error, we must _always_ release an item from the
 		// semaphore to free capacity.  This will happen automatically when the worker
@@ -743,6 +765,7 @@ ProcessLoop:
 		if err != nil {
 			// Continue on and handle the error below.
 			q.sem.Release(1)
+			telemetry.WorkerQueueCapacityCounter(ctx, -1, telemetry.CounterOpt{PkgName: pkgName})
 		}
 
 		// Check the sojourn delay for this item in the queue. Tracking system latency vs
@@ -790,7 +813,10 @@ ProcessLoop:
 
 			ctrRateLimit++
 			processErr = nil
-			telemetry.IncrQueueThrottledCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": "throttled"},
+			})
 			continue
 		case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit:
 			ctrConcurrency++
@@ -801,7 +827,19 @@ ProcessLoop:
 			// want to claim the job, as this breaks ordering guarantees.  The
 			// only safe thing to do when we hit a function or account level
 			// concurrency key.
+			var status string
+			switch cause {
+			case ErrPartitionConcurrencyLimit:
+				status = "partition_concurrency_limit"
+			case ErrAccountConcurrencyLimit:
+				status = "account_concurrency_limit"
+			}
+
 			processErr = nil
+			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": status},
+			})
 			break ProcessLoop
 		case ErrConcurrencyLimitCustomKey0, ErrConcurrencyLimitCustomKey1:
 			ctrConcurrency++
@@ -814,23 +852,39 @@ ProcessLoop:
 			// This maintains FIFO ordering amongst all custom concurrency keys.
 			denies.addConcurrency(err)
 
+			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": "custom_key_concurrency_limit"},
+			})
 			processErr = nil
 			continue
 		case ErrQueueItemNotFound:
 			// This is an okay error.  Move to the next job item.
 			ctrSuccess++ // count as a success for stats purposes.
 			processErr = nil
+			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": "success"},
+			})
 			continue
 		case ErrQueueItemAlreadyLeased:
 			// This is an okay error.  Move to the next job item.
 			ctrSuccess++ // count as a success for stats purposes.
 			processErr = nil
+			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": "success"},
+			})
 			continue
 		}
 
 		// Handle other errors.
 		if err != nil {
 			processErr = fmt.Errorf("error leasing in process: %w", err)
+			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": "error"},
+			})
 			break ProcessLoop
 		}
 
@@ -841,7 +895,15 @@ ProcessLoop:
 
 		// increase success counter.
 		ctrSuccess++
+		telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": "success"},
+		})
 		q.workers <- processItem{P: *p, I: *item, S: shard}
+	}
+
+	if err := q.setPeekEWMA(ctx, p.WorkflowID, int64(ctrConcurrency+ctrRateLimit)); err != nil {
+		log.From(ctx).Warn().Err(err).Msg("error recording concurrency limit for EWMA")
 	}
 
 	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
@@ -866,7 +928,10 @@ ProcessLoop:
 	// Requeue the partition, which reads the next unleased job or sets a time of
 	// 30 seconds.  This is why we have to lease items above, else this may return an item that is
 	// about to be leased and processed by the worker.
-	err = q.PartitionRequeue(ctx, p, getNow().Add(PartitionRequeueExtension), false)
+	_, err = duration(ctx, "partition_requeue", func(ctx context.Context) (any, error) {
+		err = q.PartitionRequeue(ctx, p, getNow().Add(PartitionRequeueExtension), false)
+		return nil, err
+	})
 	if err == ErrPartitionGarbageCollected {
 		// Safe;  we're preventing this from wasting cycles in the future.
 		return nil
@@ -901,6 +966,11 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 			case <-extendLeaseTick.C:
 				if ctx.Err() != nil {
 					// Don't extend lease when the ctx is done.
+					return
+				}
+				if leaseID == nil {
+					log.From(ctx).Error().Msg("cannot extend lease since lease ID is nil")
+					// Don't extend lease since one doesn't exist
 					return
 				}
 				leaseID, err = q.ExtendLease(ctx, p, qi, *leaseID, QueueLeaseDuration)
@@ -985,7 +1055,10 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 			})
 		}()
 
-		telemetry.IncrQueueItemStartedCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+		telemetry.IncrQueueItemStatusCounter(ctx, telemetry.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": "started"},
+		})
 
 		runInfo := osqueue.RunInfo{
 			Latency:      latency,
@@ -1001,11 +1074,17 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 		err := f(jobCtx, runInfo, qi.Data)
 		extendLeaseTick.Stop()
 		if err != nil {
-			telemetry.IncrQueueItemErroredCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+			telemetry.IncrQueueItemStatusCounter(ctx, telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": "errored"},
+			})
 			errCh <- err
 			return
 		}
-		telemetry.IncrQueueItemCompletedCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+		telemetry.IncrQueueItemStatusCounter(ctx, telemetry.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": "completed"},
+		})
 
 		// Closing this channel prevents the goroutine which extends lease from leaking,
 		// and dequeues the job
@@ -1097,15 +1176,51 @@ func (q *queue) capacity() int64 {
 	return int64(q.numWorkers) - atomic.LoadInt64(&q.sem.counter)
 }
 
-// peekSize returns the total number of available workers which can consume individual
-// queue items.
-func (q *queue) peekSize() int64 {
-	size := q.peek
-	if size == 0 {
-		size = QueuePeekMax
+// peekSize returns the number of items to peek for the queue based on a couple of factors
+// 1. EWMA of concurrency limit hits
+// 2. configured min, max of peek size range
+// 3. worker capacity
+func (q *queue) peekSize(ctx context.Context, p *QueuePartition) int64 {
+	// retrieve the EWMA value
+	ewma, err := q.peekEWMA(ctx, p.WorkflowID)
+	if err != nil {
+		// return the minimum if there's an error
+		return q.peekMin
 	}
 
-	cap := q.capacity()
+	// set multiplier
+	multiplier := q.peekCurrMultiplier
+	if multiplier == 0 {
+		multiplier = QueuePeekCurrMultiplier
+	}
+
+	// set ranges
+	pmin := q.peekMin
+	if pmin == 0 {
+		pmin = QueuePeekMin
+	}
+	pmax := q.peekMax
+	if pmax == 0 {
+		pmax = QueuePeekMax
+	}
+
+	// calculate size with EWMA and multiplier
+	size := ewma * multiplier
+	switch {
+	case size < pmin:
+		size = pmin
+	case size > pmax:
+		size = pmax
+	}
+
+	dur := time.Hour * 24
+	qsize, _ := q.partitionSize(ctx, q.kg.QueueIndex(p.Queue()), time.Now().Add(dur))
+	if qsize > size {
+		size = qsize
+	}
+
+	// add 10% expecting for some workflow that will finish in the mean time
+	cap := int64(float64(q.capacity()) * 1.1)
 	if size > cap {
 		size = cap
 	}
@@ -1127,6 +1242,23 @@ func (q *queue) isScavenger() bool {
 		return false
 	}
 	return ulid.Time(l.Time()).After(getNow())
+}
+
+// duration is a helper function to record durations of queue operations.
+func duration[T any](ctx context.Context, op string, f func(ctx context.Context) (T, error)) (T, error) {
+	now := time.Now()
+	res, err := f(ctx)
+	telemetry.HistogramQueueOperationDuration(
+		ctx,
+		time.Since(now).Milliseconds(),
+		telemetry.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"operation": op,
+			},
+		},
+	)
+	return res, err
 }
 
 // trackingSemaphore returns a semaphore that tracks closely - but not atomically -

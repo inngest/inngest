@@ -268,10 +268,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	// If the pause timeout is for an invocation, store an error to cause the
 	// step to fail.
 	if pause.Opcode != nil && *pause.Opcode == enums.OpcodeInvokeFunction.String() {
-		r.SetError(
-			"InngestInvokeTimeoutError",
-			"Timed out waiting for invoked function to complete",
-		)
+		r.SetInvokeTimeoutError()
 	}
 
 	return s.exec.Resume(ctx, *pause, r)
@@ -286,17 +283,7 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 
 	batchID := opts.BatchID
 
-	var status string
-	var err error
-	if opts.BatchPointer != "" {
-		// if we encounter a new producer, use new method
-		status, err = s.batcher.StartExecutionWithBatchPointer(ctx, batchID, opts.BatchPointer)
-	} else {
-		// otherwise, fall back to previous behavior
-		// TODO Remove when all messages include batch pointer
-		status, err = s.batcher.StartExecution(ctx, opts.FunctionID, batchID)
-	}
-
+	status, err := s.batcher.StartExecution(ctx, batchID, opts.BatchPointer)
 	if err != nil {
 		return err
 	}

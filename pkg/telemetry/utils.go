@@ -17,6 +17,7 @@ var (
 	registry = newRegistry()
 )
 
+// NOTE: these can probably be simplified by generics
 type counterMap struct {
 	rw sync.RWMutex
 	m  map[string]metric.Int64Counter
@@ -34,6 +35,28 @@ func (c *counterMap) Get(name string) (metric.Int64Counter, bool) {
 }
 
 func (c *counterMap) Add(name string, m metric.Int64Counter) {
+	c.rw.Lock()
+	defer c.rw.Unlock()
+	c.m[name] = m
+}
+
+type upDownCounterMap struct {
+	rw sync.RWMutex
+	m  map[string]metric.Int64UpDownCounter
+}
+
+func newUpDownCounterMap() *upDownCounterMap {
+	return &upDownCounterMap{m: map[string]metric.Int64UpDownCounter{}}
+}
+
+func (c *upDownCounterMap) Get(name string) (metric.Int64UpDownCounter, bool) {
+	c.rw.RLock()
+	defer c.rw.RUnlock()
+	v, ok := c.m[name]
+	return v, ok
+}
+
+func (c *upDownCounterMap) Add(name string, m metric.Int64UpDownCounter) {
 	c.rw.Lock()
 	defer c.rw.Unlock()
 	c.m[name] = m
@@ -86,16 +109,18 @@ func (h *histogramMap) Add(name string, m metric.Int64Histogram) {
 type metricsRegistry struct {
 	mu sync.RWMutex
 
-	counters    *counterMap
-	asyncGauges *asyncGaugeMap
-	histograms  *histogramMap
+	counters       *counterMap
+	updownCounters *upDownCounterMap
+	asyncGauges    *asyncGaugeMap
+	histograms     *histogramMap
 }
 
 func newRegistry() *metricsRegistry {
 	return &metricsRegistry{
-		counters:    newCounterMap(),
-		asyncGauges: newAsyncGaugeMap(),
-		histograms:  newHistogramMap(),
+		counters:       newCounterMap(),
+		updownCounters: newUpDownCounterMap(),
+		asyncGauges:    newAsyncGaugeMap(),
+		histograms:     newHistogramMap(),
 	}
 }
 
@@ -118,6 +143,29 @@ func (r *metricsRegistry) getCounter(ctx context.Context, opts CounterOpt) (metr
 	)
 	if err == nil {
 		r.counters.Add(name, c)
+	}
+	return c, err
+}
+
+func (r *metricsRegistry) getUpDownCounter(ctx context.Context, opts CounterOpt) (metric.Int64UpDownCounter, error) {
+	name := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
+	if c, ok := r.updownCounters.Get(name); ok {
+		return c, nil
+	}
+
+	// use the global one by default
+	meter := otel.Meter(opts.PkgName)
+	if opts.Meter != nil {
+		meter = opts.Meter
+	}
+
+	c, err := meter.Int64UpDownCounter(
+		name,
+		metric.WithDescription(opts.Description),
+		metric.WithUnit(opts.Unit),
+	)
+	if err == nil {
+		r.updownCounters.Add(name, c)
 	}
 	return c, err
 }
@@ -216,6 +264,22 @@ func RecordCounterMetric(ctx context.Context, incr int64, opts CounterOpt) {
 	}
 
 	c.Add(ctx, incr, metric.WithAttributes(attrs...))
+}
+
+func RecordUpDownCounterMetric(ctx context.Context, val int64, opts CounterOpt) {
+	attrs := []attribute.KeyValue{}
+	if opts.Tags != nil {
+		attrs = append(attrs, parseAttributes(opts.Tags)...)
+	}
+
+	metricName := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
+	c, err := registry.getUpDownCounter(ctx, opts)
+	if err != nil {
+		log.From(ctx).Error().Err(err).Str("metric_name", metricName).Msg("error accessing counter metric")
+		return
+	}
+
+	c.Add(ctx, val, metric.WithAttributes(attrs...))
 }
 
 type GaugeOpt struct {

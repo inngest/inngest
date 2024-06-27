@@ -1,0 +1,102 @@
+syntax = "proto3";
+package run.v2;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/run/v2;runv2";
+
+message RunSpan {
+  string account_id = 1;
+  string workspace_id = 2;
+  string app_id = 3;
+  string function_id = 4;
+  string run_id = 5;
+
+  string trace_id = 6;
+  optional string parent_span_id = 7;
+  string span_id = 8;
+
+  string name = 9;
+  SpanStatus status = 10;
+  int32 attempts = 11;
+  int64 duration_ms = 12;
+  bool is_root = 13;
+
+  google.protobuf.Timestamp queued_at = 14;
+  optional google.protobuf.Timestamp started_at = 15;
+  optional google.protobuf.Timestamp ended_at = 16;
+
+  optional string output_id = 17;
+  optional SpanStepOp step_op = 18;
+  optional StepInfo step_info = 19;
+
+  repeated RunSpan children = 20;
+}
+
+enum SpanStatus {
+  UNKNOWN = 0;
+  SCHEDULED = 100;
+  QUEUED = 110;
+  RUNNING = 200;
+  WAITING = 210;
+  COMPLETED = 300;
+  FAILED = 400;
+  CANCELLED = 500;
+}
+
+enum SpanStepOp {
+  RUN = 0;
+  INVOKE = 1;
+  SLEEP = 2;
+  WAIT_FOR_EVENT = 3;
+}
+
+message StepInfo {
+  oneof info {
+    StepInfoSleep sleep = 1;
+    StepInfoWaitForEvent wait = 2;
+    StepInfoInvoke invoke = 3;
+  }
+}
+
+message StepInfoInvoke {
+  string triggering_event_id = 1;
+  string function_id = 2;
+  google.protobuf.Timestamp timeout = 3;
+  optional string return_event_id = 4;
+  optional string run_id = 5;
+  optional bool timed_out = 6;
+}
+
+message StepInfoSleep {
+  google.protobuf.Timestamp sleep_until = 1;
+}
+
+message StepInfoWaitForEvent {
+  string event_name = 1;
+  google.protobuf.Timestamp timeout = 2;
+  optional string expression = 3;
+  optional string found_event_id = 4;
+  optional bool timed_out = 5;
+}
+
+message RunSpanOutput {
+  optional bytes data = 1;
+  optional StepError error = 2;
+}
+
+message StepError {
+  string message = 1;
+  optional string name = 2;
+  optional string stack = 3;
+}
+
+message RunTrigger {
+  string event_name = 1;
+  repeated string ids = 2;
+  repeated bytes payloads = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  bool is_batch = 5;
+  optional string batch_id = 6;
+  optional string cron = 7;
+}

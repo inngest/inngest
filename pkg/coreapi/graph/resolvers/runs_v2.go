@@ -2,12 +2,14 @@ package resolvers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/oklog/ulid/v2"
 )
 
 const (
@@ -18,9 +20,9 @@ const (
 func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []*models.RunsV2OrderBy, filter models.RunsFilterV2) (*models.RunsV2Connection, error) {
 	tsfield := enums.TraceRunTimeQueuedAt
 	switch *filter.TimeField {
-	case models.FunctionRunTimeFieldV2StartedAt:
+	case models.RunsV2OrderByFieldStartedAt:
 		tsfield = enums.TraceRunTimeStartedAt
-	case models.FunctionRunTimeFieldV2EndedAt:
+	case models.RunsV2OrderByFieldEndedAt:
 		tsfield = enums.TraceRunTimeEndedAt
 	}
 
@@ -158,8 +160,15 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 			continue
 		}
 
+		triggerIDS := []ulid.ULID{}
+		for _, tid := range r.TriggerIDs {
+			if id, err := ulid.Parse(tid); err == nil {
+				triggerIDS = append(triggerIDS, id)
+			}
+		}
+
 		node := &models.FunctionRunV2{
-			ID:         r.RunID,
+			ID:         ulid.MustParse(r.RunID),
 			AppID:      r.AppID,
 			FunctionID: r.FunctionID,
 			TraceID:    r.TraceID,
@@ -168,7 +177,7 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 			EndedAt:    ended,
 			SourceID:   sourceID,
 			Status:     status,
-			TriggerIDs: r.TriggerIDs,
+			TriggerIDs: triggerIDS,
 			Triggers:   []string{},
 			Output:     output,
 			IsBatch:    r.IsBatch,
@@ -190,4 +199,197 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 		Edges:    edges,
 		PageInfo: pageInfo,
 	}, nil
+}
+
+func (r *queryResolver) Run(ctx context.Context, runID string) (*models.FunctionRunV2, error) {
+	runid, err := ulid.Parse(runID)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing runID: %w", err)
+	}
+
+	run, err := r.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runid})
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving run: %w", err)
+	}
+
+	var (
+		startedAt *time.Time
+		endedAt   *time.Time
+		sourceID  *string
+		output    *string
+		batchTS   *time.Time
+	)
+
+	triggerIDs := []ulid.ULID{}
+	for _, evtID := range run.TriggerIDs {
+		if id, err := ulid.Parse(evtID); err == nil {
+			triggerIDs = append(triggerIDs, id)
+		}
+	}
+
+	if len(run.Output) > 0 {
+		o := string(run.Output)
+		output = &o
+	}
+
+	if run.BatchID != nil {
+		ts := ulid.Time(run.BatchID.Time())
+		batchTS = &ts
+	}
+
+	status, err := models.ToFunctionRunStatus(run.Status)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing status: %w", err)
+	}
+
+	if run.StartedAt.UnixMilli() > 0 {
+		startedAt = &run.StartedAt
+	}
+	if run.SourceID != "" {
+		sourceID = &run.SourceID
+	}
+
+	switch status {
+	case models.FunctionRunStatusCompleted, models.FunctionRunStatusFailed, models.FunctionRunStatusCancelled:
+		if run.EndedAt.UnixMilli() > 0 {
+			endedAt = &run.EndedAt
+		}
+	}
+
+	res := models.FunctionRunV2{
+		ID:             runid,
+		AppID:          run.AppID,
+		FunctionID:     run.FunctionID,
+		TraceID:        run.TraceID,
+		QueuedAt:       run.QueuedAt,
+		StartedAt:      startedAt,
+		EndedAt:        endedAt,
+		Status:         status,
+		SourceID:       sourceID,
+		TriggerIDs:     triggerIDs,
+		IsBatch:        run.IsBatch,
+		BatchCreatedAt: batchTS,
+		CronSchedule:   run.CronSchedule,
+		Output:         output,
+	}
+
+	return &res, nil
+}
+
+func (r *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID string) (*models.RunTraceSpanOutput, error) {
+	id := &cqrs.SpanIdentifier{}
+	if err := id.Decode(outputID); err != nil {
+		return nil, fmt.Errorf("error parsing span identifier: %w", err)
+	}
+
+	output, err := r.Data.GetSpanOutput(ctx, *id)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := models.RunTraceSpanOutput{}
+	if output.IsError {
+		var stepErr models.StepError
+		err := json.Unmarshal(output.Data, &stepErr)
+		if err != nil {
+			return nil, fmt.Errorf("error deserializing step error: %w", err)
+		}
+
+		if stepErr.Message == "" {
+			stack := string(output.Data)
+			stepErr.Stack = &stack
+		}
+
+		resp.Error = &stepErr
+	} else {
+		d := string(output.Data)
+		resp.Data = &d
+	}
+
+	return &resp, nil
+}
+
+func (r *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.RunTraceTrigger, error) {
+	runid, err := ulid.Parse(runID)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing runID: %w", err)
+	}
+
+	run, err := r.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runid})
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving run: %w", err)
+	}
+
+	var (
+		evtName *string
+		ts      time.Time
+	)
+
+	evtIDs := []ulid.ULID{}
+	for _, id := range run.TriggerIDs {
+		if evtID, err := ulid.Parse(id); err == nil {
+			evtIDs = append(evtIDs, evtID)
+
+			// use the earliest
+			evtTime := ulid.Time(evtID.Time())
+			if ts.IsZero() {
+				ts = evtTime
+			}
+			if evtTime.Before(ts) {
+				ts = evtTime
+			}
+		}
+	}
+
+	events, err := r.Data.GetEventsByInternalIDs(ctx, evtIDs)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving events: %w", err)
+	}
+
+	payloads := []string{}
+	for _, evt := range events {
+		byt, err := json.Marshal(evt.GetEvent())
+		if err != nil {
+			return nil, fmt.Errorf("error parsing event payload: %w", err)
+		}
+		payloads = append(payloads, string(byt))
+	}
+
+	// only parse event name if it's not cron
+	if run.CronSchedule == nil {
+		// just need the first one
+		var name string
+		for _, evt := range events {
+			if name == "" {
+				name = evt.EventName
+			}
+			// finish early if  it's not a batch and there's already a value
+			if run.BatchID == nil && name != "" {
+				break
+			}
+
+			// if there are multiple events and they are not identical,
+			// set event name to nil
+			if evt.EventName != name {
+				name = ""
+				break
+			}
+		}
+
+		if name != "" {
+			evtName = &name
+		}
+	}
+
+	resp := models.RunTraceTrigger{
+		EventName: evtName,
+		Timestamp: ts,
+		IDs:       evtIDs,
+		Payloads:  payloads,
+		BatchID:   run.BatchID,
+		IsBatch:   run.BatchID != nil,
+		Cron:      run.CronSchedule,
+	}
+
+	return &resp, nil
 }

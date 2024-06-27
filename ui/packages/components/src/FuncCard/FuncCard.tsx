@@ -1,4 +1,4 @@
-import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
 import { cn } from '@inngest/components/utils/classNames';
 
 import type { FunctionRunStatus } from '../types/functionRun';
@@ -31,7 +31,7 @@ export function FuncCard({ title, id, status, active = false, onClick }: FuncCar
       }
     >
       <div className="flex items-center gap-2 px-5 py-3.5">
-        {status && <FunctionRunStatusIcon status={status} className="h-4 w-4" />}
+        {status && <RunStatusIcon status={status} className="h-4 w-4" />}
         <h2 className="text-white">{title}</h2>
       </div>
       <hr className="border-slate-800/50" />

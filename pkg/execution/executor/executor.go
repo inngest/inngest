@@ -31,6 +31,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
 	"github.com/xhit/go-str2duration/v2"
@@ -159,9 +160,9 @@ func WithFinalizer(f execution.FinalizePublisher) ExecutorOpt {
 	}
 }
 
-func WithInvokeNotFoundHandler(f execution.InvokeNotFoundHandler) ExecutorOpt {
+func WithInvokeFailHandler(f execution.InvokeFailHandler) ExecutorOpt {
 	return func(e execution.Executor) error {
-		e.(*executor).invokeNotFoundHandler = f
+		e.(*executor).invokeFailHandler = f
 		return nil
 	}
 }
@@ -230,6 +231,13 @@ func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
 	}
 }
 
+func WithPreDeleteStateSizeReporter(f execution.PreDeleteStateSizeReporter) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).preDeleteStateSizeReporter = f
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log *zerolog.Logger
@@ -241,43 +249,70 @@ type executor struct {
 	pm   state.PauseManager
 	smv2 sv2.RunService
 
-	queue                 queue.Queue
-	debouncer             debounce.Debouncer
-	batcher               batch.BatchManager
-	fl                    state.FunctionLoader
-	evalFactory           func(ctx context.Context, expr string) (expressions.Evaluator, error)
-	runtimeDrivers        map[string]driver.Driver
-	finishHandler         execution.FinalizePublisher
-	invokeNotFoundHandler execution.InvokeNotFoundHandler
-	handleSendingEvent    execution.HandleSendingEvent
-	cancellationChecker   cancellation.Checker
+	queue               queue.Queue
+	debouncer           debounce.Debouncer
+	batcher             batch.BatchManager
+	fl                  state.FunctionLoader
+	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
+	runtimeDrivers      map[string]driver.Driver
+	finishHandler       execution.FinalizePublisher
+	invokeFailHandler   execution.InvokeFailHandler
+	handleSendingEvent  execution.HandleSendingEvent
+	cancellationChecker cancellation.Checker
 
 	lifecycles []execution.LifecycleListener
 
 	// steplimit finds step limits for a given run.
 	steplimit func(sv2.ID) int
+
+	preDeleteStateSizeReporter execution.PreDeleteStateSizeReporter
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
 	e.finishHandler = f
 }
 
-func (e *executor) SetInvokeNotFoundHandler(f execution.InvokeNotFoundHandler) {
-	e.invokeNotFoundHandler = f
+func (e *executor) SetInvokeFailHandler(f execution.InvokeFailHandler) {
+	e.invokeFailHandler = f
 }
 
-func (e *executor) InvokeNotFoundHandler(ctx context.Context, opts execution.InvokeNotFoundHandlerOpts) error {
-	if e.invokeNotFoundHandler == nil {
+func (e *executor) InvokeFailHandler(ctx context.Context, opts execution.InvokeFailHandlerOpts) error {
+	if e.invokeFailHandler == nil {
 		return nil
 	}
 
-	evt := CreateInvokeNotFoundEvent(ctx, opts)
+	evt := CreateInvokeFailedEvent(ctx, opts)
 
-	return e.invokeNotFoundHandler(ctx, opts, []event.Event{evt})
+	return e.invokeFailHandler(ctx, opts, []event.Event{evt})
 }
 
 func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 	e.lifecycles = append(e.lifecycles, l)
+}
+
+func idempotencyKey(req execution.ScheduleRequest, runID ulid.ULID) string {
+	var key string
+	if req.IdempotencyKey != nil {
+		// Use the given idempotency key
+		key = *req.IdempotencyKey
+	}
+	if req.OriginalRunID != nil {
+		// If this is a rerun then we want to use the run ID as the key. If we
+		// used the event or batch ID as the key then we wouldn't be able to
+		// rerun multiple times.
+		key = runID.String()
+	}
+	if key == "" && len(req.Events) == 1 {
+		// If not provided, use the incoming event ID if there's not a batch.
+		key = req.Events[0].GetInternalID().String()
+	}
+	if key == "" && req.BatchID != nil {
+		// Finally, if there is a batch use the batch ID as the idempotency key.
+		key = req.BatchID.String()
+	}
+
+	// The idempotency key is always prefixed by the function ID.
+	return fmt.Sprintf("%s-%s", util.XXHash(req.Function.ID.String()), util.XXHash(key))
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -308,25 +343,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// this run ID.
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
-	var key string
-	if req.IdempotencyKey != nil {
-		// Use the given idempotency key
-		key = *req.IdempotencyKey
-	}
-	if req.OriginalRunID != nil {
-		// If this is a rerun then we want to use the run ID as the key. If we
-		// used the event or batch ID as the key then we wouldn't be able to
-		// rerun multiple times.
-		key = runID.String()
-	}
-	if key == "" && len(req.Events) == 1 {
-		// If not provided, use the incoming event ID if there's not a batch.
-		key = req.Events[0].GetInternalID().String()
-	}
-	if key == "" && req.BatchID != nil {
-		// Finally, if there is a batch use the batch ID as the idempotency key.
-		key = req.BatchID.String()
-	}
+	key := idempotencyKey(req, runID)
+
 	if req.Context == nil {
 		req.Context = map[string]any{}
 	}
@@ -365,7 +383,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			},
 		},
 		Config: sv2.Config{
-			FunctionSlug:    req.Function.GetSlug(),
 			FunctionVersion: req.Function.FunctionVersion,
 			SpanID:          telemetry.NewSpanID(ctx).String(),
 			EventIDs:        eventIDs,
@@ -388,6 +405,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		}
 	}
 
+	// FunctionSlug is not stored in V1 format, so needs to be stored in Context
+	metadata.Config.SetFunctionSlug(req.Function.GetSlug())
+
 	carrier := telemetry.NewTraceCarrier()
 	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 	metadata.Config.Context[consts.OtelPropagationKey] = carrier
@@ -398,6 +418,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		for _, e := range e.lifecycles {
 			go e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
 				CronSchedule: req.Events[0].GetEvent().CronSchedule(),
+				Reason:       enums.SkipReasonFunctionPaused,
 			})
 		}
 		return nil, ErrFunctionSkipped
@@ -580,6 +601,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 					WorkspaceID: req.WorkspaceID,
 					AccountID:   req.AccountID,
 					AppID:       req.AppID,
+					EventID:     metadata.Config.EventID(),
+					EventIDs:    metadata.Config.EventIDs,
 				},
 				ID:                pauseID,
 				Expires:           state.Time(expires),
@@ -625,6 +648,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			WorkspaceID: req.WorkspaceID,
 			AccountID:   req.AccountID,
 			AppID:       req.AppID,
+			EventID:     metadata.Config.EventID(),
+			EventIDs:    metadata.Config.EventIDs,
 		},
 		CustomConcurrencyKeys: metadata.Config.CustomConcurrencyKeys,
 		PriorityFactor:        metadata.Config.PriorityFactor,
@@ -727,7 +752,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
 	// for `tools.sleep` within generator functions.
 	if item.Kind == queue.KindSleep && item.Attempt == 0 {
-		if err := e.smv2.SaveStep(ctx, sv2.ID{
+		err := e.smv2.SaveStep(ctx, sv2.ID{
 			RunID:      id.RunID,
 			FunctionID: id.WorkflowID,
 			Tenant: sv2.Tenant{
@@ -735,7 +760,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				EnvID:     id.WorkspaceID,
 				AccountID: id.AccountID,
 			},
-		}, edge.Outgoing, []byte("null")); err != nil {
+		}, edge.Outgoing, []byte("null"))
+		if !errors.Is(err, state.ErrDuplicateResponse) && err != nil {
 			return nil, err
 		}
 		// After the sleep, we start a new step.  This means we also want to start a new
@@ -794,9 +820,14 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, err
 	}
 	if v.stopWithoutRetry {
+		if e.preDeleteStateSizeReporter != nil {
+			e.preDeleteStateSizeReporter(ctx, md)
+		}
+
 		// Validation prevented execution and doesn't want the executor to retry, so
 		// don't return an error - assume the function finishes and delete state.
-		return nil, e.smv2.Delete(ctx, md.ID)
+		_, err := e.smv2.Delete(ctx, md.ID)
+		return nil, err
 	}
 
 	// Store the metadata in context for future use and propagate trace
@@ -846,6 +877,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.Int64(consts.OtelSysBatchTS, int64(md.Config.BatchID.Time())),
 		)
 	}
+	if md.Config.TraceLink() != nil {
+		fnSpan.SetAttributes(attribute.String(consts.OtelSysFunctionLink, *md.Config.TraceLink()))
+	}
 
 	for _, evt := range events {
 		fnSpan.AddEvent(string(evt), trace.WithAttributes(
@@ -853,9 +887,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		))
 	}
 
-	ctx, span := telemetry.NewSpan(ctx,
+	_, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeExecution),
-		telemetry.WithName("execute"),
+		telemetry.WithName(consts.OtelExecPlaceholder),
 		telemetry.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, id.AccountID.String()),
@@ -868,6 +902,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
 			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
 			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
+			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
 		),
 	)
 	if item.RunInfo != nil {
@@ -917,6 +952,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		// always one less than attempts.
 		retries := f.Steps[0].RetryCount() + 1
 		item.MaxAttempts = &retries
+		span.SetAttributes(attribute.Int(consts.OtelSysStepMaxAttempt, retries))
 
 		// Only just starting:  run lifecycles on first attempt.
 		if item.Attempt == 0 {
@@ -957,12 +993,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	if resp == nil && err != nil {
 		span.SetStatus(codes.Error, err.Error())
-		if byt, err := json.Marshal(err.Error()); err == nil {
-			span.AddEvent(string(byt), trace.WithAttributes(
-				attribute.Bool(consts.OtelSysStepOutput, true),
-			))
-		}
-
+		span.SetStepOutput(err.Error())
 		return nil, err
 	}
 
@@ -977,8 +1008,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			// The op changes based on the current state of the step, so we
 			// are required to normalize here.
 			switch foundOp {
-			case enums.OpcodeStep, enums.OpcodeStepError:
+			case enums.OpcodeStep, enums.OpcodeStepRun, enums.OpcodeStepError:
 				foundOp = enums.OpcodeStepRun
+				ctx = trace.ContextWithSpan(ctx, span)
 			}
 
 			span.SetAttributes(
@@ -988,40 +1020,43 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				attribute.String(consts.OtelSysStepOpcode, foundOp.String()),
 			)
 
-			if byt, err := json.Marshal(resp.Output); err == nil {
-				span.AddEvent(string(byt), trace.WithAttributes(
-					attribute.Bool(consts.OtelSysStepOutput, true),
-				))
+			if op.IsError() {
+				span.SetStepOutput(op.Error)
+				span.SetStatus(codes.Error, op.Error.Message)
+			} else {
+				span.SetStepOutput(op.Data)
+				span.SetStatus(codes.Ok, string(op.Data))
 			}
+		} else if resp.Retryable() { // these are function retries
+			span.SetStatus(codes.Error, *resp.Err)
+			span.SetAttributes(
+				attribute.String(consts.OtelSysStepOpcode, enums.OpcodeNone.String()),
+				attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
+				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
+			)
+			span.SetStepOutput(resp.Output)
 		} else if resp.IsTraceVisibleFunctionExecution() {
-			spanName := "function success"
+			spanName := consts.OtelExecFnOk
 			fnstatus := attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCompleted.ToCode())
 			fnSpan.SetStatus(codes.Ok, "success")
 			span.SetStatus(codes.Ok, "success")
 
 			if resp.StatusCode != 200 {
-				spanName = "function error"
+				spanName = consts.OtelExecFnErr
 				fnstatus = attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusFailed.ToCode())
 				fnSpan.SetStatus(codes.Error, resp.Error())
 				span.SetStatus(codes.Error, resp.Error())
 			}
 
 			fnSpan.SetAttributes(fnstatus)
+			span.SetAttributes(attribute.String(consts.OtelSysStepOpcode, enums.OpcodeNone.String()))
 			span.SetName(spanName)
-
-			if byt, err := json.Marshal(resp.Output); err == nil {
-				fnSpan.AddEvent(string(byt), trace.WithAttributes(
-					attribute.Bool(consts.OtelSysFunctionOutput, true),
-				))
-
-				span.AddEvent(string(byt), trace.WithAttributes(
-					attribute.Bool(consts.OtelSysFunctionOutput, true),
-				))
-			}
+			fnSpan.SetFnOutput(resp.Output)
+			span.SetFnOutput(resp.Output)
 		} else {
 			// if it's not a step or function response that represents either a failed or a successful execution.
 			// Do not record discovery spans and cancel it.
-			ctx = span.Cancel(ctx)
+			_ = span.Cancel(ctx)
 		}
 	}
 
@@ -1075,13 +1110,14 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 		// Check if this step permanently failed.  If so, the function is a failure.
 		if !resp.Retryable() {
 			// TODO: Refactor state input
-			if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+			if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 				logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+			} else if performedFinalization {
+				for _, e := range e.lifecycles {
+					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
+				}
 			}
 
-			for _, e := range e.lifecycles {
-				go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
-			}
 			return resp
 		}
 	}
@@ -1090,14 +1126,24 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 	if len(resp.Generator) > 0 {
 		// Handle generator responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, i, resp); serr != nil {
+
 			// If this is an error compiling async expressions, fail the function.
-			if strings.Contains(serr.Error(), "error compiling expression") {
-				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+			if shouldFailEarly := errors.Is(serr, &expressions.CompileError{}); shouldFailEarly {
+				var gracefulErr *state.WrappedStandardError
+				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
+					serialized := gracefulErr.Serialize(execution.StateErrorKey)
+					resp.Output = nil
+					resp.Err = &serialized
+				}
+
+				if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 					logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+				} else if performedFinalization {
+					for _, e := range e.lifecycles {
+						go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
+					}
 				}
-				for _, e := range e.lifecycles {
-					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
-				}
+
 				return nil
 			}
 			return fmt.Errorf("error handling generator response: %w", serr)
@@ -1106,12 +1152,12 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 	}
 
 	// This is the function result.
-	if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
+	if performedFinalization, err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), *resp); err != nil {
 		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-	}
-
-	for _, e := range e.lifecycles {
-		go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
+	} else if performedFinalization {
+		for _, e := range e.lifecycles {
+			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, *resp)
+		}
 	}
 
 	return nil
@@ -1145,26 +1191,40 @@ func (f functionFinishedData) Map() map[string]any {
 	return s.Map()
 }
 
-func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, resp state.DriverResponse) error {
+// finalize performs run finalization, which involves sending the function
+// finished/failed event and deleting state.
+//
+// Returns a boolean indicating whether it performed finalization. If the run
+// had parallel steps then it may be false, since parallel steps cause the
+// function end to be reached multiple times in a single run
+func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, resp state.DriverResponse) (bool, error) {
 	// Parse events for the fail handler before deleting state.
 	inputEvents := make([]event.Event, len(evts))
 	for n, e := range evts {
 		evt, err := event.NewEvent(e)
 		if err != nil {
-			return err
+			return false, err
 		}
 		inputEvents[n] = *evt
 	}
 
+	if e.preDeleteStateSizeReporter != nil {
+		e.preDeleteStateSizeReporter(ctx, md)
+	}
+
 	// Delete the function state in every case.
-	if err := e.smv2.Delete(ctx, md.ID); err != nil {
+	performedFinalization, err := e.smv2.Delete(ctx, md.ID)
+	if err != nil {
 		logger.StdlibLogger(ctx).Error("error deleting state in finalize", "error", err)
+	}
+	if err == nil && !performedFinalization {
+		return performedFinalization, nil
 	}
 
 	// TODO: Load all pauses for the function and remove, once we index pauses.
 
 	if e.finishHandler == nil {
-		return nil
+		return performedFinalization, nil
 	}
 
 	// Prepare events that we must send
@@ -1217,7 +1277,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		}
 	}
 
-	return e.finishHandler(ctx, md.ID, freshEvents)
+	return performedFinalization, e.finishHandler(ctx, md.ID, freshEvents)
 }
 
 func correlationID(event event.Event) *string {
@@ -1459,8 +1519,9 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 				}
 				// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
 				err = e.pm.ConsumePause(ctx, pause.ID, nil)
-				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
+				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound || err == state.ErrRunNotFound {
 					// Done. Add to the counter.
+					_ = e.pm.DeletePause(context.Background(), *pause)
 					atomic.AddInt32(&res[1], 1)
 					return
 				}
@@ -1484,8 +1545,13 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 				RunID:    resumeData.RunID,
 				StepName: resumeData.StepName,
 			})
+			if errors.Is(err, state.ErrPauseLeased) ||
+				errors.Is(err, state.ErrPauseNotFound) ||
+				errors.Is(err, state.ErrRunNotFound) {
+				return
+			}
 			if err != nil {
-				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
+				goerr = errors.Join(goerr, fmt.Errorf("error resuming pause: %w", err))
 				return
 			}
 			// Add to the counter.
@@ -1623,14 +1689,19 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 				RunID:    resumeData.RunID,
 				StepName: resumeData.StepName,
 			})
+			if errors.Is(err, state.ErrPauseLeased) ||
+				errors.Is(err, state.ErrPauseNotFound) ||
+				errors.Is(err, state.ErrRunNotFound) {
+				return
+			}
 			if err != nil {
-				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
+				goerr = errors.Join(goerr, fmt.Errorf("error resuming pause: %w", err))
 				return
 			}
 			// Add to the counter.
 			atomic.AddInt32(&res[1], 1)
 			if err := e.exprAggregator.RemovePause(ctx, pause); err != nil {
-				l.Error("error removing pause from aggregator")
+				l.Warn("error removing pause from aggregator", "error", err)
 			}
 		}()
 	}
@@ -1701,17 +1772,11 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 // Cancel cancels an in-progress function.
 func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequest) error {
 	md, err := e.smv2.LoadMetadata(ctx, id)
-	if err == sv2.ErrMetadataNotFound {
+	if err == sv2.ErrMetadataNotFound || err == state.ErrRunNotFound {
 		return nil
 	}
 	if err != nil {
 		return fmt.Errorf("unable to load run: %w", err)
-	}
-
-	// We need the function slug.
-	f, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
-	if err != nil {
-		return fmt.Errorf("unable to load function: %w", err)
 	}
 
 	// We need events to finalize the function.
@@ -1720,17 +1785,22 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		return fmt.Errorf("unable to load run events: %w", err)
 	}
 
-	fnCancelledErr := state.ErrFunctionCancelled.Error()
-	err = e.finalize(ctx, md, evts, f.GetSlug(), state.DriverResponse{
-		Err: &fnCancelledErr,
-	})
+	// We need the function slug.
+	f, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
 	if err != nil {
-		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+		return fmt.Errorf("unable to load function: %w", err)
 	}
 
-	ctx = e.extractTraceCtx(ctx, md, nil)
-	for _, e := range e.lifecycles {
-		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r)
+	fnCancelledErr := state.ErrFunctionCancelled.Error()
+	if performedFinalization, err := e.finalize(ctx, md, evts, f.GetSlug(), state.DriverResponse{
+		Err: &fnCancelledErr,
+	}); err != nil {
+		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
+	} else if performedFinalization {
+		ctx = e.extractTraceCtx(ctx, md, nil)
+		for _, e := range e.lifecycles {
+			go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
+		}
 	}
 
 	return nil
@@ -1751,6 +1821,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			AccountID: pause.Identifier.AccountID,
 		},
 	})
+	if err == state.ErrRunNotFound {
+		return err
+	}
 	if err != nil {
 		return fmt.Errorf("error loading metadata to resume from pause: %w", err)
 	}
@@ -1807,6 +1880,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			Identifier:            pause.Identifier,
 			PriorityFactor:        md.Config.PriorityFactor,
 			CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+			MaxAttempts:           pause.MaxAttempts,
 			Payload: queue.PayloadEdge{
 				Edge: pause.Edge(),
 			},
@@ -1876,15 +1950,18 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 						)
 						defer span.End()
 						span.SetAttributes(commonAttrs...)
+
+						var output any
 						if r.With != nil {
-							if byt, err := json.Marshal(r.With); err == nil {
-								span.AddEvent(string(byt), trace.WithAttributes(
-									attribute.Bool(consts.OtelSysStepOutput, true),
-								))
-							}
+							output = r.With
 						}
 						if r.HasError() {
+							output = r.Error()
 							span.SetStatus(codes.Error, r.Error())
+						}
+
+						if output != nil {
+							span.SetStepOutput(output)
 						}
 					}
 				}
@@ -1922,11 +1999,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 							span.SetAttributes(attribute.String(consts.OtelSysStepWaitExpression, *pause.Expression))
 						}
 						if r.With != nil {
-							if byt, err := json.Marshal(r.With); err == nil {
-								span.AddEvent(string(byt), trace.WithAttributes(
-									attribute.Bool(consts.OtelSysStepOutput, true),
-								))
-							}
+							span.SetStepOutput(r.With)
 						}
 						if r.HasError() {
 							span.SetStatus(codes.Error, r.Error())
@@ -2056,8 +2129,6 @@ func (e *executor) handleGenerator(ctx context.Context, i *runInstance, gen stat
 // handleGeneratorStep handles OpcodeStep and OpcodeStepRun, both indicating that a function step
 // has finished
 func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	span := trace.SpanFromContext(ctx)
-
 	nextEdge := inngest.Edge{
 		Outgoing: gen.ID,             // Going from the current step
 		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
@@ -2097,10 +2168,6 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
-	span.SetAttributes(
-		attribute.String(consts.OtelSysStepNextOpcode, enums.OpcodeStep.String()),
-		attribute.Int64(consts.OtelSysStepNextTimestamp, now.UnixMilli()),
-	)
 
 	for _, l := range e.lifecycles {
 		// We can't specify step name here since that will result in the
@@ -2200,9 +2267,6 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
-	span.SetAttributes(
-		attribute.Int64(consts.OtelSysStepNextTimestamp, now.UnixMilli()),
-	)
 
 	for _, l := range e.lifecycles {
 		go l.OnStepScheduled(ctx, i.md, nextItem, nil)
@@ -2212,8 +2276,6 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 }
 
 func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	span := trace.SpanFromContext(ctx)
-
 	nextEdge := inngest.Edge{
 		// Planned generator IDs are the same as the actual OpcodeStep IDs.
 		// We can't set edge.Edge.Outgoing here because the step hasn't yet ran.
@@ -2252,10 +2314,6 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
-	span.SetAttributes(
-		attribute.String(consts.OtelSysStepNextOpcode, enums.OpcodeStepPlanned.String()),
-		attribute.Int64(consts.OtelSysStepNextTimestamp, now.UnixMilli()),
-	)
 
 	for _, l := range e.lifecycles {
 		go l.OnStepScheduled(ctx, i.md, nextItem, &gen.Name)
@@ -2271,7 +2329,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		return err
 	}
 
-	executionSpan := trace.SpanFromContext(ctx)
 	nextEdge := inngest.Edge{
 		Outgoing: gen.ID,             // Leaving sleep
 		Incoming: edge.Edge.Incoming, // To re-call the SDK
@@ -2331,10 +2388,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		return nil
 	}
 	span.Send()
-	executionSpan.SetAttributes(
-		attribute.String(consts.OtelSysStepNextOpcode, enums.OpcodeSleep.String()),
-		attribute.Int64(consts.OtelSysStepNextTimestamp, until.UnixMilli()),
-	)
 
 	for _, e := range e.lifecycles {
 		go e.OnSleep(context.WithoutCancel(ctx), i.md, i.item, gen, until)
@@ -2344,7 +2397,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 }
 
 func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	execSpan := trace.SpanFromContext(ctx)
 	if e.handleSendingEvent == nil {
 		return fmt.Errorf("no handleSendingEvent function specified")
 	}
@@ -2407,7 +2459,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 			attribute.String(consts.OtelSysWorkspaceID, i.item.Identifier.WorkspaceID.String()),
 			attribute.String(consts.OtelSysAppID, i.item.Identifier.AppID.String()),
 			attribute.String(consts.OtelSysFunctionID, i.item.Identifier.WorkflowID.String()),
-			attribute.String(consts.OtelSysFunctionSlug, i.md.Config.FunctionSlug),
+			attribute.String(consts.OtelSysFunctionSlug, i.md.Config.FunctionSlug()),
 			attribute.Int(consts.OtelSysFunctionVersion, i.item.Identifier.WorkflowVersion),
 			attribute.String(consts.OtelAttrSDKRunID, i.item.Identifier.RunID.String()),
 			attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
@@ -2415,7 +2467,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 			attribute.String(consts.OtelSysStepGroupID, i.item.GroupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
 			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
-
 			attribute.String(consts.OtelSysStepInvokeTargetFnID, opts.FunctionID),
 			attribute.Int64(consts.OtelSysStepInvokeExpires, expires.UnixMilli()),
 			attribute.String(consts.OtelSysStepInvokeTriggeringEventID, evt.ID),
@@ -2439,6 +2490,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		InvokeCorrelationID: &correlationID,
 		TriggeringEventID:   &evt.ID,
 		InvokeTargetFnID:    &opts.FunctionID,
+		MaxAttempts:         i.item.MaxAttempts,
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
@@ -2465,6 +2517,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		Identifier:            i.item.Identifier,
 		PriorityFactor:        i.item.PriorityFactor,
 		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
+		MaxAttempts:           i.item.MaxAttempts,
 		Payload: queue.PayloadPauseTimeout{
 			PauseID:   pauseID,
 			OnTimeout: true,
@@ -2474,11 +2527,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		span.Cancel(ctx)
 		return nil
 	}
-	execSpan.SetAttributes(
-		attribute.String(consts.OtelSysStepNextOpcode, enums.OpcodeInvokeFunction.String()),
-		attribute.Int64(consts.OtelSysStepNextTimestamp, time.Now().UnixMilli()),
-		attribute.Int64(consts.OtelSysStepNextExpires, expires.UnixMilli()),
-	)
 
 	// Send the event.
 	err = e.handleSendingEvent(ctx, evt, i.item)
@@ -2496,7 +2544,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 }
 
 func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	execSpan := trace.SpanFromContext(ctx)
 	opts, err := gen.WaitForEventOpts()
 	if err != nil {
 		return fmt.Errorf("unable to parse wait for event opts: %w", err)
@@ -2527,11 +2574,17 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 			"event": evt.Map(),
 		})
 		if err != nil {
-			logger.StdlibLogger(ctx).Warn(
-				"error interpolating waitForEvent expression",
-				"error", err,
-				"expression", *opts.If,
-			)
+			var compileError *expressions.CompileError
+			if errors.As(err, &compileError) {
+				return fmt.Errorf("error interpolating wait for event expression: %w", state.WrapInStandardError(
+					compileError,
+					"CompileError",
+					"Could not compile expression",
+					compileError.Message(),
+				))
+			}
+
+			return fmt.Errorf("error interpolating wait for event expression: %w", err)
 		}
 		expr = &interpolated
 
@@ -2593,6 +2646,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		Event:       &opts.Event,
 		Expression:  expr,
 		DataKey:     gen.ID,
+		MaxAttempts: i.item.MaxAttempts,
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
@@ -2631,11 +2685,6 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		span.Cancel(ctx)
 		return nil
 	}
-	execSpan.SetAttributes(
-		attribute.String(consts.OtelSysStepNextOpcode, enums.OpcodeWaitForEvent.String()),
-		attribute.Int64(consts.OtelSysStepNextTimestamp, time.Now().UnixMilli()),
-		attribute.Int64(consts.OtelSysStepNextExpires, expires.UnixMilli()),
-	)
 
 	for _, e := range e.lifecycles {
 		go e.OnWaitForEvent(context.WithoutCancel(ctx), i.md, i.item, gen)

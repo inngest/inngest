@@ -8,9 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
+	"github.com/oklog/ulid/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,21 +26,27 @@ type BatchEvent = inngestgo.GenericEvent[BatchEventData, any]
 
 func TestBatchEvents(t *testing.T) {
 	ctx := context.Background()
+	c := client.New(t)
 	h, server, registerFuncs := NewSDKHandler(t, "batch")
 	defer server.Close()
 
 	var (
 		counter     int32
 		totalEvents int32
+		runID       string
 	)
 
 	a := inngestgo.CreateFunction(
 		inngestgo.FunctionOpts{Name: "batch test", BatchEvents: &inngest.EventBatchConfig{MaxSize: 5, Timeout: "5s"}},
 		inngestgo.EventTrigger("test/batch", nil),
 		func(ctx context.Context, input inngestgo.Input[BatchEvent]) (any, error) {
+			if runID == "" {
+				runID = input.InputCtx.RunID
+			}
+
 			atomic.AddInt32(&counter, 1)
 			atomic.AddInt32(&totalEvents, int32(len(input.Events)))
-			return true, nil
+			return "batched!!", nil
 		},
 	)
 	h.Register(a)
@@ -60,6 +70,45 @@ func TestBatchEvents(t *testing.T) {
 		<-time.After(5 * time.Second)
 		require.EqualValues(t, 2, atomic.LoadInt32(&counter))
 		require.EqualValues(t, 8, atomic.LoadInt32(&totalEvents))
+	})
+
+	t.Run("trace run should have appropriate data", func(t *testing.T) {
+		<-time.After(3 * time.Second)
+
+		require.Eventually(t, func() bool {
+			run := c.RunTraces(ctx, runID)
+			require.NotNil(t, run)
+			require.Equal(t, models.FunctionStatusCompleted.String(), run.Status)
+			require.True(t, run.IsBatch)
+			require.NotNil(t, run.BatchCreatedAt)
+
+			require.NotNil(t, run.Trace)
+			require.True(t, run.Trace.IsRoot)
+			require.Equal(t, 0, len(run.Trace.ChildSpans))
+			require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
+			// output test
+			require.NotNil(t, run.Trace.OutputID)
+			output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+			c.ExpectSpanOutput(t, "batched!!", output)
+
+			t.Run("trigger", func(t *testing.T) {
+				// check trigger
+				trigger := c.RunTrigger(ctx, runID)
+				assert.NotNil(t, trigger)
+				assert.NotNil(t, trigger.EventName)
+				assert.Equal(t, "test/batch", *trigger.EventName)
+				assert.Equal(t, 5, len(trigger.IDs))
+				assert.False(t, trigger.Timestamp.IsZero())
+				assert.True(t, trigger.IsBatch)
+				assert.NotNil(t, trigger.BatchID)
+				assert.Nil(t, trigger.Cron)
+
+				rid := ulid.MustParse(runID)
+				assert.True(t, trigger.Timestamp.Before(ulid.Time(rid.Time())))
+			})
+
+			return true
+		}, 10*time.Second, 2*time.Second)
 	})
 }
 

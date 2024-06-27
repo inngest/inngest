@@ -133,6 +133,10 @@ func (e Event) IsFinishedEvent() bool {
 	return e.Name == FnFinishedName
 }
 
+func (e Event) IsInvokeEvent() bool {
+	return e.Name == InvokeFnName
+}
+
 // InngestMetadata represents metadata for an event that is used to invoke a
 // function. Note that this metadata is not present on all functions. For
 // accessing an event's correlation ID, prefer using `Event.CorrelationID()`.

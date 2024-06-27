@@ -70,6 +70,9 @@ type KeyGenerator interface {
 	// added after the cache was last updated.
 	PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string
 
+	// RunPauses stores pause IDs for each run as a zset
+	RunPauses(ctx context.Context, runID ulid.ULID) string
+
 	// Invoke returns the key used to store the correlation key associated with invoke functions
 	Invoke(ctx context.Context, wsID uuid.UUID) string
 
@@ -140,6 +143,10 @@ func (d DefaultKeyFunc) PauseIndex(ctx context.Context, kind string, wsID uuid.U
 	return fmt.Sprintf("%s:pause-idx:%s:%s:%s", d.Prefix, kind, wsID, event)
 }
 
+func (d DefaultKeyFunc) RunPauses(ctx context.Context, runID ulid.ULID) string {
+	return fmt.Sprintf("%s:pr:%s", d.Prefix, runID)
+}
+
 func (d DefaultKeyFunc) Invoke(ctx context.Context, wsID uuid.UUID) string {
 	return fmt.Sprintf("%s:invoke:%s", d.Prefix, wsID)
 }
@@ -207,6 +214,10 @@ type QueueKeyGenerator interface {
 
 	// Status returns the key used for status queue for the provided function.
 	Status(status string, fnID uuid.UUID) string
+
+	// ConcurrencyFnEWMA returns the key storing the amount of times of concurrency hits, used for
+	// calculating the EWMA value for the function
+	ConcurrencyFnEWMA(fnID uuid.UUID) string
 
 	// ***************** Deprecated ************************
 	BatchPointer(context.Context, uuid.UUID) string
@@ -358,4 +369,8 @@ func (d DefaultQueueKeyGenerator) RunIndex(runID ulid.ULID) string {
 
 func (d DefaultQueueKeyGenerator) Status(status string, fnID uuid.UUID) string {
 	return fmt.Sprintf("%s:queue:status:%s:%s", d.Prefix, fnID, status)
+}
+
+func (d DefaultQueueKeyGenerator) ConcurrencyFnEWMA(fnID uuid.UUID) string {
+	return fmt.Sprintf("%s:queue:concurrency-ewma:%s", d.Prefix, fnID)
 }

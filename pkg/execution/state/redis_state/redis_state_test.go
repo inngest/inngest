@@ -3,7 +3,7 @@ package redis_state
 import (
 	"context"
 	"crypto/rand"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"testing"
@@ -20,6 +20,8 @@ import (
 )
 
 func TestNewRunMetadata(t *testing.T) {
+	byt, _ := json.Marshal(state.Identifier{})
+
 	tests := []struct {
 		name          string
 		data          map[string]string
@@ -32,6 +34,7 @@ func TestNewRunMetadata(t *testing.T) {
 				"status":   "1",
 				"version":  "1",
 				"debugger": "false",
+				"id":       string(byt),
 			},
 			expectedVal: &runMetadata{
 				Status:   enums.RunStatusCompleted,
@@ -41,35 +44,16 @@ func TestNewRunMetadata(t *testing.T) {
 			expectedError: nil,
 		},
 		{
-			name:          "should error with missing status",
+			name:          "should error with missing identifier",
 			data:          map[string]string{},
-			expectedError: errors.New("no status stored in metadata"),
+			expectedError: state.ErrRunNotFound,
 		},
 		{
-			name: "should error with non int status",
+			name: "missing ID should return err run not found",
 			data: map[string]string{
 				"status": "hello",
 			},
-			expectedError: errors.New("invalid function status stored in run metadata: \"hello\""),
-		},
-		{
-			name: "missing version should return 0",
-			data: map[string]string{
-				"status": "1",
-			},
-			expectedVal: &runMetadata{
-				Status:  enums.RunStatusCompleted,
-				Version: 0,
-			},
-			expectedError: nil,
-		},
-		{
-			name: "invalid version should return error",
-			data: map[string]string{
-				"status":  "1",
-				"version": "yolo",
-			},
-			expectedError: errors.New("invalid metadata version detected: \"yolo\""),
+			expectedError: state.ErrRunNotFound,
 		},
 	}
 
@@ -183,6 +167,7 @@ func BenchmarkNew(b *testing.B) {
 	r := miniredis.RunT(b)
 	sm, err := New(
 		context.Background(),
+		WithKeyGenerator(DefaultKeyFunc{Prefix: "{state}"}),
 		WithConnectOpts(rueidis.ClientOption{
 			InitAddress:  []string{r.Addr()},
 			DisableCache: true,

@@ -98,10 +98,11 @@ CREATE TABLE event_batches (
 
 CREATE TABLE traces (
 	timestamp TIMESTAMP NOT NULL,
-	trace_id BLOB NOT NULL,
-	span_id BLOB NOT NULL,
-	parent_span_id BLOB,
-	trace_state BLOB,
+	timestamp_unix_ms INT NOT NULL,
+	trace_id VARCHAR NOT NULL,
+	span_id VARCHAR NOT NULL,
+	parent_span_id VARCHAR,
+	trace_state VARCHAR,
 	span_name VARCHAR NOT NULL,
 	span_kind VARCHAR NOT NULL,
 	service_name VARCHAR NOT NULL,
@@ -118,12 +119,13 @@ CREATE TABLE traces (
 );
 
 CREATE TABLE trace_runs (
+	run_id CHAR(26) PRIMARY KEY,
+
 	account_id CHAR(36) NOT NULL,
 	workspace_id CHAR(36) NOT NULL,
 	app_id CHAR(36) NOT NULL,
 	function_id CHAR(36) NOT NULL,
 	trace_id BLOB NOT NULL,
-	run_id CHAR(26) NOT NULL,
 
 	queued_at INT NOT NULL,
 	started_at INT NOT NULL,
@@ -133,6 +135,7 @@ CREATE TABLE trace_runs (
 	source_id VARCHAR NOT NULL,
 	trigger_ids BLOB NOT NULL,
 	output BLOB,
-	is_batch BOOLEAN NOT NULL,
-	is_debounce BOOLEAN NOT NULL
+	is_debounce BOOLEAN NOT NULL,
+	batch_id BLOB,
+	cron_schedule TEXT
 );

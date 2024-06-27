@@ -1,108 +1,162 @@
-import { Button } from '../Button';
+import type { Route } from 'next';
+
 import { CancelRunButton } from '../CancelRunButton';
 import { Card } from '../Card';
-import { CodeBlock } from '../CodeBlock';
+import {
+  IDElement,
+  LazyElementWrapper,
+  LinkElement,
+  TextElement,
+  TimeElement,
+} from '../DetailsCard/Element';
+import { Link } from '../Link';
 import { RerunButton } from '../RerunButtonV2';
-import { Time } from '../Time';
+import { RunResult } from '../RunResult';
+import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
+import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 
 type Props = {
+  standalone: boolean;
   cancelRun: () => Promise<unknown>;
   className?: string;
+  pathCreator: {
+    app: (params: { externalAppID: string }) => Route;
+    runPopout: (params: { runID: string }) => Route;
+  };
+  rerun: (args: { fnID: string; runID: string }) => Promise<unknown>;
+  run: Lazy<Run>;
+  runID: string;
+  result?: Result;
+};
+
+type Run = {
   app: {
+    externalID: string;
     name: string;
   };
   fn: {
     id: string;
     name: string;
   };
-  rerun: (args: { fnID: string }) => Promise<unknown>;
-  run: {
-    id: string;
-    output: string | null;
-    trace: {
-      childrenSpans?: unknown[];
-      endedAt: string | null;
-      queuedAt: string;
-      startedAt: string | null;
-      status: string;
-    };
+  id: string;
+  trace: {
+    childrenSpans?: unknown[];
+    endedAt: string | null;
+    queuedAt: string;
+    startedAt: string | null;
+    status: string;
   };
 };
 
-export function RunInfo({ app, cancelRun, className, fn, rerun, run }: Props) {
-  const queuedAt = new Date(run.trace.queuedAt);
-  const startedAt = toMaybeDate(run.trace.startedAt);
-  const endedAt = toMaybeDate(run.trace.endedAt);
-
-  let durationText = '-';
-  if (startedAt) {
-    durationText = formatMilliseconds((endedAt ?? new Date()).getTime() - startedAt.getTime());
+export function RunInfo({
+  cancelRun,
+  className,
+  pathCreator,
+  rerun,
+  run,
+  runID,
+  standalone,
+  result,
+}: Props) {
+  let allowCancel = false;
+  let isSuccess = false;
+  if (isLazyDone(run)) {
+    allowCancel = !Boolean(run.trace.endedAt);
+    isSuccess = run.trace.status === 'COMPLETED';
   }
 
   return (
-    <div className={cn('flex flex-col gap-4', className)}>
+    <div className={cn('flex flex-col gap-5', className)}>
       <Card>
-        <Card.Header className="flex-row items-center gap-2">
-          <div className="grow">Run details</div>
+        <Card.Header className="h-11 flex-row items-center gap-2">
+          <div className="text-basis flex grow items-center gap-2">
+            Run details {!standalone && <Link href={pathCreator.runPopout({ runID })} />}
+          </div>
 
-          <CancelRunButton disabled={Boolean(endedAt)} onClick={cancelRun} />
-          <RerunButton onClick={() => rerun({ fnID: fn.id })} />
+          <CancelRunButton disabled={!allowCancel} onClick={cancelRun} />
+          <RerunButton
+            disabled={!isLazyDone(run)}
+            onClick={async () => {
+              if (!isLazyDone(run)) {
+                return;
+              }
+              await rerun({ fnID: run.fn.id, runID });
+            }}
+          />
         </Card.Header>
 
         <Card.Content>
           <div>
             <dl className="flex flex-wrap gap-4">
-              <Labeled label="App">{app.name}</Labeled>
+              <LazyElementWrapper label="Run ID" lazy={run}>
+                {(run: Run) => {
+                  return <IDElement>{run.id}</IDElement>;
+                }}
+              </LazyElementWrapper>
 
-              <Labeled label="Function">{fn.name}</Labeled>
+              <LazyElementWrapper label="App" lazy={run}>
+                {(run: Run) => {
+                  return (
+                    <LinkElement
+                      internalNavigation
+                      href={pathCreator.app({ externalAppID: run.app.externalID })}
+                      showIcon={false}
+                    >
+                      {run.app.name}
+                    </LinkElement>
+                  );
+                }}
+              </LazyElementWrapper>
 
-              <Labeled label="Run ID">
-                <span className="font-mono">{run.id}</span>
-              </Labeled>
+              <LazyElementWrapper label="Duration" lazy={run}>
+                {(run: Run) => {
+                  let durationText = '-';
 
-              <Labeled label="Status">{run.trace.status}</Labeled>
+                  const startedAt = toMaybeDate(run.trace.startedAt);
+                  if (startedAt) {
+                    durationText = formatMilliseconds(
+                      (toMaybeDate(run.trace.endedAt) ?? new Date()).getTime() - startedAt.getTime()
+                    );
+                  }
 
-              <Labeled label="Trigger">TODO</Labeled>
+                  return <TextElement>{durationText}</TextElement>;
+                }}
+              </LazyElementWrapper>
 
-              <Labeled label="Event received at">TODO</Labeled>
+              <LazyElementWrapper label="Queued at" lazy={run}>
+                {(run: Run) => {
+                  return <TimeElement date={new Date(run.trace.queuedAt)} />;
+                }}
+              </LazyElementWrapper>
 
-              <Labeled label="Queued at">
-                <Time value={queuedAt} />
-              </Labeled>
+              <LazyElementWrapper label="Started at" lazy={run}>
+                {(run: Run) => {
+                  const startedAt = toMaybeDate(run.trace.startedAt);
+                  if (!startedAt) {
+                    return <TextElement>-</TextElement>;
+                  }
+                  return <TimeElement date={startedAt} />;
+                }}
+              </LazyElementWrapper>
 
-              <Labeled label="Started at">{startedAt ? <Time value={startedAt} /> : '-'}</Labeled>
-
-              <Labeled label="Ended at">{endedAt ? <Time value={endedAt} /> : '-'}</Labeled>
-
-              <Labeled label="Duration">{durationText}</Labeled>
-
-              <Labeled label="Step count">{run.trace.childrenSpans?.length ?? 0}</Labeled>
+              <LazyElementWrapper label="Ended at" lazy={run}>
+                {(run: Run) => {
+                  const endedAt = toMaybeDate(run.trace.endedAt);
+                  if (!endedAt) {
+                    return <TextElement>-</TextElement>;
+                  }
+                  return <TimeElement date={endedAt} />;
+                }}
+              </LazyElementWrapper>
             </dl>
           </div>
         </Card.Content>
+        {result && (
+          <RunResult className="border-muted border-t" result={result} isSuccess={isSuccess} />
+        )}
       </Card>
-
-      {run.output && (
-        <CodeBlock
-          tabs={[
-            {
-              label: 'Run output',
-              content: run.output,
-            },
-          ]}
-        />
-      )}
-    </div>
-  );
-}
-
-function Labeled({ label, children }: React.PropsWithChildren<{ label: string }>) {
-  return (
-    <div className="w-64 text-sm">
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="truncate">{children}</dd>
     </div>
   );
 }

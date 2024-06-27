@@ -1,6 +1,5 @@
 'use client';
 
-import colors from 'tailwindcss/colors';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
@@ -95,9 +94,13 @@ export default function FunctionRunsChart({ functionSlug, timeRange }: FunctionR
       title="Function Runs"
       data={metrics}
       legend={[
-        { name: 'Completed', dataKey: 'completed', color: colors.teal['500'] },
-        { name: 'Failed', dataKey: 'failed', color: colors.rose['500'] },
-        { name: 'Canceled', dataKey: 'canceled', color: colors.slate['500'] },
+        { name: 'Completed', dataKey: 'completed', color: 'rgb(var(--color-primary-subtle) / 1)' },
+        { name: 'Failed', dataKey: 'failed', color: 'rgb(var(--color-tertiary-subtle) / 1)' },
+        {
+          name: 'Cancelled',
+          dataKey: 'canceled',
+          color: 'rgb(var(--color-foreground-cancelled) / 1)',
+        },
       ]}
       isLoading={isFetchingFunctionRunsMetrics}
       error={functionRunsMetricsError}

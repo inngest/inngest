@@ -44,7 +44,7 @@ export const SuccessWithoutSteps: Story = {
   args: {
     app,
     fn,
-    getOutput,
+    getResult: getOutput,
     run: {
       ...run,
       trace: {
@@ -82,7 +82,7 @@ export const ErrorWithoutSteps: Story = {
   args: {
     app,
     fn,
-    getOutput,
+    getResult: getOutput,
     run: {
       ...run,
       trace: {
@@ -186,7 +186,7 @@ export const ParallelRecovery: Story = {
   args: {
     app,
     fn,
-    getOutput,
+    getResult: getOutput,
     run: {
       ...run,
       trace: {
@@ -292,7 +292,7 @@ export const VeryLongStepName: Story = {
   args: {
     app,
     fn,
-    getOutput,
+    getResult: getOutput,
     run: {
       ...run,
       trace: {
@@ -398,7 +398,7 @@ export const LongSleep: Story = {
   args: {
     app,
     fn,
-    getOutput,
+    getResult: getOutput,
     run: {
       ...run,
       trace: {
@@ -478,7 +478,7 @@ export const LotsOfStuff: Story = {
   args: {
     app,
     fn,
-    getOutput,
+    getResult: getOutput,
     run: {
       ...run,
       trace: {

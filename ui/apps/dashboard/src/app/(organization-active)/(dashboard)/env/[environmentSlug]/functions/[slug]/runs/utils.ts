@@ -1,15 +1,18 @@
+import { type Run } from '@inngest/components/RunsPage/RunsTable';
 import { isFunctionRunStatus, type FunctionRunStatus } from '@inngest/components/types/functionRun';
+import { toMaybeDate } from '@inngest/components/utils/date';
 
 import {
   FunctionRunStatus as FunctionRunStatusEnum,
   RunsOrderByField as FunctionRunTimeFieldEnum,
+  type FunctionRunV2,
 } from '@/gql/graphql';
 
 /**
  * Convert a run status union type into an enum. This is necessary because
  * TypeScript treats as enums as nominal types, which causes silly type errors.
  */
-function toRunStatus(status: FunctionRunStatus): FunctionRunStatusEnum {
+export function toRunStatus(status: FunctionRunStatus): FunctionRunStatusEnum {
   switch (status) {
     case 'CANCELLED':
       return FunctionRunStatusEnum.Cancelled;
@@ -57,4 +60,36 @@ export function toTimeField(time: string): FunctionRunTimeFieldEnum | undefined 
     default:
       console.error(`unexpected time field: ${time}`);
   }
+}
+
+type PickedFunctionRunV2 = Pick<
+  FunctionRunV2,
+  'id' | 'queuedAt' | 'startedAt' | 'status' | 'endedAt'
+>;
+type PickedFunctionRunV2EdgeWithNode = {
+  node: PickedFunctionRunV2;
+};
+
+/**
+ * Parses the runs data into the table format
+ */
+export function parseRunsData(runsData: PickedFunctionRunV2EdgeWithNode[] | undefined): Run[] {
+  return (
+    runsData?.map((edge) => {
+      const startedAt = toMaybeDate(edge.node.startedAt);
+      let durationMS = null;
+      if (startedAt) {
+        durationMS = (toMaybeDate(edge.node.endedAt) ?? new Date()).getTime() - startedAt.getTime();
+      }
+
+      return {
+        id: edge.node.id,
+        queuedAt: edge.node.queuedAt,
+        startedAt: edge.node.startedAt,
+        endedAt: edge.node.endedAt,
+        durationMS,
+        status: edge.node.status,
+      };
+    }) ?? []
+  );
 }

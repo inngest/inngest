@@ -480,7 +480,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 
 			// If this errored, then we were supposed to find a function to
 			// invoke. In this case, emit a completion event with the error.
-			perr := s.executor.InvokeNotFoundHandler(ctx, execution.InvokeNotFoundHandlerOpts{
+			perr := s.executor.InvokeFailHandler(ctx, execution.InvokeFailHandlerOpts{
 				OriginalEvent: tracked,
 				FunctionID:    "",
 				RunID:         "",
@@ -609,6 +609,10 @@ func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 }
 
 func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.TrackedEvent) error {
+	l := logger.From(ctx).With().
+		Str("function", fn.Name).
+		Str("function_id", fn.ID.String()).Logger()
+
 	if fn.IsBatchEnabled() {
 		bi := batch.BatchItem{
 			WorkspaceID:     evt.GetWorkspaceID(),
@@ -628,23 +632,38 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 	// Attempt to rate-limit the incoming function.
 	if s.rl != nil && fn.RateLimit != nil {
 		key, err := ratelimit.RateLimitKey(ctx, fn.ID, *fn.RateLimit, evt.GetEvent().Map())
-		if err != nil {
+		switch err {
+		case nil:
+			limited, _, err := s.rl.RateLimit(ctx, key, *fn.RateLimit)
+			if err != nil {
+				return err
+			}
+			if limited {
+				if evt.GetEvent().IsInvokeEvent() {
+					// This function was invoked by another function, so we need to
+					// ensure that the invoker fails. If we don't do this, it'll
+					// hang forever
+					if err := s.executor.InvokeFailHandler(ctx, execution.InvokeFailHandlerOpts{
+						OriginalEvent: evt,
+						Err: map[string]any{
+							"name":    "Error",
+							"message": "invoked function is rate limited",
+						},
+					}); err != nil {
+						l.Error().Err(err).Msg("error handling invoke rate limit")
+					}
+				}
+				// Do nothing.
+				return nil
+			}
+		case ratelimit.ErrNotRateLimited:
+			// no-op: proceed with function run as usual
+		default:
 			return err
-		}
-		limited, _, err := s.rl.RateLimit(ctx, key, *fn.RateLimit)
-		if err != nil {
-			return err
-		}
-		if limited {
-			// Do nothing.
-			return nil
 		}
 	}
 
-	logger.From(ctx).Info().
-		Str("function_id", fn.ID.String()).
-		Str("function", fn.Name).
-		Msg("initializing fn")
+	l.Info().Msg("initializing fn")
 	_, err := Initialize(ctx, fn, evt, s.executor)
 	if err == state.ErrIdentifierExists {
 		// This run exists;  do not attempt to recreate it.

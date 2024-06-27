@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -25,6 +26,7 @@ var (
 	// that doesn't exist within the backing state store.
 	ErrPauseNotFound       = fmt.Errorf("pause not found")
 	ErrInvokePauseNotFound = fmt.Errorf("invoke pause not found")
+	ErrRunNotFound         = fmt.Errorf("run not found in state store")
 	// ErrPauseLeased is returned when attempting to lease a pause that is
 	// already leased by another event.
 	ErrPauseLeased        = fmt.Errorf("pause already leased")
@@ -35,6 +37,12 @@ var (
 	ErrFunctionFailed     = fmt.Errorf("function failed")
 	ErrFunctionOverflowed = fmt.Errorf("function has too many steps")
 	ErrDuplicateResponse  = fmt.Errorf("duplicate response")
+	ErrEventNotFound      = fmt.Errorf("event not found in state store")
+)
+
+const (
+	// InngestErrFunctionOverflowed is the public error code for ErrFunctionOverflowed
+	InngestErrFunctionOverflowed = "InngestErrFunctionOverflowed"
 )
 
 // Identifier represents the unique identifier for a workflow run.
@@ -101,9 +109,9 @@ type CustomConcurrency struct {
 func (i Identifier) IdempotencyKey() string {
 	key := i.Key
 	if i.Key == "" {
-		key = i.RunID.String()
+		return fmt.Sprintf("%s:%s", util.XXHash(i.WorkflowID), util.XXHash(i.RunID.String()))
 	}
-	return fmt.Sprintf("%s:%d:%s", i.WorkflowID, i.WorkflowVersion, key)
+	return key
 }
 
 // Metadata must be stored for each workflow run, allowing the runner to inspect
@@ -303,7 +311,7 @@ type Mutater interface {
 	UpdateMetadata(ctx context.Context, runID ulid.ULID, md MetadataUpdate) error
 
 	// Delete removes state from the state store.
-	Delete(ctx context.Context, i Identifier) error
+	Delete(ctx context.Context, i Identifier) (bool, error)
 
 	// Cancel sets a function run metadata status to RunStatusCancelled, which prevents
 	// future execution of steps.

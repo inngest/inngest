@@ -1,6 +1,8 @@
 'use client';
 
 import type React from 'react';
+import { type Route } from 'next';
+import { Link } from '@inngest/components/Link';
 import { useQuery } from 'urql';
 
 import Placeholder from '@/components/Placeholder';
@@ -65,13 +67,9 @@ export default function Payments() {
               payment.amountLabel
             ),
           url: payment.invoiceURL ? (
-            <a
-              href={payment.invoiceURL}
-              target="_blank"
-              className="font-semibold text-indigo-500 hover:text-indigo-800 hover:underline"
-            >
+            <Link href={payment.invoiceURL as Route}>
               {payment.status === 'requires_confirmation' ? 'Pay' : 'View'}
-            </a>
+            </Link>
           ) : null,
         })
       );

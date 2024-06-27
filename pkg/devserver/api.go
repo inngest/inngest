@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -64,6 +65,10 @@ func (a *devapi) addRoutes() {
 	a.Post("/fn/register", a.Register)
 	// This allows tests to remove apps by URL
 	a.Delete("/fn/remove", a.RemoveApp)
+
+	// This allows tests to update step limits per function
+	a.Post("/fn/step-limit", a.SetStepLimit)
+	a.Delete("/fn/step-limit", a.RemoveStepLimit)
 
 	// Go embeds files relative to the current source, which embeds
 	// all under ./static.  We remove the ./static
@@ -350,7 +355,7 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 	}
 	log.From(ctx).Trace().Int("len", traces.SpanCount()).Msg("recording otel trace spans")
 
-	handler := newSpanIngestionHandler()
+	handler := newSpanIngestionHandler(a.devserver.data)
 
 	for i := 0; i < traces.ResourceSpans().Len(); i++ {
 		rs := traces.ResourceSpans().At(i)
@@ -449,7 +454,7 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 
-				handler.Add(cqrsspan)
+				handler.Add(ctx, cqrsspan)
 			}
 		}
 	}
@@ -488,6 +493,30 @@ func (a devapi) RemoveApp(w http.ResponseWriter, r *http.Request) {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Error deleting app"))
 		return
 	}
+}
+
+func (a devapi) SetStepLimit(w http.ResponseWriter, r *http.Request) {
+	functionId := r.FormValue("functionId")
+	limitStr := r.FormValue("limit")
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid limit: %s", limitStr))
+		return
+	}
+
+	a.devserver.stepLimitOverrides[functionId] = limit
+}
+
+func (a devapi) RemoveStepLimit(w http.ResponseWriter, r *http.Request) {
+	functionId := r.FormValue("functionId")
+
+	if _, ok := a.devserver.stepLimitOverrides[functionId]; !ok {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(nil, 404, "No step limit set for function: %s", functionId))
+		return
+	}
+
+	delete(a.devserver.stepLimitOverrides, functionId)
 }
 
 func (a devapi) err(ctx context.Context, w http.ResponseWriter, status int, err error) {

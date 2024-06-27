@@ -26,7 +26,7 @@ export default function CurrentSubscription({
   const freeTierFeatureRows = featureRows.filter(({ showFreeTier }) => showFreeTier);
 
   return (
-    <div className="rounded-lg border border-slate-300 bg-white">
+    <div className="border-muted rounded-lg border bg-white">
       <div className="p-6">
         {isOnPaidPlan ? (
           <>

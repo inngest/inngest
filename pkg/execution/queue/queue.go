@@ -14,6 +14,8 @@ type Queue interface {
 	Consumer
 
 	JobQueueReader
+
+	SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bool) error
 }
 
 type RunInfo struct {

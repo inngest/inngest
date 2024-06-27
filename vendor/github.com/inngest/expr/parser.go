@@ -101,7 +101,7 @@ func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, 
 	}
 
 	node := newNode()
-	_, err := navigateAST(
+	_, hasMacros, err := navigateAST(
 		expr{
 			ast: ast.NativeRep().Expr(),
 		},
@@ -118,6 +118,7 @@ func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, 
 		Root:        *node,
 		Vars:        vars,
 		EvaluableID: eval.GetID(),
+		HasMacros:   hasMacros,
 	}, nil
 }
 
@@ -139,6 +140,8 @@ type ParsedExpression struct {
 
 	// Evaluable stores the original evaluable interface that was parsed.
 	EvaluableID uuid.UUID
+
+	HasMacros bool
 }
 
 // RootGroups returns the top-level matching groups within an expression.  This is a small
@@ -333,6 +336,18 @@ func (p Predicate) LiteralAsString() string {
 	return str
 }
 
+func (p Predicate) LiteralAsFloat64() (float64, error) {
+	switch v := p.Literal.(type) {
+	case int:
+		return float64(v), nil
+	case int64:
+		return float64(v), nil
+	case float64:
+		return v, nil
+	}
+	return 0, fmt.Errorf("not an int64 or float64")
+}
+
 // expr is wrapper around the CEL AST which stores parsing-related data.
 type expr struct {
 	ast celast.Expr
@@ -347,10 +362,12 @@ type expr struct {
 // It does this by iterating through the expression, amending the current `group` until
 // an or expression is found.  When an or expression is found, we create another group which
 // is mutated by the iteration.
-func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]*Node, error) {
+func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]*Node, bool, error) {
 	// on the very first call to navigateAST, ensure that we set the first node
 	// inside the nodemap.
 	result := []*Node{}
+
+	hasMacros := false
 
 	// Iterate through the stack, recursing down into each function call (eg. && branches).
 	stack := []expr{nav}
@@ -359,16 +376,23 @@ func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]
 		stack = stack[1:]
 
 		switch item.ast.Kind() {
+		case celast.ComprehensionKind:
+			// These are not supported.  A comprehension is eg. `.exists` and must
+			// awlays run naively right now.
+			c := item.ast.AsComprehension()
+			child := &Node{
+				Predicate: &Predicate{
+					Ident:    c.IterVar(),
+					Operator: "comprehension",
+				},
+			}
+			child.normalize()
+			result = append(result, child)
+			hasMacros = true
 		case celast.LiteralKind:
 			// This is a literal. Do nothing, as this is always true.
 		case celast.IdentKind:
-			// This is a variable. DO nothing.
-			// predicate := Predicate{
-			// 	Literal:  true,
-			// 	Ident:    item.AsIdent(),
-			// 	Operator: operators.Equals,
-			// }
-			// current.Predicates = append(current.Predicates, predicate)
+			// This is a variable. Do nothing.
 		case celast.CallKind:
 			// Call kinds are the actual comparator operators, eg. >=, or &&.  These are specifically
 			// what we're trying to parse, by taking the LHS and RHS of each opeartor then bringing
@@ -391,14 +415,15 @@ func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]
 
 			if fn == operators.LogicalOr {
 				for _, or := range peek(item, operators.LogicalOr) {
+					var err error
 					// Ors modify new nodes.  Assign a new Node to each
 					// Or entry.
 					newParent := newNode()
 
 					// For each item in the stack, recurse into that AST.
-					_, err := navigateAST(or, newParent, vars, rand)
+					_, hasMacros, err = navigateAST(or, newParent, vars, rand)
 					if err != nil {
-						return nil, err
+						return nil, hasMacros, err
 					}
 
 					// Ensure that we remove any redundant parents generated.
@@ -468,7 +493,7 @@ func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]
 		}
 	}
 
-	return result, nil
+	return result, hasMacros, nil
 }
 
 // peek recurses through nested operators (eg. a && b && c), grouping all operators
@@ -547,6 +572,8 @@ func callToPredicate(item celast.Expr, negated bool, vars LiftedArgs) *Predicate
 			ident = item.AsIdent()
 		case celast.LiteralKind:
 			literal = item.AsLiteral().Value()
+		case celast.MapKind:
+			literal = item.AsMap()
 		case celast.SelectKind:
 			// This is an expression, ie. "event.data.foo"  Iterate from the root field upwards
 			// to get the full ident.

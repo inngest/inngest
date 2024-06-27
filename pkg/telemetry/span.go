@@ -4,6 +4,7 @@ import (
 	"context"
 	crand "crypto/rand"
 	"encoding/binary"
+	"encoding/json"
 	"math/rand"
 	"sync"
 	"time"
@@ -92,12 +93,6 @@ func WithSpanID(sid trace.SpanID) SpanOpt {
 	}
 }
 
-func WithDedup() SpanOpt {
-	return func(s *spanOpt) {
-		s.dedup = true
-	}
-}
-
 func newSpanOpt(opts ...SpanOpt) *spanOpt {
 	s := &spanOpt{
 		kind:  trace.SpanKindUnspecified,
@@ -127,8 +122,6 @@ type spanOpt struct {
 	psid *trace.SpanID
 	// SpanID that needs to be overwritten
 	sid *trace.SpanID
-	// option to be used to mark the span is duplicated or not
-	dedup bool
 }
 
 func (so *spanOpt) Attributes() []attribute.KeyValue {
@@ -177,10 +170,6 @@ func (so *spanOpt) ParentSpanID() *trace.SpanID {
 
 func (so *spanOpt) SpanID() *trace.SpanID {
 	return so.sid
-}
-
-func (so *spanOpt) Dedup() bool {
-	return so.dedup
 }
 
 func (so *spanOpt) Resource() *resource.Resource {
@@ -265,7 +254,6 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
 		status:   tracesdk.Status{Code: codes.Unset},
 		conf:     sconf,
 		kind:     so.SpanKind(),
-		dedup:    so.Dedup(),
 	}
 
 	return trace.ContextWithSpan(ctx, s), s
@@ -301,9 +289,6 @@ type Span struct {
 	parent   trace.SpanContext
 	conf     trace.SpanContextConfig
 
-	// dedup marks the span as a potential duplicate, which in turn
-	// can be used as an indicator to allow the span to be sent of not.
-	dedup bool
 	// Mark the span as cancelled, so it doesn't get sent out when it ends
 	cancel            bool
 	childSpanCount    int
@@ -419,8 +404,9 @@ func (s *Span) End(opts ...trace.SpanEndOption) {
 	}
 
 	// don't attempt to export the span if it's marked as dedup or cancel
-	if s.cancel || s.dedup {
-		s.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
+	if s.cancel {
+		return
+		// s.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 	}
 
 	if err := UserTracer().Export(s); err != nil {
@@ -537,6 +523,33 @@ func (s *Span) SetAttributes(attrs ...attribute.KeyValue) {
 
 func (s *Span) TracerProvider() trace.TracerProvider {
 	return UserTracer().Provider()
+}
+
+func (s *Span) SetFnOutput(data any) {
+	s.setOutput(data, consts.OtelSysFunctionOutput)
+}
+
+func (s *Span) SetStepOutput(data any) {
+	s.setOutput(data, consts.OtelSysStepOutput)
+}
+
+func (s *Span) setOutput(data any, key string) {
+	attr := []attribute.KeyValue{
+		attribute.Bool(key, true),
+	}
+
+	switch v := data.(type) {
+	case string:
+		s.AddEvent(v, trace.WithAttributes(attr...))
+	case []byte:
+		s.AddEvent(string(v), trace.WithAttributes(attr...))
+	case json.RawMessage:
+		s.AddEvent(string(v), trace.WithAttributes(attr...))
+	default:
+		if byt, err := json.Marshal(v); err == nil {
+			s.AddEvent(string(byt), trace.WithAttributes(attr...))
+		}
+	}
 }
 
 func newSpanIDGenerator() *spanIDGenerator {

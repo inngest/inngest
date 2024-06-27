@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -89,6 +90,20 @@ type CreateCancellationBody struct {
 	If            *string    `json:"if,omitempty"`
 }
 
+func (c CreateCancellationBody) Validate() error {
+	var err error
+	if c.AppID == "" {
+		err = errors.Join(err, errors.New("app_id is required"))
+	}
+	if c.FunctionID == "" {
+		err = errors.Join(err, errors.New("function_id is required"))
+	}
+	if c.StartedBefore.IsZero() {
+		err = errors.Join(err, errors.New("started_before is required"))
+	}
+	return err
+}
+
 func (a API) CreateCancellation(ctx context.Context, opts CreateCancellationBody) (*cqrs.Cancellation, error) {
 	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
@@ -125,6 +140,10 @@ func (a router) createCancellation(w http.ResponseWriter, r *http.Request) {
 	opts := CreateCancellationBody{}
 	if err := json.NewDecoder(r.Body).Decode(&opts); err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid cancellation request"))
+		return
+	}
+	if err := opts.Validate(); err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, err.Error()))
 		return
 	}
 

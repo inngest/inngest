@@ -15,12 +15,12 @@ import type { FunctionRun } from '@inngest/components/types/functionRun';
 import type { FunctionVersion } from '@inngest/components/types/functionVersion';
 import { classNames } from '@inngest/components/utils/classNames';
 import { type RawHistoryItem } from '@inngest/components/utils/historyParser';
+import { devServerURL, useDevServer } from '@inngest/components/utils/useDevServer';
 import type { NavigateToRunFn } from 'node_modules/@inngest/components/src/Timeline/Timeline';
 import { useClient, useMutation } from 'urql';
 
 import { graphql } from '@/gql';
 import { useCancelRun } from '@/queries/useCancelRun';
-import { devServerURL, useDevServer } from '@/utils/useDevServer';
 import { getHistoryItemOutput } from './getHistoryItemOutput';
 
 type Props = {
@@ -45,7 +45,7 @@ export function StreamDetails({
 }: Props) {
   const client = useClient();
   const { isRunning, send } = useDevServer();
-  const cancelRun = useCancelRun({ envID: environment.id, runID: run.id });
+  const cancelRun = useCancelRun({ envID: environment.id });
   const rerun = useRerun({
     envID: environment.id,
     envSlug: environment.slug,

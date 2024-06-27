@@ -47,7 +47,7 @@ func (v v2) Create(ctx context.Context, s state.CreateState) error {
 			RunID:                 s.Metadata.ID.RunID,
 			WorkflowID:            s.Metadata.ID.FunctionID,
 			WorkflowVersion:       s.Metadata.Config.FunctionVersion,
-			EventID:               s.Metadata.Config.EventIDs[0],
+			EventID:               s.Metadata.Config.EventID(),
 			EventIDs:              s.Metadata.Config.EventIDs,
 			Key:                   s.Metadata.Config.Idempotency,
 			AccountID:             s.Metadata.ID.Tenant.AccountID,
@@ -69,7 +69,7 @@ func (v v2) Create(ctx context.Context, s state.CreateState) error {
 // Delete deletes state, metadata, and - when pauses are included - associated pauses
 // for the run from the store.  Nothing referencing the run should exist in the state
 // store after.
-func (v v2) Delete(ctx context.Context, id state.ID) error {
+func (v v2) Delete(ctx context.Context, id state.ID) (bool, error) {
 	return v.mgr.Delete(ctx, statev1.Identifier{
 		RunID:      id.RunID,
 		WorkflowID: id.FunctionID,
@@ -100,6 +100,11 @@ func (v v2) LoadState(ctx context.Context, id state.ID) (state.State, error) {
 	if state.Metadata, err = v.LoadMetadata(ctx, id); err != nil {
 		return state, err
 	}
+
+	// Reassign id since state.Metadata.ID has more complete info. Specifically,
+	// it has the function ID
+	id = state.Metadata.ID
+
 	if state.Events, err = v.LoadEvents(ctx, id); err != nil {
 		return state, err
 	}

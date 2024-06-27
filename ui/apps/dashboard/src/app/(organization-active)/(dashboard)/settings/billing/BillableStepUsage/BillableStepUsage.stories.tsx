@@ -1,6 +1,5 @@
+import { AppRoot } from '@inngest/components/AppRoot';
 import type { Meta } from '@storybook/react';
-
-import { BaseWrapper } from '@/app/baseWrapper';
 
 const Disable = () => <>disabled story</>;
 
@@ -16,9 +15,9 @@ const meta: Meta<typeof Disable> = {
   decorators: [
     (Story) => {
       return (
-        <BaseWrapper>
+        <AppRoot>
           <Story />
-        </BaseWrapper>
+        </AppRoot>
       );
     },
   ],

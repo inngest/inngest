@@ -3,62 +3,51 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
-import { DatePicker } from '@inngest/components/DatePicker';
-import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+import { RangePicker } from '@inngest/components/DatePicker';
+import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
 import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
 import { IconReplay } from '@inngest/components/icons/Replay';
+import { subtractDuration } from '@inngest/components/utils/date';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
-import { useMutation } from 'urql';
+import { useMutation, useQuery } from 'urql';
 
 import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import Input from '@/components/Forms/Input';
 import Placeholder from '@/components/Placeholder';
 import { graphql } from '@/gql';
-import { FunctionRunStatus } from '@/gql/graphql';
+import { ReplayRunStatus } from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 
-const GetFunctionEndedRunsCountDocument = graphql(`
-  query GetFunctionEndedRunsCount(
-    $environmentID: ID!
-    $functionSlug: String!
-    $timeRangeStart: Time!
-    $timeRangeEnd: Time!
-  ) {
+const GetBillingPlanDocument = graphql(`
+  query GetBillingPlan {
+    account {
+      plan {
+        id
+        name
+        features
+      }
+    }
+
+    plans {
+      name
+      features
+    }
+  }
+`);
+
+const GetReplayRunCountsDocument = graphql(`
+  query GetReplayRunCounts($environmentID: ID!, $functionSlug: String!, $from: Time!, $to: Time!) {
     environment: workspace(id: $environmentID) {
       function: workflowBySlug(slug: $functionSlug) {
         id
-        failedRuns: runsV2(
-          filter: {
-            status: [FAILED]
-            lowerTime: $timeRangeStart
-            upperTime: $timeRangeEnd
-            timeField: STARTED_AT
-          }
-        ) {
-          totalCount
-        }
-        canceledRuns: runsV2(
-          filter: {
-            status: [CANCELLED]
-            lowerTime: $timeRangeStart
-            upperTime: $timeRangeEnd
-            timeField: STARTED_AT
-          }
-        ) {
-          totalCount
-        }
-        succeededRuns: runsV2(
-          filter: {
-            status: [COMPLETED]
-            lowerTime: $timeRangeStart
-            upperTime: $timeRangeEnd
-            timeField: STARTED_AT
-          }
-        ) {
-          totalCount
+        replayCounts: replayCounts(from: $from, to: $to) {
+          completedCount
+          failedCount
+          cancelledCount
+          skippedPausedCount
         }
       }
     }
@@ -72,7 +61,7 @@ const CreateFunctionReplayDocument = graphql(`
     $name: String!
     $fromRange: ULID!
     $toRange: ULID!
-    $statuses: [FunctionRunStatus!]
+    $statuses: [ReplayRunStatus!]
   ) {
     createFunctionReplay(
       input: {
@@ -81,7 +70,7 @@ const CreateFunctionReplayDocument = graphql(`
         name: $name
         fromRange: $fromRange
         toRange: $toRange
-        statuses: $statuses
+        statusesV2: $statuses
       }
     ) {
       id
@@ -89,10 +78,11 @@ const CreateFunctionReplayDocument = graphql(`
   }
 `);
 
-type FunctionRunEndStatus =
-  | FunctionRunStatus.Failed
-  | FunctionRunStatus.Cancelled
-  | FunctionRunStatus.Completed;
+type SelectableStatuses =
+  | ReplayRunStatus.Failed
+  | ReplayRunStatus.Cancelled
+  | ReplayRunStatus.Completed
+  | ReplayRunStatus.SkippedPaused;
 
 type NewReplayModalProps = {
   functionSlug: string;
@@ -110,33 +100,42 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
   const router = useRouter();
   const [name, setName] = useState<string>('');
   const [timeRange, setTimeRange] = useState<DateRange>();
-  const [selectedStatuses, setSelectedStatuses] = useState<FunctionRunEndStatus[]>([
-    FunctionRunStatus.Failed,
+  const [selectedStatuses, setSelectedStatuses] = useState<SelectableStatuses[]>([
+    ReplayRunStatus.Failed,
   ]);
   const environment = useEnvironment();
 
+  const [{ data: planData }] = useQuery({
+    query: GetBillingPlanDocument,
+  });
+
+  const logRetention = Number(planData?.account.plan?.features.log_retention);
+  const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
+
   const { data, isLoading } = useSkippableGraphQLQuery({
-    query: GetFunctionEndedRunsCountDocument,
+    query: GetReplayRunCountsDocument,
     variables: {
       environmentID: environment.id,
       functionSlug,
-      timeRangeStart: timeRange?.start ? timeRange.start.toISOString() : '',
-      timeRangeEnd: timeRange?.end ? timeRange.end.toISOString() : '',
+      from: timeRange?.start ? timeRange.start.toISOString() : '',
+      to: timeRange?.end ? timeRange.end.toISOString() : '',
     },
-    skip: !timeRange,
+    skip: !timeRange || !timeRange.start || !timeRange.end,
   });
   const [{ fetching: isCreatingFunctionReplay }, createFunctionReplayMutation] = useMutation(
     CreateFunctionReplayDocument
   );
 
-  const failedRunsCount = data?.environment.function?.failedRuns?.totalCount ?? 0;
-  const canceledRunsCount = data?.environment.function?.canceledRuns?.totalCount ?? 0;
-  const succeededRunsCount = data?.environment.function?.succeededRuns?.totalCount ?? 0;
+  const failedRunsCount = data?.environment.function?.replayCounts.failedCount ?? 0;
+  const cancelledRunsCount = data?.environment.function?.replayCounts.cancelledCount ?? 0;
+  const succeededRunsCount = data?.environment.function?.replayCounts.completedCount ?? 0;
+  const pausedRunsCount = data?.environment.function?.replayCounts.skippedPausedCount ?? 0;
 
-  const statusCounts: Record<FunctionRunEndStatus, number> = {
-    [FunctionRunStatus.Failed]: failedRunsCount,
-    [FunctionRunStatus.Cancelled]: canceledRunsCount,
-    [FunctionRunStatus.Completed]: succeededRunsCount,
+  const statusCounts: Record<SelectableStatuses, number> = {
+    [ReplayRunStatus.Failed]: failedRunsCount,
+    [ReplayRunStatus.Cancelled]: cancelledRunsCount,
+    [ReplayRunStatus.Completed]: succeededRunsCount,
+    [ReplayRunStatus.SkippedPaused]: pausedRunsCount,
   } as const;
 
   const selectedRunsCount = selectedStatuses.reduce((acc, status) => acc + statusCounts[status], 0);
@@ -183,9 +182,10 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
   }
 
   const statusOptions = [
-    { label: 'Failed', value: FunctionRunStatus.Failed, count: failedRunsCount },
-    { label: 'Canceled', value: FunctionRunStatus.Cancelled, count: canceledRunsCount },
-    { label: 'Succeeded', value: FunctionRunStatus.Completed, count: succeededRunsCount },
+    { label: 'Failed', value: ReplayRunStatus.Failed, count: failedRunsCount },
+    { label: 'Canceled', value: ReplayRunStatus.Cancelled, count: cancelledRunsCount },
+    { label: 'Succeeded', value: ReplayRunStatus.Completed, count: succeededRunsCount },
+    { label: 'Skipped', value: ReplayRunStatus.SkippedPaused, count: pausedRunsCount },
   ];
 
   return (
@@ -221,28 +221,22 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
               />
             </div>
           </div>
-          <div className="flex flex-col justify-between gap-2 px-6 py-4">
-            <div className="space-y-0.5">
+          <div className="flex flex-row justify-between px-6 py-4">
+            <div className="w-1/2 space-y-0.5">
               <span className="text-sm font-semibold text-slate-800">Date Range</span>
               <p className="text-xs text-slate-500">Select a specific range of function runs.</p>
             </div>
-            <div className="flex flex-row gap-x-2">
-              <DatePicker
-                placeholder="Start"
-                defaultValue={timeRange?.start}
-                onChange={(d) =>
-                  setTimeRange({ start: d, end: timeRange?.end, key: timeRange?.key })
+            <div className="w-1/2">
+              <RangePicker
+                upgradeCutoff={upgradeCutoff}
+                onChange={(range) =>
+                  setTimeRange(
+                    range.type === 'relative'
+                      ? { start: subtractDuration(new Date(), range.duration), end: new Date() }
+                      : { start: range.start, end: range.end }
+                  )
                 }
-                className="w-1/2"
-              />
-
-              <DatePicker
-                placeholder="End"
-                defaultValue={timeRange?.end}
-                onChange={(d) =>
-                  setTimeRange({ start: timeRange?.start, end: d, key: timeRange?.key })
-                }
-                className="w-1/2"
+                className="w-full"
               />
             </div>
           </div>
@@ -255,7 +249,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
           <ToggleGroup.Root
             type="multiple"
             value={selectedStatuses}
-            onValueChange={(selectedStatuses: FunctionRunEndStatus[]) => {
+            onValueChange={(selectedStatuses: SelectableStatuses[]) => {
               if (selectedStatuses.length === 0) return; // Must have at least one status selected
               setSelectedStatuses(selectedStatuses);
             }}
@@ -267,20 +261,22 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
                   className="flex w-full flex-col items-center gap-1 rounded-md bg-slate-100 py-6 text-sm font-semibold text-slate-800 hover:bg-slate-200 focus:outline-1 focus:outline-indigo-500 data-[state=on]:ring data-[state=on]:ring-indigo-500 data-[state=on]:ring-offset-2"
                   value={value}
                 >
-                  <FunctionRunStatusIcon status={value} className="mx-auto h-8" />
+                  <RunStatusIcon status={value} className="mx-auto h-8" />
                   {label}
                 </ToggleGroup.Item>
-                <p aria-label={`Number of ${label} runs`} className="text-sm text-slate-500">
-                  {isLoading ? (
-                    <Placeholder className="top-px inline-flex h-3 w-3 bg-slate-200" />
-                  ) : (
-                    count.toLocaleString(undefined, {
-                      notation: 'compact',
-                      compactDisplay: 'short',
-                    })
-                  )}{' '}
-                  Runs
-                </p>
+                {timeRange && (
+                  <p aria-label={`Number of ${label} runs`} className="text-sm text-slate-500">
+                    {isLoading ? (
+                      <Placeholder className="top-px inline-flex h-3 w-3 bg-slate-200" />
+                    ) : (
+                      count.toLocaleString(undefined, {
+                        notation: 'compact',
+                        compactDisplay: 'short',
+                      })
+                    )}{' '}
+                    Runs
+                  </p>
+                )}
               </div>
             ))}
           </ToggleGroup.Root>
@@ -288,28 +284,30 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
         <div className="flex flex-col gap-6 px-6 py-4">
           <div className="max-w-sm space-y-2 text-xs text-slate-500">
             <p>
-              Replayed functions are re-run from the beginning. All previously run steps and
-              function states will not be re-used during the replay.
+              Replayed functions are re-run from the beginning. Previously run steps and function
+              states will not be reused during the replay.
             </p>
             <p>
               The <code>event.user</code> object will be empty for all runs in the replay.
             </p>
           </div>
-          <div className="flex gap-2 self-end">
-            <p className="inline-flex gap-1.5 text-slate-500">
-              Total runs to be replayed:{' '}
-              <span className="font-medium text-slate-800">
-                {isLoading ? (
-                  <Placeholder className="top-px inline-flex h-4 w-4 bg-slate-200" />
-                ) : (
-                  selectedRunsCount.toLocaleString(undefined, {
-                    notation: 'compact',
-                    compactDisplay: 'short',
-                  })
-                )}
-              </span>
-            </p>
-          </div>
+          {timeRange && (
+            <div className="flex gap-2 self-end">
+              <p className="inline-flex gap-1.5 text-slate-500">
+                Total runs to be replayed:{' '}
+                <span className="font-medium text-slate-800">
+                  {isLoading ? (
+                    <Placeholder className="top-px inline-flex h-4 w-4 bg-slate-200" />
+                  ) : (
+                    selectedRunsCount.toLocaleString(undefined, {
+                      notation: 'compact',
+                      compactDisplay: 'short',
+                    })
+                  )}
+                </span>
+              </p>
+            </div>
+          )}
         </div>
         <div className="flex justify-between border-t border-slate-100 px-5 py-4">
           <Link href="https://inngest.com/docs/platform/replay">Learn about Replay</Link>

@@ -16,18 +16,10 @@ const mutation = graphql(`
   }
 `);
 
-export function useRerun({
-  envID,
-  envSlug,
-  runID,
-}: {
-  envID: string;
-  envSlug: string;
-  runID: string;
-}) {
+export function useRerun({ envID, envSlug }: { envID: string; envSlug: string }) {
   const [, mutate] = useMutation(mutation);
 
-  async function rerun({ fnID }: { fnID: string }): Promise<void> {
+  async function rerun({ fnID, runID }: { fnID: string; runID: string }): Promise<void> {
     try {
       const response = await mutate({
         environmentID: envID,

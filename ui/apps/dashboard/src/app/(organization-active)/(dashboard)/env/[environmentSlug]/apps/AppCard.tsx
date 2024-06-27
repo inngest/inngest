@@ -38,37 +38,37 @@ type Sync = {
 };
 
 export const cardWrapperStyles =
-  'md:flex w-full lg:min-w-[800px] max-w-[1200px] overflow-hidden rounded-lg border border-slate-300 bg-white';
+  'md:flex w-full lg:min-w-[800px] max-w-[1200px] overflow-hidden rounded-lg border border-subtle bg-canvasBase';
 const cardLeftPanelStyles =
-  'h-36 md:h-56 bg-slate-910 flex md:w-[410px] flex-col justify-center gap-2 px-10';
+  'h-36 md:h-56 bg-canvasSubtle flex md:w-[410px] flex-col justify-center gap-2 px-10';
 const cardRightPanelStyles = 'h-56 flex flex-col justify-center px-8';
 
 export function AppCard({ app, className, envSlug, isArchived }: Props) {
   const latestSyncURL = app.latestSync?.url?.replace(/^https:\/\//, '').replace(/\?.+$/, '');
   return (
     <div className={cn(cardWrapperStyles, className)}>
-      <div className={cn(cardLeftPanelStyles, isArchived && 'bg-slate-700')}>
+      <Link
+        href={pathCreator.app({ envSlug, externalAppID: app.externalID })}
+        className={cn(cardLeftPanelStyles, 'hover:bg-canvasMuted transition-colors duration-300')}
+      >
         <h2>
-          <Link
-            className="transition-color flex cursor-pointer items-center gap-1 text-white underline decoration-transparent decoration-2 underline-offset-4 duration-300 hover:text-indigo-400 hover:decoration-indigo-400"
-            href={pathCreator.app({ envSlug, externalAppID: app.externalID })}
-          >
+          <div className="text-basis flex items-center gap-1 font-medium">
             {isArchived && <RiArchive2Line className="h-4 w-4" />}
             <span className="truncate" title={app.name}>
               {app.name}
             </span>
             <RiArrowRightSLine className="h-4 w-4" />
-          </Link>
+          </div>
         </h2>
         {latestSyncURL && (
           <dl>
             <dt className="hidden">URL</dt>
-            <dd className="truncate text-slate-400" title={app.latestSync?.url || ''}>
+            <dd className="text-subtle truncate" title={app.latestSync?.url || ''}>
               {latestSyncURL}
             </dd>
           </dl>
         )}
-      </div>
+      </Link>
       <div className="flex h-56 flex-1 flex-col">
         {app.latestSync?.error && (
           <div className="bg-red-100 px-8 py-2 text-red-800">{app.latestSync.error}</div>
@@ -120,8 +120,8 @@ function Description({
 }) {
   return (
     <div className={className}>
-      <dt className="pb-2 text-sm text-slate-400">{term}</dt>
-      <dd className="leading-8 text-slate-800">{detail ?? ''}</dd>
+      <dt className="text-subtle pb-2 text-sm">{term}</dt>
+      <dd className="text-basis leading-8">{detail ?? ''}</dd>
     </div>
   );
 }
@@ -135,7 +135,7 @@ export function EmptyAppCard({
 }) {
   return (
     <div className={cn(cardWrapperStyles, className)}>
-      <div className={cn(cardLeftPanelStyles, 'items-center overflow-hidden')}>
+      <div className={cn(cardLeftPanelStyles, 'bg-slate-910 items-center overflow-hidden')}>
         <Image src={AppDiagramImage} alt="App diagram" className="object-none md:object-fill" />
       </div>
       <div className={cn(cardRightPanelStyles, 'flex-1')}>

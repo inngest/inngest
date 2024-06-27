@@ -4,7 +4,8 @@ import cn from '@/utils/cn';
 
 type InputProps = {
   defaultValue?: HTMLAttributes<HTMLInputElement>['defaultValue'];
-  error?: string | undefined;
+  error?: string;
+  showError?: boolean;
   name?: string;
   id?: string;
   label?: string;
@@ -28,13 +29,13 @@ const sizeStyles = {
   lg: 'text-sm px-3.5 py-3 rounded-lg',
 };
 
-const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
+const Input = forwardRef<HTMLInputElement, InputProps>(({ showError = true, ...props }, ref) => {
   const type = props.type === undefined ? 'text' : props.type;
   const size = props.size === undefined ? 'base' : props.size;
   const placeholder = props.placeholder === undefined ? '' : props.placeholder;
   const className = props.className === undefined ? '' : props.className;
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col">
       {props.label && (
         <label htmlFor={props.name} className="text-sm font-medium text-slate-700">
           {props.label}
@@ -52,10 +53,11 @@ const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
         placeholder={placeholder}
         value={props.value}
         className={cn(
-          'border border-slate-300 text-sm leading-none placeholder-slate-500 shadow outline-2 outline-offset-2 outline-indigo-500 transition-all focus:outline',
+          'border-muted border text-sm leading-none placeholder-slate-500 shadow outline-2 outline-offset-2 outline-indigo-500 transition-all focus:outline',
           sizeStyles[size],
           props.readonly &&
             'cursor-not-allowed border-transparent shadow-transparent outline-transparent	',
+          props.error && 'border-error',
           className
         )}
         onChange={props.onChange}
@@ -65,7 +67,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
         readOnly={props.readonly}
       />
 
-      {props.error && <p className="text-sm text-red-500">{props.error}</p>}
+      <p className="text-sm text-red-500">{showError && props.error}</p>
     </div>
   );
 });

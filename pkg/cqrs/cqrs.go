@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"github.com/oklog/ulid/v2"
 )
 
 // DBWriter can be a *sql.DB or an *sql.TX, and is needed to allow
@@ -28,6 +30,7 @@ type Manager interface {
 
 	// Trace / dev only
 	TraceReadWriter
+	TraceWriterDev
 
 	// Scoped allows creating a new manager using a transaction.
 	WithTx(ctx context.Context) (TxManager, error)
@@ -45,4 +48,9 @@ type Timebound struct {
 	After *time.Time `json:"after,omitempty"`
 	// Before is the upper bound to load data from, inclusive
 	Before *time.Time `json:"before,omitempty"`
+}
+
+type IDBound struct {
+	Before *ulid.ULID
+	After  *ulid.ULID
 }

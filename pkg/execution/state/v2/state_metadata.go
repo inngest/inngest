@@ -12,6 +12,8 @@ import (
 
 const (
 	cronScheduleKey = "__cron"
+	fnslugKey       = "__fnslug"
+	traceLinkKey    = "__tracelink"
 )
 
 type ID struct {
@@ -62,8 +64,6 @@ type Tenant struct {
 
 // Config represents run config, stored within metadata.
 type Config struct {
-	// FunctionSlug stores the function slug.
-	FunctionSlug string
 	// FunctionVersion stores the version of the function used when the run is
 	// scheduled.
 	FunctionVersion int
@@ -113,6 +113,13 @@ type Config struct {
 	Context map[string]any
 }
 
+func (c *Config) EventID() ulid.ULID {
+	if len(c.EventIDs) > 0 {
+		return c.EventIDs[0]
+	}
+	return ulid.ULID{}
+}
+
 func (c *Config) GetSpanID() (*trace.SpanID, error) {
 	if c.SpanID != "" {
 		sid, err := trace.SpanIDFromHex(c.SpanID)
@@ -137,6 +144,49 @@ func (c *Config) CronSchedule() *string {
 	if v, ok := c.Context[cronScheduleKey]; ok {
 		if schedule, ok := v.(string); ok {
 			return &schedule
+		}
+	}
+
+	return nil
+}
+
+func (c *Config) SetFunctionSlug(slug string) {
+	if c.Context == nil {
+		c.Context = map[string]any{}
+	}
+	c.Context[fnslugKey] = slug
+}
+
+// FunctionSlug retrieves the stored function slug if available
+func (c *Config) FunctionSlug() string {
+	if c.Context == nil {
+		return ""
+	}
+
+	if v, ok := c.Context[fnslugKey]; ok {
+		if slug, ok := v.(string); ok {
+			return slug
+		}
+	}
+
+	return ""
+}
+
+func (c *Config) SetTraceLink(link string) {
+	if c.Context == nil {
+		c.Context = map[string]any{}
+	}
+	c.Context[traceLinkKey] = link
+}
+
+func (c *Config) TraceLink() *string {
+	if c.Context == nil {
+		return nil
+	}
+
+	if v, ok := c.Context[traceLinkKey]; ok {
+		if link, ok := v.(string); ok {
+			return &link
 		}
 	}
 
