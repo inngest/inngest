@@ -16,7 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
-	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jinzhu/copier"
@@ -51,13 +51,20 @@ type wrapper struct {
 }
 
 // LoadFunction implements the state.FunctionLoader interface.
-func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*inngest.Function, error) {
+func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*state.ExecutorFunction, error) {
 	// XXX: This doesn't store versions, as the dev server is currently ignorant to version.s
 	fn, err := w.GetFunctionByInternalUUID(ctx, envID, fnID)
 	if err != nil {
 		return nil, err
 	}
-	return fn.InngestFunction()
+	def, err := fn.InngestFunction()
+	if err != nil {
+		return nil, err
+	}
+	return &state.ExecutorFunction{
+		Function: def,
+		Paused:   false, // dev server does not support pausing
+	}, nil
 }
 
 func (w wrapper) WithTx(ctx context.Context) (cqrs.TxManager, error) {
