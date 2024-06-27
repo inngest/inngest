@@ -133,9 +133,16 @@ func (a CoreAPI) GetActions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	l := logger.StdlibLogger(ctx).With(
+		"handler", "GetActions",
+		"run_id", runID.String(),
+	)
+	l.Debug("state api: called")
+
 	// Find this run
 	state, err := a.state.Load(ctx, *runID)
 	if err != nil {
+		l.Error("error loading run metadata while fetching state", "error", err)
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Status:  410,
 			Message: fmt.Sprintf("runtime state is no longer available for runID: %s", runID),
@@ -167,9 +174,16 @@ func (a CoreAPI) GetEventBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	l := logger.StdlibLogger(ctx).With(
+		"handler", "GetEventBatch",
+		"run_id", runID.String(),
+	)
+	l.Debug("state api: called")
+
 	// Find this run
 	state, err := a.state.Load(ctx, *runID)
 	if err != nil {
+		l.Error("error loading run metadata while fetching state", "error", err)
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Status:  410,
 			Message: fmt.Sprintf("runtime state is no longer available for runID: %s", runID),
