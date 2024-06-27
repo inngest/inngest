@@ -1,4 +1,4 @@
-//go:generate go run github.com/dmarkham/enumer -trimprefix=PartitionType -type=PartitionType -json -text -gqlgen
+//go:generate go run github.com/dmarkham/enumer -trimprefix=PartitionType -type=PartitionType -json -text
 
 package enums
 
