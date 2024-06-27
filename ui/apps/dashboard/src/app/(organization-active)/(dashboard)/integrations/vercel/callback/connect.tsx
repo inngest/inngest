@@ -29,7 +29,6 @@ export default function Connect({
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
   const start = (page - 1) * PAGE_SIZE;
-  const [hover, setHover] = useState(null);
   const [custom, setCustom] = useState<string[]>([]);
 
   const updateVercelIntegration = useUpdateVercelIntegration(integrations);
@@ -72,9 +71,7 @@ export default function Connect({
               key={`project-list-${i}`}
               className={`flex h-[72px] flex-row items-center justify-between ${
                 i !== end && 'border-b'
-              } border-subtle px-6`}
-              onMouseOver={() => setHover(p.id)}
-              onMouseLeave={() => setHover(null)}
+              } border-subtle group px-6`}
             >
               <div className="flex flex-row items-center justify-start">
                 <Checkbox
@@ -99,20 +96,19 @@ export default function Connect({
                     appearance="ghost"
                     kind="secondary"
                     icon={<RiCloseLine />}
-                    className="absolute right-1 top-2"
+                    className="absolute right-1 top-2 "
                     onClick={() => setCustom(custom.filter((c) => c !== p.id))}
                   />
                 </div>
               ) : (
-                hover === p.id && (
-                  <NewButton
-                    appearance="outlined"
-                    label="Add custom path"
-                    onClick={() => {
-                      setCustom([...custom, p.id]);
-                    }}
-                  />
-                )
+                <NewButton
+                  className="hidden group-hover:block"
+                  appearance="outlined"
+                  label="Add custom path"
+                  onClick={() => {
+                    setCustom([...custom, p.id]);
+                  }}
+                />
               )}
             </div>
           ))}
