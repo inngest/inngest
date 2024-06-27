@@ -762,12 +762,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, fmt.Errorf("cannot load metadata to execute run: %w", err)
 	}
 
-	f, fnMeta, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
+	ef, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
 	if err != nil {
 		return nil, fmt.Errorf("error loading function for run: %w", err)
 	}
-
-	if fnMeta.Paused {
+	if ef.Paused {
 		return nil, state.ErrFunctionPaused
 	}
 
@@ -819,7 +818,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	// Validate that the run can execute.
-	v := newRunValidator(e, f, md, events, item) // TODO: Load events for this.
+	v := newRunValidator(e, ef.Function, md, events, item) // TODO: Load events for this.
 	if err := v.validate(ctx); err != nil {
 		return nil, err
 	}
@@ -856,7 +855,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// (re)Construct function span to force update the end time
 	ctx, fnSpan := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeFunction),
-		telemetry.WithName(f.GetSlug()),
+		telemetry.WithName(ef.Function.GetSlug()),
 		telemetry.WithTimestamp(start),
 		telemetry.WithSpanID(*fnSpanID),
 		telemetry.WithSpanAttributes(
@@ -865,7 +864,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.String(consts.OtelSysWorkspaceID, id.WorkspaceID.String()),
 			attribute.String(consts.OtelSysAppID, id.AppID.String()),
 			attribute.String(consts.OtelSysFunctionID, id.WorkflowID.String()),
-			attribute.String(consts.OtelSysFunctionSlug, f.GetSlug()),
+			attribute.String(consts.OtelSysFunctionSlug, ef.Function.GetSlug()),
 			attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
 			attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
 			attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
@@ -900,7 +899,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			attribute.String(consts.OtelSysWorkspaceID, id.WorkspaceID.String()),
 			attribute.String(consts.OtelSysAppID, id.AppID.String()),
 			attribute.String(consts.OtelSysFunctionID, id.WorkflowID.String()),
-			attribute.String(consts.OtelSysFunctionSlug, f.GetSlug()),
+			attribute.String(consts.OtelSysFunctionSlug, ef.Function.GetSlug()),
 			attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
 			attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
 			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
@@ -942,19 +941,19 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if edge.Incoming == inngest.TriggerName {
 		// We only support functions with a single step, as we've removed the DAG based approach.
 		// This means that we always execute the first step.
-		if len(f.Steps) > 1 {
+		if len(ef.Function.Steps) > 1 {
 			return nil, fmt.Errorf("DAG-based steps are no longer supported")
 		}
 
 		edge.Outgoing = inngest.TriggerName
-		edge.Incoming = f.Steps[0].ID
+		edge.Incoming = ef.Function.Steps[0].ID
 		// Update the payload
 		payload := item.Payload.(queue.PayloadEdge)
 		payload.Edge = edge
 		item.Payload = payload
 		// Add retries from the step to our queue item.  Increase as retries is
 		// always one less than attempts.
-		retries := f.Steps[0].RetryCount() + 1
+		retries := ef.Function.Steps[0].RetryCount() + 1
 		item.MaxAttempts = &retries
 		span.SetAttributes(attribute.Int(consts.OtelSysStepMaxAttempt, retries))
 
@@ -986,7 +985,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	instance := runInstance{
 		md:         md,
-		f:          *f,
+		f:          *ef.Function,
 		events:     events,
 		item:       item,
 		edge:       edge,
@@ -1790,13 +1789,13 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	}
 
 	// We need the function slug.
-	f, _, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
+	f, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
 	if err != nil {
 		return fmt.Errorf("unable to load function: %w", err)
 	}
 
 	fnCancelledErr := state.ErrFunctionCancelled.Error()
-	if performedFinalization, err := e.finalize(ctx, md, evts, f.GetSlug(), state.DriverResponse{
+	if performedFinalization, err := e.finalize(ctx, md, evts, f.Function.GetSlug(), state.DriverResponse{
 		Err: &fnCancelledErr,
 	}); err != nil {
 		logger.From(ctx).Error().Err(err).Msg("error running finish handler")

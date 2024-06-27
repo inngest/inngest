@@ -340,7 +340,13 @@ type StateLoader interface {
 // FunctionLoader loads function definitions based off of an identifier.
 type FunctionLoader interface {
 	// LoadFunction should always return the latest live version of a function
-	LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*inngest.Function, *FnMetadata, error)
+	LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*ExecutorFunction, error)
+}
+
+type ExecutorFunction struct {
+	Function *inngest.Function `json:"function"`
+	// Paused indicates whether the function is currently paused.
+	Paused bool `json:"paused"`
 }
 
 // Mutater mutates state for a given identifier, storing the state and returning
@@ -406,9 +412,4 @@ type Input struct {
 
 	// SpanID is the id used for the new function run
 	SpanID string
-}
-
-type FnMetadata struct {
-	// Paused indicates whether the function is currently paused.
-	Paused bool `json:"paused"`
 }
