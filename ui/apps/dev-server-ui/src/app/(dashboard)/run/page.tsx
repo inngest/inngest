@@ -24,7 +24,7 @@ export default function Page() {
   }
 
   return (
-    <div className={cn('overflow-y-auto pt-8')}>
+    <div className={cn('bg-canvasBase overflow-y-auto pt-8')}>
       <RunDetails
         pathCreator={pathCreator}
         standalone
