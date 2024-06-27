@@ -197,7 +197,7 @@ func (s *svc) Run(ctx context.Context) error {
 	})
 }
 
-func (s *svc) Stop(ctx context.Context) error {
+func (s *svc) Stop(_ context.Context) error {
 	// Wait for all in-flight queue runs to finish
 	s.wg.Wait()
 	return nil
