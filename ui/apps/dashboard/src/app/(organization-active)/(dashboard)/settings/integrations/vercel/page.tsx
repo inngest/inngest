@@ -25,12 +25,12 @@ export default async function VercelIntegrationPage() {
       </div>
       <div className="mt-6 flex flex-row items-center justify-between">
         <div className="flex flex-row items-center justify-start">
-          <div className="mb-7 mr-4 flex h-[52px] w-[52px] items-center justify-center rounded bg-black">
-            <IconVercel className="h-6 w-6 text-white" />
+          <div className="bg-contrast mb-7 mr-4 flex h-[52px] w-[52px] items-center justify-center rounded">
+            <IconVercel className="text-onContrast h-6 w-6" />
           </div>
           <div className="flex flex-col">
-            <div className="mb-2 text-2xl font-medium text-gray-900">Vercel</div>
-            <div className="mb-7 text-slate-500">
+            <div className="text-basis mb-2 text-xl font-medium leading-7">Vercel</div>
+            <div className="text-subtle mb-7 text-base">
               You can manage all your projects on this page.{' '}
               <Link showIcon={false} href={'https://www.inngest.com/docs/deploy/vercel' as Route}>
                 Learn more

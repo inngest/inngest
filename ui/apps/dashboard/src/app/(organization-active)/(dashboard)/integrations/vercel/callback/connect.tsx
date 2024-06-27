@@ -143,8 +143,8 @@ export default function Connect({
         </Card.Content>
       </Card>
       <div className="flex flex-row items-center justify-start rounded py-6">
-        <RiInformationLine size={20} className="mr-2 text-slate-500" />
-        <div className="text-[15px] font-normal text-slate-500">
+        <RiInformationLine size={20} className="text-subtle mr-1" />
+        <div className="text-subtle text-[15px] font-normal">
           More advanced configuration options will be available on Inngest dashboard after
           installation.
         </div>
