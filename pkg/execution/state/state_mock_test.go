@@ -185,7 +185,7 @@ func (mr *MockStateMockRecorder) Function() *gomock.Call {
 // WorkflowID mocks base method.
 func (m *MockState) WorkflowID() uuid.UUID {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WorkflowID")
+	ret := m.ctrl.Call(m, "FunctionID")
 	ret0, _ := ret[0].(uuid.UUID)
 	return ret0
 }
@@ -193,7 +193,7 @@ func (m *MockState) WorkflowID() uuid.UUID {
 // WorkflowID indicates an expected call of WorkflowID.
 func (mr *MockStateMockRecorder) WorkflowID() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WorkflowID", reflect.TypeOf((*MockState)(nil).WorkflowID))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FunctionID", reflect.TypeOf((*MockState)(nil).WorkflowID))
 }
 
 // MockLoader is a mock of Loader interface.

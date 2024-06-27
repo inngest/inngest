@@ -151,7 +151,7 @@ type PriorityFinder func(ctx context.Context, item QueueItem) uint
 //
 // NOTE: This is called frequently:  for every enqueue, lease, partition lease, and so on.
 // Expect this to be called tens of thousands of times per second.
-type ShardFinder func(ctx context.Context, queueName string, workspaceID uuid.UUID) *QueueShard
+type ShardFinder func(ctx context.Context, queueName string, workspaceID *uuid.UUID) *QueueShard
 
 type QueueOpt func(q *queue)
 
@@ -678,8 +678,8 @@ type QueueItem struct {
 	// This is set when enqueueing or requeueing a job.
 	WallTimeMS int64 `json:"wt"`
 
-	// WorkflowID is the workflow ID that this job belongs to.
-	WorkflowID uuid.UUID `json:"wfID"`
+	// FunctionID is the workflow ID that this job belongs to.
+	FunctionID uuid.UUID `json:"wfID"`
 	// WorkspaceID is the workspace that this job belongs to.
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// LeaseID is a ULID which embeds a timestamp denoting when the lease expires.
@@ -688,7 +688,7 @@ type QueueItem struct {
 	// to resume.
 	Data osqueue.Item `json:"data"`
 	// QueueName allows placing this job into a specific queue name.  If the QueueName
-	// is nil, the WorkflowID will be used as the queue name.  This allows us to
+	// is nil, the FunctionID will be used as the queue name.  This allows us to
 	// automatically create partitioned queues for each function within Inngest.
 	//
 	// This should almost always be nil.
@@ -748,7 +748,7 @@ func (q QueueItem) MarshalBinary() ([]byte, error) {
 // set.
 func (q QueueItem) Queue() string {
 	if q.QueueName == nil {
-		return q.WorkflowID.String()
+		return q.FunctionID.String()
 	}
 	return *q.QueueName
 }
@@ -765,7 +765,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem, priority uint) 
 	partitions := []QueuePartition{
 		QueuePartition{
 			QueueName:  i.QueueName,
-			FunctionID: &i.WorkflowID,
+			FunctionID: &i.FunctionID,
 			EnvID:      &i.WorkspaceID,
 			Priority:   priority,
 		},
@@ -784,7 +784,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem, priority uint) 
 			partition := QueuePartition{
 				PartitionType:    int(enums.PartitionTypeConcurrency),
 				ConcurrencyScope: int(scope),
-				FunctionID:       &i.WorkflowID,
+				FunctionID:       &i.FunctionID,
 				// XXX: Priority may cause an issue in the future;
 				// if we allow users to set custom priorities on functions
 				// and we have a non-function scope, all priorities are
@@ -794,7 +794,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem, priority uint) 
 
 			switch scope {
 			case enums.ConcurrencyScopeFn:
-				partition.FunctionID = &i.WorkflowID
+				partition.FunctionID = &i.FunctionID
 			case enums.ConcurrencyScopeEnv:
 				partition.EnvID = &i.WorkspaceID
 			case enums.ConcurrencyScopeAccount:
@@ -1014,7 +1014,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		shardName string
 	)
 	if q.sf != nil {
-		shard = q.sf(ctx, i.Queue(), i.WorkspaceID)
+		shard = q.sf(ctx, i.Queue(), &i.WorkspaceID)
 		if shard != nil {
 			shardName = shard.Name
 			shard.Leases = []ulid.ULID{}
@@ -1165,7 +1165,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 
 	var shardName string
 	if q.sf != nil {
-		if shard := q.sf(ctx, qi.Queue(), qi.WorkspaceID); shard != nil {
+		if shard := q.sf(ctx, qi.Queue(), &qi.WorkspaceID); shard != nil {
 			shardName = shard.Name
 		}
 	}
@@ -1273,7 +1273,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 
 	var shardName string
 	if q.sf != nil {
-		if shard := q.sf(ctx, item.Queue(), item.WorkspaceID); shard != nil {
+		if shard := q.sf(ctx, item.Queue(), &item.WorkspaceID); shard != nil {
 			shardName = shard.Name
 		}
 	}
@@ -1531,7 +1531,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 
 	var shardName string
 	if q.sf != nil {
-		if shard := q.sf(ctx, i.Queue(), i.WorkspaceID); shard != nil {
+		if shard := q.sf(ctx, i.Queue(), &i.WorkspaceID); shard != nil {
 			shardName = shard.Name
 		}
 	}
@@ -1611,7 +1611,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 
 	var shardName string
 	if q.sf != nil {
-		if shard := q.sf(ctx, p.Queue(), p.WorkspaceID); shard != nil {
+		if shard := q.sf(ctx, p.Queue(), p.EnvID); shard != nil {
 			shardName = shard.Name
 		}
 	}
@@ -1830,7 +1830,7 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error {
 	var shardName string
 	if q.sf != nil {
-		if shard := q.sf(ctx, p.Queue(), p.WorkspaceID); shard != nil {
+		if shard := q.sf(ctx, p.Queue(), p.EnvID); shard != nil {
 			shardName = shard.Name
 		}
 	}
@@ -2218,14 +2218,18 @@ func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
 
 // setPeekEWMA add the new value to the existing list.
 // if the length of the list exceeds the predetermined size, pop out the first item
-func (q *queue) setPeekEWMA(ctx context.Context, fnID uuid.UUID, val int64) error {
+func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) error {
+	if fnID == nil {
+		return nil
+	}
+
 	listSize := q.peekEWMALen
 	if listSize == 0 {
 		listSize = QueuePeekEWMALen
 	}
 
 	keys := []string{
-		q.kg.ConcurrencyFnEWMA(fnID),
+		q.kg.ConcurrencyFnEWMA(*fnID),
 	}
 	args, err := StrSlice([]any{
 		val,

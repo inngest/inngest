@@ -41,11 +41,11 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 
 	// Limit function concurrency by workflow ID.
 	pkf := func(ctx context.Context, p QueuePartition) (string, int) {
-		switch p.WorkflowID {
-		case limit_1:
-			return p.WorkflowID.String(), 1
-		case limit_10:
-			return p.WorkflowID.String(), 10
+		switch p.FunctionID {
+		case &limit_1:
+			return p.FunctionID.String(), 1
+		case &limit_10:
+			return p.FunctionID.String(), 10
 		default:
 			// No concurrency, which means use the default concurrency limits.
 			return "", 0

@@ -229,9 +229,9 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, item, found)
 
 		// Ensure the partition is inserted.
-		qp := getPartition(t, r, item.WorkflowID)
+		qp := getPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
-			WorkflowID: item.WorkflowID,
+			FunctionID: &item.FunctionID,
 			Priority:   testPriority,
 		}, qp)
 	})
@@ -251,9 +251,9 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		// Ensure the partition is inserted, and the earliest time is still
 		// the start time.
-		qp := getPartition(t, r, item.WorkflowID)
+		qp := getPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
-			WorkflowID: item.WorkflowID,
+			FunctionID: &item.FunctionID,
 			Priority:   testPriority,
 		}, qp)
 
@@ -275,9 +275,9 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		// Ensure the partition is inserted, and the earliest time is updated
 		// inside the partition item.
-		qp := getPartition(t, r, item.WorkflowID)
+		qp := getPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
-			WorkflowID: item.WorkflowID,
+			FunctionID: &item.FunctionID,
 			Priority:   testPriority,
 		}, qp)
 
@@ -293,7 +293,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	t.Run("Adding another workflow ID increases partition set", func(t *testing.T) {
 		at := time.Now().Truncate(time.Second)
 		item, err := q.EnqueueItem(ctx, QueueItem{
-			WorkflowID: uuid.New(),
+			FunctionID: uuid.New(),
 		}, at)
 		require.NoError(t, err)
 
@@ -304,9 +304,9 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		// Ensure the partition is inserted, and the earliest time is updated
 		// inside the partition item.
-		qp := getPartition(t, r, item.WorkflowID)
+		qp := getPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
-			WorkflowID: item.WorkflowID,
+			FunctionID: &item.FunctionID,
 			Priority:   testPriority,
 		}, qp)
 	})
@@ -315,7 +315,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		at := time.Now().Truncate(time.Second)
 		rid := ulid.MustNew(ulid.Now(), rand.Reader)
 		_, err := q.EnqueueItem(ctx, QueueItem{
-			WorkflowID: uuid.New(),
+			FunctionID: uuid.New(),
 			Data: osqueue.Item{
 				Kind: osqueue.KindEdge,
 				Identifier: state.Identifier{
@@ -335,27 +335,27 @@ func TestQueueEnqueueItem(t *testing.T) {
 		workflowId := uuid.New()
 
 		item, err := q.EnqueueItem(ctx, QueueItem{
-			WorkflowID: workflowId,
+			FunctionID: workflowId,
 		}, now.Add(10*time.Second))
 		require.NoError(t, err)
 
-		err = q.SetFunctionPaused(ctx, item.WorkflowID, true)
+		err = q.SetFunctionPaused(ctx, item.FunctionID, true)
 		require.NoError(t, err)
 
 		item, err = q.EnqueueItem(ctx, QueueItem{
-			WorkflowID: workflowId,
+			FunctionID: workflowId,
 		}, now)
 		require.NoError(t, err)
 
-		second := getPartition(t, r, item.WorkflowID)
+		second := getPartition(t, r, item.FunctionID)
 		require.True(t, second.Paused)
 
 		item, err = q.EnqueueItem(ctx, QueueItem{
-			WorkflowID: workflowId,
+			FunctionID: workflowId,
 		}, now.Add(-10*time.Second))
 		require.NoError(t, err)
 
-		second = getPartition(t, r, item.WorkflowID)
+		second = getPartition(t, r, item.FunctionID)
 		require.True(t, second.Paused)
 	})
 }
@@ -380,7 +380,7 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 		i := QueueItem{ID: "once"}
 
 		item, err := q.EnqueueItem(ctx, i, start)
-		p := QueuePartition{WorkflowID: item.WorkflowID}
+		p := QueuePartition{FunctionID: &item.FunctionID}
 
 		require.NoError(t, err)
 		require.Equal(t, HashID(ctx, "once"), item.ID)
@@ -447,7 +447,7 @@ func BenchmarkPeekTiming(b *testing.B) {
 
 	enqueue := func(id uuid.UUID, n int) {
 		for i := 0; i < n; i++ {
-			_, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: id}, time.Now())
+			_, err := q.EnqueueItem(ctx, QueueItem{FunctionID: id}, time.Now())
 			if err != nil {
 				panic(err)
 			}
@@ -535,7 +535,7 @@ func TestQueuePeek(t *testing.T) {
 		})
 
 		t.Run("It should remove any leased items from the list", func(t *testing.T) {
-			p := QueuePartition{WorkflowID: ia.WorkflowID}
+			p := QueuePartition{FunctionID: &ia.FunctionID}
 
 			// Lease step A, and it should be removed.
 			_, err := q.Lease(ctx, p, ia, 50*time.Millisecond, getNow(), nil)
@@ -608,7 +608,7 @@ func TestQueueLease(t *testing.T) {
 
 		p := QueuePartition{} // Default workflow ID etc
 
-		require.Equal(t, item.Queue(), item.WorkflowID.String())
+		require.Equal(t, item.Queue(), item.FunctionID.String())
 
 		now := time.Now()
 		id, err := q.Lease(ctx, p, item, time.Second, getNow(), nil)
@@ -676,7 +676,7 @@ func TestQueueLease(t *testing.T) {
 			_, err = q.Lease(ctx, p, item, time.Minute, getNow(), nil)
 			require.NoError(t, err)
 
-			_, err = r.ZScore(defaultQueueKey.QueueIndex(item.WorkflowID.String()), item.ID)
+			_, err = r.ZScore(defaultQueueKey.QueueIndex(item.FunctionID.String()), item.ID)
 			require.Error(t, err, "no such key")
 		})
 	})
@@ -689,12 +689,12 @@ func TestQueueLease(t *testing.T) {
 		q.accountConcurrencyGen = nil
 
 		// Create a new item
-		itemA, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: uuid.New()}, start)
+		itemA, err := q.EnqueueItem(ctx, QueueItem{FunctionID: uuid.New()}, start)
 		require.NoError(t, err)
-		itemB, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: uuid.New()}, start)
+		itemB, err := q.EnqueueItem(ctx, QueueItem{FunctionID: uuid.New()}, start)
 		require.NoError(t, err)
 		// Use the new item's workflow ID
-		p := QueuePartition{WorkflowID: itemA.WorkflowID}
+		p := QueuePartition{FunctionID: &itemA.FunctionID}
 
 		t.Run("With denylists it does not lease.", func(t *testing.T) {
 			list := newLeaseDenyList()
@@ -725,12 +725,12 @@ func TestQueueLease(t *testing.T) {
 		}
 
 		// Create a new item
-		itemA, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: uuid.New()}, start)
+		itemA, err := q.EnqueueItem(ctx, QueueItem{FunctionID: uuid.New()}, start)
 		require.NoError(t, err)
-		itemB, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: uuid.New()}, start)
+		itemB, err := q.EnqueueItem(ctx, QueueItem{FunctionID: uuid.New()}, start)
 		require.NoError(t, err)
 		// Use the new item's workflow ID
-		p := QueuePartition{WorkflowID: itemA.WorkflowID}
+		p := QueuePartition{FunctionID: &itemA.FunctionID}
 
 		t.Run("Leases with capacity", func(t *testing.T) {
 			_, err = q.Lease(ctx, p, itemA, 5*time.Second, getNow(), nil)
@@ -758,12 +758,12 @@ func TestQueueLease(t *testing.T) {
 		}
 
 		// Create a new item
-		itemA, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: uuid.New()}, start)
+		itemA, err := q.EnqueueItem(ctx, QueueItem{FunctionID: uuid.New()}, start)
 		require.NoError(t, err)
-		itemB, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: uuid.New()}, start)
+		itemB, err := q.EnqueueItem(ctx, QueueItem{FunctionID: uuid.New()}, start)
 		require.NoError(t, err)
 		// Use the new item's workflow ID
-		p := QueuePartition{WorkflowID: itemA.WorkflowID}
+		p := QueuePartition{FunctionID: &itemA.FunctionID}
 
 		t.Run("With denylists it does not lease.", func(t *testing.T) {
 			list := newLeaseDenyList()
@@ -792,7 +792,7 @@ func TestQueueLease(t *testing.T) {
 			at := time.Now().Truncate(time.Second).Add(time.Second)
 			item, err := q.EnqueueItem(ctx, QueueItem{}, at)
 			require.NoError(t, err)
-			p := QueuePartition{WorkflowID: item.WorkflowID}
+			p := QueuePartition{FunctionID: &item.FunctionID}
 
 			score, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), p.Queue())
 			require.NoError(t, err)
@@ -818,7 +818,7 @@ func TestQueueLease(t *testing.T) {
 			require.NoError(t, err)
 			itemB, err := q.EnqueueItem(ctx, QueueItem{}, atB)
 			require.NoError(t, err)
-			p := QueuePartition{WorkflowID: itemA.WorkflowID} // same for A+B
+			p := QueuePartition{FunctionID: &itemA.FunctionID} // same for A+B
 
 			score, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), p.Queue())
 			require.NoError(t, err)
@@ -857,7 +857,7 @@ func TestQueueExtendLease(t *testing.T) {
 		item = getQueueItem(t, r, item.ID)
 		require.Nil(t, item.LeaseID)
 
-		p := QueuePartition{WorkflowID: item.WorkflowID}
+		p := QueuePartition{FunctionID: &item.FunctionID}
 
 		now := time.Now()
 		id, err := q.Lease(ctx, p, item, time.Second, getNow(), nil)
@@ -899,7 +899,7 @@ func TestQueueExtendLease(t *testing.T) {
 		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 		require.NoError(t, err)
 
-		p := QueuePartition{WorkflowID: item.WorkflowID}
+		p := QueuePartition{FunctionID: &item.FunctionID}
 
 		item = getQueueItem(t, r, item.ID)
 		require.Nil(t, item.LeaseID)
@@ -933,7 +933,7 @@ func TestQueueDequeue(t *testing.T) {
 		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 		require.NoError(t, err)
 
-		p := QueuePartition{WorkflowID: item.WorkflowID}
+		p := QueuePartition{FunctionID: &item.FunctionID}
 
 		id, err := q.Lease(ctx, p, item, time.Second, getNow(), nil)
 		require.NoError(t, err)
@@ -989,7 +989,7 @@ func TestQueueDequeue(t *testing.T) {
 			at := time.Now().Truncate(time.Second)
 			rid := ulid.MustNew(ulid.Now(), rand.Reader)
 			item, err := q.EnqueueItem(ctx, QueueItem{
-				WorkflowID: uuid.New(),
+				FunctionID: uuid.New(),
 				Data: osqueue.Item{
 					Kind: osqueue.KindEdge,
 					Identifier: state.Identifier{
@@ -1034,16 +1034,16 @@ func TestQueueRequeue(t *testing.T) {
 		item, err := q.EnqueueItem(ctx, QueueItem{}, now)
 		require.NoError(t, err)
 
-		p := QueuePartition{WorkflowID: item.WorkflowID}
+		p := QueuePartition{FunctionID: &item.FunctionID}
 
 		_, err = q.Lease(ctx, p, item, time.Second, getNow(), nil)
 		require.NoError(t, err)
 
 		// Assert partition index is original
-		pi := QueuePartition{WorkflowID: item.WorkflowID, Priority: testPriority}
-		requirePartitionScoreEquals(t, r, pi.WorkflowID, now.Truncate(time.Second))
+		pi := QueuePartition{FunctionID: &item.FunctionID, Priority: testPriority}
+		requirePartitionScoreEquals(t, r, pi.FunctionID, now.Truncate(time.Second))
 
-		requirePartitionInProgress(t, q, item.WorkflowID, 1)
+		requirePartitionInProgress(t, q, item.FunctionID, 1)
 
 		next := now.Add(time.Hour)
 		err = q.Requeue(ctx, p, item, next)
@@ -1059,32 +1059,32 @@ func TestQueueRequeue(t *testing.T) {
 		})
 
 		t.Run("It should decrease the in-progress count", func(t *testing.T) {
-			requirePartitionInProgress(t, q, item.WorkflowID, 0)
+			requirePartitionInProgress(t, q, item.FunctionID, 0)
 		})
 
 		t.Run("It should update the partition's earliest time, if earliest", func(t *testing.T) {
 			// Assert partition index is updated, as there's only one item here.
-			requirePartitionScoreEquals(t, r, pi.WorkflowID, next)
+			requirePartitionScoreEquals(t, r, pi.FunctionID, next)
 		})
 
 		t.Run("It should not update the partition's earliest time, if later", func(t *testing.T) {
 			_, err := q.EnqueueItem(ctx, QueueItem{}, now)
 			require.NoError(t, err)
 
-			requirePartitionScoreEquals(t, r, pi.WorkflowID, now)
+			requirePartitionScoreEquals(t, r, pi.FunctionID, now)
 
 			next := now.Add(2 * time.Hour)
 			err = q.Requeue(ctx, pi, item, next)
 			require.NoError(t, err)
 
-			requirePartitionScoreEquals(t, r, pi.WorkflowID, now)
+			requirePartitionScoreEquals(t, r, pi.FunctionID, now)
 		})
 
 		t.Run("Updates default indexes", func(t *testing.T) {
 			at := time.Now().Truncate(time.Second)
 			rid := ulid.MustNew(ulid.Now(), rand.Reader)
 			item, err := q.EnqueueItem(ctx, QueueItem{
-				WorkflowID: uuid.New(),
+				FunctionID: uuid.New(),
 				Data: osqueue.Item{
 					Kind: osqueue.KindEdge,
 					Identifier: state.Identifier{
@@ -1128,7 +1128,7 @@ func TestQueuePartitionLease(t *testing.T) {
 	idA, idB, idC := uuid.New(), uuid.New(), uuid.New()
 	atA, atB, atC := now, now.Add(time.Second), now.Add(2*time.Second)
 
-	pA := QueuePartition{WorkflowID: idA}
+	pA := QueuePartition{FunctionID: &idA}
 
 	r := miniredis.RunT(t)
 
@@ -1142,11 +1142,11 @@ func TestQueuePartitionLease(t *testing.T) {
 	q := NewQueue(rc)
 	ctx := context.Background()
 
-	_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, atA)
+	_, err = q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, atA)
 	require.NoError(t, err)
-	_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idB}, atB)
+	_, err = q.EnqueueItem(ctx, QueueItem{FunctionID: idB}, atB)
 	require.NoError(t, err)
-	_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idC}, atC)
+	_, err = q.EnqueueItem(ctx, QueueItem{FunctionID: idC}, atC)
 	require.NoError(t, err)
 
 	t.Run("Partitions are in order after enqueueing", func(t *testing.T) {
@@ -1154,9 +1154,9 @@ func TestQueuePartitionLease(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{WorkflowID: idA, Priority: testPriority},
-			{WorkflowID: idB, Priority: testPriority},
-			{WorkflowID: idC, Priority: testPriority},
+			{FunctionID: &idA, Priority: testPriority},
+			{FunctionID: &idB, Priority: testPriority},
+			{FunctionID: &idC, Priority: testPriority},
 		}, items)
 	})
 
@@ -1181,16 +1181,16 @@ func TestQueuePartitionLease(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, items, 3)
 			require.EqualValues(t, []*QueuePartition{
-				{WorkflowID: idB, Priority: testPriority},
-				{WorkflowID: idC, Priority: testPriority},
+				{FunctionID: &idB, Priority: testPriority},
+				{FunctionID: &idC, Priority: testPriority},
 				{
-					WorkflowID: idA,
+					FunctionID: &idA,
 					Priority:   testPriority,
 					Last:       items[2].Last, // Use the leased partition time.
 					LeaseID:    leaseID,
 				}, // idA is now last.
 			}, items)
-			requirePartitionScoreEquals(t, r, idA, leaseUntil)
+			requirePartitionScoreEquals(t, r, &idA, leaseUntil)
 			// require that the last leased time is within 5ms for tests
 			require.WithinDuration(t, leasedAt, time.UnixMilli(items[2].Last), 5*time.Millisecond)
 		})
@@ -1201,7 +1201,7 @@ func TestQueuePartitionLease(t *testing.T) {
 			require.Nil(t, id)
 
 			// Assert that score didn't change (we added 1 second in the previous test)
-			requirePartitionScoreEquals(t, r, idA, leaseUntil)
+			requirePartitionScoreEquals(t, r, &idA, leaseUntil)
 		})
 
 	})
@@ -1209,13 +1209,13 @@ func TestQueuePartitionLease(t *testing.T) {
 	t.Run("It allows leasing an expired partition lease", func(t *testing.T) {
 		<-time.After(time.Until(leaseUntil))
 
-		requirePartitionScoreEquals(t, r, idA, leaseUntil)
+		requirePartitionScoreEquals(t, r, &idA, leaseUntil)
 
 		id, err := q.PartitionLease(ctx, &pA, time.Second*5)
 		require.Nil(t, err)
 		require.NotNil(t, id)
 
-		requirePartitionScoreEquals(t, r, idA, time.Now().Add(time.Second*5))
+		requirePartitionScoreEquals(t, r, &idA, time.Now().Add(time.Second*5))
 	})
 
 	t.Run("Partition pausing", func(t *testing.T) {
@@ -1223,11 +1223,11 @@ func TestQueuePartitionLease(t *testing.T) {
 		q := NewQueue(rc)
 		ctx := context.Background()
 
-		_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, atA)
+		_, err = q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, atA)
 		require.NoError(t, err)
-		_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idB}, atB)
+		_, err = q.EnqueueItem(ctx, QueueItem{FunctionID: idB}, atB)
 		require.NoError(t, err)
-		_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idC}, atC)
+		_, err = q.EnqueueItem(ctx, QueueItem{FunctionID: idC}, atC)
 		require.NoError(t, err)
 
 		t.Run("Fails to lease a paused partition", func(t *testing.T) {
@@ -1264,7 +1264,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 	newQueueItem := func(id uuid.UUID) QueueItem {
 		return QueueItem{
-			WorkflowID: id,
+			FunctionID: id,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
 					WorkflowID: id,
@@ -1313,9 +1313,9 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{WorkflowID: idA, Priority: PriorityMin},
-			{WorkflowID: idB, Priority: PriorityMax},
-			{WorkflowID: idC, Priority: PriorityMax},
+			{FunctionID: &idA, Priority: PriorityMin},
+			{FunctionID: &idB, Priority: PriorityMax},
+			{FunctionID: &idC, Priority: PriorityMax},
 		}, items)
 	})
 
@@ -1324,7 +1324,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 			items, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), 1)
 			require.NoError(t, err)
 			require.Len(t, items, 1)
-			require.Equal(t, idA, items[0].WorkflowID)
+			require.Equal(t, idA, items[0].FunctionID)
 		}
 	})
 
@@ -1335,7 +1335,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 			items, err := q.PartitionPeek(ctx, false, time.Now().Add(time.Hour), 1)
 			require.NoError(t, err)
 			require.Len(t, items, 1)
-			found[items[0].WorkflowID] = true
+			found[*items[0].FunctionID] = true
 			<-time.After(time.Millisecond)
 		}
 
@@ -1350,7 +1350,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 			items, err := q.PartitionPeek(ctx, false, time.Now().Add(time.Hour), PartitionPeekMax)
 			require.NoError(t, err)
 			require.Len(t, items, 3)
-			switch items[0].WorkflowID {
+			switch *items[0].FunctionID {
 			case idA:
 				a++
 			case idB:
@@ -1401,8 +1401,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		require.EqualValues(t, []*QueuePartition{
-			{WorkflowID: idB, Priority: PriorityMin},
-			{WorkflowID: idC, Priority: PriorityMin},
+			{FunctionID: &idB, Priority: PriorityMin},
+			{FunctionID: &idC, Priority: PriorityMin},
 		}, items)
 
 		// Try without sequential scans
@@ -1437,8 +1437,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		require.EqualValues(t, []*QueuePartition{
-			{WorkflowID: idB, Priority: PriorityDefault},
-			{WorkflowID: idC, Priority: PriorityDefault},
+			{FunctionID: &idB, Priority: PriorityDefault},
+			{FunctionID: &idC, Priority: PriorityDefault},
 		}, items)
 
 		// After unpausing A, it should be included in the peek:
@@ -1448,9 +1448,9 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{WorkflowID: idA, Priority: PriorityDefault},
-			{WorkflowID: idB, Priority: PriorityDefault},
-			{WorkflowID: idC, Priority: PriorityDefault},
+			{FunctionID: &idA, Priority: PriorityDefault},
+			{FunctionID: &idB, Priority: PriorityDefault},
+			{FunctionID: &idC, Priority: PriorityDefault},
 		}, items)
 	})
 }
@@ -1470,28 +1470,28 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	idA := uuid.New()
 	now := time.Now()
 
-	qi, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, now)
+	qi, err := q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, now)
 	require.NoError(t, err)
 
-	p := QueuePartition{WorkflowID: qi.WorkflowID, WorkspaceID: qi.WorkspaceID}
+	p := QueuePartition{FunctionID: &qi.FunctionID, EnvID: &qi.WorkspaceID}
 
 	t.Run("Uses the next job item's time when requeueing with another job", func(t *testing.T) {
-		requirePartitionScoreEquals(t, r, idA, now)
+		requirePartitionScoreEquals(t, r, &idA, now)
 		next := now.Add(time.Hour)
 		err := q.PartitionRequeue(ctx, &p, next, false)
 		require.NoError(t, err)
-		requirePartitionScoreEquals(t, r, idA, now)
+		requirePartitionScoreEquals(t, r, &idA, now)
 	})
 
 	next := now.Add(5 * time.Second)
 	t.Run("It removes any lease when requeueing", func(t *testing.T) {
 
-		_, err := q.PartitionLease(ctx, &QueuePartition{WorkflowID: idA}, time.Minute)
+		_, err := q.PartitionLease(ctx, &QueuePartition{FunctionID: &idA}, time.Minute)
 		require.NoError(t, err)
 
 		err = q.PartitionRequeue(ctx, &p, next, true)
 		require.NoError(t, err)
-		requirePartitionScoreEquals(t, r, idA, next)
+		requirePartitionScoreEquals(t, r, &idA, next)
 
 		loaded := getPartition(t, r, idA)
 		require.Nil(t, loaded.LeaseID)
@@ -1503,14 +1503,14 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			loaded := getPartition(t, r, idA)
 			require.NotEmpty(t, loaded.ForceAtMS)
 
-			qi, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, now)
+			qi, err := q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, now)
 
 			loaded = getPartition(t, r, idA)
 			require.NotEmpty(t, loaded.ForceAtMS)
 
 			require.NoError(t, err)
-			requirePartitionScoreEquals(t, r, idA, next)
-			requirePartitionScoreEquals(t, r, idA, time.UnixMilli(loaded.ForceAtMS))
+			requirePartitionScoreEquals(t, r, &idA, next)
+			requirePartitionScoreEquals(t, r, &idA, time.UnixMilli(loaded.ForceAtMS))
 
 			// Now remove this item, as we dont need it for any future tests.
 			err = q.Dequeue(ctx, p, qi)
@@ -1519,14 +1519,14 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	})
 
 	t.Run("Deletes the partition with an empty queue and a leased job", func(t *testing.T) {
-		requirePartitionScoreEquals(t, r, idA, next)
+		requirePartitionScoreEquals(t, r, &idA, next)
 
 		// Leasing the only job available moves the job into the concurrency queue,
 		// so the partition should be empty. when requeeing.
 		_, err := q.Lease(ctx, p, qi, 10*time.Second, getNow(), nil)
 		require.NoError(t, err)
 
-		requirePartitionScoreEquals(t, r, idA, next)
+		requirePartitionScoreEquals(t, r, &idA, next)
 
 		next := now.Add(time.Hour)
 		err = q.PartitionRequeue(ctx, &p, next, false)
@@ -1548,10 +1548,10 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	})
 
 	t.Run("Requeueing a paused partition does not affect the partition's pause state", func(t *testing.T) {
-		_, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, now)
+		_, err := q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, now)
 		require.NoError(t, err)
 
-		_, err = q.PartitionLease(ctx, &QueuePartition{WorkflowID: idA}, time.Minute)
+		_, err = q.PartitionLease(ctx, &QueuePartition{FunctionID: &idA}, time.Minute)
 		require.NoError(t, err)
 
 		err = q.SetFunctionPaused(ctx, idA, true)
@@ -1584,7 +1584,7 @@ func TestQueuePartitionPause(t *testing.T) {
 
 	now := time.Now().Truncate(time.Second)
 	idA := uuid.New()
-	_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, now)
+	_, err = q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, now)
 	require.NoError(t, err)
 
 	err = q.SetFunctionPaused(ctx, idA, true)
@@ -1623,7 +1623,7 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 	)
 	ctx := context.Background()
 
-	_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, now)
+	_, err = q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, now)
 	require.NoError(t, err)
 
 	first := getPartition(t, r, idA)
@@ -1692,7 +1692,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			jid := "yeee"
 			item := QueueItem{
 				ID:          jid,
-				WorkflowID:  wsA,
+				FunctionID:  wsA,
 				WorkspaceID: wsA,
 			}
 			_, err := q.EnqueueItem(ctx, item, time.Now().Add(time.Second))
@@ -1708,7 +1708,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			jid := "another"
 			item := QueueItem{
 				ID:          jid,
-				WorkflowID:  wsA,
+				FunctionID:  wsA,
 				WorkspaceID: wsA,
 			}
 
@@ -1725,7 +1725,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			jid := "leased"
 			item := QueueItem{
 				ID:          jid,
-				WorkflowID:  wsA,
+				FunctionID:  wsA,
 				WorkspaceID: wsA,
 			}
 
@@ -1753,7 +1753,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		at := time.Now().Add(time.Second).Truncate(time.Millisecond)
 		item := QueueItem{
 			ID:          jid,
-			WorkflowID:  wsA,
+			FunctionID:  wsA,
 			WorkspaceID: wsA,
 			AtMS:        at.UnixMilli(),
 		}
@@ -1803,7 +1803,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		for i := 0; i < 4; i++ {
 			next := at.Add(time.Duration(i) * time.Second)
 			item := QueueItem{
-				WorkflowID:  wsA,
+				FunctionID:  wsA,
 				WorkspaceID: wsA,
 				AtMS:        next.UnixMilli(),
 			}
@@ -1815,7 +1815,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		jid := "requeue-plz"
 		item := QueueItem{
 			ID:          jid,
-			WorkflowID:  wsA,
+			FunctionID:  wsA,
 			WorkspaceID: wsA,
 			AtMS:        target.UnixMilli(),
 		}
@@ -1858,7 +1858,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		for i := 0; i < 4; i++ {
 			next := at.Add(time.Duration(i) * time.Second)
 			item := QueueItem{
-				WorkflowID:  wsA,
+				FunctionID:  wsA,
 				WorkspaceID: wsA,
 				AtMS:        next.UnixMilli(),
 			}
@@ -1870,7 +1870,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		jid := "requeue-plz"
 		item := QueueItem{
 			ID:          jid,
-			WorkflowID:  wsA,
+			FunctionID:  wsA,
 			WorkspaceID: wsA,
 			AtMS:        target.UnixMilli(),
 		}
@@ -1985,14 +1985,14 @@ func TestSharding(t *testing.T) {
 		Priority:           0,
 		GuaranteedCapacity: 1,
 	}
-	sf := func(ctx context.Context, queueName string, wsID uuid.UUID) *QueueShard {
+	sf := func(ctx context.Context, queueName string, wsID *uuid.UUID) *QueueShard {
 		if !shouldShard {
 			return nil
 		}
 		return shard
 	}
 	q := NewQueue(rc, WithShardFinder(sf))
-	require.NotNil(t, sf(ctx, "", uuid.UUID{}))
+	require.NotNil(t, sf(ctx, "", &uuid.UUID{}))
 
 	t.Run("QueueItem which shards", func(t *testing.T) {
 
@@ -2007,7 +2007,7 @@ func TestSharding(t *testing.T) {
 			}, at)
 			require.NoError(t, err, "sharded enqueue should succeed")
 			// The partition, or function queue, for the just-enqueued item.
-			p := QueuePartition{WorkflowID: item.WorkflowID, WorkspaceID: item.WorkspaceID}
+			p := QueuePartition{FunctionID: &item.FunctionID, EnvID: &item.WorkspaceID}
 
 			t.Run("Enqueueing creates a shard in the shard map", func(t *testing.T) {
 				keys, err := r.HKeys(q.kg.Shards())
@@ -2128,7 +2128,7 @@ func TestSharding(t *testing.T) {
 		item, err := q.EnqueueItem(ctx, QueueItem{}, at)
 		require.NoError(t, err, "sharded enqueue should succeed")
 		// The partition, or function queue, for the just-enqueued item.
-		p := QueuePartition{WorkflowID: item.WorkflowID, WorkspaceID: item.WorkspaceID}
+		p := QueuePartition{FunctionID: &item.FunctionID, EnvID: &item.WorkspaceID}
 
 		t.Run("leasing a partition changes the partition's shard pointer", func(t *testing.T) {
 			// The score should be "At" to begin with.
@@ -2205,7 +2205,7 @@ func TestShardLease(t *testing.T) {
 	defer rc.Close()
 	ctx := context.Background()
 
-	sf := func(ctx context.Context, queueName string, wsID uuid.UUID) *QueueShard {
+	sf := func(ctx context.Context, queueName string, wsID *uuid.UUID) *QueueShard {
 		return &QueueShard{
 			Name:               wsID.String(),
 			Priority:           0,
@@ -2215,7 +2215,7 @@ func TestShardLease(t *testing.T) {
 	q := NewQueue(rc, WithShardFinder(sf))
 
 	t.Run("Leasing a non-existent shard fails", func(t *testing.T) {
-		shard := sf(ctx, "", uuid.UUID{})
+		shard := sf(ctx, "", &uuid.UUID{})
 		leaseID, err := q.leaseShard(ctx, shard, 2*time.Second, 1)
 		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
 		require.NotNil(t, err)
@@ -2234,7 +2234,7 @@ func TestShardLease(t *testing.T) {
 	t.Run("Leasing out-of-bounds fails", func(t *testing.T) {
 		// At the beginning, no shards have been leased.  Leasing a shard
 		// with an index of >= 1 should fail.
-		shard := sf(ctx, "", idA)
+		shard := sf(ctx, "", &idA)
 		leaseID, err := q.leaseShard(ctx, shard, 2*time.Second, 1)
 		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
 		require.NotNil(t, err)
@@ -2242,7 +2242,7 @@ func TestShardLease(t *testing.T) {
 	})
 
 	t.Run("Leasing a shard works", func(t *testing.T) {
-		shard := sf(ctx, "", idA)
+		shard := sf(ctx, "", &idA)
 
 		t.Run("Basic lease", func(t *testing.T) {
 			leaseID, err := q.leaseShard(ctx, shard, 1*time.Second, 0)
@@ -2277,7 +2277,7 @@ func TestShardLease(t *testing.T) {
 
 		t.Run("Leasing a second shard works", func(t *testing.T) {
 			// Try another shard name with an index of 0.
-			leaseID, err := q.leaseShard(ctx, sf(ctx, "", idB), 2*time.Second, 0)
+			leaseID, err := q.leaseShard(ctx, sf(ctx, "", &idB), 2*time.Second, 0)
 			require.NotNil(t, leaseID)
 			require.Nil(t, err)
 		})
@@ -2290,7 +2290,7 @@ func TestShardLease(t *testing.T) {
 		_, err = q.EnqueueItem(ctx, QueueItem{WorkspaceID: idA}, time.Now())
 		require.Nil(t, err)
 
-		shard := sf(ctx, "", idA)
+		shard := sf(ctx, "", &idA)
 		leaseID, err := q.leaseShard(ctx, shard, 1*time.Second, 0)
 		require.NotNil(t, leaseID, "could not lease shard")
 		require.Nil(t, err)
@@ -2343,7 +2343,7 @@ func TestQueueRateLimit(t *testing.T) {
 		}
 
 		aa, err := q.EnqueueItem(ctx, QueueItem{
-			WorkflowID: idA,
+			FunctionID: idA,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
 					WorkflowID: idA,
@@ -2354,7 +2354,7 @@ func TestQueueRateLimit(t *testing.T) {
 		r.NoError(err)
 
 		ab, err := q.EnqueueItem(ctx, QueueItem{
-			WorkflowID: idA,
+			FunctionID: idA,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
 					WorkflowID: idA,
@@ -2383,7 +2383,7 @@ func TestQueueRateLimit(t *testing.T) {
 
 		t.Run("Leasing another funciton succeeds", func(t *testing.T) {
 			ba, err := q.EnqueueItem(ctx, QueueItem{
-				WorkflowID: idB,
+				FunctionID: idB,
 				Data: osqueue.Item{
 					Identifier: state.Identifier{
 						WorkflowID: idB,
@@ -2427,7 +2427,7 @@ func TestQueueRateLimit(t *testing.T) {
 		items := []QueueItem{}
 		for i := 0; i <= 20; i++ {
 			item, err := q.EnqueueItem(ctx, QueueItem{
-				WorkflowID: idA,
+				FunctionID: idA,
 				Data: osqueue.Item{
 					Identifier: state.Identifier{WorkflowID: idA},
 					Throttle:   throttle,
@@ -2525,13 +2525,13 @@ func getPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) QueueParti
 
 func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item QueueItem, expected time.Time) {
 	t.Helper()
-	score, err := r.ZScore(defaultQueueKey.QueueIndex(item.WorkflowID.String()), item.ID)
+	score, err := r.ZScore(defaultQueueKey.QueueIndex(item.FunctionID.String()), item.ID)
 	parsed := time.UnixMilli(int64(score))
 	require.NoError(t, err)
 	require.WithinDuration(t, expected.Truncate(time.Millisecond), parsed, 15*time.Millisecond)
 }
 
-func requirePartitionScoreEquals(t *testing.T, r *miniredis.Miniredis, wid uuid.UUID, expected time.Time) {
+func requirePartitionScoreEquals(t *testing.T, r *miniredis.Miniredis, wid *uuid.UUID, expected time.Time) {
 	t.Helper()
 	score, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), wid.String())
 	parsed := time.Unix(int64(score), 0)

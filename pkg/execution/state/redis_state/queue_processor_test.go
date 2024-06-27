@@ -121,7 +121,7 @@ func TestQueueRunBasic(t *testing.T) {
 	idA, idB := uuid.New(), uuid.New()
 	items := []QueueItem{
 		{
-			WorkflowID: idA,
+			FunctionID: idA,
 			Data: osqueue.Item{
 				Kind:        osqueue.KindEdge,
 				MaxAttempts: max(3),
@@ -132,7 +132,7 @@ func TestQueueRunBasic(t *testing.T) {
 			},
 		},
 		{
-			WorkflowID: idB,
+			FunctionID: idB,
 			Data: osqueue.Item{
 				Kind:        osqueue.KindEdge,
 				MaxAttempts: max(1),
@@ -143,7 +143,7 @@ func TestQueueRunBasic(t *testing.T) {
 			},
 		},
 		{
-			WorkflowID: idB,
+			FunctionID: idB,
 			QueueName:  &customQueueName,
 			Data: osqueue.Item{
 				Kind:        "test-kind",
@@ -210,7 +210,7 @@ func TestQueueRunRetry(t *testing.T) {
 	idA := uuid.New()
 	items := []QueueItem{
 		{
-			WorkflowID: idA,
+			FunctionID: idA,
 			Data: osqueue.Item{
 				Kind:        osqueue.KindEdge,
 				MaxAttempts: max(3),
@@ -280,9 +280,9 @@ func TestQueueRunExtended(t *testing.T) {
 	ShardTickTime = 5 * time.Second
 	ShardLeaseTime = 5 * time.Second
 
-	sf := func(ctx context.Context, queueName string, wsID uuid.UUID) *QueueShard {
+	sf := func(ctx context.Context, queueName string, wsID *uuid.UUID) *QueueShard {
 		// For nil UUIDs, return a shard.
-		if wsID == uuid.Nil {
+		if wsID == nil || *wsID == uuid.Nil {
 			return &QueueShard{
 				Name:               "test-shard",
 				GuaranteedCapacity: 1,
@@ -391,7 +391,7 @@ func TestQueueRunExtended(t *testing.T) {
 					}
 
 					item := QueueItem{
-						WorkflowID:  id,
+						FunctionID:  id,
 						WorkspaceID: id,
 					}
 
