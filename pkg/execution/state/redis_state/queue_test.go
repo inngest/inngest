@@ -1565,7 +1565,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	})
 }
 
-func TestQueuePartitionPause(t *testing.T) {
+func TestQueueFunctionPause(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
 		InitAddress:  []string{r.Addr()},
