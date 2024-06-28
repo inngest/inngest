@@ -10,3 +10,6 @@ node_modules/
 .idea/
 *.iml
 .vscode/
+
+# Builds
+.turbo/

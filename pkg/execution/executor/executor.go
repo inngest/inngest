@@ -2651,11 +2651,12 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 			consts.OtelPropagationKey: carrier,
 		},
 	})
-	if err == state.ErrPauseAlreadyExists {
-		return nil
-	}
 	if err != nil {
 		span.Cancel(ctx)
+		if err == state.ErrPauseAlreadyExists {
+			return nil
+		}
+
 		return err
 	}
 

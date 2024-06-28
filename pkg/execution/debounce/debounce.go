@@ -126,25 +126,23 @@ type Debouncer interface {
 	DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID) error
 }
 
-func NewRedisDebouncer(r rueidis.Client, k redis_state.DebounceKeyGenerator, q redis_state.QueueManager) Debouncer {
+func NewRedisDebouncer(d *redis_state.DebounceClient, q redis_state.QueueManager) Debouncer {
 	return debouncer{
-		r: r,
-		k: k,
+		d: d,
 		q: q,
 	}
 }
 
 type debouncer struct {
-	r rueidis.Client
-	k redis_state.DebounceKeyGenerator
+	d *redis_state.DebounceClient
 	q redis_state.QueueManager
 }
 
 // DeleteDebounceItem removes a debounce from the map.
 func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID) error {
-	keyDbc := d.k.Debounce(ctx)
-	cmd := d.r.B().Hdel().Key(keyDbc).Field(debounceID.String()).Build()
-	err := d.r.Do(ctx, cmd).Error()
+	keyDbc := d.d.KeyGenerator().Debounce(ctx)
+	cmd := d.d.Client().B().Hdel().Key(keyDbc).Field(debounceID.String()).Build()
+	err := d.d.Client().Do(ctx, cmd).Error()
 	if rueidis.IsRedisNil(err) {
 		return nil
 	}
@@ -156,10 +154,10 @@ func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID)
 
 // GetDebounceItem returns a DebounceItem given a debounce ID.
 func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*DebounceItem, error) {
-	keyDbc := d.k.Debounce(ctx)
+	keyDbc := d.d.KeyGenerator().Debounce(ctx)
 
-	cmd := d.r.B().Hget().Key(keyDbc).Field(debounceID.String()).Build()
-	byt, err := d.r.Do(ctx, cmd).AsBytes()
+	cmd := d.d.Client().B().Hget().Key(keyDbc).Field(debounceID.String()).Build()
+	byt, err := d.d.Client().Do(ctx, cmd).AsBytes()
 	if rueidis.IsRedisNil(err) {
 		return nil, ErrDebounceNotFound
 	}
@@ -250,8 +248,8 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 		di.Timeout = time.Now().Add(*timeout).UnixMilli()
 	}
 
-	keyPtr := d.k.DebouncePointer(ctx, fn.ID, key)
-	keyDbc := d.k.Debounce(ctx)
+	keyPtr := d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, key)
+	keyDbc := d.d.KeyGenerator().Debounce(ctx)
 
 	byt, err := json.Marshal(di)
 	if err != nil {
@@ -260,7 +258,7 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 
 	out, err := scripts["newDebounce"].Exec(
 		ctx,
-		d.r,
+		d.d.Client(),
 		[]string{keyPtr, keyDbc},
 		[]string{debounceID.String(), string(byt), strconv.Itoa(int(ttl.Seconds()))},
 	).ToString()
@@ -305,8 +303,8 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	keyPtr := d.k.DebouncePointer(ctx, fn.ID, key)
-	keyDbc := d.k.Debounce(ctx)
+	keyPtr := d.d.KeyGenerator().DebouncePointer(ctx, fn.ID, key)
+	keyDbc := d.d.KeyGenerator().Debounce(ctx)
 	byt, err := json.Marshal(di)
 	if err != nil {
 		return fmt.Errorf("error marshalling debounce: %w", err)
@@ -314,11 +312,11 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 
 	out, err := scripts["updateDebounce"].Exec(
 		ctx,
-		d.r,
+		d.d.Client(),
 		[]string{
 			keyPtr,
 			keyDbc,
-			d.k.QueueItem(),
+			d.d.KeyGenerator().QueueItem(),
 		},
 		[]string{
 			debounceID.String(),

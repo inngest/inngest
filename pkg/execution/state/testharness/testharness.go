@@ -159,6 +159,7 @@ func checkNew(t *testing.T, m state.Manager) {
 		WorkflowVersion: w.FunctionVersion,
 		RunID:           runID,
 		Key:             runID.String(),
+		AccountID:       uuid.New(),
 	}
 
 	evt := input.Map()
@@ -182,7 +183,7 @@ func checkNew(t *testing.T, m state.Manager) {
 	require.EqualValues(t, init.Context, s.Metadata().Context, "Metadata context not saved")
 	require.EqualValues(t, id, s.Metadata().Identifier, "Metadata didn't save Identifier")
 
-	loaded, err := m.Load(ctx, s.RunID())
+	loaded, err := m.Load(ctx, id.AccountID, s.RunID())
 	require.NoError(t, err)
 
 	require.EqualValues(t, input.Map(), loaded.Event(), "Loaded event does not match input")
@@ -196,10 +197,11 @@ func checkExists(t *testing.T, m state.Manager) {
 		WorkflowVersion: w.FunctionVersion,
 		RunID:           runID,
 		Key:             runID.String(),
+		AccountID:       uuid.New(),
 	}
 
 	t.Run("With a random unsaved ID", func(t *testing.T) {
-		exists, err := m.Exists(ctx, ulid.MustNew(ulid.Now(), rand.Reader))
+		exists, err := m.Exists(ctx, id.AccountID, ulid.MustNew(ulid.Now(), rand.Reader))
 		require.NoError(t, err)
 		require.EqualValues(t, false, exists)
 	})
@@ -215,14 +217,14 @@ func checkExists(t *testing.T, m state.Manager) {
 			},
 		}
 
-		exists, err := m.Exists(ctx, id.RunID)
+		exists, err := m.Exists(ctx, id.AccountID, id.RunID)
 		require.NoError(t, err)
 		require.EqualValues(t, false, exists)
 
 		_, err = m.New(ctx, init)
 		require.NoError(t, err)
 
-		exists, err = m.Exists(ctx, id.RunID)
+		exists, err = m.Exists(ctx, id.AccountID, id.RunID)
 		require.NoError(t, err)
 		require.EqualValues(t, true, exists)
 	})
@@ -237,6 +239,7 @@ func checkNew_stepdata(t *testing.T, m state.Manager) {
 		WorkflowID: w.ID,
 		RunID:      runID,
 		Key:        runID.String(),
+		AccountID:  uuid.New(),
 	}
 
 	evt := input.Map()
@@ -258,7 +261,7 @@ func checkNew_stepdata(t *testing.T, m state.Manager) {
 	require.EqualValues(t, evt, s.Event(), "Returned event does not match input")
 	require.EqualValues(t, batch, s.Events(), "Returned events does not match input")
 
-	loaded, err := m.Load(ctx, s.RunID())
+	loaded, err := m.Load(ctx, id.AccountID, s.RunID())
 	require.NoError(t, err)
 
 	require.EqualValues(t, input.Map(), loaded.Event(), "Loaded event does not match input")
@@ -275,6 +278,7 @@ func checkUpdateMetadata(t *testing.T, m state.Manager) {
 		WorkflowID: w.ID,
 		RunID:      runID,
 		Key:        runID.String(),
+		AccountID:  uuid.New(),
 	}
 	evt := input.Map()
 	batch := []map[string]any{evt}
@@ -301,10 +305,10 @@ func checkUpdateMetadata(t *testing.T, m state.Manager) {
 		RequestVersion:            2,
 	}
 
-	err = m.UpdateMetadata(ctx, runID, update)
+	err = m.UpdateMetadata(ctx, id.AccountID, runID, update)
 	require.NoError(t, err)
 
-	loaded, err := m.Load(ctx, s.RunID())
+	loaded, err := m.Load(ctx, id.AccountID, s.RunID())
 	require.NoError(t, err)
 
 	found := loaded.Metadata()
@@ -338,7 +342,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	err := m.SaveResponse(ctx, s.Identifier(), r.Step.ID, marshal(r.Output))
 	require.NoError(t, err)
 
-	next, err := m.Load(ctx, s.Identifier().RunID)
+	next, err := m.Load(ctx, s.Identifier().AccountID, s.Identifier().RunID)
 	require.NoError(t, err)
 	require.NotNil(t, next)
 
@@ -378,7 +382,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	err = m.SaveResponse(ctx, s.Identifier(), r2.Step.ID, marshal(r2.Output))
 	require.NoError(t, err)
 
-	next, err = m.Load(ctx, s.Identifier().RunID)
+	next, err = m.Load(ctx, s.Identifier().AccountID, s.Identifier().RunID)
 	require.NoError(t, err)
 	require.NotNil(t, next)
 
@@ -401,7 +405,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	//
 	// Load() the state independently.
 	//
-	reloaded, err := m.Load(ctx, s.RunID())
+	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, next.Identifier(), reloaded.Identifier())
 	require.EqualValues(t, next.Event(), reloaded.Event())
@@ -437,7 +441,7 @@ func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
 	}
 	wg.Wait()
 
-	loaded, err := m.Load(ctx, s.RunID())
+	loaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
 	require.NoError(t, err)
 	require.Equal(t, len(n100.Steps), len(loaded.Actions()))
 }
@@ -459,7 +463,7 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 		err := m.SaveResponse(ctx, s.Identifier(), r.Step.ID, marshal(r.Output))
 		require.NoError(t, err)
 
-		next, err := m.Load(ctx, s.Identifier().RunID)
+		next, err := m.Load(ctx, s.Identifier().AccountID, s.Identifier().RunID)
 		require.NoError(t, err)
 
 		stack := next.Stack()
@@ -476,7 +480,7 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 		require.NoError(t, err)
 
 		// The stack should change
-		next, err := m.Load(ctx, s.Identifier().RunID)
+		next, err := m.Load(ctx, s.Identifier().AccountID, s.Identifier().RunID)
 		require.NoError(t, err)
 		stack := next.Stack()
 		require.EqualValues(t, 2, len(stack))
@@ -493,7 +497,7 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 		err := m.SaveResponse(ctx, s.Identifier(), r.Step.ID, marshal(r.Output))
 		require.Error(t, state.ErrDuplicateResponse, err)
 
-		next, err := m.Load(ctx, s.Identifier().RunID)
+		next, err := m.Load(ctx, s.Identifier().AccountID, s.Identifier().RunID)
 		fmt.Println(next.Actions(), r.Step.ID)
 		require.NoError(t, err)
 
@@ -761,7 +765,7 @@ func checkConsumePauseWithData(t *testing.T, m state.Manager) {
 	require.Error(t, state.ErrPauseNotFound, err)
 
 	// Load function state and assert we have the pause stored in state.
-	reloaded, err := m.Load(ctx, s.RunID())
+	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
 	require.Nil(t, err)
 	require.Equal(t, pauseData, reloaded.Actions()[pause.DataKey], "Pause data was not stored in the state store")
 }
@@ -790,7 +794,7 @@ func checkConsumePauseWithDataIndex(t *testing.T, m state.Manager) {
 		require.NoError(t, err)
 
 		// Load function state and assert we have the pause stored in state.
-		reloaded, err := m.Load(ctx, s.RunID())
+		reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
 		require.Nil(t, err)
 
 		require.Equal(t, 1, len(reloaded.Stack()))
@@ -805,7 +809,7 @@ func checkConsumePauseWithDataIndex(t *testing.T, m state.Manager) {
 		s := setup(t, m)
 
 		// Load function state and assert we have the pause stored in state.
-		loaded, err := m.Load(ctx, s.RunID())
+		loaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
 		require.Nil(t, err)
 		require.Equal(t, 0, len(loaded.Stack()))
 
@@ -828,7 +832,7 @@ func checkConsumePauseWithDataIndex(t *testing.T, m state.Manager) {
 		require.NoError(t, err)
 
 		// Load function state and assert we have the pause stored in state.
-		reloaded, err := m.Load(ctx, s.RunID())
+		reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
 		require.Nil(t, err)
 
 		require.Equal(t, 1, len(reloaded.Stack()))
@@ -884,7 +888,7 @@ func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager) {
 	require.Error(t, state.ErrPauseNotFound, err)
 
 	// Load function state and assert we have the pause stored in state.
-	reloaded, err := m.Load(ctx, s.RunID())
+	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
 	require.Nil(t, err)
 	require.Equal(t, 1, len(reloaded.Actions()), "Pause data should still be stored if data is nil")
 }
@@ -936,7 +940,7 @@ func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager) {
 	require.Error(t, state.ErrPauseNotFound, err)
 
 	// Load function state and assert we have the pause stored in state.
-	reloaded, err := m.Load(ctx, s.RunID())
+	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
 	require.Nil(t, err)
 	require.Equal(t, 0, len(reloaded.Actions()), "Pause data was stored in the state store with no data key provided")
 }
@@ -1501,7 +1505,7 @@ func checkSetStatus(t *testing.T, m state.Manager) {
 	err = m.SetStatus(ctx, s.Identifier(), enums.RunStatusOverflowed)
 	require.NoError(t, err)
 
-	reloaded, err := m.Load(ctx, s.RunID())
+	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusOverflowed, reloaded.Metadata().Status, "Status is not Overflowed")
 }
@@ -1530,7 +1534,7 @@ func checkCancel(t *testing.T, m state.Manager) {
 	err = m.Cancel(ctx, s.Identifier())
 	require.NoError(t, err)
 
-	reloaded, err := m.Load(ctx, s.RunID())
+	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Cancelled")
 }
@@ -1557,7 +1561,7 @@ func checkCancel_cancelled(t *testing.T, m state.Manager) {
 
 	err = m.Cancel(ctx, s.Identifier())
 	require.NoError(t, err)
-	reloaded, err := m.Load(ctx, s.RunID())
+	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Cancelled")
 
@@ -1588,7 +1592,7 @@ func checkCancel_completed(t *testing.T, m state.Manager) {
 	err = m.SetStatus(ctx, s.Identifier(), enums.RunStatusCompleted)
 	require.NoError(t, err)
 
-	s, err = m.Load(ctx, s.RunID())
+	s, err = m.Load(ctx, s.Identifier().AccountID, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
 
@@ -1598,7 +1602,7 @@ func checkCancel_completed(t *testing.T, m state.Manager) {
 	err = m.Cancel(ctx, s.Identifier())
 	require.Equal(t, err, state.ErrFunctionComplete)
 
-	s, err = m.Load(ctx, s.RunID())
+	s, err = m.Load(ctx, s.Identifier().AccountID, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
 }
