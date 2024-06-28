@@ -2502,7 +2502,12 @@ func TestQueueRateLimit(t *testing.T) {
 
 func getQueueItem(t *testing.T, r *miniredis.Miniredis, id string) QueueItem {
 	t.Helper()
-	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
+	kg := &queueKeyGenerator{
+		queueDefaultKey: QueueDefaultKey,
+		queueItemKeyGenerator: queueItemKeyGenerator{
+			queueDefaultKey: QueueDefaultKey,
+		},
+	}
 	// Ensure that our data is set up correctly.
 	val := r.HGet(kg.QueueItem(), id)
 	require.NotEmpty(t, val)
