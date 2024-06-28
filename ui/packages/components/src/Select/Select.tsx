@@ -44,7 +44,7 @@ export function Select({
     <Listbox value={defaultValue} onChange={onChange} multiple={multiple}>
       <span
         className={cn(
-          isLabelVisible && 'divide-muted bg-canvasSubtle divide-x',
+          isLabelVisible && 'divide-muted bg-canvasSubtle text-basis divide-x',
           'border-muted flex items-center rounded-md border text-sm',
           className
         )}
@@ -67,7 +67,7 @@ function Button({
     <Listbox.Button
       className={cn(
         !isLabelVisible && 'rounded-l-[5px]',
-        'bg-surfaceBase flex h-10 w-full items-center justify-between rounded-r-[5px] px-2',
+        'bg-surfaceBase text-basis flex h-10 w-full items-center justify-between rounded-r-[5px] px-2',
         className
       )}
     >
@@ -93,7 +93,7 @@ function Options({ children }: React.PropsWithChildren) {
 function Option({ children, option }: React.PropsWithChildren<{ option: Option }>) {
   return (
     <Listbox.Option
-      className=" ui-selected:text-success ui-selected:font-medium ui-active:bg-canvasSubtle/50 flex select-none items-center justify-between focus:outline-none"
+      className=" ui-selected:text-success ui-selected:font-medium ui-active:bg-canvasSubtle/50 text-basis flex select-none items-center justify-between focus:outline-none"
       key={option.id}
       value={option}
       disabled={option.disabled}
@@ -108,7 +108,7 @@ function Option({ children, option }: React.PropsWithChildren<{ option: Option }
 function CheckboxOption({ children, option }: React.PropsWithChildren<{ option: Option }>) {
   return (
     <Listbox.Option
-      className=" ui-active:bg-canvasSubtle/50 flex select-none items-center justify-between py-1.5 pl-2 pr-4 focus:outline-none"
+      className=" ui-active:bg-canvasSubtle/50 text-basis flex select-none items-center justify-between py-1.5 pl-2 pr-4 focus:outline-none"
       key={option.id}
       value={option}
     >
