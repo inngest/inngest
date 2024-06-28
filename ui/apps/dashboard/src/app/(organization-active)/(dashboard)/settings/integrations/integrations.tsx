@@ -84,7 +84,12 @@ export default function IntegrationsList() {
                 <div className="bg-contrast flex h-12 w-12 items-center justify-center rounded">
                   {i.Icon}
                 </div>
-                {i.actionButton(i.title === 'Vercel' ? vercelData.enabled : false, fetching)}
+                {i.actionButton(
+                  i.title === 'Vercel'
+                    ? vercelData.enabled && vercelData.projects.length > 0
+                    : false,
+                  fetching
+                )}
               </div>
               <div className="text-basis mt-[18px] text-lg font-medium">{i.title}</div>
               <div className="text-subtle mt-2 text-sm leading-tight">{i.description}</div>
