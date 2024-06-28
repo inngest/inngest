@@ -6,6 +6,11 @@ const nextConfig = {
   productionBrowserSourceMaps: true,
   experimental: {
     // typedRoutes: true,
+    turbo: {
+      resolveAlias: {
+        fs: { browser: 'empty' },
+      },
+    },
   },
   images: {
     remotePatterns: [
