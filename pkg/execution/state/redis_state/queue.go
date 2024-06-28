@@ -580,9 +580,10 @@ type FnMetadata struct {
 // QueuePartition represents an individual queue for a workflow.  It stores the
 // time of the earliest job within the workflow.
 type QueuePartition struct {
-	// TODO: CAN WE REMOVE THIS?
-	QueueName *string `json:"queue,omitempty"`
-
+	// ID represents the key used within the global Partition hash and global pointer set
+	// which represents this QueuePartition.  This is the function ID for enums.PartitionTypeDefault,
+	// or the entire key returned from the key generator for other types.
+	ID string `json:"id,omitempty"`
 	// PartitionType is the int-value of the enums.PartitionType for this
 	// partition.  By default, partitions are function-scoped without any
 	// custom keys.
@@ -600,10 +601,6 @@ type QueuePartition struct {
 	// AccountID represents the account ID for the partition.  This ONLY exists
 	// if the partition represents an account-level concurrency key.
 	AccountID *uuid.UUID `json:"aID,omitempty"`
-	// Priority represents the partition's priority.  This currently exists
-	// on the partition (instead of fn metadata) to reduce lookups when peeking
-	// many partitions.
-	Priority uint `json:"p"`
 	// Last represents the time that this partition was last leased, as a millisecond
 	// unix epoch.  In essence, we need this to track how frequently we're leasing and
 	// attempting to run items in the partition's queue.
@@ -638,11 +635,28 @@ type QueuePartition struct {
 	// TODO: Throttling;  embed max limit/period/etc?
 }
 
-func (q QueuePartition) Queue() string {
-	if q.QueueName == nil {
+// zsetKey represents the key used to store the zset.  for default partitions,
+// this is different to the ID (for backwards compatibility, it's just the fn ID
+// without prefixes)
+func (q QueuePartition) zsetKey(kg QueueKeyGenerator) string {
+	if q.PartitionType == 0 && q.FunctionID != nil {
+		// return just the fn ID
 		return q.FunctionID.String()
 	}
-	return *q.QueueName
+	if q.ID == "" {
+		// return a blank queue key.  This is used for nil queue partitions.
+		return kg.PartitionQueueSet(enums.PartitionTypeDefault, "-", "")
+	}
+	return q.ID
+}
+
+func (q QueuePartition) Queue() string {
+	// TODO
+	// if q.QueueName == nil {
+	// return q.FunctionID.String()
+	// }
+	// return *q.QueueName
+	panic("nope")
 }
 
 func (q QueuePartition) MarshalBinary() ([]byte, error) {
@@ -759,16 +773,12 @@ func (q QueueItem) IsLeased(time time.Time) bool {
 	return q.LeaseID != nil && ulid.Time(q.LeaseID.Time()).After(time)
 }
 
-func (q *queue) ItemPartitions(ctx context.Context, i QueueItem, priority uint) []QueuePartition {
-	// Right now queue items *always* add into a partition for the overall function ID.
-	// In the future this will change.
-	partitions := []QueuePartition{
-		{
-			QueueName:  i.QueueName,
-			FunctionID: &i.FunctionID,
-			Priority:   priority,
-		},
-	}
+// ItemPartitions returns up 3 item partitions for a given queue item.
+func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartition {
+	var (
+		partitions []QueuePartition
+		ckeys      []state.CustomConcurrency
+	)
 
 	// Check if we have custom concurrency keys for the given function.  If so,
 	// we're going to create new partitions for each of the custom keys.  This allows
@@ -776,19 +786,26 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem, priority uint) 
 	//
 	// See the 'key queues' spec for more information (internally).
 	if q.customConcurrencyGen != nil {
-		customKeys := q.customConcurrencyGen(ctx, i)
-		for _, key := range customKeys {
-			scope, id, _ := key.ParseKey()
+		ckeys = q.customConcurrencyGen(ctx, i)
+	}
+
+	// Right now queue items *always* add into a partition for the overall function ID.
+	// In the future this will change.
+	// if len(ckeys) == 0 {
+	partitions = append(partitions, QueuePartition{
+		ID:         i.FunctionID.String(),
+		FunctionID: &i.FunctionID,
+	})
+	// } else {
+	if len(ckeys) > 0 {
+		for _, key := range ckeys {
+			scope, id, checksum, _ := key.ParseKey()
 
 			partition := QueuePartition{
+				ID:               q.kg.PartitionQueueSet(enums.PartitionTypeConcurrency, id.String(), checksum),
 				PartitionType:    int(enums.PartitionTypeConcurrency),
 				ConcurrencyScope: int(scope),
 				FunctionID:       &i.FunctionID,
-				// XXX: Priority may cause an issue in the future;
-				// if we allow users to set custom priorities on functions
-				// and we have a non-function scope, all priorities are
-				// broken.
-				Priority: priority,
 			}
 
 			switch scope {
@@ -806,6 +823,13 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem, priority uint) 
 	}
 
 	// TODO: check for throttle keys
+
+	for i := len(partitions) - 1; i < 3; i++ {
+		// Pad to 3 partitions, and add empty partitions to the item.
+		// We MUST ignore empty partitions when managing queues.
+		partitions = append(partitions, QueuePartition{})
+	}
+
 	return partitions
 }
 
@@ -1005,27 +1029,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		partitionTime = getNow()
 	}
 
-	// Get the queue name from the queue item.  This allows utilization of
-	// the partitioned queue for jobs with custom queue names, vs utilizing
-	// workflow IDs in every case.
-	qn := i.Queue()
-
-	parts := q.ItemPartitions(ctx, i, priority)
-	var b, c, d QueuePartition
-	for idx, p := range parts {
-		if idx == 0 {
-			continue
-		} else if idx == 1 {
-			b = p
-		} else if idx == 2 {
-			c = p
-		} else if idx == 3 {
-			d = p
-		} else {
-			return i, fmt.Errorf("too many partitions (%d) for queue item %s", len(parts), i.ID)
-		}
-	}
-
 	var (
 		shard     *QueueShard
 		shardName string
@@ -1038,6 +1041,8 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		}
 	}
 
+	parts := q.ItemPartitions(ctx, i)
+
 	keys := []string{
 		q.kg.QueueItem(),                    // Queue item
 		q.kg.PartitionItem(),                // Partition item, map
@@ -1046,10 +1051,11 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		q.kg.Shards(),
 		q.kg.Idempotency(i.ID),
 		q.kg.FnMetadata(i.FunctionID),
-		q.kg.PartitionQueueSet(enums.PartitionTypeDefault, qn), // Queue sorted set
-		q.kg.PartitionQueueSet(enums.PartitionType(b.PartitionType), b.Queue()),
-		q.kg.PartitionQueueSet(enums.PartitionType(c.PartitionType), c.Queue()),
-		q.kg.PartitionQueueSet(enums.PartitionType(d.PartitionType), d.Queue()),
+
+		// Add all 3 partition sets
+		parts[0].zsetKey(q.kg),
+		parts[1].zsetKey(q.kg),
+		parts[2].zsetKey(q.kg),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.kg) {
@@ -1062,8 +1068,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		i,
 		i.ID,
 		at.UnixMilli(),
-		qn,
-		parts[0],
 		partitionTime.Unix(),
 		shard,
 		shardName,
@@ -1074,9 +1078,12 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 			FnID:   i.FunctionID,
 			Paused: false,
 		},
-		b,
-		c,
-		d,
+		parts[0],
+		parts[1],
+		parts[2],
+		parts[0].ID,
+		parts[1].ID,
+		parts[2].ID,
 	})
 
 	if err != nil {

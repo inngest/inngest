@@ -6,8 +6,8 @@ Enqueus an item within the queue.
 --]]
 
 local queueKey            = KEYS[1]           -- queue:item - hash: { $itemID: $item }
-local partitionKey        = KEYS[2]           -- partition:item - hash: { $workflowID: $partition }
-local partitionIndexKey   = KEYS[3]           -- partition:sorted - zset
+local keyPartitionMap     = KEYS[2]           -- partition:item - hash: { $workflowID: $partition }
+local keyGlobalPointer    = KEYS[3]           -- partition:sorted - zset
 local shardIndexKey       = KEYS[4]           -- shard:$name:sorted - zset
 local shardMapKey         = KEYS[5]           -- shards - hmap of shards
 local idempotencyKey      = KEYS[6]           -- seen:$key
@@ -15,25 +15,26 @@ local keyFnMetadata       = KEYS[7]           -- fnMeta:$id - hash
 local keyPartitionA       = KEYS[8]           -- queue:sorted:$workflowID - zset
 local keyPartitionB       = KEYS[9]           -- e.g. sorted:c|t:$workflowID - zset
 local keyPartitionC       = KEYS[10]          -- e.g. sorted:c|t:$workflowID - zset
-local keyPartitionD       = KEYS[11]          -- e.g. sorted:c|t:$workflowID - zset
 local keyItemIndexA       = KEYS[12]          -- custom item index 1
 local keyItemIndexB       = KEYS[13]          -- custom item index 2
 
 local queueItem           = ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID             = ARGV[2]           -- id
 local queueScore          = tonumber(ARGV[3]) -- vesting time, in milliseconds
-local workflowID          = ARGV[4]           -- $workflowID
-local partitionItemA       = ARGV[5]           -- {workflow, priority, leasedAt, etc}
-local partitionTime       = tonumber(ARGV[6]) -- score for partition, lower bounded to now in seconds
-local shard               = ARGV[7]
-local shardName           = ARGV[8]
-local nowMS               = tonumber(ARGV[9]) -- now in ms
-local fnMetadata          = ARGV[10]          -- function meta: {paused}
-local partitionItemB      = ARGV[11]
-local partitionItemC      = ARGV[12]
-local partitionItemD      = ARGV[13]
+local partitionTime       = tonumber(ARGV[4]) -- score for partition, lower bounded to now in seconds
+local shard               = ARGV[5]
+local shardName           = ARGV[6]
+local nowMS               = tonumber(ARGV[7]) -- now in ms
+local fnMetadata          = ARGV[8]          -- function meta: {paused}
+local partitionItemA      = ARGV[9]
+local partitionItemB      = ARGV[10]
+local partitionItemC      = ARGV[11]
+local partitionIdA        = ARGV[12]
+local partitionIdB        = ARGV[13]
+local partitionIdC        = ARGV[14]
 
 -- $include(get_partition_item.lua)
+-- $include(enqueue_to_partition.lua)
 
 -- Check idempotency exists
 if redis.call("EXISTS", idempotencyKey) ~= 0 then
@@ -46,21 +47,14 @@ if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
     return 1
 end
 
--- We score the queue items separately, as we need to continually update the score
--- when adding leases.  Doing so means we can't ZADD to update sorted sets, as each
--- time the lease ID changes the data structure changes; zsets require static members
--- when updating scores.
-redis.call("ZADD", keyPartitionA, queueScore, queueID)
-redis.call("ZADD", keyPartitionB, queueScore, queueID)
-redis.call("ZADD", keyPartitionC, queueScore, queueID)
-redis.call("ZADD", keyPartitionD, queueScore, queueID)
+-- Enqueue to all partitions.
+enqueue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, queueScore, queueID, partitionTime, nowMS)
+enqueue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, queueScore, queueID, partitionTime, nowMS)
+enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, queueScore, queueID, partitionTime, nowMS)
 
--- We store partitions and their leases separately from the queue-partition ZSET
--- as we want a static member excluding eg. lease IDs.  This allows us to update
--- scores idempotently.
-redis.call("HSETNX", partitionKey, workflowID, partitionItem)
 
--- note to future devs: if updating metadata, be sure you do not change the "off" (i.e. "paused") boolean in the function's metadata.
+-- note to future devs: if updating metadata, be sure you do not change the "off"
+-- (i.e. "paused") boolean in the function's metadata.
 redis.call("SET", keyFnMetadata, fnMetadata, "NX")
 
 -- If this is a sharded item, upsert the shard.
@@ -76,49 +70,6 @@ if shard ~= "" and shard ~= "null" then
         shard = cjson.encode(updatedShard)
     end
     redis.call("HSET", shardMapKey, shardName, shard)
-end
-
--- Get the current score of the partition;  if queueScore < currentScore update the
--- partition's score so that we can work on this workflow when the earliest member
--- is available.
-local currentScore = redis.call("ZSCORE", partitionIndexKey, workflowID)
-if currentScore == false or tonumber(currentScore) > partitionTime then
-    -- Get the partition item, so that we can keep the last lease score.
-    local decoded = cjson.decode(partitionItem)
-    local existing = get_partition_item(partitionKey, workflowID)
-
-    -- EnqueueAt doesn't have the latest partition data from the queue, including
-    -- last fetch/lease time and forceAtMS.  Ensure we get these from the item
-    -- atomically here.
-    if existing ~= nil then
-        decoded.last = existing.last
-        decoded.forceAtMS = existing.forceAtMS
-
-        if (nowMS > decoded.forceAtMS) then
-            -- we've already passed the time at which this partition was forced,
-            -- so unset the forced at field.
-            decoded.forceAtMS = 0
-        end
-
-        partitionItem = cjson.encode(decoded)
-    end
-
-
-    -- The only case in which now < forceAtMS is when we want to ensure that a
-    -- partition has a future time and enqueueing should not bring the partition
-    -- earlier, eg. in the case of concurrency limits spinning on partitions.
-    if nowMS > decoded.forceAtMS then
-        redis.call("ZADD", partitionIndexKey, partitionTime, workflowID)
-
-        -- Set the partition item.  We must always do this so that we can
-        -- update priorities on the fly.
-        redis.call("HSET", partitionKey, workflowID, partitionItem)
-
-        -- if this is sharded we have a shard partition to update.
-        if shard ~= "" and shard ~= "null" then
-            redis.call("ZADD", shardIndexKey, partitionTime, workflowID)
-        end
-    end
 end
 
 -- Add optional indexes.

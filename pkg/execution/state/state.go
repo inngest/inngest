@@ -122,33 +122,33 @@ func (c CustomConcurrency) Validate() error {
 	return nil
 }
 
-func (c CustomConcurrency) ParseKey() (scope enums.ConcurrencyScope, id uuid.UUID, err error) {
+func (c CustomConcurrency) ParseKey() (scope enums.ConcurrencyScope, id uuid.UUID, xxhash string, err error) {
 	// Keys must always be in the format of "$prefix:$id:$key", in which prefix
 	// is one of "f" | "e" | "a", depending on function, env, or account-level scopes.
 	//
 	// An example key is `f:${uuid}:${hash}`.
 	if len(c.Key) < 5 {
-		return enums.ConcurrencyScopeFn, id, err
+		return enums.ConcurrencyScopeFn, id, "", err
 	}
 
 	// TODO: Dont allocate, get index of colons and use offsets
 	parts := strings.Split(c.Key, ":")
 	if len(parts) != 3 {
 		// Invalid by default
-		return enums.ConcurrencyScopeFn, id, err
+		return enums.ConcurrencyScopeFn, id, parts[2], err
 	}
 
 	id, err = uuid.Parse(parts[1])
 
 	switch parts[0] {
 	case "f":
-		return enums.ConcurrencyScopeFn, id, err
+		return enums.ConcurrencyScopeFn, id, parts[2], err
 	case "e":
-		return enums.ConcurrencyScopeEnv, id, err
+		return enums.ConcurrencyScopeEnv, id, parts[2], err
 	case "a":
-		return enums.ConcurrencyScopeAccount, id, err
+		return enums.ConcurrencyScopeAccount, id, parts[2], err
 	default:
-		return enums.ConcurrencyScopeFn, id, err
+		return enums.ConcurrencyScopeFn, id, parts[2], err
 	}
 }
 

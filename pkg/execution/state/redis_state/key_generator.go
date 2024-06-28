@@ -184,11 +184,14 @@ type QueueKeyGenerator interface {
 	// - for other partitions, exactly as returned by PartitionQueueSet(...).
 	GlobalPartitionIndex() string
 
-	// PartitionQueueSet returns the key containing the sorted ZSET for a function's custom concurrency,
-	// throttling, or (future) other custom key-based queues.
-	// Returns: string key, pointing to a ZSET. This is a partition; the partition data is stored in
-	// the partition item (see PartitionItem()).
-	PartitionQueueSet(pType enums.PartitionType, id string) string
+	// PartitionQueueSet returns the key containing the sorted ZSET for a function's custom
+	// concurrency, throttling, or (future) other custom key-based queues.
+	//
+	// The xxhash should be the evaluated hash of the key.
+	//
+	// Returns: string key, pointing to a ZSET. This is a partition; the partition data is
+	// stored in the partition item (see PartitionItem()).
+	PartitionQueueSet(pType enums.PartitionType, scopeID, xxhash string) string
 
 	//
 	// Queue metadata keys
@@ -295,17 +298,17 @@ func (d DefaultQueueKeyGenerator) QueueItem() string {
 }
 
 func (d DefaultQueueKeyGenerator) FnQueueSet(id string) string {
-	return d.PartitionQueueSet(enums.PartitionTypeDefault, id)
+	return d.PartitionQueueSet(enums.PartitionTypeDefault, id, "")
 }
 
-func (d DefaultQueueKeyGenerator) PartitionQueueSet(pType enums.PartitionType, id string) string {
+func (d DefaultQueueKeyGenerator) PartitionQueueSet(pType enums.PartitionType, scopeID, xxhash string) string {
 	switch pType {
 	case enums.PartitionTypeConcurrency:
-		return fmt.Sprintf("%s:sorted:c:%s", d.Prefix, id)
+		return fmt.Sprintf("%s:sorted:c:%s:%s", d.Prefix, scopeID, xxhash)
 	case enums.PartitionTypeThrottle:
-		return fmt.Sprintf("%s:sorted:t:%s", d.Prefix, id)
+		return fmt.Sprintf("%s:sorted:t:%s:%s", d.Prefix, scopeID, xxhash)
 	default:
-		return fmt.Sprintf("%s:queue:sorted:%s", d.Prefix, id)
+		return fmt.Sprintf("%s:queue:sorted:%s", d.Prefix, scopeID)
 	}
 }
 
