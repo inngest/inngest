@@ -44,7 +44,7 @@ export function Select({
     <Listbox value={defaultValue} onChange={onChange} multiple={multiple}>
       <span
         className={cn(
-          isLabelVisible && 'divide-muted bg-canvasSubtle divide-x',
+          isLabelVisible && 'divide-muted bg-canvasSubtle text-basis divide-x',
           'border-muted flex items-center rounded-md border text-sm',
           className
         )}
@@ -62,12 +62,17 @@ function Button({
   children,
   isLabelVisible,
   className,
-}: React.PropsWithChildren<{ isLabelVisible?: boolean; className?: string }>) {
+  as: Component,
+}: React.PropsWithChildren<{
+  isLabelVisible?: boolean;
+  className?: string;
+  as: React.ElementType;
+}>) {
   return (
-    <Listbox.Button
+    <Component
       className={cn(
         !isLabelVisible && 'rounded-l-[5px]',
-        'bg-surfaceBase flex h-10 w-full items-center justify-between rounded-r-[5px] px-2',
+        'bg-surfaceBase text-basis flex h-10 w-full items-center justify-between rounded-r-[5px] px-2',
         className
       )}
     >
@@ -76,24 +81,28 @@ function Button({
         className="ui-open:-rotate-180 text-subtle h-4 w-4 transition-transform duration-500"
         aria-hidden="true"
       />
-    </Listbox.Button>
+    </Component>
   );
 }
 
-function Options({ children }: React.PropsWithChildren) {
+function Options({ children, as: Component }: React.PropsWithChildren<{ as: React.ElementType }>) {
   return (
-    <Listbox.Options className="absolute mt-1 min-w-max">
+    <Component className="absolute mt-1 min-w-max">
       <div className="border-muted bg-surfaceBase overflow-hidden rounded-md border py-1 drop-shadow-lg">
         {children}
       </div>
-    </Listbox.Options>
+    </Component>
   );
 }
 
-function Option({ children, option }: React.PropsWithChildren<{ option: Option }>) {
+function Option({
+  children,
+  option,
+  as: Component,
+}: React.PropsWithChildren<{ option: Option; as: React.ElementType }>) {
   return (
-    <Listbox.Option
-      className=" ui-selected:text-success ui-selected:font-medium ui-active:bg-canvasSubtle/50 flex select-none items-center justify-between focus:outline-none"
+    <Component
+      className=" ui-selected:text-success ui-selected:font-medium ui-active:bg-canvasSubtle/50 text-basis flex select-none items-center justify-between focus:outline-none"
       key={option.id}
       value={option}
       disabled={option.disabled}
@@ -101,14 +110,18 @@ function Option({ children, option }: React.PropsWithChildren<{ option: Option }
       <div className="ui-selected:border-success my-2 w-full border-l-2 border-transparent pl-5 pr-4">
         {children}
       </div>
-    </Listbox.Option>
+    </Component>
   );
 }
 
-function CheckboxOption({ children, option }: React.PropsWithChildren<{ option: Option }>) {
+function CheckboxOption({
+  children,
+  option,
+  as: Component,
+}: React.PropsWithChildren<{ option: Option; as: React.ElementType }>) {
   return (
-    <Listbox.Option
-      className=" ui-active:bg-canvasSubtle/50 flex select-none items-center justify-between py-1.5 pl-2 pr-4 focus:outline-none"
+    <Component
+      className=" ui-active:bg-canvasSubtle/50 text-basis flex select-none items-center justify-between py-1.5 pl-2 pr-4 focus:outline-none"
       key={option.id}
       value={option}
     >
@@ -125,14 +138,20 @@ function CheckboxOption({ children, option }: React.PropsWithChildren<{ option: 
           </span>
         </span>
       )}
-    </Listbox.Option>
+    </Component>
   );
 }
 
-Select.Button = Button;
-Select.Options = Options;
-Select.Option = Option;
-Select.CheckboxOption = CheckboxOption;
+Select.Button = (
+  props: React.PropsWithChildren<{ isLabelVisible?: boolean; className?: string }>
+) => <Button {...props} as={Listbox.Button} />;
+Select.Options = (props: React.PropsWithChildren) => <Options {...props} as={Listbox.Options} />;
+Select.Option = (props: React.PropsWithChildren<{ option: Option }>) => (
+  <Option {...props} as={Listbox.Option} />
+);
+Select.CheckboxOption = (props: React.PropsWithChildren<{ option: Option }>) => (
+  <CheckboxOption {...props} as={Listbox.Option} />
+);
 
 // Used as a wrapper when we group select components in something similar to a button group
 export function SelectGroup({ children }: React.PropsWithChildren) {
