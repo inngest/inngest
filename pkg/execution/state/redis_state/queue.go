@@ -142,8 +142,8 @@ type QueueManager interface {
 	RequeueByJobID(ctx context.Context, partitionName string, jobID string, at time.Time) error
 }
 
-// PriorityFinder returns the priority for a given queue item.
-type PriorityFinder func(ctx context.Context, item QueueItem) uint
+// PriorityFinder returns the priority for a given queue partition.
+type PriorityFinder func(ctx context.Context, part QueuePartition) uint
 
 // ShardFinder returns the given shard for a workspace ID, or nil if we should
 // not shard for the workspace.  We use a workspace ID because each individual
@@ -406,7 +406,7 @@ type PartitionConcurrencyKeyGenerator func(ctx context.Context, p QueuePartition
 func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 	q := &queue{
 		r: r,
-		pf: func(ctx context.Context, item QueueItem) uint {
+		pf: func(_ context.Context, _ QueuePartition) uint {
 			return PriorityDefault
 		},
 		kg:                 defaultQueueKey,
@@ -991,18 +991,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 
 	// TODO: If the length of ID >= max, error.
 
-	priority := PriorityMin
-	if q.pf != nil {
-		priority = q.pf(ctx, i)
-	}
-
-	if priority > PriorityMin {
-		return i, ErrPriorityTooLow
-	}
-	if priority < PriorityMax {
-		return i, ErrPriorityTooHigh
-	}
-
 	if i.WallTimeMS == 0 {
 		i.WallTimeMS = at.UnixMilli()
 	}
@@ -1525,15 +1513,6 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 
 // Requeue requeues an item in the future.
 func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at time.Time) error {
-	priority := PriorityMin
-	if q.pf != nil {
-		priority = q.pf(ctx, i)
-	}
-
-	if priority > PriorityMin {
-		return ErrPriorityTooLow
-	}
-
 	var (
 		ak, pk     string // account, partition, custom concurrency key
 		customKeys = make([]string, 2)
@@ -1861,7 +1840,8 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		}
 
 		items[n-ignored] = item
-		weights = append(weights, float64(10-item.Priority))
+		partPriority := q.pf(ctx, *item)
+		weights = append(weights, float64(10-partPriority))
 	}
 
 	// Remove any ignored items from the slice.

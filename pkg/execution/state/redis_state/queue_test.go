@@ -28,8 +28,6 @@ func init() {
 	miniredis.DumpMaxLineLen = 1024
 }
 
-const testPriority = PriorityDefault
-
 func TestQueueItemScore(t *testing.T) {
 	parse := func(layout, val string) time.Time {
 		t, _ := time.Parse(layout, val)
@@ -236,7 +234,6 @@ func TestQueueEnqueueItem(t *testing.T) {
 		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
 			FunctionID: &item.FunctionID,
-			Priority:   testPriority,
 		}, qp)
 	})
 
@@ -258,7 +255,6 @@ func TestQueueEnqueueItem(t *testing.T) {
 		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
 			FunctionID: &item.FunctionID,
-			Priority:   testPriority,
 		}, qp)
 
 		// Ensure that the zscore did not change.
@@ -282,7 +278,6 @@ func TestQueueEnqueueItem(t *testing.T) {
 		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
 			FunctionID: &item.FunctionID,
-			Priority:   testPriority,
 		}, qp)
 
 		// Assert that the zscore was changed to this earliest timestamp.
@@ -311,7 +306,6 @@ func TestQueueEnqueueItem(t *testing.T) {
 		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
 			FunctionID: &item.FunctionID,
-			Priority:   testPriority,
 		}, qp)
 	})
 
@@ -1089,7 +1083,7 @@ func TestQueueRequeue(t *testing.T) {
 		require.NoError(t, err)
 
 		// Assert partition index is original
-		pi := QueuePartition{FunctionID: &item.FunctionID, Priority: testPriority}
+		pi := QueuePartition{FunctionID: &item.FunctionID}
 		requirePartitionScoreEquals(t, r, pi.FunctionID, now.Truncate(time.Second))
 
 		requirePartitionInProgress(t, q, item.FunctionID, 1)
@@ -1203,9 +1197,9 @@ func TestQueuePartitionLease(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{FunctionID: &idA, Priority: testPriority},
-			{FunctionID: &idB, Priority: testPriority},
-			{FunctionID: &idC, Priority: testPriority},
+			{FunctionID: &idA},
+			{FunctionID: &idB},
+			{FunctionID: &idC},
 		}, items)
 	})
 
@@ -1230,11 +1224,10 @@ func TestQueuePartitionLease(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, items, 3)
 			require.EqualValues(t, []*QueuePartition{
-				{FunctionID: &idB, Priority: testPriority},
-				{FunctionID: &idC, Priority: testPriority},
+				{FunctionID: &idB},
+				{FunctionID: &idC},
 				{
 					FunctionID: &idA,
-					Priority:   testPriority,
 					Last:       items[2].Last, // Use the leased partition time.
 					LeaseID:    leaseID,
 				}, // idA is now last.
@@ -1362,9 +1355,9 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{FunctionID: &idA, Priority: PriorityMin},
-			{FunctionID: &idB, Priority: PriorityMax},
-			{FunctionID: &idC, Priority: PriorityMax},
+			{FunctionID: &idA},
+			{FunctionID: &idB},
+			{FunctionID: &idC},
 		}, items)
 	})
 
@@ -1471,7 +1464,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 		q := NewQueue(
 			rc,
-			WithPriorityFinder(func(ctx context.Context, qi QueueItem) uint {
+			WithPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
 				return PriorityDefault
 			}),
 		)
@@ -1486,8 +1479,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		require.EqualValues(t, []*QueuePartition{
-			{FunctionID: &idB, Priority: PriorityDefault},
-			{FunctionID: &idC, Priority: PriorityDefault},
+			{FunctionID: &idB},
+			{FunctionID: &idC},
 		}, items)
 
 		// After unpausing A, it should be included in the peek:
@@ -1497,9 +1490,9 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{FunctionID: &idA, Priority: PriorityDefault},
-			{FunctionID: &idB, Priority: PriorityDefault},
-			{FunctionID: &idC, Priority: PriorityDefault},
+			{FunctionID: &idA},
+			{FunctionID: &idB},
+			{FunctionID: &idC},
 		}, items)
 	})
 }
@@ -1625,7 +1618,7 @@ func TestQueueFunctionPause(t *testing.T) {
 
 	q := NewQueue(
 		rc,
-		WithPriorityFinder(func(ctx context.Context, item QueueItem) uint {
+		WithPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
 			return PriorityDefault
 		}),
 	)
@@ -1666,7 +1659,7 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 	defer rc.Close()
 	q := NewQueue(
 		rc,
-		WithPriorityFinder(func(ctx context.Context, item QueueItem) uint {
+		WithPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
 			return priority
 		}),
 	)

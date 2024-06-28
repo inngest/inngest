@@ -1075,7 +1075,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 		runInfo := osqueue.RunInfo{
 			Latency:      latency,
 			SojournDelay: sojourn,
-			Priority:     p.Priority,
+			Priority:     q.pf(ctx, p),
 			ShardName:    "<global>",
 		}
 		if s != nil {
