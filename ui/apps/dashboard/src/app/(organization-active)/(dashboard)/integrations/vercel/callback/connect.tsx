@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { NewButton } from '@inngest/components/Button/index';
