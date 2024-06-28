@@ -108,10 +108,10 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		ID:          id,
 		AtMS:        at.UnixMilli(),
 		WorkspaceID: item.WorkspaceID,
-		WorkflowID:  item.Identifier.WorkflowID,
+		FunctionID:  item.Identifier.WorkflowID,
 		Data:        item,
 		// Only use the queue name if provided by queueKindMapping.
-		// Otherwise, this defaults to WorkflowID.
+		// Otherwise, this defaults to FunctionID.
 		QueueName:  queueName,
 		WallTimeMS: at.UnixMilli(),
 	}
@@ -632,7 +632,7 @@ func (q *queue) scan(ctx context.Context) error {
 func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *QueueShard) error {
 	// Attempt to lease items.  This checks partition-level concurrency limits
 	//
-	// For oprimization, because this is the only thread that can be leasing
+	// For optimization, because this is the only thread that can be leasing
 	// jobs for this partition, we store the partition limit and current count
 	// as a variable and iterate in the loop without loading keys from the state
 	// store.
@@ -648,9 +648,15 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	if err == ErrPartitionConcurrencyLimit {
 		for _, l := range q.lifecycles {
 			// Track lifecycles; this function hit a partition limit ahead of
-			// even being leased, meaning the function is at max capacity and we skio
+			// even being leased, meaning the function is at max capacity and we skip
 			// scanning of jobs altogether.
-			go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
+			if p.FunctionID != nil {
+				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
+			}
+			// else {
+			// TODO(cdzombak): lifecycles/metrics for other concurrency scopes
+			// https://linear.app/inngest/issue/INN-3246/lifecycles-add-new-lifecycles-for-fn-env-account-concurrency-limits
+			// }
 		}
 		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 		return q.PartitionRequeue(ctx, p, getNow().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
@@ -902,7 +908,7 @@ ProcessLoop:
 		q.workers <- processItem{P: *p, I: *item, S: shard}
 	}
 
-	if err := q.setPeekEWMA(ctx, p.WorkflowID, int64(ctrConcurrency+ctrRateLimit)); err != nil {
+	if err := q.setPeekEWMA(ctx, p.FunctionID, int64(ctrConcurrency+ctrRateLimit)); err != nil {
 		log.From(ctx).Warn().Err(err).Msg("error recording concurrency limit for EWMA")
 	}
 
@@ -910,7 +916,13 @@ ProcessLoop:
 	// with a force:  ensure that we won't re-scan it until 2 seconds in the future.
 	if ctrConcurrency > 0 || (ctrRateLimit > 0 && ctrConcurrency == 0 && ctrSuccess == 0) {
 		for _, l := range q.lifecycles {
-			go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), p.WorkflowID)
+			if p.FunctionID != nil {
+				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
+			}
+			//else {
+			// TODO(cdzombak): lifecycles/metrics for other concurrency scopes
+			// https://linear.app/inngest/issue/INN-3246/lifecycles-add-new-lifecycles-for-fn-env-account-concurrency-limits
+			//}
 		}
 		// Requeue this partition as we hit concurrency limits.
 		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
@@ -1114,7 +1126,10 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 				unwrapped = errors.Unwrap(unwrapped)
 			}
 
-			qi.Data.Attempt += 1
+			if !osqueue.IsAlwaysRetryable(err) {
+				qi.Data.Attempt += 1
+			}
+
 			qi.AtMS = at.UnixMilli()
 			if err := q.Requeue(context.WithoutCancel(ctx), p, qi, at); err != nil {
 				q.logger.Error().Err(err).Interface("item", qi).Msg("error requeuing job")
@@ -1181,8 +1196,12 @@ func (q *queue) capacity() int64 {
 // 2. configured min, max of peek size range
 // 3. worker capacity
 func (q *queue) peekSize(ctx context.Context, p *QueuePartition) int64 {
+	if p.FunctionID == nil {
+		return q.peekMin
+	}
+
 	// retrieve the EWMA value
-	ewma, err := q.peekEWMA(ctx, p.WorkflowID)
+	ewma, err := q.peekEWMA(ctx, *p.FunctionID)
 	if err != nil {
 		// return the minimum if there's an error
 		return q.peekMin

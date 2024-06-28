@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -150,7 +151,7 @@ type PriorityFinder func(ctx context.Context, item QueueItem) uint
 //
 // NOTE: This is called frequently:  for every enqueue, lease, partition lease, and so on.
 // Expect this to be called tens of thousands of times per second.
-type ShardFinder func(ctx context.Context, queueName string, workspaceID uuid.UUID) *QueueShard
+type ShardFinder func(ctx context.Context, queueName string, workspaceID *uuid.UUID) *QueueShard
 
 type QueueOpt func(q *queue)
 
@@ -564,30 +565,55 @@ func (q QueueShard) Partition() string {
 	return q.Name
 }
 
+// FnMetadata is stored within the queue for retrieving
+type FnMetadata struct {
+	// NOTE: This is not encoded via JSON as we should always have the function
+	// ID prior to doing a lookup, or should be able to retrieve the function ID
+	// via the key.
+	FnID uuid.UUID `json:"fnID"`
+
+	// Paused represents whether the fn is paused.  This allows us to prevent leases
+	// to a given partition if the partition belongs to a fn.
+	Paused bool `json:"off"`
+}
+
 // QueuePartition represents an individual queue for a workflow.  It stores the
 // time of the earliest job within the workflow.
 type QueuePartition struct {
+	// TODO: CAN WE REMOVE THIS?
 	QueueName *string `json:"queue,omitempty"`
 
-	WorkflowID  uuid.UUID `json:"wid"`
-	WorkspaceID uuid.UUID `json:"wsID"`
-
+	// PartitionType is the int-value of the enums.PartitionType for this
+	// partition.  By default, partitions are function-scoped without any
+	// custom keys.
+	PartitionType int `json:"pt,omitempty"`
+	// ConcurrencyScope is the int-value representation of the enums.ConcurrencyScope,
+	// if this is a concurrency-scoped partition.
+	ConcurrencyScope int `json:"cs,omitempty"`
+	// FunctionID represents the function ID that this partition manages.
+	// NOTE: This may be nil for account and environment-scoped concurrency
+	// keys which make partitions of many functions.
+	FunctionID *uuid.UUID `json:"wid,omitempty"`
+	// EnvID represents the environment ID for the partition, either from the
+	// function ID or the environment scope itself.
+	EnvID *uuid.UUID `json:"wsID,omitempty"`
+	// AccountID represents the account ID for the partition.  This ONLY exists
+	// if the partition represents an account-level concurrency key.
+	AccountID *uuid.UUID `json:"aID,omitempty"`
+	// Priority represents the partition's priority.  This currently exists
+	// on the partition (instead of fn metadata) to reduce lookups when peeking
+	// many partitions.
 	Priority uint `json:"p"`
-	Paused   bool `json:"off"`
-
 	// Last represents the time that this partition was last leased, as a millisecond
 	// unix epoch.  In essence, we need this to track how frequently we're leasing and
 	// attempting to run items in the partition's queue.
-	//
 	// Without this, we cannot track sojourn latency.
 	Last int64 `json:"last"`
-
 	// ForcedAtMS records the time that the partition is forced to, in milliseconds, if
 	// the partition has been forced into the future via concurrency issues. This means
 	// that it was requeued due to concurrency issues and should not be brought forward
 	// when a new step is enqueued, if now < ForcedAtMS.
 	ForceAtMS int64 `json:"forceAtMS"`
-
 	// LeaseID represents a lease on this partition.  If the LeaseID is not nil,
 	// this partition can be claimed by a shared-nothing worker to work on the
 	// queue items within this partition.
@@ -595,11 +621,26 @@ type QueuePartition struct {
 	// A lease is shortly held (eg seconds).  It should last long enough for
 	// workers to claim QueueItems only.
 	LeaseID *ulid.ULID `json:"leaseID"`
+
+	//
+	// OPTIMIZATIONS
+	//
+
+	// Max represents the max concurrency for the queue partition.  This allows
+	// us to optimize the queue by checking for the max when leasing partitions
+	// directly.
+	Max int `json:"max,omitempty"`
+	// MaxOwner represents the function ID that set the max concurrency limit for
+	// this function.  This allows us to lower the max if the owner/enqueueing function
+	// ID matches - otherwise, once set, the max can never lower.
+	MaxOwner uuid.UUID `json:"maxID,omitempty"`
+
+	// TODO: Throttling;  embed max limit/period/etc?
 }
 
 func (q QueuePartition) Queue() string {
 	if q.QueueName == nil {
-		return q.WorkflowID.String()
+		return q.FunctionID.String()
 	}
 	return *q.QueueName
 }
@@ -637,8 +678,8 @@ type QueueItem struct {
 	// This is set when enqueueing or requeueing a job.
 	WallTimeMS int64 `json:"wt"`
 
-	// WorkflowID is the workflow ID that this job belongs to.
-	WorkflowID uuid.UUID `json:"wfID"`
+	// FunctionID is the workflow ID that this job belongs to.
+	FunctionID uuid.UUID `json:"wfID"`
 	// WorkspaceID is the workspace that this job belongs to.
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// LeaseID is a ULID which embeds a timestamp denoting when the lease expires.
@@ -647,7 +688,7 @@ type QueueItem struct {
 	// to resume.
 	Data osqueue.Item `json:"data"`
 	// QueueName allows placing this job into a specific queue name.  If the QueueName
-	// is nil, the WorkflowID will be used as the queue name.  This allows us to
+	// is nil, the FunctionID will be used as the queue name.  This allows us to
 	// automatically create partitioned queues for each function within Inngest.
 	//
 	// This should almost always be nil.
@@ -707,7 +748,7 @@ func (q QueueItem) MarshalBinary() ([]byte, error) {
 // set.
 func (q QueueItem) Queue() string {
 	if q.QueueName == nil {
-		return q.WorkflowID.String()
+		return q.FunctionID.String()
 	}
 	return *q.QueueName
 }
@@ -716,6 +757,56 @@ func (q QueueItem) Queue() string {
 // based on the time passed in.
 func (q QueueItem) IsLeased(time time.Time) bool {
 	return q.LeaseID != nil && ulid.Time(q.LeaseID.Time()).After(time)
+}
+
+func (q *queue) ItemPartitions(ctx context.Context, i QueueItem, priority uint) []QueuePartition {
+	// Right now queue items *always* add into a partition for the overall function ID.
+	// In the future this will change.
+	partitions := []QueuePartition{
+		{
+			QueueName:  i.QueueName,
+			FunctionID: &i.FunctionID,
+			Priority:   priority,
+		},
+	}
+
+	// Check if we have custom concurrency keys for the given function.  If so,
+	// we're going to create new partitions for each of the custom keys.  This allows
+	// us to create queues of queues for each concurrency key.
+	//
+	// See the 'key queues' spec for more information (internally).
+	if q.customConcurrencyGen != nil {
+		customKeys := q.customConcurrencyGen(ctx, i)
+		for _, key := range customKeys {
+			scope, id, _ := key.ParseKey()
+
+			partition := QueuePartition{
+				PartitionType:    int(enums.PartitionTypeConcurrency),
+				ConcurrencyScope: int(scope),
+				FunctionID:       &i.FunctionID,
+				// XXX: Priority may cause an issue in the future;
+				// if we allow users to set custom priorities on functions
+				// and we have a non-function scope, all priorities are
+				// broken.
+				Priority: priority,
+			}
+
+			switch scope {
+			case enums.ConcurrencyScopeFn:
+				partition.FunctionID = &i.FunctionID
+			case enums.ConcurrencyScopeEnv:
+				partition.EnvID = &i.WorkspaceID
+			case enums.ConcurrencyScopeAccount:
+				// AccountID comes from the concurrency key in this case
+				partition.AccountID = &id
+			}
+
+			partitions = append(partitions, partition)
+		}
+	}
+
+	// TODO: check for throttle keys
+	return partitions
 }
 
 func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
@@ -825,16 +916,23 @@ func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bo
 	if paused {
 		pausedArg = "1"
 	}
+
+	// This is written to the store if fn metadata doesn't exist.
+	defaultFnMetadata := FnMetadata{
+		FnID:   fnID,
+		Paused: true,
+	}
+
+	keys := []string{q.kg.FnMetadata(fnID)}
 	args, err := StrSlice([]any{
-		fnID.String(),
 		pausedArg,
+		defaultFnMetadata,
 	})
 	if err != nil {
 		return err
 	}
 
-	keys := []string{q.kg.PartitionItem()}
-	status, err := scripts["queue/partitionSetPaused"].Exec(
+	status, err := scripts["queue/fnSetPaused"].Exec(
 		ctx,
 		q.r,
 		keys,
@@ -846,8 +944,6 @@ func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bo
 	switch status {
 	case 0:
 		return nil
-	case 1:
-		return ErrPartitionNotFound
 	default:
 		return fmt.Errorf("unknown response updating paused state: %d", status)
 	}
@@ -914,19 +1010,15 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	// workflow IDs in every case.
 	qn := i.Queue()
 
-	qp := QueuePartition{
-		QueueName:   i.QueueName,
-		WorkflowID:  i.WorkflowID,
-		WorkspaceID: i.WorkspaceID,
-		Priority:    priority,
-	}
+	parts := q.ItemPartitions(ctx, i, priority)
+	qp := parts[0]
 
 	var (
 		shard     *QueueShard
 		shardName string
 	)
 	if q.sf != nil {
-		shard = q.sf(ctx, i.Queue(), i.WorkspaceID)
+		shard = q.sf(ctx, i.Queue(), &i.WorkspaceID)
 		if shard != nil {
 			shardName = shard.Name
 			shard.Leases = []ulid.ULID{}
@@ -942,6 +1034,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		q.kg.ShardPartitionIndex(shardName), // Shard queue
 		q.kg.Shards(),
 		q.kg.Idempotency(i.ID),
+		q.kg.FnMetadata(i.FunctionID),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.kg) {
@@ -960,6 +1053,12 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		shard,
 		shardName,
 		getNow().UnixMilli(),
+		FnMetadata{
+			// enqueue.lua only writes function metadata if it doesn't already exist.
+			// if it doesn't exist, and we're enqueuing something, this implies the fn is not currently paused.
+			FnID:   i.FunctionID,
+			Paused: false,
+		},
 	})
 
 	if err != nil {
@@ -1077,7 +1176,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 
 	var shardName string
 	if q.sf != nil {
-		if shard := q.sf(ctx, qi.Queue(), qi.WorkspaceID); shard != nil {
+		if shard := q.sf(ctx, qi.Queue(), &qi.WorkspaceID); shard != nil {
 			shardName = shard.Name
 		}
 	}
@@ -1185,7 +1284,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 
 	var shardName string
 	if q.sf != nil {
-		if shard := q.sf(ctx, item.Queue(), item.WorkspaceID); shard != nil {
+		if shard := q.sf(ctx, item.Queue(), &item.WorkspaceID); shard != nil {
 			shardName = shard.Name
 		}
 	}
@@ -1443,7 +1542,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 
 	var shardName string
 	if q.sf != nil {
-		if shard := q.sf(ctx, i.Queue(), i.WorkspaceID); shard != nil {
+		if shard := q.sf(ctx, i.Queue(), &i.WorkspaceID); shard != nil {
 			shardName = shard.Name
 		}
 	}
@@ -1523,9 +1622,14 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 
 	var shardName string
 	if q.sf != nil {
-		if shard := q.sf(ctx, p.Queue(), p.WorkspaceID); shard != nil {
+		if shard := q.sf(ctx, p.Queue(), p.EnvID); shard != nil {
 			shardName = shard.Name
 		}
+	}
+
+	fnMetaKey := uuid.Nil
+	if p.FunctionID != nil {
+		fnMetaKey = *p.FunctionID
 	}
 
 	keys := []string{
@@ -1533,6 +1637,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		q.kg.GlobalPartitionIndex(),
 		q.kg.ShardPartitionIndex(shardName),
 		q.kg.Concurrency("p", concurrencyKey),
+		q.kg.FnMetadata(fnMetaKey),
 	}
 
 	args, err := StrSlice([]any{
@@ -1551,7 +1656,6 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		keys,
 		args,
 		// TODO: Partition concurrency defer amount
-
 	).AsInt64()
 	if err != nil {
 		return nil, fmt.Errorf("error leasing partition: %w", err)
@@ -1625,7 +1729,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		return nil, err
 	}
 
-	encoded, err := scripts["queue/partitionPeek"].Exec(
+	peekRet, err := scripts["queue/partitionPeek"].Exec(
 		ctx,
 		q.r,
 		[]string{
@@ -1633,29 +1737,75 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			q.kg.PartitionItem(),
 		},
 		args,
-	).AsStrSlice()
+	).ToAny()
+	// NOTE: We use ToAny to force return a []any, allowing us to update the slice value with
+	// a JSON-decoded item without allocations
 	if err != nil {
 		return nil, fmt.Errorf("error peeking partition items: %w", err)
+	}
+	encoded, ok := peekRet.([]any)
+	if !ok {
+		return nil, fmt.Errorf("unknown return type from partitionPeek: %T", peekRet)
 	}
 
 	weights := []float64{}
 	items := make([]*QueuePartition, len(encoded))
+	fnIDs := make(map[uuid.UUID]bool)
+	fnIDsMu := sync.Mutex{}
 
-	ignored := 0
-	for n, i := range encoded {
-		if i == "" {
-			ignored++
-			continue
-		}
-
+	// Use parallel decoding as per Peek
+	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
+		str, _ := val.(string)
 		item := &QueuePartition{}
-		if err = json.Unmarshal([]byte(i), item); err != nil {
+		if err = json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), item); err != nil {
 			return nil, fmt.Errorf("error reading partition item: %w", err)
 		}
+		// Track the fn ID for partitions seen.  This allows us to do fast lookups of paused functions
+		// to prevent peeking/working on these items as an optimization.
+		if item.FunctionID != nil {
+			fnIDsMu.Lock()
+			fnIDs[*item.FunctionID] = false // default not paused
+			fnIDsMu.Unlock()
+		}
+		return item, nil
 
-		if item.Paused {
-			ignored++
-			continue
+	})
+
+	// mget all fn metas
+	if len(fnIDs) > 0 {
+		keys := make([]string, len(fnIDs))
+		n := 0
+		for k := range fnIDs {
+			keys[n] = q.kg.FnMetadata(k)
+			n++
+		}
+		vals, err := q.r.Do(ctx, q.r.B().Mget().Key(keys...).Build()).ToAny()
+		if err == nil {
+			// If this is an error, just ignore the error and continue.  The executor should gracefully handle
+			// accidental attempts at paused functions, as we cannot do this optimization for account or env-level
+			// partitions.
+			vals, _ := vals.([]any)
+			_, _ = util.ParallelDecode(vals, func(i any) (any, error) {
+				str, _ := i.(string)
+				fnMeta := &FnMetadata{}
+				if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), fnMeta); err == nil {
+					fnIDsMu.Lock()
+					fnIDs[fnMeta.FnID] = fnMeta.Paused
+					fnIDsMu.Unlock()
+				}
+				return nil, nil
+			})
+		}
+	}
+
+	ignored := 0
+	for n, item := range partitions {
+		// check pause
+		if item.FunctionID != nil {
+			if paused := fnIDs[*item.FunctionID]; paused {
+				ignored++
+				continue
+			}
 		}
 
 		// NOTE: The queue does two conflicting things:  we peek ahead of now() to fetch partitions
@@ -1742,7 +1892,7 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error {
 	var shardName string
 	if q.sf != nil {
-		if shard := q.sf(ctx, p.Queue(), p.WorkspaceID); shard != nil {
+		if shard := q.sf(ctx, p.Queue(), p.EnvID); shard != nil {
 			shardName = shard.Name
 		}
 	}
@@ -2130,14 +2280,18 @@ func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
 
 // setPeekEWMA add the new value to the existing list.
 // if the length of the list exceeds the predetermined size, pop out the first item
-func (q *queue) setPeekEWMA(ctx context.Context, fnID uuid.UUID, val int64) error {
+func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) error {
+	if fnID == nil {
+		return nil
+	}
+
 	listSize := q.peekEWMALen
 	if listSize == 0 {
 		listSize = QueuePeekEWMALen
 	}
 
 	keys := []string{
-		q.kg.ConcurrencyFnEWMA(fnID),
+		q.kg.ConcurrencyFnEWMA(*fnID),
 	}
 	args, err := StrSlice([]any{
 		val,
@@ -2160,7 +2314,18 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID uuid.UUID, val int64) erro
 	return nil
 }
 
-func HashID(ctx context.Context, id string) string {
+//nolint:all
+func (q *queue) readFnMetadata(ctx context.Context, fnID uuid.UUID) (*FnMetadata, error) {
+	cmd := q.r.B().Get().Key(q.kg.FnMetadata(fnID)).Build()
+	retv := FnMetadata{}
+	err := q.r.Do(ctx, cmd).DecodeJSON(&retv)
+	if err != nil {
+		return nil, fmt.Errorf("error reading function metadata: %w", err)
+	}
+	return &retv, nil
+}
+
+func HashID(_ context.Context, id string) string {
 	ui := xxhash.Sum64String(id)
 	return strconv.FormatUint(ui, 36)
 }

@@ -188,6 +188,8 @@ type QueueKeyGenerator interface {
 	// ThrottleKey returns the throttle key for a given queue item.
 	ThrottleKey(t *osqueue.Throttle) string
 
+	FnMetadata(fnID uuid.UUID) string
+
 	//
 	// Queue metadata keys
 	//
@@ -208,7 +210,6 @@ type QueueKeyGenerator interface {
 	// have in-progress work.  This allows us to scan and scavenge jobs in concurrency queues where
 	// leases have expired (in the case of failed workers)
 	ConcurrencyIndex() string
-
 	// RunIndex returns the index for storing job IDs associated with run IDs.
 	RunIndex(runID ulid.ULID) string
 
@@ -260,6 +261,9 @@ type BatchKeyGenerator interface {
 type DefaultQueueKeyGenerator struct {
 	Prefix string
 }
+
+// assert that DefaultQueueKeyGenerator implements the QueueKeyGenerator interface:
+var _ QueueKeyGenerator = DefaultQueueKeyGenerator{}
 
 func (d DefaultQueueKeyGenerator) Shards() string {
 	return fmt.Sprintf("%s:queue:shards", d.Prefix)
@@ -373,4 +377,8 @@ func (d DefaultQueueKeyGenerator) Status(status string, fnID uuid.UUID) string {
 
 func (d DefaultQueueKeyGenerator) ConcurrencyFnEWMA(fnID uuid.UUID) string {
 	return fmt.Sprintf("%s:queue:concurrency-ewma:%s", d.Prefix, fnID)
+}
+
+func (d DefaultQueueKeyGenerator) FnMetadata(fnID uuid.UUID) string {
+	return fmt.Sprintf("%s:fnMeta:%s", d.Prefix, fnID)
 }

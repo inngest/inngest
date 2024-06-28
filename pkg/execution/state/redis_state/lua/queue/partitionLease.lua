@@ -12,6 +12,8 @@ local partitionKey            = KEYS[1]
 local keyGlobalPartitionPtr   = KEYS[2]
 local keyShardPartitionPtr    = KEYS[3]
 local partitionConcurrencyKey = KEYS[4]
+local fnMetaKey              = KEYS[5]
+
 
 local partitionID             = ARGV[1]
 local leaseID                 = ARGV[2]
@@ -21,6 +23,7 @@ local concurrency             = tonumber(ARGV[5]) -- concurrency limit for this 
 
 -- $include(check_concurrency.lua)
 -- $include(get_partition_item.lua)
+-- $include(get_fn_meta.lua)
 -- $include(decode_ulid_time.lua)
 -- $include(update_pointer_score.lua)
 -- $include(has_shard_key.lua)
@@ -36,8 +39,11 @@ if existing.leaseID ~= nil and existing.leaseID ~= cjson.null and decode_ulid_ti
 end
 
 -- Check whether the partition is currently paused.
-if existing.off == true then
-    return -4
+if existing.wid ~= nil and existing.wid ~= cjson.null then
+    local fnMeta = get_fn_meta(fnMetaKey)
+    if fnMeta ~= nil and fnMeta.off then
+        return -4
+    end
 end
 
 local capacity = concurrency -- initialize as the default concurrency limit
