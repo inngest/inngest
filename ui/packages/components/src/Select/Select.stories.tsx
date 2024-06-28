@@ -64,7 +64,7 @@ export const WithCheckboxOption: Story = {
   ),
 };
 
-export const SelectGroupSelects: Story = {
+export const GroupOfSelects: Story = {
   render: () => (
     <SelectGroup>
       <Select onChange={() => {}} label="Status" isLabelVisible={false}>
