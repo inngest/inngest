@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"net/http"
 
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -133,8 +134,10 @@ func (a CoreAPI) GetActions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	accountId := uuid.UUID{}
+
 	// Find this run
-	state, err := a.state.Load(ctx, *runID)
+	state, err := a.state.Load(ctx, accountId, *runID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Status:  410,
@@ -167,8 +170,10 @@ func (a CoreAPI) GetEventBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	accountId := uuid.UUID{}
+
 	// Find this run
-	state, err := a.state.Load(ctx, *runID)
+	state, err := a.state.Load(ctx, accountId, *runID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Status:  410,
@@ -208,7 +213,9 @@ func (a CoreAPI) CancelRun(w http.ResponseWriter, r *http.Request) {
 		Str("run_id", runID.String()).
 		Msg("cancelling function")
 
-	if err := apiutil.CancelRun(ctx, a.state, *runID); err != nil {
+	accountId := uuid.UUID{}
+
+	if err := apiutil.CancelRun(ctx, a.state, accountId, *runID); err != nil {
 		_ = publicerr.WriteHTTP(w, err)
 		return
 	}
