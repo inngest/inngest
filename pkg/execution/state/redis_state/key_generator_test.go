@@ -27,19 +27,18 @@ func TestVerifyKeyGenerator(t *testing.T) {
 
 	newRunStateKg := runStateKeyGenerator{
 		stateDefaultKey: "estate",
-		isSharded:       NeverShard, // disable sharding for comparison tests
 	}
 
-	assert.Equal(t, legacyKg.Idempotency(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}), newRunStateKg.Idempotency(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}))
+	assert.Equal(t, legacyKg.Idempotency(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}), newRunStateKg.Idempotency(ctx, false, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}))
 
-	assert.Equal(t, legacyKg.Event(ctx, state.Identifier{RunID: fakeUlid}), newRunStateKg.Event(ctx, state.Identifier{RunID: fakeUlid}))
-	assert.Equal(t, legacyKg.Stack(ctx, fakeUlid), newRunStateKg.Stack(ctx, fakeUuid, fakeUlid))
+	assert.Equal(t, legacyKg.Event(ctx, state.Identifier{RunID: fakeUlid}), newRunStateKg.Event(ctx, false, state.Identifier{RunID: fakeUlid}))
+	assert.Equal(t, legacyKg.Stack(ctx, fakeUlid), newRunStateKg.Stack(ctx, false, fakeUlid))
 
-	assert.Equal(t, legacyKg.RunMetadata(ctx, fakeUlid), newRunStateKg.RunMetadata(ctx, fakeUuid, fakeUlid))
-	assert.Equal(t, legacyKg.Events(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}), newRunStateKg.Events(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}))
-	assert.Equal(t, legacyKg.Actions(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}), newRunStateKg.Actions(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}))
-	assert.Equal(t, legacyKg.Errors(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}), newRunStateKg.Errors(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}))
-	assert.Equal(t, legacyKg.History(ctx, fakeUlid), newRunStateKg.History(ctx, fakeUuid, fakeUlid))
+	assert.Equal(t, legacyKg.RunMetadata(ctx, fakeUlid), newRunStateKg.RunMetadata(ctx, false, fakeUlid))
+	assert.Equal(t, legacyKg.Events(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}), newRunStateKg.Events(ctx, false, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}))
+	assert.Equal(t, legacyKg.Actions(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}), newRunStateKg.Actions(ctx, false, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}))
+	assert.Equal(t, legacyKg.Errors(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}), newRunStateKg.Errors(ctx, false, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}))
+	assert.Equal(t, legacyKg.History(ctx, fakeUlid), newRunStateKg.History(ctx, false, fakeUlid))
 
 	var legacyQueueKg legacyQueueKeyGenerator = legacyDefaultkg
 	queueItemKg := queueItemKeyGenerator{queueDefaultKey: "queue"}
