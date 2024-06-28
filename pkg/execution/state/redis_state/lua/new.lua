@@ -6,19 +6,13 @@ Output:
 
 ]]
 
-local idempotencyKey = KEYS[1]
-local eventsKey = KEYS[2]
-local metadataKey = KEYS[3]
-local stepKey = KEYS[4]
+local eventsKey = KEYS[1]
+local metadataKey = KEYS[2]
+local stepKey = KEYS[3]
 
 local events = ARGV[1]
 local metadata = ARGV[2]
 local steps = ARGV[3]
-
-if redis.call("SETNX", idempotencyKey, "") == 0 then
-  -- If this key exists, everything must've been initialised, so we can exit early
-  return 1
-end
 
 local metadataJson = cjson.decode(metadata)
 for k, v in pairs(metadataJson) do

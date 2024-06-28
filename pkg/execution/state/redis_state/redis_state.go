@@ -224,6 +224,26 @@ type CompositePauseID struct {
 }
 
 func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, error) {
+	fnRunState := m.s.FunctionRunState()
+	client, isSharded := fnRunState.Client(ctx, input.Identifier.AccountID, input.Identifier.RunID)
+
+	// Firstly, check idempotency here.
+	//
+	// NOTE: We have to do this out of the new transaction as state is sharded by run ID.  this
+	// does NOT work for idempotency keys which must be sharded by account ID.  unfortunately,
+	// mixing the two leads to cross-slot queries, which fail hard.  in this case, we reduce
+	// atomicity to improve idempotency.
+	//
+	// In future/other metadata stores this is (or will be) transactional.
+	res := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		return c.B().Setnx().Key(
+			fnRunState.kg.Idempotency(ctx, isSharded, input.Identifier),
+		).Value("").Build()
+	})
+	if set, err := res.AsInt64(); err == nil && set == 0 {
+		return nil, state.ErrIdentifierExists
+	}
+
 	// We marshal this ahead of creating a redis transaction as it's necessary
 	// every time and reduces the duration that the lock is held.
 	events, err := json.Marshal(input.EventBatchData)
@@ -261,10 +281,6 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
 	}
 
-	fnRunState := m.s.FunctionRunState()
-
-	client, isSharded := fnRunState.Client(ctx, input.Identifier.AccountID, input.Identifier.RunID)
-
 	args, err := StrSlice([]any{
 		events,
 		metadataByt,
@@ -278,7 +294,6 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		ctx,
 		client,
 		[]string{
-			fnRunState.kg.Idempotency(ctx, isSharded, input.Identifier),
 			fnRunState.kg.Events(ctx, isSharded, input.Identifier),
 			fnRunState.kg.RunMetadata(ctx, isSharded, input.Identifier.RunID),
 			fnRunState.kg.Actions(ctx, isSharded, input.Identifier),
