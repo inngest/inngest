@@ -21,11 +21,11 @@ func (f *FunctionRunStateClient) KeyGenerator() RunStateKeyGenerator {
 	return f.kg
 }
 
-func (f *FunctionRunStateClient) Client(ctx context.Context, accountId uuid.UUID, runId ulid.ULID) RetriableClient {
+func (f *FunctionRunStateClient) Client(ctx context.Context, accountId uuid.UUID, runId ulid.ULID) (RetriableClient, bool) {
 	if f.isSharded(ctx, accountId, runId) {
-		return f.client
+		return f.client, true
 	}
-	return f.unshardedConn
+	return f.unshardedConn, false
 }
 
 func (f *FunctionRunStateClient) ForceShardedClient() RetriableClient {
@@ -34,7 +34,7 @@ func (f *FunctionRunStateClient) ForceShardedClient() RetriableClient {
 
 func NewFunctionRunStateClient(r rueidis.Client, u *UnshardedClient, stateDefaultKey string, isSharded IsShardedFn) *FunctionRunStateClient {
 	return &FunctionRunStateClient{
-		kg:            &runStateKeyGenerator{stateDefaultKey: stateDefaultKey, isSharded: isSharded},
+		kg:            &runStateKeyGenerator{stateDefaultKey: stateDefaultKey},
 		client:        newRetryClusterDownClient(r),
 		unshardedConn: NewNoopRetriableClient(u.unshardedConn),
 		isSharded:     isSharded,
