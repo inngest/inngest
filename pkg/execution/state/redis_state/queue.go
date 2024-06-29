@@ -617,7 +617,7 @@ type QueuePartition struct {
 	//
 	// A lease is shortly held (eg seconds).  It should last long enough for
 	// workers to claim QueueItems only.
-	LeaseID *ulid.ULID `json:"leaseID"`
+	LeaseID *ulid.ULID `json:"leaseID,omitempty"`
 
 	//
 	// OPTIMIZATIONS
@@ -630,7 +630,7 @@ type QueuePartition struct {
 	// MaxOwner represents the function ID that set the max concurrency limit for
 	// this function.  This allows us to lower the max if the owner/enqueueing function
 	// ID matches - otherwise, once set, the max can never lower.
-	MaxOwner uuid.UUID `json:"maxID,omitempty"`
+	MaxOwner *uuid.UUID `json:"maxID,omitempty"`
 
 	// TODO: Throttling;  embed max limit/period/etc?
 }
@@ -640,8 +640,8 @@ type QueuePartition struct {
 // without prefixes)
 func (q QueuePartition) zsetKey(kg QueueKeyGenerator) string {
 	if q.PartitionType == 0 && q.FunctionID != nil {
-		// return just the fn ID
-		return q.FunctionID.String()
+		// return the top-level function queue.
+		return kg.PartitionQueueSet(enums.PartitionTypeDefault, q.FunctionID.String(), "")
 	}
 	if q.ID == "" {
 		// return a blank queue key.  This is used for nil queue partitions.
@@ -777,7 +777,7 @@ func (q QueueItem) IsLeased(time time.Time) bool {
 func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartition {
 	var (
 		partitions []QueuePartition
-		ckeys      []state.CustomConcurrency
+		ckeys      = i.Data.GetConcurrencyKeys()
 	)
 
 	// Check if we have custom concurrency keys for the given function.  If so,
@@ -791,13 +791,12 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 
 	// Right now queue items *always* add into a partition for the overall function ID.
 	// In the future this will change.
-	// if len(ckeys) == 0 {
-	partitions = append(partitions, QueuePartition{
-		ID:         i.FunctionID.String(),
-		FunctionID: &i.FunctionID,
-	})
-	// } else {
-	if len(ckeys) > 0 {
+	if len(ckeys) == 0 {
+		partitions = append(partitions, QueuePartition{
+			ID:         i.FunctionID.String(),
+			FunctionID: &i.FunctionID,
+		})
+	} else {
 		for _, key := range ckeys {
 			scope, id, checksum, _ := key.ParseKey()
 

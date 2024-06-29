@@ -304,10 +304,11 @@ func (d DefaultQueueKeyGenerator) FnQueueSet(id string) string {
 func (d DefaultQueueKeyGenerator) PartitionQueueSet(pType enums.PartitionType, scopeID, xxhash string) string {
 	switch pType {
 	case enums.PartitionTypeConcurrency:
-		return fmt.Sprintf("%s:sorted:c:%s:%s", d.Prefix, scopeID, xxhash)
+		return fmt.Sprintf("%s:sorted:c:%s<%s>", d.Prefix, scopeID, xxhash)
 	case enums.PartitionTypeThrottle:
-		return fmt.Sprintf("%s:sorted:t:%s:%s", d.Prefix, scopeID, xxhash)
+		return fmt.Sprintf("%s:sorted:t:%s<%s>", d.Prefix, scopeID, xxhash)
 	default:
+		// Default - used prior to concurrency and throttle key queues.
 		return fmt.Sprintf("%s:queue:sorted:%s", d.Prefix, scopeID)
 	}
 }

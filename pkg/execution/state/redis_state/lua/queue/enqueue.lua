@@ -15,8 +15,8 @@ local keyFnMetadata       = KEYS[7]           -- fnMeta:$id - hash
 local keyPartitionA       = KEYS[8]           -- queue:sorted:$workflowID - zset
 local keyPartitionB       = KEYS[9]           -- e.g. sorted:c|t:$workflowID - zset
 local keyPartitionC       = KEYS[10]          -- e.g. sorted:c|t:$workflowID - zset
-local keyItemIndexA       = KEYS[12]          -- custom item index 1
-local keyItemIndexB       = KEYS[13]          -- custom item index 2
+local keyItemIndexA       = KEYS[11]          -- custom item index 1
+local keyItemIndexB       = KEYS[12]          -- custom item index 2
 
 local queueItem           = ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID             = ARGV[2]           -- id

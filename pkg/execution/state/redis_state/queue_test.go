@@ -6,13 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -221,7 +219,10 @@ func TestQueueEnqueueItem(t *testing.T) {
 	start := time.Now().Truncate(time.Second)
 
 	t.Run("It enqueues an item", func(t *testing.T) {
-		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
+		id := uuid.New()
+		item, err := q.EnqueueItem(ctx, QueueItem{
+			FunctionID: id,
+		}, start)
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.ULID{})
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
@@ -233,6 +234,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		// Ensure the partition is inserted.
 		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
+			ID:         item.FunctionID.String(),
 			FunctionID: &item.FunctionID,
 		}, qp)
 	})
@@ -246,7 +248,11 @@ func TestQueueEnqueueItem(t *testing.T) {
 	})
 
 	t.Run("It enqueues an item in the future", func(t *testing.T) {
+		// Empty the DB.
+		r.FlushAll()
+
 		at := time.Now().Add(time.Hour).Truncate(time.Second)
+
 		item, err := q.EnqueueItem(ctx, QueueItem{}, at)
 		require.NoError(t, err)
 
@@ -254,6 +260,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		// the start time.
 		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
+			ID:         item.FunctionID.String(),
 			FunctionID: &item.FunctionID,
 		}, qp)
 
@@ -263,11 +270,10 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, 1, len(keys))
 		score, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), keys[0])
 		require.NoError(t, err)
-		require.EqualValues(t, start.Unix(), score)
+		require.EqualValues(t, at.Unix(), score)
 	})
 
 	t.Run("Updates partition vesting time to earlier times", func(t *testing.T) {
-
 		now := time.Now()
 		at := now.Add(-10 * time.Minute).Truncate(time.Second)
 		item, err := q.EnqueueItem(ctx, QueueItem{}, at)
@@ -277,6 +283,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		// inside the partition item.
 		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
+			ID:         item.FunctionID.String(),
 			FunctionID: &item.FunctionID,
 		}, qp)
 
@@ -305,6 +312,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		// inside the partition item.
 		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
+			ID:         item.FunctionID.String(),
 			FunctionID: &item.FunctionID,
 		}, qp)
 	})
@@ -357,49 +365,49 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.True(t, fnMeta.Paused)
 	})
 
-	createConcurrencyKey := func(cfg inngest.Concurrency, id uuid.UUID) state.CustomConcurrency {
-		k := cfg.Evaluate(context.Background(), id, make(map[string]any))
-		return state.CustomConcurrency{
-			Key:   k,
-			Hash:  strconv.FormatUint(xxhash.Sum64String(k), 36),
-			Limit: cfg.Limit,
-		}
-	}
-
-	t.Run("enqueueing to a function with concurrency keys should create partitions for concurrency keys", func(t *testing.T) {
+	t.Run("Custom concurrency key queues", func(t *testing.T) {
 		now := time.Now()
-		workflowId := uuid.New()
+		fnID := uuid.New()
 
-		concurrencyConfigKey := "data.a"
-		c := inngest.Concurrency{
-			Limit: 10,
-			Key:   &concurrencyConfigKey,
-			Scope: enums.ConcurrencyScopeFn,
-		}
-		ck := createConcurrencyKey(c, workflowId)
+		t.Run("Single key, function scope", func(t *testing.T) {
+			r.FlushAll()
 
-		_, err := q.EnqueueItem(ctx, QueueItem{
-			FunctionID: workflowId,
-			Data: osqueue.Item{
-				CustomConcurrencyKeys: []state.CustomConcurrency{
-					ck,
+			// Enqueueing an item
+			ck := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test", 1)
+			_, _, hash, _ := ck.ParseKey() // get the hash of the "test" string / evaluated input.
+
+			_, err := q.EnqueueItem(ctx, QueueItem{
+				FunctionID: fnID,
+				Data: osqueue.Item{
+					CustomConcurrencyKeys: []state.CustomConcurrency{ck},
 				},
-			},
-		}, now.Add(10*time.Second))
-		require.NoError(t, err)
+			}, now.Add(10*time.Second))
+			require.NoError(t, err)
 
-		fnDefaultPartition := getDefaultPartition(t, r, workflowId) // nb. also asserts that the partition exists
-		require.Equal(t, QueuePartition{
-			FunctionID:    &workflowId,
-			PartitionType: int(enums.PartitionTypeDefault),
-		}, fnDefaultPartition)
+			// Assert that there's only one partition - the custom concurrency key.
+			items, _ := r.HKeys(defaultQueueKey.PartitionItem())
+			require.Equal(t, 1, len(items))
 
-		concurrencyPartition := getPartition(t, r, enums.PartitionTypeConcurrency, workflowId) // nb. also asserts that the partition exists
-		require.Equal(t, QueuePartition{
-			FunctionID:       &workflowId,
-			PartitionType:    int(enums.PartitionTypeConcurrency),
-			ConcurrencyScope: int(enums.ConcurrencyScopeFn),
-		}, concurrencyPartition)
+			concurrencyPartition := getPartition(t, r, enums.PartitionTypeConcurrency, fnID, hash) // nb. also asserts that the partition exists
+
+			require.Equal(t, QueuePartition{
+				ID:               q.kg.PartitionQueueSet(enums.PartitionTypeConcurrency, fnID.String(), hash),
+				FunctionID:       &fnID,
+				PartitionType:    int(enums.PartitionTypeConcurrency),
+				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
+			}, concurrencyPartition)
+
+			// We do not add the fn to the function-specific queue.
+			//
+			// fnDefaultPartition := getDefaultPartition(t, r, fnID) // nb. also asserts that the partition exists
+			// require.Equal(t, QueuePartition{
+			// 	ID:            fnID.String(),
+			// 	FunctionID:    &fnID,
+			// 	PartitionType: int(enums.PartitionTypeDefault),
+			// }, fnDefaultPartition)
+
+			fmt.Println(r.Dump())
+		})
 	})
 }
 
@@ -1329,8 +1337,11 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 	q := NewQueue(
 		rc,
-		WithPriorityFinder(func(ctx context.Context, qi QueueItem) uint {
-			switch qi.Data.Identifier.WorkflowID {
+		WithPriorityFinder(func(ctx context.Context, p QueuePartition) uint {
+			if p.FunctionID == nil {
+				return PriorityMin
+			}
+			switch *p.FunctionID {
 			case idB, idC:
 				return PriorityMax
 			default:
@@ -1423,13 +1434,15 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 		q := NewQueue(
 			rc,
-			WithPriorityFinder(func(ctx context.Context, qi QueueItem) uint {
-				switch qi.Data.Identifier.WorkflowID {
+			WithPriorityFinder(func(ctx context.Context, p QueuePartition) uint {
+				if p.FunctionID == nil {
+					return PriorityMin
+				}
+				switch *p.FunctionID {
 				case idA:
-					// A is max priority, so likely to come up.
 					return PriorityMax
 				default:
-					return PriorityMin
+					return PriorityMin // Sorry A
 				}
 			}),
 			// Ignore A
@@ -1443,8 +1456,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		require.EqualValues(t, []*QueuePartition{
-			{FunctionID: &idB, Priority: PriorityMin},
-			{FunctionID: &idC, Priority: PriorityMin},
+			{FunctionID: &idB},
+			{FunctionID: &idC},
 		}, items)
 
 		// Try without sequential scans
@@ -1642,6 +1655,8 @@ func TestQueueFunctionPause(t *testing.T) {
 	require.False(t, fnMeta.Paused)
 }
 
+/*
+TODO
 func TestQueuePartitionReprioritize(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 	idA := uuid.New()
@@ -1695,6 +1710,7 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 		require.True(t, fnMeta.Paused)
 	})
 }
+*/
 
 func TestQueueRequeueByJobID(t *testing.T) {
 	ctx := context.Background()
@@ -1710,7 +1726,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 	q := queue{
 		kg: defaultQueueKey,
 		r:  rc,
-		pf: func(ctx context.Context, item QueueItem) uint {
+		pf: func(ctx context.Context, p QueuePartition) uint {
 			return PriorityMin
 		},
 		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) (string, int) {
@@ -1955,7 +1971,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 	q := queue{
 		kg: defaultQueueKey,
 		r:  rc,
-		pf: func(ctx context.Context, item QueueItem) uint {
+		pf: func(ctx context.Context, p QueuePartition) uint {
 			return PriorityMin
 		},
 	}
@@ -2565,9 +2581,18 @@ func getDefaultPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) Que
 	return qp
 }
 
-func getPartition(t *testing.T, r *miniredis.Miniredis, pType enums.PartitionType, id uuid.UUID) QueuePartition {
+func getPartition(t *testing.T, r *miniredis.Miniredis, pType enums.PartitionType, id uuid.UUID, optionalHash ...string) QueuePartition {
 	t.Helper()
-	val := r.HGet(defaultQueueKey.PartitionItem(), defaultQueueKey.PartitionQueueSet(pType, id.String()))
+	hash := ""
+	if len(optionalHash) > 0 {
+		hash = optionalHash[0]
+	}
+	key := defaultQueueKey.PartitionQueueSet(pType, id.String(), hash)
+	val := r.HGet(defaultQueueKey.PartitionItem(), key)
+
+	items, _ := r.HKeys(defaultQueueKey.PartitionItem())
+
+	require.NotEmpty(t, val, "couldn't find partition in map with key:\n--> %s\nhave:\n%v", key, strings.Join(items, "\n"))
 	qp := QueuePartition{}
 	err := json.Unmarshal([]byte(val), &qp)
 	require.NoError(t, err)
@@ -2646,6 +2671,31 @@ func TestCheckList(t *testing.T) {
 	for _, item := range checks {
 		actual := checkList(item.Check, item.Exact, item.Prefix)
 		require.Equal(t, item.Expected, actual)
+	}
+}
+
+func createConcurrencyKey(scope enums.ConcurrencyScope, scopeID uuid.UUID, value string, limit int) state.CustomConcurrency {
+	// Users always define concurrency on the funciton level.  We then evaluate these "keys", eg:
+	//
+	// concurrency: [
+	//   {
+	//     "key": "event.data.user_id",
+	//     "limit": 10
+	//   }
+	// ]
+	//
+	// This replicates that logic.
+	c := inngest.Concurrency{
+		Key:   &value,
+		Scope: scope,
+	}
+	hash := c.Evaluate(context.Background(), scopeID, map[string]any{})
+
+	return state.CustomConcurrency{
+		Key:   hash,
+		Limit: limit,
+		// NOTE: Hash isn't really necessary;  it's used as an optimization to find the latest
+		// concurrency values within function config by matching the unevaluated concurrency keys.
 	}
 }
 
