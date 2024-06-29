@@ -651,12 +651,8 @@ func (q QueuePartition) zsetKey(kg QueueKeyGenerator) string {
 }
 
 func (q QueuePartition) Queue() string {
-	// TODO
-	// if q.QueueName == nil {
-	// return q.FunctionID.String()
-	// }
-	// return *q.QueueName
-	panic("nope")
+	// TODO: Check this
+	return q.ID
 }
 
 func (q QueuePartition) MarshalBinary() ([]byte, error) {
