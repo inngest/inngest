@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -454,6 +455,14 @@ func TestQueueEnqueueItem(t *testing.T) {
 			// 	FunctionID:    &fnID,
 			// 	PartitionType: int(enums.PartitionTypeDefault),
 			// }, fnDefaultPartition)
+
+			t.Run("Peeking partitions returns the two partitions", func(t *testing.T) {
+				parts, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), 10)
+				require.NoError(t, err)
+				require.Equal(t, 2, len(parts))
+				require.Equal(t, concurrencyPartitionA, *parts[0], "Got: %v", spew.Sdump(parts))
+				require.Equal(t, concurrencyPartitionB, *parts[1], "Got: %v", spew.Sdump(parts))
+			})
 		})
 	})
 }
@@ -511,7 +520,6 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 }
 
 func BenchmarkPeekTiming(b *testing.B) {
-
 	//
 	// Setup
 	//
