@@ -674,7 +674,7 @@ type QueueItem struct {
 	// millisecond epoch timestamp.
 	//
 	// This lets us easily track sojourn latency.
-	EarliestPeekTime int64 `json:"pt"`
+	EarliestPeekTime int64 `json:"pt,omitempty"`
 	// AtMS represents the score for the queue item - usually, the current time
 	// that this QueueItem needs to be executed at, as a millisecond epoch.
 	//

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -405,8 +406,54 @@ func TestQueueEnqueueItem(t *testing.T) {
 			// 	FunctionID:    &fnID,
 			// 	PartitionType: int(enums.PartitionTypeDefault),
 			// }, fnDefaultPartition)
+		})
 
-			fmt.Println(r.Dump())
+		t.Run("Two keys, function scope", func(t *testing.T) {
+			r.FlushAll()
+
+			// Enqueueing an item
+			ckA := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test", 1)
+			ckB := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "plz", 2)
+			_, _, hashA, _ := ckA.ParseKey() // get the hash of the "test" string / evaluated input.
+			_, _, hashB, _ := ckB.ParseKey() // get the hash of the "test" string / evaluated input.
+
+			_, err := q.EnqueueItem(ctx, QueueItem{
+				FunctionID: fnID,
+				Data: osqueue.Item{
+					CustomConcurrencyKeys: []state.CustomConcurrency{ckA, ckB},
+				},
+			}, now.Add(10*time.Second))
+			require.NoError(t, err)
+
+			// 2 partitions
+			items, _ := r.HKeys(defaultQueueKey.PartitionItem())
+			require.Equal(t, 2, len(items))
+
+			concurrencyPartitionA := getPartition(t, r, enums.PartitionTypeConcurrency, fnID, hashA) // nb. also asserts that the partition exists
+			concurrencyPartitionB := getPartition(t, r, enums.PartitionTypeConcurrency, fnID, hashB) // nb. also asserts that the partition exists
+
+			require.Equal(t, QueuePartition{
+				ID:               q.kg.PartitionQueueSet(enums.PartitionTypeConcurrency, fnID.String(), hashA),
+				FunctionID:       &fnID,
+				PartitionType:    int(enums.PartitionTypeConcurrency),
+				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
+			}, concurrencyPartitionA)
+
+			require.Equal(t, QueuePartition{
+				ID:               q.kg.PartitionQueueSet(enums.PartitionTypeConcurrency, fnID.String(), hashB),
+				FunctionID:       &fnID,
+				PartitionType:    int(enums.PartitionTypeConcurrency),
+				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
+			}, concurrencyPartitionB)
+
+			// We do not add the fn to the function-specific queue.
+			//
+			// fnDefaultPartition := getDefaultPartition(t, r, fnID) // nb. also asserts that the partition exists
+			// require.Equal(t, QueuePartition{
+			// 	ID:            fnID.String(),
+			// 	FunctionID:    &fnID,
+			// 	PartitionType: int(enums.PartitionTypeDefault),
+			// }, fnDefaultPartition)
 		})
 	})
 }
@@ -2685,6 +2732,11 @@ func createConcurrencyKey(scope enums.ConcurrencyScope, scopeID uuid.UUID, value
 	// ]
 	//
 	// This replicates that logic.
+
+	// Evaluate expects that value is either `event.data.user_id` - a JSON path - or a quoted string.
+	// Always quote for these tests.
+	value = strconv.Quote(value)
+
 	c := inngest.Concurrency{
 		Key:   &value,
 		Scope: scope,
