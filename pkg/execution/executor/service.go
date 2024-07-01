@@ -283,7 +283,7 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 
 	batchID := opts.BatchID
 
-	status, err := s.batcher.StartExecution(ctx, item.Identifier.AccountID, batchID, opts.BatchPointer)
+	status, err := s.batcher.StartExecution(ctx, opts.FunctionID, batchID, opts.BatchPointer)
 	if err != nil {
 		return err
 	}

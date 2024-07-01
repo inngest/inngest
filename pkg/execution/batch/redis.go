@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/expressions"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -53,8 +54,8 @@ func (b redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inn
 	return fmt.Sprintf("%v", out), nil
 }
 
-func (b redisBatchManager) batchPointer(ctx context.Context, fn inngest.Function, accountId uuid.UUID, isSharded bool, evt event.Event) (string, error) {
-	batchPointer := b.b.KeyGenerator().BatchPointer(ctx, isSharded, accountId, fn.ID)
+func (b redisBatchManager) batchPointer(ctx context.Context, fn inngest.Function, isSharded bool, evt event.Event) (string, error) {
+	batchPointer := b.b.KeyGenerator().BatchPointer(ctx, isSharded, fn.ID)
 
 	if fn.EventBatch.Key != nil {
 		batchKey, err := b.batchKey(ctx, evt, fn)
@@ -65,7 +66,7 @@ func (b redisBatchManager) batchPointer(ctx context.Context, fn inngest.Function
 		hashedBatchKey := sha256.Sum256([]byte(batchKey))
 		encodedBatchKey := base64.StdEncoding.EncodeToString(hashedBatchKey[:])
 
-		batchPointer = b.b.KeyGenerator().BatchPointerWithKey(ctx, isSharded, accountId, fn.ID, encodedBatchKey)
+		batchPointer = b.b.KeyGenerator().BatchPointerWithKey(ctx, isSharded, fn.ID, encodedBatchKey)
 	}
 
 	return batchPointer, nil
@@ -92,7 +93,7 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 
 	client, isSharded := b.b.Client(ctx, bi.AccountID)
 
-	batchPointer, err := b.batchPointer(ctx, fn, bi.AccountID, isSharded, bi.Event)
+	batchPointer, err := b.batchPointer(ctx, fn, isSharded, bi.Event)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve batch pointer: %w", err)
 	}
@@ -109,7 +110,7 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 		bi,
 		newULID,
 		// This is used within the Lua script to create the batch metadata key
-		b.b.KeyGenerator().QueuePrefix(),
+		b.b.KeyGenerator().QueuePrefix(ctx, isSharded, bi.FunctionID),
 		enums.BatchStatusPending,
 		enums.BatchStatusStarted,
 	})
@@ -136,15 +137,20 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 }
 
 // RetrieveItems retrieve the data associated with the specified batch.
-func (b redisBatchManager) RetrieveItems(ctx context.Context, accountId uuid.UUID, batchID ulid.ULID) ([]BatchItem, error) {
+func (b redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID, batchPointer string) ([]BatchItem, error) {
 	empty := make([]BatchItem, 0)
 
-	client, isSharded := b.b.Client(ctx, accountId)
+	isSharded := b.isSharded(ctx, batchPointer, functionId)
+
+	client := b.b.ForceUnshardedClient()
+	if isSharded {
+		client = b.b.ForceShardedClient()
+	}
 
 	itemStrList, err := retriableScripts["retrieve"].Exec(
 		ctx,
 		client,
-		[]string{b.b.KeyGenerator().Batch(ctx, isSharded, accountId, batchID)},
+		[]string{b.b.KeyGenerator().Batch(ctx, isSharded, functionId, batchID)},
 		[]string{},
 	).AsStrSlice()
 	if err != nil {
@@ -163,13 +169,23 @@ func (b redisBatchManager) RetrieveItems(ctx context.Context, accountId uuid.UUI
 	return items, nil
 }
 
+func (b redisBatchManager) isSharded(ctx context.Context, batchPointer string, functionId uuid.UUID) bool {
+	return strings.HasPrefix(batchPointer, b.b.KeyGenerator().QueuePrefix(ctx, true, functionId))
+
+}
+
 // StartExecution sets the status to `started`
 // If it has already started, don't do anything
-func (b redisBatchManager) StartExecution(ctx context.Context, accountId uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error) {
-	client, isSharded := b.b.Client(ctx, accountId)
+func (b redisBatchManager) StartExecution(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error) {
+	isSharded := b.isSharded(ctx, batchPointer, functionId)
+
+	client := b.b.ForceUnshardedClient()
+	if isSharded {
+		client = b.b.ForceShardedClient()
+	}
 
 	keys := []string{
-		b.b.KeyGenerator().BatchMetadata(ctx, isSharded, accountId, batchID),
+		b.b.KeyGenerator().BatchMetadata(ctx, isSharded, functionId, batchID),
 		batchPointer,
 	}
 	args := []string{
@@ -184,7 +200,7 @@ func (b redisBatchManager) StartExecution(ctx context.Context, accountId uuid.UU
 		args,
 	).AsInt64()
 	if err != nil {
-		return "", fmt.Errorf("failed to start batch execution: %w", err)
+		return "", fmt.Errorf("failed to start batch execuçtion: %w", err)
 	}
 
 	switch status {
@@ -236,12 +252,17 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 }
 
 // ExpireKeys sets the TTL for the keys related to the provided batchID.
-func (b redisBatchManager) ExpireKeys(ctx context.Context, accountId uuid.UUID, batchID ulid.ULID) error {
-	client, isSharded := b.b.Client(ctx, accountId)
+func (b redisBatchManager) ExpireKeys(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID, batchPointer string) error {
+	isSharded := b.isSharded(ctx, batchPointer, functionId)
+
+	client := b.b.ForceUnshardedClient()
+	if isSharded {
+		client = b.b.ForceShardedClient()
+	}
 
 	keys := []string{
-		b.b.KeyGenerator().Batch(ctx, isSharded, accountId, batchID),
-		b.b.KeyGenerator().BatchMetadata(ctx, isSharded, accountId, batchID),
+		b.b.KeyGenerator().Batch(ctx, isSharded, functionId, batchID),
+		b.b.KeyGenerator().BatchMetadata(ctx, isSharded, functionId, batchID),
 	}
 
 	timeout := consts.MaxBatchTTL.Seconds()

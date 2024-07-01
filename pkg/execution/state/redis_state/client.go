@@ -59,6 +59,14 @@ func (f *BatchClient) Client(ctx context.Context, accountId uuid.UUID) (Retriabl
 	return f.unshardedConn, false
 }
 
+func (f *BatchClient) ForceShardedClient() RetriableClient {
+	return f.client
+}
+
+func (f *BatchClient) ForceUnshardedClient() RetriableClient {
+	return f.unshardedConn
+}
+
 func NewBatchClient(r rueidis.Client, u *UnshardedClient, queueDefaultKey string, isSharded IsShardedWithAccountIdFn) *BatchClient {
 	return &BatchClient{
 		kg:            batchKeyGenerator{queueDefaultKey: queueDefaultKey, queueItemKeyGenerator: queueItemKeyGenerator{queueDefaultKey: queueDefaultKey}},
