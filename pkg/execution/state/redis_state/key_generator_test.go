@@ -67,12 +67,12 @@ func TestVerifyKeyGenerator(t *testing.T) {
 	newBatchKg := batchKeyGenerator{queueDefaultKey: "queue", queueItemKeyGenerator: queueItemKg}
 	var legacyBatchKg legacyBatchKeyGenerator = legacyDefaultkg
 
-	assert.Equal(t, legacyBatchKg.QueuePrefix(), newBatchKg.QueuePrefix())
+	assert.Equal(t, legacyBatchKg.QueuePrefix(), newBatchKg.QueuePrefix(ctx, false, fakeUuid))
 	assert.Equal(t, legacyBatchKg.QueueItem(), newBatchKg.QueueItem())
-	assert.Equal(t, legacyBatchKg.BatchPointer(ctx, fakeUuid), newBatchKg.BatchPointer(ctx, fakeUuid))
-	assert.Equal(t, legacyBatchKg.BatchPointerWithKey(ctx, fakeUuid, "key"), newBatchKg.BatchPointerWithKey(ctx, fakeUuid, "key"))
-	assert.Equal(t, legacyBatchKg.Batch(ctx, fakeUlid), newBatchKg.Batch(ctx, fakeUlid))
-	assert.Equal(t, legacyBatchKg.BatchMetadata(ctx, fakeUlid), newBatchKg.BatchMetadata(ctx, fakeUlid))
+	assert.Equal(t, legacyBatchKg.BatchPointer(ctx, fakeUuid), newBatchKg.BatchPointer(ctx, false, fakeUuid))
+	assert.Equal(t, legacyBatchKg.BatchPointerWithKey(ctx, fakeUuid, "key"), newBatchKg.BatchPointerWithKey(ctx, false, fakeUuid, "key"))
+	assert.Equal(t, legacyBatchKg.Batch(ctx, fakeUlid), newBatchKg.Batch(ctx, false, fakeUuid, fakeUlid))
+	assert.Equal(t, legacyBatchKg.BatchMetadata(ctx, fakeUlid), newBatchKg.BatchMetadata(ctx, false, fakeUuid, fakeUlid))
 
 	newPausesKg := pauseKeyGenerator{stateDefaultKey: "estate"}
 
