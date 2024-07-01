@@ -93,33 +93,40 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	stepLimitOverrides := make(map[string]int)
 
-	rc, err := createInmemoryRedis(ctx, opts.Tick)
+	shardedRc, err := createInmemoryRedis(ctx, opts.Tick)
 	if err != nil {
 		return err
 	}
+
+	unshardedRc, err := createInmemoryRedis(ctx, opts.Tick)
+	if err != nil {
+		return err
+	}
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: shardedRc,
+		StateDefaultKey:        redis_state.StateDefaultKey,
+		FnRunIsSharded:         redis_state.NeverShard,
+	})
 
 	var sm state.Manager
 	t := runner.NewTracker()
 	sm, err = redis_state.New(
 		ctx,
-		redis_state.WithRedisClient(rc),
-		redis_state.WithKeyGenerator(redis_state.DefaultKeyFunc{
-			Prefix: "{state}",
-		}),
+		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithUnshardedClient(unshardedClient),
 	)
 	if err != nil {
 		return err
 	}
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	queueKG := &redis_state.DefaultQueueKeyGenerator{
-		Prefix: "{queue}",
-	}
 	queueOpts := []redis_state.QueueOpt{
 		redis_state.WithIdempotencyTTL(time.Hour),
 		redis_state.WithNumWorkers(100),
 		redis_state.WithPollTick(opts.Tick),
-		redis_state.WithQueueKeyGenerator(queueKG),
 		redis_state.WithCustomConcurrencyKeyGenerator(func(ctx context.Context, i redis_state.QueueItem) []state.CustomConcurrency {
 			keys := i.Data.GetConcurrencyKeys()
 
@@ -182,12 +189,12 @@ func start(ctx context.Context, opts StartOpts) error {
 			backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval)*time.Second),
 		))
 	}
-	queue := redis_state.NewQueue(rc, queueOpts...)
+	queue := redis_state.NewQueue(unshardedClient.Queue(), queueOpts...)
 
-	rl := ratelimit.New(ctx, rc, "{ratelimit}:")
+	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
-	batcher := batch.NewRedisBatchManager(rc, queueKG, queue)
-	debouncer := debounce.NewRedisDebouncer(rc, queueKG, queue)
+	batcher := batch.NewRedisBatchManager(unshardedClient.Batch(), queue)
+	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queue)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, sm.(expressions.EvaluableLoader), nil)

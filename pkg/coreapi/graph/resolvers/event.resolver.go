@@ -31,7 +31,8 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 }
 
 func (r *eventResolver) PendingRuns(ctx context.Context, obj *models.Event) (*int, error) {
-	state, err := r.Runner.Runs(ctx, obj.ID)
+	accountID := uuid.UUID{}
+	state, err := r.Runner.Runs(ctx, accountID, obj.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +49,8 @@ func (r *eventResolver) PendingRuns(ctx context.Context, obj *models.Event) (*in
 }
 
 func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.EventStatus, error) {
-	state, err := r.Runner.Runs(ctx, obj.ID)
+	accountID := uuid.UUID{}
+	state, err := r.Runner.Runs(ctx, accountID, obj.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +116,8 @@ func (r *eventResolver) Raw(ctx context.Context, obj *models.Event) (*string, er
 }
 
 func (r *eventResolver) TotalRuns(ctx context.Context, obj *models.Event) (*int, error) {
-	metadata, err := r.Runner.Runs(ctx, obj.ID)
+	accountID := uuid.UUID{}
+	metadata, err := r.Runner.Runs(ctx, accountID, obj.ID)
 	if err != nil {
 		return nil, err
 	}

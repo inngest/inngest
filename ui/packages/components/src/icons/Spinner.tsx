@@ -1,10 +1,10 @@
-import { classNames } from '../utils/classNames';
+import { cn } from '../utils/classNames';
 
 export function IconSpinner({ className }: { className?: string }) {
   return (
     <svg
       aria-hidden="true"
-      className={classNames(className, 'animate-spin text-transparent')}
+      className={cn(className, 'animate-spin text-transparent')}
       viewBox="0 0 100 101"
       fill="#38bdf8" //sky-400
       xmlns="http://www.w3.org/2000/svg"

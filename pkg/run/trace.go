@@ -1215,6 +1215,9 @@ func toProtoStatus(span *cqrs.Span) rpbv2.SpanStatus {
 }
 
 func hasFinished(rs *rpbv2.RunSpan) bool {
+	if rs == nil {
+		return false
+	}
 	switch rs.Status {
 	case rpbv2.SpanStatus_CANCELLED, rpbv2.SpanStatus_COMPLETED, rpbv2.SpanStatus_FAILED:
 		return true

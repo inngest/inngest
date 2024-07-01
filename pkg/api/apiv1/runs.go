@@ -44,6 +44,7 @@ func (a API) CancelFunctionRun(ctx context.Context, runID ulid.ULID) error {
 	if err != nil {
 		return publicerr.Wrap(err, 401, "No auth found")
 	}
+
 	fr, err := a.opts.FunctionRunReader.GetFunctionRun(
 		ctx,
 		auth.AccountID(),
@@ -60,6 +61,11 @@ func (a API) CancelFunctionRun(ctx context.Context, runID ulid.ULID) error {
 	id := state.ID{
 		RunID:      runID,
 		FunctionID: fr.FunctionID,
+		Tenant: state.Tenant{
+			// TODO: AppID is missing
+			EnvID:     auth.WorkspaceID(),
+			AccountID: auth.AccountID(),
+		},
 	}
 	if err := a.opts.Executor.Cancel(ctx, id, execution.CancelRequest{}); err != nil {
 		return publicerr.Wrapf(err, 500, "Unable to cancel function run: %s", err)
