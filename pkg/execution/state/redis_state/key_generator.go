@@ -294,16 +294,16 @@ type BatchKeyGenerator interface {
 	QueueItem() string
 	// BatchPointer returns the key used as the pointer reference to the
 	// actual batch
-	BatchPointer(context.Context, uuid.UUID) string
+	BatchPointer(ctx context.Context, isSharded bool, accountId uuid.UUID, functionId uuid.UUID) string
 	// BatchPointerWithKey returns the key used as the pointer reference to the
 	// actual batch for a given batchKey
-	BatchPointerWithKey(context.Context, uuid.UUID, string) string
+	BatchPointerWithKey(ctx context.Context, isSharded bool, accountId uuid.UUID, functionId uuid.UUID, key string) string
 	// Batch returns the key used to store the specific batch of
 	// events, that is used to trigger a function run
-	Batch(context.Context, ulid.ULID) string
+	Batch(ctx context.Context, isSharded bool, accountId uuid.UUID, batchId ulid.ULID) string
 	// BatchMetadata returns the key used to store the metadata related
 	// to a batch
-	BatchMetadata(context.Context, ulid.ULID) string
+	BatchMetadata(ctx context.Context, isSharded bool, accountId uuid.UUID, batchId ulid.ULID) string
 }
 
 type batchKeyGenerator struct {
@@ -311,24 +311,31 @@ type batchKeyGenerator struct {
 	queueItemKeyGenerator
 }
 
+func (u batchKeyGenerator) PrefixByAccountId(ctx context.Context, defaultPrefix string, isSharded bool, accountId uuid.UUID) string {
+	if isSharded {
+		return fmt.Sprintf("%s:%s", defaultPrefix, accountId.String())
+	}
+	return defaultPrefix
+}
+
 func (u batchKeyGenerator) QueuePrefix() string {
 	return fmt.Sprintf("{%s}", u.queueDefaultKey)
 }
 
-func (u batchKeyGenerator) BatchPointer(ctx context.Context, workflowID uuid.UUID) string {
-	return fmt.Sprintf("{%s}:workflows:%s:batch", u.queueDefaultKey, workflowID)
+func (u batchKeyGenerator) BatchPointer(ctx context.Context, isSharded bool, accountId uuid.UUID, functionId uuid.UUID) string {
+	return fmt.Sprintf("{%s}:workflows:%s:batch", u.PrefixByAccountId(ctx, u.queueDefaultKey, isSharded, accountId), functionId)
 }
 
-func (u batchKeyGenerator) BatchPointerWithKey(ctx context.Context, workflowID uuid.UUID, batchKey string) string {
-	return fmt.Sprintf("%s:%s", u.BatchPointer(ctx, workflowID), batchKey)
+func (u batchKeyGenerator) BatchPointerWithKey(ctx context.Context, isSharded bool, accountId uuid.UUID, functionId uuid.UUID, batchKey string) string {
+	return fmt.Sprintf("%s:%s", u.BatchPointer(ctx, isSharded, accountId, functionId), batchKey)
 }
 
-func (u batchKeyGenerator) Batch(ctx context.Context, batchID ulid.ULID) string {
-	return fmt.Sprintf("{%s}:batches:%s", u.queueDefaultKey, batchID)
+func (u batchKeyGenerator) Batch(ctx context.Context, isSharded bool, accountId uuid.UUID, batchID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:batches:%s", u.PrefixByAccountId(ctx, u.queueDefaultKey, isSharded, accountId), batchID)
 }
 
-func (u batchKeyGenerator) BatchMetadata(ctx context.Context, batchID ulid.ULID) string {
-	return fmt.Sprintf("%s:metadata", u.Batch(ctx, batchID))
+func (u batchKeyGenerator) BatchMetadata(ctx context.Context, isSharded bool, accountId uuid.UUID, batchID ulid.ULID) string {
+	return fmt.Sprintf("%s:metadata", u.Batch(ctx, isSharded, accountId, batchID))
 }
 
 type DebounceKeyGenerator interface {

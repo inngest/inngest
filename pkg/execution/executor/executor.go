@@ -2790,7 +2790,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 
 // RetrieveAndScheduleBatchWithOpts retrieves all items from a started batch and schedules a function run
 func (e *executor) RetrieveAndScheduleBatchWithOpts(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
-	evtList, err := e.batcher.RetrieveItems(ctx, payload.BatchID)
+	evtList, err := e.batcher.RetrieveItems(ctx, payload.AccountID, payload.BatchID)
 	if err != nil {
 		return err
 	}
@@ -2852,7 +2852,7 @@ func (e *executor) RetrieveAndScheduleBatchWithOpts(ctx context.Context, fn inng
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 	}
 
-	if err := e.batcher.ExpireKeys(ctx, payload.BatchID); err != nil {
+	if err := e.batcher.ExpireKeys(ctx, payload.AccountID, payload.BatchID); err != nil {
 		return err
 	}
 
