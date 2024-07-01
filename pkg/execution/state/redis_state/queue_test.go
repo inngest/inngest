@@ -371,9 +371,9 @@ func TestQueueEnqueueItem(t *testing.T) {
 		now := time.Now()
 		fnID := uuid.New()
 
-		t.Run("Single key, function scope", func(t *testing.T) {
-			r.FlushAll()
+		r.FlushAll()
 
+		t.Run("Single key, function scope", func(t *testing.T) {
 			// Enqueueing an item
 			ck := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test", 1)
 			_, _, hash, _ := ck.ParseKey() // get the hash of the "test" string / evaluated input.
@@ -1234,7 +1234,7 @@ func TestQueuePartitionLease(t *testing.T) {
 	idA, idB, idC := uuid.New(), uuid.New(), uuid.New()
 	atA, atB, atC := now, now.Add(time.Second), now.Add(2*time.Second)
 
-	pA := QueuePartition{FunctionID: &idA}
+	pA := QueuePartition{ID: idA.String(), FunctionID: &idA}
 
 	r := miniredis.RunT(t)
 
@@ -1260,9 +1260,9 @@ func TestQueuePartitionLease(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{FunctionID: &idA},
-			{FunctionID: &idB},
-			{FunctionID: &idC},
+			{ID: idA.String(), FunctionID: &idA},
+			{ID: idB.String(), FunctionID: &idB},
+			{ID: idC.String(), FunctionID: &idC},
 		}, items)
 	})
 
@@ -1287,9 +1287,10 @@ func TestQueuePartitionLease(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, items, 3)
 			require.EqualValues(t, []*QueuePartition{
-				{FunctionID: &idB},
-				{FunctionID: &idC},
+				{ID: idB.String(), FunctionID: &idB},
+				{ID: idC.String(), FunctionID: &idC},
 				{
+					ID:         idA.String(),
 					FunctionID: &idA,
 					Last:       items[2].Last, // Use the leased partition time.
 					LeaseID:    leaseID,
@@ -1357,6 +1358,34 @@ func TestQueuePartitionLease(t *testing.T) {
 			require.NotNil(t, id)
 			require.NoError(t, err)
 		})
+	})
+
+	t.Run("With key partitions", func(t *testing.T) {
+		fnID := uuid.New()
+
+		// Enqueueing an item
+		ck := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test", 1)
+		_, _, hash, _ := ck.ParseKey() // get the hash of the "test" string / evaluated input.
+
+		_, err := q.EnqueueItem(ctx, QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				CustomConcurrencyKeys: []state.CustomConcurrency{ck},
+			},
+		}, now.Add(10*time.Second))
+		require.NoError(t, err)
+
+		p := QueuePartition{
+			ID:               q.kg.PartitionQueueSet(enums.PartitionTypeConcurrency, fnID.String(), hash),
+			FunctionID:       &fnID,
+			PartitionType:    int(enums.PartitionTypeConcurrency),
+			ConcurrencyScope: int(enums.ConcurrencyScopeFn),
+		}
+
+		leaseUntil := now.Add(3 * time.Second)
+		leaseID, err := q.PartitionLease(ctx, &p, time.Until(leaseUntil))
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
 	})
 
 	// TODO: Capacity checks

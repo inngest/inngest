@@ -135,7 +135,7 @@ func (c CustomConcurrency) ParseKey() (scope enums.ConcurrencyScope, id uuid.UUI
 	parts := strings.Split(c.Key, ":")
 	if len(parts) != 3 {
 		// Invalid by default
-		return enums.ConcurrencyScopeFn, id, parts[2], err
+		return enums.ConcurrencyScopeFn, id, "", err
 	}
 
 	id, err = uuid.Parse(parts[1])
