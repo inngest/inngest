@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/VividCortex/ewma"
-	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest/log"
@@ -418,7 +417,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 	}
 
 	// Attempt to claim the lease immediately.
-	leaseID, err := q.ConfigLease(ctx, q.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
+	leaseID, err := q.ConfigLease(ctx, q.u.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -435,7 +434,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 			tick.Stop()
 			return
 		case <-tick.C:
-			leaseID, err := q.ConfigLease(ctx, q.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
+			leaseID, err := q.ConfigLease(ctx, q.u.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
 			if err == ErrConfigAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
@@ -466,7 +465,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 
 func (q *queue) runScavenger(ctx context.Context) {
 	// Attempt to claim the lease immediately.
-	leaseID, err := q.ConfigLease(ctx, q.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
+	leaseID, err := q.ConfigLease(ctx, q.u.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -498,7 +497,7 @@ func (q *queue) runScavenger(ctx context.Context) {
 			}
 		case <-tick.C:
 			// Attempt to re-lease the lock.
-			leaseID, err := q.ConfigLease(ctx, q.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
+			leaseID, err := q.ConfigLease(ctx, q.u.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
 			if err == ErrConfigAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
@@ -570,7 +569,7 @@ func (q *queue) scan(ctx context.Context) error {
 	)
 
 	// By default, use the global partition
-	partitionKey := q.kg.GlobalPartitionIndex()
+	partitionKey := q.u.kg.GlobalPartitionIndex()
 
 	// If this worker has leased shards, those take priority 95% of the time.  There's a 5% chance that the
 	// worker still works on the global queue.
@@ -581,7 +580,7 @@ func (q *queue) scan(ctx context.Context) error {
 		i := rand.Intn(len(existingLeases))
 		shard = &existingLeases[i].Shard
 		// Use the shard partition
-		partitionKey = q.kg.ShardPartitionIndex(shard.Name)
+		partitionKey = q.u.kg.ShardPartitionIndex(shard.Name)
 		metricShardName = "<shard>:" + shard.Name
 	}
 
@@ -693,7 +692,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	fetch := getNow().Truncate(time.Second).Add(PartitionLookahead)
 
 	queue, err := duration(peekCtx, "peek", func(ctx context.Context) ([]*QueueItem, error) {
-		peek := q.peekSize(ctx, p.WorkflowID)
+		peek := q.peekSize(ctx, p)
 		// NOTE: would love to instrument this value to see it over time per function but
 		// it's likely too high of a cardinality
 		go telemetry.HistogramQueuePeekEWMA(ctx, peek, telemetry.HistogramOpt{PkgName: pkgName})
@@ -904,7 +903,7 @@ ProcessLoop:
 	}
 
 	if err := q.setPeekEWMA(ctx, p.WorkflowID, int64(ctrConcurrency+ctrRateLimit)); err != nil {
-		log.From(ctx).Warn().Msg("error recording concurrency limit for EWMA")
+		log.From(ctx).Warn().Err(err).Msg("error recording concurrency limit for EWMA")
 	}
 
 	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
@@ -1181,9 +1180,9 @@ func (q *queue) capacity() int64 {
 // 1. EWMA of concurrency limit hits
 // 2. configured min, max of peek size range
 // 3. worker capacity
-func (q *queue) peekSize(ctx context.Context, fnID uuid.UUID) int64 {
+func (q *queue) peekSize(ctx context.Context, p *QueuePartition) int64 {
 	// retrieve the EWMA value
-	ewma, err := q.peekEWMA(ctx, fnID)
+	ewma, err := q.peekEWMA(ctx, p.WorkflowID)
 	if err != nil {
 		// return the minimum if there's an error
 		return q.peekMin
@@ -1196,25 +1195,32 @@ func (q *queue) peekSize(ctx context.Context, fnID uuid.UUID) int64 {
 	}
 
 	// set ranges
-	min := q.peekMin
-	if min == 0 {
-		min = QueuePeekMin
+	pmin := q.peekMin
+	if pmin == 0 {
+		pmin = QueuePeekMin
 	}
-	max := q.peekMax
-	if max == 0 {
-		max = QueuePeekMax
+	pmax := q.peekMax
+	if pmax == 0 {
+		pmax = QueuePeekMax
 	}
 
 	// calculate size with EWMA and multiplier
 	size := ewma * multiplier
 	switch {
-	case size < min:
-		size = min
-	case size > max:
-		size = max
+	case size < pmin:
+		size = pmin
+	case size > pmax:
+		size = pmax
 	}
 
-	cap := q.capacity()
+	dur := time.Hour * 24
+	qsize, _ := q.partitionSize(ctx, q.u.kg.QueueIndex(p.Queue()), time.Now().Add(dur))
+	if qsize > size {
+		size = qsize
+	}
+
+	// add 10% expecting for some workflow that will finish in the mean time
+	cap := int64(float64(q.capacity()) * 1.1)
 	if size > cap {
 		size = cap
 	}

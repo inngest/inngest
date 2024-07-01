@@ -61,12 +61,14 @@ export function Select({
 function Button({
   children,
   isLabelVisible,
-}: React.PropsWithChildren<{ isLabelVisible?: boolean }>) {
+  className,
+}: React.PropsWithChildren<{ isLabelVisible?: boolean; className?: string }>) {
   return (
     <Listbox.Button
       className={cn(
         !isLabelVisible && 'rounded-l-[5px]',
-        'bg-surfaceBase flex h-10 w-full items-center justify-between rounded-r-[5px] px-2'
+        'bg-surfaceBase flex h-10 w-full items-center justify-between rounded-r-[5px] px-2',
+        className
       )}
     >
       {children}

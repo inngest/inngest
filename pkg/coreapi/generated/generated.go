@@ -2523,6 +2523,7 @@ type FunctionRunV2Edge {
 
 enum RunTraceSpanStatus {
   FAILED # step completed with an error
+  QUEUED # step of run is queued but not started
   RUNNING # actively being executed right now
   COMPLETED # step completed successfully
   # TIMED_OUT # wait for event timed out waiting

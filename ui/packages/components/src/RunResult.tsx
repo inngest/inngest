@@ -28,7 +28,7 @@ export function RunResult({ className, result, isSuccess }: Props) {
         />
       )}
 
-      {result.error?.stack && (
+      {result.error && (
         <CodeBlock
           header={{
             title:
@@ -37,7 +37,7 @@ export function RunResult({ className, result, isSuccess }: Props) {
             status: 'error',
           }}
           tab={{
-            content: result.error.stack,
+            content: result.error.stack ?? '',
           }}
         />
       )}

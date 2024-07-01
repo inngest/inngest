@@ -1,3 +1,5 @@
+'use client';
+
 import type { ReactNode } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
@@ -34,7 +36,11 @@ export function AlertModal({
   confirmButtonKind = 'danger',
   cancelButtonKind = 'default',
 }: AlertModalProps) {
-  const container = document.getElementById('modals');
+  let container = null;
+  if (globalThis.document) {
+    container = document.getElementById('modals');
+  }
+
   return (
     <AlertDialog.Root open={isOpen} onOpenChange={onClose}>
       <AnimatePresence>

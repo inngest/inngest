@@ -19,6 +19,7 @@ type SpanStatus int
 
 const (
 	SpanStatusUnknown = iota
+	SpanStatusQueued
 	SpanStatusOk
 	SpanStatusError
 )
@@ -105,6 +106,8 @@ func (s *Span) Status() SpanStatus {
 		return SpanStatusOk
 	case "ERROR", "STATUS_CODE_ERROR":
 		return SpanStatusError
+	case "QUEUED": // virtual status
+		return SpanStatusQueued
 	}
 
 	return SpanStatusUnknown

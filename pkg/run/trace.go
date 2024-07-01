@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -148,10 +149,13 @@ func (tb *runTree) ToRunSpan(ctx context.Context) (*rpbv2.RunSpan, error) {
 
 	var finished bool
 	switch root.Status {
+	case rpbv2.SpanStatus_RUNNING:
+		root.EndedAt = nil
 	case rpbv2.SpanStatus_COMPLETED, rpbv2.SpanStatus_FAILED:
 		finished = true
 	}
 
+	var last *rpbv2.RunSpan
 	// these are the execution or steps for the function run
 	for _, span := range spans {
 		tspan, skipped, err := tb.toRunSpan(ctx, span)
@@ -167,6 +171,25 @@ func (tb *runTree) ToRunSpan(ctx context.Context) (*rpbv2.RunSpan, error) {
 			root.OutputId = tspan.OutputId
 		}
 		root.Children = append(root.Children, tspan)
+		last = tspan
+	}
+
+	// append a queued span if function is not done yet
+	if !hasFinished(root) && hasFinished(last) {
+		queued := &rpbv2.RunSpan{
+			AccountId:    tb.acctID.String(),
+			WorkspaceId:  tb.wsID.String(),
+			AppId:        tb.appID.String(),
+			FunctionId:   tb.fnID.String(),
+			RunId:        tb.runID.String(),
+			TraceId:      last.TraceId,
+			ParentSpanId: &root.SpanId,
+			SpanId:       "queued",
+			Name:         "Queued step",
+			Status:       rpbv2.SpanStatus_QUEUED,
+			QueuedAt:     last.EndedAt,
+		}
+		root.Children = append(root.Children, queued)
 	}
 
 	return root, nil
@@ -404,6 +427,10 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 		mod.Children = []*rpbv2.RunSpan{}
 	}
 
+	var (
+		attempt     int32
+		notFinished bool
+	)
 	for i, p := range peers {
 		if i == 0 {
 			mod.StartedAt = timestamppb.New(p.Timestamp)
@@ -417,13 +444,6 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 			continue
 		}
 
-		var attempt int32
-		if str, ok := p.SpanAttributes[consts.OtelSysStepAttempt]; ok {
-			if count, err := strconv.ParseInt(str, 10, 32); err == nil {
-				attempt = int32(count)
-			}
-		}
-
 		status := toProtoStatus(p)
 		// output
 		outputID, err := tb.outputID(nested)
@@ -435,6 +455,8 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 		nested.Attempts = attempt
 		nested.Status = status
 		switch status { // only set outputID if the span is already finished
+		case rpbv2.SpanStatus_RUNNING:
+			nested.EndedAt = nil
 		case rpbv2.SpanStatus_COMPLETED, rpbv2.SpanStatus_FAILED:
 			nested.OutputId = &outputID
 		}
@@ -457,6 +479,8 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 					mod.Status = rpbv2.SpanStatus_FAILED
 					mod.Attempts = maxAttempts
 					mod.OutputId = &outputID
+				} else {
+					notFinished = true
 				}
 			}
 
@@ -468,6 +492,12 @@ func (tb *runTree) processStepRunGroup(ctx context.Context, span *cqrs.Span, mod
 		nested.Name = fmt.Sprintf("Attempt %d", attempt)
 		mod.Children = append(mod.Children, nested)
 		tb.processed[p.SpanID] = true
+		attempt++
+
+		if notFinished {
+			queued := tb.queuedSpan(nested)
+			mod.Children = append(mod.Children, queued)
+		}
 	}
 
 	// check if the nested span is the same one, if so discard it
@@ -962,6 +992,12 @@ func (tb *runTree) processInvoke(ctx context.Context, span *cqrs.Span, mod *rpbv
 		}
 	}
 
+	if hasFinished(mod) {
+		end := mod.StartedAt.AsTime().Add(span.Duration)
+		mod.DurationMs = span.DurationMS()
+		mod.EndedAt = timestamppb.New(end)
+	}
+
 	// output
 	if returnEventID != nil || mod.Status == rpbv2.SpanStatus_FAILED {
 		ident := &cqrs.SpanIdentifier{
@@ -1029,6 +1065,10 @@ func (tb *runTree) processExecGroup(ctx context.Context, span *cqrs.Span, mod *r
 		mod.Children = []*rpbv2.RunSpan{}
 	}
 
+	var (
+		attempt     int32
+		notFinished bool
+	)
 	for i, p := range peers {
 		if i == 0 {
 			mod.StartedAt = timestamppb.New(p.Timestamp)
@@ -1042,13 +1082,6 @@ func (tb *runTree) processExecGroup(ctx context.Context, span *cqrs.Span, mod *r
 			continue
 		}
 
-		var attempt int32
-		if str, ok := p.SpanAttributes[consts.OtelSysStepAttempt]; ok {
-			if count, err := strconv.ParseInt(str, 10, 32); err == nil {
-				attempt = int32(count)
-			}
-		}
-
 		status := toProtoStatus(p)
 		// output
 		outputID, err := tb.outputID(nested)
@@ -1060,6 +1093,8 @@ func (tb *runTree) processExecGroup(ctx context.Context, span *cqrs.Span, mod *r
 		nested.Attempts = attempt
 		nested.Status = status
 		switch status {
+		case rpbv2.SpanStatus_RUNNING:
+			nested.EndedAt = nil
 		case rpbv2.SpanStatus_CANCELLED, rpbv2.SpanStatus_FAILED:
 			nested.OutputId = &outputID
 		}
@@ -1085,6 +1120,8 @@ func (tb *runTree) processExecGroup(ctx context.Context, span *cqrs.Span, mod *r
 					mod.Status = rpbv2.SpanStatus_FAILED
 					mod.Attempts = maxAttempts
 					mod.OutputId = &outputID
+				} else {
+					notFinished = true
 				}
 			}
 
@@ -1104,6 +1141,12 @@ func (tb *runTree) processExecGroup(ctx context.Context, span *cqrs.Span, mod *r
 
 		mod.Children = append(mod.Children, nested)
 		tb.markProcessed(p)
+		attempt++
+
+		if notFinished {
+			queued := tb.queuedSpan(nested)
+			mod.Children = append(mod.Children, queued)
+		}
 	}
 
 	// check if the nested span is the same one, if so discard it
@@ -1131,8 +1174,38 @@ func (tb *runTree) markProcessed(span *cqrs.Span) {
 	tb.processed[span.SpanID] = true
 }
 
+func (tb *runTree) queuedSpan(peer *rpbv2.RunSpan) *rpbv2.RunSpan {
+	ts := time.Now()
+	if peer.EndedAt != nil {
+		ts = peer.EndedAt.AsTime()
+	}
+
+	name := "Queued step"
+	if strings.Contains(peer.GetName(), "Attempt") {
+		name = fmt.Sprintf("Attempt %d", peer.Attempts+1)
+	}
+
+	return &rpbv2.RunSpan{
+		AccountId:    tb.acctID.String(),
+		WorkspaceId:  tb.wsID.String(),
+		AppId:        tb.appID.String(),
+		FunctionId:   tb.fnID.String(),
+		RunId:        tb.runID.String(),
+		TraceId:      peer.TraceId,
+		ParentSpanId: &peer.SpanId,
+		SpanId:       "queued",
+		Name:         name,
+		Status:       rpbv2.SpanStatus_SCHEDULED,
+		Attempts:     peer.Attempts + 1,
+		QueuedAt:     timestamppb.New(ts),
+		StepOp:       peer.StepOp,
+	}
+}
+
 func toProtoStatus(span *cqrs.Span) rpbv2.SpanStatus {
 	switch span.Status() {
+	case cqrs.SpanStatusQueued:
+		return rpbv2.SpanStatus_QUEUED
 	case cqrs.SpanStatusOk:
 		return rpbv2.SpanStatus_COMPLETED
 	case cqrs.SpanStatusError:
@@ -1142,6 +1215,9 @@ func toProtoStatus(span *cqrs.Span) rpbv2.SpanStatus {
 }
 
 func hasFinished(rs *rpbv2.RunSpan) bool {
+	if rs == nil {
+		return false
+	}
 	switch rs.Status {
 	case rpbv2.SpanStatus_CANCELLED, rpbv2.SpanStatus_COMPLETED, rpbv2.SpanStatus_FAILED:
 		return true

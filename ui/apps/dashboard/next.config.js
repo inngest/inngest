@@ -5,7 +5,7 @@ const { withSentryConfig } = require('@sentry/nextjs');
 const nextConfig = {
   productionBrowserSourceMaps: true,
   experimental: {
-    typedRoutes: true,
+    // typedRoutes: true,
   },
   images: {
     remotePatterns: [
@@ -31,11 +31,6 @@ const nextConfig = {
       {
         source: '/integrations/vercel',
         destination: '/integrations/vercel/callback',
-        permanent: false,
-      },
-      {
-        source: '/settings/integrations',
-        destination: '/settings/integrations/vercel',
         permanent: false,
       },
       {

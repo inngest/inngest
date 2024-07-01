@@ -76,8 +76,8 @@ export function RunDetails(props: Props) {
       {standalone && run && (
         <div className="mx-8 flex flex-col gap-1 pb-6">
           <StatusCell status={run.trace.status} />
-          <p className="text-2xl font-medium">{run.fn.name}</p>
-          <p className="font-mono text-slate-500">{runID}</p>
+          <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
+          <p className="text-muted font-mono">{runID}</p>
         </div>
       )}
 

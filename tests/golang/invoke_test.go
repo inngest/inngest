@@ -178,6 +178,8 @@ func TestInvokeGroup(t *testing.T) {
 
 		require.Eventually(t, func() bool {
 			run := c.RunTraces(ctx, runID)
+			require.Nil(t, run.EndedAt)
+			require.Nil(t, run.Trace.EndedAt)
 			require.NotNil(t, models.FunctionStatusRunning.String(), run.Status)
 			require.NotNil(t, run.Trace)
 			require.Equal(t, 1, len(run.Trace.ChildSpans))
@@ -191,7 +193,7 @@ func TestInvokeGroup(t *testing.T) {
 			assert.Equal(t, 0, span.Attempts)
 			assert.Equal(t, rootSpanID, span.ParentSpanID)
 			assert.False(t, span.IsRoot)
-			assert.Equal(t, 1, len(span.ChildSpans))
+			assert.Equal(t, 2, len(span.ChildSpans)) // include queued retry span
 			assert.Equal(t, models.RunTraceSpanStatusRunning.String(), span.Status)
 			assert.Equal(t, "", span.StepOp)
 			assert.Nil(t, span.OutputID)
@@ -238,6 +240,7 @@ func TestInvokeGroup(t *testing.T) {
 				assert.Equal(t, rootSpanID, invoke.ParentSpanID)
 				assert.Equal(t, 2, len(invoke.ChildSpans))
 				assert.Equal(t, models.StepOpInvoke.String(), invoke.StepOp)
+				assert.NotNil(t, invoke.EndedAt)
 
 				// output test
 				assert.NotNil(t, invoke.OutputID)
@@ -340,6 +343,7 @@ func TestInvokeTimeout(t *testing.T) {
 				assert.False(t, invoke.IsRoot)
 				assert.Equal(t, rootSpanID, invoke.ParentSpanID)
 				assert.Equal(t, models.StepOpInvoke.String(), invoke.StepOp)
+				assert.NotNil(t, invoke.EndedAt)
 
 				// output test
 				assert.NotNil(t, invoke.OutputID)

@@ -470,6 +470,7 @@ export enum RunTraceSpanStatus {
   Cancelled = 'CANCELLED',
   Completed = 'COMPLETED',
   Failed = 'FAILED',
+  Queued = 'QUEUED',
   Running = 'RUNNING',
   Waiting = 'WAITING'
 }
