@@ -1450,9 +1450,9 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{FunctionID: &idA},
-			{FunctionID: &idB},
-			{FunctionID: &idC},
+			{ID: idA.String(), FunctionID: &idA},
+			{ID: idB.String(), FunctionID: &idB},
+			{ID: idC.String(), FunctionID: &idC},
 		}, items)
 	})
 
@@ -1540,8 +1540,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		require.EqualValues(t, []*QueuePartition{
-			{FunctionID: &idB},
-			{FunctionID: &idC},
+			{ID: idB.String(), FunctionID: &idB},
+			{ID: idC.String(), FunctionID: &idC},
 		}, items)
 
 		// Try without sequential scans
@@ -1576,8 +1576,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		require.EqualValues(t, []*QueuePartition{
-			{FunctionID: &idB},
-			{FunctionID: &idC},
+			{ID: idB.String(), FunctionID: &idB},
+			{ID: idC.String(), FunctionID: &idC},
 		}, items)
 
 		// After unpausing A, it should be included in the peek:
@@ -1587,9 +1587,9 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{FunctionID: &idA},
-			{FunctionID: &idB},
-			{FunctionID: &idC},
+			{ID: idA.String(), FunctionID: &idA},
+			{ID: idB.String(), FunctionID: &idB},
+			{ID: idC.String(), FunctionID: &idC},
 		}, items)
 	})
 }
