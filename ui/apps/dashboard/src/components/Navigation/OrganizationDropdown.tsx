@@ -108,7 +108,7 @@ function OrganizationDropdownMenuItem(props: {
       asChild
       className="p-2 font-medium text-slate-400 outline-none hover:bg-transparent focus:text-white"
     >
-      <Link href={props.href as Route}>
+      <Link href={props.href as Route} prefetch={true}>
         <props.icon className="size-4" />
         {props.label}
       </Link>
