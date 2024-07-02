@@ -8,62 +8,80 @@ Output:
 
 ]]
 
-local partitionKey            = KEYS[1]
-local keyGlobalPartitionPtr   = KEYS[2]
-local keyShardPartitionPtr    = KEYS[3]
-local partitionConcurrencyKey = KEYS[4]
-local fnMetaKey              = KEYS[5]
+local keyPartitionMap         = KEYS[1] -- key storing all partitions
+local keyGlobalPartitionPtr   = KEYS[2] -- global top-level partitioned queue
+local keyPartitionConcurrency = KEYS[3] -- in progress queue for partition
+local keyAccountConcurrency   = KEYS[4] -- in progress queue for account
+local keyFnMeta               = KEYS[5]
 
 
 local partitionID             = ARGV[1]
 local leaseID                 = ARGV[2]
 local currentTime             = tonumber(ARGV[3]) -- in ms, to check lease validation
 local leaseTime               = tonumber(ARGV[4]) -- in seconds, as partition score
-local concurrency             = tonumber(ARGV[5]) -- concurrency limit for this partition
+local partitionConcurrency    = tonumber(ARGV[5]) -- concurrency limit for this partition
+local accountConcurrency      = tonumber(ARGV[6]) -- concurrency limit for the acct. 
+local noCapacityScore         = tonumber(ARGV[7]) -- score if concurrency is hit
 
 -- $include(check_concurrency.lua)
 -- $include(get_partition_item.lua)
 -- $include(get_fn_meta.lua)
 -- $include(decode_ulid_time.lua)
 -- $include(update_pointer_score.lua)
--- $include(has_shard_key.lua)
 
-local existing                = get_partition_item(partitionKey, partitionID)
+local existing = get_partition_item(keyPartitionMap, partitionID)
 if existing == nil or existing == false then
-    return -2
+    return { -2 }
 end
 
 -- Check for an existing lease.
 if existing.leaseID ~= nil and existing.leaseID ~= cjson.null and decode_ulid_time(existing.leaseID) > currentTime then
-    return -3
+    return { -3 }
 end
 
 -- Check whether the partition is currently paused.
+-- We only need to do this if the queue item is for a function.
 if existing.wid ~= nil and existing.wid ~= cjson.null then
-    local fnMeta = get_fn_meta(fnMetaKey)
+    local fnMeta = get_fn_meta(keyFnMeta)
     if fnMeta ~= nil and fnMeta.off then
-        return -4
+        return {  -4 }
     end
 end
 
-local capacity = concurrency -- initialize as the default concurrency limit
-
 local existingTime = existing.last
 
-if concurrency > 0 and #partitionConcurrencyKey > 0 then
+local capacity = partitionConcurrency -- initialize as the default concurrency limit
+if partitionConcurrency > 0 and #keyPartitionConcurrency > 0 then
     -- Check that there's capacity for this partition, based off of partition-level
     -- concurrency keys.
-    capacity = check_concurrency(currentTime, partitionConcurrencyKey, concurrency)
+    capacity = check_concurrency(currentTime, keyPartitionConcurrency, partitionConcurrency)
     if capacity <= 0 then
         -- There's no capacity available.  Increase the score for this partition so that
         -- it's not immediately re-scanned.
-        redis.call("ZADD", keyGlobalPartitionPtr, leaseTime, partitionID)
-
+        redis.call("ZADD", keyGlobalPartitionPtr, noCapacityScore, partitionID)
         -- Update that we attempted to lease this partition, even if there was no capacity.
         existing.last = currentTime -- in ms.
-        redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
+        redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existing))
+        return { -1 }
+    end
+end
 
-        return -1
+if accountConcurrency > 0 and #keyAccountConcurrency > 0 then
+    -- Check that there's capacity for this partition, based off of partition-level
+    -- concurrency keys.
+    local acctCap = check_concurrency(currentTime, keyAccountConcurrency, accountConcurrency)
+    if acctCap <= 0 then
+        -- There's no capacity available.  Increase the score for this partition so that
+        -- it's not immediately re-scanned.
+        redis.call("ZADD", keyGlobalPartitionPtr, noCapacityScore, partitionID)
+        -- Update that we attempted to lease this partition, even if there was no capacity.
+        existing.last = currentTime -- in ms.
+        redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existing))
+        return { -1 }
+    end
+
+    if acctCap <= capacity then
+        capacity = acctCap
     end
 end
 
@@ -72,10 +90,7 @@ existing.at = leaseTime
 existing.last = currentTime -- in ms.
 
 -- Update item and index score
-redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
+redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existing))
 redis.call("ZADD", keyGlobalPartitionPtr, leaseTime, partitionID) -- partition scored are in seconds.
-if has_shard_key(keyShardPartitionPtr) then
-    update_pointer_score_to(partitionID, keyShardPartitionPtr, leaseTime)
-end
 
-return existingTime
+return { existingTime, capacity }
