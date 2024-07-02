@@ -6,6 +6,7 @@ export const functionRunStatuses = [
   'QUEUED',
   'COMPLETED',
   'CANCELLED',
+  'PAUSED',
 ] as const;
 const FunctionRunEndedStatuses = ['CANCELLED', 'COMPLETED', 'FAILED'] as const;
 export type FunctionRunStatus = (typeof functionRunStatuses)[number];
