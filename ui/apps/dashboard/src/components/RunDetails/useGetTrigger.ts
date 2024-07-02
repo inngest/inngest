@@ -29,7 +29,9 @@ export function useGetTrigger(): (runID: string) => Promise<Trigger> {
     async (runID: string) => {
       let res;
       try {
-        res = await client.query(query, { envID: envID, runID }).toPromise();
+        res = await client
+          .query(query, { envID: envID, runID }, { requestPolicy: 'network-only' })
+          .toPromise();
       } catch (e) {
         if (e instanceof Error) {
           throw e;
