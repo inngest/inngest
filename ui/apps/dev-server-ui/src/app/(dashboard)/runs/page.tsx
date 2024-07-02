@@ -72,6 +72,7 @@ export default function Page() {
   const { data, fetchNextPage, isFetching } = useInfiniteQuery({
     queryKey: ['runs'],
     queryFn,
+    refetchInterval: 2500,
     initialPageParam: null,
     getNextPageParam: (lastPage) => {
       if (!lastPage) {
