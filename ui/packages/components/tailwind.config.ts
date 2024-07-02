@@ -71,6 +71,8 @@ export default {
           completedText: 'rgb(var(--color-primary-intense) / <alpha-value>)',
           cancelled: 'rgb(var(--color-foreground-cancelled) / <alpha-value>)',
           cancelledText: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
+          paused: 'rgb(var(--color-foreground-paused) / <alpha-value>)',
+          pausedText: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
         },
       },
       borderColor: {

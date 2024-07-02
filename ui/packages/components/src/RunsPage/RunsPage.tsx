@@ -39,6 +39,7 @@ type Props = {
   onScrollToTop: () => void;
   pathCreator: React.ComponentProps<typeof RunDetails>['pathCreator'];
   rerun: React.ComponentProps<typeof RunDetails>['rerun'];
+  functionIsPaused?: boolean;
 };
 
 export function RunsPage({
@@ -55,6 +56,7 @@ export function RunsPage({
   onScroll,
   onScrollToTop,
   pathCreator,
+  functionIsPaused,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -141,7 +143,11 @@ export function RunsPage({
               selectedDays={lastDays}
             />
           </SelectGroup>
-          <StatusFilter selectedStatuses={filteredStatus} onStatusesChange={onStatusFilterChange} />
+          <StatusFilter
+            selectedStatuses={filteredStatus}
+            onStatusesChange={onStatusFilterChange}
+            functionIsPaused={functionIsPaused}
+          />
         </div>
         {/* TODO: wire button */}
         <Button

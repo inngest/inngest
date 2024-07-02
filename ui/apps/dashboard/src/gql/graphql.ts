@@ -469,6 +469,8 @@ export enum FunctionRunStatus {
   Completed = 'COMPLETED',
   /** The function run has failed. */
   Failed = 'FAILED',
+  /** The function is paused. */
+  Paused = 'PAUSED',
   /** The function run has been scheduled. */
   Queued = 'QUEUED',
   /** The function run is currently running. */
@@ -1126,6 +1128,7 @@ export enum RunTraceSpanStatus {
   Cancelled = 'CANCELLED',
   Completed = 'COMPLETED',
   Failed = 'FAILED',
+  Paused = 'PAUSED',
   Running = 'RUNNING',
   Waiting = 'WAITING'
 }
