@@ -133,7 +133,9 @@ func (d *devserver) Pre(ctx context.Context) error {
 	)
 
 	// Autodiscover the URLs that are hosting Inngest SDKs on the local machine.
-	go d.runDiscovery(ctx)
+	if d.opts.Autodiscover {
+		go d.runDiscovery(ctx)
+	}
 
 	return d.apiservice.Pre(ctx)
 }
@@ -191,10 +193,7 @@ func (d *devserver) runDiscovery(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-
-		if d.opts.Autodiscover {
-			_ = discovery.Autodiscover(ctx)
-		}
+		_ = discovery.Autodiscover(ctx)
 
 		<-time.After(pollInterval)
 	}
