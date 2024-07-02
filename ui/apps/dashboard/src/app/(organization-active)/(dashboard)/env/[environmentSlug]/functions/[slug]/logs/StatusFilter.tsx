@@ -14,6 +14,7 @@ import getOrderedEnumValues from '@/utils/getOrderedEnumValues';
 const orderedStatuses = getOrderedEnumValues(FunctionRunStatus, [
   FunctionRunStatus.Queued,
   FunctionRunStatus.Running,
+  FunctionRunStatus.Paused,
   FunctionRunStatus.Cancelled,
   FunctionRunStatus.Completed,
   FunctionRunStatus.Failed,
@@ -22,9 +23,14 @@ const orderedStatuses = getOrderedEnumValues(FunctionRunStatus, [
 type StatusFilterProps = {
   selectedStatuses: FunctionRunStatus[];
   onStatusesChange: (statuses: FunctionRunStatus[]) => void;
+  functionIsPaused?: boolean;
 };
 
-export default function StatusFilter({ selectedStatuses, onStatusesChange }: StatusFilterProps) {
+export default function StatusFilter({
+  selectedStatuses,
+  onStatusesChange,
+  functionIsPaused,
+}: StatusFilterProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   function resetSelection(): void {
     onStatusesChange([]);
@@ -33,7 +39,16 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
     buttonRef.current?.click();
   }
 
-  const statusDots = orderedStatuses.map((status) => {
+  const availableStatuses = orderedStatuses.filter((status) => {
+    if (status === FunctionRunStatus.Paused) {
+      return !!functionIsPaused;
+    } else if (status === FunctionRunStatus.Running) {
+      return !functionIsPaused;
+    }
+    return true;
+  });
+
+  const statusDots = availableStatuses.map((status) => {
     const isSelected = selectedStatuses.includes(status);
     return (
       <span
@@ -72,7 +87,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
             >
               <Listbox.Options className="shadow-floating absolute left-0 z-10 mt-[5px] w-52 origin-top-left overflow-hidden rounded-md bg-white/95 text-sm font-medium text-slate-800 ring-1 ring-black/5 backdrop-blur-[3px] focus:outline-none">
                 <div className="py-[9px]">
-                  {orderedStatuses.map((status) => (
+                  {availableStatuses.map((status) => (
                     <Listbox.Option
                       key={status}
                       className="ui-active:bg-slate-100 flex cursor-pointer select-none items-center justify-between px-3.5 py-[5px] focus:outline-none"

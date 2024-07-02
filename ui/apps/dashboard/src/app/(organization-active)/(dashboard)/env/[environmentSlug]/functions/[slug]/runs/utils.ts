@@ -24,6 +24,8 @@ export function toRunStatus(status: FunctionRunStatus): FunctionRunStatusEnum {
       return FunctionRunStatusEnum.Queued;
     case 'RUNNING':
       return FunctionRunStatusEnum.Running;
+    case 'PAUSED':
+      return FunctionRunStatusEnum.Paused;
   }
 }
 

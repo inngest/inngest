@@ -116,10 +116,12 @@ export default function Connect({
             <div className="row flex items-center justify-center p-2">
               <NewButton
                 appearance="ghost"
-                icon={<RiArrowLeftSLine className="disabled:text-disabled text-basis" />}
+                icon={
+                  <RiArrowLeftSLine className="bg-canvasBase group-disabled:text-disabled text-basis h-6 w-6" />
+                }
                 disabled={page === 1}
                 onClick={() => setPage(1)}
-                className="mr-1 h-6"
+                className="group mr-1 h-6 w-6 p-0"
               />
               {[...Array(pages)].map((_, i) => (
                 <NewButton
@@ -128,15 +130,17 @@ export default function Connect({
                   disabled={page === i + 1}
                   label={i + 1}
                   onClick={() => setPage(i + 1)}
-                  className="text-basis bg-contrast mr-1 h-6 text-sm disabled:bg-black disabled:text-white"
+                  className="text-basis disabled:bg-contrast disabled:text-onContrast mr-1 h-6 w-6 text-sm"
                 />
               ))}
               <NewButton
                 appearance="ghost"
-                icon={<RiArrowRightSLine className="disabled:text-disabled text-basis " />}
+                icon={
+                  <RiArrowRightSLine className="bg-canvasBase group-disabled:text-disabled text-basis h-6 w-6" />
+                }
                 disabled={page === pages}
                 onClick={() => setPage(pages)}
-                className="h-6"
+                className="h-6 w-6 p-0"
               />
             </div>
           )}
