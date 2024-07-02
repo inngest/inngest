@@ -2,6 +2,7 @@ import type React from 'react';
 import { IconStatusCancelled } from '@inngest/components/icons/status/Cancelled';
 import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
 import { IconStatusFailed } from '@inngest/components/icons/status/Failed';
+import { IconStatusPaused } from '@inngest/components/icons/status/Paused';
 import { IconStatusQueued } from '@inngest/components/icons/status/Queued';
 import { IconStatusRunning } from '@inngest/components/icons/status/Running';
 import { IconStatusSkipped } from '@inngest/components/icons/status/Skipped';
@@ -18,6 +19,7 @@ const icons: Record<string, React.ComponentType> = {
   RUNNING: IconStatusRunning,
   QUEUED: IconStatusQueued,
   SKIPPED_PAUSED: IconStatusSkipped,
+  PAUSED: IconStatusPaused,
 } as const;
 
 type Props = {

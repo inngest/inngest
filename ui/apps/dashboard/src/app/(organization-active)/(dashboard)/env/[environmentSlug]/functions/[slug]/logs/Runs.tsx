@@ -127,6 +127,7 @@ export default function RunsPage({ params }: RunsPageProps) {
           <StatusFilter
             selectedStatuses={selectedStatuses}
             onStatusesChange={handleStatusesChange}
+            functionIsPaused={functionIsPaused}
           />
           <TimeRangeFilter
             selectedTimeField={selectedTimeField}

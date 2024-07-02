@@ -4,6 +4,7 @@ import { IconFunction } from '@inngest/components/icons/Function';
 import { IconStatusCancelled } from '@inngest/components/icons/status/Cancelled';
 import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
 import { IconStatusFailed } from '@inngest/components/icons/status/Failed';
+import { IconStatusPaused } from '@inngest/components/icons/status/Paused';
 import { IconStatusQueued } from '@inngest/components/icons/status/Queued';
 import { IconStatusRunning } from '@inngest/components/icons/status/Running';
 import { RiArrowRightSLine } from '@remixicon/react';
@@ -20,6 +21,7 @@ const functionRunStatusIcons = {
   [FunctionRunStatus.Failed]: IconStatusFailed,
   [FunctionRunStatus.Running]: IconStatusRunning,
   [FunctionRunStatus.Queued]: IconStatusQueued,
+  [FunctionRunStatus.Paused]: IconStatusPaused,
 } as const satisfies Record<FunctionRunStatus, SVGComponent>;
 
 const GetFunctionRunCardDocument = graphql(`
