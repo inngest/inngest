@@ -19,7 +19,7 @@ jobs:
           version: "8.15.8"
       - uses: actions/setup-node@v3
         with:
-          node-version: "18"
+          node-version: "20"
       # - run: pnpm install
       #   working-directory: ui/apps/dev-server-ui
       # - run: pnpm test
