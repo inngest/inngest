@@ -40,14 +40,15 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 )
 
-func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher, stepLimitOverrides map[string]int) *devserver {
+func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher, stepLimitOverrides, stateSizeLimitOverrides map[string]int) *devserver {
 	return &devserver{
-		data:               data,
-		runner:             runner,
-		opts:               opts,
-		handlerLock:        &sync.Mutex{},
-		publisher:          pb,
-		stepLimitOverrides: stepLimitOverrides,
+		data:                    data,
+		runner:                  runner,
+		opts:                    opts,
+		handlerLock:             &sync.Mutex{},
+		publisher:               pb,
+		stepLimitOverrides:      stepLimitOverrides,
+		stateSizeLimitOverrides: stateSizeLimitOverrides,
 	}
 }
 
@@ -62,7 +63,8 @@ type devserver struct {
 
 	data cqrs.Manager
 
-	stepLimitOverrides map[string]int
+	stepLimitOverrides      map[string]int
+	stateSizeLimitOverrides map[string]int
 
 	// runner stores the runner
 	runner    runner.Runner
