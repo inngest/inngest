@@ -2785,7 +2785,7 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 
 // RetrieveAndScheduleBatch retrieves all items from a started batch and schedules a function run
 func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
-	evtList, err := e.batcher.RetrieveItems(ctx, payload.FunctionID, payload.BatchID, payload.BatchPointer)
+	evtList, err := e.batcher.RetrieveItems(ctx, payload.FunctionID, payload.BatchID)
 	if err != nil {
 		return err
 	}
@@ -2847,7 +2847,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 	}
 
-	if err := e.batcher.ExpireKeys(ctx, payload.FunctionID, payload.BatchID, payload.BatchPointer); err != nil {
+	if err := e.batcher.ExpireKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
 		return err
 	}
 
