@@ -28,7 +28,9 @@ export function useGetTraceResult(): (traceID: string) => Promise<Result> {
     async (traceID: string) => {
       let res;
       try {
-        res = await client.query(query, { envID: envID, traceID }).toPromise();
+        res = await client
+          .query(query, { envID: envID, traceID }, { requestPolicy: 'network-only' })
+          .toPromise();
       } catch (e) {
         if (e instanceof Error) {
           throw e;
