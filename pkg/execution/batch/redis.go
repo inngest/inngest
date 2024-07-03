@@ -197,7 +197,7 @@ func (b redisBatchManager) StartExecution(ctx context.Context, functionId uuid.U
 		args,
 	).AsInt64()
 	if err != nil {
-		return "", fmt.Errorf("failed to start batch execuçtion: %w", err)
+		return "", fmt.Errorf("failed to start batch execution: %w", err)
 	}
 
 	switch status {
