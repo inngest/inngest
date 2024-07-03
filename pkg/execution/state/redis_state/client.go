@@ -45,34 +45,27 @@ type BatchClient struct {
 	kg            BatchKeyGenerator
 	client        RetriableClient
 	unshardedConn RetriableClient
-	isSharded     IsShardedWithAccountIdFn
 }
 
 func (b *BatchClient) KeyGenerator() BatchKeyGenerator {
 	return b.kg
 }
 
-func (f *BatchClient) Client(ctx context.Context, accountId uuid.UUID) (RetriableClient, bool) {
-	if f.isSharded(ctx, accountId) {
-		return f.client, true
-	}
-	return f.unshardedConn, false
-}
-
-func (f *BatchClient) ForceShardedClient() RetriableClient {
+// ShardedClient is used for creating and retrieving new batches
+func (f *BatchClient) ShardedClient() RetriableClient {
 	return f.client
 }
 
-func (f *BatchClient) ForceUnshardedClient() RetriableClient {
+// UnshardedClient is used for old batches that still need to be processed
+func (f *BatchClient) UnshardedClient() RetriableClient {
 	return f.unshardedConn
 }
 
-func NewBatchClient(r rueidis.Client, u *UnshardedClient, queueDefaultKey string, isSharded IsShardedWithAccountIdFn) *BatchClient {
+func NewBatchClient(r rueidis.Client, u *UnshardedClient, queueDefaultKey string) *BatchClient {
 	return &BatchClient{
 		kg:            batchKeyGenerator{queueDefaultKey: queueDefaultKey, queueItemKeyGenerator: queueItemKeyGenerator{queueDefaultKey: queueDefaultKey}},
 		client:        newRetryClusterDownClient(r),
 		unshardedConn: NewNoopRetriableClient(u.unshardedConn),
-		isSharded:     isSharded,
 	}
 }
 
@@ -82,13 +75,8 @@ type ShardedClient struct {
 }
 
 type IsShardedWithRunIdFn func(ctx context.Context, accountId uuid.UUID, runId ulid.ULID) bool
-type IsShardedWithAccountIdFn func(ctx context.Context, accountId uuid.UUID) bool
 
 func AlwaysShardOnRun(ctx context.Context, accountId uuid.UUID, runId ulid.ULID) bool {
-	return true
-}
-
-func AlwaysShardOnAccount(ctx context.Context, accountId uuid.UUID) bool {
 	return true
 }
 
@@ -106,13 +94,12 @@ type ShardedClientOpts struct {
 	QueueDefaultKey string
 
 	FnRunIsSharded IsShardedWithRunIdFn
-	BatchIsSharded IsShardedWithAccountIdFn
 }
 
 func NewShardedClient(opts ShardedClientOpts) *ShardedClient {
 	return &ShardedClient{
 		fnRunState: NewFunctionRunStateClient(opts.FunctionRunStateClient, opts.UnshardedClient, opts.StateDefaultKey, opts.FnRunIsSharded),
-		batch:      NewBatchClient(opts.BatchClient, opts.UnshardedClient, opts.QueueDefaultKey, opts.BatchIsSharded),
+		batch:      NewBatchClient(opts.BatchClient, opts.UnshardedClient, opts.QueueDefaultKey),
 	}
 }
 

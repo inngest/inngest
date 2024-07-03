@@ -147,7 +147,6 @@ func (c Config) SingleClusterManager(ctx context.Context) (state.Manager, error)
 			StateDefaultKey:        StateDefaultKey,
 			QueueDefaultKey:        QueueDefaultKey,
 			FnRunIsSharded:         AlwaysShardOnRun,
-			BatchIsSharded:         AlwaysShardOnAccount,
 		})),
 	)
 }

@@ -288,16 +288,16 @@ func (u queueKeyGenerator) ConcurrencyFnEWMA(fnID uuid.UUID) string {
 type BatchKeyGenerator interface {
 	// QueuePrefix returns the hash prefix used in the queue.
 	// This is likely going to be a redis specific requirement.
-	QueuePrefix(ctx context.Context, isSharded bool, functionId uuid.UUID) string
+	QueuePrefix(ctx context.Context, functionId uuid.UUID) string
 	// QueueItem returns the key for the hash containing all items within a
 	// queue for a function.  This is used to check leases on debounce jobs.
 	QueueItem() string
 	// BatchPointer returns the key used as the pointer reference to the
 	// actual batch
-	BatchPointer(ctx context.Context, isSharded bool, functionId uuid.UUID) string
+	BatchPointer(ctx context.Context, functionId uuid.UUID) string
 	// BatchPointerWithKey returns the key used as the pointer reference to the
 	// actual batch for a given batchKey
-	BatchPointerWithKey(ctx context.Context, isSharded bool, functionId uuid.UUID, key string) string
+	BatchPointerWithKey(ctx context.Context, functionId uuid.UUID, key string) string
 	// Batch returns the key used to store the specific batch of
 	// events, that is used to trigger a function run
 	Batch(ctx context.Context, isSharded bool, functionId uuid.UUID, batchId ulid.ULID) string
@@ -318,16 +318,16 @@ func (u batchKeyGenerator) PrefixByFunctionId(ctx context.Context, defaultPrefix
 	return defaultPrefix
 }
 
-func (u batchKeyGenerator) QueuePrefix(ctx context.Context, isSharded bool, functionId uuid.UUID) string {
-	return fmt.Sprintf("{%s}", u.PrefixByFunctionId(ctx, u.queueDefaultKey, isSharded, functionId))
+func (u batchKeyGenerator) QueuePrefix(ctx context.Context, functionId uuid.UUID) string {
+	return fmt.Sprintf("{%s}", u.PrefixByFunctionId(ctx, u.queueDefaultKey, true, functionId))
 }
 
-func (u batchKeyGenerator) BatchPointer(ctx context.Context, isSharded bool, functionId uuid.UUID) string {
-	return fmt.Sprintf("{%s}:workflows:%s:batch", u.PrefixByFunctionId(ctx, u.queueDefaultKey, isSharded, functionId), functionId)
+func (u batchKeyGenerator) BatchPointer(ctx context.Context, functionId uuid.UUID) string {
+	return fmt.Sprintf("{%s}:workflows:%s:batch", u.PrefixByFunctionId(ctx, u.queueDefaultKey, true, functionId), functionId)
 }
 
-func (u batchKeyGenerator) BatchPointerWithKey(ctx context.Context, isSharded bool, functionId uuid.UUID, batchKey string) string {
-	return fmt.Sprintf("%s:%s", u.BatchPointer(ctx, isSharded, functionId), batchKey)
+func (u batchKeyGenerator) BatchPointerWithKey(ctx context.Context, functionId uuid.UUID, batchKey string) string {
+	return fmt.Sprintf("%s:%s", u.BatchPointer(ctx, functionId), batchKey)
 }
 
 func (u batchKeyGenerator) Batch(ctx context.Context, isSharded bool, functionId uuid.UUID, batchID ulid.ULID) string {

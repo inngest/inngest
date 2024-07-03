@@ -83,7 +83,6 @@ func TestStateHarness(t *testing.T) {
 		StateDefaultKey:        StateDefaultKey,
 		QueueDefaultKey:        QueueDefaultKey,
 		FnRunIsSharded:         AlwaysShardOnRun,
-		BatchIsSharded:         AlwaysShardOnAccount,
 	})
 
 	sm, err := New(

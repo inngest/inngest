@@ -54,8 +54,8 @@ func (b redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inn
 	return fmt.Sprintf("%v", out), nil
 }
 
-func (b redisBatchManager) batchPointer(ctx context.Context, fn inngest.Function, isSharded bool, evt event.Event) (string, error) {
-	batchPointer := b.b.KeyGenerator().BatchPointer(ctx, isSharded, fn.ID)
+func (b redisBatchManager) batchPointer(ctx context.Context, fn inngest.Function, evt event.Event) (string, error) {
+	batchPointer := b.b.KeyGenerator().BatchPointer(ctx, fn.ID)
 
 	if fn.EventBatch.Key != nil {
 		batchKey, err := b.batchKey(ctx, evt, fn)
@@ -66,7 +66,7 @@ func (b redisBatchManager) batchPointer(ctx context.Context, fn inngest.Function
 		hashedBatchKey := sha256.Sum256([]byte(batchKey))
 		encodedBatchKey := base64.StdEncoding.EncodeToString(hashedBatchKey[:])
 
-		batchPointer = b.b.KeyGenerator().BatchPointerWithKey(ctx, isSharded, fn.ID, encodedBatchKey)
+		batchPointer = b.b.KeyGenerator().BatchPointerWithKey(ctx, fn.ID, encodedBatchKey)
 	}
 
 	return batchPointer, nil
@@ -91,9 +91,9 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 		return nil, fmt.Errorf("no batch config found for for function: %s", fn.Slug)
 	}
 
-	client, isSharded := b.b.Client(ctx, bi.AccountID)
+	client := b.b.ShardedClient()
 
-	batchPointer, err := b.batchPointer(ctx, fn, isSharded, bi.Event)
+	batchPointer, err := b.batchPointer(ctx, fn, bi.Event)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve batch pointer: %w", err)
 	}
@@ -110,7 +110,7 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 		bi,
 		newULID,
 		// This is used within the Lua script to create the batch metadata key
-		b.b.KeyGenerator().QueuePrefix(ctx, isSharded, bi.FunctionID),
+		b.b.KeyGenerator().QueuePrefix(ctx, bi.FunctionID),
 		enums.BatchStatusPending,
 		enums.BatchStatusStarted,
 	})
@@ -140,12 +140,7 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 func (b redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID, batchPointer string) ([]BatchItem, error) {
 	empty := make([]BatchItem, 0)
 
-	isSharded := b.isSharded(ctx, batchPointer, functionId)
-
-	client := b.b.ForceUnshardedClient()
-	if isSharded {
-		client = b.b.ForceShardedClient()
-	}
+	client, isSharded := b.isSharded(ctx, batchPointer, functionId)
 
 	itemStrList, err := retriableScripts["retrieve"].Exec(
 		ctx,
@@ -169,20 +164,21 @@ func (b redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.UU
 	return items, nil
 }
 
-func (b redisBatchManager) isSharded(ctx context.Context, batchPointer string, functionId uuid.UUID) bool {
-	return strings.HasPrefix(batchPointer, b.b.KeyGenerator().QueuePrefix(ctx, true, functionId))
+func (b redisBatchManager) isSharded(ctx context.Context, batchPointer string, functionId uuid.UUID) (redis_state.RetriableClient, bool) {
+	isSharded := strings.HasPrefix(batchPointer, b.b.KeyGenerator().QueuePrefix(ctx, functionId))
 
+	client := b.b.UnshardedClient()
+	if isSharded {
+		client = b.b.ShardedClient()
+	}
+
+	return client, isSharded
 }
 
 // StartExecution sets the status to `started`
 // If it has already started, don't do anything
 func (b redisBatchManager) StartExecution(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error) {
-	isSharded := b.isSharded(ctx, batchPointer, functionId)
-
-	client := b.b.ForceUnshardedClient()
-	if isSharded {
-		client = b.b.ForceShardedClient()
-	}
+	client, isSharded := b.isSharded(ctx, batchPointer, functionId)
 
 	keys := []string{
 		b.b.KeyGenerator().BatchMetadata(ctx, isSharded, functionId, batchID),
@@ -253,12 +249,7 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 
 // ExpireKeys sets the TTL for the keys related to the provided batchID.
 func (b redisBatchManager) ExpireKeys(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID, batchPointer string) error {
-	isSharded := b.isSharded(ctx, batchPointer, functionId)
-
-	client := b.b.ForceUnshardedClient()
-	if isSharded {
-		client = b.b.ForceShardedClient()
-	}
+	client, isSharded := b.isSharded(ctx, batchPointer, functionId)
 
 	keys := []string{
 		b.b.KeyGenerator().Batch(ctx, isSharded, functionId, batchID),
