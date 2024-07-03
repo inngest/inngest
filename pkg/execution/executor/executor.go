@@ -2881,6 +2881,11 @@ func (e *executor) validateStateSize(outputSize int, md sv2.Metadata) error {
 	// validate state size and exit early if we're over the limit
 	if e.stateSizeLimit != nil {
 		stateSizeLimit := e.stateSizeLimit(md.ID)
+
+		if stateSizeLimit == 0 {
+			stateSizeLimit = consts.DefaultMaxStateSizeLimit
+		}
+
 		if outputSize+md.Metrics.StateSize > stateSizeLimit {
 			return state.WrapInStandardError(
 				state.ErrStateOverflowed,
