@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -161,6 +162,14 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 			if strings.HasPrefix(strings.ToLower(evt.Name), "inngest/") {
 				err := fmt.Errorf("event name is reserved for internal use: %s", evt.Name)
 				return err
+			}
+
+			if _, ok := evt.Data["_inngest"]; ok {
+				// User event data must not have internal metadata since it can
+				// cause issues. For example, if an invoked function's event
+				// data is forwarded into a new event then it may accidentally
+				// fulfill the invocation
+				return errors.New("event data must not contain internal metadata (the _inngest key)")
 			}
 
 			ts := time.Now()
