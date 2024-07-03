@@ -2724,13 +2724,9 @@ func (e *executor) extractTraceCtx(ctx context.Context, md sv2.Metadata, item *q
 	return ctx
 }
 
-func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem) error {
-	return e.AppendAndScheduleBatchWithOpts(ctx, fn, bi, nil)
-}
-
-// AppendAndScheduleBatchWithOpts appends a new batch item. If a new batch is created, it will be scheduled to run
+// AppendAndScheduleBatch appends a new batch item. If a new batch is created, it will be scheduled to run
 // after the batch timeout. If the item finalizes the batch, a function run is immediately scheduled.
-func (e *executor) AppendAndScheduleBatchWithOpts(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *execution.BatchExecOpts) error {
+func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *execution.BatchExecOpts) error {
 	result, err := e.batcher.Append(ctx, bi, fn)
 	if err != nil {
 		return err
