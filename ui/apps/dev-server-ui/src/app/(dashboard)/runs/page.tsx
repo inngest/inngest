@@ -24,6 +24,8 @@ import { client } from '@/store/baseApi';
 import { GetRunsDocument, type GetRunsQuery } from '@/store/generated';
 import { pathCreator } from '@/utils/pathCreator';
 
+const pollInterval = 2500;
+
 export default function Page() {
   const [filteredStatus] = useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
   const [timeField = FunctionRunTimeField.QueuedAt] = useValidatedSearchParam(
@@ -72,7 +74,7 @@ export default function Page() {
   const { data, fetchNextPage, isFetching } = useInfiniteQuery({
     queryKey: ['runs'],
     queryFn,
-    refetchInterval: 2500,
+    refetchInterval: pollInterval,
     initialPageParam: null,
     getNextPageParam: (lastPage) => {
       if (!lastPage) {
@@ -145,6 +147,7 @@ export default function Page() {
       getTrigger={getTrigger}
       rerun={rerun}
       pathCreator={pathCreator}
+      pollInterval={pollInterval}
     />
   );
 }
