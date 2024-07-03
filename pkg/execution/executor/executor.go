@@ -2847,7 +2847,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 	}
 
-	if err := e.batcher.ExpireKeys(ctx, payload.AccountID, payload.BatchID, payload.BatchPointer); err != nil {
+	if err := e.batcher.ExpireKeys(ctx, payload.FunctionID, payload.BatchID, payload.BatchPointer); err != nil {
 		return err
 	}
 
