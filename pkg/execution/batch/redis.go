@@ -136,6 +136,18 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 	return result, nil
 }
 
+func (b redisBatchManager) isSharded(ctx context.Context, batchPointer string, functionId uuid.UUID) (redis_state.RetriableClient, bool) {
+	// Check whether passed batch pointer key includes sharded queue prefix
+	isSharded := strings.HasPrefix(batchPointer, b.b.KeyGenerator().QueuePrefix(ctx, functionId))
+
+	client := b.b.UnshardedClient()
+	if isSharded {
+		client = b.b.ShardedClient()
+	}
+
+	return client, isSharded
+}
+
 // RetrieveItems retrieve the data associated with the specified batch.
 func (b redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID, batchPointer string) ([]BatchItem, error) {
 	empty := make([]BatchItem, 0)
@@ -162,17 +174,6 @@ func (b redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.UU
 	}
 
 	return items, nil
-}
-
-func (b redisBatchManager) isSharded(ctx context.Context, batchPointer string, functionId uuid.UUID) (redis_state.RetriableClient, bool) {
-	isSharded := strings.HasPrefix(batchPointer, b.b.KeyGenerator().QueuePrefix(ctx, functionId))
-
-	client := b.b.UnshardedClient()
-	if isSharded {
-		client = b.b.ShardedClient()
-	}
-
-	return client, isSharded
 }
 
 // StartExecution sets the status to `started`
