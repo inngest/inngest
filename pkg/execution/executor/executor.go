@@ -2154,17 +2154,8 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		return err
 	}
 
-	// validate state size and exit early if we're over the limit
-	if e.stateSizeLimit != nil {
-		stateSizeLimit := e.stateSizeLimit(i.md.ID)
-		if len(output)+i.md.Metrics.StateSize > stateSizeLimit {
-			return state.WrapInStandardError(
-				state.ErrStateOverflowed,
-				state.InngestErrStateOverflowed,
-				fmt.Sprintf("The function run exceeded the state size limit of %d bytes.", stateSizeLimit),
-				"",
-			)
-		}
+	if err := e.validateStateSize(len(output), i.md); err != nil {
+		return err
 	}
 
 	if err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, []byte(output)); err != nil {
@@ -2881,6 +2872,23 @@ func (e *executor) RetrieveAndScheduleBatchWithOpts(ctx context.Context, fn inng
 
 	if err := e.batcher.ExpireKeys(ctx, payload.BatchID); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (e *executor) validateStateSize(outputSize int, md sv2.Metadata) error {
+	// validate state size and exit early if we're over the limit
+	if e.stateSizeLimit != nil {
+		stateSizeLimit := e.stateSizeLimit(md.ID)
+		if outputSize+md.Metrics.StateSize > stateSizeLimit {
+			return state.WrapInStandardError(
+				state.ErrStateOverflowed,
+				state.InngestErrStateOverflowed,
+				fmt.Sprintf("The function run exceeded the state size limit of %d bytes.", stateSizeLimit),
+				"",
+			)
+		}
 	}
 
 	return nil
