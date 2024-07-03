@@ -190,6 +190,13 @@ func WithStepLimits(limit func(id sv2.ID) int) ExecutorOpt {
 	}
 }
 
+func WithStateSizeLimits(limit func(id sv2.ID) int) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).stateSizeLimit = limit
+		return nil
+	}
+}
+
 func WithDebouncer(d debounce.Debouncer) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).debouncer = d
@@ -264,6 +271,9 @@ type executor struct {
 
 	// steplimit finds step limits for a given run.
 	steplimit func(sv2.ID) int
+
+	// stateSizeLimit finds state size limits for a given run
+	stateSizeLimit func(sv2.ID) int
 
 	preDeleteStateSizeReporter execution.PreDeleteStateSizeReporter
 }
@@ -1128,7 +1138,8 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 		if serr := e.HandleGeneratorResponse(ctx, i, resp); serr != nil {
 
 			// If this is an error compiling async expressions, fail the function.
-			if shouldFailEarly := errors.Is(serr, &expressions.CompileError{}); shouldFailEarly {
+			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed)
+			if shouldFailEarly {
 				var gracefulErr *state.WrappedStandardError
 				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
 					serialized := gracefulErr.Serialize(execution.StateErrorKey)
@@ -2081,6 +2092,9 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 		eg.Go(func() error { return e.handleGenerator(ctx, i, copied) })
 	}
 	if err := eg.Wait(); err != nil {
+		if errors.Is(err, state.ErrStateOverflowed) {
+			return err
+		}
 		if resp.NoRetry {
 			return queue.NeverRetryError(err)
 		}
@@ -2137,6 +2151,10 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 	// Save the response to the state store.
 	output, err := gen.Output()
 	if err != nil {
+		return err
+	}
+
+	if err := e.validateStateSize(len(output), i.md); err != nil {
 		return err
 	}
 
@@ -2849,6 +2867,28 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 
 	if err := e.batcher.ExpireKeys(ctx, payload.FunctionID, payload.BatchID, payload.BatchPointer); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (e *executor) validateStateSize(outputSize int, md sv2.Metadata) error {
+	// validate state size and exit early if we're over the limit
+	if e.stateSizeLimit != nil {
+		stateSizeLimit := e.stateSizeLimit(md.ID)
+
+		if stateSizeLimit == 0 {
+			stateSizeLimit = consts.DefaultMaxStateSizeLimit
+		}
+
+		if outputSize+md.Metrics.StateSize > stateSizeLimit {
+			return state.WrapInStandardError(
+				state.ErrStateOverflowed,
+				state.InngestErrStateOverflowed,
+				fmt.Sprintf("The function run exceeded the state size limit of %d bytes.", stateSizeLimit),
+				"",
+			)
+		}
 	}
 
 	return nil
