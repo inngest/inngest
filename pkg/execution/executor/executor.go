@@ -2767,11 +2767,14 @@ func (e *executor) AppendAndScheduleBatchWithOpts(ctx context.Context, fn innges
 	case enums.BatchFull:
 		// start execution immediately
 		batchID := ulid.MustParse(result.BatchID)
-		if err := e.RetrieveAndScheduleBatchWithOpts(ctx, fn, batch.ScheduleBatchPayload{
-			BatchID:     batchID,
-			AppID:       bi.AppID,
-			WorkspaceID: bi.WorkspaceID,
-			AccountID:   bi.AccountID,
+		if err := e.RetrieveAndScheduleBatch(ctx, fn, batch.ScheduleBatchPayload{
+			BatchID:         batchID,
+			BatchPointer:    result.BatchPointerKey,
+			AccountID:       bi.AccountID,
+			WorkspaceID:     bi.WorkspaceID,
+			AppID:           bi.AppID,
+			FunctionID:      bi.FunctionID,
+			FunctionVersion: bi.FunctionVersion,
 		}, &execution.BatchExecOpts{
 			FunctionPausedAt: opts.FunctionPausedAt,
 		}); err != nil {
@@ -2784,13 +2787,8 @@ func (e *executor) AppendAndScheduleBatchWithOpts(ctx context.Context, fn innges
 	return nil
 }
 
-func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload) error {
-	return e.RetrieveAndScheduleBatchWithOpts(ctx, fn, payload, nil)
-}
-
-// RetrieveAndScheduleBatchWithOpts retrieves all items from a started batch and schedules a function run
-func (e *executor) RetrieveAndScheduleBatchWithOpts(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
-
+// RetrieveAndScheduleBatch retrieves all items from a started batch and schedules a function run
+func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
 	evtList, err := e.batcher.RetrieveItems(ctx, payload.FunctionID, payload.BatchID, payload.BatchPointer)
 	if err != nil {
 		return err
