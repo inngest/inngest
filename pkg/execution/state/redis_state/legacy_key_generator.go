@@ -228,27 +228,6 @@ type legacyDebounceKeyGenerator interface {
 	Debounce(ctx context.Context) string
 }
 
-type legacyBatchKeyGenerator interface {
-	// QueuePrefix returns the hash prefix used in the queue.
-	// This is likely going to be a redis specific requirement.
-	QueuePrefix() string
-	// QueueItem returns the key for the hash containing all items within a
-	// queue for a function.  This is used to check leases on debounce jobs.
-	QueueItem() string
-	// BatchPointer returns the key used as the pointer reference to the
-	// actual batch
-	BatchPointer(context.Context, uuid.UUID) string
-	// BatchPointerWithKey returns the key used as the pointer reference to the
-	// actual batch for a given batchKey
-	BatchPointerWithKey(context.Context, uuid.UUID, string) string
-	// Batch returns the key used to store the specific batch of
-	// events, that is used to trigger a function run
-	Batch(context.Context, ulid.ULID) string
-	// BatchMetadata returns the key used to store the metadata related
-	// to a batch
-	BatchMetadata(context.Context, ulid.ULID) string
-}
-
 type legacyDefaultQueueKeyGenerator struct {
 	Prefix string
 }
