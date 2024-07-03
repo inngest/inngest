@@ -1,14 +1,5 @@
 name: Test Dev Server UI
 
-on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "ui/apps/dashboard/**"
-  pull_request:
-    paths-ignore:
-      - "ui/apps/dashboard/**"
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -19,8 +10,8 @@ jobs:
           version: "8.15.8"
       - uses: actions/setup-node@v3
         with:
-          node-version: "20"
-      # - run: pnpm install
-      #   working-directory: ui/apps/dev-server-ui
-      # - run: pnpm test
-      #   working-directory: ui/apps/dev-server-ui
+          node-version: "18"
+      - run: pnpm install
+        working-directory: ui/apps/dev-server-ui
+      - run: pnpm test
+        working-directory: ui/apps/dev-server-ui
