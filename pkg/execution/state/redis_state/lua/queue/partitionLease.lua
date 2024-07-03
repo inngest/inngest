@@ -56,12 +56,7 @@ if partitionConcurrency > 0 and #keyPartitionConcurrency > 0 then
     -- concurrency keys.
     capacity = check_concurrency(currentTime, keyPartitionConcurrency, partitionConcurrency)
     if capacity <= 0 then
-        -- There's no capacity available.  Increase the score for this partition so that
-        -- it's not immediately re-scanned.
-        redis.call("ZADD", keyGlobalPartitionPtr, noCapacityScore, partitionID)
-        -- Update that we attempted to lease this partition, even if there was no capacity.
-        existing.last = currentTime -- in ms.
-        redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existing))
+        requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, rartitionID, noCapacityScore, currentTime)
         return { -1 }
     end
 end
@@ -71,12 +66,7 @@ if accountConcurrency > 0 and #keyAccountConcurrency > 0 then
     -- concurrency keys.
     local acctCap = check_concurrency(currentTime, keyAccountConcurrency, accountConcurrency)
     if acctCap <= 0 then
-        -- There's no capacity available.  Increase the score for this partition so that
-        -- it's not immediately re-scanned.
-        redis.call("ZADD", keyGlobalPartitionPtr, noCapacityScore, partitionID)
-        -- Update that we attempted to lease this partition, even if there was no capacity.
-        existing.last = currentTime -- in ms.
-        redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existing))
+        requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, rartitionID, noCapacityScore, currentTime)
         return { -1 }
     end
 

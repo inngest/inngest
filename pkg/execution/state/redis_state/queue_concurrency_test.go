@@ -40,15 +40,15 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	workflowIDs := []uuid.UUID{limit_1, limit_10}
 
 	// Limit function concurrency by workflow ID.
-	pkf := func(ctx context.Context, p QueuePartition) int {
+	pkf := func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
 		switch p.FunctionID {
 		case &limit_1:
-			return 1
+			return 1, 1, 1
 		case &limit_10:
-			return 10
+			return 10, 10, 10
 		default:
 			// No concurrency, which means use the default concurrency limits.
-			return 0
+			return NoConcurrencyLimit, NoConcurrencyLimit, NoConcurrencyLimit
 		}
 	}
 
@@ -61,7 +61,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	q := NewQueue(
 		rc,
 		WithNumWorkers(100),
-		WithPartitionConcurrencyKeyGenerator(pkf),
+		WithConcurrencyLimitGetter(pkf),
 		WithQueueLifecycles(ll),
 	)
 

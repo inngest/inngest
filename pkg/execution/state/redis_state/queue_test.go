@@ -377,7 +377,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		r.FlushAll()
 
-		t.Run("Single key, function scope", func(t *testing.T) {
+		t.Run("Single custom key, function scope", func(t *testing.T) {
 			// Enqueueing an item
 			ck := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test", 1)
 			_, _, hash, _ := ck.ParseKey() // get the hash of the "test" string / evaluated input.
@@ -394,13 +394,13 @@ func TestQueueEnqueueItem(t *testing.T) {
 			items, _ := r.HKeys(defaultQueueKey.PartitionItem())
 			require.Equal(t, 1, len(items))
 
-			concurrencyPartition := getPartition(t, r, enums.PartitionTypeConcurrency, fnID, hash) // nb. also asserts that the partition exists
+			concurrencyPartition := getPartition(t, r, enums.PartitionTypeConcurrencyKey, fnID, hash) // nb. also asserts that the partition exists
 
 			require.Equal(t, QueuePartition{
-				ID:               q.kg.PartitionQueueSet(enums.PartitionTypeConcurrency, fnID.String(), hash),
+				ID:               q.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hash),
 				FunctionID:       &fnID,
 				AccountID:        &uuid.Nil,
-				PartitionType:    int(enums.PartitionTypeConcurrency),
+				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
 			}, concurrencyPartition)
 
@@ -435,22 +435,22 @@ func TestQueueEnqueueItem(t *testing.T) {
 			items, _ := r.HKeys(defaultQueueKey.PartitionItem())
 			require.Equal(t, 2, len(items))
 
-			concurrencyPartitionA := getPartition(t, r, enums.PartitionTypeConcurrency, fnID, hashA) // nb. also asserts that the partition exists
-			concurrencyPartitionB := getPartition(t, r, enums.PartitionTypeConcurrency, fnID, hashB) // nb. also asserts that the partition exists
+			concurrencyPartitionA := getPartition(t, r, enums.PartitionTypeConcurrencyKey, fnID, hashA) // nb. also asserts that the partition exists
+			concurrencyPartitionB := getPartition(t, r, enums.PartitionTypeConcurrencyKey, fnID, hashB) // nb. also asserts that the partition exists
 
 			require.Equal(t, QueuePartition{
-				ID:               q.kg.PartitionQueueSet(enums.PartitionTypeConcurrency, fnID.String(), hashA),
+				ID:               q.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashA),
 				FunctionID:       &fnID,
 				AccountID:        &uuid.Nil,
-				PartitionType:    int(enums.PartitionTypeConcurrency),
+				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
 			}, concurrencyPartitionA)
 
 			require.Equal(t, QueuePartition{
-				ID:               q.kg.PartitionQueueSet(enums.PartitionTypeConcurrency, fnID.String(), hashB),
+				ID:               q.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashB),
 				FunctionID:       &fnID,
 				AccountID:        &uuid.Nil,
-				PartitionType:    int(enums.PartitionTypeConcurrency),
+				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
 			}, concurrencyPartitionB)
 
@@ -795,10 +795,9 @@ func TestQueueLease(t *testing.T) {
 
 	t.Run("With partition concurrency limits", func(t *testing.T) {
 		// Only allow a single leased item
-		q.partitionConcurrencyGen = func(ctx context.Context, p QueuePartition) int {
-			return 1
+		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
+			return 1, 1, 1
 		}
-		q.accountConcurrencyGen = nil
 
 		// Create a new item
 		itemA, err := q.EnqueueItem(ctx, QueueItem{FunctionID: uuid.New()}, start)
@@ -826,15 +825,10 @@ func TestQueueLease(t *testing.T) {
 		})
 	})
 
-	// TODO: tonyhb, fix
 	t.Run("With account concurrency limits", func(t *testing.T) {
-		// Only allow a single leased item
-		q.partitionConcurrencyGen = func(ctx context.Context, p QueuePartition) int {
-			return 100
-		}
-		q.customConcurrencyGen = nil
-		q.accountConcurrencyGen = func(ctx context.Context, i QueueItem) int {
-			return 1
+		// Only allow a single leased item via account limits
+		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
+			return 100, 1, NoConcurrencyLimit
 		}
 
 		// Create a new item
@@ -857,10 +851,10 @@ func TestQueueLease(t *testing.T) {
 	})
 
 	t.Run("With custom concurrency limits", func(t *testing.T) {
-		q.partitionConcurrencyGen = func(ctx context.Context, p QueuePartition) int {
-			return 100
+		// Only allow a single leased item via account limits
+		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
+			return 100, 100, 1
 		}
-		q.accountConcurrencyGen = nil
 		q.customConcurrencyGen = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
 			return []state.CustomConcurrency{
 				{
@@ -1386,9 +1380,9 @@ func TestQueuePartitionLease(t *testing.T) {
 		require.NoError(t, err)
 
 		p := QueuePartition{
-			ID:               q.kg.PartitionQueueSet(enums.PartitionTypeConcurrency, fnID.String(), hash),
+			ID:               q.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hash),
 			FunctionID:       &fnID,
-			PartitionType:    int(enums.PartitionTypeConcurrency),
+			PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 			ConcurrencyScope: int(enums.ConcurrencyScopeFn),
 		}
 
@@ -1824,8 +1818,8 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		pf: func(ctx context.Context, p QueuePartition) uint {
 			return PriorityMin
 		},
-		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) int {
-			return 100
+		concurrencyLimitGetter: func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
+			return 100, 100, 100
 		},
 		itemIndexer: QueueItemIndexerFunc,
 	}
