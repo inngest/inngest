@@ -92,6 +92,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stepLimitOverrides := make(map[string]int)
+	stateSizeLimitOverrides := make(map[string]int)
 
 	shardedRc, err := createInmemoryRedis(ctx, opts.Tick)
 	if err != nil {
@@ -246,6 +247,14 @@ func start(ctx context.Context, opts StartOpts) error {
 
 			return consts.DefaultMaxStepLimit
 		}),
+		executor.WithStateSizeLimits(func(id sv2.ID) int {
+			if override, hasOverride := stateSizeLimitOverrides[id.FunctionID.String()]; hasOverride {
+				logger.From(ctx).Warn().Msgf("Using state size limit override of %d for %q\n", override, id.FunctionID)
+				return override
+			}
+
+			return consts.DefaultMaxStateSizeLimit
+		}),
 		executor.WithInvokeFailHandler(getInvokeFailHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
@@ -281,7 +290,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	// The devserver embeds the event API.
-	ds := newService(opts, runner, dbcqrs, pb, stepLimitOverrides)
+	ds := newService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides)
 	// embed the tracker
 	ds.tracker = t
 	ds.state = sm
