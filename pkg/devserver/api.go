@@ -69,6 +69,8 @@ func (a *devapi) addRoutes() {
 	// This allows tests to update step limits per function
 	a.Post("/fn/step-limit", a.SetStepLimit)
 	a.Delete("/fn/step-limit", a.RemoveStepLimit)
+	a.Post("/fn/state-size-limit", a.SetStateSizeLimit)
+	a.Delete("/fn/state-size-limit", a.RemoveStateSizeLimit)
 
 	// Go embeds files relative to the current source, which embeds
 	// all under ./static.  We remove the ./static
@@ -517,6 +519,30 @@ func (a devapi) RemoveStepLimit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	delete(a.devserver.stepLimitOverrides, functionId)
+}
+
+func (a devapi) SetStateSizeLimit(w http.ResponseWriter, r *http.Request) {
+	functionId := r.FormValue("functionId")
+	limitStr := r.FormValue("limit")
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid limit: %s", limitStr))
+		return
+	}
+
+	a.devserver.stateSizeLimitOverrides[functionId] = limit
+}
+
+func (a devapi) RemoveStateSizeLimit(w http.ResponseWriter, r *http.Request) {
+	functionId := r.FormValue("functionId")
+
+	if _, ok := a.devserver.stateSizeLimitOverrides[functionId]; !ok {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(nil, 404, "No state size limit set for function: %s", functionId))
+		return
+	}
+
+	delete(a.devserver.stateSizeLimitOverrides, functionId)
 }
 
 func (a devapi) err(ctx context.Context, w http.ResponseWriter, status int, err error) {

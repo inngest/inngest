@@ -38,11 +38,14 @@ var (
 	ErrFunctionOverflowed = fmt.Errorf("function has too many steps")
 	ErrDuplicateResponse  = fmt.Errorf("duplicate response")
 	ErrEventNotFound      = fmt.Errorf("event not found in state store")
+	ErrStateOverflowed    = fmt.Errorf("state is too large")
 )
 
 const (
 	// InngestErrFunctionOverflowed is the public error code for ErrFunctionOverflowed
 	InngestErrFunctionOverflowed = "InngestErrFunctionOverflowed"
+	// InngestErrStateOverflowed is the public error code for ErrStateOverflowed
+	InngestErrStateOverflowed = "InngestErrStateOverflowed"
 )
 
 // Identifier represents the unique identifier for a workflow run.
