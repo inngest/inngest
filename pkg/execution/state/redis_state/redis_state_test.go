@@ -195,7 +195,6 @@ func BenchmarkNew(b *testing.B) {
 		StateDefaultKey:        statePrefix,
 		QueueDefaultKey:        QueueDefaultKey,
 		FnRunIsSharded:         AlwaysShardOnRun,
-		BatchIsSharded:         AlwaysShardOnAccount,
 	})
 
 	sm, err := New(
