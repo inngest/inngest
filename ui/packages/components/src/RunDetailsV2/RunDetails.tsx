@@ -23,6 +23,7 @@ type Props = {
     app: (params: { externalAppID: string }) => Route;
     runPopout: (params: { runID: string }) => Route;
   };
+  pollInterval?: number;
   rerun: React.ComponentProps<typeof RunInfo>['rerun'];
   runID: string;
 };
@@ -41,19 +42,42 @@ type Run = {
 };
 
 export function RunDetails(props: Props) {
-  const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
+  const { getResult, getRun, getTrigger, pathCreator, pollInterval, rerun, runID, standalone } =
+    props;
   const [error, setError] = useState<Error>();
 
   const [run, setRun] = useState<Run>();
+  const endedAt = run?.trace?.endedAt;
   useEffect(() => {
-    if (!run) {
+    if (endedAt) {
+      // Don't poll if the run has ended
+      return;
+    }
+
+    if (!pollInterval) {
+      if (run) {
+        // Nothing left to fetch
+        return;
+      }
+
       withRetry(() => getRun(runID))
         .then((data) => {
           setRun(data);
         })
         .catch(setError);
+      return;
     }
-  }, []);
+
+    const interval = setInterval(() => {
+      withRetry(() => getRun(runID))
+        .then((data) => {
+          setRun(data);
+        })
+        .catch(setError);
+    }, pollInterval);
+
+    return () => clearInterval(interval);
+  }, [endedAt, getRun, pollInterval, runID]);
 
   const [result, setResult] = useState<Result>();
   const outputID = run?.trace?.outputID;
