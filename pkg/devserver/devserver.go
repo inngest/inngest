@@ -111,7 +111,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
 		BatchClient:            shardedRc,
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
-		BatchIsSharded:         redis_state.AlwaysShardOnAccount,
 	})
 
 	var sm state.Manager
