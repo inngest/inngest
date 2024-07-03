@@ -67,10 +67,12 @@ func TestVerifyKeyGenerator(t *testing.T) {
 	newBatchKg := batchKeyGenerator{queueDefaultKey: "queue", queueItemKeyGenerator: queueItemKg}
 	var legacyBatchKg legacyBatchKeyGenerator = legacyDefaultkg
 
-	assert.Equal(t, legacyBatchKg.QueuePrefix(), newBatchKg.QueuePrefix(ctx, false, fakeUuid))
+	// QueuePrefix is only used for writing new batches in Append() / append.lua, which always uses sharding now.
+	// assert.Equal(t, legacyBatchKg.QueuePrefix(), newBatchKg.QueuePrefix(ctx, false, fakeUuid))
+	// BatchPointers are generated once on append and passed around after that, so old keys will stay unsharded while new keys always use sharding.
+	//assert.Equal(t, legacyBatchKg.BatchPointer(ctx, fakeUuid), newBatchKg.BatchPointer(ctx, false, fakeUuid))
+	//assert.Equal(t, legacyBatchKg.BatchPointerWithKey(ctx, fakeUuid, "key"), newBatchKg.BatchPointerWithKey(ctx, false, fakeUuid, "key"))
 	assert.Equal(t, legacyBatchKg.QueueItem(), newBatchKg.QueueItem())
-	assert.Equal(t, legacyBatchKg.BatchPointer(ctx, fakeUuid), newBatchKg.BatchPointer(ctx, false, fakeUuid))
-	assert.Equal(t, legacyBatchKg.BatchPointerWithKey(ctx, fakeUuid, "key"), newBatchKg.BatchPointerWithKey(ctx, false, fakeUuid, "key"))
 	assert.Equal(t, legacyBatchKg.Batch(ctx, fakeUlid), newBatchKg.Batch(ctx, false, fakeUuid, fakeUlid))
 	assert.Equal(t, legacyBatchKg.BatchMetadata(ctx, fakeUlid), newBatchKg.BatchMetadata(ctx, false, fakeUuid, fakeUlid))
 
