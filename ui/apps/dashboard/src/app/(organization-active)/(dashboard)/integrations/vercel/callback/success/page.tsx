@@ -5,6 +5,7 @@ import { RiCheckLine, RiInformationLine } from '@remixicon/react';
 
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import VercelIntegrationCallbackSuccessPage from './oldPage';
+import SuccessRedirect from './successRedirect';
 
 type SuccessProps = {
   searchParams: {
@@ -59,13 +60,7 @@ export default async function SuccessPage({ searchParams }: SuccessProps) {
           </div>
         </div>
         <div>
-          <NewButton
-            kind="primary"
-            appearance="solid"
-            size="medium"
-            label="Continue to Inngest Vercel Dashbaord"
-            href="/settings/integrations/vercel"
-          />
+          <SuccessRedirect searchParams={searchParams} />
         </div>
       </>
     </div>
