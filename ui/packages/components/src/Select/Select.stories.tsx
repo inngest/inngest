@@ -115,6 +115,7 @@ export const SelectWithSearchInput: Story = {
               {option.name}
             </SelectWithSearch.CheckboxOption>
           ))}
+          <SelectWithSearch.Footer onReset={() => setSelectedOption([])} />
         </SelectWithSearch.Options>
       </SelectWithSearch>
     );

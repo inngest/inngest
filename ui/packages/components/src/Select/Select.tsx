@@ -1,6 +1,7 @@
 import { Combobox, Listbox, type ComboboxInputProps } from '@headlessui/react';
 import { RiArrowDownSLine } from '@remixicon/react';
 
+import { NewButton as InngestButton } from '../Button';
 import { Checkbox } from '../Checkbox';
 import { cn } from '../utils/classNames';
 
@@ -142,6 +143,14 @@ function CheckboxOption({
   );
 }
 
+function Footer({ onReset }: { onReset: () => void }) {
+  return (
+    <div className="border-muted mt-1 flex items-center justify-between border-t px-2 pb-1.5 pt-2.5">
+      {onReset && <InngestButton label="Reset" appearance="ghost" size="small" onClick={onReset} />}
+    </div>
+  );
+}
+
 Select.Button = (
   props: React.PropsWithChildren<{ isLabelVisible?: boolean; className?: string }>
 ) => <Button {...props} as={Listbox.Button} />;
@@ -152,6 +161,7 @@ Select.Option = (props: React.PropsWithChildren<{ option: Option }>) => (
 Select.CheckboxOption = (props: React.PropsWithChildren<{ option: Option }>) => (
   <CheckboxOption {...props} as={Listbox.Option} />
 );
+Select.Footer = Footer;
 
 export function SelectWithSearch({
   defaultValue,
@@ -203,6 +213,7 @@ SelectWithSearch.CheckboxOption = (props: React.PropsWithChildren<{ option: Opti
   <CheckboxOption {...props} as={Combobox.Option} />
 );
 SelectWithSearch.SearchInput = Search;
+SelectWithSearch.Footer = Footer;
 
 // Used as a wrapper when we group select components in something similar to a button group
 export function SelectGroup({ children }: React.PropsWithChildren) {
