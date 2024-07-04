@@ -1,4 +1,4 @@
-import { Listbox } from '@headlessui/react';
+import { Combobox, Listbox, type ComboboxInputProps } from '@headlessui/react';
 import { RiArrowDownSLine } from '@remixicon/react';
 
 import { Checkbox } from '../Checkbox';
@@ -152,6 +152,57 @@ Select.Option = (props: React.PropsWithChildren<{ option: Option }>) => (
 Select.CheckboxOption = (props: React.PropsWithChildren<{ option: Option }>) => (
   <CheckboxOption {...props} as={Listbox.Option} />
 );
+
+export function SelectWithSearch({
+  defaultValue,
+  label,
+  isLabelVisible = true,
+  children,
+  onChange,
+  multiple,
+  className,
+}: Props) {
+  return (
+    //@ts-ignore
+    <Combobox value={defaultValue} onChange={onChange} multiple={multiple}>
+      <span
+        className={cn(
+          isLabelVisible && 'divide-muted bg-canvasSubtle text-basis divide-x',
+          'border-muted flex items-center rounded-md border text-sm',
+          className
+        )}
+      >
+        <Combobox.Label className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2')}>
+          {label}
+        </Combobox.Label>
+        <span className="relative w-full">{children}</span>
+      </span>
+    </Combobox>
+  );
+}
+
+function Search<T>({ ...props }: ComboboxInputProps<'input', T>) {
+  return (
+    <Combobox.Input
+      className="border-subtle text-basis bg-surfaceBase placeholder:text-disabled mx-2 my-2 rounded-lg border px-4 py-2"
+      {...props}
+    />
+  );
+}
+
+SelectWithSearch.Button = (
+  props: React.PropsWithChildren<{ isLabelVisible?: boolean; className?: string }>
+) => <Button {...props} as={Combobox.Button} />;
+SelectWithSearch.Options = (props: React.PropsWithChildren) => (
+  <Options {...props} as={Combobox.Options} />
+);
+SelectWithSearch.Option = (props: React.PropsWithChildren<{ option: Option }>) => (
+  <Option {...props} as={Combobox.Option} />
+);
+SelectWithSearch.CheckboxOption = (props: React.PropsWithChildren<{ option: Option }>) => (
+  <CheckboxOption {...props} as={Combobox.Option} />
+);
+SelectWithSearch.SearchInput = Search;
 
 // Used as a wrapper when we group select components in something similar to a button group
 export function SelectGroup({ children }: React.PropsWithChildren) {

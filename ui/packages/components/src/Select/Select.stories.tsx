@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { Select, SelectGroup } from './Select';
+import { Select, SelectGroup, SelectWithSearch, type Option } from './Select';
 
 const meta = {
   title: 'Components/Select',
@@ -17,6 +18,17 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<typeof Select>;
+
+const options: Option[] = [
+  {
+    id: 'id1',
+    name: 'Option 1',
+  },
+  {
+    id: 'id2',
+    name: 'Option 2',
+  },
+];
 
 export const WithLabel: Story = {
   render: () => (
@@ -53,7 +65,7 @@ export const WithOption: Story = {
 
 export const WithCheckboxOption: Story = {
   render: () => (
-    <Select onChange={() => {}} label="Status" isLabelVisible={false}>
+    <Select onChange={() => {}} label="Status" isLabelVisible={false} multiple>
       <Select.Button>Select</Select.Button>
       <Select.Options>
         <Select.CheckboxOption option={{ id: 'option1', name: 'Option 1' }}>
@@ -62,6 +74,51 @@ export const WithCheckboxOption: Story = {
       </Select.Options>
     </Select>
   ),
+};
+
+export const SelectWithSearchInput: Story = {
+  render: () => {
+    const [selectedOption, setSelectedOption] = useState(options);
+    const [query, setQuery] = useState('');
+
+    const filteredOptions =
+      query === ''
+        ? options
+        : options.filter((option) => {
+            return option.name.toLowerCase().includes(query.toLowerCase());
+          });
+    return (
+      <SelectWithSearch
+        defaultValue={selectedOption}
+        onChange={(value: Option[]) => {
+          const newValue: Option[] = [];
+          value.forEach((option) => {
+            newValue.push(option);
+          });
+          setSelectedOption(newValue);
+        }}
+        label="Status"
+        isLabelVisible={false}
+        multiple
+      >
+        <SelectWithSearch.Button>
+          Cancel suspended runs for paused function after timeout
+        </SelectWithSearch.Button>
+        <SelectWithSearch.Options>
+          <SelectWithSearch.SearchInput
+            displayValue={(option: Option) => option?.name}
+            placeholder="Search for function"
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          {filteredOptions.map((option) => (
+            <SelectWithSearch.CheckboxOption key={option.id} option={option}>
+              {option.name}
+            </SelectWithSearch.CheckboxOption>
+          ))}
+        </SelectWithSearch.Options>
+      </SelectWithSearch>
+    );
+  },
 };
 
 export const GroupOfSelects: Story = {
