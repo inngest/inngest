@@ -194,7 +194,7 @@ export function SelectWithSearch({
 function Search<T>({ ...props }: ComboboxInputProps<'input', T>) {
   return (
     <Combobox.Input
-      className="border-subtle text-basis bg-surfaceBase placeholder:text-disabled mx-2 my-2 rounded-lg border px-4 py-2"
+      className="border-subtle text-basis bg-surfaceBase placeholder:text-disabled focus-visible:outline-primary-moderate mx-2 my-2 rounded-lg border px-4 py-2"
       {...props}
     />
   );

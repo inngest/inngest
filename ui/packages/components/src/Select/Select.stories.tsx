@@ -101,13 +101,11 @@ export const SelectWithSearchInput: Story = {
         isLabelVisible={false}
         multiple
       >
-        <SelectWithSearch.Button>
-          Cancel suspended runs for paused function after timeout
-        </SelectWithSearch.Button>
+        <SelectWithSearch.Button>Select Options</SelectWithSearch.Button>
         <SelectWithSearch.Options>
           <SelectWithSearch.SearchInput
             displayValue={(option: Option) => option?.name}
-            placeholder="Search for function"
+            placeholder="Search for option"
             onChange={(event) => setQuery(event.target.value)}
           />
           {filteredOptions.map((option) => (
