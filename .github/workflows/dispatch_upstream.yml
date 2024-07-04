@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - ktlo/dispatch-upstreaming
 
 jobs:
   dispatch:
