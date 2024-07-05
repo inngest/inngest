@@ -10,6 +10,7 @@ import { Timeline } from '../TimelineV2/Timeline';
 import { TriggerDetails } from '../TriggerDetails';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
+import { withRetry } from '../utils/retry';
 import { RunInfo } from './RunInfo';
 
 type Props = {
@@ -22,6 +23,7 @@ type Props = {
     app: (params: { externalAppID: string }) => Route;
     runPopout: (params: { runID: string }) => Route;
   };
+  pollInterval?: number;
   rerun: React.ComponentProps<typeof RunInfo>['rerun'];
   runID: string;
 };
@@ -40,24 +42,54 @@ type Run = {
 };
 
 export function RunDetails(props: Props) {
-  const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
+  const { getResult, getRun, getTrigger, pathCreator, pollInterval, rerun, runID, standalone } =
+    props;
+  const [error, setError] = useState<Error>();
 
   const [run, setRun] = useState<Run>();
+  const endedAt = run?.trace?.endedAt;
   useEffect(() => {
-    if (!run) {
-      getRun(runID).then((data) => {
-        setRun(data);
-      });
+    if (endedAt) {
+      // Don't poll if the run has ended
+      return;
     }
-  }, [run, runID]);
+
+    if (!pollInterval) {
+      if (run) {
+        // Nothing left to fetch
+        return;
+      }
+
+      withRetry(() => getRun(runID))
+        .then((data) => {
+          setRun(data);
+        })
+        .catch(setError);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      withRetry(() => getRun(runID))
+        .then((data) => {
+          setRun(data);
+        })
+        .catch(setError);
+    }, pollInterval);
+
+    return () => clearInterval(interval);
+  }, [endedAt, getRun, pollInterval, runID]);
 
   const [result, setResult] = useState<Result>();
   const outputID = run?.trace?.outputID;
   useEffect(() => {
     if (!result && outputID) {
-      getResult(outputID).then((data) => {
-        setResult(data);
-      });
+      withRetry(() => getResult(outputID))
+        .then((data) => {
+          setResult(data);
+        })
+        .catch(() => {
+          toast.error('Failed to fetch run result');
+        });
     }
   }, [result, outputID]);
 
@@ -70,6 +102,10 @@ export function RunDetails(props: Props) {
       console.error(e);
     }
   }, [props.cancelRun]);
+
+  if (error) {
+    throw error;
+  }
 
   return (
     <div>
