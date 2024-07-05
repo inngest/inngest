@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -164,13 +163,11 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 
-			if _, ok := evt.Data["_inngest"]; ok {
-				// User event data must not have internal metadata since it can
-				// cause issues. For example, if an invoked function's event
-				// data is forwarded into a new event then it may accidentally
-				// fulfill the invocation
-				return errors.New("event data must not contain internal metadata (the _inngest key)")
-			}
+			// External event (i.e. doesn't have the "inngest/" prefix) data
+			// must not have internal metadata since it can cause issues. For
+			// example, if an invoked function's event data is forwarded into a
+			// new event then it may accidentally fulfill the invocation
+			delete(evt.Data, "_inngest")
 
 			ts := time.Now()
 			if evt.Timestamp == 0 {
