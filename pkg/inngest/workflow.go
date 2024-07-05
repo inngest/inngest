@@ -87,6 +87,10 @@ func (s WorkflowStep) RetryCount() int {
 }
 
 type RateLimit struct {
+	// Burst is how many extra function runs can be triggered within a time
+	// bucket. Note that increasing this value may lead to rate limit exceedance
+	Burst *uint `json:"burst,omitempty"`
+
 	// Limit is how often the function can be called within the specified period
 	Limit uint `json:"limit"`
 	// Period represents the time period for throttling the function
