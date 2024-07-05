@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -158,7 +157,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 
-			if strings.HasPrefix(strings.ToLower(evt.Name), "inngest/") {
+			if evt.IsInternal() {
 				err := fmt.Errorf("event name is reserved for internal use: %s", evt.Name)
 				return err
 			}
