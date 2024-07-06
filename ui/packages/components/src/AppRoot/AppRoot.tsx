@@ -1,4 +1,4 @@
-import { circular, circularMono, interTight, robotoMono } from './fonts';
+import { interTight, robotoMono } from './fonts';
 import './globals.css';
 
 export function AppRoot({
@@ -13,9 +13,9 @@ export function AppRoot({
   return (
     <html
       lang="en"
-      className={`${devServer ? interTight.variable : circular.variable} ${
-        devServer ? robotoMono : circularMono.variable
-      } ${mode || ''} h-full`}
+      className={`${devServer ? interTight.variable : ''} ${devServer ? robotoMono : ''} ${
+        mode || ''
+      } h-full`}
     >
       <body className="dark:bg-slate-940 h-full overflow-auto bg-white">
         <div id="app" />
