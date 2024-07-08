@@ -50,7 +50,9 @@ export function Select({
           className
         )}
       >
-        <Listbox.Label className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2')}>
+        <Listbox.Label
+          className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2 capitalize')}
+        >
           {label}
         </Listbox.Label>
         <span className="relative w-full">{children}</span>
@@ -182,7 +184,9 @@ export function SelectWithSearch({
           className
         )}
       >
-        <Combobox.Label className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2')}>
+        <Combobox.Label
+          className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2 capitalize')}
+        >
           {label}
         </Combobox.Label>
         <span className="relative w-full">{children}</span>
