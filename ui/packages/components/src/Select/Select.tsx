@@ -174,23 +174,37 @@ export function SelectWithSearch({
   multiple,
   className,
 }: Props) {
-  return (
-    //@ts-ignore
-    <Combobox value={defaultValue} onChange={onChange} multiple={multiple}>
-      <span
-        className={cn(
-          isLabelVisible && 'divide-muted bg-canvasSubtle text-basis divide-x',
-          'border-muted flex items-center rounded-md border text-sm',
-          className
-        )}
+  const content = (
+    <span
+      className={cn(
+        isLabelVisible && 'divide-muted bg-canvasSubtle text-basis divide-x',
+        'border-muted flex items-center rounded-md border text-sm',
+        className
+      )}
+    >
+      <Combobox.Label
+        className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2 capitalize')}
       >
-        <Combobox.Label
-          className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2 capitalize')}
-        >
-          {label}
-        </Combobox.Label>
-        <span className="relative w-full">{children}</span>
-      </span>
+        {label}
+      </Combobox.Label>
+      <span className="relative w-full">{children}</span>
+    </span>
+  );
+
+  // This conditional is only necessary because of a TypeScript limitation: it's
+  // having a hard time understanding how the types of `defaultValue` and
+  // `onChange` vary with `multiple`
+  if (multiple) {
+    return (
+      <Combobox value={defaultValue} onChange={onChange} multiple={multiple}>
+        {content}
+      </Combobox>
+    );
+  }
+
+  return (
+    <Combobox value={defaultValue} onChange={onChange} multiple={multiple}>
+      {content}
     </Combobox>
   );
 }
