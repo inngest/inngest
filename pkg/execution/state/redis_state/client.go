@@ -33,6 +33,9 @@ func (f *FunctionRunStateClient) ForceShardedClient() RetriableClient {
 }
 
 func NewFunctionRunStateClient(r rueidis.Client, u *UnshardedClient, stateDefaultKey string, isSharded IsShardedWithRunIdFn) *FunctionRunStateClient {
+	if r == nil {
+		panic("missing function run state client")
+	}
 	return &FunctionRunStateClient{
 		kg:            &runStateKeyGenerator{stateDefaultKey: stateDefaultKey},
 		client:        newRetryClusterDownClient(r),
@@ -62,6 +65,9 @@ func (f *BatchClient) UnshardedClient() RetriableClient {
 }
 
 func NewBatchClient(r rueidis.Client, u *UnshardedClient, queueDefaultKey string) *BatchClient {
+	if r == nil {
+		panic("missing batch redis client")
+	}
 	return &BatchClient{
 		kg:            batchKeyGenerator{queueDefaultKey: queueDefaultKey, queueItemKeyGenerator: queueItemKeyGenerator{queueDefaultKey: queueDefaultKey}},
 		client:        newRetryClusterDownClient(r),
