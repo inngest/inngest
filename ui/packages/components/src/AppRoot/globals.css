@@ -346,3 +346,25 @@
  * www.inngest.com (monthly pageviews: < 1M)
  *
  */
+@font-face {
+  font-family: 'CircularXX';
+  font-style: normal;
+  font-display: fallback;
+  font-weight: 100 400;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'CircularXX';
+  font-style: normal;
+  font-display: fallback;
+  font-weight: 500 900;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Medium.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'CircularXXMono';
+  font-style: normal;
+  font-display: fallback;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXMonoWeb-Regular.woff2') format('woff2');
+}
