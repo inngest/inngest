@@ -4,6 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { RiContractRightFill, RiExpandLeftFill } from '@remixicon/react';
 import { useLocalStorage } from 'react-use';
+import { toast } from 'sonner';
 
 import { Card } from '../Card';
 import { CodeBlock } from '../CodeBlock';
@@ -17,6 +18,7 @@ import {
 } from '../DetailsCard/Element';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import { cn } from '../utils/classNames';
+import { withRetry } from '../utils/retry';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
 
 type Props = {
@@ -42,9 +44,13 @@ export function TriggerDetails({ className, getTrigger, runID }: Props) {
   const { isRunning, send } = useDevServer();
 
   useEffect(() => {
-    getTrigger(runID).then((data) => {
-      setTrigger(data);
-    });
+    withRetry(() => getTrigger(runID))
+      .then((data) => {
+        setTrigger(data);
+      })
+      .catch(() => {
+        toast.error('Failed to fetch trigger details');
+      });
   }, [getTrigger]);
 
   const prettyPayload = useMemo(() => {
