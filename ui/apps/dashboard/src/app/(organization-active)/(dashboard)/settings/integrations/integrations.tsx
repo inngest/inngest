@@ -8,7 +8,7 @@ import { IconNetlify } from '@inngest/components/icons/platforms/Netlify';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiExternalLinkLine } from '@remixicon/react';
 
-import { useVercelIntegration } from './vercel/useVercelIntegration';
+import type VercelIntegration from './vercel/VercelIntegration';
 
 type Integration = {
   title: string;
@@ -30,6 +30,7 @@ const INTEGRATIONS: Integration[] = [
         loading={loading}
         href={enabled ? '/settings/integrations/vercel' : '/settings/integrations/vercel/connect'}
         label={enabled ? 'Manage' : 'Connect'}
+        prefetch={true}
       />
     ),
     description:
@@ -71,8 +72,7 @@ const INTEGRATIONS: Integration[] = [
   },
 ];
 
-export default function IntegrationsList() {
-  const { data: vercelData, fetching } = useVercelIntegration();
+export default function IntegrationsList({ integration }: { integration: VercelIntegration }) {
   return (
     <div className="mx-auto mt-16 flex w-[800px] flex-col">
       <div className="mb-7 w-full text-2xl font-medium">All integrations</div>
@@ -86,9 +86,8 @@ export default function IntegrationsList() {
                 </div>
                 {i.actionButton(
                   i.title === 'Vercel'
-                    ? vercelData.enabled && vercelData.projects.length > 0
-                    : false,
-                  fetching
+                    ? integration.enabled && integration.projects.length > 0
+                    : false
                 )}
               </div>
               <div className="text-basis mt-[18px] text-lg font-medium">{i.title}</div>

@@ -6,11 +6,13 @@ import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import { vercelIntegration } from '../page';
 import OldVercelIntegrationPage from './oldPage';
 import VercelProjects from './projects';
 
 export default async function VercelIntegrationPage() {
   const newIntegrations = await getBooleanFlag('new-integrations');
+  const integrations = await vercelIntegration();
 
   return !newIntegrations ? (
     <OldVercelIntegrationPage />
@@ -50,7 +52,7 @@ export default async function VercelIntegrationPage() {
           />
         </div>
       </div>
-      <VercelProjects />
+      <VercelProjects integration={integrations} />
     </div>
   );
 }
