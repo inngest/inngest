@@ -22,8 +22,6 @@ const VercelProjectSchema = z.object({
   ),
 });
 
-export type VercelProjectResponse = z.infer<typeof VercelProjectSchema>;
-
 export const vercelIntegration = async () => {
   const { getToken } = auth();
   const sessionToken = await getToken();
@@ -54,8 +52,7 @@ export const vercelIntegration = async () => {
     };
   }
 
-  const data: VercelProjectResponse = await restResponse.json();
-  const parsed = VercelProjectSchema.safeParse(data);
+  const parsed = VercelProjectSchema.safeParse(await restResponse.json());
 
   if (!parsed.success) {
     const e = 'Got invalid vercel project response data from api';
