@@ -6,6 +6,8 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/inngest/inngest/pkg/expressions"
 	"net/http"
 	"time"
 
@@ -129,6 +131,10 @@ func (a API) CreateCancellation(ctx context.Context, opts CreateCancellationBody
 		If:            opts.If,
 	}
 	if err := a.opts.CancellationReadWriter.CreateCancellation(ctx, cancel); err != nil {
+		var compileError *expressions.CompileError
+		if errors.As(err, &compileError) {
+			return nil, publicerr.Wrap(err, 400, fmt.Sprintf("invalid expression: %s", compileError.Message()))
+		}
 		return nil, publicerr.Wrap(err, 500, "Error creating cancellation")
 	}
 	return &cancel, nil

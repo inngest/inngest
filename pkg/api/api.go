@@ -163,6 +163,12 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 
+			// External event (i.e. doesn't have the "inngest/" prefix) data
+			// must not have internal metadata since it can cause issues. For
+			// example, if an invoked function's event data is forwarded into a
+			// new event then it may accidentally fulfill the invocation
+			delete(evt.Data, "_inngest")
+
 			ts := time.Now()
 			if evt.Timestamp == 0 {
 				evt.Timestamp = ts.UnixMilli()
