@@ -5,7 +5,7 @@ import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
 import RunsTable, { type Run } from '@inngest/components/RunsPage/RunsTable';
-import { SelectGroup } from '@inngest/components/Select/Select';
+import { SelectGroup, type Option } from '@inngest/components/Select/Select';
 import { LoadingMore } from '@inngest/components/Table';
 import {
   FunctionRunTimeField,
@@ -15,9 +15,11 @@ import {
 } from '@inngest/components/types/functionRun';
 import { RiLoopLeftLine } from '@remixicon/react';
 
+import EntityFilter from '../Filter/EntityFilter';
 import { RunDetails } from '../RunDetailsV2';
 import {
   useSearchParam,
+  useStringArraySearchParam,
   useValidatedArraySearchParam,
   useValidatedSearchParam,
 } from '../hooks/useSearchParam';
@@ -39,6 +41,8 @@ type Props = {
   onScrollToTop: () => void;
   pathCreator: React.ComponentProps<typeof RunDetails>['pathCreator'];
   rerun: React.ComponentProps<typeof RunDetails>['rerun'];
+  apps?: Option[];
+  functions?: Option[];
 };
 
 export function RunsPage({
@@ -55,11 +59,19 @@ export function RunsPage({
   onScroll,
   onScrollToTop,
   pathCreator,
+  apps,
+  functions,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [filteredStatus = [], setFilteredStatus, removeFilteredStatus] =
     useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
+
+  const [filteredApp = [], setFilteredApp, removeFilteredApp] =
+    useStringArraySearchParam('filterApp');
+
+  const [filteredFunction = [], setFilteredFunction, removeFilteredFunction] =
+    useStringArraySearchParam('filterFunction');
 
   const [timeField = FunctionRunTimeField.QueuedAt, setTimeField] = useValidatedSearchParam(
     'timeField',
@@ -90,6 +102,30 @@ export function RunsPage({
       }
     },
     [removeFilteredStatus, scrollToTop, setFilteredStatus]
+  );
+
+  const onAppFilterChange = useCallback(
+    (value: string[]) => {
+      scrollToTop();
+      if (value.length > 0) {
+        setFilteredApp(value);
+      } else {
+        removeFilteredApp();
+      }
+    },
+    [removeFilteredApp, scrollToTop, setFilteredApp]
+  );
+
+  const onFunctionFilterChange = useCallback(
+    (value: string[]) => {
+      scrollToTop();
+      if (value.length > 0) {
+        setFilteredFunction(value);
+      } else {
+        removeFilteredFunction();
+      }
+    },
+    [removeFilteredFunction, scrollToTop, setFilteredFunction]
   );
 
   const onTimeFieldChange = useCallback(
@@ -142,6 +178,22 @@ export function RunsPage({
             />
           </SelectGroup>
           <StatusFilter selectedStatuses={filteredStatus} onStatusesChange={onStatusFilterChange} />
+          {apps && (
+            <EntityFilter
+              type="app"
+              onFilterChange={onAppFilterChange}
+              selectedEntities={filteredApp}
+              entities={apps}
+            />
+          )}
+          {functions && (
+            <EntityFilter
+              type="function"
+              onFilterChange={onFunctionFilterChange}
+              selectedEntities={filteredFunction}
+              entities={functions}
+            />
+          )}
         </div>
         {/* TODO: wire button */}
         <Button
