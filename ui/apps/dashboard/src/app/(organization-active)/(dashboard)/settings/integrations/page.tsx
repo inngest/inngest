@@ -6,7 +6,7 @@ import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getProductionEnvironment } from '@/queries/server-only/getEnvironment';
 import IntegrationsList from './integrations';
-import { VercelDeploymentProtection, type VercelIntegration } from './vercel/VercelIntegration';
+import { VercelDeploymentProtection } from './vercel/VercelIntegration';
 import mergeVercelProjectData from './vercel/mergeVercelProjectData';
 import { GetSavedVercelProjectsDocument } from './vercel/queries';
 
@@ -23,14 +23,6 @@ const VercelProjectSchema = z.object({
 });
 
 export type VercelProjectResponse = z.infer<typeof VercelProjectSchema>;
-
-export const notEnabledVercelIntegration: VercelIntegration = {
-  id: 'not-enabled',
-  name: 'Vercel',
-  slug: 'vercel',
-  projects: [],
-  enabled: false,
-};
 
 export const vercelIntegration = async () => {
   const { getToken } = auth();
@@ -51,29 +43,38 @@ export const vercelIntegration = async () => {
     },
   });
 
-  const data: VercelProjectResponse = await restResponse.json();
-  const valid = VercelProjectSchema.safeParse(data);
+  if (!restResponse.ok) {
+    console.log('Error calling vercel project api', restResponse.status);
+    return {
+      id: 'not-enabled',
+      name: 'Vercel',
+      slug: 'vercel',
+      projects: [],
+      enabled: false,
+    };
+  }
 
-  if (!valid.success) {
+  const data: VercelProjectResponse = await restResponse.json();
+  const parsed = VercelProjectSchema.safeParse(data);
+
+  if (!parsed.success) {
     const e = 'Got invalid vercel project response data from api';
-    console.error(e, valid.error);
+    console.error(e, parsed.error);
     throw new Error(e);
   }
 
   const projects = mergeVercelProjectData({
-    vercelProjects: data?.projects || [],
+    vercelProjects: parsed.data.projects,
     savedProjects,
   });
 
-  return data
-    ? {
-        id: 'enabled-integration-id',
-        name: 'Vercel',
-        slug: 'vercel',
-        projects,
-        enabled: true,
-      }
-    : notEnabledVercelIntegration;
+  return {
+    id: 'enabled-integration-id',
+    name: 'Vercel',
+    slug: 'vercel',
+    projects,
+    enabled: true,
+  };
 };
 
 export default async function IntegrationsPage() {
