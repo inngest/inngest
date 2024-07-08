@@ -1,13 +1,28 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs';
+import { z } from 'zod';
 
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getProductionEnvironment } from '@/queries/server-only/getEnvironment';
 import IntegrationsList from './integrations';
-import type { VercelIntegration } from './vercel/VercelIntegration';
+import { VercelDeploymentProtection, type VercelIntegration } from './vercel/VercelIntegration';
 import mergeVercelProjectData from './vercel/mergeVercelProjectData';
 import { GetSavedVercelProjectsDocument } from './vercel/queries';
+
+const VercelProjectSchema = z.object({
+  projects: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      ssoProtection: z
+        .object({ deploymentType: z.nativeEnum(VercelDeploymentProtection) })
+        .optional(),
+    })
+  ),
+});
+
+export type VercelProjectResponse = z.infer<typeof VercelProjectSchema>;
 
 export const notEnabledVercelIntegration: VercelIntegration = {
   id: 'not-enabled',
@@ -36,7 +51,14 @@ export const vercelIntegration = async () => {
     },
   });
 
-  const data = await restResponse.json();
+  const data: VercelProjectResponse = await restResponse.json();
+  const valid = VercelProjectSchema.safeParse(data);
+
+  if (!valid.success) {
+    const e = 'Got invalid vercel project response data from api';
+    console.error(e, valid.error);
+    throw new Error(e);
+  }
 
   const projects = mergeVercelProjectData({
     vercelProjects: data?.projects || [],
