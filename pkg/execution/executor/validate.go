@@ -3,7 +3,9 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/expressions"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
@@ -120,13 +122,23 @@ func (r *runValidator) checkCancellation(ctx context.Context) error {
 			evt.Map(),
 		)
 		if err != nil {
-			logger.StdlibLogger(ctx).Error(
-				"error checking cancellation",
-				"error", err.Error(),
-				"run_id", r.md.ID.RunID,
-				"function_id", r.md.ID.FunctionID,
-				"workspace_id", r.md.ID.Tenant.EnvID,
-			)
+			if errors.Is(err, &expressions.CompileError{}) {
+				logger.StdlibLogger(ctx).Warn(
+					"invalid cancellation expression",
+					"error", err.Error(),
+					"run_id", r.md.ID.RunID,
+					"function_id", r.md.ID.FunctionID,
+					"workspace_id", r.md.ID.Tenant.EnvID,
+				)
+			} else {
+				logger.StdlibLogger(ctx).Error(
+					"error checking cancellation",
+					"error", err.Error(),
+					"run_id", r.md.ID.RunID,
+					"function_id", r.md.ID.FunctionID,
+					"workspace_id", r.md.ID.Tenant.EnvID,
+				)
+			}
 		}
 		if cancel != nil {
 			err = r.e.Cancel(ctx, r.md.ID, execution.CancelRequest{
