@@ -68,6 +68,8 @@ models:
         resolver: true
   FunctionRunV2:
     fields:
+      app:
+        resolver: true
       function:
         resolver: true
       trace:
