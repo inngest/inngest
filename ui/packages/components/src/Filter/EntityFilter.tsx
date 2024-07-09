@@ -31,7 +31,7 @@ export default function EntityFilter({
   return (
     <SelectWithSearch
       multiple
-      defaultValue={selectedValues}
+      value={selectedValues}
       onChange={(value: Option[]) => {
         const newValue: string[] = [];
         value.forEach((option) => {
