@@ -42,7 +42,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
   return (
     <Select
       multiple
-      defaultValue={selectedValues}
+      value={selectedValues}
       onChange={(value: Option[]) => {
         const newValue: FunctionRunStatus[] = [];
         value.forEach((status) => {

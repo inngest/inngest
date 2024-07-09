@@ -55,7 +55,7 @@ export default function VercelProjects() {
           />
 
           <Select
-            defaultValue={{ id: 'all', name: 'All' }}
+            value={{ id: 'all', name: 'All' }}
             onChange={(o) => setFilter(o.name)}
             label="Show"
             className="ml-4 h-6 rounded-sm bg-white text-xs leading-tight text-slate-500"

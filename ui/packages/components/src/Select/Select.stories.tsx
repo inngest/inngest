@@ -89,7 +89,7 @@ export const SelectWithSearchInput: Story = {
           });
     return (
       <SelectWithSearch
-        defaultValue={selectedOption}
+        value={selectedOption}
         onChange={(value: Option[]) => {
           const newValue: Option[] = [];
           value.forEach((option) => {
