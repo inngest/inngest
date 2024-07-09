@@ -1,4 +1,5 @@
 import { ArchivedEnvBanner } from '@/components/ArchivedEnvBanner';
+import { getEnvs } from '@/components/Environments/data';
 import AppNavigation from '@/components/Navigation/AppNavigation';
 import Toaster from '@/components/Toaster';
 import { EnvironmentProvider } from './environment-context';
@@ -10,13 +11,17 @@ type RootLayoutProps = {
   children: React.ReactNode;
 };
 
-export default function RootLayout({ params: { environmentSlug }, children }: RootLayoutProps) {
+export default async function RootLayout({
+  params: { environmentSlug },
+  children,
+}: RootLayoutProps) {
+  const { env, envs } = await getEnvs(environmentSlug);
   return (
-    <EnvironmentProvider environmentSlug={environmentSlug}>
+    <>
       <div className="isolate flex h-full flex-col">
-        <AppNavigation environmentSlug={environmentSlug} />
-        <ArchivedEnvBanner />
-        {children}
+        <AppNavigation envs={envs} activeEnv={env} />
+        <ArchivedEnvBanner env={env} />
+        <EnvironmentProvider env={env}>{children}</EnvironmentProvider>
       </div>
       <Toaster
         toastOptions={{
@@ -24,6 +29,6 @@ export default function RootLayout({ params: { environmentSlug }, children }: Ro
           className: 'pointer-events-auto',
         }}
       />
-    </EnvironmentProvider>
+    </>
   );
 }

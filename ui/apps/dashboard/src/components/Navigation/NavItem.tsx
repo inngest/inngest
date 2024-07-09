@@ -36,6 +36,7 @@ export default function NavItem<PassedHref extends string>({
     <Link
       key={href.toString()}
       href={href}
+      prefetch={true}
       className={cn(
         'flex h-12 items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 text-sm leading-none tracking-wide transition-all',
         isActive

@@ -17,8 +17,6 @@ import cn from '@/utils/cn';
 import { pathCreator } from '@/utils/urls';
 import EventListNotFound from './EventListNotFound';
 
-export const runtime = 'nodejs';
-
 export default function EventTypesPage() {
   const [pages, setPages] = useState([1]);
   const env = useEnvironment();
