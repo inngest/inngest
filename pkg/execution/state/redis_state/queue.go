@@ -1076,11 +1076,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	}
 
 	parts := q.ItemPartitions(ctx, i)
-
-	queueAccount := QueueAccount{
-		ID: i.AccountID,
-	}
-
+ 
 	keys := []string{
 		q.kg.QueueItem(),                        // Queue item
 		q.kg.PartitionItem(),                    // Partition item, map
@@ -1125,8 +1121,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		parts[0].ID,
 		parts[1].ID,
 		parts[2].ID,
-
-		queueAccount,
 	})
 
 	if err != nil {
