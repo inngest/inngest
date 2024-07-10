@@ -1,8 +1,9 @@
 import { ArchivedEnvBanner } from '@/components/ArchivedEnvBanner';
 import { getEnvs } from '@/components/Environments/data';
-import AppNavigation from '@/components/Navigation/AppNavigation';
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import AppNavigation from '@/components/Navigation/old/AppNavigation';
 import Toaster from '@/components/Toaster';
-import { EnvironmentProvider } from './environment-context';
+import { EnvironmentProvider } from '../../../../../components/Environments/environment-context';
 
 type RootLayoutProps = {
   params: {
@@ -16,7 +17,9 @@ export default async function RootLayout({
   children,
 }: RootLayoutProps) {
   const { env, envs } = await getEnvs(environmentSlug);
-  return (
+  const newIANav = await getBooleanFlag(' ');
+
+  return newIANav ? null : ( //coming soon
     <>
       <div className="isolate flex h-full flex-col">
         <AppNavigation envs={envs} activeEnv={env} />

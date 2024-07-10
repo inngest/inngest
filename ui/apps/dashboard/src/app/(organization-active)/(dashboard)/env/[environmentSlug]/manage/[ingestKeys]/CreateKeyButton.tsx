@@ -9,7 +9,7 @@ import { RiAddLine } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import Input from '@/components/Forms/Input';
 import { graphql } from '@/gql';
 import useManagePageTerminology from './useManagePageTerminology';

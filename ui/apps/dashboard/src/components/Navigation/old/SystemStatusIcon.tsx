@@ -1,5 +1,5 @@
 import cn from '@/utils/cn';
-import type { Status } from '../Support/Status';
+import type { Status } from '../../Support/Status';
 
 type SystemStatusIconProps = {
   className?: string;

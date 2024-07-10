@@ -10,7 +10,7 @@ import { IconApp } from '@inngest/components/icons/App';
 import { RiAddLine, RiInformationLine } from '@remixicon/react';
 
 import { Apps } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/Apps';
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { pathCreator } from '@/utils/urls';
 

@@ -4,7 +4,7 @@ import { Button } from '@inngest/components/Button';
 import { Link as InngestLink } from '@inngest/components/Link';
 import { RiErrorWarningLine } from '@remixicon/react';
 
-import AppNavigation from '@/components/Navigation/AppNavigation';
+import AppNavigation from '@/components/Navigation/old/AppNavigation';
 import Toaster from '@/components/Toaster';
 import getAllEnvironments from '@/queries/server-only/getAllEnvironments';
 import { EnvironmentType, LEGACY_TEST_MODE_NAME } from '@/utils/environments';

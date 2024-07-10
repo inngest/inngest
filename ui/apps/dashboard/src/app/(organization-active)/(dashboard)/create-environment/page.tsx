@@ -1,4 +1,4 @@
-import AppNavigation from '@/components/Navigation/AppNavigation';
+import AppNavigation from '@/components/Navigation/old/AppNavigation';
 import getAllEnvironments from '@/queries/server-only/getAllEnvironments';
 import CreateEnvironment from './CreateEnvironment';
 

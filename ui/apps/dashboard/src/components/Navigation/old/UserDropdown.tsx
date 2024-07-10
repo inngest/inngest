@@ -19,8 +19,8 @@ import {
 } from '@remixicon/react';
 
 // import type { StatusPageStatusResponse } from '@/app/(organization-active)/support/statusPage';
-import SystemStatusIcon from '@/components/Navigation/SystemStatusIcon';
-import { getStatus } from '../Support/Status';
+import SystemStatusIcon from '@/components/Navigation/old/SystemStatusIcon';
+import { getStatus } from '../../Support/Status';
 
 export default async function UserDropdown() {
   const user = await currentUser();

@@ -8,7 +8,7 @@ import { RiPauseLine, RiPlayFill } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { SelectInput } from '@/components/Forms/SelectInput';
 import { graphql } from '@/gql';
 

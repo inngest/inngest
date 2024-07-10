@@ -5,11 +5,11 @@ import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
 import { RiSearchLine, RiToolsLine } from '@remixicon/react';
 
-import OrganizationDropdown from '@/components/Navigation/OrganizationDropdown';
-import UserDropdown from '@/components/Navigation/UserDropdown';
+import OrganizationDropdown from '@/components/Navigation/old/OrganizationDropdown';
+import UserDropdown from '@/components/Navigation/old/UserDropdown';
 import InngestLogo from '@/icons/InngestLogo';
 import type { Environment } from '@/utils/environments';
-import { getBooleanFlag } from '../FeatureFlags/ServerFeatureFlag';
+import { getBooleanFlag } from '../../FeatureFlags/ServerFeatureFlag';
 import EnvironmentSelectMenu from './EnvironmentSelectMenu';
 import NavItem from './NavItem';
 import Navigation from './Navigation';
