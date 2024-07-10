@@ -40,9 +40,11 @@ type Props = {
   onScroll: UIEventHandler<HTMLDivElement>;
   onScrollToTop: () => void;
   pathCreator: React.ComponentProps<typeof RunDetails>['pathCreator'];
+  pollInterval?: number;
   rerun: React.ComponentProps<typeof RunDetails>['rerun'];
   apps?: Option[];
   functions?: Option[];
+  functionIsPaused?: boolean;
 };
 
 export function RunsPage({
@@ -61,6 +63,8 @@ export function RunsPage({
   pathCreator,
   apps,
   functions,
+  pollInterval,
+  functionIsPaused,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -144,22 +148,26 @@ export function RunsPage({
     [scrollToTop, setLastDays]
   );
 
-  const renderSubComponent = useCallback(({ id }: { id: string }) => {
-    return (
-      <div className="border-subtle border-l-4 pb-6">
-        <RunDetails
-          cancelRun={cancelRun}
-          getResult={getTraceResult}
-          getRun={getRun}
-          getTrigger={getTrigger}
-          pathCreator={pathCreator}
-          rerun={rerun}
-          runID={id}
-          standalone={false}
-        />
-      </div>
-    );
-  }, []);
+  const renderSubComponent = useCallback(
+    ({ id }: { id: string }) => {
+      return (
+        <div className="border-subtle border-l-4 pb-6">
+          <RunDetails
+            cancelRun={cancelRun}
+            getResult={getTraceResult}
+            getRun={getRun}
+            getTrigger={getTrigger}
+            pathCreator={pathCreator}
+            pollInterval={pollInterval}
+            rerun={rerun}
+            runID={id}
+            standalone={false}
+          />
+        </div>
+      );
+    },
+    [cancelRun, getRun, getTraceResult, getTrigger, pathCreator, pollInterval, rerun]
+  );
 
   return (
     <main
@@ -177,7 +185,7 @@ export function RunsPage({
               selectedDays={lastDays}
             />
           </SelectGroup>
-          <StatusFilter selectedStatuses={filteredStatus} onStatusesChange={onStatusFilterChange} />
+          <StatusFilter selectedStatuses={filteredStatus} onStatusesChange={onStatusFilterChange} functionIsPaused={functionIsPaused} />
           {apps && (
             <EntityFilter
               type="app"

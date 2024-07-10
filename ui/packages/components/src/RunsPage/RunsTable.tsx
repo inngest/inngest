@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { IDCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
 import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
@@ -42,6 +42,11 @@ export default function RunsTable({
   getRowCanExpand,
   renderSubComponent,
 }: RunsTableProps) {
+  // Manually track expanded rows because getIsExpanded seems to be index-based,
+  // which means polling can shift the expanded row. We may be able to switch
+  // back to getIsExpanded when we replace polling with websockets
+  const [expandedRunIDs, setExpandedRunIDs] = useState<string[]>([]);
+
   // Render 8 empty lines for skeletons when data is loading
   const tableData = useMemo(() => {
     if (isLoading) {
@@ -139,7 +144,17 @@ export default function RunsTable({
               <tr
                 key={row.original.id}
                 className="hover:bg-canvasSubtle/50 h-12 cursor-pointer"
-                onClick={row.getToggleExpandedHandler()}
+                onClick={() => {
+                  if (expandedRunIDs.includes(row.original.id)) {
+                    setExpandedRunIDs((prev) => {
+                      return prev.filter((id) => id !== row.original.id);
+                    });
+                  } else {
+                    setExpandedRunIDs((prev) => {
+                      return [...prev, row.original.id];
+                    });
+                  }
+                }}
               >
                 {row.getVisibleCells().map((cell) => (
                   <td className={tableColumnStyles} key={cell.id}>
@@ -147,7 +162,7 @@ export default function RunsTable({
                   </td>
                 ))}
               </tr>
-              {row.getIsExpanded() && !isLoadingRow(row.original) && (
+              {expandedRunIDs.includes(row.original.id) && !isLoadingRow(row.original) && (
                 // Overrides tableStyles divider color
                 <tr className="!border-transparent">
                   <td colSpan={row.getVisibleCells().length}>

@@ -51,8 +51,15 @@ func (s runStateKeyGenerator) Prefix(ctx context.Context, defaultPrefix string, 
 	return defaultPrefix
 }
 
+func (s runStateKeyGenerator) PrefixByAccountId(ctx context.Context, defaultPrefix string, isSharded bool, accountId uuid.UUID) string {
+	if isSharded {
+		return fmt.Sprintf("%s:%s", defaultPrefix, accountId.String())
+	}
+	return defaultPrefix
+}
+
 func (s runStateKeyGenerator) Idempotency(ctx context.Context, isSharded bool, identifier state.Identifier) string {
-	return fmt.Sprintf("{%s}:key:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, identifier.RunID), identifier.IdempotencyKey())
+	return fmt.Sprintf("{%s}:key:%s", s.PrefixByAccountId(ctx, s.stateDefaultKey, isSharded, identifier.AccountID), identifier.IdempotencyKey())
 }
 
 func (s runStateKeyGenerator) RunMetadata(ctx context.Context, isSharded bool, runID ulid.ULID) string {

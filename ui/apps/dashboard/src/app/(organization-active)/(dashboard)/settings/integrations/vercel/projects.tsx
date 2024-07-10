@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Badge } from '@inngest/components/Badge/Badge';
 import { NewButton } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
@@ -10,8 +9,7 @@ import { Select } from '@inngest/components/Select/Select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiInformationLine, RiRefreshLine } from '@remixicon/react';
 
-import { VercelDeploymentProtection } from './VercelIntegration';
-import { useVercelIntegration } from './useVercelIntegration';
+import { VercelDeploymentProtection, type VercelIntegration } from './VercelIntegration';
 
 // type DisableProjectProps = {
 //   isOpen: boolean;
@@ -33,21 +31,18 @@ import { useVercelIntegration } from './useVercelIntegration';
 //   </AlertModal>
 // );
 
-export default function VercelProjects() {
-  const { data } = useVercelIntegration();
-  const router = useRouter();
-  const { projects } = data;
+export default function VercelProjects({ integration }: { integration: VercelIntegration }) {
+  const { projects } = integration;
   const [filter, setFilter] = useState('all');
 
   return (
     <div className="mt-8 flex flex-col">
       <div className="flex flex-row items-center justify-between">
-        <div className="text-slate-500">
+        <div className="text-subtle">
           Projects (<span className="mx-[2px]">{projects.length}</span>)
         </div>
-        <div className="flex cursor-pointer flex-row items-center justify-between text-xs text-indigo-600">
+        <div className="text-btnPrimary flex cursor-pointer flex-row items-center justify-between text-xs">
           <NewButton
-            onClick={() => router.refresh()}
             appearance="ghost"
             icon={<RiRefreshLine className="h-4 w-4" />}
             iconSide="left"
@@ -58,10 +53,10 @@ export default function VercelProjects() {
             value={{ id: 'all', name: 'All' }}
             onChange={(o) => setFilter(o.name)}
             label="Show"
-            className="ml-4 h-6 rounded-sm bg-white text-xs leading-tight text-slate-500"
+            className="text-subtle bg-canvasBase ml-4 h-6 rounded-sm text-xs leading-tight"
           >
             <Select.Button className="rounded-0 h-4">
-              <span className="text-slate- pr-2 text-xs leading-tight text-slate-700 first-letter:capitalize">
+              <span className="text-slate- text-basis pr-2 text-xs leading-tight first-letter:capitalize">
                 {filter}
               </span>
             </Select.Button>
@@ -88,7 +83,7 @@ export default function VercelProjects() {
             key={`vercel-projects-${i}`}
             className="mt-4"
             accentPosition="left"
-            accentColor="bg-indigo-400"
+            accentColor={p.isEnabled ? 'bg-primary-intense' : 'bg-disabled'}
           >
             <Card.Content className="h-36 p-6">
               <div className="flex flex-row items-center justify-between">
@@ -97,30 +92,32 @@ export default function VercelProjects() {
                     <Badge
                       kind="solid"
                       className={`h-6 ${
-                        p.isEnabled ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-500'
+                        p.isEnabled
+                          ? 'bg-primary-intense text-onContrast'
+                          : 'bg-disabled text-subtle'
                       }`}
                     >
                       {p.isEnabled ? 'enabled' : 'disabled'}
                     </Badge>
                   </div>
                   <div className="mt-4 flex flex-row items-center justify-start">
-                    <div className="text-xl font-medium text-gray-900">{p.name}</div>
+                    <div className="text-basis text-xl font-medium">{p.name}</div>
                     {p.ssoProtection?.deploymentType ===
                       VercelDeploymentProtection.ProdDeploymentURLsAndAllPreviews && (
                       <Tooltip>
                         <TooltipTrigger>
-                          <RiInformationLine className="ml-2 h-4 w-4 cursor-pointer text-amber-500" />
+                          <RiInformationLine className="text-accent-subtle ml-2 h-4 w-4 cursor-pointer" />
                         </TooltipTrigger>
                         <TooltipContent className="rounded p-0">
-                          <div className="border border-slate-200">
-                            <div className="px-4 pt-2 text-sm font-medium text-slate-700">
+                          <div className="border-subtle border">
+                            <div className="text-basis px-4 pt-2 text-sm font-medium">
                               Deployment protection is enabled
                             </div>
-                            <div className="my-2 px-4 text-sm font-normal text-slate-500">
+                            <div className="text-subtle my-2 px-4 text-sm font-normal">
                               Inngest may not be able to communicate with your application by
                               default.
                             </div>
-                            <div className="w-full bg-slate-200 px-4 py-2">
+                            <div className="bg-disabled w-full px-4 py-2">
                               <Link href="https://www.inngest.com/docs/deploy/vercel#bypassing-deployment-protection">
                                 Learn more
                               </Link>
@@ -130,7 +127,7 @@ export default function VercelProjects() {
                       </Tooltip>
                     )}
                   </div>
-                  <div className="mt-2 text-base font-normal leading-snug text-slate-500">
+                  <div className="text-subtle mt-2 text-base font-normal leading-snug">
                     {p.servePath}
                   </div>
                 </div>

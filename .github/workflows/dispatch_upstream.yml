@@ -1,0 +1,17 @@
+name: Dispatch upstream
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.AUTOMATED_UPSTREAM_TOKEN }}
+          repository: inngest/monorepo
+          event-type: upstream-inngest
