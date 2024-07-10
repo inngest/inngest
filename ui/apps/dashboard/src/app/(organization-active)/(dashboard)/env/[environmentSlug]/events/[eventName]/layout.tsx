@@ -2,7 +2,7 @@
 
 import { IconEvent } from '@inngest/components/icons/Event';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import SendEventButton from './SendEventButton';
 

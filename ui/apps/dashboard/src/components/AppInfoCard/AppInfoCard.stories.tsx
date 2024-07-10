@@ -1,7 +1,7 @@
 import type { PropsWithChildren } from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { EnvironmentContext } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { EnvironmentContext } from '@/components/Environments/EnvContext';
 import { frameworks } from '@/components/FrameworkInfo';
 import { languages } from '@/components/LanguageInfo';
 import { platforms } from '@/components/PlatformInfo';

@@ -6,7 +6,7 @@ import { AlertModal } from '@inngest/components/Modal';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import { graphql } from '@/gql';
 import useManagePageTerminology from './../useManagePageTerminology';
 

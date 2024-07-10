@@ -3,8 +3,8 @@
 import { Alert } from '@inngest/components/Alert';
 import { IconApp } from '@inngest/components/icons/App';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { ArchiveButton } from './ArchiveButton';

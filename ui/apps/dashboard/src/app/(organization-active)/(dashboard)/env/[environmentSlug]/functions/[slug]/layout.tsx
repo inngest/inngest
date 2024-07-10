@@ -6,8 +6,8 @@ import { InvokeButton } from '@inngest/components/InvokeButton';
 import { IconFunction } from '@inngest/components/icons/Function';
 import { useMutation } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { graphql } from '@/gql';

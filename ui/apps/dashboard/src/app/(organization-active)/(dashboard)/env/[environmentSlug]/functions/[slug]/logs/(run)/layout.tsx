@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { SlideOver } from '@inngest/components/SlideOver';
 import { useQuery } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
 

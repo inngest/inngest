@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 import { RiArchive2Line, RiInboxUnarchiveLine } from '@remixicon/react';
 import { useQuery } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import { graphql } from '@/gql';
 
 const GetFunctionArchivalDocument = graphql(`

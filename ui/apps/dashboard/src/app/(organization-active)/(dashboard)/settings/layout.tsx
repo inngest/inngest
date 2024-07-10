@@ -1,7 +1,7 @@
 import { RiSettings3Line } from '@remixicon/react';
 
 import Header from '@/components/Header/Header';
-import AppNavigation from '@/components/Navigation/AppNavigation';
+import AppNavigation from '@/components/Navigation/old/AppNavigation';
 import Toaster from '@/components/Toaster';
 
 type SettingsLayoutProps = {

@@ -13,7 +13,7 @@ import type { CodedError } from '@/codedError';
 import Input from '@/components/Forms/Input';
 import { SyncFailure } from '@/components/SyncFailure/SyncFailure';
 import { graphql } from '@/gql';
-import { useEnvironment } from '../../environment-context';
+import { useEnvironment } from '../../../../../../../components/Environments/old/environment-context';
 
 const ResyncAppDocument = graphql(`
   mutation ResyncApp($appExternalID: String!, $appURL: String, $envID: UUID!) {

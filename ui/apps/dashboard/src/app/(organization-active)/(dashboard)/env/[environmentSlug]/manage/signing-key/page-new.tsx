@@ -5,7 +5,7 @@ import { Card } from '@inngest/components/Card';
 import { InlineCode } from '@inngest/components/InlineCode';
 import { Link } from '@inngest/components/Link';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { CreateSigningKeyButton } from './CreateSigningKeyButton';
 import { RotateSigningKeyButton } from './RotateSigningKeyButton';

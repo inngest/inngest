@@ -10,7 +10,7 @@ import { RiErrorWarningLine } from '@remixicon/react';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { duration } from '@/utils/date';

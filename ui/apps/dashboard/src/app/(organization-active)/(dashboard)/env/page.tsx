@@ -1,37 +1,18 @@
-'use client';
-
 import { type Route } from 'next';
 import Link from 'next/link';
 import { Button } from '@inngest/components/Button';
 import { Link as InngestLink } from '@inngest/components/Link';
 import { RiErrorWarningLine } from '@remixicon/react';
 
-import AppNavigation from '@/components/Navigation/AppNavigation';
+import AppNavigation from '@/components/Navigation/old/AppNavigation';
 import Toaster from '@/components/Toaster';
-import LoadingIcon from '@/icons/LoadingIcon';
-import { useEnvironments } from '@/queries';
+import getAllEnvironments from '@/queries/server-only/getAllEnvironments';
 import { EnvironmentType, LEGACY_TEST_MODE_NAME } from '@/utils/environments';
 import { EnvironmentArchiveButton } from './EnvironmentArchiveButton';
 import EnvironmentListTable from './EnvironmentListTable';
 
-export default function Envs() {
-  const [{ data: environments, fetching, error }] = useEnvironments();
-  if (error) {
-    throw error;
-  }
-  if (fetching) {
-    return (
-      <div className="flex h-full w-full items-center justify-center">
-        <LoadingIcon />
-      </div>
-    );
-  }
-  if (!environments) {
-    // Unreachable
-    throw new Error(
-      'Unable to load environments. Please try again or contact support if this continues.'
-    );
-  }
+export default async function Envs() {
+  const environments = await getAllEnvironments();
 
   // Break the environments into different groups
   const legacyTestMode = environments.find(
@@ -46,7 +27,7 @@ export default function Envs() {
   return (
     <>
       <div className="flex h-full flex-col">
-        <AppNavigation environmentSlug="all" />
+        <AppNavigation envs={environments} slug="all" />
         <div className="overflow-y-scroll">
           <div className="mx-auto w-full max-w-[860px] px-12 py-16">
             <div className="mb-4 flex w-full items-center  justify-between">

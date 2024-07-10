@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Time } from '@inngest/components/Time';
 import { RiTimeLine } from '@remixicon/react';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import cn from '@/utils/cn';
 import { getManageKey } from '@/utils/urls';
 

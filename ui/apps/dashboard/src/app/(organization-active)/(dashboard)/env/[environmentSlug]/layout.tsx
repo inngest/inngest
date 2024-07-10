@@ -1,29 +1,23 @@
-import { ArchivedEnvBanner } from '@/components/ArchivedEnvBanner';
-import AppNavigation from '@/components/Navigation/AppNavigation';
-import Toaster from '@/components/Toaster';
-import { EnvironmentProvider } from './environment-context';
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import RootLayout from '@/components/Layout/Root';
+import OldRootLayout from '@/components/Layout/old/Root';
 
-type RootLayoutProps = {
+type ParentLayoutProps = {
   params: {
     environmentSlug: string;
   };
   children: React.ReactNode;
 };
 
-export default function RootLayout({ params: { environmentSlug }, children }: RootLayoutProps) {
-  return (
-    <EnvironmentProvider environmentSlug={environmentSlug}>
-      <div className="isolate flex h-full flex-col">
-        <AppNavigation environmentSlug={environmentSlug} />
-        <ArchivedEnvBanner />
-        {children}
-      </div>
-      <Toaster
-        toastOptions={{
-          // Ensure that the toast is clickable when there are overlays/modals
-          className: 'pointer-events-auto',
-        }}
-      />
-    </EnvironmentProvider>
+export default async function ParentLayout({
+  params: { environmentSlug },
+  children,
+}: ParentLayoutProps) {
+  const newIANav = await getBooleanFlag(' ');
+
+  return newIANav ? (
+    <RootLayout environmentSlug={environmentSlug}>{children}</RootLayout>
+  ) : (
+    <OldRootLayout environmentSlug={environmentSlug}>{children}</OldRootLayout>
   );
 }

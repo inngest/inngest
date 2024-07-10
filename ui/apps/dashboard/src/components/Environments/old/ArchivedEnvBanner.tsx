@@ -2,9 +2,9 @@
 
 import { Link } from '@inngest/components/Link';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import { pathCreator } from '@/utils/urls';
-import { Banner } from './Banner';
+import { Banner } from '../../Banner';
 
 export function ArchivedEnvBanner() {
   const env = useEnvironment();

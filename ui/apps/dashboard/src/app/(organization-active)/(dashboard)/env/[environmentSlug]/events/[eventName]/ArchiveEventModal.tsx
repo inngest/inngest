@@ -3,7 +3,7 @@
 import { Button } from '@inngest/components/Button';
 import { useMutation } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
 

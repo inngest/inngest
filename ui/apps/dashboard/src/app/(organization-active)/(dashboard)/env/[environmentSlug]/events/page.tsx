@@ -7,9 +7,9 @@ import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill'
 import { IconEvent } from '@inngest/components/icons/Event';
 import { RiBarChart2Fill } from '@remixicon/react';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import SendEventButton from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/events/[eventName]/SendEventButton';
 import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import Header from '@/components/Header/Header';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useEventTypes } from '@/queries';

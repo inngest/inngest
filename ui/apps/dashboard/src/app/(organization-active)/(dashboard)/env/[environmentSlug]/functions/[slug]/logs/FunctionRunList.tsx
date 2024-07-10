@@ -10,7 +10,7 @@ import { Time } from '@inngest/components/Time';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import { useQuery } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import { graphql } from '@/gql';
 import { FunctionRunStatus, FunctionRunTimeField, type RunListItem } from '@/gql/graphql';
 import { type TimeRange } from './TimeRangeFilter';

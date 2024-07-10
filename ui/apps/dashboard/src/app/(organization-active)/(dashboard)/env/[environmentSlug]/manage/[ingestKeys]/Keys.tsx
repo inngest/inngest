@@ -3,7 +3,7 @@
 import { notFound } from 'next/navigation';
 import { Skeleton } from '@inngest/components/Skeleton';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import { graphql } from '@/gql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import KeysListItem from './KeysListItem';

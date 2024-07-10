@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { RiAddLine } from '@remixicon/react';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import { pathCreator } from '@/utils/urls';
 import { AppCard, EmptyAppCard, SkeletonCard } from './AppCard';
 import { UnattachedSyncsCard } from './UnattachedSyncsCard';

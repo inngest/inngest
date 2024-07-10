@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { ulid } from 'ulid';
 import { useMutation, useQuery } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import Input from '@/components/Forms/Input';
 import Placeholder from '@/components/Placeholder';
 import { graphql } from '@/gql';

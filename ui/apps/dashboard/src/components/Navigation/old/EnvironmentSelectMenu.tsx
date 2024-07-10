@@ -7,11 +7,9 @@ import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigati
 import { Listbox, Transition } from '@headlessui/react';
 import { RiCloudLine, RiExpandUpDownLine, RiLoopLeftLine, RiSettings3Line } from '@remixicon/react';
 
-import { useEnvironments } from '@/queries/environments';
 import cn from '@/utils/cn';
 import {
   EnvironmentType,
-  getActiveEnvironment,
   getLegacyTestMode,
   getProductionEnvironment,
   getSortedBranchEnvironments,
@@ -57,16 +55,16 @@ const useSwitchablePathname = (): string => {
 };
 
 type EnvironmentSelectMenuProps = {
-  environmentSlug: string;
+  activeEnv?: Environment;
+  envs: Environment[];
 };
 
-export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSelectMenuProps) {
+export default function EnvironmentSelectMenu({ envs, activeEnv }: EnvironmentSelectMenuProps) {
   const router = useRouter();
-  const [{ data: environments, fetching }] = useEnvironments();
   const [selected, setSelected] = useState<Environment | null>(null);
   const nextPathname = useSwitchablePathname();
 
-  if (fetching || !environments || !isNonEmptyArray(environments)) {
+  if (!isNonEmptyArray(envs)) {
     return (
       <div className="relative self-stretch border-x border-slate-800">
         <div className="font-regular flex h-full  w-28 items-center gap-0.5 py-1.5 pl-4 pr-4 text-sm  tracking-wide text-white hover:bg-slate-800 lg:w-36 xl:w-[180px]">
@@ -79,17 +77,13 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
     );
   }
 
-  const activeEnvironment = getActiveEnvironment(environments, environmentSlug);
-  const productionEnvironment = getProductionEnvironment(environments);
-  const legacyTestMode = getLegacyTestMode(environments);
-  const mostRecentlyCreatedBranchEnvironments = getSortedBranchEnvironments(environments).slice(
-    0,
-    5
-  );
-  const testEnvironments = getTestEnvironments(environments);
+  const productionEnvironment = getProductionEnvironment(envs);
+  const legacyTestMode = getLegacyTestMode(envs);
+  const mostRecentlyCreatedBranchEnvironments = getSortedBranchEnvironments(envs).slice(0, 5);
+  const testEnvironments = getTestEnvironments(envs);
 
-  if (selected === null && activeEnvironment) {
-    setSelected(activeEnvironment);
+  if (selected === null && activeEnv) {
+    setSelected(activeEnv);
   }
   const isBranchParentSelected = selected?.type === EnvironmentType.BranchParent;
 

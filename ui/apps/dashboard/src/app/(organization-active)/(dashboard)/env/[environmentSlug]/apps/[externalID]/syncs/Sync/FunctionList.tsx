@@ -7,7 +7,6 @@ import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowDownSLine, RiArrowRightLine } from '@remixicon/react';
 import { useLocalStorage } from 'react-use';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import {
   CollapsibleCardContent,
   CollapsibleCardContentWrapper,
@@ -16,6 +15,7 @@ import {
   CollapsibleCardRoot,
   CollapsibleCardTrigger,
 } from '@/components/CollapsibleCard';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import { pathCreator } from '@/utils/urls';
 
 type Fn = Pick<Function, 'id' | 'name' | 'slug'>;

@@ -2,7 +2,7 @@
 
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import { SyncList } from '../apps/[externalID]/syncs/SyncList';
 import { Sync } from './Sync';
 import { useSyncs } from './useSyncs';

@@ -1,5 +1,3 @@
-'use client';
-
 import { type Route } from 'next';
 import Link from 'next/link';
 import { IconApp } from '@inngest/components/icons/App';
@@ -7,17 +5,20 @@ import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
 import { RiSearchLine, RiToolsLine } from '@remixicon/react';
 
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-import OrganizationDropdown from '@/components/Navigation/OrganizationDropdown';
-import UserDropdown from '@/components/Navigation/UserDropdown';
+import OrganizationDropdown from '@/components/Navigation/old/OrganizationDropdown';
+import UserDropdown from '@/components/Navigation/old/UserDropdown';
 import InngestLogo from '@/icons/InngestLogo';
+import type { Environment } from '@/utils/environments';
+import { getBooleanFlag } from '../../FeatureFlags/ServerFeatureFlag';
 import EnvironmentSelectMenu from './EnvironmentSelectMenu';
 import NavItem from './NavItem';
 import Navigation from './Navigation';
 import SearchNavigation from './SearchNavigation';
 
 type AppNavigationProps = {
-  environmentSlug: string;
+  envs: Environment[];
+  activeEnv?: Environment;
+  slug?: string;
 };
 type NavItem = {
   href: string;
@@ -29,9 +30,11 @@ type NavItem = {
 
 const ALL_ENVIRONMENTS_SLUG = 'all';
 const BRANCH_PARENT_SLUG = 'branch';
+const DEFAULT_ENV_SLUG = 'production';
 
-export default function AppNavigation({ environmentSlug }: AppNavigationProps) {
-  const { value: isEventSearchEnabled } = useBooleanFlag('event-search');
+export default async function AppNavigation({ envs, activeEnv, slug }: AppNavigationProps) {
+  const isEventSearchEnabled = await getBooleanFlag('event-search');
+  const environmentSlug = slug || DEFAULT_ENV_SLUG;
 
   let items: NavItem[] = [
     {
@@ -82,7 +85,7 @@ export default function AppNavigation({ environmentSlug }: AppNavigationProps) {
         <Link href={process.env.NEXT_PUBLIC_HOME_PATH as Route}>
           <InngestLogo className="mr-2 mt-0.5 text-white" width={66} />
         </Link>
-        <EnvironmentSelectMenu environmentSlug={environmentSlug} />
+        <EnvironmentSelectMenu envs={envs} activeEnv={activeEnv} />
         <Navigation>
           {visibleItems.map(({ href, text, icon, badge }) => (
             <NavItem key={href} href={href as Route} icon={icon} text={text} badge={badge} />

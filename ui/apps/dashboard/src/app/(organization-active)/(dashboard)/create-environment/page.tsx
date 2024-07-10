@@ -1,4 +1,4 @@
-import AppNavigation from '@/components/Navigation/AppNavigation';
+import AppNavigation from '@/components/Navigation/old/AppNavigation';
 import CreateEnvironment from './CreateEnvironment';
 
 export default function Create() {

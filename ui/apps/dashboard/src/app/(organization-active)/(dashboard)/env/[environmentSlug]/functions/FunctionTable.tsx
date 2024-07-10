@@ -13,8 +13,8 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import Placeholder from '@/components/Placeholder';
 import cn from '@/utils/cn';
 

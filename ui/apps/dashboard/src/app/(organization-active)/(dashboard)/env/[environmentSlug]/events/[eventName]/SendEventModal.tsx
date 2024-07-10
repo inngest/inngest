@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { type JsonValue } from 'type-fest';
 import { useQuery } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import Modal from '@/components/Modal';
 import CodeEditor from '@/components/Textarea/CodeEditor';
 import { graphql } from '@/gql';

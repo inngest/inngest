@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/EnvContext';
 import { EventLogsPage } from './EventLogsPage';
 
 type EventLogsProps = {

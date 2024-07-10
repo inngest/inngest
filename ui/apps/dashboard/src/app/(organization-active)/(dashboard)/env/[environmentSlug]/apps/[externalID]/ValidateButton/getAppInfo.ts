@@ -3,7 +3,7 @@ import { useClient } from 'urql';
 
 import { graphql } from '@/gql';
 import { fetchWithTimeout } from '@/queries/fetch';
-import { useEnvironment } from '../../../environment-context';
+import { useEnvironment } from '../../../../../../../../components/Environments/old/environment-context';
 
 const query = graphql(`
   query CheckApp($envID: ID!, $url: String!) {
