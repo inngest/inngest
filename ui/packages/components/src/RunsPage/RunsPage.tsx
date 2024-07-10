@@ -172,7 +172,7 @@ export function RunsPage({
             functionIsPaused={functionIsPaused}
           />
         </div>
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
           <TableFilter
             columnVisibility={columnVisibility}
             setColumnVisibility={setColumnVisibility}
