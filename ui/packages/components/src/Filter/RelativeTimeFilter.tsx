@@ -14,7 +14,7 @@ export default function RelativeTimeFilter({
 }: RelativeTimeFilterProps) {
   return (
     <Select
-      defaultValue={selectedDays}
+      value={selectedDays}
       onChange={onDaysChange}
       label="Last Days"
       isLabelVisible={false}
