@@ -37,6 +37,14 @@ export default function CreateKeyButton() {
 
   function handleClick() {
     if (currentContent && inputValue) {
+      let transform = undefined;
+      if (currentContent.type === 'webhook') {
+        // We must specify a transform, otherwise the webhook will be in a
+        // broken state due to a missing transform. It might be better to
+        // specify the default transform in the backend, but this is a quick fix
+        transform = defaultTransform;
+      }
+
       createSourceKey({
         input: {
           filterList: null,
@@ -44,11 +52,7 @@ export default function CreateKeyButton() {
           name: inputValue,
           source: currentContent.type,
           metadata: {
-            // We must specify a transform, otherwise the webhook will be in a
-            // broken state due to a missing transform. It might be better to
-            // specify the default transform in the backend, but this is a quick
-            // fix
-            transform: defaultTransform,
+            transform,
           },
         },
       }).then((result) => {
