@@ -1812,17 +1812,15 @@ func TestQueueRequeueByJobID(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := queue{
-		kg: defaultQueueKey,
-		r:  rc,
-		pf: func(ctx context.Context, p QueuePartition) uint {
-			return PriorityMin
-		},
-		concurrencyLimitGetter: func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
-			return 100, 100, 100
-		},
-		itemIndexer: QueueItemIndexerFunc,
+	q := NewQueue(rc)
+	q.kg = defaultQueueKey
+	q.pf = func(ctx context.Context, p QueuePartition) uint {
+		return PriorityMin
 	}
+	q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
+		return 100, 100, 100
+	}
+	q.itemIndexer = QueueItemIndexerFunc
 
 	wsA, wsB := uuid.New(), uuid.New()
 

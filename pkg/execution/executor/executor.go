@@ -1382,7 +1382,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 
 	res, err := e.handlePausesAllNaively(ctx, iter, evt)
 	if err != nil {
-		log.From(ctx).Error().Err(err).Msg("error handling aggregate pauses")
+		log.From(ctx).Error().Err(err).Msg("error handling naive pauses")
 	}
 	return res, nil
 }
@@ -1849,7 +1849,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		if err == nil || err == state.ErrPauseNotFound {
 			return nil
 		}
-		return err
+		return fmt.Errorf("error consuming pause via timeout: %w", err)
 	}
 
 	if err = e.pm.ConsumePause(ctx, pause.ID, r.With); err != nil {
