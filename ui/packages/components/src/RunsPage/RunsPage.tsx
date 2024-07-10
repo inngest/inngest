@@ -4,9 +4,9 @@ import { useCallback, useRef, type UIEventHandler } from 'react';
 import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
-import RunsTable, { type Run } from '@inngest/components/RunsPage/RunsTable';
-import { SelectGroup } from '@inngest/components/Select/Select';
-import { LoadingMore } from '@inngest/components/Table';
+import RunsTable, { columns, type Run } from '@inngest/components/RunsPage/RunsTable';
+import { SelectGroup, type Option } from '@inngest/components/Select/Select';
+import { LoadingMore, TableFilter } from '@inngest/components/Table';
 import {
   FunctionRunTimeField,
   isFunctionRunStatus,
@@ -14,6 +14,8 @@ import {
   type FunctionRunStatus,
 } from '@inngest/components/types/functionRun';
 import { RiLoopLeftLine } from '@remixicon/react';
+import { type VisibilityState } from '@tanstack/react-table';
+import { useLocalStorage } from 'react-use';
 
 import { RunDetails } from '../RunDetailsV2';
 import {
@@ -41,6 +43,7 @@ type Props = {
   pollInterval?: number;
   rerun: React.ComponentProps<typeof RunDetails>['rerun'];
   functionIsPaused?: boolean;
+  defaultVisibility?: VisibilityState;
 };
 
 export function RunsPage({
@@ -59,8 +62,17 @@ export function RunsPage({
   pathCreator,
   pollInterval,
   functionIsPaused,
+  defaultVisibility,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const displayAllColumns: VisibilityState = Object.fromEntries(
+    columns.map((column) => [column.id, true])
+  );
+
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
+    'VisibleRunsColumns',
+    defaultVisibility || displayAllColumns
+  );
 
   const [filteredStatus = [], setFilteredStatus, removeFilteredStatus] =
     useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
@@ -133,6 +145,11 @@ export function RunsPage({
     [cancelRun, getRun, getTraceResult, getTrigger, pathCreator, pollInterval, rerun]
   );
 
+  const options: Option[] = columns.map((column) => ({
+    id: column.accessorKey,
+    name: column.header?.toString() || column.accessorKey,
+  }));
+
   return (
     <main
       className="bg-canvasBase text-basis h-full min-h-0 overflow-y-auto"
@@ -155,20 +172,28 @@ export function RunsPage({
             functionIsPaused={functionIsPaused}
           />
         </div>
-        {/* TODO: wire button */}
-        <Button
-          label="Refresh"
-          appearance="text"
-          btnAction={() => {}}
-          icon={<RiLoopLeftLine />}
-          disabled
-        />
+        <div className="flex items-center">
+          <TableFilter
+            columnVisibility={columnVisibility}
+            setColumnVisibility={setColumnVisibility}
+            options={options}
+          />
+          {/* TODO: wire button */}
+          <Button
+            label="Refresh"
+            appearance="text"
+            btnAction={() => {}}
+            icon={<RiLoopLeftLine />}
+            disabled
+          />
+        </div>
       </div>
       <RunsTable
         data={data}
         isLoading={isLoadingInitial}
         renderSubComponent={renderSubComponent}
         getRowCanExpand={() => true}
+        columnVisibility={columnVisibility}
       />
       {isLoadingMore && <LoadingMore />}
       {!hasMore && !isLoadingInitial && !isLoadingMore && (

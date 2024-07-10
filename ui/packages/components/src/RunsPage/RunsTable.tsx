@@ -14,6 +14,7 @@ import {
   type OnChangeFn,
   type Row,
   type SortingState,
+  type VisibilityState,
 } from '@tanstack/react-table';
 
 export type Run = {
@@ -32,6 +33,7 @@ type RunsTableProps = {
   isLoading?: boolean;
   renderSubComponent: (props: { id: string }) => React.ReactElement;
   getRowCanExpand: (row: Row<Run>) => boolean;
+  columnVisibility?: VisibilityState;
 };
 
 export default function RunsTable({
@@ -41,6 +43,7 @@ export default function RunsTable({
   setSorting,
   getRowCanExpand,
   renderSubComponent,
+  columnVisibility,
 }: RunsTableProps) {
   // Manually track expanded rows because getIsExpanded seems to be index-based,
   // which means polling can shift the expanded row. We may be able to switch
@@ -86,6 +89,7 @@ export default function RunsTable({
     onSortingChange: setSorting,
     state: {
       sorting,
+      columnVisibility,
     },
   });
 
@@ -191,9 +195,8 @@ export default function RunsTable({
 }
 
 const columnHelper = createColumnHelper<Run>();
-
-const columns = [
-  columnHelper.accessor('status', {
+export const columns = [
+  columnHelper.accessor<'status', FunctionRunStatus>('status', {
     cell: (info) => {
       const status = info.getValue();
 
