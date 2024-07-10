@@ -1,13 +1,12 @@
-import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
 import cn from '@/utils/cn';
+import type { Status } from '../Support/Status';
 
 type SystemStatusIconProps = {
   className?: string;
+  status: Status;
 };
 
-export default function SystemStatusIcon({ className }: SystemStatusIconProps) {
-  const status = useSystemStatus();
-
+export default function SystemStatusIcon({ className, status }: SystemStatusIconProps) {
   return (
     <span
       className={cn('mx-1 inline-flex h-2 w-2 rounded-full', className)}

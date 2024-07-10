@@ -1,11 +1,8 @@
-'use client';
-
-import type { ComponentType } from 'react';
+import type { ReactNode } from 'react';
 import type { Route } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useAuth, useUser } from '@clerk/nextjs';
+import { SignOutButton, currentUser } from '@clerk/nextjs';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +10,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
-import { Skeleton } from '@inngest/components/Skeleton';
 import {
   RiMapPinLine,
   RiNewspaperLine,
@@ -22,24 +18,17 @@ import {
   RiShutDownLine,
 } from '@remixicon/react';
 
-import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
+// import type { StatusPageStatusResponse } from '@/app/(organization-active)/support/statusPage';
 import SystemStatusIcon from '@/components/Navigation/SystemStatusIcon';
+import { getStatus } from '../Support/Status';
 
-export default function UserDropdown() {
-  const { isLoaded, isSignedIn, user } = useUser();
-  const { signOut } = useAuth();
-  const status = useSystemStatus();
-  const router = useRouter();
+export default async function UserDropdown() {
+  const user = await currentUser();
+  const status = await getStatus();
 
-  if (!isLoaded) {
-    return (
-      <div className="flex h-full items-center border-l border-slate-800 px-2 py-1.5 md:px-4">
-        <Skeleton className="block size-5 rounded-full" />
-      </div>
-    );
+  if (!user) {
+    return null;
   }
-
-  if (!isSignedIn) return null;
 
   return (
     <DropdownMenu>
@@ -59,72 +48,72 @@ export default function UserDropdown() {
       >
         <DropdownMenuGroup className="p-2">
           <OrganizationDropdownMenuItem
-            icon={RiSettings3Line}
+            icon={<RiSettings3Line className="size-4" />}
             href="/settings/user"
             label="User Settings"
           />
         </DropdownMenuGroup>
         <DropdownMenuGroup className="p-2">
           <OrganizationDropdownMenuItem
-            icon={RiMapPinLine}
+            icon={<RiMapPinLine className="size-4" />}
             href="https://roadmap.inngest.com/roadmap"
             label="Roadmap"
           />
           <OrganizationDropdownMenuItem
-            icon={RiNewspaperLine}
+            icon={<RiNewspaperLine className="size-4" />}
             href="https://roadmap.inngest.com/changelog"
             label="Release Notes"
           />
           <OrganizationDropdownMenuItem
-            icon={RiQuestionLine}
+            icon={<RiQuestionLine className="size-4" />}
             href="/support"
             label="Contact Support"
           />
           <OrganizationDropdownMenuItem
-            icon={SystemStatusIcon}
-            href={status.url}
+            icon={<SystemStatusIcon status={status} className="size-4" />}
+            href={'/'}
             label="Status Page"
           />
         </DropdownMenuGroup>
         <DropdownMenuGroup className="p-2">
-          <OrganizationDropdownMenuItem
-            icon={RiShutDownLine}
-            onSelect={() =>
-              signOut(() =>
-                router.push((process.env.NEXT_PUBLIC_SIGN_IN_PATH || '/sign-in') as Route)
-              )
-            }
-            label="Sign Out"
-          />
+          <SignOutButton>
+            <OrganizationDropdownMenuItem
+              icon={<RiShutDownLine className="size-4" />}
+              label="Sign Out"
+            />
+          </SignOutButton>
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
 
-function OrganizationDropdownMenuItem(props: {
-  icon: ComponentType<{
-    className?: string;
-  }>;
+function OrganizationDropdownMenuItem({
+  icon,
+  label,
+  href,
+  onSelect,
+}: {
+  icon: ReactNode;
   label: string;
   href?: string;
   onSelect?: () => void;
 }) {
   return (
     <DropdownMenuItem
-      onSelect={props.onSelect}
+      onSelect={onSelect}
       asChild
       className="p-2 font-medium text-slate-400 outline-none hover:bg-transparent focus:text-white"
     >
-      {props.href ? (
-        <Link href={props.href as Route}>
-          <props.icon className="size-4" />
-          {props.label}
+      {href ? (
+        <Link href={href as Route}>
+          {icon}
+          {label}
         </Link>
       ) : (
         <button>
-          <props.icon className="size-4" />
-          {props.label}
+          {icon}
+          {label}
         </button>
       )}
     </DropdownMenuItem>
