@@ -51,9 +51,9 @@ if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
 end
 
 -- Enqueue to all partitions.
-enqueue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPointer,  queueScore, queueID, partitionTime, nowMS)
-enqueue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPointer,  queueScore, queueID, partitionTime, nowMS)
-enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPointer,  queueScore, queueID, partitionTime, nowMS)
+enqueue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, keyAccountPointer,  queueScore, queueID, partitionTime, nowMS)
+enqueue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, keyAccountPointer,  queueScore, queueID, partitionTime, nowMS)
+enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, keyAccountPointer,  queueScore, queueID, partitionTime, nowMS)
 
 -- Potentially update the queue of queues (global accounts).
 local currentScore = redis.call("ZSCORE", keyGlobalAccountPointer, accountId)
