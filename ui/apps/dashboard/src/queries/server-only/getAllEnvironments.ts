@@ -11,10 +11,12 @@ const GetAllEnvironmentsDocument = graphql(`
       parentID
       test
       type
+      webhookSigningKey
       createdAt
-      lastDeployedAt
       isArchived
+      functionCount
       isAutoArchiveEnabled
+      lastDeployedAt
     }
   }
 `);
