@@ -55,13 +55,4 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
       redis.call("ZADD", keyAccountPointer, partitionTime, partitionID)
     end
   end
-
-  -- Potentially update the queue of queues (global accounts).
-  local currentScore = redis.call("ZSCORE", keyGlobalAccountPointer, partitionID)
-  if currentScore == false or tonumber(currentScore) > partitionTime then
-    local existing = get_partition_item(keyPartitionMap, partitionID)
-    if nowMS > existing.forceAtMS then
-      redis.call("ZADD", keyGlobalPointer, partitionTime, partitionID)
-    end
-  end
 end
