@@ -1,4 +1,4 @@
-local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, queueScore, queueID, partitionTime, nowMS)
+local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPointer, queueScore, queueID, partitionTime, nowMS)
 	if partitionID == "" then
 		-- This is a blank partition, so don't even bother.  This allows us to pre-allocate
 		-- 3 partitions per item, even if an item only needs a single partition.
@@ -19,7 +19,7 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 	--
 	redis.call("HSETNX", keyPartitionMap, partitionID, partitionItem) -- store the partition
 
-	-- Potentially update the queue of queues.  
+	-- Potentially update the queue of queues (global partitions).
 	local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID) 
 	if currentScore == false or tonumber(currentScore) > partitionTime then
 		-- In this case, we're enqueueing something earlier than we previously had in
@@ -46,4 +46,22 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 			redis.call("ZADD", keyGlobalPointer, partitionTime, partitionID)
 		end
 	end
+
+  -- Potentially update the queue of queues (account partitions).
+  local currentScore = redis.call("ZSCORE", keyAccountPointer, partitionID)
+  if currentScore == false or tonumber(currentScore) > partitionTime then
+    local existing = get_partition_item(keyPartitionMap, partitionID)
+    if nowMS > existing.forceAtMS then
+      redis.call("ZADD", keyAccountPointer, partitionTime, partitionID)
+    end
+  end
+
+  -- Potentially update the queue of queues (global accounts).
+  local currentScore = redis.call("ZSCORE", keyGlobalAccountPointer, partitionID)
+  if currentScore == false or tonumber(currentScore) > partitionTime then
+    local existing = get_partition_item(keyPartitionMap, partitionID)
+    if nowMS > existing.forceAtMS then
+      redis.call("ZADD", keyGlobalPointer, partitionTime, partitionID)
+    end
+  end
 end

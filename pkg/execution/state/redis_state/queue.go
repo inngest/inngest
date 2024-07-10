@@ -690,6 +690,25 @@ func (q QueuePartition) MarshalBinary() ([]byte, error) {
 	return json.Marshal(q)
 }
 
+// QueueAccount represents an individual account in the global queue of accounts.  It stores the
+// time of the earliest job within the account.
+type QueueAccount struct {
+	// ID represents the key used within the global account hash and global pointer set
+	// which represents this QueueAccount.  This is the account ID.
+	ID uuid.UUID `json:"id,omitempty"`
+	// ForcedAtMS records the time that the partition is forced to, in milliseconds, if
+	// the partition has been forced into the future via concurrency issues. This means
+	// that it was requeued due to concurrency issues and should not be brought forward
+	// when a new step is enqueued, if now < ForcedAtMS.
+	ForceAtMS int64 `json:"forceAtMS"`
+
+	// TODO Do we need to include concurrency?
+}
+
+func (q QueueAccount) MarshalBinary() ([]byte, error) {
+	return json.Marshal(q)
+}
+
 // QueueItem represents an individually queued work scheduled for some time in the
 // future.
 type QueueItem struct {
@@ -723,6 +742,8 @@ type QueueItem struct {
 	FunctionID uuid.UUID `json:"wfID"`
 	// WorkspaceID is the workspace that this job belongs to.
 	WorkspaceID uuid.UUID `json:"wsID"`
+	// AccountID is the account that this job belongs to.
+	AccountID uuid.UUID `json:"accountId"`
 	// LeaseID is a ULID which embeds a timestamp denoting when the lease expires.
 	LeaseID *ulid.ULID `json:"leaseID,omitempty"`
 	// Data represents the enqueued data, eg. the edge to process or the pause
@@ -1056,11 +1077,17 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 
 	parts := q.ItemPartitions(ctx, i)
 
+	queueAccount := QueueAccount{
+		ID: i.AccountID,
+	}
+
 	keys := []string{
-		q.kg.QueueItem(),                    // Queue item
-		q.kg.PartitionItem(),                // Partition item, map
-		q.kg.GlobalPartitionIndex(),         // Global partition queue
-		q.kg.ShardPartitionIndex(shardName), // Shard queue
+		q.kg.QueueItem(),                        // Queue item
+		q.kg.PartitionItem(),                    // Partition item, map
+		q.kg.GlobalPartitionIndex(),             // Global partition queue
+		q.kg.GlobalAccountIndex(),               // Global account queue
+		q.kg.AccountPartitionIndex(i.AccountID), // Account partition queue
+		q.kg.ShardPartitionIndex(shardName),     // Shard queue
 		q.kg.Shards(),
 		q.kg.Idempotency(i.ID),
 		q.kg.FnMetadata(i.FunctionID),
@@ -1094,9 +1121,12 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		parts[0],
 		parts[1],
 		parts[2],
+
 		parts[0].ID,
 		parts[1].ID,
 		parts[2].ID,
+
+		queueAccount,
 	})
 
 	if err != nil {

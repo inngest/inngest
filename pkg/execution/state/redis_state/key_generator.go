@@ -184,6 +184,19 @@ type QueueKeyGenerator interface {
 	// - for other partitions, exactly as returned by PartitionQueueSet(...).
 	GlobalPartitionIndex() string
 
+	// AccountPartitionIndex is like GlobalPartitionIndex but only includes partitions
+	// for a specific account
+	// Returns: string key, pointing to ZSET
+	AccountPartitionIndex(accountId uuid.UUID) string
+
+	// GlobalAccountIndex returns the sorted set for the account queue;
+	// the earliest time that each account has work available. This is a global queue
+	// of all accounts, used for fairness.
+	// Returns: string key, pointing to ZSET
+	// Members of this set are
+	// - account IDs
+	GlobalAccountIndex() string
+
 	// PartitionQueueSet returns the key containing the sorted ZSET for a function's custom
 	// concurrency, throttling, or (future) other custom key-based queues.
 	//
@@ -284,6 +297,15 @@ type BatchKeyGenerator interface {
 
 type DefaultQueueKeyGenerator struct {
 	Prefix string
+}
+
+func (d DefaultQueueKeyGenerator) AccountPartitionIndex(accountId uuid.UUID) string {
+	return fmt.Sprintf("%s:accounts:%s:partition:sorted", d.Prefix, accountId)
+}
+
+func (d DefaultQueueKeyGenerator) GlobalAccountIndex() string {
+	return fmt.Sprintf("%s:accounts:sorted", d.Prefix)
+
 }
 
 // assert that DefaultQueueKeyGenerator implements the QueueKeyGenerator interface:

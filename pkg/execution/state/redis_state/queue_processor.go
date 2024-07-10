@@ -108,6 +108,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		ID:          id,
 		AtMS:        at.UnixMilli(),
 		WorkspaceID: item.WorkspaceID,
+		AccountID:   item.Identifier.AccountID,
 		FunctionID:  item.Identifier.WorkflowID,
 		Data:        item,
 		// Only use the queue name if provided by queueKindMapping.
