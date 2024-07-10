@@ -3,12 +3,13 @@ import Link from 'next/link';
 import { IconApp } from '@inngest/components/icons/App';
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
-import { RiToolsLine } from '@remixicon/react';
+import { RiSearchLine, RiToolsLine } from '@remixicon/react';
 
 import OrganizationDropdown from '@/components/Navigation/OrganizationDropdown';
 import UserDropdown from '@/components/Navigation/UserDropdown';
 import InngestLogo from '@/icons/InngestLogo';
 import type { Environment } from '@/utils/environments';
+import { getBooleanFlag } from '../FeatureFlags/ServerFeatureFlag';
 import EnvironmentSelectMenu from './EnvironmentSelectMenu';
 import NavItem from './NavItem';
 import Navigation from './Navigation';
@@ -32,7 +33,7 @@ const BRANCH_PARENT_SLUG = 'branch';
 const DEFAULT_ENV_SLUG = 'production';
 
 export default async function AppNavigation({ envs, activeEnv, slug }: AppNavigationProps) {
-  // const isEventSearchEnabled = await getBooleanFlag('event-search');
+  const isEventSearchEnabled = await getBooleanFlag('event-search');
   const environmentSlug = slug || DEFAULT_ENV_SLUG;
 
   let items: NavItem[] = [
@@ -62,19 +63,19 @@ export default async function AppNavigation({ envs, activeEnv, slug }: AppNaviga
     },
   ];
 
-  // if (isEventSearchEnabled) {
-  //   // Insert the "Event Search" item after the 3rd item.
-  //   items = [
-  //     ...items.slice(0, 3),
-  //     {
-  //       href: `/env/${environmentSlug}/event-search`,
-  //       text: 'Event Search',
-  //       hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
-  //       icon: <RiSearchLine className="w-3.5" />,
-  //     },
-  //     ...items.slice(3),
-  //   ];
-  // }
+  if (isEventSearchEnabled) {
+    // Insert the "Event Search" item after the 3rd item.
+    items = [
+      ...items.slice(0, 3),
+      {
+        href: `/env/${environmentSlug}/event-search`,
+        text: 'Event Search',
+        hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
+        icon: <RiSearchLine className="w-3.5" />,
+      },
+      ...items.slice(3),
+    ];
+  }
 
   const visibleItems = items.filter((item) => !item.hide.includes(environmentSlug));
 
