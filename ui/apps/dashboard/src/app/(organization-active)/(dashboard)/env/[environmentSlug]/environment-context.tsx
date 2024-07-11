@@ -3,7 +3,7 @@
 import { createContext, useContext } from 'react';
 
 import LoadingIcon from '@/icons/LoadingIcon';
-import { useEnvironments } from '@/queries';
+import { useEnvironment as useEnvironmentQuery } from '@/queries';
 import type { Environment } from '@/utils/environments';
 
 export const EnvironmentContext = createContext<Environment | undefined>(undefined);
@@ -14,7 +14,7 @@ type EnvironmentProviderProps = {
 };
 
 export function EnvironmentProvider({ environmentSlug, children }: EnvironmentProviderProps) {
-  const [{ data: environments, fetching, error }] = useEnvironments();
+  const [{ data: environment, fetching, error }] = useEnvironmentQuery(environmentSlug);
 
   if (error) throw error;
 
@@ -25,10 +25,6 @@ export function EnvironmentProvider({ environmentSlug, children }: EnvironmentPr
       </div>
     );
   }
-
-  const environment = environments?.find((e) => {
-    return e.slug === environmentSlug;
-  });
 
   if (!environment) {
     throw new Error('Failed to load environment');

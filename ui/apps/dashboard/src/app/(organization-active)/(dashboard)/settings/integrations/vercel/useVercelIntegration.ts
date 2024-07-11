@@ -3,8 +3,7 @@
 import { useMemo } from 'react';
 import { useQuery } from 'urql';
 
-import { useEnvironments } from '@/queries';
-import { getProductionEnvironment } from '@/utils/environments';
+import { useProductionEnvironment } from '@/queries';
 import { useRestAPIRequest } from '@/utils/useRestAPIRequest';
 import { type VercelIntegration, type VercelProjectAPIResponse } from './VercelIntegration';
 import mergeVercelProjectData from './mergeVercelProjectData';
@@ -23,24 +22,19 @@ export function useVercelIntegration(): {
   fetching: boolean;
   error: Error | undefined;
 } {
-  const [{ data: environments, fetching: isLoadingEnvironments, error: environmentError }] =
-    useEnvironments();
-
-  const productionEnvironmentId = useMemo(() => {
-    if (!environments) return null;
-    const env = getProductionEnvironment(environments);
-    return env?.id;
-  }, [environments]);
+  const [
+    { data: productionEnvironment, fetching: isLoadingEnvironments, error: environmentError },
+  ] = useProductionEnvironment();
 
   // Use memo as the URL object will change on every render
   const url = useMemo(() => {
-    if (!productionEnvironmentId) {
+    if (!productionEnvironment?.id) {
       return null;
     }
     const url = new URL('/v1/integrations/vercel/projects', process.env.NEXT_PUBLIC_API_URL);
-    url.searchParams.set('workspaceID', productionEnvironmentId);
+    url.searchParams.set('workspaceID', productionEnvironment.id);
     return url;
-  }, [productionEnvironmentId]);
+  }, [productionEnvironment?.id]);
 
   // Fetch data from REST and GQL and merge
   const {
@@ -51,9 +45,9 @@ export function useVercelIntegration(): {
   const [{ data: savedVercelProjects, fetching: isLoadingSavedProjects }] = useQuery({
     query: GetSavedVercelProjectsDocument,
     variables: {
-      environmentID: productionEnvironmentId || '',
+      environmentID: productionEnvironment?.id || '',
     },
-    pause: !productionEnvironmentId,
+    pause: !productionEnvironment?.id,
   });
 
   const projects = mergeVercelProjectData({
