@@ -46,7 +46,8 @@ export default function NavItem<PassedHref extends string>({
     >
       <span title={text}>{icon && icon}</span>
       {/* Hide nav text for smaller resolutions if there's an icon  */}
-      <span className={icon ? 'hidden lg:block' : ''}>{text}</span>
+      {icon ? <span className={'hidden lg:block'}>{text}</span> : <span>{text}</span>}
+
       {badge}
     </Link>
   );
