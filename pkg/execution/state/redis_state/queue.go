@@ -690,25 +690,6 @@ func (q QueuePartition) MarshalBinary() ([]byte, error) {
 	return json.Marshal(q)
 }
 
-// QueueAccount represents an individual account in the global queue of accounts.  It stores the
-// time of the earliest job within the account.
-type QueueAccount struct {
-	// ID represents the key used within the global account hash and global pointer set
-	// which represents this QueueAccount.  This is the account ID.
-	ID uuid.UUID `json:"id,omitempty"`
-	// ForcedAtMS records the time that the partition is forced to, in milliseconds, if
-	// the partition has been forced into the future via concurrency issues. This means
-	// that it was requeued due to concurrency issues and should not be brought forward
-	// when a new step is enqueued, if now < ForcedAtMS.
-	ForceAtMS int64 `json:"forceAtMS"`
-
-	// TODO Do we need to include concurrency?
-}
-
-func (q QueueAccount) MarshalBinary() ([]byte, error) {
-	return json.Marshal(q)
-}
-
 // QueueItem represents an individually queued work scheduled for some time in the
 // future.
 type QueueItem struct {
