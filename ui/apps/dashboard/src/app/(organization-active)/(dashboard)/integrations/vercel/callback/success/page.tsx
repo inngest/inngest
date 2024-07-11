@@ -3,9 +3,6 @@ import { Card } from '@inngest/components/Card/Card';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiCheckLine, RiInformationLine } from '@remixicon/react';
 
-import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
-import VercelIntegrationCallbackSuccessPage from './oldPage';
-
 type SuccessProps = {
   searchParams: {
     onSuccessRedirectURL: string;
@@ -14,11 +11,7 @@ type SuccessProps = {
 };
 
 export default async function SuccessPage({ searchParams }: SuccessProps) {
-  const newIntegrations = await getBooleanFlag('new-integrations');
-
-  return !newIntegrations ? (
-    <VercelIntegrationCallbackSuccessPage searchParams={searchParams} />
-  ) : (
+  return (
     <div className="mx-auto mt-8 flex w-[800px] flex-col p-8">
       <div className="bg-contrast mb-7 flex h-12 w-12 items-center justify-center rounded">
         <IconVercel className="text-onContrast h-6 w-6" />

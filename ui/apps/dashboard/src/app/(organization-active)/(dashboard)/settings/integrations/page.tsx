@@ -1,8 +1,6 @@
-import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs';
 import { z } from 'zod';
 
-import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getProductionEnvironment } from '@/queries/server-only/getEnvironment';
 import IntegrationsList from './integrations';
@@ -75,15 +73,7 @@ export const vercelIntegration = async () => {
 };
 
 export default async function IntegrationsPage() {
-  const newIntegrations = await getBooleanFlag('new-integrations');
   const integration = await vercelIntegration();
-
-  //
-  // TODO: this can go away once the "new-integrations"
-  // feature is fully live
-  if (!newIntegrations) {
-    redirect('/settings/integrations/vercel');
-  }
 
   return <IntegrationsList integration={integration} />;
 }

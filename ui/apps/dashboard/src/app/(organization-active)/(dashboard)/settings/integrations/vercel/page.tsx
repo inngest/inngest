@@ -3,20 +3,15 @@ import NextLink from 'next/link';
 import { NewButton } from '@inngest/components/Button/index';
 import { Link } from '@inngest/components/Link/Link';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
-import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
+import { RiArrowRightSLine, RiLinksLine } from '@remixicon/react';
 
-import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { vercelIntegration } from '../page';
-import OldVercelIntegrationPage from './oldPage';
 import VercelProjects from './projects';
 
 export default async function VercelIntegrationPage() {
-  const newIntegrations = await getBooleanFlag('new-integrations');
   const integrations = await vercelIntegration();
 
-  return !newIntegrations ? (
-    <OldVercelIntegrationPage />
-  ) : (
+  return (
     <div className="mx-auto mt-6 flex w-[800px] flex-col p-8">
       <div className="flex flex-row items-center justify-start">
         <NextLink href="/settings/integrations">
@@ -43,12 +38,11 @@ export default async function VercelIntegrationPage() {
 
         <div className="place-self-start">
           <NewButton
-            appearance="outlined"
-            kind="secondary"
-            href={'https://vercel.com/integrations/inngest' as Route}
-            icon={<RiExternalLinkLine className="mr-1" />}
+            kind="primary"
+            href={'https://vercel.com/integrations/inngest/new' as Route}
+            icon={<RiLinksLine className="mr-1" />}
             iconSide="left"
-            label="Go to Vercel"
+            label="Reconnect"
           />
         </div>
       </div>
