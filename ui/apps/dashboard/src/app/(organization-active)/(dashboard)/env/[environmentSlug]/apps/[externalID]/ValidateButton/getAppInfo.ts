@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
 import { useClient } from 'urql';
 
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { fetchWithTimeout } from '@/queries/fetch';
-import { useEnvironment } from '../../../../../../../../components/Environments/environment-context';
 
 const query = graphql(`
   query CheckApp($envID: ID!, $url: String!) {

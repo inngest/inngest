@@ -10,10 +10,10 @@ import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import type { CodedError } from '@/codedError';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import Input from '@/components/Forms/Input';
 import { SyncFailure } from '@/components/SyncFailure/SyncFailure';
 import { graphql } from '@/gql';
-import { useEnvironment } from '../../../../../../../components/Environments/environment-context';
 
 const ResyncAppDocument = graphql(`
   mutation ResyncApp($appExternalID: String!, $appURL: String, $envID: UUID!) {
