@@ -162,11 +162,36 @@ export type BillingSubscription = {
   nextInvoiceDate: Scalars['Time'];
 };
 
+export type Cancellation = {
+  __typename?: 'Cancellation';
+  createdAt: Scalars['Time'];
+  environmentID: Scalars['UUID'];
+  expression: Maybe<Scalars['String']>;
+  functionID: Scalars['UUID'];
+  id: Scalars['ULID'];
+  name: Maybe<Scalars['String']>;
+  queuedAtMax: Scalars['Time'];
+  queuedAtMin: Maybe<Scalars['Time']>;
+};
+
 export type CancellationConfiguration = {
   __typename?: 'CancellationConfiguration';
   condition: Maybe<Scalars['String']>;
   event: Scalars['String'];
   timeout: Maybe<Scalars['String']>;
+};
+
+export type CancellationConnection = {
+  __typename?: 'CancellationConnection';
+  edges: Maybe<Array<Maybe<CancellationEdge>>>;
+  pageInfo: PageInfo;
+  totalCount: Scalars['Int'];
+};
+
+export type CancellationEdge = {
+  __typename?: 'CancellationEdge';
+  cursor: Scalars['String'];
+  node: Cancellation;
 };
 
 export type CodedError = {
@@ -194,6 +219,14 @@ export enum ConcurrencyScope {
   Environment = 'ENVIRONMENT',
   Function = 'FUNCTION'
 }
+
+export type CreateCancellationInput = {
+  envID: Scalars['UUID'];
+  functionID: Scalars['UUID'];
+  name?: InputMaybe<Scalars['String']>;
+  queuedAtMax: Scalars['Time'];
+  queuedAtMin?: InputMaybe<Scalars['Time']>;
+};
 
 export type CreateFunctionReplayInput = {
   fromRange: Scalars['ULID'];
@@ -486,11 +519,12 @@ export enum FunctionRunTimeField {
 export type FunctionRunV2 = {
   __typename?: 'FunctionRunV2';
   accountID: Scalars['UUID'];
+  app: App;
   appID: Scalars['UUID'];
   batchCreatedAt: Maybe<Scalars['Time']>;
   cronSchedule: Maybe<Scalars['String']>;
   endedAt: Maybe<Scalars['Time']>;
-  function: Maybe<Workflow>;
+  function: Workflow;
   functionID: Scalars['UUID'];
   id: Scalars['ULID'];
   isBatch: Scalars['Boolean'];
@@ -591,6 +625,7 @@ export type Mutation = {
   archiveWorkflow: Maybe<WorkflowResponse>;
   cancelRun: FunctionRun;
   completeAWSMarketplaceSetup: Maybe<AwsMarketplaceSetupResponse>;
+  createCancellation: Cancellation;
   createFunctionReplay: Replay;
   createIngestKey: IngestKey;
   createSigningKey: SigningKey;
@@ -598,6 +633,7 @@ export type Mutation = {
   createUser: Maybe<CreateUserPayload>;
   createVercelApp: Maybe<CreateVercelAppResponse>;
   createWorkspace: Array<Maybe<Workspace>>;
+  deleteCancellation: Scalars['ULID'];
   deleteIngestKey: Maybe<DeleteResponse>;
   deleteSigningKey: SigningKey;
   disableEnvironmentAutoArchive: Workspace;
@@ -654,6 +690,11 @@ export type MutationCompleteAwsMarketplaceSetupArgs = {
 };
 
 
+export type MutationCreateCancellationArgs = {
+  input: CreateCancellationInput;
+};
+
+
 export type MutationCreateFunctionReplayArgs = {
   input: CreateFunctionReplayInput;
 };
@@ -681,6 +722,12 @@ export type MutationCreateVercelAppArgs = {
 
 export type MutationCreateWorkspaceArgs = {
   input: NewWorkspaceInput;
+};
+
+
+export type MutationDeleteCancellationArgs = {
+  cancellationID: Scalars['ULID'];
+  envID: Scalars['UUID'];
 };
 
 
@@ -1412,6 +1459,7 @@ export type Workflow = {
   app: App;
   appName: Maybe<Scalars['String']>;
   archivedAt: Maybe<Scalars['Time']>;
+  cancellations: CancellationConnection;
   configuration: Maybe<FunctionConfiguration>;
   current: Maybe<WorkflowVersion>;
   failureHandler: Maybe<Workflow>;
@@ -1436,6 +1484,12 @@ export type Workflow = {
   slug: Scalars['String'];
   url: Scalars['String'];
   usage: Usage;
+};
+
+
+export type WorkflowCancellationsArgs = {
+  after: InputMaybe<Scalars['String']>;
+  first?: Scalars['Int'];
 };
 
 
@@ -2290,7 +2344,7 @@ export type GetRunTraceQueryVariables = Exact<{
 }>;
 
 
-export type GetRunTraceQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', run: { __typename?: 'FunctionRunV2', function: { __typename?: 'Workflow', id: string, name: string, app: { __typename?: 'App', name: string, externalID: string } } | null, trace: (
+export type GetRunTraceQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', run: { __typename?: 'FunctionRunV2', function: { __typename?: 'Workflow', id: string, name: string, app: { __typename?: 'App', name: string, externalID: string } }, trace: (
         { __typename?: 'RunTraceSpan', childrenSpans: Array<(
           { __typename?: 'RunTraceSpan', childrenSpans: Array<(
             { __typename?: 'RunTraceSpan' }
