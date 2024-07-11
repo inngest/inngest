@@ -17,7 +17,6 @@ export type Environment = {
   webhookSigningKey: string;
   createdAt: string;
   isArchived: boolean;
-  functionCount: number;
   isAutoArchiveEnabled: boolean | null | undefined;
   lastDeployedAt: string | null | undefined;
 };
@@ -117,7 +116,6 @@ export function workspaceToEnvironment(
     | 'webhookSigningKey'
     | 'createdAt'
     | 'isArchived'
-    | 'functionCount'
     | 'isAutoArchiveEnabled'
     | 'lastDeployedAt'
   >
@@ -148,7 +146,6 @@ export function workspaceToEnvironment(
     webhookSigningKey: workspace.webhookSigningKey,
     createdAt: workspace.createdAt,
     isArchived: workspace.isArchived,
-    functionCount: workspace.functionCount,
     isAutoArchiveEnabled: workspace.isAutoArchiveEnabled,
     lastDeployedAt: workspace.lastDeployedAt,
   };
@@ -202,7 +199,6 @@ export function workspacesToEnvironments(
     | 'webhookSigningKey'
     | 'createdAt'
     | 'isArchived'
-    | 'functionCount'
     | 'isAutoArchiveEnabled'
     | 'lastDeployedAt'
   >[]
