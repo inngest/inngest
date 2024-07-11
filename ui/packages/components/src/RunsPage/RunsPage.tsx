@@ -1,12 +1,13 @@
 'use client';
 
 import { useCallback, useRef, type UIEventHandler } from 'react';
+import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
-import RunsTable, { type Run } from '@inngest/components/RunsPage/RunsTable';
+import { columns, type Run } from '@inngest/components/RunsPage/RunsTable';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
-import { LoadingMore } from '@inngest/components/Table';
+import { LoadingMore, TableFilter } from '@inngest/components/Table';
 import {
   FunctionRunTimeField,
   isFunctionRunStatus,
@@ -14,6 +15,8 @@ import {
   type FunctionRunStatus,
 } from '@inngest/components/types/functionRun';
 import { RiLoopLeftLine } from '@remixicon/react';
+import { type VisibilityState } from '@tanstack/react-table';
+import { useLocalStorage } from 'react-use';
 
 import EntityFilter from '../Filter/EntityFilter';
 import { RunDetails } from '../RunDetailsV2';
@@ -25,6 +28,11 @@ import {
 } from '../hooks/useSearchParam';
 import type { Features } from '../types/features';
 import { TimeFilter } from './TimeFilter';
+
+// Disable SSR in Runs Table, to prevent hydration errors. It requires windows info on visibility columns
+const RunsTable = dynamic(() => import('@inngest/components/RunsPage/RunsTable'), {
+  ssr: false,
+});
 
 type Props = {
   cancelRun: React.ComponentProps<typeof RunDetails>['cancelRun'];
@@ -45,6 +53,7 @@ type Props = {
   apps?: Option[];
   functions?: Option[];
   functionIsPaused?: boolean;
+  defaultVisibility?: VisibilityState;
 };
 
 export function RunsPage({
@@ -65,8 +74,17 @@ export function RunsPage({
   functions,
   pollInterval,
   functionIsPaused,
+  defaultVisibility,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const displayAllColumns: VisibilityState = Object.fromEntries(
+    columns.map((column) => [column.accessorKey, true])
+  );
+
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
+    'VisibleRunsColumns',
+    defaultVisibility || displayAllColumns
+  );
 
   const [filteredStatus = [], setFilteredStatus, removeFilteredStatus] =
     useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
@@ -169,6 +187,11 @@ export function RunsPage({
     [cancelRun, getRun, getTraceResult, getTrigger, pathCreator, pollInterval, rerun]
   );
 
+  const options: Option[] = columns.map((column) => ({
+    id: column.accessorKey,
+    name: column.header?.toString() || column.accessorKey,
+  }));
+
   return (
     <main
       className="bg-canvasBase text-basis h-full min-h-0 overflow-y-auto"
@@ -185,7 +208,11 @@ export function RunsPage({
               selectedDays={lastDays}
             />
           </SelectGroup>
-          <StatusFilter selectedStatuses={filteredStatus} onStatusesChange={onStatusFilterChange} functionIsPaused={functionIsPaused} />
+          <StatusFilter
+            selectedStatuses={filteredStatus}
+            onStatusesChange={onStatusFilterChange}
+            functionIsPaused={functionIsPaused}
+          />
           {apps && (
             <EntityFilter
               type="app"
@@ -203,20 +230,28 @@ export function RunsPage({
             />
           )}
         </div>
-        {/* TODO: wire button */}
-        <Button
-          label="Refresh"
-          appearance="text"
-          btnAction={() => {}}
-          icon={<RiLoopLeftLine />}
-          disabled
-        />
+        <div className="flex items-center gap-2">
+          <TableFilter
+            columnVisibility={columnVisibility}
+            setColumnVisibility={setColumnVisibility}
+            options={options}
+          />
+          {/* TODO: wire button */}
+          <Button
+            label="Refresh"
+            appearance="text"
+            btnAction={() => {}}
+            icon={<RiLoopLeftLine />}
+            disabled
+          />
+        </div>
       </div>
       <RunsTable
         data={data}
         isLoading={isLoadingInitial}
         renderSubComponent={renderSubComponent}
         getRowCanExpand={() => true}
+        columnVisibility={columnVisibility}
       />
       {isLoadingMore && <LoadingMore />}
       {!hasMore && !isLoadingInitial && !isLoadingMore && (

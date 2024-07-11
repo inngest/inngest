@@ -150,5 +150,6 @@ export default function Page() {
       apps={[]}
       functions={[]}
       pollInterval={pollInterval}
+    />
   );
 }
