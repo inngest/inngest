@@ -8,20 +8,21 @@ Output:
 
 ]]
 
-local queueKey                = KEYS[1] -- queue:item - hash: { $itemID: $item }
-local queueIndexKey           = KEYS[2] -- queue:sorted:$workflowID - zset
-local partitionKey            = KEYS[3] -- partition:item:$workflowID - hash { n: $leased, len: $enqueued }
-local partitionIndexKey       = KEYS[4] -- partition:sorted - zset
+local queueKey                  = KEYS[1] -- queue:item - hash: { $itemID: $item }
+local queueIndexKey             = KEYS[2] -- queue:sorted:$workflowID - zset
+local partitionKey              = KEYS[3] -- partition:item:$workflowID - hash { n: $leased, len: $enqueued }
+local globalPartitionIndexKey   = KEYS[4] -- partition:sorted - zset
+local accountPartitionIndexKey  = KEYS[5] -- accounts:$accountId:partition:sorted - zset
 -- We push our queue item ID into each concurrency queue
-local accountConcurrencyKey   = KEYS[5] -- Account concurrency level
-local partitionConcurrencyKey = KEYS[6] -- When leasing an item we need to place the lease into this key.
-local customConcurrencyKeyA   = KEYS[7] -- Optional for eg. for concurrency amongst steps
-local customConcurrencyKeyB   = KEYS[8] -- Optional for eg. for concurrency amongst steps
+local accountConcurrencyKey     = KEYS[6] -- Account concurrency level
+local partitionConcurrencyKey   = KEYS[7] -- When leasing an item we need to place the lease into this key.
+local customConcurrencyKeyA     = KEYS[8] -- Optional for eg. for concurrency amongst steps
+local customConcurrencyKeyB     = KEYS[9] -- Optional for eg. for concurrency amongst steps
 -- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer      = KEYS[9]
-local shardPointerKey         = KEYS[10]
-local keyItemIndexA           = KEYS[11]          -- custom item index 1
-local keyItemIndexB           = KEYS[12]          -- custom item index 2
+local concurrencyPointer        = KEYS[10]
+local shardPointerKey           = KEYS[11]
+local keyItemIndexA             = KEYS[12]          -- custom item index 1
+local keyItemIndexB             = KEYS[13]          -- custom item index 2
 
 local queueItem               = ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID                 = ARGV[2]           -- id
@@ -63,7 +64,8 @@ if customConcurrencyKeyB ~= nil and customConcurrencyKeyB ~= "" then
 end
 
 -- Fetch partition index;  ensure this is the same as our lowest queue item score
-local currentScore = redis.call("ZSCORE", partitionIndexKey, functionID)
+local currentScore = redis.call("ZSCORE", globalPartitionIndexKey, functionID)
+-- TODO Do we need to read from the account-level partition index?
 
 -- Peek the earliest time from the queue index.  We need to know
 -- the earliest time for the entire function set, as we may be
@@ -73,7 +75,8 @@ local earliestTime = get_fn_partition_score(queueIndexKey)
 
 -- earliest is a table containing {item, score}
 if currentScore == false or tonumber(currentScore) ~= earliestTime or tonumber(currentScore) == nil then
-    redis.call("ZADD", partitionIndexKey, earliestTime, functionID)
+    redis.call("ZADD", globalPartitionIndexKey, earliestTime, functionID)
+    redis.call("ZADD", accountPartitionIndexKey, earliestTime, functionID)
     -- And the same for any shards, as long as the shard name exists.
     if has_shard_key(shardPointerKey, -2) then
         update_pointer_score_to(functionID, shardPointerKey, earliestTime)

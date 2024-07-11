@@ -17,8 +17,9 @@ Return values:
 local keyQueueIndex    = KEYS[1]
 local keyQueueHash     = KEYS[2]
 local keyGlobalIndex   = KEYS[3]           -- partition:sorted - zset
-local keyShardIndex    = KEYS[4]           -- shard zset
-local keyPartitionHash = KEYS[5]           -- partition hash
+local keyAccountIndex  = KEYS[4]           -- accounts:$accountId:partition:sorted
+local keyShardIndex    = KEYS[5]           -- shard zset
+local keyPartitionHash = KEYS[6]           -- partition hash
 
 local jobID            = ARGV[1]           -- queue item ID
 local jobScore         = tonumber(ARGV[2]) -- enqueue at, in milliseconds
@@ -69,8 +70,10 @@ local minScore = redis.call("ZRANGEBYSCORE", keyQueueIndex, "-inf", "+inf", "WIT
 local partitionScore = math.floor(minScore[2] / 1000)
 
 local currentScore = redis.call("ZSCORE", keyGlobalIndex, partitionID)
+-- TODO Do we need to read the account-level score?
 if currentScore == false or tonumber(currentScore) ~= partitionScore then
     redis.call("ZADD", keyGlobalIndex, partitionScore, partitionID)
+    redis.call("ZADD", keyAccountIndex, partitionScore, partitionID)
     if has_shard_key(keyShardIndex) then
         update_pointer_score_to(partitionID, keyShardIndex, partitionScore)
     end

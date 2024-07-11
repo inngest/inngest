@@ -1227,9 +1227,10 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 	keys := []string{
 		q.kg.FnQueueSet(partitionName),
 		q.kg.QueueItem(),
-		q.kg.GlobalPartitionIndex(),         // Global partition queue
-		q.kg.ShardPartitionIndex(shardName), // Shard partition queue
-		q.kg.PartitionItem(),                // Partition hash
+		q.kg.GlobalPartitionIndex(),                              // Global partition queue
+		q.kg.AccountPartitionIndex(qi.Data.Identifier.AccountID), // Account partition queue
+		q.kg.ShardPartitionIndex(shardName),                      // Shard partition queue
+		q.kg.PartitionItem(),                                     // Partition hash
 	}
 	status, err := scripts["queue/requeueByID"].Exec(
 		ctx,
@@ -1338,6 +1339,8 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		q.kg.Concurrency("custom", customKeys[1]),
 		q.kg.ConcurrencyIndex(),
 		q.kg.GlobalPartitionIndex(),
+		q.kg.GlobalAccountIndex(),
+		q.kg.AccountPartitionIndex(item.Data.Identifier.AccountID),
 		q.kg.ShardPartitionIndex(shardName),
 		q.kg.ThrottleKey(item.Data.Throttle),
 	}
@@ -1350,6 +1353,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		customLimits[0],
 		customLimits[1],
 		p.Queue(),
+		item.Data.Identifier.AccountID,
 	})
 	if err != nil {
 		return nil, err
@@ -1418,6 +1422,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 		q.kg.QueueItem(),
 		q.kg.FnQueueSet(i.Queue()),
 		q.kg.GlobalPartitionIndex(),
+		q.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 		q.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
 		q.kg.Concurrency("p", i.FunctionID.String()),
 		q.kg.Concurrency("custom", customKeys[0]),
@@ -1561,6 +1566,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		q.kg.FnQueueSet(i.Queue()),
 		q.kg.PartitionMeta(i.Queue()),
 		q.kg.GlobalPartitionIndex(),
+		q.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 		q.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
 		q.kg.Concurrency("p", i.FunctionID.String()),
 		q.kg.Concurrency("custom", customKeys[0]),
@@ -1633,6 +1639,8 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	keys := []string{
 		q.kg.PartitionItem(),
 		q.kg.GlobalPartitionIndex(),
+		// TODO Can AccountID ever be nil?
+		q.kg.AccountPartitionIndex(*p.AccountID),
 		p.fnConcurrencyKey(q.kg),
 		p.acctConcurrencyKey(q.kg),
 		// TODO: Custom concurrency key (?)
@@ -1739,7 +1747,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		ctx,
 		q.r,
 		[]string{
-			q.kg.GlobalPartitionIndex(),
+			partitionKey,
 			q.kg.PartitionItem(),
 		},
 		args,
@@ -1985,6 +1993,8 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 	keys := []string{
 		q.kg.PartitionItem(),
 		q.kg.GlobalPartitionIndex(),
+		// TODO Is the account ID always set?
+		q.kg.AccountPartitionIndex(*p.AccountID),
 		q.kg.ShardPartitionIndex(shardName),
 		q.kg.PartitionMeta(p.Queue()),
 		q.kg.FnQueueSet(p.Queue()),

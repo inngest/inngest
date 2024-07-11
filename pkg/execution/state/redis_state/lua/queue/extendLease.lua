@@ -11,11 +11,12 @@ Output:
 local itemHashKey       = KEYS[1] -- queue:item - hash: { $itemID: item }
 local itemQueueKey      = KEYS[2] -- queue:sorted:$workflowID - zset of queue items
 local partitionIndexKey = KEYS[3] -- partition:sorted - zset of queues by earliest item
+local accountPartitionIndexKey = KEYS[4] -- accounts:$accountId:partition:sorted - zset of account partitions by earliest item
 -- We update the lease time in each concurrency queue, also
-local accountConcurrencyKey   = KEYS[4] -- Account concurrency level
-local partitionConcurrencyKey = KEYS[5] -- Partition/function level concurrency
-local customConcurrencyKeyA   = KEYS[6] -- Optional for eg. for concurrency amongst steps 
-local customConcurrencyKeyB   = KEYS[7] -- Optional for eg. for concurrency amongst steps 
+local accountConcurrencyKey   = KEYS[5] -- Account concurrency level
+local partitionConcurrencyKey = KEYS[6] -- Partition/function level concurrency
+local customConcurrencyKeyA   = KEYS[7] -- Optional for eg. for concurrency amongst steps
+local customConcurrencyKeyB   = KEYS[8] -- Optional for eg. for concurrency amongst steps
 
 local queueID         = ARGV[1]
 local currentLeaseKey = ARGV[2]
@@ -69,6 +70,9 @@ if tonumber(redis.call("ZCARD", itemQueueKey)) == 0 then
 	--
 	-- We also add 2 seconds because we peek queues in advance.
 	redis.call("ZADD", partitionIndexKey, (math.ceil(nextTime) / 1000) + 2, partitionID)
+	-- Also add to account partition ZSET
+	redis.call("ZADD", accountPartitionIndexKey, (math.ceil(nextTime) / 1000) + 2, partitionID)
+	-- TODO: Do we need to update the global ZSET of accounts?
 end
 
 return 0

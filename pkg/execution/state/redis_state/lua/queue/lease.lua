@@ -25,8 +25,10 @@ local customConcurrencyKeyB  = KEYS[7] -- Optional for eg. for concurrency among
 -- We push pointers to partition concurrency items to the partition concurrency item
 local concurrencyPointer     = KEYS[8]
 local globalPointerKey       = KEYS[9]
-local shardPointerKey        = KEYS[10]
-local throttleKey            = KEYS[11] -- key used for throttling function run starts.
+local globalAccountKey       = KEYS[10]
+local accountPointerKey      = KEYS[11]
+local shardPointerKey        = KEYS[12]
+local throttleKey            = KEYS[13] -- key used for throttling function run starts.
 
 local queueID                = ARGV[1]
 local newLeaseKey            = ARGV[2]
@@ -39,6 +41,7 @@ local partitionConcurrency   = tonumber(ARGV[5])
 local customConcurrencyA     = tonumber(ARGV[6])
 local customConcurrencyB     = tonumber(ARGV[7])
 local partitionName          = ARGV[8] -- Same as fn queue name/workflow ID
+local accountId              = ARGV[9]
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -117,6 +120,10 @@ redis.call("ZREM", queueIndexKey, item.id)
 -- Update the fn's score in the global pointer queue to the next job, if available.
 local score = get_fn_partition_score(queueIndexKey)
 update_pointer_score_to(partitionName, globalPointerKey, score)
+-- Also update account-level partitions
+update_pointer_score_to(partitionName, accountPointerKey, score)
+-- Also updated global accounts
+update_pointer_score_to(accountId, globalAccountKey, score)
 -- And the same for any shards, as long as the shard name exists.
 if has_shard_key(shardPointerKey) then
     update_pointer_score_to(partitionName, shardPointerKey, score)

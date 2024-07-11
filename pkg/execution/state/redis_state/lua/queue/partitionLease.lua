@@ -8,11 +8,12 @@ Output:
 
 ]]
 
-local keyPartitionMap         = KEYS[1] -- key storing all partitions
-local keyGlobalPartitionPtr   = KEYS[2] -- global top-level partitioned queue
-local keyPartitionConcurrency = KEYS[3] -- in progress queue for partition
-local keyAccountConcurrency   = KEYS[4] -- in progress queue for account
-local keyFnMeta               = KEYS[5]
+local keyPartitionMap           = KEYS[1] -- key storing all partitions
+local keyGlobalPartitionPtr     = KEYS[2] -- global top-level partitioned queue
+local keyAccountPartitionPtr    = KEYS[3] -- account-level partitioned queue
+local keyPartitionConcurrency   = KEYS[4] -- in progress queue for partition
+local keyAccountConcurrency     = KEYS[5] -- in progress queue for account
+local keyFnMeta                 = KEYS[6]
 
 
 local partitionID             = ARGV[1]
@@ -57,6 +58,7 @@ if partitionConcurrency > 0 and #keyPartitionConcurrency > 0 then
     capacity = check_concurrency(currentTime, keyPartitionConcurrency, partitionConcurrency)
     if capacity <= 0 then
         requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, rartitionID, noCapacityScore, currentTime)
+        requeue_partition(keyAccountPartitionPtr, keyPartitionMap, existing, rartitionID, noCapacityScore, currentTime)
         return { -1 }
     end
 end
@@ -67,6 +69,7 @@ if accountConcurrency > 0 and #keyAccountConcurrency > 0 then
     local acctCap = check_concurrency(currentTime, keyAccountConcurrency, accountConcurrency)
     if acctCap <= 0 then
         requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, rartitionID, noCapacityScore, currentTime)
+        requeue_partition(keyAccountPartitionPtr, keyPartitionMap, existing, rartitionID, noCapacityScore, currentTime)
         return { -1 }
     end
 
@@ -82,5 +85,7 @@ existing.last = currentTime -- in ms.
 -- Update item and index score
 redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existing))
 redis.call("ZADD", keyGlobalPartitionPtr, leaseTime, partitionID) -- partition scored are in seconds.
+redis.call("ZADD", keyAccountPartitionPtr, leaseTime, partitionID) -- partition scored are in seconds.
+-- TODO Do we need to update the global account ZSET?
 
 return { existingTime, capacity }

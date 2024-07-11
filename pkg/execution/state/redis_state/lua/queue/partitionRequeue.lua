@@ -13,11 +13,12 @@
 
 local partitionKey            = KEYS[1]
 local keyGlobalPartitionPtr   = KEYS[2]
-local keyShardPartitionPtr    = KEYS[3]
-local partitionMeta           = KEYS[4]
-local queueIndex              = KEYS[5]
-local queueKey                = KEYS[6]
-local partitionConcurrencyKey = KEYS[7] -- We can only GC a partition if no running jobs occur.
+local keyAccountPartitionPtr  = KEYS[3]
+local keyShardPartitionPtr    = KEYS[4]
+local partitionMeta           = KEYS[5]
+local queueIndex              = KEYS[6]
+local queueKey                = KEYS[7]
+local partitionConcurrencyKey = KEYS[8] -- We can only GC a partition if no running jobs occur.
 
 local workflowID              = ARGV[1]
 local atMS                    = tonumber(ARGV[2]) -- time in milliseconds
@@ -38,7 +39,9 @@ end
 if tonumber(redis.call("ZCARD", queueIndex)) == 0 and tonumber(redis.call("ZCARD", partitionConcurrencyKey)) == 0 then
     redis.call("HDEL", partitionKey, workflowID)             -- Remove the item
     redis.call("DEL", partitionMeta)                         -- Remove the meta
-    redis.call("ZREM", keyGlobalPartitionPtr, workflowID)    -- Remove the index
+    redis.call("ZREM", keyGlobalPartitionPtr, workflowID)    -- Remove the global index
+    redis.call("ZREM", keyAccountPartitionPtr, workflowID)    -- Remove the account-level index
+    -- TODO Can/do we need to remove the account from the global accounts index/ZSET?
     if has_shard_key(keyShardPartitionPtr) then
         redis.call("ZREM", keyShardPartitionPtr, workflowID) -- Remove the shard index
     end
@@ -70,6 +73,8 @@ existing.at = atS
 existing.leaseID = nil
 redis.call("HSET", partitionKey, workflowID, cjson.encode(existing))
 redis.call("ZADD", keyGlobalPartitionPtr, atS, workflowID)
+redis.call("ZADD", keyAccountPartitionPtr, atS, workflowID)
+-- TODO Do we need to update the global account ZSET?
 if has_shard_key(keyShardPartitionPtr) then
     redis.call("ZADD", keyShardPartitionPtr, atS, workflowID) -- Update any index
 end
