@@ -15,7 +15,7 @@ export function TableFilter({ options, columnVisibility, setColumnVisibility }: 
   return (
     <Select
       multiple
-      defaultValue={selectedValues}
+      value={selectedValues}
       onChange={(value: Option[]) => {
         const newColumnVisibility: VisibilityState = {};
         options.forEach((option) => {
