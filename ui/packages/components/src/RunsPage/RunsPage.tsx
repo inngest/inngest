@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback, useRef, type UIEventHandler } from 'react';
+import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
-import RunsTable, { columns, type Run } from '@inngest/components/RunsPage/RunsTable';
+import { columns, type Run } from '@inngest/components/RunsPage/RunsTable';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
 import { LoadingMore, TableFilter } from '@inngest/components/Table';
 import {
@@ -27,6 +28,11 @@ import {
 } from '../hooks/useSearchParam';
 import type { Features } from '../types/features';
 import { TimeFilter } from './TimeFilter';
+
+// Disable SSR in Runs Table, to prevent hydration errors. It requires windows info on visibility columns
+const RunsTable = dynamic(() => import('@inngest/components/RunsPage/RunsTable'), {
+  ssr: false,
+});
 
 type Props = {
   cancelRun: React.ComponentProps<typeof RunDetails>['cancelRun'];
@@ -202,7 +208,11 @@ export function RunsPage({
               selectedDays={lastDays}
             />
           </SelectGroup>
-          <StatusFilter selectedStatuses={filteredStatus} onStatusesChange={onStatusFilterChange} functionIsPaused={functionIsPaused} />
+          <StatusFilter
+            selectedStatuses={filteredStatus}
+            onStatusesChange={onStatusFilterChange}
+            functionIsPaused={functionIsPaused}
+          />
           {apps && (
             <EntityFilter
               type="app"

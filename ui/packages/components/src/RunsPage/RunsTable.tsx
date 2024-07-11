@@ -49,11 +49,12 @@ export default function RunsTable({
   // which means polling can shift the expanded row. We may be able to switch
   // back to getIsExpanded when we replace polling with websockets
   const [expandedRunIDs, setExpandedRunIDs] = useState<string[]>([]);
-
+  const numberOfVisibleColumns =
+    columnVisibility && Object.values(columnVisibility).filter((value) => value === true).length;
   // Render 8 empty lines for skeletons when data is loading
   const tableData = useMemo(() => {
     if (isLoading) {
-      return Array(8)
+      return Array(numberOfVisibleColumns || columns.length)
         .fill(null)
         .map((_, index) => {
           return {
@@ -133,10 +134,9 @@ export default function RunsTable({
       <tbody className={tableBodyStyles}>
         {isEmpty && (
           <tr>
-            {/* TODO: when we introduce column visibility options, this colSpan has to be dinamically calculated depending on # visible columns */}
             <td
               className="text-subtle pt-28 text-center align-top font-medium"
-              colSpan={table.getAllColumns().length}
+              colSpan={numberOfVisibleColumns || table.getVisibleFlatColumns().length}
             >
               No results were found.
             </td>
