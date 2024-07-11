@@ -147,7 +147,8 @@ export default function Page() {
       getTrigger={getTrigger}
       rerun={rerun}
       pathCreator={pathCreator}
+      apps={[]}
+      functions={[]}
       pollInterval={pollInterval}
-    />
   );
 }

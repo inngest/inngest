@@ -17,9 +17,11 @@ import { RiLoopLeftLine } from '@remixicon/react';
 import { type VisibilityState } from '@tanstack/react-table';
 import { useLocalStorage } from 'react-use';
 
+import EntityFilter from '../Filter/EntityFilter';
 import { RunDetails } from '../RunDetailsV2';
 import {
   useSearchParam,
+  useStringArraySearchParam,
   useValidatedArraySearchParam,
   useValidatedSearchParam,
 } from '../hooks/useSearchParam';
@@ -42,6 +44,8 @@ type Props = {
   pathCreator: React.ComponentProps<typeof RunDetails>['pathCreator'];
   pollInterval?: number;
   rerun: React.ComponentProps<typeof RunDetails>['rerun'];
+  apps?: Option[];
+  functions?: Option[];
   functionIsPaused?: boolean;
   defaultVisibility?: VisibilityState;
 };
@@ -60,6 +64,8 @@ export function RunsPage({
   onScroll,
   onScrollToTop,
   pathCreator,
+  apps,
+  functions,
   pollInterval,
   functionIsPaused,
   defaultVisibility,
@@ -76,6 +82,12 @@ export function RunsPage({
 
   const [filteredStatus = [], setFilteredStatus, removeFilteredStatus] =
     useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
+
+  const [filteredApp = [], setFilteredApp, removeFilteredApp] =
+    useStringArraySearchParam('filterApp');
+
+  const [filteredFunction = [], setFilteredFunction, removeFilteredFunction] =
+    useStringArraySearchParam('filterFunction');
 
   const [timeField = FunctionRunTimeField.QueuedAt, setTimeField] = useValidatedSearchParam(
     'timeField',
@@ -106,6 +118,30 @@ export function RunsPage({
       }
     },
     [removeFilteredStatus, scrollToTop, setFilteredStatus]
+  );
+
+  const onAppFilterChange = useCallback(
+    (value: string[]) => {
+      scrollToTop();
+      if (value.length > 0) {
+        setFilteredApp(value);
+      } else {
+        removeFilteredApp();
+      }
+    },
+    [removeFilteredApp, scrollToTop, setFilteredApp]
+  );
+
+  const onFunctionFilterChange = useCallback(
+    (value: string[]) => {
+      scrollToTop();
+      if (value.length > 0) {
+        setFilteredFunction(value);
+      } else {
+        removeFilteredFunction();
+      }
+    },
+    [removeFilteredFunction, scrollToTop, setFilteredFunction]
   );
 
   const onTimeFieldChange = useCallback(
@@ -166,11 +202,23 @@ export function RunsPage({
               selectedDays={lastDays}
             />
           </SelectGroup>
-          <StatusFilter
-            selectedStatuses={filteredStatus}
-            onStatusesChange={onStatusFilterChange}
-            functionIsPaused={functionIsPaused}
-          />
+          <StatusFilter selectedStatuses={filteredStatus} onStatusesChange={onStatusFilterChange} functionIsPaused={functionIsPaused} />
+          {apps && (
+            <EntityFilter
+              type="app"
+              onFilterChange={onAppFilterChange}
+              selectedEntities={filteredApp}
+              entities={apps}
+            />
+          )}
+          {functions && (
+            <EntityFilter
+              type="function"
+              onFilterChange={onFunctionFilterChange}
+              selectedEntities={filteredFunction}
+              entities={functions}
+            />
+          )}
         </div>
         <div className="flex items-center gap-2">
           <TableFilter

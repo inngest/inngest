@@ -336,6 +336,7 @@ enum RunsOrderByDirection {
 type FunctionRunV2 {
   id: ULID!
   appID: UUID!
+  app: App!
   functionID: UUID!
   function: Function!
   traceID: String!
