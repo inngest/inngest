@@ -87,8 +87,8 @@ importers:
         specifier: 1.52.1
         version: 1.52.1
       '@tanstack/react-table':
-        specifier: 8.9.3
-        version: 8.9.3(react-dom@18.2.0)(react@18.2.0)
+        specifier: 8.19.2
+        version: 8.19.2(react-dom@18.2.0)(react@18.2.0)
       '@team-plain/typescript-sdk':
         specifier: 3.0.1
         version: 3.0.1
@@ -304,8 +304,8 @@ importers:
         specifier: 5.0.0-beta.20
         version: 5.0.0-beta.20(react-dom@18.2.0)(react@18.2.0)
       '@tanstack/react-table':
-        specifier: 8.9.3
-        version: 8.9.3(react-dom@18.2.0)(react@18.2.0)
+        specifier: 8.19.2
+        version: 8.19.2(react-dom@18.2.0)(react@18.2.0)
       framer-motion:
         specifier: 10.16.4
         version: 10.16.4(react-dom@18.2.0)(react@18.2.0)
@@ -485,8 +485,8 @@ importers:
         specifier: 4.2.0
         version: 4.2.0(react@18.2.0)
       '@tanstack/react-table':
-        specifier: 8.9.3
-        version: 8.9.3(react-dom@18.2.0)(react@18.2.0)
+        specifier: 8.19.2
+        version: 8.19.2(react-dom@18.2.0)(react@18.2.0)
       croner:
         specifier: 7.0.5
         version: 7.0.5
@@ -9967,14 +9967,14 @@ packages:
       react-dom: 18.2.0(react@18.2.0)
     dev: false
 
-  /@tanstack/react-table@8.9.3(react-dom@18.2.0)(react@18.2.0):
-    resolution: {integrity: sha512-Ng9rdm3JPoSCi6cVZvANsYnF+UoGVRxflMb270tVj0+LjeT/ZtZ9ckxF6oLPLcKesza6VKBqtdF9mQ+vaz24Aw==}
+  /@tanstack/react-table@8.19.2(react-dom@18.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-itoSIAkA/Vsg+bjY23FSemcTyPhc5/1YjYyaMsr9QSH/cdbZnQxHVWrpWn0Sp2BWN71qkzR7e5ye8WuMmwyOjg==}
     engines: {node: '>=12'}
     peerDependencies:
-      react: '>=16'
-      react-dom: '>=16'
+      react: '>=16.8'
+      react-dom: '>=16.8'
     dependencies:
-      '@tanstack/table-core': 8.9.3
+      '@tanstack/table-core': 8.19.2
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
     dev: false
@@ -9990,8 +9990,8 @@ packages:
       react-dom: 18.2.0(react@18.2.0)
     dev: false
 
-  /@tanstack/table-core@8.9.3:
-    resolution: {integrity: sha512-NpHZBoHTfqyJk0m/s/+CSuAiwtebhYK90mDuf5eylTvgViNOujiaOaxNDxJkQQAsVvHWZftUGAx1EfO1rkKtLg==}
+  /@tanstack/table-core@8.19.2:
+    resolution: {integrity: sha512-KpRjhgehIhbfH78ARm/GJDXGnpdw4bCg3qas6yjWSi7czJhI/J6pWln7NHtmBkGE9ZbohiiNtLqwGzKmBfixig==}
     engines: {node: '>=12'}
     dev: false
 
