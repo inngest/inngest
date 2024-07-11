@@ -78,7 +78,7 @@ export function RunsPage({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const displayAllColumns: VisibilityState = Object.fromEntries(
-    columns.map((column) => [column.id, true])
+    columns.map((column) => [column.accessorKey, true])
   );
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
