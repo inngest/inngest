@@ -17,12 +17,16 @@ export default async function RootLayout({
   children,
 }: RootLayoutProps) {
   const { env, envs } = await getEnvs(environmentSlug);
-  const newIANav = await getBooleanFlag(' ');
+  const newIANav = await getBooleanFlag('new-ia-nav');
 
-  return newIANav ? null : ( //coming soon
+  return (
     <>
       <div className="isolate flex h-full flex-col">
-        <AppNavigation envs={envs} activeEnv={env} />
+        {newIANav ? (
+          <div className="p-4">coming soon...</div>
+        ) : (
+          <AppNavigation envs={envs} activeEnv={env} />
+        )}
         <ArchivedEnvBanner env={env} />
         <EnvironmentProvider env={env}>{children}</EnvironmentProvider>
       </div>
