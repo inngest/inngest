@@ -144,7 +144,7 @@ export default function VercelConfigure() {
     );
   }
 
-  if (!data && !project) {
+  if (data.projects.length === 0) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Alert severity="error">Vercel project not found!</Alert>
