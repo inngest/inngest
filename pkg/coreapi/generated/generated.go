@@ -130,6 +130,7 @@ type ComplexityRoot struct {
 	}
 
 	FunctionRunV2 struct {
+		App            func(childComplexity int) int
 		AppID          func(childComplexity int) int
 		BatchCreatedAt func(childComplexity int) int
 		CronSchedule   func(childComplexity int) int
@@ -399,6 +400,8 @@ type FunctionRunResolver interface {
 	HistoryItemOutput(ctx context.Context, obj *models.FunctionRun, id ulid.ULID) (*string, error)
 }
 type FunctionRunV2Resolver interface {
+	App(ctx context.Context, obj *models.FunctionRunV2) (*cqrs.App, error)
+
 	Function(ctx context.Context, obj *models.FunctionRunV2) (*models.Function, error)
 
 	Triggers(ctx context.Context, obj *models.FunctionRunV2) ([]string, error)
@@ -841,6 +844,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FunctionRun.Workspace(childComplexity), true
+
+	case "FunctionRunV2.app":
+		if e.complexity.FunctionRunV2.App == nil {
+			break
+		}
+
+		return e.complexity.FunctionRunV2.App(childComplexity), true
 
 	case "FunctionRunV2.appID":
 		if e.complexity.FunctionRunV2.AppID == nil {
@@ -2489,6 +2499,7 @@ enum RunsOrderByDirection {
 type FunctionRunV2 {
   id: ULID!
   appID: UUID!
+  app: App!
   functionID: UUID!
   function: Function!
   traceID: String!
@@ -5663,6 +5674,76 @@ func (ec *executionContext) fieldContext_FunctionRunV2_appID(ctx context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _FunctionRunV2_app(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRunV2) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionRunV2_app(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.FunctionRunV2().App(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*cqrs.App)
+	fc.Result = res
+	return ec.marshalNApp2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcqrsᚐApp(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionRunV2_app(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionRunV2",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_App_id(ctx, field)
+			case "name":
+				return ec.fieldContext_App_name(ctx, field)
+			case "sdkLanguage":
+				return ec.fieldContext_App_sdkLanguage(ctx, field)
+			case "sdkVersion":
+				return ec.fieldContext_App_sdkVersion(ctx, field)
+			case "framework":
+				return ec.fieldContext_App_framework(ctx, field)
+			case "url":
+				return ec.fieldContext_App_url(ctx, field)
+			case "checksum":
+				return ec.fieldContext_App_checksum(ctx, field)
+			case "error":
+				return ec.fieldContext_App_error(ctx, field)
+			case "functions":
+				return ec.fieldContext_App_functions(ctx, field)
+			case "connected":
+				return ec.fieldContext_App_connected(ctx, field)
+			case "functionCount":
+				return ec.fieldContext_App_functionCount(ctx, field)
+			case "autodiscovered":
+				return ec.fieldContext_App_autodiscovered(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type App", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _FunctionRunV2_functionID(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRunV2) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_FunctionRunV2_functionID(ctx, field)
 	if err != nil {
@@ -6407,6 +6488,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2Edge_node(ctx context.Cont
 				return ec.fieldContext_FunctionRunV2_id(ctx, field)
 			case "appID":
 				return ec.fieldContext_FunctionRunV2_appID(ctx, field)
+			case "app":
+				return ec.fieldContext_FunctionRunV2_app(ctx, field)
 			case "functionID":
 				return ec.fieldContext_FunctionRunV2_functionID(ctx, field)
 			case "function":
@@ -8322,6 +8405,8 @@ func (ec *executionContext) fieldContext_Query_run(ctx context.Context, field gr
 				return ec.fieldContext_FunctionRunV2_id(ctx, field)
 			case "appID":
 				return ec.fieldContext_FunctionRunV2_appID(ctx, field)
+			case "app":
+				return ec.fieldContext_FunctionRunV2_app(ctx, field)
 			case "functionID":
 				return ec.fieldContext_FunctionRunV2_functionID(ctx, field)
 			case "function":
@@ -15998,6 +16083,26 @@ func (ec *executionContext) _FunctionRunV2(ctx context.Context, sel ast.Selectio
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
+		case "app":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FunctionRunV2_app(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "functionID":
 
 			out.Values[i] = ec._FunctionRunV2_functionID(ctx, field, obj)
