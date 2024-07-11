@@ -742,8 +742,6 @@ type QueueItem struct {
 	FunctionID uuid.UUID `json:"wfID"`
 	// WorkspaceID is the workspace that this job belongs to.
 	WorkspaceID uuid.UUID `json:"wsID"`
-	// AccountID is the account that this job belongs to.
-	AccountID uuid.UUID `json:"accountId"`
 	// LeaseID is a ULID which embeds a timestamp denoting when the lease expires.
 	LeaseID *ulid.ULID `json:"leaseID,omitempty"`
 	// Data represents the enqueued data, eg. the edge to process or the pause
@@ -1076,14 +1074,14 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	}
 
 	parts := q.ItemPartitions(ctx, i)
- 
+
 	keys := []string{
-		q.kg.QueueItem(),                        // Queue item
-		q.kg.PartitionItem(),                    // Partition item, map
-		q.kg.GlobalPartitionIndex(),             // Global partition queue
-		q.kg.GlobalAccountIndex(),               // Global account queue
-		q.kg.AccountPartitionIndex(i.AccountID), // Account partition queue
-		q.kg.ShardPartitionIndex(shardName),     // Shard queue
+		q.kg.QueueItem(),            // Queue item
+		q.kg.PartitionItem(),        // Partition item, map
+		q.kg.GlobalPartitionIndex(), // Global partition queue
+		q.kg.GlobalAccountIndex(),   // Global account queue
+		q.kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // Account partition queue
+		q.kg.ShardPartitionIndex(shardName),                     // Shard queue
 		q.kg.Shards(),
 		q.kg.Idempotency(i.ID),
 		q.kg.FnMetadata(i.FunctionID),
@@ -1121,6 +1119,8 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		parts[0].ID,
 		parts[1].ID,
 		parts[2].ID,
+
+		i.Data.Identifier.AccountID,
 	})
 
 	if err != nil {
