@@ -19,7 +19,7 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 	--
 	redis.call("HSETNX", keyPartitionMap, partitionID, partitionItem) -- store the partition
 
-	-- Potentially update the queue of queues (global partitions).
+	-- Potentially update the global queue of queues (global partitions).
 	local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID) 
 	if currentScore == false or tonumber(currentScore) > partitionTime then
 		-- In this case, we're enqueueing something earlier than we previously had in
@@ -47,7 +47,7 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 		end
 	end
 
-  -- Potentially update the queue of queues (account partitions).
+  -- Potentially update the account-level queue of queues (account partitions).
   local currentScore = redis.call("ZSCORE", keyAccountPointer, partitionID)
   if currentScore == false or tonumber(currentScore) > partitionTime then
     local existing = get_partition_item(keyPartitionMap, partitionID)

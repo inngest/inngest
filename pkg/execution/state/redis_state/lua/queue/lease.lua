@@ -122,7 +122,7 @@ local score = get_fn_partition_score(queueIndexKey)
 update_pointer_score_to(partitionName, globalPointerKey, score)
 -- Also update account-level partitions
 update_pointer_score_to(partitionName, accountPointerKey, score)
--- Also updated global accounts
+-- Also update global accounts
 -- TODO Is this correct?
 update_pointer_score_to(accountId, globalAccountKey, score)
 -- And the same for any shards, as long as the shard name exists.

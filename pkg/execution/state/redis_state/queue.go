@@ -1890,9 +1890,6 @@ func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Tim
 		limit = PartitionPeekMax
 	}
 
-	// TODO(tony): If this is an allowlist, only peek the given partitions.  Use ZMSCORE
-	// to fetch the scores for all allowed partitions, then filter where score <= until.
-	// Call an HMGET to get the partitions.
 	ms := until.UnixMilli()
 
 	isSequential := 0
@@ -1931,6 +1928,8 @@ func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Tim
 
 	weights := make([]float64, len(items))
 	for range items {
+		// TODO Do we need account-specific weights? Then we need to store
+		// a data structure like QueuePartition for accounts (QueueAccount?)
 		accountPriority := PriorityDefault
 		weights = append(weights, float64(10-accountPriority))
 	}
