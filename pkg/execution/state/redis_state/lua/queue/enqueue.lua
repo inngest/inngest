@@ -55,7 +55,7 @@ enqueue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMa
 enqueue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, keyAccountPointer,  queueScore, queueID, partitionTime, nowMS)
 enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, keyAccountPointer,  queueScore, queueID, partitionTime, nowMS)
 
--- Potentially update the queue of queues (global accounts).
+-- Potentially update the account index (global accounts pointers).
 local currentScore = redis.call("ZSCORE", keyGlobalAccountPointer, accountId)
 if currentScore == false or tonumber(currentScore) > partitionTime then
   redis.call("ZADD", keyGlobalAccountPointer, partitionTime, accountId)

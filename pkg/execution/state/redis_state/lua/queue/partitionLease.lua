@@ -59,6 +59,7 @@ if partitionConcurrency > 0 and #keyPartitionConcurrency > 0 then
     if capacity <= 0 then
         requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, rartitionID, noCapacityScore, currentTime)
         requeue_partition(keyAccountPartitionPtr, keyPartitionMap, existing, rartitionID, noCapacityScore, currentTime)
+        -- TODO Do we need to update the top-level accounts ZSET?
         return { -1 }
     end
 end
@@ -70,6 +71,7 @@ if accountConcurrency > 0 and #keyAccountConcurrency > 0 then
     if acctCap <= 0 then
         requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, rartitionID, noCapacityScore, currentTime)
         requeue_partition(keyAccountPartitionPtr, keyPartitionMap, existing, rartitionID, noCapacityScore, currentTime)
+        -- TODO Do we need to update the top-level accounts ZSET?
         return { -1 }
     end
 

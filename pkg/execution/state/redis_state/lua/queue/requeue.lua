@@ -77,6 +77,7 @@ local earliestTime = get_fn_partition_score(queueIndexKey)
 if currentScore == false or tonumber(currentScore) ~= earliestTime or tonumber(currentScore) == nil then
     redis.call("ZADD", globalPartitionIndexKey, earliestTime, functionID)
     redis.call("ZADD", accountPartitionIndexKey, earliestTime, functionID)
+    -- TODO Do we need to update the global accounts zset?
     -- And the same for any shards, as long as the shard name exists.
     if has_shard_key(shardPointerKey, -2) then
         update_pointer_score_to(functionID, shardPointerKey, earliestTime)

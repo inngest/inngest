@@ -74,6 +74,7 @@ local currentScore = redis.call("ZSCORE", keyGlobalIndex, partitionID)
 if currentScore == false or tonumber(currentScore) ~= partitionScore then
     redis.call("ZADD", keyGlobalIndex, partitionScore, partitionID)
     redis.call("ZADD", keyAccountIndex, partitionScore, partitionID)
+    -- TODO Do we need to update the global accounts zset?
     if has_shard_key(keyShardIndex) then
         update_pointer_score_to(partitionID, keyShardIndex, partitionScore)
     end
