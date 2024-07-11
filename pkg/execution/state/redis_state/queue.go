@@ -1873,6 +1873,84 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	return result, nil
 }
 
+func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
+	// TODO probably change this to account-specific limits
+	if limit > PartitionPeekMax {
+		return nil, ErrPartitionPeekMaxExceedsLimits
+	}
+	if limit <= 0 {
+		limit = PartitionPeekMax
+	}
+
+	// TODO(tony): If this is an allowlist, only peek the given partitions.  Use ZMSCORE
+	// to fetch the scores for all allowed partitions, then filter where score <= until.
+	// Call an HMGET to get the partitions.
+	ms := until.UnixMilli()
+
+	isSequential := 0
+	if sequential {
+		isSequential = 1
+	}
+
+	args, err := StrSlice([]any{
+		ms,
+		limit,
+		isSequential,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	peekRet, err := scripts["queue/accountPeek"].Exec(
+		ctx,
+		q.r,
+		[]string{
+			q.kg.GlobalAccountIndex(),
+		},
+		args,
+	).AsStrSlice()
+
+	items := make([]uuid.UUID, len(peekRet))
+
+	for i, s := range peekRet {
+		parsed, err := uuid.Parse(s)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse account id from global account queue: %w", err)
+		}
+
+		items[i] = parsed
+	}
+
+	weights := make([]float64, len(items))
+	for range items {
+		accountPriority := PriorityDefault
+		weights = append(weights, float64(10-accountPriority))
+	}
+
+	// Some scanners run sequentially, ensuring we always work on the functions with
+	// the oldest run at times in order, no matter the priority.
+	if sequential {
+		n := int(math.Min(float64(len(items)), float64(PartitionSelectionMax)))
+		return items[0:n], nil
+	}
+
+	// We want to weighted shuffle the resulting array random.  This means that many
+	// shared nothing scanners can query for outstanding partitions and receive a
+	// randomized order favouring higher-priority queue items.  This reduces the chances
+	// of contention when leasing.
+	w := sampleuv.NewWeighted(weights, rnd)
+	result := make([]uuid.UUID, len(items))
+	for n := range result {
+		idx, ok := w.Take()
+		if !ok {
+			return nil, ErrWeightedSampleRead
+		}
+		result[n] = items[idx]
+	}
+
+	return result, nil
+}
+
 func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 	for k := range exact {
 		if check == k {

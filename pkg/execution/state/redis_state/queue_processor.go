@@ -571,6 +571,22 @@ func (q *queue) scan(ctx context.Context) error {
 	// By default, use the global partition
 	partitionKey := q.kg.GlobalPartitionIndex()
 
+	peekUntil := getNow().Add(PartitionLookahead)
+
+	// Randomly scan account partition
+	if !q.isSequential() && rand.Intn(2) == 1 {
+		// TODO Should we peek more than one account and run all following code in a loop?
+		peekedAccounts, err := q.accountPeek(ctx, false, peekUntil, 1)
+		if err != nil {
+			return fmt.Errorf("could not peek account: %w", err)
+		}
+
+		if len(peekedAccounts) > 0 {
+			peekedAccount := peekedAccounts[0]
+			partitionKey = q.kg.AccountPartitionIndex(peekedAccount)
+		}
+	}
+
 	// If this worker has leased shards, those take priority 95% of the time.  There's a 5% chance that the
 	// worker still works on the global queue.
 	existingLeases := q.getShardLeases()
@@ -586,7 +602,7 @@ func (q *queue) scan(ctx context.Context) error {
 
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
 	partitions, err := duration(ctx, "partition_peek", func(ctx context.Context) ([]*QueuePartition, error) {
-		return q.partitionPeek(ctx, partitionKey, q.isSequential(), getNow().Add(PartitionLookahead), PartitionPeekMax)
+		return q.partitionPeek(ctx, partitionKey, q.isSequential(), peekUntil, PartitionPeekMax)
 	})
 	if err != nil {
 		return err
