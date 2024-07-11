@@ -96,9 +96,6 @@ export function useGetRun() {
       }
 
       const fn = run.function;
-      if (!fn) {
-        throw new Error('missing function');
-      }
 
       const trace = getFragmentData(traceDetailsFragment, run.trace);
       if (!trace) {
