@@ -80,11 +80,15 @@ export default async function OrganizationDropdown() {
         </DropdownMenuGroup>
         <DropdownMenuGroup className="p-2">
           {organizations.length > 1 ? (
-            <OrganizationDropdownMenuItem
-              icon={RiArrowLeftRightLine}
-              href="/organization-list"
-              label="Switch Organization"
-            />
+            <DropdownMenuItem
+              asChild
+              className="p-2 font-medium text-slate-400 outline-none hover:bg-transparent focus:text-white"
+            >
+              <a href="/organization-list">
+                <RiArrowLeftRightLine className="size-4" />
+                Switch Organization
+              </a>
+            </DropdownMenuItem>
           ) : (
             <OrganizationDropdownMenuItem
               icon={RiAddCircleLine}
