@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useClient } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { getFragmentData, graphql } from '@/gql';
 
 const traceDetailsFragment = graphql(`

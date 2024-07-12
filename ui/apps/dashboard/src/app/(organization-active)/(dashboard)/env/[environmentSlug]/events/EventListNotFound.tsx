@@ -8,7 +8,7 @@ import { InlineCode } from '@inngest/components/InlineCode';
 import { RiErrorWarningLine } from '@remixicon/react';
 import { useQuery } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { Secret } from '@/components/Secret';
 import { graphql } from '@/gql';
 import VercelLogomark from '@/logos/vercel-logomark.svg';

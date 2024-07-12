@@ -2,9 +2,9 @@
 
 import { useQuery } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import type { TimeRange } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import StackedBarChart from '@/components/Charts/StackedBarChart';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 
 export type UsageMetrics = { totalRuns: number; totalFailures: number };

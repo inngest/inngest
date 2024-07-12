@@ -7,7 +7,7 @@ import { Button } from '@inngest/components/Button';
 import { Time } from '@inngest/components/Time';
 import { useQuery } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 
 const GetFailedFunctionRunsDocument = graphql(`

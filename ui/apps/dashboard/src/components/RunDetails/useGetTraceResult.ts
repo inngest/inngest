@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import type { Result } from '@inngest/components/types/functionRun';
 import { useClient } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 
 const query = graphql(`
