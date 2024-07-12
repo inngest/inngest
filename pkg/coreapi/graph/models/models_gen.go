@@ -108,6 +108,7 @@ type FunctionRunQuery struct {
 type FunctionRunV2 struct {
 	ID             ulid.ULID         `json:"id"`
 	AppID          uuid.UUID         `json:"appID"`
+	App            *cqrs.App         `json:"app"`
 	FunctionID     uuid.UUID         `json:"functionID"`
 	Function       *Function         `json:"function"`
 	TraceID        string            `json:"traceID"`

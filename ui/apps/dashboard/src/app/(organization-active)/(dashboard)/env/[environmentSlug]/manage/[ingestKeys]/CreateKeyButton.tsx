@@ -12,6 +12,7 @@ import { useMutation } from 'urql';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import Input from '@/components/Forms/Input';
 import { graphql } from '@/gql';
+import { defaultTransform } from './[keyID]/TransformEvent';
 import useManagePageTerminology from './useManagePageTerminology';
 
 const CreateSourceKey = graphql(`
@@ -36,6 +37,14 @@ export default function CreateKeyButton() {
 
   function handleClick() {
     if (currentContent && inputValue) {
+      let transform = undefined;
+      if (currentContent.type === 'webhook') {
+        // We must specify a transform, otherwise the webhook will be in a
+        // broken state due to a missing transform. It might be better to
+        // specify the default transform in the backend, but this is a quick fix
+        transform = defaultTransform;
+      }
+
       createSourceKey({
         input: {
           filterList: null,
@@ -43,7 +52,7 @@ export default function CreateKeyButton() {
           name: inputValue,
           source: currentContent.type,
           metadata: {
-            transform: undefined,
+            transform,
           },
         },
       }).then((result) => {
