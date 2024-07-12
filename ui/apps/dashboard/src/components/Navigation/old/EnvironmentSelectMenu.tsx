@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigati
 import { Listbox, Transition } from '@headlessui/react';
 import { RiCloudLine, RiExpandUpDownLine, RiLoopLeftLine, RiSettings3Line } from '@remixicon/react';
 
+import { useEnvironments } from '@/queries';
 import cn from '@/utils/cn';
 import {
   EnvironmentType,
@@ -56,13 +57,13 @@ const useSwitchablePathname = (): string => {
 
 type EnvironmentSelectMenuProps = {
   activeEnv?: Environment;
-  envs: Environment[];
 };
 
-export default function EnvironmentSelectMenu({ envs, activeEnv }: EnvironmentSelectMenuProps) {
+export default function EnvironmentSelectMenu({ activeEnv }: EnvironmentSelectMenuProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<Environment | null>(null);
   const nextPathname = useSwitchablePathname();
+  const [{ data: envs = [] }] = useEnvironments();
 
   if (!isNonEmptyArray(envs)) {
     return (

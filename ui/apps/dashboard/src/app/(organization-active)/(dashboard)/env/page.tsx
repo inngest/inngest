@@ -6,13 +6,13 @@ import { RiErrorWarningLine } from '@remixicon/react';
 
 import AppNavigation from '@/components/Navigation/old/AppNavigation';
 import Toaster from '@/components/Toaster';
-import getAllEnvironments from '@/queries/server-only/getAllEnvironments';
+import { useEnvironments } from '@/queries';
 import { EnvironmentType, LEGACY_TEST_MODE_NAME } from '@/utils/environments';
 import { EnvironmentArchiveButton } from './EnvironmentArchiveButton';
 import EnvironmentListTable from './EnvironmentListTable';
 
 export default async function Envs() {
-  const environments = await getAllEnvironments();
+  const [{ data: environments = [] }] = useEnvironments();
 
   // Break the environments into different groups
   const legacyTestMode = environments.find(
@@ -27,7 +27,7 @@ export default async function Envs() {
   return (
     <>
       <div className="flex h-full flex-col">
-        <AppNavigation envs={environments} slug="all" />
+        <AppNavigation slug="all" />
         <div className="overflow-y-scroll">
           <div className="mx-auto w-full max-w-[860px] px-12 py-16">
             <div className="mb-4 flex w-full items-center  justify-between">
