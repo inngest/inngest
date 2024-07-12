@@ -31,6 +31,7 @@ const GetEnvironmentsDocument = graphql(`
     workspaces {
       id
       name
+      slug
       parentID
       test
       type
@@ -48,6 +49,7 @@ const GetEnvironmentBySlugDocument = graphql(`
     workspaceBySlug(slug: $slug) {
       id
       name
+      slug
       parentID
       test
       type
@@ -64,6 +66,7 @@ const GetProductionWorkspaceDocument = graphql(`
     productionWorkspace {
       id
       name
+      slug
       parentID
       test
       type
