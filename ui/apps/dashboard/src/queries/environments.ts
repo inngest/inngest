@@ -1,8 +1,13 @@
+import { useMemo } from 'react';
 import { useQuery, type UseQueryResponse } from 'urql';
 
 import { graphql } from '@/gql';
 import type { Workspace } from '@/gql/graphql';
-import { workspacesToEnvironments, type Environment } from '@/utils/environments';
+import {
+  workspaceToEnvironment,
+  workspacesToEnvironments,
+  type Environment,
+} from '@/utils/environments';
 
 export function useProductionEnvironment(): UseQueryResponse<Environment> {
   const [{ fetching, data, error, stale }, refetch] = useQuery({
@@ -10,9 +15,13 @@ export function useProductionEnvironment(): UseQueryResponse<Environment> {
     requestPolicy: 'cache-first',
   });
 
-  const environment = workspacesToEnvironments(
-    (data?.productionWorkspace ? [data.productionWorkspace] : []) as Workspace[]
-  )[0];
+  const environment = useMemo(() => {
+    if (!data?.productionWorkspace) {
+      return;
+    }
+
+    return workspaceToEnvironment(data.productionWorkspace as Workspace);
+  }, [data?.productionWorkspace]);
 
   return [{ data: environment, fetching, error, stale }, refetch];
 }
@@ -73,7 +82,9 @@ export const useEnvironments = (): UseQueryResponse<Environment[]> => {
     requestPolicy: 'cache-first',
   });
 
-  const environments = workspacesToEnvironments(data?.workspaces ?? []);
+  const environments = useMemo(() => {
+    return workspacesToEnvironments(data?.workspaces ?? []);
+  }, [data?.workspaces]);
 
   return [{ data: environments, fetching, error, stale }, refetch];
 };
@@ -85,9 +96,13 @@ export const useEnvironment = (environmentSlug: string): UseQueryResponse<Enviro
     variables: { slug: environmentSlug },
   });
 
-  const environment = workspacesToEnvironments(
-    (data?.workspaceBySlug ? [data.workspaceBySlug] : []) as Workspace[]
-  )[0];
+  const environment = useMemo(() => {
+    if (!data?.workspaceBySlug) {
+      return;
+    }
+
+    return workspaceToEnvironment(data.workspaceBySlug as Workspace);
+  }, [data?.workspaceBySlug]);
 
   return [{ data: environment, fetching, error, stale }, refetch];
 };
