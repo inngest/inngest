@@ -71,7 +71,7 @@ export default async function UserDropdown() {
           />
           <OrganizationDropdownMenuItem
             icon={<SystemStatusIcon status={status} className="size-4" />}
-            href={'/'}
+            href={status.url}
             label="Status Page"
           />
         </DropdownMenuGroup>
