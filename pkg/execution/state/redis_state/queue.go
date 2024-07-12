@@ -1927,11 +1927,11 @@ func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Tim
 	}
 
 	weights := make([]float64, len(items))
-	for range items {
+	for i := range items {
 		// TODO Do we need account-specific weights? Then we need to store
 		// a data structure like QueuePartition for accounts (QueueAccount?)
 		accountPriority := PriorityDefault
-		weights = append(weights, float64(10-accountPriority))
+		weights[i] = float64(10 - accountPriority)
 	}
 
 	// Some scanners run sequentially, ensuring we always work on the functions with
