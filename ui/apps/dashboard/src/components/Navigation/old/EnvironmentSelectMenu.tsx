@@ -171,6 +171,7 @@ export default function EnvironmentSelectMenu({ envs, activeEnv }: EnvironmentSe
 
               <div className="flex items-center">
                 <Link
+                  prefetch={true}
                   href="/env"
                   className="flex w-full cursor-pointer items-center gap-2 truncate rounded px-3.5 py-3 text-sm text-slate-50 transition-all hover:bg-slate-700 hover:text-white"
                 >
