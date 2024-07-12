@@ -11,7 +11,7 @@ export function useProductionEnvironment(): UseQueryResponse<Environment> {
   });
 
   const environment = workspacesToEnvironments(
-    (data?.productionWorkspace ? [data?.productionWorkspace] : []) as Workspace[]
+    (data?.productionWorkspace ? [data.productionWorkspace] : []) as Workspace[]
   )[0];
 
   return [{ data: environment, fetching, error, stale }, refetch];
