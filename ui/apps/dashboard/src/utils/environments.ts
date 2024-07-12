@@ -111,6 +111,7 @@ export function workspaceToEnvironment(
     Workspace,
     | 'id'
     | 'name'
+    | 'slug'
     | 'parentID'
     | 'test'
     | 'type'
@@ -136,6 +137,7 @@ export function workspaceToEnvironment(
   const slug = getEnvironmentSlug({
     environmentID: workspace.id,
     environmentName,
+    environmentSlug: workspace.slug,
     environmentType: workspace.type,
   });
 
@@ -198,6 +200,7 @@ export function workspacesToEnvironments(
     Workspace,
     | 'id'
     | 'name'
+    | 'slug'
     | 'parentID'
     | 'test'
     | 'type'
