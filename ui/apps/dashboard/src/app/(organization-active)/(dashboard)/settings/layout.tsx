@@ -33,7 +33,7 @@ export default async function SettingsLayout({ children }: SettingsLayoutProps) 
 
   return (
     <div className="flex h-full flex-col">
-      <AppNavigation envs={envs} />
+      <AppNavigation envs={envs} envSlug="all" />
       <Header
         title="Settings"
         links={navLinks}
