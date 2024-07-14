@@ -27,7 +27,7 @@ export default async function Envs() {
   return (
     <>
       <div className="flex h-full flex-col">
-        <AppNavigation envs={environments} slug="all" />
+        <AppNavigation envs={environments} envSlug="all" />
         <div className="overflow-y-scroll">
           <div className="mx-auto w-full max-w-[860px] px-12 py-16">
             <div className="mb-4 flex w-full items-center  justify-between">

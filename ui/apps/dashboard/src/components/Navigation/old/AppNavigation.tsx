@@ -18,7 +18,7 @@ import SearchNavigation from './SearchNavigation';
 type AppNavigationProps = {
   envs: Environment[];
   activeEnv?: Environment;
-  slug?: string;
+  envSlug: string;
 };
 type NavItem = {
   href: string;
@@ -30,33 +30,32 @@ type NavItem = {
 
 const ALL_ENVIRONMENTS_SLUG = 'all';
 const BRANCH_PARENT_SLUG = 'branch';
-const DEFAULT_ENV_SLUG = 'production';
+// const DEFAULT_ENV_SLUG = 'production';
 
-export default async function AppNavigation({ envs, activeEnv, slug }: AppNavigationProps) {
+export default async function AppNavigation({ envs, activeEnv, envSlug }: AppNavigationProps) {
   const isEventSearchEnabled = await getBooleanFlag('event-search');
-  const environmentSlug = slug || DEFAULT_ENV_SLUG;
 
   let items: NavItem[] = [
     {
-      href: `/env/${environmentSlug}/apps`,
+      href: `/env/${envSlug}/apps`,
       text: 'Apps',
       hide: [ALL_ENVIRONMENTS_SLUG],
       icon: <IconApp className="w-3.5" />,
     },
     {
-      href: `/env/${environmentSlug}/functions`,
+      href: `/env/${envSlug}/functions`,
       text: 'Functions',
       hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
       icon: <IconFunction className="w-4" />,
     },
     {
-      href: `/env/${environmentSlug}/events`,
+      href: `/env/${envSlug}/events`,
       text: 'Events',
       hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
       icon: <IconEvent className="w-5" />,
     },
     {
-      href: `/env/${environmentSlug}/manage`,
+      href: `/env/${envSlug}/manage`,
       text: 'Manage',
       hide: [ALL_ENVIRONMENTS_SLUG],
       icon: <RiToolsLine className="w-3.5" />,
@@ -68,7 +67,7 @@ export default async function AppNavigation({ envs, activeEnv, slug }: AppNaviga
     items = [
       ...items.slice(0, 3),
       {
-        href: `/env/${environmentSlug}/event-search`,
+        href: `/env/${envSlug}/event-search`,
         text: 'Event Search',
         hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
         icon: <RiSearchLine className="w-3.5" />,
@@ -77,7 +76,7 @@ export default async function AppNavigation({ envs, activeEnv, slug }: AppNaviga
     ];
   }
 
-  const visibleItems = items.filter((item) => !item.hide.includes(environmentSlug));
+  const visibleItems = items.filter((item) => !item.hide.includes(envSlug));
 
   return (
     <nav className="bg-slate-940 left-0 right-0 top-0 z-50 flex w-full items-center justify-between pl-6">

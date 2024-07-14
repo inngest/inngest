@@ -25,7 +25,7 @@ export default async function RootLayout({
         {newIANav ? (
           <div className="p-4">coming soon...</div>
         ) : (
-          <AppNavigation envs={envs} activeEnv={env} />
+          <AppNavigation envs={envs} activeEnv={env} envSlug={environmentSlug} />
         )}
         <ArchivedEnvBanner env={env} />
         <EnvironmentProvider env={env}>{children}</EnvironmentProvider>
