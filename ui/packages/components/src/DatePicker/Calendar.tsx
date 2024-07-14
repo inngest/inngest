@@ -29,19 +29,19 @@ export function Calendar({ selected, onSelect, month, onMonthChange }: CalendarP
 
 const classNames: DayPickerDefaultProps['classNames'] = {
   caption: 'flex justify-center items-center h-6',
-  root: 'text-slate-900 bg-white',
+  root: 'text-basis bg-canvasBase',
   months: 'flex gap-4 relative justify-center',
   caption_label: 'text-lg font-medium',
   nav_button:
-    'inline-flex justify-center items-center absolute top-0 w-6 h-6 rounded-full text-slate-900 hover:bg-gray-100',
+    'inline-flex justify-center items-center absolute top-0 w-6 h-6 rounded-full text-muted hover:bg-canvasSubtle',
   nav_button_next: 'right-0',
   nav_button_previous: 'left-0',
   table: 'border-collapse border-spacing-0 text-sm',
-  head_cell: 'w-11 pt-6 pb-4 align-middle text-center font-medium text-slate-500',
+  head_cell: 'w-11 pt-6 pb-4 align-middle text-center font-medium text-muted',
   cell: 'w-11 h-11 align-middle text-center border-0 font-medium',
-  day: 'rounded-full w-10 h-10 transition-colors hover:bg-indigo-100 aria-selected:hover:text-white aria-selected:hover:bg-indigo-600 hover:text-slate-500 focus:outline-none focus-visible:ring focus-visible:ring-indigo-500',
-  day_selected: 'text-white bg-indigo-600',
+  day: 'rounded-full w-10 h-10 transition-colors hover:bg-primary-xSubtle aria-selected:hover:text-basis aria-selected:hover:bg-primary-xSubtle hover:text-basis focus:outline-none focus-visible:ring focus-visible:ring-primary-subtle',
+  day_selected: 'text-onContrast bg-primary-moderate',
   day_today: 'font-semibold',
-  day_disabled: 'text-slate-400',
-  day_outside: 'text-slate-400',
+  day_disabled: 'text-disabled',
+  day_outside: 'text-disabled',
 };

@@ -93,6 +93,7 @@ export default {
         surfaceSubtle: 'rgb(var(--color-background-surface-subtle) / <alpha-value>)',
         surfaceMuted: 'rgb(var(--color-background-surface-muted) / <alpha-value>)',
         disabled: 'rgb(var(--color-background-disabled) / <alpha-value>)',
+        alwaysWhite: 'rgb(var(--color-foreground-alwaysWhite) / <alpha-value>)',
         contrast: 'rgb(var(--color-background-contrast) / <alpha-value>)',
         success: 'rgb(var(--color-background-success) / <alpha-value>)',
         successContrast: 'rgb(var(--color-background-successContrast) / <alpha-value>)',
