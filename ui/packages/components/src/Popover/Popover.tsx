@@ -18,7 +18,7 @@ export const PopoverContent = forwardRef<
         sideOffset={5}
         ref={forwardedRef}
         className={cn(
-          'bg-canvasBase z-[100] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto overflow-x-hidden rounded drop-shadow',
+          'bg-canvasBase border-muted shadow-primary z-[100] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto overflow-x-hidden rounded border',
           className
         )}
         {...props}
