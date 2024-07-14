@@ -71,14 +71,14 @@ const formatAbsolute = (absoluteRange?: AbsoluteRange) => (
 const AbsoluteDisplay = ({ absoluteRange }: { absoluteRange?: AbsoluteRange }) => (
   <Tooltip>
     <TooltipTrigger>
-      <div className="w-[180px] truncate text-slate-500">{formatAbsolute(absoluteRange)}</div>
+      <div className="text-basis w-[180px] truncate">{formatAbsolute(absoluteRange)}</div>
     </TooltipTrigger>
     <TooltipContent className="whitespace-pre-line">{formatAbsolute(absoluteRange)}</TooltipContent>
   </Tooltip>
 );
 
 const RelativeDisplay = ({ duration }: { duration: string }) => (
-  <span className="truncate text-slate-500">{duration}</span>
+  <span className="text-basis truncate">{duration}</span>
 );
 
 export const RangePicker = ({
@@ -168,7 +168,7 @@ export const RangePicker = ({
           {displayValue ? (
             displayValue
           ) : (
-            <span className="text-slate-500">{placeholder ? placeholder : 'Select dates'}</span>
+            <span className="text-disabled">{placeholder ? placeholder : 'Select dates'}</span>
           )}
         </DateInputButton>
       </PopoverTrigger>
