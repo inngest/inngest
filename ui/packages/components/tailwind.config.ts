@@ -85,6 +85,9 @@ export default {
         warning: 'rgb(var(--color-border-warning) / <alpha-value>)',
         info: 'rgb(var(--color-border-info) / <alpha-value>)',
       },
+      outlineColor: {
+        error: 'rgb(var(--color-border-error) / <alpha-value>)',
+      },
       backgroundColor: {
         canvasBase: 'rgb(var(--color-background-canvas-base) / <alpha-value>)',
         canvasSubtle: 'rgb(var(--color-background-canvas-subtle) / <alpha-value>)',
@@ -133,6 +136,9 @@ export default {
       },
       textDecorationColor: {
         link: 'rgb(var(--color-foreground-link) / <alpha-value>)',
+      },
+      placeholderColor: {
+        disabled: 'rgb(var(--color-foreground-disabled) / <alpha-value>)',
       },
       fill: {
         // temporary tooltip token
