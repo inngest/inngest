@@ -11,9 +11,9 @@ export const Switch = forwardRef<
     <SwitchPrimitive.Root
       {...props}
       ref={forwardedRef}
-      className={`relative h-6 w-[42px] cursor-default rounded-full bg-slate-600 outline-none data-[state=checked]:bg-indigo-600 ${className}`}
+      className={`bg-surfaceMuted data-[state=checked]:bg-primary-moderate relative h-6 w-[42px] cursor-default rounded-full outline-none ${className}`}
     >
-      <SwitchPrimitive.Thumb className="block h-5 w-5 translate-x-0.5 rounded-full bg-white transition-transform duration-100 will-change-transform data-[state=checked]:translate-x-[19px]" />
+      <SwitchPrimitive.Thumb className="bg-alwaysWhite block h-5 w-5 translate-x-0.5 rounded-full transition-transform duration-100 will-change-transform data-[state=checked]:translate-x-[19px]" />
     </SwitchPrimitive.Root>
   );
 });
@@ -28,7 +28,7 @@ interface SwitchLabelProps extends HTMLAttributes<HTMLLabelElement> {
 
 export const SwitchLabel = ({ htmlFor, children, className }: SwitchLabelProps) => {
   return (
-    <label htmlFor={htmlFor} className={cn('cursor-default font-medium text-slate-900', className)}>
+    <label htmlFor={htmlFor} className={cn('text-basis cursor-default font-medium', className)}>
       {children}
     </label>
   );
