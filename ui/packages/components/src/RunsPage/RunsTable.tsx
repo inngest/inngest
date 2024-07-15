@@ -18,6 +18,12 @@ import {
 } from '@tanstack/react-table';
 
 export type Run = {
+  app: {
+    externalID: string;
+  };
+  function: {
+    name: string;
+  };
   status: FunctionRunStatus;
   durationMS: number | null;
   id: string;
@@ -272,6 +278,28 @@ export const columns = [
       );
     },
     header: 'Duration',
+    enableSorting: false,
+  }),
+  columnHelper.accessor('app', {
+    cell: (info) => {
+      return (
+        <div className="flex items-center text-nowrap">
+          <TextCell>{info.getValue().externalID}</TextCell>
+        </div>
+      );
+    },
+    header: 'App',
+    enableSorting: false,
+  }),
+  columnHelper.accessor('function', {
+    cell: (info) => {
+      return (
+        <div className="flex items-center text-nowrap">
+          <TextCell>{info.getValue().name}</TextCell>
+        </div>
+      );
+    },
+    header: 'Function',
     enableSorting: false,
   }),
 ];

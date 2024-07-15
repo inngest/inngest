@@ -40,6 +40,12 @@ const GetRunsDocument = graphql(`
       ) {
         edges {
           node {
+            app {
+              externalID
+            }
+            function {
+              name
+            }
             id
             queuedAt
             endedAt

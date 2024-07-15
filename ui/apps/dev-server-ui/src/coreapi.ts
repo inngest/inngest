@@ -262,6 +262,12 @@ export const GET_RUNS = gql`
     ) {
       edges {
         node {
+          app {
+            externalID
+          }
+          function {
+            name
+          }
           id
           queuedAt
           endedAt

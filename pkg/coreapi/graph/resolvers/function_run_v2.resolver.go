@@ -13,9 +13,21 @@ import (
 
 func (r *functionRunV2Resolver) App(
 	ctx context.Context,
-	fn *models.FunctionRunV2,
+	run *models.FunctionRunV2,
 ) (*cqrs.App, error) {
-	return r.Data.GetAppByID(ctx, fn.AppID)
+	fn, err := r.Function(ctx, run)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving function: %w", err)
+	}
+
+	// TODO: Replace this with run.AppID. As of this comment, run.AppID is not
+	// set
+	appID, err := uuid.Parse(fn.AppID)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing app ID: %w", err)
+	}
+
+	return r.Data.GetAppByID(ctx, appID)
 }
 
 func (r *functionRunV2Resolver) Function(ctx context.Context, fn *models.FunctionRunV2) (*models.Function, error) {
