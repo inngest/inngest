@@ -172,7 +172,7 @@ export const RangePicker = ({
           )}
         </DateInputButton>
       </PopoverTrigger>
-      <PopoverContent>
+      <PopoverContent align="start">
         <div className="bg-canvasBase flex flex-row">
           <div className={`${showAbsolute && 'min-h-[584px]'} border-muted w-[250px] border-r`}>
             <div className="px-3 py-2">
