@@ -232,6 +232,7 @@ export default function Page({
       pathCreator={internalPathCreator}
       rerun={rerun}
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
+      scope="fn"
     />
   );
 }

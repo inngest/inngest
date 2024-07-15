@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
-import { columns, type Run } from '@inngest/components/RunsPage/RunsTable';
+import { useColumns, type Run } from '@inngest/components/RunsPage/RunsTable';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
 import { LoadingMore, TableFilter } from '@inngest/components/Table';
 import {
@@ -54,6 +54,7 @@ type Props = {
   functions?: Option[];
   functionIsPaused?: boolean;
   defaultVisibility?: VisibilityState;
+  scope: React.ComponentProps<typeof RunsTable>['scope'];
 };
 
 export function RunsPage({
@@ -75,8 +76,10 @@ export function RunsPage({
   pollInterval,
   functionIsPaused,
   defaultVisibility,
+  scope,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const columns = useColumns({ scope });
   const displayAllColumns: VisibilityState = Object.fromEntries(
     columns.map((column) => [column.accessorKey, true])
   );
@@ -252,6 +255,7 @@ export function RunsPage({
         renderSubComponent={renderSubComponent}
         getRowCanExpand={() => true}
         columnVisibility={columnVisibility}
+        scope={scope}
       />
       {isLoadingMore && <LoadingMore />}
       {!hasMore && !isLoadingInitial && !isLoadingMore && (

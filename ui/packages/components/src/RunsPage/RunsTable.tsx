@@ -32,8 +32,17 @@ export type Run = {
   startedAt: string | null;
 };
 
+// Whether the view is at the environment, app, or function level
+type ViewScope = 'env' | 'app' | 'fn';
+
 type RunsTableProps = {
   data: Run[] | undefined;
+
+  /**
+   * This is used to determine which columns are visible
+   */
+  scope: ViewScope;
+
   sorting?: SortingState;
   setSorting?: OnChangeFn<SortingState>;
   isLoading?: boolean;
@@ -45,12 +54,15 @@ type RunsTableProps = {
 export default function RunsTable({
   data = [],
   isLoading,
+  scope,
   sorting,
   setSorting,
   getRowCanExpand,
   renderSubComponent,
   columnVisibility,
 }: RunsTableProps) {
+  const columns = useColumns({ scope });
+
   // Manually track expanded rows because getIsExpanded seems to be index-based,
   // which means polling can shift the expanded row. We may be able to switch
   // back to getIsExpanded when we replace polling with websockets
@@ -201,108 +213,125 @@ export default function RunsTable({
 }
 
 const columnHelper = createColumnHelper<Run>();
-export const columns = [
-  columnHelper.accessor<'status', FunctionRunStatus>('status', {
-    cell: (info) => {
-      const status = info.getValue();
+export function useColumns({ scope }: { scope: ViewScope }) {
+  return useMemo(() => {
+    const columns = [
+      columnHelper.accessor<'status', FunctionRunStatus>('status', {
+        cell: (info) => {
+          const status = info.getValue();
 
-      return (
-        <div className="flex items-center">
-          <StatusCell status={status} />
-        </div>
-      );
-    },
-    header: 'Status',
-    enableSorting: false,
-  }),
-  columnHelper.accessor('id', {
-    cell: (info) => {
-      const id = info.getValue();
+          return (
+            <div className="flex items-center">
+              <StatusCell status={status} />
+            </div>
+          );
+        },
+        header: 'Status',
+        enableSorting: false,
+      }),
+      columnHelper.accessor('id', {
+        cell: (info) => {
+          const id = info.getValue();
 
-      return (
-        <div className="flex items-center">
-          <IDCell>{id}</IDCell>
-        </div>
-      );
-    },
-    header: 'Run ID',
-    enableSorting: false,
-  }),
-  columnHelper.accessor('queuedAt', {
-    cell: (info) => {
-      const time = info.getValue();
+          return (
+            <div className="flex items-center">
+              <IDCell>{id}</IDCell>
+            </div>
+          );
+        },
+        header: 'Run ID',
+        enableSorting: false,
+      }),
+      columnHelper.accessor('queuedAt', {
+        cell: (info) => {
+          const time = info.getValue();
 
-      return (
-        <div className="flex items-center">
-          <TimeCell date={new Date(time)} />
-        </div>
-      );
-    },
-    header: 'Queued at',
-    enableSorting: false,
-  }),
-  columnHelper.accessor('startedAt', {
-    cell: (info) => {
-      const time = info.getValue();
+          return (
+            <div className="flex items-center">
+              <TimeCell date={new Date(time)} />
+            </div>
+          );
+        },
+        header: 'Queued at',
+        enableSorting: false,
+      }),
+      columnHelper.accessor('startedAt', {
+        cell: (info) => {
+          const time = info.getValue();
 
-      return (
-        <div className="flex items-center">
-          {time ? <TimeCell date={new Date(time)} /> : <TextCell>-</TextCell>}
-        </div>
-      );
-    },
-    header: 'Started at',
-    enableSorting: false,
-  }),
-  columnHelper.accessor('endedAt', {
-    cell: (info) => {
-      const time = info.getValue();
+          return (
+            <div className="flex items-center">
+              {time ? <TimeCell date={new Date(time)} /> : <TextCell>-</TextCell>}
+            </div>
+          );
+        },
+        header: 'Started at',
+        enableSorting: false,
+      }),
+      columnHelper.accessor('endedAt', {
+        cell: (info) => {
+          const time = info.getValue();
 
-      return (
-        <div className="flex items-center">
-          {time ? <TimeCell date={new Date(time)} /> : <TextCell>-</TextCell>}
-        </div>
-      );
-    },
-    header: 'Ended at',
-    enableSorting: false,
-  }),
-  columnHelper.accessor('durationMS', {
-    cell: (info) => {
-      const duration = info.getValue();
+          return (
+            <div className="flex items-center">
+              {time ? <TimeCell date={new Date(time)} /> : <TextCell>-</TextCell>}
+            </div>
+          );
+        },
+        header: 'Ended at',
+        enableSorting: false,
+      }),
+      columnHelper.accessor('durationMS', {
+        cell: (info) => {
+          const duration = info.getValue();
 
-      return (
-        <div className="flex items-center">
-          <TextCell>{duration ? formatMilliseconds(duration) : '-'}</TextCell>
-        </div>
-      );
-    },
-    header: 'Duration',
-    enableSorting: false,
-  }),
-  columnHelper.accessor('app', {
-    cell: (info) => {
-      return (
-        <div className="flex items-center text-nowrap">
-          <TextCell>{info.getValue().externalID}</TextCell>
-        </div>
-      );
-    },
-    header: 'App',
-    enableSorting: false,
-  }),
-  columnHelper.accessor('function', {
-    cell: (info) => {
-      return (
-        <div className="flex items-center text-nowrap">
-          <TextCell>{info.getValue().name}</TextCell>
-        </div>
-      );
-    },
-    header: 'Function',
-    enableSorting: false,
-  }),
-];
+          return (
+            <div className="flex items-center">
+              <TextCell>{duration ? formatMilliseconds(duration) : '-'}</TextCell>
+            </div>
+          );
+        },
+        header: 'Duration',
+        enableSorting: false,
+      }),
+    ];
+
+    if (scope === 'fn') {
+      return columns;
+    }
+
+    const fnColumn = columnHelper.accessor('function', {
+      cell: (info) => {
+        return (
+          <div className="flex items-center text-nowrap">
+            <TextCell>{info.getValue().name}</TextCell>
+          </div>
+        );
+      },
+      header: 'Function',
+      enableSorting: false,
+    });
+    if (scope === 'app') {
+      // We're scoped to the app level so we need the function column
+      return [...columns, fnColumn];
+    }
+
+    const appColumn = columnHelper.accessor('app', {
+      cell: (info) => {
+        return (
+          <div className="flex items-center text-nowrap">
+            <TextCell>{info.getValue().externalID}</TextCell>
+          </div>
+        );
+      },
+      header: 'App',
+      enableSorting: false,
+    });
+    // We're scoped to the environment level so we need the app and function
+    // columns
+    return [...columns, appColumn, fnColumn];
+  }, [scope]);
+}
 
 const loadingRow = {
   isLoadingRow: true,

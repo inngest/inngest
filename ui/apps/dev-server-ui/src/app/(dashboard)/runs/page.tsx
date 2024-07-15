@@ -150,6 +150,7 @@ export default function Page() {
       apps={[]}
       functions={[]}
       pollInterval={pollInterval}
+      scope="env"
     />
   );
 }
