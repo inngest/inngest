@@ -90,8 +90,8 @@ function Button({
 
 function Options({ children, as: Component }: React.PropsWithChildren<{ as: React.ElementType }>) {
   return (
-    <Component className="absolute mt-1 min-w-max">
-      <div className="border-muted bg-surfaceBase overflow-hidden rounded-md border py-1 drop-shadow-lg">
+    <Component className="absolute z-10 mt-1 min-w-max">
+      <div className="border-muted bg-surfaceBase z-10 overflow-hidden rounded-md border py-1 drop-shadow-lg">
         {children}
       </div>
     </Component>
