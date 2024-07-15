@@ -143,8 +143,10 @@ func (c Config) SingleClusterManager(ctx context.Context) (state.Manager, error)
 		WithShardedClient(NewShardedClient(ShardedClientOpts{
 			UnshardedClient:        u,
 			FunctionRunStateClient: r,
+			BatchClient:            r,
 			StateDefaultKey:        StateDefaultKey,
-			FnRunIsSharded:         NeverShard,
+			QueueDefaultKey:        QueueDefaultKey,
+			FnRunIsSharded:         AlwaysShardOnRun,
 		})),
 	)
 }

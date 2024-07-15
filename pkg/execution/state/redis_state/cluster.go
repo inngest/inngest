@@ -17,10 +17,6 @@ type noopRetriableClient struct {
 	r rueidis.Client
 }
 
-func (r noopRetriableClient) B() rueidis.Builder {
-	return r.r.B()
-}
-
 func (r noopRetriableClient) Do(ctx context.Context, cmd func(client rueidis.Client) rueidis.Completed) (resp rueidis.RedisResult) {
 	return r.r.Do(ctx, cmd(r.r))
 }
@@ -31,10 +27,6 @@ func NewNoopRetriableClient(client rueidis.Client) RetriableClient {
 
 type retryClusterDownClient struct {
 	r rueidis.Client
-}
-
-func (r retryClusterDownClient) B() rueidis.Builder {
-	return r.r.B()
 }
 
 func (r retryClusterDownClient) do(ctx context.Context, cmd func(client rueidis.Client) rueidis.Completed, attempts int) rueidis.RedisResult {

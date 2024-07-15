@@ -283,7 +283,7 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 
 	batchID := opts.BatchID
 
-	status, err := s.batcher.StartExecution(ctx, batchID, opts.BatchPointer)
+	status, err := s.batcher.StartExecution(ctx, opts.FunctionID, batchID, opts.BatchPointer)
 	if err != nil {
 		return err
 	}
@@ -297,8 +297,9 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 		return err
 	}
 
-	if err := s.exec.RetrieveAndScheduleBatchWithOpts(ctx, *fn, batch.ScheduleBatchPayload{
+	if err := s.exec.RetrieveAndScheduleBatch(ctx, *fn, batch.ScheduleBatchPayload{
 		BatchID:         batchID,
+		BatchPointer:    opts.BatchPointer,
 		AccountID:       item.Identifier.AccountID,
 		WorkspaceID:     item.Identifier.WorkspaceID,
 		AppID:           item.Identifier.AppID,

@@ -109,13 +109,9 @@ type Executor interface {
 	// InvokeFailHandler invokes the invoke fail handler.
 	InvokeFailHandler(context.Context, InvokeFailHandlerOpts) error
 
-	AppendAndScheduleBatchWithOpts(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *BatchExecOpts) error
-	// deprecated; use AppendAndScheduleBatchWithOpts in new code
-	AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem) error
+	AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *BatchExecOpts) error
 
-	RetrieveAndScheduleBatchWithOpts(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *BatchExecOpts) error
-	// deprecated; use RetrieveAndScheduleBatchWithOpts in new code
-	RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload) error
+	RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *BatchExecOpts) error
 }
 
 // PublishFinishedEventOpts represents the options for publishing a finished event.
@@ -187,6 +183,12 @@ type CancelRequest struct {
 	Expression     *string
 	UserID         *uuid.UUID
 	CancellationID *ulid.ULID
+
+	// ForceLifecycleHook is used to force the OnFunctionCancelled lifecycle
+	// hook to run even if the function is already finalized. This is useful
+	// when a user wants to cancel a "false stuck" function run (i.e. it isn't
+	// in the state store but the history store thinks it's running)
+	ForceLifecycleHook bool
 }
 
 type ResumeRequest struct {

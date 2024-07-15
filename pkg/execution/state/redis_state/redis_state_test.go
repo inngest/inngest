@@ -79,8 +79,10 @@ func TestStateHarness(t *testing.T) {
 	shardedClient := NewShardedClient(ShardedClientOpts{
 		UnshardedClient:        unshardedClient,
 		FunctionRunStateClient: rc,
+		BatchClient:            rc,
 		StateDefaultKey:        StateDefaultKey,
-		FnRunIsSharded:         NeverShard,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
 	})
 
 	sm, err := New(
@@ -189,8 +191,10 @@ func BenchmarkNew(b *testing.B) {
 	shardedClient := NewShardedClient(ShardedClientOpts{
 		UnshardedClient:        unshardedClient,
 		FunctionRunStateClient: rc,
+		BatchClient:            rc,
 		StateDefaultKey:        statePrefix,
-		FnRunIsSharded:         NeverShard,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
 	})
 
 	sm, err := New(
