@@ -14,7 +14,7 @@ type FunctionRunStateClient struct {
 	kg            RunStateKeyGenerator
 	client        RetriableClient
 	unshardedConn RetriableClient
-	isSharded     IsShardedFn
+	isSharded     IsShardedWithRunIdFn
 }
 
 func (f *FunctionRunStateClient) KeyGenerator() RunStateKeyGenerator {
@@ -32,7 +32,10 @@ func (f *FunctionRunStateClient) ForceShardedClient() RetriableClient {
 	return f.client
 }
 
-func NewFunctionRunStateClient(r rueidis.Client, u *UnshardedClient, stateDefaultKey string, isSharded IsShardedFn) *FunctionRunStateClient {
+func NewFunctionRunStateClient(r rueidis.Client, u *UnshardedClient, stateDefaultKey string, isSharded IsShardedWithRunIdFn) *FunctionRunStateClient {
+	if r == nil {
+		panic("missing function run state client")
+	}
 	return &FunctionRunStateClient{
 		kg:            &runStateKeyGenerator{stateDefaultKey: stateDefaultKey},
 		client:        newRetryClusterDownClient(r),
@@ -41,35 +44,77 @@ func NewFunctionRunStateClient(r rueidis.Client, u *UnshardedClient, stateDefaul
 	}
 }
 
-type ShardedClient struct {
-	fnRunState *FunctionRunStateClient
+type BatchClient struct {
+	kg            BatchKeyGenerator
+	client        RetriableClient
+	unshardedConn RetriableClient
 }
 
-type IsShardedFn func(ctx context.Context, accountId uuid.UUID, runId ulid.ULID) bool
+func (b *BatchClient) KeyGenerator() BatchKeyGenerator {
+	return b.kg
+}
 
-func AlwaysShard(ctx context.Context, accountId uuid.UUID, runId ulid.ULID) bool {
+// ShardedClient is used for creating and retrieving new batches
+func (f *BatchClient) ShardedClient() RetriableClient {
+	return f.client
+}
+
+// UnshardedClient is used for old batches that still need to be processed
+func (f *BatchClient) UnshardedClient() RetriableClient {
+	return f.unshardedConn
+}
+
+func NewBatchClient(r rueidis.Client, u *UnshardedClient, queueDefaultKey string) *BatchClient {
+	if r == nil {
+		panic("missing batch redis client")
+	}
+	return &BatchClient{
+		kg:            batchKeyGenerator{queueDefaultKey: queueDefaultKey, queueItemKeyGenerator: queueItemKeyGenerator{queueDefaultKey: queueDefaultKey}},
+		client:        newRetryClusterDownClient(r),
+		unshardedConn: NewNoopRetriableClient(u.unshardedConn),
+	}
+}
+
+type ShardedClient struct {
+	fnRunState *FunctionRunStateClient
+	batch      *BatchClient
+}
+
+type IsShardedWithRunIdFn func(ctx context.Context, accountId uuid.UUID, runId ulid.ULID) bool
+
+func AlwaysShardOnRun(ctx context.Context, accountId uuid.UUID, runId ulid.ULID) bool {
 	return true
 }
 
-func NeverShard(ctx context.Context, accountId uuid.UUID, runId ulid.ULID) bool {
+func NeverShardOnRun(ctx context.Context, accountId uuid.UUID, runId ulid.ULID) bool {
 	return false
 }
 
 type ShardedClientOpts struct {
-	UnshardedClient        *UnshardedClient
+	UnshardedClient *UnshardedClient
+
 	FunctionRunStateClient rueidis.Client
-	StateDefaultKey        string
-	FnRunIsSharded         IsShardedFn
+	BatchClient            rueidis.Client
+
+	StateDefaultKey string
+	QueueDefaultKey string
+
+	FnRunIsSharded IsShardedWithRunIdFn
 }
 
 func NewShardedClient(opts ShardedClientOpts) *ShardedClient {
 	return &ShardedClient{
 		fnRunState: NewFunctionRunStateClient(opts.FunctionRunStateClient, opts.UnshardedClient, opts.StateDefaultKey, opts.FnRunIsSharded),
+		batch:      NewBatchClient(opts.BatchClient, opts.UnshardedClient, opts.QueueDefaultKey),
 	}
 }
 
 func (s *ShardedClient) FunctionRunState() *FunctionRunStateClient {
 	return s.fnRunState
+}
+
+func (s *ShardedClient) Batch() *BatchClient {
+	return s.batch
 }
 
 type PauseClient struct {
@@ -108,26 +153,6 @@ func (q *QueueClient) Client() rueidis.Client {
 func NewQueueClient(r rueidis.Client, queueDefaultKey string) *QueueClient {
 	return &QueueClient{
 		kg:          queueKeyGenerator{queueDefaultKey: queueDefaultKey, queueItemKeyGenerator: queueItemKeyGenerator{queueDefaultKey: queueDefaultKey}},
-		unshardedRc: r,
-	}
-}
-
-type BatchClient struct {
-	kg          BatchKeyGenerator
-	unshardedRc rueidis.Client
-}
-
-func (b *BatchClient) KeyGenerator() BatchKeyGenerator {
-	return b.kg
-}
-
-func (b *BatchClient) Client() rueidis.Client {
-	return b.unshardedRc
-}
-
-func NewBatchClient(r rueidis.Client, queueDefaultKey string) *BatchClient {
-	return &BatchClient{
-		kg:          batchKeyGenerator{queueDefaultKey: queueDefaultKey, queueItemKeyGenerator: queueItemKeyGenerator{queueDefaultKey: queueDefaultKey}},
 		unshardedRc: r,
 	}
 }
@@ -177,7 +202,6 @@ type UnshardedClient struct {
 
 	pauses   *PauseClient
 	queue    *QueueClient
-	batch    *BatchClient
 	debounce *DebounceClient
 	global   *GlobalClient
 }
@@ -188,10 +212,6 @@ func (u *UnshardedClient) Pauses() *PauseClient {
 
 func (u *UnshardedClient) Queue() *QueueClient {
 	return u.queue
-}
-
-func (u *UnshardedClient) Batch() *BatchClient {
-	return u.batch
 }
 
 func (u *UnshardedClient) Debounce() *DebounceClient {
@@ -206,7 +226,6 @@ func NewUnshardedClient(r rueidis.Client, stateDefaultKey, queueDefaultKey strin
 	return &UnshardedClient{
 		pauses:        NewPauseClient(r, stateDefaultKey),
 		queue:         NewQueueClient(r, queueDefaultKey),
-		batch:         NewBatchClient(r, queueDefaultKey),
 		debounce:      NewDebounceClient(r, queueDefaultKey),
 		global:        NewGlobalClient(r, stateDefaultKey),
 		unshardedConn: r,

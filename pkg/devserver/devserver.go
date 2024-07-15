@@ -109,7 +109,9 @@ func start(ctx context.Context, opts StartOpts) error {
 		UnshardedClient:        unshardedClient,
 		FunctionRunStateClient: shardedRc,
 		StateDefaultKey:        redis_state.StateDefaultKey,
-		FnRunIsSharded:         redis_state.NeverShard,
+		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+		BatchClient:            shardedRc,
+		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
 	var sm state.Manager
@@ -194,7 +196,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
-	batcher := batch.NewRedisBatchManager(unshardedClient.Batch(), queue)
+	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), queue)
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queue)
 
 	// Create a new expression aggregator, using Redis to load evaluables.

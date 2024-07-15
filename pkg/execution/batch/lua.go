@@ -3,6 +3,7 @@ package batch
 import (
 	"embed"
 	"fmt"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"io/fs"
 	"regexp"
 	"strings"
@@ -15,8 +16,9 @@ var embedded embed.FS
 
 var (
 	// scripts stores all embedded lua scripts on initialization
-	scripts = map[string]*rueidis.Lua{}
-	include = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
+	scripts          = map[string]*rueidis.Lua{}
+	retriableScripts = map[string]*redis_state.RetriableLua{}
+	include          = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
 )
 
 func init() {
@@ -62,5 +64,6 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 			}
 		}
 		scripts[name] = rueidis.NewLuaScript(val)
+		retriableScripts[name] = redis_state.NewClusterLuaScript(val)
 	}
 }
