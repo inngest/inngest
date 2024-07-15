@@ -39,8 +39,16 @@ func loadConfigFile(ctx context.Context, cmd *cobra.Command) {
 			l.Warn().Err(err).Msg("error getting current directory")
 		} else {
 			// Walk up the directory tree looking for a config file
-			for dir := cwd; dir != "/"; dir = filepath.Dir(dir) {
+			dir := cwd
+			for {
 				viper.AddConfigPath(dir)
+
+				parent := filepath.Dir(dir)
+				if parent == dir {
+					break
+				}
+
+				dir = parent
 			}
 		}
 
@@ -48,7 +56,7 @@ func loadConfigFile(ctx context.Context, cmd *cobra.Command) {
 			l.Warn().Err(err).Msg("error getting home directory")
 		} else {
 			// Fallback to ~/.config/inngest
-			viper.AddConfigPath(filepath.Join(homeDir, ".config/inngest"))
+			viper.AddConfigPath(filepath.Join(homeDir, ".config", "inngest"))
 		}
 	}
 

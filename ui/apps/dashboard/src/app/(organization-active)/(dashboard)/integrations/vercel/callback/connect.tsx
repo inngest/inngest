@@ -49,7 +49,7 @@ export default function Connect({
     });
     setSaving(false);
     router.push(
-      `/integrations/vercel/callback/success?onSuccessRedirectURL=${searchParams.next}` as Route
+      `/integrations/vercel/callback/success?onSuccessRedirectURL=${searchParams.next}&source=${searchParams.source}` as Route
     );
   };
 

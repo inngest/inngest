@@ -9,6 +9,7 @@ import VercelIntegrationCallbackSuccessPage from './oldPage';
 type SuccessProps = {
   searchParams: {
     onSuccessRedirectURL: string;
+    source?: string;
   };
 };
 
@@ -64,7 +65,11 @@ export default async function SuccessPage({ searchParams }: SuccessProps) {
             appearance="solid"
             size="medium"
             label="Continue to Inngest Vercel Dashbaord"
-            href="/settings/integrations/vercel"
+            href={
+              searchParams.source === 'marketplace'
+                ? searchParams.onSuccessRedirectURL
+                : '/settings/integrations/vercel'
+            }
           />
         </div>
       </>

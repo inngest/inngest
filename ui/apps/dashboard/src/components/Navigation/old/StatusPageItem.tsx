@@ -3,7 +3,7 @@
 import { type Route } from 'next';
 
 import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
-import DropdownItem from '../Dropdown/DropdownItem';
+import DropdownItem from '../../Dropdown/DropdownItem';
 
 export default function StatusPageItem() {
   const status = useSystemStatus();

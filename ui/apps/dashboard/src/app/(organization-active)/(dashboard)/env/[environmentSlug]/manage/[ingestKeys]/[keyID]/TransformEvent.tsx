@@ -62,7 +62,7 @@ function transform(evt, headers = {}, queryParams = {}) {
   };
 };`;
 }
-const defaultTransform = createTransform({});
+export const defaultTransform = createTransform({});
 
 // This must match the output of the default transform and the default incoming!
 const defaultOutput = `{

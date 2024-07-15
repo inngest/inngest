@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Badge } from '@inngest/components/Badge/Badge';
 import { NewButton } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
@@ -10,8 +9,7 @@ import { Select } from '@inngest/components/Select/Select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiInformationLine, RiRefreshLine } from '@remixicon/react';
 
-import { VercelDeploymentProtection } from './VercelIntegration';
-import { useVercelIntegration } from './useVercelIntegration';
+import { VercelDeploymentProtection, type VercelIntegration } from './VercelIntegration';
 
 // type DisableProjectProps = {
 //   isOpen: boolean;
@@ -33,10 +31,8 @@ import { useVercelIntegration } from './useVercelIntegration';
 //   </AlertModal>
 // );
 
-export default function VercelProjects() {
-  const { data } = useVercelIntegration();
-  const router = useRouter();
-  const { projects } = data;
+export default function VercelProjects({ integration }: { integration: VercelIntegration }) {
+  const { projects } = integration;
   const [filter, setFilter] = useState('all');
 
   return (
@@ -47,7 +43,6 @@ export default function VercelProjects() {
         </div>
         <div className="text-btnPrimary flex cursor-pointer flex-row items-center justify-between text-xs">
           <NewButton
-            onClick={() => router.refresh()}
             appearance="ghost"
             icon={<RiRefreshLine className="h-4 w-4" />}
             iconSide="left"
@@ -55,7 +50,7 @@ export default function VercelProjects() {
           />
 
           <Select
-            defaultValue={{ id: 'all', name: 'All' }}
+            value={{ id: 'all', name: 'All' }}
             onChange={(o) => setFilter(o.name)}
             label="Show"
             className="text-subtle bg-canvasBase ml-4 h-6 rounded-sm text-xs leading-tight"

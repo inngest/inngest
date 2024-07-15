@@ -29,6 +29,9 @@ const sizeStyles = {
   lg: 'text-sm px-3.5 py-3 rounded-lg',
 };
 
+/**
+ * @deprecated Use shared Input component instead
+ */
 const Input = forwardRef<HTMLInputElement, InputProps>(({ showError = true, ...props }, ref) => {
   const type = props.type === undefined ? 'text' : props.type;
   const size = props.size === undefined ? 'base' : props.size;
@@ -37,7 +40,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({ showError = true, ...p
   return (
     <div className="flex flex-col">
       {props.label && (
-        <label htmlFor={props.name} className="text-sm font-medium text-slate-700">
+        <label htmlFor={props.name} className="text-basis text-sm font-medium">
           {props.label}
         </label>
       )}
@@ -53,10 +56,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({ showError = true, ...p
         placeholder={placeholder}
         value={props.value}
         className={cn(
-          'border-muted border text-sm leading-none placeholder-slate-500 shadow outline-2 outline-offset-2 outline-indigo-500 transition-all focus:outline',
+          'border-muted placeholder-disabled outline-primary-moderate border text-sm leading-none outline-2 transition-all focus:outline',
           sizeStyles[size],
-          props.readonly &&
-            'cursor-not-allowed border-transparent shadow-transparent outline-transparent	',
+          props.readonly && 'cursor-not-allowed border-transparent outline-transparent	',
           props.error && 'border-error',
           className
         )}
@@ -67,7 +69,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({ showError = true, ...p
         readOnly={props.readonly}
       />
 
-      <p className="text-sm text-red-500">{showError && props.error}</p>
+      <p className="text-error text-sm">{showError && props.error}</p>
     </div>
   );
 });

@@ -23,7 +23,7 @@ export default function TimeFieldFilter({
 
   return (
     <Select
-      defaultValue={selectedValue}
+      value={selectedValue}
       onChange={(value: Option) => {
         if (isFunctionTimeField(value.id)) {
           onTimeFieldChange(value.id);
