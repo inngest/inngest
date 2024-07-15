@@ -69,7 +69,14 @@ type PickedFunctionRunV2 = Pick<
   'id' | 'queuedAt' | 'startedAt' | 'status' | 'endedAt'
 >;
 type PickedFunctionRunV2EdgeWithNode = {
-  node: PickedFunctionRunV2;
+  node: PickedFunctionRunV2 & {
+    app: {
+      externalID: string;
+    };
+    function: {
+      name: string;
+    };
+  };
 };
 
 /**
@@ -85,12 +92,8 @@ export function parseRunsData(runsData: PickedFunctionRunV2EdgeWithNode[] | unde
       }
 
       return {
-        id: edge.node.id,
-        queuedAt: edge.node.queuedAt,
-        startedAt: edge.node.startedAt,
-        endedAt: edge.node.endedAt,
+        ...edge.node,
         durationMS,
-        status: edge.node.status,
       };
     }) ?? []
   );
