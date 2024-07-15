@@ -35,6 +35,7 @@ export default function VercelConfigure() {
   const [, updateVercelApp] = useMutation(UpdateVercelAppDocument);
   const { id } = useParams<{ id: string }>();
   const [project, setProject] = useState<VercelProject & { updated?: boolean }>();
+  const [notFound, setNotFound] = useState(false);
 
   // Represents the new, unsaved enablement value. For example, the value will
   // be "disabled" if the user disables the project but hasn't saved yet
@@ -47,10 +48,17 @@ export default function VercelConfigure() {
   const [mutating, setMutating] = useState(false);
 
   useEffect(() => {
-    if (!project) {
+    if (!project && data.projects.length > 0) {
       const p = data.projects.find((p) => p.id === id);
-      setProject(p);
-      p?.servePath && setPaths(p.servePath.split(','));
+
+      if (p) {
+        setProject(p);
+        p.servePath && setPaths(p.servePath.split(','));
+        setNotFound(false);
+      } else {
+        console.log('shit setting vercel project not found');
+        setNotFound(true);
+      }
     }
   }, [id, project, data.projects]);
 
@@ -144,7 +152,7 @@ export default function VercelConfigure() {
     );
   }
 
-  if (data.projects.length === 0) {
+  if (notFound) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Alert severity="error">Vercel project not found!</Alert>

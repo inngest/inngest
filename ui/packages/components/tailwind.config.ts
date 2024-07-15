@@ -7,8 +7,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-inter-tight)', ...defaultTheme.fontFamily.sans],
-        mono: ['var(--font-roboto-mono)', ...defaultTheme.fontFamily.mono],
+        sans: ['CircularXX', ...defaultTheme.fontFamily.sans],
+        mono: ['CircularXXMono)', ...defaultTheme.fontFamily.mono],
       },
       colors: {
         slate: {
@@ -85,6 +85,9 @@ export default {
         warning: 'rgb(var(--color-border-warning) / <alpha-value>)',
         info: 'rgb(var(--color-border-info) / <alpha-value>)',
       },
+      outlineColor: {
+        error: 'rgb(var(--color-border-error) / <alpha-value>)',
+      },
       backgroundColor: {
         canvasBase: 'rgb(var(--color-background-canvas-base) / <alpha-value>)',
         canvasSubtle: 'rgb(var(--color-background-canvas-subtle) / <alpha-value>)',
@@ -93,6 +96,7 @@ export default {
         surfaceSubtle: 'rgb(var(--color-background-surface-subtle) / <alpha-value>)',
         surfaceMuted: 'rgb(var(--color-background-surface-muted) / <alpha-value>)',
         disabled: 'rgb(var(--color-background-disabled) / <alpha-value>)',
+        alwaysWhite: 'rgb(var(--color-foreground-alwaysWhite) / <alpha-value>)',
         contrast: 'rgb(var(--color-background-contrast) / <alpha-value>)',
         success: 'rgb(var(--color-background-success) / <alpha-value>)',
         successContrast: 'rgb(var(--color-background-successContrast) / <alpha-value>)',
@@ -133,6 +137,9 @@ export default {
       textDecorationColor: {
         link: 'rgb(var(--color-foreground-link) / <alpha-value>)',
       },
+      placeholderColor: {
+        disabled: 'rgb(var(--color-foreground-disabled) / <alpha-value>)',
+      },
       fill: {
         // temporary tooltip token
         tooltipArrow: 'rgb(var(--color-background-canvas-base) / <alpha-value>)',
@@ -150,6 +157,8 @@ export default {
         tooltip: 'rgb(var(--color-background-canvas-muted) / <alpha-value>)',
       },
       boxShadow: {
+        primary: '0 4px 4px 0 rgba(0,0,0,0.25)',
+        // old box-shadows:
         'outline-primary-light':
           'inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 1px 3px rgba(0, 0, 0, 0.2)',
         'outline-primary-dark':

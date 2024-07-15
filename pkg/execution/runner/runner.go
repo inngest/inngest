@@ -622,7 +622,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 			Event:           evt.GetEvent(),
 		}
 
-		if err := s.executor.AppendAndScheduleBatchWithOpts(ctx, fn, bi, nil); err != nil {
+		if err := s.executor.AppendAndScheduleBatch(ctx, fn, bi, nil); err != nil {
 			return fmt.Errorf("could not append and schedule batch item: %w", err)
 		}
 

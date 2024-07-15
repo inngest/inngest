@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useClient } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { getFragmentData, graphql } from '@/gql';
 
 const traceDetailsFragment = graphql(`
@@ -96,9 +96,6 @@ export function useGetRun() {
       }
 
       const fn = run.function;
-      if (!fn) {
-        throw new Error('missing function');
-      }
 
       const trace = getFragmentData(traceDetailsFragment, run.trace);
       if (!trace) {

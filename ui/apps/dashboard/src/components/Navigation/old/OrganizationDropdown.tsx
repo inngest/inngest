@@ -1,10 +1,9 @@
-'use client';
-
 import type { ComponentType } from 'react';
 import type { Route } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useOrganization, useOrganizationList } from '@clerk/nextjs';
+import { auth, clerkClient } from '@clerk/nextjs';
+import type { Organization, OrganizationMembership } from '@clerk/nextjs/server';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +11,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
-import { Skeleton } from '@inngest/components/Skeleton';
 import {
   RiAddCircleLine,
   RiArrowLeftRightLine,
@@ -22,20 +20,24 @@ import {
   RiTeamFill,
 } from '@remixicon/react';
 
-export default function OrganizationDropdown() {
-  const { isLoaded, organization } = useOrganization();
-  const { userMemberships } = useOrganizationList({ userMemberships: true });
+export default async function OrganizationDropdown() {
+  const { orgId: organizationId } = auth();
 
-  if (!isLoaded) {
-    return (
-      <div className="flex h-full items-center gap-2 border-l border-slate-800 px-2 py-1.5 md:px-4">
-        <Skeleton className="block size-5 rounded" />
-        <Skeleton className="h-5 w-20" />
-      </div>
-    );
+  if (!organizationId) {
+    return null;
   }
 
-  if (!organization) return null;
+  const organizations = (
+    await clerkClient.organizations.getOrganizationMembershipList({
+      organizationId,
+    })
+  ).map((o: OrganizationMembership) => o.organization);
+
+  const organization = organizations.find((o: Organization) => o.id === organizationId);
+
+  if (!organization) {
+    return null;
+  }
 
   return (
     <DropdownMenu>
@@ -77,12 +79,16 @@ export default function OrganizationDropdown() {
           />
         </DropdownMenuGroup>
         <DropdownMenuGroup className="p-2">
-          {userMemberships.count && userMemberships.count > 1 ? (
-            <OrganizationDropdownMenuItem
-              icon={RiArrowLeftRightLine}
-              href="/organization-list"
-              label="Switch Organization"
-            />
+          {organizations.length > 1 ? (
+            <DropdownMenuItem
+              asChild
+              className="p-2 font-medium text-slate-400 outline-none hover:bg-transparent focus:text-white"
+            >
+              <a href="/organization-list">
+                <RiArrowLeftRightLine className="size-4" />
+                Switch Organization
+              </a>
+            </DropdownMenuItem>
           ) : (
             <OrganizationDropdownMenuItem
               icon={RiAddCircleLine}

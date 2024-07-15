@@ -64,16 +64,6 @@ func TestVerifyKeyGenerator(t *testing.T) {
 	assert.Equal(t, legacyQueueKg.Status("status", fakeUuid), newQueueKg.Status("status", fakeUuid))
 	assert.Equal(t, legacyQueueKg.ConcurrencyFnEWMA(fakeUuid), newQueueKg.ConcurrencyFnEWMA(fakeUuid))
 
-	newBatchKg := batchKeyGenerator{queueDefaultKey: "queue", queueItemKeyGenerator: queueItemKg}
-	var legacyBatchKg legacyBatchKeyGenerator = legacyDefaultkg
-
-	assert.Equal(t, legacyBatchKg.QueuePrefix(), newBatchKg.QueuePrefix())
-	assert.Equal(t, legacyBatchKg.QueueItem(), newBatchKg.QueueItem())
-	assert.Equal(t, legacyBatchKg.BatchPointer(ctx, fakeUuid), newBatchKg.BatchPointer(ctx, fakeUuid))
-	assert.Equal(t, legacyBatchKg.BatchPointerWithKey(ctx, fakeUuid, "key"), newBatchKg.BatchPointerWithKey(ctx, fakeUuid, "key"))
-	assert.Equal(t, legacyBatchKg.Batch(ctx, fakeUlid), newBatchKg.Batch(ctx, fakeUlid))
-	assert.Equal(t, legacyBatchKg.BatchMetadata(ctx, fakeUlid), newBatchKg.BatchMetadata(ctx, fakeUlid))
-
 	newPausesKg := pauseKeyGenerator{stateDefaultKey: "estate"}
 
 	assert.Equal(t, legacyKg.PauseID(ctx, fakeUuid), newPausesKg.Pause(ctx, fakeUuid))

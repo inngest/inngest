@@ -3,9 +3,9 @@ import NextLink from 'next/link';
 import { NewButton } from '@inngest/components/Button/index';
 import { Link } from '@inngest/components/Link/Link';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
-import { RiArrowRightSLine, RiLinksLine } from '@remixicon/react';
+import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 
-import { vercelIntegration } from '../page';
+import { vercelIntegration } from '../data';
 import VercelProjects from './projects';
 
 export default async function VercelIntegrationPage() {
@@ -38,11 +38,12 @@ export default async function VercelIntegrationPage() {
 
         <div className="place-self-start">
           <NewButton
-            kind="primary"
-            href={'https://vercel.com/integrations/inngest/new' as Route}
-            icon={<RiLinksLine className="mr-1" />}
+            appearance="outlined"
+            kind="secondary"
+            href={'https://vercel.com/integrations/inngest' as Route}
+            icon={<RiExternalLinkLine className="mr-1" />}
             iconSide="left"
-            label="Reconnect"
+            label="Go to Vercel"
           />
         </div>
       </div>

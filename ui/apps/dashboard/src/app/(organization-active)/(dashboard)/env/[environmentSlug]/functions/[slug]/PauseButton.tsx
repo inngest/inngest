@@ -3,29 +3,33 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { AlertModal } from '@inngest/components/Modal';
+import { Select } from '@inngest/components/Select/Select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { RiPauseLine, RiPlayFill } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import { SelectInput } from '@/components/Forms/SelectInput';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 
 type CurrentRunHandlingOption = {
-  label: string;
-  value: string;
+  name: string;
+  id: string;
 };
 const CURRENT_RUN_HANDLING_STRATEGY_SUSPEND = 'suspend';
 const CURRENT_RUN_HANDLING_STRATEGY_CANCEL = 'cancel';
 const currentRunHandlingOptions: CurrentRunHandlingOption[] = [
   {
-    label: 'Pause immediately, then cancel after 7 days',
-    value: CURRENT_RUN_HANDLING_STRATEGY_SUSPEND,
+    name: 'Pause immediately, then cancel after 7 days',
+    id: CURRENT_RUN_HANDLING_STRATEGY_SUSPEND,
   },
-  { label: 'Cancel immediately', value: CURRENT_RUN_HANDLING_STRATEGY_CANCEL },
+  { name: 'Cancel immediately', id: CURRENT_RUN_HANDLING_STRATEGY_CANCEL },
 ];
-type CurrentRunHandlingStrategy = (typeof currentRunHandlingOptions)[number]['value'];
+
+const defaultOption: CurrentRunHandlingOption = {
+  name: 'Pause immediately, then cancel after 7 days',
+  id: CURRENT_RUN_HANDLING_STRATEGY_SUSPEND,
+};
 
 const FunctionVersionNumberDocument = graphql(`
   query GetFunctionVersionNumber($slug: String!, $environmentID: ID!) {
@@ -80,16 +84,16 @@ function PauseFunctionModal({
   const [, pauseFunction] = useMutation(PauseFunctionDocument);
   const [, unpauseFunction] = useMutation(UnpauseFunctionDocument);
   const [currentRunHandlingStrategy, setCurrentRunHandlingStrategy] =
-    useState<CurrentRunHandlingStrategy>(CURRENT_RUN_HANDLING_STRATEGY_SUSPEND);
+    useState<CurrentRunHandlingOption>(currentRunHandlingOptions[0] || defaultOption);
 
   function onCloseWrapper() {
-    setCurrentRunHandlingStrategy(CURRENT_RUN_HANDLING_STRATEGY_SUSPEND);
+    setCurrentRunHandlingStrategy(currentRunHandlingOptions[0] || defaultOption);
     onClose();
   }
   function handlePause() {
     pauseFunction({
       fnID: functionID,
-      cancelRunning: currentRunHandlingStrategy == CURRENT_RUN_HANDLING_STRATEGY_CANCEL,
+      cancelRunning: currentRunHandlingStrategy.id == CURRENT_RUN_HANDLING_STRATEGY_CANCEL,
     }).then((result) => {
       if (result.error) {
         toast.error(`“${functionName}” could not be paused: ${result.error.message}`);
@@ -149,12 +153,29 @@ function PauseFunctionModal({
             <span className="text-subtle">
               Choose what to do with currently-running function runs:
             </span>
-            <SelectInput
-              value={currentRunHandlingStrategy}
-              options={currentRunHandlingOptions}
+            <Select
               onChange={setCurrentRunHandlingStrategy}
-              placeholder="How should currently-running runs be handled?"
-            />
+              isLabelVisible={false}
+              label="Pause runs"
+              multiple={false}
+              value={currentRunHandlingStrategy}
+            >
+              <Select.Button isLabelVisible={false}>
+                <div className="">
+                  {currentRunHandlingStrategy.name ||
+                    'How should currently-running runs be handled?'}
+                </div>
+              </Select.Button>
+              <Select.Options>
+                {currentRunHandlingOptions.map((option) => {
+                  return (
+                    <Select.Option key={option.id} option={option}>
+                      {option.name}
+                    </Select.Option>
+                  );
+                })}
+              </Select.Options>
+            </Select>
           </label>
         </div>
       )}

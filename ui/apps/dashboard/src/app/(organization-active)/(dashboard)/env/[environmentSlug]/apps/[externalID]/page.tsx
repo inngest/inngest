@@ -1,8 +1,8 @@
 'use client';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { SyncErrorCard } from '@/components/SyncErrorCard';
 import { FunctionList } from './FunctionList';
 import { useApp } from './useApp';
