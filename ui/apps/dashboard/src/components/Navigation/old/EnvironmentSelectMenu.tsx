@@ -11,8 +11,8 @@ import { useEnvironments } from '@/queries';
 import cn from '@/utils/cn';
 import {
   EnvironmentType,
+  getDefaultEnvironment,
   getLegacyTestMode,
-  getProductionEnvironment,
   getSortedBranchEnvironments,
   getTestEnvironments,
   type Environment,
@@ -78,7 +78,7 @@ export default function EnvironmentSelectMenu({ activeEnv }: EnvironmentSelectMe
     );
   }
 
-  const productionEnvironment = getProductionEnvironment(envs);
+  const defaultEnvironment = getDefaultEnvironment(envs);
   const legacyTestMode = getLegacyTestMode(envs);
   const mostRecentlyCreatedBranchEnvironments = getSortedBranchEnvironments(envs).slice(0, 5);
   const testEnvironments = getTestEnvironments(envs);
@@ -140,9 +140,7 @@ export default function EnvironmentSelectMenu({ activeEnv }: EnvironmentSelectMe
             leaveTo="opacity-0"
           >
             <Listbox.Options className="bg-slate-940/95 absolute left-0 z-10 mt-2 w-[280px] origin-top-right divide-y divide-dashed divide-slate-700 rounded-md text-sm backdrop-blur focus:outline-none">
-              {productionEnvironment !== null && (
-                <EnvironmentItem environment={productionEnvironment} />
-              )}
+              {defaultEnvironment !== null && <EnvironmentItem environment={defaultEnvironment} />}
 
               {legacyTestMode !== null && (
                 <div>

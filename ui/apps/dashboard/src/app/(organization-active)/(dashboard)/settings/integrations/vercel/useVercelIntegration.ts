@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { useQuery } from 'urql';
 
-import { useProductionEnvironment } from '@/queries';
+import { useDefaultEnvironment } from '@/queries';
 import { useRestAPIRequest } from '@/utils/useRestAPIRequest';
 import { type VercelIntegration, type VercelProjectAPIResponse } from './VercelIntegration';
 import mergeVercelProjectData from './mergeVercelProjectData';
@@ -22,19 +22,18 @@ export function useVercelIntegration(): {
   fetching: boolean;
   error: Error | undefined;
 } {
-  const [
-    { data: productionEnvironment, fetching: isLoadingEnvironments, error: environmentError },
-  ] = useProductionEnvironment();
+  const [{ data: defaultEnv, fetching: isLoadingEnvironments, error: environmentError }] =
+    useDefaultEnvironment();
 
   // Use memo as the URL object will change on every render
   const url = useMemo(() => {
-    if (!productionEnvironment?.id) {
+    if (!defaultEnv?.id) {
       return null;
     }
     const url = new URL('/v1/integrations/vercel/projects', process.env.NEXT_PUBLIC_API_URL);
-    url.searchParams.set('workspaceID', productionEnvironment.id);
+    url.searchParams.set('workspaceID', defaultEnv.id);
     return url;
-  }, [productionEnvironment?.id]);
+  }, [defaultEnv?.id]);
 
   // Fetch data from REST and GQL and merge
   const {
@@ -45,9 +44,9 @@ export function useVercelIntegration(): {
   const [{ data: savedVercelProjects, fetching: isLoadingSavedProjects }] = useQuery({
     query: GetSavedVercelProjectsDocument,
     variables: {
-      environmentID: productionEnvironment?.id || '',
+      environmentID: defaultEnv?.id || '',
     },
-    pause: !productionEnvironment?.id,
+    pause: !defaultEnv?.id,
   });
 
   const projects = mergeVercelProjectData({

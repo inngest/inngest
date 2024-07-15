@@ -32,7 +32,7 @@ export function getActiveEnvironment(
   return null;
 }
 
-export function getProductionEnvironment(
+export function getDefaultEnvironment(
   environments: NonEmptyArray<Environment>
 ): Environment | null {
   return environments.find((e) => e.type === EnvironmentType.Production) || null;

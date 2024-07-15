@@ -9,19 +9,19 @@ import {
   type Environment,
 } from '@/utils/environments';
 
-export function useProductionEnvironment(): UseQueryResponse<Environment> {
+export function useDefaultEnvironment(): UseQueryResponse<Environment> {
   const [{ fetching, data, error, stale }, refetch] = useQuery({
-    query: GetProductionWorkspaceDocument,
+    query: GetDefaultEnvironmentDocument,
     requestPolicy: 'cache-first',
   });
 
   const environment = useMemo(() => {
-    if (!data?.productionWorkspace) {
+    if (!data?.defaultEnv) {
       return;
     }
 
-    return workspaceToEnvironment(data.productionWorkspace as Workspace);
-  }, [data?.productionWorkspace]);
+    return workspaceToEnvironment(data.defaultEnv as Workspace);
+  }, [data?.defaultEnv]);
 
   return [{ data: environment, fetching, error, stale }, refetch];
 }
@@ -46,7 +46,7 @@ const GetEnvironmentsDocument = graphql(`
 
 const GetEnvironmentBySlugDocument = graphql(`
   query GetEnvironmentBySlug($slug: String!) {
-    workspaceBySlug(slug: $slug) {
+    envBySlug(slug: $slug) {
       id
       name
       slug
@@ -61,9 +61,9 @@ const GetEnvironmentBySlugDocument = graphql(`
   }
 `);
 
-const GetProductionWorkspaceDocument = graphql(`
-  query GetProductionWorkspace {
-    productionWorkspace {
+const GetDefaultEnvironmentDocument = graphql(`
+  query GetDefaultEnvironment {
+    defaultEnv {
       id
       name
       slug
@@ -99,12 +99,12 @@ export const useEnvironment = (environmentSlug: string): UseQueryResponse<Enviro
   });
 
   const environment = useMemo(() => {
-    if (!data?.workspaceBySlug) {
+    if (!data?.envBySlug) {
       return;
     }
 
-    return workspaceToEnvironment(data.workspaceBySlug as Workspace);
-  }, [data?.workspaceBySlug]);
+    return workspaceToEnvironment(data.envBySlug as Workspace);
+  }, [data?.envBySlug]);
 
   return [{ data: environment, fetching, error, stale }, refetch];
 };
