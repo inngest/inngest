@@ -23,7 +23,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         )}
         <input
           ref={ref}
-          className={`bg-canvasBase border-muted placeholder-disabled text-basis outline-primary-moderate border text-sm leading-none shadow outline-2 outline-offset-2 transition-all focus:outline
+          className={`bg-canvasBase border-muted placeholder-disabled text-basis outline-primary-moderate border text-sm leading-none outline-2 transition-all focus:outline
             ${sizeStyles[inngestSize]}
             ${
               props.readOnly &&

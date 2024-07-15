@@ -16,7 +16,7 @@ export function Textarea({ value, onChange, placeholder, rows = 3, required }: T
       }}
       rows={rows}
       required={required}
-      className="bg-canvasBase text-basis border-muted placeholder-disabled outline-primary-moderate w-full rounded-lg border p-3 text-sm outline-2 outline-offset-2 transition-all focus:outline"
+      className="bg-canvasBase text-basis border-muted placeholder-disabled outline-primary-moderate w-full rounded-lg border p-3 text-sm outline-2 transition-all focus:outline"
     />
   );
 }
