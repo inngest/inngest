@@ -45,33 +45,25 @@ func NewFunctionRunStateClient(r rueidis.Client, u *UnshardedClient, stateDefaul
 }
 
 type BatchClient struct {
-	kg            BatchKeyGenerator
-	client        RetriableClient
-	unshardedConn RetriableClient
+	kg     BatchKeyGenerator
+	client RetriableClient
 }
 
 func (b *BatchClient) KeyGenerator() BatchKeyGenerator {
 	return b.kg
 }
 
-// ShardedClient is used for creating and retrieving new batches
-func (f *BatchClient) ShardedClient() RetriableClient {
-	return f.client
+func (b *BatchClient) Client() RetriableClient {
+	return b.client
 }
 
-// UnshardedClient is used for old batches that still need to be processed
-func (f *BatchClient) UnshardedClient() RetriableClient {
-	return f.unshardedConn
-}
-
-func NewBatchClient(r rueidis.Client, u *UnshardedClient, queueDefaultKey string) *BatchClient {
+func NewBatchClient(r rueidis.Client, queueDefaultKey string) *BatchClient {
 	if r == nil {
 		panic("missing batch redis client")
 	}
 	return &BatchClient{
-		kg:            batchKeyGenerator{queueDefaultKey: queueDefaultKey, queueItemKeyGenerator: queueItemKeyGenerator{queueDefaultKey: queueDefaultKey}},
-		client:        newRetryClusterDownClient(r),
-		unshardedConn: NewNoopRetriableClient(u.unshardedConn),
+		kg:     batchKeyGenerator{queueDefaultKey: queueDefaultKey, queueItemKeyGenerator: queueItemKeyGenerator{queueDefaultKey: queueDefaultKey}},
+		client: newRetryClusterDownClient(r),
 	}
 }
 
@@ -105,7 +97,7 @@ type ShardedClientOpts struct {
 func NewShardedClient(opts ShardedClientOpts) *ShardedClient {
 	return &ShardedClient{
 		fnRunState: NewFunctionRunStateClient(opts.FunctionRunStateClient, opts.UnshardedClient, opts.StateDefaultKey, opts.FnRunIsSharded),
-		batch:      NewBatchClient(opts.BatchClient, opts.UnshardedClient, opts.QueueDefaultKey),
+		batch:      NewBatchClient(opts.BatchClient, opts.QueueDefaultKey),
 	}
 }
 
