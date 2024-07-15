@@ -57,9 +57,12 @@ if partitionConcurrency > 0 and #keyPartitionConcurrency > 0 then
     -- concurrency keys.
     capacity = check_concurrency(currentTime, keyPartitionConcurrency, partitionConcurrency)
     if capacity <= 0 then
-        requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, rartitionID, noCapacityScore, currentTime)
-        requeue_partition(keyAccountPartitionPtr, keyPartitionMap, existing, rartitionID, noCapacityScore, currentTime)
-        -- TODO Do we need to update the top-level accounts ZSET?
+        requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
+        requeue_partition(keyAccountPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
+
+        -- Upsert global accounts to _earliest_ score
+        local earliestPartitionScoreInAccount = get_fn_partition_score(accountPointerKey)
+        update_pointer_score_to(accountId, globalAccountKey, earliestPartitionScoreInAccount)
         return { -1 }
     end
 end
@@ -69,9 +72,12 @@ if accountConcurrency > 0 and #keyAccountConcurrency > 0 then
     -- concurrency keys.
     local acctCap = check_concurrency(currentTime, keyAccountConcurrency, accountConcurrency)
     if acctCap <= 0 then
-        requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, rartitionID, noCapacityScore, currentTime)
-        requeue_partition(keyAccountPartitionPtr, keyPartitionMap, existing, rartitionID, noCapacityScore, currentTime)
-        -- TODO Do we need to update the top-level accounts ZSET?
+        requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
+        requeue_partition(keyAccountPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
+
+        -- Upsert global accounts to _earliest_ score
+        local earliestPartitionScoreInAccount = get_fn_partition_score(accountPointerKey)
+        update_pointer_score_to(accountId, globalAccountKey, earliestPartitionScoreInAccount)
         return { -1 }
     end
 
@@ -88,6 +94,9 @@ existing.last = currentTime -- in ms.
 redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existing))
 redis.call("ZADD", keyGlobalPartitionPtr, leaseTime, partitionID) -- partition scored are in seconds.
 redis.call("ZADD", keyAccountPartitionPtr, leaseTime, partitionID) -- partition scored are in seconds.
--- TODO Do we need to update the global account ZSET?
+
+-- Upsert global accounts to _earliest_ score
+local earliestPartitionScoreInAccount = get_fn_partition_score(accountPointerKey)
+update_pointer_score_to(accountId, globalAccountKey, earliestPartitionScoreInAccount)
 
 return { existingTime, capacity }

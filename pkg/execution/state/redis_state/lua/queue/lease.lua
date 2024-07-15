@@ -120,11 +120,16 @@ redis.call("ZREM", queueIndexKey, item.id)
 -- Update the fn's score in the global pointer queue to the next job, if available.
 local score = get_fn_partition_score(queueIndexKey)
 update_pointer_score_to(partitionName, globalPointerKey, score)
--- Also update account-level partitions
+
+-- Update partition in account partitions
 update_pointer_score_to(partitionName, accountPointerKey, score)
+
+-- Find earliest pointer _across_ account partitions
+local earliestPartitionScoreInAccount = get_fn_partition_score(accountPointerKey)
+
 -- Also update global accounts
--- TODO Is this correct?
-update_pointer_score_to(accountId, globalAccountKey, score)
+update_pointer_score_to(accountId, globalAccountKey, earliestPartitionScoreInAccount)
+
 -- And the same for any shards, as long as the shard name exists.
 if has_shard_key(shardPointerKey) then
     update_pointer_score_to(partitionName, shardPointerKey, score)
