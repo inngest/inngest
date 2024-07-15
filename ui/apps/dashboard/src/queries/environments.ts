@@ -38,7 +38,6 @@ const GetEnvironmentsDocument = graphql(`
       webhookSigningKey
       createdAt
       isArchived
-      functionCount
       isAutoArchiveEnabled
       lastDeployedAt
     }

@@ -50,7 +50,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
           />
 
           <Select
-            defaultValue={{ id: 'all', name: 'All' }}
+            value={{ id: 'all', name: 'All' }}
             onChange={(o) => setFilter(o.name)}
             label="Show"
             className="text-subtle bg-canvasBase ml-4 h-6 rounded-sm text-xs leading-tight"

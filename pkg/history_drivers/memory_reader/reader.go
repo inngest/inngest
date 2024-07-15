@@ -202,6 +202,20 @@ func (r *reader) CountReplayRuns(ctx context.Context, opts history_reader.CountR
 	return history_reader.ReplayRunCounts{}, errors.New("not implemented")
 }
 
+func (r *reader) GetActiveRunIDs(
+	ctx context.Context,
+	opts history_reader.GetActiveRunIDsOpts,
+) ([]ulid.ULID, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (r *reader) CountActiveRuns(
+	ctx context.Context,
+	opts history_reader.CountActiveRunsOpts,
+) (int, error) {
+	return 0, errors.New("not implemented")
+}
+
 func toRunHistory(item history.History) (*history_reader.RunHistory, error) {
 	var cancel *history_reader.RunHistoryCancel
 	if item.Cancel != nil {

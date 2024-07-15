@@ -86,7 +86,6 @@ function DummyEnvContext({ children }: PropsWithChildren) {
     webhookSigningKey: 'fake-signing-key',
     createdAt: new Date().toISOString(),
     isArchived: false,
-    functionCount: 1,
     isAutoArchiveEnabled: null,
     lastDeployedAt: null,
   };
