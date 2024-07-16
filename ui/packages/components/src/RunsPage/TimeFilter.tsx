@@ -1,5 +1,7 @@
-import RelativeTimeFilter from '@inngest/components/Filter/RelativeTimeFilter';
+import { forwardRef } from 'react';
 import { type Option } from '@inngest/components/Select/Select';
+
+import { DateSelectButton, RangePicker, type DateButtonProps } from '../DatePicker';
 
 const daysAgoArray = ['1', '3', '7', '14', '30'];
 
@@ -30,15 +32,25 @@ export function TimeFilter({ daysAgoMax, onDaysChange, selectedDays }: Props) {
   }
 
   return (
-    <RelativeTimeFilter
-      options={options}
-      selectedDays={selectedValue}
-      onDaysChange={(value: Option) => {
-        const numericId = parseInt(value.id);
-        if (!isNaN(numericId)) {
-          onDaysChange(value.id);
-        }
-      }}
+    <RangePicker
+      onChange={() => {}}
+      triggerComponent={forwardRef<HTMLButtonElement, DateButtonProps>((props, ref) => (
+        <DateSelectButton
+          {...props}
+          ref={ref}
+          className={`${props.className || ''} rounded-l-none border-l-0`}
+        />
+      ))}
     />
+    // <RelativeTimeFilter
+    //   options={options}
+    //   selectedDays={selectedValue}
+    //   onDaysChange={(value: Option) => {
+    //     const numericId = parseInt(value.id);
+    //     if (!isNaN(numericId)) {
+    //       onDaysChange(value.id);
+    //     }
+    //   }}
+    // />
   );
 }

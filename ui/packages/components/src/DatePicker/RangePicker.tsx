@@ -14,7 +14,7 @@ import {
   parseDuration,
   subtractDuration,
 } from '../utils/date';
-import { DateInputButton, type DateInputButtonProps } from './DateInputButton';
+import { DateInputButton, type DateButtonProps } from './DateButton';
 import { DateTimePicker } from './DateTimePicker';
 
 type RelativeProps = {
@@ -28,12 +28,13 @@ type AbsoluteProps = {
 };
 type RangeChangeProps = RelativeProps | AbsoluteProps;
 
-type RangePickerProps = Omit<DateInputButtonProps, 'defaultValue' | 'onChange'> & {
+type RangePickerProps = Omit<DateButtonProps, 'defaultValue' | 'onChange'> & {
   placeholder?: string;
   onChange: (args: RangeChangeProps) => void;
   defaultStart?: Date;
   defaultEnd?: Date;
   upgradeCutoff?: Date;
+  triggerComponent?: React.ComponentType<DateButtonProps>;
 };
 
 const RELATIVES = {
@@ -71,14 +72,14 @@ const formatAbsolute = (absoluteRange?: AbsoluteRange) => (
 const AbsoluteDisplay = ({ absoluteRange }: { absoluteRange?: AbsoluteRange }) => (
   <Tooltip>
     <TooltipTrigger>
-      <div className="text-basis w-[180px] truncate">{formatAbsolute(absoluteRange)}</div>
+      <div className="text-basis">{formatAbsolute(absoluteRange)}</div>
     </TooltipTrigger>
     <TooltipContent className="whitespace-pre-line">{formatAbsolute(absoluteRange)}</TooltipContent>
   </Tooltip>
 );
 
 const RelativeDisplay = ({ duration }: { duration: string }) => (
-  <span className="text-basis truncate">{duration}</span>
+  <span className="text-basis truncate">Last {duration}</span>
 );
 
 export const RangePicker = ({
@@ -87,6 +88,7 @@ export const RangePicker = ({
   defaultStart,
   defaultEnd,
   upgradeCutoff,
+  triggerComponent: TriggerComponent = DateInputButton,
   ...props
 }: RangePickerProps) => {
   const durationRef = useRef<HTMLInputElement | null>(null);
@@ -164,13 +166,13 @@ export const RangePicker = ({
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        <DateInputButton {...props}>
+        <TriggerComponent {...props}>
           {displayValue ? (
             displayValue
           ) : (
             <span className="text-disabled">{placeholder ? placeholder : 'Select dates'}</span>
           )}
-        </DateInputButton>
+        </TriggerComponent>
       </PopoverTrigger>
       <PopoverContent align="start">
         <div className="bg-canvasBase flex flex-row">
