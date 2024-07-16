@@ -22,7 +22,7 @@ export default async function RootLayout({
   return (
     <>
       <div className="isolate flex h-full flex-col">
-        {newIANav ? (
+        {true ? (
           <div className="p-4">coming soon...</div>
         ) : (
           <AppNavigation envs={envs} activeEnv={env} envSlug={environmentSlug} />
