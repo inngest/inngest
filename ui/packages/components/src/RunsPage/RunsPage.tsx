@@ -5,7 +5,6 @@ import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
-import { useColumns, type Run } from '@inngest/components/RunsPage/RunsTable';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
 import { LoadingMore, TableFilter } from '@inngest/components/Table';
 import {
@@ -28,6 +27,8 @@ import {
 } from '../hooks/useSearchParam';
 import type { Features } from '../types/features';
 import { TimeFilter } from './TimeFilter';
+import { useScopedColumns } from './columns';
+import type { Run, ViewScope } from './types';
 
 // Disable SSR in Runs Table, to prevent hydration errors. It requires windows info on visibility columns
 const RunsTable = dynamic(() => import('@inngest/components/RunsPage/RunsTable'), {
@@ -54,7 +55,7 @@ type Props = {
   functions?: Option[];
   functionIsPaused?: boolean;
   defaultVisibility?: VisibilityState;
-  scope: React.ComponentProps<typeof RunsTable>['scope'];
+  scope: ViewScope;
 };
 
 export function RunsPage({
@@ -79,7 +80,9 @@ export function RunsPage({
   scope,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const columns = useColumns({ scope });
+
+  const columns = useScopedColumns(scope);
+
   const displayAllColumns: VisibilityState = Object.fromEntries(
     columns.map((column) => [column.accessorKey, true])
   );
