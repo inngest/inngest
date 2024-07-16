@@ -922,10 +922,8 @@ export type Query = {
   deploys: Maybe<Array<Deploy>>;
   events: Maybe<PaginatedEvents>;
   plans: Array<Maybe<BillingPlan>>;
-  productionWorkspace: Workspace;
   session: Maybe<Session>;
   workspace: Workspace;
-  workspaceBySlug: Maybe<Workspace>;
   workspaces: Maybe<Array<Workspace>>;
 };
 
@@ -952,11 +950,6 @@ export type QueryEventsArgs = {
 
 export type QueryWorkspaceArgs = {
   id: Scalars['ID'];
-};
-
-
-export type QueryWorkspaceBySlugArgs = {
-  slug: Scalars['String'];
 };
 
 export type RateLimitConfiguration = {
@@ -1598,7 +1591,6 @@ export type Workspace = {
   runs: RunsConnection;
   runsMetrics: MetricsResponse;
   signingKeys: Array<SigningKey>;
-  slug: Maybe<Scalars['String']>;
   test: Scalars['Boolean'];
   type: EnvironmentType;
   unattachedSyncs: Array<Deploy>;
