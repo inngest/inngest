@@ -54,7 +54,6 @@ type Props = {
   apps?: Option[];
   functions?: Option[];
   functionIsPaused?: boolean;
-  defaultVisibility?: VisibilityState;
   scope: ViewScope;
 };
 
@@ -76,7 +75,6 @@ export function RunsPage({
   functions,
   pollInterval,
   functionIsPaused,
-  defaultVisibility,
   scope,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -89,7 +87,7 @@ export function RunsPage({
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
     'VisibleRunsColumns',
-    defaultVisibility || displayAllColumns
+    displayAllColumns
   );
 
   const [filteredStatus = [], setFilteredStatus, removeFilteredStatus] =

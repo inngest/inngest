@@ -42,9 +42,11 @@ const GetRunsDocument = graphql(`
           node {
             app {
               externalID
+              name
             }
             function {
               name
+              slug
             }
             id
             queuedAt
@@ -111,6 +113,8 @@ export default function Page({
       // generate URLs without knowing about environments
       app: (params: { externalAppID: string }) =>
         pathCreator.app({ envSlug: env.slug, externalAppID: params.externalAppID }),
+      function: (params: { functionSlug: string }) =>
+        pathCreator.function({ envSlug: env.slug, functionSlug: params.functionSlug }),
       runPopout: (params: { runID: string }) =>
         pathCreator.runPopout({ envSlug: env.slug, runID: params.runID }),
     };

@@ -264,9 +264,11 @@ export const GET_RUNS = gql`
         node {
           app {
             externalID
+            name
           }
           function {
             name
+            slug
           }
           id
           queuedAt

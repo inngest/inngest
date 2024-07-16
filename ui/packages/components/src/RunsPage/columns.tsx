@@ -119,9 +119,6 @@ const columns = [
 export function useScopedColumns(scope: ViewScope) {
   return useMemo(() => {
     return columns.filter((column) => {
-      if (scope === 'app') {
-        return column.accessorKey !== 'app';
-      }
       if (scope === 'fn') {
         return column.accessorKey !== 'app' && column.accessorKey !== 'function';
       }
