@@ -18,6 +18,7 @@ import {
   RemoveVercelAppDocument,
   UpdateVercelAppDocument,
 } from '@/gql/graphql';
+import LoadingIcon from '@/icons/LoadingIcon';
 import { useProductionEnvironment } from '@/queries';
 import { VercelDeploymentProtection, type VercelProject } from '../../VercelIntegration';
 import { useVercelIntegration } from '../../useVercelIntegration';
@@ -28,30 +29,38 @@ export default function VercelConfigure() {
   const [{ data: env }] = useProductionEnvironment();
   const prodEnvID = env?.id;
 
-  const { data, fetching } = useVercelIntegration();
+  const { data, fetching, error: fetchError } = useVercelIntegration();
   const [, createVercelApp] = useMutation(CreateVercelAppDocument);
   const [, removeVercelApp] = useMutation(RemoveVercelAppDocument);
   const [, updateVercelApp] = useMutation(UpdateVercelAppDocument);
-  const { projects } = data;
   const { id } = useParams<{ id: string }>();
   const [project, setProject] = useState<VercelProject & { updated?: boolean }>();
+  const [notFound, setNotFound] = useState(false);
 
   // Represents the new, unsaved enablement value. For example, the value will
   // be "disabled" if the user disables the project but hasn't saved yet
   const [newEnablement, setNewEnablement] = useState<'disabled' | 'enabled'>();
 
   const [paths, setPaths] = useState([defaultPath]);
+
   //
   // For tracking loading states since urql does not offer that on mutations
   const [mutating, setMutating] = useState(false);
 
   useEffect(() => {
-    if (!project) {
-      const p = projects.find((p) => p.id === id);
-      setProject(p);
-      p?.servePath && setPaths(p.servePath.split(','));
+    if (!project && data.projects.length > 0) {
+      const p = data.projects.find((p) => p.id === id);
+
+      if (p) {
+        setProject(p);
+        p.servePath && setPaths(p.servePath.split(','));
+        setNotFound(false);
+      } else {
+        console.log('shit setting vercel project not found');
+        setNotFound(true);
+      }
     }
-  }, [id, project, projects]);
+  }, [id, project, data.projects]);
 
   const joinedPaths = paths.join(',');
   const submit = useCallback(async () => {
@@ -127,11 +136,33 @@ export default function VercelConfigure() {
   // when enabling a project (e.g. the protection bypass secret)
   const areExtraSettingsVisible = project?.isEnabled && newEnablement !== 'enabled';
 
+  if (fetching) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <LoadingIcon />
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <Alert severity="error">{fetchError.message}</Alert>
+      </div>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <Alert severity="error">Vercel project not found!</Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto mt-6 flex w-[800px] flex-col p-8">
-      {fetching ? null : !project ? (
-        <Alert severity="error">Vercel project not found!</Alert>
-      ) : (
+      {project && (
         <div className="flex flex-col">
           <div className="flex flex-row items-center justify-start">
             <NextLink href="/settings/integrations">
