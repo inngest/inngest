@@ -56,7 +56,6 @@ export default function VercelConfigure() {
         p.servePath && setPaths(p.servePath.split(','));
         setNotFound(false);
       } else {
-        console.log('shit setting vercel project not found');
         setNotFound(true);
       }
     }

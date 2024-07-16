@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
 
-import { getEnvs } from '@/components/Environments/data';
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
-import Navigation from '@/components/Navigation/Navigation';
+import Layout from '@/components/Layout/Layout';
 import { URQLProvider } from '@/queries/URQLProvider';
 import IncidentBanner from './IncidentBanner';
 
@@ -18,15 +17,7 @@ export default async function OrganizationActiveLayout({
   return (
     <URQLProvider>
       {true ? (
-        <div className="flex w-full flex-row justify-start">
-          <div className="bg-canvasBase border-subtle h-screen w-[224px] shrink-0 border-r">
-            <Navigation />
-          </div>
-          <div className="flex w-full flex-col">
-            <IncidentBanner />
-            {children}
-          </div>
-        </div>
+        <Layout>{children}</Layout>
       ) : (
         <>
           <IncidentBanner />
