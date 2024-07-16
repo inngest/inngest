@@ -72,9 +72,11 @@ type PickedFunctionRunV2EdgeWithNode = {
   node: PickedFunctionRunV2 & {
     app: {
       externalID: string;
+      name: string;
     };
     function: {
       name: string;
+      slug: string;
     };
   };
 };
