@@ -2,14 +2,13 @@ import { ClientFeatureFlagProvider } from '@/components/FeatureFlags/ClientFeatu
 import PageViewTracker from '@/components/PageViewTracker';
 import SentryUserIdentification from './SentryUserIdentification';
 import '@inngest/components/AppRoot/globals.css';
+import '@inngest/components/AppRoot/fonts.css';
 import React from 'react';
 import { type Metadata } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
 import { AppRoot } from '@inngest/components/AppRoot';
 import { TooltipProvider } from '@inngest/components/Tooltip';
 import colors from 'tailwindcss/colors';
-
-import '../fonts/fonts.css';
 
 export const metadata: Metadata = {
   title: 'Inngest Cloud',

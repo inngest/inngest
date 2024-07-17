@@ -1,5 +1,3 @@
-import Head from 'next/head';
-
 import { interTight, robotoMono } from './fonts';
 import './globals.css';
 
@@ -15,7 +13,7 @@ export function AppRoot({
   return (
     <html
       lang="en"
-      className={`${devServer ? interTight.variable : ''} ${devServer ? robotoMono : ''} ${
+      className={`${devServer ? interTight.variable : ''} ${devServer ? robotoMono.variable : ''} ${
         mode || ''
       } h-full`}
     >
