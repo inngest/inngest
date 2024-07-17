@@ -23,6 +23,7 @@ type EventEvaluable interface {
 func NewAggregator(
 	ctx context.Context,
 	size int64,
+	concurrency int64,
 	loader EvaluableLoader,
 	log *slog.Logger,
 ) Aggregator {
@@ -94,9 +95,10 @@ type aggregator struct {
 
 	records *ccache.Cache
 
-	loader    EvaluableLoader
-	parser    expr.TreeParser
-	evaluator expr.ExpressionEvaluator
+	concurrency int64
+	loader      EvaluableLoader
+	parser      expr.TreeParser
+	evaluator   expr.ExpressionEvaluator
 
 	mapLock *sync.Mutex
 	locks   map[string]*sync.Mutex
@@ -146,7 +148,7 @@ func (a *aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eve
 		bk = &bookkeeper{
 			wsID:  wsID,
 			event: eventName,
-			ae:    expr.NewAggregateEvaluator(a.parser, a.evaluator, a.loader.EvaluablesByID),
+			ae:    expr.NewAggregateEvaluator(a.parser, a.evaluator, a.loader.EvaluablesByID, a.concurrency),
 			// updatedAt is a zero time.
 		}
 
