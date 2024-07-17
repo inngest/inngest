@@ -421,7 +421,10 @@ func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]
 					newParent := newNode()
 
 					// For each item in the stack, recurse into that AST.
-					_, hasMacros, err = navigateAST(or, newParent, vars, rand)
+					_, macros, err := navigateAST(or, newParent, vars, rand)
+					if macros {
+						hasMacros = true
+					}
 					if err != nil {
 						return nil, hasMacros, err
 					}
