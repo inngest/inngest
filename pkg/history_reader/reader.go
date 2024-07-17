@@ -56,6 +56,11 @@ type Reader interface {
 		eventID ulid.ULID,
 		opts GetRunsByEventIDOpts,
 	) ([]Run, error)
+	GetSkippedRunsByEventID(
+		ctx context.Context,
+		eventID ulid.ULID,
+		opts GetRunsByEventIDOpts,
+	) ([]SkippedRun, error)
 	GetUsage(ctx context.Context, opts GetUsageOpts) ([]usage.UsageSlot, error)
 
 	// GetActiveRunIDs returns the IDs of runs that are queued or running (i.e.
@@ -244,6 +249,17 @@ type Run struct {
 	WorkspaceID     uuid.UUID
 	WorkflowVersion int
 	Cron            *string
+}
+
+type SkippedRun struct {
+	AccountID   uuid.UUID
+	BatchID     *ulid.ULID
+	EventID     ulid.ULID
+	ID          ulid.ULID
+	SkippedAt   time.Time
+	SkipReason  enums.SkipReason
+	WorkflowID  uuid.UUID
+	WorkspaceID uuid.UUID
 }
 
 func (r Run) ToCQRS() *cqrs.FunctionRun {

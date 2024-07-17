@@ -178,6 +178,17 @@ func (r *reader) GetRunsByEventID(
 	return runs, nil
 }
 
+func (r *reader) GetSkippedRunsByEventID(
+	_ context.Context,
+	_ ulid.ULID,
+	_ history_reader.GetRunsByEventIDOpts,
+) ([]history_reader.SkippedRun, error) {
+	r.store.Mu.RLock()
+	defer r.store.Mu.RUnlock()
+
+	return nil, errors.New("not implemented")
+}
+
 func (r *reader) GetUsage(
 	ctx context.Context,
 	opts history_reader.GetUsageOpts,
