@@ -19,12 +19,6 @@ export function AppRoot({
         mode || ''
       } h-full`}
     >
-      {!devServer && (
-        <Head>
-          <link rel="preconnect" href="https://fonts-cdn.inngest.com/" />
-          <link rel="stylesheet" href="https://fonts-cdn.inngest.com/fonts.css" />
-        </Head>
-      )}
       <body className="dark:bg-slate-940 h-full overflow-auto bg-white">
         <div id="app" />
         <div id="modals" />
