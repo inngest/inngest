@@ -5,12 +5,18 @@ import { cookies } from 'next/headers';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 
 import IncidentBanner from '@/app/(organization-active)/IncidentBanner';
+import type { Environment } from '@/utils/environments';
 import Navigation from '../Navigation/Navigation';
 import SideBar from './SideBar';
 
-type LayoutProps = { envSlug?: string; children: ReactNode };
+type LayoutProps = {
+  envSlug?: string;
+  envs?: Environment[];
+  activeEnv?: Environment;
+  children: ReactNode;
+};
 
-export default async function Layout({ envSlug, children }: LayoutProps) {
+export default async function Layout({ envSlug, envs, activeEnv, children }: LayoutProps) {
   const cookieStore = cookies();
   const collapsed = cookieStore.get('navCollapsed')?.value === 'true';
 
@@ -20,7 +26,7 @@ export default async function Layout({ envSlug, children }: LayoutProps) {
         collapsed={collapsed}
         children={
           <Suspense fallback={<Skeleton className="h-full w-[12rem]" />}>
-            <Navigation collapsed={collapsed} />
+            <Navigation collapsed={collapsed} envs={envs} activeEnv={activeEnv} />
           </Suspense>
         }
       />

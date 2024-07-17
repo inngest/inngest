@@ -14,31 +14,31 @@ type LogoProps = {
   setCollapsed: (arg: boolean) => void;
 };
 
-const NavToggle = ({ collapsed, setCollapsed }: LogoProps) =>
-  collapsed ? (
+const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
+  const toggle = () => {
+    setCollapsed(!collapsed);
+    toggleNav();
+  };
+
+  return collapsed ? (
     <RiContractRightLine
       className="bg-canvasBase text-subtle invisible h-5 w-5 cursor-pointer group-hover:visible"
-      onClick={() => {
-        setCollapsed(!collapsed);
-        toggleNav();
-      }}
+      onClick={toggle}
     />
   ) : (
     <RiContractLeftLine
       className="bg-canvasBase text-subtle invisible h-5 w-5 cursor-pointer group-hover:visible"
-      onClick={() => {
-        setCollapsed(!collapsed);
-        toggleNav();
-      }}
+      onClick={toggle}
     />
   );
+};
 
 export default function Logo({ collapsed, setCollapsed }: LogoProps) {
   return (
     <div className="group ml-5 mr-4 mt-5 flex h-10 flex-row items-center justify-between">
       <div className="flex flex-row items-center justify-start">
         {collapsed ? (
-          <div className="cursor-pointer group-hover:hidden">
+          <div className="cursor-pointer transition-all delay-150 duration-300 group-hover:hidden">
             <InngestLogoSmall />
           </div>
         ) : (
