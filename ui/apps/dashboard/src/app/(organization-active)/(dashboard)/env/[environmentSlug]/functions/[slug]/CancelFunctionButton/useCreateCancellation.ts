@@ -4,8 +4,8 @@ import { useCallback } from 'react';
 import { maybeDateToString } from '@inngest/components/utils/date';
 import { useMutation } from 'urql';
 
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
-import { useEnvironment } from '../../../environment-context';
 
 const query = graphql(`
   mutation CreateCancellation($input: CreateCancellationInput!) {
