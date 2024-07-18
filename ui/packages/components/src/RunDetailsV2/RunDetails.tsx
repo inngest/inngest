@@ -19,10 +19,7 @@ type Props = {
   getResult: (outputID: string) => Promise<Result>;
   getRun: (runID: string) => Promise<Run>;
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
-  pathCreator: {
-    app: (params: { externalAppID: string }) => Route;
-    runPopout: (params: { runID: string }) => Route;
-  };
+  pathCreator: React.ComponentProps<typeof RunInfo>['pathCreator'];
   pollInterval?: number;
   rerun: React.ComponentProps<typeof RunInfo>['rerun'];
   runID: string;
@@ -36,6 +33,7 @@ type Run = {
   fn: {
     id: string;
     name: string;
+    slug: string;
   };
   id: string;
   trace: React.ComponentProps<typeof Trace>['trace'];
