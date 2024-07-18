@@ -2,7 +2,7 @@ import { TooltipProvider } from '@inngest/components/Tooltip';
 import { withThemeByClassName } from '@storybook/addon-themes';
 import type { Preview, ReactRenderer } from '@storybook/react';
 
-import { interTight, robotoMono } from '../src/AppRoot/fonts';
+import { circular, circularMono } from '../src/AppRoot/fonts';
 import '../src/AppRoot/globals.css';
 
 const preview: Preview = {
@@ -10,7 +10,7 @@ const preview: Preview = {
     (Story) => {
       return (
         <TooltipProvider>
-          <div className={`${interTight.variable} ${robotoMono.variable} font-sans`}>
+          <div className={`${circular.variable} ${circularMono.variable} font-sans`}>
             <div id="app" />
             <div id="modals" />
             <Story />

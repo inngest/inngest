@@ -5,7 +5,7 @@ const preview: Preview = {
   decorators: [
     (Story) => {
       return (
-        <AppRoot>
+        <AppRoot devServer={true}>
           <Story />
         </AppRoot>
       );

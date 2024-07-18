@@ -5,18 +5,13 @@ import { Link } from '@inngest/components/Link/Link';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 
-import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { vercelIntegration } from '../data';
-import OldVercelIntegrationPage from './oldPage';
 import VercelProjects from './projects';
 
 export default async function VercelIntegrationPage() {
-  const newIntegrations = await getBooleanFlag('new-integrations');
   const integrations = await vercelIntegration();
 
-  return !newIntegrations ? (
-    <OldVercelIntegrationPage />
-  ) : (
+  return (
     <div className="mx-auto mt-6 flex w-[800px] flex-col p-8">
       <div className="flex flex-row items-center justify-start">
         <NextLink href="/settings/integrations">

@@ -1,0 +1,166 @@
+/*
+ * Legal Disclaimer for Web licence
+ *
+ * Licence to use self-hosted webfonts for displaying dynamic text on specified website domains. Our package includes WOFF and WOFF2 font formats.
+ *
+ * Should the license page views limit be exceeded the license holder will be required to contact Lineto.com for an upgrade.
+ *
+ * It is strictly prohibited to rename the font and to download or use these fonts in any other media.
+ *
+ * These Web fonts are licensed exclusively for the use on the following domain(s) and their subdomains:
+ *
+ * www.inngest.com (monthly pageviews: < 1M)
+ *
+ */
+
+/* Notes: Only complete fonts are used, subset fonts contain far fewer characters */
+
+/* Circular */
+
+/* Thin */
+@font-face {
+  font-family: 'CircularXX';
+  font-style: normal;
+  font-weight: 200;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Thin.woff2') format('woff2'),
+    url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Thin.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'CircularXX';
+  font-style: italic;
+  font-weight: 200;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-ThinItalic.woff2') format('woff2'),
+    url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-ThinItalic.woff') format('woff');
+}
+
+/* Light */
+@font-face {
+  font-family: 'CircularXX';
+  font-style: normal;
+  font-weight: 300;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Light.woff2') format('woff2'),
+    url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Light.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'CircularXX';
+  font-style: italic;
+  font-weight: 300;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-LightItalic.woff2') format('woff2'),
+    url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-LightItalic.woff') format('woff');
+}
+
+/* Regular */
+@font-face {
+  font-family: 'CircularXX';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Regular.woff2') format('woff2'),
+    url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Regular.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'CircularXX';
+  font-style: italic;
+  font-weight: 400;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Italic.woff2') format('woff2'),
+    url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Italic.woff') format('woff');
+}
+
+/* Book */
+@font-face {
+  font-family: 'CircularXX';
+  font-style: normal;
+  font-weight: 500;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Book.woff2') format('woff2'),
+    url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Book.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'CircularXX';
+  font-style: italic;
+  font-weight: 500;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-BookItalic.woff2') format('woff2'),
+    url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-BookItalic.woff') format('woff');
+}
+
+/* Medium */
+@font-face {
+  font-family: 'CircularXX';
+  font-style: normal;
+  font-weight: 600;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Medium.woff2') format('woff2'),
+    url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Medium.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'CircularXX';
+  font-style: italic;
+  font-weight: 600;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-MediumItalic.woff2')
+      format('woff2'),
+    url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-MediumItalic.woff') format('woff');
+}
+
+/* Bold */
+@font-face {
+  font-family: 'CircularXX';
+  font-style: normal;
+  font-weight: 700;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Bold.woff2') format('woff2'),
+    url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Bold.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'CircularXX';
+  font-style: italic;
+  font-weight: 700;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-BoldItalic.woff2') format('woff2'),
+    url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-BoldItalic.woff') format('woff');
+}
+
+/* Black */
+@font-face {
+  font-family: 'CircularXX';
+  font-style: normal;
+  font-weight: 800;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Black.woff2') format('woff2'),
+    url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-Black.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'CircularXX';
+  font-style: italic;
+  font-weight: 800;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-BlackItalic.woff2') format('woff2'),
+    url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-BlackItalic.woff') format('woff');
+}
+
+/* ExtraBlack */
+@font-face {
+  font-family: 'CircularXX';
+  font-style: normal;
+  font-weight: 900;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-ExtraBlack.woff2') format('woff2'),
+    url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-ExtraBlack.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'CircularXX';
+  font-style: italic;
+  font-weight: 900;
+  src: url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-ExtraBlackItalic.woff2')
+      format('woff2'),
+    url('https://fonts-cdn.inngest.com/Circular/CircularXXWeb-ExtraBlackItalic.woff') format('woff');
+}
+
+/* Circular Mono */
+@font-face {
+  font-family: 'CircularXXMono';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts-cdn.inngest.com/CircularMono/CircularXXMonoWeb-Regular.woff2')
+      format('woff2'),
+    url('https://fonts-cdn.inngest.com/CircularMono/CircularXXMonoWeb-Regular.woff') format('woff');
+}
