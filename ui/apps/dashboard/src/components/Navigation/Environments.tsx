@@ -22,7 +22,6 @@ import {
   getTestEnvironments,
   type Environment,
 } from '@/utils/environments';
-import isNonEmptyArray from '@/utils/isNonEmptyArray';
 
 // Some URLs cannot just swap between environments,
 // we need to redirect to a less specific resource URL that is shared across environments

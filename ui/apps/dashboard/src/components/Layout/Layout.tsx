@@ -16,20 +16,17 @@ type LayoutProps = {
   children: ReactNode;
 };
 
-export default async function Layout({ envSlug, envs, activeEnv, children }: LayoutProps) {
+export default async function Layout({ envs, activeEnv, children }: LayoutProps) {
   const cookieStore = cookies();
   const collapsed = cookieStore.get('navCollapsed')?.value === 'true';
 
   return (
     <div className="flex w-full flex-row justify-start">
-      <SideBar
-        collapsed={collapsed}
-        children={
-          <Suspense fallback={<Skeleton className="h-full w-[12rem]" />}>
-            <Navigation collapsed={collapsed} envs={envs} activeEnv={activeEnv} />
-          </Suspense>
-        }
-      />
+      <SideBar collapsed={collapsed}>
+        <Suspense fallback={<Skeleton className="h-full w-[12rem]" />}>
+          <Navigation collapsed={collapsed} envs={envs} activeEnv={activeEnv} />
+        </Suspense>
+      </SideBar>
       <div className="flex w-full flex-col">
         <IncidentBanner />
         {children}
