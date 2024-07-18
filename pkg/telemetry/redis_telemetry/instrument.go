@@ -67,6 +67,42 @@ type instrumentedClient struct {
 	rueidis.Client
 }
 
+func (i instrumentedClient) report(ctx context.Context, start, end time.Time, command string) {
+	dur := end.Sub(start)
+	tags := map[string]any{
+		"cluster": i.cluster,
+	}
+	if command != "" {
+		tags["command"] = command
+	}
+
+	scope := scopeFromContext(ctx)
+	if scope != "" {
+		tags["scope"] = string(scope)
+	}
+
+	scriptName := scriptNameFromContext(ctx)
+	if scriptName != "" {
+		tags["script_name"] = scriptName
+	}
+
+	opName := opNameFromContext(ctx)
+	if opName != "" {
+		tags["op"] = opName
+	}
+
+	telemetry.HistogramRedisCommandDuration(ctx, dur.Milliseconds(), telemetry.HistogramOpt{
+		PkgName: i.pkgName,
+		Tags:    tags,
+	})
+}
+
+func (i instrumentedClient) asyncReport(ctx context.Context, start time.Time, command string) {
+	end := time.Now()
+
+	go i.report(ctx, start, end, command)
+}
+
 func (i instrumentedClient) Do(ctx context.Context, cmd rueidis.Completed) (resp rueidis.RedisResult) {
 	start := time.Now()
 
@@ -75,40 +111,7 @@ func (i instrumentedClient) Do(ctx context.Context, cmd rueidis.Completed) (resp
 		command = cmd.Commands()[0]
 	}
 
-	// adds ~1µs
-	defer func() {
-		dur := time.Now().Sub(start)
-
-		// adds ~1.5µs
-		go func() {
-			tags := map[string]any{
-				"cluster": i.cluster,
-			}
-			if command != "" {
-				tags["command"] = command
-			}
-
-			scope := scopeFromContext(ctx)
-			if scope != "" {
-				tags["scope"] = string(scope)
-			}
-
-			scriptName := scriptNameFromContext(ctx)
-			if scriptName != "" {
-				tags["script_name"] = scriptName
-			}
-
-			opName := opNameFromContext(ctx)
-			if opName != "" {
-				tags["op"] = opName
-			}
-
-			telemetry.HistogramRedisCommandDuration(ctx, dur.Milliseconds(), telemetry.HistogramOpt{
-				PkgName: i.pkgName,
-				Tags:    tags,
-			})
-		}()
-	}()
+	defer i.asyncReport(ctx, start, command)
 
 	return i.Client.Do(ctx, cmd)
 }
