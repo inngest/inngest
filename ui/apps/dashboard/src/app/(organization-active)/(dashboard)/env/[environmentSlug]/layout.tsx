@@ -20,7 +20,7 @@ export default async function RootLayout({
   const { env, envs } = await getEnvs(environmentSlug);
   const newIANav = await getBooleanFlag('new-ia-nav');
 
-  return true ? (
+  return newIANav ? (
     <Layout envs={envs} activeEnv={env}>
       <ArchivedEnvBanner env={env} />
       <EnvironmentProvider env={env}>{children}</EnvironmentProvider>

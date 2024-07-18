@@ -8,7 +8,7 @@ export default async function EnvsPage() {
   const envs = await getAllEnvironments();
   const newIANav = await getBooleanFlag('new-ia-nav');
 
-  return true ? (
+  return newIANav ? (
     <Layout>
       <Environments envs={envs} />
     </Layout>

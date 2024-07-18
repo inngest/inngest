@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { URQLProvider } from '@/queries/URQLProvider';
 import IncidentBanner from './IncidentBanner';
 
@@ -10,9 +11,10 @@ type OrganizationActiveLayoutProps = {
 export default async function OrganizationActiveLayout({
   children,
 }: OrganizationActiveLayoutProps) {
+  const newIANav = await getBooleanFlag('new-ia-nav');
   return (
     <URQLProvider>
-      {true ? (
+      {newIANav ? (
         <>{children}</>
       ) : (
         <>

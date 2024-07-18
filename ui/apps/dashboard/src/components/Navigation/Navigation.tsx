@@ -1,5 +1,6 @@
 import type { Environment as EnvType } from '@/utils/environments';
 import Environments from './Environments';
+import KeysMenu from './KeysMenu';
 
 export type NavProps = {
   collapsed: boolean;
@@ -17,6 +18,7 @@ export default function Navigation({ collapsed, envs, activeEnv }: NavProps) {
       {envs && (
         <div className="item-center flex flex-row">
           <Environments envs={envs} activeEnv={activeEnv} collapsed={collapsed} />
+          {activeEnv && !collapsed && <KeysMenu activeEnv={activeEnv} />}
         </div>
       )}
     </div>

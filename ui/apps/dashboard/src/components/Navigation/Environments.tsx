@@ -5,7 +5,6 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigation';
 import { Listbox, Transition } from '@headlessui/react';
-import { Select } from '@inngest/components/Select/Select';
 import {
   RiCloudFill,
   RiCloudLine,
@@ -106,8 +105,8 @@ export default function Environments({ envs, activeEnv, collapsed }: Environment
         <div className="bg-canvasBase relative">
           <Listbox.Button
             className={`active:border-primary-intense focus:border-primary-intense border-muted bg-canvasBase text-primary-intense hover:bg-canvasSubtle ${
-              collapsed ? ` w-8 px-1` : 'w-[158px] px-2'
-            } h-8 overflow-hidden rounded border text-sm`}
+              collapsed ? ` w-8 px-1` : 'w-[146px] px-2'
+            } m-0 h-8 overflow-hidden rounded border text-sm`}
           >
             <div
               className={`flex flex-row items-center  ${
@@ -151,7 +150,7 @@ export default function Environments({ envs, activeEnv, collapsed }: Environment
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <Listbox.Options className="bg-canvasBase border-subtle z-10000 mt-1 w-[188px] divide-none rounded border shadow focus:outline-none">
+            <Listbox.Options className="bg-canvasBase border-subtle z-10000 absolute mt-1 w-[188px] divide-none rounded border shadow focus:outline-none">
               {productionEnvironment !== null && (
                 <EnvironmentItem environment={productionEnvironment} />
               )}
