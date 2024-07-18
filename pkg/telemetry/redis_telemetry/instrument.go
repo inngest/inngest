@@ -121,6 +121,6 @@ type InstrumentedClientOpts struct {
 	Cluster string
 }
 
-func wrapWithObservability(c rueidis.Client, opts InstrumentedClientOpts) rueidis.Client {
+func InstrumentRedisClient(c rueidis.Client, opts InstrumentedClientOpts) rueidis.Client {
 	return &instrumentedClient{opts.PkgName, opts.Cluster, c}
 }
