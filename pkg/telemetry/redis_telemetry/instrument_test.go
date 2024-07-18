@@ -52,6 +52,6 @@ func BenchmarkInstrumentedClient(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		// wrapping context adds ~1µs
-		_ = rc.Do(WithScriptName(WithScope(ctx, ScopePauses), "test/script"), rc.B().Set().Key("test").Value("test").Build())
+		_ = rc.Do(WithOpName(WithScriptName(WithScope(ctx, ScopePauses), "test/script"), "testop"), rc.B().Set().Key("test").Value("test").Build())
 	}
 }
