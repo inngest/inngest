@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { Time } from '@inngest/components/Time';
 
+import SkippedFunctionCard from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/events/[eventName]/logs/[eventId]/SkippedFunctionCard';
 import { graphql } from '@/gql';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getEnvironment } from '@/queries/server-only/getEnvironment';
@@ -18,6 +19,12 @@ const GetEventDocument = graphql(`
           function {
             id
           }
+        }
+        skippedFunctionRuns {
+          id
+          skipReason
+          workflowID
+          skippedAt
         }
       }
     }
@@ -70,6 +77,24 @@ export default async function EventPage({ params }: EventPageProps) {
           <div className="absolute top-5 h-full border-r border-slate-200" />
         </div>
         <div className="w-2/6 flex-shrink-0 space-y-4 overflow-y-auto p-5">
+          {event.skippedFunctionRuns.length > 0 && (
+            <>
+              <h3 className="font-medium text-slate-800">Skipped Functions</h3>
+              <ul className="space-y-3 pb-4">
+                {event.skippedFunctionRuns.map((skippedRun) => (
+                  <li key={'skipped:' + skippedRun.id}>
+                    <SkippedFunctionCard
+                      environmentSlug={params.environmentSlug}
+                      environmentID={environment.id}
+                      functionID={skippedRun.workflowID}
+                      skipReason={skippedRun.skipReason}
+                      skippedAt={new Date(skippedRun.skippedAt)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <h3 className="font-medium text-slate-800">Triggered Functions</h3>
           <ul className="space-y-3">
             {event.functionRuns.length === 0 ? (

@@ -133,7 +133,7 @@ export function EventLogsPage({
       })}
 
       {isLoadMoreVisible && (
-        <div className="flex justify-center">
+        <div className="mb-8 flex justify-center">
           <Button
             className="mt-4"
             btnAction={() => onLoadMore(lastEvent.id)}

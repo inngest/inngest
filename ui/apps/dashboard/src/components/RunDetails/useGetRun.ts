@@ -51,6 +51,7 @@ const query = graphql(`
           }
           id
           name
+          slug
         }
         trace {
           ...TraceDetails
