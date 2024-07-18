@@ -2,11 +2,10 @@ import { useCallback, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { NewButton } from '@inngest/components/Button';
 import { RangePicker } from '@inngest/components/DatePicker';
+import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
 import { subtractDuration } from '@inngest/components/utils/date';
 
-import Input from '@/components/Forms/Input';
-import { Label } from '@/components/Forms/Label';
 import { usePlanFeatures } from '../runs/usePlanFeatures';
 import { useCreateCancellation } from './useCreateCancellation';
 import { useRunCount, type RunCountInput } from './useRunCount';
@@ -87,27 +86,25 @@ export function CancelFunctionModal(props: Props) {
       <Modal.Body>
         <div className="flex flex-col gap-4">
           <div>
-            <Label name="cancellation-name" optional>
-              Name
-            </Label>
-
             <Input
+              label="Name"
               name="cancellation-name"
-              placeholder="My cancellation"
-              value={name}
               onChange={(e) => {
                 setName(e.target.value);
               }}
+              optional
+              placeholder="My cancellation"
+              value={name}
             />
           </div>
 
           <div>
-            <Label
-              description="Choose the time range when the function runs were queued"
-              name="time-range"
-            >
+            <label className="text-basis text-sm font-medium" htmlFor="time-range">
               Date range
-            </Label>
+            </label>
+            <p className="text-subtle text-sm">
+              Choose the time range when the function runs were queued
+            </p>
 
             <RangePicker
               className="w-full"
@@ -177,7 +174,7 @@ function FooterMessage({ count }: { count: number | undefined }) {
   }
 
   if (count === 1) {
-    return <span>Approximately 1 run will cancell</span>;
+    return <span>Approximately 1 run will cancel</span>;
   }
 
   return <span>Approximately {count} runs will cancel</span>;

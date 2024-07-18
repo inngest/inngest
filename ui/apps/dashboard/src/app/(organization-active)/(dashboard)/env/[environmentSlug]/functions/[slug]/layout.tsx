@@ -106,7 +106,6 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
                   btnAction={invokeAction}
                 />
                 <PauseFunctionButton functionSlug={functionSlug} disabled={isArchived} />
-                {/* <ArchiveFunctionButton functionSlug={functionSlug} /> */}
                 <CancelFunctionButton envID={env.id} functionSlug={functionSlug} />
               </div>
             </div>
