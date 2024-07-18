@@ -39,6 +39,7 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
   const { isArchived = false, isPaused } = fn ?? {};
 
   const isNewRunsEnabled = useBooleanFlag('new-runs');
+  const isBulkCancellationEnabled = useBooleanFlag('bulk-cancellation-ui');
 
   const emptyData = !data || fetching || !fn;
   const navLinks: HeaderLink[] = [
@@ -106,7 +107,9 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
                   btnAction={invokeAction}
                 />
                 <PauseFunctionButton functionSlug={functionSlug} disabled={isArchived} />
-                <CancelFunctionButton envID={env.id} functionSlug={functionSlug} />
+                {isBulkCancellationEnabled.value && (
+                  <CancelFunctionButton envID={env.id} functionSlug={functionSlug} />
+                )}
               </div>
             </div>
           )
