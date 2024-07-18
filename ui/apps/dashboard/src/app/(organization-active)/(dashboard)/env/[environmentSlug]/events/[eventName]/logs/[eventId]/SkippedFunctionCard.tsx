@@ -1,3 +1,4 @@
+import React from 'react';
 import Link from 'next/link';
 import { Time } from '@inngest/components/Time';
 import { IconFunction } from '@inngest/components/icons/Function';
@@ -9,15 +10,15 @@ import { graphql } from '@/gql';
 import { SkipReason } from '@/gql/graphql';
 import graphqlAPI from '@/queries/graphqlAPI';
 
-const skipReasonStatusIcons = {
+const skipReasonStatusIcons: Record<string, (args: { className?: string }) => React.ReactNode> = {
   [SkipReason.None]: IconStatusCancelled,
   [SkipReason.FunctionPaused]: IconStatusPaused,
-} as const satisfies Record<SkipReason, SVGComponent>;
+};
 
-const skipReasonDescriptions = {
+const skipReasonDescriptions: Record<string, string> = {
   [SkipReason.None]: 'Skipped',
   [SkipReason.FunctionPaused]: 'Function was paused',
-} as const satisfies Record<SkipReason, string>;
+};
 
 const GetFunctionNameSlugDocument = graphql(`
   query GetFunctionNameSlug($environmentID: ID!, $functionID: ID!) {
@@ -54,7 +55,14 @@ export default async function SkippedFunctionCard({
     return null;
   }
 
-  const StatusIcon = skipReasonStatusIcons[skipReason];
+  const StatusIcon = skipReasonStatusIcons[skipReason] ?? IconStatusCancelled;
+
+  if (skipReasonStatusIcons[skipReason] === undefined) {
+    console.error(`[SkippedFunctionCard] missing skip reason icon: ${skipReason}`);
+  }
+  if (skipReasonDescriptions[skipReason] === undefined) {
+    console.error(`[SkippedFunctionCard] missing skip reason description: ${skipReason}`);
+  }
 
   return (
     <Link

@@ -15,14 +15,14 @@ import { graphql } from '@/gql';
 import { FunctionRunStatus } from '@/gql/graphql';
 import graphqlAPI from '@/queries/graphqlAPI';
 
-const functionRunStatusIcons = {
+const functionRunStatusIcons: Record<string, (args: { className?: string }) => React.ReactNode> = {
   [FunctionRunStatus.Cancelled]: IconStatusCancelled,
   [FunctionRunStatus.Completed]: IconStatusCompleted,
   [FunctionRunStatus.Failed]: IconStatusFailed,
   [FunctionRunStatus.Running]: IconStatusRunning,
   [FunctionRunStatus.Queued]: IconStatusQueued,
   [FunctionRunStatus.Paused]: IconStatusPaused,
-} as const satisfies Record<FunctionRunStatus, SVGComponent>;
+};
 
 const GetFunctionRunCardDocument = graphql(`
   query GetFunctionRunCard($environmentID: ID!, $functionID: ID!, $functionRunID: ULID!) {
@@ -65,7 +65,12 @@ export default async function TriggeredFunctionCard({
     return null;
   }
 
-  const StatusIcon = functionRunStatusIcons[function_.run.status];
+  const StatusIcon = functionRunStatusIcons[function_.run.status] ?? IconStatusCancelled;
+  if (functionRunStatusIcons[function_.run.status] === undefined) {
+    console.error(
+      `[TriggeredFunctionCard] missing function run status icon: ${function_.run.status}`
+    );
+  }
 
   return (
     <Link
