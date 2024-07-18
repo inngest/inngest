@@ -2,10 +2,8 @@ import type { Route } from 'next';
 import { Link } from '@inngest/components/Link/Link';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 
-import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import VercelConnect from './connect';
 import createVercelIntegration from './createVercelIntegration';
-import VercelIntegrationCallbackPage from './oldPage';
 
 export type VercelCallbackProps = {
   searchParams: {
@@ -25,7 +23,6 @@ export type VercelCallbackProps = {
 };
 
 export default async function VercelCallbackPage({ searchParams }: VercelCallbackProps) {
-  const newIntegrations = await getBooleanFlag('new-integrations');
   if (!searchParams.code) {
     throw new Error('Missing Vercel authorization code');
   }
@@ -33,12 +30,7 @@ export default async function VercelCallbackPage({ searchParams }: VercelCallbac
     vercelAuthorizationCode: searchParams.code,
   });
 
-  return !newIntegrations ? (
-    <VercelIntegrationCallbackPage
-      searchParams={searchParams}
-      vercelIntegration={vercelIntegration}
-    />
-  ) : (
+  return (
     <div className="mx-auto mt-8 flex w-[800px] flex-col p-8">
       <div className="mb-7 flex h-12 w-12 items-center justify-center rounded bg-black">
         <IconVercel className="text-alwaysWhite h-6 w-6" />

@@ -1,12 +1,12 @@
 'use client';
 
 import { useCallback, useRef, type UIEventHandler } from 'react';
+import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
-import RunsTable, { type Run } from '@inngest/components/RunsPage/RunsTable';
-import { SelectGroup } from '@inngest/components/Select/Select';
-import { LoadingMore } from '@inngest/components/Table';
+import { SelectGroup, type Option } from '@inngest/components/Select/Select';
+import { LoadingMore, TableFilter } from '@inngest/components/Table';
 import {
   FunctionRunTimeField,
   isFunctionRunStatus,
@@ -14,15 +14,26 @@ import {
   type FunctionRunStatus,
 } from '@inngest/components/types/functionRun';
 import { RiLoopLeftLine } from '@remixicon/react';
+import { type VisibilityState } from '@tanstack/react-table';
+import { useLocalStorage } from 'react-use';
 
+import EntityFilter from '../Filter/EntityFilter';
 import { RunDetails } from '../RunDetailsV2';
 import {
   useSearchParam,
+  useStringArraySearchParam,
   useValidatedArraySearchParam,
   useValidatedSearchParam,
 } from '../hooks/useSearchParam';
 import type { Features } from '../types/features';
 import { TimeFilter } from './TimeFilter';
+import { useScopedColumns } from './columns';
+import type { Run, ViewScope } from './types';
+
+// Disable SSR in Runs Table, to prevent hydration errors. It requires windows info on visibility columns
+const RunsTable = dynamic(() => import('@inngest/components/RunsPage/RunsTable'), {
+  ssr: false,
+});
 
 type Props = {
   cancelRun: React.ComponentProps<typeof RunDetails>['cancelRun'];
@@ -38,7 +49,12 @@ type Props = {
   onScroll: UIEventHandler<HTMLDivElement>;
   onScrollToTop: () => void;
   pathCreator: React.ComponentProps<typeof RunDetails>['pathCreator'];
+  pollInterval?: number;
   rerun: React.ComponentProps<typeof RunDetails>['rerun'];
+  apps?: Option[];
+  functions?: Option[];
+  functionIsPaused?: boolean;
+  scope: ViewScope;
 };
 
 export function RunsPage({
@@ -55,11 +71,33 @@ export function RunsPage({
   onScroll,
   onScrollToTop,
   pathCreator,
+  apps,
+  functions,
+  pollInterval,
+  functionIsPaused,
+  scope,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const columns = useScopedColumns(scope);
+
+  const displayAllColumns: VisibilityState = Object.fromEntries(
+    columns.map((column) => [column.accessorKey, true])
+  );
+
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
+    'VisibleRunsColumns',
+    displayAllColumns
+  );
+
   const [filteredStatus = [], setFilteredStatus, removeFilteredStatus] =
     useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
+
+  const [filteredApp = [], setFilteredApp, removeFilteredApp] =
+    useStringArraySearchParam('filterApp');
+
+  const [filteredFunction = [], setFilteredFunction, removeFilteredFunction] =
+    useStringArraySearchParam('filterFunction');
 
   const [timeField = FunctionRunTimeField.QueuedAt, setTimeField] = useValidatedSearchParam(
     'timeField',
@@ -92,6 +130,30 @@ export function RunsPage({
     [removeFilteredStatus, scrollToTop, setFilteredStatus]
   );
 
+  const onAppFilterChange = useCallback(
+    (value: string[]) => {
+      scrollToTop();
+      if (value.length > 0) {
+        setFilteredApp(value);
+      } else {
+        removeFilteredApp();
+      }
+    },
+    [removeFilteredApp, scrollToTop, setFilteredApp]
+  );
+
+  const onFunctionFilterChange = useCallback(
+    (value: string[]) => {
+      scrollToTop();
+      if (value.length > 0) {
+        setFilteredFunction(value);
+      } else {
+        removeFilteredFunction();
+      }
+    },
+    [removeFilteredFunction, scrollToTop, setFilteredFunction]
+  );
+
   const onTimeFieldChange = useCallback(
     (value: FunctionRunTimeField) => {
       scrollToTop();
@@ -108,22 +170,31 @@ export function RunsPage({
     [scrollToTop, setLastDays]
   );
 
-  const renderSubComponent = useCallback(({ id }: { id: string }) => {
-    return (
-      <div className="border-subtle border-l-4 pb-6">
-        <RunDetails
-          cancelRun={cancelRun}
-          getResult={getTraceResult}
-          getRun={getRun}
-          getTrigger={getTrigger}
-          pathCreator={pathCreator}
-          rerun={rerun}
-          runID={id}
-          standalone={false}
-        />
-      </div>
-    );
-  }, []);
+  const renderSubComponent = useCallback(
+    ({ id }: { id: string }) => {
+      return (
+        <div className="border-subtle border-l-4 pb-6">
+          <RunDetails
+            cancelRun={cancelRun}
+            getResult={getTraceResult}
+            getRun={getRun}
+            getTrigger={getTrigger}
+            pathCreator={pathCreator}
+            pollInterval={pollInterval}
+            rerun={rerun}
+            runID={id}
+            standalone={false}
+          />
+        </div>
+      );
+    },
+    [cancelRun, getRun, getTraceResult, getTrigger, pathCreator, pollInterval, rerun]
+  );
+
+  const options: Option[] = columns.map((column) => ({
+    id: column.accessorKey,
+    name: column.header?.toString() || column.accessorKey,
+  }));
 
   return (
     <main
@@ -141,22 +212,51 @@ export function RunsPage({
               selectedDays={lastDays}
             />
           </SelectGroup>
-          <StatusFilter selectedStatuses={filteredStatus} onStatusesChange={onStatusFilterChange} />
+          <StatusFilter
+            selectedStatuses={filteredStatus}
+            onStatusesChange={onStatusFilterChange}
+            functionIsPaused={functionIsPaused}
+          />
+          {apps && (
+            <EntityFilter
+              type="app"
+              onFilterChange={onAppFilterChange}
+              selectedEntities={filteredApp}
+              entities={apps}
+            />
+          )}
+          {functions && (
+            <EntityFilter
+              type="function"
+              onFilterChange={onFunctionFilterChange}
+              selectedEntities={filteredFunction}
+              entities={functions}
+            />
+          )}
         </div>
-        {/* TODO: wire button */}
-        <Button
-          label="Refresh"
-          appearance="text"
-          btnAction={() => {}}
-          icon={<RiLoopLeftLine />}
-          disabled
-        />
+        <div className="flex items-center gap-2">
+          <TableFilter
+            columnVisibility={columnVisibility}
+            setColumnVisibility={setColumnVisibility}
+            options={options}
+          />
+          {/* TODO: wire button */}
+          <Button
+            label="Refresh"
+            appearance="text"
+            btnAction={() => {}}
+            icon={<RiLoopLeftLine />}
+            disabled
+          />
+        </div>
       </div>
       <RunsTable
         data={data}
         isLoading={isLoadingInitial}
         renderSubComponent={renderSubComponent}
         getRowCanExpand={() => true}
+        columnVisibility={columnVisibility}
+        scope={scope}
       />
       {isLoadingMore && <LoadingMore />}
       {!hasMore && !isLoadingInitial && !isLoadingMore && (

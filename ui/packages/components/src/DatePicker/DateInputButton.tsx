@@ -9,10 +9,10 @@ export const DateInputButton = forwardRef<HTMLButtonElement, DateInputButtonProp
       <button
         {...props}
         ref={forwardRef}
-        className={`border-muted h-8 rounded-lg border bg-white px-3.5 text-sm leading-none shadow outline-2 outline-indigo-500 transition-all focus:outline ${className}`}
+        className={`border-muted bg-canvasBase outline-primary-moderate h-8 rounded-lg border px-2 text-sm leading-none outline-2 transition-all focus:outline ${className}`}
       >
         <span className="flex items-center gap-2">
-          <RiCalendarLine className="h-6 w-6" />
+          <RiCalendarLine className="text-disabled h-5 w-5" />
           {children}
         </span>
       </button>

@@ -32,7 +32,7 @@ require (
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/terraform v0.15.3
-	github.com/inngest/expr v0.0.0-20240521153320-6f549d6745fd
+	github.com/inngest/expr v0.0.0-20240717023917-90b4cdea6778
 	github.com/inngest/inngestgo v0.7.3-0.20240607055345-4b87df508283
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5

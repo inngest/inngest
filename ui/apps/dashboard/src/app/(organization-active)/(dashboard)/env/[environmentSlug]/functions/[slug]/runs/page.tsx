@@ -2,19 +2,20 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
-import { type Run } from '@inngest/components/RunsPage/RunsTable';
+import type { Run } from '@inngest/components/RunsPage/types';
 import {
   useSearchParam,
   useStringArraySearchParam,
 } from '@inngest/components/hooks/useSearchParam';
 import { getTimestampDaysAgo } from '@inngest/components/utils/date';
+import { useQuery } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { useGetRun } from '@/components/RunDetails/useGetRun';
 import { useGetTraceResult } from '@/components/RunDetails/useGetTraceResult';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
 import { graphql } from '@/gql';
-import { RunsOrderByField } from '@/gql/graphql';
+import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
 import { pathCreator } from '@/utils/urls';
@@ -39,6 +40,14 @@ const GetRunsDocument = graphql(`
       ) {
         edges {
           node {
+            app {
+              externalID
+              name
+            }
+            function {
+              name
+              slug
+            }
             id
             queuedAt
             endedAt
@@ -65,6 +74,15 @@ export default function Page({
   };
 }) {
   const functionSlug = decodeURIComponent(params.slug);
+  const env = useEnvironment();
+
+  const [{ data: pauseData }] = useQuery({
+    query: GetFunctionPauseStateDocument,
+    variables: {
+      environmentID: env.id,
+      functionSlug: functionSlug,
+    },
+  });
 
   const [rawFilteredStatus] = useStringArraySearchParam('filterStatus');
   const [rawTimeField = RunsOrderByField.QueuedAt] = useSearchParam('timeField');
@@ -82,7 +100,6 @@ export default function Page({
   const [runs, setRuns] = useState<Run[]>([]);
   const [isScrollRequest, setIsScrollRequest] = useState(false);
 
-  const env = useEnvironment();
   const cancelRun = useCancelRun({ envID: env.id });
   const rerun = useRerun({ envID: env.id, envSlug: env.slug });
   const getTraceResult = useGetTraceResult();
@@ -96,6 +113,8 @@ export default function Page({
       // generate URLs without knowing about environments
       app: (params: { externalAppID: string }) =>
         pathCreator.app({ envSlug: env.slug, externalAppID: params.externalAppID }),
+      function: (params: { functionSlug: string }) =>
+        pathCreator.function({ envSlug: env.slug, functionSlug: params.functionSlug }),
       runPopout: (params: { runID: string }) =>
         pathCreator.runPopout({ envSlug: env.slug, runID: params.runID }),
     };
@@ -216,6 +235,8 @@ export default function Page({
       getTrigger={getTrigger}
       pathCreator={internalPathCreator}
       rerun={rerun}
+      functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
+      scope="fn"
     />
   );
 }

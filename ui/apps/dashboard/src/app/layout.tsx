@@ -9,6 +9,8 @@ import { AppRoot } from '@inngest/components/AppRoot';
 import { TooltipProvider } from '@inngest/components/Tooltip';
 import colors from 'tailwindcss/colors';
 
+import '../fonts/fonts.css';
+
 export const metadata: Metadata = {
   title: 'Inngest Cloud',
   description: 'The Inngest Cloud dashboard',

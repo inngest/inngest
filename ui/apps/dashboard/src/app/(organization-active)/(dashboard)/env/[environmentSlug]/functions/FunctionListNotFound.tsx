@@ -7,7 +7,7 @@ import { RiClipboardLine, RiErrorWarningLine } from '@remixicon/react';
 import { useCopyToClipboard } from 'react-use';
 import { toast } from 'sonner';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import DevServerImage from '@/images/devserver.png';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
 

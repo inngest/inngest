@@ -417,7 +417,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 	}
 
 	// Attempt to claim the lease immediately.
-	leaseID, err := q.ConfigLease(ctx, q.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
+	leaseID, err := q.ConfigLease(ctx, q.u.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -434,7 +434,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 			tick.Stop()
 			return
 		case <-tick.C:
-			leaseID, err := q.ConfigLease(ctx, q.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
+			leaseID, err := q.ConfigLease(ctx, q.u.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
 			if err == ErrConfigAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
@@ -465,7 +465,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 
 func (q *queue) runScavenger(ctx context.Context) {
 	// Attempt to claim the lease immediately.
-	leaseID, err := q.ConfigLease(ctx, q.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
+	leaseID, err := q.ConfigLease(ctx, q.u.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -497,7 +497,7 @@ func (q *queue) runScavenger(ctx context.Context) {
 			}
 		case <-tick.C:
 			// Attempt to re-lease the lock.
-			leaseID, err := q.ConfigLease(ctx, q.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
+			leaseID, err := q.ConfigLease(ctx, q.u.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
 			if err == ErrConfigAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
@@ -569,7 +569,7 @@ func (q *queue) scan(ctx context.Context) error {
 	)
 
 	// By default, use the global partition
-	partitionKey := q.kg.GlobalPartitionIndex()
+	partitionKey := q.u.kg.GlobalPartitionIndex()
 
 	peekUntil := getNow().Add(PartitionLookahead)
 
@@ -583,7 +583,7 @@ func (q *queue) scan(ctx context.Context) error {
 
 		if len(peekedAccounts) > 0 {
 			peekedAccount := peekedAccounts[0]
-			partitionKey = q.kg.AccountPartitionIndex(peekedAccount)
+			partitionKey = q.u.kg.AccountPartitionIndex(peekedAccount)
 		}
 	}
 
@@ -596,7 +596,7 @@ func (q *queue) scan(ctx context.Context) error {
 		i := rand.Intn(len(existingLeases))
 		shard = &existingLeases[i].Shard
 		// Use the shard partition
-		partitionKey = q.kg.ShardPartitionIndex(shard.Name)
+		partitionKey = q.u.kg.ShardPartitionIndex(shard.Name)
 		metricShardName = "<shard>:" + shard.Name
 	}
 
@@ -1250,7 +1250,7 @@ func (q *queue) peekSize(ctx context.Context, p *QueuePartition) int64 {
 	}
 
 	dur := time.Hour * 24
-	qsize, _ := q.partitionSize(ctx, q.kg.FnQueueSet(p.Queue()), time.Now().Add(dur))
+	qsize, _ := q.partitionSize(ctx, q.u.kg.FnQueueSet(p.Queue()), time.Now().Add(dur))
 	if qsize > size {
 		size = qsize
 	}

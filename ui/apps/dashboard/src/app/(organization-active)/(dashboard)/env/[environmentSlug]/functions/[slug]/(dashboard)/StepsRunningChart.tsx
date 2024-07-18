@@ -3,9 +3,9 @@
 import colors from 'tailwindcss/colors';
 import { useQuery } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import type { TimeRange } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import SimpleLineChart from '@/components/Charts/SimpleLineChart';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 
 const GetStepsRunningDocument = graphql(`

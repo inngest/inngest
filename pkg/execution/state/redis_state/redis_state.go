@@ -30,8 +30,9 @@ var embedded embed.FS
 
 var (
 	// scripts stores all embedded lua scripts on initialization
-	scripts = map[string]*rueidis.Lua{}
-	include = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
+	scripts          = map[string]*rueidis.Lua{}
+	retriableScripts = map[string]*RetriableLua{}
+	include          = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
 
 	// A number to version backend logic in order to prevent non-backward compatible
 	// changes to break
@@ -86,6 +87,7 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 			}
 		}
 		scripts[name] = rueidis.NewLuaScript(val)
+		retriableScripts[name] = NewClusterLuaScript(val)
 	}
 }
 
@@ -120,16 +122,32 @@ type Config struct {
 
 func (c Config) StateName() string { return "redis" }
 
-func (c Config) Manager(ctx context.Context) (state.Manager, error) {
+// SingleClusterManager returns a state manager connecting to just one Redis instance. Do not use this when separate instances
+// should be used for sharded/unsharded data
+func (c Config) SingleClusterManager(ctx context.Context) (state.Manager, error) {
 	opts, err := c.ConnectOpts()
 	if err != nil {
 		return nil, err
 	}
 
+	r, err := rueidis.NewClient(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	u := NewUnshardedClient(r, StateDefaultKey, QueueDefaultKey)
+
 	return New(
 		ctx,
-		WithConnectOpts(opts),
-		WithKeyGenerator(DefaultKeyFunc{Prefix: c.KeyPrefix}),
+		WithUnshardedClient(u),
+		WithShardedClient(NewShardedClient(ShardedClientOpts{
+			UnshardedClient:        u,
+			FunctionRunStateClient: r,
+			BatchClient:            r,
+			StateDefaultKey:        StateDefaultKey,
+			QueueDefaultKey:        QueueDefaultKey,
+			FnRunIsSharded:         AlwaysShardOnRun,
+		})),
 	)
 }
 
@@ -152,85 +170,82 @@ type Opt func(r *mgr)
 // By default, this connects to a local Redis server.  Use WithConnectOpts to
 // change how we connect to Redis.
 func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
-	m := &mgr{
-		kf: DefaultKeyFunc{},
-	}
+	m := &mgr{}
 
 	for _, opt := range opts {
 		opt(m)
 	}
 
-	if m.r == nil {
-		var err error
-		m.r, err = rueidis.NewClient(rueidis.ClientOption{
-			InitAddress: []string{"localhost:6379"},
-			Password:    "",
-		})
-		return m, err
+	m.shardedMgr = shardedMgr{
+		s: m.unsafeShardedClientDoNotUse,
 	}
 
-	if m.pauseR == nil {
-		// Use the standard redis client for pauses
-		m.pauseR = m.r
+	m.unshardedMgr = unshardedMgr{
+		u: m.unsafeUnshardedClientDoNotUse,
 	}
 
 	return m, nil
 }
 
-// WithConnectOpts allows you to customize the options used to connect to Redis.
-//
-// This panics if the client cannot connect.
-func WithConnectOpts(o rueidis.ClientOption) Opt {
+// WithShardedClient uses an already connected redis client.
+func WithShardedClient(s *ShardedClient) Opt {
 	return func(m *mgr) {
-		var err error
-		m.r, err = rueidis.NewClient(o)
-		if err != nil {
-			panic(fmt.Errorf("unable to connect to redis with client opts: %w", err))
-		}
+		m.unsafeShardedClientDoNotUse = s
 	}
 }
 
-// WithKeyPrefix uses a specific key prefix
-func WithKeyPrefix(prefix string) Opt {
+// WithUnshardedClient uses an already connected redis client.
+func WithUnshardedClient(u *UnshardedClient) Opt {
 	return func(m *mgr) {
-		m.kf = DefaultKeyFunc{
-			Prefix: prefix,
-		}
-	}
-}
-
-// WithRedisClient uses an already connected redis client.
-func WithRedisClient(r rueidis.Client) Opt {
-	return func(m *mgr) {
-		m.r = r
-	}
-}
-
-// WithPauseRedisClient uses an already connected redis client for managing pauses.
-func WithPauseRedisClient(r rueidis.Client) Opt {
-	return func(m *mgr) {
-		m.pauseR = r
-	}
-}
-
-// WithKeyGenerator specifies the function to use when creating keys for
-// each stored data type.
-func WithKeyGenerator(kf KeyGenerator) Opt {
-	return func(m *mgr) {
-		m.kf = kf
+		m.unsafeUnshardedClientDoNotUse = u
 	}
 }
 
 type mgr struct {
-	kf KeyGenerator
+	// unsafe: Operate on sharded manager instead.
+	unsafeShardedClientDoNotUse *ShardedClient
 
-	// this is the standard redis client for the state store.
-	r rueidis.Client
-	// this is the redis client for managing pauses.
-	pauseR rueidis.Client
+	// unsafe: Operate on unsharded manager instead.
+	unsafeUnshardedClientDoNotUse *UnshardedClient
+
+	shardedMgr
+	unshardedMgr
 }
 
-func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
+type shardedMgr struct {
+	s *ShardedClient
+}
+
+type unshardedMgr struct {
+	u *UnshardedClient
+}
+
+type CompositePauseID struct {
+	PauseID uuid.UUID
+	RunID   *ulid.ULID
+}
+
+func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, error) {
+	fnRunState := m.s.FunctionRunState()
+	client, isSharded := fnRunState.Client(ctx, input.Identifier.AccountID, input.Identifier.RunID)
+
+	// Firstly, check idempotency here.
+	//
+	// NOTE: We have to do this out of the new transaction as state is sharded by run ID.  this
+	// does NOT work for idempotency keys which must be sharded by account ID.  unfortunately,
+	// mixing the two leads to cross-slot queries, which fail hard.  in this case, we reduce
+	// atomicity to improve idempotency.
+	//
+	// In future/other metadata stores this is (or will be) transactional.
+	res := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		return c.B().Setnx().Key(
+			fnRunState.kg.Idempotency(ctx, isSharded, input.Identifier),
+		).Value("").Build()
+	})
+	if set, err := res.AsInt64(); err == nil && set == 0 {
+		return nil, state.ErrIdentifierExists
+	}
+
 	// We marshal this ahead of creating a redis transaction as it's necessary
 	// every time and reduces the duration that the lock is held.
 	events, err := json.Marshal(input.EventBatchData)
@@ -277,14 +292,13 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		return nil, err
 	}
 
-	status, err := scripts["new"].Exec(
+	status, err := retriableScripts["new"].Exec(
 		ctx,
-		m.r,
+		client,
 		[]string{
-			m.kf.Idempotency(ctx, input.Identifier),
-			m.kf.Events(ctx, input.Identifier),
-			m.kf.RunMetadata(ctx, input.Identifier.RunID),
-			m.kf.Actions(ctx, input.Identifier),
+			fnRunState.kg.Events(ctx, isSharded, input.Identifier),
+			fnRunState.kg.RunMetadata(ctx, isSharded, input.Identifier.RunID),
+			fnRunState.kg.Actions(ctx, isSharded, input.Identifier),
 		},
 		args,
 	).AsInt64()
@@ -307,7 +321,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		nil
 }
 
-func (m mgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.MetadataUpdate) error {
+func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, md state.MetadataUpdate) error {
 	input := []string{
 		"0", // Force planning / disable immediate execution
 		strconv.Itoa(consts.RequestVersionUnknown), // Request version
@@ -322,11 +336,15 @@ func (m mgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.Metad
 	if !md.StartedAt.IsZero() {
 		input[2] = strconv.FormatInt(md.StartedAt.UnixMilli(), 10)
 	}
-	status, err := scripts["updateMetadata"].Exec(
+
+	fnRunState := m.s.FunctionRunState()
+	client, isSharded := fnRunState.Client(ctx, accountID, runID)
+
+	status, err := retriableScripts["updateMetadata"].Exec(
 		ctx,
-		m.r,
+		client,
 		[]string{
-			m.kf.RunMetadata(ctx, runID),
+			fnRunState.kg.RunMetadata(ctx, isSharded, runID),
 		},
 		input,
 	).AsInt64()
@@ -339,34 +357,47 @@ func (m mgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.Metad
 	return nil
 }
 
-func (m mgr) IsComplete(ctx context.Context, runID ulid.ULID) (bool, error) {
-	cmd := m.r.B().Hget().Key(m.kf.RunMetadata(ctx, runID)).Field("status").Build()
-	val, err := m.r.Do(ctx, cmd).AsBytes()
+func (m shardedMgr) IsComplete(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (bool, error) {
+	fnRunState := m.s.FunctionRunState()
+
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	val, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hget().Key(fnRunState.kg.RunMetadata(ctx, isSharded, runID)).Field("status").Build()
+	}).AsBytes()
 	if err != nil {
 		return false, err
 	}
 	return !bytes.Equal(val, []byte("0")), nil
 }
 
-func (m mgr) Exists(ctx context.Context, runID ulid.ULID) (bool, error) {
-	cmd := m.r.B().Exists().Key(m.kf.RunMetadata(ctx, runID)).Build()
-	return m.r.Do(ctx, cmd).AsBool()
+func (m shardedMgr) Exists(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (bool, error) {
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+	return r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Exists().Key(fnRunState.kg.RunMetadata(ctx, isSharded, runID)).Build()
+	}).AsBool()
 }
 
-func (m mgr) metadata(ctx context.Context, runID ulid.ULID) (*runMetadata, error) {
-	cmd := m.r.B().Hgetall().Key(m.kf.RunMetadata(ctx, runID)).Build()
-	val, err := m.r.Do(ctx, cmd).AsStrMap()
+func (m shardedMgr) metadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (*runMetadata, error) {
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+	val, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hgetall().Key(fnRunState.kg.RunMetadata(ctx, isSharded, runID)).Build()
+	}).AsStrMap()
 	if err != nil {
 		return nil, err
 	}
 	return newRunMetadata(val)
 }
 
-func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
-	status, err := scripts["cancel"].Exec(
+func (m shardedMgr) Cancel(ctx context.Context, id state.Identifier) error {
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, id.AccountID, id.RunID)
+	status, err := retriableScripts["cancel"].Exec(
 		ctx,
-		m.r,
-		[]string{m.kf.RunMetadata(ctx, id.RunID)},
+		r,
+		[]string{fnRunState.kg.RunMetadata(ctx, isSharded, id.RunID)},
 		[]string{},
 	).AsInt64()
 	if err != nil && !rueidis.IsRedisNil(err) {
@@ -385,7 +416,9 @@ func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 	return fmt.Errorf("unknown return value cancelling function: %d", status)
 }
 
-func (m mgr) SetStatus(ctx context.Context, id state.Identifier, status enums.RunStatus) error {
+func (m shardedMgr) SetStatus(ctx context.Context, id state.Identifier, status enums.RunStatus) error {
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, id.AccountID, id.RunID)
 	args, err := StrSlice([]any{
 		int(status),
 	})
@@ -393,10 +426,10 @@ func (m mgr) SetStatus(ctx context.Context, id state.Identifier, status enums.Ru
 		return err
 	}
 
-	_, err = scripts["setStatus"].Exec(
+	_, err = retriableScripts["setStatus"].Exec(
 		ctx,
-		m.r,
-		[]string{m.kf.RunMetadata(ctx, id.RunID)},
+		r,
+		[]string{fnRunState.kg.RunMetadata(ctx, isSharded, id.RunID)},
 		args,
 	).AsInt64()
 	if err != nil {
@@ -405,8 +438,8 @@ func (m mgr) SetStatus(ctx context.Context, id state.Identifier, status enums.Ru
 	return nil
 }
 
-func (m mgr) Metadata(ctx context.Context, runID ulid.ULID) (*state.Metadata, error) {
-	metadata, err := m.metadata(ctx, runID)
+func (m shardedMgr) Metadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (*state.Metadata, error) {
+	metadata, err := m.metadata(ctx, accountId, runID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load metadata: %w", err)
 	}
@@ -414,17 +447,23 @@ func (m mgr) Metadata(ctx context.Context, runID ulid.ULID) (*state.Metadata, er
 	return &meta, nil
 }
 
-func (m mgr) LoadEvents(ctx context.Context, fnID uuid.UUID, runID ulid.ULID) ([]json.RawMessage, error) {
+func (m shardedMgr) LoadEvents(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) ([]json.RawMessage, error) {
+	fnRunState := m.s.FunctionRunState()
+
 	var (
 		events []json.RawMessage
 		v1id   = state.Identifier{
 			RunID:      runID,
 			WorkflowID: fnID,
+			AccountID:  accountId,
 		}
 	)
 
-	cmd := m.r.B().Get().Key(m.kf.Events(ctx, v1id)).Build()
-	byt, err := m.r.Do(ctx, cmd).AsBytes()
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, v1id)).Build()
+	}).AsBytes()
 	if err == nil {
 		if err := json.Unmarshal(byt, &events); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
@@ -433,8 +472,9 @@ func (m mgr) LoadEvents(ctx context.Context, fnID uuid.UUID, runID ulid.ULID) ([
 	}
 
 	// Pre-batch days for backcompat.
-	cmd = m.r.B().Get().Key(m.kf.Event(ctx, v1id)).Build()
-	byt, err = m.r.Do(ctx, cmd).AsBytes()
+	byt, err = r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Get().Key(fnRunState.kg.Event(ctx, isSharded, v1id)).Build()
+	}).AsBytes()
 	if err != nil {
 		if err == rueidis.Nil {
 			return nil, state.ErrEventNotFound
@@ -444,18 +484,24 @@ func (m mgr) LoadEvents(ctx context.Context, fnID uuid.UUID, runID ulid.ULID) ([
 	return []json.RawMessage{byt}, nil
 }
 
-func (m mgr) LoadSteps(ctx context.Context, fnID uuid.UUID, runID ulid.ULID) (map[string]json.RawMessage, error) {
+func (m shardedMgr) LoadSteps(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (map[string]json.RawMessage, error) {
+	fnRunState := m.s.FunctionRunState()
+
 	var (
 		steps = map[string]json.RawMessage{}
 		v1id  = state.Identifier{
 			RunID:      runID,
 			WorkflowID: fnID,
+			AccountID:  accountId,
 		}
 	)
 
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
 	// Load the actions.  This is a map of step IDs to JSON-encoded results.
-	cmd := m.r.B().Hgetall().Key(m.kf.Actions(ctx, v1id)).Build()
-	rmap, err := m.r.Do(ctx, cmd).AsStrMap()
+	rmap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hgetall().Key(fnRunState.kg.Actions(ctx, isSharded, v1id)).Build()
+	}).AsStrMap()
 	if err != nil {
 		return nil, fmt.Errorf("failed loading actions; %w", err)
 	}
@@ -465,21 +511,26 @@ func (m mgr) LoadSteps(ctx context.Context, fnID uuid.UUID, runID ulid.ULID) (ma
 	return steps, nil
 }
 
-func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
+func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (state.State, error) {
+	fnRunState := m.s.FunctionRunState()
+
 	// XXX: Use a pipeliner to improve speed.
-	metadata, err := m.metadata(ctx, runID)
+	metadata, err := m.metadata(ctx, accountId, runID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load metadata; %w", err)
 	}
 
 	id := metadata.Identifier
 
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
 	// Load events.
 	events := []map[string]any{}
 	switch metadata.Version {
 	case 0: // pre-batch days
-		cmd := m.r.B().Get().Key(m.kf.Event(ctx, id)).Build()
-		byt, err := m.r.Do(ctx, cmd).AsBytes()
+		byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+			return client.B().Get().Key(fnRunState.kg.Event(ctx, isSharded, id)).Build()
+		}).AsBytes()
 		if err != nil {
 			if err == rueidis.Nil {
 				return nil, state.ErrEventNotFound
@@ -493,8 +544,9 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 		events = []map[string]any{event}
 	default: // current default is 1
 		// Load the batch of events
-		cmd := m.r.B().Get().Key(m.kf.Events(ctx, id)).Build()
-		byt, err := m.r.Do(ctx, cmd).AsBytes()
+		byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+			return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, id)).Build()
+		}).AsBytes()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get batch; %w", err)
 		}
@@ -504,8 +556,9 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 	}
 
 	// Load the actions.  This is a map of step IDs to JSON-encoded results.
-	cmd := m.r.B().Hgetall().Key(m.kf.Actions(ctx, id)).Build()
-	rmap, err := m.r.Do(ctx, cmd).AsStrMap()
+	rmap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hgetall().Key(fnRunState.kg.Actions(ctx, isSharded, id)).Build()
+	}).AsStrMap()
 	if err != nil {
 		return nil, fmt.Errorf("failed loading actions; %w", err)
 	}
@@ -521,7 +574,7 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 
 	meta := metadata.Metadata()
 
-	stack, err := m.stack(ctx, id.RunID)
+	stack, err := m.stack(ctx, id.AccountID, id.RunID)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching stack: %w", err)
 	}
@@ -529,18 +582,26 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 	return state.NewStateInstance(id, meta, events, actions, stack), nil
 }
 
-func (m mgr) stack(ctx context.Context, runID ulid.ULID) ([]string, error) {
-	cmd := m.r.B().Lrange().Key(m.kf.Stack(ctx, runID)).Start(0).Stop(-1).Build()
-	stack, err := m.r.Do(ctx, cmd).AsStrSlice()
+func (m shardedMgr) stack(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) ([]string, error) {
+	fnRunState := m.s.FunctionRunState()
+
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+	stack, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Lrange().Key(fnRunState.kg.Stack(ctx, isSharded, runID)).Start(0).Stop(-1).Build()
+	}).AsStrSlice()
 	if err != nil {
 		return nil, fmt.Errorf("error fetching stack: %w", err)
 	}
 	return stack, nil
 }
 
-func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error) {
-	cmd := m.r.B().Lrange().Key(m.kf.Stack(ctx, runID)).Start(0).Stop(-1).Build()
-	stack, err := m.r.Do(ctx, cmd).AsStrSlice()
+func (m shardedMgr) StackIndex(ctx context.Context, accountId uuid.UUID, runID ulid.ULID, stepID string) (int, error) {
+	fnRunState := m.s.FunctionRunState()
+
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+	stack, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Lrange().Key(fnRunState.kg.Stack(ctx, isSharded, runID)).Start(0).Stop(-1).Build()
+	}).AsStrSlice()
 	if err != nil {
 		return 0, err
 	}
@@ -556,17 +617,21 @@ func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (in
 	return 0, fmt.Errorf("step not found in stack: %s", stepID)
 }
 
-func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) error {
+func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) error {
+	fnRunState := m.s.FunctionRunState()
+
+	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
+
 	keys := []string{
-		m.kf.Actions(ctx, i),
-		m.kf.RunMetadata(ctx, i.RunID),
-		m.kf.Stack(ctx, i.RunID),
+		fnRunState.kg.Actions(ctx, isSharded, i),
+		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
+		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
 	}
 	args := []string{stepID, marshalledOuptut}
 
-	index, err := scripts["saveResponse"].Exec(
+	index, err := retriableScripts["saveResponse"].Exec(
 		ctx,
-		m.r,
+		r,
 		keys,
 		args,
 	).AsInt64()
@@ -580,7 +645,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marsh
 	return nil
 }
 
-func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
+func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
 	packed, err := json.Marshal(p)
 	if err != nil {
 		return err
@@ -595,29 +660,26 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		evt = *p.Event
 	}
 
-	keys := []string{
-		m.kf.PauseID(ctx, p.ID),
-		m.kf.PauseEvent(ctx, p.WorkspaceID, evt),
-		m.kf.Invoke(ctx, p.WorkspaceID),
-		m.kf.PauseIndex(ctx, "add", p.WorkspaceID, evt),
-		m.kf.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
-		m.kf.RunPauses(ctx, p.Identifier.RunID),
-	}
-
-	// Add 1 second because int will truncate the float. Otherwise, timeouts
-	// will be 1 second less than configured.
-	ttl := int(time.Until(p.Expires.Time()).Seconds()) + 1
-
-	// Ensure the TTL is at least 1 second. This probably will always be true
-	// since we're adding 1 second above. But you never know if some code
-	// between expiry creation and here will take longer than expected.
-	if ttl < 1 {
-		ttl = 1
-	}
-
 	corrId := ""
 	if p.InvokeCorrelationID != nil {
 		corrId = *p.InvokeCorrelationID
+	}
+
+	extendedExpiry := time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()
+	nowUnixSeconds := time.Now().Unix()
+
+	pause := m.u.Pauses()
+
+	// Warning: We need to access global keys, which must be colocated on the same Redis cluster
+	global := m.u.Global()
+
+	keys := []string{
+		pause.kg.Pause(ctx, p.ID),
+		pause.kg.PauseEvent(ctx, p.WorkspaceID, evt),
+		global.kg.Invoke(ctx, p.WorkspaceID),
+		pause.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
+		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
+		pause.kg.RunPauses(ctx, p.Identifier.RunID),
 	}
 
 	args, err := StrSlice([]any{
@@ -625,11 +687,10 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		p.ID.String(),
 		evt,
 		corrId,
-		ttl,
 		// Add at least 10 minutes to this pause, allowing us to process the
 		// pause by ID for 10 minutes past expiry.
-		int(time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()),
-		time.Now().Unix(),
+		int(extendedExpiry),
+		nowUnixSeconds,
 	})
 	if err != nil {
 		return err
@@ -637,13 +698,14 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 
 	status, err := scripts["savePause"].Exec(
 		ctx,
-		m.pauseR,
+		pause.Client(),
 		keys,
 		args,
 	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error finalizing: %w", err)
 	}
+
 	switch status {
 	case 0:
 		return nil
@@ -653,7 +715,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 	return fmt.Errorf("unknown response saving pause: %d", status)
 }
 
-func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
+func (m unshardedMgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 	args, err := StrSlice([]any{
 		time.Now().UnixMilli(),
 		state.PauseLeaseDuration.Seconds(),
@@ -662,10 +724,13 @@ func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 
+	pause := m.u.Pauses()
+
 	status, err := scripts["leasePause"].Exec(
 		ctx,
-		m.pauseR,
-		[]string{m.kf.PauseID(ctx, id), m.kf.PauseLease(ctx, id)},
+		pause.Client(),
+		// keys will be sharded/unsharded depending on RunID
+		[]string{pause.kg.Pause(ctx, id), pause.kg.PauseLease(ctx, id)},
 		args,
 	).AsInt64()
 	if err != nil {
@@ -696,50 +761,60 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier) (bool, error) {
 	callCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	key := i.Key
-	if i.Key == "" {
-		if md, err := m.Metadata(ctx, i.RunID); err == nil {
-			key = m.kf.Idempotency(ctx, md.Identifier)
-		}
-	} else {
-		key = m.kf.Idempotency(ctx, i)
-	}
-
-	cmd := m.r.B().Expire().Key(key).Seconds(int64(consts.FunctionIdempotencyPeriod.Seconds())).Build()
-	if err := m.r.Do(callCtx, cmd).Error(); err != nil {
+	performedDeletion, err := m.shardedMgr.delete(ctx, callCtx, i)
+	if err != nil {
 		return false, err
 	}
 
-	// Fetch all pauses for the run
-	if pauseIDs, err := m.r.Do(callCtx, m.r.B().Smembers().Key(m.kf.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
-		for _, id := range pauseIDs {
-			pauseID, _ := uuid.Parse(id)
-			_ = m.DeletePauseByID(ctx, pauseID)
+	err = m.deletePausesForRun(ctx, callCtx, i)
+	if err != nil {
+		return false, err
+	}
+
+	return performedDeletion, nil
+}
+
+func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state.Identifier) (bool, error) {
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
+
+	key := i.Key
+	if i.Key == "" {
+		if md, err := m.Metadata(ctx, i.AccountID, i.RunID); err == nil {
+			key = fnRunState.kg.Idempotency(ctx, isSharded, md.Identifier)
 		}
+	} else {
+		key = fnRunState.kg.Idempotency(ctx, isSharded, i)
+	}
+
+	if err := r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Expire().Key(key).Seconds(int64(consts.FunctionIdempotencyPeriod.Seconds())).Build()
+	}).Error(); err != nil {
+		return false, err
 	}
 
 	// Clear all other data for a job.
 	keys := []string{
-		m.kf.Actions(ctx, i),
-		m.kf.RunMetadata(ctx, i.RunID),
-		m.kf.Events(ctx, i),
-		m.kf.Stack(ctx, i.RunID),
+		fnRunState.kg.Actions(ctx, isSharded, i),
+		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
+		fnRunState.kg.Events(ctx, isSharded, i),
+		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
 
 		// XXX: remove these in a state store refactor.
-		m.kf.Event(ctx, i),
-		m.kf.History(ctx, i.RunID),
-		m.kf.Errors(ctx, i),
-		m.kf.RunPauses(ctx, i.RunID),
+		fnRunState.kg.Event(ctx, isSharded, i),
+		fnRunState.kg.History(ctx, isSharded, i.RunID),
+		fnRunState.kg.Errors(ctx, isSharded, i),
 	}
 
 	performedDeletion := false
 	for _, k := range keys {
-		cmd := m.r.B().Del().Key(k).Build()
-		result := m.r.Do(callCtx, cmd)
+		result := r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
+			return client.B().Del().Key(k).Build()
+		})
 
 		// We should check a single key rather than all keys, to avoid races.
 		// We'll somewhat arbitrarily pick RunMetadata
-		if k == m.kf.RunMetadata(ctx, i.RunID) {
+		if k == fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID) {
 			if count, _ := result.ToInt64(); count > 0 {
 				performedDeletion = true
 			}
@@ -753,7 +828,21 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier) (bool, error) {
 	return performedDeletion, nil
 }
 
-func (m mgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error {
+func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Context, i state.Identifier) error {
+	pause := m.u.Pauses()
+
+	// Fetch all pauses for the run
+	if pauseIDs, err := pause.Client().Do(callCtx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
+		for _, id := range pauseIDs {
+			pauseID, _ := uuid.Parse(id)
+			_ = m.DeletePauseByID(ctx, pauseID)
+		}
+	}
+
+	return pause.Client().Do(callCtx, pause.Client().B().Del().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).Error()
+}
+
+func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error {
 	// Attempt to fetch this pause.
 	pause, err := m.PauseByID(ctx, pauseID)
 	if err == nil && pause != nil {
@@ -766,12 +855,16 @@ func (m mgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error {
 	})
 }
 
-func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
+func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
+	pause := m.u.Pauses()
+
+	global := m.u.Global()
+
 	// Add a default event here, which is null and overwritten by everything.  This is necessary
 	// to keep the same cluster key.
-	eventKey := m.kf.PauseEvent(ctx, p.WorkspaceID, "-")
+	eventKey := pause.kg.PauseEvent(ctx, p.WorkspaceID, "-")
 	if p.Event != nil {
-		eventKey = m.kf.PauseEvent(ctx, p.WorkspaceID, *p.Event)
+		eventKey = pause.kg.PauseEvent(ctx, p.WorkspaceID, *p.Event)
 	}
 
 	evt := ""
@@ -779,22 +872,29 @@ func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
 		evt = *p.Event
 	}
 
-	keys := []string{
-		m.kf.PauseID(ctx, p.ID),
-		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
-		eventKey,
-		m.kf.Invoke(ctx, p.WorkspaceID),
-		m.kf.PauseIndex(ctx, "add", p.WorkspaceID, evt),
-		m.kf.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
-		m.kf.RunPauses(ctx, p.Identifier.RunID),
-	}
 	corrId := ""
 	if p.InvokeCorrelationID != nil && *p.InvokeCorrelationID != "" {
 		corrId = *p.InvokeCorrelationID
 	}
+
+	pauseKey := pause.kg.Pause(ctx, p.ID)
+	pauseStepKey := pause.kg.PauseStep(ctx, p.Identifier, p.Incoming)
+	runPausesKey := pause.kg.RunPauses(ctx, p.Identifier.RunID)
+
+	keys := []string{
+		pauseKey,
+		pauseStepKey,
+		eventKey,
+		// Warning: We need to access global keys, which must be colocated on the same Redis cluster
+		global.kg.Invoke(ctx, p.WorkspaceID),
+		pause.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
+		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
+		runPausesKey,
+	}
+
 	status, err := scripts["deletePause"].Exec(
 		ctx,
-		m.pauseR,
+		pause.Client(),
 		keys,
 		[]string{
 			p.ID.String(),
@@ -802,8 +902,9 @@ func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
 		},
 	).AsInt64()
 	if err != nil {
-		return fmt.Errorf("error consuming pause: %w", err)
+		return fmt.Errorf("error deleting pause: %w", err)
 	}
+
 	switch status {
 	case 0:
 		return nil
@@ -812,50 +913,37 @@ func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
 	}
 }
 
-func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
-	p, err := m.PauseByID(ctx, id)
+func (m mgr) ConsumePause(ctx context.Context, pauseID uuid.UUID, data any) error {
+	p, err := m.unshardedMgr.PauseByID(ctx, pauseID)
 	if err != nil {
 		return err
 	}
+
+	err = m.shardedMgr.consumePause(ctx, p, data)
+	if err != nil {
+		return err
+	}
+
+	// The pause was now consumed, so let's clean up
+	return m.unshardedMgr.DeletePause(ctx, *p)
+}
+
+func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) error {
+	fnRunState := m.s.FunctionRunState()
+	client, isSharded := fnRunState.Client(ctx, p.Identifier.AccountID, p.Identifier.RunID)
 
 	marshalledData, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("cannot marshal data to store in state: %w", err)
 	}
 
-	// Add a default event here, which is null and overwritten by everything.  This is necessary
-	// to keep the same cluster key.
-	eventKey := m.kf.PauseEvent(ctx, p.WorkspaceID, "-")
-	if p.Event != nil {
-		eventKey = m.kf.PauseEvent(ctx, p.WorkspaceID, *p.Event)
-	}
-
-	// For pause indexes.
-	evt := ""
-	if p.Event != nil && (p.InvokeCorrelationID == nil || *p.InvokeCorrelationID == "") {
-		evt = *p.Event
-	}
-
 	keys := []string{
-		m.kf.PauseID(ctx, id),
-		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
-		eventKey,
-		m.kf.Invoke(ctx, p.WorkspaceID),
-		m.kf.Actions(ctx, p.Identifier),
-		m.kf.Stack(ctx, p.Identifier.RunID),
-		m.kf.RunMetadata(ctx, p.Identifier.RunID),
-		m.kf.PauseIndex(ctx, "add", p.WorkspaceID, evt),
-		m.kf.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
-		m.kf.RunPauses(ctx, p.Identifier.RunID),
+		fnRunState.kg.Actions(ctx, isSharded, p.Identifier),
+		fnRunState.kg.Stack(ctx, isSharded, p.Identifier.RunID),
+		fnRunState.kg.RunMetadata(ctx, isSharded, p.Identifier.RunID),
 	}
 
-	corrId := ""
-	if p.InvokeCorrelationID != nil && *p.InvokeCorrelationID != "" {
-		corrId = *p.InvokeCorrelationID
-	}
 	args, err := StrSlice([]any{
-		id.String(),
-		corrId,
 		p.DataKey,
 		string(marshalledData),
 	})
@@ -863,9 +951,9 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		return err
 	}
 
-	status, err := scripts["consumePause"].Exec(
+	status, err := retriableScripts["consumePause"].Exec(
 		ctx,
-		m.pauseR,
+		client,
 		keys,
 		args,
 	).AsInt64()
@@ -876,21 +964,23 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 	case 0:
 		return nil
 	case 1:
-		return state.ErrPauseNotFound
+		return nil // Pause already consumed
 	default:
 		return fmt.Errorf("unknown response leasing pause: %d", status)
 	}
 }
 
-func (m mgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID, event string) (bool, error) {
-	key := m.kf.PauseEvent(ctx, workspaceID, event)
-	cmd := m.pauseR.B().Exists().Key(key).Build()
-	return m.pauseR.Do(ctx, cmd).AsBool()
+func (m unshardedMgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID, event string) (bool, error) {
+	pause := m.u.Pauses()
+	key := pause.kg.PauseEvent(ctx, workspaceID, event)
+	cmd := pause.Client().B().Exists().Key(key).Build()
+	return pause.Client().Do(ctx, cmd).AsBool()
 }
 
-func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) {
-	cmd := m.pauseR.B().Get().Key(m.kf.PauseID(ctx, id)).Build()
-	str, err := m.pauseR.Do(ctx, cmd).ToString()
+func (m unshardedMgr) PauseByID(ctx context.Context, pauseID uuid.UUID) (*state.Pause, error) {
+	pauses := m.u.Pauses()
+	cmd := pauses.Client().B().Get().Key(pauses.kg.Pause(ctx, pauseID)).Build()
+	str, err := pauses.Client().Do(ctx, cmd).ToString()
 	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
 	}
@@ -902,10 +992,11 @@ func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) 
 	return pause, err
 }
 
-func (m mgr) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*state.Pause, error) {
-	key := m.kf.Invoke(ctx, wsID)
-	cmd := m.pauseR.B().Hget().Key(key).Field(correlationID).Build()
-	pauseIDstr, err := m.pauseR.Do(ctx, cmd).ToString()
+func (m unshardedMgr) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*state.Pause, error) {
+	global := m.u.Global()
+	key := global.kg.Invoke(ctx, wsID)
+	cmd := global.Client().B().Hget().Key(key).Field(correlationID).Build()
+	pauseIDstr, err := global.Client().Do(ctx, cmd).ToString()
 	if err == rueidis.Nil {
 		return nil, state.ErrInvokePauseNotFound
 	}
@@ -920,18 +1011,19 @@ func (m mgr) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, cor
 	return m.PauseByID(ctx, pauseID)
 }
 
-func (m mgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {
+func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {
+	pause := m.u.Pauses()
 	if len(ids) == 0 {
 		return nil, nil
 	}
 
 	keys := make([]string, len(ids))
 	for n, id := range ids {
-		keys[n] = m.kf.PauseID(ctx, id)
+		keys[n] = pause.kg.Pause(ctx, id)
 	}
 
-	cmd := m.pauseR.B().Mget().Key(keys...).Build()
-	strings, err := m.pauseR.Do(ctx, cmd).AsStrSlice()
+	cmd := pause.Client().B().Mget().Key(keys...).Build()
+	strings, err := pause.Client().Do(ctx, cmd).AsStrSlice()
 	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
 	}
@@ -964,9 +1056,12 @@ func (m mgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, 
 // This is required when continuing a step function from an async step, ie. one that
 // has deferred results which must be continued by resuming the specific pause set
 // up for the given step ID.
-func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID string) (*state.Pause, error) {
-	cmd := m.pauseR.B().Get().Key(m.kf.PauseStep(ctx, i, actionID)).Build()
-	str, err := m.pauseR.Do(ctx, cmd).ToString()
+func (m unshardedMgr) PauseByStep(ctx context.Context, i state.Identifier, actionID string) (*state.Pause, error) {
+	pauses := m.u.Pauses()
+
+	// Access sharded value first
+	cmd := pauses.Client().B().Get().Key(pauses.kg.PauseStep(ctx, i, actionID)).Build()
+	str, err := pauses.Client().Do(ctx, cmd).ToString()
 
 	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
@@ -980,8 +1075,9 @@ func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID strin
 		return nil, err
 	}
 
-	cmd = m.pauseR.B().Get().Key(m.kf.PauseID(ctx, id)).Build()
-	byt, err := m.pauseR.Do(ctx, cmd).AsBytes()
+	// Then access value
+	cmd = pauses.Client().B().Get().Key(pauses.kg.Pause(ctx, id)).Build()
+	byt, err := pauses.Client().Do(ctx, cmd).AsBytes()
 
 	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
@@ -996,18 +1092,20 @@ func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID strin
 }
 
 // PausesByEvent returns all pauses for a given event within a workspace.
-func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
-	key := m.kf.PauseEvent(ctx, workspaceID, event)
+func (m unshardedMgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
+	pauses := m.u.Pauses()
+
+	key := pauses.kg.PauseEvent(ctx, workspaceID, event)
 	// If there are > 1000 keys in the hmap, use scanning
 
-	cntCmd := m.pauseR.B().Hlen().Key(key).Build()
-	cnt, err := m.pauseR.Do(ctx, cntCmd).AsInt64()
+	cntCmd := pauses.Client().B().Hlen().Key(key).Build()
+	cnt, err := pauses.Client().Do(ctx, cntCmd).AsInt64()
 
 	if err != nil || cnt > 1000 {
-		key := m.kf.PauseEvent(ctx, workspaceID, event)
+		key := pauses.kg.PauseEvent(ctx, workspaceID, event)
 		iter := &scanIter{
 			count: cnt,
-			r:     m.pauseR,
+			r:     pauses.Client(),
 		}
 		err := iter.init(ctx, key, 1000)
 		return iter, err
@@ -1015,37 +1113,39 @@ func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event str
 
 	// If there are less than a thousand items, query the keys
 	// for iteration.
-	iter := &bufIter{r: m.pauseR}
+	iter := &bufIter{r: pauses.Client()}
 	err = iter.init(ctx, key)
 	return iter, err
 }
 
-func (m mgr) PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time) (state.PauseIterator, error) {
+func (m unshardedMgr) PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time) (state.PauseIterator, error) {
 	if since.IsZero() {
 		return m.PausesByEvent(ctx, workspaceID, event)
 	}
 
+	pauses := m.u.Pauses()
+
 	// Load all items in the set.
-	cmd := m.r.B().
+	cmd := pauses.Client().B().
 		Zrangebyscore().
-		Key(m.kf.PauseIndex(ctx, "add", workspaceID, event)).
+		Key(pauses.kg.PauseIndex(ctx, "add", workspaceID, event)).
 		Min(strconv.Itoa(int(since.Unix()))).
 		Max("+inf").
 		Build()
-	ids, err := m.r.Do(ctx, cmd).AsStrSlice()
+	ids, err := pauses.Client().Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return nil, err
 	}
 
 	iter := &keyIter{
-		r:  m.r,
-		kf: m.kf,
+		r:  pauses.Client(),
+		kf: pauses.kg,
 	}
 	err = iter.init(ctx, ids, 100)
 	return iter, err
 }
 
-func (m mgr) EvaluablesByID(ctx context.Context, ids ...uuid.UUID) ([]expr.Evaluable, error) {
+func (m unshardedMgr) EvaluablesByID(ctx context.Context, ids ...uuid.UUID) ([]expr.Evaluable, error) {
 	items, err := m.PausesByID(ctx, ids...)
 	if err != nil {
 		return nil, err
@@ -1057,7 +1157,7 @@ func (m mgr) EvaluablesByID(ctx context.Context, ids ...uuid.UUID) ([]expr.Evalu
 	return evaluables, nil
 }
 
-func (m mgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {
+func (m unshardedMgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {
 
 	// Keep a list of pauses that should be deleted because they've expired.
 	//
@@ -1373,7 +1473,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 // keyIter loads all pauses in batches given a list of IDs
 type keyIter struct {
 	r  rueidis.Client
-	kf KeyGenerator
+	kf PauseKeyGenerator
 	// chunk is the size of scans to load in one.
 	chunk int64
 	// keys stores pause IDs to fetch in batches
@@ -1418,7 +1518,7 @@ func (i *keyIter) fetch(ctx context.Context) error {
 	}
 
 	for n, id := range load {
-		load[n] = i.kf.PauseID(ctx, uuid.MustParse(id))
+		load[n] = i.kf.Pause(ctx, uuid.MustParse(id))
 	}
 
 	cmd := i.r.B().Mget().Key(load...).Build()

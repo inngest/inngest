@@ -181,12 +181,6 @@ func WithShardFinder(sf ShardFinder) QueueOpt {
 	}
 }
 
-func WithQueueKeyGenerator(kg QueueKeyGenerator) QueueOpt {
-	return func(q *queue) {
-		q.kg = kg
-	}
-}
-
 func WithIdempotencyTTL(t time.Duration) QueueOpt {
 	return func(q *queue) {
 		q.idempotencyTTL = t
@@ -256,14 +250,14 @@ func WithAsyncInstrumentation() QueueOpt {
 			PkgName: pkgName,
 			Callback: func(ctx context.Context) (int64, error) {
 				dur := time.Hour * 24 * 365
-				return q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), getNow().Add(dur))
+				return q.partitionSize(ctx, q.u.kg.GlobalPartitionIndex(), getNow().Add(dur))
 			},
 		})
 
 		telemetry.GaugeGlobalQueuePartitionAvailable(ctx, telemetry.GaugeOpt{
 			PkgName: pkgName,
 			Callback: func(ctx context.Context) (int64, error) {
-				return q.partitionSize(ctx, q.kg.GlobalPartitionIndex(), getNow().Add(PartitionLookahead))
+				return q.partitionSize(ctx, q.u.kg.GlobalPartitionIndex(), getNow().Add(PartitionLookahead))
 			},
 		})
 
@@ -291,7 +285,7 @@ func WithAsyncInstrumentation() QueueOpt {
 				PkgName: pkgName,
 				Tags:    tags,
 				Callback: func(ctx context.Context) (int64, error) {
-					return q.partitionSize(ctx, q.kg.ShardPartitionIndex(shard.Name), getNow().Add(PartitionLookahead))
+					return q.partitionSize(ctx, q.u.kg.ShardPartitionIndex(shard.Name), getNow().Add(PartitionLookahead))
 				},
 			})
 		}
@@ -392,13 +386,12 @@ type QueueItemConcurrencyKeyGenerator func(ctx context.Context, i QueueItem) []s
 // ConcurrencyLimitGetter returns the fn, account, and custom limits for a given partition.
 type ConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) (fn, acct, custom int)
 
-func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
+func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 	q := &queue{
-		r: r,
+		u: u,
 		pf: func(_ context.Context, _ QueuePartition) uint {
 			return PriorityDefault
 		},
-		kg:                 defaultQueueKey,
 		numWorkers:         defaultNumWorkers,
 		wg:                 &sync.WaitGroup{},
 		seqLeaseLock:       &sync.RWMutex{},
@@ -455,10 +448,9 @@ type queue struct {
 	name string
 
 	// redis stores the redis connection to use.
-	r  rueidis.Client
+	u  *QueueClient
 	pf PriorityFinder
 	sf ShardFinder
-	kg QueueKeyGenerator
 
 	lifecycles []QueueLifecycleListener
 
@@ -829,7 +821,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 			scope, id, checksum, _ := key.ParseKey()
 
 			partition := QueuePartition{
-				ID:               q.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, id.String(), checksum),
+				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, id.String(), checksum),
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(scope),
 				FunctionID:       &i.FunctionID,
@@ -866,8 +858,8 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 		limit = 10
 	}
 
-	cmd := q.r.B().Zscan().Key(q.kg.RunIndex(runID)).Cursor(uint64(offset)).Count(limit).Build()
-	jobIDs, err := q.r.Do(ctx, cmd).AsScanEntry()
+	cmd := q.u.unshardedRc.B().Zscan().Key(q.u.kg.RunIndex(runID)).Cursor(uint64(offset)).Count(limit).Build()
+	jobIDs, err := q.u.unshardedRc.Do(ctx, cmd).AsScanEntry()
 	if err != nil {
 		return nil, fmt.Errorf("error reading index: %w", err)
 	}
@@ -877,7 +869,7 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 	}
 
 	// Get all job items.
-	jsonItems, err := q.r.Do(ctx, q.r.B().Hmget().Key(q.kg.QueueItem()).Field(jobIDs.Elements...).Build()).AsStrSlice()
+	jsonItems, err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Hmget().Key(q.u.kg.QueueItem()).Field(jobIDs.Elements...).Build()).AsStrSlice()
 	if err != nil {
 		return nil, fmt.Errorf("error reading jobs: %w", err)
 	}
@@ -895,8 +887,8 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 		if qi.Data.Identifier.WorkspaceID != workspaceID {
 			continue
 		}
-		cmd := q.r.B().Zrank().Key(q.kg.FnQueueSet(workflowID.String())).Member(qi.ID).Build()
-		pos, err := q.r.Do(ctx, cmd).AsInt64()
+		cmd := q.u.unshardedRc.B().Zrank().Key(q.u.kg.FnQueueSet(workflowID.String())).Member(qi.ID).Build()
+		pos, err := q.u.unshardedRc.Do(ctx, cmd).AsInt64()
 		if !rueidis.IsRedisNil(err) && err != nil {
 			return nil, fmt.Errorf("error reading queue position: %w", err)
 		}
@@ -912,8 +904,8 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 }
 
 func (q *queue) OutstandingJobCount(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID) (int, error) {
-	cmd := q.r.B().Zcard().Key(q.kg.RunIndex(runID)).Build()
-	count, err := q.r.Do(ctx, cmd).AsInt64()
+	cmd := q.u.unshardedRc.B().Zcard().Key(q.u.kg.RunIndex(runID)).Build()
+	count, err := q.u.unshardedRc.Do(ctx, cmd).AsInt64()
 	if err != nil {
 		return 0, fmt.Errorf("error counting index cardinality: %w", err)
 	}
@@ -921,9 +913,9 @@ func (q *queue) OutstandingJobCount(ctx context.Context, workspaceID, workflowID
 }
 
 func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error) {
-	key := q.kg.Status(status, workflowID)
-	cmd := q.r.B().Zcount().Key(key).Min("-inf").Max("+inf").Build()
-	count, err := q.r.Do(ctx, cmd).AsInt64()
+	key := q.u.kg.Status(status, workflowID)
+	cmd := q.u.unshardedRc.B().Zcount().Key(key).Min("-inf").Max("+inf").Build()
+	count, err := q.u.unshardedRc.Do(ctx, cmd).AsInt64()
 	if err != nil {
 		return 0, fmt.Errorf("error inspecting function queue status: %w", err)
 	}
@@ -937,8 +929,8 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	// TODO: Remove the ability to change keys based off of initialized inputs.  It's more trouble than
 	// it's worth, and ends up meaning we have more queries to write (such as this) in order to load
 	// relevant data.
-	cmd := q.r.B().Hget().Key(q.kg.PartitionItem()).Field(workflowID.String()).Build()
-	enc, err := q.r.Do(ctx, cmd).AsBytes()
+	cmd := q.u.unshardedRc.B().Hget().Key(q.u.kg.PartitionItem()).Field(workflowID.String()).Build()
+	enc, err := q.u.unshardedRc.Do(ctx, cmd).AsBytes()
 	if rueidis.IsRedisNil(err) {
 		return 0, nil
 	}
@@ -951,9 +943,9 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	}
 
 	// Fetch the concurrency via the partition concurrency name.
-	key := q.kg.Concurrency("p", workflowID.String())
-	cmd = q.r.B().Zcard().Key(key).Build()
-	count, err := q.r.Do(ctx, cmd).AsInt64()
+	key := q.u.kg.Concurrency("p", workflowID.String())
+	cmd = q.u.unshardedRc.B().Zcard().Key(key).Build()
+	count, err := q.u.unshardedRc.Do(ctx, cmd).AsInt64()
 	if err != nil {
 		return 0, fmt.Errorf("error inspecting running job count: %w", err)
 	}
@@ -974,7 +966,7 @@ func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bo
 		Paused: true,
 	}
 
-	keys := []string{q.kg.FnMetadata(fnID)}
+	keys := []string{q.u.kg.FnMetadata(fnID)}
 	args, err := StrSlice([]any{
 		pausedArg,
 		defaultFnMetadata,
@@ -985,7 +977,7 @@ func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bo
 
 	status, err := scripts["queue/fnSetPaused"].Exec(
 		ctx,
-		q.r,
+		q.u.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -1057,23 +1049,23 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	parts := q.ItemPartitions(ctx, i)
 
 	keys := []string{
-		q.kg.QueueItem(),            // Queue item
-		q.kg.PartitionItem(),        // Partition item, map
-		q.kg.GlobalPartitionIndex(), // Global partition queue
-		q.kg.GlobalAccountIndex(),   // Global account queue
-		q.kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // Account partition queue
-		q.kg.ShardPartitionIndex(shardName),                     // Shard queue
-		q.kg.Shards(),
-		q.kg.Idempotency(i.ID),
-		q.kg.FnMetadata(i.FunctionID),
+		q.u.kg.QueueItem(),                                        // Queue item
+		q.u.kg.PartitionItem(),                                    // Partition item, map
+		q.u.kg.GlobalPartitionIndex(),                             // Global partition queue
+		q.u.kg.GlobalAccountIndex(),                               // Global account queue
+		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // Account partition queue
+		q.u.kg.ShardPartitionIndex(shardName),                     // Shard queue
+		q.u.kg.Shards(),
+		q.u.kg.Idempotency(i.ID),
+		q.u.kg.FnMetadata(i.FunctionID),
 
 		// Add all 3 partition sets
-		parts[0].zsetKey(q.kg),
-		parts[1].zsetKey(q.kg),
-		parts[2].zsetKey(q.kg),
+		parts[0].zsetKey(q.u.kg),
+		parts[1].zsetKey(q.u.kg),
+		parts[2].zsetKey(q.u.kg),
 	}
 	// Append indexes
-	for _, idx := range q.itemIndexer(ctx, i, q.kg) {
+	for _, idx := range q.itemIndexer(ctx, i, q.u.kg) {
 		if idx != "" {
 			keys = append(keys, idx)
 		}
@@ -1109,7 +1101,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	}
 	status, err := scripts["queue/enqueue"].Exec(
 		ctx,
-		q.r,
+		q.u.Client(),
 		keys,
 		args,
 	).AsInt64()
@@ -1157,10 +1149,10 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 	}
 	res, err := scripts["queue/peek"].Exec(
 		ctx,
-		q.r,
+		q.u.unshardedRc,
 		[]string{
-			q.kg.FnQueueSet(queueName),
-			q.kg.QueueItem(),
+			q.u.kg.FnQueueSet(queueName),
+			q.u.kg.QueueItem(),
 		},
 		args,
 	).ToAny()
@@ -1213,7 +1205,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 
 	// Find the queue item so that we can fetch the shard info.
 	qi := &QueueItem{}
-	if err := q.r.Do(ctx, q.r.B().Hget().Key(q.kg.QueueItem()).Field(jobID).Build()).DecodeJSON(qi); err != nil {
+	if err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Hget().Key(q.u.kg.QueueItem()).Field(jobID).Build()).DecodeJSON(qi); err != nil {
 		return err
 	}
 
@@ -1225,16 +1217,16 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 	}
 
 	keys := []string{
-		q.kg.FnQueueSet(partitionName),
-		q.kg.QueueItem(),
-		q.kg.GlobalPartitionIndex(),                              // Global partition queue
-		q.kg.AccountPartitionIndex(qi.Data.Identifier.AccountID), // Account partition queue
-		q.kg.ShardPartitionIndex(shardName),                      // Shard partition queue
-		q.kg.PartitionItem(),                                     // Partition hash
+		q.u.kg.FnQueueSet(partitionName),
+		q.u.kg.QueueItem(),
+		q.u.kg.GlobalPartitionIndex(),                              // Global partition queue
+		q.u.kg.AccountPartitionIndex(qi.Data.Identifier.AccountID), // Account partition queue
+		q.u.kg.ShardPartitionIndex(shardName),                      // Shard partition queue
+		q.u.kg.PartitionItem(),                                     // Partition hash
 	}
 	status, err := scripts["queue/requeueByID"].Exec(
 		ctx,
-		q.r,
+		q.u.unshardedRc,
 		keys,
 		[]string{
 			jobID,
@@ -1330,19 +1322,19 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	}
 
 	keys := []string{
-		q.kg.QueueItem(),
-		q.kg.FnQueueSet(item.Queue()),
-		q.kg.PartitionMeta(item.Queue()),
-		q.kg.Concurrency("account", item.Data.Identifier.AccountID.String()),
-		q.kg.Concurrency("p", item.FunctionID.String()),
-		q.kg.Concurrency("custom", customKeys[0]),
-		q.kg.Concurrency("custom", customKeys[1]),
-		q.kg.ConcurrencyIndex(),
-		q.kg.GlobalPartitionIndex(),
-		q.kg.GlobalAccountIndex(),
-		q.kg.AccountPartitionIndex(item.Data.Identifier.AccountID),
-		q.kg.ShardPartitionIndex(shardName),
-		q.kg.ThrottleKey(item.Data.Throttle),
+		q.u.kg.QueueItem(),
+		q.u.kg.FnQueueSet(item.Queue()),
+		q.u.kg.PartitionMeta(item.Queue()),
+		q.u.kg.Concurrency("account", item.Data.Identifier.AccountID.String()),
+		q.u.kg.Concurrency("p", item.FunctionID.String()),
+		q.u.kg.Concurrency("custom", customKeys[0]),
+		q.u.kg.Concurrency("custom", customKeys[1]),
+		q.u.kg.ConcurrencyIndex(),
+		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(item.Data.Identifier.AccountID),
+		q.u.kg.ShardPartitionIndex(shardName),
+		q.u.kg.ThrottleKey(item.Data.Throttle),
 	}
 	args, err := StrSlice([]any{
 		item.ID,
@@ -1360,7 +1352,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	}
 	status, err := scripts["queue/lease"].Exec(
 		ctx,
-		q.r,
+		q.u.unshardedRc,
 		keys,
 		args,
 	).ToInt64()
@@ -1419,14 +1411,14 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 	}
 
 	keys := []string{
-		q.kg.QueueItem(),
-		q.kg.FnQueueSet(i.Queue()),
-		q.kg.GlobalPartitionIndex(),
-		q.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
-		q.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
-		q.kg.Concurrency("p", i.FunctionID.String()),
-		q.kg.Concurrency("custom", customKeys[0]),
-		q.kg.Concurrency("custom", customKeys[1]),
+		q.u.kg.QueueItem(),
+		q.u.kg.FnQueueSet(i.Queue()),
+		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
+		q.u.kg.Concurrency("p", i.FunctionID.String()),
+		q.u.kg.Concurrency("custom", customKeys[0]),
+		q.u.kg.Concurrency("custom", customKeys[1]),
 	}
 
 	args, err := StrSlice([]any{
@@ -1440,7 +1432,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 	}
 	status, err := scripts["queue/extendLease"].Exec(
 		ctx,
-		q.r,
+		q.u.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -1479,18 +1471,18 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 
 	qn := i.Queue()
 	keys := []string{
-		q.kg.QueueItem(),
-		q.kg.FnQueueSet(qn),
-		q.kg.PartitionMeta(qn),
-		q.kg.Idempotency(i.ID),
-		q.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
-		q.kg.Concurrency("p", i.FunctionID.String()),
-		q.kg.Concurrency("custom", customKeys[0]),
-		q.kg.Concurrency("custom", customKeys[1]),
-		q.kg.ConcurrencyIndex(),
+		q.u.kg.QueueItem(),
+		q.u.kg.FnQueueSet(qn),
+		q.u.kg.PartitionMeta(qn),
+		q.u.kg.Idempotency(i.ID),
+		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
+		q.u.kg.Concurrency("p", i.FunctionID.String()),
+		q.u.kg.Concurrency("custom", customKeys[0]),
+		q.u.kg.Concurrency("custom", customKeys[1]),
+		q.u.kg.ConcurrencyIndex(),
 	}
 	// Append indexes
-	for _, idx := range q.itemIndexer(ctx, i, q.kg) {
+	for _, idx := range q.itemIndexer(ctx, i, q.u.kg) {
 		if idx != "" {
 			keys = append(keys, idx)
 		}
@@ -1511,7 +1503,7 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 	}
 	status, err := scripts["queue/dequeue"].Exec(
 		ctx,
-		q.r,
+		q.u.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -1562,20 +1554,20 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 	}
 
 	keys := []string{
-		q.kg.QueueItem(),
-		q.kg.FnQueueSet(i.Queue()),
-		q.kg.PartitionMeta(i.Queue()),
-		q.kg.GlobalPartitionIndex(),
-		q.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
-		q.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
-		q.kg.Concurrency("p", i.FunctionID.String()),
-		q.kg.Concurrency("custom", customKeys[0]),
-		q.kg.Concurrency("custom", customKeys[1]),
-		q.kg.ConcurrencyIndex(),
-		q.kg.ShardPartitionIndex(shardName),
+		q.u.kg.QueueItem(),
+		q.u.kg.FnQueueSet(i.Queue()),
+		q.u.kg.PartitionMeta(i.Queue()),
+		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
+		q.u.kg.Concurrency("p", i.FunctionID.String()),
+		q.u.kg.Concurrency("custom", customKeys[0]),
+		q.u.kg.Concurrency("custom", customKeys[1]),
+		q.u.kg.ConcurrencyIndex(),
+		q.u.kg.ShardPartitionIndex(shardName),
 	}
 	// Append indexes
-	for _, idx := range q.itemIndexer(ctx, i, q.kg) {
+	for _, idx := range q.itemIndexer(ctx, i, q.u.kg) {
 		if idx != "" {
 			keys = append(keys, idx)
 		}
@@ -1592,7 +1584,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 	}
 	status, err := scripts["queue/requeue"].Exec(
 		ctx,
-		q.r,
+		q.u.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -1637,14 +1629,14 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	_ = customConcurrency
 
 	keys := []string{
-		q.kg.PartitionItem(),
-		q.kg.GlobalPartitionIndex(),
+		q.u.kg.PartitionItem(),
+		q.u.kg.GlobalPartitionIndex(),
 		// TODO Can AccountID ever be nil?
-		q.kg.AccountPartitionIndex(*p.AccountID),
-		p.fnConcurrencyKey(q.kg),
-		p.acctConcurrencyKey(q.kg),
+		q.u.kg.AccountPartitionIndex(*p.AccountID),
+		p.fnConcurrencyKey(q.u.kg),
+		p.acctConcurrencyKey(q.u.kg),
 		// TODO: Custom concurrency key (?)
-		q.kg.FnMetadata(fnMetaKey),
+		q.u.kg.FnMetadata(fnMetaKey),
 	}
 
 	// TODO: Enable checking of env and custom concurrency keys here.
@@ -1664,7 +1656,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	}
 	result, err := scripts["queue/partitionLease"].Exec(
 		ctx,
-		q.r,
+		q.u.unshardedRc,
 		keys,
 		args,
 	).AsIntSlice()
@@ -1708,12 +1700,12 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 // randomly, with higher priority partitions more likely to be selected.  This reduces
 // lease contention amongst multiple shared-nothing workers.
 func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
-	return q.partitionPeek(ctx, q.kg.GlobalPartitionIndex(), sequential, until, limit)
+	return q.partitionPeek(ctx, q.u.kg.GlobalPartitionIndex(), sequential, until, limit)
 }
 
 func (q *queue) partitionSize(ctx context.Context, partitionKey string, until time.Time) (int64, error) {
-	cmd := q.r.B().Zcount().Key(partitionKey).Min("-inf").Max(strconv.Itoa(int(until.Unix()))).Build()
-	return q.r.Do(ctx, cmd).AsInt64()
+	cmd := q.u.Client().B().Zcount().Key(partitionKey).Min("-inf").Max(strconv.Itoa(int(until.Unix()))).Build()
+	return q.u.Client().Do(ctx, cmd).AsInt64()
 }
 
 func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
@@ -1745,10 +1737,10 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 	peekRet, err := scripts["queue/partitionPeek"].Exec(
 		ctx,
-		q.r,
+		q.u.Client(),
 		[]string{
 			partitionKey,
-			q.kg.PartitionItem(),
+			q.u.kg.PartitionItem(),
 		},
 		args,
 	).ToAny()
@@ -1790,10 +1782,10 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		keys := make([]string, len(fnIDs))
 		n := 0
 		for k := range fnIDs {
-			keys[n] = q.kg.FnMetadata(k)
+			keys[n] = q.u.kg.FnMetadata(k)
 			n++
 		}
-		vals, err := q.r.Do(ctx, q.r.B().Mget().Key(keys...).Build()).ToAny()
+		vals, err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Mget().Key(keys...).Build()).ToAny()
 		if err == nil {
 			// If this is an error, just ignore the error and continue.  The executor should gracefully handle
 			// accidental attempts at paused functions, as we cannot do this optimization for account or env-level
@@ -1908,9 +1900,9 @@ func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Tim
 
 	peekRet, err := scripts["queue/accountPeek"].Exec(
 		ctx,
-		q.r,
+		q.u.unshardedRc,
 		[]string{
-			q.kg.GlobalAccountIndex(),
+			q.u.kg.GlobalAccountIndex(),
 		},
 		args,
 	).AsStrSlice()
@@ -1990,15 +1982,15 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 	}
 
 	keys := []string{
-		q.kg.PartitionItem(),
-		q.kg.GlobalPartitionIndex(),
+		q.u.kg.PartitionItem(),
+		q.u.kg.GlobalPartitionIndex(),
 		// TODO Is the account ID always set?
-		q.kg.AccountPartitionIndex(*p.AccountID),
-		q.kg.ShardPartitionIndex(shardName),
-		q.kg.PartitionMeta(p.Queue()),
-		q.kg.FnQueueSet(p.Queue()),
-		q.kg.QueueItem(),
-		p.fnConcurrencyKey(q.kg),
+		q.u.kg.AccountPartitionIndex(*p.AccountID),
+		q.u.kg.ShardPartitionIndex(shardName),
+		q.u.kg.PartitionMeta(p.Queue()),
+		q.u.kg.FnQueueSet(p.Queue()),
+		q.u.kg.QueueItem(),
+		p.fnConcurrencyKey(q.u.kg),
 	}
 	force := 0
 	if forceAt {
@@ -2014,7 +2006,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 	}
 	status, err := scripts["queue/partitionRequeue"].Exec(
 		ctx,
-		q.r,
+		q.u.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -2056,10 +2048,10 @@ func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, pri
 		return err
 	}
 
-	keys := []string{q.kg.PartitionItem()}
+	keys := []string{q.u.kg.PartitionItem()}
 	status, err := scripts["queue/partitionReprioritize"].Exec(
 		ctx,
-		q.r,
+		q.u.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -2078,12 +2070,12 @@ func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, pri
 
 func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey string) (int64, error) {
 	s := getNow().UnixMilli()
-	cmd := q.r.B().Zcount().
-		Key(q.kg.Concurrency(prefix, concurrencyKey)).
+	cmd := q.u.unshardedRc.B().Zcount().
+		Key(q.u.kg.Concurrency(prefix, concurrencyKey)).
 		Min(fmt.Sprintf("%d", s)).
 		Max("+inf").
 		Build()
-	return q.r.Do(ctx, cmd).AsInt64()
+	return q.u.unshardedRc.Do(ctx, cmd).AsInt64()
 }
 
 // Scavenge attempts to find jobs that may have been lost due to killed workers.  Workers are shared
@@ -2096,15 +2088,15 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 	// (0-now] in unix milliseconds.
 	now := fmt.Sprintf("%d", getNow().UnixMilli())
 
-	cmd := q.r.B().Zrange().
-		Key(q.kg.ConcurrencyIndex()).
+	cmd := q.u.unshardedRc.B().Zrange().
+		Key(q.u.kg.ConcurrencyIndex()).
 		Min("-inf").
 		Max(now).
 		Byscore().
 		Limit(0, 100).
 		Build()
 
-	pKeys, err := q.r.Do(ctx, cmd).AsStrSlice()
+	pKeys, err := q.u.unshardedRc.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return 0, fmt.Errorf("error scavenging for lost items: %w", err)
 	}
@@ -2116,7 +2108,7 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 	for _, partition := range pKeys {
 		// Fetch the partition.  This uses the concurrency:p: prefix,
 		// so remove the prefix from the item.
-		partitionJSON, err := q.r.Do(ctx, q.r.B().Hget().Key(q.kg.PartitionItem()).Field(partition).Build()).AsBytes()
+		partitionJSON, err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Hget().Key(q.u.kg.PartitionItem()).Field(partition).Build()).AsBytes()
 		if err == rueidis.Nil {
 			continue
 		}
@@ -2125,14 +2117,14 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 			continue
 		}
 
-		cmd := q.r.B().Zrange().
-			Key(q.kg.Concurrency("p", partition)).
+		cmd := q.u.unshardedRc.B().Zrange().
+			Key(q.u.kg.Concurrency("p", partition)).
 			Min("-inf").
 			Max(now).
 			Byscore().
 			Limit(0, 100).
 			Build()
-		itemIDs, err := q.r.Do(ctx, cmd).AsStrSlice()
+		itemIDs, err := q.u.unshardedRc.Do(ctx, cmd).AsStrSlice()
 		if err != nil && err != rueidis.Nil {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("error querying partition concurrency queue '%s' during scavenge: %w", partition, err))
 			continue
@@ -2148,8 +2140,8 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 		}
 
 		// Fetch the queue item, then requeue.
-		cmd = q.r.B().Hmget().Key(q.kg.QueueItem()).Field(itemIDs...).Build()
-		jobs, err := q.r.Do(ctx, cmd).AsStrSlice()
+		cmd = q.u.unshardedRc.B().Hmget().Key(q.u.kg.QueueItem()).Field(itemIDs...).Build()
+		jobs, err := q.u.unshardedRc.Do(ctx, cmd).AsStrSlice()
 		if err != nil && err != rueidis.Nil {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("error fetching jobs for concurrency queue '%s' during scavenge: %w", partition, err))
 			continue
@@ -2209,7 +2201,7 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 
 	status, err := scripts["queue/configLease"].Exec(
 		ctx,
-		q.r,
+		q.u.unshardedRc,
 		[]string{key},
 		args,
 	).AsInt64()
@@ -2227,7 +2219,7 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 }
 
 func (q *queue) getShards(ctx context.Context) (map[string]*QueueShard, error) {
-	m, err := q.r.Do(ctx, q.r.B().Hgetall().Key(q.kg.Shards()).Build()).AsMap()
+	m, err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Hgetall().Key(q.u.kg.Shards()).Build()).AsMap()
 	if rueidis.IsRedisNil(err) {
 		return nil, nil
 	}
@@ -2256,7 +2248,7 @@ func (q *queue) leaseShard(ctx context.Context, shard *QueueShard, duration time
 		return nil, err
 	}
 
-	keys := []string{q.kg.Shards()}
+	keys := []string{q.u.kg.Shards()}
 	args, err := StrSlice([]any{
 		now.UnixMilli(),
 		shard.Name,
@@ -2269,7 +2261,7 @@ func (q *queue) leaseShard(ctx context.Context, shard *QueueShard, duration time
 
 	status, err := scripts["queue/shardLease"].Exec(
 		ctx,
-		q.r,
+		q.u.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -2297,7 +2289,7 @@ func (q *queue) renewShardLease(ctx context.Context, shard *QueueShard, duration
 		return nil, err
 	}
 
-	keys := []string{q.kg.Shards()}
+	keys := []string{q.u.kg.Shards()}
 	args, err := StrSlice([]any{
 		now.UnixMilli(),
 		shard.Name,
@@ -2310,7 +2302,7 @@ func (q *queue) renewShardLease(ctx context.Context, shard *QueueShard, duration
 
 	status, err := scripts["queue/renewShardLease"].Exec(
 		ctx,
-		q.r,
+		q.u.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -2343,8 +2335,8 @@ func (q *queue) getShardLeases() []leasedShard {
 // peekEWMA returns the calculated EWMA value from the list
 func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
 	// retrieves the list from redis
-	cmd := q.r.B().Lrange().Key(q.kg.ConcurrencyFnEWMA(fnID)).Start(0).Stop(-1).Build()
-	strlist, err := q.r.Do(ctx, cmd).AsStrSlice()
+	cmd := q.u.Client().B().Lrange().Key(q.u.KeyGenerator().ConcurrencyFnEWMA(fnID)).Start(0).Stop(-1).Build()
+	strlist, err := q.u.Client().Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return 0, fmt.Errorf("error reading function concurrency EWMA values: %w", err)
 	}
@@ -2385,7 +2377,7 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) err
 	}
 
 	keys := []string{
-		q.kg.ConcurrencyFnEWMA(*fnID),
+		q.u.kg.ConcurrencyFnEWMA(*fnID),
 	}
 	args, err := StrSlice([]any{
 		val,
@@ -2397,7 +2389,7 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) err
 
 	_, err = scripts["queue/setPeekEWMA"].Exec(
 		ctx,
-		q.r,
+		q.u.Client(),
 		keys,
 		args,
 	).AsInt64()
@@ -2410,9 +2402,9 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) err
 
 //nolint:all
 func (q *queue) readFnMetadata(ctx context.Context, fnID uuid.UUID) (*FnMetadata, error) {
-	cmd := q.r.B().Get().Key(q.kg.FnMetadata(fnID)).Build()
+	cmd := q.u.unshardedRc.B().Get().Key(q.u.kg.FnMetadata(fnID)).Build()
 	retv := FnMetadata{}
-	err := q.r.Do(ctx, cmd).DecodeJSON(&retv)
+	err := q.u.unshardedRc.Do(ctx, cmd).DecodeJSON(&retv)
 	if err != nil {
 		return nil, fmt.Errorf("error reading function metadata: %w", err)
 	}
