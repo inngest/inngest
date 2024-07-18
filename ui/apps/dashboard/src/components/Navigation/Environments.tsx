@@ -64,9 +64,21 @@ const useSwitchablePathname = (): string => {
 type EnvironmentSelectMenuProps = {
   activeEnv?: Environment;
   envs: Environment[];
+  collapsed: boolean;
 };
 
-export default function Environments({ envs, activeEnv }: EnvironmentSelectMenuProps) {
+const selectedName = (name: string, collapsed: boolean) => {
+  switch (name) {
+    case 'Production':
+      return collapsed ? 'PR' : name;
+    case 'Branch Environments':
+      return collapsed ? 'BE' : name;
+    default:
+      return collapsed ? name.substring(0, 2).toUpperCase() : name;
+  }
+};
+
+export default function Environments({ envs, activeEnv, collapsed }: EnvironmentSelectMenuProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<Environment | null>(null);
   const nextPathname = useSwitchablePathname();
@@ -92,29 +104,43 @@ export default function Environments({ envs, activeEnv }: EnvironmentSelectMenuP
     <Listbox value={selected} onChange={onSelect}>
       {({ open }) => (
         <div className="bg-canvasBase relative">
-          <Listbox.Button className="border-muted bg-canvasBase text-primary-intense h-8 w-[158px] rounded border px-2 text-sm">
-            <div className="flex flex-row items-center justify-between">
-              <span className="flex flex-row items-center pr-4">
+          <Listbox.Button
+            className={`active:border-primary-intense focus:border-primary-intense border-muted bg-canvasBase text-primary-intense hover:bg-canvasSubtle ${
+              collapsed ? ` w-8 px-1` : 'w-[158px] px-2'
+            } h-8 overflow-hidden rounded border text-sm`}
+          >
+            <div
+              className={`flex flex-row items-center  ${
+                collapsed ? 'justify-center' : 'justify-between'
+              }`}
+            >
+              <span className="flex flex-row items-center ">
                 {isBranchParentSelected ? (
                   <>
-                    <RiSettings3Line className="mr-2 h-4" />
-                    <span className="block truncate">Branch Environments</span>
+                    {!collapsed && <RiSettings3Line className="mr-2 h-4" />}
+                    <span className="block truncate">
+                      {selectedName('Branch Environments', collapsed)}
+                    </span>
                   </>
                 ) : selected ? (
                   <span className="block truncate">
                     {selected.type === EnvironmentType.BranchParent
-                      ? 'Branch Environments'
-                      : selected.name}
+                      ? selectedName('Branch Environments', collapsed)
+                      : selectedName(selected.name, collapsed)}
                   </span>
                 ) : (
                   <>
-                    <RiCloudLine className="mr-2 h-4 w-4" />
-                    <span className="block truncate">All Environments</span>
+                    {!collapsed && <RiCloudLine className="mr-2 h-4 w-4" />}
+                    <span className="block truncate">
+                      {selectedName('All Environments', collapsed)}
+                    </span>
                   </>
                 )}
               </span>
 
-              <RiExpandUpDownLine className="text-subtle h-4 w-4" aria-hidden="true" />
+              {!collapsed && (
+                <RiExpandUpDownLine className="text-subtle h-4 w-4" aria-hidden="true" />
+              )}
             </div>
           </Listbox.Button>
 
@@ -125,7 +151,7 @@ export default function Environments({ envs, activeEnv }: EnvironmentSelectMenuP
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <Listbox.Options className="bg-canvasBase border-subtle mt-1 w-[188px] divide-none rounded border shadow focus:outline-none">
+            <Listbox.Options className="bg-canvasBase border-subtle z-10000 mt-1 w-[188px] divide-none rounded border shadow focus:outline-none">
               {productionEnvironment !== null && (
                 <EnvironmentItem environment={productionEnvironment} />
               )}

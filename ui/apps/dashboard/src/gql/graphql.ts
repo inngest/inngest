@@ -144,6 +144,7 @@ export type ArchivedEvent = {
   name: Scalars['String'];
   occurredAt: Scalars['Time'];
   receivedAt: Scalars['Time'];
+  skippedFunctionRuns: Array<SkippedFunctionRun>;
   source: Maybe<IngestKey>;
   version: Scalars['String'];
 };
@@ -194,6 +195,11 @@ export type CancellationEdge = {
   node: Cancellation;
 };
 
+export type CancellationRunCountInput = {
+  queuedAtMax: Scalars['Time'];
+  queuedAtMin?: InputMaybe<Scalars['Time']>;
+};
+
 export type CodedError = {
   __typename?: 'CodedError';
   code: Scalars['String'];
@@ -222,10 +228,16 @@ export enum ConcurrencyScope {
 
 export type CreateCancellationInput = {
   envID: Scalars['UUID'];
-  functionID: Scalars['UUID'];
+  functionSlug: Scalars['String'];
   name?: InputMaybe<Scalars['String']>;
   queuedAtMax: Scalars['Time'];
   queuedAtMin?: InputMaybe<Scalars['Time']>;
+  testOnly?: InputMaybe<CreateCancellationInputTestOnly>;
+};
+
+export type CreateCancellationInputTestOnly = {
+  maxStepCount?: InputMaybe<Scalars['Int']>;
+  queryLimit?: InputMaybe<Scalars['Int']>;
 };
 
 export type CreateFunctionReplayInput = {
@@ -918,8 +930,10 @@ export type Query = {
   __typename?: 'Query';
   account: Account;
   billableStepTimeSeries: Array<TimeSeries>;
+  defaultEnv: Workspace;
   deploy: Deploy;
   deploys: Maybe<Array<Deploy>>;
+  envBySlug: Maybe<Workspace>;
   events: Maybe<PaginatedEvents>;
   plans: Array<Maybe<BillingPlan>>;
   session: Maybe<Session>;
@@ -940,6 +954,11 @@ export type QueryDeployArgs = {
 
 export type QueryDeploysArgs = {
   workspaceID: InputMaybe<Scalars['ID']>;
+};
+
+
+export type QueryEnvBySlugArgs = {
+  slug: Scalars['String'];
 };
 
 
@@ -1294,6 +1313,23 @@ export type SigningKeyRotationCheck = {
   signingKeyState: SecretCheck;
 };
 
+export enum SkipReason {
+  FunctionPaused = 'FUNCTION_PAUSED',
+  None = 'NONE'
+}
+
+export type SkippedFunctionRun = {
+  __typename?: 'SkippedFunctionRun';
+  accountID: Scalars['UUID'];
+  batchID: Maybe<Scalars['ULID']>;
+  eventID: Maybe<Scalars['ULID']>;
+  id: Scalars['ULID'];
+  skipReason: SkipReason;
+  skippedAt: Scalars['Time'];
+  workflowID: Scalars['UUID'];
+  workspaceID: Scalars['UUID'];
+};
+
 export type SleepStepInfo = {
   __typename?: 'SleepStepInfo';
   sleepUntil: Scalars['Time'];
@@ -1459,6 +1495,7 @@ export type Workflow = {
   app: App;
   appName: Maybe<Scalars['String']>;
   archivedAt: Maybe<Scalars['Time']>;
+  cancellationRunCount: Scalars['Int'];
   cancellations: CancellationConnection;
   configuration: Maybe<FunctionConfiguration>;
   current: Maybe<WorkflowVersion>;
@@ -1484,6 +1521,11 @@ export type Workflow = {
   slug: Scalars['String'];
   url: Scalars['String'];
   usage: Usage;
+};
+
+
+export type WorkflowCancellationRunCountArgs = {
+  input: CancellationRunCountInput;
 };
 
 
@@ -1591,6 +1633,7 @@ export type Workspace = {
   runs: RunsConnection;
   runsMetrics: MetricsResponse;
   signingKeys: Array<SigningKey>;
+  slug: Maybe<Scalars['String']>;
   test: Scalars['Boolean'];
   type: EnvironmentType;
   unattachedSyncs: Array<Deploy>;

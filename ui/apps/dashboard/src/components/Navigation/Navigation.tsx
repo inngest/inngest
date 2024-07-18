@@ -9,8 +9,16 @@ export type NavProps = {
 
 export default function Navigation({ collapsed, envs, activeEnv }: NavProps) {
   return (
-    <div className="flex-start text-basis ml-5 mt-5 flex w-full flex-row items-center">
-      {envs && <Environments envs={envs} activeEnv={activeEnv} />}
+    <div
+      className={`flex-start text-basis ${
+        collapsed ? 'justify-center' : 'ml-5'
+      } mt-5 flex w-full flex-row items-center`}
+    >
+      {envs && (
+        <div className="item-center flex flex-row">
+          <Environments envs={envs} activeEnv={activeEnv} collapsed={collapsed} />
+        </div>
+      )}
     </div>
   );
 }
