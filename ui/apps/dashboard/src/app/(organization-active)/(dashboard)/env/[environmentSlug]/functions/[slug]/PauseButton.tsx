@@ -18,18 +18,14 @@ type CurrentRunHandlingOption = {
 };
 const CURRENT_RUN_HANDLING_STRATEGY_SUSPEND = 'suspend';
 const CURRENT_RUN_HANDLING_STRATEGY_CANCEL = 'cancel';
-const currentRunHandlingOptions: CurrentRunHandlingOption[] = [
+const currentRunHandlingOptions = [
   {
     name: 'Pause immediately, then cancel after 7 days',
     id: CURRENT_RUN_HANDLING_STRATEGY_SUSPEND,
   },
   { name: 'Cancel immediately', id: CURRENT_RUN_HANDLING_STRATEGY_CANCEL },
-];
-
-const defaultOption: CurrentRunHandlingOption = {
-  name: 'Pause immediately, then cancel after 7 days',
-  id: CURRENT_RUN_HANDLING_STRATEGY_SUSPEND,
-};
+] as const;
+const defaultCurrentRunHandlingOption = currentRunHandlingOptions[0];
 
 const FunctionVersionNumberDocument = graphql(`
   query GetFunctionVersionNumber($slug: String!, $environmentID: ID!) {
@@ -84,10 +80,10 @@ function PauseFunctionModal({
   const [, pauseFunction] = useMutation(PauseFunctionDocument);
   const [, unpauseFunction] = useMutation(UnpauseFunctionDocument);
   const [currentRunHandlingStrategy, setCurrentRunHandlingStrategy] =
-    useState<CurrentRunHandlingOption>(currentRunHandlingOptions[0] || defaultOption);
+    useState<CurrentRunHandlingOption>(defaultCurrentRunHandlingOption);
 
   function onCloseWrapper() {
-    setCurrentRunHandlingStrategy(currentRunHandlingOptions[0] || defaultOption);
+    setCurrentRunHandlingStrategy(defaultCurrentRunHandlingOption);
     onClose();
   }
   function handlePause() {
@@ -114,6 +110,11 @@ function PauseFunctionModal({
     onCloseWrapper();
   }
 
+  let confirmButtonLabel = isPaused ? 'Resume Function' : 'Pause Function';
+  if (!isPaused && currentRunHandlingStrategy.id === CURRENT_RUN_HANDLING_STRATEGY_CANCEL) {
+    confirmButtonLabel = 'Pause & Cancel Runs';
+  }
+
   return (
     <AlertModal
       isOpen={isOpen}
@@ -121,9 +122,9 @@ function PauseFunctionModal({
       onSubmit={isPaused ? handleResume : handlePause}
       title={`${isPaused ? 'Resume' : 'Pause'} function “${functionName}”`}
       className="w-1/3"
-      confirmButtonLabel={isPaused ? 'Resume' : 'Pause'}
+      confirmButtonLabel={confirmButtonLabel}
       confirmButtonKind={isPaused ? 'success' : 'danger'}
-      cancelButtonLabel="Cancel"
+      cancelButtonLabel="Close"
     >
       {isPaused && (
         <div>
@@ -143,8 +144,11 @@ function PauseFunctionModal({
           </p>
           <ul className="text-subtle list-inside list-disc p-6 pb-0 pt-3 text-sm leading-6">
             <li>Functions can be resumed at any time.</li>
-            <li>No new runs will be queued or invoked.</li>
-            <li>Events will continue to be received, but they will not trigger new runs.</li>
+            <li>No new runs will be queued or invoked while the function is paused.</li>
+            <li>
+              No data will be lost. Events will continue being received, and you can process them
+              later via a Replay.
+            </li>
           </ul>
           <div className="p-6 pb-0">
             <hr className="border-muted" />
