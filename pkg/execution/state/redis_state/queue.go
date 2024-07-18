@@ -37,6 +37,7 @@ import (
 var (
 	PartitionSelectionMax int64 = 100
 	PartitionPeekMax      int64 = PartitionSelectionMax * 3
+	AccountPeekMax        int64 = 25
 )
 
 const (
@@ -103,6 +104,7 @@ var (
 	ErrPartitionNotFound             = fmt.Errorf("partition not found")
 	ErrPartitionAlreadyLeased        = fmt.Errorf("partition already leased")
 	ErrPartitionPeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", PartitionPeekMax)
+	ErrAccountPeekMaxExceedsLimits   = fmt.Errorf("account peek exceeded the maximum limit of %d", AccountPeekMax)
 	ErrPartitionGarbageCollected     = fmt.Errorf("partition garbage collected")
 	ErrPartitionPaused               = fmt.Errorf("partition is paused")
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
@@ -1879,12 +1881,11 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 }
 
 func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
-	// TODO probably change this to account-specific limits
-	if limit > PartitionPeekMax {
-		return nil, ErrPartitionPeekMaxExceedsLimits
+	if limit > AccountPeekMax {
+		return nil, ErrAccountPeekMaxExceedsLimits
 	}
 	if limit <= 0 {
-		limit = PartitionPeekMax
+		limit = AccountPeekMax
 	}
 
 	ms := until.UnixMilli()
