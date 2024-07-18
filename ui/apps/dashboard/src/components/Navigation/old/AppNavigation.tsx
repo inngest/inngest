@@ -32,7 +32,7 @@ const BRANCH_PARENT_SLUG = 'branch';
 // const DEFAULT_ENV_SLUG = 'production';
 
 export default async function AppNavigation({ activeEnv, envSlug }: AppNavigationProps) {
-  // const isEventSearchEnabled = await getBooleanFlag('event-search');
+  const isEventSearchEnabled = await getBooleanFlag('event-search');
 
   let items: NavItem[] = [
     {
@@ -61,19 +61,19 @@ export default async function AppNavigation({ activeEnv, envSlug }: AppNavigatio
     },
   ];
 
-  // if (isEventSearchEnabled) {
-  //   // Insert the "Event Search" item after the 3rd item.
-  //   items = [
-  //     ...items.slice(0, 3),
-  //     {
-  //       href: `/env/${envSlug}/event-search`,
-  //       text: 'Event Search',
-  //       hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
-  //       icon: <RiSearchLine className="w-3.5" />,
-  //     },
-  //     ...items.slice(3),
-  //   ];
-  // }
+  if (isEventSearchEnabled) {
+    // Insert the "Event Search" item after the 3rd item.
+    items = [
+      ...items.slice(0, 3),
+      {
+        href: `/env/${envSlug}/event-search`,
+        text: 'Event Search',
+        hide: [ALL_ENVIRONMENTS_SLUG, BRANCH_PARENT_SLUG],
+        icon: <RiSearchLine className="w-3.5" />,
+      },
+      ...items.slice(3),
+    ];
+  }
 
   const visibleItems = items.filter((item) => !item.hide.includes(envSlug));
 
