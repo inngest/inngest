@@ -141,9 +141,7 @@ func BenchmarkSliceAccess(b *testing.B) {
 
 // 0.3ns
 func BenchmarkFunc(b *testing.B) {
-	testFunc := func() {
-		return
-	}
+	testFunc := func() {}
 
 	for n := 0; n < b.N; n++ {
 		testFunc()
@@ -157,8 +155,6 @@ func BenchmarkDefer(b *testing.B) {
 			doSomething := true
 			_ = doSomething
 		}()
-
-		return
 	}
 
 	for n := 0; n < b.N; n++ {
@@ -175,8 +171,6 @@ func BenchmarkDeferGoroutine(b *testing.B) {
 				_ = doSomething
 			}()
 		}()
-
-		return
 	}
 
 	for n := 0; n < b.N; n++ {
