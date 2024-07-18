@@ -18,14 +18,14 @@ type CurrentRunHandlingOption = {
 };
 const CURRENT_RUN_HANDLING_STRATEGY_SUSPEND = 'suspend';
 const CURRENT_RUN_HANDLING_STRATEGY_CANCEL = 'cancel';
-const currentRunHandlingOptions: CurrentRunHandlingOption[] = [
+const currentRunHandlingOptions = [
   {
     name: 'Pause immediately, then cancel after 7 days',
     id: CURRENT_RUN_HANDLING_STRATEGY_SUSPEND,
   },
   { name: 'Cancel immediately', id: CURRENT_RUN_HANDLING_STRATEGY_CANCEL },
-];
-const defaultCurrentRunHandlingOption: CurrentRunHandlingOption = currentRunHandlingOptions[0];
+] as const;
+const defaultCurrentRunHandlingOption = currentRunHandlingOptions[0];
 
 const FunctionVersionNumberDocument = graphql(`
   query GetFunctionVersionNumber($slug: String!, $environmentID: ID!) {
