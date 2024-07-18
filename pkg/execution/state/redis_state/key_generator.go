@@ -99,37 +99,6 @@ type GlobalKeyGenerator interface {
 	Invoke(ctx context.Context, wsID uuid.UUID) string
 }
 
-type PauseKeyGenerator interface {
-	// Pause returns the key used to store an individual pause from its ID.
-	Pause(ctx context.Context, pauseID uuid.UUID) string
-
-	// RunPauses stores pause IDs for each run as a zset
-	RunPauses(ctx context.Context, runID ulid.ULID) string
-
-	// PauseLease stores the key which references a pause's lease.
-	//
-	// This is stored independently as we may store more than one copy of a pause
-	// for easy iteration.
-	PauseLease(ctx context.Context, pauseId uuid.UUID) string
-
-	// PauseStep returns the prefix of the key used within PauseStep.  This lets us
-	// iterate through all pauses for a given identifier
-	PauseStepPrefix(context.Context, state.Identifier) string
-
-	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
-	PauseStep(context.Context, state.Identifier, string) string
-
-	// PauseEvent returns the key used to store data for loading pauses by events.
-	PauseEvent(ctx context.Context, workspaceId uuid.UUID, event string) string
-
-	// PauseIndex is a key that's used to index added/expired times for pauses.
-	//
-	// Added times are necessary to load pauses after a specific point in time,
-	// which is used when caching pauses in-memory to only load the subset of pauses
-	// added after the cache was last updated.
-	PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string
-}
-
 type globalKeyGenerator struct {
 	stateDefaultKey string
 }
@@ -348,7 +317,7 @@ func (u queueKeyGenerator) PartitionQueueSet(pType enums.PartitionType, scopeID,
 }
 
 func (u queueKeyGenerator) FnMetadata(fnID uuid.UUID) string {
-	return fmt.Sprintf("%s:fnMeta:%s", u.queueDefaultKey, fnID)
+	return fmt.Sprintf("{%s}:fnMeta:%s", u.queueDefaultKey, fnID)
 }
 
 type BatchKeyGenerator interface {
@@ -430,6 +399,37 @@ func (u debounceKeyGenerator) DebouncePointer(ctx context.Context, fnID uuid.UUI
 // This is a hash of debounce IDs -> debounces.
 func (u debounceKeyGenerator) Debounce(ctx context.Context) string {
 	return fmt.Sprintf("{%s}:debounce-hash", u.queueDefaultKey)
+}
+
+type PauseKeyGenerator interface {
+	// Pause returns the key used to store an individual pause from its ID.
+	Pause(ctx context.Context, pauseID uuid.UUID) string
+
+	// RunPauses stores pause IDs for each run as a zset
+	RunPauses(ctx context.Context, runID ulid.ULID) string
+
+	// PauseLease stores the key which references a pause's lease.
+	//
+	// This is stored independently as we may store more than one copy of a pause
+	// for easy iteration.
+	PauseLease(ctx context.Context, pauseId uuid.UUID) string
+
+	// PauseStep returns the prefix of the key used within PauseStep.  This lets us
+	// iterate through all pauses for a given identifier
+	PauseStepPrefix(context.Context, state.Identifier) string
+
+	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
+	PauseStep(context.Context, state.Identifier, string) string
+
+	// PauseEvent returns the key used to store data for loading pauses by events.
+	PauseEvent(ctx context.Context, workspaceId uuid.UUID, event string) string
+
+	// PauseIndex is a key that's used to index added/expired times for pauses.
+	//
+	// Added times are necessary to load pauses after a specific point in time,
+	// which is used when caching pauses in-memory to only load the subset of pauses
+	// added after the cache was last updated.
+	PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string
 }
 
 type pauseKeyGenerator struct {
