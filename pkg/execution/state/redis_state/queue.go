@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"math"
 	"strconv"
 	"strings"
@@ -715,6 +716,8 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 		limit = 10
 	}
 
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunJobs"), redis_telemetry.ScopeQueue)
+
 	cmd := q.u.unshardedRc.B().Zscan().Key(q.u.kg.RunIndex(runID)).Cursor(uint64(offset)).Count(limit).Build()
 	jobIDs, err := q.u.unshardedRc.Do(ctx, cmd).AsScanEntry()
 	if err != nil {
@@ -761,6 +764,8 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 }
 
 func (q *queue) OutstandingJobCount(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID) (int, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "OutstandingJobCount"), redis_telemetry.ScopeQueue)
+
 	cmd := q.u.unshardedRc.B().Zcard().Key(q.u.kg.RunIndex(runID)).Build()
 	count, err := q.u.unshardedRc.Do(ctx, cmd).AsInt64()
 	if err != nil {
@@ -770,6 +775,8 @@ func (q *queue) OutstandingJobCount(ctx context.Context, workspaceID, workflowID
 }
 
 func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "StatusCount"), redis_telemetry.ScopeQueue)
+
 	key := q.u.kg.Status(status, workflowID)
 	cmd := q.u.unshardedRc.B().Zcount().Key(key).Min("-inf").Max("+inf").Build()
 	count, err := q.u.unshardedRc.Do(ctx, cmd).AsInt64()
@@ -780,6 +787,8 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 }
 
 func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunningCount"), redis_telemetry.ScopeQueue)
+
 	// Load the partition for a given queue.  This allows us to generate the concurrency
 	// key properly via the given function.
 	//
@@ -813,6 +822,8 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 // SetFunctionPaused sets the "Paused" flag (represented in JSON as "off") for the given
 // function ID's queue partition.
 func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bool) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionPaused"), redis_telemetry.ScopeQueue)
+
 	pausedArg := "0"
 	if paused {
 		pausedArg = "1"
@@ -827,7 +838,7 @@ func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bo
 
 	keys := []string{q.u.kg.PartitionItem()}
 	status, err := scripts["queue/partitionSetPaused"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "partitionSetPaused"),
 		q.u.unshardedRc,
 		keys,
 		args,
@@ -853,6 +864,8 @@ func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bo
 //
 // The queue score must be added in milliseconds to process sub-second items in order.
 func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (QueueItem, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EnqueueItem"), redis_telemetry.ScopeQueue)
+
 	if len(i.ID) == 0 {
 		i.SetID(ctx, ulid.MustNew(ulid.Now(), rnd).String())
 	} else {
@@ -958,7 +971,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		return i, err
 	}
 	status, err := scripts["queue/enqueue"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "enqueue"),
 		q.u.Client(),
 		keys,
 		args,
@@ -983,6 +996,8 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 // If limit is -1, this will return the first unleased item - representing the next available item in the
 // queue.
 func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, limit int64) ([]*QueueItem, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Peek"), redis_telemetry.ScopeQueue)
+
 	// Check whether limit is -1, peeking next available time
 	isPeekNext := limit == -1
 
@@ -1006,7 +1021,7 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 		return nil, err
 	}
 	res, err := scripts["queue/peek"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "peek"),
 		q.u.unshardedRc,
 		[]string{
 			q.u.kg.QueueIndex(queueName),
@@ -1059,6 +1074,8 @@ func (q *queue) decodeQueueItemFromPeek(str string, now time.Time) (*QueueItem, 
 // If the queue item referenced by the job ID is not outstanding (ie. it has a lease, is in
 // progress, or doesn't exist) this returns an error.
 func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID string, at time.Time) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RequeueByJobID"), redis_telemetry.ScopeQueue)
+
 	jobID = HashID(ctx, jobID)
 
 	// Find the queue item so that we can fetch the shard info.
@@ -1082,7 +1099,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 		q.u.kg.PartitionItem(),                // Partition hash
 	}
 	status, err := scripts["queue/requeueByID"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "requeueByID"),
 		q.u.unshardedRc,
 		keys,
 		[]string{
@@ -1114,6 +1131,8 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 // Obtaining a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
 func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, duration time.Duration, now time.Time, denies *leaseDenies) (*ulid.ULID, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Lease"), redis_telemetry.ScopeQueue)
+
 	var (
 		ak, pk string // account, partition concurrency key
 		ac, pc int    // account, partiiton concurrency max
@@ -1209,7 +1228,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		return nil, err
 	}
 	status, err := scripts["queue/lease"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "lease"),
 		q.u.unshardedRc,
 		keys,
 		args,
@@ -1249,6 +1268,8 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 // Renewing a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
 func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ExtendLease"), redis_telemetry.ScopeQueue)
+
 	var (
 		ak, pk     string // account, partition, custom concurrency key
 		customKeys = make([]string, 2)
@@ -1295,7 +1316,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 		return nil, err
 	}
 	status, err := scripts["queue/extendLease"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "extendLease"),
 		q.u.unshardedRc,
 		keys,
 		args,
@@ -1319,6 +1340,8 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 
 // Dequeue removes an item from the queue entirely.
 func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Dequeue"), redis_telemetry.ScopeQueue)
+
 	var (
 		ak, pk     string // account, partition, custom concurrency key
 		customKeys = make([]string, 2)
@@ -1373,7 +1396,7 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		return err
 	}
 	status, err := scripts["queue/dequeue"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "dequeue"),
 		q.u.unshardedRc,
 		keys,
 		args,
@@ -1393,6 +1416,8 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 
 // Requeue requeues an item in the future.
 func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at time.Time) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Requeue"), redis_telemetry.ScopeQueue)
+
 	priority := PriorityMin
 	if q.pf != nil {
 		priority = q.pf(ctx, i)
@@ -1469,7 +1494,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		return err
 	}
 	status, err := scripts["queue/requeue"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "requeue"),
 		q.u.unshardedRc,
 		keys,
 		args,
@@ -1495,6 +1520,8 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 // that the worker always wants to lease the given queue.  Filtering must be done when peeking
 // when running a worker.
 func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration) (*ulid.ULID, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionLease"), redis_telemetry.ScopeQueue)
+
 	var (
 		concurrencyKey string
 		concurrency    = defaultPartitionConcurrency
@@ -1538,7 +1565,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		return nil, err
 	}
 	result, err := scripts["queue/partitionLease"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "partitionLease"),
 		q.u.unshardedRc,
 		keys,
 		args,
@@ -1586,11 +1613,15 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 }
 
 func (q *queue) partitionSize(ctx context.Context, partitionKey string, until time.Time) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionSize"), redis_telemetry.ScopeQueue)
+
 	cmd := q.u.Client().B().Zcount().Key(partitionKey).Min("-inf").Max(strconv.Itoa(int(until.Unix()))).Build()
 	return q.u.Client().Do(ctx, cmd).AsInt64()
 }
 
 func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionPeek"), redis_telemetry.ScopeQueue)
+
 	if limit > PartitionPeekMax {
 		return nil, ErrPartitionPeekMaxExceedsLimits
 	}
@@ -1618,7 +1649,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	}
 
 	encoded, err := scripts["queue/partitionPeek"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "partitionPeek"),
 		q.u.Client(),
 		[]string{
 			q.u.kg.GlobalPartitionIndex(),
@@ -1732,6 +1763,8 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 // concurrency limit;  we don't want to scan the partition next time, so we force the partition
 // to be at a specific time instead of taking the earliest available queue item time
 func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionRequeue"), redis_telemetry.ScopeQueue)
+
 	var shardName string
 	if q.sf != nil {
 		if shard := q.sf(ctx, p.Queue(), p.WorkspaceID); shard != nil {
@@ -1761,7 +1794,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		return err
 	}
 	status, err := scripts["queue/partitionRequeue"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "partitionRequeue"),
 		q.u.unshardedRc,
 		keys,
 		args,
@@ -1789,6 +1822,8 @@ func (q *queue) PartitionDequeue(ctx context.Context, queueName string, at time.
 
 // PartitionReprioritize reprioritizes a workflow's QueueItems within the queue.
 func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, priority uint) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionReprioritize"), redis_telemetry.ScopeQueue)
+
 	if priority > PriorityMin {
 		return ErrPriorityTooLow
 	}
@@ -1806,7 +1841,7 @@ func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, pri
 
 	keys := []string{q.u.kg.PartitionItem()}
 	status, err := scripts["queue/partitionReprioritize"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "partitionReprioritize"),
 		q.u.unshardedRc,
 		keys,
 		args,
@@ -1825,6 +1860,8 @@ func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, pri
 }
 
 func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey string) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "InProgress"), redis_telemetry.ScopeQueue)
+
 	s := getNow().UnixMilli()
 	cmd := q.u.unshardedRc.B().Zcount().
 		Key(q.u.kg.Concurrency(prefix, concurrencyKey)).
@@ -1840,6 +1877,8 @@ func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey st
 //
 // We scan all partition concurrency queues - queues of leases - to find leases that have expired.
 func (q *queue) Scavenge(ctx context.Context) (int, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Scavenge"), redis_telemetry.ScopeQueue)
+
 	// Find all items that have an expired lease - eg. where the min time for a lease is between
 	// (0-now] in unix milliseconds.
 	now := fmt.Sprintf("%d", getNow().UnixMilli())
@@ -1931,6 +1970,8 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 //
 // If the sequential key is leased, this allows a worker to peek partitions sequentially.
 func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ConfigLease"), redis_telemetry.ScopeQueue)
+
 	if duration > ConfigLeaseMax {
 		return nil, ErrConfigLeaseExceedsLimits
 	}
@@ -1956,7 +1997,7 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 	}
 
 	status, err := scripts["queue/configLease"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "configLease"),
 		q.u.unshardedRc,
 		[]string{key},
 		args,
@@ -1975,6 +2016,8 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 }
 
 func (q *queue) getShards(ctx context.Context) (map[string]*QueueShard, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "getShards"), redis_telemetry.ScopeQueue)
+
 	m, err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Hgetall().Key(q.u.kg.Shards()).Build()).AsMap()
 	if rueidis.IsRedisNil(err) {
 		return nil, nil
@@ -1998,6 +2041,8 @@ func (q *queue) getShards(ctx context.Context) (map[string]*QueueShard, error) {
 // from claiming the same lease index;  if workers A and B see a shard with 0 leases and both attempt
 // to claim lease "0", only one will succeed.
 func (q *queue) leaseShard(ctx context.Context, shard *QueueShard, duration time.Duration, n int) (*ulid.ULID, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "leaseShard"), redis_telemetry.ScopeQueue)
+
 	now := getNow()
 	leaseID, err := ulid.New(uint64(now.Add(duration).UnixMilli()), rand.Reader)
 	if err != nil {
@@ -2016,7 +2061,7 @@ func (q *queue) leaseShard(ctx context.Context, shard *QueueShard, duration time
 	}
 
 	status, err := scripts["queue/shardLease"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "shardLease"),
 		q.u.unshardedRc,
 		keys,
 		args,
@@ -2039,6 +2084,8 @@ func (q *queue) leaseShard(ctx context.Context, shard *QueueShard, duration time
 }
 
 func (q *queue) renewShardLease(ctx context.Context, shard *QueueShard, duration time.Duration, leaseID ulid.ULID) (*ulid.ULID, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunJobs"), redis_telemetry.ScopeQueue)
+
 	now := getNow()
 	newLeaseID, err := ulid.New(uint64(now.Add(duration).UnixMilli()), rand.Reader)
 	if err != nil {
@@ -2057,7 +2104,7 @@ func (q *queue) renewShardLease(ctx context.Context, shard *QueueShard, duration
 	}
 
 	status, err := scripts["queue/renewShardLease"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "renewShardLease"),
 		q.u.unshardedRc,
 		keys,
 		args,
@@ -2090,6 +2137,8 @@ func (q *queue) getShardLeases() []leasedShard {
 
 // peekEWMA returns the calculated EWMA value from the list
 func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "peekEWMA"), redis_telemetry.ScopeQueue)
+
 	// retrieves the list from redis
 	cmd := q.u.Client().B().Lrange().Key(q.u.KeyGenerator().ConcurrencyFnEWMA(fnID)).Start(0).Stop(-1).Build()
 	strlist, err := q.u.Client().Do(ctx, cmd).AsStrSlice()
@@ -2123,6 +2172,8 @@ func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
 // setPeekEWMA add the new value to the existing list.
 // if the length of the list exceeds the predetermined size, pop out the first item
 func (q *queue) setPeekEWMA(ctx context.Context, fnID uuid.UUID, val int64) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "setPeekEWMA"), redis_telemetry.ScopeQueue)
+
 	listSize := q.peekEWMALen
 	if listSize == 0 {
 		listSize = QueuePeekEWMALen
@@ -2140,7 +2191,7 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID uuid.UUID, val int64) erro
 	}
 
 	_, err = scripts["queue/setPeekEWMA"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "setPeekEWMA"),
 		q.u.Client(),
 		keys,
 		args,

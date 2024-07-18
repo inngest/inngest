@@ -1,4 +1,4 @@
-package redis
+package redis_telemetry
 
 import (
 	"context"
@@ -9,18 +9,26 @@ import (
 
 type scopeValType struct{}
 type scriptNameValType struct{}
+type opNameCtxValType struct{}
 
 var (
 	scopeCtxVal      = scopeValType{}
 	scriptNameCtxVal = scriptNameValType{}
+	opNameCtxVal     = opNameCtxValType{}
 )
 
 type Scope string
 
 const (
-	ScopeQueue  Scope = "queue"
-	ScopePauses Scope = "pauses"
+	ScopeQueue      Scope = "queue"
+	ScopePauses     Scope = "pauses"
+	ScopeFnRunState Scope = "state"
 )
+
+// WithOpName returns a context that stores the given opName inside.
+func WithOpName(ctx context.Context, opName string) context.Context {
+	return context.WithValue(ctx, opNameCtxVal, opName)
+}
 
 // WithScope returns a context that stores the given scope inside.
 func WithScope(ctx context.Context, scope Scope) context.Context {
@@ -43,6 +51,13 @@ func scopeFromContext(ctx context.Context) Scope {
 // empty string if there's no scope.
 func scriptNameFromContext(ctx context.Context) string {
 	str, _ := ctx.Value(scriptNameCtxVal).(string)
+	return str
+}
+
+// opNameFromContext returns the scope given the current context, or an
+// empty string if there's no scope.
+func opNameFromContext(ctx context.Context) string {
+	str, _ := ctx.Value(opNameCtxVal).(string)
 	return str
 }
 
@@ -81,6 +96,11 @@ func (i instrumentedClient) Do(ctx context.Context, cmd rueidis.Completed) (resp
 			scriptName := scriptNameFromContext(ctx)
 			if scriptName != "" {
 				tags["script_name"] = scriptName
+			}
+
+			opName := opNameFromContext(ctx)
+			if opName != "" {
+				tags["op"] = opName
 			}
 
 			telemetry.HistogramRedisCommandDuration(ctx, dur.Milliseconds(), telemetry.HistogramOpt{
