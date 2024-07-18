@@ -332,6 +332,7 @@ export const GET_RUN = gql`
         }
         id
         name
+        slug
       }
       trace {
         ...TraceDetails
