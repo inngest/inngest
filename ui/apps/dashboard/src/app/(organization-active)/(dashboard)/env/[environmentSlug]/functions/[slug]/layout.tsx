@@ -12,6 +12,7 @@ import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { graphql } from '@/gql';
 import { useFunction } from '@/queries';
+import { pathCreator } from '@/utils/urls';
 import { CancelFunctionButton } from './CancelFunctionButton';
 import PauseFunctionButton from './PauseButton';
 
@@ -62,6 +63,21 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
     navLinks.push({
       href: `/env/${params.environmentSlug}/functions/${params.slug}/runs`,
       text: 'Runs',
+      badge: (
+        <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
+          Beta
+        </Badge>
+      ),
+    });
+  }
+
+  if (isBulkCancellationEnabled.value) {
+    navLinks.push({
+      href: pathCreator.functionCancellations({
+        envSlug: params.environmentSlug,
+        functionSlug: params.slug,
+      }),
+      text: 'Cancellations',
       badge: (
         <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
           Beta
