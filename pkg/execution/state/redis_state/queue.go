@@ -1220,6 +1220,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 		q.u.kg.FnQueueSet(partitionName),
 		q.u.kg.QueueItem(),
 		q.u.kg.GlobalPartitionIndex(),                              // Global partition queue
+		q.u.kg.GlobalAccountIndex(),                                // Global account queue
 		q.u.kg.AccountPartitionIndex(qi.Data.Identifier.AccountID), // Account partition queue
 		q.u.kg.ShardPartitionIndex(shardName),                      // Shard partition queue
 		q.u.kg.PartitionItem(),                                     // Partition hash
@@ -1233,6 +1234,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 			strconv.Itoa(int(at.UnixMilli())),
 			partitionName,
 			strconv.Itoa(int(getNow().UnixMilli())),
+			qi.Data.Identifier.AccountID.String(),
 		},
 	).AsInt64()
 	if err != nil {
@@ -1558,6 +1560,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		q.u.kg.FnQueueSet(i.Queue()),
 		q.u.kg.PartitionMeta(i.Queue()),
 		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
 		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
 		q.u.kg.Concurrency("p", i.FunctionID.String()),
@@ -1578,6 +1581,8 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		i.ID,
 		at.UnixMilli(),
 		i.Queue(),
+		p,
+		i.Data.Identifier.AccountID,
 	})
 	if err != nil {
 		return err
@@ -2000,6 +2005,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		p.Queue(),
 		at.UnixMilli(),
 		force,
+		*p.AccountID,
 	})
 	if err != nil {
 		return err

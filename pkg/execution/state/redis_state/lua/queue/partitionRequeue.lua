@@ -21,16 +21,19 @@ local queueIndex              = KEYS[7]
 local queueKey                = KEYS[8]
 local partitionConcurrencyKey = KEYS[9] -- We can only GC a partition if no running jobs occur.
 
-local workflowID              = ARGV[1]
+local partitionID             = ARGV[1]
 local atMS                    = tonumber(ARGV[2]) -- time in milliseconds
 local forceAt                 = tonumber(ARGV[3])
+local accountId               = ARGV[4]
 
 local atS = math.floor(atMS / 1000) -- in seconds;  partitions are currently second granularity, but this should change.
 
 -- $include(get_partition_item.lua)
 -- $include(has_shard_key.lua)
+-- $include(update_pointer_score.lua)
+
 --
-local existing                = get_partition_item(partitionKey, workflowID)
+local existing                = get_partition_item(partitionKey, partitionID)
 if existing == nil then
     return 1
 end
@@ -38,10 +41,10 @@ end
 -- If there are no items in the workflow queue, we can safely remove the
 -- partition.
 if tonumber(redis.call("ZCARD", queueIndex)) == 0 and tonumber(redis.call("ZCARD", partitionConcurrencyKey)) == 0 then
-    redis.call("HDEL", partitionKey, workflowID)             -- Remove the item
+    redis.call("HDEL", partitionKey, partitionID)             -- Remove the item
     redis.call("DEL", partitionMeta)                         -- Remove the meta
-    redis.call("ZREM", keyGlobalPartitionPtr, workflowID)    -- Remove the global index
-    redis.call("ZREM", keyAccountPartitionPtr, workflowID)    -- Remove the account-level index
+    redis.call("ZREM", keyGlobalPartitionPtr, partitionID)    -- Remove the global index
+    redis.call("ZREM", keyAccountPartitionPtr, partitionID)    -- Remove the account-level index
 
     -- Remove account from global accounts if there are no partitions to work on
     local account_items = tonumber(redis.call("ZCARD", keyAccountPartitionPtr))
@@ -50,7 +53,7 @@ if tonumber(redis.call("ZCARD", queueIndex)) == 0 and tonumber(redis.call("ZCARD
     end
 
     if has_shard_key(keyShardPartitionPtr) then
-        redis.call("ZREM", keyShardPartitionPtr, workflowID) -- Remove the shard index
+        redis.call("ZREM", keyShardPartitionPtr, partitionID) -- Remove the shard index
     end
     return 2
 end
@@ -78,12 +81,17 @@ end
 
 existing.at = atS
 existing.leaseID = nil
-redis.call("HSET", partitionKey, workflowID, cjson.encode(existing))
-redis.call("ZADD", keyGlobalPartitionPtr, atS, workflowID)
-redis.call("ZADD", keyAccountPartitionPtr, atS, workflowID)
--- TODO Do we need to update the global account ZSET?
+redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
+update_pointer_score_to(partitionID,keyGlobalPartitionPtr,atS)
+update_pointer_score_to(partitionID,keyAccountPartitionPtr,atS)
+
+-- Read the _updated_ account partitions after the operation above
+-- to consistently set account pointer to earliest possible partition
+local earliestPartitionScoreInAccount = get_fn_partition_score(keyAccountPartitionPtr)
+update_pointer_score_to(accountId, keyGlobalAccountsPtr, earliestPartitionScoreInAccount)
+
 if has_shard_key(keyShardPartitionPtr) then
-    redis.call("ZADD", keyShardPartitionPtr, atS, workflowID) -- Update any index
+    redis.call("ZADD", keyShardPartitionPtr, atS, partitionID) -- Update any index
 end
 
 return 0

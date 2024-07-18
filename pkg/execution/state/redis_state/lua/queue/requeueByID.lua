@@ -14,17 +14,19 @@ Return values:
 ]]
 --
 
-local keyQueueIndex    = KEYS[1]
-local keyQueueHash     = KEYS[2]
-local keyGlobalIndex   = KEYS[3]           -- partition:sorted - zset
-local keyAccountIndex  = KEYS[4]           -- accounts:$accountId:partition:sorted
-local keyShardIndex    = KEYS[5]           -- shard zset
-local keyPartitionHash = KEYS[6]           -- partition hash
+local keyQueueIndex         = KEYS[1]
+local keyQueueHash          = KEYS[2]
+local keyGlobalIndex        = KEYS[3]           -- partition:sorted - zset
+local globalAccountIndexKey = KEYS[4] -- accounts:sorted - zset
+local keyAccountIndex       = KEYS[5]           -- accounts:$accountId:partition:sorted
+local keyShardIndex         = KEYS[6]           -- shard zset
+local keyPartitionHash      = KEYS[7]           -- partition hash
 
 local jobID            = ARGV[1]           -- queue item ID
 local jobScore         = tonumber(ARGV[2]) -- enqueue at, in milliseconds
 local partitionID      = ARGV[3]           -- function ID
 local currentTime      = tonumber(ARGV[4]) -- in ms
+local accountId        = ARGV[5]
 
 if redis.call("ZSCORE", keyQueueIndex, jobID) == false then
     -- This doesn't exist.
@@ -74,7 +76,12 @@ local currentScore = redis.call("ZSCORE", keyGlobalIndex, partitionID)
 if currentScore == false or tonumber(currentScore) ~= partitionScore then
     redis.call("ZADD", keyGlobalIndex, partitionScore, partitionID)
     redis.call("ZADD", keyAccountIndex, partitionScore, partitionID)
-    -- TODO Do we need to update the global accounts zset?
+
+    -- Read the _updated_ account partitions after the operation above
+    -- to consistently set account pointer to earliest possible partition
+    local earliestPartitionScoreInAccount = get_fn_partition_score(keyAccountIndex)
+    update_pointer_score_to(accountId, globalAccountIndexKey, earliestPartitionScoreInAccount)
+
     if has_shard_key(keyShardIndex) then
         update_pointer_score_to(partitionID, keyShardIndex, partitionScore)
     end
