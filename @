@@ -1,0 +1,11 @@
+remove select changes that I didn't end up using
+
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# On branch jacob/new-ia-nav
+# Your branch is up to date with 'origin/jacob/new-ia-nav'.
+#
+# Changes to be committed:
+#	modified:   ui/packages/components/src/Select/Select.tsx
+#

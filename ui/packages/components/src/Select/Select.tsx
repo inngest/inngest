@@ -64,12 +64,10 @@ export function Select({
 function Button({
   children,
   isLabelVisible,
-  isControlVisible = true,
   className,
   as: Component,
 }: React.PropsWithChildren<{
   isLabelVisible?: boolean;
-  isControlVisible?: boolean;
   className?: string;
   as: React.ElementType;
 }>) {
@@ -82,12 +80,10 @@ function Button({
       )}
     >
       {children}
-      {isControlVisible && (
-        <RiArrowDownSLine
-          className="ui-open:-rotate-180 text-subtle h-4 w-4 transition-transform duration-500"
-          aria-hidden="true"
-        />
-      )}
+      <RiArrowDownSLine
+        className="ui-open:-rotate-180 text-subtle h-4 w-4 transition-transform duration-500"
+        aria-hidden="true"
+      />
     </Component>
   );
 }
@@ -105,12 +101,11 @@ function Options({ children, as: Component }: React.PropsWithChildren<{ as: Reac
 function Option({
   children,
   option,
-  className,
   as: Component,
-}: React.PropsWithChildren<{ option: Option; className?: string; as: React.ElementType }>) {
+}: React.PropsWithChildren<{ option: Option; as: React.ElementType }>) {
   return (
     <Component
-      className={`ui-selected:text-success ui-selected:font-medium ui-active:bg-canvasSubtle/50 text-basis flex select-none items-center justify-between focus:outline-none ${className}`}
+      className=" ui-selected:text-success ui-selected:font-medium ui-active:bg-canvasSubtle/50 text-basis flex select-none items-center justify-between focus:outline-none"
       key={option.id}
       value={option}
       disabled={option.disabled}
@@ -159,14 +154,10 @@ function Footer({ onReset }: { onReset: () => void }) {
 }
 
 Select.Button = (
-  props: React.PropsWithChildren<{
-    isLabelVisible?: boolean;
-    isControlVisible?: boolean;
-    className?: string;
-  }>
+  props: React.PropsWithChildren<{ isLabelVisible?: boolean; className?: string }>
 ) => <Button {...props} as={Listbox.Button} />;
 Select.Options = (props: React.PropsWithChildren) => <Options {...props} as={Listbox.Options} />;
-Select.Option = (props: React.PropsWithChildren<{ option: Option; className?: string }>) => (
+Select.Option = (props: React.PropsWithChildren<{ option: Option }>) => (
   <Option {...props} as={Listbox.Option} />
 );
 Select.CheckboxOption = (props: React.PropsWithChildren<{ option: Option }>) => (
