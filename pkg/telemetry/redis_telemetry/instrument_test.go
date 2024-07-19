@@ -65,7 +65,7 @@ func BenchmarkParallelDirectClient(b *testing.B) {
 // ~24,000ns with largeContextSize = 50
 func BenchmarkInstrumentedClient(b *testing.B) {
 	ctx := createLargeContext()
-	rc := InstrumentRedisClient(setupMiniredis(b), InstrumentedClientOpts{"test", "test"})
+	rc := InstrumentRedisClient(context.Background(), setupMiniredis(b), InstrumentedClientOpts{"test", "test"})
 	defer rc.Close()
 
 	b.ResetTimer()
@@ -79,7 +79,7 @@ func BenchmarkInstrumentedClient(b *testing.B) {
 // ~8,000ns with largeContextSize = 50
 func BenchmarkParallelInstrumentedClient(b *testing.B) {
 	ctx := createLargeContext()
-	rc := InstrumentRedisClient(setupMiniredis(b), InstrumentedClientOpts{"test", "test"})
+	rc := InstrumentRedisClient(context.Background(), setupMiniredis(b), InstrumentedClientOpts{"test", "test"})
 	defer rc.Close()
 
 	b.ResetTimer()
