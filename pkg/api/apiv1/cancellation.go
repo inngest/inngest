@@ -127,25 +127,33 @@ func (a API) CreateCancellation(ctx context.Context, opts CreateCancellationBody
 	if err != nil {
 		return nil, publicerr.Wrap(err, 404, "function not found")
 	}
-	// Create a new cancellation for the given function ID
-	cancel := cqrs.Cancellation{
-		CreatedAt:     time.Now(),
-		ID:            ulid.MustNew(ulid.Now(), rand.Reader),
-		WorkspaceID:   auth.WorkspaceID(),
-		FunctionID:    fn.ID,
-		FunctionSlug:  fn.Slug,
-		StartedAfter:  opts.StartedAfter,
-		StartedBefore: opts.StartedBefore,
-		If:            opts.If,
+
+	var cancel *cqrs.Cancellation
+	if a.overrides.CreateCancellationImpl != nil {
+		cancel, err = a.overrides.CreateCancellationImpl(ctx, &opts)
+	} else {
+		// Create a new cancellation for the given function ID
+		cancel = &cqrs.Cancellation{
+			CreatedAt:     time.Now(),
+			ID:            ulid.MustNew(ulid.Now(), rand.Reader),
+			WorkspaceID:   auth.WorkspaceID(),
+			FunctionID:    fn.ID,
+			FunctionSlug:  fn.Slug,
+			StartedAfter:  opts.StartedAfter,
+			StartedBefore: opts.StartedBefore,
+			If:            opts.If,
+		}
+		err = a.opts.CancellationReadWriter.CreateCancellation(ctx, *cancel)
 	}
-	if err := a.opts.CancellationReadWriter.CreateCancellation(ctx, cancel); err != nil {
+
+	if err != nil {
 		var compileError *expressions.CompileError
 		if errors.As(err, &compileError) {
 			return nil, publicerr.Wrap(err, 400, fmt.Sprintf("invalid expression: %s", compileError.Message()))
 		}
 		return nil, publicerr.Wrap(err, 500, "Error creating cancellation")
 	}
-	return &cancel, nil
+	return cancel, nil
 }
 
 func (a router) createCancellation(w http.ResponseWriter, r *http.Request) {

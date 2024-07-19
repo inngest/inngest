@@ -39,6 +39,10 @@ type Opts struct {
 	CancellationReadWriter cqrs.CancellationReadWriter
 }
 
+type Overrides struct {
+	CreateCancellationImpl func(context.Context, *CreateCancellationBody) (*cqrs.Cancellation, error)
+}
+
 // AddRoutes adds a new API handler to the given router.
 func AddRoutes(r chi.Router, o Opts) http.Handler {
 	if o.AuthFinder == nil {
@@ -62,7 +66,8 @@ func AddRoutes(r chi.Router, o Opts) http.Handler {
 }
 
 type API struct {
-	opts Opts
+	opts      Opts
+	overrides Overrides
 }
 
 type router struct {
