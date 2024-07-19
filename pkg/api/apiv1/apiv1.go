@@ -28,6 +28,9 @@ type Opts struct {
 	AuthFinder AuthFinder
 	// Executor is required to cancel and manage function executions.
 	Executor execution.Executor
+	// CancelExecutor is a service capable of creating and initiating a cancellation.
+	CancelExecutor CancelExecutorService
+
 	// EventReader allows reading of events from storage.
 	EventReader EventReader
 	// FunctionReader reads functions from a backing store.
@@ -38,10 +41,6 @@ type Opts struct {
 	JobQueueReader queue.JobQueueReader
 	// CancellationReadWriter reads/writes cancellation records in a backing store.
 	CancellationReadWriter cqrs.CancellationReadWriter
-}
-
-type Overrides struct {
-	CreateCancellationImpl func(context.Context, *CreateCancellationBody) (*cqrs.Cancellation, error)
 }
 
 // AddRoutes adds a new API handler to the given router.
@@ -67,8 +66,7 @@ func AddRoutes(r chi.Router, o Opts) http.Handler {
 }
 
 type API struct {
-	opts      Opts
-	overrides Overrides
+	opts Opts
 }
 
 type router struct {

@@ -3,20 +3,35 @@ package apiv1
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/inngest/inngest/pkg/expressions"
-
 	"github.com/go-chi/chi/v5"
-	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
+
+	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/publicerr"
 )
+
+// CancelExecutorService is capable of creating and initiating a cancellation.
+type CancelExecutorService interface {
+	Cancel(context.Context, CancelInput) (*cqrs.Cancellation, error)
+}
+
+type CancelInput struct {
+	AppID         uuid.UUID
+	EnvID         uuid.UUID
+	FunctionID    uuid.UUID
+	FunctionSlug  string
+	StartedAfter  *time.Time // aka QueuedAtMin
+	StartedBefore time.Time  // aka QueuedAtMax
+	If            *string
+}
 
 // DeleteCancellation is implementation which finds and deletes a cancellation given the ID.
 func (a API) DeleteCancellation(ctx context.Context, cancellationID ulid.ULID) error {
@@ -128,24 +143,18 @@ func (a API) CreateCancellation(ctx context.Context, opts CreateCancellationBody
 		return nil, publicerr.Wrap(err, 404, "function not found")
 	}
 
-	var cancel *cqrs.Cancellation
-	if a.overrides.CreateCancellationImpl != nil {
-		cancel, err = a.overrides.CreateCancellationImpl(ctx, &opts)
-	} else {
-		// Create a new cancellation for the given function ID
-		cancel = &cqrs.Cancellation{
-			CreatedAt:     time.Now(),
-			ID:            ulid.MustNew(ulid.Now(), rand.Reader),
-			WorkspaceID:   auth.WorkspaceID(),
+	cancellation, err := a.opts.CancelExecutor.Cancel(
+		ctx,
+		CancelInput{
+			AppID:         fn.AppID,
+			EnvID:         auth.WorkspaceID(),
 			FunctionID:    fn.ID,
 			FunctionSlug:  fn.Slug,
 			StartedAfter:  opts.StartedAfter,
 			StartedBefore: opts.StartedBefore,
 			If:            opts.If,
-		}
-		err = a.opts.CancellationReadWriter.CreateCancellation(ctx, *cancel)
-	}
-
+		},
+	)
 	if err != nil {
 		var compileError *expressions.CompileError
 		if errors.As(err, &compileError) {
@@ -153,7 +162,7 @@ func (a API) CreateCancellation(ctx context.Context, opts CreateCancellationBody
 		}
 		return nil, publicerr.Wrap(err, 500, "Error creating cancellation")
 	}
-	return cancel, nil
+	return cancellation, nil
 }
 
 func (a router) createCancellation(w http.ResponseWriter, r *http.Request) {
