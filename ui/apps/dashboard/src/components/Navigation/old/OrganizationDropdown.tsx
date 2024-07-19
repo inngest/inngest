@@ -21,15 +21,15 @@ import {
 } from '@remixicon/react';
 
 export default async function OrganizationDropdown() {
-  const { orgId: organizationId } = auth();
+  const { orgId: organizationId, userId } = auth();
 
   if (!organizationId) {
     return null;
   }
 
   const organizations = (
-    await clerkClient.organizations.getOrganizationMembershipList({
-      organizationId,
+    await clerkClient.users.getOrganizationMembershipList({
+      userId,
     })
   ).map((o: OrganizationMembership) => o.organization);
 
