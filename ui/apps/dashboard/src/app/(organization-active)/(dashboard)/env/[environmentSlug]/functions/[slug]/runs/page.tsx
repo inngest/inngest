@@ -7,7 +7,7 @@ import {
   useSearchParam,
   useStringArraySearchParam,
 } from '@inngest/components/hooks/useSearchParam';
-import { getTimestampDaysAgo } from '@inngest/components/utils/date';
+import { parseDuration, subtractDuration } from '@inngest/components/utils/date';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -27,6 +27,7 @@ const GetRunsDocument = graphql(`
   query GetRuns(
     $environmentID: ID!
     $startTime: Time!
+    $endTime: Time
     $status: [FunctionRunStatus!]
     $timeField: RunsOrderByField!
     $functionSlug: String!
@@ -34,7 +35,13 @@ const GetRunsDocument = graphql(`
   ) {
     environment: workspace(id: $environmentID) {
       runs(
-        filter: { from: $startTime, status: $status, timeField: $timeField, fnSlug: $functionSlug }
+        filter: {
+          from: $startTime
+          until: $endTime
+          status: $status
+          timeField: $timeField
+          fnSlug: $functionSlug
+        }
         orderBy: [{ field: $timeField, direction: DESC }]
         after: $functionRunCursor
       ) {
@@ -78,16 +85,14 @@ export default function Page({
 
   const [rawFilteredStatus] = useStringArraySearchParam('filterStatus');
   const [rawTimeField = RunsOrderByField.QueuedAt] = useSearchParam('timeField');
-  const [lastDays = '3'] = useSearchParam('last');
+  const [lastDays = '3d'] = useSearchParam('last');
+  const [startTime] = useSearchParam('start');
+  const [endTime] = useSearchParam('end');
 
   const timeField = toTimeField(rawTimeField) ?? RunsOrderByField.QueuedAt;
 
-  /* TODO: Time params for absolute time filter */
-  // const [fromTime, setFromTime] = useSearchParam('from');
-  // const [untilTime, setUntilTime] = useSearchParam('until');
-
-  /* TODO: When we have absolute time, the start date will be either coming from the date picker or the relative time */
-  const [startTime, setStartTime] = useState<Date>(new Date());
+  /* The start date comes from either the absolute start time or the relative time */
+  const [calculatedStartTime, setCalculatedStartTime] = useState<Date>(new Date());
   const [cursor, setCursor] = useState('');
   const [runs, setRuns] = useState<Run[]>([]);
   const [isScrollRequest, setIsScrollRequest] = useState(false);
@@ -112,14 +117,11 @@ export default function Page({
 
   useEffect(() => {
     if (lastDays) {
-      setStartTime(
-        getTimestampDaysAgo({
-          currentDate: new Date(),
-          days: parseInt(lastDays),
-        })
-      );
+      setCalculatedStartTime(subtractDuration(new Date(), parseDuration(lastDays)));
+    } else if (startTime) {
+      setCalculatedStartTime(new Date(startTime));
     }
-  }, [lastDays]);
+  }, [lastDays, startTime]);
 
   const filteredStatus = useMemo(() => {
     return toRunStatuses(rawFilteredStatus ?? []);
@@ -132,7 +134,8 @@ export default function Page({
     variables: {
       environmentID: environment.id,
       functionSlug,
-      startTime: startTime.toISOString(),
+      startTime: calculatedStartTime.toISOString(),
+      endTime: endTime ?? null,
       status: filteredStatus.length > 0 ? filteredStatus : null,
       timeField,
       functionRunCursor: null,
@@ -145,7 +148,8 @@ export default function Page({
     variables: {
       environmentID: environment.id,
       functionSlug,
-      startTime: startTime.toISOString(),
+      startTime: calculatedStartTime.toISOString(),
+      endTime: endTime ?? null,
       status: filteredStatus.length > 0 ? filteredStatus : null,
       timeField,
       functionRunCursor: cursor,

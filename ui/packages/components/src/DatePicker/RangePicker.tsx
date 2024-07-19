@@ -26,7 +26,7 @@ type AbsoluteProps = {
   start: Date;
   end: Date;
 };
-type RangeChangeProps = RelativeProps | AbsoluteProps;
+export type RangeChangeProps = RelativeProps | AbsoluteProps;
 
 type RangePickerProps = Omit<DateButtonProps, 'defaultValue' | 'onChange'> & {
   placeholder?: string;

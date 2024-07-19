@@ -14,10 +14,12 @@ import {
   isFunctionTimeField,
   type FunctionRunStatus,
 } from '@inngest/components/types/functionRun';
+import { durationToString, parseDuration, subtractDuration } from '@inngest/components/utils/date';
 import { RiLoopLeftLine } from '@remixicon/react';
 import { type VisibilityState } from '@tanstack/react-table';
 import { useLocalStorage } from 'react-use';
 
+import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
 import { RunDetails } from '../RunDetailsV2';
 import {
@@ -99,7 +101,10 @@ export function RunsPage({
     'timeField',
     isFunctionTimeField
   );
-  const [lastDays = '3', setLastDays] = useSearchParam('last');
+
+  const [lastDays = '3d', setLastDays, removeLastDays] = useSearchParam('last');
+  const [startTime, setStartTime, removeStartTime] = useSearchParam('start');
+  const [endTime, setEndTime, removeEndTime] = useSearchParam('end');
 
   const scrollToTop = useCallback(
     (smooth = false) => {
@@ -159,11 +164,19 @@ export function RunsPage({
   );
 
   const onDaysChange = useCallback(
-    (value: string) => {
+    (value: RangeChangeProps) => {
       scrollToTop();
-      setLastDays(value);
+      if (value.type === 'relative') {
+        setLastDays(durationToString(value.duration));
+        removeEndTime();
+        removeStartTime();
+      } else {
+        setStartTime(value.start.toISOString());
+        setEndTime(value.end.toISOString());
+        removeLastDays();
+      }
     },
-    [scrollToTop, setLastDays]
+    [scrollToTop, setLastDays, setStartTime, setEndTime]
   );
 
   const renderSubComponent = useCallback(
@@ -205,7 +218,14 @@ export function RunsPage({
             <TimeFilter
               daysAgoMax={features.history}
               onDaysChange={onDaysChange}
-              selectedDays={lastDays}
+              defaultStart={
+                lastDays
+                  ? subtractDuration(new Date(), parseDuration(lastDays))
+                  : startTime
+                  ? new Date(startTime)
+                  : undefined
+              }
+              defaultEnd={endTime ? new Date(endTime) : undefined}
             />
           </SelectGroup>
           <StatusFilter
