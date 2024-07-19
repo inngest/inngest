@@ -12,7 +12,7 @@ type SetParam<T> = (value: T) => void;
  * Returns a tuple of the current value of the search param and a function to
  * update it.
  */
-export function useSearchParam(name: string): [string | undefined, SetParam<string>] {
+export function useSearchParam(name: string): [string | undefined, SetParam<string>, () => void] {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -27,8 +27,15 @@ export function useSearchParam(name: string): [string | undefined, SetParam<stri
     [name, pathname, router, searchParams]
   );
 
+  const remove = useCallback(() => {
+    const params = new URLSearchParams(searchParams);
+    params.delete(name);
+
+    router.replace((pathname + '?' + params.toString()) as Route);
+  }, [name, pathname, router, searchParams]);
+
   const value = searchParams.get(name) ?? undefined;
-  return [value, upsert];
+  return [value, upsert, remove];
 }
 
 export function useBooleanSearchParam(name: string): [boolean | undefined, SetParam<boolean>] {
