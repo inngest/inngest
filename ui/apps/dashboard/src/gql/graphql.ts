@@ -930,8 +930,10 @@ export type Query = {
   __typename?: 'Query';
   account: Account;
   billableStepTimeSeries: Array<TimeSeries>;
+  defaultEnv: Workspace;
   deploy: Deploy;
   deploys: Maybe<Array<Deploy>>;
+  envBySlug: Maybe<Workspace>;
   events: Maybe<PaginatedEvents>;
   plans: Array<Maybe<BillingPlan>>;
   session: Maybe<Session>;
@@ -952,6 +954,11 @@ export type QueryDeployArgs = {
 
 export type QueryDeploysArgs = {
   workspaceID: InputMaybe<Scalars['ID']>;
+};
+
+
+export type QueryEnvBySlugArgs = {
+  slug: Scalars['String'];
 };
 
 
@@ -1626,6 +1633,7 @@ export type Workspace = {
   runs: RunsConnection;
   runsMetrics: MetricsResponse;
   signingKeys: Array<SigningKey>;
+  slug: Maybe<Scalars['String']>;
   test: Scalars['Boolean'];
   type: EnvironmentType;
   unattachedSyncs: Array<Deploy>;
