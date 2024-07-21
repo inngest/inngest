@@ -30,6 +30,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
@@ -93,7 +94,7 @@ func (d *devserver) Pre(ctx context.Context) error {
 	devAPI.Route("/v1", func(r chi.Router) {
 		// Add the V1 API to our dev server API.
 		cache := cache.New[[]byte](freecachestore.NewFreecache(freecache.NewCache(1024 * 1024)))
-		caching := apiv1.NewCacheMiddleware(cache)
+		caching := apiv1.NewCacheMiddleware(cache, headers.ServerKindDev)
 
 		apiv1.AddRoutes(r, apiv1.Opts{
 			CachingMiddleware: caching,
