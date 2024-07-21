@@ -75,6 +75,28 @@ export default function FunctionConfiguration({ configuration }: FunctionConfigu
     }
   }
 
+  let eventBatchItems: MetadataItemProps[] | undefined;
+  if (configuration.eventsBatch) {
+    eventBatchItems = [
+      {
+        label: 'Max Size',
+        value: configuration.eventsBatch.maxSize.toString(),
+      },
+      {
+        label: 'Timeout',
+        value: configuration.eventsBatch.timeout,
+      },
+    ];
+
+    if (configuration.eventsBatch.key) {
+      eventBatchItems.push({
+        label: 'Key',
+        value: configuration.eventsBatch.key,
+        type: 'code',
+      });
+    }
+  }
+
   let throttleItems: MetadataItemProps[] | undefined;
   if (configuration.throttle) {
     throttleItems = [
@@ -104,22 +126,10 @@ export default function FunctionConfiguration({ configuration }: FunctionConfigu
   return (
     <Block title="Configuration">
       <MetadataGrid columns={2} metadataItems={miscellaneousItems} />
-      {configuration.eventsBatch && (
+      {eventBatchItems && (
         <>
           <h3 className="pb-2 pt-6 text-sm font-medium text-slate-800">Events Batch</h3>
-          <MetadataGrid
-            columns={2}
-            metadataItems={[
-              {
-                label: 'Max Size',
-                value: configuration.eventsBatch.maxSize.toString(),
-              },
-              {
-                label: 'Timeout',
-                value: configuration.eventsBatch.timeout,
-              },
-            ]}
-          />
+          <MetadataGrid columns={2} metadataItems={eventBatchItems} />
         </>
       )}
       <h3 className="pb-2 pt-6 text-sm font-medium text-slate-800">Concurrency</h3>

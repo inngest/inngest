@@ -168,6 +168,7 @@ const GetFunctionDocument = graphql(`
           eventsBatch {
             maxSize
             timeout
+            key
           }
           concurrency {
             scope
