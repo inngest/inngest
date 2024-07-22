@@ -19,15 +19,15 @@ import {
   UpdateVercelAppDocument,
 } from '@/gql/graphql';
 import LoadingIcon from '@/icons/LoadingIcon';
-import { useProductionEnvironment } from '@/queries';
+import { useDefaultEnvironment } from '@/queries';
 import { VercelDeploymentProtection, type VercelProject } from '../../VercelIntegration';
 import { useVercelIntegration } from '../../useVercelIntegration';
 
 const defaultPath = '/api/inngest';
 
 export default function VercelConfigure() {
-  const [{ data: env }] = useProductionEnvironment();
-  const prodEnvID = env?.id;
+  const [{ data: defaultEnv }] = useDefaultEnvironment();
+  const defaultEnvID = defaultEnv?.id;
 
   const { data, fetching, error: fetchError } = useVercelIntegration();
   const [, createVercelApp] = useMutation(CreateVercelAppDocument);
@@ -64,7 +64,7 @@ export default function VercelConfigure() {
 
   const joinedPaths = paths.join(',');
   const submit = useCallback(async () => {
-    if (!prodEnvID) {
+    if (!defaultEnvID) {
       console.error('no environment found');
       return;
     }
@@ -85,7 +85,7 @@ export default function VercelConfigure() {
           input: {
             path: project.servePath,
             projectID: project.id,
-            workspaceID: prodEnvID,
+            workspaceID: defaultEnvID,
           },
         })
       ).error;
@@ -94,7 +94,7 @@ export default function VercelConfigure() {
         await removeVercelApp({
           input: {
             projectID: project.id,
-            workspaceID: prodEnvID,
+            workspaceID: defaultEnvID,
           },
         })
       ).error;
@@ -125,7 +125,7 @@ export default function VercelConfigure() {
     createVercelApp,
     joinedPaths,
     newEnablement,
-    prodEnvID,
+    defaultEnvID,
     project,
     removeVercelApp,
     updateVercelApp,

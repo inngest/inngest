@@ -10,8 +10,7 @@ import { useMutation } from 'urql';
 import Input from '@/components/Forms/Input';
 import { graphql } from '@/gql';
 import WebhookIcon from '@/icons/webhookIcon.svg';
-import { useEnvironments } from '@/queries';
-import { getProductionEnvironment } from '@/utils/environments';
+import { useDefaultEnvironment } from '@/queries';
 import { createTransform } from '../../(dashboard)/env/[environmentSlug]/manage/[ingestKeys]/[keyID]/TransformEvent';
 import ApprovalDialog from '../ApprovalDialog';
 
@@ -33,7 +32,7 @@ function getNameFromDomain(domain: string | null) {
 
 export default function Page() {
   // TODO - handle failure to fetch environments
-  const [{ data: environments }] = useEnvironments();
+  const [{ data: defaultEnv }] = useDefaultEnvironment();
   const [loading, setLoading] = useState(false);
   const [isEditing, setEditing] = useState(false);
   const [customPrefix, setCustomPrefix] = useState<string>('');
@@ -84,15 +83,14 @@ export default function Page() {
   });
 
   async function approve() {
-    const productionEnv = getProductionEnvironment(environments || []);
-    if (!productionEnv) {
+    if (!defaultEnv) {
       throw new Error('Failed to fetch production environment ID');
     }
     setLoading(true);
 
     createWebhook({
       input: {
-        workspaceID: productionEnv.id,
+        workspaceID: defaultEnv.id,
         name: displayName,
         source: 'webhook',
         metadata: {
