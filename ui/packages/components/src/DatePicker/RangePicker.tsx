@@ -71,7 +71,7 @@ const formatAbsolute = (absoluteRange?: AbsoluteRange) => (
 
 const AbsoluteDisplay = ({ absoluteRange }: { absoluteRange?: AbsoluteRange }) => (
   <Tooltip>
-    <TooltipTrigger>
+    <TooltipTrigger asChild>
       <div className="text-basis">{formatAbsolute(absoluteRange)}</div>
     </TooltipTrigger>
     <TooltipContent className="whitespace-pre-line">{formatAbsolute(absoluteRange)}</TooltipContent>
