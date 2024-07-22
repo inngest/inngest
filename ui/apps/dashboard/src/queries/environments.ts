@@ -44,7 +44,7 @@ const GetEnvironmentsDocument = graphql(`
   }
 `);
 
-const GetEnvironmentBySlugDocument = graphql(`
+export const GetEnvironmentBySlugDocument = graphql(`
   query GetEnvironmentBySlug($slug: String!) {
     envBySlug(slug: $slug) {
       id
@@ -57,6 +57,7 @@ const GetEnvironmentBySlugDocument = graphql(`
       lastDeployedAt
       isArchived
       isAutoArchiveEnabled
+      webhookSigningKey
     }
   }
 `);

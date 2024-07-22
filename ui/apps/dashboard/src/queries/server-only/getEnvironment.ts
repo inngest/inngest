@@ -1,24 +1,7 @@
 import { graphql } from '@/gql';
-import type { Workspace } from '@/gql/graphql';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { workspacesToEnvironments, type Environment } from '@/utils/environments';
-
-const GetEnvironmentBySlugDocument = graphql(`
-  query GetEnvironmentBySlug($slug: String!) {
-    envBySlug(slug: $slug) {
-      id
-      name
-      slug
-      parentID
-      test
-      type
-      createdAt
-      lastDeployedAt
-      isArchived
-      isAutoArchiveEnabled
-    }
-  }
-`);
+import { GetEnvironmentBySlugDocument } from '../environments';
 
 const GetProductionWorkspaceDocument = graphql(`
   query GetProductionWorkspace {
@@ -33,6 +16,7 @@ const GetProductionWorkspaceDocument = graphql(`
       lastDeployedAt
       isArchived
       isAutoArchiveEnabled
+      webhookSigningKey
     }
   }
 `);
@@ -51,7 +35,7 @@ export async function getEnvironment({
     throw new Error(`Environment "${environmentSlug}" not found`);
   }
 
-  const environment = workspacesToEnvironments([query.envBySlug] as Workspace[])[0];
+  const environment = workspacesToEnvironments([query.envBySlug])[0];
   if (!environment) {
     throw new Error(`Failed to convert workspace "${environmentSlug}" to environment`);
   }
@@ -62,7 +46,7 @@ export async function getEnvironment({
 export async function getProductionEnvironment(): Promise<Environment> {
   const query = await graphqlAPI.request(GetProductionWorkspaceDocument);
 
-  const environment = workspacesToEnvironments([query.defaultEnv] as Workspace[])[0];
+  const environment = workspacesToEnvironments([query.defaultEnv])[0];
   if (!environment) {
     throw new Error(`Failed to convert production workspace to environment`);
   }
