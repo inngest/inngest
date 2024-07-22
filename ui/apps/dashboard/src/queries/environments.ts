@@ -44,7 +44,7 @@ const GetEnvironmentsDocument = graphql(`
   }
 `);
 
-export const GetEnvironmentBySlugDocument = graphql(`
+const GetEnvironmentBySlugDocument = graphql(`
   query GetEnvironmentBySlug($slug: String!) {
     envBySlug(slug: $slug) {
       id
