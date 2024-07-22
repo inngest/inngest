@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
+import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   useSearchParam,
   useValidatedArraySearchParam,
@@ -12,7 +13,7 @@ import {
   isFunctionRunStatus,
   isFunctionTimeField,
 } from '@inngest/components/types/functionRun';
-import { parseDuration, subtractDuration, toMaybeDate } from '@inngest/components/utils/date';
+import { toMaybeDate } from '@inngest/components/utils/date';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import { useCancelRun } from '@/hooks/useCancelRun';
@@ -33,19 +34,9 @@ export default function Page() {
     isFunctionTimeField
   );
   const [lastDays] = useSearchParam('last');
-  const [calculatedStartTime, setCalculatedStartTime] = useState<Date>(new Date());
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
-
-  useEffect(() => {
-    if (lastDays) {
-      setCalculatedStartTime(subtractDuration(new Date(), parseDuration(lastDays)));
-    } else if (startTime) {
-      setCalculatedStartTime(new Date(startTime));
-    } else {
-      setCalculatedStartTime(subtractDuration(new Date(), parseDuration('3d')));
-    }
-  }, [lastDays, startTime]);
+  const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
 
   const queryFn = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {

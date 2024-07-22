@@ -7,6 +7,7 @@ import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
 import { LoadingMore, TableFilter } from '@inngest/components/Table';
+import { DEFAULT_TIME } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   FunctionRunTimeField,
   isFunctionRunStatus,
@@ -242,7 +243,7 @@ export function RunsPage({
                     }
                   : {
                       type: 'relative',
-                      duration: parseDuration('3d'),
+                      duration: parseDuration(DEFAULT_TIME),
                     }
               }
             />

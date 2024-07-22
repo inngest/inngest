@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import type { Run } from '@inngest/components/RunsPage/types';
+import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   useSearchParam,
   useStringArraySearchParam,
 } from '@inngest/components/hooks/useSearchParam';
-import { parseDuration, subtractDuration } from '@inngest/components/utils/date';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -100,7 +100,7 @@ export default function Page({
   const timeField = toTimeField(rawTimeField) ?? RunsOrderByField.QueuedAt;
 
   /* The start date comes from either the absolute start time or the relative time */
-  const [calculatedStartTime, setCalculatedStartTime] = useState<Date>(new Date());
+  const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
   const [cursor, setCursor] = useState('');
   const [runs, setRuns] = useState<Run[]>([]);
   const [isScrollRequest, setIsScrollRequest] = useState(false);
@@ -124,16 +124,6 @@ export default function Page({
         pathCreator.runPopout({ envSlug: env.slug, runID: params.runID }),
     };
   }, [env.slug]);
-
-  useEffect(() => {
-    if (lastDays) {
-      setCalculatedStartTime(subtractDuration(new Date(), parseDuration(lastDays)));
-    } else if (startTime) {
-      setCalculatedStartTime(new Date(startTime));
-    } else {
-      setCalculatedStartTime(subtractDuration(new Date(), parseDuration('3d')));
-    }
-  }, [lastDays, startTime]);
 
   const filteredStatus = useMemo(() => {
     return toRunStatuses(rawFilteredStatus ?? []);
