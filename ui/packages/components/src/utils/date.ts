@@ -109,6 +109,14 @@ export function getTimestampDaysAgo({ currentDate, days }: { currentDate: Date; 
   return subDays(currentDate, days);
 }
 
+export function maybeDateToString<T extends Date | null | undefined>(value: T): string | null {
+  if (!value) {
+    return null;
+  }
+
+  return value.toISOString();
+}
+
 export function toMaybeDate<T extends string | null | undefined>(value: T): Date | null {
   if (!value) {
     return null;

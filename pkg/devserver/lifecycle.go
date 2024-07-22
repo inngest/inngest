@@ -33,24 +33,22 @@ func (l lifecycle) OnFunctionScheduled(
 		OriginalRunID: md.Config.OriginalRunID,
 	})
 
-	/*
-		if id.BatchID != nil {
-			executedTime := ulid.Time(id.RunID.Time())
+	if md.Config.BatchID != nil {
+		executedTime := ulid.Time(md.ID.RunID.Time())
 
-			batch := cqrs.NewEventBatch(
-				cqrs.WithEventBatchID(*id.BatchID),
-				cqrs.WithEventBatchAccountID(id.AccountID),
-				cqrs.WithEventBatchWorkspaceID(id.WorkspaceID),
-				cqrs.WithEventBatchAppID(id.AppID),
-				cqrs.WithEventBatchFunctionID(id.WorkflowID),
-				cqrs.WithEventBatchRunID(id.RunID),
-				cqrs.WithEventBatchEventIDs(id.EventIDs),
-				cqrs.WithEventBatchExecutedTime(executedTime),
-			)
+		batch := cqrs.NewEventBatch(
+			cqrs.WithEventBatchID(*md.Config.BatchID),
+			cqrs.WithEventBatchAccountID(md.ID.Tenant.AccountID),
+			cqrs.WithEventBatchWorkspaceID(md.ID.Tenant.EnvID),
+			cqrs.WithEventBatchAppID(md.ID.Tenant.AppID),
+			cqrs.WithEventBatchFunctionID(md.ID.FunctionID),
+			cqrs.WithEventBatchRunID(md.ID.RunID),
+			cqrs.WithEventBatchEventIDs(md.Config.EventIDs),
+			cqrs.WithEventBatchExecutedTime(executedTime),
+		)
 
-			if batch.IsMulti() {
-				_ = l.cqrs.InsertEventBatch(ctx, *batch)
-			}
+		if batch.IsMulti() {
+			_ = l.cqrs.InsertEventBatch(ctx, *batch)
 		}
-	*/
+	}
 }
