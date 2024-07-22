@@ -294,7 +294,7 @@ export function RunsPage({
         scope={scope}
       />
       {isLoadingMore && <LoadingMore />}
-      {!hasMore && !isLoadingInitial && !isLoadingMore && (
+      {!hasMore && !isLoadingInitial && !isLoadingMore && data.length > 1 && (
         <div className="flex flex-col items-center py-8">
           <p className="text-subtle">No additional runs found.</p>
           <Button
