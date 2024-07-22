@@ -32,7 +32,7 @@ export default function Page() {
     'timeField',
     isFunctionTimeField
   );
-  const [lastDays = '3d'] = useSearchParam('last');
+  const [lastDays] = useSearchParam('last');
   const [calculatedStartTime, setCalculatedStartTime] = useState<Date>(new Date());
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
@@ -42,6 +42,8 @@ export default function Page() {
       setCalculatedStartTime(subtractDuration(new Date(), parseDuration(lastDays)));
     } else if (startTime) {
       setCalculatedStartTime(new Date(startTime));
+    } else {
+      setCalculatedStartTime(subtractDuration(new Date(), parseDuration('3d')));
     }
   }, [lastDays, startTime]);
 

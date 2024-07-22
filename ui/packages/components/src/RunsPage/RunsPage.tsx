@@ -13,7 +13,7 @@ import {
   isFunctionTimeField,
   type FunctionRunStatus,
 } from '@inngest/components/types/functionRun';
-import { durationToString, parseDuration, subtractDuration } from '@inngest/components/utils/date';
+import { durationToString, parseDuration } from '@inngest/components/utils/date';
 import { RiLoopLeftLine } from '@remixicon/react';
 import { type VisibilityState } from '@tanstack/react-table';
 import { useLocalStorage } from 'react-use';

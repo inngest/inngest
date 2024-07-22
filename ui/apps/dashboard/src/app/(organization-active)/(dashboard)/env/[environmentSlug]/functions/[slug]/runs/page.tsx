@@ -93,7 +93,7 @@ export default function Page({
 
   const [rawFilteredStatus] = useStringArraySearchParam('filterStatus');
   const [rawTimeField = RunsOrderByField.QueuedAt] = useSearchParam('timeField');
-  const [lastDays = '3d'] = useSearchParam('last');
+  const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
 
@@ -130,6 +130,8 @@ export default function Page({
       setCalculatedStartTime(subtractDuration(new Date(), parseDuration(lastDays)));
     } else if (startTime) {
       setCalculatedStartTime(new Date(startTime));
+    } else {
+      setCalculatedStartTime(subtractDuration(new Date(), parseDuration('3d')));
     }
   }, [lastDays, startTime]);
 
