@@ -10,11 +10,12 @@ import { Input } from '../Forms/Input';
 import { Popover, PopoverContent, PopoverTrigger } from '../Popover';
 import {
   DURATION_STRING_REGEX,
+  durationToString,
   longDateFormat,
   parseDuration,
   subtractDuration,
 } from '../utils/date';
-import { DateInputButton, type DateInputButtonProps } from './DateInputButton';
+import { DateInputButton, type DateButtonProps } from './DateButton';
 import { DateTimePicker } from './DateTimePicker';
 
 type RelativeProps = {
@@ -26,14 +27,14 @@ type AbsoluteProps = {
   start: Date;
   end: Date;
 };
-type RangeChangeProps = RelativeProps | AbsoluteProps;
+export type RangeChangeProps = RelativeProps | AbsoluteProps;
 
-type RangePickerProps = Omit<DateInputButtonProps, 'defaultValue' | 'onChange'> & {
+type RangePickerProps = Omit<DateButtonProps, 'defaultValue' | 'onChange'> & {
   placeholder?: string;
   onChange: (args: RangeChangeProps) => void;
-  defaultStart?: Date;
-  defaultEnd?: Date;
+  defaultValue?: RangeChangeProps;
   upgradeCutoff?: Date;
+  triggerComponent?: React.ComponentType<DateButtonProps>;
 };
 
 const RELATIVES = {
@@ -70,32 +71,47 @@ const formatAbsolute = (absoluteRange?: AbsoluteRange) => (
 
 const AbsoluteDisplay = ({ absoluteRange }: { absoluteRange?: AbsoluteRange }) => (
   <Tooltip>
-    <TooltipTrigger>
-      <div className="text-basis w-[180px] truncate">{formatAbsolute(absoluteRange)}</div>
+    <TooltipTrigger asChild>
+      <div className="text-basis">{formatAbsolute(absoluteRange)}</div>
     </TooltipTrigger>
     <TooltipContent className="whitespace-pre-line">{formatAbsolute(absoluteRange)}</TooltipContent>
   </Tooltip>
 );
 
 const RelativeDisplay = ({ duration }: { duration: string }) => (
-  <span className="text-basis truncate">{duration}</span>
+  <span className="text-basis truncate">Last {duration}</span>
 );
 
 export const RangePicker = ({
   placeholder,
   onChange,
-  defaultStart,
-  defaultEnd,
+  defaultValue,
   upgradeCutoff,
+  triggerComponent: TriggerComponent = DateInputButton,
   ...props
 }: RangePickerProps) => {
+  const getInitialDisplayValue = (defaultValue: RangeChangeProps | undefined): ReactNode => {
+    if (defaultValue) {
+      if (defaultValue.type === 'relative') {
+        return <RelativeDisplay duration={durationToString(defaultValue.duration)} />;
+      } else if (defaultValue.start && defaultValue.end) {
+        return <AbsoluteDisplay absoluteRange={defaultValue} />;
+      }
+    }
+    return null;
+  };
+
   const durationRef = useRef<HTMLInputElement | null>(null);
   const [open, setOpen] = useState(false);
   const [durationError, setDurationError] = useState<string>('');
   const [absoluteRange, setAbsoluteRange] = useState<AbsoluteRange>();
-  const [showAbsolute, setShowAbsolute] = useState<boolean>();
+  const [showAbsolute, setShowAbsolute] = useState<boolean>(
+    () => defaultValue?.type === 'absolute'
+  );
   const [tab, setTab] = useState('start');
-  const [displayValue, setDisplayValue] = useState<ReactNode | null>(null);
+  const [displayValue, setDisplayValue] = useState<ReactNode | null>(
+    getInitialDisplayValue(defaultValue)
+  );
   const [startValid, setStartValid] = useState(true);
   const [endValid, setEndValid] = useState(true);
   const [startError, setStartError] = useState('');
@@ -164,13 +180,13 @@ export const RangePicker = ({
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        <DateInputButton {...props}>
+        <TriggerComponent {...props}>
           {displayValue ? (
             displayValue
           ) : (
             <span className="text-disabled">{placeholder ? placeholder : 'Select dates'}</span>
           )}
-        </DateInputButton>
+        </TriggerComponent>
       </PopoverTrigger>
       <PopoverContent align="start">
         <div className="bg-canvasBase flex flex-row">
@@ -272,7 +288,7 @@ export const RangePicker = ({
                     setValid={setStartValid}
                     defaultValue={
                       absoluteRange?.start ||
-                      defaultStart ||
+                      (defaultValue?.type === 'absolute' && defaultValue.start) ||
                       subtractDuration(new Date(), { days: 1 })
                     }
                   />
@@ -303,7 +319,11 @@ export const RangePicker = ({
                     }}
                     valid={endValid}
                     setValid={setEndValid}
-                    defaultValue={absoluteRange?.end || defaultEnd || new Date()}
+                    defaultValue={
+                      absoluteRange?.end ||
+                      (defaultValue?.type === 'absolute' && defaultValue.end) ||
+                      new Date()
+                    }
                   />
                   <div className="flex flex-col">
                     {endError && <p className="text-error mx-4 mt-1 text-sm">{endError}</p>}
