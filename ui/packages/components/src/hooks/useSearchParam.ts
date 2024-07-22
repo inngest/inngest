@@ -38,6 +38,30 @@ export function useSearchParam(name: string): [string | undefined, SetParam<stri
   return [value, upsert, remove];
 }
 
+/**
+ * When we need to manipulate multiple search params at the same time
+ */
+export const useBatchedSearchParams = () => {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  return useCallback(
+    (updates: { [key: string]: string | null }) => {
+      const params = new URLSearchParams(searchParams);
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === null) {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+      });
+      router.replace((pathname + '?' + params.toString()) as Route);
+    },
+    [pathname, router, searchParams]
+  );
+};
+
 export function useBooleanSearchParam(name: string): [boolean | undefined, SetParam<boolean>] {
   const pathname = usePathname();
   const router = useRouter();

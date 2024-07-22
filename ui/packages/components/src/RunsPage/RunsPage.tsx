@@ -23,6 +23,7 @@ import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
 import { RunDetails } from '../RunDetailsV2';
 import {
+  useBatchedSearchParams,
   useSearchParam,
   useStringArraySearchParam,
   useValidatedArraySearchParam,
@@ -102,9 +103,10 @@ export function RunsPage({
     isFunctionTimeField
   );
 
-  const [lastDays = '3d', setLastDays, removeLastDays] = useSearchParam('last');
-  const [startTime, setStartTime, removeStartTime] = useSearchParam('start');
-  const [endTime, setEndTime, removeEndTime] = useSearchParam('end');
+  const [lastDays = '3d'] = useSearchParam('last');
+  const [startTime] = useSearchParam('start');
+  const [endTime] = useSearchParam('end');
+  const batchUpdate = useBatchedSearchParams();
 
   const scrollToTop = useCallback(
     (smooth = false) => {
@@ -167,16 +169,20 @@ export function RunsPage({
     (value: RangeChangeProps) => {
       scrollToTop();
       if (value.type === 'relative') {
-        setLastDays(durationToString(value.duration));
-        removeEndTime();
-        removeStartTime();
+        batchUpdate({
+          last: durationToString(value.duration),
+          start: null,
+          end: null,
+        });
       } else {
-        setStartTime(value.start.toISOString());
-        setEndTime(value.end.toISOString());
-        removeLastDays();
+        batchUpdate({
+          last: null,
+          start: value.start.toISOString(),
+          end: value.end.toISOString(),
+        });
       }
     },
-    [scrollToTop, setLastDays, setStartTime, setEndTime]
+    [scrollToTop]
   );
 
   const renderSubComponent = useCallback(
