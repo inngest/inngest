@@ -7,16 +7,22 @@ import { RiEqualizer2Line } from '@remixicon/react';
 
 import type { Environment as EnvType } from '@/utils/environments';
 
-export default function KeysMenu({ activeEnv }: { activeEnv: EnvType }) {
+export default function KeysMenu({
+  activeEnv,
+  collapsed,
+}: {
+  activeEnv: EnvType;
+  collapsed: boolean;
+}) {
   return (
     <Listbox value={true}>
       <Listbox.Button as="div">
         <NewButton
           kind="secondary"
-          appearance="outlined"
+          appearance={collapsed ? 'ghost' : 'outlined'}
           size="medium"
           icon={<RiEqualizer2Line className="fill-subtle" />}
-          className="ml-2.5"
+          className={collapsed ? 'mt-2.5' : 'ml-2.5'}
         />
       </Listbox.Button>
       <div className="relative">

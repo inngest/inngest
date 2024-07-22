@@ -21,9 +21,13 @@ export default function Navigation({ collapsed, envs, activeEnv }: NavProps) {
     >
       {envs && (
         <div className="flex flex-col">
-          <div className="item-center flex flex-row justify-center">
+          <div
+            className={`flex items-center ${
+              collapsed ? 'flex-col' : 'flex-row'
+            } flex-wrap justify-center`}
+          >
             <Environments envs={envs} activeEnv={activeEnv} collapsed={collapsed} />
-            {activeEnv && !collapsed && <KeysMenu activeEnv={activeEnv} />}
+            {activeEnv && <KeysMenu activeEnv={activeEnv} collapsed={collapsed} />}
           </div>
           <div className="flex flex-col">
             {activeEnv && <Monitor activeEnv={activeEnv} collapsed={collapsed} />}

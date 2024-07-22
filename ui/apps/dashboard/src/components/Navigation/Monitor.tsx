@@ -16,7 +16,7 @@ export default function Monitor({
   collapsed: boolean;
 }) {
   return (
-    <div className="jusity-center mt-5 flex flex-col">
+    <div className={`jusity-center  flex flex-col ${collapsed ? 'mt-2' : 'mt-5'}`}>
       {collapsed ? (
         <hr className="bg-subtle mx-auto mb-1 w-6" />
       ) : (
