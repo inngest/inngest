@@ -90,13 +90,28 @@ export const RangePicker = ({
   triggerComponent: TriggerComponent = DateInputButton,
   ...props
 }: RangePickerProps) => {
+  const getInitialDisplayValue = (defaultValue: RangeChangeProps | undefined): ReactNode => {
+    if (defaultValue) {
+      if (defaultValue.type === 'relative') {
+        return <RelativeDisplay duration={durationToString(defaultValue.duration)} />;
+      } else if (defaultValue.start && defaultValue.end) {
+        return <AbsoluteDisplay absoluteRange={defaultValue} />;
+      }
+    }
+    return null;
+  };
+
   const durationRef = useRef<HTMLInputElement | null>(null);
   const [open, setOpen] = useState(false);
   const [durationError, setDurationError] = useState<string>('');
   const [absoluteRange, setAbsoluteRange] = useState<AbsoluteRange>();
-  const [showAbsolute, setShowAbsolute] = useState<boolean>();
+  const [showAbsolute, setShowAbsolute] = useState<boolean>(
+    () => defaultValue?.type === 'absolute'
+  );
   const [tab, setTab] = useState('start');
-  const [displayValue, setDisplayValue] = useState<ReactNode | null>(null);
+  const [displayValue, setDisplayValue] = useState<ReactNode | null>(
+    getInitialDisplayValue(defaultValue)
+  );
   const [startValid, setStartValid] = useState(true);
   const [endValid, setEndValid] = useState(true);
   const [startError, setStartError] = useState('');
@@ -136,18 +151,8 @@ export const RangePicker = ({
 
   useEffect(() => {
     return () => {
-      if (defaultValue) {
-        if (defaultValue.type === 'relative') {
-          setDisplayValue(<RelativeDisplay duration={durationToString(defaultValue.duration)} />);
-          setShowAbsolute(false);
-        } else if (defaultValue.start && defaultValue.end) {
-          setDisplayValue(<AbsoluteDisplay absoluteRange={defaultValue} />);
-          setShowAbsolute(true);
-        }
-      } else {
-        setShowAbsolute(false);
-        setDurationError('');
-      }
+      setShowAbsolute(false);
+      setDurationError('');
     };
   }, []);
 
