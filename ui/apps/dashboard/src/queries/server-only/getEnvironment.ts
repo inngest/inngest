@@ -1,7 +1,24 @@
 import { graphql } from '@/gql';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { workspacesToEnvironments, type Environment } from '@/utils/environments';
-import { GetEnvironmentBySlugDocument } from '../environments';
+
+const GetEnvironmentBySlugDocument = graphql(`
+  query GetEnvironmentBySlug($slug: String!) {
+    envBySlug(slug: $slug) {
+      id
+      name
+      slug
+      parentID
+      test
+      type
+      createdAt
+      lastDeployedAt
+      isArchived
+      isAutoArchiveEnabled
+      webhookSigningKey
+    }
+  }
+`);
 
 const GetProductionWorkspaceDocument = graphql(`
   query GetProductionWorkspace {
