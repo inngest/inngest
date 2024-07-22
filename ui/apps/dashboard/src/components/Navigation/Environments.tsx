@@ -101,7 +101,7 @@ export default function Environments({ envs, activeEnv, collapsed }: Environment
   return (
     <Listbox value={selected} onChange={onSelect}>
       {({ open }) => (
-        <div className="bg-canvasBase relative">
+        <div className="bg-canvasBase relative flex">
           <Listbox.Button
             className={`active:border-primary-intense focus:border-primary-intense border-muted bg-canvasBase text-primary-intense hover:bg-canvasSubtle ${
               collapsed ? ` w-8 px-1` : 'w-[146px] px-2'

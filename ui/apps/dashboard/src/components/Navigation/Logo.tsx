@@ -2,11 +2,11 @@
 
 import type { Route } from 'next';
 import Link from 'next/link';
+import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
+import { InngestLogoSmallBW } from '@inngest/components/icons/logos/InngestLogoSmall';
 import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
 
 import { toggleNav } from '@/app/actions';
-import InngestLogo from '@/icons/InngestLogo';
-import { InngestLogoSmall } from '@/icons/InngestLogoSmall';
 import Search from './Search';
 
 type LogoProps = {
@@ -39,7 +39,7 @@ export default function Logo({ collapsed, setCollapsed }: LogoProps) {
       <div className="flex flex-row items-center justify-start">
         {collapsed ? (
           <div className="cursor-pointer transition-all delay-150 duration-300 group-hover:hidden">
-            <InngestLogoSmall />
+            <InngestLogoSmallBW />
           </div>
         ) : (
           <>

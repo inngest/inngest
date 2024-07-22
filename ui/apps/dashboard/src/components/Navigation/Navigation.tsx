@@ -1,6 +1,8 @@
-import type { Environment as EnvType } from '@/utils/environments';
+import type { Environment as EnvType, Environment } from '@/utils/environments';
 import Environments from './Environments';
 import KeysMenu from './KeysMenu';
+import Manage from './Manage';
+import Monitor from './Monitor';
 
 export type NavProps = {
   collapsed: boolean;
@@ -8,17 +10,25 @@ export type NavProps = {
   activeEnv?: EnvType;
 };
 
+export const getNavRoute = (activeEnv: EnvType, link: string) => `/env/${activeEnv.slug}/${link}`;
+
 export default function Navigation({ collapsed, envs, activeEnv }: NavProps) {
   return (
     <div
       className={`flex-start text-basis ${
         collapsed ? 'justify-center' : 'ml-5'
-      } mt-5 flex w-full flex-row items-center`}
+      } mt-5 flex w-full flex-row items-center `}
     >
       {envs && (
-        <div className="item-center flex flex-row">
-          <Environments envs={envs} activeEnv={activeEnv} collapsed={collapsed} />
-          {activeEnv && !collapsed && <KeysMenu activeEnv={activeEnv} />}
+        <div className="flex flex-col">
+          <div className="item-center flex flex-row justify-center">
+            <Environments envs={envs} activeEnv={activeEnv} collapsed={collapsed} />
+            {activeEnv && !collapsed && <KeysMenu activeEnv={activeEnv} />}
+          </div>
+          <div className="flex flex-col">
+            {activeEnv && <Monitor activeEnv={activeEnv} collapsed={collapsed} />}
+            {activeEnv && <Manage activeEnv={activeEnv} collapsed={collapsed} />}
+          </div>
         </div>
       )}
     </div>
