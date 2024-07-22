@@ -62,7 +62,7 @@ func opNameFromContext(ctx context.Context) string {
 }
 
 type instrumentedClient struct {
-	reports chan reportItem
+	reports chan *reportItem
 
 	pkgName string
 	cluster string
@@ -89,8 +89,8 @@ type reportItem struct {
 	command string
 }
 
-const defaultBufferSize int = 100
-const defaultNumWorkers int = 100
+const defaultBufferSize int = 100_000
+const defaultNumWorkers int = 10_000
 
 type InstrumentedClientOpts struct {
 	PkgName string
@@ -111,7 +111,7 @@ func InstrumentRedisClient(ctx context.Context, c rueidis.Client, opts Instrumen
 		bufferSize = defaultBufferSize
 	}
 
-	reports := make(chan reportItem, bufferSize)
+	reports := make(chan *reportItem, bufferSize)
 
 	instrumented := &instrumentedClient{reports, opts.PkgName, opts.Cluster, c}
 
@@ -156,7 +156,7 @@ func (i instrumentedClient) report(ctx context.Context, start, end time.Time, co
 func (i instrumentedClient) asyncReport(ctx context.Context, start time.Time, command string) {
 	end := time.Now()
 
-	i.reports <- reportItem{ctx, start, end, command}
+	i.reports <- &reportItem{ctx, start, end, command}
 }
 
 func (i instrumentedClient) worker(ctx context.Context) {
