@@ -7,16 +7,13 @@ import type { RangeChangeProps } from '../DatePicker/RangePicker';
 type Props = {
   daysAgoMax: number;
   onDaysChange: (value: RangeChangeProps) => void;
-  defaultStart?: Date;
-  defaultEnd?: Date;
+  defaultValue?: RangeChangeProps;
 };
 
-export function TimeFilter({ daysAgoMax, onDaysChange, defaultStart, defaultEnd }: Props) {
+export function TimeFilter({ daysAgoMax, onDaysChange, defaultValue }: Props) {
   return (
     <RangePicker
-      defaultStart={defaultStart}
-      defaultEnd={defaultEnd}
-      placeholder="Last 3d"
+      defaultValue={defaultValue}
       onChange={(range) => {
         onDaysChange(range);
       }}

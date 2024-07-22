@@ -10,6 +10,7 @@ import { Input } from '../Forms/Input';
 import { Popover, PopoverContent, PopoverTrigger } from '../Popover';
 import {
   DURATION_STRING_REGEX,
+  durationToString,
   longDateFormat,
   parseDuration,
   subtractDuration,
@@ -31,8 +32,7 @@ export type RangeChangeProps = RelativeProps | AbsoluteProps;
 type RangePickerProps = Omit<DateButtonProps, 'defaultValue' | 'onChange'> & {
   placeholder?: string;
   onChange: (args: RangeChangeProps) => void;
-  defaultStart?: Date;
-  defaultEnd?: Date;
+  defaultValue?: RangeChangeProps;
   upgradeCutoff?: Date;
   triggerComponent?: React.ComponentType<DateButtonProps>;
 };
@@ -85,8 +85,7 @@ const RelativeDisplay = ({ duration }: { duration: string }) => (
 export const RangePicker = ({
   placeholder,
   onChange,
-  defaultStart,
-  defaultEnd,
+  defaultValue,
   upgradeCutoff,
   triggerComponent: TriggerComponent = DateInputButton,
   ...props
@@ -137,8 +136,18 @@ export const RangePicker = ({
 
   useEffect(() => {
     return () => {
-      setShowAbsolute(false);
-      setDurationError('');
+      if (defaultValue) {
+        if (defaultValue.type === 'relative') {
+          setDisplayValue(<RelativeDisplay duration={durationToString(defaultValue.duration)} />);
+          setShowAbsolute(false);
+        } else if (defaultValue.start && defaultValue.end) {
+          setDisplayValue(<AbsoluteDisplay absoluteRange={defaultValue} />);
+          setShowAbsolute(true);
+        }
+      } else {
+        setShowAbsolute(false);
+        setDurationError('');
+      }
     };
   }, []);
 
@@ -274,7 +283,7 @@ export const RangePicker = ({
                     setValid={setStartValid}
                     defaultValue={
                       absoluteRange?.start ||
-                      defaultStart ||
+                      (defaultValue?.type === 'absolute' && defaultValue.start) ||
                       subtractDuration(new Date(), { days: 1 })
                     }
                   />
@@ -305,7 +314,11 @@ export const RangePicker = ({
                     }}
                     valid={endValid}
                     setValid={setEndValid}
-                    defaultValue={absoluteRange?.end || defaultEnd || new Date()}
+                    defaultValue={
+                      absoluteRange?.end ||
+                      (defaultValue?.type === 'absolute' && defaultValue.end) ||
+                      new Date()
+                    }
                   />
                   <div className="flex flex-col">
                     {endError && <p className="text-error mx-4 mt-1 text-sm">{endError}</p>}

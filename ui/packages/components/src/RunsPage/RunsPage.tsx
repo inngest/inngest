@@ -107,7 +107,7 @@ export function RunsPage({
     isFunctionTimeField
   );
 
-  const [lastDays = '3d'] = useSearchParam('last');
+  const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
   const batchUpdate = useBatchedSearchParams();
@@ -228,14 +228,23 @@ export function RunsPage({
             <TimeFilter
               daysAgoMax={features.history}
               onDaysChange={onDaysChange}
-              defaultStart={
+              defaultValue={
                 lastDays
-                  ? subtractDuration(new Date(), parseDuration(lastDays))
-                  : startTime
-                  ? new Date(startTime)
-                  : undefined
+                  ? {
+                      type: 'relative',
+                      duration: parseDuration(lastDays),
+                    }
+                  : startTime && endTime
+                  ? {
+                      type: 'absolute',
+                      start: new Date(startTime),
+                      end: new Date(endTime),
+                    }
+                  : {
+                      type: 'relative',
+                      duration: parseDuration('3d'),
+                    }
               }
-              defaultEnd={endTime ? new Date(endTime) : undefined}
             />
           </SelectGroup>
           <StatusFilter
