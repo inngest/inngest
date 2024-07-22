@@ -74,3 +74,14 @@ func HistogramQueuePeekEWMA(ctx context.Context, value int64, opts HistogramOpt)
 		Boundaries:  peekSizeBoundaries,
 	})
 }
+
+func HistogramRedisCommandDuration(ctx context.Context, value int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, value, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "redis_command_duration",
+		Description: "Redis command duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
