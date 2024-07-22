@@ -1,30 +1,9 @@
-import Head from 'next/head';
-
-import { interTight, robotoMono } from './fonts';
 import './globals.css';
+import './fonts.css';
 
-export function AppRoot({
-  children,
-  mode,
-  devServer = false,
-}: {
-  children: React.ReactNode;
-  mode?: 'dark';
-  devServer?: boolean;
-}) {
+export function AppRoot({ children, mode }: { children: React.ReactNode; mode?: 'dark' }) {
   return (
-    <html
-      lang="en"
-      className={`${devServer ? interTight.variable : ''} ${devServer ? robotoMono : ''} ${
-        mode || ''
-      } h-full`}
-    >
-      {!devServer && (
-        <Head>
-          <link rel="preconnect" href="https://fonts-cdn.inngest.com/" />
-          <link rel="stylesheet" href="https://fonts-cdn.inngest.com/fonts.css" />
-        </Head>
-      )}
+    <html lang="en" className={`${mode || ''} h-full`}>
       <body className="dark:bg-slate-940 h-full overflow-auto bg-white">
         <div id="app" />
         <div id="modals" />

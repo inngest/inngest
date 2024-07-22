@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"io/fs"
 	"regexp"
 	"strconv"
@@ -226,6 +227,8 @@ type CompositePauseID struct {
 }
 
 func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "New"), redis_telemetry.ScopeFnRunState)
+
 	fnRunState := m.s.FunctionRunState()
 	client, isSharded := fnRunState.Client(ctx, input.Identifier.AccountID, input.Identifier.RunID)
 
@@ -293,7 +296,7 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 	}
 
 	status, err := retriableScripts["new"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "new"),
 		client,
 		[]string{
 			fnRunState.kg.Events(ctx, isSharded, input.Identifier),
@@ -322,6 +325,8 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 }
 
 func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, md state.MetadataUpdate) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "UpdateMetadata"), redis_telemetry.ScopeFnRunState)
+
 	input := []string{
 		"0", // Force planning / disable immediate execution
 		strconv.Itoa(consts.RequestVersionUnknown), // Request version
@@ -341,7 +346,7 @@ func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, run
 	client, isSharded := fnRunState.Client(ctx, accountID, runID)
 
 	status, err := retriableScripts["updateMetadata"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "updateMetadata"),
 		client,
 		[]string{
 			fnRunState.kg.RunMetadata(ctx, isSharded, runID),
@@ -358,6 +363,8 @@ func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, run
 }
 
 func (m shardedMgr) IsComplete(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (bool, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "IsComplete"), redis_telemetry.ScopeFnRunState)
+
 	fnRunState := m.s.FunctionRunState()
 
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
@@ -372,6 +379,8 @@ func (m shardedMgr) IsComplete(ctx context.Context, accountId uuid.UUID, runID u
 }
 
 func (m shardedMgr) Exists(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (bool, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Exists"), redis_telemetry.ScopeFnRunState)
+
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
 	return r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
@@ -380,6 +389,8 @@ func (m shardedMgr) Exists(ctx context.Context, accountId uuid.UUID, runID ulid.
 }
 
 func (m shardedMgr) metadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (*runMetadata, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "metadata"), redis_telemetry.ScopeFnRunState)
+
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
 	val, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
@@ -392,10 +403,12 @@ func (m shardedMgr) metadata(ctx context.Context, accountId uuid.UUID, runID uli
 }
 
 func (m shardedMgr) Cancel(ctx context.Context, id state.Identifier) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Cancel"), redis_telemetry.ScopeFnRunState)
+
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, id.AccountID, id.RunID)
 	status, err := retriableScripts["cancel"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "cancel"),
 		r,
 		[]string{fnRunState.kg.RunMetadata(ctx, isSharded, id.RunID)},
 		[]string{},
@@ -417,6 +430,8 @@ func (m shardedMgr) Cancel(ctx context.Context, id state.Identifier) error {
 }
 
 func (m shardedMgr) SetStatus(ctx context.Context, id state.Identifier, status enums.RunStatus) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetStatus"), redis_telemetry.ScopeFnRunState)
+
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, id.AccountID, id.RunID)
 	args, err := StrSlice([]any{
@@ -427,7 +442,7 @@ func (m shardedMgr) SetStatus(ctx context.Context, id state.Identifier, status e
 	}
 
 	_, err = retriableScripts["setStatus"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "setStatus"),
 		r,
 		[]string{fnRunState.kg.RunMetadata(ctx, isSharded, id.RunID)},
 		args,
@@ -448,6 +463,8 @@ func (m shardedMgr) Metadata(ctx context.Context, accountId uuid.UUID, runID uli
 }
 
 func (m shardedMgr) LoadEvents(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) ([]json.RawMessage, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "LoadEvents"), redis_telemetry.ScopeFnRunState)
+
 	fnRunState := m.s.FunctionRunState()
 
 	var (
@@ -485,6 +502,8 @@ func (m shardedMgr) LoadEvents(ctx context.Context, accountId uuid.UUID, fnID uu
 }
 
 func (m shardedMgr) LoadSteps(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (map[string]json.RawMessage, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "LoadSteps"), redis_telemetry.ScopeFnRunState)
+
 	fnRunState := m.s.FunctionRunState()
 
 	var (
@@ -512,6 +531,8 @@ func (m shardedMgr) LoadSteps(ctx context.Context, accountId uuid.UUID, fnID uui
 }
 
 func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (state.State, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Load"), redis_telemetry.ScopeFnRunState)
+
 	fnRunState := m.s.FunctionRunState()
 
 	// XXX: Use a pipeliner to improve speed.
@@ -583,6 +604,8 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 }
 
 func (m shardedMgr) stack(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) ([]string, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "stack"), redis_telemetry.ScopeFnRunState)
+
 	fnRunState := m.s.FunctionRunState()
 
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
@@ -596,6 +619,8 @@ func (m shardedMgr) stack(ctx context.Context, accountId uuid.UUID, runID ulid.U
 }
 
 func (m shardedMgr) StackIndex(ctx context.Context, accountId uuid.UUID, runID ulid.ULID, stepID string) (int, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "StackIndex"), redis_telemetry.ScopeFnRunState)
+
 	fnRunState := m.s.FunctionRunState()
 
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
@@ -618,6 +643,8 @@ func (m shardedMgr) StackIndex(ctx context.Context, accountId uuid.UUID, runID u
 }
 
 func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SaveResponse"), redis_telemetry.ScopeFnRunState)
+
 	fnRunState := m.s.FunctionRunState()
 
 	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
@@ -630,7 +657,7 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 	args := []string{stepID, marshalledOuptut}
 
 	index, err := retriableScripts["saveResponse"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "saveResponse"),
 		r,
 		keys,
 		args,
@@ -650,6 +677,8 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
 	if err != nil {
 		return err
 	}
+
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SavePause"), redis_telemetry.ScopePauses)
 
 	// `evt` is used to search for pauses based on event names. We only want to
 	// do this if this pause is not part of an invoke. If it is, we don't want
@@ -697,7 +726,7 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
 	}
 
 	status, err := scripts["savePause"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "savePause"),
 		pause.Client(),
 		keys,
 		args,
@@ -716,6 +745,8 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
 }
 
 func (m unshardedMgr) LeasePause(ctx context.Context, id uuid.UUID) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "LeasePause"), redis_telemetry.ScopePauses)
+
 	args, err := StrSlice([]any{
 		time.Now().UnixMilli(),
 		state.PauseLeaseDuration.Seconds(),
@@ -727,7 +758,7 @@ func (m unshardedMgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 	pause := m.u.Pauses()
 
 	status, err := scripts["leasePause"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "leasePause"),
 		pause.Client(),
 		// keys will be sharded/unsharded depending on RunID
 		[]string{pause.kg.Pause(ctx, id), pause.kg.PauseLease(ctx, id)},
@@ -775,6 +806,8 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier) (bool, error) {
 }
 
 func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state.Identifier) (bool, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "delete"), redis_telemetry.ScopeFnRunState)
+
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
 
@@ -829,6 +862,8 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 }
 
 func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Context, i state.Identifier) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "deletePausesForRun"), redis_telemetry.ScopePauses)
+
 	pause := m.u.Pauses()
 
 	// Fetch all pauses for the run
@@ -856,6 +891,8 @@ func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) er
 }
 
 func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "DeletePause"), redis_telemetry.ScopePauses)
+
 	pause := m.u.Pauses()
 
 	global := m.u.Global()
@@ -893,7 +930,7 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 	}
 
 	status, err := scripts["deletePause"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "deletePause"),
 		pause.Client(),
 		keys,
 		[]string{
@@ -929,6 +966,8 @@ func (m mgr) ConsumePause(ctx context.Context, pauseID uuid.UUID, data any) erro
 }
 
 func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "consumePause"), redis_telemetry.ScopePauses)
+
 	fnRunState := m.s.FunctionRunState()
 	client, isSharded := fnRunState.Client(ctx, p.Identifier.AccountID, p.Identifier.RunID)
 
@@ -952,7 +991,7 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 	}
 
 	status, err := retriableScripts["consumePause"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "consumePause"),
 		client,
 		keys,
 		args,
@@ -971,6 +1010,8 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 }
 
 func (m unshardedMgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID, event string) (bool, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EventHasPauses"), redis_telemetry.ScopePauses)
+
 	pause := m.u.Pauses()
 	key := pause.kg.PauseEvent(ctx, workspaceID, event)
 	cmd := pause.Client().B().Exists().Key(key).Build()
@@ -978,6 +1019,8 @@ func (m unshardedMgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID,
 }
 
 func (m unshardedMgr) PauseByID(ctx context.Context, pauseID uuid.UUID) (*state.Pause, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PauseByID"), redis_telemetry.ScopePauses)
+
 	pauses := m.u.Pauses()
 	cmd := pauses.Client().B().Get().Key(pauses.kg.Pause(ctx, pauseID)).Build()
 	str, err := pauses.Client().Do(ctx, cmd).ToString()
@@ -993,6 +1036,8 @@ func (m unshardedMgr) PauseByID(ctx context.Context, pauseID uuid.UUID) (*state.
 }
 
 func (m unshardedMgr) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*state.Pause, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PauseByInvokeCorrelationID"), redis_telemetry.ScopePauses)
+
 	global := m.u.Global()
 	key := global.kg.Invoke(ctx, wsID)
 	cmd := global.Client().B().Hget().Key(key).Field(correlationID).Build()
@@ -1012,6 +1057,8 @@ func (m unshardedMgr) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.
 }
 
 func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PausesByID"), redis_telemetry.ScopePauses)
+
 	pause := m.u.Pauses()
 	if len(ids) == 0 {
 		return nil, nil
@@ -1057,6 +1104,8 @@ func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*stat
 // has deferred results which must be continued by resuming the specific pause set
 // up for the given step ID.
 func (m unshardedMgr) PauseByStep(ctx context.Context, i state.Identifier, actionID string) (*state.Pause, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PauseByStep"), redis_telemetry.ScopePauses)
+
 	pauses := m.u.Pauses()
 
 	// Access sharded value first
@@ -1093,6 +1142,8 @@ func (m unshardedMgr) PauseByStep(ctx context.Context, i state.Identifier, actio
 
 // PausesByEvent returns all pauses for a given event within a workspace.
 func (m unshardedMgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PausesByEvent"), redis_telemetry.ScopePauses)
+
 	pauses := m.u.Pauses()
 
 	key := pauses.kg.PauseEvent(ctx, workspaceID, event)
@@ -1122,6 +1173,8 @@ func (m unshardedMgr) PausesByEventSince(ctx context.Context, workspaceID uuid.U
 	if since.IsZero() {
 		return m.PausesByEvent(ctx, workspaceID, event)
 	}
+
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PausesByEventSince"), redis_telemetry.ScopePauses)
 
 	pauses := m.u.Pauses()
 

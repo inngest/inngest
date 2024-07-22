@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
-import { type Run } from '@inngest/components/RunsPage/RunsTable';
+import type { Run } from '@inngest/components/RunsPage/types';
 import {
   useSearchParam,
   useStringArraySearchParam,
@@ -47,6 +47,14 @@ const GetRunsDocument = graphql(`
       ) {
         edges {
           node {
+            app {
+              externalID
+              name
+            }
+            function {
+              name
+              slug
+            }
             id
             queuedAt
             endedAt
@@ -110,6 +118,8 @@ export default function Page({
       // generate URLs without knowing about environments
       app: (params: { externalAppID: string }) =>
         pathCreator.app({ envSlug: env.slug, externalAppID: params.externalAppID }),
+      function: (params: { functionSlug: string }) =>
+        pathCreator.function({ envSlug: env.slug, functionSlug: params.functionSlug }),
       runPopout: (params: { runID: string }) =>
         pathCreator.runPopout({ envSlug: env.slug, runID: params.runID }),
     };
@@ -230,6 +240,7 @@ export default function Page({
       pathCreator={internalPathCreator}
       rerun={rerun}
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
+      scope="fn"
     />
   );
 }

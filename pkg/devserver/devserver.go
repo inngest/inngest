@@ -200,7 +200,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queue)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
-	agg := expressions.NewAggregator(ctx, 100, sm.(expressions.EvaluableLoader), nil)
+	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
 
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {

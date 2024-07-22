@@ -5,7 +5,6 @@ import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
-import { columns, type Run } from '@inngest/components/RunsPage/RunsTable';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
 import { LoadingMore, TableFilter } from '@inngest/components/Table';
 import {
@@ -31,6 +30,8 @@ import {
 } from '../hooks/useSearchParam';
 import type { Features } from '../types/features';
 import { TimeFilter } from './TimeFilter';
+import { useScopedColumns } from './columns';
+import type { Run, ViewScope } from './types';
 
 // Disable SSR in Runs Table, to prevent hydration errors. It requires windows info on visibility columns
 const RunsTable = dynamic(() => import('@inngest/components/RunsPage/RunsTable'), {
@@ -56,7 +57,7 @@ type Props = {
   apps?: Option[];
   functions?: Option[];
   functionIsPaused?: boolean;
-  defaultVisibility?: VisibilityState;
+  scope: ViewScope;
 };
 
 export function RunsPage({
@@ -77,16 +78,19 @@ export function RunsPage({
   functions,
   pollInterval,
   functionIsPaused,
-  defaultVisibility,
+  scope,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const columns = useScopedColumns(scope);
+
   const displayAllColumns: VisibilityState = Object.fromEntries(
     columns.map((column) => [column.accessorKey, true])
   );
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
     'VisibleRunsColumns',
-    defaultVisibility || displayAllColumns
+    displayAllColumns
   );
 
   const [filteredStatus = [], setFilteredStatus, removeFilteredStatus] =
@@ -278,6 +282,7 @@ export function RunsPage({
         renderSubComponent={renderSubComponent}
         getRowCanExpand={() => true}
         columnVisibility={columnVisibility}
+        scope={scope}
       />
       {isLoadingMore && <LoadingMore />}
       {!hasMore && !isLoadingInitial && !isLoadingMore && (
