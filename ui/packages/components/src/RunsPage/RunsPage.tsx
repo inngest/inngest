@@ -211,7 +211,7 @@ export function RunsPage({
       onScroll={onScroll}
       ref={containerRef}
     >
-      <div className="bg-canvasBase sticky top-0 z-[5] flex items-center justify-between gap-2 px-8 py-2">
+      <div className="bg-canvasBase sticky top-0 z-10 flex items-center justify-between gap-2 px-8 py-2">
         <div className="flex items-center gap-2">
           <SelectGroup>
             <TimeFieldFilter selectedTimeField={timeField} onTimeFieldChange={onTimeFieldChange} />
