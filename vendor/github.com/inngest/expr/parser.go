@@ -476,6 +476,14 @@ func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]
 		total += 1
 	}
 
+	// Create a new group ID which tracks the number of expressions that must match
+	// within this group in order for the group to pass.
+	//
+	// This includes ALL ands, plus at least one OR.
+	//
+	// When checking an incoming event, we match the event against each node's
+	// ident/variable.  Using the group ID, we can see if we've matched N necessary
+	// items from the same identifier.  If so, the evaluation is true.
 	parent.GroupID = newGroupIDWithReader(uint16(total), rand)
 
 	// For each sub-group, add the same group IDs to children if there's no nesting.

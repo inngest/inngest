@@ -85,7 +85,7 @@ func AccountCreated(ctx context.Context, input inngestgo.Input[AccountCreatedEve
 	})
 	if err != nil {
 		// This step retried 5 times by default and permanently failed.
-		return err.
+		return nil, err
 	}
 	// `result` is  fully typed from the lambda
 	_ = result
