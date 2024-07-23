@@ -1062,7 +1062,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		}
 
 		// the cursor target should be skipped
-		if reqcursor != nil && reqcursor.ID == data.RunID.String() {
+		if reqcursor.ID == data.RunID.String() {
 			continue
 		}
 
