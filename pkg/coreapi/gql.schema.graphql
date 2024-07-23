@@ -350,7 +350,7 @@ type FunctionRunV2 {
   status: FunctionRunStatus!
   sourceID: String # The parent trace / run that triggered this run
   triggerIDs: [ULID!]!
-  triggers: [Bytes!]!
+  eventName: String
   isBatch: Boolean!
   batchCreatedAt: Time
   cronSchedule: String

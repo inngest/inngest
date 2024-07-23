@@ -118,7 +118,7 @@ type FunctionRunV2 struct {
 	Status         FunctionRunStatus `json:"status"`
 	SourceID       *string           `json:"sourceID,omitempty"`
 	TriggerIDs     []ulid.ULID       `json:"triggerIDs"`
-	Triggers       []string          `json:"triggers"`
+	EventName      *string           `json:"eventName,omitempty"`
 	IsBatch        bool              `json:"isBatch"`
 	BatchCreatedAt *time.Time        `json:"batchCreatedAt,omitempty"`
 	CronSchedule   *string           `json:"cronSchedule,omitempty"`

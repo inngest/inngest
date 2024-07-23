@@ -77,8 +77,6 @@ models:
         resolver: true
       trace:
         resolver: true
-      triggers:
-        resolver: true
   RunsV2Connection:
     fields:
       totalCount:

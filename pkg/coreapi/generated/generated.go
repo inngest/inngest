@@ -137,6 +137,7 @@ type ComplexityRoot struct {
 		BatchCreatedAt func(childComplexity int) int
 		CronSchedule   func(childComplexity int) int
 		EndedAt        func(childComplexity int) int
+		EventName      func(childComplexity int) int
 		Function       func(childComplexity int) int
 		FunctionID     func(childComplexity int) int
 		ID             func(childComplexity int) int
@@ -149,7 +150,6 @@ type ComplexityRoot struct {
 		Trace          func(childComplexity int) int
 		TraceID        func(childComplexity int) int
 		TriggerIDs     func(childComplexity int) int
-		Triggers       func(childComplexity int) int
 	}
 
 	FunctionRunV2Edge struct {
@@ -407,8 +407,6 @@ type FunctionRunV2Resolver interface {
 	App(ctx context.Context, obj *models.FunctionRunV2) (*cqrs.App, error)
 
 	Function(ctx context.Context, obj *models.FunctionRunV2) (*models.Function, error)
-
-	Triggers(ctx context.Context, obj *models.FunctionRunV2) ([]string, error)
 
 	Trace(ctx context.Context, obj *models.FunctionRunV2) (*models.RunTraceSpan, error)
 }
@@ -894,6 +892,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.FunctionRunV2.EndedAt(childComplexity), true
 
+	case "FunctionRunV2.eventName":
+		if e.complexity.FunctionRunV2.EventName == nil {
+			break
+		}
+
+		return e.complexity.FunctionRunV2.EventName(childComplexity), true
+
 	case "FunctionRunV2.function":
 		if e.complexity.FunctionRunV2.Function == nil {
 			break
@@ -977,13 +982,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FunctionRunV2.TriggerIDs(childComplexity), true
-
-	case "FunctionRunV2.triggers":
-		if e.complexity.FunctionRunV2.Triggers == nil {
-			break
-		}
-
-		return e.complexity.FunctionRunV2.Triggers(childComplexity), true
 
 	case "FunctionRunV2Edge.cursor":
 		if e.complexity.FunctionRunV2Edge.Cursor == nil {
@@ -2534,7 +2532,7 @@ type FunctionRunV2 {
   status: FunctionRunStatus!
   sourceID: String # The parent trace / run that triggered this run
   triggerIDs: [ULID!]!
-  triggers: [Bytes!]!
+  eventName: String
   isBatch: Boolean!
   batchCreatedAt: Time
   cronSchedule: String
@@ -6222,8 +6220,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_triggerIDs(ctx context.Co
 	return fc, nil
 }
 
-func (ec *executionContext) _FunctionRunV2_triggers(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRunV2) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_FunctionRunV2_triggers(ctx, field)
+func (ec *executionContext) _FunctionRunV2_eventName(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRunV2) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionRunV2_eventName(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -6236,31 +6234,28 @@ func (ec *executionContext) _FunctionRunV2_triggers(ctx context.Context, field g
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.FunctionRunV2().Triggers(rctx, obj)
+		return obj.EventName, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.([]string)
+	res := resTmp.(*string)
 	fc.Result = res
-	return ec.marshalNBytes2ᚕstringᚄ(ctx, field.Selections, res)
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_FunctionRunV2_triggers(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_FunctionRunV2_eventName(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "FunctionRunV2",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Bytes does not have child fields")
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -6579,8 +6574,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2Edge_node(ctx context.Cont
 				return ec.fieldContext_FunctionRunV2_sourceID(ctx, field)
 			case "triggerIDs":
 				return ec.fieldContext_FunctionRunV2_triggerIDs(ctx, field)
-			case "triggers":
-				return ec.fieldContext_FunctionRunV2_triggers(ctx, field)
+			case "eventName":
+				return ec.fieldContext_FunctionRunV2_eventName(ctx, field)
 			case "isBatch":
 				return ec.fieldContext_FunctionRunV2_isBatch(ctx, field)
 			case "batchCreatedAt":
@@ -8504,8 +8499,8 @@ func (ec *executionContext) fieldContext_Query_run(ctx context.Context, field gr
 				return ec.fieldContext_FunctionRunV2_sourceID(ctx, field)
 			case "triggerIDs":
 				return ec.fieldContext_FunctionRunV2_triggerIDs(ctx, field)
-			case "triggers":
-				return ec.fieldContext_FunctionRunV2_triggers(ctx, field)
+			case "eventName":
+				return ec.fieldContext_FunctionRunV2_eventName(ctx, field)
 			case "isBatch":
 				return ec.fieldContext_FunctionRunV2_isBatch(ctx, field)
 			case "batchCreatedAt":
@@ -16313,26 +16308,10 @@ func (ec *executionContext) _FunctionRunV2(ctx context.Context, sel ast.Selectio
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
-		case "triggers":
-			field := field
+		case "eventName":
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._FunctionRunV2_triggers(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
-				return res
-			}
+			out.Values[i] = ec._FunctionRunV2_eventName(ctx, field, obj)
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
 		case "isBatch":
 
 			out.Values[i] = ec._FunctionRunV2_isBatch(ctx, field, obj)
