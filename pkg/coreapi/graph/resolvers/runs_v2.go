@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -29,6 +30,11 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 		scursor *string
 		ecursor *string
 	)
+	// eventID to run map
+	evtRunMap := map[ulid.ULID]*models.FunctionRunV2{}
+	// used for retrieving eventIDs
+	evtIDs := []ulid.ULID{}
+
 	edges := []*models.FunctionRunV2Edge{}
 	total := len(runs)
 	for i, r := range runs {
@@ -61,39 +67,66 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 			output = &s
 		}
 
+		runID := ulid.MustParse(r.RunID)
 		status, err := models.ToFunctionRunStatus(r.Status)
 		if err != nil {
 			continue
+		}
+
+		node := &models.FunctionRunV2{
+			ID:           runID,
+			AppID:        r.AppID,
+			FunctionID:   r.FunctionID,
+			TraceID:      r.TraceID,
+			QueuedAt:     r.QueuedAt,
+			StartedAt:    started,
+			EndedAt:      ended,
+			SourceID:     sourceID,
+			Status:       status,
+			Output:       output,
+			IsBatch:      r.IsBatch,
+			CronSchedule: r.CronSchedule,
 		}
 
 		triggerIDS := []ulid.ULID{}
 		for _, tid := range r.TriggerIDs {
 			if id, err := ulid.Parse(tid); err == nil {
 				triggerIDS = append(triggerIDS, id)
+
+				// track evtID only if it's not batch nor cron
+				if !r.IsBatch && r.CronSchedule == nil {
+					evtRunMap[id] = node
+					evtIDs = append(evtIDs, id)
+				}
 			}
 		}
 
-		node := &models.FunctionRunV2{
-			ID:         ulid.MustParse(r.RunID),
-			AppID:      r.AppID,
-			FunctionID: r.FunctionID,
-			TraceID:    r.TraceID,
-			QueuedAt:   r.QueuedAt,
-			StartedAt:  started,
-			EndedAt:    ended,
-			SourceID:   sourceID,
-			Status:     status,
-			TriggerIDs: triggerIDS,
-			Triggers:   []string{},
-			Output:     output,
-			IsBatch:    r.IsBatch,
-		}
+		node.TriggerIDs = triggerIDS
 
 		edges = append(edges, &models.FunctionRunV2Edge{
 			Node:   node,
 			Cursor: r.Cursor,
 		})
 	}
+
+	evts, err := r.Data.GetEventsByInternalIDs(ctx, evtIDs)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving events associated with runs: %w", err)
+	}
+	var wg sync.WaitGroup
+	for _, e := range evts {
+		wg.Add(1)
+		go func(evt *cqrs.Event) {
+			defer wg.Done()
+
+			run, ok := evtRunMap[evt.GetInternalID()]
+			if !ok {
+				return
+			}
+			run.EventName = &evt.EventName
+		}(e)
+	}
+	wg.Wait()
 
 	pageInfo := &models.PageInfo{
 		HasNextPage: total == int(opts.Items),
