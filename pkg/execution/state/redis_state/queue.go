@@ -994,7 +994,7 @@ func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bo
 	}
 
 	status, err := scripts["queue/fnSetPaused"].Exec(
-		ctx,
+		redis_telemetry.WithScriptName(ctx, "fnSetPaused"),
 		q.u.unshardedRc,
 		keys,
 		args,
