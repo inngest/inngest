@@ -3,16 +3,9 @@
   "extends": "@inngest/tsconfig/nextjs.json",
   "compilerOptions": {
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo.json",
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
+    "plugins": [{ "name": "next" }],
     "baseUrl": "./",
-    "paths": {
-      "@/*": ["./src/*"]
-    },
-    "strictNullChecks": true
+    "paths": { "@/*": ["./src/*"] }
   },
   "include": [
     "./src/**/*",
