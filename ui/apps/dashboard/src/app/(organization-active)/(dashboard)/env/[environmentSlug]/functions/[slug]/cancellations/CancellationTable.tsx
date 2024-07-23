@@ -1,9 +1,12 @@
 'use client';
 
 import { useRef } from 'react';
+import { NewButton } from '@inngest/components/Button';
 import { Table } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
+
+import { usePagination } from './usePagination';
 
 type Cancellation = {
   createdAt: string;
@@ -13,23 +16,52 @@ type Cancellation = {
 };
 
 type Props = {
-  data: Cancellation[];
+  envSlug: string;
+  fnSlug: string;
 };
 
-export function CancellationTable({ data }: Props) {
+export function CancellationTable({ envSlug, fnSlug }: Props) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
+  const {
+    data: items,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isInitiallyFetching,
+  } = usePagination({ envSlug, fnSlug });
+
+  let blankSlate = <p>No results</p>;
+  if (isInitiallyFetching) {
+    blankSlate = <p>Loading...</p>;
+  }
+
   return (
-    <Table
-      blankState={<p>No results</p>}
-      options={{
-        columns,
-        data,
-        enableSorting: false,
-        getCoreRowModel: getCoreRowModel(),
-      }}
-      tableContainerRef={tableContainerRef}
-    />
+    <div className="flex flex-col items-center">
+      <div className="mb-8 self-stretch">
+        <Table
+          blankState={blankSlate}
+          options={{
+            columns,
+            data: items,
+            enableSorting: false,
+            getCoreRowModel: getCoreRowModel(),
+          }}
+          tableContainerRef={tableContainerRef}
+        />
+      </div>
+
+      {!isInitiallyFetching && (
+        <span>
+          <NewButton
+            appearance="outlined"
+            disabled={isFetching || !hasNextPage}
+            label="Load More"
+            onClick={() => fetchNextPage()}
+          />
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -50,7 +82,7 @@ const columns = [
     },
   }),
   columnHelper.accessor('queuedAtMin', {
-    header: () => <span>Queued at min</span>,
+    header: () => <span>Minimum queued at</span>,
     cell: (props) => {
       const value = props.getValue();
       if (!value) {
@@ -61,7 +93,7 @@ const columns = [
     },
   }),
   columnHelper.accessor('queuedAtMax', {
-    header: () => <span>Queued at max</span>,
+    header: () => <span>Maximum queued at</span>,
     cell: (props) => {
       return <Time value={props.getValue()} />;
     },
