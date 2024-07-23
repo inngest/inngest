@@ -961,7 +961,7 @@ func TestQueueLease(t *testing.T) {
 
 				// The partition should use a custom ID for the concurrency key.
 				p := q.ItemPartitions(ctx, item)[0]
-				require.Contains(t, p.ID, fmt.Sprintf("<%s>", util.XXHash("custom-level-key")))
+				require.Contains(t, p.ID, "<custom-level-key>")
 
 				score, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), p.ID)
 				require.NoError(t, err)
