@@ -1968,7 +1968,6 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		at.UnixMilli(),
 		force,
 	})
-	fmt.Println(args)
 	if err != nil {
 		return err
 	}
