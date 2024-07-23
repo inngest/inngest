@@ -1022,7 +1022,33 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 }
 
 func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
-	return 0, fmt.Errorf("not implemented")
+	builder := newRunsQueryBuilder(ctx, opt)
+	filter := builder.filter
+	order := builder.order
+
+	sql, args, err := sq.Dialect("sqlite3").
+		From("trace_runs").
+		Select(sq.COUNT("run_id").As("total")).
+		Where(filter...).
+		Order(order...).
+		ToSQL()
+	if err != nil {
+		return 0, err
+	}
+
+	rows, err := w.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return 0, err
+	}
+
+	var count int
+	for rows.Next() {
+		if err := rows.Scan(&count); err != nil {
+			return 0, err
+		}
+	}
+
+	return count, nil
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
