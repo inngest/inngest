@@ -5,10 +5,10 @@ import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '../Popove
 import { Switch, SwitchLabel, SwitchWrapper } from '../Switch';
 import { combineDayAndTime, formatDayString, formatTimeString } from '../utils/date';
 import { Calendar } from './Calendar';
-import { DateInputButton, type DateInputButtonProps } from './DateInputButton';
+import { DateInputButton, type DateButtonProps } from './DateButton';
 import { TimeInput } from './TimeInput';
 
-type DatePickerProps = Omit<DateInputButtonProps, 'defaultValue' | 'onChange'> & {
+type DatePickerProps = Omit<DateButtonProps, 'defaultValue' | 'onChange'> & {
   defaultValue?: Date;
   placeholder?: string;
   onChange: (value: Date | undefined) => void;

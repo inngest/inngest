@@ -96,7 +96,7 @@ export default function RunsTable({
   const isEmpty = data.length < 1 && !isLoading;
 
   return (
-    <table className={cn(isEmpty && 'h-full', tableStyles)}>
+    <table className={cn(isEmpty && 'h-[calc(100%-58px)]', tableStyles)}>
       <thead className={tableHeadStyles}>
         {table.getHeaderGroups().map((headerGroup) => (
           <tr key={headerGroup.id} className="h-12">
@@ -171,19 +171,21 @@ export default function RunsTable({
             </Fragment>
           ))}
       </tbody>
-      <tfoot>
-        {table.getFooterGroups().map((footerGroup) => (
-          <tr key={footerGroup.id}>
-            {footerGroup.headers.map((header) => (
-              <th key={header.id}>
-                {header.isPlaceholder
-                  ? null
-                  : flexRender(header.column.columnDef.footer, header.getContext())}
-              </th>
-            ))}
-          </tr>
-        ))}
-      </tfoot>
+      {!isEmpty && (
+        <tfoot>
+          {table.getFooterGroups().map((footerGroup) => (
+            <tr key={footerGroup.id}>
+              {footerGroup.headers.map((header) => (
+                <th key={header.id}>
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.footer, header.getContext())}
+                </th>
+              ))}
+            </tr>
+          ))}
+        </tfoot>
+      )}
     </table>
   );
 }
