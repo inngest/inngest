@@ -8,7 +8,7 @@ const query = graphql(`
   query GetFnCancellations($after: String, $envSlug: String!, $fnSlug: String!) {
     env: envBySlug(slug: $envSlug) {
       fn: workflowBySlug(slug: $fnSlug) {
-        cancellations(after: $after, first: 2) {
+        cancellations(after: $after) {
           edges {
             cursor
             node {
