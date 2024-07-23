@@ -6,19 +6,22 @@ Output:
 
 ]]
 
-local queueKey       = KEYS[1]
-local queueIndexKey  = KEYS[2]
-local partitionKey   = KEYS[3]
-local idempotencyKey = KEYS[4]
+local keyQueueMap    = KEYS[1]
+-- remove items from all outsanding queues it may be in
+local keyPartitionA  = KEYS[2]  -- queue:sorted:$workflowID - zset
+local keyPartitionB  = KEYS[3]  -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionC  = KEYS[4]  -- e.g. sorted:c|t:$workflowID - zset
+
+local idempotencyKey = KEYS[5]
 -- We must dequeue our queue item ID from each concurrency queue
-local accountConcurrencyKey   = KEYS[5] -- Account concurrency level
-local partitionConcurrencyKey = KEYS[6] -- Partition (function) concurrency level
-local customConcurrencyKeyA   = KEYS[7] -- Optional for eg. for concurrency amongst steps 
-local customConcurrencyKeyB   = KEYS[8] -- Optional for eg. for concurrency amongst steps 
+local accountConcurrencyKey   = KEYS[6] -- Account concurrency level
+local partitionConcurrencyKey = KEYS[7] -- Partition (function) concurrency level
+local customConcurrencyKeyA   = KEYS[8] -- Optional for eg. for concurrency amongst steps 
+local customConcurrencyKeyB   = KEYS[9] -- Optional for eg. for concurrency amongst steps 
 -- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer      = KEYS[9]
-local keyItemIndexA           = KEYS[10]   -- custom item index 1
-local keyItemIndexB           = KEYS[11]  -- custom item index 2
+local concurrencyPointer      = KEYS[10]
+local keyItemIndexA           = KEYS[11]  -- custom item index 1
+local keyItemIndexB           = KEYS[12]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local idempotencyTTL = tonumber(ARGV[2])
@@ -26,22 +29,18 @@ local partitionName  = ARGV[3]
 
 -- $include(get_queue_item.lua)
 -- Fetch this item to see if it was in progress prior to deleting.
-local item = get_queue_item(queueKey, queueID)
+local item = get_queue_item(keyQueueMap, queueID)
 if item == nil then
 	return 1
 end
 
-redis.call("HDEL", queueKey, queueID)
-redis.call("ZREM", queueIndexKey, queueID)
-redis.call("HINCRBY", partitionKey, "len", -1) -- len of enqueued items decreases
+redis.call("HDEL", keyQueueMap, queueID)
+redis.call("ZREM", keyPartitionA, queueID)
+redis.call("ZREM", keyPartitionB, queueID)
+redis.call("ZREM", keyPartitionC, queueID)
 
 if idempotencyTTL > 0 then
 	redis.call("SETEX", idempotencyKey, idempotencyTTL, "")
-end
-
-if item.leaseID ~= nil and item.leaseID ~= cjson.null then
-	-- Remove total number in progress, if there's a lease.
-	redis.call("HINCRBY", partitionKey, "n", -1)
 end
 
 redis.call("ZREM", partitionConcurrencyKey, item.id)

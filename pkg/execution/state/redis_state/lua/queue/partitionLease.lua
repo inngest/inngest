@@ -2,9 +2,12 @@
 
 Output:
     0: Success
-   -1: No capacity left, not leased
-   -2: Partition item not found
-   -3: Partition item already leased
+   -1: No account capacity left, not leased
+   -2: No fn capacity left, not leased
+   -3: No custom capacity left, not leased
+   -4: Partition item not found
+   -5: Partition item already leased
+   -6: Fn paused
 
 ]]
 
@@ -33,12 +36,12 @@ local noCapacityScore         = tonumber(ARGV[8]) -- score if limit concurrency 
 
 local existing = get_partition_item(keyPartitionMap, partitionID)
 if existing == nil or existing == false then
-    return { -2 }
+    return { -4 }
 end
 
 -- Check for an existing lease.
 if existing.leaseID ~= nil and existing.leaseID ~= cjson.null and decode_ulid_time(existing.leaseID) > currentTime then
-    return { -3 }
+    return { -5 }
 end
 
 -- Check whether the partition is currently paused.
@@ -46,7 +49,7 @@ end
 if existing.wid ~= nil and existing.wid ~= cjson.null then
     local fnMeta = get_fn_meta(keyFnMeta)
     if fnMeta ~= nil and fnMeta.off then
-        return {  -4 }
+        return {  -6 }
     end
 end
 
@@ -73,7 +76,7 @@ if fnConcurrency > 0 and #keyFnConcurrency > 0 then
     local fnCap = check_concurrency(currentTime, keyFnConcurrency, fnConcurrency)
     if fnCap <= 0 then
         requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
-        return { -1 }
+        return { -2 }
     end
     if fnCap <= capacity then
         capacity = fnCap
@@ -83,10 +86,10 @@ end
 if customConcurrency > 0 and #keyCustomConcurrency > 0 then
     -- Check that there's capacity for this partition, based off of partition-level
     -- concurrency keys.
-    local customCap = check_concurrency(currentTime, keyCustomConcurrency, fnConcurrency)
+    local customCap = check_concurrency(currentTime, keyCustomConcurrency, customConcurrency)
     if customCap <= 0 then
         requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
-        return { -1 }
+        return { -3 }
     end
     if customCap <= capacity then
         capacity = customCap

@@ -674,6 +674,20 @@ func (q QueuePartition) zsetKey(kg QueueKeyGenerator) string {
 	return q.ID
 }
 
+// concurrencyKey returns the single concurrency key for the given partition, depending
+// on the partition type.  This is used to check the partition's in-progress items whilst
+// requeueing partitions.
+func (q QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
+	// Hierarchically, custom keys take precedence.
+	if q.ConcurrencyKey != "" {
+		return q.customConcurrencyKey(kg)
+	}
+	if q.FunctionID != nil {
+		return q.fnConcurrencyKey(kg)
+	}
+	return q.acctConcurrencyKey(kg)
+}
+
 // fnConcurrencyKey returns the concurrency key for a function scope limit, on the
 // entire function (not custom keys)
 func (q QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
@@ -849,18 +863,19 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 	} else {
 		for _, key := range ckeys {
 			scope, id, checksum, _ := key.ParseKey()
+
 			if checksum == "" && key.Key != "" {
-				// For testing, use the hashed key here.
-				checksum = util.XXHash(key.Key)
+				// For testing, use the key here.
+				checksum = key.Key
 			}
 
 			partition := QueuePartition{
 				ID:               q.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, id.String(), checksum),
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
-				ConcurrencyScope: int(scope),
 				FunctionID:       &i.FunctionID,
 				AccountID:        i.Data.Identifier.AccountID,
-				ConcurrencyKey:   checksum,
+				ConcurrencyScope: int(scope),
+				ConcurrencyKey:   key.Key,
 				ConcurrencyLimit: key.Limit,
 			}
 
@@ -1335,7 +1350,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 			return nil, ErrConcurrencyLimitCustomKey1
 		}
 
-		customKeys[i] = item.Key
+		customKeys[i] = item.Key // It is important that this is the entire key.
 		customLimits[i] = item.Limit
 	}
 
@@ -1496,11 +1511,17 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		}
 	}
 
-	qn := i.Queue()
+	// Remove all items from all partitions.  For this, we need all partitions for
+	// the queue item instead of just the partition passed via args.
+	//
+	// This is because a single queue item may be present in more than one queue.
+	parts := q.ItemPartitions(ctx, i)
+
 	keys := []string{
 		q.kg.QueueItem(),
-		q.kg.FnQueueSet(qn),
-		q.kg.PartitionMeta(qn),
+		parts[0].zsetKey(q.kg),
+		parts[1].zsetKey(q.kg),
+		parts[2].zsetKey(q.kg),
 		q.kg.Idempotency(i.ID),
 		q.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
 		q.kg.Concurrency("p", i.FunctionID.String()),
@@ -1675,6 +1696,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		customConcurrency,
 		now.Add(PartitionConcurrencyLimitRequeueExtension).Unix(),
 	})
+
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1692,13 +1714,13 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	}
 
 	switch result[0] {
-	case -1:
+	case -1, -2, -3:
 		return nil, 0, ErrPartitionConcurrencyLimit
-	case -2:
-		return nil, 0, ErrPartitionNotFound
-	case -3:
-		return nil, 0, ErrPartitionAlreadyLeased
 	case -4:
+		return nil, 0, ErrPartitionNotFound
+	case -5:
+		return nil, 0, ErrPartitionAlreadyLeased
+	case -6:
 		return nil, 0, ErrPartitionPaused
 	default:
 		limit := fnConcurrency
@@ -1932,10 +1954,10 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		q.kg.PartitionItem(),
 		q.kg.GlobalPartitionIndex(),
 		q.kg.ShardPartitionIndex(shardName),
-		q.kg.PartitionMeta(p.Queue()),
-		q.kg.FnQueueSet(p.Queue()),
+		q.kg.PartitionMeta(p.Queue()), // TODO: Remove?
+		p.zsetKey(q.kg),               // Partition ZSET itself
+		p.concurrencyKey(q.kg),
 		q.kg.QueueItem(),
-		p.fnConcurrencyKey(q.kg),
 	}
 	force := 0
 	if forceAt {
@@ -1946,6 +1968,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		at.UnixMilli(),
 		force,
 	})
+	fmt.Println(args)
 	if err != nil {
 		return err
 	}
