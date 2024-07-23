@@ -427,7 +427,7 @@ func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 				// concurrency limits for this partition.
 				fn = NoConcurrencyLimit
 			}
-			if p.AccountID == nil {
+			if p.AccountID == uuid.Nil {
 				// There's no account ID, so return -1 indicating that there are no account
 				// concurrency limits for this partition.
 				account = NoConcurrencyLimit
@@ -617,8 +617,7 @@ type QueuePartition struct {
 	// function ID or the environment scope itself.
 	EnvID *uuid.UUID `json:"wsID,omitempty"`
 	// AccountID represents the account ID for the partition
-	// TODO: Don't make this a pointer;  this should always exist
-	AccountID *uuid.UUID `json:"aID,omitempty"`
+	AccountID uuid.UUID `json:"aID,omitempty"`
 	// LeaseID represents a lease on this partition.  If the LeaseID is not nil,
 	// this partition can be claimed by a shared-nothing worker to work on the
 	// queue items within this partition.
@@ -659,8 +658,8 @@ type QueuePartition struct {
 	// TODO: Throttling;  embed max limit/period/etc?
 }
 
-// zsetKey represents the key used to store the zset for this partition's items
-// for default partitions, this is different to the ID (for backwards compatibility, it's just
+// zsetKey represents the key used to store the zset for this partition's items.
+// For default partitions, this is different to the ID (for backwards compatibility, it's just
 // the fn ID without prefixes)
 func (q QueuePartition) zsetKey(kg QueueKeyGenerator) string {
 	if q.PartitionType == int(enums.PartitionTypeDefault) && q.FunctionID != nil {
@@ -687,7 +686,7 @@ func (q QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
 // acctConcurrencyKey returns the concurrency key for the account limit, on the
 // entire account (not custom keys)
 func (q QueuePartition) acctConcurrencyKey(kg QueueKeyGenerator) string {
-	if q.AccountID == nil {
+	if q.AccountID == uuid.Nil {
 		return kg.Concurrency("account", "-")
 	}
 	return kg.Concurrency("account", q.AccountID.String())
@@ -703,7 +702,9 @@ func (q QueuePartition) customConcurrencyKey(kg QueueKeyGenerator) string {
 }
 
 func (q QueuePartition) Queue() string {
-	// TODO: Check this
+	if q.ID == "" {
+		return q.FunctionID.String()
+	}
 	return q.ID
 }
 
@@ -843,18 +844,24 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 		partitions = append(partitions, QueuePartition{
 			ID:         i.FunctionID.String(),
 			FunctionID: &i.FunctionID,
-			AccountID:  &i.Data.Identifier.AccountID,
+			AccountID:  i.Data.Identifier.AccountID,
 		})
 	} else {
 		for _, key := range ckeys {
 			scope, id, checksum, _ := key.ParseKey()
+			if checksum == "" && key.Key != "" {
+				// For testing, use the hashed key here.
+				checksum = util.XXHash(key.Key)
+			}
 
 			partition := QueuePartition{
 				ID:               q.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, id.String(), checksum),
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(scope),
 				FunctionID:       &i.FunctionID,
-				AccountID:        &i.Data.Identifier.AccountID,
+				AccountID:        i.Data.Identifier.AccountID,
+				ConcurrencyKey:   checksum,
+				ConcurrencyLimit: key.Limit,
 			}
 
 			switch scope {
@@ -864,7 +871,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 				partition.EnvID = &i.WorkspaceID
 			case enums.ConcurrencyScopeAccount:
 				// AccountID comes from the concurrency key in this case
-				partition.AccountID = &id
+				partition.AccountID = id
 			}
 
 			partitions = append(partitions, partition)
