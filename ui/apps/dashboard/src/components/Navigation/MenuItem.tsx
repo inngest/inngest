@@ -1,19 +1,22 @@
+import type { UrlObject } from 'url';
 import type { ReactNode } from 'react';
-import Link from 'next/link';
+import { OptionalLink } from '@inngest/components/Link/OptionalLink';
 
 export const MenuItem = ({
   text,
   icon,
   collapsed,
   href,
+  prefetch = true,
 }: {
   text: string;
   icon: ReactNode;
   collapsed: boolean;
-  href: string;
+  href?: string | UrlObject;
+  prefetch?: boolean;
 }) => {
   return (
-    <Link href={href}>
+    <OptionalLink href={href} prefetch={prefetch}>
       <div
         className={`flex cursor-pointer flex-row items-center p-2.5 ${
           collapsed ? 'justify-center ' : 'justify-start'
@@ -22,6 +25,6 @@ export const MenuItem = ({
         {icon}
         {!collapsed && <span className="text-muted ml-2.5 text-sm leading-tight">{text}</span>}
       </div>
-    </Link>
+    </OptionalLink>
   );
 };

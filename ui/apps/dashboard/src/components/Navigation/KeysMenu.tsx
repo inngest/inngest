@@ -15,7 +15,7 @@ export default function KeysMenu({
   collapsed: boolean;
 }) {
   return (
-    <Listbox value={true}>
+    <Listbox>
       <Listbox.Button as="div">
         <NewButton
           kind="secondary"

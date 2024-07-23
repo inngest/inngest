@@ -43,6 +43,10 @@
   @apply rounded-b-lg;
 }
 
+.discreteTransition {
+  transition-behavior: allow-discrete;
+}
+
 @layer base {
   :root {
     /* Carbon Colors */
