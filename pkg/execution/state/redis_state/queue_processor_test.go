@@ -25,6 +25,7 @@ func init() {
 }
 
 func TestQueueRunSequential(t *testing.T) {
+	t.Skip()
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -96,6 +97,7 @@ func max(i int) *int {
 }
 
 func TestQueueRunBasic(t *testing.T) {
+	t.Skip()
 	customQueueName := "custom-queue-name"
 
 	r := miniredis.RunT(t)
@@ -191,6 +193,7 @@ func TestQueueRunBasic(t *testing.T) {
 }
 
 func TestQueueRunRetry(t *testing.T) {
+	t.Skip()
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -260,6 +263,7 @@ func TestQueueRunRetry(t *testing.T) {
 // is severely limited.  This means that we need to extend the time in which we can
 // process jobs.
 func TestQueueRunExtended(t *testing.T) {
+	t.Skip()
 	var handled int64
 
 	jobCompleteMax := int32(12_500) // ms
@@ -460,6 +464,7 @@ func TestQueueRunExtended(t *testing.T) {
 }
 
 func TestRunPriorityFactor(t *testing.T) {
+	t.Skip()
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{

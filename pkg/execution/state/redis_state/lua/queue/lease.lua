@@ -109,19 +109,6 @@ redis.call("HSET", queueKey, queueID, cjson.encode(item))
 
 -- Add the item to all concurrency keys
 redis.call("ZADD", functionConcurrencyKey, nextTime, item.id)
-
--- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
--- and store din functionConcurrencyKey.
-redis.call("ZREM", queueIndexKey, item.id)
-
--- Update the fn's score in the global pointer queue to the next job, if available.
-local score = get_fn_partition_score(queueIndexKey)
-update_pointer_score_to(partitionName, globalPointerKey, score)
--- And the same for any shards, as long as the shard name exists.
-if has_shard_key(shardPointerKey) then
-    update_pointer_score_to(partitionName, shardPointerKey, score)
-end
-
 -- NOTE: We check if concurrency > 0 here because this disables concurrency.  AccountID
 -- and custom concurrency items may not be set, but the keys need to be set for clustered
 -- mode.
@@ -133,6 +120,19 @@ if customConcurrencyA > 0 then
 end
 if customConcurrencyB > 0 then
     redis.call("ZADD", customConcurrencyKeyB, nextTime, item.id)
+end
+
+
+-- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
+-- and store din functionConcurrencyKey.
+redis.call("ZREM", queueIndexKey, item.id)
+
+-- Update the fn's score in the global pointer queue to the next job, if available.
+local score = get_fn_partition_score(queueIndexKey)
+update_pointer_score_to(partitionName, globalPointerKey, score)
+-- And the same for any shards, as long as the shard name exists.
+if has_shard_key(shardPointerKey) then
+    update_pointer_score_to(partitionName, shardPointerKey, score)
 end
 
 -- Get the earliest item in the partition/fn concurrency set - all items that have
