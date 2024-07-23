@@ -306,12 +306,17 @@ func (r *runsV2Resolver) TotalCount(ctx context.Context, obj *models.RunsV2Conne
 		return 0, fmt.Errorf("failed to access cursor")
 	}
 
+	orderBy, ok := graphql.GetFieldContext(ctx).Parent.Args["orderBy"].([]*models.RunsV2OrderBy)
+	if !ok {
+		return 0, fmt.Errorf("failed to retrieve order")
+	}
+
 	filter, ok := graphql.GetFieldContext(ctx).Parent.Args["filter"].(models.RunsFilterV2)
 	if !ok {
 		return 0, fmt.Errorf("failed to access query filter")
 	}
 
-	opts := toRunsQueryOpt(0, cursor, nil, filter)
+	opts := toRunsQueryOpt(0, cursor, orderBy, filter)
 	count, err := r.Data.GetTraceRunsCount(ctx, opts)
 	if err != nil {
 		return 0, fmt.Errorf("error retrieving count for runs: %w", err)
