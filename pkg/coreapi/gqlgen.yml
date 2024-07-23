@@ -79,6 +79,10 @@ models:
         resolver: true
       triggers:
         resolver: true
+  RunsV2Connection:
+    fields:
+      totalCount:
+        resolver: true
   HistoryType:
     model: github.com/inngest/inngest/pkg/enums.HistoryType
   HistoryStepType:
