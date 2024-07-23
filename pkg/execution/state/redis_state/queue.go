@@ -419,8 +419,8 @@ func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 			if p.ConcurrencyLimit >= 0 {
 				def = p.ConcurrencyLimit
 			}
-			// Use the defaults.
-			account, fn, custom = def, def, def
+			// Use the defaults, and add no concurrency limits to custom keys.
+			account, fn, custom = def, def, -1
 
 			if p.FunctionID == nil {
 				// There's no fn ID, so return -1 indicating that there are no account
@@ -435,7 +435,7 @@ func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 			if p.ConcurrencyKey == "" {
 				custom = NoConcurrencyLimit
 			}
-			return account, fn, -1
+			return account, fn, custom
 		},
 		customConcurrencyGen: func(ctx context.Context, item QueueItem) []state.CustomConcurrency {
 			// Use whatever's in the queue item by default
