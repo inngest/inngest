@@ -1475,7 +1475,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 	}
 
 	now := time.Now().Truncate(time.Second).UTC()
-	atA, atB, atC := now, now.Add(time.Second), now.Add(2*time.Second)
+	atA, atB, atC := now, now.Add(2*time.Second), now.Add(4*time.Second)
 
 	r := miniredis.RunT(t)
 
@@ -1657,7 +1657,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 			{ID: idA.String(), FunctionID: &idA},
 			{ID: idB.String(), FunctionID: &idB},
 			{ID: idC.String(), FunctionID: &idC},
-		}, items)
+		}, items, r.Dump())
 	})
 }
 
