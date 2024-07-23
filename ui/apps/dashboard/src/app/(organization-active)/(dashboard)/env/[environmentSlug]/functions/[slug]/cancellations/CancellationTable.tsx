@@ -6,7 +6,7 @@ import { Table } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 
-import { usePagination } from './usePagination';
+import { useCancellations } from './useCancellations';
 
 type Cancellation = {
   createdAt: string;
@@ -29,7 +29,7 @@ export function CancellationTable({ envSlug, fnSlug }: Props) {
     hasNextPage,
     isFetching,
     isInitiallyFetching,
-  } = usePagination({ envSlug, fnSlug });
+  } = useCancellations({ envSlug, fnSlug });
 
   let blankSlate = <p>No results</p>;
   if (isInitiallyFetching) {

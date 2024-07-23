@@ -27,7 +27,7 @@ const query = graphql(`
   }
 `);
 
-export function usePagination({ envSlug, fnSlug }: { envSlug: string; fnSlug: string }) {
+export function useCancellations({ envSlug, fnSlug }: { envSlug: string; fnSlug: string }) {
   const [hasNextPage, setHasNextPage] = useState(true);
   const [isInitiallyFetching, setIsInitiallyFetching] = useState(true);
 
@@ -67,13 +67,6 @@ export function usePagination({ envSlug, fnSlug }: { envSlug: string; fnSlug: st
     refetchInterval: 2500,
     initialPageParam: null,
     getNextPageParam: (lastPage) => {
-      if (!lastPage) {
-        return undefined;
-      }
-      if (lastPage.edges.length === 0) {
-        return undefined;
-      }
-
       const endCursor = lastPage.edges[lastPage.edges.length - 1]?.cursor;
       if (!endCursor) {
         return undefined;
