@@ -403,6 +403,8 @@ func TestQueueEnqueueItem(t *testing.T) {
 				AccountID:        uuid.Nil,
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
+				ConcurrencyLimit: 1,
+				ConcurrencyKey:   util.XXHash("test"),
 			}, concurrencyPartition)
 
 			// We do not add the fn to the function-specific queue.
@@ -445,6 +447,8 @@ func TestQueueEnqueueItem(t *testing.T) {
 				AccountID:        uuid.Nil,
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
+				ConcurrencyLimit: 1,
+				ConcurrencyKey:   util.XXHash("test"),
 			}, concurrencyPartitionA)
 
 			require.Equal(t, QueuePartition{
@@ -453,6 +457,8 @@ func TestQueueEnqueueItem(t *testing.T) {
 				AccountID:        uuid.Nil,
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
+				ConcurrencyLimit: 2,
+				ConcurrencyKey:   util.XXHash("plz"),
 			}, concurrencyPartitionB)
 
 			// We do not add the fn to the function-specific queue.
@@ -1102,10 +1108,9 @@ func TestQueueDequeue(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("The lease exists in the partition queue", func(t *testing.T) {
-			require.EqualValues(t, uuid.UUID{}.String(), p.fnConcurrencyKey(q.kg))
-			count, err := q.InProgress(ctx, "p", p.fnConcurrencyKey(q.kg))
+			count, err := q.InProgress(ctx, "p", p.FunctionID.String())
 			require.NoError(t, err)
-			require.EqualValues(t, 1, count)
+			require.EqualValues(t, 1, count, r.Dump())
 		})
 
 		err = q.Dequeue(ctx, p, item)
@@ -1129,8 +1134,7 @@ func TestQueueDequeue(t *testing.T) {
 		})
 
 		t.Run("It should remove the item from the concurrency partition's queue", func(t *testing.T) {
-			require.EqualValues(t, uuid.UUID{}.String(), p.fnConcurrencyKey(q.kg))
-			count, err := q.InProgress(ctx, "p", p.fnConcurrencyKey(q.kg))
+			count, err := q.InProgress(ctx, "p", p.FunctionID.String())
 			require.NoError(t, err)
 			require.EqualValues(t, 0, count)
 		})
@@ -1174,6 +1178,7 @@ func TestQueueDequeue(t *testing.T) {
 		})
 	})
 
+	// TODO: This should work for custom concurrency keys.
 }
 
 func TestQueueRequeue(t *testing.T) {
