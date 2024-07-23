@@ -333,7 +333,7 @@ func (r *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.R
 	return &resp, nil
 }
 
-func (r *runsV2Resolver) TotalCount(ctx context.Context, obj *models.RunsV2Connection) (int, error) {
+func (r *runsV2ConnResolver) TotalCount(ctx context.Context, obj *models.RunsV2Connection) (int, error) {
 	cursor, ok := graphql.GetFieldContext(ctx).Parent.Args["after"].(*string)
 	if !ok {
 		return 0, fmt.Errorf("failed to access cursor")

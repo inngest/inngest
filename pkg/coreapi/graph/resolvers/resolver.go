@@ -38,7 +38,9 @@ func (r *Resolver) Function() generated.FunctionResolver { return &functionResol
 
 func (r *Resolver) StreamItem() generated.StreamItemResolver { return &streamItemResolver{r} }
 
-func (r *Resolver) RunsV2Connection() generated.RunsV2ConnectionResolver { return &runsV2Resolver{r} }
+func (r *Resolver) RunsV2Connection() generated.RunsV2ConnectionResolver {
+	return &runsV2ConnResolver{r}
+}
 
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
@@ -48,4 +50,4 @@ type functionRunResolver struct{ *Resolver }
 type functionRunV2Resolver struct{ *Resolver }
 type functionResolver struct{ *Resolver }
 type streamItemResolver struct{ *Resolver }
-type runsV2Resolver struct{ *Resolver }
+type runsV2ConnResolver struct{ *Resolver }
