@@ -13,6 +13,7 @@ const query = graphql(`
             cursor
             node {
               createdAt
+              envID: environmentID
               id
               queuedAtMax
               queuedAtMin
