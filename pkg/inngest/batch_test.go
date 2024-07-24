@@ -3,6 +3,7 @@ package inngest
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/consts"
@@ -24,17 +25,6 @@ func TestNewEventBatchConfig(t *testing.T) {
 			},
 			expected: &EventBatchConfig{
 				MaxSize: 10,
-				Timeout: "2s",
-			},
-		},
-		{
-			name: "should use default batch size if provided value is <= 0",
-			data: map[string]any{
-				"maxSize": -1,
-				"timeout": "2s",
-			},
-			expected: &EventBatchConfig{
-				MaxSize: consts.DefaultBatchSize,
 				Timeout: "2s",
 			},
 		},
@@ -123,6 +113,13 @@ func TestEventBatchConfigIsValid(t *testing.T) {
 			expected: errors.New("batch size cannot be smaller than 2"),
 		},
 		{
+			name: "should return error if MaxSize is larger than limit",
+			config: &EventBatchConfig{
+				MaxSize: consts.MaxBatchSizeLimit + 1,
+			},
+			expected: fmt.Errorf("batch size cannot be larger than %d", consts.MaxBatchSizeLimit),
+		},
+		{
 			name: "should return error if timeout is invalid duration string",
 			config: &EventBatchConfig{
 				MaxSize: 10,
@@ -130,11 +127,28 @@ func TestEventBatchConfigIsValid(t *testing.T) {
 			},
 			expected: errors.New("invalid timeout string"),
 		},
+		{
+			name: "should return error if timeout is larger less than a second",
+			config: &EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "100ms",
+			},
+			expected: errors.New("batch timeout should be more than 1s"),
+		},
+		{
+			name: "should return error if timeout is larger than limit",
+			config: &EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "1h",
+			},
+			expected: errors.New("batch timeout should be smaller than 10m"),
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if err := test.config.IsValid(context.Background()); err != nil {
+			err := test.config.IsValid(context.Background())
+			if test.expected != nil {
 				require.ErrorContains(t, err, test.expected.Error())
 			}
 		})
