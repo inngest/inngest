@@ -124,6 +124,8 @@ func (c CustomConcurrency) Validate() error {
 	return nil
 }
 
+// ParseKey returns the key's concurrency scope, the scope ID (fn or acct ID), the hash,
+// or an error if the concurrency key is invalid.
 func (c CustomConcurrency) ParseKey() (scope enums.ConcurrencyScope, id uuid.UUID, xxhash string, err error) {
 	// Keys must always be in the format of "$prefix:$id:$key", in which prefix
 	// is one of "f" | "e" | "a", depending on function, env, or account-level scopes.

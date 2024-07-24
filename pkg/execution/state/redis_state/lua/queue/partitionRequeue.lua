@@ -17,9 +17,9 @@ local keyAccountPartitionPtr  = KEYS[3]
 local keyGlobalAccountsPtr    = KEYS[4]
 local keyShardPartitionPtr    = KEYS[5]
 local partitionMeta           = KEYS[6]
-local queueIndex              = KEYS[7]
-local queueKey                = KEYS[8]
-local partitionConcurrencyKey = KEYS[9] -- We can only GC a partition if no running jobs occur.
+local keyPartitionZset        = KEYS[7]
+local partitionConcurrencyKey = KEYS[8] -- We can only GC a partition if no running jobs occur.
+local queueKey                = KEYS[9]
 
 local partitionID             = ARGV[1]
 local atMS                    = tonumber(ARGV[2]) -- time in milliseconds
@@ -33,17 +33,17 @@ local atS = math.floor(atMS / 1000) -- in seconds;  partitions are currently sec
 -- $include(update_pointer_score.lua)
 
 --
-local existing                = get_partition_item(partitionKey, partitionID)
+local existing = get_partition_item(partitionKey, partitionID)
 if existing == nil then
     return 1
 end
 
 -- If there are no items in the workflow queue, we can safely remove the
 -- partition.
-if tonumber(redis.call("ZCARD", queueIndex)) == 0 and tonumber(redis.call("ZCARD", partitionConcurrencyKey)) == 0 then
+if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call("ZCARD", partitionConcurrencyKey)) == 0 then
     redis.call("HDEL", partitionKey, partitionID)             -- Remove the item
     redis.call("DEL", partitionMeta)                         -- Remove the meta
-    redis.call("ZREM", keyGlobalPartitionPtr, partitionID)    -- Remove the global index
+    redis.call("ZREM", keyGlobalPartitionPtr, partitionID)    -- Remove the index
     redis.call("ZREM", keyAccountPartitionPtr, partitionID)    -- Remove the account-level index
 
     -- Remove account from global accounts if there are no partitions to work on
@@ -59,7 +59,7 @@ if tonumber(redis.call("ZCARD", queueIndex)) == 0 and tonumber(redis.call("ZCARD
 end
 
 -- Peek up the next available item from the queue
-local items = redis.call("ZRANGE", queueIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1)
+local items = redis.call("ZRANGE", keyPartitionZset, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1)
 
 if #items > 0 and forceAt ~= 1 then
     local encoded = redis.call("HMGET", queueKey, unpack(items))

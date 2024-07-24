@@ -369,7 +369,14 @@ func WithCustomConcurrencyKeyGenerator(f QueueItemConcurrencyKeyGenerator) func(
 // for a given partition.
 func WithConcurrencyLimitGetter(f ConcurrencyLimitGetter) func(q *queue) {
 	return func(q *queue) {
-		q.concurrencyLimitGetter = f
+		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
+			acct, fn, custom = f(ctx, p)
+			// Always clip limits for accounts to impose _some_ limit.
+			if acct <= 0 {
+				acct = consts.DefaultConcurrencyLimit
+			}
+			return acct, fn, custom
+		}
 	}
 }
 
@@ -403,20 +410,20 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 		idempotencyTTL:     defaultIdempotencyTTL,
 		queueKindMapping:   make(map[string]string),
 		logger:             logger.From(context.Background()),
-		concurrencyLimitGetter: func(ctx context.Context, p QueuePartition) (fn, account, custom int) {
+		concurrencyLimitGetter: func(ctx context.Context, p QueuePartition) (account, fn, custom int) {
 			def := defaultConcurrency
 			if p.ConcurrencyLimit >= 0 {
 				def = p.ConcurrencyLimit
 			}
-			// Use the defaults.
-			fn, account, custom = def, def, def
+			// Use the defaults, and add no concurrency limits to custom keys.
+			account, fn, custom = def, def, -1
 
 			if p.FunctionID == nil {
 				// There's no fn ID, so return -1 indicating that there are no account
 				// concurrency limits for this partition.
 				fn = NoConcurrencyLimit
 			}
-			if p.AccountID == nil {
+			if p.AccountID == uuid.Nil {
 				// There's no account ID, so return -1 indicating that there are no account
 				// concurrency limits for this partition.
 				account = NoConcurrencyLimit
@@ -424,7 +431,7 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 			if p.ConcurrencyKey == "" {
 				custom = NoConcurrencyLimit
 			}
-			return fn, account, -1
+			return account, fn, custom
 		},
 		customConcurrencyGen: func(ctx context.Context, item QueueItem) []state.CustomConcurrency {
 			// Use whatever's in the queue item by default
@@ -617,11 +624,11 @@ type QueuePartition struct {
 	// FunctionID represents the function ID that this partition manages.
 	// NOTE:  If this partition represents many fns (eg. acct or env), this may be nil
 	FunctionID *uuid.UUID `json:"wid,omitempty"`
-	// AccountID represents the account ID for the partition
-	AccountID *uuid.UUID `json:"aID,omitempty"`
 	// EnvID represents the environment ID for the partition, either from the
 	// function ID or the environment scope itself.
 	EnvID *uuid.UUID `json:"wsID,omitempty"`
+	// AccountID represents the account ID for the partition
+	AccountID uuid.UUID `json:"aID,omitempty"`
 	// LeaseID represents a lease on this partition.  If the LeaseID is not nil,
 	// this partition can be claimed by a shared-nothing worker to work on the
 	// queue items within this partition.
@@ -650,6 +657,9 @@ type QueuePartition struct {
 	ConcurrencyLimit int `json:"l,omitempty"`
 	// ConcurrencyKey represents the hashed custom key for the queue partition, if this is
 	// for a custom key.
+	//
+	// This must be set so that we can fetch the latest concurrency limits dynamically when
+	// leasing a partition, if desired, via the ConcurrencyLimitGetter.
 	ConcurrencyKey string `json:"ck,omitempty"`
 	// LimitOwner represents the function ID that set the max concurrency limit for
 	// this function.  This allows us to lower the max if the owner/enqueueing function
@@ -659,11 +669,11 @@ type QueuePartition struct {
 	// TODO: Throttling;  embed max limit/period/etc?
 }
 
-// zsetKey represents the key used to store the zset for this partition's items
-// for default partitions, this is different to the ID (for backwards compatibility, it's just
+// zsetKey represents the key used to store the zset for this partition's items.
+// For default partitions, this is different to the ID (for backwards compatibility, it's just
 // the fn ID without prefixes)
 func (q QueuePartition) zsetKey(kg QueueKeyGenerator) string {
-	if q.PartitionType == 0 && q.FunctionID != nil {
+	if q.PartitionType == int(enums.PartitionTypeDefault) && q.FunctionID != nil {
 		// return the top-level function queue.
 		return kg.PartitionQueueSet(enums.PartitionTypeDefault, q.FunctionID.String(), "")
 	}
@@ -671,7 +681,22 @@ func (q QueuePartition) zsetKey(kg QueueKeyGenerator) string {
 		// return a blank queue key.  This is used for nil queue partitions.
 		return kg.PartitionQueueSet(enums.PartitionTypeDefault, "-", "")
 	}
+	// q.ID is already a properly defined key.
 	return q.ID
+}
+
+// concurrencyKey returns the single concurrency key for the given partition, depending
+// on the partition type.  This is used to check the partition's in-progress items whilst
+// requeueing partitions.
+func (q QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
+	// Hierarchically, custom keys take precedence.
+	if q.ConcurrencyKey != "" {
+		return q.customConcurrencyKey(kg)
+	}
+	if q.FunctionID != nil {
+		return q.fnConcurrencyKey(kg)
+	}
+	return q.acctConcurrencyKey(kg)
 }
 
 // fnConcurrencyKey returns the concurrency key for a function scope limit, on the
@@ -686,14 +711,25 @@ func (q QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
 // acctConcurrencyKey returns the concurrency key for the account limit, on the
 // entire account (not custom keys)
 func (q QueuePartition) acctConcurrencyKey(kg QueueKeyGenerator) string {
-	if q.AccountID == nil {
+	if q.AccountID == uuid.Nil {
 		return kg.Concurrency("account", "-")
 	}
 	return kg.Concurrency("account", q.AccountID.String())
 }
 
+// acctConcurrencyKey returns the concurrency key for the account limit, on the
+// entire account (not custom keys)
+func (q QueuePartition) customConcurrencyKey(kg QueueKeyGenerator) string {
+	if q.ConcurrencyKey == "" {
+		return kg.Concurrency("custom", "-")
+	}
+	return kg.Concurrency("custom", q.ConcurrencyKey)
+}
+
 func (q QueuePartition) Queue() string {
-	// TODO: Check this
+	if q.ID == "" {
+		return q.FunctionID.String()
+	}
 	return q.ID
 }
 
@@ -833,18 +869,25 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 		partitions = append(partitions, QueuePartition{
 			ID:         i.FunctionID.String(),
 			FunctionID: &i.FunctionID,
-			AccountID:  &i.Data.Identifier.AccountID,
+			AccountID:  i.Data.Identifier.AccountID,
 		})
 	} else {
 		for _, key := range ckeys {
 			scope, id, checksum, _ := key.ParseKey()
 
+			if checksum == "" && key.Key != "" {
+				// For testing, use the key here.
+				checksum = key.Key
+			}
+
 			partition := QueuePartition{
 				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, id.String(), checksum),
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
-				ConcurrencyScope: int(scope),
 				FunctionID:       &i.FunctionID,
-				AccountID:        &i.Data.Identifier.AccountID,
+				AccountID:        i.Data.Identifier.AccountID,
+				ConcurrencyScope: int(scope),
+				ConcurrencyKey:   key.Key,
+				ConcurrencyLimit: key.Limit,
 			}
 
 			switch scope {
@@ -854,7 +897,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 				partition.EnvID = &i.WorkspaceID
 			case enums.ConcurrencyScopeAccount:
 				// AccountID comes from the concurrency key in this case
-				partition.AccountID = &id
+				partition.AccountID = id
 			}
 
 			partitions = append(partitions, partition)
@@ -1318,7 +1361,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 
 	// Required.
 	//
-	// This should be found by calling function.ConcurrencyLimit() to return
+	// Custom key limits should be found by calling function.ConcurrencyLimit() to return
 	// the lowest concurrency limit available.  It limits the capacity of all
 	// runs for the given function.
 	//
@@ -1344,7 +1387,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 			return nil, ErrConcurrencyLimitCustomKey1
 		}
 
-		customKeys[i] = item.Key
+		customKeys[i] = item.Key // It is important that this is the entire key.
 		customLimits[i] = item.Limit
 	}
 
@@ -1398,6 +1441,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	if err != nil {
 		return nil, fmt.Errorf("error leasing queue item: %w", err)
 	}
+
 	switch status {
 	case 0:
 		return &leaseID, nil
@@ -1512,11 +1556,17 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		}
 	}
 
-	qn := i.Queue()
+	// Remove all items from all partitions.  For this, we need all partitions for
+	// the queue item instead of just the partition passed via args.
+	//
+	// This is because a single queue item may be present in more than one queue.
+	parts := q.ItemPartitions(ctx, i)
+
 	keys := []string{
 		q.u.kg.QueueItem(),
-		q.u.kg.FnQueueSet(qn),
-		q.u.kg.PartitionMeta(qn),
+		parts[0].zsetKey(q.u.kg),
+		parts[1].zsetKey(q.u.kg),
+		parts[2].zsetKey(q.u.kg),
 		q.u.kg.Idempotency(i.ID),
 		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
 		q.u.kg.Concurrency("p", i.FunctionID.String()),
@@ -1658,8 +1708,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 // when running a worker.
 func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration) (*ulid.ULID, int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionLease"), redis_telemetry.ScopeQueue)
-
-	fnConcurrency, acctConcurrency, customConcurrency := q.concurrencyLimitGetter(ctx, *p)
+	acctConcurrency, fnConcurrency, customConcurrency := q.concurrencyLimitGetter(ctx, *p)
 
 	// XXX: Check for function throttling prior to leasing;  if it's throttled we can requeue
 	// the pointer and back off.  A question here is enqueuing new items onto the partition
@@ -1676,17 +1725,17 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		fnMetaKey = *p.FunctionID
 	}
 
-	_ = customConcurrency
-
 	keys := []string{
 		q.u.kg.PartitionItem(),
 		q.u.kg.GlobalPartitionIndex(),
-		// TODO Can AccountID ever be nil?
-		q.u.kg.AccountPartitionIndex(*p.AccountID),
-		p.fnConcurrencyKey(q.u.kg),
-		p.acctConcurrencyKey(q.u.kg),
-		// TODO: Custom concurrency key (?)
+		// TODO Can AccountID ever be zero value?
+		q.u.kg.AccountPartitionIndex(p.AccountID),
 		q.u.kg.FnMetadata(fnMetaKey),
+		// These concurrency keys are for fast checking of partition
+		// concurrnecy limits prior to leasing, as an optimization.
+		p.acctConcurrencyKey(q.u.kg),
+		p.fnConcurrencyKey(q.u.kg),
+		p.customConcurrencyKey(q.u.kg),
 	}
 
 	// TODO: Enable checking of env and custom concurrency keys here.
@@ -1696,11 +1745,12 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		leaseID.String(),
 		now.UnixMilli(),
 		leaseExpires.Unix(),
-		fnConcurrency,
 		acctConcurrency,
-		// customConcurrency,
+		fnConcurrency,
+		customConcurrency,
 		now.Add(PartitionConcurrencyLimitRequeueExtension).Unix(),
 	})
+
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1718,13 +1768,13 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	}
 
 	switch result[0] {
-	case -1:
+	case -1, -2, -3:
 		return nil, 0, ErrPartitionConcurrencyLimit
-	case -2:
-		return nil, 0, ErrPartitionNotFound
-	case -3:
-		return nil, 0, ErrPartitionAlreadyLeased
 	case -4:
+		return nil, 0, ErrPartitionNotFound
+	case -5:
+		return nil, 0, ErrPartitionAlreadyLeased
+	case -6:
 		return nil, 0, ErrPartitionPaused
 	default:
 		limit := fnConcurrency
@@ -2041,13 +2091,13 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 	keys := []string{
 		q.u.kg.PartitionItem(),
 		q.u.kg.GlobalPartitionIndex(),
-		// TODO Is the account ID always set?
-		q.u.kg.AccountPartitionIndex(*p.AccountID),
+		// TODO Is the account ID always non-zero?
+		q.u.kg.AccountPartitionIndex(p.AccountID),
 		q.u.kg.ShardPartitionIndex(shardName),
-		q.u.kg.PartitionMeta(p.Queue()),
-		q.u.kg.FnQueueSet(p.Queue()),
+		q.u.kg.PartitionMeta(p.Queue()), // TODO: Remove?
+		p.zsetKey(q.u.kg),               // Partition ZSET itself
+		p.concurrencyKey(q.u.kg),
 		q.u.kg.QueueItem(),
-		p.fnConcurrencyKey(q.u.kg),
 	}
 	force := 0
 	if forceAt {
@@ -2057,7 +2107,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		p.Queue(),
 		at.UnixMilli(),
 		force,
-		*p.AccountID,
+		p.AccountID,
 	})
 	if err != nil {
 		return err

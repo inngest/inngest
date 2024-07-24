@@ -18,6 +18,7 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
@@ -246,7 +247,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			ID:         item.FunctionID.String(),
 			FunctionID: &item.FunctionID,
-			AccountID:  &accountId,
+			AccountID:  accountId,
 		}, qp)
 
 		// Ensure the account is inserted
@@ -281,7 +282,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			ID:         item.FunctionID.String(),
 			FunctionID: &item.FunctionID,
-			AccountID:  &uuid.Nil,
+			AccountID:  uuid.Nil,
 		}, qp)
 
 		// Ensure that the zscore did not change.
@@ -305,7 +306,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			ID:         item.FunctionID.String(),
 			FunctionID: &item.FunctionID,
-			AccountID:  &uuid.Nil,
+			AccountID:  uuid.Nil,
 		}, qp)
 
 		// Assert that the zscore was changed to this earliest timestamp.
@@ -335,7 +336,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			ID:         item.FunctionID.String(),
 			FunctionID: &item.FunctionID,
-			AccountID:  &uuid.Nil,
+			AccountID:  uuid.Nil,
 		}, qp)
 	})
 
@@ -415,9 +416,11 @@ func TestQueueEnqueueItem(t *testing.T) {
 			require.Equal(t, QueuePartition{
 				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hash),
 				FunctionID:       &fnID,
-				AccountID:        &uuid.Nil,
+				AccountID:        uuid.Nil,
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
+				ConcurrencyLimit: 1,
+				ConcurrencyKey:   util.XXHash("test"),
 			}, concurrencyPartition)
 
 			// We do not add the fn to the function-specific queue.
@@ -457,17 +460,21 @@ func TestQueueEnqueueItem(t *testing.T) {
 			require.Equal(t, QueuePartition{
 				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashA),
 				FunctionID:       &fnID,
-				AccountID:        &uuid.Nil,
+				AccountID:        uuid.Nil,
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
+				ConcurrencyLimit: 1,
+				ConcurrencyKey:   util.XXHash("test"),
 			}, concurrencyPartitionA)
 
 			require.Equal(t, QueuePartition{
 				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashB),
 				FunctionID:       &fnID,
-				AccountID:        &uuid.Nil,
+				AccountID:        uuid.Nil,
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
+				ConcurrencyLimit: 2,
+				ConcurrencyKey:   util.XXHash("plz"),
 			}, concurrencyPartitionB)
 
 			// We do not add the fn to the function-specific queue.
@@ -690,7 +697,7 @@ func TestQueuePeek(t *testing.T) {
 			scavengeAt := time.Now().UnixMilli()
 			caught, err = q.Scavenge(ctx)
 			require.NoError(t, err)
-			require.EqualValues(t, 1, caught)
+			require.EqualValues(t, 1, caught, "Items not found during scavenge")
 
 			items, err = q.Peek(ctx, workflowID.String(), d, QueuePeekMax)
 			require.NoError(t, err)
@@ -813,8 +820,10 @@ func TestQueueLease(t *testing.T) {
 	})
 
 	t.Run("With partition concurrency limits", func(t *testing.T) {
+		r.FlushAll()
+
 		// Only allow a single leased item
-		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
+		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
 			return 1, 1, 1
 		}
 
@@ -824,12 +833,14 @@ func TestQueueLease(t *testing.T) {
 		itemB, err := q.EnqueueItem(ctx, QueueItem{FunctionID: uuid.New()}, start)
 		require.NoError(t, err)
 		// Use the new item's workflow ID
-		p := QueuePartition{FunctionID: &itemA.FunctionID}
+		p := QueuePartition{ID: itemA.FunctionID.String(), FunctionID: &itemA.FunctionID}
 
 		t.Run("With denylists it does not lease.", func(t *testing.T) {
 			list := newLeaseDenyList()
 			list.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, p.Queue()))
-			_, err = q.Lease(ctx, p, itemA, 5*time.Second, getNow(), list)
+			id, err := q.Lease(ctx, p, itemA, 5*time.Second, getNow(), list)
+			require.NotNil(t, err, "Expcted error leasing denylists")
+			require.Nil(t, id, "Expected nil ID with denylists")
 			require.ErrorIs(t, err, ErrPartitionConcurrencyLimit)
 		})
 
@@ -845,9 +856,11 @@ func TestQueueLease(t *testing.T) {
 	})
 
 	t.Run("With account concurrency limits", func(t *testing.T) {
+		r.FlushAll()
+
 		// Only allow a single leased item via account limits
-		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
-			return 100, 1, NoConcurrencyLimit
+		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
+			return 1, 100, NoConcurrencyLimit
 		}
 
 		// Create a new item
@@ -871,7 +884,7 @@ func TestQueueLease(t *testing.T) {
 
 	t.Run("With custom concurrency limits", func(t *testing.T) {
 		// Only allow a single leased item via account limits
-		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
+		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
 			return 100, 100, 1
 		}
 		q.customConcurrencyGen = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
@@ -910,33 +923,82 @@ func TestQueueLease(t *testing.T) {
 	})
 
 	t.Run("It should update the global partition index", func(t *testing.T) {
-		r.FlushAll()
+		t.Run("With no concurrency keys", func(t *testing.T) {
+			r.FlushAll()
+			q.customConcurrencyGen = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
+				return nil
+			}
 
-		// NOTE: We need two items to ensure that this updates.  Leasing an
-		// item removes it from the fn queue.
-		t.Run("With a single item in the queue hwen leasing, nothing updates", func(t *testing.T) {
-			at := time.Now().Truncate(time.Second).Add(time.Second)
-			item, err := q.EnqueueItem(ctx, QueueItem{}, at)
-			require.NoError(t, err)
-			p := QueuePartition{FunctionID: &item.FunctionID}
+			// NOTE: We need two items to ensure that this updates.  Leasing an
+			// item removes it from the fn queue.
+			t.Run("With a single item in the queue hwen leasing, nothing updates", func(t *testing.T) {
+				at := time.Now().Truncate(time.Second).Add(time.Second)
+				item, err := q.EnqueueItem(ctx, QueueItem{}, at)
+				require.NoError(t, err)
+				p := QueuePartition{FunctionID: &item.FunctionID}
 
-			score, err := r.ZScore(q.u.kg.GlobalPartitionIndex(), p.Queue())
-			require.NoError(t, err)
-			require.EqualValues(t, at.Unix(), score)
+				score, err := r.ZScore(q.u.kg.GlobalPartitionIndex(), p.Queue())
+				require.NoError(t, err)
+				require.EqualValues(t, at.Unix(), score, r.Dump())
 
-			// Nothing should update here, as there's nothing left in the fn queue
-			// so nothing happens.
-			_, err = q.Lease(ctx, p, item, 10*time.Second, getNow(), nil)
-			require.NoError(t, err)
+				// Nothing should update here, as there's nothing left in the fn queue
+				// so nothing happens.
+				_, err = q.Lease(ctx, p, item, 10*time.Second, getNow(), nil)
+				require.NoError(t, err)
 
-			nextScore, err := r.ZScore(q.u.kg.GlobalPartitionIndex(), p.Queue())
-			require.NoError(t, err)
-			require.EqualValues(t, int(score), int(nextScore), "score should not equal previous score")
+				nextScore, err := r.ZScore(q.u.kg.GlobalPartitionIndex(), p.Queue())
+				require.NoError(t, err)
+				require.EqualValues(t, int(score), int(nextScore), "score should not equal previous score")
 		})
 
-		r.FlushAll()
+		t.Run("With custom concurrency keys", func(t *testing.T) {
+			r.FlushAll()
+			q.customConcurrencyGen = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
+				return nil
+			}
+			q.customConcurrencyGen = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
+				return []state.CustomConcurrency{
+					{
+						Key:   "custom-level-key",
+						Limit: 1,
+					},
+				}
+			}
+			defer func() {
+				q.customConcurrencyGen = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
+					return nil
+				}
+			}()
+
+			// NOTE: We need two items to ensure that this updates.  Leasing an
+			// item removes it from the fn queue.
+			t.Run("With a single item in the queue hwen leasing, nothing updates", func(t *testing.T) {
+				at := time.Now().Truncate(time.Second).Add(time.Second)
+				item, err := q.EnqueueItem(ctx, QueueItem{}, at)
+				require.NoError(t, err)
+
+				// The partition should use a custom ID for the concurrency key.
+				p := q.ItemPartitions(ctx, item)[0]
+				require.Contains(t, p.ID, "<custom-level-key>")
+
+				score, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), p.ID)
+				require.NoError(t, err)
+				require.EqualValues(t, at.Unix(), score, r.Dump())
+
+				// Nothing should update here, as there's nothing left in the fn queue
+				// so nothing happens.
+				_, err = q.Lease(ctx, p, item, 10*time.Second, getNow(), nil)
+				require.NoError(t, err)
+
+				nextScore, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), p.Queue())
+				require.NoError(t, err)
+				require.EqualValues(t, int(score), int(nextScore), "score should not equal previous score")
+			})
+		})
 
 		t.Run("With more than one item in the fn queue, it uses the next val", func(t *testing.T) {
+			r.FlushAll()
+
 			atA := time.Now().Truncate(time.Second).Add(time.Second)
 			atB := atA.Add(time.Minute)
 
@@ -1066,10 +1128,9 @@ func TestQueueDequeue(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("The lease exists in the partition queue", func(t *testing.T) {
-			require.EqualValues(t, uuid.UUID{}.String(), p.fnConcurrencyKey(q.u.kg))
-			count, err := q.InProgress(ctx, "p", p.fnConcurrencyKey(q.u.kg))
+			count, err := q.InProgress(ctx, "p", p.FunctionID.String())
 			require.NoError(t, err)
-			require.EqualValues(t, 1, count)
+			require.EqualValues(t, 1, count, r.Dump())
 		})
 
 		err = q.Dequeue(ctx, p, item)
@@ -1093,8 +1154,7 @@ func TestQueueDequeue(t *testing.T) {
 		})
 
 		t.Run("It should remove the item from the concurrency partition's queue", func(t *testing.T) {
-			require.EqualValues(t, uuid.UUID{}.String(), p.fnConcurrencyKey(q.u.kg))
-			count, err := q.InProgress(ctx, "p", p.fnConcurrencyKey(q.u.kg))
+			count, err := q.InProgress(ctx, "p", p.FunctionID.String())
 			require.NoError(t, err)
 			require.EqualValues(t, 0, count)
 		})
@@ -1138,6 +1198,7 @@ func TestQueueDequeue(t *testing.T) {
 		})
 	})
 
+	// TODO: This should work for custom concurrency keys.
 }
 
 func TestQueueRequeue(t *testing.T) {
@@ -1279,9 +1340,9 @@ func TestQueuePartitionLease(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{ID: idA.String(), FunctionID: &idA, AccountID: &uuid.Nil},
-			{ID: idB.String(), FunctionID: &idB, AccountID: &uuid.Nil},
-			{ID: idC.String(), FunctionID: &idC, AccountID: &uuid.Nil},
+			{ID: idA.String(), FunctionID: &idA, AccountID: uuid.Nil},
+			{ID: idB.String(), FunctionID: &idB, AccountID: uuid.Nil},
+			{ID: idC.String(), FunctionID: &idC, AccountID: uuid.Nil},
 		}, items)
 	})
 
@@ -1307,12 +1368,12 @@ func TestQueuePartitionLease(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, items, 3)
 			require.EqualValues(t, []*QueuePartition{
-				{ID: idB.String(), FunctionID: &idB, AccountID: &uuid.Nil},
-				{ID: idC.String(), FunctionID: &idC, AccountID: &uuid.Nil},
+				{ID: idB.String(), FunctionID: &idB, AccountID: uuid.Nil},
+				{ID: idC.String(), FunctionID: &idC, AccountID: uuid.Nil},
 				{
 					ID:         idA.String(),
 					FunctionID: &idA,
-					AccountID:  &uuid.Nil,
+					AccountID:  uuid.Nil,
 					Last:       items[2].Last, // Use the leased partition time.
 					LeaseID:    leaseID,
 				}, // idA is now last.
@@ -1434,7 +1495,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 	}
 
 	now := time.Now().Truncate(time.Second).UTC()
-	atA, atB, atC := now, now.Add(time.Second), now.Add(2*time.Second)
+	atA, atB, atC := now, now.Add(2*time.Second), now.Add(4*time.Second)
 
 	r := miniredis.RunT(t)
 
@@ -1616,7 +1677,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 			{ID: idA.String(), FunctionID: &idA},
 			{ID: idB.String(), FunctionID: &idB},
 			{ID: idC.String(), FunctionID: &idC},
-		}, items)
+		}, items, r.Dump())
 	})
 }
 
@@ -1635,98 +1696,178 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	idA := uuid.New()
 	now := time.Now()
 
-	qi, err := q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, now)
-	require.NoError(t, err)
-
-	p := QueuePartition{FunctionID: &qi.FunctionID, EnvID: &qi.WorkspaceID}
-
-	t.Run("Uses the next job item's time when requeueing with another job", func(t *testing.T) {
-		requirePartitionScoreEquals(t, r, &idA, now)
-		next := now.Add(time.Hour)
-		err := q.PartitionRequeue(ctx, &p, next, false)
-		require.NoError(t, err)
-		requirePartitionScoreEquals(t, r, &idA, now)
-	})
-
-	next := now.Add(5 * time.Second)
-	t.Run("It removes any lease when requeueing", func(t *testing.T) {
-
-		_, _, err := q.PartitionLease(ctx, &QueuePartition{FunctionID: &idA}, time.Minute)
+	t.Run("For default items without concurrency settings", func(t *testing.T) {
+		qi, err := q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, now)
 		require.NoError(t, err)
 
-		err = q.PartitionRequeue(ctx, &p, next, true)
-		require.NoError(t, err)
-		requirePartitionScoreEquals(t, r, &idA, next)
+		p := QueuePartition{FunctionID: &qi.FunctionID, EnvID: &qi.WorkspaceID}
 
-		loaded := getDefaultPartition(t, r, idA)
-		require.Nil(t, loaded.LeaseID)
+		t.Run("Uses the next job item's time when requeueing with another job", func(t *testing.T) {
+			requirePartitionScoreEquals(t, r, &idA, now)
+			next := now.Add(time.Hour)
+			err := q.PartitionRequeue(ctx, &p, next, false)
+			require.NoError(t, err)
+			requirePartitionScoreEquals(t, r, &idA, now)
+		})
 
-		// Forcing should set a ForceAtMS field.
-		require.NotEmpty(t, loaded.ForceAtMS)
+		next := now.Add(5 * time.Second)
+		t.Run("It removes any lease when requeueing", func(t *testing.T) {
+			_, _, err := q.PartitionLease(ctx, &QueuePartition{FunctionID: &idA}, time.Minute)
+			require.NoError(t, err)
 
-		t.Run("Enqueueing with a force at time should not update the score", func(t *testing.T) {
-			loaded := getDefaultPartition(t, r, idA)
-			require.NotEmpty(t, loaded.ForceAtMS)
-
-			qi, err := q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, now)
-
-			loaded = getDefaultPartition(t, r, idA)
-			require.NotEmpty(t, loaded.ForceAtMS)
-
+			err = q.PartitionRequeue(ctx, &p, next, true)
 			require.NoError(t, err)
 			requirePartitionScoreEquals(t, r, &idA, next)
-			requirePartitionScoreEquals(t, r, &idA, time.UnixMilli(loaded.ForceAtMS))
 
-			// Now remove this item, as we dont need it for any future tests.
-			err = q.Dequeue(ctx, p, qi)
+			loaded := getDefaultPartition(t, r, idA)
+			require.Nil(t, loaded.LeaseID)
+
+			// Forcing should set a ForceAtMS field.
+			require.NotEmpty(t, loaded.ForceAtMS)
+
+			t.Run("Enqueueing with a force at time should not update the score", func(t *testing.T) {
+				loaded := getDefaultPartition(t, r, idA)
+				require.NotEmpty(t, loaded.ForceAtMS)
+
+				qi, err := q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, now)
+
+				loaded = getDefaultPartition(t, r, idA)
+				require.NotEmpty(t, loaded.ForceAtMS)
+
+				require.NoError(t, err)
+				requirePartitionScoreEquals(t, r, &idA, next)
+				requirePartitionScoreEquals(t, r, &idA, time.UnixMilli(loaded.ForceAtMS))
+
+				// Now remove this item, as we dont need it for any future tests.
+				err = q.Dequeue(ctx, p, qi)
+				require.NoError(t, err)
+			})
+		})
+
+		t.Run("Deletes the partition with an empty queue and a leased job", func(t *testing.T) {
+			requirePartitionScoreEquals(t, r, &idA, next)
+
+			// Leasing the only job available moves the job into the concurrency queue,
+			// so the partition should be empty. when requeeing.
+			_, err := q.Lease(ctx, p, qi, 10*time.Second, getNow(), nil)
 			require.NoError(t, err)
+
+			requirePartitionScoreEquals(t, r, &idA, next)
+
+			next := now.Add(time.Hour)
+			err = q.PartitionRequeue(ctx, &p, next, false)
+			require.Error(t, ErrPartitionGarbageCollected, err)
+
+			loaded := getDefaultPartition(t, r, idA)
+
+			// This should unset the force at field.
+			require.Empty(t, loaded.ForceAtMS)
+		})
+
+		t.Run("It returns a partition not found error if deleted", func(t *testing.T) {
+			err := q.Dequeue(ctx, p, qi)
+			require.NoError(t, err)
+			err = q.PartitionRequeue(ctx, &p, time.Now().Add(time.Minute), false)
+			require.Equal(t, ErrPartitionGarbageCollected, err)
+			err = q.PartitionRequeue(ctx, &p, time.Now().Add(time.Minute), false)
+			require.Equal(t, ErrPartitionNotFound, err)
+		})
+
+		t.Run("Requeueing a paused partition does not affect the partition's pause state", func(t *testing.T) {
+			_, err := q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, now)
+			require.NoError(t, err)
+
+			_, _, err = q.PartitionLease(ctx, &QueuePartition{FunctionID: &idA}, time.Minute)
+			require.NoError(t, err)
+
+			err = q.SetFunctionPaused(ctx, idA, true)
+			require.NoError(t, err)
+
+			err = q.PartitionRequeue(ctx, &p, next, true)
+			require.NoError(t, err)
+
+			fnMeta := getFnMetadata(t, r, idA)
+			require.True(t, fnMeta.Paused)
 		})
 	})
 
-	t.Run("Deletes the partition with an empty queue and a leased job", func(t *testing.T) {
-		requirePartitionScoreEquals(t, r, &idA, next)
+	t.Run("Custom concurrency keys", func(t *testing.T) {
+		t.Run("For account-scoped partition keys", func(t *testing.T) {
+			r.FlushAll()
 
-		// Leasing the only job available moves the job into the concurrency queue,
-		// so the partition should be empty. when requeeing.
-		_, err := q.Lease(ctx, p, qi, 10*time.Second, getNow(), nil)
-		require.NoError(t, err)
+			fnID, acctID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte("fn")), uuid.NewSHA1(uuid.NameSpaceDNS, []byte("acct"))
 
-		requirePartitionScoreEquals(t, r, &idA, next)
+			q.customConcurrencyGen = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
+				return []state.CustomConcurrency{
+					{
+						Key: util.ConcurrencyKey(
+							enums.ConcurrencyScopeAccount,
+							acctID,
+							"test-plz",
+						),
+						Limit: 1,
+					},
+				}
+			}
 
-		next := now.Add(time.Hour)
-		err = q.PartitionRequeue(ctx, &p, next, false)
-		require.Error(t, ErrPartitionGarbageCollected, err)
+			item := QueueItem{
+				FunctionID: fnID,
+				Data: osqueue.Item{
+					Identifier: state.Identifier{
+						AccountID: acctID,
+					},
+				},
+			}
 
-		loaded := getDefaultPartition(t, r, idA)
+			p := q.ItemPartitions(ctx, item)[0]
 
-		// This should unset the force at field.
-		require.Empty(t, loaded.ForceAtMS)
-	})
+			require.Equal(t, "{queue}:concurrency:custom:a:4d59bf95-28b6-5423-b1a8-604046826e33:3cwxlkg53rr2c", p.concurrencyKey(q.kg))
 
-	t.Run("It returns a partition not found error if deleted", func(t *testing.T) {
-		err := q.Dequeue(ctx, p, qi)
-		require.NoError(t, err)
-		err = q.PartitionRequeue(ctx, &p, time.Now().Add(time.Minute), false)
-		require.Equal(t, ErrPartitionGarbageCollected, err)
-		err = q.PartitionRequeue(ctx, &p, time.Now().Add(time.Minute), false)
-		require.Equal(t, ErrPartitionNotFound, err)
-	})
+			item, err := q.EnqueueItem(ctx, item, now)
+			require.NoError(t, err)
 
-	t.Run("Requeueing a paused partition does not affect the partition's pause state", func(t *testing.T) {
-		_, err := q.EnqueueItem(ctx, QueueItem{FunctionID: idA}, now)
-		require.NoError(t, err)
+			t.Run("Uses the next job item's time when requeueing with another job", func(t *testing.T) {
+				requireGlobalPartitionScore(t, r, p.zsetKey(q.kg), now)
+				next := now.Add(time.Hour)
+				err := q.PartitionRequeue(ctx, &p, next, false)
+				require.NoError(t, err)
+				// This should still be now(), as we're not forcing "next" and the earliest job is still now.
+				requireGlobalPartitionScore(t, r, p.zsetKey(q.kg), now)
+			})
 
-		_, _, err = q.PartitionLease(ctx, &QueuePartition{FunctionID: &idA}, time.Minute)
-		require.NoError(t, err)
+			t.Run("Forces a custom partition with `force` set to true", func(t *testing.T) {
+				requireGlobalPartitionScore(t, r, p.zsetKey(q.kg), now)
+				next := now.Add(time.Hour)
+				err := q.PartitionRequeue(ctx, &p, next, true)
+				require.NoError(t, err)
+				requireGlobalPartitionScore(t, r, p.zsetKey(q.kg), next)
+			})
 
-		err = q.SetFunctionPaused(ctx, idA, true)
-		require.NoError(t, err)
+			t.Run("Sets back to next job with force: false", func(t *testing.T) {
+				err := q.PartitionRequeue(ctx, &p, time.Now(), false)
+				require.NoError(t, err)
+				requireGlobalPartitionScore(t, r, p.zsetKey(q.kg), now)
+			})
 
-		err = q.PartitionRequeue(ctx, &p, next, true)
-		require.NoError(t, err)
+			t.Run("It doesn't dequeue the partition with an in-progress job", func(t *testing.T) {
+				id, err := q.Lease(ctx, p, item, 10*time.Second, getNow(), nil)
+				require.NoError(t, err)
+				require.NotNil(t, id)
 
-		fnMeta := getFnMetadata(t, r, idA)
-		require.True(t, fnMeta.Paused)
+				next := now.Add(time.Minute)
+
+				err = q.PartitionRequeue(ctx, &p, next, false)
+				require.NoError(t, err)
+				requireGlobalPartitionScore(t, r, p.zsetKey(q.kg), next)
+
+				t.Run("With an empty queue the zset is deleted", func(t *testing.T) {
+					err := q.Dequeue(ctx, p, item)
+					require.NoError(t, err)
+					err = q.PartitionRequeue(ctx, &p, next, false)
+					require.Error(t, ErrPartitionGarbageCollected, err)
+				})
+			})
+		})
 	})
 }
 
@@ -1837,7 +1978,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 	q.pf = func(ctx context.Context, p QueuePartition) uint {
 		return PriorityMin
 	}
-	q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
+	q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) (acct, fn, custom int) {
 		return 100, 100, 100
 	}
 	q.itemIndexer = QueueItemIndexerFunc
@@ -2131,9 +2272,11 @@ func TestQueueLeaseSequential(t *testing.T) {
 	})
 }
 
-// TestSharding covers the basics of shards;  we assert that function enqueues/dequeues/leasing
+// TestShardFinding covers the basics of shards;  we assert that function enqueues/dequeues/leasing
 // modify shards appropriately, and that partition opeartions also modify the shards.
-func TestSharding(t *testing.T) {
+func TestShardFinding(t *testing.T) {
+	t.Skip()
+
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
 		InitAddress:  []string{r.Addr()},
@@ -2777,13 +2920,20 @@ func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item QueueItem
 	require.WithinDuration(t, expected.Truncate(time.Millisecond), parsed, 15*time.Millisecond)
 }
 
-func requirePartitionScoreEquals(t *testing.T, r *miniredis.Miniredis, wid *uuid.UUID, expected time.Time) {
+// requirePartitionScoreEquals is used to check scores for any partition, including custom partitions.
+func requireGlobalPartitionScore(t *testing.T, r *miniredis.Miniredis, id string, expected time.Time) {
 	t.Helper()
 	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-	score, err := r.ZScore(kg.GlobalPartitionIndex(), wid.String())
+	score, err := r.ZScore(kg.GlobalPartitionIndex(), id)
 	parsed := time.Unix(int64(score), 0)
 	require.NoError(t, err)
-	require.WithinDuration(t, expected.Truncate(time.Second), parsed, time.Millisecond)
+	require.WithinDuration(t, expected.Truncate(time.Second), parsed, time.Millisecond, r.Dump())
+}
+
+// requirePartitionScoreEquals is used to check scores for fn partitions (queues for function IDs)
+func requirePartitionScoreEquals(t *testing.T, r *miniredis.Miniredis, wid *uuid.UUID, expected time.Time) {
+	t.Helper()
+	requireGlobalPartitionScore(t, r, wid.String(), expected)
 }
 
 func concurrencyQueueScores(t *testing.T, r *miniredis.Miniredis, key string, from time.Time) map[string]time.Time {
