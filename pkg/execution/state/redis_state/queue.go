@@ -1728,6 +1728,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	keys := []string{
 		q.u.kg.PartitionItem(),
 		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
 		// TODO Can AccountID ever be zero value?
 		q.u.kg.AccountPartitionIndex(p.AccountID),
 		q.u.kg.FnMetadata(fnMetaKey),
@@ -1749,6 +1750,9 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		fnConcurrency,
 		customConcurrency,
 		now.Add(PartitionConcurrencyLimitRequeueExtension).Unix(),
+
+		// TODO Can AccountID ever be zero value?
+		p.AccountID,
 	})
 
 	if err != nil {
@@ -2091,6 +2095,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 	keys := []string{
 		q.u.kg.PartitionItem(),
 		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
 		// TODO Is the account ID always non-zero?
 		q.u.kg.AccountPartitionIndex(p.AccountID),
 		q.u.kg.ShardPartitionIndex(shardName),

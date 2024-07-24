@@ -13,11 +13,12 @@ Output:
 
 local keyPartitionMap           = KEYS[1] -- key storing all partitions
 local keyGlobalPartitionPtr     = KEYS[2] -- global top-level partitioned queue
-local keyAccountPartitionPtr    = KEYS[3] -- account-level partitioned queue
-local keyFnMeta                 = KEYS[4]
-local keyAcctConcurrency        = KEYS[5] -- in progress queue for account
-local keyFnConcurrency          = KEYS[6] -- in progress queue for partition
-local keyCustomConcurrency      = KEYS[7] -- in progress queue for custom key
+local keyGlobalAccountPtr       = KEYS[3] -- global top-level accounts
+local keyAccountPartitionPtr    = KEYS[4] -- account-level partitioned queue
+local keyFnMeta                 = KEYS[5]
+local keyAcctConcurrency        = KEYS[6] -- in progress queue for account
+local keyFnConcurrency          = KEYS[7] -- in progress queue for partition
+local keyCustomConcurrency      = KEYS[8] -- in progress queue for custom key
 
 
 local partitionID             = ARGV[1]
@@ -28,6 +29,7 @@ local acctConcurrency         = tonumber(ARGV[5]) -- concurrency limit for the a
 local fnConcurrency           = tonumber(ARGV[6]) -- concurrency limit for this fn
 local customConcurrency       = tonumber(ARGV[7]) -- concurrency limit for the custom key
 local noCapacityScore         = tonumber(ARGV[8]) -- score if limit concurrency limit is hit
+local accountId               = ARGV[9]
 
 -- $include(check_concurrency.lua)
 -- $include(get_partition_item.lua)
@@ -67,8 +69,8 @@ if acctConcurrency > 0 and #keyAcctConcurrency > 0 then
         requeue_partition(keyAccountPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
 
         -- Upsert global accounts to _earliest_ score
-        local earliestPartitionScoreInAccount = get_fn_partition_score(accountPointerKey)
-        update_pointer_score_to(accountId, globalAccountKey, earliestPartitionScoreInAccount)
+        local earliestPartitionScoreInAccount = get_fn_partition_score(keyAccountPartitionPtr)
+        update_pointer_score_to(accountId, keyGlobalAccountPtr, earliestPartitionScoreInAccount)
 
         return { -1 }
     end
@@ -86,8 +88,8 @@ if fnConcurrency > 0 and #keyFnConcurrency > 0 then
         requeue_partition(keyAccountPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
 
         -- Upsert global accounts to _earliest_ score
-        local earliestPartitionScoreInAccount = get_fn_partition_score(accountPointerKey)
-        update_pointer_score_to(accountId, globalAccountKey, earliestPartitionScoreInAccount)
+        local earliestPartitionScoreInAccount = get_fn_partition_score(keyAccountPartitionPtr)
+        update_pointer_score_to(accountId, keyGlobalAccountPtr, earliestPartitionScoreInAccount)
 
         return { -2 }
     end
@@ -105,8 +107,8 @@ if customConcurrency > 0 and #keyCustomConcurrency > 0 then
         requeue_partition(keyAccountPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
 
         -- Upsert global accounts to _earliest_ score
-        local earliestPartitionScoreInAccount = get_fn_partition_score(accountPointerKey)
-        update_pointer_score_to(accountId, globalAccountKey, earliestPartitionScoreInAccount)
+        local earliestPartitionScoreInAccount = get_fn_partition_score(keyAccountPartitionPtr)
+        update_pointer_score_to(accountId, keyGlobalAccountPtr, earliestPartitionScoreInAccount)
 
         return { -3 }
     end
@@ -125,7 +127,7 @@ redis.call("ZADD", keyGlobalPartitionPtr, leaseTime, partitionID) -- partition s
 redis.call("ZADD", keyAccountPartitionPtr, leaseTime, partitionID) -- partition scored are in seconds.
 
 -- Upsert global accounts to _earliest_ score
-local earliestPartitionScoreInAccount = get_fn_partition_score(accountPointerKey)
-update_pointer_score_to(accountId, globalAccountKey, earliestPartitionScoreInAccount)
+local earliestPartitionScoreInAccount = get_fn_partition_score(keyAccountPartitionPtr)
+update_pointer_score_to(accountId, keyGlobalAccountPtr, earliestPartitionScoreInAccount)
 
 return { existingTime, capacity }
