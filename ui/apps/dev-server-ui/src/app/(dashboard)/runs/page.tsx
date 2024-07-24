@@ -5,6 +5,7 @@ import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   useSearchParam,
+  useStringArraySearchParam,
   useValidatedArraySearchParam,
   useValidatedSearchParam,
 } from '@inngest/components/hooks/useSearchParam';
@@ -22,12 +23,13 @@ import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
 import { useRerun } from '@/hooks/useRerun';
 import { client } from '@/store/baseApi';
-import { GetRunsDocument, type GetRunsQuery } from '@/store/generated';
+import { GetRunsDocument, useGetAppsQuery, type GetRunsQuery } from '@/store/generated';
 import { pathCreator } from '@/utils/pathCreator';
 
 const pollInterval = 2500;
 
 export default function Page() {
+  const [filterApp] = useStringArraySearchParam('filterApp');
   const [filteredStatus] = useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
   const [timeField = FunctionRunTimeField.QueuedAt] = useValidatedSearchParam(
     'timeField',
@@ -37,10 +39,12 @@ export default function Page() {
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
+  const appsRes = useGetAppsQuery();
 
   const queryFn = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
       const data: GetRunsQuery = await client.request(GetRunsDocument, {
+        appIDs: filterApp,
         functionRunCursor: pageParam,
         startTime: calculatedStartTime,
         endTime: endTime,
@@ -67,7 +71,7 @@ export default function Page() {
         edges,
       };
     },
-    [filteredStatus, calculatedStartTime, timeField]
+    [filterApp, filteredStatus, calculatedStartTime, timeField]
   );
 
   const { data, fetchNextPage, isFetching } = useInfiniteQuery({
@@ -146,8 +150,7 @@ export default function Page() {
       getTrigger={getTrigger}
       rerun={rerun}
       pathCreator={pathCreator}
-      apps={[]}
-      functions={[]}
+      apps={appsRes.data?.apps || []}
       pollInterval={pollInterval}
       scope="env"
     />

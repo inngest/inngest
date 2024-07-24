@@ -710,6 +710,7 @@ export type RerunMutationVariables = Exact<{
 export type RerunMutation = { __typename?: 'Mutation', rerun: any };
 
 export type GetRunsQueryVariables = Exact<{
+  appIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
   startTime: Scalars['Time'];
   status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
   timeField: RunsV2OrderByField;
@@ -1007,9 +1008,9 @@ export const RerunDocument = `
 }
     `;
 export const GetRunsDocument = `
-    query GetRuns($startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $functionRunCursor: String = null) {
+    query GetRuns($appIDs: [UUID!], $startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $functionRunCursor: String = null) {
   runs(
-    filter: {from: $startTime, status: $status, timeField: $timeField}
+    filter: {appIDs: $appIDs, from: $startTime, status: $status, timeField: $timeField}
     orderBy: [{field: $timeField, direction: DESC}]
     after: $functionRunCursor
   ) {
