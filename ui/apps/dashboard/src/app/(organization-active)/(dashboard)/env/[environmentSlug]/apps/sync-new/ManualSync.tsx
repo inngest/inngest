@@ -16,7 +16,7 @@ import { Secret } from '@/components/Secret';
 import { SyncFailure } from '@/components/SyncFailure';
 import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
-import { useEnvironment } from '../../environment-context';
+import { useEnvironment } from '../../../../../../../components/Environments/environment-context';
 
 const SyncNewAppDocument = graphql(`
   mutation SyncNewApp($appURL: String!, $envID: UUID!) {

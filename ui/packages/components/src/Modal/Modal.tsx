@@ -30,7 +30,7 @@ export function Modal({
   footer,
   alignTop,
 }: ModalProps) {
-  const container = document?.getElementById('modals');
+  const container = typeof document !== 'undefined' ? document.getElementById('modals') : undefined;
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose} modal>
       <AnimatePresence>

@@ -43,7 +43,7 @@ export default function CodeEditor({
   const numberOfLinesArray = Array.from({ length: numberOfLines }, (_, i) => i + 1);
 
   return (
-    <div className={cn('flex min-h-[200px] font-mono', className)}>
+    <div className={cn('dark flex min-h-[200px] font-mono', className)}>
       <label className="hidden" htmlFor={textAreaID}>
         {label ?? name}
       </label>
@@ -67,7 +67,7 @@ export default function CodeEditor({
         </SyntaxHighlighter>
         {!readOnly && (
           <textarea
-            className="absolute inset-0 z-10 h-full w-full resize-none overflow-auto whitespace-pre border-none bg-transparent py-2 pl-2 text-sm leading-5 text-transparent caret-white focus:ring-0 focus-visible:outline-none"
+            className="text-basis bg-canvasBase absolute inset-0 z-10 h-full w-full resize-none overflow-auto whitespace-pre border-none py-2 pl-2 font-[CircularXXMono] text-sm leading-5 caret-white focus:ring-0 focus-visible:outline-none"
             id={textAreaID}
             name={name}
             value={code}

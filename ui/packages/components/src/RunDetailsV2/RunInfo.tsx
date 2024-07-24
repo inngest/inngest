@@ -23,6 +23,7 @@ type Props = {
   className?: string;
   pathCreator: {
     app: (params: { externalAppID: string }) => Route;
+    function: (params: { functionSlug: string }) => Route;
     runPopout: (params: { runID: string }) => Route;
   };
   rerun: (args: { fnID: string; runID: string }) => Promise<unknown>;
@@ -39,6 +40,7 @@ type Run = {
   fn: {
     id: string;
     name: string;
+    slug: string;
   };
   id: string;
   trace: {
@@ -105,6 +107,20 @@ export function RunInfo({
                       showIcon={false}
                     >
                       {run.app.name}
+                    </LinkElement>
+                  );
+                }}
+              </LazyElementWrapper>
+
+              <LazyElementWrapper label="Function" lazy={run}>
+                {(run: Run) => {
+                  return (
+                    <LinkElement
+                      internalNavigation
+                      href={pathCreator.function({ functionSlug: run.fn.slug })}
+                      showIcon={false}
+                    >
+                      {run.fn.name}
                     </LinkElement>
                   );
                 }}

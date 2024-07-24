@@ -7,7 +7,7 @@ import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { RiInformationLine } from '@remixicon/react';
 import { useClient } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import Input from '@/components/Forms/Input';
 import { Details } from './Details';
 import { EventTable } from './EventTable';

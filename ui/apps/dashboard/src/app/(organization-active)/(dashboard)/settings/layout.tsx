@@ -1,14 +1,12 @@
 import { RiSettings3Line } from '@remixicon/react';
 
 import Header from '@/components/Header/Header';
-import AppNavigation from '@/components/Navigation/AppNavigation';
+import AppNavigation from '@/components/Navigation/old/AppNavigation';
 import Toaster from '@/components/Toaster';
 
 type SettingsLayoutProps = {
   children: React.ReactNode;
 };
-
-const DEFAULT_ENV_SLUG = 'production';
 
 export default async function SettingsLayout({ children }: SettingsLayoutProps) {
   const navLinks = [
@@ -32,7 +30,7 @@ export default async function SettingsLayout({ children }: SettingsLayoutProps) 
 
   return (
     <div className="flex h-full flex-col">
-      <AppNavigation environmentSlug={DEFAULT_ENV_SLUG} />
+      <AppNavigation envSlug="all" />
       <Header
         title="Settings"
         links={navLinks}

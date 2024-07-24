@@ -16,9 +16,8 @@ local pause          = ARGV[1]
 local pauseID        = ARGV[2]
 local event          = ARGV[3]
 local invokeCorrelationID = ARGV[4]
-local expiry         = tonumber(ARGV[5])
-local extendedExpiry = tonumber(ARGV[6])
-local nowUnixSeconds = tonumber(ARGV[7])
+local extendedExpiry = tonumber(ARGV[5])
+local nowUnixSeconds = tonumber(ARGV[6])
 
 
 if redis.call("SETNX", pauseKey, pause) == 0 then
@@ -32,6 +31,7 @@ redis.call("ZADD", keyPauseAddIdx, nowUnixSeconds, pauseID)
 -- Add an index of when the pause expires.  This lets us manually
 -- garbage collect expired pauses from the HSET below.
 redis.call("ZADD", keyPauseExpIdx, nowUnixSeconds+extendedExpiry, pauseID)
+
 -- SADD to store the pause for this run
 redis.call("SADD", keyRunPauses, pauseID)
 

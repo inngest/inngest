@@ -2,15 +2,15 @@ import { TooltipProvider } from '@inngest/components/Tooltip';
 import { withThemeByClassName } from '@storybook/addon-themes';
 import type { Preview, ReactRenderer } from '@storybook/react';
 
-import { interTight, robotoMono } from '../src/AppRoot/fonts';
 import '../src/AppRoot/globals.css';
+import '../src/AppRoot/fonts.css';
 
 const preview: Preview = {
   decorators: [
     (Story) => {
       return (
         <TooltipProvider>
-          <div className={`${interTight.variable} ${robotoMono.variable} font-sans`}>
+          <div className={`font-sans`}>
             <div id="app" />
             <div id="modals" />
             <Story />

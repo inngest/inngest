@@ -29,7 +29,7 @@ export const DateTimePicker = ({
 
   return (
     <div>
-      <div className="mt-2 p-2 dark:bg-white">
+      <div className="bg-canvasBase mt-2 p-2">
         <Calendar
           month={calendarDate}
           selected={calendarDate}
@@ -51,9 +51,11 @@ export const DateTimePicker = ({
           }}
         />
       </div>
-      <div className="w-full border-b border-t border-slate-200 p-4">
+      <div className="border-subtle w-full border-b border-t p-4">
         <div className="flex items-center justify-between pb-4">
-          <p className="text-sm font-medium">{Intl.DateTimeFormat().resolvedOptions().timeZone}</p>
+          <p className="text-basis text-sm font-medium">
+            {Intl.DateTimeFormat().resolvedOptions().timeZone}
+          </p>
           <SwitchWrapper>
             <Switch
               checked={is24HourFormat}

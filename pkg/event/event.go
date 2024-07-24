@@ -15,13 +15,14 @@ import (
 )
 
 const (
-	EventReceivedName = "event/event.received"
-	FnFailedName      = "inngest/function.failed"
-	FnFinishedName    = "inngest/function.finished"
+	EventReceivedName  = "event/event.received"
+	InternalNamePrefix = "inngest/"
+	FnFailedName       = InternalNamePrefix + "function.failed"
+	FnFinishedName     = InternalNamePrefix + "function.finished"
 	// InvokeEventName is the event name used to invoke specific functions via an
 	// API.  Note that invoking functions still sends an event in the usual manner.
-	InvokeFnName = "inngest/function.invoked"
-	FnCronName   = "inngest/scheduled.timer"
+	InvokeFnName = InternalNamePrefix + "function.invoked"
+	FnCronName   = InternalNamePrefix + "scheduled.timer"
 )
 
 var (
@@ -126,6 +127,10 @@ func (e Event) CorrelationID() string {
 	}
 
 	return ""
+}
+
+func (e Event) IsInternal() bool {
+	return strings.HasPrefix(e.Name, InternalNamePrefix)
 }
 
 // IsFinishedEvent returns true if the event is a function finished event.

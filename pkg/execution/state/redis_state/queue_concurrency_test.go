@@ -18,10 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func init() {
-	defaultQueueKey.Prefix = "{queue}"
-}
-
 func TestQueuePartitionConcurrency(t *testing.T) {
 	r := miniredis.RunT(t)
 
@@ -59,7 +55,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	}
 
 	q := NewQueue(
-		rc,
+		NewQueueClient(rc, QueueDefaultKey),
 		WithNumWorkers(100),
 		WithConcurrencyLimitGetter(pkf),
 		WithQueueLifecycles(ll),

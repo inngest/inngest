@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { RunDetails as RunDetailsView } from '@inngest/components/RunDetailsV2';
 import { cn } from '@inngest/components/utils/classNames';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
 import { pathCreator } from '@/utils/urls';
@@ -29,6 +29,8 @@ export function RunDetails({ runID, standalone = true }: Props) {
       // generate URLs without knowing about environments
       app: (params: { externalAppID: string }) =>
         pathCreator.app({ envSlug: env.slug, externalAppID: params.externalAppID }),
+      function: (params: { functionSlug: string }) =>
+        pathCreator.function({ envSlug: env.slug, functionSlug: params.functionSlug }),
       runPopout: (params: { runID: string }) =>
         pathCreator.runPopout({ envSlug: env.slug, runID: params.runID }),
     };

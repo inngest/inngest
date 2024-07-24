@@ -75,5 +75,5 @@ type QueueConfig interface {
 
 type StateConfig interface {
 	StateName() string
-	Manager(context.Context) (state.Manager, error)
+	SingleClusterManager(context.Context) (state.Manager, error)
 }

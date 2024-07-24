@@ -207,8 +207,8 @@ export function DateTimeInput({
   return (
     <div
       className={cn(
-        'border-muted flex h-8 items-center rounded-lg border bg-white px-3.5 text-sm leading-none text-slate-700 placeholder-slate-300 transition-all has-[:focus]:border-slate-200',
-        !valid && 'border-rose-500 has-[:focus]:border-rose-500'
+        'border-muted has-[:focus]:border-muted bg-canvasBase text-basis placeholder-disabled flex h-8 items-center rounded-lg border px-3.5 text-sm leading-none transition-all',
+        !valid && 'border-error has-[:focus]:border-error'
       )}
       onPaste={(e: React.ClipboardEvent<HTMLDivElement>) => {
         const raw = e?.clipboardData?.getData('text') || '';
@@ -225,7 +225,7 @@ export function DateTimeInput({
       }}
     >
       <input
-        className="w-7 px-0.5 text-center focus:outline-none"
+        className="bg-canvasBase w-7 px-0.5 text-center focus:outline-none"
         placeholder="MM"
         aria-label="Month"
         maxLength={2}
@@ -236,7 +236,7 @@ export function DateTimeInput({
       <span className="px-0.5">/</span>
       <input
         ref={daysRef}
-        className="w-7 px-0.5 text-center focus:outline-none"
+        className="bg-canvasBase w-7 px-0.5 text-center focus:outline-none"
         placeholder="dd"
         aria-label="Day"
         maxLength={2}
@@ -247,7 +247,7 @@ export function DateTimeInput({
       <span className="px-0.5">/</span>
       <input
         ref={yearsRef}
-        className="w-9 px-0.5 text-center focus:outline-none"
+        className="bg-canvasBase w-9 px-0.5 text-center focus:outline-none"
         placeholder="yyyy"
         aria-label="Year"
         maxLength={4}
@@ -258,7 +258,7 @@ export function DateTimeInput({
       <span className="pr-0.5">,</span>
       <input
         ref={hoursRef}
-        className="w-7 px-0.5 text-center focus:outline-none"
+        className="bg-canvasBase w-7 px-0.5 text-center focus:outline-none"
         placeholder="HH"
         aria-label="Point in time (Hours)"
         maxLength={2}
@@ -275,7 +275,7 @@ export function DateTimeInput({
       <span className="px-0.5">:</span>
       <input
         ref={minutesRef}
-        className="w-7 px-0.5 text-center focus:outline-none"
+        className="bg-canvasBase w-7 px-0.5 text-center focus:outline-none"
         placeholder="mm"
         aria-label="Point in time (Minutes)"
         maxLength={2}
@@ -288,7 +288,7 @@ export function DateTimeInput({
       <span className="px-0.5">:</span>
       <input
         ref={secondsRef}
-        className="w-7 px-0.5 text-center focus:outline-none"
+        className="bg-canvasBase w-7 px-0.5 text-center focus:outline-none"
         placeholder="ss"
         aria-label="Point in time (Seconds)"
         maxLength={2}
@@ -301,7 +301,7 @@ export function DateTimeInput({
       <span className="px-0.5">.</span>
       <input
         ref={millisecondsRef}
-        className="w-9 px-0.5 text-center focus:outline-none"
+        className="bg-canvasBase w-9 px-0.5 text-center focus:outline-none"
         placeholder="sss"
         aria-label="Point in time (Milliseconds)"
         maxLength={3}
@@ -316,7 +316,7 @@ export function DateTimeInput({
       {!is24HourFormat && (
         <input
           ref={meridiemRef}
-          className="w-7 pl-0.5 focus:outline-none"
+          className="bg-canvasBase w-7 pl-0.5 focus:outline-none"
           placeholder="AM"
           aria-label="Point in time (Period)"
           maxLength={2}

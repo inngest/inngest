@@ -6,8 +6,11 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/inngest/inngest/pkg/expressions"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -101,6 +104,12 @@ func (c CreateCancellationBody) Validate() error {
 	if c.StartedBefore.IsZero() {
 		err = errors.Join(err, errors.New("started_before is required"))
 	}
+	if c.StartedBefore.After(time.Now()) {
+		err = errors.Join(err, errors.New("started_before must be in the past"))
+	}
+	if c.StartedAfter != nil && c.StartedAfter.After(c.StartedBefore) {
+		err = errors.Join(err, errors.New("started_after must be before started_before"))
+	}
 	return err
 }
 
@@ -120,6 +129,7 @@ func (a API) CreateCancellation(ctx context.Context, opts CreateCancellationBody
 	}
 	// Create a new cancellation for the given function ID
 	cancel := cqrs.Cancellation{
+		CreatedAt:     time.Now(),
 		ID:            ulid.MustNew(ulid.Now(), rand.Reader),
 		WorkspaceID:   auth.WorkspaceID(),
 		FunctionID:    fn.ID,
@@ -129,6 +139,10 @@ func (a API) CreateCancellation(ctx context.Context, opts CreateCancellationBody
 		If:            opts.If,
 	}
 	if err := a.opts.CancellationReadWriter.CreateCancellation(ctx, cancel); err != nil {
+		var compileError *expressions.CompileError
+		if errors.As(err, &compileError) {
+			return nil, publicerr.Wrap(err, 400, fmt.Sprintf("invalid expression: %s", compileError.Message()))
+		}
 		return nil, publicerr.Wrap(err, 500, "Error creating cancellation")
 	}
 	return &cancel, nil

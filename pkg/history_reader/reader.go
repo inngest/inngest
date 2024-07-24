@@ -56,7 +56,26 @@ type Reader interface {
 		eventID ulid.ULID,
 		opts GetRunsByEventIDOpts,
 	) ([]Run, error)
+	GetSkippedRunsByEventID(
+		ctx context.Context,
+		eventID ulid.ULID,
+		opts GetRunsByEventIDOpts,
+	) ([]SkippedRun, error)
 	GetUsage(ctx context.Context, opts GetUsageOpts) ([]usage.UsageSlot, error)
+
+	// GetActiveRunIDs returns the IDs of runs that are queued or running (i.e.
+	// not ended)
+	GetActiveRunIDs(
+		ctx context.Context,
+		opts GetActiveRunIDsOpts,
+	) ([]ulid.ULID, error)
+
+	// GetActiveRunIDs returns a count of runs that are queued or running (i.e.
+	// not ended)
+	CountActiveRuns(
+		ctx context.Context,
+		opts CountActiveRunsOpts,
+	) (int, error)
 
 	// This also embeds the V1 function reader interface.
 	cqrs.APIV1FunctionRunReader
@@ -232,6 +251,17 @@ type Run struct {
 	Cron            *string
 }
 
+type SkippedRun struct {
+	AccountID   uuid.UUID
+	BatchID     *ulid.ULID
+	EventID     ulid.ULID
+	ID          ulid.ULID
+	SkippedAt   time.Time
+	SkipReason  enums.SkipReason
+	WorkflowID  uuid.UUID
+	WorkspaceID uuid.UUID
+}
+
 func (r Run) ToCQRS() *cqrs.FunctionRun {
 	run := &cqrs.FunctionRun{
 		RunID:           r.ID,
@@ -396,4 +426,71 @@ func (c CountReplayRunsOpts) Validate() error {
 		Cursor:      nil,
 	}
 	return gRROpts.Validate()
+}
+
+type GetActiveRunIDsOpts struct {
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	WorkflowID  uuid.UUID
+	LowerTime   time.Time
+	UpperTime   time.Time
+	Limit       int
+	Cursor      *ulid.ULID
+}
+
+func (c GetActiveRunIDsOpts) Validate() error {
+	if c.AccountID == uuid.Nil {
+		return errors.New("account ID must be provided")
+	}
+	if c.WorkspaceID == uuid.Nil {
+		return errors.New("workspace ID must be provided")
+	}
+	if c.WorkflowID == uuid.Nil {
+		return errors.New("workflow ID must be provided")
+	}
+	if c.LowerTime.IsZero() {
+		return errors.New("lower time must be provided")
+	}
+	if c.UpperTime.IsZero() {
+		return errors.New("upper time must be provided")
+	}
+	if c.UpperTime.Before(c.LowerTime) {
+		return errors.New("upper/end time must be after lower/start time")
+	}
+	if c.Limit < 0 {
+		return errors.New("limit must be positive")
+	}
+
+	return nil
+}
+
+type CountActiveRunsOpts struct {
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	WorkflowID  uuid.UUID
+	LowerTime   *time.Time
+	UpperTime   time.Time
+}
+
+func (c CountActiveRunsOpts) Validate() error {
+	if c.AccountID == uuid.Nil {
+		return errors.New("account ID must be provided")
+	}
+	if c.WorkspaceID == uuid.Nil {
+		return errors.New("workspace ID must be provided")
+	}
+	if c.WorkflowID == uuid.Nil {
+		return errors.New("workflow ID must be provided")
+	}
+	if c.LowerTime.IsZero() {
+		return errors.New("lower time must be provided")
+	}
+	if c.UpperTime.IsZero() {
+		return errors.New("upper time must be provided")
+	}
+	if c.LowerTime != nil && c.UpperTime.Before(*c.LowerTime) {
+		return errors.New("upper/end time must be after lower/start time")
+	}
+
+	return nil
 }
