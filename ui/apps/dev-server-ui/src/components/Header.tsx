@@ -1,4 +1,7 @@
+import { usePathname } from 'next/navigation';
+
 import AddAppButton from '@/components/App/AddAppButton';
+import SendEventButton from '@/components/Event/SendEventButton';
 import { InngestLogo, InngestSmallLogo } from '@/icons';
 
 type Props = {
@@ -6,6 +9,8 @@ type Props = {
 };
 
 export default function Header(props: Props) {
+  const pathname = usePathname();
+
   return (
     <header className="bg-slate-910 col-span-3 flex w-full items-center justify-between border-b border-slate-800/30 pl-6 pr-5">
       <nav className="flex items-center gap-3">
@@ -17,7 +22,18 @@ export default function Header(props: Props) {
         {props.children}
       </nav>
       <div className="my-1 hidden md:block">
-        <AddAppButton />
+        {pathname === '/runs' ? (
+          <SendEventButton
+            label="Send test event"
+            data={JSON.stringify({
+              name: '',
+              data: {},
+              user: {},
+            })}
+          />
+        ) : (
+          <AddAppButton />
+        )}
       </div>
     </header>
   );

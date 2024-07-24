@@ -1337,9 +1337,12 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 // Obtaining a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
 func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, duration time.Duration, now time.Time, denies *leaseDenies) (*ulid.ULID, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Lease"), redis_telemetry.ScopeQueue)
+
 	if item.Data.Throttle != nil && denies != nil && denies.denyThrottle(item.Data.Throttle.Key) {
 		return nil, ErrQueueItemThrottled
 	}
+
 	// Check to see if this key has already been denied in the lease iteration.
 	// If so, fail early.
 	if denies != nil && denies.denyConcurrency(item.FunctionID.String()) {
@@ -1349,8 +1352,6 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	if denies != nil && denies.denyConcurrency(item.Data.Identifier.AccountID.String()) {
 		return nil, ErrAccountConcurrencyLimit
 	}
-
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Lease"), redis_telemetry.ScopeQueue)
 
 	var (
 		ac, pc int // account, partiiton concurrency max
@@ -1708,6 +1709,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 // when running a worker.
 func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration) (*ulid.ULID, int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionLease"), redis_telemetry.ScopeQueue)
+
 	acctConcurrency, fnConcurrency, customConcurrency := q.concurrencyLimitGetter(ctx, *p)
 
 	// XXX: Check for function throttling prior to leasing;  if it's throttled we can requeue
