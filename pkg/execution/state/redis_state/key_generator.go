@@ -195,8 +195,6 @@ type QueueKeyGenerator interface {
 	// GuaranteedCapacityMap is a key to a hashmap of guaranteed capacities available.  The values of this
 	// key are JSON-encoded GuaranteedCapacity items.
 	GuaranteedCapacityMap() string
-	// ShardPartitionIndex returns the sorted set for the shard's partition queue.
-	ShardPartitionIndex(shard string) string
 
 	//
 	// ***************** Deprecated *****************
@@ -216,8 +214,8 @@ type queueKeyGenerator struct {
 	queueItemKeyGenerator
 }
 
-func (u queueKeyGenerator) GuaranteedCapacity() string {
-	return fmt.Sprintf("{%s}:queue:shards", u.queueDefaultKey)
+func (u queueKeyGenerator) GuaranteedCapacityMap() string {
+	return fmt.Sprintf("{%s}:queue:guaranteed-capacity", u.queueDefaultKey)
 }
 
 func (u queueKeyGenerator) QueueIndex(id string) string {
@@ -234,14 +232,6 @@ func (u queueKeyGenerator) PartitionItem() string {
 // This is grouped so that we can make N partitions independently.
 func (u queueKeyGenerator) GlobalPartitionIndex() string {
 	return fmt.Sprintf("{%s}:partition:sorted", u.queueDefaultKey)
-}
-
-// ShardPartitionIndex returns the key to the sorted set containing all shard partitions
-func (u queueKeyGenerator) ShardPartitionIndex(shard string) string {
-	if shard == "" {
-		return fmt.Sprintf("{%s}:shard:-", u.queueDefaultKey)
-	}
-	return fmt.Sprintf("{%s}:shard:%s", u.queueDefaultKey, shard)
 }
 
 func (u queueKeyGenerator) ThrottleKey(t *osqueue.Throttle) string {

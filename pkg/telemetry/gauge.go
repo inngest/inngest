@@ -76,11 +76,11 @@ func GaugeQueueGuaranteedCapacityLeaseCount(ctx context.Context, opts GaugeOpt) 
 	})
 }
 
-func GaugeQueueShardPartitionAvailableCount(ctx context.Context, opts GaugeOpt) {
+func GaugeQueueGuaranteedCapacityAccountPartitionAvailableCount(ctx context.Context, opts GaugeOpt) {
 	RegisterAsyncGauge(ctx, GaugeOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "queue_shard_partition_available_count",
-		Description: "The number of shard partitions available",
+		MetricName:  "queue_guaranteed_capacity_account_partition_available_count",
+		Description: "The number of partitions available for account with guaranteed capacity",
 		Tags:        opts.Tags,
 		Callback:    opts.Callback,
 	})

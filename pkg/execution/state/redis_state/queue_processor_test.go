@@ -273,8 +273,8 @@ func TestQueueRunExtended(t *testing.T) {
 
 	// In this test, shards must be leased rapidly, as we randomly close and terminate workers
 	// after a minimum of 10 seconds.
-	ShardTickTime = 5 * time.Second
-	ShardLeaseTime = 5 * time.Second
+	GuaranteedCapacityTickTime = 5 * time.Second
+	AccountLeaseTime = 5 * time.Second
 
 	sf := func(ctx context.Context, queueName string, wsID *uuid.UUID) *GuaranteedCapacity {
 		// For nil UUIDs, return a shard.

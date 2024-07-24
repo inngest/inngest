@@ -119,9 +119,9 @@ var (
 	ErrConcurrencyLimitCustomKey1 = fmt.Errorf("At concurrency limit 1")
 
 	// internal shard errors
-	errShardNotFound     = fmt.Errorf("shard not found")
-	errShardIndexLeased  = fmt.Errorf("shard index is already leased")
-	errShardIndexInvalid = fmt.Errorf("shard lease index is too high (a lease just expired)")
+	errGuaranteedCapacityNotFound     = fmt.Errorf("guaranteed capacity not found")
+	errGuaranteedCapacityIndexLeased  = fmt.Errorf("guaranteed capacity index is already leased")
+	errGuaranteedCapacityIndexInvalid = fmt.Errorf("guaranteed capacity lease index is too high (a lease just expired)")
 )
 
 var (
@@ -264,30 +264,30 @@ func WithAsyncInstrumentation() QueueOpt {
 		})
 
 		// Shard instrumentations
-		shards, err := q.getGuaranteedCapacityMap(ctx)
+		guaranteedCapacityMap, err := q.getGuaranteedCapacityMap(ctx)
 		if err != nil {
-			q.logger.Error().Err(err).Msg("error retrieving shards")
+			q.logger.Error().Err(err).Msg("error retrieving guaranteedCapacityMap")
 		}
 
-		telemetry.GaugeQueueGuaranteedCapacityCount(ctx, int64(len(shards)), telemetry.GaugeOpt{PkgName: pkgName})
-		for _, shard := range shards {
-			tags := map[string]any{"account_id": shard.AccountID}
+		telemetry.GaugeQueueGuaranteedCapacityCount(ctx, int64(len(guaranteedCapacityMap)), telemetry.GaugeOpt{PkgName: pkgName})
+		for _, guaranteedCapacity := range guaranteedCapacityMap {
+			tags := map[string]any{"account_id": guaranteedCapacity.AccountID}
 
 			telemetry.GaugeQueueAccountGuaranteedCapacityCount(ctx, telemetry.GaugeOpt{
 				PkgName:  pkgName,
 				Tags:     tags,
-				Callback: func(ctx context.Context) (int64, error) { return int64(shard.GuaranteedCapacity), nil },
+				Callback: func(ctx context.Context) (int64, error) { return int64(guaranteedCapacity.GuaranteedCapacity), nil },
 			})
 			telemetry.GaugeQueueGuaranteedCapacityLeaseCount(ctx, telemetry.GaugeOpt{
 				PkgName:  pkgName,
 				Tags:     tags,
-				Callback: func(ctx context.Context) (int64, error) { return int64(len(shard.Leases)), nil },
+				Callback: func(ctx context.Context) (int64, error) { return int64(len(guaranteedCapacity.Leases)), nil },
 			})
-			telemetry.GaugeQueueShardPartitionAvailableCount(ctx, telemetry.GaugeOpt{
+			telemetry.GaugeQueueGuaranteedCapacityAccountPartitionAvailableCount(ctx, telemetry.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    tags,
 				Callback: func(ctx context.Context) (int64, error) {
-					return q.partitionSize(ctx, q.u.kg.ShardPartitionIndex(shard.Name), getNow().Add(PartitionLookahead))
+					return q.partitionSize(ctx, q.u.kg.AccountPartitionIndex(guaranteedCapacity.AccountID), getNow().Add(PartitionLookahead))
 				},
 			})
 		}
