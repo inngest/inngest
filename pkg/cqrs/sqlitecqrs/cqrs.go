@@ -890,7 +890,14 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 	return output, nil
 }
 
-func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+type runsQueryBuilder struct {
+	filter       []sq.Expression
+	order        []sqexp.OrderedExpression
+	cursor       *cqrs.TracePageCursor
+	cursorLayout *cqrs.TracePageCursor
+}
+
+func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQueryBuilder {
 	// filters
 	filter := []sq.Expression{}
 	if len(opt.Filter.AppID) > 0 {
@@ -1006,6 +1013,51 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		))
 	}
 
+	return &runsQueryBuilder{
+		filter:       filter,
+		order:        order,
+		cursor:       reqcursor,
+		cursorLayout: &resCursorLayout,
+	}
+}
+
+func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
+	builder := newRunsQueryBuilder(ctx, opt)
+	filter := builder.filter
+	order := builder.order
+
+	sql, args, err := sq.Dialect("sqlite3").
+		From("trace_runs").
+		Select(sq.COUNT("run_id").As("total")).
+		Where(filter...).
+		Order(order...).
+		ToSQL()
+	if err != nil {
+		return 0, err
+	}
+
+	rows, err := w.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return 0, err
+	}
+
+	var count int
+	for rows.Next() {
+		if err := rows.Scan(&count); err != nil {
+			return 0, err
+		}
+	}
+
+	return count, nil
+}
+
+func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	builder := newRunsQueryBuilder(ctx, opt)
+	filter := builder.filter
+	order := builder.order
+	reqcursor := builder.cursor
+	resCursorLayout := builder.cursorLayout
+
 	// read from database
 	sql, args, err := sq.Dialect("sqlite3").
 		From("trace_runs").
@@ -1058,7 +1110,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		}
 
 		// the cursor target should be skipped
-		if reqcursor != nil && reqcursor.ID == data.RunID.String() {
+		if reqcursor.ID == data.RunID.String() {
 			continue
 		}
 
