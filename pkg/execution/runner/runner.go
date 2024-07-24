@@ -47,7 +47,7 @@ type Runner interface {
 
 	StateManager() state.Manager
 	InitializeCrons(ctx context.Context) error
-	Runs(ctx context.Context, eventId ulid.ULID) ([]state.State, error)
+	Runs(ctx context.Context, accountId uuid.UUID, eventId ulid.ULID) ([]state.State, error)
 	Events(ctx context.Context, eventId string) ([]event.Event, error)
 }
 
@@ -162,7 +162,7 @@ func (s *svc) Pre(ctx context.Context) error {
 	}
 
 	if s.state == nil {
-		s.state, err = s.config.State.Service.Concrete.Manager(ctx)
+		s.state, err = s.config.State.Service.Concrete.SingleClusterManager(ctx)
 		if err != nil {
 			return err
 		}
@@ -302,11 +302,11 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 	return nil
 }
 
-func (s *svc) Runs(ctx context.Context, eventID ulid.ULID) ([]state.State, error) {
+func (s *svc) Runs(ctx context.Context, accountId uuid.UUID, eventID ulid.ULID) ([]state.State, error) {
 	items, _ := s.tracker.Runs(ctx, eventID)
 	result := make([]state.State, len(items))
 	for n, i := range items {
-		state, err := s.state.Load(ctx, i)
+		state, err := s.state.Load(ctx, accountId, i)
 		if err != nil {
 			return nil, err
 		}
@@ -622,7 +622,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 			Event:           evt.GetEvent(),
 		}
 
-		if err := s.executor.AppendAndScheduleBatchWithOpts(ctx, fn, bi, nil); err != nil {
+		if err := s.executor.AppendAndScheduleBatch(ctx, fn, bi, nil); err != nil {
 			return fmt.Errorf("could not append and schedule batch item: %w", err)
 		}
 

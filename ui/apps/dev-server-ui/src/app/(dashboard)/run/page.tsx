@@ -32,6 +32,7 @@ export default function Page() {
         getResult={getTraceResult}
         getRun={getRun}
         getTrigger={getTrigger}
+        pollInterval={2500}
         rerun={rerun}
         runID={runID}
       />

@@ -1,8 +1,8 @@
 import { type Route } from 'next';
 
 import cn from '@/utils/cn';
-import NavItem, { type ActiveMatching } from '../Navigation/NavItem';
-import Navigation from '../Navigation/Navigation';
+import NavItem, { type ActiveMatching } from '../Navigation/old/NavItem';
+import Navigation from '../Navigation/old/Navigation';
 
 export type HeaderLink = {
   href: string;

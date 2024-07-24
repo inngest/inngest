@@ -1,4 +1,4 @@
-import { type Run } from '@inngest/components/RunsPage/RunsTable';
+import type { Run } from '@inngest/components/RunsPage/types';
 import { isFunctionRunStatus, type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { toMaybeDate } from '@inngest/components/utils/date';
 
@@ -24,6 +24,8 @@ export function toRunStatus(status: FunctionRunStatus): FunctionRunStatusEnum {
       return FunctionRunStatusEnum.Queued;
     case 'RUNNING':
       return FunctionRunStatusEnum.Running;
+    case 'PAUSED':
+      return FunctionRunStatusEnum.Paused;
   }
 }
 
@@ -67,7 +69,16 @@ type PickedFunctionRunV2 = Pick<
   'id' | 'queuedAt' | 'startedAt' | 'status' | 'endedAt'
 >;
 type PickedFunctionRunV2EdgeWithNode = {
-  node: PickedFunctionRunV2;
+  node: PickedFunctionRunV2 & {
+    app: {
+      externalID: string;
+      name: string;
+    };
+    function: {
+      name: string;
+      slug: string;
+    };
+  };
 };
 
 /**
@@ -83,12 +94,8 @@ export function parseRunsData(runsData: PickedFunctionRunV2EdgeWithNode[] | unde
       }
 
       return {
-        id: edge.node.id,
-        queuedAt: edge.node.queuedAt,
-        startedAt: edge.node.startedAt,
-        endedAt: edge.node.endedAt,
+        ...edge.node,
         durationMS,
-        status: edge.node.status,
       };
     }) ?? []
   );

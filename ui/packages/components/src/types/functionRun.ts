@@ -3,6 +3,7 @@ import type { RawHistoryItem } from '@inngest/components/utils/historyParser';
 export const functionRunStatuses = [
   'FAILED',
   'RUNNING',
+  'PAUSED',
   'QUEUED',
   'COMPLETED',
   'CANCELLED',

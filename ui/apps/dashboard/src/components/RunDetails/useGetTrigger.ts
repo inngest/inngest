@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import type { Trigger } from '@inngest/components/TriggerDetails/TriggerDetails';
 import { useClient } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 
 const query = graphql(`
@@ -29,7 +29,9 @@ export function useGetTrigger(): (runID: string) => Promise<Trigger> {
     async (runID: string) => {
       let res;
       try {
-        res = await client.query(query, { envID: envID, runID }).toPromise();
+        res = await client
+          .query(query, { envID: envID, runID }, { requestPolicy: 'network-only' })
+          .toPromise();
       } catch (e) {
         if (e instanceof Error) {
           throw e;

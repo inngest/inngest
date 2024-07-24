@@ -1,7 +1,7 @@
 import { Client, useQuery, type UseQueryResponse } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import type { TimeRange } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import type { GetFunctionQuery } from '@/gql/graphql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
@@ -168,6 +168,7 @@ const GetFunctionDocument = graphql(`
           eventsBatch {
             maxSize
             timeout
+            key
           }
           concurrency {
             scope

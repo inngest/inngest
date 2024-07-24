@@ -17,7 +17,6 @@ export type Environment = {
   webhookSigningKey: string;
   createdAt: string;
   isArchived: boolean;
-  functionCount: number;
   isAutoArchiveEnabled: boolean | null | undefined;
   lastDeployedAt: string | null | undefined;
 };
@@ -33,7 +32,7 @@ export function getActiveEnvironment(
   return null;
 }
 
-export function getProductionEnvironment(
+export function getDefaultEnvironment(
   environments: NonEmptyArray<Environment>
 ): Environment | null {
   return environments.find((e) => e.type === EnvironmentType.Production) || null;
@@ -111,13 +110,13 @@ export function workspaceToEnvironment(
     Workspace,
     | 'id'
     | 'name'
+    | 'slug'
     | 'parentID'
     | 'test'
     | 'type'
     | 'webhookSigningKey'
     | 'createdAt'
     | 'isArchived'
-    | 'functionCount'
     | 'isAutoArchiveEnabled'
     | 'lastDeployedAt'
   >
@@ -136,6 +135,7 @@ export function workspaceToEnvironment(
   const slug = getEnvironmentSlug({
     environmentID: workspace.id,
     environmentName,
+    environmentSlug: workspace.slug,
     environmentType: workspace.type,
   });
 
@@ -148,7 +148,6 @@ export function workspaceToEnvironment(
     webhookSigningKey: workspace.webhookSigningKey,
     createdAt: workspace.createdAt,
     isArchived: workspace.isArchived,
-    functionCount: workspace.functionCount,
     isAutoArchiveEnabled: workspace.isAutoArchiveEnabled,
     lastDeployedAt: workspace.lastDeployedAt,
   };
@@ -162,19 +161,21 @@ export const staticSlugs = {
 type getEnvironmentSlugProps = {
   environmentID: string;
   environmentName: string;
+  environmentSlug: string | null;
   environmentType: string;
 };
 
 export function getEnvironmentSlug({
   environmentID,
   environmentName,
+  environmentSlug,
   environmentType,
 }: getEnvironmentSlugProps): string {
   const isProduction = environmentType === EnvironmentType.Production;
   const isTestWorkspace = environmentType === EnvironmentType.Test;
   const isLegacyTestMode = isTestWorkspace && environmentName === 'default';
 
-  let slug: string;
+  let slug = environmentSlug || '';
   if (isLegacyTestMode) {
     environmentName = LEGACY_TEST_MODE_NAME;
     slug = slugify(environmentName);
@@ -182,7 +183,7 @@ export function getEnvironmentSlug({
     slug = staticSlugs.production;
   } else if (environmentType === EnvironmentType.BranchParent) {
     slug = staticSlugs.branch;
-  } else {
+  } else if (!slug) {
     slug = `${slugify(environmentName)}-${environmentID.split('-')[0]}`;
   }
 
@@ -196,13 +197,13 @@ export function workspacesToEnvironments(
     Workspace,
     | 'id'
     | 'name'
+    | 'slug'
     | 'parentID'
     | 'test'
     | 'type'
     | 'webhookSigningKey'
     | 'createdAt'
     | 'isArchived'
-    | 'functionCount'
     | 'isAutoArchiveEnabled'
     | 'lastDeployedAt'
   >[]

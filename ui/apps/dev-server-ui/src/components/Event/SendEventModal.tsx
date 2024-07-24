@@ -245,7 +245,7 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
                 },
                 scrollBeyondLastLine: false,
                 wordWrap: 'on',
-                fontFamily: 'RobotoMono',
+                fontFamily: 'CircularXXMono',
                 fontSize: 13,
                 fontWeight: 'light',
                 lineHeight: 26,

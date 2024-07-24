@@ -178,6 +178,17 @@ func (r *reader) GetRunsByEventID(
 	return runs, nil
 }
 
+func (r *reader) GetSkippedRunsByEventID(
+	_ context.Context,
+	_ ulid.ULID,
+	_ history_reader.GetRunsByEventIDOpts,
+) ([]history_reader.SkippedRun, error) {
+	r.store.Mu.RLock()
+	defer r.store.Mu.RUnlock()
+
+	return nil, errors.New("not implemented")
+}
+
 func (r *reader) GetUsage(
 	ctx context.Context,
 	opts history_reader.GetUsageOpts,
@@ -200,6 +211,20 @@ func (r *reader) CountReplayRuns(ctx context.Context, opts history_reader.CountR
 	defer r.store.Mu.RUnlock()
 
 	return history_reader.ReplayRunCounts{}, errors.New("not implemented")
+}
+
+func (r *reader) GetActiveRunIDs(
+	ctx context.Context,
+	opts history_reader.GetActiveRunIDsOpts,
+) ([]ulid.ULID, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (r *reader) CountActiveRuns(
+	ctx context.Context,
+	opts history_reader.CountActiveRunsOpts,
+) (int, error) {
+	return 0, errors.New("not implemented")
 }
 
 func toRunHistory(item history.History) (*history_reader.RunHistory, error) {

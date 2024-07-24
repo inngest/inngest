@@ -4,8 +4,8 @@ import React, { useState } from 'react';
 import { useOrganization, useUser } from '@clerk/nextjs';
 import { useQuery } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import NewReplayButton from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/NewReplayButton';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { ClientFeatureFlag } from '@/components/FeatureFlags/ClientFeatureFlag';
 import { graphql } from '@/gql';
 import { FunctionRunStatus, FunctionRunTimeField } from '@/gql/graphql';
@@ -127,6 +127,7 @@ export default function RunsPage({ params }: RunsPageProps) {
           <StatusFilter
             selectedStatuses={selectedStatuses}
             onStatusesChange={handleStatusesChange}
+            functionIsPaused={functionIsPaused}
           />
           <TimeRangeFilter
             selectedTimeField={selectedTimeField}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useClient } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { getFunctionUsagesPage, useFunctionsPage } from '@/queries';
 import type { FunctionTableRow } from './FunctionTable';
 

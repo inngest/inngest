@@ -10,7 +10,7 @@ import {
 } from '@inngest/components/DropdownMenu';
 import { RiDeleteBinLine, RiMore2Line, RiPencilLine } from '@remixicon/react';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { Secret } from '@/components/Secret';
 import type { SecretKind } from '@/components/Secret/Secret';
 import { graphql } from '@/gql';

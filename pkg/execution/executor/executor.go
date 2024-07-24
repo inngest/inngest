@@ -190,6 +190,13 @@ func WithStepLimits(limit func(id sv2.ID) int) ExecutorOpt {
 	}
 }
 
+func WithStateSizeLimits(limit func(id sv2.ID) int) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).stateSizeLimit = limit
+		return nil
+	}
+}
+
 func WithDebouncer(d debounce.Debouncer) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).debouncer = d
@@ -264,6 +271,9 @@ type executor struct {
 
 	// steplimit finds step limits for a given run.
 	steplimit func(sv2.ID) int
+
+	// stateSizeLimit finds state size limits for a given run
+	stateSizeLimit func(sv2.ID) int
 
 	preDeleteStateSizeReporter execution.PreDeleteStateSizeReporter
 }
@@ -1131,7 +1141,8 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 		if serr := e.HandleGeneratorResponse(ctx, i, resp); serr != nil {
 
 			// If this is an error compiling async expressions, fail the function.
-			if shouldFailEarly := errors.Is(serr, &expressions.CompileError{}); shouldFailEarly {
+			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed)
+			if shouldFailEarly {
 				var gracefulErr *state.WrappedStandardError
 				if hasGracefulErr := errors.As(serr, &gracefulErr); hasGracefulErr {
 					serialized := gracefulErr.Serialize(execution.StateErrorKey)
@@ -1799,7 +1810,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		Err: &fnCancelledErr,
 	}); err != nil {
 		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
-	} else if performedFinalization {
+	} else if performedFinalization || r.ForceLifecycleHook {
 		ctx = e.extractTraceCtx(ctx, md, nil)
 		for _, e := range e.lifecycles {
 			go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
@@ -2084,6 +2095,9 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 		eg.Go(func() error { return e.handleGenerator(ctx, i, copied) })
 	}
 	if err := eg.Wait(); err != nil {
+		if errors.Is(err, state.ErrStateOverflowed) {
+			return err
+		}
 		if resp.NoRetry {
 			return queue.NeverRetryError(err)
 		}
@@ -2140,6 +2154,10 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 	// Save the response to the state store.
 	output, err := gen.Output()
 	if err != nil {
+		return err
+	}
+
+	if err := e.validateStateSize(len(output), i.md); err != nil {
 		return err
 	}
 
@@ -2654,11 +2672,12 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 			consts.OtelPropagationKey: carrier,
 		},
 	})
-	if err == state.ErrPauseAlreadyExists {
-		return nil
-	}
 	if err != nil {
 		span.Cancel(ctx)
+		if err == state.ErrPauseAlreadyExists {
+			return nil
+		}
+
 		return err
 	}
 
@@ -2726,13 +2745,9 @@ func (e *executor) extractTraceCtx(ctx context.Context, md sv2.Metadata, item *q
 	return ctx
 }
 
-func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem) error {
-	return e.AppendAndScheduleBatchWithOpts(ctx, fn, bi, nil)
-}
-
-// AppendAndScheduleBatchWithOpts appends a new batch item. If a new batch is created, it will be scheduled to run
+// AppendAndScheduleBatch appends a new batch item. If a new batch is created, it will be scheduled to run
 // after the batch timeout. If the item finalizes the batch, a function run is immediately scheduled.
-func (e *executor) AppendAndScheduleBatchWithOpts(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *execution.BatchExecOpts) error {
+func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *execution.BatchExecOpts) error {
 	result, err := e.batcher.Append(ctx, bi, fn)
 	if err != nil {
 		return err
@@ -2769,11 +2784,14 @@ func (e *executor) AppendAndScheduleBatchWithOpts(ctx context.Context, fn innges
 	case enums.BatchFull:
 		// start execution immediately
 		batchID := ulid.MustParse(result.BatchID)
-		if err := e.RetrieveAndScheduleBatchWithOpts(ctx, fn, batch.ScheduleBatchPayload{
-			BatchID:     batchID,
-			AppID:       bi.AppID,
-			WorkspaceID: bi.WorkspaceID,
-			AccountID:   bi.AccountID,
+		if err := e.RetrieveAndScheduleBatch(ctx, fn, batch.ScheduleBatchPayload{
+			BatchID:         batchID,
+			BatchPointer:    result.BatchPointerKey,
+			AccountID:       bi.AccountID,
+			WorkspaceID:     bi.WorkspaceID,
+			AppID:           bi.AppID,
+			FunctionID:      bi.FunctionID,
+			FunctionVersion: bi.FunctionVersion,
 		}, &execution.BatchExecOpts{
 			FunctionPausedAt: opts.FunctionPausedAt,
 		}); err != nil {
@@ -2786,13 +2804,9 @@ func (e *executor) AppendAndScheduleBatchWithOpts(ctx context.Context, fn innges
 	return nil
 }
 
-func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload) error {
-	return e.RetrieveAndScheduleBatchWithOpts(ctx, fn, payload, nil)
-}
-
-// RetrieveAndScheduleBatchWithOpts retrieves all items from a started batch and schedules a function run
-func (e *executor) RetrieveAndScheduleBatchWithOpts(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
-	evtList, err := e.batcher.RetrieveItems(ctx, payload.BatchID)
+// RetrieveAndScheduleBatch retrieves all items from a started batch and schedules a function run
+func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
+	evtList, err := e.batcher.RetrieveItems(ctx, payload.FunctionID, payload.BatchID)
 	if err != nil {
 		return err
 	}
@@ -2854,8 +2868,30 @@ func (e *executor) RetrieveAndScheduleBatchWithOpts(ctx context.Context, fn inng
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 	}
 
-	if err := e.batcher.ExpireKeys(ctx, payload.BatchID); err != nil {
+	if err := e.batcher.ExpireKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (e *executor) validateStateSize(outputSize int, md sv2.Metadata) error {
+	// validate state size and exit early if we're over the limit
+	if e.stateSizeLimit != nil {
+		stateSizeLimit := e.stateSizeLimit(md.ID)
+
+		if stateSizeLimit == 0 {
+			stateSizeLimit = consts.DefaultMaxStateSizeLimit
+		}
+
+		if outputSize+md.Metrics.StateSize > stateSizeLimit {
+			return state.WrapInStandardError(
+				state.ErrStateOverflowed,
+				state.InngestErrStateOverflowed,
+				fmt.Sprintf("The function run exceeded the state size limit of %d bytes.", stateSizeLimit),
+				"",
+			)
+		}
 	}
 
 	return nil

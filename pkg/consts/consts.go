@@ -28,6 +28,9 @@ const (
 	// MaxBodySize is the maximum payload size read on any HTTP response.
 	MaxBodySize = 1024 * 1024 * 4 // 4MB
 
+	// DefaultMaxStateSizeLimit is the maximum number of bytes of output state per function run allowed.
+	DefaultMaxStateSizeLimit = 1024 * 1024 * 32 // 32MB
+
 	// MaxRetries represents the maximum number of retries for a particular function or step
 	// possible.
 	MaxRetries = 30

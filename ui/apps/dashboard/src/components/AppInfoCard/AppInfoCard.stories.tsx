@@ -1,7 +1,7 @@
 import type { PropsWithChildren } from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { EnvironmentContext } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { EnvironmentContext } from '@/components/Environments/environment-context';
 import { frameworks } from '@/components/FrameworkInfo';
 import { languages } from '@/components/LanguageInfo';
 import { platforms } from '@/components/PlatformInfo';
@@ -86,7 +86,6 @@ function DummyEnvContext({ children }: PropsWithChildren) {
     webhookSigningKey: 'fake-signing-key',
     createdAt: new Date().toISOString(),
     isArchived: false,
-    functionCount: 1,
     isAutoArchiveEnabled: null,
     lastDeployedAt: null,
   };

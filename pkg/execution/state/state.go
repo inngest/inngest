@@ -2,7 +2,6 @@ package state
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -40,12 +39,15 @@ var (
 	ErrFunctionOverflowed = fmt.Errorf("function has too many steps")
 	ErrDuplicateResponse  = fmt.Errorf("duplicate response")
 	ErrEventNotFound      = fmt.Errorf("event not found in state store")
-	ErrFunctionPaused     = errors.New("function is paused")
+	ErrFunctionPaused     = fmt.Errorf("function is paused")
+	ErrStateOverflowed    = fmt.Errorf("state is too large")
 )
 
 const (
 	// InngestErrFunctionOverflowed is the public error code for ErrFunctionOverflowed
 	InngestErrFunctionOverflowed = "InngestErrFunctionOverflowed"
+	// InngestErrStateOverflowed is the public error code for ErrStateOverflowed
+	InngestErrStateOverflowed = "InngestErrStateOverflowed"
 )
 
 // Identifier represents the unique identifier for a workflow run.
@@ -319,22 +321,22 @@ type FunctionCallback func(context.Context, Identifier, enums.RunStatus)
 // StateLoader allows loading of previously stored state based off of a given Identifier.
 type StateLoader interface {
 	// Exists checks whether the run ID exists.
-	Exists(ctx context.Context, runID ulid.ULID) (bool, error)
+	Exists(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (bool, error)
 
 	// Metadata returns run metadata for the given identifier.  It may be cheaper
 	// than a full load in cases where only the metadata is necessary.
-	Metadata(ctx context.Context, runID ulid.ULID) (*Metadata, error)
+	Metadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (*Metadata, error)
 
 	// Load returns run state for the given identifier.
-	Load(ctx context.Context, runID ulid.ULID) (State, error)
+	Load(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (State, error)
 
 	// IsComplete returns whether the given identifier is complete, ie. the
 	// pending count in the identifier's metadata is zero.
-	IsComplete(ctx context.Context, runID ulid.ULID) (complete bool, err error)
+	IsComplete(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (complete bool, err error)
 
 	// StackIndex returns the index for the given step ID within the function stack of
 	// a given run.
-	StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error)
+	StackIndex(ctx context.Context, accountId uuid.UUID, runID ulid.ULID, stepID string) (int, error)
 }
 
 // FunctionLoader loads function definitions based off of an identifier.
@@ -361,7 +363,7 @@ type Mutater interface {
 	// ErrIdentifierExists.
 	New(ctx context.Context, input Input) (State, error)
 
-	UpdateMetadata(ctx context.Context, runID ulid.ULID, md MetadataUpdate) error
+	UpdateMetadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID, md MetadataUpdate) error
 
 	// Delete removes state from the state store.
 	Delete(ctx context.Context, i Identifier) (bool, error)

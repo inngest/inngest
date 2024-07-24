@@ -4,7 +4,7 @@ import { Button } from '@inngest/components/Button';
 import { useBooleanSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { IconFunction } from '@inngest/components/icons/Function';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { FunctionTable } from './FunctionTable';
 import { useRows } from './useRows';

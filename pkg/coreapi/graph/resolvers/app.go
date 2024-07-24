@@ -21,6 +21,16 @@ func (a appResolver) ID(ctx context.Context, obj *cqrs.App) (string, error) {
 	return obj.ID.String(), nil
 }
 
+func (a appResolver) ExternalID(ctx context.Context, obj *cqrs.App) (string, error) {
+	if obj == nil {
+		return "", fmt.Errorf("no app defined")
+	}
+
+	// Name is currently the same as external ID, but we'll eventually allow
+	// apps to have names (similar to functions)
+	return obj.Name, nil
+}
+
 func (a appResolver) Framework(ctx context.Context, obj *cqrs.App) (*string, error) {
 	if obj == nil {
 		return nil, fmt.Errorf("no app defined")
