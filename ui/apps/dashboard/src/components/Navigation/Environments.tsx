@@ -113,9 +113,9 @@ export default function EnvironmentSelectMenu({
       {({ open }) => (
         <div className="bg-canvasBase relative flex">
           <Listbox.Button
-            className={`active:border-primary-intense focus:border-primary-intense border-muted bg-canvasBase text-primary-intense hover:bg-canvasSubtle ${
+            className={`border-muted bg-canvasBase text-primary-intense hover:bg-canvasSubtle ${
               collapsed ? `w-8 px-1` : 'w-[146px] px-2'
-            } m-0 h-8 overflow-hidden rounded border text-sm`}
+            } m-0 h-8 overflow-hidden rounded border text-sm ${open && 'border-primary-intense'}`}
           >
             <div
               className={`flex flex-row items-center  ${

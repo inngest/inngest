@@ -12,9 +12,10 @@ export default function SideBar({
   children: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(serverCollapsed);
+
   return (
     <div
-      className={`bg-canvasBase border-subtle sticky top-0 flex h-screen flex-col justify-start ${
+      className={`bg-canvasBase border-subtle top-0 flex h-screen flex-col justify-start ${
         collapsed ? 'w-[64px]' : 'w-[224px]'
       }  shrink-0 border-r transition-all delay-150 duration-300`}
     >
