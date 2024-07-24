@@ -138,14 +138,10 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	for i := int32(0); i < q.numWorkers; i++ {
 		go q.worker(ctx, f)
 	}
+	
+	go q.claimSequentialLease(ctx)
 
-	if q.runMode.sequential {
-		go q.claimSequentialLease(ctx)
-	}
-
-	if q.runMode.scavenger {
-		go q.runScavenger(ctx)
-	}
+	go q.runScavenger(ctx)
 
 	tick := time.NewTicker(q.pollTick)
 
