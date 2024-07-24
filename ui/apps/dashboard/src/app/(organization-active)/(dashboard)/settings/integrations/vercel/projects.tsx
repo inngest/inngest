@@ -102,8 +102,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
                   </div>
                   <div className="mt-4 flex flex-row items-center justify-start">
                     <div className="text-basis text-xl font-medium">{p.name}</div>
-                    {p.ssoProtection?.deploymentType ===
-                      VercelDeploymentProtection.ProdDeploymentURLsAndAllPreviews && (
+                    {p.ssoProtection?.deploymentType !== VercelDeploymentProtection.Disabled && (
                       <Tooltip>
                         <TooltipTrigger>
                           <RiInformationLine className="text-accent-subtle ml-2 h-4 w-4 cursor-pointer" />

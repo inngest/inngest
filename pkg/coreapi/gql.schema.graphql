@@ -350,7 +350,7 @@ type FunctionRunV2 {
   status: FunctionRunStatus!
   sourceID: String # The parent trace / run that triggered this run
   triggerIDs: [ULID!]!
-  triggers: [Bytes!]!
+  eventName: String
   isBatch: Boolean!
   batchCreatedAt: Time
   cronSchedule: String
@@ -363,6 +363,7 @@ type FunctionRunV2 {
 type RunsV2Connection {
   edges: [FunctionRunV2Edge!]!
   pageInfo: PageInfo!
+  totalCount: Int!
 }
 
 type FunctionRunV2Edge {

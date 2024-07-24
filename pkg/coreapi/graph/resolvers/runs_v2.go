@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
@@ -18,102 +20,7 @@ const (
 )
 
 func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []*models.RunsV2OrderBy, filter models.RunsFilterV2) (*models.RunsV2Connection, error) {
-	tsfield := enums.TraceRunTimeQueuedAt
-	switch *filter.TimeField {
-	case models.RunsV2OrderByFieldStartedAt:
-		tsfield = enums.TraceRunTimeStartedAt
-	case models.RunsV2OrderByFieldEndedAt:
-		tsfield = enums.TraceRunTimeEndedAt
-	}
-
-	statuses := []enums.RunStatus{}
-	if len(filter.Status) > 0 {
-		for _, s := range filter.Status {
-			var status enums.RunStatus
-			switch s {
-			case models.FunctionRunStatusQueued:
-				status = enums.RunStatusScheduled
-			case models.FunctionRunStatusRunning:
-				status = enums.RunStatusRunning
-			case models.FunctionRunStatusCompleted:
-				status = enums.RunStatusCompleted
-			case models.FunctionRunStatusCancelled:
-				status = enums.RunStatusCancelled
-			case models.FunctionRunStatusFailed:
-				status = enums.RunStatusFailed
-			default:
-				// unknown status
-				continue
-			}
-			statuses = append(statuses, status)
-		}
-	}
-
-	orderBy := []cqrs.GetTraceRunOrder{}
-	for _, o := range order {
-		var (
-			field enums.TraceRunTime
-			dir   enums.TraceRunOrder
-		)
-
-		switch o.Field {
-		case models.RunsV2OrderByFieldQueuedAt:
-			field = enums.TraceRunTimeQueuedAt
-		case models.RunsV2OrderByFieldStartedAt:
-			field = enums.TraceRunTimeStartedAt
-		case models.RunsV2OrderByFieldEndedAt:
-			field = enums.TraceRunTimeEndedAt
-		default: // unknown, skip
-			continue
-		}
-
-		switch o.Direction {
-		case models.RunsOrderByDirectionAsc:
-			dir = enums.TraceRunOrderAsc
-		case models.RunsOrderByDirectionDesc:
-			dir = enums.TraceRunOrderDesc
-		default: // unknown, skip
-			continue
-		}
-
-		orderBy = append(orderBy, cqrs.GetTraceRunOrder{Field: field, Direction: dir})
-	}
-
-	var cursor string
-	if cur != nil {
-		cursor = *cur
-	}
-
-	var cel string
-	if filter.Query != nil {
-		cel = *filter.Query
-	}
-
-	until := time.Now()
-	if filter.Until != nil {
-		until = *filter.Until
-	}
-
-	items := defaultRunItems
-	if num > 0 && num < maxRunItems {
-		items = num
-	}
-
-	opts := cqrs.GetTraceRunOpt{
-		Filter: cqrs.GetTraceRunFilter{
-			AppID:      filter.AppIDs,
-			FunctionID: filter.FunctionIDs,
-			TimeField:  tsfield,
-			From:       filter.From,
-			Until:      until,
-			Status:     statuses,
-			CEL:        cel,
-		},
-		Order:  orderBy,
-		Cursor: cursor,
-		Items:  uint(items),
-	}
-
+	opts := toRunsQueryOpt(num, cur, order, filter)
 	runs, err := r.Data.GetTraceRuns(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving runs: %w", err)
@@ -123,6 +30,11 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 		scursor *string
 		ecursor *string
 	)
+	// eventID to run map
+	evtRunMap := map[ulid.ULID]*models.FunctionRunV2{}
+	// used for retrieving eventIDs
+	evtIDs := []ulid.ULID{}
+
 	edges := []*models.FunctionRunV2Edge{}
 	total := len(runs)
 	for i, r := range runs {
@@ -155,39 +67,66 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 			output = &s
 		}
 
+		runID := ulid.MustParse(r.RunID)
 		status, err := models.ToFunctionRunStatus(r.Status)
 		if err != nil {
 			continue
+		}
+
+		node := &models.FunctionRunV2{
+			ID:           runID,
+			AppID:        r.AppID,
+			FunctionID:   r.FunctionID,
+			TraceID:      r.TraceID,
+			QueuedAt:     r.QueuedAt,
+			StartedAt:    started,
+			EndedAt:      ended,
+			SourceID:     sourceID,
+			Status:       status,
+			Output:       output,
+			IsBatch:      r.IsBatch,
+			CronSchedule: r.CronSchedule,
 		}
 
 		triggerIDS := []ulid.ULID{}
 		for _, tid := range r.TriggerIDs {
 			if id, err := ulid.Parse(tid); err == nil {
 				triggerIDS = append(triggerIDS, id)
+
+				// track evtID only if it's not batch nor cron
+				if !r.IsBatch && r.CronSchedule == nil {
+					evtRunMap[id] = node
+					evtIDs = append(evtIDs, id)
+				}
 			}
 		}
 
-		node := &models.FunctionRunV2{
-			ID:         ulid.MustParse(r.RunID),
-			AppID:      r.AppID,
-			FunctionID: r.FunctionID,
-			TraceID:    r.TraceID,
-			QueuedAt:   r.QueuedAt,
-			StartedAt:  started,
-			EndedAt:    ended,
-			SourceID:   sourceID,
-			Status:     status,
-			TriggerIDs: triggerIDS,
-			Triggers:   []string{},
-			Output:     output,
-			IsBatch:    r.IsBatch,
-		}
+		node.TriggerIDs = triggerIDS
 
 		edges = append(edges, &models.FunctionRunV2Edge{
 			Node:   node,
 			Cursor: r.Cursor,
 		})
 	}
+
+	evts, err := r.Data.GetEventsByInternalIDs(ctx, evtIDs)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving events associated with runs: %w", err)
+	}
+	var wg sync.WaitGroup
+	for _, e := range evts {
+		wg.Add(1)
+		go func(evt *cqrs.Event) {
+			defer wg.Done()
+
+			run, ok := evtRunMap[evt.GetInternalID()]
+			if !ok {
+				return
+			}
+			run.EventName = &evt.EventName
+		}(e)
+	}
+	wg.Wait()
 
 	pageInfo := &models.PageInfo{
 		HasNextPage: total == int(opts.Items),
@@ -392,4 +331,132 @@ func (r *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.R
 	}
 
 	return &resp, nil
+}
+
+func (r *runsV2ConnResolver) TotalCount(ctx context.Context, obj *models.RunsV2Connection) (int, error) {
+	cursor, ok := graphql.GetFieldContext(ctx).Parent.Args["after"].(*string)
+	if !ok {
+		return 0, fmt.Errorf("failed to access cursor")
+	}
+
+	orderBy, ok := graphql.GetFieldContext(ctx).Parent.Args["orderBy"].([]*models.RunsV2OrderBy)
+	if !ok {
+		return 0, fmt.Errorf("failed to retrieve order")
+	}
+
+	filter, ok := graphql.GetFieldContext(ctx).Parent.Args["filter"].(models.RunsFilterV2)
+	if !ok {
+		return 0, fmt.Errorf("failed to access query filter")
+	}
+
+	opts := toRunsQueryOpt(0, cursor, orderBy, filter)
+	count, err := r.Data.GetTraceRunsCount(ctx, opts)
+	if err != nil {
+		return 0, fmt.Errorf("error retrieving count for runs: %w", err)
+	}
+
+	return count, nil
+}
+
+func toRunsQueryOpt(
+	num int,
+	cur *string,
+	order []*models.RunsV2OrderBy,
+	filter models.RunsFilterV2,
+) cqrs.GetTraceRunOpt {
+	tsfield := enums.TraceRunTimeQueuedAt
+	switch *filter.TimeField {
+	case models.RunsV2OrderByFieldStartedAt:
+		tsfield = enums.TraceRunTimeStartedAt
+	case models.RunsV2OrderByFieldEndedAt:
+		tsfield = enums.TraceRunTimeEndedAt
+	}
+
+	statuses := []enums.RunStatus{}
+	if len(filter.Status) > 0 {
+		for _, s := range filter.Status {
+			var status enums.RunStatus
+			switch s {
+			case models.FunctionRunStatusQueued:
+				status = enums.RunStatusScheduled
+			case models.FunctionRunStatusRunning:
+				status = enums.RunStatusRunning
+			case models.FunctionRunStatusCompleted:
+				status = enums.RunStatusCompleted
+			case models.FunctionRunStatusCancelled:
+				status = enums.RunStatusCancelled
+			case models.FunctionRunStatusFailed:
+				status = enums.RunStatusFailed
+			default:
+				// unknown status
+				continue
+			}
+			statuses = append(statuses, status)
+		}
+	}
+
+	orderBy := []cqrs.GetTraceRunOrder{}
+	for _, o := range order {
+		var (
+			field enums.TraceRunTime
+			dir   enums.TraceRunOrder
+		)
+
+		switch o.Field {
+		case models.RunsV2OrderByFieldQueuedAt:
+			field = enums.TraceRunTimeQueuedAt
+		case models.RunsV2OrderByFieldStartedAt:
+			field = enums.TraceRunTimeStartedAt
+		case models.RunsV2OrderByFieldEndedAt:
+			field = enums.TraceRunTimeEndedAt
+		default: // unknown, skip
+			continue
+		}
+
+		switch o.Direction {
+		case models.RunsOrderByDirectionAsc:
+			dir = enums.TraceRunOrderAsc
+		case models.RunsOrderByDirectionDesc:
+			dir = enums.TraceRunOrderDesc
+		default: // unknown, skip
+			continue
+		}
+
+		orderBy = append(orderBy, cqrs.GetTraceRunOrder{Field: field, Direction: dir})
+	}
+
+	var cursor string
+	if cur != nil {
+		cursor = *cur
+	}
+
+	var cel string
+	if filter.Query != nil {
+		cel = *filter.Query
+	}
+
+	until := time.Now()
+	if filter.Until != nil {
+		until = *filter.Until
+	}
+
+	items := defaultRunItems
+	if num > 0 && num < maxRunItems {
+		items = num
+	}
+
+	return cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AppID:      filter.AppIDs,
+			FunctionID: filter.FunctionIDs,
+			TimeField:  tsfield,
+			From:       filter.From,
+			Until:      until,
+			Status:     statuses,
+			CEL:        cel,
+		},
+		Order:  orderBy,
+		Cursor: cursor,
+		Items:  uint(items),
+	}
 }

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import * as Tabs from '@radix-ui/react-tabs';
 import { RiArrowRightSLine } from '@remixicon/react';
 import { isBefore, type Duration } from 'date-fns';
@@ -70,12 +69,7 @@ const formatAbsolute = (absoluteRange?: AbsoluteRange) => (
 );
 
 const AbsoluteDisplay = ({ absoluteRange }: { absoluteRange?: AbsoluteRange }) => (
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <div className="text-basis">{formatAbsolute(absoluteRange)}</div>
-    </TooltipTrigger>
-    <TooltipContent className="whitespace-pre-line">{formatAbsolute(absoluteRange)}</TooltipContent>
-  </Tooltip>
+  <div className="text-basis">{formatAbsolute(absoluteRange)}</div>
 );
 
 const RelativeDisplay = ({ duration }: { duration: string }) => (
