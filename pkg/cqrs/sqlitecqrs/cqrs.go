@@ -1165,6 +1165,22 @@ func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt)
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	// TODO: use evtIDs as post query filter
+	evtIDs := []string{}
+	if opt.Filter.CEL != "" {
+		cel := strings.Split(opt.Filter.CEL, "\n")
+		fmt.Printf("\nCEL:\n%#v\n\n", cel)
+
+		evts, err := w.GetEventsByExpressions(ctx, cel)
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range evts {
+			evtIDs = append(evtIDs, e.ID.String())
+		}
+		fmt.Printf("EventIDs: %#v\n", evtIDs)
+	}
+
 	builder := newRunsQueryBuilder(ctx, opt)
 	filter := builder.filter
 	order := builder.order
@@ -1172,6 +1188,9 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	resCursorLayout := builder.cursorLayout
 
 	// read from database
+	// TODO:
+	// might need to loop the query continuously if it doesn't fulfill the
+	// specified number of items
 	sql, args, err := sq.Dialect("sqlite3").
 		From("trace_runs").
 		Select(
