@@ -21,9 +21,8 @@ local customConcurrencyKeyA     = KEYS[9] -- Optional for eg. for concurrency am
 local customConcurrencyKeyB     = KEYS[10] -- Optional for eg. for concurrency amongst steps
 -- We push pointers to partition concurrency items to the partition concurrency item
 local concurrencyPointer        = KEYS[11]
-local shardPointerKey           = KEYS[12]
-local keyItemIndexA             = KEYS[13]          -- custom item index 1
-local keyItemIndexB             = KEYS[14]          -- custom item index 2
+local keyItemIndexA             = KEYS[12]          -- custom item index 1
+local keyItemIndexB             = KEYS[13]          -- custom item index 2
 
 local queueItem               = ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID                 = ARGV[2]           -- id
@@ -35,7 +34,6 @@ local accountId               = ARGV[6]           -- accountId
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
 -- $include(update_pointer_score.lua)
--- $include(has_shard_key.lua)
 
 local item                    = get_queue_item(queueKey, queueID)
 if item == nil then
@@ -85,10 +83,6 @@ if currentScore == false or tonumber(currentScore) ~= earliestTime or tonumber(c
     local earliestPartitionScoreInAccount = get_fn_partition_score(accountPartitionIndexKey)
     update_pointer_score_to(accountId, globalAccountIndexKey, earliestPartitionScoreInAccount)
 
-    -- And the same for any shards, as long as the shard name exists.
-    if has_shard_key(shardPointerKey, -2) then
-        update_pointer_score_to(functionID, shardPointerKey, earliestTime)
-    end
 end
 
 -- Get the earliest item in the partition concurrency set.  We may be requeueing

@@ -276,10 +276,10 @@ func TestQueueRunExtended(t *testing.T) {
 	ShardTickTime = 5 * time.Second
 	ShardLeaseTime = 5 * time.Second
 
-	sf := func(ctx context.Context, queueName string, wsID *uuid.UUID) *QueueShard {
+	sf := func(ctx context.Context, queueName string, wsID *uuid.UUID) *GuaranteedCapacity {
 		// For nil UUIDs, return a shard.
 		if wsID == nil || *wsID == uuid.Nil {
-			return &QueueShard{
+			return &GuaranteedCapacity{
 				Name:               "test-shard",
 				GuaranteedCapacity: 1,
 			}
@@ -293,7 +293,7 @@ func TestQueueRunExtended(t *testing.T) {
 		// so lower the number of workers.
 		WithNumWorkers(200),
 		WithLogger(&l),
-		WithShardFinder(sf),
+		WithGuaranteedCapacityFinder(sf),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -321,7 +321,7 @@ func TestQueueRunExtended(t *testing.T) {
 					// so lower the number of workers.
 					WithNumWorkers(200),
 					WithLogger(&l),
-					WithShardFinder(sf),
+					WithGuaranteedCapacityFinder(sf),
 				)
 
 				go func() {

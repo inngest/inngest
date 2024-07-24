@@ -34,6 +34,9 @@ var (
 	ShardLeaseTime = 10 * time.Second
 
 	maxShardLeaseAttempts = 10
+
+	// How many accounts to lease on a single worker when processing guaranteed capacity
+	GuaranteedCapacityLeaseLimit = 1
 )
 
 var (
@@ -140,8 +143,11 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	}
 
 	if q.runMode.guaranteedCapacity {
-		// TODO Refactor guaranteed capacity
-		go q.claimShards(ctx)
+		if q.runMode.sequential {
+			return fmt.Errorf("sequential and guaranteed capacity cannot be used together")
+		}
+
+		go q.claimAccount(ctx)
 	}
 
 	if q.runMode.sequential {
@@ -202,16 +208,16 @@ LOOP:
 	return nil
 }
 
-func (q *queue) claimShards(ctx context.Context) {
-	if q.sf == nil {
+func (q *queue) claimAccount(ctx context.Context) {
+	if q.gcf == nil {
 		// TODO: Inspect denylists and whether this worker is capable of leasing
-		// shards.  Note that shards should only be created for SDK-based workers;
+		// accounts.  Note that accounts should only be created for SDK-based workers;
 		// if you use the queue for anything else other than step jobs, the worker
 		// cannot lease jobs.  To this point, we should make this opt-in instead of
 		// opt-out to prevent errors.
 		//
 		// For now, you have to provide a shardFinder to lease shards.
-		q.logger.Info().Msg("no shard finder;  skipping shard claiming")
+		q.logger.Info().Msg("no guaranteed capacity finder;  skipping account claiming")
 		return
 	}
 
@@ -223,7 +229,7 @@ func (q *queue) claimShards(ctx context.Context) {
 
 	for {
 		if q.isSequential() {
-			// Sequential workers never lease shards.  They always run in order
+			// Sequential workers never lease accounts.  They always run in order
 			// on the global partition queue.
 			<-scanTick.C
 			continue
@@ -247,14 +253,14 @@ func (q *queue) claimShards(ctx context.Context) {
 				defer func() { atomic.StoreInt32(&leasing, 0) }()
 
 				// Retry claiming leases until all shards have been taken.  All operations
-				// must succeed, even if it leaves us spinning.  Note that scanShards filters
+				// must succeed, even if it leaves us spinning.  Note that scanGuaranteedCapacity filters
 				// out unnecessary leases and shards that have already been leased.
 				retry := true
 				n := 0
 				for retry && n < maxShardLeaseAttempts {
 					n++
 					var err error
-					retry, err = q.scanShards(ctx)
+					retry, err = q.scanGuaranteedCapacity(ctx)
 					if err != nil {
 						q.logger.Error().Err(err).Msg("error scanning and leasing shards")
 						return
@@ -266,12 +272,12 @@ func (q *queue) claimShards(ctx context.Context) {
 			}()
 		case <-leaseTick.C:
 			// Copy the slice to prevent locking/concurrent access.
-			existingLeases := q.getShardLeases()
+			existingLeases := q.getAccountLeases()
 
 			for _, s := range existingLeases {
 				// Attempt to lease all ASAP, even if the backing store is single threaded.
-				go func(ls leasedShard) {
-					nextLeaseID, err := q.renewShardLease(ctx, &ls.Shard, ShardLeaseTime, ls.Lease)
+				go func(ls leasedAccount) {
+					nextLeaseID, err := q.renewAccountLease(ctx, &ls.Shard, ShardLeaseTime, ls.Lease)
 					if err != nil {
 						q.logger.Error().Err(err).Msg("error renewing shard lease")
 						return
@@ -286,29 +292,30 @@ func (q *queue) claimShards(ctx context.Context) {
 	}
 }
 
-func (q *queue) scanShards(ctx context.Context) (retry bool, err error) {
+func (q *queue) scanGuaranteedCapacity(ctx context.Context) (retry bool, err error) {
 	// TODO: Make instances of *queue register worker information when calling
 	//       Run().
 	//       Fetch this information, and correctly assign workers to shard maps
 	//       based on the distribution of items in the queue here.  This lets
 	//       us oversubscribe appropriately.
-	shardMap, err := q.getShards(ctx)
+	guaranteedCapacityMap, err := q.getGuaranteedCapacityMap(ctx)
 	if err != nil {
-		q.logger.Error().Err(err).Msg("error fetching shards")
+		q.logger.Error().Err(err).Msg("error fetching filteredGuaranteedCapacity")
 		return
 	}
-	shards, err := q.filterShards(ctx, shardMap)
+	filteredGuaranteedCapacity, err := q.filterGuaranteedCapacity(ctx, guaranteedCapacityMap)
 	if err != nil {
-		q.logger.Error().Err(err).Msg("error filtering shards")
+		q.logger.Error().Err(err).Msg("error filtering filteredGuaranteedCapacity")
 		return
 	}
 
-	if len(shards) == 0 {
+	if len(filteredGuaranteedCapacity) == 0 {
 		return
 	}
 
-	for _, shard := range shards {
-		leaseID, err := q.leaseShard(ctx, shard, ShardLeaseTime, len(shard.Leases))
+	// TODO Ensure that we only ever process a max of <GuaranteedCapacityLeaseLimit> accounts per worker; don't lease if we're already set!
+	for _, shard := range filteredGuaranteedCapacity[0:GuaranteedCapacityLeaseLimit] {
+		leaseID, err := q.leaseAccount(ctx, shard, ShardLeaseTime, len(shard.Leases))
 		if err == nil {
 			// go q.counter(ctx, "queue_shard_lease_success_total", 1, map[string]any{
 			// 	"shard_name": shard.Name,
@@ -342,45 +349,45 @@ func (q *queue) scanShards(ctx context.Context) (retry bool, err error) {
 	return retry, nil
 }
 
-func (q *queue) addLeasedShard(ctx context.Context, shard *QueueShard, lease ulid.ULID) {
-	for i, n := range q.shardLeases {
+func (q *queue) addLeasedShard(ctx context.Context, shard *GuaranteedCapacity, lease ulid.ULID) {
+	for i, n := range q.accountLeases {
 		if n.Shard.Name == shard.Name {
 			// Updated in place.
-			q.shardLeaseLock.Lock()
-			q.shardLeases[i] = leasedShard{
+			q.accountLeaseLock.Lock()
+			q.accountLeases[i] = leasedAccount{
 				Lease: lease,
 				Shard: *shard,
 			}
-			q.shardLeaseLock.Unlock()
+			q.accountLeaseLock.Unlock()
 			return
 		}
 	}
 	// Not updated in place, so add to the list and return.
-	q.shardLeaseLock.Lock()
-	q.shardLeases = append(q.shardLeases, leasedShard{
+	q.accountLeaseLock.Lock()
+	q.accountLeases = append(q.accountLeases, leasedAccount{
 		Lease: lease,
 		Shard: *shard,
 	})
-	q.shardLeaseLock.Unlock()
+	q.accountLeaseLock.Unlock()
 }
 
-// filterShards filters shards during assignment, removing any shards that this worker
-// has already leased;  any shards that have already had their leasing requirements met;
-// and priority shuffles shards to lease in a non-deterministic (but prioritized) order.
+// filterGuaranteedCapacity filters guaranteed capacities during assignment, removing any accounts that this worker
+// has already leased;  any accounts that have already had their leasing requirements met;
+// and priority shuffles guaranteed capacity to lease in a non-deterministic (but prioritized) order.
 //
 // The returned shards are safe to be leased, and should be attempted in-order.
-func (q *queue) filterShards(ctx context.Context, shards map[string]*QueueShard) ([]*QueueShard, error) {
+func (q *queue) filterGuaranteedCapacity(ctx context.Context, shards map[string]*GuaranteedCapacity) ([]*GuaranteedCapacity, error) {
 	if len(shards) == 0 {
 		return nil, nil
 	}
 
 	// Copy the slice to prevent locking/concurrent access.
-	for _, v := range q.getShardLeases() {
-		delete(shards, v.Shard.Name)
+	for _, v := range q.getAccountLeases() {
+		delete(shards, v.GuaranteedCapacity.Name)
 	}
 
 	weights := []float64{}
-	shuffleIdx := []*QueueShard{}
+	shuffleIdx := []*GuaranteedCapacity{}
 	for _, v := range shards {
 		// XXX: Here we can add latency targets, etc.
 
@@ -405,11 +412,11 @@ func (q *queue) filterShards(ctx context.Context, shards map[string]*QueueShard)
 		return shuffleIdx, nil
 	}
 
-	// Reduce the likelihood of all workers attempting to claim shards by
-	// randomly shuffling.  Note that high priority shards will still be
+	// Reduce the likelihood of all workers attempting to claim accounts by
+	// randomly shuffling.  Note that high priority accounts will still be
 	// likely to come first with some contention.
 	w := sampleuv.NewWeighted(weights, rnd)
-	result := make([]*QueueShard, len(weights))
+	result := make([]*GuaranteedCapacity, len(weights))
 	for n := range result {
 		idx, ok := w.Take()
 		if !ok && len(result) < len(weights)-1 {
@@ -570,7 +577,7 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 	}
 }
 
-func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, shard *QueueShard, metricShardName string) error {
+func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, shard *GuaranteedCapacity, metricShardName string) error {
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
 	partitions, err := duration(ctx, "partition_peek", func(ctx context.Context) ([]*QueuePartition, error) {
 		return q.partitionPeek(ctx, partitionKey, q.isSequential(), peekUntil, peekLimit)
@@ -622,7 +629,7 @@ func (q *queue) scan(ctx context.Context) error {
 	// Store the shard that we processed, allowing us to eventually pass this
 	// down to the job for stat tracking.
 	var (
-		shard           *QueueShard
+		shard           *GuaranteedCapacity
 		metricShardName = "<global>" // default global name for metrics in this function
 	)
 
@@ -635,7 +642,7 @@ func (q *queue) scan(ctx context.Context) error {
 	// TODO Update with guaranteed capacity
 	// If this worker has leased shards, those take priority 95% of the time.  There's a 5% chance that the
 	// worker still works on the global queue.
-	existingLeases := q.getShardLeases()
+	existingLeases := q.getAccountLeases()
 
 	if len(existingLeases) > 0 {
 		// Pick a random item between the shards.
@@ -693,7 +700,7 @@ func (q *queue) scan(ctx context.Context) error {
 
 // NOTE: Shard is only passed as a reference if the partition was peeked from
 // a shard.  It exists for accounting and tracking purposes only, eg. to report shard metrics.
-func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *QueueShard) error {
+func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *GuaranteedCapacity) error {
 	// Attempt to lease items.  This checks partition-level concurrency limits
 	//
 	// For optimization, because this is the only thread that can be leasing
@@ -1019,7 +1026,7 @@ ProcessLoop:
 	return nil
 }
 
-func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *QueueShard, f osqueue.RunFunc) error {
+func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *GuaranteedCapacity, f osqueue.RunFunc) error {
 	var err error
 	leaseID := qi.LeaseID
 

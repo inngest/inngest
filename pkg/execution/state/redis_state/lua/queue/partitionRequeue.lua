@@ -15,11 +15,10 @@ local partitionKey            = KEYS[1]
 local keyGlobalPartitionPtr   = KEYS[2]
 local keyAccountPartitionPtr  = KEYS[3]
 local keyGlobalAccountsPtr    = KEYS[4]
-local keyShardPartitionPtr    = KEYS[5]
-local partitionMeta           = KEYS[6]
-local keyPartitionZset        = KEYS[7]
-local partitionConcurrencyKey = KEYS[8] -- We can only GC a partition if no running jobs occur.
-local queueKey                = KEYS[9]
+local partitionMeta           = KEYS[5]
+local keyPartitionZset        = KEYS[6]
+local partitionConcurrencyKey = KEYS[7] -- We can only GC a partition if no running jobs occur.
+local queueKey                = KEYS[8]
 
 local partitionID             = ARGV[1]
 local atMS                    = tonumber(ARGV[2]) -- time in milliseconds
@@ -29,7 +28,6 @@ local accountId               = ARGV[4]
 local atS = math.floor(atMS / 1000) -- in seconds;  partitions are currently second granularity, but this should change.
 
 -- $include(get_partition_item.lua)
--- $include(has_shard_key.lua)
 -- $include(update_pointer_score.lua)
 
 --
@@ -52,9 +50,6 @@ if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call(
       redis.call("ZREM", keyGlobalAccountsPtr, accountID)
     end
 
-    if has_shard_key(keyShardPartitionPtr) then
-        redis.call("ZREM", keyShardPartitionPtr, partitionID) -- Remove the shard index
-    end
     return 2
 end
 
@@ -89,9 +84,5 @@ update_pointer_score_to(partitionID,keyAccountPartitionPtr,atS)
 -- to consistently set account pointer to earliest possible partition
 local earliestPartitionScoreInAccount = get_fn_partition_score(keyAccountPartitionPtr)
 update_pointer_score_to(accountId, keyGlobalAccountsPtr, earliestPartitionScoreInAccount)
-
-if has_shard_key(keyShardPartitionPtr) then
-    redis.call("ZADD", keyShardPartitionPtr, atS, partitionID) -- Update any index
-end
 
 return 0

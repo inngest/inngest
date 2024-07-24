@@ -19,8 +19,7 @@ local keyQueueHash          = KEYS[2]
 local keyGlobalIndex        = KEYS[3]           -- partition:sorted - zset
 local globalAccountIndexKey = KEYS[4] -- accounts:sorted - zset
 local keyAccountIndex       = KEYS[5]           -- accounts:$accountId:partition:sorted
-local keyShardIndex         = KEYS[6]           -- shard zset
-local keyPartitionHash      = KEYS[7]           -- partition hash
+local keyPartitionHash      = KEYS[6]           -- partition hash
 
 local jobID            = ARGV[1]           -- queue item ID
 local jobScore         = tonumber(ARGV[2]) -- enqueue at, in milliseconds
@@ -36,7 +35,6 @@ end
 -- $include(get_queue_item.lua)
 -- $include(update_pointer_score.lua)
 -- $include(get_partition_item.lua)
--- $include(has_shard_key.lua)
 
 local item = get_queue_item(keyQueueHash, jobID)
 if item == nil then
@@ -81,10 +79,6 @@ if currentScore == false or tonumber(currentScore) ~= partitionScore then
     -- to consistently set account pointer to earliest possible partition
     local earliestPartitionScoreInAccount = get_fn_partition_score(keyAccountIndex)
     update_pointer_score_to(accountId, globalAccountIndexKey, earliestPartitionScoreInAccount)
-
-    if has_shard_key(keyShardIndex) then
-        update_pointer_score_to(partitionID, keyShardIndex, partitionScore)
-    end
 end
 
 -- Update the partition pointer's actual AtS timestamp in the struct.

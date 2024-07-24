@@ -192,9 +192,9 @@ type QueueKeyGenerator interface {
 	// calculating the EWMA value for the function
 	ConcurrencyFnEWMA(fnID uuid.UUID) string
 
-	// Shards is a key to a hashmap of shards available.  The values of this
-	// key are JSON-encoded shards.
-	Shards() string
+	// GuaranteedCapacityMap is a key to a hashmap of guaranteed capacities available.  The values of this
+	// key are JSON-encoded GuaranteedCapacity items.
+	GuaranteedCapacityMap() string
 	// ShardPartitionIndex returns the sorted set for the shard's partition queue.
 	ShardPartitionIndex(shard string) string
 
@@ -216,7 +216,7 @@ type queueKeyGenerator struct {
 	queueItemKeyGenerator
 }
 
-func (u queueKeyGenerator) Shards() string {
+func (u queueKeyGenerator) GuaranteedCapacity() string {
 	return fmt.Sprintf("{%s}:queue:shards", u.queueDefaultKey)
 }
 

@@ -44,11 +44,11 @@ func GaugeGlobalQueuePartitionAvailable(ctx context.Context, opts GaugeOpt) {
 	})
 }
 
-func GaugeQueueShardCount(ctx context.Context, value int64, opts GaugeOpt) {
+func GaugeQueueGuaranteedCapacityCount(ctx context.Context, value int64, opts GaugeOpt) {
 	RegisterAsyncGauge(ctx, GaugeOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "queue_shards_count",
-		Description: "Number of shards in the queue",
+		MetricName:  "queue_guaranteed_capacity_count",
+		Description: "Number of accounts with guaranteed capacity in the queue",
 		Tags:        opts.Tags,
 		Callback: func(ctx context.Context) (int64, error) {
 			return value, nil
@@ -56,21 +56,21 @@ func GaugeQueueShardCount(ctx context.Context, value int64, opts GaugeOpt) {
 	})
 }
 
-func GaugeQueueShardGuaranteedCapacityCount(ctx context.Context, opts GaugeOpt) {
+func GaugeQueueAccountGuaranteedCapacityCount(ctx context.Context, opts GaugeOpt) {
 	RegisterAsyncGauge(ctx, GaugeOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "queue_shards_guaranteed_capacity_count",
-		Description: "Shard guaranteed capacity",
+		MetricName:  "queue_account_guaranteed_capacity_count",
+		Description: "Account guaranteed capacity",
 		Tags:        opts.Tags,
 		Callback:    opts.Callback,
 	})
 }
 
-func GaugeQueueShardLeaseCount(ctx context.Context, opts GaugeOpt) {
+func GaugeQueueGuaranteedCapacityLeaseCount(ctx context.Context, opts GaugeOpt) {
 	RegisterAsyncGauge(ctx, GaugeOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "queue_shards_lease_count",
-		Description: "Shard current lease count",
+		MetricName:  "queue_guaranteed_capacity_lease_count",
+		Description: "Guaranteed capacity current lease count",
 		Tags:        opts.Tags,
 		Callback:    opts.Callback,
 	})

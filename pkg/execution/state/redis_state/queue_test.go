@@ -2289,18 +2289,18 @@ func TestShardFinding(t *testing.T) {
 	ctx := context.Background()
 
 	shouldShard := true // indicate whether to shard in tests
-	shard := &QueueShard{
+	shard := &GuaranteedCapacity{
 		Name:               "sharded",
 		Priority:           0,
 		GuaranteedCapacity: 1,
 	}
-	sf := func(ctx context.Context, queueName string, wsID *uuid.UUID) *QueueShard {
+	sf := func(ctx context.Context, queueName string, wsID *uuid.UUID) *GuaranteedCapacity {
 		if !shouldShard {
 			return nil
 		}
 		return shard
 	}
-	q := NewQueue(NewQueueClient(rc, QueueDefaultKey), WithShardFinder(sf))
+	q := NewQueue(NewQueueClient(rc, QueueDefaultKey), WithGuaranteedCapacityFinder(sf))
 	require.NotNil(t, sf(ctx, "", &uuid.UUID{}))
 
 	t.Run("QueueItem which shards", func(t *testing.T) {
@@ -2319,12 +2319,12 @@ func TestShardFinding(t *testing.T) {
 			p := QueuePartition{FunctionID: &item.FunctionID, EnvID: &item.WorkspaceID}
 
 			t.Run("Enqueueing creates a shard in the shard map", func(t *testing.T) {
-				keys, err := r.HKeys(q.u.kg.Shards())
+				keys, err := r.HKeys(q.u.kg.GuaranteedCapacity())
 				require.NoError(t, err)
 				require.Equal(t, 1, len(keys))
 
-				shardJSON := r.HGet(q.u.kg.Shards(), shard.Name)
-				actual := &QueueShard{}
+				shardJSON := r.HGet(q.u.kg.GuaranteedCapacity(), shard.Name)
+				actual := &GuaranteedCapacity{}
 				err = json.Unmarshal([]byte(shardJSON), actual)
 				require.NoError(t, err)
 				require.EqualValues(t, *shard, *actual)
@@ -2341,12 +2341,12 @@ func TestShardFinding(t *testing.T) {
 				_, err := q.EnqueueItem(ctx, QueueItem{}, at.Add(time.Minute))
 				require.NoError(t, err)
 
-				keys, err := r.HKeys(q.u.kg.Shards())
+				keys, err := r.HKeys(q.u.kg.GuaranteedCapacity())
 				require.NoError(t, err)
 				require.Equal(t, 1, len(keys))
 
-				shardJSON := r.HGet(q.u.kg.Shards(), "sharded")
-				actual := &QueueShard{}
+				shardJSON := r.HGet(q.u.kg.GuaranteedCapacity(), "sharded")
+				actual := &GuaranteedCapacity{}
 				err = json.Unmarshal([]byte(shardJSON), actual)
 				require.NoError(t, err)
 				require.EqualValues(t, *shard, *actual)
@@ -2411,8 +2411,8 @@ func TestShardFinding(t *testing.T) {
 		})
 
 		t.Run("shards are updated when enqueueing, if already exists", func(t *testing.T) {
-			shardJSON := r.HGet(q.u.kg.Shards(), shard.Name)
-			first := &QueueShard{}
+			shardJSON := r.HGet(q.u.kg.GuaranteedCapacity(), shard.Name)
+			first := &GuaranteedCapacity{}
 			err = json.Unmarshal([]byte(shardJSON), first)
 			require.NoError(t, err)
 			require.EqualValues(t, *shard, *first)
@@ -2421,8 +2421,8 @@ func TestShardFinding(t *testing.T) {
 			shard.GuaranteedCapacity = shard.GuaranteedCapacity + 1
 			_, err = q.EnqueueItem(ctx, QueueItem{}, time.Now())
 
-			shardJSON = r.HGet(q.u.kg.Shards(), shard.Name)
-			updated := &QueueShard{}
+			shardJSON = r.HGet(q.u.kg.GuaranteedCapacity(), shard.Name)
+			updated := &GuaranteedCapacity{}
 			err = json.Unmarshal([]byte(shardJSON), updated)
 			require.NoError(t, err)
 			require.NotEqualValues(t, *first, *updated)
@@ -2497,7 +2497,7 @@ func TestShardFinding(t *testing.T) {
 			_, err := q.EnqueueItem(ctx, QueueItem{}, at)
 			require.NoError(t, err, "sharded enqueue should succeed")
 
-			keys, err := r.HKeys(q.u.kg.Shards())
+			keys, err := r.HKeys(q.u.kg.GuaranteedCapacity())
 			require.Equal(t, miniredis.ErrKeyNotFound, err)
 			require.Equal(t, 0, len(keys))
 		})
@@ -2514,18 +2514,18 @@ func TestShardLease(t *testing.T) {
 	defer rc.Close()
 	ctx := context.Background()
 
-	sf := func(ctx context.Context, queueName string, wsID *uuid.UUID) *QueueShard {
-		return &QueueShard{
+	sf := func(ctx context.Context, queueName string, wsID *uuid.UUID) *GuaranteedCapacity {
+		return &GuaranteedCapacity{
 			Name:               wsID.String(),
 			Priority:           0,
 			GuaranteedCapacity: 1,
 		}
 	}
-	q := NewQueue(NewQueueClient(rc, QueueDefaultKey), WithShardFinder(sf))
+	q := NewQueue(NewQueueClient(rc, QueueDefaultKey), WithGuaranteedCapacityFinder(sf))
 
 	t.Run("Leasing a non-existent shard fails", func(t *testing.T) {
 		shard := sf(ctx, "", &uuid.UUID{})
-		leaseID, err := q.leaseShard(ctx, shard, 2*time.Second, 1)
+		leaseID, err := q.leaseAccount(ctx, shard, 2*time.Second, 1)
 		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
 		require.NotNil(t, err)
 		require.ErrorContains(t, err, "shard not found")
@@ -2544,7 +2544,7 @@ func TestShardLease(t *testing.T) {
 		// At the beginning, no shards have been leased.  Leasing a shard
 		// with an index of >= 1 should fail.
 		shard := sf(ctx, "", &idA)
-		leaseID, err := q.leaseShard(ctx, shard, 2*time.Second, 1)
+		leaseID, err := q.leaseAccount(ctx, shard, 2*time.Second, 1)
 		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
 		require.NotNil(t, err)
 		require.ErrorContains(t, err, "lease index is too high")
@@ -2554,13 +2554,13 @@ func TestShardLease(t *testing.T) {
 		shard := sf(ctx, "", &idA)
 
 		t.Run("Basic lease", func(t *testing.T) {
-			leaseID, err := q.leaseShard(ctx, shard, 1*time.Second, 0)
+			leaseID, err := q.leaseAccount(ctx, shard, 1*time.Second, 0)
 			require.NotNil(t, leaseID, "Didn't get a lease ID for a basic lease")
 			require.Nil(t, err)
 		})
 
 		t.Run("Leasing a subsequent index works", func(t *testing.T) {
-			leaseID, err := q.leaseShard(ctx, shard, 8*time.Second, 1) // Same length as the lease below, after wait
+			leaseID, err := q.leaseAccount(ctx, shard, 8*time.Second, 1) // Same length as the lease below, after wait
 			require.NotNil(t, leaseID, "Didn't get a lease ID for a secondary lease")
 			require.Nil(t, err)
 		})
@@ -2570,7 +2570,7 @@ func TestShardLease(t *testing.T) {
 			// is no longer valid, so leasing with an index of (1) should succeed.
 			<-time.After(2 * time.Second) // Wait a few seconds so that time.Now() in the call works.
 			r.FastForward(2 * time.Second)
-			leaseID, err := q.leaseShard(ctx, shard, 10*time.Second, 1)
+			leaseID, err := q.leaseAccount(ctx, shard, 10*time.Second, 1)
 			require.NotNil(t, leaseID)
 			require.Nil(t, err)
 
@@ -2578,7 +2578,7 @@ func TestShardLease(t *testing.T) {
 		})
 
 		t.Run("Leasing an already leased index fails", func(t *testing.T) {
-			leaseID, err := q.leaseShard(ctx, shard, 2*time.Second, 1)
+			leaseID, err := q.leaseAccount(ctx, shard, 2*time.Second, 1)
 			require.Nil(t, leaseID, "got a lease ID for an existing lease")
 			require.NotNil(t, err)
 			require.ErrorContains(t, err, "index is already leased")
@@ -2586,7 +2586,7 @@ func TestShardLease(t *testing.T) {
 
 		t.Run("Leasing a second shard works", func(t *testing.T) {
 			// Try another shard name with an index of 0.
-			leaseID, err := q.leaseShard(ctx, sf(ctx, "", &idB), 2*time.Second, 0)
+			leaseID, err := q.leaseAccount(ctx, sf(ctx, "", &idB), 2*time.Second, 0)
 			require.NotNil(t, leaseID)
 			require.Nil(t, err)
 		})
@@ -2600,12 +2600,12 @@ func TestShardLease(t *testing.T) {
 		require.Nil(t, err)
 
 		shard := sf(ctx, "", &idA)
-		leaseID, err := q.leaseShard(ctx, shard, 1*time.Second, 0)
+		leaseID, err := q.leaseAccount(ctx, shard, 1*time.Second, 0)
 		require.NotNil(t, leaseID, "could not lease shard")
 		require.Nil(t, err)
 
 		t.Run("Current leases succeed", func(t *testing.T) {
-			leaseID, err = q.renewShardLease(ctx, shard, 2*time.Second, *leaseID)
+			leaseID, err = q.renewAccountLease(ctx, shard, 2*time.Second, *leaseID)
 			require.NotNil(t, leaseID, "did not get a new lease when renewing")
 			require.Nil(t, err)
 		})
@@ -2614,13 +2614,13 @@ func TestShardLease(t *testing.T) {
 			<-time.After(3 * time.Second)
 			r.FastForward(3 * time.Second)
 
-			leaseID, err := q.renewShardLease(ctx, shard, 2*time.Second, *leaseID)
+			leaseID, err := q.renewAccountLease(ctx, shard, 2*time.Second, *leaseID)
 			require.ErrorContains(t, err, "lease not found")
 			require.Nil(t, leaseID)
 		})
 
 		t.Run("Invalid lease IDs fail", func(t *testing.T) {
-			leaseID, err := q.renewShardLease(ctx, shard, 2*time.Second, ulid.MustNew(ulid.Now(), rand.Reader))
+			leaseID, err := q.renewAccountLease(ctx, shard, 2*time.Second, ulid.MustNew(ulid.Now(), rand.Reader))
 			require.ErrorContains(t, err, "lease not found")
 			require.Nil(t, leaseID)
 		})

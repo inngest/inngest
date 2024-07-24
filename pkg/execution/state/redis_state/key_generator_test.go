@@ -49,7 +49,7 @@ func TestVerifyKeyGenerator(t *testing.T) {
 	assert.Equal(t, legacyQueueKg.QueueItem(), newQueueKg.QueueItem())
 
 	assert.Equal(t, legacyQueueKg.QueueIndex("id"), newQueueKg.QueueIndex("id"))
-	assert.Equal(t, legacyQueueKg.Shards(), newQueueKg.Shards())
+	assert.Equal(t, legacyQueueKg.Shards(), newQueueKg.GuaranteedCapacity())
 	assert.Equal(t, legacyQueueKg.PartitionItem(), newQueueKg.PartitionItem())
 	assert.Equal(t, legacyQueueKg.PartitionMeta("id"), newQueueKg.PartitionMeta("id"))
 	assert.Equal(t, legacyQueueKg.GlobalPartitionIndex(), newQueueKg.GlobalPartitionIndex())

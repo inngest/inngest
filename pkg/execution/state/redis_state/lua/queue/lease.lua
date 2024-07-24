@@ -27,8 +27,7 @@ local concurrencyPointer     = KEYS[8]
 local globalPointerKey       = KEYS[9]
 local globalAccountKey       = KEYS[10]
 local accountPointerKey      = KEYS[11]
-local shardPointerKey        = KEYS[12]
-local throttleKey            = KEYS[13] -- key used for throttling function run starts.
+local throttleKey            = KEYS[12] -- key used for throttling function run starts.
 
 local queueID                = ARGV[1]
 local newLeaseKey            = ARGV[2]
@@ -49,7 +48,6 @@ local accountId              = ARGV[9]
 -- $include(get_queue_item.lua)
 -- $include(set_item_peek_time.lua)
 -- $include(update_pointer_score.lua)
--- $include(has_shard_key.lua)
 -- $include(gcra.lua)
 
 -- first, get the queue item.  we must do this and bail early if the queue item
@@ -129,11 +127,6 @@ local earliestPartitionScoreInAccount = get_fn_partition_score(accountPointerKey
 
 -- Also update global accounts
 update_pointer_score_to(accountId, globalAccountKey, earliestPartitionScoreInAccount)
-
--- And the same for any shards, as long as the shard name exists.
-if has_shard_key(shardPointerKey) then
-    update_pointer_score_to(partitionName, shardPointerKey, score)
-end
 
 -- NOTE: We check if concurrency > 0 here because this disables concurrency.  AccountID
 -- and custom concurrency items may not be set, but the keys need to be set for clustered

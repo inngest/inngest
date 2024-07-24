@@ -5,36 +5,35 @@ Enqueus an item within the queue.
 
 --]]
 
-local queueKey                = KEYS[1]           -- queue:item - hash: { $itemID: $item }
-local keyPartitionMap         = KEYS[2]           -- partition:item - hash: { $workflowID: $partition }
-local keyGlobalPointer        = KEYS[3]           -- partition:sorted - zset
-local keyGlobalAccountPointer = KEYS[4]           -- accounts:sorted - zset
-local keyAccountPointer       = KEYS[5]           -- accounts:$accountId:partition:sorted - zset
-local shardIndexKey           = KEYS[6]           -- shard:$name:sorted - zset
-local shardMapKey             = KEYS[7]           -- shards - hmap of shards
-local idempotencyKey          = KEYS[8]           -- seen:$key
-local keyFnMetadata           = KEYS[9]           -- fnMeta:$id - hash
-local keyPartitionA           = KEYS[10]           -- queue:sorted:$workflowID - zset
-local keyPartitionB           = KEYS[11]           -- e.g. sorted:c|t:$workflowID - zset
-local keyPartitionC           = KEYS[12]          -- e.g. sorted:c|t:$workflowID - zset
-local keyItemIndexA           = KEYS[13]          -- custom item index 1
-local keyItemIndexB           = KEYS[14]          -- custom item index 2
+local queueKey                  = KEYS[1]           -- queue:item - hash: { $itemID: $item }
+local keyPartitionMap           = KEYS[2]           -- partition:item - hash: { $workflowID: $partition }
+local keyGlobalPointer          = KEYS[3]           -- partition:sorted - zset
+local keyGlobalAccountPointer   = KEYS[4]           -- accounts:sorted - zset
+local keyAccountPointer         = KEYS[5]           -- accounts:$accountId:partition:sorted - zset
+local guaranteedCapacityMapKey  = KEYS[6]           -- shards - hmap of shards
+local idempotencyKey            = KEYS[7]           -- seen:$key
+local keyFnMetadata             = KEYS[8]           -- fnMeta:$id - hash
+local keyPartitionA             = KEYS[9]           -- queue:sorted:$workflowID - zset
+local keyPartitionB             = KEYS[10]           -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionC             = KEYS[11]          -- e.g. sorted:c|t:$workflowID - zset
+local keyItemIndexA             = KEYS[12]          -- custom item index 1
+local keyItemIndexB             = KEYS[13]          -- custom item index 2
 
-local queueItem           = ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
-local queueID             = ARGV[2]           -- id
-local queueScore          = tonumber(ARGV[3]) -- vesting time, in milliseconds
-local partitionTime       = tonumber(ARGV[4]) -- score for partition, lower bounded to now in seconds
-local shard               = ARGV[5]
-local shardName           = ARGV[6]
-local nowMS               = tonumber(ARGV[7]) -- now in ms
-local fnMetadata          = ARGV[8]          -- function meta: {paused}
-local partitionItemA      = ARGV[9]
-local partitionItemB      = ARGV[10]
-local partitionItemC      = ARGV[11]
-local partitionIdA        = ARGV[12]
-local partitionIdB        = ARGV[13]
-local partitionIdC        = ARGV[14]
-local accountId           = ARGV[15]
+local queueItem               = ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
+local queueID                 = ARGV[2]           -- id
+local queueScore              = tonumber(ARGV[3]) -- vesting time, in milliseconds
+local partitionTime           = tonumber(ARGV[4]) -- score for partition, lower bounded to now in seconds
+local guaranteedCapacity      = ARGV[5]
+local guaranteedCapacityName  = ARGV[6]
+local nowMS                   = tonumber(ARGV[7]) -- now in ms
+local fnMetadata              = ARGV[8]          -- function meta: {paused}
+local partitionItemA          = ARGV[9]
+local partitionItemB          = ARGV[10]
+local partitionItemC          = ARGV[11]
+local partitionIdA            = ARGV[12]
+local partitionIdB            = ARGV[13]
+local partitionIdC            = ARGV[14]
+local accountId               = ARGV[15]
 
 -- $include(get_partition_item.lua)
 -- $include(enqueue_to_partition.lua)
@@ -65,19 +64,19 @@ end
 -- (i.e. "paused") boolean in the function's metadata.
 redis.call("SET", keyFnMetadata, fnMetadata, "NX")
 
--- If this is a sharded item, upsert the shard.
-if shard ~= "" and shard ~= "null" then
-    -- NOTE: We do not want to overwrite the shard leases, so here
-    -- we fetch the shard item, set the lease values in the passed in shard
+-- If the account has guaranteed capacity, upsert the guaranteed capacity map.
+if guaranteedCapacity ~= "" and guaranteedCapacity ~= "null" then
+    -- NOTE: We do not want to overwrite the account leases, so here
+    -- we fetch the guaranteed capacity item, set the lease values in the passed in guaranteed capacity
     -- item, then write the updated value.
-    local existingShard = redis.call("HGET", shardMapKey, shardName)
-    if existingShard ~= nil and existingShard ~= false then
-        local updatedShard = cjson.decode(shard)
-        existingShard = cjson.decode(existingShard)
-        updatedShard.leases = existingShard.leases
-        shard = cjson.encode(updatedShard)
+    local existingGuaranteedCapacity = redis.call("HGET", guaranteedCapacityMapKey, guaranteedCapacityName)
+    if existingGuaranteedCapacity ~= nil and existingGuaranteedCapacity ~= false then
+        local updatedGuaranteedCapacity = cjson.decode(guaranteedCapacity)
+        existingGuaranteedCapacity = cjson.decode(existingGuaranteedCapacity)
+        updatedGuaranteedCapacity.leases = existingGuaranteedCapacity.leases
+        guaranteedCapacity = cjson.encode(updatedGuaranteedCapacity)
     end
-    redis.call("HSET", shardMapKey, shardName, shard)
+    redis.call("HSET", guaranteedCapacityMapKey, guaranteedCapacityName, guaranteedCapacity)
 end
 
 -- Add optional indexes.
