@@ -386,6 +386,12 @@ func WithBackoffFunc(f backoff.BackoffFunc) func(q *queue) {
 	}
 }
 
+func WithRunMode(m queueRunMode) func(q *queue) {
+	return func(q *queue) {
+		q.runMode = m
+	}
+}
+
 // QueueItemConcurrencyKeyGenerator returns concurrenc keys given a queue item to limits.
 //
 // Each queue item can have its own concurrency keys.  For example, you can define
@@ -401,6 +407,13 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 		u: u,
 		pf: func(_ context.Context, _ QueuePartition) uint {
 			return PriorityDefault
+		},
+		runMode: queueRunMode{
+			sequential:         true,
+			scavenger:          true,
+			partition:          true,
+			account:            true,
+			guaranteedCapacity: true,
 		},
 		numWorkers:         defaultNumWorkers,
 		wg:                 &sync.WaitGroup{},
@@ -538,6 +551,25 @@ type queue struct {
 
 	// backoffFunc is the backoff function to use when retrying operations.
 	backoffFunc backoff.BackoffFunc
+
+	runMode queueRunMode
+}
+
+type queueRunMode struct {
+	// sequential determines whether Run() instance acquires sequential lease and processes items sequentially if lease is granted
+	sequential bool
+
+	// scavenger determines whether scavenger lease is acquired and scavenger is processed if lease is granted
+	scavenger bool
+
+	// partition determines whether partitions are processed
+	partition bool
+
+	// account determines whether accounts are processed
+	account bool
+
+	// guaranteedAccount determines whether accounts with guaranteed capacity are fetched, and one lease is acquired per instance to process the account
+	guaranteedCapacity bool
 }
 
 // processItem references the queue partition and queue item to be processed by a worker.
@@ -2021,7 +2053,7 @@ func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Tim
 		weights[i] = float64(10 - accountPriority)
 	}
 
-	// Some scanners run sequentially, ensuring we always work on the functions with
+	// Some scanners run sequentially, ensuring we always work on the accounts with
 	// the oldest run at times in order, no matter the priority.
 	if sequential {
 		n := int(math.Min(float64(len(items)), float64(PartitionSelectionMax)))

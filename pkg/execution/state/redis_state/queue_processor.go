@@ -139,10 +139,22 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		go q.worker(ctx, f)
 	}
 
-	go q.claimShards(ctx)
-	go q.claimSequentialLease(ctx)
+	if q.runMode.guaranteedCapacity {
+		// TODO Refactor guaranteed capacity
+		go q.claimShards(ctx)
+	}
 
-	go q.runScavenger(ctx)
+	if q.runMode.sequential {
+		go q.claimSequentialLease(ctx)
+	}
+
+	if q.runMode.scavenger {
+		go q.runScavenger(ctx)
+	}
+
+	if !q.runMode.partition && !q.runMode.account {
+		return fmt.Errorf("need to specify either partition, account, or both in queue run mode")
+	}
 
 	tick := time.NewTicker(q.pollTick)
 
@@ -620,12 +632,34 @@ func (q *queue) scan(ctx context.Context) error {
 	peekSize := PartitionPeekMax
 	peekUntil := getNow().Add(PartitionLookahead)
 
+	// TODO Update with guaranteed capacity
+	// If this worker has leased shards, those take priority 95% of the time.  There's a 5% chance that the
+	// worker still works on the global queue.
+	existingLeases := q.getShardLeases()
+
+	if len(existingLeases) > 0 {
+		// Pick a random item between the shards.
+		i := rand.Intn(len(existingLeases))
+		shard = &existingLeases[i].Shard
+		// Use the shard partition
+		partitionKey = q.u.kg.ShardPartitionIndex(shard.Name)
+		metricShardName = "<shard>:" + shard.Name
+
+		// TODO When account is leased, process it
+		// partitionKey = q.u.kg.AccountPartitionIndex(account)
+		// return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, shard, metricShardName)
+	}
+
 	// Randomly scan account partition
 	// TODO Should we determine this for each scan iteration or determine a value at launch time?
 	// TODO We might be able to consolidate logic for handling guaranteed capacity and sequential/account/partition operation modes
-	scanAccounts := !q.isSequential() && rand.Intn(2) == 1
+	scanAccounts := false
+	if q.runMode.account && rand.Intn(2) == 1 {
+		scanAccounts = true
+	}
+
 	if scanAccounts {
-		peekedAccounts, err := q.accountPeek(ctx, false, peekUntil, AccountPeekMax)
+		peekedAccounts, err := q.accountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
 		if err != nil {
 			return fmt.Errorf("could not peek accounts: %w", err)
 		}
@@ -652,19 +686,6 @@ func (q *queue) scan(ctx context.Context) error {
 		}
 
 		return eg.Wait()
-	}
-
-	// If this worker has leased shards, those take priority 95% of the time.  There's a 5% chance that the
-	// worker still works on the global queue.
-	existingLeases := q.getShardLeases()
-
-	if len(existingLeases) > 0 {
-		// Pick a random item between the shards.
-		i := rand.Intn(len(existingLeases))
-		shard = &existingLeases[i].Shard
-		// Use the shard partition
-		partitionKey = q.u.kg.ShardPartitionIndex(shard.Name)
-		metricShardName = "<shard>:" + shard.Name
 	}
 
 	return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, shard, metricShardName)
