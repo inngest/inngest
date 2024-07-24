@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { NewButton } from '@inngest/components/Button';
-import { IDCell, Table, TimeCell } from '@inngest/components/Table';
+import { IDCell, Table, TextCell, TimeCell } from '@inngest/components/Table';
 import { RiDeleteBinLine } from '@remixicon/react';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 
@@ -13,6 +13,7 @@ type Cancellation = {
   createdAt: string;
   envID: string;
   id: string;
+  name: string | null;
   queuedAtMax: string;
   queuedAtMin: string | null;
 };
@@ -85,6 +86,12 @@ const columnHelper = createColumnHelper<Cancellation>();
 function useColumns({ setPendingDelete }: { setPendingDelete: (obj: PendingDelete) => void }) {
   return useMemo(() => {
     return [
+      columnHelper.accessor('name', {
+        header: 'Name',
+        cell: (props) => {
+          return <TextCell>{props.getValue()}</TextCell>;
+        },
+      }),
       columnHelper.accessor('createdAt', {
         header: 'Created at',
         cell: (props) => {
@@ -98,7 +105,7 @@ function useColumns({ setPendingDelete }: { setPendingDelete: (obj: PendingDelet
         },
       }),
       columnHelper.accessor('queuedAtMin', {
-        header: 'Minimum queued at',
+        header: 'Minimum queued at (filter)',
         cell: (props) => {
           const value = props.getValue();
           if (!value) {
@@ -109,7 +116,7 @@ function useColumns({ setPendingDelete }: { setPendingDelete: (obj: PendingDelet
         },
       }),
       columnHelper.accessor('queuedAtMax', {
-        header: 'Maximum queued at',
+        header: 'Maximum queued at (filter)',
         cell: (props) => {
           return <TimeCell date={props.getValue()} />;
         },

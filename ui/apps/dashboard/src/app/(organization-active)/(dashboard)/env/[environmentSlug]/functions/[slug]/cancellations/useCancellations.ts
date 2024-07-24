@@ -15,6 +15,7 @@ const query = graphql(`
               createdAt
               envID: environmentID
               id
+              name
               queuedAtMax
               queuedAtMin
             }
