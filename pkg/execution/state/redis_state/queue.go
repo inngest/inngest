@@ -536,24 +536,8 @@ type queue struct {
 	shardLeases    []leasedShard
 	shardLeaseLock *sync.Mutex
 
-	runMode queueRunMode
-
 	// backoffFunc is the backoff function to use when retrying operations.
 	backoffFunc backoff.BackoffFunc
-}
-
-type queueRunMode struct {
-	// sequential determines whether Run() instance acquires sequential lease and processes items sequentially if lease is granted
-	sequential bool
-
-	// scavenger determines whether scavenger lease is acquired and scavenger is processed if lease is granted
-	scavenger bool
-
-	// partitionRatio sets the integer ratio (between 1-100) of partitions to process
-	partitionRatio int
-
-	// accountRatio sets the integer ratio (between 1-100) of accounts to process
-	accountRatio int
 }
 
 // processItem references the queue partition and queue item to be processed by a worker.
@@ -1047,8 +1031,8 @@ func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bo
 		return err
 	}
 
-	status, err := scripts["queue/fnSetPaused"].Exec(
-		redis_telemetry.WithScriptName(ctx, "fnSetPaused"),
+	status, err := scripts["queue/partitionSetPaused"].Exec(
+		redis_telemetry.WithScriptName(ctx, "partitionSetPaused"),
 		q.u.unshardedRc,
 		keys,
 		args,

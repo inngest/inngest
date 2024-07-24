@@ -138,7 +138,8 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	for i := int32(0); i < q.numWorkers; i++ {
 		go q.worker(ctx, f)
 	}
-	
+
+	go q.claimShards(ctx)
 	go q.claimSequentialLease(ctx)
 
 	go q.runScavenger(ctx)
@@ -209,7 +210,7 @@ func (q *queue) claimShards(ctx context.Context) {
 	var leasing int32
 
 	for {
-		if q.hasSequentialLease() {
+		if q.isSequential() {
 			// Sequential workers never lease shards.  They always run in order
 			// on the global partition queue.
 			<-scanTick.C
@@ -560,7 +561,7 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, shard *QueueShard, metricShardName string) error {
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
 	partitions, err := duration(ctx, "partition_peek", func(ctx context.Context) ([]*QueuePartition, error) {
-		return q.partitionPeek(ctx, partitionKey, q.hasSequentialLease(), peekUntil, peekLimit)
+		return q.partitionPeek(ctx, partitionKey, q.isSequential(), peekUntil, peekLimit)
 	})
 	if err != nil {
 		return err
@@ -622,7 +623,7 @@ func (q *queue) scan(ctx context.Context) error {
 	// Randomly scan account partition
 	// TODO Should we determine this for each scan iteration or determine a value at launch time?
 	// TODO We might be able to consolidate logic for handling guaranteed capacity and sequential/account/partition operation modes
-	scanAccounts := !q.hasSequentialLease() && rand.Intn(2) == 1
+	scanAccounts := !q.isSequential() && rand.Intn(2) == 1
 	if scanAccounts {
 		peekedAccounts, err := q.accountPeek(ctx, false, peekUntil, AccountPeekMax)
 		if err != nil {
@@ -1290,7 +1291,7 @@ func (q *queue) peekSize(ctx context.Context, p *QueuePartition) int64 {
 	return size
 }
 
-func (q *queue) hasSequentialLease() bool {
+func (q *queue) isSequential() bool {
 	l := q.sequentialLease()
 	if l == nil {
 		return false
