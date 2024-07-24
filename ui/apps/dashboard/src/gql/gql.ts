@@ -16,10 +16,6 @@ const documents = {
     "\n  mutation SetUpAccount {\n    setUpAccount {\n      account {\n        id\n      }\n    }\n  }\n": types.SetUpAccountDocument,
     "\n  mutation CreateUser {\n    createUser {\n      user {\n        id\n      }\n    }\n  }\n": types.CreateUserDocument,
     "\n  mutation CreateEnvironment($name: String!) {\n    createWorkspace(input: { name: $name }) {\n      id\n    }\n  }\n": types.CreateEnvironmentDocument,
-    "\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.ArchiveEnvironmentDocument,
-    "\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.UnarchiveEnvironmentDocument,
-    "\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.DisableEnvironmentAutoArchiveDocumentDocument,
-    "\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.EnableEnvironmentAutoArchiveDocument,
     "\n  mutation AchiveApp($appID: UUID!) {\n    archiveApp(id: $appID) {\n      id\n    }\n  }\n": types.AchiveAppDocument,
     "\n  mutation UnachiveApp($appID: UUID!) {\n    unarchiveApp(id: $appID) {\n      id\n    }\n  }\n": types.UnachiveAppDocument,
     "\n  mutation ResyncApp($appExternalID: String!, $appURL: String, $envID: UUID!) {\n    resyncApp(appExternalID: $appExternalID, appURL: $appURL, envID: $envID) {\n      app {\n        id\n      }\n      error {\n        code\n        data\n        message\n      }\n    }\n  }\n": types.ResyncAppDocument,
@@ -70,6 +66,7 @@ const documents = {
     "\n  query GetReplays($environmentID: ID!, $functionSlug: String!) {\n    environment: workspace(id: $environmentID) {\n      id\n      function: workflowBySlug(slug: $functionSlug) {\n        id\n        replays {\n          id\n          name\n          createdAt\n          endedAt\n          functionRunsScheduledCount\n        }\n      }\n    }\n  }\n": types.GetReplaysDocument,
     "\n  query GetFunctionPauseState($environmentID: ID!, $functionSlug: String!) {\n    environment: workspace(id: $environmentID) {\n      function: workflowBySlug(slug: $functionSlug) {\n        id\n        isPaused\n      }\n    }\n  }\n": types.GetFunctionPauseStateDocument,
     "\n  query GetRuns(\n    $environmentID: ID!\n    $startTime: Time!\n    $endTime: Time\n    $status: [FunctionRunStatus!]\n    $timeField: RunsOrderByField!\n    $functionSlug: String!\n    $functionRunCursor: String = null\n  ) {\n    environment: workspace(id: $environmentID) {\n      runs(\n        filter: {\n          from: $startTime\n          until: $endTime\n          status: $status\n          timeField: $timeField\n          fnSlug: $functionSlug\n        }\n        orderBy: [{ field: $timeField, direction: DESC }]\n        after: $functionRunCursor\n      ) {\n        edges {\n          node {\n            app {\n              externalID\n              name\n            }\n            function {\n              name\n              slug\n            }\n            id\n            queuedAt\n            endedAt\n            startedAt\n            status\n          }\n        }\n        pageInfo {\n          hasNextPage\n          hasPreviousPage\n          startCursor\n          endCursor\n        }\n      }\n    }\n  }\n": types.GetRunsDocument,
+    "\n  query CountRuns(\n    $environmentID: ID!\n    $startTime: Time!\n    $endTime: Time\n    $status: [FunctionRunStatus!]\n    $timeField: RunsOrderByField!\n    $functionSlug: String!\n  ) {\n    environment: workspace(id: $environmentID) {\n      runs(\n        filter: {\n          from: $startTime\n          until: $endTime\n          status: $status\n          timeField: $timeField\n          fnSlug: $functionSlug\n        }\n        orderBy: [{ field: $timeField, direction: DESC }]\n      ) {\n        totalCount\n      }\n    }\n  }\n": types.CountRunsDocument,
     "\n  query GetPlanFeatures {\n    account {\n      plan {\n        features\n      }\n    }\n  }\n": types.GetPlanFeaturesDocument,
     "\n  mutation NewIngestKey($input: NewIngestKey!) {\n    key: createIngestKey(input: $input) {\n      id\n    }\n  }\n": types.NewIngestKeyDocument,
     "\n  query GetIngestKeys($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKeys {\n        id\n        name\n        createdAt\n        source\n      }\n    }\n  }\n": types.GetIngestKeysDocument,
@@ -97,6 +94,10 @@ const documents = {
     "\n  mutation CompleteAWSMarketplaceSetup($input: AWSMarketplaceSetupInput!) {\n    completeAWSMarketplaceSetup(input: $input) {\n      message\n    }\n  }\n": types.CompleteAwsMarketplaceSetupDocument,
     "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n": types.GetAccountSupportInfoDocument,
     "\n  query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {\n    environment: workspace(id: $envID) {\n      app: appByExternalID(externalID: $externalAppID) {\n        isArchived\n      }\n    }\n  }\n": types.GetArchivedAppBannerDataDocument,
+    "\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.ArchiveEnvironmentDocument,
+    "\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.UnarchiveEnvironmentDocument,
+    "\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.DisableEnvironmentAutoArchiveDocumentDocument,
+    "\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.EnableEnvironmentAutoArchiveDocument,
     "\n  query GetGlobalSearch($opts: SearchInput!) {\n    account {\n      search(opts: $opts) {\n        results {\n          env {\n            name\n            id\n            type\n            slug\n          }\n          kind\n          value {\n            ... on ArchivedEvent {\n              id\n              name\n            }\n            ... on FunctionRun {\n              id\n              functionID: workflowID\n            }\n          }\n        }\n      }\n    }\n  }\n": types.GetGlobalSearchDocument,
     "\n  query GetFunctionSlug($environmentID: ID!, $functionID: ID!) {\n    environment: workspace(id: $environmentID) {\n      function: workflow(id: $functionID) {\n        slug\n        name\n      }\n    }\n  }\n": types.GetFunctionSlugDocument,
     "\n  fragment TraceDetails on RunTraceSpan {\n    name\n    status\n    attempts\n    queuedAt\n    startedAt\n    endedAt\n    isRoot\n    outputID\n    spanID\n    stepOp\n    stepInfo {\n      __typename\n      ... on InvokeStepInfo {\n        triggeringEventID\n        functionID\n        timeout\n        returnEventID\n        runID\n        timedOut\n      }\n      ... on SleepStepInfo {\n        sleepUntil\n      }\n      ... on WaitForEventStepInfo {\n        eventName\n        expression\n        timeout\n        foundEventID\n        timedOut\n      }\n    }\n  }\n": types.TraceDetailsFragmentDoc,
@@ -143,22 +144,6 @@ export function graphql(source: "\n  mutation CreateUser {\n    createUser {\n  
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation CreateEnvironment($name: String!) {\n    createWorkspace(input: { name: $name }) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation CreateEnvironment($name: String!) {\n    createWorkspace(input: { name: $name }) {\n      id\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -362,6 +347,10 @@ export function graphql(source: "\n  query GetRuns(\n    $environmentID: ID!\n  
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
+export function graphql(source: "\n  query CountRuns(\n    $environmentID: ID!\n    $startTime: Time!\n    $endTime: Time\n    $status: [FunctionRunStatus!]\n    $timeField: RunsOrderByField!\n    $functionSlug: String!\n  ) {\n    environment: workspace(id: $environmentID) {\n      runs(\n        filter: {\n          from: $startTime\n          until: $endTime\n          status: $status\n          timeField: $timeField\n          fnSlug: $functionSlug\n        }\n        orderBy: [{ field: $timeField, direction: DESC }]\n      ) {\n        totalCount\n      }\n    }\n  }\n"): (typeof documents)["\n  query CountRuns(\n    $environmentID: ID!\n    $startTime: Time!\n    $endTime: Time\n    $status: [FunctionRunStatus!]\n    $timeField: RunsOrderByField!\n    $functionSlug: String!\n  ) {\n    environment: workspace(id: $environmentID) {\n      runs(\n        filter: {\n          from: $startTime\n          until: $endTime\n          status: $status\n          timeField: $timeField\n          fnSlug: $functionSlug\n        }\n        orderBy: [{ field: $timeField, direction: DESC }]\n      ) {\n        totalCount\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
 export function graphql(source: "\n  query GetPlanFeatures {\n    account {\n      plan {\n        features\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetPlanFeatures {\n    account {\n      plan {\n        features\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
@@ -467,6 +456,22 @@ export function graphql(source: "\n  query GetAccountSupportInfo {\n    account 
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {\n    environment: workspace(id: $envID) {\n      app: appByExternalID(externalID: $externalAppID) {\n        isArchived\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {\n    environment: workspace(id: $envID) {\n      app: appByExternalID(externalID: $externalAppID) {\n        isArchived\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
