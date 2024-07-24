@@ -1,5 +1,3 @@
-'use client';
-
 import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
 import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
