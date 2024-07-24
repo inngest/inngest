@@ -1,14 +1,8 @@
-import getAllEnvironments from '@/queries/server-only/getAllEnvironments';
-import { getActiveEnvironment, type Environment } from '@/utils/environments';
+import { getEnvironment } from '@/queries/server-only/getEnvironment';
+import { type Environment } from '@/utils/environments';
 
-export const getEnvs = async (slug: string): Promise<{ env: Environment; envs: Environment[] }> => {
-  const envs = await getAllEnvironments();
+export const getEnv = async (slug: string): Promise<Environment> => {
+  const env = await getEnvironment({ environmentSlug: slug });
 
-  const env = getActiveEnvironment(envs, slug);
-
-  if (!env) {
-    throw new Error(`Environments not found for slug ${slug}`);
-  }
-
-  return { envs, env };
+  return env;
 };

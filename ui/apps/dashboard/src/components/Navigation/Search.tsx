@@ -25,6 +25,7 @@ const GetGlobalSearchDocument = graphql(`
             name
             id
             type
+            slug
           }
           kind
           value {
@@ -142,6 +143,7 @@ function SearchModal({ isOpen, onOpenChange }: SearchModalProps) {
    */
   const environmentSlug = getEnvironmentSlug({
     environmentID: globalResults?.env.id ?? '',
+    environmentSlug: globalResults?.env.slug || null,
     environmentName: globalResults?.env.name ?? '',
     environmentType: globalResults?.env.type ?? '',
   });

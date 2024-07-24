@@ -5,6 +5,7 @@ import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigation';
 import { Listbox, Transition } from '@headlessui/react';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import {
   RiCloudFill,
   RiCloudLine,
@@ -13,15 +14,17 @@ import {
   RiSettings3Line,
 } from '@remixicon/react';
 
+import { useEnvironments } from '@/queries';
 import cn from '@/utils/cn';
 import {
   EnvironmentType,
+  getDefaultEnvironment,
   getLegacyTestMode,
-  getProductionEnvironment,
   getSortedBranchEnvironments,
   getTestEnvironments,
   type Environment,
 } from '@/utils/environments';
+import isNonEmptyArray from '@/utils/isNonEmptyArray';
 
 // Some URLs cannot just swap between environments,
 // we need to redirect to a less specific resource URL that is shared across environments
@@ -59,12 +62,6 @@ const useSwitchablePathname = (): string => {
   return '/' + segmentsWithoutRouteGroups.join('/');
 };
 
-type EnvironmentSelectMenuProps = {
-  activeEnv?: Environment;
-  envs: Environment[];
-  collapsed: boolean;
-};
-
 const selectedName = (name: string, collapsed: boolean) => {
   switch (name) {
     case 'Production':
@@ -76,12 +73,25 @@ const selectedName = (name: string, collapsed: boolean) => {
   }
 };
 
-export default function Environments({ envs, activeEnv, collapsed }: EnvironmentSelectMenuProps) {
+type EnvironmentSelectMenuProps = {
+  activeEnv?: Environment;
+  collapsed: boolean;
+};
+
+export default function EnvironmentSelectMenu({
+  activeEnv,
+  collapsed,
+}: EnvironmentSelectMenuProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<Environment | null>(null);
   const nextPathname = useSwitchablePathname();
+  const [{ fetching, data: envs = [] }] = useEnvironments();
 
-  const productionEnvironment = getProductionEnvironment(envs);
+  if (fetching || !isNonEmptyArray(envs)) {
+    return <Skeleton className={`h-8 ${collapsed ? 'w-8 px-1' : 'w-[146px] px-2'}`} />;
+  }
+
+  const defaultEnvironment = getDefaultEnvironment(envs);
   const legacyTestMode = getLegacyTestMode(envs);
   const mostRecentlyCreatedBranchEnvironments = getSortedBranchEnvironments(envs).slice(0, 5);
   const testEnvironments = getTestEnvironments(envs);
@@ -104,7 +114,7 @@ export default function Environments({ envs, activeEnv, collapsed }: Environment
         <div className="bg-canvasBase relative flex">
           <Listbox.Button
             className={`active:border-primary-intense focus:border-primary-intense border-muted bg-canvasBase text-primary-intense hover:bg-canvasSubtle ${
-              collapsed ? ` w-8 px-1` : 'w-[146px] px-2'
+              collapsed ? `w-8 px-1` : 'w-[146px] px-2'
             } m-0 h-8 overflow-hidden rounded border text-sm`}
           >
             <div
@@ -149,10 +159,8 @@ export default function Environments({ envs, activeEnv, collapsed }: Environment
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <Listbox.Options className="bg-canvasBase border-subtle z-10000 absolute mt-1 w-[188px] divide-none rounded border shadow focus:outline-none">
-              {productionEnvironment !== null && (
-                <EnvironmentItem environment={productionEnvironment} />
-              )}
+            <Listbox.Options className="bg-canvasBase border-subtle absolute top-10 z-[1000] w-[188px] divide-none rounded border shadow focus:outline-none">
+              {defaultEnvironment !== null && <EnvironmentItem environment={defaultEnvironment} />}
 
               {legacyTestMode !== null && (
                 <div>

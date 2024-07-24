@@ -1,12 +1,8 @@
 import { Fragment, useMemo, useState } from 'react';
 import { Skeleton } from '@inngest/components/Skeleton';
-import { IDCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
-import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { cn } from '@inngest/components/utils/classNames';
-import { formatMilliseconds } from '@inngest/components/utils/date';
 import { RiSortAsc, RiSortDesc } from '@remixicon/react';
 import {
-  createColumnHelper,
   flexRender,
   getCoreRowModel,
   getExpandedRowModel,
@@ -17,14 +13,8 @@ import {
   type VisibilityState,
 } from '@tanstack/react-table';
 
-export type Run = {
-  status: FunctionRunStatus;
-  durationMS: number | null;
-  id: string;
-  queuedAt: string;
-  endedAt: string | null;
-  startedAt: string | null;
-};
+import { useScopedColumns } from './columns';
+import type { Run, ViewScope } from './types';
 
 type RunsTableProps = {
   data: Run[] | undefined;
@@ -34,6 +24,7 @@ type RunsTableProps = {
   renderSubComponent: (props: { id: string }) => React.ReactElement;
   getRowCanExpand: (row: Row<Run>) => boolean;
   columnVisibility?: VisibilityState;
+  scope: ViewScope;
 };
 
 export default function RunsTable({
@@ -44,7 +35,10 @@ export default function RunsTable({
   getRowCanExpand,
   renderSubComponent,
   columnVisibility,
+  scope,
 }: RunsTableProps) {
+  const columns = useScopedColumns(scope);
+
   // Manually track expanded rows because getIsExpanded seems to be index-based,
   // which means polling can shift the expanded row. We may be able to switch
   // back to getIsExpanded when we replace polling with websockets
@@ -102,7 +96,7 @@ export default function RunsTable({
   const isEmpty = data.length < 1 && !isLoading;
 
   return (
-    <table className={cn(isEmpty && 'h-full', tableStyles)}>
+    <table className={cn(isEmpty && 'h-[calc(100%-58px)]', tableStyles)}>
       <thead className={tableHeadStyles}>
         {table.getHeaderGroups().map((headerGroup) => (
           <tr key={headerGroup.id} className="h-12">
@@ -177,104 +171,24 @@ export default function RunsTable({
             </Fragment>
           ))}
       </tbody>
-      <tfoot>
-        {table.getFooterGroups().map((footerGroup) => (
-          <tr key={footerGroup.id}>
-            {footerGroup.headers.map((header) => (
-              <th key={header.id}>
-                {header.isPlaceholder
-                  ? null
-                  : flexRender(header.column.columnDef.footer, header.getContext())}
-              </th>
-            ))}
-          </tr>
-        ))}
-      </tfoot>
+      {!isEmpty && (
+        <tfoot>
+          {table.getFooterGroups().map((footerGroup) => (
+            <tr key={footerGroup.id}>
+              {footerGroup.headers.map((header) => (
+                <th key={header.id}>
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.footer, header.getContext())}
+                </th>
+              ))}
+            </tr>
+          ))}
+        </tfoot>
+      )}
     </table>
   );
 }
-
-const columnHelper = createColumnHelper<Run>();
-export const columns = [
-  columnHelper.accessor<'status', FunctionRunStatus>('status', {
-    cell: (info) => {
-      const status = info.getValue();
-
-      return (
-        <div className="flex items-center">
-          <StatusCell status={status} />
-        </div>
-      );
-    },
-    header: 'Status',
-    enableSorting: false,
-  }),
-  columnHelper.accessor('id', {
-    cell: (info) => {
-      const id = info.getValue();
-
-      return (
-        <div className="flex items-center">
-          <IDCell>{id}</IDCell>
-        </div>
-      );
-    },
-    header: 'Run ID',
-    enableSorting: false,
-  }),
-  columnHelper.accessor('queuedAt', {
-    cell: (info) => {
-      const time = info.getValue();
-
-      return (
-        <div className="flex items-center">
-          <TimeCell date={new Date(time)} />
-        </div>
-      );
-    },
-    header: 'Queued at',
-    enableSorting: false,
-  }),
-  columnHelper.accessor('startedAt', {
-    cell: (info) => {
-      const time = info.getValue();
-
-      return (
-        <div className="flex items-center">
-          {time ? <TimeCell date={new Date(time)} /> : <TextCell>-</TextCell>}
-        </div>
-      );
-    },
-    header: 'Started at',
-    enableSorting: false,
-  }),
-  columnHelper.accessor('endedAt', {
-    cell: (info) => {
-      const time = info.getValue();
-
-      return (
-        <div className="flex items-center">
-          {time ? <TimeCell date={new Date(time)} /> : <TextCell>-</TextCell>}
-        </div>
-      );
-    },
-    header: 'Ended at',
-    enableSorting: false,
-  }),
-  columnHelper.accessor('durationMS', {
-    cell: (info) => {
-      const duration = info.getValue();
-
-      return (
-        <div className="flex items-center">
-          <TextCell>{duration ? formatMilliseconds(duration) : '-'}</TextCell>
-        </div>
-      );
-    },
-    header: 'Duration',
-    enableSorting: false,
-  }),
-];
 
 const loadingRow = {
   isLoadingRow: true,

@@ -122,7 +122,7 @@ const MAX_LINES = 10;
 const FONT = {
   size: 13,
   type: 'monospace',
-  font: 'RobotoMono',
+  font: 'CircularXXMono',
 };
 
 type MonacoEditorType = editor.IStandaloneCodeEditor | null;

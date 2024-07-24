@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
+import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   useSearchParam,
   useValidatedArraySearchParam,
@@ -12,7 +13,7 @@ import {
   isFunctionRunStatus,
   isFunctionTimeField,
 } from '@inngest/components/types/functionRun';
-import { getTimestampDaysAgo, toMaybeDate } from '@inngest/components/utils/date';
+import { toMaybeDate } from '@inngest/components/utils/date';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import { useCancelRun } from '@/hooks/useCancelRun';
@@ -32,19 +33,17 @@ export default function Page() {
     'timeField',
     isFunctionTimeField
   );
-  const [lastDays = '3'] = useSearchParam('last');
-  const startTime = useMemo(() => {
-    return getTimestampDaysAgo({
-      currentDate: new Date(),
-      days: parseInt(lastDays),
-    });
-  }, []);
+  const [lastDays] = useSearchParam('last');
+  const [startTime] = useSearchParam('start');
+  const [endTime] = useSearchParam('end');
+  const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
 
   const queryFn = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
       const data: GetRunsQuery = await client.request(GetRunsDocument, {
         functionRunCursor: pageParam,
-        startTime,
+        startTime: calculatedStartTime,
+        endTime: endTime,
         status: filteredStatus,
         timeField,
       });
@@ -68,7 +67,7 @@ export default function Page() {
         edges,
       };
     },
-    [filteredStatus, startTime, timeField]
+    [filteredStatus, calculatedStartTime, timeField]
   );
 
   const { data, fetchNextPage, isFetching } = useInfiniteQuery({
@@ -150,6 +149,7 @@ export default function Page() {
       apps={[]}
       functions={[]}
       pollInterval={pollInterval}
+      scope="env"
     />
   );
 }

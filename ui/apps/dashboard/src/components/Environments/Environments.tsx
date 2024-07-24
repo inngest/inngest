@@ -1,3 +1,5 @@
+'use client';
+
 import { type Route } from 'next';
 import Link from 'next/link';
 import { Button } from '@inngest/components/Button';
@@ -5,11 +7,16 @@ import { Link as InngestLink } from '@inngest/components/Link';
 import { RiErrorWarningLine } from '@remixicon/react';
 
 import Toaster from '@/components/Toaster';
-import { EnvironmentType, LEGACY_TEST_MODE_NAME, type Environment } from '@/utils/environments';
+import LoadingIcon from '@/icons/LoadingIcon';
+import { useEnvironments } from '@/queries';
+import { EnvironmentType, LEGACY_TEST_MODE_NAME } from '@/utils/environments';
+import AppNavigation from '../Navigation/old/AppNavigation';
 import { EnvironmentArchiveButton } from './old/EnvironmentArchiveButton';
 import EnvironmentListTable from './old/EnvironmentListTable';
 
-export default async function Environments({ envs }: { envs: Environment[] }) {
+export default function Environments() {
+  const [{ data: envs = [], fetching }] = useEnvironments();
+
   // Break the environments into different groups
   const legacyTestMode = envs.find(
     (env) => env.type === EnvironmentType.Test && env.name === LEGACY_TEST_MODE_NAME
@@ -19,6 +26,14 @@ export default async function Environments({ envs }: { envs: Environment[] }) {
   const otherTestEnvs = envs.filter(
     (env) => env.type === EnvironmentType.Test && env.name !== LEGACY_TEST_MODE_NAME
   );
+
+  if (fetching) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <LoadingIcon />
+      </div>
+    );
+  }
 
   return (
     <>

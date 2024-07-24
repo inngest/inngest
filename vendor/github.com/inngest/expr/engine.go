@@ -13,7 +13,7 @@ const (
 
 	EngineTypeStringHash
 	EngineTypeNullMatch
-	EngineTypeBTree // TODO
+	EngineTypeBTree
 	// EngineTypeART
 )
 

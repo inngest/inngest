@@ -5,6 +5,7 @@ type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   error?: string | undefined;
   inngestSize?: 'base' | 'lg';
   className?: string;
+  optional?: boolean;
 };
 
 const sizeStyles = {
@@ -18,7 +19,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       <div className="flex flex-col gap-1">
         {props.label && (
           <label htmlFor={props.name} className="text-basis text-sm font-medium">
-            {props.label}
+            {props.label}{' '}
+            {props.optional && <span className="text-muted font-normal">(optional)</span>}
           </label>
         )}
         <input

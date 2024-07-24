@@ -13,12 +13,11 @@ import SideBar from './SideBar';
 
 type LayoutProps = {
   envSlug?: string;
-  envs?: Environment[];
   activeEnv?: Environment;
   children: ReactNode;
 };
 
-export default async function Layout({ envs, activeEnv, children }: LayoutProps) {
+export default async function Layout({ activeEnv, children }: LayoutProps) {
   const cookieStore = cookies();
   const collapsed = cookieStore.get('navCollapsed')?.value === 'true';
 
@@ -26,7 +25,7 @@ export default async function Layout({ envs, activeEnv, children }: LayoutProps)
     <div className="flex w-full flex-row justify-start">
       <SideBar collapsed={collapsed}>
         <div className="flex grow flex-col justify-between">
-          <Navigation collapsed={collapsed} envs={envs} activeEnv={activeEnv} />
+          <Navigation collapsed={collapsed} activeEnv={activeEnv} />
 
           <div className="">
             <Integrations collapsed={collapsed} />
@@ -35,6 +34,7 @@ export default async function Layout({ envs, activeEnv, children }: LayoutProps)
           </div>
         </div>
       </SideBar>
+
       <div className="flex w-full flex-col">
         <IncidentBanner />
         {children}

@@ -9,6 +9,8 @@ import (
 
 	"github.com/google/cel-go/common/operators"
 	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 )
 
 var (
@@ -70,11 +72,17 @@ func NewAggregateEvaluator(
 	parser TreeParser,
 	eval ExpressionEvaluator,
 	evalLoader EvaluableLoader,
+	concurrency int64,
 ) AggregateEvaluator {
+	if concurrency <= 0 {
+		concurrency = 1
+	}
+
 	return &aggregator{
 		eval:   eval,
 		parser: parser,
 		loader: evalLoader,
+		sem:    semaphore.NewWeighted(concurrency),
 		engines: map[EngineType]MatchingEngine{
 			EngineTypeStringHash: newStringEqualityMatcher(),
 			EngineTypeNullMatch:  newNullMatcher(),
@@ -91,6 +99,8 @@ type aggregator struct {
 
 	// engines records all engines
 	engines map[EngineType]MatchingEngine
+
+	sem *semaphore.Weighted
 
 	// lock prevents concurrent updates of data
 	lock *sync.RWMutex
@@ -123,6 +133,7 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 		err     error
 		matched = int32(0)
 		result  = []Evaluable{}
+		s       sync.Mutex
 	)
 
 	// TODO: Concurrently match constant expressions using a semaphore for capacity.
@@ -131,25 +142,49 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 	if err != nil {
 		return nil, 0, err
 	}
-	for _, expr := range constantEvals {
-		atomic.AddInt32(&matched, 1)
 
-		if expr.GetExpression() == "" {
-			result = append(result, expr)
-			continue
+	eg := errgroup.Group{}
+	for _, item := range constantEvals {
+		if err := a.sem.Acquire(ctx, 1); err != nil {
+			return result, matched, err
 		}
 
-		// NOTE: We don't need to add lifted expression variables,
-		// because match.Parsed.Evaluable() returns the original expression
-		// string.
-		ok, evalerr := a.eval(ctx, expr, data)
-		if evalerr != nil {
-			err = errors.Join(err, evalerr)
-			continue
-		}
-		if ok {
-			result = append(result, expr)
-		}
+		expr := item
+		eg.Go(func() error {
+			defer a.sem.Release(1)
+			defer func() {
+				if r := recover(); r != nil {
+					err = errors.Join(err, fmt.Errorf("recovered from panic in evaluate: %v", r))
+				}
+			}()
+
+			atomic.AddInt32(&matched, 1)
+
+			if expr.GetExpression() == "" {
+				s.Lock()
+				result = append(result, expr)
+				s.Unlock()
+				return nil
+			}
+
+			// NOTE: We don't need to add lifted expression variables,
+			// because match.Parsed.Evaluable() returns the original expression
+			// string.
+			ok, evalerr := a.eval(ctx, expr, data)
+			if evalerr != nil {
+				return evalerr
+			}
+			if ok {
+				s.Lock()
+				result = append(result, expr)
+				s.Unlock()
+			}
+			return nil
+		})
+	}
+
+	if werr := eg.Wait(); werr != nil {
+		err = errors.Join(err, werr)
 	}
 
 	matches, merr := a.AggregateMatch(ctx, data)
@@ -173,26 +208,46 @@ func (a *aggregator) Evaluate(ctx context.Context, data map[string]any) ([]Evalu
 	// ID's length.
 	seen := map[uuid.UUID]struct{}{}
 
+	eg = errgroup.Group{}
 	for _, match := range evaluables {
-		if _, ok := seen[match.GetID()]; ok {
-			continue
+		if err := a.sem.Acquire(ctx, 1); err != nil {
+			return result, matched, err
 		}
 
-		atomic.AddInt32(&matched, 1)
-		// NOTE: We don't need to add lifted expression variables,
-		// because match.Parsed.Evaluable() returns the original expression
-		// string.
-		ok, evalerr := a.eval(ctx, match, data)
+		expr := match
+		eg.Go(func() error {
+			defer a.sem.Release(1)
+			defer func() {
+				if r := recover(); r != nil {
+					err = errors.Join(err, fmt.Errorf("recovered from panic in evaluate: %v", r))
+				}
+			}()
 
-		seen[match.GetID()] = struct{}{}
+			if _, ok := seen[expr.GetID()]; ok {
+				return nil
+			}
 
-		if evalerr != nil {
-			err = errors.Join(err, evalerr)
-			continue
-		}
-		if ok {
-			result = append(result, match)
-		}
+			atomic.AddInt32(&matched, 1)
+			// NOTE: We don't need to add lifted expression variables,
+			// because match.Parsed.Evaluable() returns the original expression
+			// string.
+			ok, evalerr := a.eval(ctx, expr, data)
+
+			seen[expr.GetID()] = struct{}{}
+			if evalerr != nil {
+				return evalerr
+			}
+			if ok {
+				s.Lock()
+				result = append(result, expr)
+				s.Unlock()
+			}
+			return nil
+		})
+	}
+
+	if werr := eg.Wait(); werr != nil {
+		err = errors.Join(err, werr)
 	}
 
 	return result, matched, err
@@ -237,16 +292,27 @@ func (a *aggregator) AggregateMatch(ctx context.Context, data map[string]any) ([
 	}
 
 	// Validate that groups meet the minimum size.
-	for k, count := range counts {
-		// if int(k.Size()) > count {
-		// 	// The GroupID required more comparisons to equate to true than
-		// 	// we had, so this could never evaluate to true.  Skip this.
-		// 	//
-		// 	// TODO: Optimize and fix.
-		// 	continue
-		// }
-		_ = count
-		result = append(result, found[k]...)
+	for groupID, matchingCount := range counts {
+		requiredSize := int(groupID.Size()) // The total req size from the group ID
+
+		if matchingCount >= requiredSize {
+			// The matching count met the group size;  all results are safe.
+			result = append(result, found[groupID]...)
+			continue
+		}
+
+		// The GroupID required more comparisons to equate to true than
+		// we had, so this could never evaluate to true.  Skip this.
+		//
+		// NOTE: We currently don't add items with OR predicates to the
+		// matching engine, so we cannot use group sizes if the expr part
+		// has an OR.
+		for _, i := range found[groupID] {
+			if len(i.Parsed.Root.Ors) > 0 {
+				// for now, mark this as viable as it had an OR
+				result = append(result, i)
+			}
+		}
 	}
 
 	return result, nil
@@ -343,15 +409,8 @@ func (a *aggregator) removeConstantEvaluable(ctx context.Context, eval Evaluable
 }
 
 func (a *aggregator) iterGroup(ctx context.Context, node *Node, parsed *ParsedExpression, op nodeOp) (bool, error) {
-	if len(node.Ors) > 0 {
-		// If there are additional branches, don't bother to add this to the aggregate tree.
-		// Mark this as a non-exhaustive addition and skip immediately.
-		//
-		// TODO: Allow ORs _only if_ the ORs are not nested, eg. the ORs are basic predicate
-		// groups that themselves have no branches.
-		return false, nil
-	}
-
+	// It's possible that if there are additional branches, don't bother to add this to the aggregate tree.
+	// Mark this as a non-exhaustive addition and skip immediately.
 	if len(node.Ands) > 0 {
 		for _, n := range node.Ands {
 			if !n.HasPredicate() || len(n.Ors) > 0 {
@@ -364,6 +423,8 @@ func (a *aggregator) iterGroup(ctx context.Context, node *Node, parsed *ParsedEx
 		}
 	}
 
+	// XXX: Here we must add the OR groups to make group IDs a success.
+
 	all := node.Ands
 	if node.Predicate != nil {
 		if !isAggregateable(node) {
@@ -373,14 +434,7 @@ func (a *aggregator) iterGroup(ctx context.Context, node *Node, parsed *ParsedEx
 		all = append(node.Ands, node)
 	}
 
-	// Create a new group ID which tracks the number of expressions that must match
-	// within this group in order for the group to pass.
-	//
-	// This includes ALL ands, plus at least one OR.
-	//
-	// When checking an incoming event, we match the event against each node's
-	// ident/variable.  Using the group ID, we can see if we've matched N necessary
-	// items from the same identifier.  If so, the evaluation is true.
+	// Iterate through and add every predicate to each engine.
 	for _, n := range all {
 		err := op(ctx, n, parsed)
 		if err == errEngineUnimplemented {

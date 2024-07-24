@@ -16,7 +16,6 @@ import Navigation from './Navigation';
 import SearchNavigation from './SearchNavigation';
 
 type AppNavigationProps = {
-  envs: Environment[];
   activeEnv?: Environment;
   envSlug: string;
 };
@@ -32,7 +31,7 @@ const ALL_ENVIRONMENTS_SLUG = 'all';
 const BRANCH_PARENT_SLUG = 'branch';
 // const DEFAULT_ENV_SLUG = 'production';
 
-export default async function AppNavigation({ envs, activeEnv, envSlug }: AppNavigationProps) {
+export default async function AppNavigation({ activeEnv, envSlug }: AppNavigationProps) {
   const isEventSearchEnabled = await getBooleanFlag('event-search');
 
   let items: NavItem[] = [
@@ -84,7 +83,7 @@ export default async function AppNavigation({ envs, activeEnv, envSlug }: AppNav
         <Link href={process.env.NEXT_PUBLIC_HOME_PATH as Route}>
           <InngestLogo className="mr-2 mt-0.5 text-white" width={66} />
         </Link>
-        <EnvironmentSelectMenu envs={envs} activeEnv={activeEnv} />
+        <EnvironmentSelectMenu activeEnv={activeEnv} />
         <Navigation>
           {visibleItems.map(({ href, text, icon, badge }) => (
             <NavItem key={href} href={href as Route} icon={icon} text={text} badge={badge} />

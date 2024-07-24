@@ -631,10 +631,10 @@ github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:
 github.com/imdario/mergo v0.3.11/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
 github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
-github.com/inngest/expr v0.0.0-20240521153320-6f549d6745fd h1:zVlqAmiuWBYO8O5T8Rxin4qfqD0YrFQyK/als0w9LS0=
-github.com/inngest/expr v0.0.0-20240521153320-6f549d6745fd/go.mod h1:Dq8dNC1Q/cZBjl6ltxCoAeNn8fstrBJWWjeSisqTL94=
-github.com/inngest/inngestgo v0.7.3-0.20240607055345-4b87df508283 h1:VNWku4LGO+cyxZy+bmIuy4mCxqVdv5qstKjr+oixwlg=
-github.com/inngest/inngestgo v0.7.3-0.20240607055345-4b87df508283/go.mod h1:tpkVxqBTy8UeSeI6RhX+VW4qSmL3JEMpAnWpOyaQ5vk=
+github.com/inngest/expr v0.0.0-20240717151033-03e4378c436c h1:9XaJS0BV+5wYqv3pVh9OxowUPArRdGMRa8xFdV7eTAI=
+github.com/inngest/expr v0.0.0-20240717151033-03e4378c436c/go.mod h1:Dq8dNC1Q/cZBjl6ltxCoAeNn8fstrBJWWjeSisqTL94=
+github.com/inngest/inngestgo v0.7.3-0.20240718000349-c9247956e061 h1:6SPtaSrdw78aQxd64KRX+Xmz8dyE/3bx1+Bj5awUU+4=
+github.com/inngest/inngestgo v0.7.3-0.20240718000349-c9247956e061/go.mod h1:fWsObvVboMXUMdKmqk+9oEju3loyIHYKHmjUQU6xDlA=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=
 github.com/jackc/chunkreader/v2 v2.0.0/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=
 github.com/jackc/chunkreader/v2 v2.0.1/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=

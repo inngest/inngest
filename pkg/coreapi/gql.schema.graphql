@@ -105,6 +105,7 @@ enum FunctionStatus {
 
 type App {
   id: ID!
+  externalID: String!
   name: String!
   sdkLanguage: String!
   sdkVersion: String!
