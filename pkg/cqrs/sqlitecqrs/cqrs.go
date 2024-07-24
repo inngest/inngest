@@ -480,6 +480,10 @@ func (w wrapper) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([
 	return evts, nil
 }
 
+func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*cqrs.Event, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func (w wrapper) FindEvent(ctx context.Context, workspaceID uuid.UUID, internalID ulid.ULID) (*cqrs.Event, error) {
 	return w.GetEventByInternalID(ctx, internalID)
 }
