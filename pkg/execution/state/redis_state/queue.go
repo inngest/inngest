@@ -705,7 +705,7 @@ func (q QueuePartition) customConcurrencyKey(kg QueueKeyGenerator) string {
 }
 
 func (q QueuePartition) Queue() string {
-	if q.ID == "" {
+	if q.ID == "" && q.FunctionID != nil {
 		return q.FunctionID.String()
 	}
 	return q.ID

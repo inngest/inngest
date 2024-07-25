@@ -1177,6 +1177,64 @@ func TestQueueExtendLease(t *testing.T) {
 		require.Nil(t, item.LeaseID)
 	})
 
+	t.Run("With custom keys in multiple partitions", func(t *testing.T) {
+		item, err := q.EnqueueItem(ctx, QueueItem{
+			FunctionID: uuid.New(),
+			Data: osqueue.Item{
+				CustomConcurrencyKeys: []state.CustomConcurrency{
+					{
+						Key: util.ConcurrencyKey(
+							enums.ConcurrencyScopeAccount,
+							uuid.Nil,
+							"acct-id",
+						),
+						Limit: 10,
+					},
+					{
+						Key: util.ConcurrencyKey(
+							enums.ConcurrencyScopeFn,
+							uuid.Nil,
+							"fn-id",
+						),
+						Limit: 5,
+					},
+				},
+			},
+		}, start)
+		require.Nil(t, err)
+
+		// First 2 partitions will be custom.
+		parts := q.ItemPartitions(ctx, item)
+		require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
+		require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[1].PartitionType)
+
+		// Lease the item.
+		id, err := q.Lease(ctx, QueuePartition{}, item, time.Second, getNow(), nil)
+		require.NoError(t, err)
+		require.NotNil(t, id)
+
+		score0, err := r.ZScore(q.u.kg.GlobalPartitionIndex(), parts[0].ID)
+		require.NoError(t, err)
+		score1, err := r.ZScore(q.u.kg.GlobalPartitionIndex(), parts[1].ID)
+		require.NoError(t, err)
+		require.Equal(t, score0, score1, "Partition scores should match after leasing")
+
+		t.Run("extending the lease should extend both items in all partition's concurrency queues", func(t *testing.T) {
+			nextID, err := q.ExtendLease(ctx, QueuePartition{}, item, *id, 10*time.Second)
+			require.NoError(t, err)
+			require.NotNil(t, nextID)
+
+			newScore0, err := r.ZScore(q.u.kg.GlobalPartitionIndex(), parts[0].ID)
+			require.NoError(t, err)
+			newScore1, err := r.ZScore(q.u.kg.GlobalPartitionIndex(), parts[1].ID)
+			require.NoError(t, err)
+
+			require.Equal(t, newScore0, newScore1, "Partition scores should match after leasing")
+			require.NotEqual(t, score0, newScore0, "Partition scores should have been updated")
+			require.NotEqual(t, score1, newScore1, "Partition scores should have been updated")
+		})
+	})
+
 }
 
 func TestQueueDequeue(t *testing.T) {
