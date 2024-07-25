@@ -1615,13 +1615,45 @@ func TestQueueRequeue(t *testing.T) {
 				},
 			},
 		}
-		item, err := q.EnqueueItem(ctx, QueueItem{}, now)
+		item, err := q.EnqueueItem(ctx, item, now)
 		require.NoError(t, err)
 
-		p := QueuePartition{FunctionID: &item.FunctionID}
+		parts := q.ItemPartitions(ctx, item)
 
-		_, err = q.Lease(ctx, p, item, time.Second, getNow(), nil)
+		// Get all scores
+		itemScoreA, _ := r.ZMScore(parts[0].zsetKey(q.u.kg), item.ID)
+		itemScoreB, _ := r.ZMScore(parts[1].zsetKey(q.u.kg), item.ID)
+		partScoreA, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[0].ID)
+		partScoreB, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[1].ID)
+
+		require.NotEmpty(t, itemScoreA, "Couldn't find item in '%s':\n%s", parts[0].zsetKey(q.u.kg), r.Dump())
+		require.NotEmpty(t, itemScoreB, "Couldn't find item in '%s':\n%s", parts[1].zsetKey(q.u.kg), r.Dump())
+		require.NotEmpty(t, partScoreA)
+		require.NotEmpty(t, partScoreB)
+
+		_, err = q.Lease(ctx, QueuePartition{}, item, time.Second, getNow(), nil)
 		require.NoError(t, err)
+
+		// Requeue
+		next := now.Add(time.Hour)
+		err = q.Requeue(ctx, QueuePartition{}, item, next)
+		require.NoError(t, err)
+
+		t.Run("It requeues all partitions", func(t *testing.T) {
+			newItemScoreA, _ := r.ZMScore(parts[0].zsetKey(q.u.kg), item.ID)
+			newItemScoreB, _ := r.ZMScore(parts[1].zsetKey(q.u.kg), item.ID)
+			newPartScoreA, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[0].ID)
+			newPartScoreB, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[1].ID)
+
+			require.NotEqual(t, itemScoreA, newItemScoreA)
+			require.NotEqual(t, itemScoreB, newItemScoreB)
+			require.NotEqual(t, partScoreA, newPartScoreA)
+			require.NotEqual(t, partScoreB, newPartScoreB)
+
+			require.Equal(t, newItemScoreA, newItemScoreB)
+			require.EqualValues(t, next.UnixMilli(), int(newItemScoreA[0]))
+			require.EqualValues(t, next.Unix(), int(newPartScoreA[0]))
+		})
 	})
 }
 
