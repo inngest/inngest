@@ -1178,6 +1178,8 @@ func TestQueueExtendLease(t *testing.T) {
 	})
 
 	t.Run("With custom keys in multiple partitions", func(t *testing.T) {
+		r.FlushAll()
+
 		item, err := q.EnqueueItem(ctx, QueueItem{
 			FunctionID: uuid.New(),
 			Data: osqueue.Item{
@@ -1213,25 +1215,33 @@ func TestQueueExtendLease(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, id)
 
-		score0, err := r.ZScore(q.u.kg.GlobalPartitionIndex(), parts[0].ID)
+		score0, err := r.ZMScore(parts[0].concurrencyKey(q.u.kg), item.ID)
 		require.NoError(t, err)
-		score1, err := r.ZScore(q.u.kg.GlobalPartitionIndex(), parts[1].ID)
+		score1, err := r.ZMScore(parts[1].concurrencyKey(q.u.kg), item.ID)
 		require.NoError(t, err)
-		require.Equal(t, score0, score1, "Partition scores should match after leasing")
+		require.Equal(t, score0[0], score1[0], "Partition scores should match after leasing")
 
 		t.Run("extending the lease should extend both items in all partition's concurrency queues", func(t *testing.T) {
-			nextID, err := q.ExtendLease(ctx, QueuePartition{}, item, *id, 10*time.Second)
+			nextID, err := q.ExtendLease(ctx, QueuePartition{}, item, *id, 98712*time.Millisecond)
 			require.NoError(t, err)
 			require.NotNil(t, nextID)
 
-			newScore0, err := r.ZScore(q.u.kg.GlobalPartitionIndex(), parts[0].ID)
+			newScore0, err := r.ZMScore(parts[0].concurrencyKey(q.u.kg), item.ID)
 			require.NoError(t, err)
-			newScore1, err := r.ZScore(q.u.kg.GlobalPartitionIndex(), parts[1].ID)
+			newScore1, err := r.ZMScore(parts[1].concurrencyKey(q.u.kg), item.ID)
 			require.NoError(t, err)
 
 			require.Equal(t, newScore0, newScore1, "Partition scores should match after leasing")
-			require.NotEqual(t, score0, newScore0, "Partition scores should have been updated")
+			require.NotEqual(t, int(score0[0]), int(newScore0[0]), "Partition scores should have been updated: %v", newScore0)
 			require.NotEqual(t, score1, newScore1, "Partition scores should have been updated")
+
+			// And, the account-level concurrency queue is updated
+			acctScore, err := r.ZMScore(q.u.kg.Concurrency("account", item.Data.Identifier.AccountID.String()), item.ID)
+			require.EqualValues(t, acctScore[0], newScore0[0])
+		})
+
+		t.Run("Scavenge queue is updated", func(t *testing.T) {
+			// TODO
 		})
 	})
 
