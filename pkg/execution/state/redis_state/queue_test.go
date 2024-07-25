@@ -14,6 +14,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -1859,9 +1860,9 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{ID: idA.String(), FunctionID: &idA},
-			{ID: idB.String(), FunctionID: &idB},
-			{ID: idC.String(), FunctionID: &idC},
+			{ID: idA.String(), FunctionID: &idA, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idB.String(), FunctionID: &idB, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idC.String(), FunctionID: &idC, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 		}, items)
 	})
 
@@ -1949,8 +1950,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		require.EqualValues(t, []*QueuePartition{
-			{ID: idB.String(), FunctionID: &idB},
-			{ID: idC.String(), FunctionID: &idC},
+			{ID: idB.String(), FunctionID: &idB, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idC.String(), FunctionID: &idC, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 		}, items)
 
 		// Try without sequential scans
@@ -1985,8 +1986,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		require.EqualValues(t, []*QueuePartition{
-			{ID: idB.String(), FunctionID: &idB},
-			{ID: idC.String(), FunctionID: &idC},
+			{ID: idB.String(), FunctionID: &idB, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idC.String(), FunctionID: &idC, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 		}, items)
 
 		// After unpausing A, it should be included in the peek:
@@ -1996,9 +1997,9 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{ID: idA.String(), FunctionID: &idA},
-			{ID: idB.String(), FunctionID: &idB},
-			{ID: idC.String(), FunctionID: &idC},
+			{ID: idA.String(), FunctionID: &idA, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idB.String(), FunctionID: &idB, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idC.String(), FunctionID: &idC, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 		}, items, r.Dump())
 	})
 }
