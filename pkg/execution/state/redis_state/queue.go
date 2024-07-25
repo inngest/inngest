@@ -1486,25 +1486,30 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
+	parts := q.ItemPartitions(ctx, i)
+
 	keys := []string{
 		q.u.kg.QueueItem(),
-		q.u.kg.FnQueueSet(i.Queue()),
-		q.u.kg.GlobalPartitionIndex(),
+		// Pass in the actual key queue
+		parts[0].zsetKey(q.u.kg),
+		parts[1].zsetKey(q.u.kg),
+		parts[2].zsetKey(q.u.kg),
+		// And pass in the key queue's concurrency keys.
+		parts[0].concurrencyKey(q.u.kg),
+		parts[1].concurrencyKey(q.u.kg),
+		parts[2].concurrencyKey(q.u.kg),
 		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
-		q.u.kg.Concurrency("p", i.FunctionID.String()),
-		q.u.kg.Concurrency("custom", customKeys[0]),
-		q.u.kg.Concurrency("custom", customKeys[1]),
 	}
 
 	args, err := StrSlice([]any{
 		i.ID,
 		leaseID.String(),
 		newLeaseID.String(),
-		p.Queue(),
 	})
 	if err != nil {
 		return nil, err
 	}
+
 	status, err := scripts["queue/extendLease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "extendLease"),
 		q.u.unshardedRc,

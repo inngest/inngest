@@ -15,7 +15,7 @@ Output:
 
 ]]
 
-local queueKey               = KEYS[1]
+local keyQueueMap            = KEYS[1]
 local keyPartitionA          = KEYS[2]           -- queue:sorted:$workflowID - zset
 local keyPartitionB          = KEYS[3]           -- e.g. sorted:c|t:$workflowID - zset
 local keyPartitionC          = KEYS[4]          -- e.g. sorted:c|t:$workflowID - zset
@@ -55,7 +55,7 @@ local concurrencyAcct = tonumber(ARGV[10])
 
 -- first, get the queue item.  we must do this and bail early if the queue item
 -- was not found.
-local item = get_queue_item(queueKey, queueID)
+local item = get_queue_item(keyQueueMap, queueID)
 if item == nil then
     return 1
 end
@@ -69,7 +69,7 @@ if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.
 end
 
 -- Track the earliest time this job was attempted in the queue.
-item = set_item_peek_time(queueKey, queueID, item, currentTime)
+item = set_item_peek_time(keyQueueMap, queueID, item, currentTime)
 
 -- Track throttling/rate limiting IF the queue item has throttling info set.  This allows
 -- us to target specific queue items with rate limiting individually.
@@ -109,7 +109,7 @@ end
 
 -- Update the item's lease key.
 item.leaseID = newLeaseKey
-redis.call("HSET", queueKey, queueID, cjson.encode(item))
+redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 
 local function handleEnqueue(keyPartition, keyConcurrency, partitionID)
 	-- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress

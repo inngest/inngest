@@ -8,19 +8,20 @@ Output:
 
 ]]
 
-local itemHashKey       = KEYS[1] -- queue:item - hash: { $itemID: item }
-local itemQueueKey      = KEYS[2] -- queue:sorted:$workflowID - zset of queue items
-local partitionIndexKey = KEYS[3] -- partition:sorted - zset of queues by earliest item
--- We update the lease time in each concurrency queue, also
-local accountConcurrencyKey   = KEYS[4] -- Account concurrency level
-local partitionConcurrencyKey = KEYS[5] -- Partition/function level concurrency
-local customConcurrencyKeyA   = KEYS[6] -- Optional for eg. for concurrency amongst steps 
-local customConcurrencyKeyB   = KEYS[7] -- Optional for eg. for concurrency amongst steps 
+local keyQueueMap       = KEYS[1] -- queue:item - hash: { $itemID: item }
+
+local keyPartitionA     = KEYS[2]           -- queue:sorted:$workflowID - zset
+local keyPartitionB     = KEYS[3]           -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionC     = KEYS[4]          -- e.g. sorted:c|t:$workflowID - zset
+
+local keyConcurrencyA    = KEYS[5] -- Account concurrency level
+local keyConcurrencyB    = KEYS[6] -- When leasing an item we need to place the lease into this key.
+local keyConcurrencyC    = KEYS[7] -- Optional for eg. for concurrency amongst steps
+local keyAcctConcurrency = KEYS[8]       
 
 local queueID         = ARGV[1]
 local currentLeaseKey = ARGV[2]
 local newLeaseKey     = ARGV[3]
-local partitionID     = ARGV[4]
 
 -- $include(decode_ulid_time.lua)
 -- $include(get_queue_item.lua)
@@ -28,8 +29,12 @@ local partitionID     = ARGV[4]
 -- Grab the current time from the new lease key.
 local nextTime = decode_ulid_time(newLeaseKey)
 
+local function ends_with(str, ending)
+   return ending == "" or str:sub(-#ending) == ending
+end
+
 -- Look up the current queue item.  We need to see if the queue item is already leased.
-local item = get_queue_item(itemHashKey, queueID)
+local item = get_queue_item(keyQueueMap, queueID)
 if item == nil then
 	return 1
 end
@@ -42,33 +47,20 @@ end
 
 item.leaseID = newLeaseKey
 -- Update the item's lease key.
-redis.call("HSET", itemHashKey, queueID, cjson.encode(item))
+redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 -- Update the item's score in our sorted index.
 
--- Add the item to all keys
-redis.call("ZADD", partitionConcurrencyKey, nextTime, item.id)
-if accountConcurrencyKey ~= nil and accountConcurrencyKey ~= "" then
-	redis.call("ZADD", accountConcurrencyKey, nextTime, item.id)
-end
-if customConcurrencyKeyA ~= nil and customConcurrencyKeyA ~= "" then
-	redis.call("ZADD", customConcurrencyKeyA, nextTime, item.id)
-end
-if customConcurrencyKeyB ~= nil and customConcurrencyKeyA ~= "" then
-	redis.call("ZADD", customConcurrencyKeyB, nextTime, item.id)
-end
+-- Items always belong to an account
+redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
 
--- If there's nothing in the queue of queues, extend the queue expiry time by the
--- lease time.  This lets us ensure that a partition exists and will NOT be garbage
--- collected while an item is worked on, which is necessary if the job fails.
--- 
--- Partitions are garbage collected during the peeking & leasing process, so
--- if the current partition is empty we want to prevent that.
-if tonumber(redis.call("ZCARD", itemQueueKey)) == 0 then
-	-- NOTE: this is math.ceil to minimize race conditions;  partitions are stored
-	-- using seconds and we should round up to process this after the 
-	--
-	-- We also add 2 seconds because we peek queues in advance.
-	redis.call("ZADD", partitionIndexKey, (math.ceil(nextTime) / 1000) + 2, partitionID)
+if keyConcurrencyA ~= nil and keyConcurrencyA ~= "" and ends_with(keyConcurrencyA, "sorted:-") ~= true then
+	redis.call("ZADD", keyConcurrencyA, nextTime, item.id)
+end
+if keyConcurrencyB ~= nil and keyConcurrencyB ~= "" and ends_with(keyConcurrencyB, "sorted:-") ~= true then
+	redis.call("ZADD", keyConcurrencyB, nextTime, item.id)
+end
+if keyConcurrencyC ~= nil and keyConcurrencyC ~= "" and ends_with(keyConcurrencyC, "sorted:-") ~= true then
+	redis.call("ZADD", keyConcurrencyC, nextTime, item.id)
 end
 
 return 0
