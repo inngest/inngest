@@ -1357,6 +1357,12 @@ func TestQueueDequeue(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, id)
 
+			t.Run("The scavenger queue should not yet be empty", func(t *testing.T) {
+				mems, err := r.ZMembers(q.u.kg.ConcurrencyIndex())
+				require.NoError(t, err)
+				require.NotEmpty(t, mems)
+			})
+
 			err = q.Dequeue(ctx, QueuePartition{}, item)
 			require.Nil(t, err)
 
@@ -1376,6 +1382,11 @@ func TestQueueDequeue(t *testing.T) {
 				mem, _ = r.ZMembers(parts[1].concurrencyKey(q.u.kg))
 				require.NoError(t, err)
 				require.Equal(t, 0, len(mem))
+			})
+
+			t.Run("The scavenger queue should now be empty", func(t *testing.T) {
+				mems, _ := r.ZMembers(q.u.kg.ConcurrencyIndex())
+				require.Empty(t, mems)
 			})
 		})
 	})

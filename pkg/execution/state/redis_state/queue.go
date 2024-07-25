@@ -1563,11 +1563,11 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		parts[0].zsetKey(q.u.kg),
 		parts[1].zsetKey(q.u.kg),
 		parts[2].zsetKey(q.u.kg),
-		q.u.kg.Idempotency(i.ID),
+		parts[0].concurrencyKey(q.u.kg),
+		parts[1].concurrencyKey(q.u.kg),
+		parts[2].concurrencyKey(q.u.kg),
 		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
-		q.u.kg.Concurrency("p", i.FunctionID.String()),
-		q.u.kg.Concurrency("custom", customKeys[0]),
-		q.u.kg.Concurrency("custom", customKeys[1]),
+		q.u.kg.Idempotency(i.ID),
 		q.u.kg.ConcurrencyIndex(),
 	}
 	// Append indexes
