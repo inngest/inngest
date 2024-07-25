@@ -146,7 +146,7 @@ type QueueManager interface {
 
 	Dequeue(ctx context.Context, p QueuePartition, i QueueItem) error
 	Requeue(ctx context.Context, p QueuePartition, i QueueItem, at time.Time) error
-	RequeueByJobID(ctx context.Context, partitionName string, jobID string, at time.Time) error
+	RequeueByJobID(ctx context.Context, jobID string, at time.Time) error
 }
 
 // PriorityFinder returns the priority for a given queue partition.
@@ -1252,35 +1252,57 @@ func (q *queue) decodeQueueItemFromPeek(str string, now time.Time) (*QueueItem, 
 //
 // If the queue item referenced by the job ID is not outstanding (ie. it has a lease, is in
 // progress, or doesn't exist) this returns an error.
-func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID string, at time.Time) error {
+func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RequeueByJobID"), redis_telemetry.ScopeQueue)
 
 	jobID = HashID(ctx, jobID)
 
 	// Find the queue item so that we can fetch the shard info.
-	qi := &QueueItem{}
-	if err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Hget().Key(q.u.kg.QueueItem()).Field(jobID).Build()).DecodeJSON(qi); err != nil {
+	i := QueueItem{}
+	if err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Hget().Key(q.u.kg.QueueItem()).Field(jobID).Build()).DecodeJSON(&i); err != nil {
 		return err
 	}
 
-	// TODO: FIX
+	// Don't requeue before now.
+	now := getNow()
+	if at.Before(now) {
+		at = now
+	}
+
+	// Remove all items from all partitions.  For this, we need all partitions for
+	// the queue item instead of just the partition passed via args.
+	//
+	// This is because a single queue item may be present in more than one queue.
+	parts := q.ItemPartitions(ctx, i)
 
 	keys := []string{
-		q.u.kg.FnQueueSet(partitionName),
 		q.u.kg.QueueItem(),
-		q.u.kg.GlobalPartitionIndex(), // Global partition queue
-		q.u.kg.PartitionItem(),        // Partition hash
+		q.u.kg.PartitionItem(), // Partition item, map
+		q.u.kg.GlobalPartitionIndex(),
+
+		parts[0].zsetKey(q.u.kg),
+		parts[1].zsetKey(q.u.kg),
+		parts[2].zsetKey(q.u.kg),
+	}
+	args, err := StrSlice([]any{
+		jobID,
+		strconv.Itoa(int(at.UnixMilli())),
+		strconv.Itoa(int(now.UnixMilli())),
+		parts[0],
+		parts[1],
+		parts[2],
+		parts[0].ID,
+		parts[1].ID,
+		parts[2].ID,
+	})
+	if err != nil {
+		return err
 	}
 	status, err := scripts["queue/requeueByID"].Exec(
 		redis_telemetry.WithScriptName(ctx, "requeueByID"),
 		q.u.unshardedRc,
 		keys,
-		[]string{
-			jobID,
-			strconv.Itoa(int(at.UnixMilli())),
-			partitionName,
-			strconv.Itoa(int(getNow().UnixMilli())),
-		},
+		args,
 	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error requeueing item: %w", err)

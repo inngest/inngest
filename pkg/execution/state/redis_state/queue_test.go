@@ -2329,14 +2329,9 @@ func TestQueueRequeueByJobID(t *testing.T) {
 	}
 	q.itemIndexer = QueueItemIndexerFunc
 
-	wsA, wsB := uuid.New(), uuid.New()
+	wsA := uuid.New()
 
 	t.Run("Failure cases", func(t *testing.T) {
-
-		t.Run("It fails with a non-existent partition and job ID", func(t *testing.T) {
-			err := q.RequeueByJobID(ctx, "foo", "bar", time.Now().Add(5*time.Second))
-			require.NotNil(t, err)
-		})
 
 		t.Run("It fails with a non-existent job ID for an existing partition", func(t *testing.T) {
 			r.FlushDB()
@@ -2350,24 +2345,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			_, err := q.EnqueueItem(ctx, item, time.Now().Add(time.Second))
 			require.NoError(t, err)
 
-			err = q.RequeueByJobID(ctx, wsA.String(), "no bruv", time.Now().Add(5*time.Second))
-			require.NotNil(t, err)
-		})
-
-		t.Run("It fails with a non-existent partition but an existing job ID", func(t *testing.T) {
-			r.FlushDB()
-
-			jid := "another"
-			item := QueueItem{
-				ID:          jid,
-				FunctionID:  wsA,
-				WorkspaceID: wsA,
-			}
-
-			_, err := q.EnqueueItem(ctx, item, time.Now().Add(time.Second))
-			require.NoError(t, err)
-
-			err = q.RequeueByJobID(ctx, wsB.String(), jid, time.Now().Add(5*time.Second))
+			err = q.RequeueByJobID(ctx, "no bruv", time.Now().Add(5*time.Second))
 			require.NotNil(t, err)
 		})
 
@@ -2393,7 +2371,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, lid)
 
-			err = q.RequeueByJobID(ctx, wsB.String(), jid, time.Now().Add(5*time.Second))
+			err = q.RequeueByJobID(ctx, jid, time.Now().Add(5*time.Second))
 			require.NotNil(t, err)
 		})
 	})
@@ -2420,7 +2398,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 
 		// Requeue the function for 5 seconds in the future.
 		next := at.Add(5 * time.Second)
-		err = q.RequeueByJobID(ctx, wsA.String(), jid, next)
+		err = q.RequeueByJobID(ctx, jid, next)
 		require.Nil(t, err, r.Dump())
 
 		t.Run("It updates the queue's At time", func(t *testing.T) {
@@ -2485,7 +2463,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		})
 
 		next := target.Add(5 * time.Second)
-		err = q.RequeueByJobID(ctx, wsA.String(), jid, next)
+		err = q.RequeueByJobID(ctx, jid, next)
 		require.Nil(t, err, r.Dump())
 
 		t.Run("The earliest time is still 'at' for the partition after requeueing", func(t *testing.T) {
@@ -2540,7 +2518,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		})
 
 		next := target.Add(5 * time.Second)
-		err = q.RequeueByJobID(ctx, wsA.String(), jid, next)
+		err = q.RequeueByJobID(ctx, jid, next)
 		require.Nil(t, err, r.Dump())
 
 		t.Run("The earliest time is 'next' for the partition after requeueing", func(t *testing.T) {
@@ -2727,7 +2705,7 @@ func TestShardFinding(t *testing.T) {
 			})
 
 			t.Run("requeue by job ID modifies the shard partition", func(t *testing.T) {
-				err := q.RequeueByJobID(ctx, p.Queue(), "foo", at.Add(45*time.Second))
+				err := q.RequeueByJobID(ctx, "foo", at.Add(45*time.Second))
 				require.NoError(t, err)
 
 				// Check shard partition score changed in the ptr.
