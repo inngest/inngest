@@ -1199,11 +1199,20 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 	if err != nil {
 		return nil, err
 	}
+
+	// If the queue name is a UUID, assume that we need to adjust this as we've been
+	// given a standard function queue (enums.PartitionTypeDefault).
+	//
+	// Otherwise, this must be the queue's zset already.
+	if len(queueName) == 36 {
+		queueName = q.u.kg.PartitionQueueSet(enums.PartitionTypeDefault, queueName, "")
+	}
+
 	res, err := scripts["queue/peek"].Exec(
 		redis_telemetry.WithScriptName(ctx, "peek"),
 		q.u.unshardedRc,
 		[]string{
-			q.u.kg.FnQueueSet(queueName),
+			queueName,
 			q.u.kg.QueueItem(),
 		},
 		args,
