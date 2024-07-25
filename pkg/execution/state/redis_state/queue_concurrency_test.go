@@ -81,6 +81,9 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 				atomic.AddInt32(&counter_10, 1)
 			}
 			<-time.After(jobDuration / 2)
+			if item.Identifier.WorkflowID == limit_1 {
+				fmt.Println("Single concurrency item done", time.Now().Truncate(time.Millisecond))
+			}
 			return nil
 		})
 	}()

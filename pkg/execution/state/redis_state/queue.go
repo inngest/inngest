@@ -68,7 +68,7 @@ const (
 	// NOTE: This must be greater than PartitionLookahead
 	// NOTE: This is the maximum latency introduced into concurrnecy limited partitions in the
 	//       worst case.
-	PartitionConcurrencyLimitRequeueExtension = 6 * time.Second
+	PartitionConcurrencyLimitRequeueExtension = 30 * time.Second
 	PartitionLookahead                        = time.Second
 
 	// default values
@@ -1550,6 +1550,8 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
 		q.u.kg.Idempotency(i.ID),
 		q.u.kg.ConcurrencyIndex(),
+		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.PartitionItem(),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.u.kg) {
@@ -1567,6 +1569,9 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		i.ID,
 		int(idempotency.Seconds()),
 		p.Queue(),
+		parts[0].ID,
+		parts[1].ID,
+		parts[2].ID,
 	})
 	if err != nil {
 		return err

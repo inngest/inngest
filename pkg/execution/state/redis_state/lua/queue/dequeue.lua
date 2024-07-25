@@ -18,14 +18,21 @@ local keyConcurrencyC    = KEYS[7] -- Optional for eg. for concurrency amongst s
 local keyAcctConcurrency = KEYS[8]       
 local keyIdempotency     = KEYS[9]
 local concurrencyPointer = KEYS[10]
-local keyItemIndexA      = KEYS[11]   -- custom item index 1
-local keyItemIndexB      = KEYS[12]  -- custom item index 2
+local keyGlobalPointer   = KEYS[11]
+local keyPartitionMap    = KEYS[12]
+local keyItemIndexA      = KEYS[13]   -- custom item index 1
+local keyItemIndexB      = KEYS[14]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local idempotencyTTL = tonumber(ARGV[2])
 local partitionName  = ARGV[3]
+local partitionIdA   = ARGV[4]
+local partitionIdB   = ARGV[5]
+local partitionIdC   = ARGV[6]
 
 -- $include(get_queue_item.lua)
+-- $include(get_partition_item.lua)
+--
 -- Fetch this item to see if it was in progress prior to deleting.
 local item = get_queue_item(keyQueueMap, queueID)
 if item == nil then
@@ -43,7 +50,7 @@ end
 
 -- This extends the item in the zset and also ensures that scavenger queues are
 -- updated.
-local function handleDequeue(keyConcurrency)
+local function handleDequeue(keyConcurrency, keyPartitionSet, partitionID)
 	redis.call("ZREM", keyConcurrency, item.id)
 
 	-- Get the earliest item in the partition concurrency set.  We may be dequeueing
@@ -64,11 +71,39 @@ local function handleDequeue(keyConcurrency)
 			redis.call("ZADD", concurrencyPointer, earliestLease, keyConcurrency)
 		end
 	end
+
+	-- For each partition, we now have an extra available capacity.  Check the partition's
+	-- score, and ensure that it's updated in the global pointer index.
+	--
+	-- TODO: Update the account pointer index here.
+	local minScores = redis.call("ZRANGE", keyPartitionSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+	if minScores == nil or minScores == false or #minScores == 0 then
+		return
+	end
+
+	-- If there's nothing int he partition set (no more jobs), end early, as we don't need to
+	-- check partition scores.
+	local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID)
+	if currentScore == nil or currentScore == false then
+		return
+	end
+
+	local earliestScore = tonumber(minScores[2])/1000
+	if tonumber(currentScore) > earliestScore then
+		-- Update the global index now that there's capacity, even if we've forced, as we now
+		-- have capacity.  Note the earliest score is in MS while partitions are stored in S.
+		redis.call("ZADD", keyGlobalPointer, earliestScore, partitionID)
+		-- Clear the ForceAtMS from the pointer.
+		local existing = get_partition_item(keyPartitionMap, partitionID)
+		existing.forceAtMS = nil
+		redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existing))
+	end
 end
 
-handleDequeue(keyConcurrencyA)
-handleDequeue(keyConcurrencyB)
-handleDequeue(keyConcurrencyC)
+handleDequeue(keyConcurrencyA, keyPartitionA, partitionIdA)
+handleDequeue(keyConcurrencyB, keyPartitionB, partitionIdB)
+handleDequeue(keyConcurrencyC, keyPartitionC, partitionIdC)
+
 -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
 -- and Lease for respective ZADD calls.
 redis.call("ZREM", keyAcctConcurrency, item.id)

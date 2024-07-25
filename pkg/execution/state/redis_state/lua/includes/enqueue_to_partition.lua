@@ -1,3 +1,12 @@
+-- gets a decoded partition item
+local function enqueue_get_partition_item(partitionKey, id)
+	local fetched = redis.call("HGET", partitionKey, id)
+	if fetched ~= false then
+		return cjson.decode(fetched)
+	end
+	return nil
+end
+
 local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, queueScore, queueID, partitionTime, nowMS)
 	if partitionID == "" then
 		-- This is a blank partition, so don't even bother.  This allows us to pre-allocate
@@ -27,7 +36,7 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 		--   2. Track some metadata in the current queue/partition item, because of things.
 
 		-- Get the partition item, so that we can keep the last lease score.
-		local existing = get_partition_item(keyPartitionMap, partitionID)
+		local existing = enqueue_get_partition_item(keyPartitionMap, partitionID)
 		-- NOTE: There's a concept of "forcing" a partition not to be evaluated until a
 		--       specific time.  We want to do this to reduce contention.  It makes sense.
 		--       Trust me.
@@ -82,7 +91,7 @@ local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem,
 		--   2. Track some metadata in the current queue/partition item, because of things.
 
 		-- Get the partition item, so that we can keep the last lease score.
-		local existing = get_partition_item(keyPartitionMap, partitionID)
+		local existing = enqueue_get_partition_item(keyPartitionMap, partitionID)
 		-- NOTE: There's a concept of "forcing" a partition not to be evaluated until a
 		--       specific time.  We want to do this to reduce contention.  It makes sense.
 		--       Trust me.

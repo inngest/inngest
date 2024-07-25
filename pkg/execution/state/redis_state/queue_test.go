@@ -1272,6 +1272,102 @@ func TestQueueDequeue(t *testing.T) {
 	q := NewQueue(queueClient)
 	ctx := context.Background()
 
+	t.Run("It always changes global partition scores", func(t *testing.T) {
+		r.FlushAll()
+
+		fnID, acctID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte("fn")),
+			uuid.NewSHA1(uuid.NameSpaceDNS, []byte("acct"))
+
+		start := time.Now().Truncate(time.Second)
+		itemA, err := q.EnqueueItem(ctx, QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					AccountID: acctID,
+				},
+				CustomConcurrencyKeys: []state.CustomConcurrency{
+					{
+						Key: util.ConcurrencyKey(
+							enums.ConcurrencyScopeAccount,
+							acctID,
+							"acct-id",
+						),
+						Limit: 10,
+					},
+					{
+						Key: util.ConcurrencyKey(
+							enums.ConcurrencyScopeFn,
+							fnID,
+							"fn-id",
+						),
+						Limit: 5,
+					},
+				},
+			},
+		}, start)
+		require.Nil(t, err)
+		_, err = q.EnqueueItem(ctx, QueueItem{
+			FunctionID: uuid.New(),
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					AccountID: acctID,
+				},
+				CustomConcurrencyKeys: []state.CustomConcurrency{
+					{
+						Key: util.ConcurrencyKey(
+							enums.ConcurrencyScopeAccount,
+							acctID,
+							"acct-id",
+						),
+						Limit: 10,
+					},
+					{
+						Key: util.ConcurrencyKey(
+							enums.ConcurrencyScopeFn,
+							fnID,
+							"fn-id",
+						),
+						Limit: 5,
+					},
+				},
+			},
+		}, start)
+		require.Nil(t, err)
+
+		// First 2 partitions will be custom.
+		parts := q.ItemPartitions(ctx, itemA)
+		require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
+		require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[1].PartitionType)
+
+		// Lease the first item, pretending it's in progress.
+		_, err = q.Lease(ctx, QueuePartition{}, itemA, 10*time.Second, getNow(), nil)
+		require.NoError(t, err)
+
+		// Force requeue the next partition such that it's pushed forward, pretending there's
+		// no capacity.
+		err = q.PartitionRequeue(ctx, &parts[0], start.Add(30*time.Minute), true)
+		require.NoError(t, err)
+		err = q.PartitionRequeue(ctx, &parts[1], start.Add(30*time.Minute), true)
+		require.NoError(t, err)
+
+		t.Run("Requeueing partitions updates the score", func(t *testing.T) {
+			partScoreA, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[0].ID)
+			partScoreB, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[1].ID)
+			require.EqualValues(t, start.Add(30*time.Minute).Unix(), partScoreA[0])
+			require.EqualValues(t, start.Add(30*time.Minute).Unix(), partScoreB[0])
+		})
+
+		err = q.Dequeue(ctx, QueuePartition{}, itemA)
+		require.Nil(t, err)
+
+		t.Run("The outstanding partition scores should reset", func(t *testing.T) {
+			partScoreA, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[0].ID)
+			partScoreB, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[1].ID)
+			require.EqualValues(t, start, time.Unix(int64(partScoreA[0]), 0), r.Dump())
+			require.EqualValues(t, start, time.Unix(int64(partScoreB[0]), 0))
+		})
+	})
+
 	t.Run("with concurrency keys", func(t *testing.T) {
 		start := time.Now()
 

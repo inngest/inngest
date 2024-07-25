@@ -89,10 +89,6 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 			}
 		}
 
-		if name == "queue/requeue" {
-			// fmt.Println(val)
-		}
-
 		scripts[name] = rueidis.NewLuaScript(val)
 		retriableScripts[name] = NewClusterLuaScript(val)
 	}
