@@ -133,6 +133,17 @@ export default {
         btnPrimaryDisabled: 'rgb(var(--color-foreground-btn-primaryDisabled) / <alpha-value>)',
         btnDanger: 'rgb(var(--color-foreground-btn-danger) / <alpha-value>)',
         btnDangerDisabled: 'rgb(var(--color-foreground-btn-dangerDisabled) / <alpha-value>)',
+        codeDelimiterBracketJson:
+          'rgb(var(--color-foreground-code-delimiterBracketJson) / <alpha-value>)',
+        codeStringKeyJson: 'rgb(var(--color-foreground-code-stringKeyJson) / <alpha-value>)',
+        codeNumberJson: 'rgb(var(--color-foreground-code-numberJson) / <alpha-value>)',
+        codeStringValueJson: 'rgb(var(--color-foreground-code-stringValueJson) / <alpha-value>)',
+        codeKeywordJson: 'rgb(var(--color-foreground-code-keywordJson) / <alpha-value>)',
+        codeComment: 'rgb(var(--color-foreground-code-comment) / <alpha-value>)',
+        codeString: 'rgb(var(--color-foreground-code-string) / <alpha-value>)',
+        codeKeyword: 'rgb(var(--color-foreground-code-keyword) / <alpha-value>)',
+        codeEntityNameFunction:
+          'rgb(var(--color-foreground-code-entityNameFunction) / <alpha-value>)',
       },
       textDecorationColor: {
         link: 'rgb(var(--color-foreground-link) / <alpha-value>)',
