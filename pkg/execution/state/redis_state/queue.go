@@ -1499,6 +1499,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 		parts[1].concurrencyKey(q.u.kg),
 		parts[2].concurrencyKey(q.u.kg),
 		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
+		q.u.kg.ConcurrencyIndex(),
 	}
 
 	args, err := StrSlice([]any{

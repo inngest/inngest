@@ -19,6 +19,8 @@ local keyConcurrencyB    = KEYS[6] -- When leasing an item we need to place the 
 local keyConcurrencyC    = KEYS[7] -- Optional for eg. for concurrency amongst steps
 local keyAcctConcurrency = KEYS[8]       
 
+local keyConcurrencyPointer = KEYS[9]
+
 local queueID         = ARGV[1]
 local currentLeaseKey = ARGV[2]
 local newLeaseKey     = ARGV[3]
@@ -50,17 +52,36 @@ item.leaseID = newLeaseKey
 redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 -- Update the item's score in our sorted index.
 
+
+-- This extends the item in the zset and also ensures that scavenger queues are
+-- updated.
+local function handleExtendLease(keyConcurrency)
+	redis.call("ZADD", keyConcurrency, nextTime, item.id)
+
+	-- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
+	-- so that expired leases can be re-processed.  We want to take the earliest time from the
+	-- concurrenqy queue such that we get a previously lost job if possible.
+
+	local inProgressScores = redis.call("ZRANGE", keyConcurrency, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+	if inProgressScores ~= false then
+		local earliestLease = tonumber(inProgressScores[2])
+		-- Add the earliest time to the pointer queue for in-progress, allowing us to scavenge
+		-- lost jobs easily.
+		redis.call("ZADD", keyConcurrencyPointer, earliestLease, keyConcurrency)
+	end
+end
+
 -- Items always belong to an account
 redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
 
 if keyConcurrencyA ~= nil and keyConcurrencyA ~= "" and ends_with(keyConcurrencyA, "sorted:-") ~= true then
-	redis.call("ZADD", keyConcurrencyA, nextTime, item.id)
+	handleExtendLease(keyConcurrencyA)
 end
 if keyConcurrencyB ~= nil and keyConcurrencyB ~= "" and ends_with(keyConcurrencyB, "sorted:-") ~= true then
-	redis.call("ZADD", keyConcurrencyB, nextTime, item.id)
+	handleExtendLease(keyConcurrencyB)
 end
 if keyConcurrencyC ~= nil and keyConcurrencyC ~= "" and ends_with(keyConcurrencyC, "sorted:-") ~= true then
-	redis.call("ZADD", keyConcurrencyC, nextTime, item.id)
+	handleExtendLease(keyConcurrencyC)
 end
 
 return 0

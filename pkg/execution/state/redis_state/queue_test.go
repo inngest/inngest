@@ -1222,9 +1222,9 @@ func TestQueueExtendLease(t *testing.T) {
 		require.Equal(t, score0[0], score1[0], "Partition scores should match after leasing")
 
 		t.Run("extending the lease should extend both items in all partition's concurrency queues", func(t *testing.T) {
-			nextID, err := q.ExtendLease(ctx, QueuePartition{}, item, *id, 98712*time.Millisecond)
+			id, err = q.ExtendLease(ctx, QueuePartition{}, item, *id, 98712*time.Millisecond)
 			require.NoError(t, err)
-			require.NotNil(t, nextID)
+			require.NotNil(t, id)
 
 			newScore0, err := r.ZMScore(parts[0].concurrencyKey(q.u.kg), item.ID)
 			require.NoError(t, err)
@@ -1241,7 +1241,18 @@ func TestQueueExtendLease(t *testing.T) {
 		})
 
 		t.Run("Scavenge queue is updated", func(t *testing.T) {
-			// TODO
+			score, err := r.ZMScore(q.u.kg.ConcurrencyIndex(), parts[0].concurrencyKey(q.u.kg))
+			require.NoError(t, err)
+			require.NotZero(t, score[0])
+
+			id, err = q.ExtendLease(ctx, QueuePartition{}, item, *id, 1238712*time.Millisecond)
+			require.NoError(t, err)
+			require.NotNil(t, id)
+
+			nextScore, err := r.ZMScore(q.u.kg.ConcurrencyIndex(), parts[0].concurrencyKey(q.u.kg))
+			require.NoError(t, err)
+
+			require.NotEqual(t, score[0], nextScore[0])
 		})
 	})
 
