@@ -27,9 +27,8 @@ local keyConcurrencyC  = KEYS[7] -- Optional for eg. for concurrency amongst ste
 -- We push pointers to partition concurrency items to the partition concurrency item
 local concurrencyPointer     = KEYS[8]
 local globalPointerKey       = KEYS[9]
-local shardPointerKey        = KEYS[10]
-local throttleKey            = KEYS[11] -- key used for throttling function run starts.
-local keyAcctConcurrency     = KEYS[12]       
+local throttleKey            = KEYS[10] -- key used for throttling function run starts.
+local keyAcctConcurrency     = KEYS[11]       
 
 local queueID      = ARGV[1]
 local newLeaseKey  = ARGV[2]

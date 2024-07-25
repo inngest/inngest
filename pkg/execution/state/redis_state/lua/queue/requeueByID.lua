@@ -17,8 +17,7 @@ Return values:
 local keyQueueIndex    = KEYS[1]
 local keyQueueHash     = KEYS[2]
 local keyGlobalIndex   = KEYS[3]           -- partition:sorted - zset
-local keyShardIndex    = KEYS[4]           -- shard zset
-local keyPartitionHash = KEYS[5]           -- partition hash
+local keyPartitionHash = KEYS[4]           -- partition hash
 
 local jobID            = ARGV[1]           -- queue item ID
 local jobScore         = tonumber(ARGV[2]) -- enqueue at, in milliseconds
@@ -71,9 +70,6 @@ local partitionScore = math.floor(minScore[2] / 1000)
 local currentScore = redis.call("ZSCORE", keyGlobalIndex, partitionID)
 if currentScore == false or tonumber(currentScore) ~= partitionScore then
     redis.call("ZADD", keyGlobalIndex, partitionScore, partitionID)
-    if has_shard_key(keyShardIndex) then
-        update_pointer_score_to(partitionID, keyShardIndex, partitionScore)
-    end
 end
 
 -- Update the partition pointer's actual AtS timestamp in the struct.

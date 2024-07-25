@@ -809,16 +809,6 @@ func (q QueueItem) MarshalBinary() ([]byte, error) {
 	return json.Marshal(q)
 }
 
-// Queue returns the queue name for this queue item.  This is the
-// workflow ID of the QueueItem unless the QueueName is specifically
-// set.
-func (q QueueItem) Queue() string {
-	if q.QueueName == nil {
-		return q.FunctionID.String()
-	}
-	return *q.QueueName
-}
-
 // IsLeased checks if the QueueItem is currently already leased or not
 // based on the time passed in.
 func (q QueueItem) IsLeased(time time.Time) bool {
@@ -1116,26 +1106,12 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		partitionTime = getNow()
 	}
 
-	var (
-		shard     *QueueShard
-		shardName string
-	)
-	if q.sf != nil {
-		shard = q.sf(ctx, i.Queue(), &i.WorkspaceID)
-		if shard != nil {
-			shardName = shard.Name
-			shard.Leases = []ulid.ULID{}
-		}
-	}
-
 	parts := q.ItemPartitions(ctx, i)
 
 	keys := []string{
-		q.u.kg.QueueItem(),                    // Queue item
-		q.u.kg.PartitionItem(),                // Partition item, map
-		q.u.kg.GlobalPartitionIndex(),         // Global partition queue
-		q.u.kg.ShardPartitionIndex(shardName), // Shard queue
-		q.u.kg.Shards(),
+		q.u.kg.QueueItem(),            // Queue item
+		q.u.kg.PartitionItem(),        // Partition item, map
+		q.u.kg.GlobalPartitionIndex(), // Global partition queue
 		q.u.kg.Idempotency(i.ID),
 		q.u.kg.FnMetadata(i.FunctionID),
 
@@ -1156,8 +1132,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		i.ID,
 		at.UnixMilli(),
 		partitionTime.Unix(),
-		shard,
-		shardName,
 		getNow().UnixMilli(),
 		FnMetadata{
 			// enqueue.lua only writes function metadata if it doesn't already exist.
@@ -1290,19 +1264,13 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 		return err
 	}
 
-	var shardName string
-	if q.sf != nil {
-		if shard := q.sf(ctx, qi.Queue(), &qi.WorkspaceID); shard != nil {
-			shardName = shard.Name
-		}
-	}
+	// TODO: FIX
 
 	keys := []string{
 		q.u.kg.FnQueueSet(partitionName),
 		q.u.kg.QueueItem(),
-		q.u.kg.GlobalPartitionIndex(),         // Global partition queue
-		q.u.kg.ShardPartitionIndex(shardName), // Shard partition queue
-		q.u.kg.PartitionItem(),                // Partition hash
+		q.u.kg.GlobalPartitionIndex(), // Global partition queue
+		q.u.kg.PartitionItem(),        // Partition hash
 	}
 	status, err := scripts["queue/requeueByID"].Exec(
 		redis_telemetry.WithScriptName(ctx, "requeueByID"),
@@ -1358,13 +1326,6 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
-	var shardName string
-	if q.sf != nil {
-		if shard := q.sf(ctx, item.Queue(), &item.WorkspaceID); shard != nil {
-			shardName = shard.Name
-		}
-	}
-
 	// Grab all partitions for the queue item
 	parts := q.ItemPartitions(ctx, item)
 	for _, partition := range parts {
@@ -1396,7 +1357,6 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		parts[2].concurrencyKey(q.u.kg),
 		q.u.kg.ConcurrencyIndex(),
 		q.u.kg.GlobalPartitionIndex(),
-		q.u.kg.ShardPartitionIndex(shardName),
 		q.u.kg.ThrottleKey(item.Data.Throttle),
 		// Finally, there are ALWAYS account-level concurrency keys.
 		q.u.kg.Concurrency("account", item.Data.Identifier.AccountID.String()),
@@ -1637,13 +1597,6 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 	// Update the wall time that this should run at.
 	i.WallTimeMS = at.UnixMilli()
 
-	var shardName string
-	if q.sf != nil {
-		if shard := q.sf(ctx, i.Queue(), &i.WorkspaceID); shard != nil {
-			shardName = shard.Name
-		}
-	}
-
 	// Remove all items from all partitions.  For this, we need all partitions for
 	// the queue item instead of just the partition passed via args.
 	//
@@ -1661,7 +1614,6 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		q.u.kg.Concurrency("custom", customKeys[0]),
 		q.u.kg.Concurrency("custom", customKeys[1]),
 		q.u.kg.ConcurrencyIndex(),
-		q.u.kg.ShardPartitionIndex(shardName),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.u.kg) {
@@ -1670,11 +1622,11 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		}
 	}
 
+	// TODO: FIX
 	args, err := StrSlice([]any{
 		i,
 		i.ID,
 		at.UnixMilli(),
-		i.Queue(),
 	})
 	if err != nil {
 		return err

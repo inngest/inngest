@@ -20,15 +20,14 @@ local customConcurrencyKeyA   = KEYS[8] -- Optional for eg. for concurrency amon
 local customConcurrencyKeyB   = KEYS[9] -- Optional for eg. for concurrency amongst steps
 -- We push pointers to partition concurrency items to the partition concurrency item
 local concurrencyPointer      = KEYS[10]
-local shardPointerKey         = KEYS[11]
 local keyItemIndexA           = KEYS[12]          -- custom item index 1
 local keyItemIndexB           = KEYS[13]          -- custom item index 2
 
 local queueItem               = ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID                 = ARGV[2]           -- id
 local queueScore              = tonumber(ARGV[3]) -- vesting time, in ms
-local functionID              = ARGV[4]           -- workflowID
-local partitionItem           = ARGV[5]           -- {workflow, priority, leasedAt, etc}
+-- local functionID              = ARGV[4]           -- workflowID
+-- local partitionItem           = ARGV[5]           -- {workflow, priority, leasedAt, etc}
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)

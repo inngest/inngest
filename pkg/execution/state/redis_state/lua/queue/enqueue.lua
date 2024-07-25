@@ -8,30 +8,26 @@ Enqueus an item within the queue.
 local queueKey            = KEYS[1]           -- queue:item - hash: { $itemID: $item }
 local keyPartitionMap     = KEYS[2]           -- partition:item - hash: { $workflowID: $partition }
 local keyGlobalPointer    = KEYS[3]           -- partition:sorted - zset
-local shardIndexKey       = KEYS[4]           -- shard:$name:sorted - zset
-local shardMapKey         = KEYS[5]           -- shards - hmap of shards
-local idempotencyKey      = KEYS[6]           -- seen:$key
-local keyFnMetadata       = KEYS[7]           -- fnMeta:$id - hash
-local keyPartitionA       = KEYS[8]           -- queue:sorted:$workflowID - zset
-local keyPartitionB       = KEYS[9]           -- e.g. sorted:c|t:$workflowID - zset
-local keyPartitionC       = KEYS[10]          -- e.g. sorted:c|t:$workflowID - zset
-local keyItemIndexA       = KEYS[11]          -- custom item index 1
-local keyItemIndexB       = KEYS[12]          -- custom item index 2
+local idempotencyKey      = KEYS[4]           -- seen:$key
+local keyFnMetadata       = KEYS[5]           -- fnMeta:$id - hash
+local keyPartitionA       = KEYS[6]           -- queue:sorted:$workflowID - zset
+local keyPartitionB       = KEYS[7]           -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionC       = KEYS[8]          -- e.g. sorted:c|t:$workflowID - zset
+local keyItemIndexA       = KEYS[9]          -- custom item index 1
+local keyItemIndexB       = KEYS[10]          -- custom item index 2
 
 local queueItem           = ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID             = ARGV[2]           -- id
 local queueScore          = tonumber(ARGV[3]) -- vesting time, in milliseconds
 local partitionTime       = tonumber(ARGV[4]) -- score for partition, lower bounded to now in seconds
-local shard               = ARGV[5]
-local shardName           = ARGV[6]
-local nowMS               = tonumber(ARGV[7]) -- now in ms
-local fnMetadata          = ARGV[8]          -- function meta: {paused}
-local partitionItemA      = ARGV[9]
-local partitionItemB      = ARGV[10]
-local partitionItemC      = ARGV[11]
-local partitionIdA        = ARGV[12]
-local partitionIdB        = ARGV[13]
-local partitionIdC        = ARGV[14]
+local nowMS               = tonumber(ARGV[5]) -- now in ms
+local fnMetadata          = ARGV[6]          -- function meta: {paused}
+local partitionItemA      = ARGV[7]
+local partitionItemB      = ARGV[8]
+local partitionItemC      = ARGV[9]
+local partitionIdA        = ARGV[10]
+local partitionIdB        = ARGV[11]
+local partitionIdC        = ARGV[12]
 
 -- $include(get_partition_item.lua)
 -- $include(enqueue_to_partition.lua)
@@ -56,21 +52,6 @@ enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMa
 -- note to future devs: if updating metadata, be sure you do not change the "off"
 -- (i.e. "paused") boolean in the function's metadata.
 redis.call("SET", keyFnMetadata, fnMetadata, "NX")
-
--- If this is a sharded item, upsert the shard.
-if shard ~= "" and shard ~= "null" then
-    -- NOTE: We do not want to overwrite the shard leases, so here
-    -- we fetch the shard item, set the lease values in the passed in shard
-    -- item, then write the updated value.
-    local existingShard = redis.call("HGET", shardMapKey, shardName)
-    if existingShard ~= nil and existingShard ~= false then
-        local updatedShard = cjson.decode(shard)
-        existingShard = cjson.decode(existingShard)
-        updatedShard.leases = existingShard.leases
-        shard = cjson.encode(updatedShard)
-    end
-    redis.call("HSET", shardMapKey, shardName, shard)
-end
 
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then

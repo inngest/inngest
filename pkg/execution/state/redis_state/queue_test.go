@@ -742,8 +742,6 @@ func TestQueueLease(t *testing.T) {
 			require.Equal(t, 1, len(mem))
 		})
 
-		require.Equal(t, item.Queue(), item.FunctionID.String())
-
 		now := time.Now()
 		id, err := q.Lease(ctx, p, item, time.Second, getNow(), nil)
 		require.NoError(t, err)
@@ -1425,7 +1423,7 @@ func TestQueueDequeue(t *testing.T) {
 		})
 
 		t.Run("It should remove the item from the queue index", func(t *testing.T) {
-			items, err := q.Peek(ctx, item.Queue(), time.Now().Add(time.Hour), 10)
+			items, err := q.Peek(ctx, p.zsetKey(q.u.kg), time.Now().Add(time.Hour), 10)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, len(items))
 		})
