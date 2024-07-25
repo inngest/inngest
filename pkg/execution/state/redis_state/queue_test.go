@@ -1236,6 +1236,7 @@ func TestQueueExtendLease(t *testing.T) {
 
 			// And, the account-level concurrency queue is updated
 			acctScore, err := r.ZMScore(q.u.kg.Concurrency("account", item.Data.Identifier.AccountID.String()), item.ID)
+			require.NoError(t, err)
 			require.EqualValues(t, acctScore[0], newScore0[0])
 		})
 
