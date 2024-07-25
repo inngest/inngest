@@ -1273,7 +1273,116 @@ func TestQueueDequeue(t *testing.T) {
 	q := NewQueue(queueClient)
 	ctx := context.Background()
 
+	t.Run("with concurrency keys", func(t *testing.T) {
+		start := time.Now()
+
+		t.Run("with an unleased item", func(t *testing.T) {
+			r.FlushAll()
+			item, err := q.EnqueueItem(ctx, QueueItem{
+				FunctionID: uuid.New(),
+				Data: osqueue.Item{
+					CustomConcurrencyKeys: []state.CustomConcurrency{
+						{
+							Key: util.ConcurrencyKey(
+								enums.ConcurrencyScopeAccount,
+								uuid.Nil,
+								"acct-id",
+							),
+							Limit: 10,
+						},
+						{
+							Key: util.ConcurrencyKey(
+								enums.ConcurrencyScopeFn,
+								uuid.Nil,
+								"fn-id",
+							),
+							Limit: 5,
+						},
+					},
+				},
+			}, start)
+			require.Nil(t, err)
+
+			// First 2 partitions will be custom.
+			parts := q.ItemPartitions(ctx, item)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[1].PartitionType)
+
+			err = q.Dequeue(ctx, QueuePartition{}, item)
+			require.Nil(t, err)
+
+			t.Run("The outstanding partition items should be empty", func(t *testing.T) {
+				mem, _ := r.ZMembers(parts[0].zsetKey(q.u.kg))
+				require.Equal(t, 0, len(mem))
+
+				mem, _ = r.ZMembers(parts[1].zsetKey(q.u.kg))
+				require.NoError(t, err)
+				require.Equal(t, 0, len(mem))
+			})
+		})
+
+		t.Run("with a leased item", func(t *testing.T) {
+			r.FlushAll()
+			item, err := q.EnqueueItem(ctx, QueueItem{
+				FunctionID: uuid.New(),
+				Data: osqueue.Item{
+					CustomConcurrencyKeys: []state.CustomConcurrency{
+						{
+							Key: util.ConcurrencyKey(
+								enums.ConcurrencyScopeAccount,
+								uuid.Nil,
+								"acct-id",
+							),
+							Limit: 10,
+						},
+						{
+							Key: util.ConcurrencyKey(
+								enums.ConcurrencyScopeFn,
+								uuid.Nil,
+								"fn-id",
+							),
+							Limit: 5,
+						},
+					},
+				},
+			}, start)
+			require.Nil(t, err)
+
+			// First 2 partitions will be custom.
+			parts := q.ItemPartitions(ctx, item)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[1].PartitionType)
+
+			id, err := q.Lease(ctx, QueuePartition{}, item, 10*time.Second, time.Now(), nil)
+			require.NoError(t, err)
+			require.NotEmpty(t, id)
+
+			err = q.Dequeue(ctx, QueuePartition{}, item)
+			require.Nil(t, err)
+
+			t.Run("The outstanding partition items should be empty", func(t *testing.T) {
+				mem, _ := r.ZMembers(parts[0].zsetKey(q.u.kg))
+				require.Equal(t, 0, len(mem))
+
+				mem, _ = r.ZMembers(parts[1].zsetKey(q.u.kg))
+				require.NoError(t, err)
+				require.Equal(t, 0, len(mem))
+			})
+
+			t.Run("The concurrenty partition items should be empty", func(t *testing.T) {
+				mem, _ := r.ZMembers(parts[0].concurrencyKey(q.u.kg))
+				require.Equal(t, 0, len(mem))
+
+				mem, _ = r.ZMembers(parts[1].concurrencyKey(q.u.kg))
+				require.NoError(t, err)
+				require.Equal(t, 0, len(mem))
+			})
+		})
+	})
+
 	t.Run("It should remove a queue item", func(t *testing.T) {
+		r.FlushAll()
+
 		start := time.Now()
 
 		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
@@ -1355,7 +1464,6 @@ func TestQueueDequeue(t *testing.T) {
 		})
 	})
 
-	// TODO: This should work for custom concurrency keys.
 }
 
 func TestQueueRequeue(t *testing.T) {
