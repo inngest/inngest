@@ -848,7 +848,7 @@ ProcessLoop:
 				Tags:    map[string]any{"status": status},
 			})
 			break ProcessLoop
-		case ErrConcurrencyLimitCustomKey0, ErrConcurrencyLimitCustomKey1:
+		case ErrConcurrencyLimitCustomKey:
 			ctrConcurrency++
 			// Custom concurrency keys are different.  Each job may have a different key,
 			// so we cannot break the loop in case the next job has a different key and

@@ -5,10 +5,11 @@ Output:
   1: Queue item not found
   2: Queue item already leased
 
-  3: No function capacity
-  4: No account capacity
-  5: No custom capacity 1
-  6: No custom capacity 2
+  3: First partition concurrnecy limit hit
+  4: Second partition concurrnecy limit hit
+  5: Third partition concurrnecy limit hit
+
+  6: Account concurrency limit hit
 
   7: Rate limited via throttling;  no capacity.
 
@@ -19,31 +20,29 @@ local keyPartitionA          = KEYS[2]           -- queue:sorted:$workflowID - z
 local keyPartitionB          = KEYS[3]           -- e.g. sorted:c|t:$workflowID - zset
 local keyPartitionC          = KEYS[4]          -- e.g. sorted:c|t:$workflowID - zset
 
-local partitionKey           = KEYS[5]
 -- We push our queue item ID into each concurrency queue
-local accountConcurrencyKey  = KEYS[6] -- Account concurrency level
-local functionConcurrencyKey = KEYS[7] -- When leasing an item we need to place the lease into this key.
-local customConcurrencyKeyA  = KEYS[8] -- Optional for eg. for concurrency amongst steps
-local customConcurrencyKeyB  = KEYS[9] -- Optional for eg. for concurrency amongst steps
+local keyConcurrencyA  = KEYS[5] -- Account concurrency level
+local keyConcurrencyB  = KEYS[6] -- When leasing an item we need to place the lease into this key.
+local keyConcurrencyC  = KEYS[7] -- Optional for eg. for concurrency amongst steps
 -- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer     = KEYS[10]
-local globalPointerKey       = KEYS[11]
-local shardPointerKey        = KEYS[12]
-local throttleKey            = KEYS[13] -- key used for throttling function run starts.
+local concurrencyPointer     = KEYS[8]
+local globalPointerKey       = KEYS[9]
+local shardPointerKey        = KEYS[10]
+local throttleKey            = KEYS[11] -- key used for throttling function run starts.
+local keyAcctConcurrency     = KEYS[12]       
 
-local queueID                = ARGV[1]
-local newLeaseKey            = ARGV[2]
-local currentTime            = tonumber(ARGV[3]) -- in ms
--- We check concurrency limits when leasing queue items: an account-level concurrency limit,
--- and a custom key.  The custom key is option.  It's used to add concurrency limits to individual
--- steps across differing functions
-local accountConcurrency     = tonumber(ARGV[4])
-local partitionConcurrency   = tonumber(ARGV[5])
-local customConcurrencyA     = tonumber(ARGV[6])
-local customConcurrencyB     = tonumber(ARGV[7])
-local partitionIdA        = ARGV[8]
-local partitionIdB        = ARGV[9]
-local partitionIdC        = ARGV[10]
+local queueID      = ARGV[1]
+local newLeaseKey  = ARGV[2]
+local currentTime  = tonumber(ARGV[3]) -- in ms
+local partitionIdA = ARGV[4]
+local partitionIdB = ARGV[5]
+local partitionIdC = ARGV[6]
+-- We check concurrency limits when leasing queue items.
+local concurrencyA    = tonumber(ARGV[7])
+local concurrencyB    = tonumber(ARGV[8])
+local concurrencyC    = tonumber(ARGV[9])
+-- And we always check against account concurrency limits
+local concurrencyAcct = tonumber(ARGV[10])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -87,23 +86,23 @@ end
 -- Check the concurrency limits for the account and custom key;  partition keys are checked when
 -- leasing the partition and do not need to be checked again (only one worker can run a partition at
 -- once, and the capacity is kept in memory after leasing a partition)
-if partitionConcurrency > 0 then
-    if check_concurrency(currentTime, functionConcurrencyKey, partitionConcurrency) <= 0 then
+if concurrencyA > 0 then
+    if check_concurrency(currentTime, keyConcurrencyA, concurrencyA) <= 0 then
         return 3
     end
 end
-if accountConcurrency > 0 then
-    if check_concurrency(currentTime, accountConcurrencyKey, accountConcurrency) <= 0 then
+if concurrencyB > 0 then
+    if check_concurrency(currentTime, keyConcurrencyB, concurrencyB) <= 0 then
         return 4
     end
 end
-if customConcurrencyA > 0 then
-    if check_concurrency(currentTime, customConcurrencyKeyA, customConcurrencyA) <= 0 then
+if concurrencyC > 0 then
+    if check_concurrency(currentTime, keyConcurrencyC, concurrencyC) <= 0 then
         return 5
     end
 end
-if customConcurrencyB > 0 then
-    if check_concurrency(currentTime, customConcurrencyKeyB, customConcurrencyB) <= 0 then
+if concurrencyAcct > 0 then
+    if check_concurrency(currentTime, keyAcctConcurrency, concurrencyAcct) <= 0 then
         return 6
     end
 end
@@ -112,48 +111,52 @@ end
 item.leaseID = newLeaseKey
 redis.call("HSET", queueKey, queueID, cjson.encode(item))
 
--- Add the item to all concurrency keys
-redis.call("ZADD", functionConcurrencyKey, nextTime, item.id)
+local function handleEnqueue(keyPartition, keyConcurrency, partitionID)
+	-- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
+	-- and store din functionConcurrencyKey.
+	redis.call("ZREM", keyPartition, item.id)
+	-- Update the fn's score in the global pointer queue to the next job, if available.
+	local score = get_fn_partition_score(keyPartition)
+
+	-- NOTE: The global partition ID isn't the actual partition zset key for backwards compatibility.
+	-- Instead, they are the partition IDs, which is either the partition ZSET (for new concurrency
+	-- key partitions) OR the function ID (for default partitions).
+	-- 
+	-- The first version of the queue used function UUIDs as queue names, and the global pointer
+	-- expected just the function UUIDs instead of a fully defined redis key.
+	update_pointer_score_to(partitionID, globalPointerKey, score)
+
+	-- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
+	-- so that expired leases can be re-processed.  We want to take the earliest time from the
+	-- concurrenqy queue such that we get a previously lost job if possible.
+
+	local inProgressScores = redis.call("ZRANGE", keyConcurrency, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+	if inProgressScores ~= false then
+		local earliestLease = tonumber(inProgressScores[2])
+		-- Add the earliest time to the pointer queue for in-progress, allowing us to scavenge
+		-- lost jobs easily.
+		redis.call("ZADD", concurrencyPointer, earliestLease, keyConcurrency)
+	end
+end
+
+
+-- Always add this to acct level concurrency queues
+redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
+
 -- NOTE: We check if concurrency > 0 here because this disables concurrency.  AccountID
 -- and custom concurrency items may not be set, but the keys need to be set for clustered
 -- mode.
-if accountConcurrency > 0 then
-    redis.call("ZADD", accountConcurrencyKey, nextTime, item.id)
+if concurrencyA > 0 then
+	redis.call("ZADD", keyConcurrencyA, nextTime, item.id)
+	handleEnqueue(keyPartitionA, keyConcurrencyA, partitionIdA)
 end
-if customConcurrencyA > 0 then
-    redis.call("ZADD", customConcurrencyKeyA, nextTime, item.id)
+if concurrencyB > 0 then
+	redis.call("ZADD", keyConcurrencyB, nextTime, item.id)
+	handleEnqueue(keyPartitionB, keyConcurrencyB, partitionIdB)
 end
-if customConcurrencyB > 0 then
-    redis.call("ZADD", customConcurrencyKeyB, nextTime, item.id)
-end
-
-
--- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
--- and store din functionConcurrencyKey.
-redis.call("ZREM", keyPartitionA, item.id)
-redis.call("ZREM", keyPartitionB, item.id)
-redis.call("ZREM", keyPartitionC, item.id)
-
--- Update the fn's score in the global pointer queue to the next job, if available.
-local scoreA = get_fn_partition_score(keyPartitionA)
-local scoreB = get_fn_partition_score(keyPartitionB)
-local scoreC = get_fn_partition_score(keyPartitionB)
-
--- TODO: ALL
-update_pointer_score_to(partitionIdA, globalPointerKey, scoreA)
-update_pointer_score_to(partitionIdB, globalPointerKey, scoreB)
-update_pointer_score_to(partitionIdC, globalPointerKey, scoreC)
-
--- Get the earliest item in the partition/fn concurrency set - all items that have
--- been leased and are in progress.  If the current lease is the only item in the set, we'll
--- get the current lease.  Otherwise, we might get a lost job or a previously lost job.
-local inProgressScores = redis.call("ZRANGE", functionConcurrencyKey, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1,
-    "WITHSCORES")
-if inProgressScores ~= false then
-    local earliestLease = tonumber(inProgressScores[2])
-    -- Add the earliest time to the pointer queue for in-progress, allowing us to scavenge
-    -- lost jobs easily.
-    redis.call("ZADD", concurrencyPointer, earliestLease, partitionIdA)
+if concurrencyC > 0 then
+	redis.call("ZADD", keyConcurrencyC, nextTime, item.id)
+	handleEnqueue(keyPartitionC, keyConcurrencyC, partitionIdC)
 end
 
 return 0
