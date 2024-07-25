@@ -8,14 +8,21 @@ const {
   theme: { backgroundColor, textColor, borderColor },
 } = resolveConfig(tailwindConfig);
 
-function resolveColor(colorValue) {
+const defaultColor = '#f6f6f6'; // carbon 50
+
+// Transform css variables into format that monaco can read
+function resolveColor(colorValue: string): string {
   if (typeof window === 'undefined') {
-    // We're in a server-side environment
-    return '#ffffff'; // Default dark color
+    return defaultColor;
   }
 
   // Extract the CSS variable name from the color value
-  const variableName = colorValue.match(/var\((.*?)\)/)[1];
+  const match = colorValue.match(/var\((.*?)\)/);
+  if (!match || !match[1]) {
+    console.warn(`Invalid color value format: ${colorValue}`);
+    return defaultColor;
+  }
+  const variableName = match[1];
 
   // Get the computed style
   const computedStyle = window.getComputedStyle(document.documentElement);
@@ -23,19 +30,30 @@ function resolveColor(colorValue) {
   // Get the RGB values
   const rgbValues = computedStyle.getPropertyValue(variableName).trim();
 
-  // If we couldn't get the RGB values, return a default color
   if (!rgbValues) {
-    return '#ffffff';
+    console.warn(`Could not resolve color for variable: ${variableName}`);
+    return defaultColor;
   }
 
   // Split the RGB values and convert to numbers
-  const [r, g, b] = rgbValues.split(' ').map(Number);
+  const rgbArray = rgbValues.split(' ').map(Number);
 
-  // Convert to hex
+  if (rgbArray.length !== 3 || rgbArray.some(isNaN)) {
+    console.warn(`Invalid RGB values: ${rgbValues}`);
+    return defaultColor;
+  }
+
+  const [r, g, b] = rgbArray;
+
+  if (typeof r !== 'number' || typeof g !== 'number' || typeof b !== 'number') {
+    console.warn(`Unexpected non-number values in RGB: ${rgbValues}`);
+    return defaultColor;
+  }
+
   return rgbToHex(r, g, b);
 }
 
-function rgbToHex(r, g, b) {
+function rgbToHex(r: number, g: number, b: number): string {
   return (
     '#' +
     [r, g, b]
