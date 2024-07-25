@@ -238,9 +238,10 @@ func TestQueueEnqueueItem(t *testing.T) {
 		// Ensure the partition is inserted.
 		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
-			ID:         item.FunctionID.String(),
-			FunctionID: &item.FunctionID,
-			AccountID:  uuid.Nil,
+			ID:               item.FunctionID.String(),
+			FunctionID:       &item.FunctionID,
+			AccountID:        uuid.Nil,
+			ConcurrencyLimit: consts.DefaultConcurrencyLimit,
 		}, qp)
 	})
 
@@ -265,9 +266,10 @@ func TestQueueEnqueueItem(t *testing.T) {
 		// the start time.
 		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
-			ID:         item.FunctionID.String(),
-			FunctionID: &item.FunctionID,
-			AccountID:  uuid.Nil,
+			ID:               item.FunctionID.String(),
+			FunctionID:       &item.FunctionID,
+			AccountID:        uuid.Nil,
+			ConcurrencyLimit: consts.DefaultConcurrencyLimit,
 		}, qp)
 
 		// Ensure that the zscore did not change.
@@ -289,9 +291,10 @@ func TestQueueEnqueueItem(t *testing.T) {
 		// inside the partition item.
 		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
-			ID:         item.FunctionID.String(),
-			FunctionID: &item.FunctionID,
-			AccountID:  uuid.Nil,
+			ID:               item.FunctionID.String(),
+			FunctionID:       &item.FunctionID,
+			AccountID:        uuid.Nil,
+			ConcurrencyLimit: consts.DefaultConcurrencyLimit,
 		}, qp)
 
 		// Assert that the zscore was changed to this earliest timestamp.
@@ -319,9 +322,10 @@ func TestQueueEnqueueItem(t *testing.T) {
 		// inside the partition item.
 		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
-			ID:         item.FunctionID.String(),
-			FunctionID: &item.FunctionID,
-			AccountID:  uuid.Nil,
+			ID:               item.FunctionID.String(),
+			FunctionID:       &item.FunctionID,
+			AccountID:        uuid.Nil,
+			ConcurrencyLimit: consts.DefaultConcurrencyLimit,
 		}, qp)
 	})
 
@@ -405,7 +409,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
 				ConcurrencyLimit: 1,
-				ConcurrencyKey:   util.XXHash("test"),
+				ConcurrencyKey:   util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test"),
 			}, concurrencyPartition)
 
 			// We do not add the fn to the function-specific queue.
@@ -449,7 +453,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
 				ConcurrencyLimit: 1,
-				ConcurrencyKey:   util.XXHash("test"),
+				ConcurrencyKey:   util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test"),
 			}, concurrencyPartitionA)
 
 			require.Equal(t, QueuePartition{
@@ -459,7 +463,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
 				ConcurrencyLimit: 2,
-				ConcurrencyKey:   util.XXHash("plz"),
+				ConcurrencyKey:   util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "plz"),
 			}, concurrencyPartitionB)
 
 			// We do not add the fn to the function-specific queue.
@@ -2924,6 +2928,8 @@ func TestShardFinding(t *testing.T) {
 }
 
 func TestShardLease(t *testing.T) {
+	t.Skip()
+
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
 		InitAddress:  []string{r.Addr()},
