@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"math"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 	"unsafe"
+
+	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 
 	"golang.org/x/sync/semaphore"
 
@@ -854,6 +855,7 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 			AccountID:  i.Data.Identifier.AccountID,
 		})
 	} else {
+		// Up to 2 concurrency keys.
 		for _, key := range ckeys {
 			scope, id, checksum, _ := key.ParseKey()
 
@@ -1378,9 +1380,16 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		}
 	}
 
+	// Grab all partitions for the queue item
+	parts := q.ItemPartitions(ctx, item)
+
 	keys := []string{
 		q.u.kg.QueueItem(),
-		q.u.kg.FnQueueSet(item.Queue()),
+
+		parts[0].zsetKey(q.u.kg),
+		parts[1].zsetKey(q.u.kg),
+		parts[2].zsetKey(q.u.kg),
+
 		q.u.kg.PartitionMeta(item.Queue()),
 		q.u.kg.Concurrency("account", item.Data.Identifier.AccountID.String()),
 		q.u.kg.Concurrency("p", item.FunctionID.String()),
@@ -1399,7 +1408,10 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		pc,
 		customLimits[0],
 		customLimits[1],
-		p.Queue(),
+
+		parts[0].ID,
+		parts[1].ID,
+		parts[2].ID,
 	})
 	if err != nil {
 		return nil, err
@@ -1619,10 +1631,17 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		}
 	}
 
+	// Remove all items from all partitions.  For this, we need all partitions for
+	// the queue item instead of just the partition passed via args.
+	//
+	// This is because a single queue item may be present in more than one queue.
+	parts := q.ItemPartitions(ctx, i)
+
 	keys := []string{
 		q.u.kg.QueueItem(),
-		q.u.kg.FnQueueSet(i.Queue()),
-		q.u.kg.PartitionMeta(i.Queue()),
+		parts[0].zsetKey(q.u.kg),
+		parts[1].zsetKey(q.u.kg),
+		parts[2].zsetKey(q.u.kg),
 		q.u.kg.GlobalPartitionIndex(),
 		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
 		q.u.kg.Concurrency("p", i.FunctionID.String()),

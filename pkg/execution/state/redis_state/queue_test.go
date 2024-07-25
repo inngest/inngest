@@ -735,6 +735,12 @@ func TestQueueLease(t *testing.T) {
 			FunctionID: &nilUUID,
 		} // Default workflow ID etc
 
+		t.Run("It should exist in the pending partition queue", func(t *testing.T) {
+			mem, err := r.ZMembers(p.zsetKey(q.u.kg))
+			require.NoError(t, err)
+			require.Equal(t, 1, len(mem))
+		})
+
 		require.Equal(t, item.Queue(), item.FunctionID.String())
 
 		now := time.Now()
@@ -745,6 +751,11 @@ func TestQueueLease(t *testing.T) {
 		require.NotNil(t, item.LeaseID)
 		require.EqualValues(t, id, item.LeaseID)
 		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
+
+		t.Run("It should remove from the pending partition queue", func(t *testing.T) {
+			mem, _ := r.ZMembers(p.zsetKey(q.u.kg))
+			require.Empty(t, mem)
+		})
 
 		t.Run("It should add the item to the partition queue", func(t *testing.T) {
 			count, err := q.InProgress(ctx, "p", uuid.UUID{}.String())
@@ -940,45 +951,72 @@ func TestQueueLease(t *testing.T) {
 		t.Run("With custom concurrency keys", func(t *testing.T) {
 			r.FlushAll()
 			q.customConcurrencyGen = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
-				return nil
-			}
-			q.customConcurrencyGen = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
 				return []state.CustomConcurrency{
 					{
-						Key:   "custom-level-key",
-						Limit: 1,
+						Key: util.ConcurrencyKey(
+							enums.ConcurrencyScopeAccount,
+							uuid.Nil,
+							"acct-id",
+						),
+						Limit: 10,
+					},
+					{
+						Key: util.ConcurrencyKey(
+							enums.ConcurrencyScopeFn,
+							uuid.Nil,
+							"fn-id",
+						),
+						Limit: 5,
 					},
 				}
 			}
+
 			defer func() {
+				// reset
 				q.customConcurrencyGen = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
 					return nil
 				}
 			}()
 
-			// NOTE: We need two items to ensure that this updates.  Leasing an
-			// item removes it from the fn queue.
-			t.Run("With a single item in the queue hwen leasing, nothing updates", func(t *testing.T) {
+			t.Run("It moves items from each concurrency queue", func(t *testing.T) {
 				at := time.Now().Truncate(time.Second).Add(time.Second)
 				item, err := q.EnqueueItem(ctx, QueueItem{}, at)
 				require.NoError(t, err)
 
 				// The partition should use a custom ID for the concurrency key.
-				p := q.ItemPartitions(ctx, item)[0]
-				require.Contains(t, p.ID, "<custom-level-key>")
+				p1 := q.ItemPartitions(ctx, item)[0]
+				p2 := q.ItemPartitions(ctx, item)[1]
 
-				score, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), p.ID)
+				require.Equal(t, "{queue}:sorted:c:00000000-0000-0000-0000-000000000000<2gu959eo1zbsi>", p1.ID)
+				require.Equal(t, "{queue}:sorted:c:00000000-0000-0000-0000-000000000000<1x6209w26mx6i>", p2.ID)
+
+				score, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), p2.ID)
 				require.NoError(t, err)
 				require.EqualValues(t, at.Unix(), score, r.Dump())
 
-				// Nothing should update here, as there's nothing left in the fn queue
-				// so nothing happens.
-				_, err = q.Lease(ctx, p, item, 10*time.Second, getNow(), nil)
+				// Do the lease.
+				_, err = q.Lease(ctx, p1, item, 10*time.Second, getNow(), nil)
 				require.NoError(t, err)
 
-				nextScore, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), p.Queue())
-				require.NoError(t, err)
-				require.EqualValues(t, int(score), int(nextScore), "score should not equal previous score")
+				// The queue item is removed from each partition
+				t.Run("The queue item is removed from each partition", func(t *testing.T) {
+					mem, _ := r.ZMembers(p1.zsetKey(q.u.kg))
+					require.Empty(t, mem, "first partition was not empty", p1.zsetKey(q.u.kg))
+
+					mem, _ = r.ZMembers(p2.zsetKey(q.u.kg))
+					require.Empty(t, mem, "second partition was not empty", p2.zsetKey(q.u.kg))
+				})
+
+				t.Run("Pointer queues don't update with a single tqueue item", func(t *testing.T) {
+					nextScore, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), p1.Queue())
+					require.NoError(t, err)
+					require.EqualValues(t, int(score), int(nextScore), "score should not equal previous score")
+
+					nextScore, err = r.ZScore(defaultQueueKey.GlobalPartitionIndex(), p2.Queue())
+					require.NoError(t, err)
+					require.EqualValues(t, int(score), int(nextScore), "score should not equal previous score")
+
+				})
 			})
 		})
 
@@ -1292,6 +1330,54 @@ func TestQueueRequeue(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 1, len(keys))
 		})
+	})
+
+	t.Run("For a queue item with concurrency keys it requeues all partitions", func(t *testing.T) {
+		r.FlushAll()
+
+		fnID, acctID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte("fn")),
+			uuid.NewSHA1(uuid.NameSpaceDNS, []byte("acct"))
+
+		q.customConcurrencyGen = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
+			return []state.CustomConcurrency{
+				{
+					Key: util.ConcurrencyKey(
+						enums.ConcurrencyScopeAccount,
+						acctID,
+						"test-plz",
+					),
+					Limit: 5,
+				},
+				{
+					Key: util.ConcurrencyKey(
+						enums.ConcurrencyScopeFn,
+						fnID,
+						"another-id",
+					),
+					Limit: 2,
+				},
+			}
+		}
+
+		now := time.Now()
+		item := QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					AccountID: acctID,
+				},
+			},
+		}
+		item, err := q.EnqueueItem(ctx, QueueItem{}, now)
+		require.NoError(t, err)
+
+		p := QueuePartition{FunctionID: &item.FunctionID}
+
+		_, err = q.Lease(ctx, p, item, time.Second, getNow(), nil)
+		require.NoError(t, err)
+
+		t.Fail()
+		// TODO: Shouldn't have to pass in a partition.
 	})
 }
 

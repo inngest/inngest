@@ -15,18 +15,21 @@ Output:
 ]]
 
 local queueKey               = KEYS[1]
-local queueIndexKey          = KEYS[2]
-local partitionKey           = KEYS[3]
+local keyPartitionA          = KEYS[2]           -- queue:sorted:$workflowID - zset
+local keyPartitionB          = KEYS[3]           -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionC          = KEYS[4]          -- e.g. sorted:c|t:$workflowID - zset
+
+local partitionKey           = KEYS[5]
 -- We push our queue item ID into each concurrency queue
-local accountConcurrencyKey  = KEYS[4] -- Account concurrency level
-local functionConcurrencyKey = KEYS[5] -- When leasing an item we need to place the lease into this key.
-local customConcurrencyKeyA  = KEYS[6] -- Optional for eg. for concurrency amongst steps
-local customConcurrencyKeyB  = KEYS[7] -- Optional for eg. for concurrency amongst steps
+local accountConcurrencyKey  = KEYS[6] -- Account concurrency level
+local functionConcurrencyKey = KEYS[7] -- When leasing an item we need to place the lease into this key.
+local customConcurrencyKeyA  = KEYS[8] -- Optional for eg. for concurrency amongst steps
+local customConcurrencyKeyB  = KEYS[9] -- Optional for eg. for concurrency amongst steps
 -- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer     = KEYS[8]
-local globalPointerKey       = KEYS[9]
-local shardPointerKey        = KEYS[10]
-local throttleKey            = KEYS[11] -- key used for throttling function run starts.
+local concurrencyPointer     = KEYS[10]
+local globalPointerKey       = KEYS[11]
+local shardPointerKey        = KEYS[12]
+local throttleKey            = KEYS[13] -- key used for throttling function run starts.
 
 local queueID                = ARGV[1]
 local newLeaseKey            = ARGV[2]
@@ -38,7 +41,9 @@ local accountConcurrency     = tonumber(ARGV[4])
 local partitionConcurrency   = tonumber(ARGV[5])
 local customConcurrencyA     = tonumber(ARGV[6])
 local customConcurrencyB     = tonumber(ARGV[7])
-local partitionName          = ARGV[8] -- Same as fn queue name/workflow ID
+local partitionIdA        = ARGV[8]
+local partitionIdB        = ARGV[9]
+local partitionIdC        = ARGV[10]
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -51,7 +56,7 @@ local partitionName          = ARGV[8] -- Same as fn queue name/workflow ID
 
 -- first, get the queue item.  we must do this and bail early if the queue item
 -- was not found.
-local item                   = get_queue_item(queueKey, queueID)
+local item = get_queue_item(queueKey, queueID)
 if item == nil then
     return 1
 end
@@ -125,15 +130,19 @@ end
 
 -- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
 -- and store din functionConcurrencyKey.
-redis.call("ZREM", queueIndexKey, item.id)
+redis.call("ZREM", keyPartitionA, item.id)
+redis.call("ZREM", keyPartitionB, item.id)
+redis.call("ZREM", keyPartitionC, item.id)
 
 -- Update the fn's score in the global pointer queue to the next job, if available.
-local score = get_fn_partition_score(queueIndexKey)
-update_pointer_score_to(partitionName, globalPointerKey, score)
--- And the same for any shards, as long as the shard name exists.
-if has_shard_key(shardPointerKey) then
-    update_pointer_score_to(partitionName, shardPointerKey, score)
-end
+local scoreA = get_fn_partition_score(keyPartitionA)
+local scoreB = get_fn_partition_score(keyPartitionB)
+local scoreC = get_fn_partition_score(keyPartitionB)
+
+-- TODO: ALL
+update_pointer_score_to(partitionIdA, globalPointerKey, scoreA)
+update_pointer_score_to(partitionIdB, globalPointerKey, scoreB)
+update_pointer_score_to(partitionIdC, globalPointerKey, scoreC)
 
 -- Get the earliest item in the partition/fn concurrency set - all items that have
 -- been leased and are in progress.  If the current lease is the only item in the set, we'll
@@ -144,7 +153,7 @@ if inProgressScores ~= false then
     local earliestLease = tonumber(inProgressScores[2])
     -- Add the earliest time to the pointer queue for in-progress, allowing us to scavenge
     -- lost jobs easily.
-    redis.call("ZADD", concurrencyPointer, earliestLease, partitionName)
+    redis.call("ZADD", concurrencyPointer, earliestLease, partitionIdA)
 end
 
 return 0

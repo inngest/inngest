@@ -9,19 +9,20 @@ Output:
 ]]
 
 local queueKey                = KEYS[1] -- queue:item - hash: { $itemID: $item }
-local queueIndexKey           = KEYS[2] -- queue:sorted:$workflowID - zset
-local partitionKey            = KEYS[3] -- partition:item:$workflowID - hash { n: $leased, len: $enqueued }
-local partitionIndexKey       = KEYS[4] -- partition:sorted - zset
+local keyPartitionA           = KEYS[2]           -- queue:sorted:$workflowID - zset
+local keyPartitionB           = KEYS[3]           -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionC           = KEYS[4]          -- e.g. sorted:c|t:$workflowID - zset
+local partitionIndexKey       = KEYS[5] -- partition:sorted - zset
 -- We push our queue item ID into each concurrency queue
-local accountConcurrencyKey   = KEYS[5] -- Account concurrency level
-local partitionConcurrencyKey = KEYS[6] -- When leasing an item we need to place the lease into this key.
-local customConcurrencyKeyA   = KEYS[7] -- Optional for eg. for concurrency amongst steps
-local customConcurrencyKeyB   = KEYS[8] -- Optional for eg. for concurrency amongst steps
+local accountConcurrencyKey   = KEYS[6] -- Account concurrency level
+local partitionConcurrencyKey = KEYS[7] -- When leasing an item we need to place the lease into this key.
+local customConcurrencyKeyA   = KEYS[8] -- Optional for eg. for concurrency amongst steps
+local customConcurrencyKeyB   = KEYS[9] -- Optional for eg. for concurrency amongst steps
 -- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer      = KEYS[9]
-local shardPointerKey         = KEYS[10]
-local keyItemIndexA           = KEYS[11]          -- custom item index 1
-local keyItemIndexB           = KEYS[12]          -- custom item index 2
+local concurrencyPointer      = KEYS[10]
+local shardPointerKey         = KEYS[11]
+local keyItemIndexA           = KEYS[12]          -- custom item index 1
+local keyItemIndexB           = KEYS[13]          -- custom item index 2
 
 local queueItem               = ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID                 = ARGV[2]           -- id
@@ -37,13 +38,6 @@ local partitionItem           = ARGV[5]           -- {workflow, priority, leased
 local item                    = get_queue_item(queueKey, queueID)
 if item == nil then
     return 1
-end
-
-if item.leaseID ~= nil and item.leaseID ~= cjson.null then
-    -- Remove total number in progress if there's a lease.
-    -- XXX: This is unused and is a rough indicator.  Use concurrency queues for
-    -- an actual indicator.
-    redis.call("HINCRBY", partitionKey, "n", -1)
 end
 
 redis.call("HSET", queueKey, queueID, queueItem)
