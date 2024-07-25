@@ -26,12 +26,13 @@ import { OptionalTooltip } from './OptionalTooltip';
 // for the user to switch context correctly
 const useSwitchablePathname = (): string => {
   const segments = useSelectedLayoutSegments();
-  const segmentsWithoutRouteGroups =
-    segments?.filter((segment) => !segment.startsWith('(') && !segment.endsWith(')')) || [];
+  const segmentsWithoutRouteGroups = segments.filter(
+    (segment) => !segment.startsWith('(') && !segment.endsWith(')')
+  );
   const pathname = usePathname();
 
   // Accounts are not environment specific
-  if (pathname?.match(/^\/settings\//)) {
+  if (pathname.match(/^\/settings\//)) {
     return '/functions';
   }
 
