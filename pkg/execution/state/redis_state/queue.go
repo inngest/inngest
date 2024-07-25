@@ -1079,7 +1079,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	}
 
 	// XXX: If the length of ID >= max, error.
-
 	if i.WallTimeMS == 0 {
 		i.WallTimeMS = at.UnixMilli()
 	}
@@ -1573,19 +1572,9 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Requeue"), redis_telemetry.ScopeQueue)
 
-	var (
-		customKeys = make([]string, 2)
-	)
-
-	if q.customConcurrencyGen != nil {
-		// Get the custom concurrency key, if available.
-		for n, item := range q.customConcurrencyGen(ctx, i) {
-			if n >= 2 {
-				// We only support two concurrency keys right now.
-				break
-			}
-			customKeys[n] = item.Key
-		}
+	now := getNow()
+	if at.Before(now) {
+		at = now
 	}
 
 	// Unset any lease ID as this is requeued.
@@ -1605,14 +1594,16 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 
 	keys := []string{
 		q.u.kg.QueueItem(),
+		q.u.kg.PartitionItem(), // Partition item, map
+		q.u.kg.GlobalPartitionIndex(),
 		parts[0].zsetKey(q.u.kg),
 		parts[1].zsetKey(q.u.kg),
 		parts[2].zsetKey(q.u.kg),
-		q.u.kg.GlobalPartitionIndex(),
+		// And pass in the key queue's concurrency keys.
+		parts[0].concurrencyKey(q.u.kg),
+		parts[1].concurrencyKey(q.u.kg),
+		parts[2].concurrencyKey(q.u.kg),
 		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
-		q.u.kg.Concurrency("p", i.FunctionID.String()),
-		q.u.kg.Concurrency("custom", customKeys[0]),
-		q.u.kg.Concurrency("custom", customKeys[1]),
 		q.u.kg.ConcurrencyIndex(),
 	}
 	// Append indexes
@@ -1622,11 +1613,17 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		}
 	}
 
-	// TODO: FIX
 	args, err := StrSlice([]any{
 		i,
 		i.ID,
 		at.UnixMilli(),
+		now.UnixMilli(),
+		parts[0],
+		parts[1],
+		parts[2],
+		parts[0].ID,
+		parts[1].ID,
+		parts[2].ID,
 	})
 	if err != nil {
 		return err

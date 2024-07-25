@@ -1588,33 +1588,30 @@ func TestQueueRequeue(t *testing.T) {
 		fnID, acctID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte("fn")),
 			uuid.NewSHA1(uuid.NameSpaceDNS, []byte("acct"))
 
-		q.customConcurrencyGen = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
-			return []state.CustomConcurrency{
-				{
-					Key: util.ConcurrencyKey(
-						enums.ConcurrencyScopeAccount,
-						acctID,
-						"test-plz",
-					),
-					Limit: 5,
-				},
-				{
-					Key: util.ConcurrencyKey(
-						enums.ConcurrencyScopeFn,
-						fnID,
-						"another-id",
-					),
-					Limit: 2,
-				},
-			}
-		}
-
 		now := time.Now()
 		item := QueueItem{
 			FunctionID: fnID,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
 					AccountID: acctID,
+				},
+				CustomConcurrencyKeys: []state.CustomConcurrency{
+					{
+						Key: util.ConcurrencyKey(
+							enums.ConcurrencyScopeAccount,
+							acctID,
+							"test-plz",
+						),
+						Limit: 5,
+					},
+					{
+						Key: util.ConcurrencyKey(
+							enums.ConcurrencyScopeFn,
+							fnID,
+							"another-id",
+						),
+						Limit: 2,
+					},
 				},
 			},
 		}
@@ -1625,9 +1622,6 @@ func TestQueueRequeue(t *testing.T) {
 
 		_, err = q.Lease(ctx, p, item, time.Second, getNow(), nil)
 		require.NoError(t, err)
-
-		t.Fail()
-		// TODO: Shouldn't have to pass in a partition.
 	})
 }
 
@@ -2120,24 +2114,21 @@ func TestQueuePartitionRequeue(t *testing.T) {
 
 			fnID, acctID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte("fn")), uuid.NewSHA1(uuid.NameSpaceDNS, []byte("acct"))
 
-			q.customConcurrencyGen = func(ctx context.Context, i QueueItem) []state.CustomConcurrency {
-				return []state.CustomConcurrency{
-					{
-						Key: util.ConcurrencyKey(
-							enums.ConcurrencyScopeAccount,
-							acctID,
-							"test-plz",
-						),
-						Limit: 1,
-					},
-				}
-			}
-
 			item := QueueItem{
 				FunctionID: fnID,
 				Data: osqueue.Item{
 					Identifier: state.Identifier{
 						AccountID: acctID,
+					},
+					CustomConcurrencyKeys: []state.CustomConcurrency{
+						{
+							Key: util.ConcurrencyKey(
+								enums.ConcurrencyScopeAccount,
+								acctID,
+								"test-plz",
+							),
+							Limit: 1,
+						},
 					},
 				},
 			}
