@@ -24,19 +24,19 @@ export default function Monitor({
         href={getNavRoute(activeEnv, 'metrics')}
         collapsed={collapsed}
         text="Metrics"
-        icon={<MetricsIcon className="w-5" />}
+        icon={<MetricsIcon className="h-18px text-muted w-[18px]" />}
       />
       <MenuItem
         href={getNavRoute(activeEnv, 'functions')}
         collapsed={collapsed}
         text="Runs"
-        icon={<RunsIcon className="w-5" />}
+        icon={<RunsIcon className="h-18px text-muted w-[18px]" />}
       />
       <MenuItem
         href={getNavRoute(activeEnv, 'events')}
         collapsed={collapsed}
         text="Event Logs"
-        icon={<EventLogsIcon className="w-5" />}
+        icon={<EventLogsIcon className="h-18px text-muted w-[18px]" />}
       />
     </div>
   );

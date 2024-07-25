@@ -27,7 +27,7 @@ export default async function Layout({ activeEnv, children }: LayoutProps) {
         <div className="flex grow flex-col justify-between">
           <Navigation collapsed={collapsed} activeEnv={activeEnv} />
 
-          <div className="">
+          <div>
             <Integrations collapsed={collapsed} />
             <Help collapsed={collapsed} />
             <Profile collapsed={collapsed} />

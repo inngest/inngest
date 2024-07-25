@@ -25,25 +25,25 @@ export default function Manage({
         href={getNavRoute(activeEnv, 'apps')}
         collapsed={collapsed}
         text="Apps"
-        icon={<AppsIcon className="w-5" />}
+        icon={<AppsIcon className="h-18px text-muted w-[18px]" />}
       />
       <MenuItem
         href={getNavRoute(activeEnv, 'functions')}
         collapsed={collapsed}
         text="Functions"
-        icon={<FunctionsIcon className="w-5" />}
+        icon={<FunctionsIcon className="h-18px text-muted w-[18px]" />}
       />
       <MenuItem
         href={getNavRoute(activeEnv, 'events')}
         collapsed={collapsed}
         text="Events"
-        icon={<EventsIcon className="w-5" />}
+        icon={<EventsIcon className="h-18px text-muted w-[18px]" />}
       />
       <MenuItem
         href={getNavRoute(activeEnv, 'manage/webhooks')}
         collapsed={collapsed}
         text="Webhooks"
-        icon={<WebhooksIcon className="w-5" />}
+        icon={<WebhooksIcon className="h-18px text-muted w-[18px]" />}
       />
     </div>
   );
