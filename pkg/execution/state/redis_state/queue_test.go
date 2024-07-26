@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/consts"
 	"os"
 	"strconv"
 	"strings"
@@ -14,7 +15,6 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -224,8 +224,15 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 	t.Run("It enqueues an item", func(t *testing.T) {
 		id := uuid.New()
+		accountId := uuid.New()
+
 		item, err := q.EnqueueItem(ctx, QueueItem{
 			FunctionID: id,
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					AccountID: accountId,
+				},
+			},
 		}, start)
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.ULID{})
@@ -237,12 +244,21 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		// Ensure the partition is inserted.
 		qp := getDefaultPartition(t, r, item.FunctionID)
+		require.Equal(t, accountId.String(), qp.AccountID.String())
 		require.Equal(t, QueuePartition{
 			ID:               item.FunctionID.String(),
 			FunctionID:       &item.FunctionID,
-			AccountID:        uuid.Nil,
+			AccountID:        accountId,
 			ConcurrencyLimit: consts.DefaultConcurrencyLimit,
 		}, qp)
+
+		// Ensure the account is inserted
+		accountIds := getGlobalAccounts(t, rc)
+		require.Contains(t, accountIds, accountId.String())
+
+		// Ensure the partition is inserted in account partitions
+		partitionIds := getAccountPartitions(t, rc, accountId)
+		require.Contains(t, partitionIds, qp.ID)
 	})
 
 	t.Run("It sets the right item score", func(t *testing.T) {
@@ -1101,6 +1117,7 @@ func TestQueueLease(t *testing.T) {
 			require.EqualValues(t, itemB.AtMS/1000, int(nextScore))
 			require.NotEqualValues(t, int(score), int(nextScore), "score should not equal previous score")
 		})
+
 	})
 }
 
@@ -3266,6 +3283,48 @@ func getDefaultPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) Que
 	return qp
 }
 
+func getGlobalAccounts(t *testing.T, rc rueidis.Client) []string {
+	t.Helper()
+
+	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
+
+	resp := rc.Do(context.Background(), rc.
+		B().
+		Zrangebyscore().
+		Key(kg.GlobalAccountIndex()).
+		Min("0").
+		Max("+inf").
+		Build(),
+	)
+	require.NoError(t, resp.Error())
+
+	strSlice, err := resp.AsStrSlice()
+	require.NoError(t, err)
+
+	return strSlice
+}
+
+func getAccountPartitions(t *testing.T, rc rueidis.Client, accountId uuid.UUID) []string {
+	t.Helper()
+
+	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
+
+	resp := rc.Do(context.Background(), rc.
+		B().
+		Zrangebyscore().
+		Key(kg.AccountPartitionIndex(accountId)).
+		Min("0").
+		Max("+inf").
+		Build(),
+	)
+	require.NoError(t, resp.Error())
+
+	strSlice, err := resp.AsStrSlice()
+	require.NoError(t, err)
+
+	return strSlice
+}
+
 func getPartition(t *testing.T, r *miniredis.Miniredis, pType enums.PartitionType, id uuid.UUID, optionalHash ...string) QueuePartition {
 	t.Helper()
 	hash := ""
@@ -3273,6 +3332,7 @@ func getPartition(t *testing.T, r *miniredis.Miniredis, pType enums.PartitionTyp
 		hash = optionalHash[0]
 	}
 	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
+
 	key := kg.PartitionQueueSet(pType, id.String(), hash)
 	val := r.HGet(kg.PartitionItem(), key)
 
