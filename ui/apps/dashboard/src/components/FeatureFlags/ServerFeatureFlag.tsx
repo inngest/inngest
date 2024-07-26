@@ -23,9 +23,6 @@ export async function getBooleanFlag(
   flag: string,
   { defaultValue = false }: { defaultValue?: boolean } = {}
 ): Promise<boolean> {
-  if (flag === 'new-ia-nav') {
-    return true;
-  }
   const user = await currentUser();
   const { orgId } = auth();
 
