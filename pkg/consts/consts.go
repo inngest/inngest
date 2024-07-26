@@ -69,9 +69,7 @@ const (
 	FunctionIdempotencyPeriod = 24 * time.Hour
 
 	DefaultBatchSizeLimit = 100
-	MaxBatchSizeLimit     = 500
 	DefaultBatchTimeout   = 60 * time.Second
-	MaxBatchTimeout       = 10 * time.Minute
 
 	// MaxEvents is the maximum number of events we can parse in a single batch.
 	MaxEvents = 5_000

@@ -7,7 +7,6 @@ import (
 	"github.com/inngest/inngest/pkg/expressions"
 	"time"
 
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/syscode"
 )
 
@@ -64,12 +63,6 @@ func (c EventBatchConfig) IsValid(ctx context.Context) error {
 			Message: fmt.Sprintf("batch size cannot be smaller than 2: %d", c.MaxSize),
 		}
 	}
-	if c.MaxSize > consts.MaxBatchSizeLimit {
-		return syscode.Error{
-			Code:    syscode.CodeBatchSizeInvalid,
-			Message: fmt.Sprintf("batch size cannot be larger than %d", consts.MaxBatchSizeLimit),
-		}
-	}
 
 	dur, err := time.ParseDuration(c.Timeout)
 	if err != nil {
@@ -83,12 +76,6 @@ func (c EventBatchConfig) IsValid(ctx context.Context) error {
 		return syscode.Error{
 			Code:    syscode.CodeBatchTimeoutInvalid,
 			Message: "batch timeout should be more than 1s",
-		}
-	}
-	if dur > consts.MaxBatchTimeout {
-		return syscode.Error{
-			Code:    syscode.CodeBatchTimeoutInvalid,
-			Message: fmt.Sprintf("batch timeout should be smaller than %s", consts.MaxBatchTimeout),
 		}
 	}
 
