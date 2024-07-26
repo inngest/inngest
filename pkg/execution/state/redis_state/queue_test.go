@@ -396,9 +396,10 @@ func TestQueueEnqueueItem(t *testing.T) {
 			}, now.Add(10*time.Second))
 			require.NoError(t, err)
 
-			// Assert that there's only one partition - the custom concurrency key.
+			// There should be 2 partitions - custom key, and the function
+			// level limit.
 			items, _ := r.HKeys(q.u.kg.PartitionItem())
-			require.Equal(t, 1, len(items))
+			require.Equal(t, 2, len(items))
 
 			concurrencyPartition := getPartition(t, r, enums.PartitionTypeConcurrencyKey, fnID, hash) // nb. also asserts that the partition exists
 
