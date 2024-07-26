@@ -173,7 +173,7 @@ LOOP:
 
 			if err := q.scan(ctx); err != nil {
 				// On scan errors, halt the worker entirely.
-				if errors.Unwrap(err) != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					q.logger.Error().Err(err).Msg("error scanning partition pointers")
 				}
 				break LOOP

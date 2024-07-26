@@ -900,6 +900,31 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 
 			partitions = append(partitions, partition)
 		}
+
+		// BACKWARDS COMPATABILITY FOR PRE-MULTIPLE-PARTITION-PER-ITEM QUEUES.
+		//
+		// As of 2024-07-26, we've refactored this system to have many queues per
+		// function.  If a fn had two concurrency settings: [{ limit: 5 }, { limit: 5, key: "foo"}]
+		// only the items with a key are treated as custom concurrency keys.
+		//
+		// We still need to create a QueuePartition for the function's limit (the first setting in
+		// the above example) for older queue items.
+		//
+		// NOTE: New queue items now always create two concurrency keys in this case.
+		if len(ckeys) == 1 {
+			// Get the function limit from the `concurrencyLimitGetter`.  If this returns
+			// a limit (> 0), create a new PartitionTypeDefault queue partition for the function.
+			_, fn, _ := q.concurrencyLimitGetter(ctx, partitions[0])
+			if fn > 0 {
+				partitions = append(partitions, QueuePartition{
+					ID:               i.FunctionID.String(),
+					PartitionType:    int(enums.PartitionTypeDefault), // Function partition
+					FunctionID:       &i.FunctionID,
+					AccountID:        i.Data.Identifier.AccountID,
+					ConcurrencyLimit: fn,
+				})
+			}
+		}
 	}
 
 	// TODO: check for throttle keys
