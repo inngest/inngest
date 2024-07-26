@@ -2195,25 +2195,26 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			})
 		})
 
-		t.Run("Deletes the partition with an empty queue and a leased job", func(t *testing.T) {
-			requirePartitionScoreEquals(t, r, &idA, next)
+		// We no longer delete queues on requeue;  this should happen on a final dequeue.
+		// t.Run("Deletes the partition with an empty queue and a leased job", func(t *testing.T) {
+		// 	requirePartitionScoreEquals(t, r, &idA, next)
 
-			// Leasing the only job available moves the job into the concurrency queue,
-			// so the partition should be empty. when requeeing.
-			_, err := q.Lease(ctx, p, qi, 10*time.Second, getNow(), nil)
-			require.NoError(t, err)
+		// 	// Leasing the only job available moves the job into the concurrency queue,
+		// 	// so the partition should be empty. when requeeing.
+		// 	_, err := q.Lease(ctx, p, qi, 10*time.Second, getNow(), nil)
+		// 	require.NoError(t, err)
 
-			requirePartitionScoreEquals(t, r, &idA, next)
+		// 	requirePartitionScoreEquals(t, r, &idA, next)
 
-			next := now.Add(time.Hour)
-			err = q.PartitionRequeue(ctx, &p, next, false)
-			require.Error(t, ErrPartitionGarbageCollected, err)
+		// 	next := now.Add(time.Hour)
+		// 	err = q.PartitionRequeue(ctx, &p, next, false)
+		// 	require.Error(t, ErrPartitionGarbageCollected, err)
 
-			loaded := getDefaultPartition(t, r, idA)
+		// 	loaded := getDefaultPartition(t, r, idA)
 
-			// This should unset the force at field.
-			require.Empty(t, loaded.ForceAtMS)
-		})
+		// 	// This should unset the force at field.
+		// 	require.Empty(t, loaded.ForceAtMS)
+		// })
 
 		t.Run("It returns a partition not found error if deleted", func(t *testing.T) {
 			err := q.Dequeue(ctx, p, qi)
