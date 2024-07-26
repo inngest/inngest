@@ -8,6 +8,7 @@ import { RiSearchLine, RiToolsLine } from '@remixicon/react';
 import OrganizationDropdown from '@/components/Navigation/old/OrganizationDropdown';
 import UserDropdown from '@/components/Navigation/old/UserDropdown';
 import InngestLogo from '@/icons/InngestLogo';
+import { getNavEnvs } from '@/queries/server-only/getEnvironment';
 import type { Environment } from '@/utils/environments';
 import { getBooleanFlag } from '../../FeatureFlags/ServerFeatureFlag';
 import EnvironmentSelectMenu from './EnvironmentSelectMenu';
@@ -33,6 +34,11 @@ const BRANCH_PARENT_SLUG = 'branch';
 
 export default async function AppNavigation({ activeEnv, envSlug }: AppNavigationProps) {
   const isEventSearchEnabled = await getBooleanFlag('event-search');
+  const navEnvs = await getNavEnvs();
+
+  const { prodEnv } = navEnvs;
+  const branchEnvs = navEnvs.branchEnvs.edges.map(({ node }) => node);
+  const customEnvs = navEnvs.customEnvs.edges.map(({ node }) => node);
 
   let items: NavItem[] = [
     {
@@ -83,7 +89,12 @@ export default async function AppNavigation({ activeEnv, envSlug }: AppNavigatio
         <Link href={process.env.NEXT_PUBLIC_HOME_PATH as Route}>
           <InngestLogo className="mr-2 mt-0.5 text-white" width={66} />
         </Link>
-        <EnvironmentSelectMenu activeEnv={activeEnv} />
+        <EnvironmentSelectMenu
+          activeEnv={activeEnv}
+          branchEnvs={branchEnvs}
+          customEnvs={customEnvs}
+          prodEnv={prodEnv}
+        />
         <Navigation>
           {visibleItems.map(({ href, text, icon, badge }) => (
             <NavItem key={href} href={href as Route} icon={icon} text={text} badge={badge} />

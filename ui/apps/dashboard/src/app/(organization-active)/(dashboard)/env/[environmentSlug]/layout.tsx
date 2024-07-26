@@ -28,7 +28,7 @@ export default async function RootLayout({
   ) : (
     <>
       <div className="isolate flex h-full flex-col">
-        <AppNavigation activeEnv={env} envSlug={environmentSlug} />
+        <AppNavigation envSlug={environmentSlug} />
 
         <ArchivedEnvBanner env={env} />
         <EnvironmentProvider env={env}>{children}</EnvironmentProvider>

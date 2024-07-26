@@ -38,6 +38,36 @@ const GetProductionWorkspaceDocument = graphql(`
   }
 `);
 
+const GetNavEnvsDocument = graphql(`
+  query GetNavEnvs {
+    prodEnv: defaultEnv {
+      name
+      slug
+      type
+    }
+
+    customEnvs: envs(first: 5, filter: { archived: false, envTypes: [TEST] }) {
+      edges {
+        node {
+          name
+          slug
+          type
+        }
+      }
+    }
+
+    branchEnvs: envs(first: 5, filter: { archived: false, envTypes: [BRANCH_CHILD] }) {
+      edges {
+        node {
+          name
+          slug
+          type
+        }
+      }
+    }
+  }
+`);
+
 type GetEnvironmentParams = {
   environmentSlug: string;
 };
@@ -69,4 +99,8 @@ export async function getProductionEnvironment(): Promise<Environment> {
   }
 
   return environment;
+}
+
+export async function getNavEnvs() {
+  return graphqlAPI.request(GetNavEnvsDocument);
 }

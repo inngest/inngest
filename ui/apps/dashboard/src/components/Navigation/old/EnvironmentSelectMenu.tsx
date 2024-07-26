@@ -7,17 +7,8 @@ import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigati
 import { Listbox, Transition } from '@headlessui/react';
 import { RiCloudLine, RiExpandUpDownLine, RiLoopLeftLine, RiSettings3Line } from '@remixicon/react';
 
-import { useEnvironments } from '@/queries';
 import cn from '@/utils/cn';
-import {
-  EnvironmentType,
-  getDefaultEnvironment,
-  getLegacyTestMode,
-  getSortedBranchEnvironments,
-  getTestEnvironments,
-  type Environment,
-} from '@/utils/environments';
-import isNonEmptyArray from '@/utils/isNonEmptyArray';
+import { EnvironmentType, type Environment } from '@/utils/environments';
 
 // Some URLs cannot just swap between environments,
 // we need to redirect to a less specific resource URL that is shared across environments
@@ -55,39 +46,30 @@ const useSwitchablePathname = (): string => {
   return '/' + segmentsWithoutRouteGroups.join('/');
 };
 
-type EnvironmentSelectMenuProps = {
-  activeEnv?: Environment;
+type Env = {
+  name: string;
+  slug: string;
+  type: EnvironmentType;
 };
 
-export default function EnvironmentSelectMenu({ activeEnv }: EnvironmentSelectMenuProps) {
+type Props = {
+  activeEnv: Env | undefined;
+  branchEnvs: Env[];
+  customEnvs: Env[];
+  prodEnv: Env;
+};
+
+export default function EnvironmentSelectMenu({
+  activeEnv,
+  branchEnvs,
+  customEnvs,
+  prodEnv,
+}: Props) {
   const router = useRouter();
-  const [selected, setSelected] = useState<Environment | null>(null);
+  const [selected, setSelected] = useState<Env>();
   const nextPathname = useSwitchablePathname();
-  const [{ data: envs = [] }] = useEnvironments();
 
-  if (!isNonEmptyArray(envs)) {
-    return (
-      <div className="relative self-stretch border-x border-slate-800">
-        <div className="font-regular flex h-full  w-28 items-center gap-0.5 py-1.5 pl-4 pr-4 text-sm  tracking-wide text-white hover:bg-slate-800 lg:w-36 xl:w-[180px]">
-          <span className="text-shadow pr-4 text-sm font-medium text-white">Loading...</span>
-          <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
-            <RiExpandUpDownLine className="h-5 w-5 text-gray-400" aria-hidden="true" />
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  const defaultEnvironment = getDefaultEnvironment(envs);
-  const includeArchived = false;
-  const legacyTestMode = getLegacyTestMode(envs, includeArchived);
-  const mostRecentlyCreatedBranchEnvironments = getSortedBranchEnvironments(
-    envs,
-    includeArchived
-  ).slice(0, 5);
-  const testEnvironments = getTestEnvironments(envs, includeArchived);
-
-  if (selected === null && activeEnv) {
+  if (!selected && activeEnv) {
     setSelected(activeEnv);
   }
   const isBranchParentSelected = selected?.type === EnvironmentType.BranchParent;
@@ -112,12 +94,7 @@ export default function EnvironmentSelectMenu({ activeEnv }: EnvironmentSelectMe
                 </>
               ) : selected ? (
                 <>
-                  <span
-                    className={cn(
-                      'mr-2 h-2 w-2 flex-shrink-0 rounded-full',
-                      selected.isArchived ? 'bg-slate-300' : 'bg-cyan-500'
-                    )}
-                  />
+                  <span className={'mr-2 h-2 w-2 flex-shrink-0 rounded-full bg-cyan-500'} />
                   <span className="block truncate">
                     {selected.type === EnvironmentType.BranchParent
                       ? 'Branch Environments'
@@ -144,22 +121,17 @@ export default function EnvironmentSelectMenu({ activeEnv }: EnvironmentSelectMe
             leaveTo="opacity-0"
           >
             <Listbox.Options className="bg-slate-940/95 absolute left-0 z-10 mt-2 w-[280px] origin-top-right divide-y divide-dashed divide-slate-700 rounded-md text-sm backdrop-blur focus:outline-none">
-              {defaultEnvironment !== null && <EnvironmentItem environment={defaultEnvironment} />}
+              <EnvironmentItem environment={prodEnv} />
 
-              {legacyTestMode !== null && (
-                <div>
-                  <EnvironmentItem environment={legacyTestMode} name="Test mode" />
-                </div>
-              )}
-
-              {testEnvironments.length > 0 &&
-                testEnvironments.map((env) => <EnvironmentItem key={env.id} environment={env} />)}
+              {customEnvs.map((env) => (
+                <EnvironmentItem key={env.slug} environment={env} />
+              ))}
 
               <div>
                 <div className="px-4 py-3 pb-1 font-medium text-white">Branch Environments</div>
-                {mostRecentlyCreatedBranchEnvironments.length > 0 ? (
-                  mostRecentlyCreatedBranchEnvironments.map((env) => (
-                    <EnvironmentItem key={env.id} environment={env} variant="compact" />
+                {branchEnvs.length > 0 ? (
+                  branchEnvs.map((env) => (
+                    <EnvironmentItem key={env.slug} environment={env} variant="compact" />
                   ))
                 ) : (
                   <Link
@@ -195,27 +167,20 @@ function EnvironmentItem({
   name,
   variant = 'normal',
 }: {
-  environment: Environment;
+  environment: { name: string; slug: string };
   name?: string;
   variant?: 'compact' | 'normal';
 }) {
-  let statusColorClass: string;
-  if (environment.isArchived) {
-    statusColorClass = 'bg-slate-300';
-  } else {
-    statusColorClass = 'bg-teal-500';
-  }
-
   return (
     <Listbox.Option
-      key={environment.id}
+      key={environment.slug}
       value={environment}
       className={cn(
         'flex cursor-pointer items-center gap-3 rounded px-4 py-3 text-sm font-medium text-slate-300 transition-all hover:bg-slate-800 hover:text-white',
         variant === 'compact' && 'py-2'
       )}
     >
-      <span className={cn('block h-2 w-2 shrink-0 rounded-full', statusColorClass)} />
+      <span className={'block h-2 w-2 shrink-0 rounded-full bg-teal-500'} />
       <span className="truncate">{name || environment.name}</span>
     </Listbox.Option>
   );
