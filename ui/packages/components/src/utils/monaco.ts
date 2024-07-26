@@ -11,7 +11,7 @@ const {
 const defaultColor = '#f6f6f6'; // carbon 50
 
 // Transform css variables into format that monaco can read
-function resolveColor(colorValue: string): string {
+function resolveColor(colorValue: string, isDark: boolean): string {
   if (typeof window === 'undefined') {
     return defaultColor;
   }
@@ -24,8 +24,13 @@ function resolveColor(colorValue: string): string {
   }
   const variableName = match[1];
 
+  // Get the appropriate root element based on isDark
+  const root = isDark
+    ? document.querySelector('.dark') || document.documentElement
+    : document.documentElement;
+
   // Get the computed style
-  const computedStyle = window.getComputedStyle(document.documentElement);
+  const computedStyle = window.getComputedStyle(root);
 
   // Get the RGB values
   const rgbValues = computedStyle.getPropertyValue(variableName).trim();
@@ -65,55 +70,54 @@ function rgbToHex(r: number, g: number, b: number): string {
   );
 }
 
-export const RULES = [
+export const createRules = (isDark: boolean) => [
   {
     token: 'delimiter.bracket.json',
-    foreground: resolveColor(textColor.codeDelimiterBracketJson),
+    foreground: resolveColor(textColor.codeDelimiterBracketJson, isDark),
   },
   {
     token: 'string.key.json',
-    foreground: resolveColor(textColor.codeStringKeyJson),
+    foreground: resolveColor(textColor.codeStringKeyJson, isDark),
   },
   {
     token: 'number.json',
-    foreground: resolveColor(textColor.codeNumberJson),
+    foreground: resolveColor(textColor.codeNumberJson, isDark),
   },
   {
     token: 'string.value.json',
-    foreground: resolveColor(textColor.codeStringValueJson),
+    foreground: resolveColor(textColor.codeStringValueJson, isDark),
   },
   {
     token: 'keyword.json',
-    foreground: resolveColor(textColor.codeKeyword),
+    foreground: resolveColor(textColor.codeKeyword, isDark),
   },
   {
     token: 'comment',
     fontStyle: 'italic',
-    foreground: resolveColor(textColor.codeComment),
+    foreground: resolveColor(textColor.codeComment, isDark),
   },
   {
     token: 'string',
-    foreground: resolveColor(textColor.codeString),
+    foreground: resolveColor(textColor.codeString, isDark),
   },
   {
     token: 'keyword',
-    foreground: resolveColor(textColor.codeKeyword),
+    foreground: resolveColor(textColor.codeKeyword, isDark),
   },
   {
     token: 'entity.name.function',
-    foreground: resolveColor(textColor.codeEntityNameFunction),
+    foreground: resolveColor(textColor.codeEntityNameFunction, isDark),
   },
 ];
-console.log(backgroundColor.codeEditor);
 
-export const COLORS = {
-  'editor.background': resolveColor(backgroundColor.codeEditor),
-  'editorLineNumber.foreground': resolveColor(textColor.subtle),
-  'editorLineNumber.activeForeground': resolveColor(textColor.basis),
-  'editorWidget.background': resolveColor(backgroundColor.codeEditor),
-  'editorWidget.border': resolveColor(borderColor.subtle),
-  'editorBracketHighlight.foreground1': resolveColor(textColor.warning),
-};
+export const createColors = (isDark: boolean) => ({
+  'editor.background': resolveColor(backgroundColor.codeEditor, isDark),
+  'editorLineNumber.foreground': resolveColor(textColor.subtle, isDark),
+  'editorLineNumber.activeForeground': resolveColor(textColor.basis, isDark),
+  'editorWidget.background': resolveColor(backgroundColor.codeEditor, isDark),
+  'editorWidget.border': resolveColor(borderColor.subtle, isDark),
+  'editorBracketHighlight.foreground1': resolveColor(textColor.warning, isDark),
+});
 
 export const LINE_HEIGHT = 26;
 export const FONT = {
