@@ -66,6 +66,19 @@ func messageFromMultiErrData(data []byte) (string, error) {
 	return out, nil
 }
 
+// Used to structure Error.Data when there was an HTTP-related error
+type DataHTTPErr struct {
+	Headers    map[string][]string `json:"headers"`
+	StatusCode int                 `json:"status_code"`
+}
+
+func (d DataHTTPErr) ToMap() map[string]any {
+	return map[string]any{
+		"headers":     d.Headers,
+		"status_code": d.StatusCode,
+	}
+}
+
 // Used to structure Error.Data when there are multiple errors (e.g.
 // synchronization validation)
 type DataMultiErr struct {

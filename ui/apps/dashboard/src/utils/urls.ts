@@ -63,6 +63,15 @@ export const pathCreator = {
   function({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
     return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}` as Route;
   },
+  functionCancellations({
+    envSlug,
+    functionSlug,
+  }: {
+    envSlug: string;
+    functionSlug: string;
+  }): Route {
+    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/cancellations` as Route;
+  },
   functionRuns({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
     return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/logs` as Route;
   },

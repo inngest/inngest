@@ -1,9 +1,10 @@
 import { ArchivedEnvBanner } from '@/components/ArchivedEnvBanner';
 import { getEnv } from '@/components/Environments/data';
+import { EnvironmentProvider } from '@/components/Environments/environment-context';
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import Layout from '@/components/Layout/Layout';
 import AppNavigation from '@/components/Navigation/old/AppNavigation';
 import Toaster from '@/components/Toaster';
-import { EnvironmentProvider } from '../../../../../components/Environments/environment-context';
 
 type RootLayoutProps = {
   params: {
@@ -19,14 +20,16 @@ export default async function RootLayout({
   const env = await getEnv(environmentSlug);
   const newIANav = await getBooleanFlag('new-ia-nav');
 
-  return (
+  return newIANav ? (
+    <Layout activeEnv={env}>
+      <ArchivedEnvBanner env={env} />
+      <EnvironmentProvider env={env}>{children}</EnvironmentProvider>
+    </Layout>
+  ) : (
     <>
       <div className="isolate flex h-full flex-col">
-        {newIANav ? (
-          <div className="p-4">coming soon...</div>
-        ) : (
-          <AppNavigation activeEnv={env} envSlug={environmentSlug} />
-        )}
+        <AppNavigation activeEnv={env} envSlug={environmentSlug} />
+
         <ArchivedEnvBanner env={env} />
         <EnvironmentProvider env={env}>{children}</EnvironmentProvider>
       </div>

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"math"
 	"strconv"
 	"strings"
@@ -14,12 +13,18 @@ import (
 	"time"
 	"unsafe"
 
-	"golang.org/x/sync/semaphore"
-
 	"github.com/VividCortex/ewma"
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
+	"github.com/jonboulle/clockwork"
+	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
+	"github.com/rs/zerolog"
+	"golang.org/x/sync/semaphore"
+	"gonum.org/v1/gonum/stat/sampleuv"
+	"lukechampine.com/frand"
+
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -27,17 +32,13 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry"
+	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
-	"github.com/oklog/ulid/v2"
-	"github.com/redis/rueidis"
-	"github.com/rs/zerolog"
-	"gonum.org/v1/gonum/stat/sampleuv"
-	"lukechampine.com/frand"
 )
 
-var (
-	PartitionSelectionMax int64 = 100
-	PartitionPeekMax      int64 = PartitionSelectionMax * 3
+const (
+	PartitionSelectionMax = int64(100)
+	PartitionPeekMax      = PartitionSelectionMax * 3
 )
 
 const (
@@ -123,10 +124,6 @@ var (
 
 var (
 	rnd *frandRNG
-
-	// now is a reference to time.Now and exists for overriding within
-	// specific tests, allowing us to eg. test rate limiting with ease.
-	getNow = time.Now
 )
 
 func init() {
@@ -249,14 +246,14 @@ func WithAsyncInstrumentation() QueueOpt {
 			PkgName: pkgName,
 			Callback: func(ctx context.Context) (int64, error) {
 				dur := time.Hour * 24 * 365
-				return q.partitionSize(ctx, q.u.kg.GlobalPartitionIndex(), getNow().Add(dur))
+				return q.partitionSize(ctx, q.u.kg.GlobalPartitionIndex(), q.clock.Now().Add(dur))
 			},
 		})
 
 		telemetry.GaugeGlobalQueuePartitionAvailable(ctx, telemetry.GaugeOpt{
 			PkgName: pkgName,
 			Callback: func(ctx context.Context) (int64, error) {
-				return q.partitionSize(ctx, q.u.kg.GlobalPartitionIndex(), getNow().Add(PartitionLookahead))
+				return q.partitionSize(ctx, q.u.kg.GlobalPartitionIndex(), q.clock.Now().Add(PartitionLookahead))
 			},
 		})
 
@@ -284,7 +281,7 @@ func WithAsyncInstrumentation() QueueOpt {
 				PkgName: pkgName,
 				Tags:    tags,
 				Callback: func(ctx context.Context) (int64, error) {
-					return q.partitionSize(ctx, q.u.kg.ShardPartitionIndex(shard.Name), getNow().Add(PartitionLookahead))
+					return q.partitionSize(ctx, q.u.kg.ShardPartitionIndex(shard.Name), q.clock.Now().Add(PartitionLookahead))
 				},
 			})
 		}
@@ -381,6 +378,13 @@ func WithBackoffFunc(f backoff.BackoffFunc) func(q *queue) {
 	}
 }
 
+// WithClock allows replacing the queue's default (real) clock by a mock, for testing.
+func WithClock(c clockwork.Clock) func(q *queue) {
+	return func(q *queue) {
+		q.clock = c
+	}
+}
+
 // QueueItemConcurrencyKeyGenerator returns concurrenc keys given a queue item to limits.
 //
 // Each queue item can have its own concurrency keys.  For example, you can define
@@ -419,6 +423,7 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 		backoffFunc:    backoff.DefaultBackoff,
 		shardLeases:    []leasedShard{},
 		shardLeaseLock: &sync.Mutex{},
+		clock:          clockwork.NewRealClock(),
 	}
 
 	for _, opt := range opts {
@@ -517,6 +522,8 @@ type queue struct {
 
 	// backoffFunc is the backoff function to use when retrying operations.
 	backoffFunc backoff.BackoffFunc
+
+	clock clockwork.Clock
 }
 
 // processItem references the queue partition and queue item to be processed by a worker.
@@ -706,7 +713,11 @@ func (q *QueueItem) SetID(ctx context.Context, str string) {
 //
 // We can ONLY do this for the first attempt, and we can ONLY do this for edges that
 // are not sleeps (eg. immediate runs)
-func (q QueueItem) Score() int64 {
+func (q QueueItem) Score(now time.Time) int64 {
+	if now.IsZero() {
+		now = time.Now()
+	}
+
 	// If this is not a start/simple edge/edge error, we can ignore this.
 	if (q.Data.Kind != osqueue.KindStart &&
 		q.Data.Kind != osqueue.KindEdge &&
@@ -717,7 +728,7 @@ func (q QueueItem) Score() int64 {
 	// If this is > 2 seconds in the future, don't mess with the time.
 	// This prevents any accidental fudging of future run times, even if the
 	// kind is edge (which should never exist... but, better to be safe).
-	if q.AtMS > getNow().Add(consts.FutureAtLimit).UnixMilli() {
+	if q.AtMS > now.Add(consts.FutureAtLimit).UnixMilli() {
 		return q.AtMS
 	}
 
@@ -988,9 +999,9 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		i.WallTimeMS = at.UnixMilli()
 	}
 
-	if at.Before(getNow()) {
+	if at.Before(q.clock.Now()) {
 		// Normalize to now to minimize latency.
-		i.WallTimeMS = getNow().UnixMilli()
+		i.WallTimeMS = q.clock.Now().UnixMilli()
 	}
 
 	// Add the At timestamp, if not included.
@@ -1003,11 +1014,11 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	}
 
 	partitionTime := at
-	if at.Before(getNow()) {
+	if at.Before(q.clock.Now()) {
 		// We don't want to enqueue partitions (pointers to fns) before now.
 		// Doing so allows users to stay at the front of the queue for
 		// leases.
-		partitionTime = getNow()
+		partitionTime = q.clock.Now()
 	}
 
 	// Get the queue name from the queue item.  This allows utilization of
@@ -1057,7 +1068,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		partitionTime.Unix(),
 		shard,
 		shardName,
-		getNow().UnixMilli(),
+		q.clock.Now().UnixMilli(),
 		FnMetadata{
 			// enqueue.lua only writes function metadata if it doesn't already exist.
 			// if it doesn't exist, and we're enqueuing something, this implies the fn is not currently paused.
@@ -1140,14 +1151,14 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 	}
 
 	if isPeekNext {
-		i, err := q.decodeQueueItemFromPeek(items[0].(string), getNow())
+		i, err := q.decodeQueueItemFromPeek(items[0].(string), q.clock.Now())
 		if err != nil {
 			return nil, err
 		}
 		return []*QueueItem{i}, nil
 	}
 
-	now := getNow()
+	now := q.clock.Now()
 	return util.ParallelDecode(items, func(val any) (*QueueItem, error) {
 		str, _ := val.(string)
 		return q.decodeQueueItemFromPeek(str, now)
@@ -1205,7 +1216,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID 
 			jobID,
 			strconv.Itoa(int(at.UnixMilli())),
 			partitionName,
-			strconv.Itoa(int(getNow().UnixMilli())),
+			strconv.Itoa(int(q.clock.Now().UnixMilli())),
 		},
 	).AsInt64()
 	if err != nil {
@@ -1288,7 +1299,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		}
 	}
 
-	leaseID, err := ulid.New(ulid.Timestamp(getNow().Add(duration).UTC()), rnd)
+	leaseID, err := ulid.New(ulid.Timestamp(q.clock.Now().Add(duration).UTC()), rnd)
 	if err != nil {
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
@@ -1390,7 +1401,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 		}
 	}
 
-	newLeaseID, err := ulid.New(ulid.Timestamp(getNow().Add(duration).UTC()), rnd)
+	newLeaseID, err := ulid.New(ulid.Timestamp(q.clock.Now().Add(duration).UTC()), rnd)
 	if err != nil {
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
@@ -1632,7 +1643,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	// XXX: Check for function throttling prior to leasing;  if it's throttled we can requeue
 	// the pointer and back off.  A question here is enqueuing new items onto the partition
 	// will reset the pointer update, leading to thrash.
-	now := getNow()
+	now := q.clock.Now()
 	leaseExpires := now.Add(duration).UTC().Truncate(time.Millisecond)
 	leaseID, err := ulid.New(ulid.Timestamp(leaseExpires), rnd)
 	if err != nil {
@@ -2012,7 +2023,7 @@ func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, pri
 func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey string) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "InProgress"), redis_telemetry.ScopeQueue)
 
-	s := getNow().UnixMilli()
+	s := q.clock.Now().UnixMilli()
 	cmd := q.u.unshardedRc.B().Zcount().
 		Key(q.u.kg.Concurrency(prefix, concurrencyKey)).
 		Min(fmt.Sprintf("%d", s)).
@@ -2031,7 +2042,7 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 
 	// Find all items that have an expired lease - eg. where the min time for a lease is between
 	// (0-now] in unix milliseconds.
-	now := fmt.Sprintf("%d", getNow().UnixMilli())
+	now := fmt.Sprintf("%d", q.clock.Now().UnixMilli())
 
 	cmd := q.u.unshardedRc.B().Zrange().
 		Key(q.u.kg.ConcurrencyIndex()).
@@ -2097,7 +2108,7 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 				resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling job '%s': %w", item, err))
 				continue
 			}
-			if err := q.Requeue(ctx, p, qi, getNow()); err != nil {
+			if err := q.Requeue(ctx, p, qi, q.clock.Now()); err != nil {
 				resultErr = multierror.Append(resultErr, fmt.Errorf("error requeueing job '%s': %w", item, err))
 				continue
 			}
@@ -2126,7 +2137,7 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 		return nil, ErrConfigLeaseExceedsLimits
 	}
 
-	now := getNow()
+	now := q.clock.Now()
 	newLeaseID, err := ulid.New(ulid.Timestamp(now.Add(duration)), rnd)
 	if err != nil {
 		return nil, err
@@ -2193,7 +2204,7 @@ func (q *queue) getShards(ctx context.Context) (map[string]*QueueShard, error) {
 func (q *queue) leaseShard(ctx context.Context, shard *QueueShard, duration time.Duration, n int) (*ulid.ULID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "leaseShard"), redis_telemetry.ScopeQueue)
 
-	now := getNow()
+	now := q.clock.Now()
 	leaseID, err := ulid.New(uint64(now.Add(duration).UnixMilli()), rand.Reader)
 	if err != nil {
 		return nil, err
@@ -2236,7 +2247,7 @@ func (q *queue) leaseShard(ctx context.Context, shard *QueueShard, duration time
 func (q *queue) renewShardLease(ctx context.Context, shard *QueueShard, duration time.Duration, leaseID ulid.ULID) (*ulid.ULID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunJobs"), redis_telemetry.ScopeQueue)
 
-	now := getNow()
+	now := q.clock.Now()
 	newLeaseID, err := ulid.New(uint64(now.Add(duration).UnixMilli()), rand.Reader)
 	if err != nil {
 		return nil, err

@@ -56,7 +56,6 @@ export default function VercelConfigure() {
         p.servePath && setPaths(p.servePath.split(','));
         setNotFound(false);
       } else {
-        console.log('shit setting vercel project not found');
         setNotFound(true);
       }
     }
@@ -176,8 +175,7 @@ export default function VercelConfigure() {
             <div className="text-basis text-base">{project.name}</div>
           </div>
           <div className="text-basis mb-2 mt-6 text-2xl font-medium">{project.name}</div>
-          {project.ssoProtection?.deploymentType ===
-            VercelDeploymentProtection.ProdDeploymentURLsAndAllPreviews && (
+          {project.ssoProtection?.deploymentType !== VercelDeploymentProtection.Disabled && (
             <div className="text-accent-intense mb-7 flex flex-row items-center justify-start text-sm leading-tight">
               <RiInformationLine className="mr-1 h-4 w-4" />
               Vercel Deployment Protection might block syncing. Use the deployment protection key
@@ -260,8 +258,8 @@ export default function VercelConfigure() {
               <div className="flex flex-row gap-4">
                 <div
                   className={`border-subtle mt-4 flex w-full flex-col gap-2 rounded-lg border p-6 ${
-                    project.ssoProtection?.deploymentType !==
-                      VercelDeploymentProtection.ProdDeploymentURLsAndAllPreviews && 'bg-disabled'
+                    project.ssoProtection?.deploymentType === VercelDeploymentProtection.Disabled &&
+                    'bg-disabled'
                   }`}
                 >
                   <div className="text-basis text-lg font-medium">Deployment protection key</div>
@@ -273,13 +271,11 @@ export default function VercelConfigure() {
                   </div>
                   <Input
                     className={`text-basis mt-4 h-10 px-2 py-2 text-base ${
-                      project.ssoProtection?.deploymentType !==
-                        VercelDeploymentProtection.ProdDeploymentURLsAndAllPreviews &&
-                      'border-subtle bg-disabled'
+                      project.ssoProtection?.deploymentType ===
+                        VercelDeploymentProtection.Disabled && 'border-subtle bg-disabled'
                     }`}
                     readonly={
-                      project.ssoProtection?.deploymentType !==
-                      VercelDeploymentProtection.ProdDeploymentURLsAndAllPreviews
+                      project.ssoProtection?.deploymentType === VercelDeploymentProtection.Disabled
                     }
                     onChange={({ target: { value } }) =>
                       setProject({ ...project, protectionBypassSecret: value, updated: true })
