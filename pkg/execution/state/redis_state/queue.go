@@ -1571,6 +1571,8 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		q.u.kg.Idempotency(i.ID),
 		q.u.kg.ConcurrencyIndex(),
 		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 		q.u.kg.PartitionItem(),
 	}
 	// Append indexes
@@ -1592,6 +1594,7 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		parts[0].ID,
 		parts[1].ID,
 		parts[2].ID,
+		i.Data.Identifier.AccountID.String(),
 	})
 	if err != nil {
 		return err

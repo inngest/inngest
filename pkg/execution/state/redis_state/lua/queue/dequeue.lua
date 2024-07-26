@@ -19,9 +19,12 @@ local keyAcctConcurrency = KEYS[8]
 local keyIdempotency     = KEYS[9]
 local concurrencyPointer = KEYS[10]
 local keyGlobalPointer   = KEYS[11]
-local keyPartitionMap    = KEYS[12]
-local keyItemIndexA      = KEYS[13]   -- custom item index 1
-local keyItemIndexB      = KEYS[14]  -- custom item index 2
+local keyGlobalAccountPointer = KEYS[12]           -- accounts:sorted - zset
+local keyAccountPartitions    = KEYS[13]           -- accounts:$accountId:partition:sorted - zset
+
+local keyPartitionMap    = KEYS[14]
+local keyItemIndexA      = KEYS[15]   -- custom item index 1
+local keyItemIndexB      = KEYS[16]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local idempotencyTTL = tonumber(ARGV[2])
@@ -29,9 +32,14 @@ local partitionName  = ARGV[3]
 local partitionIdA   = ARGV[4]
 local partitionIdB   = ARGV[5]
 local partitionIdC   = ARGV[6]
+local accountId      = ARGV[7]
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
+-- $include(update_pointer_score.lua)
+-- $include(ends_with.lua)
+-- $include(update_account_queues.lua)
+
 --
 -- Fetch this item to see if it was in progress prior to deleting.
 local item = get_queue_item(keyQueueMap, queueID)
@@ -75,7 +83,6 @@ local function handleDequeue(keyConcurrency, keyPartitionSet, partitionID)
 	-- For each partition, we now have an extra available capacity.  Check the partition's
 	-- score, and ensure that it's updated in the global pointer index.
 	--
-	-- TODO: Update the account pointer index here.
 	local minScores = redis.call("ZRANGE", keyPartitionSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 	if minScores == nil or minScores == false or #minScores == 0 then
 		return
@@ -92,7 +99,9 @@ local function handleDequeue(keyConcurrency, keyPartitionSet, partitionID)
 	if tonumber(currentScore) > earliestScore then
 		-- Update the global index now that there's capacity, even if we've forced, as we now
 		-- have capacity.  Note the earliest score is in MS while partitions are stored in S.
-		redis.call("ZADD", keyGlobalPointer, earliestScore, partitionID)
+    update_pointer_score_to(partitionID, keyGlobalPointer, earliestScore)
+		update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, earliestScore)
+
 		-- Clear the ForceAtMS from the pointer.
 		local existing = get_partition_item(keyPartitionMap, partitionID)
 		existing.forceAtMS = nil
