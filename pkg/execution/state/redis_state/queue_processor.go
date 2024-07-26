@@ -925,9 +925,20 @@ ProcessLoop:
 			// https://linear.app/inngest/issue/INN-3246/lifecycles-add-new-lifecycles-for-fn-env-account-concurrency-limits
 			// }
 		}
+
+		requeue := PartitionConcurrencyLimitRequeueExtension
+		if ctrConcurrency == 0 {
+			// This has been throttled only.  Don't requeue so far ahead, otherwise we'll be waiting longer
+			// than the minimum throttle.
+			//
+			// TODO: When we create throttle queues, requeue this appropriately depending on the throttle
+			//       period.
+			requeue = PartitionThrottleLimitRequeueExtension
+		}
+
 		// Requeue this partition as we hit concurrency limits.
 		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
-		return q.PartitionRequeue(ctx, p, getNow().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+		return q.PartitionRequeue(ctx, p, getNow().Truncate(time.Second).Add(requeue), true)
 	}
 
 	if processErr != nil {
