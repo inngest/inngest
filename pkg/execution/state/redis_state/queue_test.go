@@ -1126,7 +1126,7 @@ func TestQueueExtendLease(t *testing.T) {
 		item = getQueueItem(t, r, item.ID)
 		require.Nil(t, item.LeaseID)
 
-		p := QueuePartition{FunctionID: &item.FunctionID}
+		p := q.ItemPartitions(ctx, item)[0]
 
 		now := time.Now()
 		id, err := q.Lease(ctx, p, item, time.Second, getNow(), nil)
@@ -1149,10 +1149,10 @@ func TestQueueExtendLease(t *testing.T) {
 
 		t.Run("It extends the score of the partition concurrency queue", func(t *testing.T) {
 			at := ulid.Time(nextID.Time())
-			scores := concurrencyQueueScores(t, r, q.u.kg.Concurrency("p", p.FunctionID.String()), time.Now())
+			scores := concurrencyQueueScores(t, r, p.concurrencyKey(q.u.kg), time.Now())
 			require.Len(t, scores, 1)
 			// Ensure that the score matches the lease.
-			require.Equal(t, at, scores[item.ID])
+			require.Equal(t, at, scores[item.ID], "%s not extended\n%s", p.concurrencyKey(q.u.kg), r.Dump())
 		})
 
 		t.Run("It fails with an invalid lease ID", func(t *testing.T) {

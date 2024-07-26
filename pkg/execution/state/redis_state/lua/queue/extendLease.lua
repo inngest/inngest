@@ -71,13 +71,13 @@ end
 -- Items always belong to an account
 redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
 
-if exists_without_ending(keyConcurrencyA, "sorted:-") ~= true then
+if exists_without_ending(keyConcurrencyA, "sorted:-") == true then
 	handleExtendLease(keyConcurrencyA)
 end
-if exists_without_ending(keyConcurrencyB, "sorted:-") ~= true then
+if exists_without_ending(keyConcurrencyB, "sorted:-") == true then
 	handleExtendLease(keyConcurrencyB)
 end
-if exists_without_ending(keyConcurrencyC, "sorted:-") ~= true then
+if exists_without_ending(keyConcurrencyC, "sorted:-") == true then
 	handleExtendLease(keyConcurrencyC)
 end
 

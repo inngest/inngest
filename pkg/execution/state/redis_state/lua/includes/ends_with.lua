@@ -4,5 +4,5 @@ end
 
 -- used to ensure that keys don't terminate in a specific string, but still exist.
 local function exists_without_ending(str, ending)
-   return ending ~= "" and ending ~= nil and ends_with(str, ending) ~= true
+   return str ~= "" and str ~= nil and ends_with(str, ending) == false
 end
