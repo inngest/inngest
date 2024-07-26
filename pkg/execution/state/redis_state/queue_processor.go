@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"runtime/debug"
 	"sync"
@@ -140,6 +141,7 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 
 	go q.claimShards(ctx)
 	go q.claimSequentialLease(ctx)
+
 	go q.runScavenger(ctx)
 
 	tick := time.NewTicker(q.pollTick)
@@ -556,37 +558,10 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 	}
 }
 
-func (q *queue) scan(ctx context.Context) error {
-	if q.capacity() == 0 {
-		return nil
-	}
-
-	// Store the shard that we processed, allowing us to eventually pass this
-	// down to the job for stat tracking.
-	var (
-		shard           *QueueShard
-		metricShardName = "<global>" // default global name for metrics in this function
-	)
-
-	// By default, use the global partition
-	partitionKey := q.u.kg.GlobalPartitionIndex()
-
-	// If this worker has leased shards, those take priority 95% of the time.  There's a 5% chance that the
-	// worker still works on the global queue.
-	existingLeases := q.getShardLeases()
-
-	if len(existingLeases) > 0 {
-		// Pick a random item between the shards.
-		i := rand.Intn(len(existingLeases))
-		shard = &existingLeases[i].Shard
-		// Use the shard partition
-		partitionKey = q.u.kg.ShardPartitionIndex(shard.Name)
-		metricShardName = "<shard>:" + shard.Name
-	}
-
+func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, shard *QueueShard, metricShardName string) error {
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
 	partitions, err := duration(ctx, "partition_peek", func(ctx context.Context) ([]*QueuePartition, error) {
-		return q.partitionPeek(ctx, partitionKey, q.isSequential(), getNow().Add(PartitionLookahead), PartitionPeekMax)
+		return q.partitionPeek(ctx, partitionKey, q.isSequential(), peekUntil, peekLimit)
 	})
 	if err != nil {
 		return err
@@ -625,6 +600,74 @@ func (q *queue) scan(ctx context.Context) error {
 	}
 
 	return eg.Wait()
+}
+
+func (q *queue) scan(ctx context.Context) error {
+	if q.capacity() == 0 {
+		return nil
+	}
+
+	// Store the shard that we processed, allowing us to eventually pass this
+	// down to the job for stat tracking.
+	var (
+		shard           *QueueShard
+		metricShardName = "<global>" // default global name for metrics in this function
+	)
+
+	// By default, use the global partition
+	partitionKey := q.u.kg.GlobalPartitionIndex()
+
+	peekSize := PartitionPeekMax
+	peekUntil := getNow().Add(PartitionLookahead)
+
+	// Randomly scan account partition
+	// TODO Should we determine this for each scan iteration or determine a value at launch time?
+	// TODO We might be able to consolidate logic for handling guaranteed capacity and sequential/account/partition operation modes
+	scanAccounts := !q.isSequential() && rand.Intn(2) == 1
+	if scanAccounts {
+		peekedAccounts, err := q.accountPeek(ctx, false, peekUntil, AccountPeekMax)
+		if err != nil {
+			return fmt.Errorf("could not peek accounts: %w", err)
+		}
+
+		if len(peekedAccounts) == 0 {
+			return nil
+		}
+
+		eg := errgroup.Group{}
+
+		// Reduce number of peeked partitions as we're processing multiple accounts in parallel
+		// Note: This is not optimal as some accounts may have fewer partitions than others and
+		// we're leaving capacity on the table. We'll need to find a better way to determine the
+		// optimal peek size in this case.
+		peekSize = int64(math.Round(float64(PartitionPeekMax / int64(len(peekedAccounts)))))
+
+		// Scan and process account partitions in parallel
+		for _, account := range peekedAccounts {
+			partitionKey = q.u.kg.AccountPartitionIndex(account)
+
+			eg.Go(func() error {
+				return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, shard, metricShardName)
+			})
+		}
+
+		return eg.Wait()
+	}
+
+	// If this worker has leased shards, those take priority 95% of the time.  There's a 5% chance that the
+	// worker still works on the global queue.
+	existingLeases := q.getShardLeases()
+
+	if len(existingLeases) > 0 {
+		// Pick a random item between the shards.
+		i := rand.Intn(len(existingLeases))
+		shard = &existingLeases[i].Shard
+		// Use the shard partition
+		partitionKey = q.u.kg.ShardPartitionIndex(shard.Name)
+		metricShardName = "<shard>:" + shard.Name
+	}
+
+	return q.scanPartition(ctx, partitionKey, peekSize, peekUntil, shard, metricShardName)
 }
 
 // NOTE: Shard is only passed as a reference if the partition was peeked from

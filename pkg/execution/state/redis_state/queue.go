@@ -39,6 +39,7 @@ import (
 var (
 	PartitionSelectionMax int64 = 100
 	PartitionPeekMax      int64 = PartitionSelectionMax * 3
+	AccountPeekMax        int64 = 25
 )
 
 const (
@@ -109,6 +110,7 @@ var (
 	ErrPartitionNotFound             = fmt.Errorf("partition not found")
 	ErrPartitionAlreadyLeased        = fmt.Errorf("partition already leased")
 	ErrPartitionPeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", PartitionPeekMax)
+	ErrAccountPeekMaxExceedsLimits   = fmt.Errorf("account peek exceeded the maximum limit of %d", AccountPeekMax)
 	ErrPartitionGarbageCollected     = fmt.Errorf("partition garbage collected")
 	ErrPartitionPaused               = fmt.Errorf("partition is paused")
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
@@ -1046,7 +1048,7 @@ func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bo
 	}
 
 	status, err := scripts["queue/fnSetPaused"].Exec(
-		redis_telemetry.WithScriptName(ctx, "partitionSetPaused"),
+		redis_telemetry.WithScriptName(ctx, "fnSetPaused"),
 		q.u.unshardedRc,
 		keys,
 		args,
@@ -1975,6 +1977,84 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	return result, nil
 }
 
+func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "accountPeek"), redis_telemetry.ScopeQueue)
+
+	if limit > AccountPeekMax {
+		return nil, ErrAccountPeekMaxExceedsLimits
+	}
+	if limit <= 0 {
+		limit = AccountPeekMax
+	}
+
+	ms := until.UnixMilli()
+
+	isSequential := 0
+	if sequential {
+		isSequential = 1
+	}
+
+	args, err := StrSlice([]any{
+		ms,
+		limit,
+		isSequential,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	peekRet, err := scripts["queue/accountPeek"].Exec(
+		redis_telemetry.WithScriptName(ctx, "accountPeek"),
+		q.u.unshardedRc,
+		[]string{
+			q.u.kg.GlobalAccountIndex(),
+		},
+		args,
+	).AsStrSlice()
+
+	items := make([]uuid.UUID, len(peekRet))
+
+	for i, s := range peekRet {
+		parsed, err := uuid.Parse(s)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse account id from global account queue: %w", err)
+		}
+
+		items[i] = parsed
+	}
+
+	weights := make([]float64, len(items))
+	for i := range items {
+		// TODO Do we need account-specific weights? Then we need to store
+		// a data structure like QueuePartition for accounts (QueueAccount?)
+		accountPriority := PriorityDefault
+		weights[i] = float64(10 - accountPriority)
+	}
+
+	// Some scanners run sequentially, ensuring we always work on the functions with
+	// the oldest run at times in order, no matter the priority.
+	if sequential {
+		n := int(math.Min(float64(len(items)), float64(PartitionSelectionMax)))
+		return items[0:n], nil
+	}
+
+	// We want to weighted shuffle the resulting array random.  This means that many
+	// shared nothing scanners can query for outstanding partitions and receive a
+	// randomized order favouring higher-priority queue items.  This reduces the chances
+	// of contention when leasing.
+	w := sampleuv.NewWeighted(weights, rnd)
+	result := make([]uuid.UUID, len(items))
+	for n := range result {
+		idx, ok := w.Take()
+		if !ok {
+			return nil, ErrWeightedSampleRead
+		}
+		result[n] = items[idx]
+	}
+
+	return result, nil
+}
+
 func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 	for k := range exact {
 		if check == k {
@@ -2438,6 +2518,8 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) err
 
 //nolint:all
 func (q *queue) readFnMetadata(ctx context.Context, fnID uuid.UUID) (*FnMetadata, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "readFnMetadata"), redis_telemetry.ScopeQueue)
+
 	cmd := q.u.unshardedRc.B().Get().Key(q.u.kg.FnMetadata(fnID)).Build()
 	retv := FnMetadata{}
 	err := q.u.unshardedRc.Do(ctx, cmd).DecodeJSON(&retv)
