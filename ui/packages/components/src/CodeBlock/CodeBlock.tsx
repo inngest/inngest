@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
-import { COLORS, FONT, LINE_HEIGHT, RULES } from '@inngest/components/CodeQuery';
 import { CopyButton } from '@inngest/components/CopyButton';
 import { maxRenderedOutputSizeBytes } from '@inngest/components/constants';
 import { useCopyToClipboard } from '@inngest/components/hooks/useCopyToClipboard';
@@ -12,6 +11,7 @@ import { IconOverflowText } from '@inngest/components/icons/OverflowText';
 import { IconShrinkText } from '@inngest/components/icons/ShrinkText';
 import { IconWrapText } from '@inngest/components/icons/WrapText';
 import { cn } from '@inngest/components/utils/classNames';
+import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { RiDownload2Line } from '@remixicon/react';
 import { type editor } from 'monaco-editor';
@@ -77,8 +77,8 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
     monaco.editor.defineTheme('inngest-theme', {
       base: dark ? 'vs-dark' : 'vs',
       inherit: true,
-      rules: RULES,
-      colors: COLORS,
+      rules: dark ? createRules(true) : createRules(false),
+      colors: dark ? createColors(true) : createColors(false),
     });
   }, [monaco, dark]);
 
@@ -236,7 +236,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
         <>
           <div
             className={cn(
-              'border-b border-b-slate-300 bg-slate-50 dark:border-slate-700/20 dark:bg-slate-800/40 dark:shadow'
+              'border-b-subtle bg-canvasBase border-b dark:border-slate-700/20  dark:shadow'
             )}
           >
             <div
