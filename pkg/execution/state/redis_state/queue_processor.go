@@ -129,10 +129,6 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	}
 
 	if q.runMode.guaranteedCapacity {
-		if q.runMode.sequential {
-			return fmt.Errorf("sequential and guaranteed capacity cannot be used together")
-		}
-
 		go q.claimUnleasedGuaranteedCapacity(ctx)
 	}
 

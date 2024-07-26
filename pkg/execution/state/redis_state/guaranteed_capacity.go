@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
@@ -153,7 +154,7 @@ func (q *queue) renewAccountLease(ctx context.Context, guaranteedCapacity *Guara
 	}
 	switch status {
 	case int64(-1):
-		return nil, fmt.Errorf("guaranteed capacity not found")
+		return nil, errGuaranteedCapacityNotFound
 	case int64(-2):
 		return nil, fmt.Errorf("lease not found")
 	case int64(0):
@@ -161,6 +162,10 @@ func (q *queue) renewAccountLease(ctx context.Context, guaranteedCapacity *Guara
 	default:
 		return nil, fmt.Errorf("unknown lease renew return value: %T(%v)", status, status)
 	}
+}
+
+func (q *queue) expireAccountLease(ctx context.Context, guaranteedCapacity *GuaranteedCapacity, leaseID ulid.ULID) (*ulid.ULID, error) {
+	return q.renewAccountLease(ctx, guaranteedCapacity, 0, leaseID)
 }
 
 //nolint:all
@@ -175,18 +180,6 @@ func (q *queue) getAccountLeases() []leasedAccount {
 }
 
 func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context) {
-	if q.gcf == nil {
-		// TODO: Inspect denylists and whether this worker is capable of leasing
-		// accounts.  Note that accounts should only be created for SDK-based workers;
-		// if you use the queue for anything else other than step jobs, the worker
-		// cannot lease jobs.  To this point, we should make this opt-in instead of
-		// opt-out to prevent errors.
-		//
-		// For now, you have to provide a guaranteed capacity finder to lease accounts.
-		q.logger.Info().Msg("no guaranteed capacity finder;  skipping account claiming")
-		return
-	}
-
 	scanTick := time.NewTicker(GuaranteedCapacityTickTime)
 	leaseTick := time.NewTicker(AccountLeaseTime / 2)
 
@@ -197,23 +190,36 @@ func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context) {
 		if q.isSequential() {
 			// Sequential workers never lease accounts.  They always run in order
 			// on the global partition queue.
+			// We perform this check every scan iteration to support claiming
+			// guaranteed capacity if the sequential lease expires for some reason
 			<-scanTick.C
 			continue
 		}
 
 		select {
 		case <-ctx.Done():
-			// TODO: Remove leases immediately from backing store.
 			scanTick.Stop()
 			leaseTick.Stop()
+
+			// Copy the slice to prevent locking/concurrent access.
+			existingLeases := q.getAccountLeases()
+
+			// Attempt to expire all leases ASAP, even if the backing store is single threaded.
+			for _, ls := range existingLeases {
+				// Expire leases immediately from backing store.
+				ls := ls
+				go func(ls leasedAccount) {
+					_, err := q.expireAccountLease(context.Background(), &ls.GuaranteedCapacity, ls.Lease)
+					if err != nil {
+						q.logger.Error().Err(err).Msg("error expiring account lease")
+						return
+					}
+				}(ls)
+			}
+
 			return
 		case <-scanTick.C:
 			go func() {
-				if len(q.accountLeases) >= GuaranteedCapacityLeaseLimit {
-					// We've reached the maximum number of leases we can handle.
-					return
-				}
-
 				if !atomic.CompareAndSwapInt32(&leasing, 0, 1) {
 					// Only one lease can occur at once.
 					q.logger.Debug().Msg("already leasing accounts")
@@ -250,6 +256,12 @@ func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context) {
 				go func(ls leasedAccount) {
 					nextLeaseID, err := q.renewAccountLease(ctx, &ls.GuaranteedCapacity, AccountLeaseTime, ls.Lease)
 					if err != nil {
+						// If guaranteed capacity was removed, we can remove the internal lease state
+						if errors.Is(err, errGuaranteedCapacityNotFound) {
+							q.removeLeasedAccount(ctx, ls.GuaranteedCapacity)
+							return
+						}
+
 						q.logger.Error().Err(err).Msg("error renewing account lease")
 						return
 					}
@@ -285,11 +297,11 @@ func (q *queue) scanGuaranteedCapacity(ctx context.Context) (retry bool, err err
 		return
 	}
 
-	leaseNum := GuaranteedCapacityLeaseLimit - len(guaranteedCapacityMap)
-	// TODO Do we need to check if some leases have expired locally and remove them?
-	//if leaseNum <= 0 {
-	//	return
-	//}
+	// Only lease additional guaranteed capacity if current worker is within limits
+	leaseNum := GuaranteedCapacityLeaseLimit - len(q.getAccountLeases())
+	if leaseNum <= 0 {
+		return
+	}
 
 	for _, guaranteedCapacity := range filteredGuaranteedCapacity[0:leaseNum] {
 		leaseID, err := q.leaseAccount(ctx, guaranteedCapacity, AccountLeaseTime, len(guaranteedCapacity.Leases))
@@ -345,6 +357,23 @@ func (q *queue) addLeasedAccount(ctx context.Context, guaranteedCapacity *Guaran
 		Lease:              lease,
 		GuaranteedCapacity: *guaranteedCapacity,
 	})
+	q.accountLeaseLock.Unlock()
+}
+
+func (q *queue) removeLeasedAccount(ctx context.Context, guaranteedCapacity GuaranteedCapacity) {
+	q.accountLeaseLock.Lock()
+
+	filtered := make([]leasedAccount, len(q.accountLeases)-1)
+	skipped := 0
+	for i, accountLease := range q.accountLeases {
+		if accountLease.GuaranteedCapacity.Name == guaranteedCapacity.Name {
+			skipped += 1
+			continue
+		}
+
+		filtered[i+skipped] = accountLease
+	}
+
 	q.accountLeaseLock.Unlock()
 }
 
