@@ -11,7 +11,7 @@ export const Profile = async ({ collapsed }: { collapsed: boolean }) => {
           {org?.name.substring(0, 2) || '?'}
         </div>
         {!collapsed && (
-          <div className="ml-2 flex flex-col justify-start">
+          <div className="ml-2 flex flex-col items-start justify-start">
             <div className="text-muted leading-1 text-sm">{org?.name}</div>
             <div className="text-subtle text-xs leading-4">
               {user.firstName} {user.lastName}
