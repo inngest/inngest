@@ -610,7 +610,7 @@ func (q *queue) scan(ctx context.Context) error {
 					// TODO: Increase internal metrics
 					return nil
 				}
-				if errors.Unwrap(err) != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					q.logger.Error().Err(err).Msg("error processing partition")
 				}
 				return err
