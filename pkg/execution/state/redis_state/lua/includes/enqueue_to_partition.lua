@@ -119,7 +119,7 @@ local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem,
 			-- So, update the global index such that this partition is found, plz. Tyvm!!
 			updateTo = earliestScore/1000
 
-			update_pointer_score_to(partitionID, keyGlobalPointer, updateTo)
+      update_pointer_score_to(partitionID, keyGlobalPointer, updateTo)
       update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, updateTo)
 		end
 	end
