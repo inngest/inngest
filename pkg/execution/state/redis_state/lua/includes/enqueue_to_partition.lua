@@ -25,7 +25,6 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 	--       
 	--       Because of this discrepancy, we have to pass in a "partitionID" to this function so
 	--       that we can properly do backcompat in the global queue of queues.
-	-- TODO Did we forget to re-add this?
 	redis.call("HSETNX", keyPartitionMap, partitionID, partitionItem) -- store the partition
 
 	-- Potentially update the queue of queues.  
