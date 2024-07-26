@@ -686,7 +686,7 @@ func TestQueuePeek(t *testing.T) {
 			scavengeAt := time.Now().UnixMilli()
 			caught, err = q.Scavenge(ctx)
 			require.NoError(t, err)
-			require.EqualValues(t, 1, caught, "Items not found during scavenge")
+			require.EqualValues(t, 1, caught, "Items not found during scavenge\n%s", r.Dump())
 
 			items, err = q.Peek(ctx, workflowID.String(), d, QueuePeekMax)
 			require.NoError(t, err)

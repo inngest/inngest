@@ -2122,19 +2122,15 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 	// Each of the items is a concurrency queue with lost items.
 	var resultErr error
 	for _, partition := range pKeys {
-		// Fetch the partition.  This uses the concurrency:p: prefix,
-		// so remove the prefix from the item.
-		partitionJSON, err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Hget().Key(q.u.kg.PartitionItem()).Field(partition).Build()).AsBytes()
-		if err == rueidis.Nil {
-			continue
-		}
-		if err != nil {
-			resultErr = multierror.Append(resultErr, fmt.Errorf("error finding partition '%s' during scavenge: %w", partition, err))
-			continue
+
+		// If this is a UUID, assume that this is an old partition queue
+		queueKey := partition
+		if len(partition) == 36 {
+			queueKey = q.u.kg.PartitionQueueSet(enums.PartitionTypeDefault, partition, "")
 		}
 
 		cmd := q.u.unshardedRc.B().Zrange().
-			Key(q.u.kg.Concurrency("p", partition)).
+			Key(queueKey).
 			Min("-inf").
 			Max(now).
 			Byscore().
@@ -2146,12 +2142,6 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 			continue
 		}
 		if len(itemIDs) == 0 {
-			continue
-		}
-
-		p := QueuePartition{}
-		if err := json.Unmarshal([]byte(partitionJSON), &p); err != nil {
-			resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling partition '%s': %w", partitionJSON, err))
 			continue
 		}
 
@@ -2168,7 +2158,7 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 				resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling job '%s': %w", item, err))
 				continue
 			}
-			if err := q.Requeue(ctx, p, qi, getNow()); err != nil {
+			if err := q.Requeue(ctx, QueuePartition{}, qi, getNow()); err != nil {
 				resultErr = multierror.Append(resultErr, fmt.Errorf("error requeueing job '%s': %w", item, err))
 				continue
 			}
