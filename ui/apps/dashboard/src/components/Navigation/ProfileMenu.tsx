@@ -16,9 +16,7 @@ import {
 export const ProfileMenu = ({ children }: { children: ReactNode }) => {
   return (
     <Listbox>
-      <Listbox.Button as="div" className="cursor-pointer ring-0">
-        {children}
-      </Listbox.Button>
+      <Listbox.Button className="w-full cursor-pointer ring-0">{children}</Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase absolute -right-48 bottom-4 z-50 ml-8 w-[199px] rounded border shadow ring-0 focus:outline-none">
           <Listbox.Option

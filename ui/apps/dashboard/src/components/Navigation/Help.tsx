@@ -21,7 +21,7 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
   return (
     <div className="m-2.5">
       <Listbox>
-        <Listbox.Button as="div" className="ring-0">
+        <Listbox.Button className="w-full ring-0">
           <MenuItem
             collapsed={collapsed}
             text="Help and Feedback"
