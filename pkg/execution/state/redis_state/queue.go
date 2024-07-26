@@ -1111,6 +1111,8 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		q.u.kg.QueueItem(),            // Queue item
 		q.u.kg.PartitionItem(),        // Partition item, map
 		q.u.kg.GlobalPartitionIndex(), // Global partition queue
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // new queue items always
 		q.u.kg.Idempotency(i.ID),
 		q.u.kg.FnMetadata(i.FunctionID),
 
@@ -1144,6 +1146,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		parts[0].ID,
 		parts[1].ID,
 		parts[2].ID,
+		i.Data.Identifier.AccountID.String(),
 	})
 
 	if err != nil {
@@ -1288,6 +1291,8 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 		q.u.kg.QueueItem(),
 		q.u.kg.PartitionItem(), // Partition item, map
 		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 
 		parts[0].zsetKey(q.u.kg),
 		parts[1].zsetKey(q.u.kg),
@@ -1303,6 +1308,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 		parts[0].ID,
 		parts[1].ID,
 		parts[2].ID,
+		i.Data.Identifier.AccountID.String(),
 	})
 	if err != nil {
 		return err
@@ -1387,6 +1393,8 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		parts[2].concurrencyKey(q.u.kg),
 		q.u.kg.ConcurrencyIndex(),
 		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(item.Data.Identifier.AccountID),
 		q.u.kg.ThrottleKey(item.Data.Throttle),
 		// Finally, there are ALWAYS account-level concurrency keys.
 		q.u.kg.Concurrency("account", item.Data.Identifier.AccountID.String()),
@@ -1402,6 +1410,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		parts[1].ConcurrencyLimit,
 		parts[2].ConcurrencyLimit,
 		acctLimit,
+		item.Data.Identifier.AccountID,
 	})
 	if err != nil {
 		return nil, err
@@ -1632,6 +1641,8 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		q.u.kg.QueueItem(),
 		q.u.kg.PartitionItem(), // Partition item, map
 		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 		parts[0].zsetKey(q.u.kg),
 		parts[1].zsetKey(q.u.kg),
 		parts[2].zsetKey(q.u.kg),
@@ -1660,6 +1671,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		parts[0].ID,
 		parts[1].ID,
 		parts[2].ID,
+		i.Data.Identifier.AccountID.String(),
 	})
 	if err != nil {
 		return err
@@ -1713,6 +1725,8 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	keys := []string{
 		q.u.kg.PartitionItem(),
 		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(p.AccountID),
 		q.u.kg.FnMetadata(fnMetaKey),
 		// These concurrency keys are for fast checking of partition
 		// concurrnecy limits prior to leasing, as an optimization.
@@ -1732,6 +1746,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		fnConcurrency,
 		customConcurrency,
 		now.Add(PartitionConcurrencyLimitRequeueExtension).Unix(),
+		p.AccountID.String(),
 	})
 
 	if err != nil {
@@ -1826,7 +1841,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		redis_telemetry.WithScriptName(ctx, "partitionPeek"),
 		q.u.Client(),
 		[]string{
-			q.u.kg.GlobalPartitionIndex(),
+			partitionKey,
 			q.u.kg.PartitionItem(),
 		},
 		args,
@@ -1996,6 +2011,8 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 	keys := []string{
 		q.u.kg.PartitionItem(),
 		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(p.AccountID),
 		q.u.kg.ShardPartitionIndex(shardName),
 		q.u.kg.PartitionMeta(p.Queue()), // TODO: Remove?
 		p.zsetKey(q.u.kg),               // Partition ZSET itself
@@ -2010,6 +2027,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		p.Queue(),
 		at.UnixMilli(),
 		force,
+		p.AccountID.String(),
 	})
 	if err != nil {
 		return err

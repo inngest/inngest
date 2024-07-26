@@ -7,7 +7,7 @@ local function enqueue_get_partition_item(partitionKey, id)
 	return nil
 end
 
-local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, queueScore, queueID, partitionTime, nowMS)
+local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyAccountPartitionPointer, queueScore, queueID, partitionTime, nowMS)
 	if partitionID == "" then
 		-- This is a blank partition, so don't even bother.  This allows us to pre-allocate
 		-- 3 partitions per item, even if an item only needs a single partition.
@@ -25,7 +25,6 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 	--       
 	--       Because of this discrepancy, we have to pass in a "partitionID" to this function so
 	--       that we can properly do backcompat in the global queue of queues.
-	redis.call("HSETNX", keyPartitionMap, partitionID, partitionItem) -- store the partition
 
 	-- Potentially update the queue of queues.  
 	local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID) 
@@ -54,11 +53,20 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 			redis.call("ZADD", keyGlobalPointer, partitionTime, partitionID)
 		end
 	end
+
+  -- Potentially update the account partition pointer
+  local currentScore = redis.call("ZSCORE", keyAccountPartitionPointer, partitionID)
+  if currentScore == false or tonumber(currentScore) > partitionTime then
+    local existing = enqueue_get_partition_item(keyPartitionMap, partitionID)
+    if nowMS > existing.forceAtMS then
+      redis.call("ZADD", keyAccountPartitionPointer, partitionTime, partitionID)
+    end
+  end
 end
 
 -- requeue_to_partition is similar to enqueue, but always fetches the minimum score for a partition to
 -- update global pointers instead of using the current queue item's score.
-local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, queueScore, queueID, nowMS)
+local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitionPointer, queueScore, queueID, nowMS, accountID)
 	if partitionID == "" then
 		-- This is a blank partition, so don't even bother.  This allows us to pre-allocate
 		-- 3 partitions per item, even if an item only needs a single partition.
@@ -109,4 +117,22 @@ local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem,
 			redis.call("ZADD", keyGlobalPointer, earliestScore/1000, partitionID)
 		end
 	end
+
+  -- Potentially update the queue of account partitions
+	local currentScore = redis.call("ZSCORE", keyAccountPartitionPointer, partitionID)
+	if currentScore == false or tonumber(currentScore) ~= earliestScore then
+		local existing = enqueue_get_partition_item(keyPartitionMap, partitionID)
+		if nowMS > existing.forceAtMS then
+			redis.call("ZADD", keyAccountPartitionPointer, earliestScore/1000, partitionID)
+		end
+	end
+
+  -- Potentially update the queue of accounts
+  	local currentAccountScore = redis.call("ZSCORE", keyGlobalAccountPointer, accountID)
+  	if currentAccountScore == false or tonumber(currentAccountScore) ~= earliestScore then
+  		local existing = enqueue_get_partition_item(keyPartitionMap, partitionID)
+  		if nowMS > existing.forceAtMS then
+  			redis.call("ZADD", keyGlobalAccountPointer, earliestScore/1000, accountID)
+  		end
+  	end
 end

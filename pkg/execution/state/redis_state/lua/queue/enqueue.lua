@@ -5,16 +5,18 @@ Enqueus an item within the queue.
 
 --]]
 
-local queueKey            = KEYS[1]           -- queue:item - hash: { $itemID: $item }
-local keyPartitionMap     = KEYS[2]           -- partition:item - hash: { $workflowID: $partition }
-local keyGlobalPointer    = KEYS[3]           -- partition:sorted - zset
-local idempotencyKey      = KEYS[4]           -- seen:$key
-local keyFnMetadata       = KEYS[5]           -- fnMeta:$id - hash
-local keyPartitionA       = KEYS[6]           -- queue:sorted:$workflowID - zset
-local keyPartitionB       = KEYS[7]           -- e.g. sorted:c|t:$workflowID - zset
-local keyPartitionC       = KEYS[8]          -- e.g. sorted:c|t:$workflowID - zset
-local keyItemIndexA       = KEYS[9]          -- custom item index 1
-local keyItemIndexB       = KEYS[10]          -- custom item index 2
+local queueKey                = KEYS[1]           -- queue:item - hash: { $itemID: $item }
+local keyPartitionMap         = KEYS[2]           -- partition:item - hash: { $workflowID: $partition }
+local keyGlobalPointer        = KEYS[3]           -- partition:sorted - zset
+local keyGlobalAccountPointer = KEYS[4]           -- accounts:sorted - zset
+local keyAccountPartitions    = KEYS[5]           -- accounts:$accountId:partition:sorted - zset
+local idempotencyKey          = KEYS[6]           -- seen:$key
+local keyFnMetadata           = KEYS[7]           -- fnMeta:$id - hash
+local keyPartitionA           = KEYS[8]           -- queue:sorted:$workflowID - zset
+local keyPartitionB           = KEYS[9]           -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionC           = KEYS[10]          -- e.g. sorted:c|t:$workflowID - zset
+local keyItemIndexA           = KEYS[11]          -- custom item index 1
+local keyItemIndexB           = KEYS[12]          -- custom item index 2
 
 local queueItem           = ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID             = ARGV[2]           -- id
@@ -28,6 +30,7 @@ local partitionItemC      = ARGV[9]
 local partitionIdA        = ARGV[10]
 local partitionIdB        = ARGV[11]
 local partitionIdC        = ARGV[12]
+local accountId           = ARGV[13]
 
 -- $include(get_partition_item.lua)
 -- $include(enqueue_to_partition.lua)
@@ -44,10 +47,15 @@ if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
 end
 
 -- Enqueue to all partitions.
-enqueue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, queueScore, queueID, partitionTime, nowMS)
-enqueue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, queueScore, queueID, partitionTime, nowMS)
-enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, queueScore, queueID, partitionTime, nowMS)
+enqueue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
+enqueue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
+enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
 
+-- Potentially update the account index (global accounts pointers).
+local currentScore = redis.call("ZSCORE", keyGlobalAccountPointer, accountId)
+if currentScore == false or tonumber(currentScore) > partitionTime then
+  redis.call("ZADD", keyGlobalAccountPointer, partitionTime, accountId)
+end
 
 -- note to future devs: if updating metadata, be sure you do not change the "off"
 -- (i.e. "paused") boolean in the function's metadata.
