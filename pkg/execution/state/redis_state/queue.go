@@ -1886,7 +1886,8 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
 		str, _ := val.(string)
 		item := &QueuePartition{}
-		if err = json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), item); err != nil {
+
+		if err = json.Unmarshal([]byte(str), item); err != nil {
 			return nil, fmt.Errorf("error reading partition item: %w", err)
 		}
 		// Track the fn ID for partitions seen.  This allows us to do fast lookups of paused functions
