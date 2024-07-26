@@ -613,9 +613,20 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 		Str("function", fn.Name).
 		Str("function_id", fn.ID.String()).Logger()
 
+	var appID uuid.UUID
+	wsID := evt.GetWorkspaceID()
+	{
+		fn, err := s.cqrs.GetFunctionByInternalUUID(ctx, wsID, fn.ID)
+		if err != nil {
+			return err
+		}
+		appID = fn.AppID
+	}
+
 	if fn.IsBatchEnabled() {
 		bi := batch.BatchItem{
-			WorkspaceID:     evt.GetWorkspaceID(),
+			WorkspaceID:     wsID,
+			AppID:           appID,
 			FunctionID:      fn.ID,
 			FunctionVersion: fn.FunctionVersion,
 			EventID:         evt.GetInternalID(),
@@ -664,7 +675,12 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 	}
 
 	l.Info().Msg("initializing fn")
-	_, err := Initialize(ctx, fn, evt, s.executor)
+	_, err := Initialize(ctx, InitOpts{
+		appID: appID,
+		fn:    fn,
+		evt:   evt,
+		exec:  s.executor,
+	})
 	if err == state.ErrIdentifierExists {
 		// This run exists;  do not attempt to recreate it.
 		return nil
@@ -675,14 +691,25 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 	return err
 }
 
+type InitOpts struct {
+	appID uuid.UUID
+	fn    inngest.Function
+	evt   event.TrackedEvent
+	exec  execution.Executor
+}
+
 // Initialize creates a new funciton run identifier for the given workflow and
 // event, stores this in our state store, then enqueues a new function run
 // within the given queue for execution.
 //
 // This is a separate, exported function so that it can be used from this service
 // and also from eg. the run command.
-func Initialize(ctx context.Context, fn inngest.Function, tracked event.TrackedEvent, e execution.Executor) (*sv2.Metadata, error) {
+func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 	zero := uuid.UUID{}
+	tracked := opts.evt
+	wsID := tracked.GetWorkspaceID()
+	fn := opts.fn
+
 	if bytes.Equal(fn.ID[:], zero[:]) {
 		// Locally, we want to ensure that each function has its own deterministic
 		// UUID for managing state.
@@ -696,7 +723,9 @@ func Initialize(ctx context.Context, fn inngest.Function, tracked event.TrackedE
 	idempotencyKey := tracked.GetEvent().ID
 
 	// If this is a debounced function, run this through a debouncer.
-	md, err := e.Schedule(ctx, execution.ScheduleRequest{
+	md, err := opts.exec.Schedule(ctx, execution.ScheduleRequest{
+		WorkspaceID:    wsID,
+		AppID:          opts.appID,
 		Function:       fn,
 		Events:         []event.TrackedEvent{tracked},
 		IdempotencyKey: &idempotencyKey,

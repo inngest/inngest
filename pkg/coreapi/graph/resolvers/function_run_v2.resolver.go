@@ -2,7 +2,6 @@ package resolvers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -15,19 +14,7 @@ func (r *functionRunV2Resolver) App(
 	ctx context.Context,
 	run *models.FunctionRunV2,
 ) (*cqrs.App, error) {
-	fn, err := r.Function(ctx, run)
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving function: %w", err)
-	}
-
-	// TODO: Replace this with run.AppID. As of this comment, run.AppID is not
-	// set
-	appID, err := uuid.Parse(fn.AppID)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing app ID: %w", err)
-	}
-
-	return r.Data.GetAppByID(ctx, appID)
+	return r.Data.GetAppByID(ctx, run.AppID)
 }
 
 func (r *functionRunV2Resolver) Function(ctx context.Context, fn *models.FunctionRunV2) (*models.Function, error) {
@@ -37,28 +24,6 @@ func (r *functionRunV2Resolver) Function(ctx context.Context, fn *models.Functio
 	}
 
 	return models.MakeFunction(fun)
-}
-
-func (r *functionRunV2Resolver) Triggers(ctx context.Context, fn *models.FunctionRunV2) ([]string, error) {
-	events, err := r.Data.GetEventsByInternalIDs(ctx, fn.TriggerIDs)
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving triggers: %w", err)
-	}
-
-	res := []string{}
-	for _, evt := range events {
-		byt, err := json.Marshal(evt.GetEvent())
-		if err != nil {
-			return nil, fmt.Errorf("invalid event format: %w", err)
-		}
-
-		sevt := string(byt)
-		if sevt != "" {
-			res = append(res, string(byt))
-		}
-	}
-
-	return res, nil
 }
 
 func (r *functionRunV2Resolver) Trace(ctx context.Context, fn *models.FunctionRunV2) (*models.RunTraceSpan, error) {

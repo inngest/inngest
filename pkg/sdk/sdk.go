@@ -79,6 +79,13 @@ type RegisterRequest struct {
 
 	// checksum is a memoized field.
 	checksum string
+
+	Capabilities Capabilities `json:"capabilities"`
+}
+
+type Capabilities struct {
+	InBandSync bool `json:"in_band_sync"`
+	TrustProbe bool `json:"trust_probe"`
 }
 
 type Headers struct {
