@@ -99,7 +99,7 @@ local function handleDequeue(keyConcurrency, keyPartitionSet, partitionID)
 	if tonumber(currentScore) > earliestScore then
 		-- Update the global index now that there's capacity, even if we've forced, as we now
 		-- have capacity.  Note the earliest score is in MS while partitions are stored in S.
-    update_pointer_score_to(partitionID, keyGlobalPointer, earliestScore)
+		update_pointer_score_to(partitionID, keyGlobalPointer, earliestScore)
 		update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, earliestScore)
 
 		-- Clear the ForceAtMS from the pointer.
