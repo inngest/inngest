@@ -1790,9 +1790,9 @@ func TestQueuePartitionLease(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{ID: idA.String(), FunctionID: &idA, AccountID: uuid.Nil},
-			{ID: idB.String(), FunctionID: &idB, AccountID: uuid.Nil},
-			{ID: idC.String(), FunctionID: &idC, AccountID: uuid.Nil},
+			{ID: idA.String(), FunctionID: &idA, AccountID: uuid.Nil, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idB.String(), FunctionID: &idB, AccountID: uuid.Nil, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			{ID: idC.String(), FunctionID: &idC, AccountID: uuid.Nil, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 		}, items)
 	})
 
@@ -1818,14 +1818,15 @@ func TestQueuePartitionLease(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, items, 3)
 			require.EqualValues(t, []*QueuePartition{
-				{ID: idB.String(), FunctionID: &idB, AccountID: uuid.Nil},
-				{ID: idC.String(), FunctionID: &idC, AccountID: uuid.Nil},
+				{ID: idB.String(), FunctionID: &idB, AccountID: uuid.Nil, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+				{ID: idC.String(), FunctionID: &idC, AccountID: uuid.Nil, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 				{
-					ID:         idA.String(),
-					FunctionID: &idA,
-					AccountID:  uuid.Nil,
-					Last:       items[2].Last, // Use the leased partition time.
-					LeaseID:    leaseID,
+					ID:               idA.String(),
+					FunctionID:       &idA,
+					AccountID:        uuid.Nil,
+					Last:             items[2].Last, // Use the leased partition time.
+					LeaseID:          leaseID,
+					ConcurrencyLimit: consts.DefaultConcurrencyLimit,
 				}, // idA is now last.
 			}, items)
 			requirePartitionScoreEquals(t, r, &idA, leaseUntil)

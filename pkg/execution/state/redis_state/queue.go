@@ -414,7 +414,7 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 		logger:             logger.From(context.Background()),
 		concurrencyLimitGetter: func(ctx context.Context, p QueuePartition) (account, fn, custom int) {
 			def := defaultConcurrency
-			if p.ConcurrencyLimit >= 0 {
+			if p.ConcurrencyLimit > 0 {
 				def = p.ConcurrencyLimit
 			}
 			// Use the defaults, and add no concurrency limits to custom keys.
