@@ -1900,6 +1900,9 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		return item, nil
 
 	})
+	if err != nil {
+		return nil, fmt.Errorf("error decoding partitions: %w", err)
+	}
 
 	// mget all fn metas
 	if len(fnIDs) > 0 {
