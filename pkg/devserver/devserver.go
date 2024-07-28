@@ -166,13 +166,13 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		redis_state.WithConcurrencyLimitGetter(func(ctx context.Context, p redis_state.QueuePartition) (account, fn, custom int) {
 			// In the dev server, there are never account limits.
-			account = -1
+			account = redis_state.NoConcurrencyLimit
 
 			// Ensure that we return the correct concurrency values per
 			// partition.
 			funcs, err := dbcqrs.GetFunctions(ctx)
 			if err != nil {
-				return -1, consts.DefaultConcurrencyLimit, -1
+				return redis_state.NoConcurrencyLimit, consts.DefaultConcurrencyLimit, redis_state.NoConcurrencyLimit
 			}
 			for _, fun := range funcs {
 				f, _ := fun.InngestFunction()

@@ -702,8 +702,8 @@ func (q QueuePartition) acctConcurrencyKey(kg QueueKeyGenerator) string {
 	return kg.Concurrency("account", q.AccountID.String())
 }
 
-// acctConcurrencyKey returns the concurrency key for the account limit, on the
-// entire account (not custom keys)
+// customConcurrencyKey returns the concurrency key if this partition represents
+// a custom concurrnecy limit.
 func (q QueuePartition) customConcurrencyKey(kg QueueKeyGenerator) string {
 	if q.ConcurrencyKey == "" {
 		return kg.Concurrency("custom", "-")
@@ -1240,7 +1240,7 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 	// given a standard function queue (enums.PartitionTypeDefault).
 	//
 	// Otherwise, this must be the queue's zset already.
-	if len(queueName) == 36 {
+	if isPartitionUUID(queueName) {
 		queueName = q.u.kg.PartitionQueueSet(enums.PartitionTypeDefault, queueName, "")
 	}
 
@@ -2037,8 +2037,9 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		q.u.kg.PartitionItem(),
 		q.u.kg.GlobalPartitionIndex(),
 		q.u.kg.ShardPartitionIndex(shardName),
-		q.u.kg.PartitionMeta(p.Queue()), // TODO: Remove?
-		p.zsetKey(q.u.kg),               // Partition ZSET itself
+		// NOTE: PartitionMeta is only here for backwards compat, and only clears up partitions.
+		q.u.kg.PartitionMeta(p.Queue()),
+		p.zsetKey(q.u.kg), // Partition ZSET itself
 		p.concurrencyKey(q.u.kg),
 		q.u.kg.QueueItem(),
 	}
@@ -2164,8 +2165,9 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 	for _, partition := range pKeys {
 
 		// If this is a UUID, assume that this is an old partition queue
+		//
 		queueKey := partition
-		if len(partition) == 36 {
+		if isPartitionUUID(partition) {
 			queueKey = q.u.kg.PartitionQueueSet(enums.PartitionTypeDefault, partition, "")
 		}
 
@@ -2566,4 +2568,10 @@ func (l *leaseDenies) denyThrottle(key string) bool {
 	_, ok := l.throttle[key]
 	l.lock.RUnlock()
 	return ok
+}
+
+func isPartitionUUID(p string) bool {
+	// NOTE: We use 36 as a fast heuristic here and assume that the partition
+	// is a UUID.  This is not a proper UUID check, but still works.
+	return len(p) == 36
 }

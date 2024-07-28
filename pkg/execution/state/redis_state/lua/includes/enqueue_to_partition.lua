@@ -17,7 +17,7 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 	-- Push the queue item's ID to the given partition set.
 	redis.call("ZADD", keyPartitionSet, queueScore, queueID)
 
-	-- NOTE: For backwards compatibility, if a function has no concurrency or throttling keys it's
+	-- NOTE: For backwards compatibility, if a function has no concurrency or throttling keys its
 	--       partition set is "{q:v1}:queue:sorted:$workflowID", and the member stored in the global
 	--       set of functions is *just* the workflow ID.
 	--
@@ -68,7 +68,7 @@ local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem,
 	-- Push the queue item's ID to the given partition set.
 	redis.call("ZADD", keyPartitionSet, queueScore, queueID)
 
-	-- NOTE: For backwards compatibility, if a function has no concurrency or throttling keys it's
+	-- NOTE: For backwards compatibility, if a function has no concurrency or throttling keys its
 	--       partition set is "{q:v1}:queue:sorted:$workflowID", and the member stored in the global
 	--       set of functions is *just* the workflow ID.
 	--
