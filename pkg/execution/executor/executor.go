@@ -758,28 +758,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, fmt.Errorf("no function loader specified running step")
 	}
 
-	md, err := e.smv2.LoadMetadata(ctx, sv2.ID{
-		RunID:      id.RunID,
-		FunctionID: id.WorkflowID,
-		Tenant: sv2.Tenant{
-			AppID:     id.AppID,
-			EnvID:     id.WorkspaceID,
-			AccountID: id.AccountID,
-		},
-	})
-	// XXX: MetadataNotFound -> assume fn is deleted.
-	if err != nil {
-		return nil, fmt.Errorf("cannot load metadata to execute run: %w", err)
-	}
-
-	ef, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
-	if err != nil {
-		return nil, fmt.Errorf("error loading function for run: %w", err)
-	}
-	if ef.Paused {
-		return nil, state.ErrFunctionPaused
-	}
-
 	// If this is of type sleep, ensure that we save "nil" within the state store
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
 	// for `tools.sleep` within generator functions.
@@ -800,6 +778,28 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		// group ID, ensuring that we correlate the next step _after_ this sleep (to be
 		// scheduled in this executor run)
 		ctx = state.WithGroupID(ctx, uuid.New().String())
+	}
+
+	md, err := e.smv2.LoadMetadata(ctx, sv2.ID{
+		RunID:      id.RunID,
+		FunctionID: id.WorkflowID,
+		Tenant: sv2.Tenant{
+			AppID:     id.AppID,
+			EnvID:     id.WorkspaceID,
+			AccountID: id.AccountID,
+		},
+	})
+	// XXX: MetadataNotFound -> assume fn is deleted.
+	if err != nil {
+		return nil, fmt.Errorf("cannot load metadata to execute run: %w", err)
+	}
+
+	ef, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
+	if err != nil {
+		return nil, fmt.Errorf("error loading function for run: %w", err)
+	}
+	if ef.Paused {
+		return nil, state.ErrFunctionPaused
 	}
 
 	// Find the stack index for the incoming step.
