@@ -6,7 +6,6 @@ import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
 import { InngestLogoSmallBW } from '@inngest/components/icons/logos/InngestLogoSmall';
 import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
 
-import { toggleNav } from '@/app/actions';
 import Search from './Search';
 
 type LogoProps = {
