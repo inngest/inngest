@@ -15,9 +15,11 @@ type LogoProps = {
 };
 
 const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
-  const toggle = () => {
-    setCollapsed(!collapsed);
-    toggleNav();
+  const toggle = async () => {
+    const toggled = !collapsed;
+    setCollapsed(toggled);
+    typeof window !== 'undefined' &&
+      window.cookieStore.set('navCollapsed', toggled ? 'true' : 'false');
   };
 
   return collapsed ? (

@@ -331,12 +331,29 @@ export type EditWorkflowInput = {
   workflowID: Scalars['ID'];
 };
 
+export type EnvEdge = {
+  __typename?: 'EnvEdge';
+  cursor: Scalars['String'];
+  node: Workspace;
+};
+
 export enum EnvironmentType {
   BranchChild = 'BRANCH_CHILD',
   BranchParent = 'BRANCH_PARENT',
   Production = 'PRODUCTION',
   Test = 'TEST'
 }
+
+export type EnvsConnection = {
+  __typename?: 'EnvsConnection';
+  edges: Array<EnvEdge>;
+  pageInfo: PageInfo;
+};
+
+export type EnvsFilter = {
+  archived?: InputMaybe<Scalars['Boolean']>;
+  envTypes?: InputMaybe<Array<EnvironmentType>>;
+};
 
 export type Event = {
   __typename?: 'Event';
@@ -935,6 +952,7 @@ export type Query = {
   deploy: Deploy;
   deploys: Maybe<Array<Deploy>>;
   envBySlug: Maybe<Workspace>;
+  envs: EnvsConnection;
   events: Maybe<PaginatedEvents>;
   plans: Array<Maybe<BillingPlan>>;
   session: Maybe<Session>;
@@ -960,6 +978,13 @@ export type QueryDeploysArgs = {
 
 export type QueryEnvBySlugArgs = {
   slug: Scalars['String'];
+};
+
+
+export type QueryEnvsArgs = {
+  after: InputMaybe<Scalars['String']>;
+  filter: InputMaybe<EnvsFilter>;
+  first?: Scalars['Int'];
 };
 
 
@@ -1635,7 +1660,7 @@ export type Workspace = {
   runs: RunsConnection;
   runsMetrics: MetricsResponse;
   signingKeys: Array<SigningKey>;
-  slug: Maybe<Scalars['String']>;
+  slug: Scalars['String'];
   test: Scalars['Boolean'];
   type: EnvironmentType;
   unattachedSyncs: Array<Deploy>;
@@ -2397,7 +2422,7 @@ export type GetGlobalSearchQueryVariables = Exact<{
 }>;
 
 
-export type GetGlobalSearchQuery = { __typename?: 'Query', account: { __typename?: 'Account', search: { __typename?: 'SearchResults', results: Array<{ __typename?: 'SearchResult', kind: SearchResultType, env: { __typename?: 'Workspace', name: string, id: string, type: EnvironmentType, slug: string | null }, value: { __typename?: 'ArchivedEvent', id: string, name: string } | { __typename?: 'FunctionRun', id: string, functionID: string } } | null> } } };
+export type GetGlobalSearchQuery = { __typename?: 'Query', account: { __typename?: 'Account', search: { __typename?: 'SearchResults', results: Array<{ __typename?: 'SearchResult', kind: SearchResultType, env: { __typename?: 'Workspace', name: string, id: string, type: EnvironmentType, slug: string }, value: { __typename?: 'ArchivedEvent', id: string, name: string } | { __typename?: 'FunctionRun', id: string, functionID: string } } | null> } } };
 
 export type GetFunctionSlugQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -2452,19 +2477,19 @@ export type GetDeployssQuery = { __typename?: 'Query', deploys: Array<{ __typena
 export type GetEnvironmentsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetEnvironmentsQuery = { __typename?: 'Query', workspaces: Array<{ __typename?: 'Workspace', id: string, name: string, slug: string | null, parentID: string | null, test: boolean, type: EnvironmentType, webhookSigningKey: string, createdAt: string, isArchived: boolean, isAutoArchiveEnabled: boolean, lastDeployedAt: string | null }> | null };
+export type GetEnvironmentsQuery = { __typename?: 'Query', workspaces: Array<{ __typename?: 'Workspace', id: string, name: string, slug: string, parentID: string | null, test: boolean, type: EnvironmentType, webhookSigningKey: string, createdAt: string, isArchived: boolean, isAutoArchiveEnabled: boolean, lastDeployedAt: string | null }> | null };
 
 export type GetEnvironmentBySlugQueryVariables = Exact<{
   slug: Scalars['String'];
 }>;
 
 
-export type GetEnvironmentBySlugQuery = { __typename?: 'Query', envBySlug: { __typename?: 'Workspace', id: string, name: string, slug: string | null, parentID: string | null, test: boolean, type: EnvironmentType, createdAt: string, lastDeployedAt: string | null, isArchived: boolean, isAutoArchiveEnabled: boolean, webhookSigningKey: string } | null };
+export type GetEnvironmentBySlugQuery = { __typename?: 'Query', envBySlug: { __typename?: 'Workspace', id: string, name: string, slug: string, parentID: string | null, test: boolean, type: EnvironmentType, createdAt: string, lastDeployedAt: string | null, isArchived: boolean, isAutoArchiveEnabled: boolean, webhookSigningKey: string } | null };
 
 export type GetDefaultEnvironmentQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetDefaultEnvironmentQuery = { __typename?: 'Query', defaultEnv: { __typename?: 'Workspace', id: string, name: string, slug: string | null, parentID: string | null, test: boolean, type: EnvironmentType, createdAt: string, lastDeployedAt: string | null, isArchived: boolean, isAutoArchiveEnabled: boolean } };
+export type GetDefaultEnvironmentQuery = { __typename?: 'Query', defaultEnv: { __typename?: 'Workspace', id: string, name: string, slug: string, parentID: string | null, test: boolean, type: EnvironmentType, createdAt: string, lastDeployedAt: string | null, isArchived: boolean, isAutoArchiveEnabled: boolean } };
 
 export type GetEventTypesQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -2523,7 +2548,7 @@ export type GetFunctionUsageQuery = { __typename?: 'Query', workspace: { __typen
 export type GetProductionWorkspaceQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetProductionWorkspaceQuery = { __typename?: 'Query', defaultEnv: { __typename?: 'Workspace', id: string, name: string, slug: string | null, parentID: string | null, test: boolean, type: EnvironmentType, createdAt: string, lastDeployedAt: string | null, isArchived: boolean, isAutoArchiveEnabled: boolean, webhookSigningKey: string } };
+export type GetProductionWorkspaceQuery = { __typename?: 'Query', defaultEnv: { __typename?: 'Workspace', id: string, name: string, slug: string, parentID: string | null, test: boolean, type: EnvironmentType, createdAt: string, lastDeployedAt: string | null, isArchived: boolean, isAutoArchiveEnabled: boolean, webhookSigningKey: string } };
 
 export type CancelRunMutationVariables = Exact<{
   envID: Scalars['UUID'];
