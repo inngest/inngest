@@ -115,10 +115,17 @@ func (c CustomConcurrency) Validate() error {
 	if len(c.Key) < 5 {
 		return fmt.Errorf("invalid custom concurrency key length")
 	}
+	if c.Limit < 0 {
+		return fmt.Errorf("invalid custom concurrency key limit")
+	}
 	switch c.Key[0] {
 	case 'f', 'e', 'a':
 	default:
 		return fmt.Errorf("unknown concurrency key scope: %v", c.Key[0])
+	}
+	parts := strings.Split(c.Key, ":")
+	if len(parts) != 3 {
+		return fmt.Errorf("invalid custom concurrency key format")
 	}
 	return nil
 }
