@@ -746,7 +746,7 @@ ProcessLoop:
 			continue
 		}
 
-		// Cbeck if there's capacity from our local workers atomically prior to leasing our tiems.
+		// Check if there's capacity from our local workers atomically prior to leasing our items.
 		if !q.sem.TryAcquire(1) {
 			telemetry.IncrQueuePartitionProcessNoCapacityCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 			// Break the entire loop to prevent out of order work.
