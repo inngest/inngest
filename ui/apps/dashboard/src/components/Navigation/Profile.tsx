@@ -9,9 +9,9 @@ export type ProfileType = { orgName?: string; fullName: string };
 export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: ProfileType }) => {
   const pathname = usePathname();
   const active =
-    pathname?.startsWith('/settings/organization') ||
-    pathname?.startsWith('/settings/billing') ||
-    pathname?.startsWith('/settings/user');
+    pathname.startsWith('/settings/organization') ||
+    pathname.startsWith('/settings/billing') ||
+    pathname.startsWith('/settings/user');
 
   return (
     <ProfileMenu>
