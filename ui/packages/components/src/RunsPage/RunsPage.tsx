@@ -59,6 +59,7 @@ type Props = {
   functions?: Option[];
   functionIsPaused?: boolean;
   scope: ViewScope;
+  totalCount: number | undefined;
 };
 
 export function RunsPage({
@@ -80,6 +81,7 @@ export function RunsPage({
   pollInterval,
   functionIsPaused,
   scope,
+  totalCount,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -269,6 +271,8 @@ export function RunsPage({
               entities={functions}
             />
           )}
+
+          <TotalCount totalCount={totalCount} />
         </div>
         <div className="flex items-center gap-2">
           <TableFilter
@@ -308,4 +312,22 @@ export function RunsPage({
       )}
     </main>
   );
+}
+
+function TotalCount({
+  className,
+  totalCount,
+}: {
+  className?: string;
+  totalCount: number | undefined;
+}) {
+  if (totalCount === undefined) {
+    return null;
+  }
+
+  const formatted = new Intl.NumberFormat().format(totalCount);
+  if (totalCount === 1) {
+    return <span className={className}>{formatted} run</span>;
+  }
+  return <span className={className}>{formatted} runs</span>;
 }
