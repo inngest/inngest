@@ -2,7 +2,7 @@ import { auth, clerkClient, currentUser } from '@clerk/nextjs';
 import type { Organization, OrganizationMembership, User } from '@clerk/nextjs/server';
 
 export type ProfileType = {
-  user: User;
+  user: User & { displayName: string };
   org: Organization | undefined;
 };
 
@@ -13,9 +13,14 @@ export const getProfile = async (): Promise<ProfileType> => {
     throw new Error('User is not logged in');
   }
 
+  const displayName =
+    user.firstName || user.lastName
+      ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()
+      : user.username ?? '';
+
   const { orgId } = auth();
 
-  return { user, org: orgId ? await getOrg(orgId) : undefined };
+  return { user: { ...user, displayName }, org: orgId ? await getOrg(orgId) : undefined };
 };
 
 export const getOrg = async (organizationId: string): Promise<Organization | undefined> => {

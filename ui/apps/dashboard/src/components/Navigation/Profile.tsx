@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 
 import { ProfileMenu } from './ProfileMenu';
 
-export type ProfileType = { orgName?: string; fullName: string };
+export type ProfileType = { orgName?: string; displayName: string };
 
 export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: ProfileType }) => {
   const pathname = usePathname();
@@ -35,7 +35,7 @@ export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: P
           {!collapsed && (
             <div className="ml-2 flex flex-col items-start justify-start">
               <div className="text-muted leading-1 text-sm">{profile.orgName}</div>
-              <div className="text-subtle text-xs leading-4">{profile.fullName}</div>
+              <div className="text-subtle text-xs leading-4">{profile.displayName}</div>
             </div>
           )}
         </div>
