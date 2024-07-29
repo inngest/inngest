@@ -5,8 +5,16 @@ export type ProfileType = { orgName?: string; fullName: string };
 export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: ProfileType }) => {
   return (
     <ProfileMenu>
-      <div className="border-subtle flex h-16 flex-row items-center justify-start border-t px-4">
-        <div className="hover:bg-canvasSubtle flex w-full flex-row items-center justify-start rounded p-1 px-1.5">
+      <div
+        className={`border-subtle flex h-16 w-full flex-row items-center justify-start border-t px-2.5 ${
+          collapsed ? 'justify-center' : 'justify-start'
+        }`}
+      >
+        <div
+          className={`hover:bg-canvasSubtle flex w-full flex-row items-center rounded p-1 ${
+            collapsed ? 'justify-center' : 'justify-start'
+          }`}
+        >
           <div className="bg-canvasMuted text-muted flex h-8 w-8 items-center justify-center rounded-full text-xs uppercase">
             {profile.orgName?.substring(0, 2) || '?'}
           </div>
