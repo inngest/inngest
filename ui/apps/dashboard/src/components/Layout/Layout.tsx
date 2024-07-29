@@ -17,7 +17,7 @@ type LayoutProps = {
 export default async function Layout({ activeEnv, children }: LayoutProps) {
   const collapsed = await getNavCollapsed();
   const { user, org } = await getProfile();
-  const profile = { orgName: org?.name, fullName: `${user.firstName} ${user.lastName}` };
+  const profile = { orgName: org?.name, displayName: user.displayName };
 
   return (
     <div className="flex w-full flex-row justify-start">

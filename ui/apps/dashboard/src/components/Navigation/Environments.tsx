@@ -138,8 +138,8 @@ export default function EnvironmentSelectMenu({
         <div className="bg-canvasBase relative flex">
           <OptionalTooltip tooltip={collapsed && tooltip(selected)}>
             <Listbox.Button
-              className={`border-muted bg-canvasBase text-primary-intense hover:bg-canvasSubtle ${
-                collapsed ? `w-8 px-1` : 'w-[146px] px-2'
+              className={`border-muted bg-canvasBase text-primary-intense hover:bg-canvasSubtle px-2 ${
+                collapsed ? `w-8` : !activeEnv ? 'w-[186px]' : 'w-[146px]'
               } m-0 h-8 overflow-hidden rounded border text-sm ${open && 'border-primary-intense'}`}
             >
               <div
@@ -155,7 +155,7 @@ export default function EnvironmentSelectMenu({
             </Listbox.Button>
           </OptionalTooltip>
 
-          <Listbox.Options className="bg-canvasBase border-subtle absolute top-10 w-[188px] divide-none rounded border shadow focus:outline-none">
+          <Listbox.Options className="bg-canvasBase border-subtle absolute top-10 z-50 w-[188px] divide-none rounded border shadow focus:outline-none">
             {defaultEnvironment !== null && <EnvironmentItem environment={defaultEnvironment} />}
 
             {legacyTestMode !== null && (

@@ -7,7 +7,7 @@ import { Help } from '../Navigation/Help';
 import { Integrations } from '../Navigation/Integrations';
 import Logo from '../Navigation/Logo';
 import Navigation from '../Navigation/Navigation';
-import { Profile } from '../Navigation/Profile';
+import { Profile, type ProfileType } from '../Navigation/Profile';
 
 export default function SideBar({
   collapsed: serverCollapsed,
@@ -16,17 +16,16 @@ export default function SideBar({
 }: {
   collapsed: boolean;
   activeEnv?: Environment;
-  profile: { orgName?: string; fullName: string };
+  profile: ProfileType;
 }) {
   const [collapsed, setCollapsed] = useState(serverCollapsed);
 
   return (
     <nav
-      className={`bg-canvasBase border-subtle
+      className={`bg-canvasBase  border-subtle group
          top-0 flex h-screen flex-col justify-start ${
            collapsed ? 'w-[64px]' : 'w-[224px]'
-         }  sticky z-[500] shrink-0 overflow-visible border-r
-         `}
+         }  sticky z-[500] shrink-0 overflow-visible border-r`}
     >
       <Logo collapsed={collapsed} setCollapsed={setCollapsed} />
       <div className="flex grow flex-col justify-between">

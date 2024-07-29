@@ -19,73 +19,75 @@ export const ProfileMenu = ({ children }: { children: ReactNode }) => {
       <Listbox.Button className="w-full cursor-pointer ring-0">{children}</Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase absolute -right-48 bottom-4 z-50 ml-8 w-[199px] rounded border shadow ring-0 focus:outline-none">
-          <Listbox.Option
-            className="text-subtle hover:bg-canvasSubtle flex h-12 cursor-pointer items-center px-4 text-[13px]"
-            value="eventKeys"
-          >
-            <Link href="/settings/organization/organization-settings">
+          <Link href="/settings/organization/organization-settings">
+            <Listbox.Option
+              className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              value="org"
+            >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
                 <RiEqualizerLine className="text-subtle mr-2 h-4 w-4 " />
                 <div>Your Organization</div>
               </div>
-            </Link>
-          </Listbox.Option>
-          <Listbox.Option
-            className="text-subtle hover:bg-canvasSubtle flex h-12 cursor-pointer items-center px-4 text-[13px]"
-            value="eventKeys"
-          >
-            <Link href="/settings/organization">
+            </Listbox.Option>
+          </Link>
+          <Link href="/settings/organization">
+            <Listbox.Option
+              className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              value="members"
+            >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
                 <RiGroupLine className="text-subtle mr-2 h-4 w-4" />
                 <div>Members</div>
               </div>
-            </Link>
-          </Listbox.Option>
-          <Listbox.Option
-            className="text-subtle hover:bg-canvasSubtle flex h-12 cursor-pointer items-center px-4 text-[13px]"
-            value="eventKeys"
-          >
-            <Link href="/settings/billing">
+            </Listbox.Option>
+          </Link>
+          <Link href="/settings/billing">
+            <Listbox.Option
+              className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              value="billing"
+            >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
                 <RiBillLine className="text-subtle mr-2 h-4 w-4" />
                 <div>Billing</div>
               </div>
-            </Link>
-          </Listbox.Option>
-          <Listbox.Option
-            className="text-subtle hover:bg-canvasSubtle border-subtle flex h-12 cursor-pointer items-center border-b px-4 text-[13px]"
-            value="eventKeys"
-          >
-            <Link href="/organization-list">
+            </Listbox.Option>
+          </Link>
+          <Link href="/organization-list">
+            <Listbox.Option
+              className="text-subtle hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              value="switchOrg"
+            >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
                 <RiArrowLeftRightLine className="text-subtle mr-2 h-4 w-4" />
                 <div>Switch Organization</div>
               </div>
-            </Link>
-          </Listbox.Option>
+            </Listbox.Option>
+          </Link>
 
-          <Listbox.Option
-            className="text-subtle hover:bg-canvasSubtle flex h-12 cursor-pointer items-center px-4 text-[13px]"
-            value="eventKeys"
-          >
-            <Link href="/settings/user">
+          <hr />
+
+          <Link href="/settings/user">
+            <Listbox.Option
+              className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              value="userProfile"
+            >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
                 <RiUserLine className="text-subtle mr-2 h-4 w-4" />
                 <div>Your Profile</div>
               </div>
-            </Link>
-          </Listbox.Option>
-          <Listbox.Option
-            className="text-subtle hover:bg-canvasSubtle flex h-12 cursor-pointer items-center px-4 text-[13px]"
-            value="eventKeys"
-          >
-            <SignOutButton>
-              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiLogoutCircleLine className="text-subtle mr-2 h-4 w-4" />
-                <div>Sign Out</div>
-              </div>
-            </SignOutButton>
-          </Listbox.Option>
+            </Listbox.Option>
+            <Listbox.Option
+              className="text-subtle hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              value="signOut"
+            >
+              <SignOutButton>
+                <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+                  <RiLogoutCircleLine className="text-subtle mr-2 h-4 w-4" />
+                  <div>Sign Out</div>
+                </div>
+              </SignOutButton>
+            </Listbox.Option>
+          </Link>
         </Listbox.Options>
       </div>
     </Listbox>
