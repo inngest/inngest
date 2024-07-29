@@ -56,25 +56,26 @@ export default function Envs() {
               Production
             </h3>
           </Link>
-          {Boolean(legacyTestMode) && (
+          {legacyTestMode && (
             <div className="mt-12 border-t border-slate-100 pt-8">
               <div className="mb-4 flex w-full items-center  justify-between">
                 <h2 className="text-lg font-medium text-slate-800">Test Mode</h2>
                 <div className="flex items-center gap-2">
                   <Button
-                    href={`/env/${legacyTestMode?.slug}/manage`}
+                    href={`/env/${legacyTestMode.slug}/manage`}
                     appearance="outlined"
                     label="Manage"
                   />
+                  <EnvironmentArchiveButton env={legacyTestMode} />
                   <Button
-                    href={`/env/${legacyTestMode?.slug}/apps` as Route}
+                    href={`/env/${legacyTestMode.slug}/apps` as Route}
                     kind="primary"
                     label="Go To Apps"
                   />
                 </div>
               </div>
               <Link
-                href={`/env/${legacyTestMode?.slug}/functions` as Route}
+                href={`/env/${legacyTestMode.slug}/functions` as Route}
                 className="mt-8 flex cursor-pointer items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm hover:bg-slate-100/60"
               >
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">

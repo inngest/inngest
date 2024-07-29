@@ -86,6 +86,9 @@ importers:
       '@stripe/stripe-js':
         specifier: 1.52.1
         version: 1.52.1
+      '@tanstack/react-query':
+        specifier: 5.51.11
+        version: 5.51.11(react@18.2.0)
       '@tanstack/react-table':
         specifier: 8.19.2
         version: 8.19.2(react-dom@18.2.0)(react@18.2.0)
@@ -9949,6 +9952,10 @@ packages:
     resolution: {integrity: sha512-KTI6b4DLXq39n/VNLvWqxM0K/bmCyL5SvOfPGZ1cZGOvVfZxpo/81ZF9cuRDyPjInmzz8d8jUZOHZVJDKSDcvQ==}
     dev: false
 
+  /@tanstack/query-core@5.51.9:
+    resolution: {integrity: sha512-HsAwaY5J19MD18ykZDS3aVVh+bAt0i7m6uQlFC2b77DLV9djo+xEN7MWQAQQTR8IM+7r/zbozTQ7P0xr0bHuew==}
+    dev: false
+
   /@tanstack/react-query@5.0.0-beta.20(react-dom@18.2.0)(react@18.2.0):
     resolution: {integrity: sha512-L5YP1zwEMBwZJ/oCnFXLnb6S60srU7Oyj/oM5TVLcC/efdKpcdToMZTHA9Vjq3oFA9ysxFgrskkideIMa3fB4A==}
     peerDependencies:
@@ -9965,6 +9972,15 @@ packages:
       client-only: 0.0.1
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
+    dev: false
+
+  /@tanstack/react-query@5.51.11(react@18.2.0):
+    resolution: {integrity: sha512-4Kq2x0XpDlpvSnaLG+8pHNH60zEc3mBvb3B2tOMDjcPCi/o+Du3p/9qpPLwJOTliVxxPJAP27fuIhLrsRdCr7A==}
+    peerDependencies:
+      react: ^18.0.0
+    dependencies:
+      '@tanstack/query-core': 5.51.9
+      react: 18.2.0
     dev: false
 
   /@tanstack/react-table@8.19.2(react-dom@18.2.0)(react@18.2.0):
