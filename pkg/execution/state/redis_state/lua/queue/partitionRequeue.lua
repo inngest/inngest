@@ -47,7 +47,7 @@ if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call(
 
     redis.call("ZREM", keyGlobalPartitionPtr, partitionID)    -- Remove the partition from global index
 
-    if account_is_set(keyAccountPartitions)
+    if account_is_set(keyAccountPartitions) then
       redis.call("ZREM", keyAccountPartitions, partitionID)    -- Remove the partition from account index
 
       -- If this was the last account partition, remove account from global queue of accounts

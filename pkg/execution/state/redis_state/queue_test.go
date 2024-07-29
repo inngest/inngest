@@ -259,10 +259,16 @@ func TestQueueEnqueueItem(t *testing.T) {
 		// Ensure the partition is inserted in account partitions
 		partitionIds := getAccountPartitions(t, rc, accountId)
 		require.Contains(t, partitionIds, qp.ID)
+
+		// Score of partition in global + account partition indexes should match
+		kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
+		requirePartitionItemScoreEquals(t, r, kg.GlobalPartitionIndex(), qp, start)
+		requirePartitionItemScoreEquals(t, r, kg.AccountPartitionIndex(accountId), qp, start)
 	})
 
 	t.Run("It sets the right item score", func(t *testing.T) {
 		start := time.Now()
+
 		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 		require.NoError(t, err)
 
@@ -292,7 +298,16 @@ func TestQueueEnqueueItem(t *testing.T) {
 		keys, err := r.ZMembers(q.u.kg.GlobalPartitionIndex())
 		require.NoError(t, err)
 		require.Equal(t, 1, len(keys))
+
 		score, err := r.ZScore(q.u.kg.GlobalPartitionIndex(), keys[0])
+		require.NoError(t, err)
+		require.EqualValues(t, at.Unix(), score)
+
+		score, err = r.ZScore(q.u.kg.AccountPartitionIndex(uuid.Nil), keys[0])
+		require.NoError(t, err)
+		require.EqualValues(t, at.Unix(), score)
+
+		score, err = r.ZScore(q.u.kg.GlobalAccountIndex(), uuid.Nil.String())
 		require.NoError(t, err)
 		require.EqualValues(t, at.Unix(), score)
 	})
@@ -300,6 +315,8 @@ func TestQueueEnqueueItem(t *testing.T) {
 	t.Run("Updates partition vesting time to earlier times", func(t *testing.T) {
 		now := time.Now()
 		at := now.Add(-10 * time.Minute).Truncate(time.Second)
+
+		// Note: This will reuse the existing partition (zero UUID) from the step above
 		item, err := q.EnqueueItem(ctx, QueueItem{}, at)
 		require.NoError(t, err)
 
@@ -311,21 +328,39 @@ func TestQueueEnqueueItem(t *testing.T) {
 			FunctionID:       &item.FunctionID,
 			AccountID:        uuid.Nil,
 			ConcurrencyLimit: consts.DefaultConcurrencyLimit,
-		}, qp)
+		}, qp, "queue partition does not match")
 
 		// Assert that the zscore was changed to this earliest timestamp.
 		keys, err := r.ZMembers(q.u.kg.GlobalPartitionIndex())
 		require.NoError(t, err)
 		require.Equal(t, 1, len(keys))
+
 		score, err := r.ZScore(q.u.kg.GlobalPartitionIndex(), keys[0])
+		require.NoError(t, err)
+		require.EqualValues(t, now.Unix(), score)
+
+		score, err = r.ZScore(q.u.kg.AccountPartitionIndex(uuid.Nil), keys[0])
+		require.NoError(t, err)
+		require.NotZero(t, score)
+		require.EqualValues(t, now.Unix(), score, r.Dump())
+
+		score, err = r.ZScore(q.u.kg.GlobalAccountIndex(), uuid.Nil.String())
 		require.NoError(t, err)
 		require.EqualValues(t, now.Unix(), score)
 	})
 
 	t.Run("Adding another workflow ID increases partition set", func(t *testing.T) {
 		at := time.Now().Truncate(time.Second)
+
+		accountId := uuid.New()
+
 		item, err := q.EnqueueItem(ctx, QueueItem{
 			FunctionID: uuid.New(),
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					AccountID: accountId,
+				},
+			},
 		}, at)
 		require.NoError(t, err)
 
@@ -334,13 +369,18 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 2, len(keys))
 
+		// Assert that we have one zscore in accounts:$accountId:partition:sorted.
+		keys, err = r.ZMembers(q.u.kg.AccountPartitionIndex(accountId))
+		require.NoError(t, err)
+		require.Equal(t, 1, len(keys))
+
 		// Ensure the partition is inserted, and the earliest time is updated
 		// inside the partition item.
 		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, QueuePartition{
 			ID:               item.FunctionID.String(),
 			FunctionID:       &item.FunctionID,
-			AccountID:        uuid.Nil,
+			AccountID:        accountId,
 			ConcurrencyLimit: consts.DefaultConcurrencyLimit,
 		}, qp)
 	})
@@ -428,6 +468,14 @@ func TestQueueEnqueueItem(t *testing.T) {
 				ConcurrencyKey:   util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test"),
 			}, concurrencyPartition)
 
+			accountIds := getGlobalAccounts(t, rc)
+			require.Equal(t, 1, len(accountIds))
+			require.Contains(t, accountIds, uuid.Nil.String())
+
+			apIds := getAccountPartitions(t, rc, uuid.Nil)
+			require.Equal(t, 1, len(apIds))
+			require.Contains(t, apIds, concurrencyPartition.ID)
+
 			// We do not add the fn to the function-specific queue.
 			//
 			// fnDefaultPartition := getDefaultPartition(t, r, fnID) // nb. also asserts that the partition exists
@@ -481,6 +529,15 @@ func TestQueueEnqueueItem(t *testing.T) {
 				ConcurrencyLimit: 2,
 				ConcurrencyKey:   util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "plz"),
 			}, concurrencyPartitionB)
+
+			accountIds := getGlobalAccounts(t, rc)
+			require.Equal(t, 1, len(accountIds))
+			require.Contains(t, accountIds, uuid.Nil.String())
+
+			apIds := getAccountPartitions(t, rc, uuid.Nil)
+			require.Equal(t, 2, len(apIds))
+			require.Contains(t, apIds, concurrencyPartitionA.ID)
+			require.Contains(t, apIds, concurrencyPartitionB.ID)
 
 			// We do not add the fn to the function-specific queue.
 			//
@@ -833,6 +890,41 @@ func TestQueueLease(t *testing.T) {
 			_, err = r.ZScore(defaultQueueKey.FnQueueSet(item.FunctionID.String()), item.ID)
 			require.Error(t, err, "no such key")
 		})
+
+		t.Run("it should update the partition score to the next item", func(t *testing.T) {
+			r.FlushAll()
+
+			t1 := time.Now().Truncate(time.Second)
+			t2 := t1.Add(time.Second * 5).Truncate(time.Second)
+
+			// Enqueue future item (partition time will be now + 5s)
+			item, err = q.EnqueueItem(ctx, QueueItem{}, t2)
+			require.NoError(t, err)
+			require.Nil(t, item.LeaseID)
+
+			qp := getDefaultPartition(t, r, uuid.Nil)
+
+			requireItemScoreEquals(t, r, item, t2)
+			requirePartitionItemScoreEquals(t, r, q.u.kg.GlobalPartitionIndex(), qp, t2)
+			requirePartitionItemScoreEquals(t, r, q.u.kg.AccountPartitionIndex(uuid.Nil), qp, t2)
+
+			// Enqueue current item (partition time will be moved up to now)
+			item, err := q.EnqueueItem(ctx, QueueItem{}, t1)
+			require.NoError(t, err)
+			require.Nil(t, item.LeaseID)
+
+			requireItemScoreEquals(t, r, item, t1)
+
+			requirePartitionItemScoreEquals(t, r, q.u.kg.GlobalPartitionIndex(), qp, t1)
+			requirePartitionItemScoreEquals(t, r, q.u.kg.AccountPartitionIndex(uuid.Nil), qp, t1)
+
+			// Lease item (moves partition time back to now + 5s)
+			_, err = q.Lease(ctx, p, item, time.Minute, getNow(), nil)
+			require.NoError(t, err)
+
+			requirePartitionItemScoreEquals(t, r, q.u.kg.GlobalPartitionIndex(), qp, t2)
+			requirePartitionItemScoreEquals(t, r, q.u.kg.AccountPartitionIndex(uuid.Nil), qp, t2)
+		})
 	})
 
 	t.Run("With partition concurrency limits", func(t *testing.T) {
@@ -975,6 +1067,10 @@ func TestQueueLease(t *testing.T) {
 				require.NoError(t, err)
 				require.EqualValues(t, at.Unix(), score, r.Dump())
 
+				score, err = r.ZScore(defaultQueueKey.AccountPartitionIndex(uuid.Nil), p.Queue())
+				require.NoError(t, err)
+				require.EqualValues(t, at.Unix(), score, r.Dump())
+
 				// Nothing should update here, as there's nothing left in the fn queue
 				// so nothing happens.
 				_, err = q.Lease(ctx, p, item, 10*time.Second, getNow(), nil)
@@ -983,6 +1079,10 @@ func TestQueueLease(t *testing.T) {
 				nextScore, err := r.ZScore(defaultQueueKey.GlobalPartitionIndex(), p.Queue())
 				require.NoError(t, err)
 				require.EqualValues(t, int(score), int(nextScore), "score should not equal previous score")
+
+				nextScore, err = r.ZScore(defaultQueueKey.AccountPartitionIndex(uuid.Nil), p.Queue())
+				require.NoError(t, err)
+				require.EqualValues(t, int(score), int(nextScore), "account score should not equal previous score")
 			})
 		})
 
@@ -1377,6 +1477,11 @@ func TestQueueDequeue(t *testing.T) {
 			partScoreB, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[1].ID)
 			require.EqualValues(t, start.Add(30*time.Minute).Unix(), partScoreA[0])
 			require.EqualValues(t, start.Add(30*time.Minute).Unix(), partScoreB[0])
+
+			partScoreA, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(uuid.Nil), parts[0].ID)
+			partScoreB, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(uuid.Nil), parts[1].ID)
+			require.EqualValues(t, start.Add(30*time.Minute).Unix(), partScoreA[0])
+			require.EqualValues(t, start.Add(30*time.Minute).Unix(), partScoreB[0])
 		})
 
 		err = q.Dequeue(ctx, QueuePartition{}, itemA)
@@ -1385,6 +1490,11 @@ func TestQueueDequeue(t *testing.T) {
 		t.Run("The outstanding partition scores should reset", func(t *testing.T) {
 			partScoreA, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[0].ID)
 			partScoreB, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[1].ID)
+			require.EqualValues(t, start, time.Unix(int64(partScoreA[0]), 0), r.Dump())
+			require.EqualValues(t, start, time.Unix(int64(partScoreB[0]), 0))
+
+			partScoreA, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(uuid.Nil), parts[0].ID)
+			partScoreB, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(uuid.Nil), parts[1].ID)
 			require.EqualValues(t, start, time.Unix(int64(partScoreA[0]), 0), r.Dump())
 			require.EqualValues(t, start, time.Unix(int64(partScoreB[0]), 0))
 		})
@@ -3363,6 +3473,16 @@ func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item QueueItem
 	parsed := time.UnixMilli(int64(score))
 	require.NoError(t, err)
 	require.WithinDuration(t, expected.Truncate(time.Millisecond), parsed, 15*time.Millisecond)
+}
+
+func requirePartitionItemScoreEquals(t *testing.T, r *miniredis.Miniredis, keyPartitionIndex string, qp QueuePartition, expected time.Time) {
+	t.Helper()
+	score, err := r.ZScore(keyPartitionIndex, qp.ID)
+	require.NotZero(t, score, r.Dump(), qp.ID)
+
+	parsed := time.Unix(int64(score), 0) // score is in seconds :)
+	require.NoError(t, err)
+	require.WithinDuration(t, expected.Truncate(time.Millisecond), parsed, 15*time.Millisecond, r.Dump())
 }
 
 // requirePartitionScoreEquals is used to check scores for any partition, including custom partitions.

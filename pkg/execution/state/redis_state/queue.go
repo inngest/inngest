@@ -643,7 +643,7 @@ type QueuePartition struct {
 	// LimitOwner represents the function ID that set the max concurrency limit for
 	// this function.  This allows us to lower the max if the owner/enqueueing function
 	// ID matches - otherwise, once set, the max can never lower.
-	LimitOnwer *uuid.UUID `json:"lID,omitempty"`
+	LimitOwner *uuid.UUID `json:"lID,omitempty"`
 
 	// TODO: Throttling;  embed max limit/period/etc?
 }
