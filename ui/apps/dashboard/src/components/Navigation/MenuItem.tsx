@@ -1,6 +1,5 @@
 'use client';
 
-import type { UrlObject } from 'url';
 import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { OptionalLink } from '@inngest/components/Link/OptionalLink';
@@ -18,12 +17,12 @@ export const MenuItem = ({
   text: string;
   icon: ReactNode;
   collapsed: boolean;
-  href?: string | UrlObject;
+  href?: string;
   prefetch?: boolean;
   comingSoon?: boolean;
 }) => {
   const pathname = usePathname();
-  const active = pathname === href;
+  const active = href && pathname?.startsWith(href);
 
   return (
     <OptionalLink href={comingSoon ? '' : href} prefetch={prefetch}>

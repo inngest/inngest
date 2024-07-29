@@ -23,12 +23,12 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
 
   return collapsed ? (
     <RiContractRightLine
-      className="bg-canvasBase text-subtle invisible h-5 w-5 cursor-pointer group-hover:visible"
+      className="bg-canvasBase text-subtle hidden h-5 w-5 cursor-pointer group-hover:block"
       onClick={toggle}
     />
   ) : (
     <RiContractLeftLine
-      className="bg-canvasBase text-subtle invisible h-5 w-5 cursor-pointer group-hover:visible"
+      className="bg-canvasBase text-subtle hidden h-5 w-5 cursor-pointer group-hover:block"
       onClick={toggle}
     />
   );
@@ -36,8 +36,12 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
 
 export default function Logo({ collapsed, setCollapsed }: LogoProps) {
   return (
-    <div className="group ml-5 mr-4 mt-5 flex h-10 flex-row items-center justify-between overflow-hidden">
-      <div className="flex flex-row items-center justify-start">
+    <div
+      className={`mt-5 flex h-10 w-full flex-row items-center ${
+        collapsed ? 'justify-center' : 'ml-5 justify-start'
+      }`}
+    >
+      <div className={`flex flex-row items-center justify-start ${collapsed ? '' : 'mr-4'} `}>
         {collapsed ? (
           <div className="cursor-pointer group-hover:hidden">
             <InngestLogoSmallBW />

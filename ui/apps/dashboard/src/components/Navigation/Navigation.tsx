@@ -15,7 +15,7 @@ export const getNavRoute = (activeEnv: EnvType, link: string) => `/env/${activeE
 export default function Navigation({ collapsed, activeEnv }: NavProps) {
   return (
     <div
-      className={`text-basis flex h-full w-full flex-col items-start justify-start ${
+      className={`text-basis flex h-full w-full flex-col items-start ${
         collapsed ? 'items-center' : 'ml-5'
       } mt-5 flex`}
     >
