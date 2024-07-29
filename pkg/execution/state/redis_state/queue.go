@@ -114,13 +114,12 @@ var (
 	ErrPartitionPaused               = fmt.Errorf("partition is paused")
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
 	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
-	ErrPartitionConcurrencyLimit     = fmt.Errorf("At partition concurrency limit")
-	ErrAccountConcurrencyLimit       = fmt.Errorf("At account concurrency limit")
+	ErrPartitionConcurrencyLimit     = fmt.Errorf("at partition concurrency limit")
+	ErrAccountConcurrencyLimit       = fmt.Errorf("at account concurrency limit")
 
 	// ErrConcurrencyLimitCustomKey represents a concurrency limit being hit for *some*, but *not all*
 	// jobs in a queue, via custom concurrency keys which are evaluated to a specific string.
-
-	ErrConcurrencyLimitCustomKey = fmt.Errorf("At concurrency limit")
+	ErrConcurrencyLimitCustomKey = fmt.Errorf("at concurrency limit")
 
 	// internal shard errors
 	errShardNotFound     = fmt.Errorf("shard not found")
