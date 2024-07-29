@@ -1,4 +1,4 @@
-import { IntegrationsIcon } from '@inngest/components/icons/sections/Integrations';
+import { RiPlugLine } from '@remixicon/react';
 
 import { MenuItem } from './MenuItem';
 
@@ -8,7 +8,7 @@ export const Integrations = ({ collapsed }: { collapsed: boolean }) => (
       href="/settings/integrations"
       collapsed={collapsed}
       text="Integrations"
-      icon={<IntegrationsIcon className="w-5" />}
+      icon={<RiPlugLine className="text-muted h-[18px] w-[18px]" />}
     />
   </div>
 );

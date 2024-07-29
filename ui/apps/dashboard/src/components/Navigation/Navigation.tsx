@@ -20,11 +20,7 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
       } mt-5 flex`}
     >
       <div className="flex flex-col justify-start">
-        <div
-          className={`flex ${
-            collapsed ? 'flex-col' : 'flex-row'
-          } items-center justify-center transition-none`}
-        >
+        <div className={`flex ${collapsed ? 'flex-col' : 'flex-row'} items-center justify-center`}>
           <Environments activeEnv={activeEnv} collapsed={collapsed} />
 
           {activeEnv && <KeysMenu activeEnv={activeEnv} collapsed={collapsed} />}

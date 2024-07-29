@@ -29,7 +29,7 @@ export default function KeysMenu({
         <Listbox.Options className="bg-canvasBase absolute left-0 z-50 ml-1 w-[137px] rounded border shadow">
           <Link href={`/env/${activeEnv.slug}/manage/keys`} prefetch={true}>
             <Listbox.Option
-              className="text-subtle flex h-12 cursor-pointer items-center px-4 text-[13px]"
+              className="text-subtle hover:bg-canvasSubtle flex h-12 cursor-pointer items-center px-4 text-[13px]"
               value="eventKeys"
             >
               Event keys
@@ -37,7 +37,7 @@ export default function KeysMenu({
           </Link>
           <Link href={`/env/${activeEnv.slug}/manage/signing-key`} prefetch={true}>
             <Listbox.Option
-              className="text-subtle flex h-12 cursor-pointer items-center px-4 text-[13px]"
+              className="text-subtle hover:bg-canvasSubtle flex h-12 cursor-pointer items-center px-4 text-[13px]"
               value="signingKeys"
             >
               Signing Keys

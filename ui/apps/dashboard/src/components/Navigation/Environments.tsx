@@ -1,18 +1,12 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import { type Route } from 'next';
 import Link from 'next/link';
 import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigation';
-import { Listbox, Transition } from '@headlessui/react';
+import { Listbox } from '@headlessui/react';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
-import {
-  RiCloudFill,
-  RiCloudLine,
-  RiExpandUpDownLine,
-  RiLoopLeftLine,
-  RiSettings3Line,
-} from '@remixicon/react';
+import { RiCloudFill, RiCloudLine, RiExpandUpDownLine, RiLoopLeftLine } from '@remixicon/react';
 
 import { useEnvironments } from '@/queries';
 import cn from '@/utils/cn';
@@ -25,6 +19,7 @@ import {
   type Environment,
 } from '@/utils/environments';
 import isNonEmptyArray from '@/utils/isNonEmptyArray';
+import { OptionalTooltip } from './OptionalTooltip';
 
 // Some URLs cannot just swap between environments,
 // we need to redirect to a less specific resource URL that is shared across environments
@@ -73,6 +68,36 @@ const selectedName = (name: string, collapsed: boolean) => {
   }
 };
 
+const SelectedDisplay = ({
+  selected,
+  collapsed,
+}: {
+  selected: Environment | null;
+  collapsed: boolean;
+}) => (
+  <span className="flex flex-row items-center ">
+    {selected ? (
+      <span className="block truncate">
+        {selected.type === EnvironmentType.BranchParent
+          ? selectedName('Branch Environments', collapsed)
+          : selectedName(selected.name, collapsed)}
+      </span>
+    ) : (
+      <>
+        {!collapsed && <RiCloudLine className="mr-2 h-4 w-4" />}
+        <span className="block truncate">{selectedName('All Environments', collapsed)}</span>
+      </>
+    )}
+  </span>
+);
+
+const tooltip = (selected: Environment | null) =>
+  !selected
+    ? 'All Environments'
+    : selected.type === EnvironmentType.BranchParent
+    ? 'Branch Environments'
+    : selected.name;
+
 type EnvironmentSelectMenuProps = {
   activeEnv?: Environment;
   collapsed: boolean;
@@ -99,7 +124,6 @@ export default function EnvironmentSelectMenu({
   if (selected === null && activeEnv) {
     setSelected(activeEnv);
   }
-  const isBranchParentSelected = selected?.type === EnvironmentType.BranchParent;
 
   const onSelect = (env: Environment) => {
     setSelected(env);
@@ -112,96 +136,67 @@ export default function EnvironmentSelectMenu({
     <Listbox value={selected} onChange={onSelect}>
       {({ open }) => (
         <div className="bg-canvasBase relative flex">
-          <Listbox.Button
-            className={`border-muted bg-canvasBase text-primary-intense hover:bg-canvasSubtle ${
-              collapsed ? `w-8 px-1` : 'w-[146px] px-2'
-            } m-0 h-8 overflow-hidden rounded border text-sm ${open && 'border-primary-intense'}`}
-          >
-            <div
-              className={`flex flex-row items-center  ${
-                collapsed ? 'justify-center' : 'justify-between'
-              }`}
+          <OptionalTooltip tooltip={collapsed && tooltip(selected)}>
+            <Listbox.Button
+              className={`border-muted bg-canvasBase text-primary-intense hover:bg-canvasSubtle ${
+                collapsed ? `w-8 px-1` : 'w-[146px] px-2'
+              } m-0 h-8 overflow-hidden rounded border text-sm ${open && 'border-primary-intense'}`}
             >
-              <span className="flex flex-row items-center ">
-                {isBranchParentSelected ? (
-                  <>
-                    {!collapsed && <RiSettings3Line className="mr-2 h-4" />}
-                    <span className="block truncate">
-                      {selectedName('Branch Environments', collapsed)}
-                    </span>
-                  </>
-                ) : selected ? (
-                  <span className="block truncate">
-                    {selected.type === EnvironmentType.BranchParent
-                      ? selectedName('Branch Environments', collapsed)
-                      : selectedName(selected.name, collapsed)}
-                  </span>
-                ) : (
-                  <>
-                    {!collapsed && <RiCloudLine className="mr-2 h-4 w-4" />}
-                    <span className="block truncate">
-                      {selectedName('All Environments', collapsed)}
-                    </span>
-                  </>
+              <div
+                className={`flex flex-row items-center  ${
+                  collapsed ? 'justify-center' : 'justify-between'
+                }`}
+              >
+                <SelectedDisplay selected={selected} collapsed={collapsed} />
+                {!collapsed && (
+                  <RiExpandUpDownLine className="text-subtle h-4 w-4" aria-hidden="true" />
                 )}
-              </span>
+              </div>
+            </Listbox.Button>
+          </OptionalTooltip>
 
-              {!collapsed && (
-                <RiExpandUpDownLine className="text-subtle h-4 w-4" aria-hidden="true" />
+          <Listbox.Options className="bg-canvasBase border-subtle absolute top-10 w-[188px] divide-none rounded border shadow focus:outline-none">
+            {defaultEnvironment !== null && <EnvironmentItem environment={defaultEnvironment} />}
+
+            {legacyTestMode !== null && (
+              <div>
+                <EnvironmentItem environment={legacyTestMode} name="Test mode" />
+              </div>
+            )}
+
+            {testEnvironments.length > 0 &&
+              testEnvironments.map((env) => <EnvironmentItem key={env.id} environment={env} />)}
+
+            <div>
+              <div className="bg-canvasBase text-disabled border-subtle flex h-[18px] cursor-not-allowed items-center gap-3 border-t px-3 py-4 text-xs font-normal">
+                Branch Environments
+              </div>
+              {mostRecentlyCreatedBranchEnvironments.length > 0 ? (
+                mostRecentlyCreatedBranchEnvironments.map((env) => (
+                  <EnvironmentItem key={env.id} environment={env} variant="compact" />
+                ))
+              ) : (
+                <Link
+                  href="/env"
+                  className="bg-canvasBase hover:bg-canvasSubtle text-muted flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal"
+                >
+                  <RiLoopLeftLine className="h-3 w-3" />
+                  Sync a branch
+                </Link>
               )}
             </div>
-          </Listbox.Button>
 
-          <Transition
-            show={open}
-            as={Fragment}
-            leave="transition ease-in duration-100"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <Listbox.Options className="bg-canvasBase border-subtle absolute top-10 z-[1000] w-[188px] divide-none rounded border shadow focus:outline-none">
-              {defaultEnvironment !== null && <EnvironmentItem environment={defaultEnvironment} />}
-
-              {legacyTestMode !== null && (
-                <div>
-                  <EnvironmentItem environment={legacyTestMode} name="Test mode" />
-                </div>
-              )}
-
-              {testEnvironments.length > 0 &&
-                testEnvironments.map((env) => <EnvironmentItem key={env.id} environment={env} />)}
-
-              <div>
-                <div className="bg-canvasBase text-disabled border-subtle flex h-10 cursor-not-allowed items-center gap-3  border-t px-3 text-xs font-normal transition-all">
-                  Branch Environments
-                </div>
-                {mostRecentlyCreatedBranchEnvironments.length > 0 ? (
-                  mostRecentlyCreatedBranchEnvironments.map((env) => (
-                    <EnvironmentItem key={env.id} environment={env} variant="compact" />
-                  ))
-                ) : (
-                  <Link
-                    href="/env"
-                    className="bg-canvasBase hover:bg-canvasSubtle text-muted flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal transition-all"
-                  >
-                    <RiLoopLeftLine className="h-3 w-3" />
-                    Sync a branch
-                  </Link>
-                )}
-              </div>
-
-              <div>
-                <Link
-                  prefetch={true}
-                  href="/env"
-                  className="hover:bg-canvasSubtle text-muted flex h-10 cursor-pointer items-center gap-2 whitespace-nowrap px-3 text-[13px] font-normal transition-all"
-                >
-                  <RiCloudFill className="h-3 w-3" />
-                  View All Environments
-                </Link>
-              </div>
-            </Listbox.Options>
-          </Transition>
+            <div>
+              <Link
+                prefetch={true}
+                href="/env"
+                className="hover:bg-canvasSubtle text-muted flex h-10 cursor-pointer items-center gap-2 whitespace-nowrap px-3 text-[13px] font-normal"
+              >
+                <RiCloudFill className="h-3 w-3" />
+                View All Environments
+              </Link>
+            </div>
+          </Listbox.Options>
         </div>
       )}
     </Listbox>
@@ -229,7 +224,7 @@ function EnvironmentItem({
       key={environment.id}
       value={environment}
       className={cn(
-        'bg-canvasBase hover:bg-canvasSubtle text-muted flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal transition-all',
+        'bg-canvasBase hover:bg-canvasSubtle text-muted flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal',
         variant === 'compact' && 'py-2'
       )}
     >
