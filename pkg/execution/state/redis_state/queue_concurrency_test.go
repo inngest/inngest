@@ -50,8 +50,8 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 
 	// Create a new lifecycle listener.  This should be invoked each time we hit limits.
 	ll := testLifecycleListener{
-		l:           &sync.Mutex{},
-		concurrency: map[uuid.UUID]int{},
+		lock:          &sync.Mutex{},
+		fnConcurrency: map[uuid.UUID]int{},
 	}
 
 	q := NewQueue(
@@ -123,7 +123,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 		}
 	}
 
-	require.NotZero(t, ll.concurrency[limit_1])
+	require.NotZero(t, ll.fnConcurrency[limit_1])
 
 	diff := time.Since(start).Seconds()
 	require.Greater(t, int(diff), 10, "10 jobs should have taken at least 10 seconds")
@@ -131,13 +131,14 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 }
 
 type testLifecycleListener struct {
-	l           *sync.Mutex
-	concurrency map[uuid.UUID]int
+	lock          *sync.Mutex
+	fnConcurrency map[uuid.UUID]int
 }
 
-func (t testLifecycleListener) OnConcurrencyLimitReached(ctx context.Context, fnID uuid.UUID) {
-	t.l.Lock()
-	i := t.concurrency[fnID]
-	t.concurrency[fnID] = i + 1
-	t.l.Unlock()
+func (t testLifecycleListener) OnFnConcurrencyLimitReached(_ context.Context, fnID uuid.UUID) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	i := t.fnConcurrency[fnID]
+	t.fnConcurrency[fnID] = i + 1
 }

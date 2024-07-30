@@ -8,12 +8,9 @@ import (
 
 // QueueLifecycleListener represents a lifecycle listener for queue-related specifics.
 type QueueLifecycleListener interface {
-	// OnConcurrencyLimitReached is called when a queue item cannot be processed due to
-	// concurrency constraints.
-	//
-	// In the future, we should specify which concurrency limit was reached (account,
-	// partition, or custom).
-	OnConcurrencyLimitReached(ctx context.Context, fnID uuid.UUID)
+	// OnFnConcurrencyLimitReached is called when a queue item cannot be processed due to
+	// its function concurrency limit.
+	OnFnConcurrencyLimitReached(ctx context.Context, fnID uuid.UUID)
 }
 
 type QueueLifecycleListeners []QueueLifecycleListener
@@ -26,8 +23,8 @@ func (l QueueLifecycleListeners) GoEach(fn func(listener QueueLifecycleListener)
 	}
 }
 
-func (l QueueLifecycleListeners) OnConcurrencyLimitReached(ctx context.Context, fnID uuid.UUID) {
+func (l QueueLifecycleListeners) OnFnConcurrencyLimitReached(ctx context.Context, fnID uuid.UUID) {
 	l.GoEach(func(listener QueueLifecycleListener) {
-		listener.OnConcurrencyLimitReached(ctx, fnID)
+		listener.OnFnConcurrencyLimitReached(ctx, fnID)
 	})
 }

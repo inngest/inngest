@@ -647,17 +647,8 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		return capacity, err
 	})
 	if err == ErrPartitionConcurrencyLimit {
-		for _, l := range q.lifecycles {
-			// Track lifecycles; this function hit a partition limit ahead of
-			// even being leased, meaning the function is at max capacity and we skip
-			// scanning of jobs altogether.
-			if p.FunctionID != nil {
-				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
-			}
-			// else {
-			// TODO(cdzombak): lifecycles/metrics for other concurrency scopes
-			// https://linear.app/inngest/issue/INN-3246/lifecycles-add-new-lifecycles-for-fn-env-account-concurrency-limits
-			// }
+		if p.FunctionID != nil {
+			q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
 		}
 		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
@@ -916,16 +907,6 @@ ProcessLoop:
 	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
 	// with a force:  ensure that we won't re-scan it until 2 seconds in the future.
 	if ctrConcurrency > 0 || (ctrRateLimit > 0 && ctrConcurrency == 0 && ctrSuccess == 0) {
-		for _, l := range q.lifecycles {
-			if p.FunctionID != nil {
-				go l.OnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
-			}
-			// else {
-			// TODO(cdzombak): lifecycles/metrics for other concurrency scopes
-			// https://linear.app/inngest/issue/INN-3246/lifecycles-add-new-lifecycles-for-fn-env-account-concurrency-limits
-			// }
-		}
-
 		requeue := PartitionConcurrencyLimitRequeueExtension
 		if ctrConcurrency == 0 {
 			// This has been throttled only.  Don't requeue so far ahead, otherwise we'll be waiting longer
@@ -934,6 +915,8 @@ ProcessLoop:
 			// TODO: When we create throttle queues, requeue this appropriately depending on the throttle
 			//       period.
 			requeue = PartitionThrottleLimitRequeueExtension
+		} else if p.FunctionID != nil {
+			q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
 		}
 
 		// Requeue this partition as we hit concurrency limits.
