@@ -475,8 +475,13 @@ func TestQueueEnqueueItem(t *testing.T) {
 			require.Contains(t, accountIds, uuid.Nil.String())
 
 			apIds := getAccountPartitions(t, rc, uuid.Nil)
-			require.Equal(t, 1, len(apIds))
+			require.Equal(t, 2, len(apIds), "expected two account partitions", apIds, r.Dump())
+
+			// concurrency key partition
 			require.Contains(t, apIds, concurrencyPartition.ID)
+
+			// workflow partition for backwards compatibility
+			require.Contains(t, apIds, fnID.String())
 
 			// We do not add the fn to the function-specific queue.
 			//
@@ -1480,8 +1485,10 @@ func TestQueueDequeue(t *testing.T) {
 			require.EqualValues(t, start.Add(30*time.Minute).Unix(), partScoreA[0])
 			require.EqualValues(t, start.Add(30*time.Minute).Unix(), partScoreB[0])
 
-			partScoreA, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(uuid.Nil), parts[0].ID)
-			partScoreB, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(uuid.Nil), parts[1].ID)
+			partScoreA, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(acctID), parts[0].ID)
+			partScoreB, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(acctID), parts[1].ID)
+			require.NotNil(t, partScoreA, "expected partition requeue to update account partition index", r.Dump())
+			require.NotNil(t, partScoreB)
 			require.EqualValues(t, start.Add(30*time.Minute).Unix(), partScoreA[0])
 			require.EqualValues(t, start.Add(30*time.Minute).Unix(), partScoreB[0])
 		})
@@ -1495,8 +1502,8 @@ func TestQueueDequeue(t *testing.T) {
 			require.EqualValues(t, start, time.Unix(int64(partScoreA[0]), 0), r.Dump())
 			require.EqualValues(t, start, time.Unix(int64(partScoreB[0]), 0))
 
-			partScoreA, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(uuid.Nil), parts[0].ID)
-			partScoreB, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(uuid.Nil), parts[1].ID)
+			partScoreA, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(acctID), parts[0].ID)
+			partScoreB, _ = r.ZMScore(q.u.kg.AccountPartitionIndex(acctID), parts[1].ID)
 			require.EqualValues(t, start, time.Unix(int64(partScoreA[0]), 0), r.Dump())
 			require.EqualValues(t, start, time.Unix(int64(partScoreB[0]), 0))
 		})
