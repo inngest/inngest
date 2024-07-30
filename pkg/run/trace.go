@@ -783,8 +783,8 @@ func (tb *runTree) processWaitForEvent(ctx context.Context, span *cqrs.Span, mod
 			},
 		},
 	}
-	// if has ended
-	if (expired != nil && *expired) || (!timeout.IsZero() && timeout.Before(now)) {
+	// if event was found or has ended
+	if foundEvtID != nil || ((expired != nil && *expired) || (!timeout.IsZero() && timeout.Before(now))) {
 		mod.EndedAt = timestamppb.New(endedAt)
 	}
 
