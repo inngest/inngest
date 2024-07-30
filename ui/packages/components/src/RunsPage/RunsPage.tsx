@@ -43,7 +43,6 @@ type Props = {
   cancelRun: React.ComponentProps<typeof RunDetails>['cancelRun'];
   data: Run[];
   features: Pick<Features, 'history'>;
-  functionSlug: string;
   getRun: React.ComponentProps<typeof RunDetails>['getRun'];
   getTraceResult: React.ComponentProps<typeof RunDetails>['getResult'];
   getTrigger: React.ComponentProps<typeof RunDetails>['getTrigger'];
@@ -92,7 +91,7 @@ export function RunsPage({
   );
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
-    'VisibleRunsColumns',
+    `VisibleRunsColumns-${scope}`,
     displayAllColumns
   );
 
