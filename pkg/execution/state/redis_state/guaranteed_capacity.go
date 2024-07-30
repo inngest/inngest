@@ -83,7 +83,7 @@ func (q *queue) getGuaranteedCapacityMap(ctx context.Context) (map[string]*Guara
 func (q *queue) leaseAccount(ctx context.Context, guaranteedCapacity *GuaranteedCapacity, duration time.Duration, n int) (*ulid.ULID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "leaseAccount"), redis_telemetry.ScopeQueue)
 
-	now := getNow()
+	now := q.clock.Now()
 	leaseID, err := ulid.New(uint64(now.Add(duration).UnixMilli()), rand.Reader)
 	if err != nil {
 		return nil, err
@@ -126,7 +126,7 @@ func (q *queue) leaseAccount(ctx context.Context, guaranteedCapacity *Guaranteed
 func (q *queue) renewAccountLease(ctx context.Context, guaranteedCapacity *GuaranteedCapacity, duration time.Duration, leaseID ulid.ULID) (*ulid.ULID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "renewAccountLease"), redis_telemetry.ScopeQueue)
 
-	now := getNow()
+	now := q.clock.Now()
 	newLeaseID, err := ulid.New(uint64(now.Add(duration).UnixMilli()), rand.Reader)
 	if err != nil {
 		return nil, err
@@ -180,8 +180,8 @@ func (q *queue) getAccountLeases() []leasedAccount {
 }
 
 func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context) {
-	scanTick := time.NewTicker(GuaranteedCapacityTickTime)
-	leaseTick := time.NewTicker(AccountLeaseTime / 2)
+	scanTick := q.clock.NewTicker(GuaranteedCapacityTickTime)
+	leaseTick := q.clock.NewTicker(AccountLeaseTime / 2)
 
 	// records whether we're leasing
 	var leasing int32
@@ -192,7 +192,7 @@ func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context) {
 			// on the global partition queue.
 			// We perform this check every scan iteration to support claiming
 			// guaranteed capacity if the sequential lease expires for some reason
-			<-scanTick.C
+			<-scanTick.Chan()
 			continue
 		}
 
@@ -218,7 +218,7 @@ func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context) {
 			}
 
 			return
-		case <-scanTick.C:
+		case <-scanTick.Chan():
 			go func() {
 				if !atomic.CompareAndSwapInt32(&leasing, 0, 1) {
 					// Only one lease can occur at once.
@@ -243,11 +243,11 @@ func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context) {
 						return
 					}
 					if retry {
-						<-time.After(time.Duration(mathRand.Intn(50)) * time.Millisecond)
+						<-q.clock.After(time.Duration(mathRand.Intn(50)) * time.Millisecond)
 					}
 				}
 			}()
-		case <-leaseTick.C:
+		case <-leaseTick.Chan():
 			// Copy the slice to prevent locking/concurrent access.
 			existingLeases := q.getAccountLeases()
 
@@ -399,7 +399,7 @@ func (q *queue) filterGuaranteedCapacity(ctx context.Context, guaranteedCapacity
 
 		validLeases := []ulid.ULID{}
 		for _, l := range v.Leases {
-			if time.UnixMilli(int64(l.Time())).After(getNow()) {
+			if time.UnixMilli(int64(l.Time())).After(q.clock.Now()) {
 				validLeases = append(validLeases, l)
 			}
 		}
