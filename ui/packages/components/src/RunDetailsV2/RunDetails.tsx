@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -39,12 +39,13 @@ type Run = {
 };
 
 export function RunDetails(props: Props) {
-  const { getResult, getRun, getTrigger, pathCreator, pollInterval, rerun, runID, standalone } =
-    props;
+  const { getResult, getRun, getTrigger, pathCreator, rerun, runID, standalone } = props;
+  const [pollInterval, setPollInterval] = useState(props.pollInterval);
 
   const runRes = useQuery({
     queryKey: ['run', runID],
     queryFn: useCallback(() => {
+      throw new Error('oh no');
       return getRun(runID);
     }, [getRun, runID]),
     retry: 3,
@@ -80,6 +81,10 @@ export function RunDetails(props: Props) {
   }
 
   const run = runRes.data;
+  if (run?.trace.endedAt && pollInterval) {
+    // The run won't change anymore so no need to poll
+    setPollInterval(undefined);
+  }
 
   return (
     <div>

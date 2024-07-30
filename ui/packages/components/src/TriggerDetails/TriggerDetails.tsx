@@ -127,11 +127,6 @@ export function TriggerDetails({ className, getTrigger, runID }: Props) {
     throw error;
   }
 
-  // if (!trigger) {
-  //   // Unreachable
-  //   throw new Error('missing trigger');
-  // }
-
   return (
     <Collapsible.Root
       className={cn(showEventPanel && 'w-3/4 2xl:w-2/5', 'flex flex-col gap-5', className)}

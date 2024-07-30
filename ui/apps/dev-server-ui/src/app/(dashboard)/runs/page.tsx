@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
@@ -25,7 +25,6 @@ import { client } from '@/store/baseApi';
 import {
   CountRunsDocument,
   GetRunsDocument,
-  useCountRunsQuery,
   type CountRunsQuery,
   type GetRunsQuery,
 } from '@/store/generated';
@@ -44,9 +43,6 @@ export default function Page() {
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
-  console.log('calculatedStartTime', calculatedStartTime);
-  console.log('lastDays', lastDays);
-  console.log('startTime', startTime);
 
   const queryFn = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
@@ -71,7 +67,7 @@ export default function Page() {
           durationMS,
         };
       });
-      console.log(edges.length);
+
       return {
         ...data.runs,
         edges,
