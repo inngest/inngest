@@ -1786,8 +1786,12 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	}
 
 	switch result[0] {
-	case -1, -2, -3:
+	case -1:
+		return nil, 0, ErrAccountConcurrencyLimit
+	case -2:
 		return nil, 0, ErrPartitionConcurrencyLimit
+	case -3:
+		return nil, 0, ErrConcurrencyLimitCustomKey
 	case -4:
 		return nil, 0, ErrPartitionNotFound
 	case -5:
