@@ -173,7 +173,7 @@ func TestQueueRunBasic(t *testing.T) {
 	}
 
 	<-time.After(12 * time.Second)
-	require.EqualValues(t, int32(len(items)), atomic.LoadInt32(&handled))
+	require.EqualValues(t, int32(len(items)), atomic.LoadInt32(&handled), "number of enqueued and received items does  not match", r.Dump())
 	cancel()
 
 	<-time.After(time.Second)

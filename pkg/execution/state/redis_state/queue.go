@@ -2070,6 +2070,9 @@ func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Tim
 		},
 		args,
 	).AsStrSlice()
+	if err != nil {
+		return nil, fmt.Errorf("error peeking accounts: %w", err)
+	}
 
 	items := make([]uuid.UUID, len(peekRet))
 

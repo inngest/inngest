@@ -53,6 +53,8 @@ local accountId       = ARGV[11]
 -- $include(set_item_peek_time.lua)
 -- $include(update_pointer_score.lua)
 -- $include(gcra.lua)
+-- $include(ends_with.lua)
+-- $include(update_account_queues.lua)
 
 -- first, get the queue item.  we must do this and bail early if the queue item
 -- was not found.
@@ -128,8 +130,8 @@ local function handleEnqueue(keyPartition, keyConcurrency, partitionID)
 	-- expected just the function UUIDs instead of a fully defined redis key.
 	update_pointer_score_to(partitionID, keyGlobalPointer, earliestScore)
 
-	-- Update account partitions with new score of next item
-	update_pointer_score_to(partitionID, keyAccountPartitions, earliestScore)
+	-- Update account partitions and account pointers with new score of next item
+	update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, earliestScore)
 
 	-- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 	-- so that expired leases can be re-processed.  We want to take the earliest time from the
@@ -183,11 +185,5 @@ if concurrencyC > 0 then
 	redis.call("ZADD", keyConcurrencyC, nextTime, item.id)
 	handleEnqueue(keyPartitionC, keyConcurrencyC, partitionIdC)
 end
-
--- Find earliest pointer _across_ account partitions
-local earliestPartitionScore = get_fn_partition_score(keyAccountPartitions)
-
--- Update account pointer to earliest partition
-update_pointer_score_to(accountId, keyGlobalAccountPointer, earliestPartitionScore)
 
 return 0
