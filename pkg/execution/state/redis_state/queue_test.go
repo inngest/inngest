@@ -265,6 +265,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
 		requirePartitionItemScoreEquals(t, r, kg.GlobalPartitionIndex(), qp, start)
 		requirePartitionItemScoreEquals(t, r, kg.AccountPartitionIndex(accountId), qp, start)
+		requireAccountScoreEquals(t, r, accountId, start)
 	})
 
 	t.Run("It sets the right item score", func(t *testing.T) {
@@ -901,36 +902,43 @@ func TestQueueLease(t *testing.T) {
 		t.Run("it should update the partition score to the next item", func(t *testing.T) {
 			r.FlushAll()
 
-			t1 := time.Now().Truncate(time.Second)
-			t2 := t1.Add(time.Second * 5).Truncate(time.Second)
+			timeNow := time.Now().Truncate(time.Second)
+			timeNowPlusFiveSeconds := timeNow.Add(time.Second * 5).Truncate(time.Second)
+
+			acctId := uuid.New()
 
 			// Enqueue future item (partition time will be now + 5s)
-			item, err = q.EnqueueItem(ctx, QueueItem{}, t2)
+			item, err = q.EnqueueItem(ctx, QueueItem{
+				Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}},
+			}, timeNowPlusFiveSeconds)
 			require.NoError(t, err)
 			require.Nil(t, item.LeaseID)
 
 			qp := getDefaultPartition(t, r, uuid.Nil)
 
-			requireItemScoreEquals(t, r, item, t2)
-			requirePartitionItemScoreEquals(t, r, q.u.kg.GlobalPartitionIndex(), qp, t2)
-			requirePartitionItemScoreEquals(t, r, q.u.kg.AccountPartitionIndex(uuid.Nil), qp, t2)
+			requireItemScoreEquals(t, r, item, timeNowPlusFiveSeconds)
+			requirePartitionItemScoreEquals(t, r, q.u.kg.GlobalPartitionIndex(), qp, timeNowPlusFiveSeconds)
+			requirePartitionItemScoreEquals(t, r, q.u.kg.AccountPartitionIndex(acctId), qp, timeNowPlusFiveSeconds)
+			requireAccountScoreEquals(t, r, acctId, timeNowPlusFiveSeconds)
 
 			// Enqueue current item (partition time will be moved up to now)
-			item, err := q.EnqueueItem(ctx, QueueItem{}, t1)
+			item, err := q.EnqueueItem(ctx, QueueItem{Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, timeNow)
 			require.NoError(t, err)
 			require.Nil(t, item.LeaseID)
 
-			requireItemScoreEquals(t, r, item, t1)
+			requireItemScoreEquals(t, r, item, timeNow)
 
-			requirePartitionItemScoreEquals(t, r, q.u.kg.GlobalPartitionIndex(), qp, t1)
-			requirePartitionItemScoreEquals(t, r, q.u.kg.AccountPartitionIndex(uuid.Nil), qp, t1)
+			requirePartitionItemScoreEquals(t, r, q.u.kg.GlobalPartitionIndex(), qp, timeNow)
+			requirePartitionItemScoreEquals(t, r, q.u.kg.AccountPartitionIndex(acctId), qp, timeNow)
+			requireAccountScoreEquals(t, r, acctId, timeNow)
 
 			// Lease item (moves partition time back to now + 5s)
 			_, err = q.Lease(ctx, p, item, time.Minute, q.clock.Now(), nil)
 			require.NoError(t, err)
 
-			requirePartitionItemScoreEquals(t, r, q.u.kg.GlobalPartitionIndex(), qp, t2)
-			requirePartitionItemScoreEquals(t, r, q.u.kg.AccountPartitionIndex(uuid.Nil), qp, t2)
+			requirePartitionItemScoreEquals(t, r, q.u.kg.GlobalPartitionIndex(), qp, timeNowPlusFiveSeconds)
+			requirePartitionItemScoreEquals(t, r, q.u.kg.AccountPartitionIndex(acctId), qp, timeNowPlusFiveSeconds)
+			requireAccountScoreEquals(t, r, acctId, timeNowPlusFiveSeconds)
 		})
 	})
 
@@ -1862,11 +1870,17 @@ func TestQueueRequeue(t *testing.T) {
 		itemScoreB, _ := r.ZMScore(parts[1].zsetKey(q.u.kg), item.ID)
 		partScoreA, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[0].ID)
 		partScoreB, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[1].ID)
+		accountPartScoreA, _ := r.ZMScore(q.u.kg.AccountPartitionIndex(acctID), parts[0].ID)
+		accountPartScoreB, _ := r.ZMScore(q.u.kg.AccountPartitionIndex(acctID), parts[1].ID)
+		accountScore, _ := r.ZMScore(q.u.kg.GlobalAccountIndex(), acctID.String())
 
 		require.NotEmpty(t, itemScoreA, "Couldn't find item in '%s':\n%s", parts[0].zsetKey(q.u.kg), r.Dump())
 		require.NotEmpty(t, itemScoreB, "Couldn't find item in '%s':\n%s", parts[1].zsetKey(q.u.kg), r.Dump())
 		require.NotEmpty(t, partScoreA)
 		require.NotEmpty(t, partScoreB)
+		require.Equal(t, partScoreA, accountPartScoreA, "expected account partitions to match global partitions")
+		require.Equal(t, partScoreB, accountPartScoreB, "expected account partitions to match global partitions")
+		require.Equal(t, accountPartScoreA[0], accountScore[0], "expected account score to match earliest account partition")
 
 		_, err = q.Lease(ctx, QueuePartition{}, item, time.Second, q.clock.Now(), nil)
 		require.NoError(t, err)
@@ -1881,11 +1895,18 @@ func TestQueueRequeue(t *testing.T) {
 			newItemScoreB, _ := r.ZMScore(parts[1].zsetKey(q.u.kg), item.ID)
 			newPartScoreA, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[0].ID)
 			newPartScoreB, _ := r.ZMScore(q.u.kg.GlobalPartitionIndex(), parts[1].ID)
+			newAccountPartScoreA, _ := r.ZMScore(q.u.kg.AccountPartitionIndex(acctID), parts[0].ID)
+			newAccountPartScoreB, _ := r.ZMScore(q.u.kg.AccountPartitionIndex(acctID), parts[1].ID)
+			newAccountScore, _ := r.ZMScore(q.u.kg.GlobalAccountIndex(), acctID.String())
 
 			require.NotEqual(t, itemScoreA, newItemScoreA)
 			require.NotEqual(t, itemScoreB, newItemScoreB)
 			require.NotEqual(t, partScoreA, newPartScoreA)
 			require.NotEqual(t, partScoreB, newPartScoreB)
+			require.Equal(t, newPartScoreA, newAccountPartScoreA)
+			require.Equal(t, newPartScoreB, newAccountPartScoreB)
+			require.Equal(t, next.Truncate(time.Second).Unix(), int64(newPartScoreA[0]))
+			require.Equal(t, newAccountPartScoreA[0], newAccountScore[0], "expected account score to match earliest account partition", r.Dump())
 
 			require.Equal(t, newItemScoreA, newItemScoreB)
 			require.EqualValues(t, next.UnixMilli(), int(newItemScoreA[0]))
@@ -3498,11 +3519,21 @@ func requirePartitionItemScoreEquals(t *testing.T, r *miniredis.Miniredis, keyPa
 	require.WithinDuration(t, expected.Truncate(time.Millisecond), parsed, 15*time.Millisecond, r.Dump())
 }
 
-// requirePartitionScoreEquals is used to check scores for any partition, including custom partitions.
+// requireGlobalPartitionScore is used to check scores for any partition, including custom partitions.
 func requireGlobalPartitionScore(t *testing.T, r *miniredis.Miniredis, id string, expected time.Time) {
 	t.Helper()
 	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
 	score, err := r.ZScore(kg.GlobalPartitionIndex(), id)
+	parsed := time.Unix(int64(score), 0)
+	require.NoError(t, err)
+	require.WithinDuration(t, expected.Truncate(time.Second), parsed, time.Millisecond, r.Dump())
+}
+
+// requireAccountScoreEquals is used to check scores for any account
+func requireAccountScoreEquals(t *testing.T, r *miniredis.Miniredis, accountId uuid.UUID, expected time.Time) {
+	t.Helper()
+	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
+	score, err := r.ZScore(kg.GlobalAccountIndex(), accountId.String())
 	parsed := time.Unix(int64(score), 0)
 	require.NoError(t, err)
 	require.WithinDuration(t, expected.Truncate(time.Second), parsed, time.Millisecond, r.Dump())
