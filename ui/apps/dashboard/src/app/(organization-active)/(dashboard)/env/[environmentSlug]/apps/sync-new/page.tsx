@@ -10,7 +10,7 @@ import { IconApp } from '@inngest/components/icons/App';
 import * as Tabs from '@radix-ui/react-tabs';
 import { RiLoopLeftLine } from '@remixicon/react';
 
-import Header from '@/components/Header/Header';
+import Header from '@/components/Header/old/Header';
 import { setSkipCacheSearchParam } from '@/utils/urls';
 import ManualSync from './ManualSync';
 

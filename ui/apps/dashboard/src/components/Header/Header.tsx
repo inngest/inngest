@@ -1,8 +1,8 @@
 import { type Route } from 'next';
 
-import cn from '@/utils/cn';
-import NavItem, { type ActiveMatching } from '../Navigation/old/NavItem';
-import Navigation from '../Navigation/old/Navigation';
+import NavItem, { type ActiveMatching } from '@/components/Navigation/old/NavItem';
+import Navigation from '@/components/Navigation/old/Navigation';
+import { BreadCrumb } from './BreadCrumb';
 
 export type HeaderLink = {
   href: string;
@@ -12,51 +12,33 @@ export type HeaderLink = {
   badge?: React.ReactNode;
 };
 
-type HeaderTypes = {
-  children?: React.ReactNode;
+export type HeaderType = {
   links?: HeaderLink[];
-  title: string | React.ReactNode;
+  breadcrumb: string[];
   icon?: React.ReactNode;
   action?: React.ReactNode;
   className?: string;
-  badge?: React.ReactNode;
 };
 
-export default function Header({
-  children,
-  links,
-  title,
-  icon,
-  action,
-  badge,
-  className = '',
-}: HeaderTypes) {
+export const Header = ({ links, breadcrumb, icon, action, className = '' }: HeaderType) => {
   return (
-    <div className={cn('dark left-0 right-0 top-0 z-10 bg-slate-900', className)}>
-      <div className="flex items-center justify-between px-6">
-        <div>
-          <div className="flex items-center">
-            {icon ? (
-              <div className="mr-2 flex h-8 w-8 items-center justify-center rounded-md border border-slate-800">
-                {icon}
-              </div>
-            ) : (
-              ''
-            )}
-            <h1 className="py-3 text-lg font-medium tracking-wide text-white">{title}</h1>
-            <span className="pl-4">{badge}</span>
-          </div>
-          {links && (
-            <Navigation className="-ml-2 -mt-2">
-              {links.map(({ href, text, ...props }) => (
-                <NavItem key={href} href={href as Route} text={text} {...props} />
-              ))}
-            </Navigation>
-          )}
+    <>
+      <div
+        className={`bg-canvasBase border-subtle flex h-[52px] flex-row items-center justify-between border-b p-4 ${className}`}
+      >
+        <div className="flex flex-row items-center justify-start">
+          <BreadCrumb path={breadcrumb} />
+          {icon}
         </div>
         <div>{action}</div>
       </div>
-      <div>{children}</div>
-    </div>
+      {links && (
+        <Navigation className="-ml-2 -mt-2">
+          {links.map(({ href, text, ...props }) => (
+            <NavItem key={href} href={href as Route} text={text} {...props} />
+          ))}
+        </Navigation>
+      )}
+    </>
   );
-}
+};

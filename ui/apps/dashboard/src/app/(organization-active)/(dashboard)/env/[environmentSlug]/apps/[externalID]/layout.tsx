@@ -6,7 +6,7 @@ import { IconApp } from '@inngest/components/icons/App';
 import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-import Header, { type HeaderLink } from '@/components/Header/Header';
+import Header, { type HeaderLink } from '@/components/Header/old/Header';
 import { ArchiveButton } from './ArchiveButton';
 import { ResyncButton } from './ResyncButton';
 import { ValidateButton } from './ValidateButton';
