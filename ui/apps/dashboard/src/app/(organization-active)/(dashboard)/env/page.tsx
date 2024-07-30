@@ -1,16 +1,19 @@
-import { EnvLayout } from '@/components/Environments/EnvLayout';
 import Environments from '@/components/Environments/Environments';
 import OldEnvs from '@/components/Environments/old/oldPage';
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import Layout from '@/components/Layout/Layout';
 import AppNavigation from '@/components/Navigation/old/AppNavigation';
 
 export default async function EnvsPage() {
   const newIANav = await getBooleanFlag('new-ia-nav');
 
   return newIANav ? (
-    <EnvLayout>
+    <Layout>
+      <div className="border-subtle flex h-[52px] w-full flex-row items-center justify-start border-b px-6">
+        <div className="text-basis text-base leading-tight">All Environments</div>
+      </div>
       <Environments />
-    </EnvLayout>
+    </Layout>
   ) : (
     <>
       <AppNavigation envSlug="all" />

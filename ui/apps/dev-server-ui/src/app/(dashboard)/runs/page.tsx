@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
@@ -22,12 +22,19 @@ import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
 import { useRerun } from '@/hooks/useRerun';
 import { client } from '@/store/baseApi';
-import { GetRunsDocument, type GetRunsQuery } from '@/store/generated';
+import {
+  CountRunsDocument,
+  GetRunsDocument,
+  useCountRunsQuery,
+  type CountRunsQuery,
+  type GetRunsQuery,
+} from '@/store/generated';
 import { pathCreator } from '@/utils/pathCreator';
 
 const pollInterval = 2500;
 
 export default function Page() {
+  const [totalCount, setTotalCount] = useState<number>();
   const [filteredStatus] = useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
   const [timeField = FunctionRunTimeField.QueuedAt] = useValidatedSearchParam(
     'timeField',
@@ -83,6 +90,20 @@ export default function Page() {
       return lastPage.pageInfo.endCursor;
     },
   });
+
+  useEffect(() => {
+    setTotalCount(undefined);
+
+    (async () => {
+      const data: CountRunsQuery = await client.request(CountRunsDocument, {
+        startTime: calculatedStartTime,
+        endTime,
+        status: filteredStatus,
+        timeField,
+      });
+      setTotalCount(data.runs.totalCount);
+    })();
+  }, [calculatedStartTime, endTime, filteredStatus, timeField]);
 
   const runs = useMemo(() => {
     if (!data?.pages) {
@@ -150,6 +171,7 @@ export default function Page() {
       functions={[]}
       pollInterval={pollInterval}
       scope="env"
+      totalCount={totalCount}
     />
   );
 }

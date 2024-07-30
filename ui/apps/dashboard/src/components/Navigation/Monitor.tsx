@@ -1,4 +1,3 @@
-import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
 import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
 
@@ -24,20 +23,23 @@ export default function Monitor({
         href={getNavRoute(activeEnv, 'metrics')}
         collapsed={collapsed}
         text="Metrics"
-        icon={<MetricsIcon className="w-5" />}
+        icon={<MetricsIcon className="h-18px w-[18px]" />}
+        comingSoon={true}
       />
       <MenuItem
-        href={getNavRoute(activeEnv, 'functions')}
+        href={getNavRoute(activeEnv, 'functions/monitor')}
         collapsed={collapsed}
         text="Runs"
-        icon={<RunsIcon className="w-5" />}
+        icon={<RunsIcon className="h-18px w-[18px]" />}
+        comingSoon={true}
       />
-      <MenuItem
-        href={getNavRoute(activeEnv, 'events')}
+      {/* <MenuItem
+        href={getNavRoute(activeEnv, 'events/monitor')}
         collapsed={collapsed}
         text="Event Logs"
-        icon={<EventLogsIcon className="w-5" />}
-      />
+        icon={<EventLogsIcon className="h-18px w-[18px]" />}
+        comingSoon={true}
+      /> */}
     </div>
   );
 }
