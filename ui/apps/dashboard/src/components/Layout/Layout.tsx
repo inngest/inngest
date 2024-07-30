@@ -1,14 +1,11 @@
 'use server';
 
 import { type ReactNode } from 'react';
-import { cookies } from 'next/headers';
 
 import IncidentBanner from '@/app/(organization-active)/IncidentBanner';
+import { getNavCollapsed } from '@/app/actions';
+import { getProfile } from '@/queries/server-only/profile';
 import type { Environment } from '@/utils/environments';
-import { Help } from '../Navigation/Help';
-import { Integrations } from '../Navigation/Integrations';
-import Navigation from '../Navigation/Navigation';
-import { Profile } from '../Navigation/Profile';
 import SideBar from './SideBar';
 
 type LayoutProps = {
@@ -18,22 +15,13 @@ type LayoutProps = {
 };
 
 export default async function Layout({ activeEnv, children }: LayoutProps) {
-  const cookieStore = cookies();
-  const collapsed = cookieStore.get('navCollapsed')?.value === 'true';
+  const collapsed = await getNavCollapsed();
+  const { user, org } = await getProfile();
+  const profile = { orgName: org?.name, displayName: user.displayName };
 
   return (
     <div className="flex w-full flex-row justify-start">
-      <SideBar collapsed={collapsed}>
-        <div className="flex grow flex-col justify-between">
-          <Navigation collapsed={collapsed} activeEnv={activeEnv} />
-
-          <div className="">
-            <Integrations collapsed={collapsed} />
-            <Help collapsed={collapsed} />
-            <Profile collapsed={collapsed} />
-          </div>
-        </div>
-      </SideBar>
+      <SideBar collapsed={collapsed} activeEnv={activeEnv} profile={profile} />
 
       <div className="flex w-full flex-col">
         <IncidentBanner />

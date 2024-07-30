@@ -287,6 +287,21 @@ export const GET_RUNS = gql`
   }
 `;
 
+export const COUNT_RUNS = gql`
+  query CountRuns(
+    $startTime: Time!
+    $status: [FunctionRunStatus!]
+    $timeField: RunsV2OrderByField!
+  ) {
+    runs(
+      filter: { from: $startTime, status: $status, timeField: $timeField }
+      orderBy: [{ field: $timeField, direction: DESC }]
+    ) {
+      totalCount
+    }
+  }
+`;
+
 export const TRACE_DETAILS_FRAGMENT = gql`
   fragment TraceDetails on RunTraceSpan {
     name
