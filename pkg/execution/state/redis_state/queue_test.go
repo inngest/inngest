@@ -921,7 +921,7 @@ func TestQueueLease(t *testing.T) {
 			requirePartitionItemScoreEquals(t, r, q.u.kg.AccountPartitionIndex(uuid.Nil), qp, t1)
 
 			// Lease item (moves partition time back to now + 5s)
-			_, err = q.Lease(ctx, p, item, time.Minute, getNow(), nil)
+			_, err = q.Lease(ctx, p, item, time.Minute, q.clock.Now(), nil)
 			require.NoError(t, err)
 
 			requirePartitionItemScoreEquals(t, r, q.u.kg.GlobalPartitionIndex(), qp, t2)
