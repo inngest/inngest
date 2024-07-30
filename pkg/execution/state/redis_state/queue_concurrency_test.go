@@ -50,8 +50,10 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 
 	// Create a new lifecycle listener.  This should be invoked each time we hit limits.
 	ll := testLifecycleListener{
-		lock:          &sync.Mutex{},
-		fnConcurrency: map[uuid.UUID]int{},
+		lock:            &sync.Mutex{},
+		fnConcurrency:   map[uuid.UUID]int{},
+		acctConcurrency: map[uuid.UUID]int{},
+		ckConcurrency:   map[string]int{},
 	}
 
 	q := NewQueue(
@@ -131,8 +133,10 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 }
 
 type testLifecycleListener struct {
-	lock          *sync.Mutex
-	fnConcurrency map[uuid.UUID]int
+	lock            *sync.Mutex
+	fnConcurrency   map[uuid.UUID]int
+	acctConcurrency map[uuid.UUID]int
+	ckConcurrency   map[string]int
 }
 
 func (t testLifecycleListener) OnFnConcurrencyLimitReached(_ context.Context, fnID uuid.UUID) {
@@ -141,4 +145,20 @@ func (t testLifecycleListener) OnFnConcurrencyLimitReached(_ context.Context, fn
 
 	i := t.fnConcurrency[fnID]
 	t.fnConcurrency[fnID] = i + 1
+}
+
+func (t testLifecycleListener) OnAccountConcurrencyLimitReached(_ context.Context, acctID uuid.UUID) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	i := t.acctConcurrency[acctID]
+	t.acctConcurrency[acctID] = i + 1
+}
+
+func (t testLifecycleListener) OnCustomKeyConcurrencyLimitReached(_ context.Context, key string) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	i := t.ckConcurrency[key]
+	t.ckConcurrency[key] = i + 1
 }

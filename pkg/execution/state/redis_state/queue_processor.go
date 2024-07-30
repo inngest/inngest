@@ -664,6 +664,18 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		telemetry.IncrPartitionGoneCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 		return nil
 	}
+	if errors.Is(err, ErrAccountConcurrencyLimit) {
+		q.lifecycles.OnAccountConcurrencyLimitReached(context.WithoutCancel(ctx), p.AccountID)
+		// TODO(cdzombak): telemetry?
+		// TODO(cdzombak): requeue?
+		return nil
+	}
+	if errors.Is(err, ErrConcurrencyLimitCustomKey) {
+		q.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), p.ConcurrencyKey)
+		// TODO(cdzombak): telemetry?
+		// TODO(cdzombak): requeue?
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("error leasing partition: %w", err)
 	}
@@ -831,6 +843,7 @@ ProcessLoop:
 				status = "partition_concurrency_limit"
 			case ErrAccountConcurrencyLimit:
 				status = "account_concurrency_limit"
+				q.lifecycles.OnAccountConcurrencyLimitReached(context.WithoutCancel(ctx), p.AccountID)
 			}
 
 			processErr = nil
@@ -850,6 +863,7 @@ ProcessLoop:
 			// This maintains FIFO ordering amongst all custom concurrency keys.
 			denies.addConcurrency(err)
 
+			q.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), p.ConcurrencyKey)
 			telemetry.IncrQueueItemProcessedCounter(ctx, telemetry.CounterOpt{
 				PkgName: pkgName,
 				Tags:    map[string]any{"status": "custom_key_concurrency_limit"},
