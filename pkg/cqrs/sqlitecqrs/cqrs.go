@@ -481,7 +481,76 @@ func (w wrapper) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([
 }
 
 func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*cqrs.Event, error) {
-	return nil, fmt.Errorf("not implemented")
+	// NOTE:
+	// expressions can contain multiple filters, which is why it is a powerful tool for filtering.
+	// any value the event body holds will be a filter target
+	// - ULID
+	// - event id (idempotency key)
+	// - event name
+	// - event data
+	// - version
+	// - timestamp
+	dataExpr := []string{}
+	filter := []sq.Expression{}
+	for _, ex := range cel {
+		// TODO:
+		// - parse the AST for each CEL expression
+		// - create filter based on AST
+	}
+
+	sql, args, err := sq.Dialect("sqlite3").
+		From("events").
+		Select("*"). // select fields
+		Where(filter...).
+		Order(sq.C("received_at").Desc()).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := w.db.QueryContext(ctx, sql, args)
+	if err != nil {
+		return nil, err
+	}
+
+	res := []*cqrs.Event{}
+	for rows.Next() {
+		var include bool
+
+		data := sqlc.Event{}
+		if err := rows.Scan(
+			&data.InternalID,
+			&data.AccountID,
+			&data.WorkspaceID,
+			&data.Source,
+			&data.SourceID,
+			&data.ReceivedAt,
+			&data.EventID,
+			&data.EventName,
+			&data.EventData,
+			&data.EventUser,
+			&data.EventV,
+			&data.EventTs,
+		); err != nil {
+			return nil, err
+		}
+
+		// iterate through data expression and check if this event matches
+		for _, exp := range dataExpr {
+		}
+
+		if include {
+			evt, err := data.ToCQRS()
+			if err != nil {
+				// TODO: log error
+				continue
+			}
+
+			res = append(res, evt)
+		}
+	}
+
+	return res, nil
 }
 
 func (w wrapper) FindEvent(ctx context.Context, workspaceID uuid.UUID, internalID ulid.ULID) (*cqrs.Event, error) {
