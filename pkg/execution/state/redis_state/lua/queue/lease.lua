@@ -150,26 +150,6 @@ end
 -- Always add this to acct level concurrency queues
 redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
 
--- Add the item to all concurrency keys
-redis.call("ZADD", functionConcurrencyKey, nextTime, item.id)
-
--- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
--- and store din functionConcurrencyKey.
-redis.call("ZREM", queueIndexKey, item.id)
-
--- Update the fn's score in the global pointer queue to the next job, if available.
-local score = get_fn_partition_score(queueIndexKey)
-update_pointer_score_to(partitionName, globalPointerKey, score)
-
--- Update partition in account partitions
-update_pointer_score_to(partitionName, accountPointerKey, score)
-
--- Find earliest pointer _across_ account partitions
-local earliestPartitionScoreInAccount = get_fn_partition_score(accountPointerKey)
-
--- Also update global accounts
-update_pointer_score_to(accountId, globalAccountKey, earliestPartitionScoreInAccount)
-
 -- NOTE: We check if concurrency > 0 here because this disables concurrency.  AccountID
 -- and custom concurrency items may not be set, but the keys need to be set for clustered
 -- mode.

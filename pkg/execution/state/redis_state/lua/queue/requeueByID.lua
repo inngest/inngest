@@ -38,7 +38,6 @@ local accountId           = ARGV[10]
 -- $include(get_queue_item.lua)
 -- $include(update_pointer_score.lua)
 -- $include(get_partition_item.lua)
--- $include(has_shard_key.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(enqueue_to_partition.lua)

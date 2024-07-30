@@ -49,11 +49,13 @@ func TestVerifyKeyGenerator(t *testing.T) {
 	assert.Equal(t, legacyQueueKg.QueueItem(), newQueueKg.QueueItem())
 
 	assert.Equal(t, legacyQueueKg.QueueIndex("id"), newQueueKg.QueueIndex("id"))
-	assert.Equal(t, legacyQueueKg.Shards(), newQueueKg.GuaranteedCapacity())
+	// Expected difference: This is guaranteed capacity now
+	// assert.Equal(t, legacyQueueKg.Shards(), newQueueKg.GuaranteedCapacityMap())
 	assert.Equal(t, legacyQueueKg.PartitionItem(), newQueueKg.PartitionItem())
 	assert.Equal(t, legacyQueueKg.PartitionMeta("id"), newQueueKg.PartitionMeta("id"))
 	assert.Equal(t, legacyQueueKg.GlobalPartitionIndex(), newQueueKg.GlobalPartitionIndex())
-	assert.Equal(t, legacyQueueKg.ShardPartitionIndex("shard"), newQueueKg.ShardPartitionIndex("shard"))
+	// Expected difference: This was removed for guaranteed capacity
+	// assert.Equal(t, legacyQueueKg.ShardPartitionIndex("shard"), newQueueKg.ShardPartitionIndex("shard"))
 	assert.Equal(t, legacyQueueKg.ThrottleKey(&osqueue.Throttle{}), newQueueKg.ThrottleKey(&osqueue.Throttle{}))
 	assert.Equal(t, legacyQueueKg.Sequential(), newQueueKg.Sequential())
 	assert.Equal(t, legacyQueueKg.Scavenger(), newQueueKg.Scavenger())

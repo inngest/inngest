@@ -276,11 +276,12 @@ func TestQueueRunExtended(t *testing.T) {
 	GuaranteedCapacityTickTime = 5 * time.Second
 	AccountLeaseTime = 5 * time.Second
 
-	sf := func(ctx context.Context, queueName string, wsID *uuid.UUID) *GuaranteedCapacity {
+	sf := func(ctx context.Context, accountId uuid.UUID) *GuaranteedCapacity {
 		// For nil UUIDs, return a shard.
-		if wsID == nil || *wsID == uuid.Nil {
+		if accountId == uuid.Nil {
 			return &GuaranteedCapacity{
 				Name:               "test-shard",
+				AccountID:          uuid.Nil,
 				GuaranteedCapacity: 1,
 			}
 		}
