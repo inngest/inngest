@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
-import { URQLProvider } from '@/queries/URQLProvider';
+import { ClientSideProviders } from './ClientSideProviders';
 import IncidentBanner from './IncidentBanner';
 
 type OrganizationActiveLayoutProps = {
@@ -13,7 +13,7 @@ export default async function OrganizationActiveLayout({
 }: OrganizationActiveLayoutProps) {
   const newIANav = await getBooleanFlag('new-ia-nav');
   return (
-    <URQLProvider>
+    <ClientSideProviders>
       {newIANav ? (
         <>{children}</>
       ) : (
@@ -47,6 +47,6 @@ export default async function OrganizationActiveLayout({
           `,
         }}
       ></script>
-    </URQLProvider>
+    </ClientSideProviders>
   );
 }

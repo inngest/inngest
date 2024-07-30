@@ -44,6 +44,9 @@ export default function Page() {
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
+  console.log('calculatedStartTime', calculatedStartTime);
+  console.log('lastDays', lastDays);
+  console.log('startTime', startTime);
 
   const queryFn = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
@@ -68,7 +71,7 @@ export default function Page() {
           durationMS,
         };
       });
-
+      console.log(edges.length);
       return {
         ...data.runs,
         edges,
@@ -117,7 +120,6 @@ export default function Page() {
     for (const page of data.pages) {
       out.push(...page.edges);
     }
-
     return out;
   }, [data?.pages]);
 
