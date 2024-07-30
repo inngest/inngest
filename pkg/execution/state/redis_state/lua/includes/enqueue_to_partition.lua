@@ -116,7 +116,7 @@ local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem,
 			--
 			-- This is the case when there's no force delay or we've waited enough time.
 			-- So, update the global index such that this partition is found, plz. Tyvm!!
-			updateTo = earliestScore/1000
+			local updateTo = earliestScore/1000
 
 			update_pointer_score_to(partitionID, keyGlobalPointer, updateTo)
 			update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, updateTo)

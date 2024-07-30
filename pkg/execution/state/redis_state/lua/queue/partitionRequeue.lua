@@ -13,13 +13,13 @@
 
 local partitionKey            = KEYS[1]
 local keyGlobalPartitionPtr   = KEYS[2]
-local keyGlobalAccountPointer = KEYS[4] -- accounts:sorted - zset
-local keyAccountPartitions    = KEYS[5] -- accounts:$accountId:partition:sorted - zset
-local keyShardPartitionPtr    = KEYS[3]
-local partitionMeta           = KEYS[4]
-local keyPartitionZset        = KEYS[5]
-local partitionConcurrencyKey = KEYS[6] -- We can only GC a partition if no running jobs occur.
-local queueKey                = KEYS[7]
+local keyGlobalAccountPointer = KEYS[3] -- accounts:sorted - zset
+local keyAccountPartitions    = KEYS[4] -- accounts:$accountId:partition:sorted - zset
+local keyShardPartitionPtr    = KEYS[5]
+local partitionMeta           = KEYS[6]
+local keyPartitionZset        = KEYS[7]
+local partitionConcurrencyKey = KEYS[8] -- We can only GC a partition if no running jobs occur.
+local queueKey                = KEYS[9]
 
 local partitionID             = ARGV[1]
 local atMS                    = tonumber(ARGV[2]) -- time in milliseconds

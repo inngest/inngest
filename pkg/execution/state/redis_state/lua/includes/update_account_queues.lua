@@ -1,3 +1,7 @@
+local function account_is_set(keyAccountPartitions)
+  return exists_without_ending(keyAccountPartitions, "accounts:00000000-0000-0000-0000-000000000000:partition:sorted") == true
+end
+
 -- This function updates account queues
 -- Requires: update_pointer_score.lua, ends_with.lua
 local function update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, score)
@@ -11,6 +15,3 @@ local function update_account_queues(keyGlobalAccountPointer, keyAccountPartitio
   end
 end
 
-local function account_is_set(keyAccountPartitions)
-  return exists_without_ending(keyAccountPartitions, "accounts:00000000-0000-0000-0000-000000000000:partition:sorted") == true
-end
