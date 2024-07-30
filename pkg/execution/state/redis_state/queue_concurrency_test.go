@@ -125,7 +125,11 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 		}
 	}
 
-	require.NotZero(t, ll.fnConcurrency[limit_1])
+	require.Eventually(t, func() bool {
+		ll.lock.Lock()
+		defer ll.lock.Unlock()
+		return ll.fnConcurrency[limit_1] > 0
+	}, 5*time.Second, 50*time.Millisecond)
 
 	diff := time.Since(start).Seconds()
 	require.Greater(t, int(diff), 10, "10 jobs should have taken at least 10 seconds")
