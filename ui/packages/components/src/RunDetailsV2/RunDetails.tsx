@@ -45,7 +45,6 @@ export function RunDetails(props: Props) {
   const runRes = useQuery({
     queryKey: ['run', runID],
     queryFn: useCallback(() => {
-      throw new Error('oh no');
       return getRun(runID);
     }, [getRun, runID]),
     retry: 3,
