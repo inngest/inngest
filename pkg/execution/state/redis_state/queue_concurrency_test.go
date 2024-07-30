@@ -70,17 +70,24 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	// Run the queue.
 	go func() {
 		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
+			if item.Identifier.WorkflowID == limit_1 {
+				fmt.Println("Single concurrency item hit", time.Now().Truncate(time.Millisecond))
+			}
+
 			<-time.After(jobDuration / 2)
 			// each job takes 2 seconds to complete.
 			switch item.Identifier.WorkflowID {
 			case limit_1:
-				fmt.Println("Single concurrency item hit", time.Now().Truncate(time.Millisecond))
 				atomic.AddInt32(&counter_1, 1)
 			case limit_10:
 				fmt.Println("10 concurrency item hit", time.Now().Truncate(time.Millisecond))
 				atomic.AddInt32(&counter_10, 1)
 			}
+
 			<-time.After(jobDuration / 2)
+			if item.Identifier.WorkflowID == limit_1 {
+				fmt.Println("Single concurrency item done", time.Now().Truncate(time.Millisecond))
+			}
 			return nil
 		})
 	}()

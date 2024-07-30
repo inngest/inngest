@@ -366,7 +366,7 @@ func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimi
 					// TODO: Increase internal metrics
 					return nil
 				}
-				if errors.Unwrap(err) != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					q.logger.Error().Err(err).Msg("error processing partition")
 				}
 				return err
@@ -532,7 +532,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 		// NOTE: would love to instrument this value to see it over time per function but
 		// it's likely too high of a cardinality
 		go telemetry.HistogramQueuePeekEWMA(ctx, peek, telemetry.HistogramOpt{PkgName: pkgName})
-		return q.Peek(peekCtx, p.Queue(), fetch, peek)
+		return q.Peek(peekCtx, p.zsetKey(q.u.kg), fetch, peek)
 	})
 	if err != nil {
 		return err
@@ -677,7 +677,7 @@ ProcessLoop:
 				Tags:    map[string]any{"status": status},
 			})
 			break ProcessLoop
-		case ErrConcurrencyLimitCustomKey0, ErrConcurrencyLimitCustomKey1:
+		case ErrConcurrencyLimitCustomKey:
 			ctrConcurrency++
 			// Custom concurrency keys are different.  Each job may have a different key,
 			// so we cannot break the loop in case the next job has a different key and

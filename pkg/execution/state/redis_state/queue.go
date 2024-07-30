@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"math"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 	"unsafe"
+
+	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 
 	"golang.org/x/sync/semaphore"
 
@@ -63,7 +64,11 @@ const (
 	//
 	// This means that jobs not started because of concurrency limits incur up to this amount
 	// of additional latency.
-	PartitionConcurrencyLimitRequeueExtension = 2 * time.Second
+	//
+	// NOTE: This must be greater than PartitionLookahead
+	// NOTE: This is the maximum latency introduced into concurrnecy limited partitions in the
+	//       worst case.
+	PartitionConcurrencyLimitRequeueExtension = 30 * time.Second
 	PartitionLookahead                        = time.Second
 
 	// default values
@@ -112,11 +117,10 @@ var (
 	ErrPartitionConcurrencyLimit     = fmt.Errorf("At partition concurrency limit")
 	ErrAccountConcurrencyLimit       = fmt.Errorf("At account concurrency limit")
 
-	// ErrConcurrencyLimitCustomKeyN represents a concurrency limit being hit for *some*, but *not all*
+	// ErrConcurrencyLimitCustomKey represents a concurrency limit being hit for *some*, but *not all*
 	// jobs in a queue, via custom concurrency keys which are evaluated to a specific string.
 
-	ErrConcurrencyLimitCustomKey0 = fmt.Errorf("At concurrency limit 0")
-	ErrConcurrencyLimitCustomKey1 = fmt.Errorf("At concurrency limit 1")
+	ErrConcurrencyLimitCustomKey = fmt.Errorf("At concurrency limit")
 
 	// internal shard errors
 	errGuaranteedCapacityNotFound     = fmt.Errorf("guaranteed capacity not found")
@@ -143,7 +147,7 @@ type QueueManager interface {
 
 	Dequeue(ctx context.Context, p QueuePartition, i QueueItem) error
 	Requeue(ctx context.Context, p QueuePartition, i QueueItem, at time.Time) error
-	RequeueByJobID(ctx context.Context, partitionName string, jobID string, at time.Time) error
+	RequeueByJobID(ctx context.Context, jobID string, at time.Time) error
 }
 
 // PriorityFinder returns the priority for a given queue partition.
@@ -424,22 +428,11 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 		logger:             logger.From(context.Background()),
 		concurrencyLimitGetter: func(ctx context.Context, p QueuePartition) (account, fn, custom int) {
 			def := defaultConcurrency
-			if p.ConcurrencyLimit >= 0 {
+			if p.ConcurrencyLimit > 0 {
 				def = p.ConcurrencyLimit
 			}
 			// Use the defaults, and add no concurrency limits to custom keys.
 			account, fn, custom = def, def, -1
-
-			if p.FunctionID == nil {
-				// There's no fn ID, so return -1 indicating that there are no account
-				// concurrency limits for this partition.
-				fn = NoConcurrencyLimit
-			}
-			if p.AccountID == uuid.Nil {
-				// There's no account ID, so return -1 indicating that there are no account
-				// concurrency limits for this partition.
-				account = NoConcurrencyLimit
-			}
 			if p.ConcurrencyKey == "" {
 				custom = NoConcurrencyLimit
 			}
@@ -639,6 +632,8 @@ type QueuePartition struct {
 	// ConcurrencyLimit represents the max concurrency for the queue partition.  This allows
 	// us to optimize the queue by checking for the max when leasing partitions
 	// directly.
+	//
+	// This ALWAYS exists, even for function level partitions.
 	ConcurrencyLimit int `json:"l,omitempty"`
 	// ConcurrencyKey represents the hashed custom key for the queue partition, if this is
 	// for a custom key.
@@ -649,7 +644,7 @@ type QueuePartition struct {
 	// LimitOwner represents the function ID that set the max concurrency limit for
 	// this function.  This allows us to lower the max if the owner/enqueueing function
 	// ID matches - otherwise, once set, the max can never lower.
-	LimitOnwer *uuid.UUID `json:"lID,omitempty"`
+	LimitOwner *uuid.UUID `json:"lID,omitempty"`
 
 	// TODO: Throttling;  embed max limit/period/etc?
 }
@@ -674,14 +669,15 @@ func (q QueuePartition) zsetKey(kg QueueKeyGenerator) string {
 // on the partition type.  This is used to check the partition's in-progress items whilst
 // requeueing partitions.
 func (q QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
-	// Hierarchically, custom keys take precedence.
-	if q.ConcurrencyKey != "" {
-		return q.customConcurrencyKey(kg)
-	}
-	if q.FunctionID != nil {
+	switch enums.PartitionType(q.PartitionType) {
+	case enums.PartitionTypeDefault:
 		return q.fnConcurrencyKey(kg)
+	case enums.PartitionTypeConcurrencyKey:
+		// Hierarchically, custom keys take precedence.
+		return q.customConcurrencyKey(kg)
+	default:
+		return q.acctConcurrencyKey(kg)
 	}
-	return q.acctConcurrencyKey(kg)
 }
 
 // fnConcurrencyKey returns the concurrency key for a function scope limit, on the
@@ -712,7 +708,7 @@ func (q QueuePartition) customConcurrencyKey(kg QueueKeyGenerator) string {
 }
 
 func (q QueuePartition) Queue() string {
-	if q.ID == "" {
+	if q.ID == "" && q.FunctionID != nil {
 		return q.FunctionID.String()
 	}
 	return q.ID
@@ -816,16 +812,6 @@ func (q QueueItem) MarshalBinary() ([]byte, error) {
 	return json.Marshal(q)
 }
 
-// Queue returns the queue name for this queue item.  This is the
-// workflow ID of the QueueItem unless the QueueName is specifically
-// set.
-func (q QueueItem) Queue() string {
-	if q.QueueName == nil {
-		return q.FunctionID.String()
-	}
-	return *q.QueueName
-}
-
 // IsLeased checks if the QueueItem is currently already leased or not
 // based on the time passed in.
 func (q QueueItem) IsLeased(time time.Time) bool {
@@ -844,19 +830,49 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 	// us to create queues of queues for each concurrency key.
 	//
 	// See the 'key queues' spec for more information (internally).
+	//
+	// NOTE: This is an optimization that ensures we return *updated* concurrency keys
+	// for any recently published function configuration.  The embeddeed ckeys from the
+	// queue items above may be outdated.
 	if q.customConcurrencyGen != nil {
-		ckeys = q.customConcurrencyGen(ctx, i)
+		// As an optimization, allow fetching updated concurrency limits if desired.
+		updated := q.customConcurrencyGen(ctx, i)
+		for _, update := range updated {
+			// This is quadratic, but concurrency keys are limited to 2 so it's
+			// okay.
+			for n, existing := range ckeys {
+				if existing.Key == update.Key {
+					ckeys[n].Limit = update.Limit
+				}
+			}
+		}
 	}
 
-	// Right now queue items *always* add into a partition for the overall function ID.
-	// In the future this will change.
+	// If there are no concurrency keys, we're putting this queue item into a partition
+	// for the function itself.
 	if len(ckeys) == 0 {
-		partitions = append(partitions, QueuePartition{
-			ID:         i.FunctionID.String(),
-			FunctionID: &i.FunctionID,
-			AccountID:  i.Data.Identifier.AccountID,
-		})
+		fnPartition := QueuePartition{
+			ID:            i.FunctionID.String(),
+			PartitionType: int(enums.PartitionTypeDefault), // Function partition
+			FunctionID:    &i.FunctionID,
+			AccountID:     i.Data.Identifier.AccountID,
+		}
+		// The concurrency limit for fns MUST be added for leasing.
+		acct, fn, _ := q.concurrencyLimitGetter(ctx, fnPartition)
+		limit := fn
+		if fn <= 0 {
+			// Use account-level limits, as there are no function level limits
+			limit = acct
+		}
+		if limit <= 0 {
+			// Use default limits
+			limit = consts.DefaultConcurrencyLimit
+		}
+		// Always add a concurrency limit
+		fnPartition.ConcurrencyLimit = limit
+		partitions = append(partitions, fnPartition)
 	} else {
+		// Up to 2 concurrency keys.
 		for _, key := range ckeys {
 			scope, id, checksum, _ := key.ParseKey()
 
@@ -1032,8 +1048,8 @@ func (q *queue) SetFunctionPaused(ctx context.Context, fnID uuid.UUID, paused bo
 		return err
 	}
 
-	status, err := scripts["queue/partitionSetPaused"].Exec(
-		redis_telemetry.WithScriptName(ctx, "partitionSetPaused"),
+	status, err := scripts["queue/fnSetPaused"].Exec(
+		redis_telemetry.WithScriptName(ctx, "fnSetPaused"),
 		q.u.unshardedRc,
 		keys,
 		args,
@@ -1066,7 +1082,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	}
 
 	// XXX: If the length of ID >= max, error.
-
 	if i.WallTimeMS == 0 {
 		i.WallTimeMS = at.UnixMilli()
 	}
@@ -1094,24 +1109,26 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	}
 
 	var guaranteedCapacity *GuaranteedCapacity
+	var guaranteedCapacityName string
 	if q.gcf != nil {
 		guaranteedCapacity = q.gcf(ctx, &i.Data.Identifier.AccountID)
 		if guaranteedCapacity != nil {
 			guaranteedCapacity.Leases = []ulid.ULID{}
+			guaranteedCapacityName = guaranteedCapacity.Name
 		}
 	}
 
 	parts := q.ItemPartitions(ctx, i)
 
 	keys := []string{
-		q.u.kg.QueueItem(),                                        // Queue item
-		q.u.kg.PartitionItem(),                                    // Partition item, map
-		q.u.kg.GlobalPartitionIndex(),                             // Global partition queue
-		q.u.kg.GlobalAccountIndex(),                               // Global account queue
-		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // Account partition queue
-		q.u.kg.GuaranteedCapacityMap(),
+		q.u.kg.QueueItem(),            // Queue item
+		q.u.kg.PartitionItem(),        // Partition item, map
+		q.u.kg.GlobalPartitionIndex(), // Global partition queue
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // new queue items always
 		q.u.kg.Idempotency(i.ID),
 		q.u.kg.FnMetadata(i.FunctionID),
+		q.u.kg.GuaranteedCapacityMap(),
 
 		// Add all 3 partition sets
 		parts[0].zsetKey(q.u.kg),
@@ -1130,7 +1147,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		i.ID,
 		at.UnixMilli(),
 		partitionTime.Unix(),
-		guaranteedCapacity,
 		getNow().UnixMilli(),
 		FnMetadata{
 			// enqueue.lua only writes function metadata if it doesn't already exist.
@@ -1145,8 +1161,10 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		parts[0].ID,
 		parts[1].ID,
 		parts[2].ID,
+		i.Data.Identifier.AccountID.String(),
 
-		i.Data.Identifier.AccountID,
+		guaranteedCapacity,
+		guaranteedCapacityName,
 	})
 
 	if err != nil {
@@ -1202,11 +1220,20 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 	if err != nil {
 		return nil, err
 	}
+
+	// If the queue name is a UUID, assume that we need to adjust this as we've been
+	// given a standard function queue (enums.PartitionTypeDefault).
+	//
+	// Otherwise, this must be the queue's zset already.
+	if len(queueName) == 36 {
+		queueName = q.u.kg.PartitionQueueSet(enums.PartitionTypeDefault, queueName, "")
+	}
+
 	res, err := scripts["queue/peek"].Exec(
 		redis_telemetry.WithScriptName(ctx, "peek"),
 		q.u.unshardedRc,
 		[]string{
-			q.u.kg.FnQueueSet(queueName),
+			queueName,
 			q.u.kg.QueueItem(),
 		},
 		args,
@@ -1255,36 +1282,60 @@ func (q *queue) decodeQueueItemFromPeek(str string, now time.Time) (*QueueItem, 
 //
 // If the queue item referenced by the job ID is not outstanding (ie. it has a lease, is in
 // progress, or doesn't exist) this returns an error.
-func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID string, at time.Time) error {
+func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RequeueByJobID"), redis_telemetry.ScopeQueue)
 
 	jobID = HashID(ctx, jobID)
 
 	// Find the queue item so that we can fetch the shard info.
-	qi := &QueueItem{}
-	if err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Hget().Key(q.u.kg.QueueItem()).Field(jobID).Build()).DecodeJSON(qi); err != nil {
+	i := QueueItem{}
+	if err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Hget().Key(q.u.kg.QueueItem()).Field(jobID).Build()).DecodeJSON(&i); err != nil {
 		return err
 	}
 
+	// Don't requeue before now.
+	now := getNow()
+	if at.Before(now) {
+		at = now
+	}
+
+	// Remove all items from all partitions.  For this, we need all partitions for
+	// the queue item instead of just the partition passed via args.
+	//
+	// This is because a single queue item may be present in more than one queue.
+	parts := q.ItemPartitions(ctx, i)
+
 	keys := []string{
-		q.u.kg.FnQueueSet(partitionName),
 		q.u.kg.QueueItem(),
-		q.u.kg.GlobalPartitionIndex(),                              // Global partition queue
-		q.u.kg.GlobalAccountIndex(),                                // Global account queue
-		q.u.kg.AccountPartitionIndex(qi.Data.Identifier.AccountID), // Account partition queue
-		q.u.kg.PartitionItem(),                                     // Partition hash
+		q.u.kg.PartitionItem(), // Partition item, map
+		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+
+		parts[0].zsetKey(q.u.kg),
+		parts[1].zsetKey(q.u.kg),
+		parts[2].zsetKey(q.u.kg),
+	}
+	args, err := StrSlice([]any{
+		jobID,
+		strconv.Itoa(int(at.UnixMilli())),
+		strconv.Itoa(int(now.UnixMilli())),
+		parts[0],
+		parts[1],
+		parts[2],
+		parts[0].ID,
+		parts[1].ID,
+		parts[2].ID,
+		i.Data.Identifier.AccountID.String(),
+	})
+	if err != nil {
+		return err
 	}
 	status, err := scripts["queue/requeueByID"].Exec(
 		redis_telemetry.WithScriptName(ctx, "requeueByID"),
 		q.u.unshardedRc,
 		keys,
-		[]string{
-			jobID,
-			strconv.Itoa(int(at.UnixMilli())),
-			partitionName,
-			strconv.Itoa(int(getNow().UnixMilli())),
-			qi.Data.Identifier.AccountID.String(),
-		},
+		args,
 	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error requeueing item: %w", err)
@@ -1324,73 +1375,59 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		return nil, ErrAccountConcurrencyLimit
 	}
 
-	var (
-		ac, pc int // account, partiiton concurrency max
-
-		customKeys   = make([]string, 2)
-		customLimits = make([]int, 2)
-	)
-
-	// Required.
-	//
-	// Custom key limits should be found by calling function.ConcurrencyLimit() to return
-	// the lowest concurrency limit available.  It limits the capacity of all
-	// runs for the given function.
-	//
-	// NOTE: Each function can have up to 2 custom concurrency keys with different
-	//       limits specified.  This means that a queue item may be in two separate
-	//       partitions;  we cannot rely on JUST the partition's custom limit and must
-	//       fetch the custom concurrnecy info from the queue item directly.
-	//       Because
-	ac, pc, _ = q.concurrencyLimitGetter(ctx, p)
-	// Get the custom concurrency key, if available.
-	for i, item := range q.customConcurrencyGen(ctx, item) {
-		if i >= 2 {
-			// We only support two concurrency keys right now.
-			break
-		}
-
-		// Check to see if this key has already been denied in the lease iteration.
-		// If so, fail early.
-		if denies != nil && denies.denyConcurrency(item.Key) {
-			if i == 0 {
-				return nil, ErrConcurrencyLimitCustomKey0
-			}
-			return nil, ErrConcurrencyLimitCustomKey1
-		}
-
-		customKeys[i] = item.Key // It is important that this is the entire key.
-		customLimits[i] = item.Limit
-	}
-
 	leaseID, err := ulid.New(ulid.Timestamp(getNow().Add(duration).UTC()), rnd)
 	if err != nil {
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
+	// Grab all partitions for the queue item
+	parts := q.ItemPartitions(ctx, item)
+	for _, partition := range parts {
+		// Check to see if this key has already been denied in the lease iteration.
+		// If so, fail early.
+		if denies != nil && partition.ConcurrencyKey != "" && denies.denyConcurrency(partition.ConcurrencyKey) {
+			return nil, ErrConcurrencyLimitCustomKey
+		}
+	}
+
+	// NOTE: This has been called in ItemPartitions.  We always need to fetch the latest
+	// account concurrency limit.
+	//
+	// TODO: Refactor this to be nicer/remove dupe calls
+	acctLimit, _, _ := q.concurrencyLimitGetter(ctx, parts[0])
+	if acctLimit <= 0 {
+		acctLimit = consts.DefaultConcurrencyLimit
+	}
+
 	keys := []string{
 		q.u.kg.QueueItem(),
-		q.u.kg.FnQueueSet(item.Queue()),
-		q.u.kg.PartitionMeta(item.Queue()),
-		q.u.kg.Concurrency("account", item.Data.Identifier.AccountID.String()),
-		q.u.kg.Concurrency("p", item.FunctionID.String()),
-		q.u.kg.Concurrency("custom", customKeys[0]),
-		q.u.kg.Concurrency("custom", customKeys[1]),
+		// Pass in the actual key queue
+		parts[0].zsetKey(q.u.kg),
+		parts[1].zsetKey(q.u.kg),
+		parts[2].zsetKey(q.u.kg),
+		// And pass in the key queue's concurrency keys.
+		parts[0].concurrencyKey(q.u.kg),
+		parts[1].concurrencyKey(q.u.kg),
+		parts[2].concurrencyKey(q.u.kg),
 		q.u.kg.ConcurrencyIndex(),
 		q.u.kg.GlobalPartitionIndex(),
 		q.u.kg.GlobalAccountIndex(),
 		q.u.kg.AccountPartitionIndex(item.Data.Identifier.AccountID),
 		q.u.kg.ThrottleKey(item.Data.Throttle),
+		// Finally, there are ALWAYS account-level concurrency keys.
+		q.u.kg.Concurrency("account", item.Data.Identifier.AccountID.String()),
 	}
 	args, err := StrSlice([]any{
 		item.ID,
 		leaseID.String(),
 		now.UnixMilli(),
-		ac,
-		pc,
-		customLimits[0],
-		customLimits[1],
-		p.Queue(),
+		parts[0].ID,
+		parts[1].ID,
+		parts[2].ID,
+		parts[0].ConcurrencyLimit,
+		parts[1].ConcurrencyLimit,
+		parts[2].ConcurrencyLimit,
+		acctLimit,
 		item.Data.Identifier.AccountID,
 	})
 	if err != nil {
@@ -1414,15 +1451,22 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 	case 2:
 		return nil, ErrQueueItemAlreadyLeased
 	case 3:
+		// TODO: Refactor
 		// fn limit relevant to all runs in the fn
-		return nil, newKeyError(ErrPartitionConcurrencyLimit, item.FunctionID.String())
+		// return nil, newKeyError(ErrPartitionConcurrencyLimit, item.FunctionID.String())
+		return nil, newKeyError(ErrConcurrencyLimitCustomKey, parts[0].ConcurrencyKey)
 	case 4:
-		return nil, newKeyError(ErrAccountConcurrencyLimit, item.Data.Identifier.AccountID.String())
+		// return nil, newKeyError(ErrAccountConcurrencyLimit, item.Data.Identifier.AccountID.String())
+		return nil, newKeyError(ErrConcurrencyLimitCustomKey, parts[1].ConcurrencyKey)
 	case 5:
-		return nil, newKeyError(ErrConcurrencyLimitCustomKey0, customKeys[0])
+		return nil, newKeyError(ErrConcurrencyLimitCustomKey, parts[2].ConcurrencyKey)
 	case 6:
-		return nil, newKeyError(ErrConcurrencyLimitCustomKey1, customKeys[1])
+		return nil, newKeyError(ErrAccountConcurrencyLimit, item.Data.Identifier.AccountID.String())
 	case 7:
+		if item.Data.Throttle == nil {
+			// This should never happen, as the throttle key is nil.
+			return nil, fmt.Errorf("lease attempted throttle with nil throttle config: %#v", item)
+		}
 		return nil, newKeyError(ErrQueueItemThrottled, item.Data.Throttle.Key)
 	default:
 		return nil, fmt.Errorf("unknown response leasing item: %d", status)
@@ -1459,26 +1503,31 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
+	parts := q.ItemPartitions(ctx, i)
+
 	keys := []string{
 		q.u.kg.QueueItem(),
-		q.u.kg.FnQueueSet(i.Queue()),
-		q.u.kg.GlobalPartitionIndex(),
-		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+		// Pass in the actual key queue
+		parts[0].zsetKey(q.u.kg),
+		parts[1].zsetKey(q.u.kg),
+		parts[2].zsetKey(q.u.kg),
+		// And pass in the key queue's concurrency keys.
+		parts[0].concurrencyKey(q.u.kg),
+		parts[1].concurrencyKey(q.u.kg),
+		parts[2].concurrencyKey(q.u.kg),
 		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
-		q.u.kg.Concurrency("p", i.FunctionID.String()),
-		q.u.kg.Concurrency("custom", customKeys[0]),
-		q.u.kg.Concurrency("custom", customKeys[1]),
+		q.u.kg.ConcurrencyIndex(),
 	}
 
 	args, err := StrSlice([]any{
 		i.ID,
 		leaseID.String(),
 		newLeaseID.String(),
-		p.Queue(),
 	})
 	if err != nil {
 		return nil, err
 	}
+
 	status, err := scripts["queue/extendLease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "extendLease"),
 		q.u.unshardedRc,
@@ -1531,12 +1580,16 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		parts[0].zsetKey(q.u.kg),
 		parts[1].zsetKey(q.u.kg),
 		parts[2].zsetKey(q.u.kg),
-		q.u.kg.Idempotency(i.ID),
+		parts[0].concurrencyKey(q.u.kg),
+		parts[1].concurrencyKey(q.u.kg),
+		parts[2].concurrencyKey(q.u.kg),
 		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
-		q.u.kg.Concurrency("p", i.FunctionID.String()),
-		q.u.kg.Concurrency("custom", customKeys[0]),
-		q.u.kg.Concurrency("custom", customKeys[1]),
+		q.u.kg.Idempotency(i.ID),
 		q.u.kg.ConcurrencyIndex(),
+		q.u.kg.GlobalPartitionIndex(),
+		q.u.kg.GlobalAccountIndex(),
+		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+		q.u.kg.PartitionItem(),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.u.kg) {
@@ -1554,6 +1607,10 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		i.ID,
 		int(idempotency.Seconds()),
 		p.Queue(),
+		parts[0].ID,
+		parts[1].ID,
+		parts[2].ID,
+		i.Data.Identifier.AccountID.String(),
 	})
 	if err != nil {
 		return err
@@ -1581,19 +1638,9 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Requeue"), redis_telemetry.ScopeQueue)
 
-	var (
-		customKeys = make([]string, 2)
-	)
-
-	if q.customConcurrencyGen != nil {
-		// Get the custom concurrency key, if available.
-		for n, item := range q.customConcurrencyGen(ctx, i) {
-			if n >= 2 {
-				// We only support two concurrency keys right now.
-				break
-			}
-			customKeys[n] = item.Key
-		}
+	now := getNow()
+	if at.Before(now) {
+		at = now
 	}
 
 	// Unset any lease ID as this is requeued.
@@ -1605,17 +1652,26 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 	// Update the wall time that this should run at.
 	i.WallTimeMS = at.UnixMilli()
 
+	// Remove all items from all partitions.  For this, we need all partitions for
+	// the queue item instead of just the partition passed via args.
+	//
+	// This is because a single queue item may be present in more than one queue.
+	parts := q.ItemPartitions(ctx, i)
+
 	keys := []string{
 		q.u.kg.QueueItem(),
-		q.u.kg.FnQueueSet(i.Queue()),
-		q.u.kg.PartitionMeta(i.Queue()),
+		q.u.kg.PartitionItem(), // Partition item, map
 		q.u.kg.GlobalPartitionIndex(),
 		q.u.kg.GlobalAccountIndex(),
 		q.u.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+		parts[0].zsetKey(q.u.kg),
+		parts[1].zsetKey(q.u.kg),
+		parts[2].zsetKey(q.u.kg),
+		// And pass in the key queue's concurrency keys.
+		parts[0].concurrencyKey(q.u.kg),
+		parts[1].concurrencyKey(q.u.kg),
+		parts[2].concurrencyKey(q.u.kg),
 		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
-		q.u.kg.Concurrency("p", i.FunctionID.String()),
-		q.u.kg.Concurrency("custom", customKeys[0]),
-		q.u.kg.Concurrency("custom", customKeys[1]),
 		q.u.kg.ConcurrencyIndex(),
 	}
 	// Append indexes
@@ -1629,9 +1685,14 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		i,
 		i.ID,
 		at.UnixMilli(),
-		i.Queue(),
-		p,
-		i.Data.Identifier.AccountID,
+		now.UnixMilli(),
+		parts[0],
+		parts[1],
+		parts[2],
+		parts[0].ID,
+		parts[1].ID,
+		parts[2].ID,
+		i.Data.Identifier.AccountID.String(),
 	})
 	if err != nil {
 		return err
@@ -1686,7 +1747,6 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		q.u.kg.PartitionItem(),
 		q.u.kg.GlobalPartitionIndex(),
 		q.u.kg.GlobalAccountIndex(),
-		// TODO Can AccountID ever be zero value?
 		q.u.kg.AccountPartitionIndex(p.AccountID),
 		q.u.kg.FnMetadata(fnMetaKey),
 		// These concurrency keys are for fast checking of partition
@@ -1707,9 +1767,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		fnConcurrency,
 		customConcurrency,
 		now.Add(PartitionConcurrencyLimitRequeueExtension).Unix(),
-
-		// TODO Can AccountID ever be zero value?
-		p.AccountID,
+		p.AccountID.String(),
 	})
 
 	if err != nil {
@@ -2046,7 +2104,6 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		q.u.kg.PartitionItem(),
 		q.u.kg.GlobalPartitionIndex(),
 		q.u.kg.GlobalAccountIndex(),
-		// TODO Is the account ID always non-zero?
 		q.u.kg.AccountPartitionIndex(p.AccountID),
 		q.u.kg.PartitionMeta(p.Queue()), // TODO: Remove?
 		p.zsetKey(q.u.kg),               // Partition ZSET itself
@@ -2061,7 +2118,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *QueuePartition, at time
 		p.Queue(),
 		at.UnixMilli(),
 		force,
-		p.AccountID,
+		p.AccountID.String(),
 	})
 	if err != nil {
 		return err
@@ -2174,19 +2231,15 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 	// Each of the items is a concurrency queue with lost items.
 	var resultErr error
 	for _, partition := range pKeys {
-		// Fetch the partition.  This uses the concurrency:p: prefix,
-		// so remove the prefix from the item.
-		partitionJSON, err := q.u.unshardedRc.Do(ctx, q.u.unshardedRc.B().Hget().Key(q.u.kg.PartitionItem()).Field(partition).Build()).AsBytes()
-		if err == rueidis.Nil {
-			continue
-		}
-		if err != nil {
-			resultErr = multierror.Append(resultErr, fmt.Errorf("error finding partition '%s' during scavenge: %w", partition, err))
-			continue
+
+		// If this is a UUID, assume that this is an old partition queue
+		queueKey := partition
+		if len(partition) == 36 {
+			queueKey = q.u.kg.PartitionQueueSet(enums.PartitionTypeDefault, partition, "")
 		}
 
 		cmd := q.u.unshardedRc.B().Zrange().
-			Key(q.u.kg.Concurrency("p", partition)).
+			Key(queueKey).
 			Min("-inf").
 			Max(now).
 			Byscore().
@@ -2198,12 +2251,6 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 			continue
 		}
 		if len(itemIDs) == 0 {
-			continue
-		}
-
-		p := QueuePartition{}
-		if err := json.Unmarshal([]byte(partitionJSON), &p); err != nil {
-			resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling partition '%s': %w", partitionJSON, err))
 			continue
 		}
 
@@ -2220,7 +2267,7 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 				resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling job '%s': %w", item, err))
 				continue
 			}
-			if err := q.Requeue(ctx, p, qi, getNow()); err != nil {
+			if err := q.Requeue(ctx, QueuePartition{}, qi, getNow()); err != nil {
 				resultErr = multierror.Append(resultErr, fmt.Errorf("error requeueing job '%s': %w", item, err))
 				continue
 			}
