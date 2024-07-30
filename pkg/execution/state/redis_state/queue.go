@@ -457,7 +457,7 @@ type queue struct {
 	pf PriorityFinder
 	sf ShardFinder
 
-	lifecycles []QueueLifecycleListener
+	lifecycles QueueLifecycleListeners
 
 	concurrencyLimitGetter ConcurrencyLimitGetter
 	customConcurrencyGen   QueueItemConcurrencyKeyGenerator

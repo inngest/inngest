@@ -15,3 +15,19 @@ type QueueLifecycleListener interface {
 	// partition, or custom).
 	OnConcurrencyLimitReached(ctx context.Context, fnID uuid.UUID)
 }
+
+type QueueLifecycleListeners []QueueLifecycleListener
+
+var _ QueueLifecycleListener = QueueLifecycleListeners{}
+
+func (l QueueLifecycleListeners) GoEach(fn func(listener QueueLifecycleListener)) {
+	for _, listener := range l {
+		go fn(listener)
+	}
+}
+
+func (l QueueLifecycleListeners) OnConcurrencyLimitReached(ctx context.Context, fnID uuid.UUID) {
+	l.GoEach(func(listener QueueLifecycleListener) {
+		listener.OnConcurrencyLimitReached(ctx, fnID)
+	})
+}
