@@ -841,6 +841,9 @@ ProcessLoop:
 			switch cause {
 			case ErrPartitionConcurrencyLimit:
 				status = "partition_concurrency_limit"
+				if p.FunctionID != nil {
+					q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
+				}
 			case ErrAccountConcurrencyLimit:
 				status = "account_concurrency_limit"
 				q.lifecycles.OnAccountConcurrencyLimitReached(context.WithoutCancel(ctx), p.AccountID)
@@ -929,8 +932,6 @@ ProcessLoop:
 			// TODO: When we create throttle queues, requeue this appropriately depending on the throttle
 			//       period.
 			requeue = PartitionThrottleLimitRequeueExtension
-		} else if p.FunctionID != nil {
-			q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
 		}
 
 		// Requeue this partition as we hit concurrency limits.
