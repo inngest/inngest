@@ -725,6 +725,7 @@ func (tb *runTree) processWaitForEvent(ctx context.Context, span *cqrs.Span, mod
 		return ErrRedundantExecSpan
 	}
 
+	now := time.Now()
 	stepOp := rpbv2.SpanStepOp_WAIT_FOR_EVENT
 	status := rpbv2.SpanStatus_WAITING
 	dur := span.DurationMS()
@@ -755,7 +756,7 @@ func (tb *runTree) processWaitForEvent(ctx context.Context, span *cqrs.Span, mod
 			expired = &exp
 		}
 	}
-	if !timeout.IsZero() && timeout.Before(time.Now()) {
+	if !timeout.IsZero() && timeout.Before(now) {
 		status = rpbv2.SpanStatus_COMPLETED
 		if v, ok := span.SpanAttributes[consts.OtelSysStepWaitExpired]; ok {
 			if exp, err := strconv.ParseBool(v); err == nil {
@@ -770,7 +771,6 @@ func (tb *runTree) processWaitForEvent(ctx context.Context, span *cqrs.Span, mod
 	mod.StepOp = &stepOp
 	mod.Name = *span.StepDisplayName()
 	mod.DurationMs = dur
-	mod.EndedAt = timestamppb.New(endedAt)
 	mod.Status = status
 	mod.StepInfo = &rpbv2.StepInfo{
 		Info: &rpbv2.StepInfo_Wait{
@@ -782,6 +782,10 @@ func (tb *runTree) processWaitForEvent(ctx context.Context, span *cqrs.Span, mod
 				TimedOut:     expired,
 			},
 		},
+	}
+	// if has ended
+	if (expired != nil && *expired) || (!timeout.IsZero() && timeout.Before(now)) {
+		mod.EndedAt = timestamppb.New(endedAt)
 	}
 
 	// output
