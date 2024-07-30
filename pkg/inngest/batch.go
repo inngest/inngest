@@ -7,7 +7,6 @@ import (
 	"github.com/inngest/inngest/pkg/expressions"
 	"time"
 
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/syscode"
 )
 
@@ -26,16 +25,8 @@ func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
 		return nil, fmt.Errorf("failed to decode batch config: %v", err)
 	}
 
-	if config.MaxSize <= 0 || config.MaxSize > consts.DefaultBatchSize {
-		config.MaxSize = consts.DefaultBatchSize
-	}
-
-	dur, err := time.ParseDuration(config.Timeout)
-	if err != nil {
+	if _, err = time.ParseDuration(config.Timeout); err != nil {
 		return nil, fmt.Errorf("failed to parse time duration: %v", err)
-	}
-	if dur > consts.MaxBatchTimeout {
-		config.Timeout = "60s"
 	}
 
 	return config, nil
@@ -72,15 +63,20 @@ func (c EventBatchConfig) IsValid(ctx context.Context) error {
 			Message: fmt.Sprintf("batch size cannot be smaller than 2: %d", c.MaxSize),
 		}
 	}
-	if c.MaxSize > consts.DefaultBatchSize {
+
+	dur, err := time.ParseDuration(c.Timeout)
+	if err != nil {
 		return syscode.Error{
-			Code:    syscode.CodeBatchSizeInvalid,
-			Message: fmt.Sprintf("batch size cannot be larger than %d", consts.DefaultBatchSize),
+			Code:    syscode.CodeBatchTimeoutInvalid,
+			Message: fmt.Sprintf("invalid timeout string: %s", c.Timeout),
 		}
 	}
 
-	if _, err := time.ParseDuration(c.Timeout); err != nil {
-		return fmt.Errorf("invalid timeout string: %v", err)
+	if dur < time.Second {
+		return syscode.Error{
+			Code:    syscode.CodeBatchTimeoutInvalid,
+			Message: "batch timeout should be more than 1s",
+		}
 	}
 
 	if c.Key != nil {

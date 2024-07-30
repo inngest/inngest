@@ -73,6 +73,32 @@ const GetRunsDocument = graphql(`
   }
 `);
 
+const CountRunsDocument = graphql(`
+  query CountRuns(
+    $environmentID: ID!
+    $startTime: Time!
+    $endTime: Time
+    $status: [FunctionRunStatus!]
+    $timeField: RunsOrderByField!
+    $functionSlug: String!
+  ) {
+    environment: workspace(id: $environmentID) {
+      runs(
+        filter: {
+          from: $startTime
+          until: $endTime
+          status: $status
+          timeField: $timeField
+          fnSlug: $functionSlug
+        }
+        orderBy: [{ field: $timeField, direction: DESC }]
+      ) {
+        totalCount
+      }
+    }
+  }
+`);
+
 export default function Page({
   params,
 }: {
@@ -130,16 +156,21 @@ export default function Page({
   }, [rawFilteredStatus]);
 
   const environment = useEnvironment();
+
+  const commonQueryVars = {
+    environmentID: environment.id,
+    functionSlug,
+    startTime: calculatedStartTime.toISOString(),
+    endTime: endTime ?? null,
+    status: filteredStatus.length > 0 ? filteredStatus : null,
+    timeField,
+  };
+
   const firstPageRes = useSkippableGraphQLQuery({
     query: GetRunsDocument,
     skip: !functionSlug || isScrollRequest,
     variables: {
-      environmentID: environment.id,
-      functionSlug,
-      startTime: calculatedStartTime.toISOString(),
-      endTime: endTime ?? null,
-      status: filteredStatus.length > 0 ? filteredStatus : null,
-      timeField,
+      ...commonQueryVars,
       functionRunCursor: null,
     },
   });
@@ -148,18 +179,19 @@ export default function Page({
     query: GetRunsDocument,
     skip: !functionSlug || !isScrollRequest,
     variables: {
-      environmentID: environment.id,
-      functionSlug,
-      startTime: calculatedStartTime.toISOString(),
-      endTime: endTime ?? null,
-      status: filteredStatus.length > 0 ? filteredStatus : null,
-      timeField,
+      ...commonQueryVars,
       functionRunCursor: cursor,
     },
   });
 
-  if (firstPageRes.error || nextPageRes.error) {
-    throw firstPageRes.error || nextPageRes.error;
+  const countRes = useSkippableGraphQLQuery({
+    query: CountRunsDocument,
+    skip: !functionSlug || isScrollRequest,
+    variables: commonQueryVars,
+  });
+
+  if (firstPageRes.error || nextPageRes.error || countRes.error) {
+    throw firstPageRes.error || nextPageRes.error || countRes.error;
   }
 
   const firstPageRunsData = firstPageRes.data?.environment.runs.edges;
@@ -168,6 +200,13 @@ export default function Page({
   const nextPageInfo = nextPageRes.data?.environment.runs.pageInfo;
   const hasNextPage = nextPageInfo?.hasNextPage || firstPageInfo?.hasNextPage;
   const isLoading = firstPageRes.isLoading || nextPageRes.isLoading;
+
+  let totalCount = undefined;
+  if (!countRes.isLoading) {
+    // Only set the total count if the count query has finished loading since we
+    // don't want to render stale data
+    totalCount = countRes.data?.environment.runs.totalCount;
+  }
 
   if (functionSlug && !firstPageRunsData && !firstPageRes.isLoading && !firstPageRes.isSkipped) {
     throw new Error('missing run');
@@ -233,6 +272,7 @@ export default function Page({
       rerun={rerun}
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
       scope="fn"
+      totalCount={totalCount}
     />
   );
 }
