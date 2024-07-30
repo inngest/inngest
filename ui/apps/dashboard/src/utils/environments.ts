@@ -38,11 +38,17 @@ export function getDefaultEnvironment(
   return environments.find((e) => e.type === EnvironmentType.Production) || null;
 }
 
-export function getLegacyTestMode(environments: NonEmptyArray<Environment>): Environment | null {
+export function getLegacyTestMode(
+  environments: NonEmptyArray<Environment>,
+  includeArchived = true
+): Environment | null {
   return (
-    environments.find(
-      (env) => env.type === EnvironmentType.Test && env.name === LEGACY_TEST_MODE_NAME
-    ) || null
+    environments.find((env) => {
+      if (!includeArchived && env.isArchived) {
+        return false;
+      }
+      return env.type === EnvironmentType.Test && env.name === LEGACY_TEST_MODE_NAME;
+    }) || null
   );
 }
 
@@ -51,10 +57,16 @@ function getRecentCutOffDate(): Date {
 }
 
 export function getSortedBranchEnvironments(
-  environments: NonEmptyArray<Environment>
+  environments: NonEmptyArray<Environment>,
+  includeArchived = true
 ): Environment[] {
   return environments
-    .filter((env) => env.type === EnvironmentType.BranchChild)
+    .filter((env) => {
+      if (!includeArchived && env.isArchived) {
+        return false;
+      }
+      return env.type === EnvironmentType.BranchChild;
+    })
     .sort((a, b) => {
       // Active envs are always before archived envs.
       if (!a.isArchived && b.isArchived) {
@@ -99,10 +111,16 @@ export function getNonRecentBranchEnvironments(
 }
 
 // Get parent test environments created by the user, not branch envs or legacy test mode
-export function getTestEnvironments(environments: NonEmptyArray<Environment>): Environment[] {
-  return environments.filter(
-    (env) => env.type === EnvironmentType.Test && env.name !== LEGACY_TEST_MODE_NAME
-  );
+export function getTestEnvironments(
+  environments: NonEmptyArray<Environment>,
+  includeArchived = true
+): Environment[] {
+  return environments.filter((env) => {
+    if (!includeArchived && env.isArchived) {
+      return false;
+    }
+    return env.type === EnvironmentType.Test && env.name !== LEGACY_TEST_MODE_NAME;
+  });
 }
 
 export function workspaceToEnvironment(

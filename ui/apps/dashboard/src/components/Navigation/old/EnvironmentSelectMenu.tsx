@@ -79,9 +79,13 @@ export default function EnvironmentSelectMenu({ activeEnv }: EnvironmentSelectMe
   }
 
   const defaultEnvironment = getDefaultEnvironment(envs);
-  const legacyTestMode = getLegacyTestMode(envs);
-  const mostRecentlyCreatedBranchEnvironments = getSortedBranchEnvironments(envs).slice(0, 5);
-  const testEnvironments = getTestEnvironments(envs);
+  const includeArchived = false;
+  const legacyTestMode = getLegacyTestMode(envs, includeArchived);
+  const mostRecentlyCreatedBranchEnvironments = getSortedBranchEnvironments(
+    envs,
+    includeArchived
+  ).slice(0, 5);
+  const testEnvironments = getTestEnvironments(envs, includeArchived);
 
   if (selected === null && activeEnv) {
     setSelected(activeEnv);
