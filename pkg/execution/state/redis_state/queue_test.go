@@ -223,9 +223,10 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 	start := time.Now().Truncate(time.Second)
 
+	accountId := uuid.New()
+
 	t.Run("It enqueues an item", func(t *testing.T) {
 		id := uuid.New()
-		accountId := uuid.New()
 
 		item, err := q.EnqueueItem(ctx, QueueItem{
 			FunctionID: id,
@@ -283,7 +284,13 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		at := time.Now().Add(time.Hour).Truncate(time.Second)
 
-		item, err := q.EnqueueItem(ctx, QueueItem{}, at)
+		item, err := q.EnqueueItem(ctx, QueueItem{
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					AccountID: accountId,
+				},
+			},
+		}, at)
 		require.NoError(t, err)
 
 		// Ensure the partition is inserted, and the earliest time is still
@@ -292,7 +299,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			ID:               item.FunctionID.String(),
 			FunctionID:       &item.FunctionID,
-			AccountID:        uuid.Nil,
+			AccountID:        accountId,
 			ConcurrencyLimit: consts.DefaultConcurrencyLimit,
 		}, qp)
 
@@ -305,11 +312,11 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.NoError(t, err)
 		require.EqualValues(t, at.Unix(), score)
 
-		score, err = r.ZScore(q.u.kg.AccountPartitionIndex(uuid.Nil), keys[0])
+		score, err = r.ZScore(q.u.kg.AccountPartitionIndex(accountId), keys[0])
 		require.NoError(t, err)
 		require.EqualValues(t, at.Unix(), score)
 
-		score, err = r.ZScore(q.u.kg.GlobalAccountIndex(), uuid.Nil.String())
+		score, err = r.ZScore(q.u.kg.GlobalAccountIndex(), accountId.String())
 		require.NoError(t, err)
 		require.EqualValues(t, at.Unix(), score)
 	})
@@ -319,7 +326,13 @@ func TestQueueEnqueueItem(t *testing.T) {
 		at := now.Add(-10 * time.Minute).Truncate(time.Second)
 
 		// Note: This will reuse the existing partition (zero UUID) from the step above
-		item, err := q.EnqueueItem(ctx, QueueItem{}, at)
+		item, err := q.EnqueueItem(ctx, QueueItem{
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					AccountID: accountId,
+				},
+			},
+		}, at)
 		require.NoError(t, err)
 
 		// Ensure the partition is inserted, and the earliest time is updated
@@ -328,7 +341,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			ID:               item.FunctionID.String(),
 			FunctionID:       &item.FunctionID,
-			AccountID:        uuid.Nil,
+			AccountID:        accountId,
 			ConcurrencyLimit: consts.DefaultConcurrencyLimit,
 		}, qp, "queue partition does not match")
 
@@ -341,12 +354,12 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.NoError(t, err)
 		require.EqualValues(t, now.Unix(), score)
 
-		score, err = r.ZScore(q.u.kg.AccountPartitionIndex(uuid.Nil), keys[0])
+		score, err = r.ZScore(q.u.kg.AccountPartitionIndex(accountId), keys[0])
 		require.NoError(t, err)
 		require.NotZero(t, score)
 		require.EqualValues(t, now.Unix(), score, r.Dump())
 
-		score, err = r.ZScore(q.u.kg.GlobalAccountIndex(), uuid.Nil.String())
+		score, err = r.ZScore(q.u.kg.GlobalAccountIndex(), accountId.String())
 		require.NoError(t, err)
 		require.EqualValues(t, now.Unix(), score)
 	})
@@ -450,6 +463,9 @@ func TestQueueEnqueueItem(t *testing.T) {
 				FunctionID: fnID,
 				Data: osqueue.Item{
 					CustomConcurrencyKeys: []state.CustomConcurrency{ck},
+					Identifier: state.Identifier{
+						AccountID: accountId,
+					},
 				},
 			}, now.Add(10*time.Second))
 			require.NoError(t, err)
@@ -464,7 +480,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 			require.Equal(t, QueuePartition{
 				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hash),
 				FunctionID:       &fnID,
-				AccountID:        uuid.Nil,
+				AccountID:        accountId,
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
 				ConcurrencyLimit: 1,
@@ -473,9 +489,9 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 			accountIds := getGlobalAccounts(t, rc)
 			require.Equal(t, 1, len(accountIds))
-			require.Contains(t, accountIds, uuid.Nil.String())
+			require.Contains(t, accountIds, accountId.String())
 
-			apIds := getAccountPartitions(t, rc, uuid.Nil)
+			apIds := getAccountPartitions(t, rc, accountId)
 			require.Equal(t, 2, len(apIds), "expected two account partitions", apIds, r.Dump())
 
 			// concurrency key partition
@@ -507,7 +523,9 @@ func TestQueueEnqueueItem(t *testing.T) {
 				FunctionID: fnID,
 				Data: osqueue.Item{
 					CustomConcurrencyKeys: []state.CustomConcurrency{ckA, ckB},
-				},
+					Identifier: state.Identifier{
+						AccountID: accountId,
+					}},
 			}, now.Add(10*time.Second))
 			require.NoError(t, err)
 
@@ -521,7 +539,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 			require.Equal(t, QueuePartition{
 				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashA),
 				FunctionID:       &fnID,
-				AccountID:        uuid.Nil,
+				AccountID:        accountId,
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
 				ConcurrencyLimit: 1,
@@ -531,7 +549,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 			require.Equal(t, QueuePartition{
 				ID:               q.u.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashB),
 				FunctionID:       &fnID,
-				AccountID:        uuid.Nil,
+				AccountID:        accountId,
 				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
 				ConcurrencyScope: int(enums.ConcurrencyScopeFn),
 				ConcurrencyLimit: 2,
@@ -540,9 +558,9 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 			accountIds := getGlobalAccounts(t, rc)
 			require.Equal(t, 1, len(accountIds))
-			require.Contains(t, accountIds, uuid.Nil.String())
+			require.Contains(t, accountIds, accountId.String())
 
-			apIds := getAccountPartitions(t, rc, uuid.Nil)
+			apIds := getAccountPartitions(t, rc, accountId)
 			require.Equal(t, 2, len(apIds))
 			require.Contains(t, apIds, concurrencyPartitionA.ID)
 			require.Contains(t, apIds, concurrencyPartitionB.ID)
@@ -1074,7 +1092,10 @@ func TestQueueLease(t *testing.T) {
 			// item removes it from the fn queue.
 			t.Run("With a single item in the queue hwen leasing, nothing updates", func(t *testing.T) {
 				at := time.Now().Truncate(time.Second).Add(time.Second)
-				item, err := q.EnqueueItem(ctx, QueueItem{}, at)
+				accountId := uuid.New()
+				item, err := q.EnqueueItem(ctx, QueueItem{
+					Data: osqueue.Item{Identifier: state.Identifier{AccountID: accountId}},
+				}, at)
 				require.NoError(t, err)
 				p := QueuePartition{FunctionID: &item.FunctionID}
 
@@ -1082,7 +1103,7 @@ func TestQueueLease(t *testing.T) {
 				require.NoError(t, err)
 				require.EqualValues(t, at.Unix(), score, r.Dump())
 
-				score, err = r.ZScore(defaultQueueKey.AccountPartitionIndex(uuid.Nil), p.Queue())
+				score, err = r.ZScore(defaultQueueKey.AccountPartitionIndex(accountId), p.Queue())
 				require.NoError(t, err)
 				require.EqualValues(t, at.Unix(), score, r.Dump())
 
@@ -1095,7 +1116,7 @@ func TestQueueLease(t *testing.T) {
 				require.NoError(t, err)
 				require.EqualValues(t, int(score), int(nextScore), "score should not equal previous score")
 
-				nextScore, err = r.ZScore(defaultQueueKey.AccountPartitionIndex(uuid.Nil), p.Queue())
+				nextScore, err = r.ZScore(defaultQueueKey.AccountPartitionIndex(accountId), p.Queue())
 				require.NoError(t, err)
 				require.EqualValues(t, int(score), int(nextScore), "account score should not equal previous score")
 			})

@@ -7,7 +7,7 @@ local function enqueue_get_partition_item(partitionKey, id)
 	return nil
 end
 
-local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
+local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
 	if partitionID == "" then
 		-- This is a blank partition, so don't even bother.  This allows us to pre-allocate
 		-- 3 partitions per item, even if an item only needs a single partition.
@@ -52,17 +52,9 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 			-- This is the case when there's no force delay or we've waited enough time.
 			-- So, update the global index such that this partition is found, plz. Tyvm!!
 			redis.call("ZADD", keyGlobalPointer, partitionTime, partitionID)
+			update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, partitionTime)
 		end
 	end
-
-  -- Potentially update the account partition pointer
-  local currentScore = redis.call("ZSCORE", keyAccountPartitions, partitionID)
-  if currentScore == false or tonumber(currentScore) > partitionTime then
-    local existing = enqueue_get_partition_item(keyPartitionMap, partitionID)
-    if nowMS > existing.forceAtMS then
-      redis.call("ZADD", keyAccountPartitions, partitionTime, partitionID)
-    end
-  end
 end
 
 -- requeue_to_partition is similar to enqueue, but always fetches the minimum score for a partition to

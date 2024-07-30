@@ -32,6 +32,9 @@ local partitionIdB        = ARGV[11]
 local partitionIdC        = ARGV[12]
 local accountId           = ARGV[13]
 
+-- $include(update_pointer_score.lua)
+-- $include(ends_with.lua)
+-- $include(update_account_queues.lua)
 -- $include(get_partition_item.lua)
 -- $include(enqueue_to_partition.lua)
 
@@ -47,15 +50,9 @@ if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
 end
 
 -- Enqueue to all partitions.
-enqueue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
-enqueue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
-enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
-
--- Potentially update the account index (global accounts pointers).
-local currentScore = redis.call("ZSCORE", keyGlobalAccountPointer, accountId)
-if currentScore == false or tonumber(currentScore) > partitionTime then
-  redis.call("ZADD", keyGlobalAccountPointer, partitionTime, accountId)
-end
+enqueue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
+enqueue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
+enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
 
 -- note to future devs: if updating metadata, be sure you do not change the "off"
 -- (i.e. "paused") boolean in the function's metadata.
