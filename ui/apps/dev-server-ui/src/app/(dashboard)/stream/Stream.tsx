@@ -256,6 +256,7 @@ export default function Stream() {
       >
         <Table
           options={{
+            // @ts-expect-error TODO: Fix this
             data: triggers ?? [],
             columns,
             getCoreRowModel: getCoreRowModel(),

@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from './utils/classNames';
-import { relativeTime } from './utils/date';
+import { relativeTime, toMaybeDate } from './utils/date';
 
 /**
  * Use this component instead of the builtin <time> element. Since server-side
@@ -12,25 +12,36 @@ import { relativeTime } from './utils/date';
 type Props = {
   className?: string;
   format?: 'relative';
-  value: Date;
+  value: Date | string;
 };
 
 export function Time({ className, format, value }: Props) {
+  let date: Date | null;
+  if (value instanceof Date) {
+    date = value;
+  } else {
+    date = toMaybeDate(value);
+  }
+
+  if (!date) {
+    return <span>Invalid date</span>;
+  }
+
   let dateString: string;
   let title: string | undefined;
   if (format === 'relative') {
-    dateString = relativeTime(value);
-    title = value.toISOString();
+    dateString = relativeTime(date);
+    title = date.toISOString();
   } else {
-    dateString = value.toLocaleString();
-    title = value.toISOString();
+    dateString = date.toLocaleString();
+    title = date.toISOString();
   }
 
   return (
     <time
       suppressHydrationWarning={true}
       className={cn('whitespace-nowrap', className)}
-      dateTime={value.toISOString()}
+      dateTime={date.toISOString()}
       title={title}
     >
       {dateString}

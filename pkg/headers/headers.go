@@ -15,6 +15,8 @@ const (
 	// to be, used to validate that every part of a registration is performed
 	// against the same target.
 	HeaderKeyExpectedServerKind = "X-Inngest-Expected-Server-Kind"
+
+	HeaderKeySignature = "X-Inngest-Signature"
 )
 
 const (

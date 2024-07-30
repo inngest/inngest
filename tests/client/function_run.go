@@ -58,7 +58,7 @@ type FnRunPageInfo struct {
 	EndCursor   *string `json:"endCursor,omitempty"`
 }
 
-func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRunEdge, FnRunPageInfo) {
+func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRunEdge, FnRunPageInfo, int) {
 	c.Helper()
 
 	items := 40
@@ -106,6 +106,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 				endCursor
 				hasNextPage
 			}
+			totalCount
 		}
 	}`,
 		cursor,
@@ -128,8 +129,9 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 
 	type response struct {
 		Runs struct {
-			Edges    []FnRunEdge   `json:"edges"`
-			PageInfo FnRunPageInfo `json:"pageInfo"`
+			Edges      []FnRunEdge   `json:"edges"`
+			PageInfo   FnRunPageInfo `json:"pageInfo"`
+			TotalCount int           `json:"totalCount"`
 		}
 	}
 
@@ -138,7 +140,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 		c.Fatalf(err.Error())
 	}
 
-	return data.Runs.Edges, data.Runs.PageInfo
+	return data.Runs.Edges, data.Runs.PageInfo, data.Runs.TotalCount
 }
 
 type Run struct {
