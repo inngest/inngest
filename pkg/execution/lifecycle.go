@@ -158,7 +158,9 @@ type LifecycleListener interface {
 	//
 	// This is backend specific and may be a noop depending on the
 	// listener implementation.
-	Close() error
+	Close(
+		context.Context,
+	) error
 }
 
 // NoopLifecyceListener does nothing.  This can be embedded into a custom implementation
@@ -300,4 +302,4 @@ func (NoopLifecyceListener) OnSleep(
 ) {
 }
 
-func (NoopLifecyceListener) Close() error { return nil }
+func (NoopLifecyceListener) Close(context.Context) error { return nil }

@@ -300,6 +300,14 @@ func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 	e.lifecycles = append(e.lifecycles, l)
 }
 
+func (e *executor) CloseLifecycleListeners(ctx context.Context) {
+	for _, l := range e.lifecycles {
+		// todo parallel
+		l.Close(ctx)
+	}
+
+}
+
 func idempotencyKey(req execution.ScheduleRequest, runID ulid.ULID) string {
 	var key string
 	if req.IdempotencyKey != nil {
