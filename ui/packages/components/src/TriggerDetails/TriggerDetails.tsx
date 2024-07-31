@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { RiContractRightFill, RiExpandLeftFill } from '@remixicon/react';
+import { useQuery } from '@tanstack/react-query';
 import { useLocalStorage } from 'react-use';
-import { toast } from 'sonner';
 
 import { Card } from '../Card';
 import { CodeBlock } from '../CodeBlock';
@@ -16,9 +16,11 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
+// NOTE - This component should be a shared component as part of the design system.
+// Until then, we re-use it from the RunDetailsV2 as these are part of the same parent UI.
+import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import { cn } from '../utils/classNames';
-import { withRetry } from '../utils/retry';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
 
 type Props = {
@@ -39,19 +41,20 @@ export type Trigger = {
 
 export function TriggerDetails({ className, getTrigger, runID }: Props) {
   const [showEventPanel, setShowEventPanel] = useLocalStorage('showEventPanel', true);
-  const [trigger, setTrigger] = useState<Trigger>();
-  const isLoading = !trigger;
   const { isRunning, send } = useDevServer();
 
-  useEffect(() => {
-    withRetry(() => getTrigger(runID))
-      .then((data) => {
-        setTrigger(data);
-      })
-      .catch(() => {
-        toast.error('Failed to fetch trigger details');
-      });
-  }, [getTrigger]);
+  const {
+    data: trigger,
+    error,
+    isPending,
+    refetch,
+  } = useQuery({
+    queryKey: ['run-trigger', runID],
+    queryFn: useCallback(() => {
+      return getTrigger(runID);
+    }, [getTrigger, runID]),
+    retry: 3,
+  });
 
   const prettyPayload = useMemo(() => {
     if (!trigger?.payloads) return null;
@@ -124,6 +127,10 @@ export function TriggerDetails({ className, getTrigger, runID }: Props) {
     ];
   }, [trigger]);
 
+  if (error) {
+    return <ErrorCard error={error} reset={() => refetch()} />;
+  }
+
   return (
     <Collapsible.Root
       className={cn(showEventPanel && 'w-3/4 2xl:w-2/5', 'flex flex-col gap-5', className)}
@@ -166,21 +173,21 @@ export function TriggerDetails({ className, getTrigger, runID }: Props) {
                     {type === 'EVENT' && (
                       <>
                         <ElementWrapper label="Event name">
-                          {isLoading ? (
+                          {isPending ? (
                             <SkeletonElement />
                           ) : (
                             <TextElement>{trigger.eventName}</TextElement>
                           )}
                         </ElementWrapper>
                         <ElementWrapper label="Event ID">
-                          {isLoading ? (
+                          {isPending ? (
                             <SkeletonElement />
                           ) : (
                             <IDElement>{trigger.IDs[0]}</IDElement>
                           )}
                         </ElementWrapper>
                         <ElementWrapper label="Received at">
-                          {isLoading ? (
+                          {isPending ? (
                             <SkeletonElement />
                           ) : (
                             <TimeElement date={new Date(trigger.timestamp)} />
@@ -191,17 +198,17 @@ export function TriggerDetails({ className, getTrigger, runID }: Props) {
                     {type === 'CRON' && trigger?.cron && (
                       <>
                         <ElementWrapper label="Cron expression">
-                          {isLoading ? <SkeletonElement /> : <CodeElement value={trigger.cron} />}
+                          {isPending ? <SkeletonElement /> : <CodeElement value={trigger.cron} />}
                         </ElementWrapper>
                         <ElementWrapper label="Cron ID">
-                          {isLoading ? (
+                          {isPending ? (
                             <SkeletonElement />
                           ) : (
                             <IDElement>{trigger.IDs[0]}</IDElement>
                           )}
                         </ElementWrapper>
                         <ElementWrapper label="Triggered at">
-                          {isLoading ? (
+                          {isPending ? (
                             <SkeletonElement />
                           ) : (
                             <TimeElement date={new Date(trigger.timestamp)} />
@@ -212,21 +219,21 @@ export function TriggerDetails({ className, getTrigger, runID }: Props) {
                     {type === 'BATCH' && (
                       <>
                         <ElementWrapper label="Event name">
-                          {isLoading ? (
+                          {isPending ? (
                             <SkeletonElement />
                           ) : (
                             <TextElement>{trigger.eventName ?? '-'}</TextElement>
                           )}
                         </ElementWrapper>
                         <ElementWrapper label="Batch ID">
-                          {isLoading ? (
+                          {isPending ? (
                             <SkeletonElement />
                           ) : (
                             <IDElement>{trigger.batchID}</IDElement>
                           )}
                         </ElementWrapper>
                         <ElementWrapper label="Received at">
-                          {isLoading ? (
+                          {isPending ? (
                             <SkeletonElement />
                           ) : (
                             <TimeElement date={new Date(trigger.timestamp)} />
