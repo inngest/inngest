@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import type { Trigger } from '@inngest/components/TriggerDetails/TriggerDetails';
 import { useClient } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 
 const query = graphql(`
@@ -21,26 +21,31 @@ const query = graphql(`
   }
 `);
 
-export function useGetTrigger({ runID }: { runID: string }): () => Promise<Trigger> {
+export function useGetTrigger(): (runID: string) => Promise<Trigger> {
   const envID = useEnvironment().id;
   const client = useClient();
 
-  return useCallback(async () => {
-    let res;
-    try {
-      res = await client.query(query, { envID: envID, runID }).toPromise();
-    } catch (e) {
-      if (e instanceof Error) {
-        throw e;
+  return useCallback(
+    async (runID: string) => {
+      let res;
+      try {
+        res = await client
+          .query(query, { envID: envID, runID }, { requestPolicy: 'network-only' })
+          .toPromise();
+      } catch (e) {
+        if (e instanceof Error) {
+          throw e;
+        }
+        throw new Error('unknown error');
       }
-      throw new Error('unknown error');
-    }
-    if (res.error) {
-      throw res.error;
-    }
-    if (!res.data) {
-      throw new Error('no data returned');
-    }
-    return res.data.workspace.runTrigger;
-  }, [client, envID, runID]);
+      if (res.error) {
+        throw res.error;
+      }
+      if (!res.data) {
+        throw new Error('no data returned');
+      }
+      return res.data.workspace.runTrigger;
+    },
+    [client, envID]
+  );
 }

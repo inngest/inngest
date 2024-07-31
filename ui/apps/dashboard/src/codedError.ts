@@ -20,6 +20,7 @@ const codes = [
   'http_unsupported_protocol',
   'no_functions',
   'not_sdk',
+  'server_kind_mismatch',
   'signing_key_invalid',
   'signing_key_unspecified',
   'too_many_pings',

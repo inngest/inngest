@@ -631,10 +631,10 @@ github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:
 github.com/imdario/mergo v0.3.11/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
 github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
-github.com/inngest/expr v0.0.0-20240521153320-6f549d6745fd h1:zVlqAmiuWBYO8O5T8Rxin4qfqD0YrFQyK/als0w9LS0=
-github.com/inngest/expr v0.0.0-20240521153320-6f549d6745fd/go.mod h1:Dq8dNC1Q/cZBjl6ltxCoAeNn8fstrBJWWjeSisqTL94=
-github.com/inngest/inngestgo v0.7.3-0.20240606231355-a4f101f74a94 h1:1nfGqgrTbZ5NyOx1cmkQO6XggJKbZctKfncUovZaFTE=
-github.com/inngest/inngestgo v0.7.3-0.20240606231355-a4f101f74a94/go.mod h1:tpkVxqBTy8UeSeI6RhX+VW4qSmL3JEMpAnWpOyaQ5vk=
+github.com/inngest/expr v0.0.0-20240717151033-03e4378c436c h1:9XaJS0BV+5wYqv3pVh9OxowUPArRdGMRa8xFdV7eTAI=
+github.com/inngest/expr v0.0.0-20240717151033-03e4378c436c/go.mod h1:Dq8dNC1Q/cZBjl6ltxCoAeNn8fstrBJWWjeSisqTL94=
+github.com/inngest/inngestgo v0.7.3-0.20240718000349-c9247956e061 h1:6SPtaSrdw78aQxd64KRX+Xmz8dyE/3bx1+Bj5awUU+4=
+github.com/inngest/inngestgo v0.7.3-0.20240718000349-c9247956e061/go.mod h1:fWsObvVboMXUMdKmqk+9oEju3loyIHYKHmjUQU6xDlA=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=
 github.com/jackc/chunkreader/v2 v2.0.0/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=
 github.com/jackc/chunkreader/v2 v2.0.1/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=
@@ -686,6 +686,8 @@ github.com/jmespath/go-jmespath/internal/testify v1.5.1 h1:shLQSRRSCCPj3f2gpwzGw
 github.com/jmespath/go-jmespath/internal/testify v1.5.1/go.mod h1:L3OGu8Wl2/fWfCI6z80xFu9LTZmf1ZRjMHUOPmWr69U=
 github.com/joho/godotenv v1.3.0/go.mod h1:7hK45KPybAkOC6peb+G5yklZfMxEjkZhHbwpqxOKXbg=
 github.com/jonboulle/clockwork v0.1.0/go.mod h1:Ii8DK3G1RaLaWxj9trq07+26W01tbo22gdxWY5EU2bo=
+github.com/jonboulle/clockwork v0.4.0 h1:p4Cf1aMWXnXAUh8lVfewRBx1zaTSYKrKMF2g3ST4RZ4=
+github.com/jonboulle/clockwork v0.4.0/go.mod h1:xgRqUGwRcjKCO1vbZUEtSLrqKoPSsUpK7fnezOII0kc=
 github.com/joyent/triton-go v0.0.0-20180313100802-d8f9c0314926/go.mod h1:U+RSyWxWd04xTqnuOQxnai7XGS2PrPY2cfGoDKtMHjA=
 github.com/json-iterator/go v0.0.0-20180612202835-f2b4162afba3/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=
 github.com/json-iterator/go v0.0.0-20180701071628-ab8a2e0c74be/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=

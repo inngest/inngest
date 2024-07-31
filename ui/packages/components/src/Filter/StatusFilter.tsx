@@ -1,4 +1,4 @@
-import { RunStatusIcon } from '../FunctionRunStatusIcon/RunStatusIcons';
+import { RunStatusDot } from '../FunctionRunStatusIcons';
 import { Select, type Option } from '../Select/Select';
 import { getStatusBackgroundClass, getStatusBorderClass } from '../statusClasses';
 import {
@@ -11,18 +11,30 @@ import { cn } from '../utils/classNames';
 type StatusFilterProps = {
   selectedStatuses: FunctionRunStatus[];
   onStatusesChange: (value: FunctionRunStatus[]) => void;
+  functionIsPaused?: boolean;
 };
 
-const options: Option[] = functionRunStatuses.map((status: FunctionRunStatus) => ({
-  id: status,
-  name: status,
-}));
-
-export default function StatusFilter({ selectedStatuses, onStatusesChange }: StatusFilterProps) {
+export default function StatusFilter({
+  selectedStatuses,
+  onStatusesChange,
+  functionIsPaused,
+}: StatusFilterProps) {
+  const availableStatuses: FunctionRunStatus[] = functionRunStatuses.filter((status) => {
+    if (status === 'PAUSED') {
+      return !!functionIsPaused;
+    } else if (status === 'RUNNING') {
+      return !functionIsPaused;
+    }
+    return true;
+  });
+  const options: Option[] = availableStatuses.map((status: FunctionRunStatus) => ({
+    id: status,
+    name: status,
+  }));
   const selectedValues = options.filter((option) =>
     selectedStatuses.some((status) => isFunctionRunStatus(status) && status === option.id)
   );
-  const areAllStatusesSelected = functionRunStatuses.every((status) =>
+  const areAllStatusesSelected = availableStatuses.every((status) =>
     selectedStatuses.includes(status)
   );
   const statusDots = selectedStatuses.map((status) => {
@@ -42,7 +54,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
   return (
     <Select
       multiple
-      defaultValue={selectedValues}
+      value={selectedValues}
       onChange={(value: Option[]) => {
         const newValue: FunctionRunStatus[] = [];
         value.forEach((status) => {
@@ -69,7 +81,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
           return (
             <Select.CheckboxOption key={option.id} option={option}>
               <span className="flex items-center gap-1 lowercase">
-                <RunStatusIcon status={option.id} className="h-2 w-2" />
+                <RunStatusDot status={option.id} className="h-2 w-2" />
                 <label className="text-sm first-letter:capitalize">{option.name}</label>
               </span>
             </Select.CheckboxOption>

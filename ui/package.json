@@ -1,4 +1,5 @@
 {
+  "name": "inngest-ui",
   "scripts": {
     "format": "prettier . --write",
     "preinstall": "npx only-allow pnpm",
@@ -9,12 +10,17 @@
     "husky": "8.0.2",
     "lint-staged": "13.0.4",
     "prettier": "2.8.7",
-    "prettier-plugin-tailwindcss": "0.2.7"
+    "prettier-plugin-tailwindcss": "0.2.7",
+    "turbo": "2.0.1"
   },
   "engines": {
-    "node": "18.x",
+    "node": "20.x",
     "pnpm": "8.15.8"
   },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "packageManager": "pnpm@8.15.8",
   "private": true
 }

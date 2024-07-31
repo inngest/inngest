@@ -45,7 +45,7 @@ export function StreamDetails({
 }: Props) {
   const client = useClient();
   const { isRunning, send } = useDevServer();
-  const cancelRun = useCancelRun({ envID: environment.id, runID: run.id });
+  const cancelRun = useCancelRun({ envID: environment.id });
   const rerun = useRerun({
     envID: environment.id,
     envSlug: environment.slug,

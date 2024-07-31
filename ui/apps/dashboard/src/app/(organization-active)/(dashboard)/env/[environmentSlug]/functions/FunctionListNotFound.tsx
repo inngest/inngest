@@ -7,7 +7,7 @@ import { RiClipboardLine, RiErrorWarningLine } from '@remixicon/react';
 import { useCopyToClipboard } from 'react-use';
 import { toast } from 'sonner';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import DevServerImage from '@/images/devserver.png';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
 
@@ -75,7 +75,7 @@ export default function FunctionListNotFound() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-300 px-8 pt-8">
+        <div className="border-muted rounded-lg border px-8 pt-8">
           <h3 className="flex items-center text-xl font-semibold text-slate-800">
             <span className="mr-2 inline-flex h-6 w-6  items-center justify-center rounded-full bg-slate-800 text-center text-sm text-white">
               2

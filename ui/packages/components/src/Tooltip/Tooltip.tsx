@@ -19,11 +19,14 @@ const TooltipContent = React.forwardRef<
     ref={ref}
     sideOffset={sideOffset}
     className={cn(
-      'animate-slide-down-fade z-50 max-w-xs rounded-md bg-white/95 px-2 py-1 text-sm text-slate-400 drop-shadow backdrop-blur-[3px] dark:bg-slate-800',
+      'animate-slide-down-and-fade bg-canvasBase text-basis shadow-tooltip z-50 max-w-xs rounded-md px-2 py-1 text-sm shadow-md',
       className
     )}
     {...props}
-  />
+  >
+    {props.children}
+    <TooltipPrimitive.Arrow className="fill-tooltipArrow" />
+  </TooltipPrimitive.Content>
 ));
 
 const TooltipArrow = TooltipPrimitive.Arrow;

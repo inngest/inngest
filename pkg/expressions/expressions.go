@@ -242,7 +242,7 @@ func Validate(ctx context.Context, expression string) error {
 		return err
 	}
 	if _, issues := env.Compile(expression); issues != nil {
-		return fmt.Errorf("error validating expression: %w", issues.Err())
+		return fmt.Errorf("error validating expression: %w", NewCompileError(issues.Err()))
 	}
 	return nil
 }

@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { RunDetails as RunDetailsView } from '@inngest/components/RunDetailsV2';
 import { cn } from '@inngest/components/utils/classNames';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
 import { pathCreator } from '@/utils/urls';
@@ -19,8 +19,8 @@ type Props = {
 
 export function RunDetails({ runID, standalone = true }: Props) {
   const env = useEnvironment();
-  const cancelRun = useCancelRun({ envID: env.id, runID });
-  const rerun = useRerun({ envID: env.id, envSlug: env.slug, runID });
+  const cancelRun = useCancelRun({ envID: env.id });
+  const rerun = useRerun({ envID: env.id, envSlug: env.slug });
   const getTraceResult = useGetTraceResult();
 
   const internalPathCreator = useMemo(() => {
@@ -29,12 +29,14 @@ export function RunDetails({ runID, standalone = true }: Props) {
       // generate URLs without knowing about environments
       app: (params: { externalAppID: string }) =>
         pathCreator.app({ envSlug: env.slug, externalAppID: params.externalAppID }),
+      function: (params: { functionSlug: string }) =>
+        pathCreator.function({ envSlug: env.slug, functionSlug: params.functionSlug }),
       runPopout: (params: { runID: string }) =>
         pathCreator.runPopout({ envSlug: env.slug, runID: params.runID }),
     };
   }, [env.slug]);
 
-  const getTrigger = useGetTrigger({ runID });
+  const getTrigger = useGetTrigger();
   const getRun = useGetRun();
 
   return (

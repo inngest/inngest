@@ -10,10 +10,10 @@ import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import type { CodedError } from '@/codedError';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import Input from '@/components/Forms/Input';
 import { SyncFailure } from '@/components/SyncFailure/SyncFailure';
 import { graphql } from '@/gql';
-import { useEnvironment } from '../../environment-context';
 
 const ResyncAppDocument = graphql(`
   mutation ResyncApp($appExternalID: String!, $appURL: String, $envID: UUID!) {
@@ -54,15 +54,20 @@ export default function ResyncModal({ appExternalID, isOpen, onClose, url, platf
     setIsSyncing(true);
 
     try {
-      // TODO: This component is using legacy syncs stuff that needs
-      // reorginization and/or refactoring. We should use a GraphQL mutation
-      // that gets the last sync URL, rather than relying on the UI to find it.
-      // failure = await deployViaUrl(url);
-      const res = await resyncApp({
-        appExternalID,
-        appURL: url,
-        envID: env.id,
-      });
+      const res = await resyncApp(
+        {
+          appExternalID,
+          appURL: url,
+          envID: env.id,
+        },
+        {
+          additionalTypenames: [
+            // Bust the cache for the Workflow type to prevent the functions
+            // list from being stale
+            'Workflow',
+          ],
+        }
+      );
       if (res.error) {
         throw res.error;
       }

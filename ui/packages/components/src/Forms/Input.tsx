@@ -5,6 +5,7 @@ type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   error?: string | undefined;
   inngestSize?: 'base' | 'lg';
   className?: string;
+  optional?: boolean;
 };
 
 const sizeStyles = {
@@ -17,24 +18,25 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="flex flex-col gap-1">
         {props.label && (
-          <label htmlFor={props.name} className="text-sm font-medium text-slate-700">
-            {props.label}
+          <label htmlFor={props.name} className="text-basis text-sm font-medium">
+            {props.label}{' '}
+            {props.optional && <span className="text-muted font-normal">(optional)</span>}
           </label>
         )}
         <input
           ref={ref}
-          className={`border border-slate-300 text-sm leading-none placeholder-slate-400 shadow outline-2 outline-offset-2 outline-indigo-500 transition-all focus:outline
+          className={`bg-canvasBase border-muted placeholder-disabled text-basis outline-primary-moderate border text-sm leading-none outline-2 transition-all focus:outline
             ${sizeStyles[inngestSize]}
             ${
               props.readOnly &&
               'cursor-not-allowed border-transparent shadow-transparent outline-transparent	'
             }
-            ${props.error && 'outline-red-300'}
+            ${props.error && 'outline-error'}
             ${className}`}
           {...props}
         />
 
-        {props.error && <p className="text-sm text-red-500">{props.error}</p>}
+        {props.error && <p className="text-error text-sm">{props.error}</p>}
       </div>
     );
   }

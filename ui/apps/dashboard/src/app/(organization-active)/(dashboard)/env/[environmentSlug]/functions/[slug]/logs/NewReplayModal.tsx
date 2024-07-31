@@ -2,23 +2,24 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
+import { NewButton } from '@inngest/components/Button';
 import { RangePicker } from '@inngest/components/DatePicker';
-import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+import { Input } from '@inngest/components/Forms/Input';
+import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
 import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
 import { IconReplay } from '@inngest/components/icons/Replay';
 import { subtractDuration } from '@inngest/components/utils/date';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
+import { RiInformationLine } from '@remixicon/react';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
 import { useMutation, useQuery } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
-import Input from '@/components/Forms/Input';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import Placeholder from '@/components/Placeholder';
 import { graphql } from '@/gql';
-import { FunctionRunStatus } from '@/gql/graphql';
+import { ReplayRunStatus } from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const GetBillingPlanDocument = graphql(`
@@ -38,45 +39,16 @@ const GetBillingPlanDocument = graphql(`
   }
 `);
 
-const GetFunctionEndedRunsCountDocument = graphql(`
-  query GetFunctionEndedRunsCount(
-    $environmentID: ID!
-    $functionSlug: String!
-    $timeRangeStart: Time!
-    $timeRangeEnd: Time!
-  ) {
+const GetReplayRunCountsDocument = graphql(`
+  query GetReplayRunCounts($environmentID: ID!, $functionSlug: String!, $from: Time!, $to: Time!) {
     environment: workspace(id: $environmentID) {
       function: workflowBySlug(slug: $functionSlug) {
         id
-        failedRuns: runsV2(
-          filter: {
-            status: [FAILED]
-            lowerTime: $timeRangeStart
-            upperTime: $timeRangeEnd
-            timeField: STARTED_AT
-          }
-        ) {
-          totalCount
-        }
-        canceledRuns: runsV2(
-          filter: {
-            status: [CANCELLED]
-            lowerTime: $timeRangeStart
-            upperTime: $timeRangeEnd
-            timeField: STARTED_AT
-          }
-        ) {
-          totalCount
-        }
-        succeededRuns: runsV2(
-          filter: {
-            status: [COMPLETED]
-            lowerTime: $timeRangeStart
-            upperTime: $timeRangeEnd
-            timeField: STARTED_AT
-          }
-        ) {
-          totalCount
+        replayCounts: replayCounts(from: $from, to: $to) {
+          completedCount
+          failedCount
+          cancelledCount
+          skippedPausedCount
         }
       }
     }
@@ -90,7 +62,7 @@ const CreateFunctionReplayDocument = graphql(`
     $name: String!
     $fromRange: ULID!
     $toRange: ULID!
-    $statuses: [FunctionRunStatus!]
+    $statuses: [ReplayRunStatus!]
   ) {
     createFunctionReplay(
       input: {
@@ -99,7 +71,7 @@ const CreateFunctionReplayDocument = graphql(`
         name: $name
         fromRange: $fromRange
         toRange: $toRange
-        statuses: $statuses
+        statusesV2: $statuses
       }
     ) {
       id
@@ -107,10 +79,11 @@ const CreateFunctionReplayDocument = graphql(`
   }
 `);
 
-type FunctionRunEndStatus =
-  | FunctionRunStatus.Failed
-  | FunctionRunStatus.Cancelled
-  | FunctionRunStatus.Completed;
+type SelectableStatuses =
+  | ReplayRunStatus.Failed
+  | ReplayRunStatus.Cancelled
+  | ReplayRunStatus.Completed
+  | ReplayRunStatus.SkippedPaused;
 
 type NewReplayModalProps = {
   functionSlug: string;
@@ -128,8 +101,8 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
   const router = useRouter();
   const [name, setName] = useState<string>('');
   const [timeRange, setTimeRange] = useState<DateRange>();
-  const [selectedStatuses, setSelectedStatuses] = useState<FunctionRunEndStatus[]>([
-    FunctionRunStatus.Failed,
+  const [selectedStatuses, setSelectedStatuses] = useState<SelectableStatuses[]>([
+    ReplayRunStatus.Failed,
   ]);
   const environment = useEnvironment();
 
@@ -141,27 +114,29 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention || 7 });
 
   const { data, isLoading } = useSkippableGraphQLQuery({
-    query: GetFunctionEndedRunsCountDocument,
+    query: GetReplayRunCountsDocument,
     variables: {
       environmentID: environment.id,
       functionSlug,
-      timeRangeStart: timeRange?.start ? timeRange.start.toISOString() : '',
-      timeRangeEnd: timeRange?.end ? timeRange.end.toISOString() : '',
+      from: timeRange?.start ? timeRange.start.toISOString() : '',
+      to: timeRange?.end ? timeRange.end.toISOString() : '',
     },
-    skip: !timeRange,
+    skip: !timeRange || !timeRange.start || !timeRange.end,
   });
   const [{ fetching: isCreatingFunctionReplay }, createFunctionReplayMutation] = useMutation(
     CreateFunctionReplayDocument
   );
 
-  const failedRunsCount = data?.environment.function?.failedRuns?.totalCount ?? 0;
-  const canceledRunsCount = data?.environment.function?.canceledRuns?.totalCount ?? 0;
-  const succeededRunsCount = data?.environment.function?.succeededRuns?.totalCount ?? 0;
+  const failedRunsCount = data?.environment.function?.replayCounts.failedCount ?? 0;
+  const cancelledRunsCount = data?.environment.function?.replayCounts.cancelledCount ?? 0;
+  const succeededRunsCount = data?.environment.function?.replayCounts.completedCount ?? 0;
+  const pausedRunsCount = data?.environment.function?.replayCounts.skippedPausedCount ?? 0;
 
-  const statusCounts: Record<FunctionRunEndStatus, number> = {
-    [FunctionRunStatus.Failed]: failedRunsCount,
-    [FunctionRunStatus.Cancelled]: canceledRunsCount,
-    [FunctionRunStatus.Completed]: succeededRunsCount,
+  const statusCounts: Record<SelectableStatuses, number> = {
+    [ReplayRunStatus.Failed]: failedRunsCount,
+    [ReplayRunStatus.Cancelled]: cancelledRunsCount,
+    [ReplayRunStatus.Completed]: succeededRunsCount,
+    [ReplayRunStatus.SkippedPaused]: pausedRunsCount,
   } as const;
 
   const selectedRunsCount = selectedStatuses.reduce((acc, status) => acc + statusCounts[status], 0);
@@ -208,9 +183,10 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
   }
 
   const statusOptions = [
-    { label: 'Failed', value: FunctionRunStatus.Failed, count: failedRunsCount },
-    { label: 'Canceled', value: FunctionRunStatus.Cancelled, count: canceledRunsCount },
-    { label: 'Succeeded', value: FunctionRunStatus.Completed, count: succeededRunsCount },
+    { label: 'Failed', value: ReplayRunStatus.Failed, count: failedRunsCount },
+    { label: 'Canceled', value: ReplayRunStatus.Cancelled, count: cancelledRunsCount },
+    { label: 'Succeeded', value: ReplayRunStatus.Completed, count: succeededRunsCount },
+    { label: 'Skipped', value: ReplayRunStatus.SkippedPaused, count: pausedRunsCount },
   ];
 
   return (
@@ -222,18 +198,20 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
           Replay Function
         </span>
       }
-      description="Select which function runs to replay."
       isOpen={isOpen}
       onClose={onClose}
     >
-      <form className="divide-y divide-slate-100" onSubmit={createFunctionReplay}>
-        <div className="divide-y divide-slate-100">
-          <div className="flex items-start justify-between gap-7 px-6 py-4">
-            <label htmlFor="replayName" className="block space-y-0.5">
-              <span className="text-sm font-semibold text-slate-800">Replay Name</span>
-              <p className="text-xs text-slate-500">Give your Replay a name to reference later.</p>
+      <form onSubmit={createFunctionReplay}>
+        <div>
+          <div className="flex flex-col items-start justify-between gap-2 px-6 py-4">
+            <label htmlFor="replayName">
+              <span className="text-basis text-sm font-semibold">Replay Name</span>
+              <p className="text-subtle text-sm">
+                Provide a unique name for this replay group to easily identify the runs being
+                replayed.
+              </p>
             </label>
-            <div className="w-64">
+            <div className="w-full">
               <Input
                 type="text"
                 id="replayName"
@@ -246,12 +224,14 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
               />
             </div>
           </div>
-          <div className="flex flex-row justify-between px-6 py-4">
-            <div className="w-1/2 space-y-0.5">
-              <span className="text-sm font-semibold text-slate-800">Date Range</span>
-              <p className="text-xs text-slate-500">Select a specific range of function runs.</p>
+          <div className="flex flex-col justify-between gap-2 px-6 py-4">
+            <div>
+              <span className="text-basis text-sm font-semibold">Date Range</span>
+              <p className="text-subtle text-sm">
+                Choose the time range for when the runs were queued.
+              </p>
             </div>
-            <div className="w-1/2">
+            <div className="w-full">
               <RangePicker
                 upgradeCutoff={upgradeCutoff}
                 onChange={(range) =>
@@ -267,78 +247,88 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
           </div>
         </div>
         <div className="space-y-5 px-6 py-4">
-          <div className="space-y-0.5">
-            <span className="text-sm font-semibold text-slate-800">Statuses</span>
-            <p className="text-xs text-slate-500">Select the statuses you want to be replayed.</p>
+          <div>
+            <span className="text-basis text-sm font-semibold">Statuses</span>
+            <p className="text-subtle text-sm">Select the statuses you wish to replay.</p>
           </div>
           <ToggleGroup.Root
             type="multiple"
             value={selectedStatuses}
-            onValueChange={(selectedStatuses: FunctionRunEndStatus[]) => {
+            onValueChange={(selectedStatuses: SelectableStatuses[]) => {
               if (selectedStatuses.length === 0) return; // Must have at least one status selected
               setSelectedStatuses(selectedStatuses);
             }}
             className="flex gap-5"
           >
             {statusOptions.map(({ label, value, count }) => (
-              <div key={value} className="flex flex-1 flex-col items-center gap-3.5">
+              <div key={value} className="flex flex-1">
                 <ToggleGroup.Item
-                  className="flex w-full flex-col items-center gap-1 rounded-md bg-slate-100 py-6 text-sm font-semibold text-slate-800 hover:bg-slate-200 focus:outline-1 focus:outline-indigo-500 data-[state=on]:ring data-[state=on]:ring-indigo-500 data-[state=on]:ring-offset-2"
+                  className="focus:ring-primary-moderate data-[state=on]:bg-success text-basis border-subtle hover:bg-canvasSubtle data-[state=on]:border-primary-moderate items-left flex w-full flex-col gap-1 rounded-md border p-3 text-sm"
                   value={value}
                 >
-                  <FunctionRunStatusIcon status={value} className="mx-auto h-8" />
+                  <RunStatusIcon status={value} className="mx-auto h-8" />
                   {label}
+                  {!timeRange && <p className="text-subtle text-sm">-- runs</p>}
+                  {timeRange && (
+                    <p aria-label={`Number of ${label} runs`} className="text-subtle text-sm">
+                      {isLoading ? (
+                        <Placeholder className="top-px inline-flex h-3 w-3 bg-slate-200" />
+                      ) : (
+                        count.toLocaleString(undefined, {
+                          notation: 'compact',
+                          compactDisplay: 'short',
+                        })
+                      )}{' '}
+                      runs
+                    </p>
+                  )}
                 </ToggleGroup.Item>
-                <p aria-label={`Number of ${label} runs`} className="text-sm text-slate-500">
-                  {isLoading ? (
-                    <Placeholder className="top-px inline-flex h-3 w-3 bg-slate-200" />
-                  ) : (
-                    count.toLocaleString(undefined, {
-                      notation: 'compact',
-                      compactDisplay: 'short',
-                    })
-                  )}{' '}
-                  Runs
-                </p>
               </div>
             ))}
           </ToggleGroup.Root>
         </div>
-        <div className="flex flex-col gap-6 px-6 py-4">
-          <div className="max-w-sm space-y-2 text-xs text-slate-500">
+        <div className="px-6 py-4">
+          <div className="text-subtle bg-canvasSubtle rounded-md px-6 py-4 text-sm">
             <p>
-              Replayed functions are re-run from the beginning. All previously run steps and
-              function states will not be re-used during the replay.
+              Note: Replayed functions are re-run from the beginning. Previously run steps and
+              function states will not be reused during the replay. The <code>event.user</code>{' '}
+              object will be empty for all runs in the replay.
             </p>
-            <p>
-              The <code>event.user</code> object will be empty for all runs in the replay.
-            </p>
-          </div>
-          <div className="flex gap-2 self-end">
-            <p className="inline-flex gap-1.5 text-slate-500">
-              Total runs to be replayed:{' '}
-              <span className="font-medium text-slate-800">
-                {isLoading ? (
-                  <Placeholder className="top-px inline-flex h-4 w-4 bg-slate-200" />
-                ) : (
-                  selectedRunsCount.toLocaleString(undefined, {
-                    notation: 'compact',
-                    compactDisplay: 'short',
-                  })
-                )}
-              </span>
-            </p>
+            <Link href="https://inngest.com/docs/platform/replay">Learn more about replay</Link>
           </div>
         </div>
-        <div className="flex justify-between border-t border-slate-100 px-5 py-4">
-          <Link href="https://inngest.com/docs/platform/replay">Learn about Replay</Link>
+        <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-5 py-4">
+          {!timeRange && <p></p>}
+          {timeRange && (
+            <div className="flex items-center gap-2">
+              <p className="text-subtle inline-flex items-center gap-1.5 text-sm">
+                <RiInformationLine className="h-5 w-5" />A total of{' '}
+                <span className="font-bold">
+                  {isLoading ? (
+                    <Placeholder className="top-px inline-flex h-4 w-4 bg-slate-200" />
+                  ) : (
+                    selectedRunsCount.toLocaleString(undefined, {
+                      notation: 'compact',
+                      compactDisplay: 'short',
+                    })
+                  )}
+                </span>
+                runs will be replayed.
+              </p>
+            </div>
+          )}
           <div className="flex gap-2">
-            <Button type="button" appearance="outlined" label="Cancel" btnAction={onClose} />
-            <Button
+            <NewButton
+              type="button"
+              appearance="outlined"
+              kind="secondary"
+              label="Cancel"
+              onClick={onClose}
+            />
+            <NewButton
               label="Replay Function"
               kind="primary"
               type="submit"
-              icon={<IconReplay className="h-5 w-5 text-white" />}
               disabled={isCreatingFunctionReplay}
             />
           </div>

@@ -28,6 +28,9 @@ const (
 	// MaxBodySize is the maximum payload size read on any HTTP response.
 	MaxBodySize = 1024 * 1024 * 4 // 4MB
 
+	// DefaultMaxStateSizeLimit is the maximum number of bytes of output state per function run allowed.
+	DefaultMaxStateSizeLimit = 1024 * 1024 * 32 // 32MB
+
 	// MaxRetries represents the maximum number of retries for a particular function or step
 	// possible.
 	MaxRetries = 30
@@ -65,8 +68,8 @@ const (
 	// when using idempotency keys.
 	FunctionIdempotencyPeriod = 24 * time.Hour
 
-	DefaultBatchSize = 100
-	MaxBatchTimeout  = 60 * time.Second
+	DefaultBatchSizeLimit = 100
+	DefaultBatchTimeout   = 60 * time.Second
 
 	// MaxEvents is the maximum number of events we can parse in a single batch.
 	MaxEvents = 5_000

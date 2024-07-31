@@ -2,12 +2,11 @@
 
 import { Link } from '@inngest/components/Link';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
+import type { Environment } from '@/utils/environments';
 import { pathCreator } from '@/utils/urls';
 import { Banner } from './Banner';
 
-export function ArchivedEnvBanner() {
-  const env = useEnvironment();
+export function ArchivedEnvBanner({ env }: { env: Environment }) {
   if (!env.isArchived) {
     return null;
   }

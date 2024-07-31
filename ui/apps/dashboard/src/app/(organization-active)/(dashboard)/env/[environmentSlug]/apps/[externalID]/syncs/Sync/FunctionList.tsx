@@ -7,7 +7,6 @@ import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowDownSLine, RiArrowRightLine } from '@remixicon/react';
 import { useLocalStorage } from 'react-use';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import {
   CollapsibleCardContent,
   CollapsibleCardContentWrapper,
@@ -16,6 +15,7 @@ import {
   CollapsibleCardRoot,
   CollapsibleCardTrigger,
 } from '@/components/CollapsibleCard';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { pathCreator } from '@/utils/urls';
 
 type Fn = Pick<Function, 'id' | 'name' | 'slug'>;
@@ -57,7 +57,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
         collapsible
       >
         <CollapsibleCardItem value="syncedFunctions">
-          <CollapsibleCardHeader className="flex h-11 items-center justify-between border-b border-transparent px-6 text-sm font-medium text-slate-600 data-[state=open]:border-slate-300">
+          <CollapsibleCardHeader className="data-[state=open]:border-muted flex h-11 items-center justify-between border-b border-transparent px-6 text-sm font-medium text-slate-600">
             <p>Synced Functions ({syncedFunctions.length})</p>
             <CollapsibleCardTrigger
               asChild
@@ -107,7 +107,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
         collapsible
       >
         <CollapsibleCardItem value="RemovedFunctions">
-          <CollapsibleCardHeader className="flex h-11 items-center justify-between border-b border-transparent px-6 text-sm font-medium text-slate-600 data-[state=open]:border-slate-300">
+          <CollapsibleCardHeader className="data-[state=open]:border-muted flex h-11 items-center justify-between border-b border-transparent px-6 text-sm font-medium text-slate-600">
             <p>Removed Functions ({removedFunctions.length})</p>
             <CollapsibleCardTrigger
               asChild

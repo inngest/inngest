@@ -5,9 +5,13 @@ export const GetSavedVercelProjectsDocument = graphql(`
     environment: workspace(id: $environmentID) {
       savedVercelProjects: vercelApps {
         id
+        originOverride
         projectID
+        protectionBypassSecret
         path
         workspaceID
+        originOverride
+        protectionBypassSecret
       }
     }
   }

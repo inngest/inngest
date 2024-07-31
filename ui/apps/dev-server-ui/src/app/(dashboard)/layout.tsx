@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { TooltipProvider } from '@inngest/components/Tooltip';
 import { IconApp } from '@inngest/components/icons/App';
 import { IconFunction } from '@inngest/components/icons/Function';
@@ -37,7 +38,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <NavbarLink icon={<IconFunction />} href="/functions" tabName="Functions" />
         </Navbar>
       </Header>
-      <TooltipProvider>{children}</TooltipProvider>
+      <TooltipProvider delayDuration={0}>
+        <React.Suspense>{children}</React.Suspense>
+      </TooltipProvider>
       <Toaster
         theme="dark"
         toastOptions={{

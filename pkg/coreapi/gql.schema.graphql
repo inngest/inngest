@@ -105,6 +105,7 @@ enum FunctionStatus {
 
 type App {
   id: ID!
+  externalID: String!
   name: String!
   sdkLanguage: String!
   sdkVersion: String!
@@ -308,19 +309,13 @@ type RunHistoryInvokeFunctionResult {
 input RunsFilterV2 {
   from: Time!
   until: Time
-  timeField: FunctionRunTimeFieldV2 = QUEUED_AT
+  timeField: RunsV2OrderByField = QUEUED_AT
 
   status: [FunctionRunStatus!]
   functionIDs: [UUID!]
   appIDs: [UUID!]
 
   query: String # CEL query string
-}
-
-enum FunctionRunTimeFieldV2 {
-  QUEUED_AT
-  STARTED_AT
-  ENDED_AT
 }
 
 input RunsV2OrderBy {
@@ -342,6 +337,7 @@ enum RunsOrderByDirection {
 type FunctionRunV2 {
   id: ULID!
   appID: UUID!
+  app: App!
   functionID: UUID!
   function: Function!
   traceID: String!
@@ -354,7 +350,7 @@ type FunctionRunV2 {
   status: FunctionRunStatus!
   sourceID: String # The parent trace / run that triggered this run
   triggerIDs: [ULID!]!
-  triggers: [Bytes!]!
+  eventName: String
   isBatch: Boolean!
   batchCreatedAt: Time
   cronSchedule: String
@@ -367,6 +363,7 @@ type FunctionRunV2 {
 type RunsV2Connection {
   edges: [FunctionRunV2Edge!]!
   pageInfo: PageInfo!
+  totalCount: Int!
 }
 
 type FunctionRunV2Edge {
@@ -376,6 +373,7 @@ type FunctionRunV2Edge {
 
 enum RunTraceSpanStatus {
   FAILED # step completed with an error
+  QUEUED # step of run is queued but not started
   RUNNING # actively being executed right now
   COMPLETED # step completed successfully
   # TIMED_OUT # wait for event timed out waiting

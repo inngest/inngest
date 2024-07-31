@@ -33,12 +33,14 @@ const (
 // Reader defines the history reader interface, loading runs and run history
 type Reader interface {
 	CountRuns(ctx context.Context, opts CountRunOpts) (int, error)
+	CountReplayRuns(ctx context.Context, opts CountReplayRunsOpts) (ReplayRunCounts, error)
 	GetRun(
 		ctx context.Context,
 		runID ulid.ULID,
 		opts GetRunOpts,
 	) (Run, error)
 	GetRuns(ctx context.Context, opts GetRunsOpts) ([]Run, error)
+	GetReplayRuns(ctx context.Context, opts GetReplayRunsOpts) ([]ReplayRun, error)
 	GetRunHistory(
 		ctx context.Context,
 		runID ulid.ULID,
@@ -54,7 +56,26 @@ type Reader interface {
 		eventID ulid.ULID,
 		opts GetRunsByEventIDOpts,
 	) ([]Run, error)
+	GetSkippedRunsByEventID(
+		ctx context.Context,
+		eventID ulid.ULID,
+		opts GetRunsByEventIDOpts,
+	) ([]SkippedRun, error)
 	GetUsage(ctx context.Context, opts GetUsageOpts) ([]usage.UsageSlot, error)
+
+	// GetActiveRunIDs returns the IDs of runs that are queued or running (i.e.
+	// not ended)
+	GetActiveRunIDs(
+		ctx context.Context,
+		opts GetActiveRunIDsOpts,
+	) ([]ulid.ULID, error)
+
+	// GetActiveRunIDs returns a count of runs that are queued or running (i.e.
+	// not ended)
+	CountActiveRuns(
+		ctx context.Context,
+		opts CountActiveRunsOpts,
+	) (int, error)
 
 	// This also embeds the V1 function reader interface.
 	cqrs.APIV1FunctionRunReader
@@ -230,6 +251,17 @@ type Run struct {
 	Cron            *string
 }
 
+type SkippedRun struct {
+	AccountID   uuid.UUID
+	BatchID     *ulid.ULID
+	EventID     ulid.ULID
+	ID          ulid.ULID
+	SkippedAt   time.Time
+	SkipReason  enums.SkipReason
+	WorkflowID  uuid.UUID
+	WorkspaceID uuid.UUID
+}
+
 func (r Run) ToCQRS() *cqrs.FunctionRun {
 	run := &cqrs.FunctionRun{
 		RunID:           r.ID,
@@ -313,4 +345,152 @@ type RunHistoryInvokeFunctionResult struct {
 	EventID *ulid.ULID `json:"eventID"`
 	RunID   *ulid.ULID `json:"runID"`
 	Timeout bool       `json:"timeout"`
+}
+
+type ReplayRun struct {
+	ID         ulid.ULID  // run ID
+	BatchID    *ulid.ULID // batch ID
+	EventID    ulid.ULID  // event ID
+	WorkflowID uuid.UUID  // workflow ID
+	Cron       *string    // cron schedule, if this was a cron-triggered run
+}
+
+type GetReplayRunsOpts struct {
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	WorkflowID  *uuid.UUID // if workflow ID is nil, all functions in the env will be queried
+	LowerTime   time.Time
+	UpperTime   time.Time
+	Statuses    []enums.RunStatus  // if empty, no completed/failed/cancelled runs will be included
+	SkipReasons []enums.SkipReason // if empty, no skipped runs will be included
+	Limit       int
+	Cursor      *ulid.ULID
+}
+
+func (c GetReplayRunsOpts) Validate() error {
+	if c.AccountID == uuid.Nil {
+		return errors.New("account ID must be provided")
+	}
+	if c.WorkspaceID == uuid.Nil {
+		return errors.New("workspace ID must be provided")
+	}
+	if c.WorkflowID != nil && *c.WorkflowID == uuid.Nil {
+		return errors.New("workflow ID must be provided")
+	}
+	if c.LowerTime.IsZero() {
+		return errors.New("lower time must be provided")
+	}
+	if c.UpperTime.IsZero() {
+		return errors.New("upper time must be provided")
+	}
+	if c.UpperTime.Before(c.LowerTime) {
+		return errors.New("upper/end time must be after lower/start time")
+	}
+	if c.Limit < 0 {
+		return errors.New("limit must be positive")
+	}
+	if len(c.Statuses) == 0 && len(c.SkipReasons) == 0 {
+		return errors.New("at least one status or skip reason must be provided")
+	}
+
+	return nil
+}
+
+// CountReplayRunsOpts is used to estimate the number of runs that would match the given criteria for replay.
+// See GetReplayRunsOpts for field documentation.
+type CountReplayRunsOpts struct {
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	WorkflowID  *uuid.UUID
+	LowerTime   time.Time
+	UpperTime   time.Time
+}
+
+type ReplayRunCounts struct {
+	CompletedCount     int
+	FailedCount        int
+	CancelledCount     int
+	SkippedPausedCount int
+}
+
+func (c CountReplayRunsOpts) Validate() error {
+	gRROpts := GetReplayRunsOpts{
+		AccountID:   c.AccountID,
+		WorkspaceID: c.WorkspaceID,
+		WorkflowID:  c.WorkflowID,
+		LowerTime:   c.LowerTime,
+		UpperTime:   c.UpperTime,
+		Statuses:    enums.ReplayableFunctionRunStatuses(),
+		SkipReasons: enums.ReplayableSkipReasons(),
+		Limit:       DefaultQueryLimit,
+		Cursor:      nil,
+	}
+	return gRROpts.Validate()
+}
+
+type GetActiveRunIDsOpts struct {
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	WorkflowID  uuid.UUID
+	LowerTime   time.Time
+	UpperTime   time.Time
+	Limit       int
+	Cursor      *ulid.ULID
+}
+
+func (c GetActiveRunIDsOpts) Validate() error {
+	if c.AccountID == uuid.Nil {
+		return errors.New("account ID must be provided")
+	}
+	if c.WorkspaceID == uuid.Nil {
+		return errors.New("workspace ID must be provided")
+	}
+	if c.WorkflowID == uuid.Nil {
+		return errors.New("workflow ID must be provided")
+	}
+	if c.LowerTime.IsZero() {
+		return errors.New("lower time must be provided")
+	}
+	if c.UpperTime.IsZero() {
+		return errors.New("upper time must be provided")
+	}
+	if c.UpperTime.Before(c.LowerTime) {
+		return errors.New("upper/end time must be after lower/start time")
+	}
+	if c.Limit < 0 {
+		return errors.New("limit must be positive")
+	}
+
+	return nil
+}
+
+type CountActiveRunsOpts struct {
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	WorkflowID  uuid.UUID
+	LowerTime   *time.Time
+	UpperTime   time.Time
+}
+
+func (c CountActiveRunsOpts) Validate() error {
+	if c.AccountID == uuid.Nil {
+		return errors.New("account ID must be provided")
+	}
+	if c.WorkspaceID == uuid.Nil {
+		return errors.New("workspace ID must be provided")
+	}
+	if c.WorkflowID == uuid.Nil {
+		return errors.New("workflow ID must be provided")
+	}
+	if c.LowerTime.IsZero() {
+		return errors.New("lower time must be provided")
+	}
+	if c.UpperTime.IsZero() {
+		return errors.New("upper time must be provided")
+	}
+	if c.LowerTime != nil && c.UpperTime.Before(*c.LowerTime) {
+		return errors.New("upper/end time must be after lower/start time")
+	}
+
+	return nil
 }

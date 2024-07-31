@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import { IconStatusCanceled } from '@inngest/components/icons/status/Canceled';
+import { IconStatusCancelled } from '@inngest/components/icons/status/Cancelled';
 
 import { CancelRunModal } from './CancelRunModal';
 
@@ -28,7 +28,7 @@ export function CancelRunButton({ disabled, hasIcon = false, onClick }: Props) {
       <Button
         btnAction={() => setIsModalOpen(true)}
         disabled={disabled}
-        icon={hasIcon && <IconStatusCanceled />}
+        icon={hasIcon && <IconStatusCancelled />}
         label="Cancel"
         size="small"
       />

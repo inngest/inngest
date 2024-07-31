@@ -89,16 +89,20 @@ func TestFunctionRunList(t *testing.T) {
 	require.EqualValues(t, successTotal, ok)
 	require.EqualValues(t, failureTotal, failed)
 
+	total := successTotal + failureTotal
+
 	// tests
 	t.Run("retrieve all runs", func(t *testing.T) {
+
 		require.Eventually(t, func() bool {
-			edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
+			edges, pageInfo, count := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start: start,
 				End:   end,
 			})
 
-			assert.Equal(t, successTotal+failureTotal, len(edges))
+			assert.Equal(t, total, len(edges))
 			assert.False(t, pageInfo.HasNextPage)
+			assert.Equal(t, total, count)
 
 			// sorted by queued_at desc order by default
 			ts := time.Now()
@@ -114,10 +118,10 @@ func TestFunctionRunList(t *testing.T) {
 
 	t.Run("retrieve only successful runs sorted by started_at", func(t *testing.T) {
 		require.Eventually(t, func() bool {
-			edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
+			edges, pageInfo, _ := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:     start,
 				End:       end,
-				TimeField: models.FunctionRunTimeFieldV2StartedAt,
+				TimeField: models.RunsV2OrderByFieldStartedAt,
 				Order: []models.RunsV2OrderBy{
 					{Field: models.RunsV2OrderByFieldStartedAt, Direction: models.RunsOrderByDirectionDesc},
 				},
@@ -141,10 +145,10 @@ func TestFunctionRunList(t *testing.T) {
 
 	t.Run("retrieve only failed runs sorted by ended_at", func(t *testing.T) {
 		require.Eventually(t, func() bool {
-			edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
+			edges, pageInfo, _ := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:     start,
 				End:       end,
-				TimeField: models.FunctionRunTimeFieldV2EndedAt,
+				TimeField: models.RunsV2OrderByFieldEndedAt,
 				Order: []models.RunsV2OrderBy{
 					{Field: models.RunsV2OrderByFieldEndedAt, Direction: models.RunsOrderByDirectionAsc},
 				},
@@ -168,7 +172,7 @@ func TestFunctionRunList(t *testing.T) {
 
 	t.Run("retrieve only failed runs", func(t *testing.T) {
 		require.Eventually(t, func() bool {
-			edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
+			edges, pageInfo, _ := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:  start,
 				End:    end,
 				Status: []string{models.FunctionRunStatusFailed.String()},
@@ -192,7 +196,7 @@ func TestFunctionRunList(t *testing.T) {
 	t.Run("paginate without additional filter", func(t *testing.T) {
 		require.Eventually(t, func() bool {
 			items := 10
-			edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
+			edges, pageInfo, _ := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start: start,
 				End:   end,
 				Items: items,
@@ -202,7 +206,7 @@ func TestFunctionRunList(t *testing.T) {
 			assert.True(t, pageInfo.HasNextPage)
 
 			// there should be only 3 left
-			edges, pageInfo = c.FunctionRuns(ctx, client.FunctionRunOpt{
+			edges, pageInfo, _ = c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:  start,
 				End:    end,
 				Items:  items,
@@ -219,10 +223,10 @@ func TestFunctionRunList(t *testing.T) {
 	t.Run("paginate with status filter", func(t *testing.T) {
 		require.Eventually(t, func() bool {
 			items := 2
-			edges, pageInfo := c.FunctionRuns(ctx, client.FunctionRunOpt{
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:     start,
 				End:       end,
-				TimeField: models.FunctionRunTimeFieldV2EndedAt,
+				TimeField: models.RunsV2OrderByFieldEndedAt,
 				Status:    []string{models.FunctionRunStatusFailed.String()},
 				Order: []models.RunsV2OrderBy{
 					{Field: models.RunsV2OrderByFieldEndedAt, Direction: models.RunsOrderByDirectionDesc},
@@ -232,12 +236,13 @@ func TestFunctionRunList(t *testing.T) {
 
 			assert.Equal(t, 2, len(edges))
 			assert.True(t, pageInfo.HasNextPage)
+			assert.Equal(t, failureTotal, total)
 
 			// there are only 3 failed runs, so there shouldn't be anymore than 1
-			edges, pageInfo = c.FunctionRuns(ctx, client.FunctionRunOpt{
+			edges, pageInfo, _ = c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:     start,
 				End:       end,
-				TimeField: models.FunctionRunTimeFieldV2EndedAt,
+				TimeField: models.RunsV2OrderByFieldEndedAt,
 				Status:    []string{models.FunctionRunStatusFailed.String()},
 				Items:     items,
 				Order: []models.RunsV2OrderBy{
@@ -249,6 +254,7 @@ func TestFunctionRunList(t *testing.T) {
 			remain := failureTotal - items
 			assert.Equal(t, remain, len(edges))
 			assert.False(t, pageInfo.HasNextPage)
+			assert.Equal(t, failureTotal, total)
 
 			return true
 		}, 10*time.Second, 2*time.Second)

@@ -1,16 +1,16 @@
 import { Select, type Option } from '../Select/Select';
-import {
-  FunctionRunTimeFields,
-  isFunctionTimeField,
-  type FunctionRunTimeField,
-} from '../types/functionRun';
+import { FunctionRunTimeField, isFunctionTimeField } from '../types/functionRun';
 
 type TimeFieldFilterProps = {
   selectedTimeField: FunctionRunTimeField;
   onTimeFieldChange: (value: FunctionRunTimeField) => void;
 };
 
-const options: Option[] = FunctionRunTimeFields.map((field) => ({
+const options: Option[] = [
+  FunctionRunTimeField.QueuedAt,
+  FunctionRunTimeField.StartedAt,
+  FunctionRunTimeField.EndedAt,
+].map((field) => ({
   id: field,
   name: field.replace(/_/g, ' '),
 }));
@@ -23,7 +23,7 @@ export default function TimeFieldFilter({
 
   return (
     <Select
-      defaultValue={selectedValue}
+      value={selectedValue}
       onChange={(value: Option) => {
         if (isFunctionTimeField(value.id)) {
           onTimeFieldChange(value.id);
@@ -31,7 +31,7 @@ export default function TimeFieldFilter({
       }}
       label="Time Field"
       isLabelVisible={false}
-      className="w-[6.6rem]"
+      className="min-w-[6.8rem]"
     >
       <Select.Button>
         <span className="pr-2 text-sm lowercase first-letter:capitalize">

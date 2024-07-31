@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
@@ -81,7 +82,7 @@ func TestFunctionFailure(t *testing.T) {
 
 			t.Run("failed run", func(t *testing.T) {
 				span := run.Trace.ChildSpans[0]
-				assert.Equal(t, "function error", span.Name)
+				assert.Equal(t, consts.OtelExecFnErr, span.Name)
 				assert.False(t, span.IsRoot)
 				assert.Equal(t, rootSpanID, span.ParentSpanID)
 				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
@@ -170,7 +171,7 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 
 				t.Run("failed", func(t *testing.T) {
 					failed := span.ChildSpans[0]
-					assert.Equal(t, "Attempt 1", failed.Name)
+					assert.Equal(t, "Attempt 0", failed.Name)
 					assert.False(t, span.IsRoot)
 					assert.Equal(t, models.RunTraceSpanStatusFailed.String(), failed.Status)
 
@@ -207,7 +208,7 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 			// first attempt
 			t.Run("failed run", func(t *testing.T) {
 				span := run.Trace.ChildSpans[0]
-				assert.Equal(t, "execute", span.Name)
+				assert.Equal(t, consts.OtelExecPlaceholder, span.Name)
 				assert.False(t, span.IsRoot)
 				assert.Equal(t, rootSpanID, span.ParentSpanID)
 				assert.Equal(t, 2, len(span.ChildSpans))
@@ -220,12 +221,12 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 				assert.NotNil(t, output)
 				c.ExpectSpanErrorOutput(t, "", "nope!", output)
 
-				t.Run("attempt 1", func(t *testing.T) {
+				t.Run("attempt 0", func(t *testing.T) {
 					one := span.ChildSpans[0]
-					assert.Equal(t, "Attempt 1", one.Name)
+					assert.Equal(t, "Attempt 0", one.Name)
 					assert.False(t, one.IsRoot)
 					assert.Equal(t, rootSpanID, one.ParentSpanID)
-					assert.Equal(t, 1, one.Attempts)
+					assert.Equal(t, 0, one.Attempts)
 					assert.Equal(t, models.RunTraceSpanStatusFailed.String(), one.Status)
 					assert.NotNil(t, one.OutputID)
 
@@ -235,12 +236,12 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 				})
 
 				// second attempt
-				t.Run("attempt 2", func(t *testing.T) {
+				t.Run("attempt 1", func(t *testing.T) {
 					two := span.ChildSpans[1]
-					assert.Equal(t, "Attempt 2", two.Name)
+					assert.Equal(t, "Attempt 1", two.Name)
 					assert.False(t, two.IsRoot)
 					assert.Equal(t, rootSpanID, two.ParentSpanID)
-					assert.Equal(t, 2, two.Attempts)
+					assert.Equal(t, 1, two.Attempts)
 					assert.Equal(t, models.RunTraceSpanStatusFailed.String(), two.Status)
 					assert.NotNil(t, two.OutputID)
 

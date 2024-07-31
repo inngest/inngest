@@ -1,3 +1,5 @@
+import { Fragment } from 'react';
+
 import { ElementWrapper } from '../DetailsCard/Element';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 import { cn } from '../utils/classNames';
@@ -19,16 +21,6 @@ type Props = {
 };
 
 export function InlineSpans({ className, minTime, maxTime, name, spans, widths }: Props) {
-  // const startedAt = toMaybeDate(spans[0]?.startedAt);
-
-  // const delayText = formatMilliseconds((startedAt ?? new Date()).getTime() - minTime.getTime());
-
-  // let durationText;
-  // if (startedAt) {
-  //   const endedAt = toMaybeDate(spans[spans.length - 1]?.endedAt) ?? maxTime;
-  //   durationText = formatMilliseconds(endedAt.getTime() - startedAt.getTime());
-  // }
-
   let delay = 0;
   if (spans.length === 1) {
     const startedAt = toMaybeDate(spans[0]?.startedAt);
@@ -48,7 +40,7 @@ export function InlineSpans({ className, minTime, maxTime, name, spans, widths }
     <Tooltip>
       <TooltipTrigger className="h-fit grow">
         <div className={cn('flex h-8 grow items-center', className)}>
-          <div className="h-px bg-slate-300" style={{ flexGrow: widths.before }}></div>
+          <div className="bg-contrast h-px" style={{ flexGrow: widths.before }}></div>
 
           <div
             className="flex"
@@ -63,20 +55,21 @@ export function InlineSpans({ className, minTime, maxTime, name, spans, widths }
             })}
           </div>
 
-          <div className="h-px bg-slate-300" style={{ flexGrow: widths.after }}></div>
+          <div className="bg-contrast h-px" style={{ flexGrow: widths.after }}></div>
         </div>
       </TooltipTrigger>
       <TooltipContent>
-        <div className="text-slate-700">
+        <div className="text-basis">
           {spans[0] && <Times isDelayVisible={spans.length === 1} name={name} span={spans[0]} />}
 
           {spans.length > 1 &&
             spans.map((span) => {
               return (
-                <>
+                <Fragment key={span.spanID}>
                   <hr className="my-2" />
-                  <Times key={span.spanID} name={span.name} span={span} />
-                </>
+                  <Times name={span.name} span={span} />
+                  {span.spanID}
+                </Fragment>
               );
             })}
         </div>

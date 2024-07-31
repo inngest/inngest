@@ -18,6 +18,8 @@ var (
 		1_500, 2_000, 4_000,
 		8_000, 15_000,
 	}
+
+	peekSizeBoundaries = []float64{10, 30, 50, 100, 250, 500, 1000, 3000, 5000}
 )
 
 func HistogramQueueItemLatency(ctx context.Context, value int64, opts HistogramOpt) {
@@ -50,5 +52,36 @@ func HistogramQueueOperationDuration(ctx context.Context, value int64, opts Hist
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  processPartitionBoundaries,
+	})
+}
+
+func HistogramQueuePeekSize(ctx context.Context, value int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, value, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_peek_size",
+		Description: "Distribution of the number of items being peeked on each call",
+		Tags:        opts.Tags,
+		Boundaries:  peekSizeBoundaries,
+	})
+}
+
+func HistogramQueuePeekEWMA(ctx context.Context, value int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, value, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_peek_ewma",
+		Description: "Distribution of the EWMA values for peeks",
+		Tags:        opts.Tags,
+		Boundaries:  peekSizeBoundaries,
+	})
+}
+
+func HistogramRedisCommandDuration(ctx context.Context, value int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, value, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "redis_command_duration",
+		Description: "Redis command duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
 	})
 }

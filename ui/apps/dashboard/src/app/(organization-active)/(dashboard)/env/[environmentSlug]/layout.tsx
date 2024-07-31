@@ -1,7 +1,10 @@
 import { ArchivedEnvBanner } from '@/components/ArchivedEnvBanner';
-import AppNavigation from '@/components/Navigation/AppNavigation';
+import { getEnv } from '@/components/Environments/data';
+import { EnvironmentProvider } from '@/components/Environments/environment-context';
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import Layout from '@/components/Layout/Layout';
+import AppNavigation from '@/components/Navigation/old/AppNavigation';
 import Toaster from '@/components/Toaster';
-import { EnvironmentProvider } from './environment-context';
 
 type RootLayoutProps = {
   params: {
@@ -10,13 +13,25 @@ type RootLayoutProps = {
   children: React.ReactNode;
 };
 
-export default function RootLayout({ params: { environmentSlug }, children }: RootLayoutProps) {
-  return (
-    <EnvironmentProvider environmentSlug={environmentSlug}>
+export default async function RootLayout({
+  params: { environmentSlug },
+  children,
+}: RootLayoutProps) {
+  const env = await getEnv(environmentSlug);
+  const newIANav = await getBooleanFlag('new-ia-nav');
+
+  return newIANav ? (
+    <Layout activeEnv={env}>
+      <ArchivedEnvBanner env={env} />
+      <EnvironmentProvider env={env}>{children}</EnvironmentProvider>
+    </Layout>
+  ) : (
+    <>
       <div className="isolate flex h-full flex-col">
-        <AppNavigation environmentSlug={environmentSlug} />
-        <ArchivedEnvBanner />
-        {children}
+        <AppNavigation activeEnv={env} envSlug={environmentSlug} />
+
+        <ArchivedEnvBanner env={env} />
+        <EnvironmentProvider env={env}>{children}</EnvironmentProvider>
       </div>
       <Toaster
         toastOptions={{
@@ -24,6 +39,6 @@ export default function RootLayout({ params: { environmentSlug }, children }: Ro
           className: 'pointer-events-auto',
         }}
       />
-    </EnvironmentProvider>
+    </>
   );
 }

@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { GSP_NO_RETURNED_VALUE } from 'next/dist/lib/constants';
-// import { Button } from '@inngest/components/Button';
-// import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '@inngest/components/Button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import * as Collapsible from '@radix-ui/react-collapsible';
-// import { RiContractRightFill, RiExpandLeftFill } from '@remixicon/react';
+import { RiContractRightFill, RiExpandLeftFill } from '@remixicon/react';
+import { useQuery } from '@tanstack/react-query';
 import { useLocalStorage } from 'react-use';
 
 import { Card } from '../Card';
@@ -16,13 +16,17 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
+// NOTE - This component should be a shared component as part of the design system.
+// Until then, we re-use it from the RunDetailsV2 as these are part of the same parent UI.
+import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import { cn } from '../utils/classNames';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
 
 type Props = {
   className?: string;
-  getTrigger: () => Promise<Trigger>;
+  getTrigger: (runID: string) => Promise<Trigger>;
+  runID: string;
 };
 
 export type Trigger = {
@@ -35,17 +39,22 @@ export type Trigger = {
   cron: string | null;
 };
 
-export function TriggerDetails({ className, getTrigger }: Props) {
+export function TriggerDetails({ className, getTrigger, runID }: Props) {
   const [showEventPanel, setShowEventPanel] = useLocalStorage('showEventPanel', true);
-  const [trigger, setTrigger] = useState<Trigger>();
-  const isLoading = !trigger;
   const { isRunning, send } = useDevServer();
 
-  useEffect(() => {
-    getTrigger().then((data) => {
-      setTrigger(data);
-    });
-  }, [getTrigger]);
+  const {
+    data: trigger,
+    error,
+    isPending,
+    refetch,
+  } = useQuery({
+    queryKey: ['run-trigger', runID],
+    queryFn: useCallback(() => {
+      return getTrigger(runID);
+    }, [getTrigger, runID]),
+    retry: 3,
+  });
 
   const prettyPayload = useMemo(() => {
     if (!trigger?.payloads) return null;
@@ -118,34 +127,44 @@ export function TriggerDetails({ className, getTrigger }: Props) {
     ];
   }, [trigger]);
 
+  if (error) {
+    return <ErrorCard error={error} reset={() => refetch()} />;
+  }
+
   return (
     <Collapsible.Root
-      className={cn(showEventPanel && 'w-2/5', 'flex flex-col gap-5', className)}
+      className={cn(showEventPanel && 'w-3/4 2xl:w-2/5', 'flex flex-col gap-5', className)}
       open={showEventPanel}
       onOpenChange={setShowEventPanel}
     >
-      {/* TODO: Enable the collapsed feature */}
-      {/* {!showEventPanel && (
+      {!showEventPanel && (
         <Collapsible.Trigger asChild>
-          <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-400">
-            <Tooltip>
-              <TooltipTrigger>
-                <RiExpandLeftFill className="text-slate-400" />
-              </TooltipTrigger>
-              <TooltipContent>Show trigger details</TooltipContent>
-            </Tooltip>
+          <span className="pt-2">
+            <span className="border-muted flex h-7 w-7 items-center justify-center rounded-full border">
+              <Tooltip>
+                <TooltipTrigger>
+                  <RiExpandLeftFill className="text-subtle hover:text-muted	h-5 w-5" />
+                </TooltipTrigger>
+                <TooltipContent>Show trigger details</TooltipContent>
+              </Tooltip>
+            </span>
           </span>
         </Collapsible.Trigger>
-      )} */}
+      )}
       <Collapsible.Content>
         {showEventPanel && (
           <>
             <Card>
               <Card.Header className="h-11 flex-row items-center gap-2">
                 <div className="text-basis flex grow items-center gap-2">Trigger details</div>
-                {/* <Collapsible.Trigger asChild>
-                  <Button size="large" appearance="text" icon={<RiContractRightFill />} />
-                </Collapsible.Trigger> */}
+                <Collapsible.Trigger asChild>
+                  <Button
+                    size="large"
+                    appearance="text"
+                    icon={<RiContractRightFill />}
+                    className="text-subtle hover:text-muted"
+                  />
+                </Collapsible.Trigger>
               </Card.Header>
 
               <Card.Content>
@@ -154,21 +173,21 @@ export function TriggerDetails({ className, getTrigger }: Props) {
                     {type === 'EVENT' && (
                       <>
                         <ElementWrapper label="Event name">
-                          {isLoading ? (
+                          {isPending ? (
                             <SkeletonElement />
                           ) : (
                             <TextElement>{trigger.eventName}</TextElement>
                           )}
                         </ElementWrapper>
                         <ElementWrapper label="Event ID">
-                          {isLoading ? (
+                          {isPending ? (
                             <SkeletonElement />
                           ) : (
                             <IDElement>{trigger.IDs[0]}</IDElement>
                           )}
                         </ElementWrapper>
                         <ElementWrapper label="Received at">
-                          {isLoading ? (
+                          {isPending ? (
                             <SkeletonElement />
                           ) : (
                             <TimeElement date={new Date(trigger.timestamp)} />
@@ -179,17 +198,17 @@ export function TriggerDetails({ className, getTrigger }: Props) {
                     {type === 'CRON' && trigger?.cron && (
                       <>
                         <ElementWrapper label="Cron expression">
-                          {isLoading ? <SkeletonElement /> : <CodeElement value={trigger.cron} />}
+                          {isPending ? <SkeletonElement /> : <CodeElement value={trigger.cron} />}
                         </ElementWrapper>
                         <ElementWrapper label="Cron ID">
-                          {isLoading ? (
+                          {isPending ? (
                             <SkeletonElement />
                           ) : (
                             <IDElement>{trigger.IDs[0]}</IDElement>
                           )}
                         </ElementWrapper>
                         <ElementWrapper label="Triggered at">
-                          {isLoading ? (
+                          {isPending ? (
                             <SkeletonElement />
                           ) : (
                             <TimeElement date={new Date(trigger.timestamp)} />
@@ -200,21 +219,21 @@ export function TriggerDetails({ className, getTrigger }: Props) {
                     {type === 'BATCH' && (
                       <>
                         <ElementWrapper label="Event name">
-                          {isLoading ? (
+                          {isPending ? (
                             <SkeletonElement />
                           ) : (
                             <TextElement>{trigger.eventName ?? '-'}</TextElement>
                           )}
                         </ElementWrapper>
                         <ElementWrapper label="Batch ID">
-                          {isLoading ? (
+                          {isPending ? (
                             <SkeletonElement />
                           ) : (
                             <IDElement>{trigger.batchID}</IDElement>
                           )}
                         </ElementWrapper>
                         <ElementWrapper label="Received at">
-                          {isLoading ? (
+                          {isPending ? (
                             <SkeletonElement />
                           ) : (
                             <TimeElement date={new Date(trigger.timestamp)} />

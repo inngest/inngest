@@ -24,7 +24,9 @@ import (
 )
 
 func (r *functionRunResolver) PendingSteps(ctx context.Context, obj *models.FunctionRun) (*int, error) {
-	md, err := r.Runner.StateManager().Metadata(ctx, ulid.MustParse(obj.ID))
+	randomId := uuid.UUID{}
+
+	md, err := r.Runner.StateManager().Metadata(ctx, randomId, ulid.MustParse(obj.ID))
 	if err != nil {
 		zero := 0
 		if errors.Is(err, statev1.ErrRunNotFound) {

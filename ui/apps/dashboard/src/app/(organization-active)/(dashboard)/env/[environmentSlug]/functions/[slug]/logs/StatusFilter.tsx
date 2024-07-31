@@ -2,6 +2,7 @@
 
 import { Fragment, useRef } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
+import { getStatusBackgroundClass, getStatusBorderClass } from '@inngest/components/statusClasses';
 import { RiArrowDownSLine, RiCloseLine } from '@remixicon/react';
 import { noCase } from 'change-case';
 import { titleCase } from 'title-case';
@@ -13,25 +14,23 @@ import getOrderedEnumValues from '@/utils/getOrderedEnumValues';
 const orderedStatuses = getOrderedEnumValues(FunctionRunStatus, [
   FunctionRunStatus.Queued,
   FunctionRunStatus.Running,
+  FunctionRunStatus.Paused,
   FunctionRunStatus.Cancelled,
   FunctionRunStatus.Completed,
   FunctionRunStatus.Failed,
 ]);
 
-const statusColors = {
-  [FunctionRunStatus.Queued]: 'bg-status-queued',
-  [FunctionRunStatus.Running]: 'bg-status-running',
-  [FunctionRunStatus.Cancelled]: 'bg-status-cancelled',
-  [FunctionRunStatus.Completed]: 'bg-status-completed',
-  [FunctionRunStatus.Failed]: 'bg-status-failed',
-} as const satisfies Record<FunctionRunStatus, `bg-${string}`>;
-
 type StatusFilterProps = {
   selectedStatuses: FunctionRunStatus[];
   onStatusesChange: (statuses: FunctionRunStatus[]) => void;
+  functionIsPaused?: boolean;
 };
 
-export default function StatusFilter({ selectedStatuses, onStatusesChange }: StatusFilterProps) {
+export default function StatusFilter({
+  selectedStatuses,
+  onStatusesChange,
+  functionIsPaused,
+}: StatusFilterProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   function resetSelection(): void {
     onStatusesChange([]);
@@ -40,14 +39,23 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
     buttonRef.current?.click();
   }
 
-  const statusDots = orderedStatuses.map((status) => {
+  const availableStatuses = orderedStatuses.filter((status) => {
+    if (status === FunctionRunStatus.Paused) {
+      return !!functionIsPaused;
+    } else if (status === FunctionRunStatus.Running) {
+      return !functionIsPaused;
+    }
+    return true;
+  });
+
+  const statusDots = availableStatuses.map((status) => {
     const isSelected = selectedStatuses.includes(status);
     return (
       <span
         key={status}
         className={cn(
           'inline-block h-[9px] w-[9px] flex-shrink-0 rounded-full border border-slate-50 bg-slate-50 ring-1 ring-inset ring-slate-300 group-hover:border-slate-100 [&:not(:first-child)]:-ml-1',
-          isSelected && [statusColors[status], 'ring-0']
+          isSelected && [getStatusBackgroundClass(status), getStatusBorderClass(status), 'ring-0']
         )}
         aria-hidden="true"
       />
@@ -79,7 +87,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
             >
               <Listbox.Options className="shadow-floating absolute left-0 z-10 mt-[5px] w-52 origin-top-left overflow-hidden rounded-md bg-white/95 text-sm font-medium text-slate-800 ring-1 ring-black/5 backdrop-blur-[3px] focus:outline-none">
                 <div className="py-[9px]">
-                  {orderedStatuses.map((status) => (
+                  {availableStatuses.map((status) => (
                     <Listbox.Option
                       key={status}
                       className="ui-active:bg-slate-100 flex cursor-pointer select-none items-center justify-between px-3.5 py-[5px] focus:outline-none"
@@ -91,7 +99,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
                             <span
                               className={cn(
                                 'inline-block h-[9px] w-[9px] flex-shrink-0 rounded-full',
-                                statusColors[status]
+                                [getStatusBackgroundClass(status), getStatusBorderClass(status)]
                               )}
                               aria-hidden="true"
                             />
@@ -102,7 +110,7 @@ export default function StatusFilter({ selectedStatuses, onStatusesChange }: Sta
                             id={status}
                             checked={selected}
                             readOnly
-                            className="h-[15px] w-[15px] rounded border-slate-300 text-indigo-500 drop-shadow-sm checked:border-indigo-500 checked:drop-shadow-none"
+                            className="border-muted h-[15px] w-[15px] rounded text-indigo-500 drop-shadow-sm checked:border-indigo-500 checked:drop-shadow-none"
                           />
                         </>
                       )}

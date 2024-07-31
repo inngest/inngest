@@ -109,6 +109,14 @@ export function getTimestampDaysAgo({ currentDate, days }: { currentDate: Date; 
   return subDays(currentDate, days);
 }
 
+export function maybeDateToString<T extends Date | null | undefined>(value: T): string | null {
+  if (!value) {
+    return null;
+  }
+
+  return value.toISOString();
+}
+
 export function toMaybeDate<T extends string | null | undefined>(value: T): Date | null {
   if (!value) {
     return null;
@@ -130,3 +138,24 @@ export const parseDuration = (duration: string): Duration => {
 };
 
 export const subtractDuration = (d: Date, duration: Duration) => sub(d, duration);
+
+export function durationToString(duration: Duration): string {
+  const entries = Object.entries(duration);
+  if (entries.length !== 1) {
+    throw new Error('Duration object should have exactly one key-value pair');
+  }
+
+  const entry = entries[0];
+  if (!entry) {
+    throw new Error('Unexpected: entries array is empty');
+  }
+
+  const [unit, value] = entry;
+  const shortUnit = Object.keys(DURATION_UNITS).find((key) => DURATION_UNITS[key] === unit);
+
+  if (!shortUnit) {
+    throw new Error(`Unknown duration unit: ${unit}`);
+  }
+
+  return `${value}${shortUnit}`;
+}

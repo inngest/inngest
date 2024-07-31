@@ -19,6 +19,7 @@ type SpanStatus int
 
 const (
 	SpanStatusUnknown = iota
+	SpanStatusQueued
 	SpanStatusOk
 	SpanStatusError
 )
@@ -105,6 +106,8 @@ func (s *Span) Status() SpanStatus {
 		return SpanStatusOk
 	case "ERROR", "STATUS_CODE_ERROR":
 		return SpanStatusError
+	case "QUEUED": // virtual status
+		return SpanStatusQueued
 	}
 
 	return SpanStatusUnknown
@@ -130,6 +133,8 @@ func (s *Span) StepOpCode() enums.Opcode {
 			return enums.OpcodeInvokeFunction
 		case enums.OpcodeWaitForEvent.String():
 			return enums.OpcodeWaitForEvent
+		case enums.OpcodeStepPlanned.String():
+			return enums.OpcodeStepPlanned
 		}
 	}
 
@@ -207,6 +212,8 @@ type TraceWriterDev interface {
 type TraceReader interface {
 	// GetTraceRuns retrieves a list of TraceRun based on the options specified
 	GetTraceRuns(ctx context.Context, opt GetTraceRunOpt) ([]*TraceRun, error)
+	// GetTraceRunsCount returns the total number of items applicable to the specified filter
+	GetTraceRunsCount(ctx context.Context, opt GetTraceRunOpt) (int, error)
 	// GetTraceRun retrieve the specified run
 	GetTraceRun(ctx context.Context, id TraceRunIdentifier) (*TraceRun, error)
 	// GetTraceSpansByRun retrieves all the spans related to the trace

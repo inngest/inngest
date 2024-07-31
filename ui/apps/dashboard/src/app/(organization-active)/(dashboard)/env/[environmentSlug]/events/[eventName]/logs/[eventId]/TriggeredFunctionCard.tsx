@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { Time } from '@inngest/components/Time';
 import { IconFunction } from '@inngest/components/icons/Function';
-import { IconStatusCanceled } from '@inngest/components/icons/status/Canceled';
+import { IconStatusCancelled } from '@inngest/components/icons/status/Cancelled';
 import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
 import { IconStatusFailed } from '@inngest/components/icons/status/Failed';
+import { IconStatusPaused } from '@inngest/components/icons/status/Paused';
 import { IconStatusQueued } from '@inngest/components/icons/status/Queued';
 import { IconStatusRunning } from '@inngest/components/icons/status/Running';
 import { RiArrowRightSLine } from '@remixicon/react';
@@ -14,13 +15,14 @@ import { graphql } from '@/gql';
 import { FunctionRunStatus } from '@/gql/graphql';
 import graphqlAPI from '@/queries/graphqlAPI';
 
-const functionRunStatusIcons = {
-  [FunctionRunStatus.Cancelled]: IconStatusCanceled,
+const functionRunStatusIcons: Record<string, (args: { className?: string }) => React.ReactNode> = {
+  [FunctionRunStatus.Cancelled]: IconStatusCancelled,
   [FunctionRunStatus.Completed]: IconStatusCompleted,
   [FunctionRunStatus.Failed]: IconStatusFailed,
   [FunctionRunStatus.Running]: IconStatusRunning,
   [FunctionRunStatus.Queued]: IconStatusQueued,
-} as const satisfies Record<FunctionRunStatus, SVGComponent>;
+  [FunctionRunStatus.Paused]: IconStatusPaused,
+};
 
 const GetFunctionRunCardDocument = graphql(`
   query GetFunctionRunCard($environmentID: ID!, $functionID: ID!, $functionRunID: ULID!) {
@@ -63,7 +65,12 @@ export default async function TriggeredFunctionCard({
     return null;
   }
 
-  const StatusIcon = functionRunStatusIcons[function_.run.status];
+  const StatusIcon = functionRunStatusIcons[function_.run.status] ?? IconStatusCancelled;
+  if (functionRunStatusIcons[function_.run.status] === undefined) {
+    console.error(
+      `[TriggeredFunctionCard] missing function run status icon: ${function_.run.status}`
+    );
+  }
 
   return (
     <Link

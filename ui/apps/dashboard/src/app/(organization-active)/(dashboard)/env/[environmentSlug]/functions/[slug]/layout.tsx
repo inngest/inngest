@@ -6,13 +6,14 @@ import { InvokeButton } from '@inngest/components/InvokeButton';
 import { IconFunction } from '@inngest/components/icons/Function';
 import { useMutation } from 'urql';
 
-import { useEnvironment } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/environment-context';
 import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import Header, { type HeaderLink } from '@/components/Header/Header';
 import { graphql } from '@/gql';
 import { useFunction } from '@/queries';
-import ArchiveFunctionButton from './ArchiveButton';
+import { pathCreator } from '@/utils/urls';
+import { CancelFunctionButton } from './CancelFunctionButton';
 import PauseFunctionButton from './PauseButton';
 
 const InvokeFunctionDocument = graphql(`
@@ -39,6 +40,7 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
   const { isArchived = false, isPaused } = fn ?? {};
 
   const isNewRunsEnabled = useBooleanFlag('new-runs');
+  const isBulkCancellationEnabled = useBooleanFlag('bulk-cancellation-ui');
 
   const emptyData = !data || fetching || !fn;
   const navLinks: HeaderLink[] = [
@@ -61,6 +63,21 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
     navLinks.push({
       href: `/env/${params.environmentSlug}/functions/${params.slug}/runs`,
       text: 'Runs',
+      badge: (
+        <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
+          Beta
+        </Badge>
+      ),
+    });
+  }
+
+  if (isBulkCancellationEnabled.value) {
+    navLinks.push({
+      href: pathCreator.functionCancellations({
+        envSlug: params.environmentSlug,
+        functionSlug: params.slug,
+      }),
+      text: 'Cancellations',
       badge: (
         <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
           Beta
@@ -106,7 +123,9 @@ export default function FunctionLayout({ children, params }: FunctionLayoutProps
                   btnAction={invokeAction}
                 />
                 <PauseFunctionButton functionSlug={functionSlug} disabled={isArchived} />
-                <ArchiveFunctionButton functionSlug={functionSlug} />
+                {isBulkCancellationEnabled.value && (
+                  <CancelFunctionButton envID={env.id} functionSlug={functionSlug} />
+                )}
               </div>
             </div>
           )
