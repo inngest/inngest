@@ -579,7 +579,7 @@ func toSQLEventFilter(nodes []*expr.Node) ([]sq.Expression, error) {
 
 func isValidResult(res []bool) bool {
 	for _, v := range res {
-		if v == false {
+		if !v {
 			return false
 		}
 	}
