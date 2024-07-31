@@ -1380,7 +1380,6 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	evtIDs := []string{}
 	if opt.Filter.CEL != "" {
 		cel := strings.Split(opt.Filter.CEL, "\n")
-		fmt.Printf("\nCEL:\n%#v\n\n", cel)
 
 		evts, err := w.GetEventsByExpressions(ctx, cel)
 		if err != nil {
@@ -1389,7 +1388,6 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		for _, e := range evts {
 			evtIDs = append(evtIDs, e.ID.String())
 		}
-		fmt.Printf("EventIDs: %#v\n", evtIDs)
 	}
 
 	builder := newRunsQueryBuilder(ctx, opt)
@@ -1400,8 +1398,8 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 
 	// read from database
 	// TODO:
-	// might need to loop the query continuously if it doesn't fulfill the
-	// specified number of items
+	// change this to a continuous loop with limits instead of just attempting to grab everything.
+	// might not matter though since this is primarily meant for local development
 	sql, args, err := sq.Dialect("sqlite3").
 		From("trace_runs").
 		Select(
@@ -1421,7 +1419,6 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			"cron_schedule",
 		).
 		Where(filter...).
-		Limit(opt.Items).
 		Order(order...).
 		ToSQL()
 	if err != nil {
@@ -1434,6 +1431,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	}
 
 	res := []*cqrs.TraceRun{}
+	var count uint
 	for rows.Next() {
 		data := sqlc.TraceRun{}
 		err := rows.Scan(
@@ -1517,6 +1515,11 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			CronSchedule: cron,
 			Cursor:       cursor,
 		})
+		count++
+		// enough items, don't need to proceed anymore
+		if count >= opt.Items {
+			break
+		}
 	}
 
 	return res, nil
