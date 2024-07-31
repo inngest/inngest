@@ -446,11 +446,13 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 			// Use whatever's in the queue item by default
 			return item.Data.GetConcurrencyKeys()
 		},
-		itemIndexer:      QueueItemIndexerFunc,
-		backoffFunc:      backoff.DefaultBackoff,
-		accountLeases:    []leasedAccount{},
-		accountLeaseLock: &sync.Mutex{},
-		clock:            clockwork.NewRealClock(),
+		itemIndexer:                     QueueItemIndexerFunc,
+		backoffFunc:                     backoff.DefaultBackoff,
+		accountLeases:                   []leasedAccount{},
+		accountLeaseLock:                &sync.Mutex{},
+		guaranteedCapacityScanTickTime:  GuaranteedCapacityTickTime,
+		guaranteedCapacityLeaseTickTime: AccountLeaseTime,
+		clock:                           clockwork.NewRealClock(),
 	}
 
 	for _, opt := range opts {
@@ -551,7 +553,11 @@ type queue struct {
 
 	clock clockwork.Clock
 
+	// runMode defines the processing scopes or capabilities of the queue instances
 	runMode QueueRunMode
+
+	guaranteedCapacityScanTickTime  time.Duration
+	guaranteedCapacityLeaseTickTime time.Duration
 }
 
 type QueueRunMode struct {

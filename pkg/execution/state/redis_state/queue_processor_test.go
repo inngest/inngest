@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"github.com/inngest/inngest/pkg/enums"
 	mrand "math/rand"
 	"sync/atomic"
 	"testing"
@@ -618,6 +619,150 @@ func TestQueueRunAccount(t *testing.T) {
 
 	<-time.After(12 * time.Second)
 	require.EqualValues(t, int32(len(items)), atomic.LoadInt32(&handled), "number of enqueued and received items does  not match", r.Dump())
+	cancel()
+
+	<-time.After(time.Second)
+
+	r.Close()
+	rc.Close()
+
+	// Assert queue items have been processed
+	// Assert queue items have been dequeued, and peek is nil for workflows.
+	// Assert metrics are correct.
+}
+
+func TestQueueRunGuaranteedCapacity(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	priorityAccountId, regularAccountId := uuid.New(), uuid.New()
+	priorityFn, regularFn := uuid.New(), uuid.New()
+
+	sf := func(ctx context.Context, accountId uuid.UUID) *GuaranteedCapacity {
+		if accountId == priorityAccountId {
+			return &GuaranteedCapacity{
+				Scope:              enums.GuaranteedCapacityScopeAccount,
+				AccountID:          priorityAccountId,
+				GuaranteedCapacity: 1,
+			}
+		}
+		return nil
+	}
+
+	q := NewQueue(
+		NewQueueClient(rc, QueueDefaultKey),
+		// We can't add more than 8128 goroutines when detecting race conditions.
+		WithNumWorkers(10),
+		// Test custom queue names
+		WithRunMode(QueueRunMode{
+			Account:            true,
+			GuaranteedCapacity: true,
+		}),
+		WithGuaranteedCapacityFinder(sf),
+	)
+	q.guaranteedCapacityScanTickTime = time.Second
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var handledPrio, handledRegular int32
+	go func() {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
+			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
+			if item.Identifier.AccountID == priorityAccountId {
+				atomic.AddInt32(&handledPrio, 1)
+			} else if item.Identifier.AccountID == regularAccountId {
+				atomic.AddInt32(&handledRegular, 1)
+			}
+			id := osqueue.JobIDFromContext(ctx)
+			require.NotEmpty(t, id, "No job ID was passed via context")
+			return nil
+		})
+	}()
+
+	// ensure guaranteed capacity exists
+	_, err = q.EnqueueItem(ctx, QueueItem{
+		FunctionID: priorityFn,
+		Data: osqueue.Item{
+			Kind:        osqueue.KindEdge,
+			MaxAttempts: max(3),
+			Identifier: state.Identifier{
+				WorkflowID: priorityFn,
+				RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+				AccountID:  priorityAccountId,
+			},
+		},
+	}, time.Now())
+	require.NoError(t, err)
+
+	// Wait for account to be locked
+	<-time.After(5 * time.Second)
+
+	currentLeases := q.getAccountLeases()
+	require.Equal(t, 1, len(currentLeases), "number of leased accounts does not match")
+	require.Equal(t, priorityAccountId, currentLeases[0].GuaranteedCapacity.AccountID)
+
+	items := []QueueItem{
+		{
+			FunctionID: priorityFn,
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(3),
+				Identifier: state.Identifier{
+					WorkflowID: priorityFn,
+					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:  priorityAccountId,
+				},
+			},
+		},
+		{
+			FunctionID: regularFn,
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(1),
+				Identifier: state.Identifier{
+					WorkflowID: regularFn,
+					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:  regularAccountId,
+				},
+			},
+		},
+		{
+			FunctionID: priorityFn,
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(1),
+				Identifier: state.Identifier{
+					WorkflowID: priorityFn,
+					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:  priorityAccountId,
+				},
+			},
+		},
+	}
+
+	for n, item := range items {
+		at := time.Now()
+		if n == len(items)-1 {
+			at = time.Now().Add(10 * time.Second)
+		}
+		_, err := q.EnqueueItem(ctx, item, at)
+		require.NoError(t, err)
+	}
+
+	<-time.After(12 * time.Second)
+	require.EqualValues(t, 3, atomic.LoadInt32(&handledPrio), "number of enqueued and received priority items does not match", r.Dump())
+	require.EqualValues(t, 0, atomic.LoadInt32(&handledRegular), "number of enqueued and received regular items does not match", r.Dump())
+
+	currentLeases = q.getAccountLeases()
+	require.Equal(t, 1, len(currentLeases), "number of leased accounts does not match")
+	require.Equal(t, priorityAccountId, currentLeases[0].GuaranteedCapacity.AccountID)
+
 	cancel()
 
 	<-time.After(time.Second)

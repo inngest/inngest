@@ -198,9 +198,9 @@ func (q *queue) getAccountLeases() []leasedAccount {
 	return existingLeases
 }
 
-func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context) {
-	scanTick := q.clock.NewTicker(GuaranteedCapacityTickTime)
-	leaseTick := q.clock.NewTicker(AccountLeaseTime / 2)
+func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context, scanTickTime, leaseTickTime time.Duration) {
+	scanTick := q.clock.NewTicker(scanTickTime)
+	leaseTick := q.clock.NewTicker(leaseTickTime / 2)
 
 	// records whether we're leasing
 	var leasing int32
@@ -321,6 +321,8 @@ func (q *queue) scanAndLeaseUnleasedAccounts(ctx context.Context) (retry bool, e
 		return
 	}
 
+	q.logger.Trace().Msgf("leasing %d accounts", leaseNum)
+
 	for _, guaranteedCapacity := range filteredUnleasedAccounts[0:leaseNum] {
 		leaseID, err := q.leaseAccount(ctx, guaranteedCapacity, AccountLeaseTime, len(guaranteedCapacity.Leases))
 		if err == nil {
@@ -328,9 +330,9 @@ func (q *queue) scanAndLeaseUnleasedAccounts(ctx context.Context) (retry bool, e
 			// 	"shard_name": guaranteedCapacity.Name,
 			// })
 			q.addLeasedAccount(ctx, guaranteedCapacity, *leaseID)
-			q.logger.Debug().Interface("guaranteed_capacity", guaranteedCapacity).Str("lease_id", leaseID.String()).Msg("leased guaranteedCapacity")
+			q.logger.Debug().Interface("guaranteed_capacity", guaranteedCapacity).Str("lease_id", leaseID.String()).Msg("leased account with guaranteed capacity")
 		} else {
-			q.logger.Debug().Interface("guaranteed_capacity", guaranteedCapacity).Err(err).Msg("failed to lease guaranteedCapacity")
+			q.logger.Debug().Interface("guaranteed_capacity", guaranteedCapacity).Err(err).Msg("failed to lease account with guaranteed capacity")
 		}
 
 		// go q.counter(ctx, "queue_shard_lease_conflict_total", 1, map[string]any{
