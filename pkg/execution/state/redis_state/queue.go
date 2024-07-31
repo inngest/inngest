@@ -1145,12 +1145,14 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	}
 
 	var guaranteedCapacity *GuaranteedCapacity
-	var guaranteedCapacityName string
 	if q.gcf != nil {
+		// Fetch guaranteed capacity for the given account. If there is no guaranteed
+		// capacity configured, this will return nil, and we will remove any leftover
+		// items in the guaranteed capacity map
+		// Note: This function is called _a lot_ so the calls should be memoized.
 		guaranteedCapacity = q.gcf(ctx, i.Data.Identifier.AccountID)
 		if guaranteedCapacity != nil {
 			guaranteedCapacity.Leases = []ulid.ULID{}
-			guaranteedCapacityName = guaranteedCapacity.Name
 		}
 	}
 
@@ -1200,7 +1202,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		i.Data.Identifier.AccountID.String(),
 
 		guaranteedCapacity,
-		guaranteedCapacityName,
 	})
 
 	if err != nil {

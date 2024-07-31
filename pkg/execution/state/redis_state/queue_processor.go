@@ -411,7 +411,7 @@ func (q *queue) scan(ctx context.Context) error {
 		guaranteedCapacity = &existingLeases[i].GuaranteedCapacity
 
 		// Backwards-compatible metrics names
-		metricShardName = "<shard>:" + guaranteedCapacity.Name
+		metricShardName = "<guaranteed-capacity>:" + guaranteedCapacity.AccountID.String()
 
 		// When account is leased, process it
 		partitionKey = q.u.kg.AccountPartitionIndex(guaranteedCapacity.AccountID)
@@ -917,10 +917,9 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, s *
 			Latency:      latency,
 			SojournDelay: sojourn,
 			Priority:     q.pf(ctx, p),
-			ShardName:    "<global>",
 		}
 		if s != nil {
-			runInfo.ShardName = s.Name
+			runInfo.GuaranteedCapacityAccount = s.AccountID
 		}
 
 		// Call the run func.

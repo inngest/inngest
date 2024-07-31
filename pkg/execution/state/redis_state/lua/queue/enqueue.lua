@@ -33,7 +33,6 @@ local partitionIdB        		= ARGV[11]
 local partitionIdC        		= ARGV[12]
 local accountId           		= ARGV[13]
 local guaranteedCapacity      = ARGV[14]
-local guaranteedCapacityName  = ARGV[15]
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
@@ -61,19 +60,24 @@ enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMa
 -- (i.e. "paused") boolean in the function's metadata.
 redis.call("SET", keyFnMetadata, fnMetadata, "NX")
 
--- If the account has guaranteed capacity, upsert the guaranteed capacity map.
-if guaranteedCapacity ~= "" and guaranteedCapacity ~= "null" then
-    -- NOTE: We do not want to overwrite the account leases, so here
-    -- we fetch the guaranteed capacity item, set the lease values in the passed in guaranteed capacity
-    -- item, then write the updated value.
-    local existingGuaranteedCapacity = redis.call("HGET", guaranteedCapacityMapKey, guaranteedCapacityName)
-    if existingGuaranteedCapacity ~= nil and existingGuaranteedCapacity ~= false then
-        local updatedGuaranteedCapacity = cjson.decode(guaranteedCapacity)
-        existingGuaranteedCapacity = cjson.decode(existingGuaranteedCapacity)
-        updatedGuaranteedCapacity.leases = existingGuaranteedCapacity.leases
-        guaranteedCapacity = cjson.encode(updatedGuaranteedCapacity)
-    end
-    redis.call("HSET", guaranteedCapacityMapKey, guaranteedCapacityName, guaranteedCapacity)
+if accountId ~= "" then
+	-- If no guaranteed capacity is defined, remove key from map
+	if guaranteedCapacity ~= "" and guaranteedCapacity ~= "null" then
+		-- If the account has guaranteed capacity, upsert the guaranteed capacity map.
+		-- NOTE: We do not want to overwrite the account leases, so here
+		-- we fetch the guaranteed capacity item, set the lease values in the passed in guaranteed capacity
+		-- item, then write the updated value.
+		local existingGuaranteedCapacity = redis.call("HGET", guaranteedCapacityMapKey, accountId)
+		if existingGuaranteedCapacity ~= nil and existingGuaranteedCapacity ~= false then
+			local updatedGuaranteedCapacity = cjson.decode(guaranteedCapacity)
+			existingGuaranteedCapacity = cjson.decode(existingGuaranteedCapacity)
+			updatedGuaranteedCapacity.leases = existingGuaranteedCapacity.leases
+			guaranteedCapacity = cjson.encode(updatedGuaranteedCapacity)
+		end
+		redis.call("HSET", guaranteedCapacityMapKey, accountId, guaranteedCapacity)
+	else
+		redis.call("HDEL", guaranteedCapacityMapKey, accountId)
+	end
 end
 
 -- Add optional indexes.

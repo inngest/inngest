@@ -1,10 +1,9 @@
 --[[]
 
 Output:
-    -1: Shard not found
+    -1: Guaranteed capacity not found
     -2: Lease not found
     0: success
-
 --]]
 
 local keyGuaranteedCapacityMap  = KEYS[1]

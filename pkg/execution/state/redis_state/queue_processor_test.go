@@ -280,7 +280,6 @@ func TestQueueRunExtended(t *testing.T) {
 		// For nil UUIDs, return a shard.
 		if accountId == uuid.Nil {
 			return &GuaranteedCapacity{
-				Name:               "test-shard",
 				AccountID:          uuid.Nil,
 				GuaranteedCapacity: 1,
 			}
