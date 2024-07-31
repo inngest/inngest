@@ -1144,7 +1144,15 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		partitionTime = q.clock.Now()
 	}
 
-	var guaranteedCapacity *GuaranteedCapacity
+	var (
+		guaranteedCapacity *GuaranteedCapacity
+
+		// initialize guaranteed capacity key for automatic cleanup
+		guaranteedCapacityKey = GuaranteedCapacity{
+			Scope:     enums.GuaranteedCapacityScopeAccount,
+			AccountID: i.Data.Identifier.AccountID,
+		}.Key()
+	)
 	if q.gcf != nil {
 		// Fetch guaranteed capacity for the given account. If there is no guaranteed
 		// capacity configured, this will return nil, and we will remove any leftover
@@ -1153,6 +1161,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		guaranteedCapacity = q.gcf(ctx, i.Data.Identifier.AccountID)
 		if guaranteedCapacity != nil {
 			guaranteedCapacity.Leases = []ulid.ULID{}
+			guaranteedCapacityKey = guaranteedCapacity.Key()
 		}
 	}
 
@@ -1202,6 +1211,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		i.Data.Identifier.AccountID.String(),
 
 		guaranteedCapacity,
+		guaranteedCapacityKey,
 	})
 
 	if err != nil {

@@ -23,7 +23,7 @@ type RunInfo struct {
 	SojournDelay time.Duration
 	Priority     uint
 
-	GuaranteedCapacityAccount uuid.UUID
+	GuaranteedCapacityKey string
 }
 
 type RunFunc func(context.Context, RunInfo, Item) error

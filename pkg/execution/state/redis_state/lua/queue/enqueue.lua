@@ -33,6 +33,7 @@ local partitionIdB        		= ARGV[11]
 local partitionIdC        		= ARGV[12]
 local accountId           		= ARGV[13]
 local guaranteedCapacity      = ARGV[14]
+local guaranteedCapacityKey   = ARGV[15]
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
@@ -60,23 +61,23 @@ enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMa
 -- (i.e. "paused") boolean in the function's metadata.
 redis.call("SET", keyFnMetadata, fnMetadata, "NX")
 
-if accountId ~= "" then
+if guaranteedCapacityKey ~= "" then
 	-- If no guaranteed capacity is defined, remove key from map
 	if guaranteedCapacity ~= "" and guaranteedCapacity ~= "null" then
 		-- If the account has guaranteed capacity, upsert the guaranteed capacity map.
 		-- NOTE: We do not want to overwrite the account leases, so here
 		-- we fetch the guaranteed capacity item, set the lease values in the passed in guaranteed capacity
 		-- item, then write the updated value.
-		local existingGuaranteedCapacity = redis.call("HGET", guaranteedCapacityMapKey, accountId)
+		local existingGuaranteedCapacity = redis.call("HGET", guaranteedCapacityMapKey, guaranteedCapacityKey)
 		if existingGuaranteedCapacity ~= nil and existingGuaranteedCapacity ~= false then
 			local updatedGuaranteedCapacity = cjson.decode(guaranteedCapacity)
 			existingGuaranteedCapacity = cjson.decode(existingGuaranteedCapacity)
 			updatedGuaranteedCapacity.leases = existingGuaranteedCapacity.leases
 			guaranteedCapacity = cjson.encode(updatedGuaranteedCapacity)
 		end
-		redis.call("HSET", guaranteedCapacityMapKey, accountId, guaranteedCapacity)
+		redis.call("HSET", guaranteedCapacityMapKey, guaranteedCapacityKey, guaranteedCapacity)
 	else
-		redis.call("HDEL", guaranteedCapacityMapKey, accountId)
+		redis.call("HDEL", guaranteedCapacityMapKey, guaranteedCapacityKey)
 	end
 end
 

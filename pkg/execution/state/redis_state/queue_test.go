@@ -2892,6 +2892,7 @@ func TestGuaranteedCapacity(t *testing.T) {
 	accountId := uuid.New()
 	enableGuaranteedCapacity := true // indicate whether to enable guaranteed capacity in tests
 	guaranteedCapacity := &GuaranteedCapacity{
+		Scope:              enums.GuaranteedCapacityScopeAccount,
 		AccountID:          accountId,
 		GuaranteedCapacity: 1,
 	}
@@ -2935,7 +2936,7 @@ func TestGuaranteedCapacity(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, 1, len(keys))
 
-				serialized := r.HGet(q.u.kg.GuaranteedCapacityMap(), accountId.String())
+				serialized := r.HGet(q.u.kg.GuaranteedCapacityMap(), guaranteedCapacity.Key())
 				actual := &GuaranteedCapacity{}
 				err = json.Unmarshal([]byte(serialized), actual)
 				require.NoError(t, err)
@@ -2956,7 +2957,7 @@ func TestGuaranteedCapacity(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, 1, len(keys))
 
-				serialized := r.HGet(q.u.kg.GuaranteedCapacityMap(), accountId.String())
+				serialized := r.HGet(q.u.kg.GuaranteedCapacityMap(), guaranteedCapacity.Key())
 				actual := &GuaranteedCapacity{}
 				err = json.Unmarshal([]byte(serialized), actual)
 				require.NoError(t, err)
@@ -2965,7 +2966,7 @@ func TestGuaranteedCapacity(t *testing.T) {
 		})
 
 		t.Run("guaranteed capacity is updated when enqueueing, if already exists", func(t *testing.T) {
-			serialized := r.HGet(q.u.kg.GuaranteedCapacityMap(), accountId.String())
+			serialized := r.HGet(q.u.kg.GuaranteedCapacityMap(), guaranteedCapacity.Key())
 			first := &GuaranteedCapacity{}
 			err = json.Unmarshal([]byte(serialized), first)
 			require.NoError(t, err)
@@ -2981,7 +2982,7 @@ func TestGuaranteedCapacity(t *testing.T) {
 				},
 			}, time.Now())
 
-			serialized = r.HGet(q.u.kg.GuaranteedCapacityMap(), accountId.String())
+			serialized = r.HGet(q.u.kg.GuaranteedCapacityMap(), guaranteedCapacity.Key())
 			updated := &GuaranteedCapacity{}
 			err = json.Unmarshal([]byte(serialized), updated)
 			require.NoError(t, err)
@@ -2990,13 +2991,13 @@ func TestGuaranteedCapacity(t *testing.T) {
 		})
 
 		t.Run("disabled guaranteed capacity is removed when enqueueing, if already exists", func(t *testing.T) {
-			serialized := r.HGet(q.u.kg.GuaranteedCapacityMap(), accountId.String())
+			serialized := r.HGet(q.u.kg.GuaranteedCapacityMap(), guaranteedCapacity.Key())
 			first := &GuaranteedCapacity{}
 			err = json.Unmarshal([]byte(serialized), first)
 			require.NoError(t, err)
 			require.EqualValues(t, *guaranteedCapacity, *first)
 
-			exists, err := rc.Do(ctx, rc.B().Hexists().Key(q.u.kg.GuaranteedCapacityMap()).Field(accountId.String()).Build()).AsBool()
+			exists, err := rc.Do(ctx, rc.B().Hexists().Key(q.u.kg.GuaranteedCapacityMap()).Field(guaranteedCapacity.Key()).Build()).AsBool()
 			require.NoError(t, err)
 			require.True(t, exists)
 
@@ -3009,7 +3010,7 @@ func TestGuaranteedCapacity(t *testing.T) {
 				},
 			}, time.Now())
 
-			exists, err = rc.Do(ctx, rc.B().Hexists().Key(q.u.kg.GuaranteedCapacityMap()).Field(accountId.String()).Build()).AsBool()
+			exists, err = rc.Do(ctx, rc.B().Hexists().Key(q.u.kg.GuaranteedCapacityMap()).Field(guaranteedCapacity.Key()).Build()).AsBool()
 			require.NoError(t, err)
 			require.False(t, exists, r.Dump())
 		})
@@ -3028,6 +3029,7 @@ func TestAccountLease(t *testing.T) {
 
 	sf := func(ctx context.Context, accountId uuid.UUID) *GuaranteedCapacity {
 		return &GuaranteedCapacity{
+			Scope:              enums.GuaranteedCapacityScopeAccount,
 			AccountID:          accountId,
 			GuaranteedCapacity: 1,
 		}
@@ -3047,13 +3049,13 @@ func TestAccountLease(t *testing.T) {
 
 	_, err = q.EnqueueItem(ctx, QueueItem{Data: osqueue.Item{Identifier: state.Identifier{AccountID: idA}}}, time.Now())
 	require.NoError(t, err)
-	exists, err := rc.Do(ctx, rc.B().Hexists().Key(q.u.kg.GuaranteedCapacityMap()).Field(idA.String()).Build()).AsBool()
+	exists, err := rc.Do(ctx, rc.B().Hexists().Key(q.u.kg.GuaranteedCapacityMap()).Field(GuaranteedCapacity{AccountID: idA}.Key()).Build()).AsBool()
 	require.NoError(t, err)
 	require.True(t, exists, r.Dump())
 
 	_, err = q.EnqueueItem(ctx, QueueItem{Data: osqueue.Item{Identifier: state.Identifier{AccountID: idB}}}, time.Now())
 	require.NoError(t, err)
-	exists, err = rc.Do(ctx, rc.B().Hexists().Key(q.u.kg.GuaranteedCapacityMap()).Field(idB.String()).Build()).AsBool()
+	exists, err = rc.Do(ctx, rc.B().Hexists().Key(q.u.kg.GuaranteedCapacityMap()).Field(GuaranteedCapacity{AccountID: idB}.Key()).Build()).AsBool()
 	require.NoError(t, err)
 	require.True(t, exists, r.Dump())
 
@@ -3066,7 +3068,7 @@ func TestAccountLease(t *testing.T) {
 		leaseID, err := q.leaseAccount(ctx, guaranteedCapacity, 2*time.Second, 1)
 		require.Nil(t, leaseID, "Got lease ID: %v", leaseID)
 		require.NotNil(t, err)
-		require.ErrorContains(t, err, "lease index is too high")
+		require.ErrorContains(t, err, "lease index is too high", r.Dump())
 	})
 
 	t.Run("Leasing an account works", func(t *testing.T) {
@@ -3125,7 +3127,7 @@ func TestAccountLease(t *testing.T) {
 
 		t.Run("Current leases succeed", func(t *testing.T) {
 			leaseID, err = q.renewAccountLease(ctx, guaranteedCapacity, 2*time.Second, *leaseID)
-			require.NotNil(t, leaseID, "did not get a new lease when renewing")
+			require.NotNil(t, leaseID, "did not get a new lease when renewing", r.Dump())
 			require.Nil(t, err)
 		})
 
