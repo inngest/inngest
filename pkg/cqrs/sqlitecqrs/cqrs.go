@@ -1456,6 +1456,11 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			return nil, err
 		}
 
+		// filter out runs that doesn't have the event IDs
+		if len(evtIDs) > 0 && !data.HasEventIDs(evtIDs) {
+			continue
+		}
+
 		// the cursor target should be skipped
 		if reqcursor.ID == data.RunID.String() {
 			continue
