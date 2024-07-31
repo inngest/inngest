@@ -19,6 +19,7 @@ type FunctionRunOpt struct {
 	Status    []string
 	TimeField models.RunsV2OrderByField
 	Order     []models.RunsV2OrderBy
+	Query     *string
 	Start     time.Time
 	End       time.Time
 }
@@ -82,12 +83,13 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 		$endTime: Time!,
 		$timeField: RunsV2OrderByField = QUEUED_AT,
 		$status: [FunctionRunStatus!],
-		$first: Int = 40
+		$first: Int = 40,
+		$query: String
 	) {
 		runs(
 			first: $first,
 			after: %s,
-			filter: { from: $startTime, until: $endTime, status: $status, timeField: $timeField },
+			filter: { from: $startTime, until: $endTime, status: $status, timeField: $timeField, query: $query },
 			orderBy: %s
 		) {
 			edges {
@@ -121,6 +123,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 			"timeField": timeField,
 			"status":    opts.Status,
 			"first":     items,
+			"query":     opts.Query,
 		},
 	})
 	if len(resp.Errors) > 0 {
