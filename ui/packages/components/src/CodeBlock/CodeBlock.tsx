@@ -352,7 +352,8 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
               <p
                 className={cn(
                   header?.status === 'error' ? 'text-status-failedText' : 'text-muted',
-                  ' px-5 py-2.5 text-sm'
+                  ' px-5 py-2.5 text-sm',
+                  'max-h-24 text-ellipsis break-words' // Handle long titles
                 )}
               >
                 {header?.title}

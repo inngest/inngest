@@ -84,6 +84,7 @@ func TestWait(t *testing.T) {
 				assert.Equal(t, 0, len(span.ChildSpans)) // NOTE: should have no child
 				assert.Equal(t, models.RunTraceSpanStatusWaiting.String(), span.Status)
 				assert.Equal(t, models.StepOpWaitForEvent.String(), span.StepOp)
+				assert.Nil(t, span.EndedAt)
 				assert.Nil(t, span.OutputID)
 
 				var stepInfo models.WaitForEventStepInfo
