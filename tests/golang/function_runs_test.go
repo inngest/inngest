@@ -3,6 +3,7 @@ package golang
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -68,7 +69,7 @@ func TestFunctionRunList(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < successTotal; i++ {
-			_, _ = inngestgo.Send(ctx, inngestgo.Event{Name: "fnrun/ok", Data: map[string]any{"success": true}})
+			_, _ = inngestgo.Send(ctx, inngestgo.Event{Name: "fnrun/ok", Data: map[string]any{"success": true, "idx": i}})
 		}
 	}()
 
@@ -76,7 +77,7 @@ func TestFunctionRunList(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < failureTotal; i++ {
-			_, _ = inngestgo.Send(ctx, inngestgo.Event{Name: "fnrun/failed", Data: map[string]any{"success": false}})
+			_, _ = inngestgo.Send(ctx, inngestgo.Event{Name: "fnrun/failed", Data: map[string]any{"success": false, "idx": i}})
 		}
 	}()
 
@@ -255,6 +256,31 @@ func TestFunctionRunList(t *testing.T) {
 			assert.Equal(t, remain, len(edges))
 			assert.False(t, pageInfo.HasNextPage)
 			assert.Equal(t, failureTotal, total)
+
+			return true
+		}, 10*time.Second, 2*time.Second)
+	})
+
+	t.Run("filter with event CEL expression", func(t *testing.T) {
+		min := 5
+		queries := []string{
+			"event.name == 'fnrun/ok'",
+			fmt.Sprintf("event.data.idx > %d", min),
+		}
+		cel := strings.Join(queries, "\n")
+
+		require.Eventually(t, func() bool {
+			items := 3
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start: start,
+				End:   end,
+				Items: items,
+				Query: &cel,
+			})
+
+			assert.Equal(t, items, len(edges))
+			assert.Equal(t, successTotal-(min+1), total)
+			assert.True(t, pageInfo.HasNextPage)
 
 			return true
 		}, 10*time.Second, 2*time.Second)
