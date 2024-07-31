@@ -1,4 +1,4 @@
-package devconfig
+package localconfig
 
 import (
 	"context"

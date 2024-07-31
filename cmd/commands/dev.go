@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/inngest/inngest/cmd/commands/internal/devconfig"
+	"github.com/inngest/inngest/cmd/commands/internal/localconfig"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/telemetry"
@@ -59,7 +59,7 @@ func doDev(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	if err = devconfig.InitConfig(ctx, cmd); err != nil {
+	if err = localconfig.InitConfig(ctx, cmd); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
