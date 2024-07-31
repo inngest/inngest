@@ -1359,33 +1359,14 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 }
 
 func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
-	builder := newRunsQueryBuilder(ctx, opt)
-	filter := builder.filter
-	order := builder.order
-
-	sql, args, err := sq.Dialect("sqlite3").
-		From("trace_runs").
-		Select(sq.COUNT("run_id").As("total")).
-		Where(filter...).
-		Order(order...).
-		ToSQL()
+	// explicitly set it to zero so it would not attempt to paginate
+	opt.Items = 0
+	res, err := w.GetTraceRuns(ctx, opt)
 	if err != nil {
 		return 0, err
 	}
 
-	rows, err := w.db.QueryContext(ctx, sql, args...)
-	if err != nil {
-		return 0, err
-	}
-
-	var count int
-	for rows.Next() {
-		if err := rows.Scan(&count); err != nil {
-			return 0, err
-		}
-	}
-
-	return count, nil
+	return len(res), nil
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
@@ -1530,7 +1511,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		})
 		count++
 		// enough items, don't need to proceed anymore
-		if count >= opt.Items {
+		if opt.Items > 0 && count >= opt.Items {
 			break
 		}
 	}
