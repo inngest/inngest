@@ -86,7 +86,7 @@ func TestSleep(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("in progress sleep", func(t *testing.T) {
-		<-time.After(2 * time.Second)
+		<-time.After(4 * time.Second)
 
 		require.Eventually(t, func() bool {
 			run := c.RunTraces(ctx, runID)

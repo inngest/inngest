@@ -8,7 +8,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ['CircularXX', ...defaultTheme.fontFamily.sans],
-        mono: ['CircularXXMono)', ...defaultTheme.fontFamily.mono],
+        mono: ['CircularXXMono', ...defaultTheme.fontFamily.mono],
       },
       colors: {
         slate: {
