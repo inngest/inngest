@@ -13,17 +13,19 @@ export default async function Layout({ children, params: { externalID } }: Props
 
   return newIANav ? (
     <NewLayout
-      children={children}
       params={{
         externalID,
       }}
-    />
+    >
+      {children}
+    </NewLayout>
   ) : (
     <OldLayout
-      children={children}
       params={{
         externalID,
       }}
-    />
+    >
+      {children}
+    </OldLayout>
   );
 }
