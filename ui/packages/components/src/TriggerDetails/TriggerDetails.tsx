@@ -16,6 +16,9 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
+// NOTE - This component should be a shared component as part of the design system.
+// Until then, we re-use it from the RunDetailsV2 as these are part of the same parent UI.
+import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import { cn } from '../utils/classNames';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
@@ -44,6 +47,7 @@ export function TriggerDetails({ className, getTrigger, runID }: Props) {
     data: trigger,
     error,
     isPending,
+    refetch,
   } = useQuery({
     queryKey: ['run-trigger', runID],
     queryFn: useCallback(() => {
@@ -124,7 +128,7 @@ export function TriggerDetails({ className, getTrigger, runID }: Props) {
   }, [trigger]);
 
   if (error) {
-    throw error;
+    return <ErrorCard error={error} reset={() => refetch()} />;
   }
 
   return (

@@ -10,6 +10,7 @@ import { Timeline } from '../TimelineV2/Timeline';
 import { TriggerDetails } from '../TriggerDetails';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
+import { ErrorCard } from './ErrorCard';
 import { RunInfo } from './RunInfo';
 
 type Props = {
@@ -75,10 +76,6 @@ export function RunDetails(props: Props) {
     }
   }, [props.cancelRun]);
 
-  if (runRes.error) {
-    throw runRes.error;
-  }
-
   const run = runRes.data;
   if (run?.trace.endedAt && pollInterval) {
     // The run won't change anymore so no need to poll
@@ -98,16 +95,23 @@ export function RunDetails(props: Props) {
       <div className="flex gap-4">
         <div className="grow">
           <div className="ml-8">
-            <RunInfo
-              cancelRun={cancelRun}
-              className="mb-4"
-              pathCreator={pathCreator}
-              rerun={rerun}
-              run={nullishToLazy(run)}
-              runID={runID}
-              standalone={standalone}
-              result={resultRes.data}
-            />
+            {runRes.error || resultRes.error ? (
+              <ErrorCard
+                error={runRes.error || resultRes.error}
+                reset={runRes.error ? () => runRes.refetch() : () => resultRes.refetch()}
+              />
+            ) : (
+              <RunInfo
+                cancelRun={cancelRun}
+                className="mb-4"
+                pathCreator={pathCreator}
+                rerun={rerun}
+                run={nullishToLazy(run)}
+                runID={runID}
+                standalone={standalone}
+                result={resultRes.data}
+              />
+            )}
           </div>
 
           {run && <Timeline getResult={getResult} pathCreator={pathCreator} trace={run.trace} />}
