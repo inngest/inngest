@@ -22,12 +22,7 @@ export const ActionsMenu = ({
   return (
     <Listbox>
       <Listbox.Button as="div">
-        <NewButton
-          kind="secondary"
-          appearance="outlined"
-          size="medium"
-          icon={<RiMore2Line className="fill-subtle" />}
-        />
+        <NewButton kind="primary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
       </Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase absolute right-1 top-5 z-50 w-[170px] gap-y-0.5 rounded border shadow">
@@ -46,7 +41,9 @@ export const ActionsMenu = ({
                 icon={<RiFirstAidKitLine className="h-4 w-4" />}
                 iconSide="left"
                 label="Check app health"
-                className={`m-0 w-full justify-start ${disableValidate && 'cursor-not-allowed'}`}
+                className={`text-subtle m-0 w-full justify-start ${
+                  disableValidate && 'cursor-not-allowed'
+                }`}
                 onClick={showValidate}
               />
             </OptionalTooltip>

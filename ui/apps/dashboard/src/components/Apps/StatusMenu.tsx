@@ -20,7 +20,7 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
       className="mb-5"
     >
       <Select.Button className="w-[124px] px-4">
-        <div className="mr-2 flex flex-row items-center">
+        <div className="text-basis mr-2 flex flex-row items-center text-xs font-medium leading-tight">
           <StatusIcon className={`mr-2 ${archived ? 'bg-accent-subtle' : 'bg-primary-moderate'}`} />
           {archived ? 'Archived' : 'Active'}
         </div>
