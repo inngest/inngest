@@ -44,28 +44,5 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
         </Link>
       </Select.Options>
     </Select>
-    // <Listbox>
-    //   <Listbox.Button as="div">{archived ? 'Archived' : 'Active'}</Listbox.Button>
-    //   <div className="relative">
-    //     <Listbox.Options className="bg-canvasBase absolute left-0 z-50 ml-1 w-[137px] gap-y-0.5 rounded border shadow">
-    //       <Link href={`/env/${envSlug}/apps`} prefetch={true}>
-    //         <Listbox.Option
-    //           className="text-subtle hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-    //           value="eventKeys"
-    //         >
-    //           Active
-    //         </Listbox.Option>
-    //       </Link>
-    //       <Link href={`/env/${envSlug}/apps?archived=true`} prefetch={true}>
-    //         <Listbox.Option
-    //           className="text-subtle hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-    //           value="signingKeys"
-    //         >
-    //           Archived
-    //         </Listbox.Option>
-    //       </Link>
-    //     </Listbox.Options>
-    //   </div>
-    // </Listbox>
   );
 };
