@@ -43,12 +43,12 @@ func (e *Event) ToCQRS() (*cqrs.Event, error) {
 		evt.WorkspaceID = id
 	}
 
-	// TODO: Event data
+	// Event data
 	if err := json.Unmarshal([]byte(e.EventData), &evt.EventData); err != nil {
 		return nil, fmt.Errorf("error parsing event data: %w", err)
 	}
 
-	// TODO: Event user
+	// Event user
 	if err := json.Unmarshal([]byte(e.EventUser), &evt.EventUser); err != nil {
 		return nil, fmt.Errorf("error parsing event user data: %w", err)
 	}
