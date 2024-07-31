@@ -533,3 +533,100 @@ func TestRunPriorityFactor(t *testing.T) {
 	// Assert queue items have been dequeued, and peek is nil for workflows.
 	// Assert metrics are correct.
 }
+
+func TestQueueRunAccount(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	q := NewQueue(
+		NewQueueClient(rc, QueueDefaultKey),
+		// We can't add more than 8128 goroutines when detecting race conditions.
+		WithNumWorkers(10),
+		// Test custom queue names
+		WithRunMode(QueueRunMode{
+			Account: true,
+		}),
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	idA, idB := uuid.New(), uuid.New()
+	accountIdA, accountIdB := uuid.New(), uuid.New()
+
+	items := []QueueItem{
+		{
+			FunctionID: idA,
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(3),
+				Identifier: state.Identifier{
+					WorkflowID: idA,
+					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:  accountIdA,
+				},
+			},
+		},
+		{
+			FunctionID: idB,
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(1),
+				Identifier: state.Identifier{
+					WorkflowID: idB,
+					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:  accountIdB,
+				},
+			},
+		},
+		{
+			FunctionID: idB,
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(1),
+				Identifier: state.Identifier{
+					WorkflowID: idB,
+					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:  accountIdB,
+				},
+			},
+		},
+	}
+
+	var handled int32
+	go func() {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
+			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
+			atomic.AddInt32(&handled, 1)
+			id := osqueue.JobIDFromContext(ctx)
+			require.NotEmpty(t, id, "No job ID was passed via context")
+			return nil
+		})
+	}()
+
+	for n, item := range items {
+		at := time.Now()
+		if n == len(items)-1 {
+			at = time.Now().Add(10 * time.Second)
+		}
+		_, err := q.EnqueueItem(ctx, item, at)
+		require.NoError(t, err)
+	}
+
+	<-time.After(12 * time.Second)
+	require.EqualValues(t, int32(len(items)), atomic.LoadInt32(&handled), "number of enqueued and received items does  not match", r.Dump())
+	cancel()
+
+	<-time.After(time.Second)
+
+	r.Close()
+	rc.Close()
+
+	// Assert queue items have been processed
+	// Assert queue items have been dequeued, and peek is nil for workflows.
+	// Assert metrics are correct.
+}

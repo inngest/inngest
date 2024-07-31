@@ -386,7 +386,7 @@ func WithBackoffFunc(f backoff.BackoffFunc) func(q *queue) {
 	}
 }
 
-func WithRunMode(m queueRunMode) func(q *queue) {
+func WithRunMode(m QueueRunMode) func(q *queue) {
 	return func(q *queue) {
 		q.runMode = m
 	}
@@ -415,12 +415,12 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 		pf: func(_ context.Context, _ QueuePartition) uint {
 			return PriorityDefault
 		},
-		runMode: queueRunMode{
-			sequential:         true,
-			scavenger:          true,
-			partition:          true,
-			account:            true,
-			guaranteedCapacity: true,
+		runMode: QueueRunMode{
+			Sequential:         true,
+			Scavenger:          true,
+			Partition:          true,
+			Account:            true,
+			GuaranteedCapacity: true,
 		},
 		numWorkers:         defaultNumWorkers,
 		wg:                 &sync.WaitGroup{},
@@ -551,24 +551,24 @@ type queue struct {
 
 	clock clockwork.Clock
 
-	runMode queueRunMode
+	runMode QueueRunMode
 }
 
-type queueRunMode struct {
-	// sequential determines whether Run() instance acquires sequential lease and processes items sequentially if lease is granted
-	sequential bool
+type QueueRunMode struct {
+	// Sequential determines whether Run() instance acquires sequential lease and processes items sequentially if lease is granted
+	Sequential bool
 
-	// scavenger determines whether scavenger lease is acquired and scavenger is processed if lease is granted
-	scavenger bool
+	// Scavenger determines whether scavenger lease is acquired and scavenger is processed if lease is granted
+	Scavenger bool
 
-	// partition determines whether partitions are processed
-	partition bool
+	// Partition determines whether partitions are processed
+	Partition bool
 
-	// account determines whether accounts are processed
-	account bool
+	// Account determines whether accounts are processed
+	Account bool
 
-	// guaranteedAccount determines whether accounts with guaranteed capacity are fetched, and one lease is acquired per instance to process the account
-	guaranteedCapacity bool
+	// GuaranteedAccount determines whether accounts with guaranteed capacity are fetched, and one lease is acquired per instance to process the account
+	GuaranteedCapacity bool
 }
 
 // processItem references the queue partition and queue item to be processed by a worker.

@@ -128,19 +128,19 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		go q.worker(ctx, f)
 	}
 
-	if q.runMode.guaranteedCapacity {
+	if q.runMode.GuaranteedCapacity {
 		go q.claimUnleasedGuaranteedCapacity(ctx)
 	}
 
-	if q.runMode.sequential {
+	if q.runMode.Sequential {
 		go q.claimSequentialLease(ctx)
 	}
 
-	if q.runMode.scavenger {
+	if q.runMode.Scavenger {
 		go q.runScavenger(ctx)
 	}
 
-	if !q.runMode.partition && !q.runMode.account {
+	if !q.runMode.Partition && !q.runMode.Account {
 		return fmt.Errorf("need to specify either partition, account, or both in queue run mode")
 	}
 
@@ -419,7 +419,7 @@ func (q *queue) scan(ctx context.Context) error {
 	}
 
 	processAccount := false
-	if q.runMode.account && (!q.runMode.partition || rand.Intn(2) == 1) {
+	if q.runMode.Account && (!q.runMode.Partition || rand.Intn(2) == 1) {
 		processAccount = true
 	}
 
