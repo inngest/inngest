@@ -7,7 +7,7 @@ const StatusIcon = ({ className }: { className: string }) => (
   <span className={`block h-2 w-2 shrink-0 rounded-full ${className}`} />
 );
 
-export const ActiveMenu = ({ envSlug, archived }: { envSlug: string; archived: boolean }) => {
+export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: boolean }) => {
   const activeOption = { id: 'active', name: 'Active apps' };
   const archivedOption = { id: 'archived', name: 'Archived apps' };
   return (

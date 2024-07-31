@@ -3,7 +3,7 @@ import { Link } from '@inngest/components/Link/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiAddLine, RiQuestionLine } from '@remixicon/react';
 
-import { ActiveMenu } from '@/components/Apps/ActiveMenu';
+import { StatusMenu } from '@/components/Apps/StatusMenu';
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { Header } from '@/components/Header/Header';
 import { pathCreator } from '@/utils/urls';
@@ -48,25 +48,23 @@ export default async function AppsPage({
   return (
     <>
       <Header
-        breadcrumb={['Apps']}
+        breadcrumb={[{ text: 'Apps' }]}
         icon={<AppInfo />}
         action={
-          <div className="flex items-center gap-2">
-            {!isArchived && (
-              <NewButton
-                kind="primary"
-                label="Sync new app"
-                href={pathCreator.createApp({ envSlug })}
-                icon={<RiAddLine />}
-                iconSide="left"
-              />
-            )}
-          </div>
+          !isArchived && (
+            <NewButton
+              kind="primary"
+              label="Sync new app"
+              href={pathCreator.createApp({ envSlug })}
+              icon={<RiAddLine />}
+              iconSide="left"
+            />
+          )
         }
       />
-      <div className="bg-canvasBase relative my-16 flex h-full flex-col overflow-y-auto px-6">
-        <div className="relative flex flex-row justify-end">
-          <ActiveMenu archived={isArchived} envSlug={envSlug} />
+      <div className="bg-canvasBase mx-auto my-16 flex h-full w-full max-w-[1200px] flex-col overflow-y-auto px-6">
+        <div className="relative flex w-full flex-row justify-end">
+          <StatusMenu archived={isArchived} envSlug={envSlug} />
         </div>
         <Apps isArchived={isArchived} />
       </div>

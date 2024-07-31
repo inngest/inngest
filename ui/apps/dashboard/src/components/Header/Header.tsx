@@ -12,9 +12,14 @@ export type HeaderLink = {
   badge?: React.ReactNode;
 };
 
+export type BreadCrumbType = {
+  href?: string;
+  text: string;
+};
+
 export type HeaderType = {
   links?: HeaderLink[];
-  breadcrumb: string[];
+  breadcrumb: BreadCrumbType[];
   icon?: React.ReactNode;
   action?: React.ReactNode;
   className?: string;
@@ -26,7 +31,7 @@ export const Header = ({ links, breadcrumb, icon, action, className = '' }: Head
       <div
         className={`bg-canvasBase border-subtle flex h-[52px] flex-row items-center justify-between border-b p-4 ${className}`}
       >
-        <div className="flex flex-row items-center justify-start">
+        <div className="flex flex-row items-center justify-start align-baseline">
           <BreadCrumb path={breadcrumb} />
           {icon}
         </div>
