@@ -11,12 +11,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/cel-go/common/operators"
 	"github.com/google/uuid"
+	"github.com/inngest/expr"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
+	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/util"
@@ -480,6 +483,97 @@ func (w wrapper) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([
 	return evts, nil
 }
 
+// toSQLEventFilter parses the passed in nodes and converts them into SQL filter expressions
+func toSQLEventFilter(nodes []*expr.Node) ([]sq.Expression, error) {
+	filters := []sq.Expression{}
+
+	for _, n := range nodes {
+		if n.HasPredicate() {
+			literal := n.Predicate.Literal
+
+			switch n.Predicate.Ident {
+			case "event.id":
+				id, ok := literal.(string)
+				if !ok {
+					return nil, fmt.Errorf("expects 'event.id' to be a string: %v", literal)
+				}
+				switch n.Predicate.Operator {
+				case operators.Equals:
+					filters = append(filters, sq.C("event_id").Eq(id))
+				case operators.NotEquals:
+					filters = append(filters, sq.C("event_id").Neq(id))
+				}
+			case "event.name":
+				name, ok := literal.(string)
+				if !ok {
+					return nil, fmt.Errorf("expects 'event.name' to be a string: %v", literal)
+				}
+				switch n.Predicate.Operator {
+				case operators.Equals:
+					filters = append(filters, sq.C("event_name").Eq(name))
+				case operators.NotEquals:
+					filters = append(filters, sq.C("event_name").Neq(name))
+				}
+			case "event.ts":
+				ts, ok := literal.(int64)
+				if !ok {
+					return nil, fmt.Errorf("expects 'event.ts' to be an integer: %v", literal)
+				}
+				var f sq.Expression
+				field := "event_ts"
+
+				switch n.Predicate.Operator {
+				case operators.Greater:
+					f = sq.C(field).Gt(ts)
+				case operators.GreaterEquals:
+					f = sq.C(field).Gte(ts)
+				case operators.Equals:
+					f = sq.C(field).Eq(ts)
+				case operators.Less:
+					f = sq.C(field).Lt(ts)
+				case operators.LessEquals:
+					f = sq.C(field).Lte(ts)
+				case operators.NotEquals:
+					f = sq.C(field).Neq(ts)
+				}
+				if f != nil {
+					filters = append(filters, f)
+				}
+			case "event.v":
+				v, ok := literal.(string)
+				if !ok {
+					return nil, fmt.Errorf("expects 'event.v' to be a string: %v", literal)
+				}
+				switch n.Predicate.Operator {
+				case operators.Equals:
+					filters = append(filters, sq.C("event_v").Eq(v))
+				case operators.NotEquals:
+					filters = append(filters, sq.C("event_v").Neq(v))
+				}
+			}
+		}
+
+		// check for further nesting
+		if n.Ands != nil {
+			nested, err := toSQLEventFilter(n.Ands)
+			if err != nil {
+				return nil, err
+			}
+			filters = append(filters, sq.And(nested...))
+		}
+
+		if n.Ors != nil {
+			nested, err := toSQLEventFilter(n.Ors)
+			if err != nil {
+				return nil, err
+			}
+			filters = append(filters, sq.Or(nested...))
+		}
+	}
+
+	return filters, nil
+}
+
 func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*cqrs.Event, error) {
 	// NOTE:
 	// expressions can contain multiple filters, which is why it is a powerful tool for filtering.
@@ -490,32 +584,41 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 	// - event data
 	// - version
 	// - timestamp
-	dataExpr := []string{}
-	filter := []sq.Expression{}
-	for _, ex := range cel {
-		// TODO:
-		// - parse the AST for each CEL expression
-		// - create filter based on AST
+	parser := expressions.ParserSingleton()
+	prefilters := []sq.Expression{}
+	for _, exp := range cel {
+		tree, err := parser.Parse(ctx, expr.StringExpression(exp))
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating expression '%s': %w", exp, err)
+		}
+
+		expFilter, err := toSQLEventFilter([]*expr.Node{&tree.Root})
+		if err != nil {
+			return nil, err
+		}
+		prefilters = append(prefilters, expFilter...)
 	}
 
 	sql, args, err := sq.Dialect("sqlite3").
 		From("events").
 		Select("*"). // select fields
-		Where(filter...).
+		Where(prefilters...).
 		Order(sq.C("received_at").Desc()).
 		ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := w.db.QueryContext(ctx, sql, args)
+	fmt.Println("SQL:", sql)
+	rows, err := w.db.QueryContext(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
 
 	res := []*cqrs.Event{}
 	for rows.Next() {
-		var include bool
+		// var include bool
+		include := true
 
 		data := sqlc.Event{}
 		if err := rows.Scan(
@@ -535,9 +638,9 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 			return nil, err
 		}
 
-		// iterate through data expression and check if this event matches
-		for _, exp := range dataExpr {
-		}
+		// TODO: iterate through data expression and check if this event matches
+		// for _, exp := range dataExpr {
+		// }
 
 		if include {
 			evt, err := data.ToCQRS()

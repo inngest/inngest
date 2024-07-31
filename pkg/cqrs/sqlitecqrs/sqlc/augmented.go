@@ -1,6 +1,7 @@
 package sqlc
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -43,11 +44,13 @@ func (e *Event) ToCQRS() (*cqrs.Event, error) {
 	}
 
 	// TODO: Event data
-	{
+	if err := json.Unmarshal([]byte(e.EventData), &evt.EventData); err != nil {
+		return nil, fmt.Errorf("error parsing event data: %w", err)
 	}
 
 	// TODO: Event user
-	{
+	if err := json.Unmarshal([]byte(e.EventUser), &evt.EventUser); err != nil {
+		return nil, fmt.Errorf("error parsing event user data: %w", err)
 	}
 
 	if e.EventV.Valid {
