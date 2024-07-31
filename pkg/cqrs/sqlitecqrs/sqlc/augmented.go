@@ -17,6 +17,23 @@ func (tr *TraceRun) EventIDs() []string {
 	return strings.Split(string(tr.TriggerIds), ",")
 }
 
+// HasEventIDs checks if the run include any of the provided event IDs
+func (tr *TraceRun) HasEventIDs(ids []string) bool {
+	// map out IDs for quick look up
+	idmap := map[string]bool{}
+	for _, id := range ids {
+		idmap[id] = true
+	}
+
+	for _, rid := range tr.EventIDs() {
+		if _, ok := idmap[string(rid)]; ok {
+			return true
+		}
+	}
+
+	return false
+}
+
 // --- Event
 
 func (e *Event) ToCQRS() (*cqrs.Event, error) {
