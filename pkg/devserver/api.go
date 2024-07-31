@@ -39,7 +39,7 @@ type devapi struct {
 	devserver *devserver
 }
 
-func newDevAPI(d *devserver) chi.Router {
+func NewDevAPI(d *devserver) chi.Router {
 	// Return a chi router, which lets us attach routes to a handler.
 	api := &devapi{
 		Router:    chi.NewMux(),

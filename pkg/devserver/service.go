@@ -35,7 +35,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 )
 
-func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher, stepLimitOverrides map[string]int, stateSizeLimitOverrides map[string]int, rc rueidis.Client, hw history.Driver) *devserver {
+func NewService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher, stepLimitOverrides map[string]int, stateSizeLimitOverrides map[string]int, rc rueidis.Client, hw history.Driver) *devserver {
 	return &devserver{
 		data:                    data,
 		runner:                  runner,
