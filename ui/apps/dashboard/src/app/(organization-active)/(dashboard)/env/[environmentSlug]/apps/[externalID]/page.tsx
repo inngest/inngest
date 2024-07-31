@@ -44,19 +44,21 @@ export default function Page({ params: { environmentSlug, externalID } }: Props)
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto w-full max-w-[1200px] py-4">
-        {newIANav && (
-          <div className="relative mb-8 flex flex-row items-center justify-between">
-            <div className="flex flex-col ">
+      <div className="mx-auto w-full max-w-[1200px] px-6">
+        {newIANav ? (
+          <div className="relative my-16 mb-8 flex flex-row items-center justify-between">
+            <div className="flex flex-col">
               <div className="text-basis text-2xl leading-tight">{appRes.data.name}</div>
             </div>
             <Link
               internalNavigation={true}
               href={`/env/${env.slug}/apps/${encodeURIComponent(externalID)}/syncs`}
             >
-              See all synks
+              See all syncs
             </Link>
           </div>
+        ) : (
+          <div className="h-6" />
         )}
         {appRes.data.latestSync?.error && (
           <SyncErrorCard className="mb-4" error={appRes.data.latestSync.error} />

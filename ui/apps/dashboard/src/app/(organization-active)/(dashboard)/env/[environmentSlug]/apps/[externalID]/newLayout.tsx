@@ -93,7 +93,7 @@ export default function NewLayout({ children, params: { externalID } }: Props) {
           </div>
         }
       />
-      <div className="bg-canvasBase mx-auto my-16 flex h-full w-full flex-col overflow-y-auto px-6">
+      <div className="bg-canvasBase mx-auto flex h-full w-full flex-col overflow-y-auto">
         <div className="bg-canvasBase h-full overflow-hidden">
           {res.isLoading ? (
             <Skeleton className="h-36 w-full" />

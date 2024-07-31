@@ -87,7 +87,7 @@ export default function OldLayout({ children, params: { externalID } }: Props) {
         links={navLinks}
         title={res.data.name}
       />
-      <div className="bg-canvasBase h-full overflow-hidden">{children}</div>
+      <div className="h-full overflow-hidden bg-slate-100">{children}</div>
     </>
   );
 }
