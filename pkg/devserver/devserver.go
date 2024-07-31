@@ -200,12 +200,12 @@ func start(ctx context.Context, opts StartOpts) error {
 			backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval)*time.Second),
 		))
 	}
-	queue := redis_state.NewQueue(unshardedClient.Queue(), queueOpts...)
+	rq := redis_state.NewQueue(unshardedClient.Queue(), queueOpts...)
 
 	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
-	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), queue)
-	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queue)
+	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq)
+	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), rq)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
@@ -302,7 +302,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	// The devserver embeds the event API.
-	ds := newService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides)
+	ds := NewService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hmw)
 	// embed the tracker
 	ds.tracker = t
 	ds.state = sm
@@ -311,7 +311,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// start the API
 	// Create a new API endpoint which hosts SDK-related functionality for
 	// registering functions.
-	devAPI := newDevAPI(ds)
+	devAPI := NewDevAPI(ds)
 
 	devAPI.Route("/v1", func(r chi.Router) {
 		// Add the V1 API to our dev server API.
