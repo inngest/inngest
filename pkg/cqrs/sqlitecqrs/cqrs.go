@@ -620,7 +620,20 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 
 	sql, args, err := sq.Dialect("sqlite3").
 		From("events").
-		Select("*"). // select fields
+		Select(
+			"internal_id",
+			"account_id",
+			"workspace_id",
+			"source",
+			"source_id",
+			"received_at",
+			"event_id",
+			"event_name",
+			"event_data",
+			"event_user",
+			"event_v",
+			"event_ts",
+		).
 		Where(prefilters...).
 		Order(sq.C("received_at").Desc()).
 		ToSQL()
