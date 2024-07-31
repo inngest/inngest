@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jinzhu/copier"
 	"github.com/oklog/ulid/v2"
+	"golang.org/x/sync/errgroup"
 
 	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -37,9 +39,10 @@ const (
 
 var (
 	// end represents a ulid ending with 'Z', eg. a far out cursor.
-	endULID = ulid.ULID([16]byte{'Z'})
-	nilULID = ulid.ULID{}
-	nilUUID = uuid.UUID{}
+	endULID    = ulid.ULID([16]byte{'Z'})
+	nilULID    = ulid.ULID{}
+	nilUUID    = uuid.UUID{}
+	eventRegex = regexp.MustCompile(`^event\..*`)
 )
 
 func NewCQRS(db *sql.DB) cqrs.Manager {
@@ -574,22 +577,37 @@ func toSQLEventFilter(nodes []*expr.Node) ([]sq.Expression, error) {
 	return filters, nil
 }
 
+func isValidResult(res []bool) bool {
+	for _, v := range res {
+		if v == false {
+			return false
+		}
+	}
+	return true
+}
+
 func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*cqrs.Event, error) {
-	// NOTE:
-	// expressions can contain multiple filters, which is why it is a powerful tool for filtering.
-	// any value the event body holds will be a filter target
+	// create pre-filters for database queries
 	// - ULID
 	// - event id (idempotency key)
 	// - event name
-	// - event data
 	// - version
 	// - timestamp
+	validCel := []string{}
 	parser := expressions.ParserSingleton()
 	prefilters := []sq.Expression{}
 	for _, exp := range cel {
+		if exp == "" {
+			continue
+		}
 		tree, err := parser.Parse(ctx, expr.StringExpression(exp))
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating expression '%s': %w", exp, err)
+		}
+
+		// check if the expression is targeting the event or not
+		if tree.Root.HasPredicate() && !eventRegex.MatchString(tree.Root.Predicate.Ident) {
+			continue
 		}
 
 		expFilter, err := toSQLEventFilter([]*expr.Node{&tree.Root})
@@ -597,6 +615,7 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 			return nil, err
 		}
 		prefilters = append(prefilters, expFilter...)
+		validCel = append(validCel, exp)
 	}
 
 	sql, args, err := sq.Dialect("sqlite3").
@@ -609,7 +628,7 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 		return nil, err
 	}
 
-	fmt.Println("SQL:", sql)
+	fmt.Println("Event filter SQL:", sql)
 	rows, err := w.db.QueryContext(ctx, sql, args...)
 	if err != nil {
 		return nil, err
@@ -617,9 +636,6 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 
 	res := []*cqrs.Event{}
 	for rows.Next() {
-		// var include bool
-		include := true
-
 		data := sqlc.Event{}
 		if err := rows.Scan(
 			&data.InternalID,
@@ -638,17 +654,40 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 			return nil, err
 		}
 
-		// TODO: iterate through data expression and check if this event matches
-		// for _, exp := range dataExpr {
-		// }
+		evt, err := data.ToCQRS()
+		if err != nil {
+			return nil, fmt.Errorf("error deserializing event: %w", err)
+		}
 
-		if include {
-			evt, err := data.ToCQRS()
-			if err != nil {
-				// TODO: log error
-				continue
-			}
+		results := make([]bool, len(validCel))
+		eg := errgroup.Group{}
+		// evaluate expressions concurrenctly
+		for i, c := range validCel {
+			idx := i
+			emap := evt.GetEvent().Map()
 
+			eg.Go(func() error {
+				eval, err := expressions.NewBooleanEvaluator(ctx, c)
+				if err != nil {
+					return err
+				}
+				ok, _, err := eval.Evaluate(ctx, expressions.NewData(map[string]any{
+					"event": emap,
+				}))
+				if err != nil {
+					return fmt.Errorf("error evaluating expression '%s': %w", c, err)
+				}
+
+				results[idx] = ok
+				return nil
+			})
+		}
+
+		if err := eg.Wait(); err != nil {
+			return nil, fmt.Errorf("error running evaluation on events: %w", err)
+		}
+		// check if all evaluations results in true
+		if isValidResult(results) {
 			res = append(res, evt)
 		}
 	}
