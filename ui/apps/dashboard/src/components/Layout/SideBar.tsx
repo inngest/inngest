@@ -22,10 +22,10 @@ export default function SideBar({
 
   return (
     <nav
-      className={`bg-canvasBase  border-subtle group
+      className={`bg-canvasBase border-subtle group
          top-0 flex h-screen flex-col justify-start ${
            collapsed ? 'w-[64px]' : 'w-[224px]'
-         }  sticky z-[500] shrink-0 overflow-visible border-r`}
+         }  sticky z-[49] shrink-0 overflow-visible border-r`}
     >
       <Logo collapsed={collapsed} setCollapsed={setCollapsed} />
       <div className="flex grow flex-col justify-between">

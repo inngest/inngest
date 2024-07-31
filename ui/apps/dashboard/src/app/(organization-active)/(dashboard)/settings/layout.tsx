@@ -1,7 +1,7 @@
 import { RiSettings3Line } from '@remixicon/react';
 
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
-import Header from '@/components/Header/Header';
+import Header from '@/components/Header/old/Header';
 import Layout from '@/components/Layout/Layout';
 import AppNavigation from '@/components/Navigation/old/AppNavigation';
 import Toaster from '@/components/Toaster';

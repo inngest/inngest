@@ -5,7 +5,7 @@ import { useBooleanSearchParam } from '@inngest/components/hooks/useSearchParam'
 import { IconFunction } from '@inngest/components/icons/Function';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import Header, { type HeaderLink } from '@/components/Header/Header';
+import Header, { type HeaderLink } from '@/components/Header/old/Header';
 import { FunctionTable } from './FunctionTable';
 import { useRows } from './useRows';
 

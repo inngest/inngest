@@ -10,7 +10,7 @@ import { RiBarChart2Fill } from '@remixicon/react';
 import SendEventButton from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/events/[eventName]/SendEventButton';
 import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import Header from '@/components/Header/Header';
+import Header from '@/components/Header/old/Header';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useEventTypes } from '@/queries';
 import cn from '@/utils/cn';

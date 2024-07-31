@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
+import { Button, NewButton } from '@inngest/components/Button';
+import { RiRefreshLine } from '@remixicon/react';
 
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import ResyncModal from './ResyncModal';
 
 type Props = {
@@ -12,15 +14,27 @@ type Props = {
 
 export function ResyncButton({ appExternalID, disabled = false, latestSyncUrl, platform }: Props) {
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const { value: newIANav } = useBooleanFlag('new-ia-nav');
 
   return (
     <>
-      <Button
-        btnAction={() => setIsModalVisible(true)}
-        disabled={disabled}
-        kind="primary"
-        label="Resync"
-      />
+      {newIANav ? (
+        <NewButton
+          onClick={() => setIsModalVisible(true)}
+          disabled={disabled}
+          kind="primary"
+          label="Resync"
+          icon={<RiRefreshLine />}
+          iconSide="left"
+        />
+      ) : (
+        <Button
+          btnAction={() => setIsModalVisible(true)}
+          disabled={disabled}
+          kind="primary"
+          label="Resync"
+        />
+      )}
 
       <ResyncModal
         appExternalID={appExternalID}
