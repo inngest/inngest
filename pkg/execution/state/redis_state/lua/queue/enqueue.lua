@@ -77,6 +77,9 @@ if guaranteedCapacityKey ~= "" then
 		end
 		redis.call("HSET", guaranteedCapacityMapKey, guaranteedCapacityKey, guaranteedCapacity)
 	else
+		-- Note: This code path is hit by every enqueue that does not have guaranteed capacity
+		-- and might never have used guaranteed capacity in the first place. We can also remove this
+		-- as long as we remove guaranteed capacity from the map manually whenever accounts lose access.
 		redis.call("HDEL", guaranteedCapacityMapKey, guaranteedCapacityKey)
 	end
 end
