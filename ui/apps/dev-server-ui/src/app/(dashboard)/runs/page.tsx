@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
@@ -25,7 +25,6 @@ import { client } from '@/store/baseApi';
 import {
   CountRunsDocument,
   GetRunsDocument,
-  useCountRunsQuery,
   type CountRunsQuery,
   type GetRunsQuery,
 } from '@/store/generated';
@@ -117,7 +116,6 @@ export default function Page() {
     for (const page of data.pages) {
       out.push(...page.edges);
     }
-
     return out;
   }, [data?.pages]);
 

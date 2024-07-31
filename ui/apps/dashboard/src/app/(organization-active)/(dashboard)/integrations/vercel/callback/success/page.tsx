@@ -17,7 +17,7 @@ export default async function SuccessPage({ searchParams }: SuccessProps) {
         <IconVercel className="text-onContrast h-6 w-6" />
       </div>
       <div className="text-basis mb-2 text-2xl leading-loose">
-        Inngest sucessfully installed on Vercel!
+        Inngest successfully installed on Vercel!
       </div>
       <div className="text-subtle mb-7 text-base">
         The Inngest integration has successfully been installed on your Vercel account.

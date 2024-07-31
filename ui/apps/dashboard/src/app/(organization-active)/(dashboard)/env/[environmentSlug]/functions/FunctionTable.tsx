@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { type Route } from 'next';
 import { Link } from '@inngest/components/Link';
-import { Pill, PillContent } from '@inngest/components/Pill';
+import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { type Trigger } from '@inngest/components/types/trigger';
 import { RiBarChart2Fill, RiErrorWarningLine } from '@remixicon/react';
 import {
@@ -137,21 +137,29 @@ function createColumns(environmentSlug: string) {
       header: 'Function Name',
     }),
     columnHelper.accessor('triggers', {
-      cell: (info) => {
-        return info.getValue().map((trigger) => {
-          return (
-            <Pill
-              href={
-                trigger.type === 'EVENT'
-                  ? (`/env/${environmentSlug}/events/${encodeURIComponent(trigger.value)}` as Route)
-                  : undefined
-              }
-              key={trigger.value}
-            >
-              <PillContent type={trigger.type}>{trigger.value}</PillContent>
-            </Pill>
-          );
-        });
+      cell: (props) => {
+        const triggers = props.getValue();
+        return (
+          <HorizontalPillList
+            alwaysVisibleCount={2}
+            pills={triggers.map((trigger) => {
+              return (
+                <Pill
+                  href={
+                    trigger.type === 'EVENT'
+                      ? (`/env/${environmentSlug}/events/${encodeURIComponent(
+                          trigger.value
+                        )}` as Route)
+                      : undefined
+                  }
+                  key={trigger.type + trigger.value}
+                >
+                  <PillContent type={trigger.type}>{trigger.value}</PillContent>
+                </Pill>
+              );
+            })}
+          />
+        );
       },
       header: 'Triggers',
     }),
