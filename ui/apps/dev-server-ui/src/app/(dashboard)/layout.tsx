@@ -35,8 +35,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Header>
         <Navbar>
           <NavbarLink icon={<IconFeed />} href="/stream" tabName="Stream" />
-          <NavbarLink icon={<IconApp />} href="/apps" hasError={hasSyncingError} tabName="Apps" />
-          <NavbarLink icon={<IconFunction />} href="/functions" tabName="Functions" />
           <NavbarLink
             icon={<IconFunction />}
             href="/runs"
@@ -47,6 +45,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Badge>
             }
           />
+          <NavbarLink icon={<IconApp />} href="/apps" hasError={hasSyncingError} tabName="Apps" />
+          <NavbarLink icon={<IconFunction />} href="/functions" tabName="Functions" />
         </Navbar>
       </Header>
       <TooltipProvider delayDuration={0}>
