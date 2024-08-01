@@ -94,8 +94,7 @@ func TestFunctionRunList(t *testing.T) {
 
 	// tests
 	t.Run("retrieve all runs", func(t *testing.T) {
-
-		require.Eventually(t, func() bool {
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			edges, pageInfo, count := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start: start,
 				End:   end,
@@ -112,13 +111,11 @@ func TestFunctionRunList(t *testing.T) {
 				assert.True(t, queuedAt.UnixMilli() <= ts.UnixMilli())
 				ts = queuedAt
 			}
-
-			return true
 		}, 10*time.Second, 2*time.Second)
 	})
 
 	t.Run("retrieve only successful runs sorted by started_at", func(t *testing.T) {
-		require.Eventually(t, func() bool {
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			edges, pageInfo, _ := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:     start,
 				End:       end,
@@ -139,13 +136,11 @@ func TestFunctionRunList(t *testing.T) {
 				assert.True(t, startedAt.UnixMilli() <= ts.UnixMilli())
 				ts = startedAt
 			}
-
-			return true
 		}, 10*time.Second, 2*time.Second)
 	})
 
 	t.Run("retrieve only failed runs sorted by ended_at", func(t *testing.T) {
-		require.Eventually(t, func() bool {
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			edges, pageInfo, _ := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:     start,
 				End:       end,
@@ -166,13 +161,11 @@ func TestFunctionRunList(t *testing.T) {
 				assert.True(t, endedAt.UnixMilli() >= ts.UnixMilli())
 				ts = endedAt
 			}
-
-			return true
 		}, 10*time.Second, 2*time.Second)
 	})
 
 	t.Run("retrieve only failed runs", func(t *testing.T) {
-		require.Eventually(t, func() bool {
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			edges, pageInfo, _ := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:  start,
 				End:    end,
@@ -189,13 +182,11 @@ func TestFunctionRunList(t *testing.T) {
 				assert.True(t, queuedAt.UnixMilli() <= ts.UnixMilli())
 				ts = queuedAt
 			}
-
-			return true
 		}, 10*time.Second, 2*time.Second)
 	})
 
 	t.Run("paginate without additional filter", func(t *testing.T) {
-		require.Eventually(t, func() bool {
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			items := 10
 			edges, pageInfo, _ := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start: start,
@@ -216,13 +207,11 @@ func TestFunctionRunList(t *testing.T) {
 			remain := successTotal + failureTotal - items
 			assert.Equal(t, remain, len(edges))
 			assert.False(t, pageInfo.HasNextPage)
-
-			return true
 		}, 10*time.Second, 2*time.Second)
 	})
 
 	t.Run("paginate with status filter", func(t *testing.T) {
-		require.Eventually(t, func() bool {
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			items := 2
 			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:     start,
@@ -256,8 +245,6 @@ func TestFunctionRunList(t *testing.T) {
 			assert.Equal(t, remain, len(edges))
 			assert.False(t, pageInfo.HasNextPage)
 			assert.Equal(t, failureTotal, total)
-
-			return true
 		}, 10*time.Second, 2*time.Second)
 	})
 
@@ -269,7 +256,7 @@ func TestFunctionRunList(t *testing.T) {
 		}
 		cel := strings.Join(queries, "\n")
 
-		require.Eventually(t, func() bool {
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			items := 3
 			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start: start,
@@ -281,8 +268,6 @@ func TestFunctionRunList(t *testing.T) {
 			assert.Equal(t, items, len(edges))
 			assert.Equal(t, successTotal-(min+1), total)
 			assert.True(t, pageInfo.HasNextPage)
-
-			return true
 		}, 10*time.Second, 2*time.Second)
 	})
 }
