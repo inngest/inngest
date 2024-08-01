@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import type { CombinedError } from 'urql';
@@ -39,18 +40,19 @@ const Error = ({ error, externalID }: { error: Error; externalID: string }) => {
 export default function NewLayout({ children, params: { externalID } }: Props) {
   const [showArchive, setShowArchive] = useState(false);
   const [showValidate, setShowValidate] = useState(false);
+  const pathname = usePathname();
 
-  externalID = decodeURIComponent(externalID);
+  const externalAppID = decodeURIComponent(externalID);
   const env = useEnvironment();
 
   const res = useNavData({
     envID: env.id,
-    externalAppID: externalID,
+    externalAppID,
   });
 
   return (
     <>
-      <ArchivedAppBanner externalAppID={externalID} />
+      <ArchivedAppBanner externalAppID={externalAppID} />
 
       {res.data?.latestSync?.url && (
         <ValidateModal
@@ -70,7 +72,10 @@ export default function NewLayout({ children, params: { externalID } }: Props) {
       <Header
         breadcrumb={[
           { text: 'Apps', href: `/env/${env.slug}/apps` },
-          { text: res.data?.name || '' },
+          { text: res.data?.name || '', href: `/env/${env.slug}/apps/${externalID}` },
+          ...(pathname?.endsWith('/syncs')
+            ? [{ text: 'All syncs', href: `/env/${env.slug}/apps/${externalID}/syncs` }]
+            : []),
         ]}
         action={
           <div className="flex flex-row items-center justify-end gap-x-1">
@@ -84,7 +89,7 @@ export default function NewLayout({ children, params: { externalID } }: Props) {
             )}
             {res.data?.latestSync?.url && (
               <ResyncButton
-                appExternalID={externalID}
+                appExternalID={externalAppID}
                 disabled={res.data.isArchived}
                 platform={res.data.latestSync.platform}
                 latestSyncUrl={res.data.latestSync.url}
@@ -98,9 +103,9 @@ export default function NewLayout({ children, params: { externalID } }: Props) {
           {res.isLoading ? (
             <Skeleton className="h-36 w-full" />
           ) : res.error ? (
-            <Error error={res.error as CombinedError} externalID={externalID} />
+            <Error error={res.error as CombinedError} externalID={externalAppID} />
           ) : !res.data.id ? (
-            <NotFound externalID={externalID} />
+            <NotFound externalID={externalAppID} />
           ) : (
             children
           )}

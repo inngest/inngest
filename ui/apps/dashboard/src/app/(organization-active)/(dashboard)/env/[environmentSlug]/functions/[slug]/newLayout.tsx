@@ -3,18 +3,18 @@
 import { useCallback, useState } from 'react';
 import { Badge } from '@inngest/components/Badge';
 import { InvokeModal } from '@inngest/components/InvokeButton';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
+import { RiPauseCircleLine } from '@remixicon/react';
 import { useMutation } from 'urql';
 
 import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { ActionsMenu } from '@/components/Functions/ActionMenu';
 import { CancelFunctionModal } from '@/components/Functions/CancelFunction/CancelFunctionModal';
 import { PauseFunctionModal } from '@/components/Functions/PauseFunction/PauseModal';
-import { Header, type HeaderLink } from '@/components/Header/Header';
+import { Header } from '@/components/Header/Header';
 import { graphql } from '@/gql';
 import { useFunction } from '@/queries';
-import { pathCreator } from '@/utils/urls';
 import NewReplayModal from './logs/NewReplayModal';
 
 const InvokeFunctionDocument = graphql(`
@@ -47,53 +47,6 @@ export default function FunctionLayout({
 
   const fn = data?.workspace.workflow;
   const { isArchived = false, isPaused } = fn ?? {};
-
-  const isNewRunsEnabled = useBooleanFlag('new-runs');
-  const isBulkCancellationEnabled = useBooleanFlag('bulk-cancellation-ui');
-
-  const emptyData = !data || fetching || !fn;
-  const navLinks: HeaderLink[] = [
-    {
-      href: `/env/${environmentSlug}/functions/$slug}`,
-      text: 'Dashboard',
-      active: 'exact',
-    },
-    {
-      href: `/env/${environmentSlug}/functions/${slug}/logs`,
-      text: 'Runs',
-    },
-    {
-      href: `/env/${environmentSlug}/functions/${slug}/replay`,
-      text: 'Replay',
-    },
-  ];
-
-  if (isNewRunsEnabled.value) {
-    navLinks.push({
-      href: `/env/${environmentSlug}/functions/${slug}/runs`,
-      text: 'Runs',
-      badge: (
-        <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
-          Beta
-        </Badge>
-      ),
-    });
-  }
-
-  if (isBulkCancellationEnabled.value) {
-    navLinks.push({
-      href: pathCreator.functionCancellations({
-        envSlug: environmentSlug,
-        functionSlug: slug,
-      }),
-      text: 'Cancellations',
-      badge: (
-        <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
-          Beta
-        </Badge>
-      ),
-    });
-  }
 
   const doesFunctionAcceptPayload =
     fn?.current?.triggers.some((trigger) => {
@@ -154,6 +107,13 @@ export default function FunctionLayout({
           { text: 'Functions', href: `/env/${environmentSlug}/functions` },
           { text: fn?.name || 'Function', href: `/env/${environmentSlug}/functions/${slug}` },
         ]}
+        icon={
+          isPaused && (
+            <Badge kind="solid" className="text-warning h-6 bg-amber-100 text-xs">
+              <RiPauseCircleLine className="h-4 w-4" /> Paused
+            </Badge>
+          )
+        }
         action={
           <div className="flex flex-row items-center justify-end">
             <ActionsMenu
@@ -166,7 +126,18 @@ export default function FunctionLayout({
             />
           </div>
         }
+        tabs={[
+          {
+            text: 'Dashboard',
+            href: `/env/${environmentSlug}/functions/${slug}`,
+            exactRouteMatch: true,
+          },
+          { text: 'Runs', href: `/env/${environmentSlug}/functions/${slug}/logs` },
+          { text: 'Beta Runs', href: `/env/${environmentSlug}/functions/${slug}/runs` },
+          { text: 'Replay history', href: `/env/${environmentSlug}/functions/${slug}/replay` },
+        ]}
       />
+      {fetching && <Skeleton className="h-36 w-full" />}
       {children}
     </>
   );

@@ -46,6 +46,7 @@ export const ActionsMenu = ({
               icon={open ? <RiArrowUpSLine /> : <RiArrowDownSLine />}
               iconSide="right"
               label="All actions"
+              className="text-sm"
             />
           </Listbox.Button>
           <div className="relative">
@@ -66,7 +67,7 @@ export const ActionsMenu = ({
                     icon={<RiFlashlightFill className="h-4 w-4" />}
                     iconSide="left"
                     label="Invoke"
-                    className={`text-subtle m-0 w-full justify-start ${
+                    className={`text-subtle m-0 w-full justify-start text-sm ${
                       archived && 'cursor-not-allowed'
                     }`}
                   />
@@ -93,7 +94,7 @@ export const ActionsMenu = ({
                     }
                     iconSide="left"
                     label={paused ? 'Resume' : 'Pause'}
-                    className={`text-subtle m-0 w-full justify-start ${
+                    className={`text-subtle m-0 w-full justify-start text-sm ${
                       archived && 'cursor-not-allowed'
                     }`}
                   />
@@ -105,7 +106,7 @@ export const ActionsMenu = ({
               >
                 <OptionalTooltip
                   tooltip={
-                    archived &&
+                    (archived || paused) &&
                     `Replay not available, function is ${archived ? 'archived' : 'paused'}.`
                   }
                 >
@@ -118,7 +119,7 @@ export const ActionsMenu = ({
                     icon={<IconReplay className="h-4 w-4" />}
                     iconSide="left"
                     label="Replay"
-                    className={`text-subtle m-0 w-full justify-start ${
+                    className={`text-subtle m-0 w-full justify-start text-sm ${
                       archived || (paused && 'cursor-not-allowed')
                     }`}
                   />
@@ -140,7 +141,9 @@ export const ActionsMenu = ({
                       icon={<RiCloseCircleLine className="h-4 w-4" />}
                       iconSide="left"
                       label="Bulk Cancel"
-                      className={`m-0 w-full justify-start ${archived && 'cursor-not-allowed'}`}
+                      className={`m-0 w-full justify-start text-sm ${
+                        archived && 'cursor-not-allowed'
+                      }`}
                     />
                   </OptionalTooltip>
                 </Listbox.Option>

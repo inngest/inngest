@@ -1,16 +1,7 @@
 import { type Route } from 'next';
 
-import NavItem, { type ActiveMatching } from '@/components/Navigation/old/NavItem';
-import Navigation from '@/components/Navigation/old/Navigation';
 import { BreadCrumb } from './BreadCrumb';
-
-export type HeaderLink = {
-  href: string;
-  text: string;
-  icon?: React.ReactNode;
-  active?: ActiveMatching | boolean;
-  badge?: React.ReactNode;
-};
+import { HeaderTab } from './HeaderTab';
 
 export type BreadCrumbType = {
   href?: string;
@@ -18,18 +9,18 @@ export type BreadCrumbType = {
 };
 
 export type HeaderType = {
-  links?: HeaderLink[];
+  tabs?: HeaderTab[];
   breadcrumb: BreadCrumbType[];
   icon?: React.ReactNode;
   action?: React.ReactNode;
   className?: string;
 };
 
-export const Header = ({ links, breadcrumb, icon, action, className = '' }: HeaderType) => {
+export const Header = ({ tabs, breadcrumb, icon, action, className = '' }: HeaderType) => {
   return (
-    <>
+    <div className="flex flex-col justify-start border-b">
       <div
-        className={`bg-canvasBase border-subtle flex h-[52px] flex-row items-center justify-between border-b p-4 ${className}`}
+        className={`bg-canvasBase border-subtle flex h-[52px] flex-row items-center justify-between p-4 ${className}`}
       >
         <div className="flex flex-row items-center justify-start align-baseline">
           <BreadCrumb path={breadcrumb} />
@@ -37,13 +28,18 @@ export const Header = ({ links, breadcrumb, icon, action, className = '' }: Head
         </div>
         <div>{action}</div>
       </div>
-      {links && (
-        <Navigation className="-ml-2 -mt-2">
-          {links.map(({ href, text, ...props }) => (
-            <NavItem key={href} href={href as Route} text={text} {...props} />
+      {tabs && (
+        <div className="flex h-[30px] flex-row items-center justify-start space-x-3 px-4">
+          {tabs.map(({ href, text, exactRouteMatch }) => (
+            <HeaderTab
+              key={href}
+              href={href as Route}
+              text={text}
+              exactRouteMatch={exactRouteMatch}
+            />
           ))}
-        </Navigation>
+        </div>
       )}
-    </>
+    </div>
   );
 };
