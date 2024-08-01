@@ -63,13 +63,13 @@ const columns = [
       const data = props.row.original;
 
       if (data.isBatch) {
-        return 'Batch';
+        return <TextCell>Batch</TextCell>;
       }
       if (data.cronSchedule) {
-        return data.cronSchedule;
+        return <IDCell>data.cronSchedule</IDCell>;
       }
       if (data.eventName) {
-        return data.eventName;
+        return <TextCell>data.eventName</TextCell>;
       }
 
       // Unreachable
