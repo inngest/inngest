@@ -8,12 +8,14 @@ import { useMutation } from 'urql';
 import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
+import { ActionsMenu } from '@/components/Functions/ActionMenu';
 import { CancelFunctionModal } from '@/components/Functions/CancelFunction/CancelFunctionModal';
 import { PauseFunctionModal } from '@/components/Functions/PauseFunction/PauseModal';
 import { Header, type HeaderLink } from '@/components/Header/Header';
 import { graphql } from '@/gql';
 import { useFunction } from '@/queries';
 import { pathCreator } from '@/utils/urls';
+import NewReplayModal from './logs/NewReplayModal';
 
 const InvokeFunctionDocument = graphql(`
   mutation InvokeFunction($envID: UUID!, $data: Map, $functionSlug: String!) {
@@ -36,6 +38,7 @@ export default function FunctionLayout({
   const [invokOpen, setInvokeOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [replayOpen, setReplayOpen] = useState(false);
 
   const functionSlug = decodeURIComponent(slug);
   const [{ data, fetching }] = useFunction({ functionSlug });
@@ -139,11 +142,30 @@ export default function FunctionLayout({
           onClose={() => setCancelOpen(false)}
         />
       )}
+      {replayOpen && (
+        <NewReplayModal
+          isOpen={replayOpen}
+          functionSlug={functionSlug}
+          onClose={() => setReplayOpen(false)}
+        />
+      )}
       <Header
         breadcrumb={[
           { text: 'Functions', href: `/env/${environmentSlug}/functions` },
           { text: fn?.name || 'Function', href: `/env/${environmentSlug}/functions/${slug}` },
         ]}
+        action={
+          <div className="flex flex-row items-center justify-end">
+            <ActionsMenu
+              showCancel={() => setCancelOpen(true)}
+              showInvoke={() => setInvokeOpen(true)}
+              showPause={() => setPauseOpen(true)}
+              showReplay={() => setReplayOpen(true)}
+              archived={isArchived}
+              paused={isPaused}
+            />
+          </div>
+        }
       />
       {children}
     </>
