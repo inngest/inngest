@@ -119,12 +119,17 @@ func (h *ExpressionHandler) ToSQLEventFilters(ctx context.Context) ([]sq.Express
 }
 
 func (h *ExpressionHandler) MatchEventExpressions(ctx context.Context, evt event.Event) (bool, error) {
+	if !h.HasEventFilters() {
+		return false, nil
+	}
+
 	eg := errgroup.Group{}
 	res := make([]bool, len(h.EventExprList))
 	data := evt.Map()
 
-	for i, exp := range h.EventExprList {
+	for i, e := range h.EventExprList {
 		idx := i
+		exp := e
 
 		eg.Go(func() error {
 			eval, err := expressions.NewBooleanEvaluator(ctx, exp)
@@ -136,6 +141,43 @@ func (h *ExpressionHandler) MatchEventExpressions(ctx context.Context, evt event
 			if err != nil {
 				return fmt.Errorf("error evaluating event expression: %w", err)
 			}
+
+			res[idx] = ok
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return false, err
+	}
+
+	return allMatches(res), nil
+}
+
+func (h *ExpressionHandler) MatchOutputExpressions(ctx context.Context, output []byte) (bool, error) {
+	if !h.HasOutputFilters() {
+		return false, nil
+	}
+
+	eg := errgroup.Group{}
+	res := make([]bool, len(h.OutputExprList))
+	// data := string(output)
+	fmt.Printf("Output Data: %s\n", output)
+	for i, e := range h.OutputExprList {
+		idx := i
+		exp := e
+
+		eg.Go(func() error {
+			eval, err := expressions.NewBooleanEvaluator(ctx, exp)
+			if err != nil {
+				return fmt.Errorf("error initializing expression evaluator for output: %w", err)
+			}
+
+			ok, _, err := eval.Evaluate(ctx, expressions.NewData(map[string]any{"output": output}))
+			if err != nil {
+				return fmt.Errorf("error evaluating output expression: %w", err)
+			}
+			fmt.Printf("Found: %v\n", ok)
 
 			res[idx] = ok
 			return nil
