@@ -13,8 +13,10 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
@@ -321,6 +323,192 @@ func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata
 		span.AddEvent(string(evt), trace.WithAttributes(
 			attribute.Bool(consts.OtelSysEventData, true),
 		))
+	}
+}
+
+func (l traceLifecycle) OnStepStarted(
+	ctx context.Context,
+	md state.Metadata,
+	item queue.Item,
+	edge inngest.Edge,
+	url string,
+) {
+	spanID := telemetry.NewSpanIDWithHash(ctx, *item.JobID)
+	start, ok := redis_state.GetItemStart(ctx)
+	if !ok {
+		// TODO: raise a warning here
+		start = time.Now()
+	}
+	runID := md.ID.RunID
+
+	// reassign here to make sure we have the right traceID and such
+	ctx = l.extractTraceCtx(ctx, md, &item)
+	_, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeExecution),
+		telemetry.WithName(consts.OtelExecPlaceholder),
+		telemetry.WithTimestamp(start),
+		telemetry.WithSpanID(spanID),
+		telemetry.WithSpanAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
+			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, md.Config.FunctionSlug()),
+			attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
+			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
+			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
+			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
+			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
+			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
+		),
+	)
+	defer span.End()
+
+	if item.RunInfo != nil {
+		span.SetAttributes(
+			attribute.Int64(consts.OtelSysDelaySystem, item.RunInfo.Latency.Milliseconds()),
+			attribute.Int64(consts.OtelSysDelaySojourn, item.RunInfo.SojournDelay.Milliseconds()),
+		)
+	}
+	if item.Attempt > 0 {
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepRetry, true))
+	}
+
+	// first step
+	if edge.Incoming == inngest.TriggerName {
+		// NOTE:
+		// annotate the step as the first step of the function run.
+		// this way the delay associated with this run is directly correlated to the delay of the
+		// function run itself.
+		if item.Attempt == 0 {
+			span.SetAttributes(attribute.Bool(consts.OtelSysStepFirst, true))
+		}
+	}
+}
+
+func (l traceLifecycle) OnStepFinished(
+	ctx context.Context,
+	md state.Metadata,
+	item queue.Item,
+	edge inngest.Edge,
+	resp *statev1.DriverResponse,
+	runErr error,
+) {
+	spanID := telemetry.NewSpanIDWithHash(ctx, *item.JobID)
+	start, ok := redis_state.GetItemStart(ctx)
+	if !ok {
+		// TODO: raise a warning here
+		start = time.Now()
+	}
+	runID := md.ID.RunID
+
+	// reassign here to make sure we have the right traceID and such
+	ctx = l.extractTraceCtx(ctx, md, &item)
+	_, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeExecution),
+		telemetry.WithName(consts.OtelExecPlaceholder),
+		telemetry.WithTimestamp(start),
+		telemetry.WithSpanID(spanID),
+		telemetry.WithSpanAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
+			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, md.Config.FunctionSlug()),
+			attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
+			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
+			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
+			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
+			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
+			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
+		),
+	)
+	defer span.End()
+
+	if item.RunInfo != nil {
+		span.SetAttributes(
+			attribute.Int64(consts.OtelSysDelaySystem, item.RunInfo.Latency.Milliseconds()),
+			attribute.Int64(consts.OtelSysDelaySojourn, item.RunInfo.SojournDelay.Milliseconds()),
+		)
+	}
+	if item.Attempt > 0 {
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepRetry, true))
+	}
+
+	// first step
+	if edge.Incoming == inngest.TriggerName {
+		// NOTE:
+		// annotate the step as the first step of the function run.
+		// this way the delay associated with this run is directly correlated to the delay of the
+		// function run itself.
+		if item.Attempt == 0 {
+			span.SetAttributes(attribute.Bool(consts.OtelSysStepFirst, true))
+		}
+	}
+
+	if runErr != nil {
+		span.SetStatus(codes.Error, runErr.Error())
+		span.SetStepOutput(runErr.Error())
+		return
+	}
+
+	// check response
+	if resp != nil {
+		if op := resp.TraceVisibleStepExecution(); op != nil {
+			spanName := op.UserDefinedName()
+			span.SetName(spanName)
+
+			// fnSpan.SetAttributes(attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusRunning.ToCode()))
+
+			foundOp := op.Op
+			// The op changes based on the current state of the step, so we
+			// are required to normalize here.
+			switch foundOp {
+			case enums.OpcodeStep, enums.OpcodeStepRun, enums.OpcodeStepError:
+				foundOp = enums.OpcodeStepRun
+			}
+
+			span.SetAttributes(
+				attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
+				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
+				attribute.String(consts.OtelSysStepDisplayName, op.UserDefinedName()),
+				attribute.String(consts.OtelSysStepOpcode, foundOp.String()),
+			)
+
+			if op.IsError() {
+				span.SetStepOutput(op.Error)
+				span.SetStatus(codes.Error, op.Error.Message)
+			} else {
+				span.SetStepOutput(op.Data)
+				span.SetStatus(codes.Ok, string(op.Data))
+			}
+		} else if resp.Retryable() { // these are function retries
+			span.SetStatus(codes.Error, *resp.Err)
+			span.SetAttributes(
+				attribute.String(consts.OtelSysStepOpcode, enums.OpcodeNone.String()),
+				attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
+				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
+			)
+			span.SetStepOutput(resp.Output)
+		} else if resp.IsTraceVisibleFunctionExecution() {
+			spanName := consts.OtelExecFnOk
+			span.SetStatus(codes.Ok, "success")
+
+			if resp.StatusCode != 200 {
+				spanName = consts.OtelExecFnErr
+				span.SetStatus(codes.Error, resp.Error())
+			}
+
+			span.SetAttributes(attribute.String(consts.OtelSysStepOpcode, enums.OpcodeNone.String()))
+			span.SetName(spanName)
+			span.SetFnOutput(resp.Output)
+		} else {
+			// if it's not a step or function response that represents either a failed or a successful execution.
+			// Do not record discovery spans and cancel it.
+			_ = span.Cancel(ctx)
+		}
 	}
 }
 

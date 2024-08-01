@@ -106,8 +106,8 @@ type LifecycleListener interface {
 		state.Metadata,
 		queue.Item,
 		inngest.Edge,
-		inngest.Step,
-		statev1.DriverResponse,
+		*statev1.DriverResponse,
+		error,
 	)
 
 	// OnWaitForEvent is called when a wait for event step is scheduled.  The
@@ -253,8 +253,8 @@ func (NoopLifecyceListener) OnStepFinished(
 	state.Metadata,
 	queue.Item,
 	inngest.Edge,
-	inngest.Step,
-	statev1.DriverResponse,
+	*statev1.DriverResponse,
+	error,
 ) {
 }
 

@@ -812,37 +812,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		evtIDs[i] = eid.String()
 	}
 
-	_, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeExecution),
-		telemetry.WithName(consts.OtelExecPlaceholder),
-		telemetry.WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
-			attribute.String(consts.OtelSysAccountID, id.AccountID.String()),
-			attribute.String(consts.OtelSysWorkspaceID, id.WorkspaceID.String()),
-			attribute.String(consts.OtelSysAppID, id.AppID.String()),
-			attribute.String(consts.OtelSysFunctionID, id.WorkflowID.String()),
-			attribute.String(consts.OtelSysFunctionSlug, f.GetSlug()),
-			attribute.Int(consts.OtelSysFunctionVersion, id.WorkflowVersion),
-			attribute.String(consts.OtelAttrSDKRunID, id.RunID.String()),
-			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
-			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
-			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
-			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
-		),
-	)
-	if item.RunInfo != nil {
-		span.SetAttributes(
-			attribute.Int64(consts.OtelSysDelaySystem, item.RunInfo.Latency.Milliseconds()),
-			attribute.Int64(consts.OtelSysDelaySojourn, item.RunInfo.SojournDelay.Milliseconds()),
-		)
-	}
-	if item.Attempt > 0 {
-		span.SetAttributes(attribute.Bool(consts.OtelSysStepRetry, true))
-	}
-	defer span.End()
-	// send early here to help show the span has started and is in-progress
-	span.Send()
-
 	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
 	// that child;  we don't need to handle the trigger individually.
 	//
@@ -868,16 +837,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		// always one less than attempts.
 		retries := f.Steps[0].RetryCount() + 1
 		item.MaxAttempts = &retries
-		span.SetAttributes(attribute.Int(consts.OtelSysStepMaxAttempt, retries))
 
 		// Only just starting:  run lifecycles on first attempt.
 		if item.Attempt == 0 {
-			// NOTE:
-			// annotate the step as the first step of the function run.
-			// this way the delay associated with this run is directly correlated to the delay of the
-			// function run itself.
-			span.SetAttributes(attribute.Bool(consts.OtelSysStepFirst, true))
-
 			// Set the start time and spanID in metadata for subsequent runs
 			// This should be an one time operation and is never updated after,
 			// which is enforced on the Lua script.
@@ -905,68 +867,14 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	resp, err := e.run(ctx, &instance)
-
 	if resp == nil && err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		span.SetStepOutput(err.Error())
-		return nil, err
-	}
-
-	if resp != nil {
-		if op := resp.TraceVisibleStepExecution(); op != nil {
-			spanName := op.UserDefinedName()
-			span.SetName(spanName)
-
-			// fnSpan.SetAttributes(attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusRunning.ToCode()))
-
-			foundOp := op.Op
-			// The op changes based on the current state of the step, so we
-			// are required to normalize here.
-			switch foundOp {
-			case enums.OpcodeStep, enums.OpcodeStepRun, enums.OpcodeStepError:
-				foundOp = enums.OpcodeStepRun
-				ctx = trace.ContextWithSpan(ctx, span)
-			}
-
-			span.SetAttributes(
-				attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
-				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
-				attribute.String(consts.OtelSysStepDisplayName, op.UserDefinedName()),
-				attribute.String(consts.OtelSysStepOpcode, foundOp.String()),
-			)
-
-			if op.IsError() {
-				span.SetStepOutput(op.Error)
-				span.SetStatus(codes.Error, op.Error.Message)
-			} else {
-				span.SetStepOutput(op.Data)
-				span.SetStatus(codes.Ok, string(op.Data))
-			}
-		} else if resp.Retryable() { // these are function retries
-			span.SetStatus(codes.Error, *resp.Err)
-			span.SetAttributes(
-				attribute.String(consts.OtelSysStepOpcode, enums.OpcodeNone.String()),
-				attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
-				attribute.Int(consts.OtelSysStepOutputSizeBytes, resp.OutputSize),
-			)
-			span.SetStepOutput(resp.Output)
-		} else if resp.IsTraceVisibleFunctionExecution() {
-			spanName := consts.OtelExecFnOk
-			span.SetStatus(codes.Ok, "success")
-
-			if resp.StatusCode != 200 {
-				spanName = consts.OtelExecFnErr
-				span.SetStatus(codes.Error, resp.Error())
-			}
-
-			span.SetAttributes(attribute.String(consts.OtelSysStepOpcode, enums.OpcodeNone.String()))
-			span.SetName(spanName)
-			span.SetFnOutput(resp.Output)
-		} else {
-			// if it's not a step or function response that represents either a failed or a successful execution.
-			// Do not record discovery spans and cancel it.
-			_ = span.Cancel(ctx)
+		for _, e := range e.lifecycles {
+			// OnStepFinished handles step success and step errors/failures.  It is
+			// currently the responsibility of the lifecycle manager to handle the differing
+			// step statuses when a step finishes.
+			go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
 		}
+		return nil, err
 	}
 
 	err = e.HandleResponse(ctx, &instance, resp)
@@ -981,7 +889,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance, resp *sta
 		//
 		// TODO (tonyhb): This should probably change, as each lifecycle listener has to
 		// do the same parsing & conditional checks.
-		go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, resp.Step, *resp)
+		go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, resp, nil)
 	}
 
 	// Check for temporary failures.  The outputs of transient errors are not

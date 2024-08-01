@@ -359,9 +359,14 @@ func (l lifecycle) OnStepFinished(
 	md sv2.Metadata,
 	item queue.Item,
 	edge inngest.Edge,
-	step inngest.Step,
-	resp state.DriverResponse,
+	resp *state.DriverResponse,
+	runErr error,
 ) {
+	// TODO: should this be handled differently?
+	if runErr != nil {
+		return
+	}
+
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
 		l.log.Error(
@@ -387,11 +392,11 @@ func (l lifecycle) OnStepFinished(
 		EventID:         md.Config.EventID(),
 		StepName:        &resp.Step.Name,
 		StepID:          &edge.Incoming,
-		URL:             &step.URI,
+		URL:             &resp.Step.URI,
 		BatchID:         md.Config.BatchID,
 	}
 
-	err = applyResponse(&h, &resp)
+	err = applyResponse(&h, resp)
 	if err != nil {
 		// Swallow error and log, since we don't want a response parsing error
 		// to fail history writing.
