@@ -1,4 +1,4 @@
-package executor
+package run
 
 import (
 	"context"
@@ -16,25 +16,25 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func NewTraceRunLifecycleListener(l *slog.Logger, run sv2.RunService) execution.LifecycleListener {
+func NewTraceLifecycleListener(l *slog.Logger, run sv2.RunService) execution.LifecycleListener {
 	if l == nil {
 		l = slog.Default()
 	}
 
-	return lifecycle{
+	return traceLifecycle{
 		log: l,
 		run: run,
 	}
 }
 
-type lifecycle struct {
+type traceLifecycle struct {
 	execution.NoopLifecyceListener
 
 	log *slog.Logger
 	run sv2.RunService
 }
 
-func (l lifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata, req execution.CancelRequest, evts []json.RawMessage) {
+func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata, req execution.CancelRequest, evts []json.RawMessage) {
 	start := time.Now()
 	if !md.Config.StartedAt.IsZero() {
 		start = md.Config.StartedAt
