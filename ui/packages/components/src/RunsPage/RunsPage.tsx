@@ -202,7 +202,7 @@ export function RunsPage({
         });
       }
     },
-    [scrollToTop]
+    [batchUpdate, scrollToTop]
   );
 
   const renderSubComponent = useCallback(
