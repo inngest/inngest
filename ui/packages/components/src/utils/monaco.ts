@@ -84,6 +84,10 @@ export const createRules = (isDark: boolean) => [
     foreground: resolveColor(textColor.codeNumberJson, isDark),
   },
   {
+    token: 'number',
+    foreground: resolveColor(textColor.codeNumberJson, isDark),
+  },
+  {
     token: 'string.value.json',
     foreground: resolveColor(textColor.codeStringValueJson, isDark),
   },
@@ -108,6 +112,10 @@ export const createRules = (isDark: boolean) => [
     token: 'entity.name.function',
     foreground: resolveColor(textColor.codeEntityNameFunction, isDark),
   },
+  {
+    token: 'type',
+    foreground: resolveColor(textColor.codeStringValueJson, isDark),
+  },
 ];
 
 export const createColors = (isDark: boolean) => ({
@@ -116,7 +124,10 @@ export const createColors = (isDark: boolean) => ({
   'editorLineNumber.activeForeground': resolveColor(textColor.basis, isDark),
   'editorWidget.background': resolveColor(backgroundColor.codeEditor, isDark),
   'editorWidget.border': resolveColor(borderColor.subtle, isDark),
-  'editorBracketHighlight.foreground1': resolveColor(textColor.warning, isDark),
+  'editorBracketHighlight.foreground1': resolveColor(textColor.codeDelimiterBracketJson, isDark),
+  'editorBracketHighlight.foreground2': resolveColor(textColor.codeDelimiterBracketJson, isDark),
+  'editorBracketHighlight.foreground3': resolveColor(textColor.codeDelimiterBracketJson, isDark),
+  'editorBracketHighlight.foreground4': resolveColor(textColor.codeDelimiterBracketJson, isDark),
 });
 
 export const LINE_HEIGHT = 26;

@@ -196,7 +196,7 @@
     --color-foreground-btn-danger: var(--color-ruby-600);
     --color-foreground-btn-dangerDisabled: var(--color-ruby-300);
     --color-foreground-code-delimiterBracketJson: var(--color-carbon-800);
-    --color-foreground-code-stringKeyJson: var(--color-matcha-800);
+    --color-foreground-code-stringKeyJson: var(--color-purplehaze-500);
     --color-foreground-code-numberJson: var(--color-honey-600);
     --color-foreground-code-stringValueJson: var(--color-matcha-600);
     --color-foreground-code-keywordJson: var(--color-blush-500);
@@ -299,9 +299,9 @@
     --color-foreground-btn-danger: var(--color-ruby-500);
     --color-foreground-btn-dangerDisabled: var(--color-ruby-900);
     --color-foreground-code-delimiterBracketJson: var(--color-carbon-200);
-    --color-foreground-code-stringKeyJson: var(--color-matcha-300);
+    --color-foreground-code-stringKeyJson: var(--color-purplehaze-500);
     --color-foreground-code-numberJson: var(--color-honey-400);
-    --color-foreground-code-stringValueJson: var(--color-matcha-500);
+    --color-foreground-code-stringValueJson: var(--color-matcha-400);
     --color-foreground-code-keywordJson: var(--color-blush-500);
     --color-foreground-code-comment: var(--color-carbon-500);
     --color-foreground-code-string: var(--color-breeze-400);
