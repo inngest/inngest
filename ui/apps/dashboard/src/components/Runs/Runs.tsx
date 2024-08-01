@@ -18,7 +18,6 @@ import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
 import { pathCreator } from '@/utils/urls';
-import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { usePlanFeatures } from '@/utils/usePlanFeatures';
 import { AppFilterDocument, CountRunsDocument, GetRunsDocument } from './queries';
 import { parseRunsData, toRunStatuses, toTimeField } from './utils';
@@ -104,27 +103,29 @@ export function Runs({ functionSlug, scope }: Props) {
     timeField,
   };
 
-  const firstPageRes = useSkippableGraphQLQuery({
+  const [firstPageRes, fetchFirstPage] = useQuery({
     query: GetRunsDocument,
-    skip: isScrollRequest,
+    pause: isScrollRequest,
+    requestPolicy: 'network-only',
     variables: {
       ...commonQueryVars,
       functionRunCursor: null,
     },
   });
 
-  const nextPageRes = useSkippableGraphQLQuery({
+  const [nextPageRes] = useQuery({
     query: GetRunsDocument,
-    skip: !isScrollRequest,
+    pause: !isScrollRequest,
+    requestPolicy: 'network-only',
     variables: {
       ...commonQueryVars,
       functionRunCursor: cursor,
     },
   });
 
-  const countRes = useSkippableGraphQLQuery({
+  const [countRes] = useQuery({
     query: CountRunsDocument,
-    skip: isScrollRequest,
+    pause: isScrollRequest,
     variables: commonQueryVars,
   });
 
@@ -137,16 +138,16 @@ export function Runs({ functionSlug, scope }: Props) {
   const firstPageInfo = firstPageRes.data?.environment.runs.pageInfo;
   const nextPageInfo = nextPageRes.data?.environment.runs.pageInfo;
   const hasNextPage = nextPageInfo?.hasNextPage || firstPageInfo?.hasNextPage;
-  const isLoading = firstPageRes.isLoading || nextPageRes.isLoading;
+  const isLoading = firstPageRes.fetching || nextPageRes.fetching;
 
   let totalCount = undefined;
-  if (!countRes.isLoading) {
+  if (!countRes.fetching) {
     // Only set the total count if the count query has finished loading since we
     // don't want to render stale data
     totalCount = countRes.data?.environment.runs.totalCount;
   }
 
-  if (functionSlug && !firstPageRunsData && !firstPageRes.isLoading && !firstPageRes.isSkipped) {
+  if (functionSlug && !firstPageRunsData && !firstPageRes.fetching) {
     throw new Error('missing run');
   }
 
@@ -190,6 +191,13 @@ export function Runs({ functionSlug, scope }: Props) {
     setIsScrollRequest(false);
   }, []);
 
+  const onRefresh = useCallback(() => {
+    onScrollToTop();
+    setCursor('');
+    setRuns([]);
+    fetchFirstPage();
+  }, [fetchFirstPage, onScrollToTop]);
+
   return (
     <RunsPage
       apps={appsRes.data?.env?.apps.map((app) => ({
@@ -202,9 +210,10 @@ export function Runs({ functionSlug, scope }: Props) {
         history: features.data?.history ?? 7,
       }}
       hasMore={hasNextPage ?? false}
-      isLoadingInitial={firstPageRes.isLoading}
-      isLoadingMore={nextPageRes.isLoading}
+      isLoadingInitial={firstPageRes.fetching}
+      isLoadingMore={nextPageRes.fetching}
       getRun={getRun}
+      onRefresh={onRefresh}
       onScroll={fetchMoreOnScroll}
       onScrollToTop={onScrollToTop}
       getTraceResult={getTraceResult}
