@@ -7,20 +7,16 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/google/cel-go/common/operators"
 	"github.com/google/uuid"
-	"github.com/inngest/expr"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs/sqlc"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
-	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/run"
@@ -486,123 +482,11 @@ func (w wrapper) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([
 	return evts, nil
 }
 
-// toSQLEventFilter parses the passed in nodes and converts them into SQL filter expressions
-func toSQLEventFilter(nodes []*expr.Node) ([]sq.Expression, error) {
-	filters := []sq.Expression{}
-
-	for _, n := range nodes {
-		if n.HasPredicate() {
-			literal := n.Predicate.Literal
-
-			switch n.Predicate.Ident {
-			case "event.id":
-				id, ok := literal.(string)
-				if !ok {
-					return nil, fmt.Errorf("expects 'event.id' to be a string: %v", literal)
-				}
-				switch n.Predicate.Operator {
-				case operators.Equals:
-					filters = append(filters, sq.C("event_id").Eq(id))
-				case operators.NotEquals:
-					filters = append(filters, sq.C("event_id").Neq(id))
-				}
-			case "event.name":
-				name, ok := literal.(string)
-				if !ok {
-					return nil, fmt.Errorf("expects 'event.name' to be a string: %v", literal)
-				}
-				switch n.Predicate.Operator {
-				case operators.Equals:
-					filters = append(filters, sq.C("event_name").Eq(name))
-				case operators.NotEquals:
-					filters = append(filters, sq.C("event_name").Neq(name))
-				}
-			case "event.ts":
-				ts, ok := literal.(int64)
-				if !ok {
-					return nil, fmt.Errorf("expects 'event.ts' to be an integer: %v", literal)
-				}
-				var f sq.Expression
-				field := "event_ts"
-
-				switch n.Predicate.Operator {
-				case operators.Greater:
-					f = sq.C(field).Gt(ts)
-				case operators.GreaterEquals:
-					f = sq.C(field).Gte(ts)
-				case operators.Equals:
-					f = sq.C(field).Eq(ts)
-				case operators.Less:
-					f = sq.C(field).Lt(ts)
-				case operators.LessEquals:
-					f = sq.C(field).Lte(ts)
-				case operators.NotEquals:
-					f = sq.C(field).Neq(ts)
-				}
-				if f != nil {
-					filters = append(filters, f)
-				}
-			case "event.v":
-				v, ok := literal.(string)
-				if !ok {
-					return nil, fmt.Errorf("expects 'event.v' to be a string: %v", literal)
-				}
-				switch n.Predicate.Operator {
-				case operators.Equals:
-					filters = append(filters, sq.C("event_v").Eq(v))
-				case operators.NotEquals:
-					filters = append(filters, sq.C("event_v").Neq(v))
-				}
-			}
-		}
-
-		// check for further nesting
-		if n.Ands != nil {
-			nested, err := toSQLEventFilter(n.Ands)
-			if err != nil {
-				return nil, err
-			}
-			filters = append(filters, sq.And(nested...))
-		}
-
-		if n.Ors != nil {
-			nested, err := toSQLEventFilter(n.Ors)
-			if err != nil {
-				return nil, err
-			}
-			filters = append(filters, sq.Or(nested...))
-		}
-	}
-
-	return filters, nil
-}
-
 func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*cqrs.Event, error) {
-	// create pre-filters for database queries
-	// - ULID
-	// - event id (idempotency key)
-	// - event name
-	// - version
-	// - timestamp
-	parser := expressions.ParserSingleton()
-	prefilters := []sq.Expression{}
 	expHandler := run.NewExpressionHandler(run.WithExpressionHandlerExpressions(cel))
-	for _, exp := range expHandler.EventExprList {
-		tree, err := parser.Parse(ctx, expr.StringExpression(exp))
-		if err != nil {
-			return nil, fmt.Errorf("error evaluating expression '%s': %w", exp, err)
-		}
-
-		// check if the expression is targeting the event or not
-		if tree.Root.HasPredicate() && !eventRegex.MatchString(tree.Root.Predicate.Ident) {
-			continue
-		}
-
-		expFilter, err := toSQLEventFilter([]*expr.Node{&tree.Root})
-		if err != nil {
-			return nil, err
-		}
-		prefilters = append(prefilters, expFilter...)
+	prefilters, err := expHandler.ToSQLEventFilters(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	sql, args, err := sq.Dialect("sqlite3").
