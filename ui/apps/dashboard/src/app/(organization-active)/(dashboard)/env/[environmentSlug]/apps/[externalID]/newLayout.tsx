@@ -73,7 +73,7 @@ export default function NewLayout({ children, params: { externalID } }: Props) {
         breadcrumb={[
           { text: 'Apps', href: `/env/${env.slug}/apps` },
           { text: res.data?.name || '', href: `/env/${env.slug}/apps/${externalID}` },
-          ...(pathname?.endsWith('/syncs')
+          ...(pathname.endsWith('/syncs')
             ? [{ text: 'All syncs', href: `/env/${env.slug}/apps/${externalID}/syncs` }]
             : []),
         ]}
