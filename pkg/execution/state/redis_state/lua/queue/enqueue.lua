@@ -31,6 +31,7 @@ local partitionIdC        = ARGV[12]
 
 -- $include(get_partition_item.lua)
 -- $include(enqueue_to_partition.lua)
+-- $include(ends_with.lua)
 
 -- Check idempotency exists
 if redis.call("EXISTS", idempotencyKey) ~= 0 then
@@ -48,10 +49,11 @@ enqueue_to_partition(keyPartitionA, partitionIdA, partitionItemA, keyPartitionMa
 enqueue_to_partition(keyPartitionB, partitionIdB, partitionItemB, keyPartitionMap, keyGlobalPointer, queueScore, queueID, partitionTime, nowMS)
 enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, keyPartitionMap, keyGlobalPointer, queueScore, queueID, partitionTime, nowMS)
 
-
--- note to future devs: if updating metadata, be sure you do not change the "off"
--- (i.e. "paused") boolean in the function's metadata.
-redis.call("SET", keyFnMetadata, fnMetadata, "NX")
+if exists_without_ending(keyFnMetadata, ":fnMeta:-") == true then
+	-- note to future devs: if updating metadata, be sure you do not change the "off"
+	-- (i.e. "paused") boolean in the function's metadata.
+	redis.call("SET", keyFnMetadata, fnMetadata, "NX")
+end
 
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then

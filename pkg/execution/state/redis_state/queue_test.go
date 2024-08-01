@@ -595,6 +595,59 @@ func BenchmarkPeekTiming(b *testing.B) {
 	}
 }
 
+func TestQueueSystemPartitions(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	customQueueName := "custom"
+	customTestLimit := 91414751920
+
+	q := NewQueue(
+		NewQueueClient(rc, QueueDefaultKey),
+		WithAllowQueueNames(customQueueName),
+		WithSystemConcurrencyLimitGetter(
+			func(ctx context.Context, p QueuePartition) int {
+				return customTestLimit
+			}),
+	)
+	ctx := context.Background()
+
+	start := time.Now().Truncate(time.Second)
+
+	t.Run("It enqueues an item", func(t *testing.T) {
+		id := uuid.New()
+		item, err := q.EnqueueItem(ctx, QueueItem{
+			FunctionID: id,
+			Data: osqueue.Item{
+				QueueName: &customQueueName,
+			},
+			QueueName: &customQueueName,
+		}, start)
+		require.NoError(t, err)
+		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
+
+		// Ensure that our data is set up correctly.
+		found := getQueueItem(t, r, item.ID)
+		require.Equal(t, item, found)
+
+		// Ensure the partition is inserted.
+		qp := getSystemPartition(t, r, customQueueName)
+		require.Equal(t, QueuePartition{
+			ID:               "custom",
+			PartitionType:    int(enums.PartitionTypeSystem),
+			ConcurrencyLimit: customTestLimit,
+		}, qp)
+	})
+
+	// TODO Add more cases
+}
+
 func TestQueuePeek(t *testing.T) {
 	r := miniredis.RunT(t)
 
@@ -3266,6 +3319,18 @@ func getDefaultPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) Que
 	qp := QueuePartition{}
 	err := json.Unmarshal([]byte(val), &qp)
 	require.NoError(t, err)
+	return qp
+}
+
+func getSystemPartition(t *testing.T, r *miniredis.Miniredis, name string) QueuePartition {
+	t.Helper()
+	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
+	val := r.HGet(kg.PartitionItem(), name)
+	require.NotEmpty(t, val, "expected item to be set", r.Dump())
+	qp := QueuePartition{}
+	err := json.Unmarshal([]byte(val), &qp)
+	require.NoError(t, err, "expected item to be valid json")
+	require.Equal(t, int(enums.PartitionTypeSystem), qp.PartitionType)
 	return qp
 }
 

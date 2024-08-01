@@ -533,6 +533,7 @@ func TestRunPriorityFactor(t *testing.T) {
 	// Assert metrics are correct.
 }
 
+// TODO Add more cases
 func TestQueueAllowList(t *testing.T) {
 	r := miniredis.RunT(t)
 
@@ -574,17 +575,15 @@ func TestQueueAllowList(t *testing.T) {
 		{
 			QueueName: &allowedQueueName,
 			Data: osqueue.Item{
-				Kind:        osqueue.KindEdge,
+				QueueName:   &allowedQueueName,
+				Kind:        osqueue.KindPause,
 				MaxAttempts: max(3),
-				Identifier: state.Identifier{
-
-					RunID: ulid.MustNew(ulid.Now(), rand.Reader),
-				},
 			},
 		},
 		{
 			QueueName: &otherQueueName,
 			Data: osqueue.Item{
+				QueueName:   &otherQueueName,
 				Kind:        osqueue.KindEdge,
 				MaxAttempts: max(1),
 				Identifier: state.Identifier{
