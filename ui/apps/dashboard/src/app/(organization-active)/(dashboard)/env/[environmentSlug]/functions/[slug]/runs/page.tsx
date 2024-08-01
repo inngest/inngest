@@ -1,6 +1,6 @@
 'use client';
 
-import { FnRuns } from '@/components/Runs/FnRuns';
+import { Runs } from '@/components/Runs';
 
 export default function Page({
   params,
@@ -11,5 +11,5 @@ export default function Page({
 }) {
   const functionSlug = decodeURIComponent(params.slug);
 
-  return <FnRuns functionSlug={functionSlug} />;
+  return <Runs functionSlug={functionSlug} scope="fn" />;
 }

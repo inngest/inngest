@@ -14,110 +14,46 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { useGetRun } from '@/components/RunDetails/useGetRun';
 import { useGetTraceResult } from '@/components/RunDetails/useGetTraceResult';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
-import { graphql } from '@/gql';
 import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
 import { pathCreator } from '@/utils/urls';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { usePlanFeatures } from '@/utils/usePlanFeatures';
+import { AppFilterDocument, CountRunsDocument, GetRunsDocument } from './queries';
 import { parseRunsData, toRunStatuses, toTimeField } from './utils';
 
-const GetRunsDocument = graphql(`
-  query GetFnRuns(
-    $environmentID: ID!
-    $startTime: Time!
-    $endTime: Time
-    $status: [FunctionRunStatus!]
-    $timeField: RunsOrderByField!
-    $functionSlug: String!
-    $functionRunCursor: String = null
-  ) {
-    environment: workspace(id: $environmentID) {
-      runs(
-        filter: {
-          from: $startTime
-          until: $endTime
-          status: $status
-          timeField: $timeField
-          fnSlug: $functionSlug
-        }
-        orderBy: [{ field: $timeField, direction: DESC }]
-        after: $functionRunCursor
-      ) {
-        edges {
-          node {
-            app {
-              externalID
-              name
-            }
-            cronSchedule
-            eventName
-            function {
-              name
-              slug
-            }
-            id
-            isBatch
-            queuedAt
-            endedAt
-            startedAt
-            status
-          }
-        }
-        pageInfo {
-          hasNextPage
-          hasPreviousPage
-          startCursor
-          endCursor
-        }
-      }
-    }
-  }
-`);
-
-const CountRunsDocument = graphql(`
-  query CountFnRuns(
-    $environmentID: ID!
-    $startTime: Time!
-    $endTime: Time
-    $status: [FunctionRunStatus!]
-    $timeField: RunsOrderByField!
-    $functionSlug: String!
-  ) {
-    environment: workspace(id: $environmentID) {
-      runs(
-        filter: {
-          from: $startTime
-          until: $endTime
-          status: $status
-          timeField: $timeField
-          fnSlug: $functionSlug
-        }
-        orderBy: [{ field: $timeField, direction: DESC }]
-      ) {
-        totalCount
-      }
-    }
-  }
-`);
-
-type Props = {
+type FnProps = {
   functionSlug: string;
+  scope: 'fn';
 };
 
-// TODO: DRY out this component along with EnvRuns
-export function FnRuns({ functionSlug }: Props) {
+type EnvProps = {
+  functionSlug?: undefined;
+  scope: 'env';
+};
+
+type Props = FnProps | EnvProps;
+
+export function Runs({ functionSlug, scope }: Props) {
   const env = useEnvironment();
 
   const [{ data: pauseData }] = useQuery({
+    pause: scope !== 'fn',
     query: GetFunctionPauseStateDocument,
     variables: {
       environmentID: env.id,
-      functionSlug: functionSlug,
+      functionSlug: functionSlug ?? '',
     },
   });
 
+  const [appsRes] = useQuery({
+    pause: scope === 'fn',
+    query: AppFilterDocument,
+    variables: { envSlug: env.slug },
+  });
+
+  const [appIDs] = useStringArraySearchParam('filterApp');
   const [rawFilteredStatus] = useStringArraySearchParam('filterStatus');
   const [rawTimeField = RunsOrderByField.QueuedAt] = useSearchParam('timeField');
   const [lastDays] = useSearchParam('last');
@@ -159,8 +95,9 @@ export function FnRuns({ functionSlug }: Props) {
   const environment = useEnvironment();
 
   const commonQueryVars = {
+    appIDs: appIDs ?? null,
     environmentID: environment.id,
-    functionSlug,
+    functionSlug: functionSlug ?? null,
     startTime: calculatedStartTime.toISOString(),
     endTime: endTime ?? null,
     status: filteredStatus.length > 0 ? filteredStatus : null,
@@ -169,7 +106,7 @@ export function FnRuns({ functionSlug }: Props) {
 
   const firstPageRes = useSkippableGraphQLQuery({
     query: GetRunsDocument,
-    skip: !functionSlug || isScrollRequest,
+    skip: isScrollRequest,
     variables: {
       ...commonQueryVars,
       functionRunCursor: null,
@@ -178,7 +115,7 @@ export function FnRuns({ functionSlug }: Props) {
 
   const nextPageRes = useSkippableGraphQLQuery({
     query: GetRunsDocument,
-    skip: !functionSlug || !isScrollRequest,
+    skip: !isScrollRequest,
     variables: {
       ...commonQueryVars,
       functionRunCursor: cursor,
@@ -187,7 +124,7 @@ export function FnRuns({ functionSlug }: Props) {
 
   const countRes = useSkippableGraphQLQuery({
     query: CountRunsDocument,
-    skip: !functionSlug || isScrollRequest,
+    skip: isScrollRequest,
     variables: commonQueryVars,
   });
 
@@ -255,6 +192,10 @@ export function FnRuns({ functionSlug }: Props) {
 
   return (
     <RunsPage
+      apps={appsRes.data?.env?.apps.map((app) => ({
+        id: app.id,
+        name: app.externalID,
+      }))}
       cancelRun={cancelRun}
       data={runs}
       features={{
@@ -271,7 +212,7 @@ export function FnRuns({ functionSlug }: Props) {
       pathCreator={internalPathCreator}
       rerun={rerun}
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
-      scope="fn"
+      scope={scope}
       totalCount={totalCount}
     />
   );

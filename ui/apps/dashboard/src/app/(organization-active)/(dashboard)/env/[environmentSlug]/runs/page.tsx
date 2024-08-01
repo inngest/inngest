@@ -1,7 +1,7 @@
 'use client';
 
-import { EnvRuns } from '@/components/Runs/EnvRuns';
+import { Runs } from '@/components/Runs';
 
 export default function Page() {
-  return <EnvRuns />;
+  return <Runs scope="env" />;
 }
