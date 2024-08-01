@@ -23,10 +23,10 @@ import (
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jinzhu/copier"
 	"github.com/oklog/ulid/v2"
-	"golang.org/x/sync/errgroup"
 
 	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -577,15 +577,6 @@ func toSQLEventFilter(nodes []*expr.Node) ([]sq.Expression, error) {
 	return filters, nil
 }
 
-func isValidResult(res []bool) bool {
-	for _, v := range res {
-		if !v {
-			return false
-		}
-	}
-	return true
-}
-
 func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*cqrs.Event, error) {
 	// create pre-filters for database queries
 	// - ULID
@@ -593,13 +584,10 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 	// - event name
 	// - version
 	// - timestamp
-	validCel := []string{}
 	parser := expressions.ParserSingleton()
 	prefilters := []sq.Expression{}
-	for _, exp := range cel {
-		if exp == "" {
-			continue
-		}
+	expHandler := run.NewExpressionHandler(run.WithExpressionHandlerExpressions(cel))
+	for _, exp := range expHandler.EventExprList {
 		tree, err := parser.Parse(ctx, expr.StringExpression(exp))
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating expression '%s': %w", exp, err)
@@ -615,7 +603,6 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 			return nil, err
 		}
 		prefilters = append(prefilters, expFilter...)
-		validCel = append(validCel, exp)
 	}
 
 	sql, args, err := sq.Dialect("sqlite3").
@@ -672,35 +659,11 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 			return nil, fmt.Errorf("error deserializing event: %w", err)
 		}
 
-		results := make([]bool, len(validCel))
-		eg := errgroup.Group{}
-		// evaluate expressions concurrenctly
-		for i, c := range validCel {
-			idx := i
-			emap := evt.GetEvent().Map()
-
-			eg.Go(func() error {
-				eval, err := expressions.NewBooleanEvaluator(ctx, c)
-				if err != nil {
-					return err
-				}
-				ok, _, err := eval.Evaluate(ctx, expressions.NewData(map[string]any{
-					"event": emap,
-				}))
-				if err != nil {
-					return fmt.Errorf("error evaluating expression '%s': %w", c, err)
-				}
-
-				results[idx] = ok
-				return nil
-			})
+		ok, err := expHandler.MatchEventExpressions(ctx, evt.GetEvent())
+		if err != nil {
+			return nil, err
 		}
-
-		if err := eg.Wait(); err != nil {
-			return nil, fmt.Errorf("error running evaluation on events: %w", err)
-		}
-		// check if all evaluations results in true
-		if isValidResult(results) {
+		if ok {
 			res = append(res, evt)
 		}
 	}
@@ -1370,12 +1333,13 @@ func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt)
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
-	// TODO: use evtIDs as post query filter
+	// use evtIDs as post query filter
 	evtIDs := []string{}
-	if opt.Filter.CEL != "" {
-		cel := strings.Split(opt.Filter.CEL, "\n")
-
-		evts, err := w.GetEventsByExpressions(ctx, cel)
+	expHandler := run.NewExpressionHandler(
+		run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
+	)
+	if expHandler.HasEventFilters() {
+		evts, err := w.GetEventsByExpressions(ctx, expHandler.EventExprList)
 		if err != nil {
 			return nil, err
 		}
