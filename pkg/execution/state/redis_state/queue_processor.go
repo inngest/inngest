@@ -110,8 +110,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		WorkspaceID: item.WorkspaceID,
 		FunctionID:  item.Identifier.WorkflowID,
 		Data:        item,
-		// Only use the queue name if provided by queueKindMapping.
-		// Otherwise, this defaults to FunctionID.
+		// Only use the queue name if provided by queueKindMapping or set explicitly
 		QueueName:  queueName,
 		WallTimeMS: at.UnixMilli(),
 	}

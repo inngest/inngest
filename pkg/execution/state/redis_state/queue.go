@@ -379,6 +379,14 @@ func WithConcurrencyLimitGetter(f ConcurrencyLimitGetter) func(q *queue) {
 	}
 }
 
+// WithConcurrencyLimitGetter assigns a function that returns concurrency limits
+// for a given partition.
+func WithSystemConcurrencyLimitGetter(f SystemConcurrencyLimitGetter) func(q *queue) {
+	return func(q *queue) {
+		q.systemConcurrencyLimitGetter = f
+	}
+}
+
 func WithBackoffFunc(f backoff.BackoffFunc) func(q *queue) {
 	return func(q *queue) {
 		q.backoffFunc = f
@@ -401,6 +409,9 @@ type QueueItemConcurrencyKeyGenerator func(ctx context.Context, i QueueItem) []s
 
 // ConcurrencyLimitGetter returns the fn, account, and custom limits for a given partition.
 type ConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) (fn, acct, custom int)
+
+// SystemConcurrencyLimitGetter returns the concurrency limits for a given system partition.
+type SystemConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) int
 
 func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 	q := &queue{
@@ -427,6 +438,13 @@ func NewQueue(u *QueueClient, opts ...QueueOpt) *queue {
 				custom = NoConcurrencyLimit
 			}
 			return account, fn, custom
+		},
+		systemConcurrencyLimitGetter: func(ctx context.Context, p QueuePartition) int {
+			def := defaultConcurrency
+			if p.ConcurrencyLimit > 0 {
+				def = p.ConcurrencyLimit
+			}
+			return def
 		},
 		customConcurrencyGen: func(ctx context.Context, item QueueItem) []state.CustomConcurrency {
 			// Use whatever's in the queue item by default
@@ -460,8 +478,9 @@ type queue struct {
 
 	lifecycles []QueueLifecycleListener
 
-	concurrencyLimitGetter ConcurrencyLimitGetter
-	customConcurrencyGen   QueueItemConcurrencyKeyGenerator
+	concurrencyLimitGetter       ConcurrencyLimitGetter
+	systemConcurrencyLimitGetter SystemConcurrencyLimitGetter
+	customConcurrencyGen         QueueItemConcurrencyKeyGenerator
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.
@@ -657,6 +676,10 @@ type QueuePartition struct {
 // For default partitions, this is different to the ID (for backwards compatibility, it's just
 // the fn ID without prefixes)
 func (q QueuePartition) zsetKey(kg QueueKeyGenerator) string {
+	// For system partitions, return zset using custom queueName
+	if q.PartitionType == int(enums.PartitionTypeSystem) {
+		return kg.PartitionQueueSet(enums.PartitionTypeDefault, q.Queue(), "")
+	}
 	if q.PartitionType == int(enums.PartitionTypeDefault) && q.FunctionID != nil {
 		// return the top-level function queue.
 		return kg.PartitionQueueSet(enums.PartitionTypeDefault, q.FunctionID.String(), "")
@@ -674,6 +697,8 @@ func (q QueuePartition) zsetKey(kg QueueKeyGenerator) string {
 // requeueing partitions.
 func (q QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
 	switch enums.PartitionType(q.PartitionType) {
+	case enums.PartitionTypeSystem:
+		return q.fnConcurrencyKey(kg)
 	case enums.PartitionTypeDefault:
 		return q.fnConcurrencyKey(kg)
 	case enums.PartitionTypeConcurrencyKey:
@@ -687,6 +712,9 @@ func (q QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
 // fnConcurrencyKey returns the concurrency key for a function scope limit, on the
 // entire function (not custom keys)
 func (q QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
+	if q.PartitionType == int(enums.PartitionTypeSystem) {
+		return kg.Concurrency("p", q.Queue())
+	}
 	if q.FunctionID == nil {
 		return kg.Concurrency("p", "-")
 	}
@@ -712,6 +740,12 @@ func (q QueuePartition) customConcurrencyKey(kg QueueKeyGenerator) string {
 }
 
 func (q QueuePartition) Queue() string {
+	// This is redundant but acts as a safeguard, so that
+	// we always return the ID (queueName) for system partitions
+	if q.PartitionType == int(enums.PartitionTypeSystem) {
+		return q.ID
+	}
+
 	if q.ID == "" && q.FunctionID != nil {
 		return q.FunctionID.String()
 	}
@@ -760,9 +794,9 @@ type QueueItem struct {
 	// Data represents the enqueued data, eg. the edge to process or the pause
 	// to resume.
 	Data osqueue.Item `json:"data"`
-	// QueueName allows placing this job into a specific queue name.  If the QueueName
-	// is nil, the FunctionID will be used as the queue name.  This allows us to
-	// automatically create partitioned queues for each function within Inngest.
+	// QueueName allows placing this job into a specific queue name. This is exclusively
+	// used for system-specific queues for handling pauses, recovery, and other features.
+	// If unset, the workflow-specific partitions for key queues will be used.
 	//
 	// This should almost always be nil.
 	QueueName *string `json:"queueID,omitempty"`
@@ -832,6 +866,22 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 		partitions []QueuePartition
 		ckeys      = i.Data.GetConcurrencyKeys()
 	)
+
+	if i.Data.QueueName != nil {
+		systemPartition := QueuePartition{
+			ID:            *i.Data.QueueName,
+			PartitionType: int(enums.PartitionTypeSystem),
+		}
+		systemLimit := q.systemConcurrencyLimitGetter(ctx, systemPartition)
+		systemPartition.ConcurrencyLimit = systemLimit
+
+		return []QueuePartition{
+			systemPartition,
+			// pad with empty partitions
+			{},
+			{},
+		}
+	}
 
 	// Check if we have custom concurrency keys for the given function.  If so,
 	// we're going to create new partitions for each of the custom keys.  This allows
@@ -1402,13 +1452,24 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		}
 	}
 
-	// NOTE: This has been called in ItemPartitions.  We always need to fetch the latest
-	// account concurrency limit.
-	//
-	// TODO: Refactor this to be nicer/remove dupe calls
-	acctLimit, _, _ := q.concurrencyLimitGetter(ctx, parts[0])
-	if acctLimit <= 0 {
-		acctLimit = consts.DefaultConcurrencyLimit
+	// NOTE: The account limit is used for queue items within accounts, as well as system partitions
+	// For system partitions, this doesn't make a lot of sense, but it matches the previous
+	// implementation. In the future, we should streamline the abstraction layers so that the
+	// queue does not need to handle account-related details outside the account scope.
+	var acctLimit int
+	accountConcurrencyKey := q.u.kg.Concurrency("account", item.Data.Identifier.AccountID.String())
+	if len(parts) == 1 && parts[0].PartitionType == int(enums.PartitionTypeSystem) {
+		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
+		acctLimit = parts[0].ConcurrencyLimit
+	} else {
+		// NOTE: This has been called in ItemPartitions.  We always need to fetch the latest
+		// account concurrency limit.
+		//
+		// TODO: Refactor this to be nicer/remove dupe calls
+		acctLimit, _, _ = q.concurrencyLimitGetter(ctx, parts[0])
+		if acctLimit <= 0 {
+			acctLimit = consts.DefaultConcurrencyLimit
+		}
 	}
 
 	keys := []string{
@@ -1425,7 +1486,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		q.u.kg.GlobalPartitionIndex(),
 		q.u.kg.ThrottleKey(item.Data.Throttle),
 		// Finally, there are ALWAYS account-level concurrency keys.
-		q.u.kg.Concurrency("account", item.Data.Identifier.AccountID.String()),
+		accountConcurrencyKey,
 	}
 	args, err := StrSlice([]any{
 		item.ID,

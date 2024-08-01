@@ -532,3 +532,95 @@ func TestRunPriorityFactor(t *testing.T) {
 	// Assert queue items have been dequeued, and peek is nil for workflows.
 	// Assert metrics are correct.
 }
+
+func TestQueueAllowList(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	allowedQueueName := "allowed"
+	otherQueueName := "other"
+
+	q := NewQueue(
+		NewQueueClient(rc, QueueDefaultKey),
+		// We can't add more than 8128 goroutines when detecting race conditions.
+		WithNumWorkers(10),
+		WithAllowQueueNames(allowedQueueName),
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var handledAllow, handledOther int32
+	go func() {
+		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) error {
+			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
+			if item.QueueName != nil && *item.QueueName == allowedQueueName {
+				atomic.AddInt32(&handledAllow, 1)
+			} else {
+				atomic.AddInt32(&handledOther, 1)
+			}
+			id := osqueue.JobIDFromContext(ctx)
+			require.NotEmpty(t, id, "No job ID was passed via context")
+			return nil
+		})
+	}()
+
+	items := []QueueItem{
+		{
+			QueueName: &allowedQueueName,
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(3),
+				Identifier: state.Identifier{
+
+					RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+				},
+			},
+		},
+		{
+			QueueName: &otherQueueName,
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(1),
+				Identifier: state.Identifier{
+					RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+				},
+			},
+		},
+		{
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(1),
+				Identifier: state.Identifier{
+					RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+				},
+			},
+		},
+	}
+
+	for _, item := range items {
+		at := time.Now()
+		_, err := q.EnqueueItem(ctx, item, at)
+		require.NoError(t, err)
+	}
+
+	<-time.After(5 * time.Second)
+	require.EqualValues(t, 1, atomic.LoadInt32(&handledAllow), "number of enqueued and received allowed items does not match", r.Dump())
+	require.EqualValues(t, 0, atomic.LoadInt32(&handledOther), "number of enqueued and received other items does not match", r.Dump())
+
+	cancel()
+
+	<-time.After(time.Second)
+
+	r.Close()
+	rc.Close()
+
+	// Assert queue items have been processed
+	// Assert queue items have been dequeued, and peek is nil for workflows.
+	// Assert metrics are correct.
+}
