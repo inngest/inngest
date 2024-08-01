@@ -667,7 +667,7 @@ type QueuePartition struct {
 	// LimitOwner represents the function ID that set the max concurrency limit for
 	// this function.  This allows us to lower the max if the owner/enqueueing function
 	// ID matches - otherwise, once set, the max can never lower.
-	LimitOnwer *uuid.UUID `json:"lID,omitempty"`
+	LimitOwner *uuid.UUID `json:"lID,omitempty"`
 
 	// TODO: Throttling;  embed max limit/period/etc?
 }
@@ -680,14 +680,18 @@ func (q QueuePartition) zsetKey(kg QueueKeyGenerator) string {
 	if q.PartitionType == int(enums.PartitionTypeSystem) {
 		return kg.PartitionQueueSet(enums.PartitionTypeDefault, q.Queue(), "")
 	}
+
+	// Backwards compatibility with old fn queues
 	if q.PartitionType == int(enums.PartitionTypeDefault) && q.FunctionID != nil {
 		// return the top-level function queue.
 		return kg.PartitionQueueSet(enums.PartitionTypeDefault, q.FunctionID.String(), "")
 	}
+
 	if q.ID == "" {
 		// return a blank queue key.  This is used for nil queue partitions.
 		return kg.PartitionQueueSet(enums.PartitionTypeDefault, "-", "")
 	}
+
 	// q.ID is already a properly defined key.
 	return q.ID
 }
@@ -697,9 +701,7 @@ func (q QueuePartition) zsetKey(kg QueueKeyGenerator) string {
 // requeueing partitions.
 func (q QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
 	switch enums.PartitionType(q.PartitionType) {
-	case enums.PartitionTypeSystem:
-		return q.fnConcurrencyKey(kg)
-	case enums.PartitionTypeDefault:
+	case enums.PartitionTypeSystem, enums.PartitionTypeDefault:
 		return q.fnConcurrencyKey(kg)
 	case enums.PartitionTypeConcurrencyKey:
 		// Hierarchically, custom keys take precedence.
@@ -712,9 +714,11 @@ func (q QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
 // fnConcurrencyKey returns the concurrency key for a function scope limit, on the
 // entire function (not custom keys)
 func (q QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
+	// Enable system partitions to use the queueName override instead of the fnId
 	if q.PartitionType == int(enums.PartitionTypeSystem) {
 		return kg.Concurrency("p", q.Queue())
 	}
+
 	if q.FunctionID == nil {
 		return kg.Concurrency("p", "-")
 	}
@@ -724,6 +728,10 @@ func (q QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
 // acctConcurrencyKey returns the concurrency key for the account limit, on the
 // entire account (not custom keys)
 func (q QueuePartition) acctConcurrencyKey(kg QueueKeyGenerator) string {
+	// Enable system partitions to use the queueName override instead of the accountId
+	if q.PartitionType == int(enums.PartitionTypeSystem) {
+		return kg.Concurrency("account", q.Queue())
+	}
 	if q.AccountID == uuid.Nil {
 		return kg.Concurrency("account", "-")
 	}
@@ -733,6 +741,11 @@ func (q QueuePartition) acctConcurrencyKey(kg QueueKeyGenerator) string {
 // customConcurrencyKey returns the concurrency key if this partition represents
 // a custom concurrnecy limit.
 func (q QueuePartition) customConcurrencyKey(kg QueueKeyGenerator) string {
+	// This should never happen, but we attempt to handle it gracefully
+	if q.PartitionType == int(enums.PartitionTypeSystem) {
+		return kg.Concurrency("custom", q.Queue())
+	}
+
 	if q.ConcurrencyKey == "" {
 		return kg.Concurrency("custom", "-")
 	}
@@ -867,11 +880,13 @@ func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartitio
 		ckeys      = i.Data.GetConcurrencyKeys()
 	)
 
+	// The only case when we manually set a queueName is for system partitions
 	if i.Data.QueueName != nil {
 		systemPartition := QueuePartition{
 			ID:            *i.Data.QueueName,
 			PartitionType: int(enums.PartitionTypeSystem),
 		}
+		// Fetch most recent system concurrency limit
 		systemLimit := q.systemConcurrencyLimitGetter(ctx, systemPartition)
 		systemPartition.ConcurrencyLimit = systemLimit
 
@@ -1554,26 +1569,16 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ExtendLease"), redis_telemetry.ScopeQueue)
 
-	var (
-		customKeys = make([]string, 2)
-	)
-	if q.customConcurrencyGen != nil {
-		// Get the custom concurrency key, if available.
-		for n, item := range q.customConcurrencyGen(ctx, i) {
-			if n >= 2 {
-				// We only support two concurrency keys right now.
-				break
-			}
-			customKeys[n] = item.Key
-		}
-	}
-
 	newLeaseID, err := ulid.New(ulid.Timestamp(q.clock.Now().Add(duration).UTC()), rnd)
 	if err != nil {
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
 	parts := q.ItemPartitions(ctx, i)
+	accountConcurrencyKey := q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
+	if len(parts) == 1 && parts[0].PartitionType == int(enums.PartitionTypeSystem) {
+		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
+	}
 
 	keys := []string{
 		q.u.kg.QueueItem(),
@@ -1585,7 +1590,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 		parts[0].concurrencyKey(q.u.kg),
 		parts[1].concurrencyKey(q.u.kg),
 		parts[2].concurrencyKey(q.u.kg),
-		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
+		accountConcurrencyKey,
 		q.u.kg.ConcurrencyIndex(),
 	}
 
@@ -1625,25 +1630,15 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Dequeue"), redis_telemetry.ScopeQueue)
 
-	var (
-		customKeys = make([]string, 2)
-	)
-	if q.customConcurrencyGen != nil {
-		// Get the custom concurrency key, if available.
-		for n, item := range q.customConcurrencyGen(ctx, i) {
-			if n >= 2 {
-				// We only support two concurrency keys right now.
-				break
-			}
-			customKeys[n] = item.Key
-		}
-	}
-
 	// Remove all items from all partitions.  For this, we need all partitions for
 	// the queue item instead of just the partition passed via args.
 	//
 	// This is because a single queue item may be present in more than one queue.
 	parts := q.ItemPartitions(ctx, i)
+	accountConcurrencyKey := q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
+	if len(parts) == 1 && parts[0].PartitionType == int(enums.PartitionTypeSystem) {
+		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
+	}
 
 	keys := []string{
 		q.u.kg.QueueItem(),
@@ -1653,7 +1648,7 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		parts[0].concurrencyKey(q.u.kg),
 		parts[1].concurrencyKey(q.u.kg),
 		parts[2].concurrencyKey(q.u.kg),
-		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
+		accountConcurrencyKey,
 		q.u.kg.Idempotency(i.ID),
 		q.u.kg.ConcurrencyIndex(),
 		q.u.kg.GlobalPartitionIndex(),
@@ -1724,6 +1719,10 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 	//
 	// This is because a single queue item may be present in more than one queue.
 	parts := q.ItemPartitions(ctx, i)
+	accountConcurrencyKey := q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String())
+	if len(parts) == 1 && parts[0].PartitionType == int(enums.PartitionTypeSystem) {
+		accountConcurrencyKey = q.u.kg.Concurrency("account", parts[0].Queue())
+	}
 
 	keys := []string{
 		q.u.kg.QueueItem(),
@@ -1736,7 +1735,7 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		parts[0].concurrencyKey(q.u.kg),
 		parts[1].concurrencyKey(q.u.kg),
 		parts[2].concurrencyKey(q.u.kg),
-		q.u.kg.Concurrency("account", i.Data.Identifier.AccountID.String()),
+		accountConcurrencyKey,
 		q.u.kg.ConcurrencyIndex(),
 	}
 	// Append indexes
@@ -1811,8 +1810,9 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		q.u.kg.PartitionItem(),
 		q.u.kg.GlobalPartitionIndex(),
 		q.u.kg.FnMetadata(fnMetaKey),
+
 		// These concurrency keys are for fast checking of partition
-		// concurrnecy limits prior to leasing, as an optimization.
+		// concurrency limits prior to leasing, as an optimization.
 		p.acctConcurrencyKey(q.u.kg),
 		p.fnConcurrencyKey(q.u.kg),
 		p.customConcurrencyKey(q.u.kg),

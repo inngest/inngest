@@ -921,9 +921,6 @@ func TestQueueLease(t *testing.T) {
 		p := QueuePartition{FunctionID: &itemA.FunctionID}
 
 		t.Run("With denylists it does not lease.", func(t *testing.T) {
-			// TODO: Bring back denylists with new key queues.
-			t.Skip()
-
 			list := newLeaseDenyList()
 			list.addConcurrency(newKeyError(ErrConcurrencyLimitCustomKey, "custom-level-key"))
 			_, err = q.Lease(ctx, p, itemA, 5*time.Second, time.Now(), list)
