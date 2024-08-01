@@ -142,6 +142,8 @@ local function handleEnqueue(keyPartition, keyConcurrency, partitionID)
 		local earliestLease = tonumber(inProgressScores[2])
 		-- Add the earliest time to the pointer queue for in-progress, allowing us to scavenge
 		-- lost jobs easily.
+		-- Note: Previously, we stored the queue name in the zset, so we have to add an extra
+		-- check to the scavenger logic to handle partition uuids for old queue items
 		redis.call("ZADD", concurrencyPointer, earliestLease, keyConcurrency)
 	end
 end

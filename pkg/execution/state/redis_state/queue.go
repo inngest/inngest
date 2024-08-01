@@ -836,6 +836,8 @@ func (q QueueItem) IsLeased(time time.Time) bool {
 }
 
 // ItemPartitions returns up 3 item partitions for a given queue item.
+// Note: Currently, we only ever return 2 partitions (2x custom concurrency keys or function + custom concurrency key)
+// This will change with the implementation of throttling key queues.
 func (q *queue) ItemPartitions(ctx context.Context, i QueueItem) []QueuePartition {
 	var (
 		partitions []QueuePartition
