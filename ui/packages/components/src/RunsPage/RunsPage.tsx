@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, type UIEventHandler } from 'react';
+import { useCallback, useMemo, useRef, type UIEventHandler } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
@@ -86,9 +86,21 @@ export function RunsPage({
 
   const columns = useScopedColumns(scope);
 
-  const displayAllColumns: VisibilityState = Object.fromEntries(
-    columns.map((column) => [column.accessorKey, true])
-  );
+  const displayAllColumns = useMemo(() => {
+    const out: Record<string, boolean> = {};
+    for (const column of columns) {
+      let { id } = column;
+      if ('accessorKey' in column) {
+        id = column.accessorKey;
+      }
+      if (!id) {
+        continue;
+      }
+
+      out[id] = true;
+    }
+    return out;
+  }, [columns]);
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
     `VisibleRunsColumns-${scope}`,
@@ -212,10 +224,24 @@ export function RunsPage({
     [cancelRun, getRun, getTraceResult, getTrigger, pathCreator, pollInterval, rerun]
   );
 
-  const options: Option[] = columns.map((column) => ({
-    id: column.accessorKey,
-    name: column.header?.toString() || column.accessorKey,
-  }));
+  const options = useMemo(() => {
+    const out = [];
+    for (const column of columns) {
+      let { id } = column;
+      if ('accessorKey' in column) {
+        id = column.accessorKey;
+      }
+      if (!id) {
+        continue;
+      }
+
+      out.push({
+        id,
+        name: column.header?.toString() || id,
+      });
+    }
+    return out;
+  }, [columns]);
 
   return (
     <main

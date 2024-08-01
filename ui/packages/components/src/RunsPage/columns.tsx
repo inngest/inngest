@@ -34,6 +34,49 @@ const columns = [
     header: 'Run ID',
     enableSorting: false,
   }),
+  columnHelper.display({
+    cell: (props) => {
+      const data = props.row.original;
+
+      if (data.isBatch) {
+        return 'Batch';
+      }
+      if (data.cronSchedule) {
+        return data.cronSchedule;
+      }
+      if (data.eventName) {
+        return data.eventName;
+      }
+
+      // Unreachable
+      console.error(`Unknown trigger for run ${data.id}`);
+      return null;
+    },
+    header: 'Trigger',
+    id: 'trigger',
+  }),
+  columnHelper.accessor('function', {
+    cell: (info) => {
+      return (
+        <div className="flex items-center text-nowrap">
+          <TextCell>{info.getValue().name}</TextCell>
+        </div>
+      );
+    },
+    header: 'Function',
+    enableSorting: false,
+  }),
+  columnHelper.accessor('app', {
+    cell: (info) => {
+      return (
+        <div className="flex items-center text-nowrap">
+          <TextCell>{info.getValue().externalID}</TextCell>
+        </div>
+      );
+    },
+    header: 'App',
+    enableSorting: false,
+  }),
   columnHelper.accessor('queuedAt', {
     cell: (info) => {
       const time = info.getValue();
@@ -86,28 +129,6 @@ const columns = [
     header: 'Duration',
     enableSorting: false,
   }),
-  columnHelper.accessor('app', {
-    cell: (info) => {
-      return (
-        <div className="flex items-center text-nowrap">
-          <TextCell>{info.getValue().externalID}</TextCell>
-        </div>
-      );
-    },
-    header: 'App',
-    enableSorting: false,
-  }),
-  columnHelper.accessor('function', {
-    cell: (info) => {
-      return (
-        <div className="flex items-center text-nowrap">
-          <TextCell>{info.getValue().name}</TextCell>
-        </div>
-      );
-    },
-    header: 'Function',
-    enableSorting: false,
-  }),
 ];
 
 /**
@@ -119,8 +140,10 @@ const columns = [
 export function useScopedColumns(scope: ViewScope) {
   return useMemo(() => {
     return columns.filter((column) => {
-      if (scope === 'fn') {
-        return column.accessorKey !== 'app' && column.accessorKey !== 'function';
+      if ('accessorKey' in column) {
+        if (scope === 'fn') {
+          return column.accessorKey !== 'app' && column.accessorKey !== 'function';
+        }
       }
       return true;
     });
