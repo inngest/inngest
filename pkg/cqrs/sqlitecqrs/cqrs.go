@@ -483,7 +483,12 @@ func (w wrapper) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([
 }
 
 func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*cqrs.Event, error) {
-	expHandler := run.NewExpressionHandler(run.WithExpressionHandlerExpressions(cel))
+	expHandler, err := run.NewExpressionHandler(ctx,
+		run.WithExpressionHandlerExpressions(cel),
+	)
+	if err != nil {
+		return nil, err
+	}
 	prefilters, err := expHandler.ToSQLEventFilters(ctx)
 	if err != nil {
 		return nil, err
@@ -1219,9 +1224,12 @@ func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt)
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
 	// use evtIDs as post query filter
 	evtIDs := []string{}
-	expHandler := run.NewExpressionHandler(
+	expHandler, err := run.NewExpressionHandler(ctx,
 		run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
 	)
+	if err != nil {
+		return nil, err
+	}
 	if expHandler.HasEventFilters() {
 		evts, err := w.GetEventsByExpressions(ctx, expHandler.EventExprList)
 		if err != nil {

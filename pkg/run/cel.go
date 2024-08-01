@@ -19,11 +19,11 @@ var (
 	outputRegex = regexp.MustCompile(`^output`)
 )
 
-type ExprHandlerOpt func(h *ExpressionHandler)
+type ExprHandlerOpt func(ctx context.Context, h *ExpressionHandler) error
 
 func WithExpressionHandlerExpressions(cel []string) ExprHandlerOpt {
-	return func(h *ExpressionHandler) {
-		h.add(cel)
+	return func(ctx context.Context, h *ExpressionHandler) error {
+		return h.add(ctx, cel)
 	}
 }
 
@@ -33,8 +33,8 @@ func WithExpressionHandlerBlob(exp string, delimiter string) ExprHandlerOpt {
 	}
 	cel := strings.Split(exp, delimiter)
 
-	return func(h *ExpressionHandler) {
-		h.add(cel)
+	return func(ctx context.Context, h *ExpressionHandler) error {
+		return h.add(ctx, cel)
 	}
 }
 
@@ -43,28 +43,41 @@ type ExpressionHandler struct {
 	OutputExprList []string
 }
 
-func NewExpressionHandler(opts ...ExprHandlerOpt) *ExpressionHandler {
+func NewExpressionHandler(ctx context.Context, opts ...ExprHandlerOpt) (*ExpressionHandler, error) {
 	h := &ExpressionHandler{
 		EventExprList:  []string{},
 		OutputExprList: []string{},
 	}
 
 	for _, apply := range opts {
-		apply(h)
-	}
-
-	return h
-}
-
-func (h *ExpressionHandler) add(cel []string) {
-	for _, e := range cel {
-		switch {
-		case eventRegex.MatchString(e):
-			h.EventExprList = append(h.EventExprList, e)
-		case outputRegex.MatchString(e):
-			h.OutputExprList = append(h.OutputExprList, e)
+		if err := apply(ctx, h); err != nil {
+			return nil, err
 		}
 	}
+
+	return h, nil
+}
+
+func (h *ExpressionHandler) add(ctx context.Context, cel []string) error {
+	parser := expressions.ParserSingleton()
+
+	for _, e := range cel {
+		tree, err := parser.Parse(ctx, expr.StringExpression(e))
+		if err != nil {
+			return fmt.Errorf("error parsing expression '%s': %w", e, err)
+		}
+
+		if tree.Root.HasPredicate() {
+			switch {
+			case eventRegex.MatchString(tree.Root.Predicate.Ident):
+				h.EventExprList = append(h.EventExprList, e)
+			case outputRegex.MatchString(tree.Root.Predicate.Ident):
+				h.OutputExprList = append(h.OutputExprList, e)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (h *ExpressionHandler) HasFilters() bool {
@@ -93,11 +106,6 @@ func (h *ExpressionHandler) ToSQLEventFilters(ctx context.Context) ([]sq.Express
 		tree, err := parser.Parse(ctx, expr.StringExpression(exp))
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating event expression '%s': %w", exp, err)
-		}
-
-		// check if the expression is targeting the event or not
-		if tree.Root.HasPredicate() && !eventRegex.MatchString(tree.Root.Predicate.Ident) {
-			continue
 		}
 
 		expFilter, err := toSQLEventFilters(ctx, []*expr.Node{&tree.Root})
