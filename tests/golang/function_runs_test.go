@@ -16,7 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type FnRunTestEvtData struct{}
+type FnRunTestEvtData struct {
+	Success bool `json:"success"`
+	Index   int  `json:"idx"`
+}
 type FnRunTestEvt inngestgo.GenericEvent[FnRunTestEvtData, any]
 
 func TestFunctionRunList(t *testing.T) {
@@ -37,7 +40,7 @@ func TestFunctionRunList(t *testing.T) {
 		inngestgo.EventTrigger("fnrun/ok", nil),
 		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {
 			atomic.AddInt32(&ok, 1)
-			return nil, nil
+			return map[string]any{"num": input.Event.Data.Index * 2}, nil
 		},
 	)
 
@@ -250,11 +253,10 @@ func TestFunctionRunList(t *testing.T) {
 
 	t.Run("filter with event CEL expression", func(t *testing.T) {
 		min := 5
-		queries := []string{
+		cel := celBlob([]string{
 			"event.name == 'fnrun/ok'",
 			fmt.Sprintf("event.data.idx > %d", min),
-		}
-		cel := strings.Join(queries, "\n")
+		})
 
 		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			items := 3
@@ -270,4 +272,27 @@ func TestFunctionRunList(t *testing.T) {
 			assert.True(t, pageInfo.HasNextPage)
 		}, 10*time.Second, 2*time.Second)
 	})
+
+	t.Run("filter with output CEL expression", func(t *testing.T) {
+		cel := celBlob([]string{
+			"output.num > 11",
+		})
+		expectedCount := 4
+
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start: start,
+				End:   end,
+				Query: &cel,
+			})
+
+			assert.Equal(t, expectedCount, len(edges))
+			assert.Equal(t, expectedCount, total)
+			assert.False(t, pageInfo.HasNextPage)
+		}, 10*time.Second, 2*time.Second)
+	})
+}
+
+func celBlob(cel []string) string {
+	return strings.Join(cel, "\n")
 }
