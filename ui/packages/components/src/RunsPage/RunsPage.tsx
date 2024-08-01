@@ -50,6 +50,7 @@ type Props = {
   hasMore: boolean;
   isLoadingInitial: boolean;
   isLoadingMore: boolean;
+  onRefresh: () => void;
   onScroll: UIEventHandler<HTMLDivElement>;
   onScrollToTop: () => void;
   pathCreator: React.ComponentProps<typeof RunDetails>['pathCreator'];
@@ -74,6 +75,7 @@ export function RunsPage({
   hasMore,
   isLoadingInitial,
   isLoadingMore,
+  onRefresh,
   onScroll,
   onScrollToTop,
   pathCreator,
@@ -303,13 +305,12 @@ export function RunsPage({
             setColumnVisibility={setColumnVisibility}
             options={options}
           />
-          {/* TODO: wire button */}
+
           <Button
             label="Refresh"
             appearance="text"
-            btnAction={() => {}}
+            btnAction={onRefresh}
             icon={<RiLoopLeftLine />}
-            disabled
           />
         </div>
       </div>
