@@ -151,6 +151,7 @@ export default function Page() {
     <RunsPage
       cancelRun={cancelRun}
       data={runs ?? []}
+      defaultVisibleColumns={['status', 'id', 'trigger', 'function', 'queuedAt', 'endedAt']}
       features={{
         history: Number.MAX_SAFE_INTEGER,
       }}
@@ -164,8 +165,6 @@ export default function Page() {
       getTrigger={getTrigger}
       rerun={rerun}
       pathCreator={pathCreator}
-      apps={[]}
-      functions={[]}
       pollInterval={pollInterval}
       scope="env"
       totalCount={totalCount}

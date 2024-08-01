@@ -50,11 +50,14 @@ const GetRunsDocument = graphql(`
               externalID
               name
             }
+            cronSchedule
+            eventName
             function {
               name
               slug
             }
             id
+            isBatch
             queuedAt
             endedAt
             startedAt
