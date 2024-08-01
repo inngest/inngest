@@ -8,9 +8,11 @@ import { getNavRoute } from './Navigation';
 export default function Monitor({
   activeEnv,
   collapsed,
+  isRunsEnabled,
 }: {
   activeEnv: EnvType;
   collapsed: boolean;
+  isRunsEnabled: boolean;
 }) {
   return (
     <div className={`jusity-center flex flex-col ${collapsed ? 'mt-2' : 'mt-5'}`}>
@@ -27,11 +29,11 @@ export default function Monitor({
         comingSoon={true}
       />
       <MenuItem
-        href={getNavRoute(activeEnv, 'functions/monitor')}
+        href={getNavRoute(activeEnv, 'runs')}
         collapsed={collapsed}
         text="Runs"
         icon={<RunsIcon className="h-18px w-[18px]" />}
-        comingSoon={true}
+        comingSoon={!isRunsEnabled}
       />
       {/* <MenuItem
         href={getNavRoute(activeEnv, 'events/monitor')}

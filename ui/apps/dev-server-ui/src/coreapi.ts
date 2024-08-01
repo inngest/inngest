@@ -266,11 +266,14 @@ export const GET_RUNS = gql`
             externalID
             name
           }
+          cronSchedule
+          eventName
           function {
             name
             slug
           }
           id
+          isBatch
           queuedAt
           endedAt
           startedAt

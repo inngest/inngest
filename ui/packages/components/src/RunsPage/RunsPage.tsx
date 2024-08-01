@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, type UIEventHandler } from 'react';
+import { useCallback, useMemo, useRef, type UIEventHandler } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import StatusFilter from '@inngest/components/Filter/StatusFilter';
@@ -31,7 +31,7 @@ import {
 } from '../hooks/useSearchParam';
 import type { Features } from '../types/features';
 import { TimeFilter } from './TimeFilter';
-import { useScopedColumns } from './columns';
+import { isColumnID, useScopedColumns, type ColumnID } from './columns';
 import type { Run, ViewScope } from './types';
 
 // Disable SSR in Runs Table, to prevent hydration errors. It requires windows info on visibility columns
@@ -42,8 +42,8 @@ const RunsTable = dynamic(() => import('@inngest/components/RunsPage/RunsTable')
 type Props = {
   cancelRun: React.ComponentProps<typeof RunDetails>['cancelRun'];
   data: Run[];
+  defaultVisibleColumns?: ColumnID[];
   features: Pick<Features, 'history'>;
-  functionSlug: string;
   getRun: React.ComponentProps<typeof RunDetails>['getRun'];
   getTraceResult: React.ComponentProps<typeof RunDetails>['getResult'];
   getTrigger: React.ComponentProps<typeof RunDetails>['getTrigger'];
@@ -64,6 +64,7 @@ type Props = {
 
 export function RunsPage({
   cancelRun,
+  defaultVisibleColumns,
   getRun,
   getTraceResult,
   getTrigger,
@@ -87,12 +88,24 @@ export function RunsPage({
 
   const columns = useScopedColumns(scope);
 
-  const displayAllColumns: VisibilityState = Object.fromEntries(
-    columns.map((column) => [column.accessorKey, true])
-  );
+  const displayAllColumns = useMemo(() => {
+    const out: Record<string, boolean> = {};
+    for (const column of columns) {
+      if (!isColumnID(column.id)) {
+        continue;
+      }
+
+      if (defaultVisibleColumns && !defaultVisibleColumns.includes(column.id)) {
+        out[column.id] = false;
+      } else {
+        out[column.id] = true;
+      }
+    }
+    return out;
+  }, [defaultVisibleColumns, columns]);
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
-    'VisibleRunsColumns',
+    `VisibleRunsColumns-${scope}`,
     displayAllColumns
   );
 
@@ -213,10 +226,20 @@ export function RunsPage({
     [cancelRun, getRun, getTraceResult, getTrigger, pathCreator, pollInterval, rerun]
   );
 
-  const options: Option[] = columns.map((column) => ({
-    id: column.accessorKey,
-    name: column.header?.toString() || column.accessorKey,
-  }));
+  const options = useMemo(() => {
+    const out = [];
+    for (const column of columns) {
+      if (!isColumnID(column.id)) {
+        continue;
+      }
+
+      out.push({
+        id: column.id,
+        name: column.header?.toString() || column.id,
+      });
+    }
+    return out;
+  }, [columns]);
 
   return (
     <main
@@ -295,7 +318,7 @@ export function RunsPage({
         isLoading={isLoadingInitial}
         renderSubComponent={renderSubComponent}
         getRowCanExpand={() => true}
-        columnVisibility={columnVisibility}
+        visibleColumns={columnVisibility}
         scope={scope}
       />
       {isLoadingMore && <LoadingMore />}

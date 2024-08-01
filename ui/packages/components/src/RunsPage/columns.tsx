@@ -7,6 +7,28 @@ import { createColumnHelper } from '@tanstack/react-table';
 import type { Run, ViewScope } from './types';
 
 const columnHelper = createColumnHelper<Run>();
+
+const columnsIDs = [
+  'app',
+  'durationMS',
+  'endedAt',
+  'function',
+  'id',
+  'queuedAt',
+  'startedAt',
+  'status',
+  'trigger',
+] as const;
+export type ColumnID = (typeof columnsIDs)[number];
+export function isColumnID(value: unknown): value is ColumnID {
+  return columnsIDs.includes(value as ColumnID);
+}
+
+// Ensure that the column ID is valid at compile time
+function ensureColumnID(id: ColumnID): ColumnID {
+  return id;
+}
+
 const columns = [
   columnHelper.accessor<'status', FunctionRunStatus>('status', {
     cell: (info) => {
@@ -20,6 +42,7 @@ const columns = [
     },
     header: 'Status',
     enableSorting: false,
+    id: ensureColumnID('status'),
   }),
   columnHelper.accessor('id', {
     cell: (info) => {
@@ -33,6 +56,52 @@ const columns = [
     },
     header: 'Run ID',
     enableSorting: false,
+    id: ensureColumnID('id'),
+  }),
+  columnHelper.display({
+    cell: (props) => {
+      const data = props.row.original;
+
+      if (data.isBatch) {
+        return <TextCell>Batch</TextCell>;
+      }
+      if (data.cronSchedule) {
+        return <IDCell>data.cronSchedule</IDCell>;
+      }
+      if (data.eventName) {
+        return <TextCell>data.eventName</TextCell>;
+      }
+
+      // Unreachable
+      console.error(`Unknown trigger for run ${data.id}`);
+      return null;
+    },
+    header: 'Trigger',
+    id: ensureColumnID('trigger'),
+  }),
+  columnHelper.accessor('function', {
+    cell: (info) => {
+      return (
+        <div className="flex items-center text-nowrap">
+          <TextCell>{info.getValue().name}</TextCell>
+        </div>
+      );
+    },
+    header: 'Function',
+    enableSorting: false,
+    id: ensureColumnID('function'),
+  }),
+  columnHelper.accessor('app', {
+    cell: (info) => {
+      return (
+        <div className="flex items-center text-nowrap">
+          <TextCell>{info.getValue().externalID}</TextCell>
+        </div>
+      );
+    },
+    header: 'App',
+    enableSorting: false,
+    id: ensureColumnID('app'),
   }),
   columnHelper.accessor('queuedAt', {
     cell: (info) => {
@@ -46,6 +115,7 @@ const columns = [
     },
     header: 'Queued at',
     enableSorting: false,
+    id: ensureColumnID('queuedAt'),
   }),
   columnHelper.accessor('startedAt', {
     cell: (info) => {
@@ -59,6 +129,7 @@ const columns = [
     },
     header: 'Started at',
     enableSorting: false,
+    id: ensureColumnID('startedAt'),
   }),
   columnHelper.accessor('endedAt', {
     cell: (info) => {
@@ -72,6 +143,7 @@ const columns = [
     },
     header: 'Ended at',
     enableSorting: false,
+    id: ensureColumnID('endedAt'),
   }),
   columnHelper.accessor('durationMS', {
     cell: (info) => {
@@ -85,30 +157,9 @@ const columns = [
     },
     header: 'Duration',
     enableSorting: false,
+    id: ensureColumnID('durationMS'),
   }),
-  columnHelper.accessor('app', {
-    cell: (info) => {
-      return (
-        <div className="flex items-center text-nowrap">
-          <TextCell>{info.getValue().externalID}</TextCell>
-        </div>
-      );
-    },
-    header: 'App',
-    enableSorting: false,
-  }),
-  columnHelper.accessor('function', {
-    cell: (info) => {
-      return (
-        <div className="flex items-center text-nowrap">
-          <TextCell>{info.getValue().name}</TextCell>
-        </div>
-      );
-    },
-    header: 'Function',
-    enableSorting: false,
-  }),
-];
+] as const;
 
 /**
  * Return the correct columns for the given view scope. This is necessary to
@@ -119,8 +170,10 @@ const columns = [
 export function useScopedColumns(scope: ViewScope) {
   return useMemo(() => {
     return columns.filter((column) => {
-      if (scope === 'fn') {
-        return column.accessorKey !== 'app' && column.accessorKey !== 'function';
+      if ('accessorKey' in column) {
+        if (scope === 'fn') {
+          return column.accessorKey !== 'app' && column.accessorKey !== 'function';
+        }
       }
       return true;
     });

@@ -66,7 +66,7 @@ export function toTimeField(time: string): FunctionRunTimeFieldEnum | undefined 
 
 type PickedFunctionRunV2 = Pick<
   FunctionRunV2,
-  'id' | 'queuedAt' | 'startedAt' | 'status' | 'endedAt'
+  'id' | 'queuedAt' | 'startedAt' | 'status' | 'endedAt' | 'eventName' | 'isBatch' | 'cronSchedule'
 >;
 type PickedFunctionRunV2EdgeWithNode = {
   node: PickedFunctionRunV2 & {

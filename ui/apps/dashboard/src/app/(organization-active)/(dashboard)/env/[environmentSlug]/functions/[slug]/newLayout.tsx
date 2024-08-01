@@ -135,9 +135,12 @@ export default function FunctionLayout({
           { children: 'Runs', href: `/env/${environmentSlug}/functions/${slug}/logs` },
           {
             children: (
-              <div className="flex flex-row items-center justify-start space-x-1">
+              <div className="m-0 flex flex-row items-center justify-start space-x-1 p-0">
                 <div>New runs</div>
-                <Badge kind="solid" className="text-onContrast bg-btnPrimary h-6 text-xs">
+                <Badge
+                  kind="solid"
+                  className="text-onContrast bg-btnPrimary h-5 px-1.5 py-1 text-xs"
+                >
                   Beta
                 </Badge>
               </div>
