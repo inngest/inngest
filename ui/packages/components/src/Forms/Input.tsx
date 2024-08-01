@@ -19,7 +19,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     { allowPasswordManager = false, className, type = 'text', inngestSize = 'base', ...props },
     ref
   ) => {
-    let passwordManagerProps: Record<string, boolean> = {
+    let passwordManagerProps: Record<string, unknown> = {
+      autocomplete: 'off',
       'data-1p-ignore': true,
       'data-bwignore': true,
       'data-lpignore': true,
