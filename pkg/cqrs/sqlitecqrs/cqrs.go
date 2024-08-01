@@ -1314,6 +1314,19 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			continue
 		}
 
+		// fmt.Printf("Output Expr: %#v\n", expHandler.OutputExprList)
+		if expHandler.HasOutputFilters() {
+			ok, err := expHandler.MatchOutputExpressions(ctx, data.Output)
+			if err != nil {
+				fmt.Printf("Output match error: %#v\n", err)
+				// TODO: log error
+				continue
+			}
+			if !ok {
+				continue
+			}
+		}
+
 		// copy layout
 		pc := resCursorLayout
 		// construct the needed fields to generate a cursor representing this run
