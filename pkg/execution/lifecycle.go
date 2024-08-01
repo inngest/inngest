@@ -55,6 +55,7 @@ type LifecycleListener interface {
 		context.Context,
 		state.Metadata,
 		queue.Item,
+		[]json.RawMessage,
 	)
 
 	// OnFunctionFinished is called when a function finishes.  This will
@@ -66,6 +67,7 @@ type LifecycleListener interface {
 		context.Context,
 		state.Metadata,
 		queue.Item,
+		[]json.RawMessage,
 		statev1.DriverResponse,
 	)
 
@@ -198,6 +200,7 @@ func (NoopLifecyceListener) OnFunctionStarted(
 	context.Context,
 	state.Metadata,
 	queue.Item,
+	[]json.RawMessage,
 ) {
 }
 
@@ -210,6 +213,7 @@ func (NoopLifecyceListener) OnFunctionFinished(
 	context.Context,
 	state.Metadata,
 	queue.Item,
+	[]json.RawMessage,
 	statev1.DriverResponse,
 ) {
 }

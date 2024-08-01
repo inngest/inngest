@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -15,6 +16,7 @@ const (
 	fnslugKey       = "__fnslug"
 	traceLinkKey    = "__tracelink"
 	debounceKey     = "__debounce"
+	fnTrace         = "__fn_trace"
 )
 
 type ID struct {
@@ -122,6 +124,13 @@ func (c *Config) EventID() ulid.ULID {
 }
 
 func (c *Config) GetSpanID() (*trace.SpanID, error) {
+	fnTrace := c.FunctionTrace()
+	if fnTrace != nil {
+		sid := fnTrace.SpanID()
+		return &sid, nil
+	}
+
+	// keep this around for backward compatibility purposes
 	if c.SpanID != "" {
 		sid, err := trace.SpanIDFromHex(c.SpanID)
 		return &sid, err
@@ -213,6 +222,27 @@ func (c *Config) DebounceFlag() bool {
 	}
 
 	return false
+}
+
+func (c *Config) SetFunctionTrace(carrier *telemetry.TraceCarrier) {
+	if c.Context != nil {
+		c.Context = map[string]any{}
+	}
+	c.Context[fnTrace] = carrier
+}
+
+func (c *Config) FunctionTrace() *telemetry.TraceCarrier {
+	if c.Context == nil {
+		return nil
+	}
+
+	if v, ok := c.Context[fnTrace]; ok {
+		carrier := telemetry.NewTraceCarrier()
+		if err := carrier.Unmarshal(v); err == nil {
+			return carrier
+		}
+	}
+	return nil
 }
 
 // RunMetrics stores state-level run metrics.

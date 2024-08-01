@@ -97,6 +97,7 @@ func (l lifecycle) OnFunctionStarted(
 	ctx context.Context,
 	md sv2.Metadata,
 	item queue.Item,
+	_ []json.RawMessage,
 ) {
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
@@ -170,6 +171,7 @@ func (l lifecycle) OnFunctionFinished(
 	ctx context.Context,
 	md sv2.Metadata,
 	item queue.Item,
+	_ []json.RawMessage,
 	resp state.DriverResponse,
 ) {
 	groupID, err := toUUID(item.GroupID)
