@@ -376,11 +376,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	// Normalization
 	eventIDs := []ulid.ULID{}
-	estrIDs := []string{}
 	for _, e := range req.Events {
 		id := e.GetInternalID()
 		eventIDs = append(eventIDs, id)
-		estrIDs = append(estrIDs, id.String())
 	}
 
 	evts := make([]json.RawMessage, len(req.Events))
@@ -422,16 +420,15 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	// Grab the cron schedule for function config.  This is necessary for fast
 	// lookups, trace info, etc.
-	var schedule *string
 	if len(req.Events) == 1 && req.Events[0].GetEvent().Name == event.FnCronName {
 		if cron, ok := req.Events[0].GetEvent().Data["cron"].(string); ok {
-			schedule = &cron
 			metadata.Config.SetCronSchedule(cron)
 		}
 	}
 
 	// FunctionSlug is not stored in V1 format, so needs to be stored in Context
 	metadata.Config.SetFunctionSlug(req.Function.GetSlug())
+	metadata.Config.SetDebounceFlag(req.PreventDebounce)
 
 	carrier := telemetry.NewTraceCarrier()
 	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
@@ -449,57 +446,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, ErrFunctionSkipped
 	}
 
-	// span that tells when the function was queued
-	_, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeTrigger),
-		telemetry.WithName(consts.OtelSpanTrigger),
-		telemetry.WithTimestamp(ulid.Time(runID.Time())),
-		telemetry.WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
-			attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
-			attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
-			attribute.String(consts.OtelSysAppID, req.AppID.String()),
-			attribute.String(consts.OtelSysFunctionID, req.Function.ID.String()),
-			attribute.String(consts.OtelSysFunctionSlug, req.Function.GetSlug()),
-			attribute.Int(consts.OtelSysFunctionVersion, req.Function.FunctionVersion),
-			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
-			attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusScheduled.ToCode()),
-			attribute.String(consts.OtelSysEventIDs, strings.Join(estrIDs, ",")),
-		),
-	)
-	defer span.End()
-
-	if schedule != nil {
-		span.SetAttributes(attribute.String(consts.OtelSysCronExpr, *schedule))
-	}
-	if req.BatchID != nil {
-		span.SetAttributes(
-			attribute.String(consts.OtelSysBatchID, req.BatchID.String()),
-			attribute.Int64(consts.OtelSysBatchTS, int64(req.BatchID.Time())),
-		)
-	}
-	if req.PreventDebounce {
-		span.SetAttributes(attribute.Bool(consts.OtelSysDebounceTimeout, true))
-	}
-	if req.Context != nil {
-		if val, ok := req.Context[consts.OtelPropagationLinkKey]; ok {
-			if link, ok := val.(string); ok {
-				span.SetAttributes(attribute.String(consts.OtelPropagationLinkKey, link))
-			}
-		}
-	}
-
 	mapped := make([]map[string]any, len(req.Events))
 	for n, item := range req.Events {
-		evt := item.GetEvent()
-		mapped[n] = evt.Map()
-
-		// serialize this data to the span at the same time
-		if byt, err := json.Marshal(evt); err == nil {
-			span.AddEvent(string(byt), trace.WithAttributes(
-				attribute.Bool(consts.OtelSysEventData, true),
-			))
-		}
+		mapped[n] = item.GetEvent().Map()
 	}
 
 	if req.Function.Concurrency != nil {
@@ -564,12 +513,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Events:   evts,
 	})
 	if err == state.ErrIdentifierExists {
-		_ = span.Cancel(ctx)
 		// This function was already created.
 		return nil, state.ErrIdentifierExists
 	}
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
 
@@ -687,11 +634,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 	err = e.queue.Enqueue(ctx, item, at)
 	if err == redis_state.ErrQueueItemExists {
-		_ = span.Cancel(ctx)
 		return nil, state.ErrIdentifierExists
 	}
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
 
@@ -751,7 +696,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item)
+		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
 
 	return &metadata, nil

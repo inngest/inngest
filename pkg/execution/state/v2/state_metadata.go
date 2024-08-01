@@ -14,6 +14,7 @@ const (
 	cronScheduleKey = "__cron"
 	fnslugKey       = "__fnslug"
 	traceLinkKey    = "__tracelink"
+	debounceKey     = "__debounce"
 )
 
 type ID struct {
@@ -191,6 +192,27 @@ func (c *Config) TraceLink() *string {
 	}
 
 	return nil
+}
+
+func (c *Config) SetDebounceFlag(flag bool) {
+	if c.Context == nil {
+		c.Context = map[string]any{}
+	}
+	c.Context[debounceKey] = flag
+}
+
+func (c *Config) DebounceFlag() bool {
+	if c.Context == nil {
+		return false
+	}
+
+	if v, ok := c.Context[debounceKey]; ok {
+		if flag, ok := v.(bool); ok {
+			return flag
+		}
+	}
+
+	return false
 }
 
 // RunMetrics stores state-level run metrics.

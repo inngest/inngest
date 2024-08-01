@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
@@ -35,6 +36,7 @@ type LifecycleListener interface {
 		context.Context,
 		state.Metadata,
 		queue.Item,
+		[]event.TrackedEvent,
 	)
 
 	// OnFunctionSkipped is called when a function run is skipped.
@@ -176,6 +178,7 @@ func (NoopLifecyceListener) OnFunctionScheduled(
 	context.Context,
 	state.Metadata,
 	queue.Item,
+	[]event.TrackedEvent,
 ) {
 }
 
