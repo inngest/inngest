@@ -126,6 +126,7 @@ export function Runs({ functionSlug, scope }: Props) {
   const [countRes] = useQuery({
     query: CountRunsDocument,
     pause: isScrollRequest,
+    requestPolicy: 'network-only',
     variables: commonQueryVars,
   });
 
