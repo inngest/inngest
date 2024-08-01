@@ -1,4 +1,5 @@
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import { FunctionInfo } from '@/components/Functions/FunctionInfo';
 import { FunctionList } from '@/components/Functions/FunctionsList';
 import { Header } from '@/components/Header/Header';
 import { FunctionsHeader } from './oldHeader';
@@ -22,7 +23,10 @@ export default async function FunctionPage({
   return (
     <>
       {newIANav ? (
-        <Header breadcrumb={[{ text: 'Functions', href: `/env/${environmentSlug}/functions` }]} />
+        <Header
+          breadcrumb={[{ text: 'Functions', href: `/env/${environmentSlug}/functions` }]}
+          icon={<FunctionInfo />}
+        />
       ) : (
         <FunctionsHeader />
       )}

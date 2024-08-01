@@ -30,13 +30,10 @@ export const Header = ({ tabs, breadcrumb, icon, action, className = '' }: Heade
       </div>
       {tabs && (
         <div className="flex h-[30px] flex-row items-center justify-start space-x-3 px-4">
-          {tabs.map(({ href, text, exactRouteMatch }) => (
-            <HeaderTab
-              key={href}
-              href={href as Route}
-              text={text}
-              exactRouteMatch={exactRouteMatch}
-            />
+          {tabs.map(({ href, children, exactRouteMatch }) => (
+            <HeaderTab key={href} href={href as Route} exactRouteMatch={exactRouteMatch}>
+              {children}
+            </HeaderTab>
           ))}
         </div>
       )}

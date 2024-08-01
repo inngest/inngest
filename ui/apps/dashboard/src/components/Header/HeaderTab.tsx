@@ -1,15 +1,16 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 export type HeaderTab = {
   href: string;
-  text: string;
+  children: ReactNode;
   exactRouteMatch?: boolean;
 };
 
-export const HeaderTab = ({ href, text, exactRouteMatch = false }: HeaderTab) => {
+export const HeaderTab = ({ href, children, exactRouteMatch = false }: HeaderTab) => {
   const pathname = usePathname();
   const active = href && exactRouteMatch ? pathname === href : pathname.startsWith(href);
 
@@ -17,11 +18,11 @@ export const HeaderTab = ({ href, text, exactRouteMatch = false }: HeaderTab) =>
     <nav
       className={`${
         active ? 'text-basis border-contrast border-b-2' : 'text-subtle'
-      }  flex h-full items-center self-center p-2 text-sm leading-tight outline-none`}
+      }  flex h-full items-center self-center text-sm leading-tight outline-none`}
     >
       <div className="hover:bg-canvasSubtle rounded p-1">
         <Link href={href} prefetch={true}>
-          {text}
+          {children}
         </Link>
       </div>
     </nav>

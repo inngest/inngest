@@ -128,13 +128,27 @@ export default function FunctionLayout({
         }
         tabs={[
           {
-            text: 'Dashboard',
+            children: 'Dashboard',
             href: `/env/${environmentSlug}/functions/${slug}`,
             exactRouteMatch: true,
           },
-          { text: 'Runs', href: `/env/${environmentSlug}/functions/${slug}/logs` },
-          { text: 'Beta Runs', href: `/env/${environmentSlug}/functions/${slug}/runs` },
-          { text: 'Replay history', href: `/env/${environmentSlug}/functions/${slug}/replay` },
+          { children: 'Runs', href: `/env/${environmentSlug}/functions/${slug}/logs` },
+          {
+            children: (
+              <div className="flex flex-row items-center justify-start space-x-1">
+                <div>New runs</div>
+                <Badge kind="solid" className="text-onContrast bg-btnPrimary h-6 text-xs">
+                  Beta
+                </Badge>
+              </div>
+            ),
+            href: `/env/${environmentSlug}/functions/${slug}/runs`,
+          },
+          { children: 'Replay history', href: `/env/${environmentSlug}/functions/${slug}/replay` },
+          {
+            children: 'Cancellation history',
+            href: `/env/${environmentSlug}/functions/${slug}/cancellations`,
+          },
         ]}
       />
       {fetching && <Skeleton className="h-36 w-full" />}
