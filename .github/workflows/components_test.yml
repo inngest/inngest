@@ -26,4 +26,4 @@ jobs:
         working-directory: ui/packages/components
       - name: Lint
         run: pnpm lint
-        working-directory: ui/apps/dev-server-ui
+        working-directory: ui/packages/components
