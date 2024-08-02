@@ -1,5 +1,6 @@
 import { type Route } from 'next';
 
+import { Back } from './Back';
 import { BreadCrumb } from './BreadCrumb';
 import { HeaderTab } from './HeaderTab';
 
@@ -11,18 +12,27 @@ export type BreadCrumbType = {
 export type HeaderType = {
   tabs?: HeaderTab[];
   breadcrumb: BreadCrumbType[];
-  icon?: React.ReactNode;
+  infoIcon?: React.ReactNode;
   action?: React.ReactNode;
   className?: string;
+  backNav?: boolean;
 };
 
-export const Header = ({ tabs, breadcrumb, icon, action, className = '' }: HeaderType) => {
+export const Header = ({
+  tabs,
+  breadcrumb,
+  infoIcon: icon,
+  action,
+  className = '',
+  backNav = false,
+}: HeaderType) => {
   return (
     <div className="flex flex-col justify-start border-b">
       <div
         className={`bg-canvasBase border-subtle flex h-[52px] flex-row items-center justify-between p-4 ${className}`}
       >
         <div className="flex flex-row items-center justify-start align-baseline">
+          {backNav && <Back className="mr-2" />}
           <BreadCrumb path={breadcrumb} />
           {icon}
         </div>

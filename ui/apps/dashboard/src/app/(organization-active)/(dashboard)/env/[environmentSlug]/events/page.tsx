@@ -19,8 +19,8 @@ export default async function EventsPage({
       {newIANav ? (
         <Header
           breadcrumb={[{ text: 'Events', href: `/env/${environmentSlug}/events` }]}
-          icon={<EventInfo />}
-          action={<SendEventButton />}
+          infoIcon={<EventInfo />}
+          action={<SendEventButton newIANav={true} />}
         />
       ) : (
         <OldHeader

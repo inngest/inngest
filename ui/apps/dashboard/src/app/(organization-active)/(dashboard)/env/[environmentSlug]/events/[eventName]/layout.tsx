@@ -1,8 +1,8 @@
 import { IconEvent } from '@inngest/components/icons/Event';
 
-import { EventsHeader } from '@/components/Events/Header';
 import SendEventButton from '@/components/Events/SendEventButton';
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import { Header } from '@/components/Header/Header';
 import OldHeader from '@/components/Header/old/Header';
 
 type EventLayoutProps = {
@@ -18,21 +18,39 @@ export default async function EventLayout({
   params: { environmentSlug: envSlug, eventName: eventSlug },
 }: EventLayoutProps) {
   const newIANav = await getBooleanFlag('new-ia-nav');
-  const dashboardPath = `/env/${envSlug}/events/${eventSlug}`;
+  const eventsPath = `/env/${envSlug}/events`;
   const logsPath = `/env/${envSlug}/events/${eventSlug}/logs`;
+  const eventPath = `/env/${envSlug}/events/${eventSlug}`;
   const eventName = decodeURIComponent(eventSlug);
 
   return (
     <>
       {newIANav ? (
-        <EventsHeader envSlug={envSlug} eventSlug={eventSlug} />
+        <Header
+          breadcrumb={[
+            { text: 'Events', href: eventsPath },
+            { text: eventName, href: eventPath },
+          ]}
+          tabs={[
+            {
+              href: eventPath,
+              children: 'Dashboard',
+              exactRouteMatch: true,
+            },
+            {
+              href: logsPath,
+              children: 'Logs',
+            },
+          ]}
+          action={<SendEventButton eventName={eventName} newIANav={true} />}
+        />
       ) : (
         <OldHeader
           icon={<IconEvent className="h-5 w-5 text-white" />}
           title={eventName}
           links={[
             {
-              href: dashboardPath,
+              href: eventPath,
               text: 'Dashboard',
               active: 'exact',
             },

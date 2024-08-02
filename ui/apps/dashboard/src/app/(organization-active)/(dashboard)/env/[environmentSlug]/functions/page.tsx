@@ -25,7 +25,7 @@ export default async function FunctionPage({
       {newIANav ? (
         <Header
           breadcrumb={[{ text: 'Functions', href: `/env/${environmentSlug}/functions` }]}
-          icon={<FunctionInfo />}
+          infoIcon={<FunctionInfo />}
         />
       ) : (
         <FunctionsHeader />

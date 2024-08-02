@@ -21,7 +21,7 @@ export const ManageHeader = ({ envSlug }: { envSlug: string }) => {
         ...(pathname.includes('/keys') ? [{ text: 'Event Keys', href: keysPath }] : []),
         ...(pathname.includes('/signing-key') ? [{ text: 'Signing Key', href: signingPath }] : []),
       ]}
-      icon={
+      infoIcon={
         <>
           {pathname.includes('/webhooks') && <WebhookInfo />}
           {pathname.includes('/keys') && <EventKeyInfo />}

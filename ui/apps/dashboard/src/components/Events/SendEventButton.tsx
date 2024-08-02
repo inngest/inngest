@@ -4,17 +4,17 @@ import { useState } from 'react';
 import { Button, NewButton } from '@inngest/components/Button';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { OptionalTooltip } from '@/components/Navigation/OptionalTooltip';
 import { SendEventModal } from './SendEventModal';
 
 type SendEventButtonProps = {
   eventName?: string;
+  newIANav?: boolean;
 };
 
-export default function SendEventButton({ eventName }: SendEventButtonProps) {
+export default function SendEventButton({ eventName, newIANav = false }: SendEventButtonProps) {
   const { isArchived } = useEnvironment();
-  const { value: newIANav } = useBooleanFlag('new-ia-nav');
+
   const [isModalVisible, setIsModalVisible] = useState(false);
 
   return (

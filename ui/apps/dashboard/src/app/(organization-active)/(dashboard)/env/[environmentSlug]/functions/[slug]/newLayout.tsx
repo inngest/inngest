@@ -107,7 +107,7 @@ export default function FunctionLayout({
           { text: 'Functions', href: `/env/${environmentSlug}/functions` },
           { text: fn?.name || 'Function', href: `/env/${environmentSlug}/functions/${slug}` },
         ]}
-        icon={
+        infoIcon={
           isPaused && (
             <Badge kind="solid" className="text-warning h-6 bg-amber-100 text-xs">
               <RiPauseCircleLine className="h-4 w-4" /> Paused
