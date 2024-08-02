@@ -667,14 +667,12 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 	if errors.Is(err, ErrAccountConcurrencyLimit) {
 		q.lifecycles.OnAccountConcurrencyLimitReached(context.WithoutCancel(ctx), p.AccountID)
 		// TODO(cdzombak): telemetry?
-		// TODO(cdzombak): requeue?
-		return nil
+		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 	if errors.Is(err, ErrConcurrencyLimitCustomKey) {
 		q.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), p.ConcurrencyKey)
 		// TODO(cdzombak): telemetry?
-		// TODO(cdzombak): requeue?
-		return nil
+		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 	if err != nil {
 		return fmt.Errorf("error leasing partition: %w", err)
