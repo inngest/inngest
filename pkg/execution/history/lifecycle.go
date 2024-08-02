@@ -501,10 +501,11 @@ func (l lifecycle) OnWaitForEvent(
 func (l lifecycle) OnWaitForEventResumed(
 	ctx context.Context,
 	md sv2.Metadata,
+	pause state.Pause,
 	req execution.ResumeRequest,
-	groupID string,
 ) {
 	var groupIDUUID *uuid.UUID
+	groupID := pause.GroupID
 	if groupID != "" {
 		val, err := toUUID(groupID)
 		if err != nil {
@@ -633,10 +634,11 @@ func (l lifecycle) OnInvokeFunction(
 func (l lifecycle) OnInvokeFunctionResumed(
 	ctx context.Context,
 	md sv2.Metadata,
+	pause state.Pause,
 	req execution.ResumeRequest,
-	groupID string,
 ) {
 	var groupIDUUID *uuid.UUID
+	groupID := pause.GroupID
 	if groupID != "" {
 		val, err := toUUID(groupID)
 		if err != nil {

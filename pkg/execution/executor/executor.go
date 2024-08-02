@@ -1709,126 +1709,13 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		return fmt.Errorf("error enqueueing after pause: %w", err)
 	}
 
-	returnedEventID := ""
-	if r.EventID != nil {
-		returnedEventID = r.EventID.String()
-	}
-
-	commonAttrs := []attribute.KeyValue{
-		attribute.Bool(consts.OtelUserTraceFilterKey, true),
-		attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
-		attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
-		attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),
-		attribute.String(consts.OtelSysFunctionID, pause.Identifier.WorkflowID.String()),
-		attribute.Int(consts.OtelSysFunctionVersion, pause.Identifier.WorkflowVersion),
-		attribute.String(consts.OtelAttrSDKRunID, pause.Identifier.RunID.String()),
-		attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
-		attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
-		attribute.String(consts.OtelSysStepGroupID, pause.GroupID),
-		attribute.String(consts.OtelSysStepDisplayName, pause.StepName),
-	}
-
 	if pause.IsInvoke() {
-		if pause.Metadata != nil {
-			if meta, ok := pause.Metadata[consts.OtelPropagationKey]; ok {
-				carrier := telemetry.NewTraceCarrier()
-				if err := carrier.Unmarshal(meta); err == nil {
-					ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
-					if carrier.CanResumePause() {
-						// Used for spans
-						triggeringEventID := ""
-						if pause.TriggeringEventID != nil {
-							triggeringEventID = *pause.TriggeringEventID
-						}
-
-						targetFnID := ""
-						if pause.InvokeTargetFnID != nil {
-							targetFnID = *pause.InvokeTargetFnID
-						}
-
-						runID := ""
-						if r.RunID != nil {
-							runID = r.RunID.String()
-						}
-
-						_, span := telemetry.NewSpan(ctx,
-							telemetry.WithScope(consts.OtelScopeStep),
-							telemetry.WithName(consts.OtelSpanInvoke),
-							telemetry.WithTimestamp(carrier.Timestamp),
-							telemetry.WithSpanID(carrier.SpanID()),
-							telemetry.WithSpanAttributes(
-								attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
-								attribute.String(consts.OtelSysStepInvokeTargetFnID, targetFnID),
-								attribute.Int64(consts.OtelSysStepInvokeExpires, pause.Expires.Time().UnixMilli()),
-								attribute.String(consts.OtelSysStepInvokeTriggeringEventID, triggeringEventID),
-								attribute.String(consts.OtelSysStepInvokeReturnedEventID, returnedEventID),
-								attribute.String(consts.OtelSysStepInvokeRunID, runID),
-								attribute.Bool(consts.OtelSysStepInvokeExpired, r.EventID == nil),
-							),
-						)
-						defer span.End()
-						span.SetAttributes(commonAttrs...)
-
-						var output any
-						if r.With != nil {
-							output = r.With
-						}
-						if r.HasError() {
-							output = r.Error()
-							span.SetStatus(codes.Error, r.Error())
-						}
-
-						if output != nil {
-							span.SetStepOutput(output)
-						}
-					}
-				}
-			}
-		}
-
 		for _, e := range e.lifecycles {
-			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, r, pause.GroupID)
+			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
 		}
 	} else {
-		if pause.Metadata != nil {
-			if meta, ok := pause.Metadata[consts.OtelPropagationKey]; ok {
-				carrier := telemetry.NewTraceCarrier()
-				if err := carrier.Unmarshal(meta); err == nil {
-					ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
-					if carrier.CanResumePause() {
-						_, span := telemetry.NewSpan(ctx,
-							telemetry.WithScope(consts.OtelScopeStep),
-							telemetry.WithName(consts.OtelSpanWaitForEvent),
-							telemetry.WithTimestamp(carrier.Timestamp),
-							telemetry.WithSpanID(carrier.SpanID()),
-							telemetry.WithSpanAttributes(
-								attribute.String(consts.OtelSysStepOpcode, enums.OpcodeWaitForEvent.String()),
-								attribute.Int64(consts.OtelSysStepWaitExpires, pause.Expires.Time().UnixMilli()),
-								attribute.Bool(consts.OtelSysStepWaitExpired, r.EventID == nil),
-								attribute.String(consts.OtelSysStepWaitMatchedEventID, returnedEventID),
-							),
-						)
-						defer span.End()
-						span.SetAttributes(commonAttrs...)
-						if pause.Event != nil {
-							span.SetAttributes(attribute.String(consts.OtelSysStepWaitEventName, *pause.Event))
-						}
-						if pause.Expression != nil {
-							span.SetAttributes(attribute.String(consts.OtelSysStepWaitExpression, *pause.Expression))
-						}
-						if r.With != nil {
-							span.SetStepOutput(r.With)
-						}
-						if r.HasError() {
-							span.SetStatus(codes.Error, r.Error())
-						}
-					}
-				}
-			}
-		}
-
 		for _, e := range e.lifecycles {
-			go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, r, pause.GroupID)
+			go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
 		}
 	}
 

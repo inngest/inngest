@@ -12,9 +12,10 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
-	"github.com/inngest/inngest/pkg/execution/state/v2"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/telemetry"
@@ -43,7 +44,7 @@ type traceLifecycle struct {
 	run sv2.RunService
 }
 
-func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md state.Metadata, item queue.Item, evts []event.TrackedEvent) {
+func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Metadata, item queue.Item, evts []event.TrackedEvent) {
 	runID := md.ID.RunID
 	evtIDs := []string{}
 	for _, e := range evts {
@@ -184,7 +185,7 @@ func (l traceLifecycle) OnFunctionStarted(
 
 func (l traceLifecycle) OnFunctionFinished(
 	ctx context.Context,
-	md state.Metadata,
+	md statev2.Metadata,
 	item queue.Item,
 	evts []json.RawMessage,
 	resp statev1.DriverResponse,
@@ -331,7 +332,7 @@ func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata
 
 func (l traceLifecycle) OnStepStarted(
 	ctx context.Context,
-	md state.Metadata,
+	md statev2.Metadata,
 	item queue.Item,
 	edge inngest.Edge,
 	url string,
@@ -396,7 +397,7 @@ func (l traceLifecycle) OnStepStarted(
 
 func (l traceLifecycle) OnStepFinished(
 	ctx context.Context,
-	md state.Metadata,
+	md statev2.Metadata,
 	item queue.Item,
 	edge inngest.Edge,
 	resp *statev1.DriverResponse,
@@ -520,6 +521,155 @@ func (l traceLifecycle) OnStepFinished(
 			// if it's not a step or function response that represents either a failed or a successful execution.
 			// Do not record discovery spans and cancel it.
 			_ = span.Cancel(ctx)
+		}
+	}
+}
+
+func (l traceLifecycle) OnInvokeFunctionResumed(
+	ctx context.Context,
+	md statev2.Metadata,
+	pause state.Pause,
+	r execution.ResumeRequest,
+) {
+	if pause.Metadata == nil {
+		return
+	}
+
+	meta, ok := pause.Metadata[consts.OtelPropagationKey]
+	if !ok {
+		return
+	}
+
+	returnedEventID := ""
+	if r.EventID != nil {
+		returnedEventID = r.EventID.String()
+	}
+
+	carrier := telemetry.NewTraceCarrier()
+	if err := carrier.Unmarshal(meta); err == nil {
+		ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+		if carrier.CanResumePause() {
+			// Used for spans
+			triggeringEventID := ""
+			if pause.TriggeringEventID != nil {
+				triggeringEventID = *pause.TriggeringEventID
+			}
+
+			targetFnID := ""
+			if pause.InvokeTargetFnID != nil {
+				targetFnID = *pause.InvokeTargetFnID
+			}
+
+			runID := ""
+			if r.RunID != nil {
+				runID = r.RunID.String()
+			}
+
+			_, span := telemetry.NewSpan(ctx,
+				telemetry.WithScope(consts.OtelScopeStep),
+				telemetry.WithName(consts.OtelSpanInvoke),
+				telemetry.WithTimestamp(carrier.Timestamp),
+				telemetry.WithSpanID(carrier.SpanID()),
+				telemetry.WithSpanAttributes(
+					attribute.Bool(consts.OtelUserTraceFilterKey, true),
+					attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
+					attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
+					attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),
+					attribute.String(consts.OtelSysFunctionID, pause.Identifier.WorkflowID.String()),
+					attribute.Int(consts.OtelSysFunctionVersion, pause.Identifier.WorkflowVersion),
+					attribute.String(consts.OtelAttrSDKRunID, pause.Identifier.RunID.String()),
+					attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
+					attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
+					attribute.String(consts.OtelSysStepGroupID, pause.GroupID),
+					attribute.String(consts.OtelSysStepDisplayName, pause.StepName),
+					attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
+					attribute.String(consts.OtelSysStepInvokeTargetFnID, targetFnID),
+					attribute.Int64(consts.OtelSysStepInvokeExpires, pause.Expires.Time().UnixMilli()),
+					attribute.String(consts.OtelSysStepInvokeTriggeringEventID, triggeringEventID),
+					attribute.String(consts.OtelSysStepInvokeReturnedEventID, returnedEventID),
+					attribute.String(consts.OtelSysStepInvokeRunID, runID),
+					attribute.Bool(consts.OtelSysStepInvokeExpired, r.EventID == nil),
+				),
+			)
+			defer span.End()
+
+			var output any
+			if r.With != nil {
+				output = r.With
+			}
+			if r.HasError() {
+				output = r.Error()
+				span.SetStatus(codes.Error, r.Error())
+			}
+
+			if output != nil {
+				span.SetStepOutput(output)
+			}
+		}
+	}
+}
+
+func (l traceLifecycle) OnWaitForEventResumed(
+	ctx context.Context,
+	md statev2.Metadata,
+	pause state.Pause,
+	r execution.ResumeRequest,
+) {
+	if pause.Metadata == nil {
+		return
+	}
+
+	meta, ok := pause.Metadata[consts.OtelPropagationKey]
+	if !ok {
+		return
+	}
+
+	returnedEventID := ""
+	if r.EventID != nil {
+		returnedEventID = r.EventID.String()
+	}
+
+	carrier := telemetry.NewTraceCarrier()
+	if err := carrier.Unmarshal(meta); err == nil {
+		ctx = telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+		if carrier.CanResumePause() {
+			_, span := telemetry.NewSpan(ctx,
+				telemetry.WithScope(consts.OtelScopeStep),
+				telemetry.WithName(consts.OtelSpanWaitForEvent),
+				telemetry.WithTimestamp(carrier.Timestamp),
+				telemetry.WithSpanID(carrier.SpanID()),
+				telemetry.WithSpanAttributes(
+					attribute.Bool(consts.OtelUserTraceFilterKey, true),
+					attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
+					attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
+					attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),
+					attribute.String(consts.OtelSysFunctionID, pause.Identifier.WorkflowID.String()),
+					attribute.Int(consts.OtelSysFunctionVersion, pause.Identifier.WorkflowVersion),
+					attribute.String(consts.OtelAttrSDKRunID, pause.Identifier.RunID.String()),
+					attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
+					attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
+					attribute.String(consts.OtelSysStepGroupID, pause.GroupID),
+					attribute.String(consts.OtelSysStepDisplayName, pause.StepName),
+					attribute.String(consts.OtelSysStepOpcode, enums.OpcodeWaitForEvent.String()),
+					attribute.Int64(consts.OtelSysStepWaitExpires, pause.Expires.Time().UnixMilli()),
+					attribute.Bool(consts.OtelSysStepWaitExpired, r.EventID == nil),
+					attribute.String(consts.OtelSysStepWaitMatchedEventID, returnedEventID),
+				),
+			)
+			defer span.End()
+
+			if pause.Event != nil {
+				span.SetAttributes(attribute.String(consts.OtelSysStepWaitEventName, *pause.Event))
+			}
+			if pause.Expression != nil {
+				span.SetAttributes(attribute.String(consts.OtelSysStepWaitExpression, *pause.Expression))
+			}
+			if r.With != nil {
+				span.SetStepOutput(r.With)
+			}
+			if r.HasError() {
+				span.SetStatus(codes.Error, r.Error())
+			}
 		}
 	}
 }
