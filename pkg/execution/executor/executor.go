@@ -722,9 +722,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	// for recording function start time after a successful step.
-	start := time.Now()
-	if !md.Config.StartedAt.IsZero() {
-		start = md.Config.StartedAt
+	if md.Config.StartedAt.IsZero() {
+		md.Config.StartedAt = time.Now()
 	}
 
 	f, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
@@ -789,7 +788,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			// This should be an one time operation and is never updated after,
 			// which is enforced on the Lua script.
 			if err := e.smv2.UpdateMetadata(ctx, md.ID, sv2.MutableConfig{
-				StartedAt:      start,
+				StartedAt:      md.Config.StartedAt,
 				ForceStepPlan:  md.Config.ForceStepPlan,
 				RequestVersion: md.Config.RequestVersion,
 			}); err != nil {

@@ -325,7 +325,6 @@ func (l traceLifecycle) OnFunctionFinished(
 		span.SetAttributes(attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusFailed.ToCode()))
 	}
 
-	// fmt.Printf("Output: %s\n", resp.Output)
 	span.SetFnOutput(resp.Output)
 }
 
