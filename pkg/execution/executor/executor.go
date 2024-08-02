@@ -2261,35 +2261,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	)
 	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
-	_, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeStep),
-		telemetry.WithName(consts.OtelSpanWaitForEvent),
-		telemetry.WithTimestamp(now),
-		telemetry.WithSpanID(sid),
-		telemetry.WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
-			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeWaitForEvent.String()),
-			attribute.String(consts.OtelSysAccountID, i.item.Identifier.AccountID.String()),
-			attribute.String(consts.OtelSysWorkspaceID, i.item.Identifier.WorkspaceID.String()),
-			attribute.String(consts.OtelSysAppID, i.item.Identifier.AppID.String()),
-			attribute.String(consts.OtelSysFunctionID, i.item.Identifier.WorkflowID.String()),
-			attribute.Int(consts.OtelSysFunctionVersion, i.item.Identifier.WorkflowVersion),
-			attribute.String(consts.OtelAttrSDKRunID, i.item.Identifier.RunID.String()),
-			attribute.Int(consts.OtelSysStepAttempt, 0),
-			attribute.Int(consts.OtelSysStepMaxAttempt, 1),
-			attribute.String(consts.OtelSysStepGroupID, i.item.GroupID),
-			attribute.String(consts.OtelSysStepWaitEventName, opts.Event),
-			attribute.Int64(consts.OtelSysStepWaitExpires, expires.UnixMilli()),
-			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
-		),
-	)
-	defer span.End()
-
-	if opts.If != nil {
-		span.SetAttributes(attribute.String(consts.OtelSysStepWaitExpression, *opts.If))
-	}
-
-	err = e.pm.SavePause(ctx, state.Pause{
+	pause := state.Pause{
 		ID:          pauseID,
 		WorkspaceID: i.md.ID.Tenant.EnvID,
 		Identifier:  i.item.Identifier,
@@ -2306,9 +2278,9 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
-	})
+	}
+	err = e.pm.SavePause(ctx, pause)
 	if err != nil {
-		span.Cancel(ctx)
 		if err == state.ErrPauseAlreadyExists {
 			return nil
 		}
@@ -2339,12 +2311,11 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		},
 	}, expires)
 	if err == redis_state.ErrQueueItemExists {
-		span.Cancel(ctx)
 		return nil
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnWaitForEvent(context.WithoutCancel(ctx), i.md, i.item, gen)
+		go e.OnWaitForEvent(context.WithoutCancel(ctx), i.md, i.item, gen, pause)
 	}
 
 	return err

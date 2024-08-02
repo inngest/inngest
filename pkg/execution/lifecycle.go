@@ -117,6 +117,7 @@ type LifecycleListener interface {
 		statev2.Metadata,
 		queue.Item,
 		statev1.GeneratorOpcode,
+		state.Pause,
 	)
 
 	// OnWaitForEventResumed is called when a function is resumed from waiting for
@@ -262,6 +263,7 @@ func (NoopLifecyceListener) OnWaitForEvent(
 	statev2.Metadata,
 	queue.Item,
 	statev1.GeneratorOpcode,
+	state.Pause,
 ) {
 }
 

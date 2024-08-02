@@ -452,6 +452,7 @@ func (l lifecycle) OnWaitForEvent(
 	md sv2.Metadata,
 	item queue.Item,
 	op state.GeneratorOpcode,
+	_ state.Pause,
 ) {
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {

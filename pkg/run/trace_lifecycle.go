@@ -703,6 +703,65 @@ func (l traceLifecycle) OnInvokeFunctionResumed(
 	}
 }
 
+func (l traceLifecycle) OnWaitForEvent(
+	ctx context.Context,
+	md statev2.Metadata,
+	item queue.Item,
+	gen statev1.GeneratorOpcode,
+	pause state.Pause,
+) {
+	runID := md.ID.RunID
+	opts, err := gen.WaitForEventOpts()
+	if err != nil {
+		// TODO: log warning here
+		return
+	}
+	expires, err := opts.Expires()
+	if err != nil {
+		// TODO: log warning here
+		return
+	}
+
+	v, ok := pause.Metadata[consts.OtelPropagationKey]
+	if !ok {
+		// TODO: log warning here
+		return
+	}
+	carrier, ok := v.(*telemetry.TraceCarrier)
+	if !ok {
+		// TODO: log warning here
+		return
+	}
+
+	_, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeStep),
+		telemetry.WithName(consts.OtelSpanWaitForEvent),
+		telemetry.WithTimestamp(carrier.Timestamp),
+		telemetry.WithSpanID(carrier.SpanID()),
+		telemetry.WithSpanAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeWaitForEvent.String()),
+			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
+			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
+			attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
+			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
+			attribute.Int(consts.OtelSysStepAttempt, 0),
+			attribute.Int(consts.OtelSysStepMaxAttempt, 1),
+			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
+			attribute.String(consts.OtelSysStepWaitEventName, opts.Event),
+			attribute.Int64(consts.OtelSysStepWaitExpires, expires.UnixMilli()),
+			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
+		),
+	)
+	defer span.End()
+
+	if opts.If != nil {
+		span.SetAttributes(attribute.String(consts.OtelSysStepWaitExpression, *opts.If))
+	}
+}
+
 func (l traceLifecycle) OnWaitForEventResumed(
 	ctx context.Context,
 	md statev2.Metadata,
