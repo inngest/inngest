@@ -556,9 +556,16 @@ func (l lifecycle) OnInvokeFunction(
 	md sv2.Metadata,
 	item queue.Item,
 	op state.GeneratorOpcode,
-	eventID ulid.ULID,
-	corrID string,
+	invocationEvt event.Event,
 ) {
+	eventID := ulid.MustParse(invocationEvt.ID)
+	meta := invocationEvt.InngestMetadata()
+	if meta == nil {
+		// TODO: log warning here?
+		return
+	}
+	corrID := meta.InvokeCorrelationId
+
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
 		l.log.Error(

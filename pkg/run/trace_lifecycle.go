@@ -568,6 +568,54 @@ func (l traceLifecycle) OnSleep(
 	defer span.End(trace.WithTimestamp(until))
 }
 
+func (l traceLifecycle) OnInvokeFunction(
+	ctx context.Context,
+	md statev2.Metadata,
+	item queue.Item,
+	gen statev1.GeneratorOpcode,
+	invocationEvt event.Event,
+) {
+	meta := invocationEvt.InngestMetadata()
+	if meta == nil {
+		// TODO: log warning here
+		return
+	}
+
+	runID := md.ID.RunID
+	carrier := meta.InvokeTraceCarrier
+	if carrier == nil {
+		// TODO: log warning here
+		return
+	}
+	spanID := carrier.SpanID()
+
+	_, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeStep),
+		telemetry.WithName(consts.OtelSpanInvoke),
+		telemetry.WithTimestamp(carrier.Timestamp),
+		telemetry.WithSpanID(spanID),
+		telemetry.WithSpanAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
+			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, md.Config.FunctionSlug()),
+			attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
+			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
+			attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
+			attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
+			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
+			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
+			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
+			attribute.String(consts.OtelSysStepInvokeTargetFnID, meta.InvokeFnID),
+			attribute.Int64(consts.OtelSysStepInvokeExpires, meta.InvokeExpiresAt),
+			attribute.String(consts.OtelSysStepInvokeTriggeringEventID, invocationEvt.ID),
+		),
+	)
+	defer span.End()
+}
+
 func (l traceLifecycle) OnInvokeFunctionResumed(
 	ctx context.Context,
 	md statev2.Metadata,

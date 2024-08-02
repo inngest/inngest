@@ -2134,32 +2134,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		SourceFnVersion: i.item.Identifier.WorkflowVersion,
 	})
 
-	ctx, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeStep),
-		telemetry.WithName(consts.OtelSpanInvoke),
-		telemetry.WithTimestamp(now),
-		telemetry.WithSpanID(sid),
-		telemetry.WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
-			attribute.String(consts.OtelSysAccountID, i.item.Identifier.AccountID.String()),
-			attribute.String(consts.OtelSysWorkspaceID, i.item.Identifier.WorkspaceID.String()),
-			attribute.String(consts.OtelSysAppID, i.item.Identifier.AppID.String()),
-			attribute.String(consts.OtelSysFunctionID, i.item.Identifier.WorkflowID.String()),
-			attribute.String(consts.OtelSysFunctionSlug, i.md.Config.FunctionSlug()),
-			attribute.Int(consts.OtelSysFunctionVersion, i.item.Identifier.WorkflowVersion),
-			attribute.String(consts.OtelAttrSDKRunID, i.item.Identifier.RunID.String()),
-			attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
-			attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
-			attribute.String(consts.OtelSysStepGroupID, i.item.GroupID),
-			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
-			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
-			attribute.String(consts.OtelSysStepInvokeTargetFnID, opts.FunctionID),
-			attribute.Int64(consts.OtelSysStepInvokeExpires, expires.UnixMilli()),
-			attribute.String(consts.OtelSysStepInvokeTriggeringEventID, evt.ID),
-		),
-	)
-	defer span.End()
-
 	err = e.pm.SavePause(ctx, state.Pause{
 		ID:                  pauseID,
 		WorkspaceID:         i.md.ID.Tenant.EnvID,
@@ -2182,11 +2156,9 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		},
 	})
 	if err == state.ErrPauseAlreadyExists {
-		span.Cancel(ctx)
 		return nil
 	}
 	if err != nil {
-		span.Cancel(ctx)
 		return err
 	}
 
@@ -2210,20 +2182,18 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		},
 	}, expires)
 	if err == redis_state.ErrQueueItemExists {
-		span.Cancel(ctx)
 		return nil
 	}
 
 	// Send the event.
 	err = e.handleSendingEvent(ctx, evt, i.item)
 	if err != nil {
-		span.Cancel(ctx)
 		// TODO Cancel pause/timeout?
 		return fmt.Errorf("error publishing internal invocation event: %w", err)
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnInvokeFunction(context.WithoutCancel(ctx), i.md, i.item, gen, ulid.MustParse(evt.ID), correlationID)
+		go e.OnInvokeFunction(context.WithoutCancel(ctx), i.md, i.item, gen, evt)
 	}
 
 	return err

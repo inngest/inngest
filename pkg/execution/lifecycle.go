@@ -12,7 +12,6 @@ import (
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/oklog/ulid/v2"
 )
 
 // SkipState represents the subset of state.State's data required for OnFunctionSkipped.
@@ -135,8 +134,7 @@ type LifecycleListener interface {
 		statev2.Metadata,
 		queue.Item,
 		statev1.GeneratorOpcode,
-		ulid.ULID,
-		string,
+		event.Event,
 	)
 
 	// OnInvokeFunctionResumed is called when a function is resumed from an
@@ -283,8 +281,7 @@ func (NoopLifecyceListener) OnInvokeFunction(
 	statev2.Metadata,
 	queue.Item,
 	statev1.GeneratorOpcode,
-	ulid.ULID,
-	string,
+	event.Event,
 ) {
 }
 
