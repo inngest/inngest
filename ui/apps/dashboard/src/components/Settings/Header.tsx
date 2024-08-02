@@ -15,7 +15,7 @@ const paths: [string, string][] = [
   ['/user', 'Your profile'],
 ];
 
-const defined = <T,>(value: T | undefined) => value !== undefined;
+const defined = <T,>(value: T | undefined): value is T => value !== undefined;
 
 const getBreadCrumbs = (pathname: string): BreadCrumbType[] =>
   paths
