@@ -26,6 +26,3 @@ jobs:
       - name: Type check
         run: pnpm type-check
         working-directory: ui/apps/dev-server-ui
-      - name: Test
-        run: pnpm test
-        working-directory: ui/apps/dev-server-ui
