@@ -18,9 +18,9 @@ export const ManageHeader = ({ envSlug }: { envSlug: string }) => {
       breadcrumb={[
         { text: 'Manage Environment', href: managePath },
 
-        ...(pathname?.includes('/keys') ? [{ text: 'Keys', href: keysPath }] : []),
-        ...(pathname?.includes('/webhooks') ? [{ text: 'Webhooks', href: hooksPath }] : []),
-        ...(pathname?.includes('/signing-key') ? [{ text: 'Signing Key', href: signingPath }] : []),
+        ...(pathname.includes('/keys') ? [{ text: 'Keys', href: keysPath }] : []),
+        ...(pathname.includes('/webhooks') ? [{ text: 'Webhooks', href: hooksPath }] : []),
+        ...(pathname.includes('/signing-key') ? [{ text: 'Signing Key', href: signingPath }] : []),
       ]}
       icon={<ManageInfo />}
       tabs={[

@@ -26,7 +26,7 @@ export const EventsHeader = ({ envSlug, eventSlug }: EventType) => {
       breadcrumb={[
         { text: 'Dashboard', href: dashboardPath },
         { text: eventName, href: eventPath },
-        ...(pathname?.includes('/logs') ? [{ text: 'Logs', href: logsPath }] : []),
+        ...(pathname.includes('/logs') ? [{ text: 'Logs', href: logsPath }] : []),
       ]}
       tabs={[
         {

@@ -85,7 +85,7 @@ export default function CreateKeyButton() {
           <NewButton
             icon={<RiAddLine />}
             onClick={() => setModalOpen(true)}
-            disabled={!currentContent || environment.isArchived}
+            disabled={environment.isArchived}
             kind="primary"
             label={`Create ${currentContent.name}`}
           />
@@ -93,7 +93,7 @@ export default function CreateKeyButton() {
           <Button
             icon={<RiAddLine />}
             btnAction={() => setModalOpen(true)}
-            disabled={!currentContent || environment.isArchived}
+            disabled={environment.isArchived}
             kind="primary"
             label={`Create ${currentContent.name}`}
           />

@@ -70,7 +70,7 @@ function EventTypesListPaginationPage({
   onLoadMore,
 }: EventListPaginationPageProps) {
   const env = useEnvironment();
-  const [{ data, fetching: isFetchingEvents, error }] = useEventTypes({
+  const [{ data, fetching: isFetchingEvents }] = useEventTypes({
     page,
   });
 
