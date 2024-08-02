@@ -13,5 +13,8 @@ jobs:
           node-version: "18"
       - run: pnpm install
         working-directory: ui/apps/dev-server-ui
+      - name: type-check
+        run: pnpm type-check
+        working-directory: ui/apps/dev-server-ui
       - run: pnpm test
         working-directory: ui/apps/dev-server-ui
