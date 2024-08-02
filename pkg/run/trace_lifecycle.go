@@ -532,6 +532,9 @@ func (l traceLifecycle) OnSleep(
 	gen statev1.GeneratorOpcode,
 	until time.Time,
 ) {
+	// reassign here to make sure we have the right traceID and such
+	ctx = l.extractTraceCtx(ctx, md, &item, false)
+
 	dur, err := gen.SleepDuration()
 	if err != nil {
 		// TODO: log a warning here
@@ -571,6 +574,9 @@ func (l traceLifecycle) OnInvokeFunctionResumed(
 	pause state.Pause,
 	r execution.ResumeRequest,
 ) {
+	// reassign here to make sure we have the right traceID and such
+	ctx = l.extractTraceCtx(ctx, md, nil, false)
+
 	if pause.Metadata == nil {
 		return
 	}
@@ -655,6 +661,9 @@ func (l traceLifecycle) OnWaitForEventResumed(
 	pause state.Pause,
 	r execution.ResumeRequest,
 ) {
+	// reassign here to make sure we have the right traceID and such
+	ctx = l.extractTraceCtx(ctx, md, nil, false)
+
 	if pause.Metadata == nil {
 		return
 	}
