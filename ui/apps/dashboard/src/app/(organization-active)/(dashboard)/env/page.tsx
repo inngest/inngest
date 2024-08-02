@@ -1,15 +1,23 @@
-import Envs from '@/components/Environments/Environments';
+import Environments from '@/components/Environments/Environments';
+import OldEnvs from '@/components/Environments/old/oldPage';
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import Layout from '@/components/Layout/Layout';
 import AppNavigation from '@/components/Navigation/old/AppNavigation';
-import Toaster from '@/components/Toaster';
 
 export default async function EnvsPage() {
-  return (
-    <>
-      <div className="flex h-full flex-col">
-        <AppNavigation envSlug="all" />
-        <Envs />
+  const newIANav = await getBooleanFlag('new-ia-nav');
+
+  return newIANav ? (
+    <Layout>
+      <div className="border-subtle flex h-[52px] w-full flex-row items-center justify-start border-b px-6">
+        <div className="text-basis text-base leading-tight">All Environments</div>
       </div>
-      <Toaster />
+      <Environments />
+    </Layout>
+  ) : (
+    <>
+      <AppNavigation envSlug="all" />
+      <OldEnvs />
     </>
   );
 }

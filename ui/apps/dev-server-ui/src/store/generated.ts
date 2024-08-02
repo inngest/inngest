@@ -162,6 +162,7 @@ export type FunctionRunV2 = {
   batchCreatedAt: Maybe<Scalars['Time']>;
   cronSchedule: Maybe<Scalars['String']>;
   endedAt: Maybe<Scalars['Time']>;
+  eventName: Maybe<Scalars['String']>;
   function: Function;
   functionID: Scalars['UUID'];
   id: Scalars['ULID'];
@@ -174,7 +175,6 @@ export type FunctionRunV2 = {
   trace: Maybe<RunTraceSpan>;
   traceID: Scalars['String'];
   triggerIDs: Array<Scalars['ULID']>;
-  triggers: Array<Scalars['Bytes']>;
 };
 
 export type FunctionRunV2Edge = {
@@ -507,6 +507,7 @@ export type RunsV2Connection = {
   __typename?: 'RunsV2Connection';
   edges: Array<FunctionRunV2Edge>;
   pageInfo: PageInfo;
+  totalCount: Scalars['Int'];
 };
 
 export type RunsV2OrderBy = {
@@ -718,7 +719,16 @@ export type GetRunsQueryVariables = Exact<{
 }>;
 
 
-export type GetRunsQuery = { __typename?: 'Query', runs: { __typename?: 'RunsV2Connection', edges: Array<{ __typename?: 'FunctionRunV2Edge', node: { __typename?: 'FunctionRunV2', id: any, queuedAt: any, endedAt: any | null, startedAt: any | null, status: FunctionRunStatus, app: { __typename?: 'App', externalID: string, name: string }, function: { __typename?: 'Function', name: string, slug: string } } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, hasPreviousPage: boolean, startCursor: string | null, endCursor: string | null } } };
+export type GetRunsQuery = { __typename?: 'Query', runs: { __typename?: 'RunsV2Connection', edges: Array<{ __typename?: 'FunctionRunV2Edge', node: { __typename?: 'FunctionRunV2', cronSchedule: string | null, eventName: string | null, id: any, isBatch: boolean, queuedAt: any, endedAt: any | null, startedAt: any | null, status: FunctionRunStatus, app: { __typename?: 'App', externalID: string, name: string }, function: { __typename?: 'Function', name: string, slug: string } } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, hasPreviousPage: boolean, startCursor: string | null, endCursor: string | null } } };
+
+export type CountRunsQueryVariables = Exact<{
+  startTime: Scalars['Time'];
+  status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
+  timeField: RunsV2OrderByField;
+}>;
+
+
+export type CountRunsQuery = { __typename?: 'Query', runs: { __typename?: 'RunsV2Connection', totalCount: number } };
 
 export type TraceDetailsFragment = { __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, outputID: string | null, spanID: string, stepOp: StepOp | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | null };
 
@@ -1020,11 +1030,14 @@ export const GetRunsDocument = `
           externalID
           name
         }
+        cronSchedule
+        eventName
         function {
           name
           slug
         }
         id
+        isBatch
         queuedAt
         endedAt
         startedAt
@@ -1037,6 +1050,16 @@ export const GetRunsDocument = `
       startCursor
       endCursor
     }
+  }
+}
+    `;
+export const CountRunsDocument = `
+    query CountRuns($startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!) {
+  runs(
+    filter: {from: $startTime, status: $status, timeField: $timeField}
+    orderBy: [{field: $timeField, direction: DESC}]
+  ) {
+    totalCount
   }
 }
     `;
@@ -1136,6 +1159,9 @@ const injectedRtkApi = api.injectEndpoints({
     GetRuns: build.query<GetRunsQuery, GetRunsQueryVariables>({
       query: (variables) => ({ document: GetRunsDocument, variables })
     }),
+    CountRuns: build.query<CountRunsQuery, CountRunsQueryVariables>({
+      query: (variables) => ({ document: CountRunsDocument, variables })
+    }),
     GetRun: build.query<GetRunQuery, GetRunQueryVariables>({
       query: (variables) => ({ document: GetRunDocument, variables })
     }),
@@ -1149,5 +1175,5 @@ const injectedRtkApi = api.injectEndpoints({
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useGetRunsQuery, useLazyGetRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery } = injectedRtkApi;
+export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery } = injectedRtkApi;
 

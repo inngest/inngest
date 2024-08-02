@@ -79,6 +79,16 @@ type RegisterRequest struct {
 
 	// checksum is a memoized field.
 	checksum string
+
+	Capabilities Capabilities `json:"capabilities"`
+}
+
+const (
+	TrustProbeV1 string = "v1"
+)
+
+type Capabilities struct {
+	TrustProbe string `json:"trust_probe"`
 }
 
 type Headers struct {

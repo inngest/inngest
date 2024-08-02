@@ -68,8 +68,8 @@ const (
 	// when using idempotency keys.
 	FunctionIdempotencyPeriod = 24 * time.Hour
 
-	DefaultBatchSize = 100
-	MaxBatchTimeout  = 60 * time.Second
+	DefaultBatchSizeLimit = 100
+	DefaultBatchTimeout   = 60 * time.Second
 
 	// MaxEvents is the maximum number of events we can parse in a single batch.
 	MaxEvents = 5_000

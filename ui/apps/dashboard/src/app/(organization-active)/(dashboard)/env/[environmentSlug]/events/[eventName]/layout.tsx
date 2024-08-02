@@ -3,7 +3,7 @@
 import { IconEvent } from '@inngest/components/icons/Event';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import Header, { type HeaderLink } from '@/components/Header/Header';
+import Header, { type HeaderLink } from '@/components/Header/old/Header';
 import SendEventButton from './SendEventButton';
 
 type EventLayoutProps = {

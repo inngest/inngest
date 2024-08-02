@@ -6,7 +6,6 @@ import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
 import { subtractDuration } from '@inngest/components/utils/date';
 
-import { usePlanFeatures } from '../runs/usePlanFeatures';
 import { useCreateCancellation } from './useCreateCancellation';
 import { useRunCount, type RunCountInput } from './useRunCount';
 
@@ -72,12 +71,6 @@ export function CancelFunctionModal(props: Props) {
   }
 
   const countRes = useRunCount(runCountInput);
-  const featureRes = usePlanFeatures();
-
-  let upgradeCutoff: Date | undefined;
-  if (featureRes.data) {
-    upgradeCutoff = subtractDuration(new Date(), { days: featureRes.data.history });
-  }
 
   return (
     <Modal className="w-[800px]" isOpen={isOpen} onClose={onClose}>
@@ -108,7 +101,6 @@ export function CancelFunctionModal(props: Props) {
 
             <RangePicker
               className="w-full"
-              disabled={featureRes.isLoading}
               onChange={(range) =>
                 setTimeRange(
                   range.type === 'relative'
@@ -116,7 +108,6 @@ export function CancelFunctionModal(props: Props) {
                     : { start: range.start, end: range.end }
                 )
               }
-              upgradeCutoff={upgradeCutoff}
             />
           </div>
 
@@ -127,12 +118,6 @@ export function CancelFunctionModal(props: Props) {
 
           {countRes.error && (
             <Alert severity="error">Failed to query run count: {countRes.error.message}</Alert>
-          )}
-
-          {featureRes.error && (
-            <Alert severity="error">
-              Failed to query plan features: {featureRes.error.message}
-            </Alert>
           )}
 
           {creationError && (

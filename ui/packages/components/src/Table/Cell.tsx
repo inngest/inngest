@@ -14,7 +14,7 @@ export function TextCell({ children }: React.PropsWithChildren) {
   return <p className={cn(cellStyles, 'font-medium')}>{children}</p>;
 }
 
-export function TimeCell({ date }: { date: Date }) {
+export function TimeCell({ date }: { date: Date | string }) {
   return (
     <span className={cn(cellStyles, 'font-medium')}>
       <Time value={date} />

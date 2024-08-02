@@ -29,7 +29,8 @@ export const Default: Story = {
       title: 'Output',
     },
     tab: {
-      content: '{\n  "customerId": "cus_1234"\n}',
+      content:
+        '{\n  "customerId": "cus_1234",\n  "amount": 1234,\n  "list": [ "first", "second" ]\n}',
     },
   },
 };
@@ -39,7 +40,10 @@ export const DefaultWithWrapper: Story = {
     <CodeBlock.Wrapper>
       <CodeBlock
         header={{ title: 'Output' }}
-        tab={{ content: '{\n  "customerId": "cus_1234"\n}' }}
+        tab={{
+          content:
+            '{\n  "customerId": "cus_1234",\n  "amount": 1234,\n  "list": [ "first", "second" ]\n}',
+        }}
       />
     </CodeBlock.Wrapper>
   ),
@@ -98,5 +102,26 @@ export const Actions: Story = {
         onClick: () => alert('Sending to dev server...'),
       },
     ],
+  },
+};
+
+export const JavaScript: Story = {
+  args: {
+    header: {
+      title: 'Transform',
+    },
+    tab: {
+      language: 'javascript',
+      content: `function transform(data) {
+  // This is a code comment
+  return {
+    name: \`webhook/\${data.event}\`,
+    data: data.payload,
+    ts: new Date(data.timestamp * 1000).valueOf(),
+    v: "2024-03-01.1"
+  }
+}
+`,
+    },
   },
 };
