@@ -14,110 +14,45 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { useGetRun } from '@/components/RunDetails/useGetRun';
 import { useGetTraceResult } from '@/components/RunDetails/useGetTraceResult';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
-import { graphql } from '@/gql';
 import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useRerun } from '@/queries/useRerun';
 import { pathCreator } from '@/utils/urls';
-import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { usePlanFeatures } from '@/utils/usePlanFeatures';
+import { AppFilterDocument, CountRunsDocument, GetRunsDocument } from './queries';
 import { parseRunsData, toRunStatuses, toTimeField } from './utils';
 
-const GetRunsDocument = graphql(`
-  query GetFnRuns(
-    $environmentID: ID!
-    $startTime: Time!
-    $endTime: Time
-    $status: [FunctionRunStatus!]
-    $timeField: RunsOrderByField!
-    $functionSlug: String!
-    $functionRunCursor: String = null
-  ) {
-    environment: workspace(id: $environmentID) {
-      runs(
-        filter: {
-          from: $startTime
-          until: $endTime
-          status: $status
-          timeField: $timeField
-          fnSlug: $functionSlug
-        }
-        orderBy: [{ field: $timeField, direction: DESC }]
-        after: $functionRunCursor
-      ) {
-        edges {
-          node {
-            app {
-              externalID
-              name
-            }
-            cronSchedule
-            eventName
-            function {
-              name
-              slug
-            }
-            id
-            isBatch
-            queuedAt
-            endedAt
-            startedAt
-            status
-          }
-        }
-        pageInfo {
-          hasNextPage
-          hasPreviousPage
-          startCursor
-          endCursor
-        }
-      }
-    }
-  }
-`);
-
-const CountRunsDocument = graphql(`
-  query CountFnRuns(
-    $environmentID: ID!
-    $startTime: Time!
-    $endTime: Time
-    $status: [FunctionRunStatus!]
-    $timeField: RunsOrderByField!
-    $functionSlug: String!
-  ) {
-    environment: workspace(id: $environmentID) {
-      runs(
-        filter: {
-          from: $startTime
-          until: $endTime
-          status: $status
-          timeField: $timeField
-          fnSlug: $functionSlug
-        }
-        orderBy: [{ field: $timeField, direction: DESC }]
-      ) {
-        totalCount
-      }
-    }
-  }
-`);
-
-type Props = {
+type FnProps = {
   functionSlug: string;
+  scope: 'fn';
 };
 
-// TODO: DRY out this component along with EnvRuns
-export function FnRuns({ functionSlug }: Props) {
+type EnvProps = {
+  functionSlug?: undefined;
+  scope: 'env';
+};
+
+type Props = FnProps | EnvProps;
+
+export function Runs({ functionSlug, scope }: Props) {
   const env = useEnvironment();
 
   const [{ data: pauseData }] = useQuery({
+    pause: scope !== 'fn',
     query: GetFunctionPauseStateDocument,
     variables: {
       environmentID: env.id,
-      functionSlug: functionSlug,
+      functionSlug: functionSlug ?? '',
     },
   });
 
+  const [appsRes] = useQuery({
+    pause: scope === 'fn',
+    query: AppFilterDocument,
+    variables: { envSlug: env.slug },
+  });
+
+  const [appIDs] = useStringArraySearchParam('filterApp');
   const [rawFilteredStatus] = useStringArraySearchParam('filterStatus');
   const [rawTimeField = RunsOrderByField.QueuedAt] = useSearchParam('timeField');
   const [lastDays] = useSearchParam('last');
@@ -159,35 +94,39 @@ export function FnRuns({ functionSlug }: Props) {
   const environment = useEnvironment();
 
   const commonQueryVars = {
+    appIDs: appIDs ?? null,
     environmentID: environment.id,
-    functionSlug,
+    functionSlug: functionSlug ?? null,
     startTime: calculatedStartTime.toISOString(),
     endTime: endTime ?? null,
     status: filteredStatus.length > 0 ? filteredStatus : null,
     timeField,
   };
 
-  const firstPageRes = useSkippableGraphQLQuery({
+  const [firstPageRes, fetchFirstPage] = useQuery({
     query: GetRunsDocument,
-    skip: !functionSlug || isScrollRequest,
+    pause: isScrollRequest,
+    requestPolicy: 'network-only',
     variables: {
       ...commonQueryVars,
       functionRunCursor: null,
     },
   });
 
-  const nextPageRes = useSkippableGraphQLQuery({
+  const [nextPageRes] = useQuery({
     query: GetRunsDocument,
-    skip: !functionSlug || !isScrollRequest,
+    pause: !isScrollRequest,
+    requestPolicy: 'network-only',
     variables: {
       ...commonQueryVars,
       functionRunCursor: cursor,
     },
   });
 
-  const countRes = useSkippableGraphQLQuery({
+  const [countRes] = useQuery({
     query: CountRunsDocument,
-    skip: !functionSlug || isScrollRequest,
+    pause: isScrollRequest,
+    requestPolicy: 'network-only',
     variables: commonQueryVars,
   });
 
@@ -200,16 +139,16 @@ export function FnRuns({ functionSlug }: Props) {
   const firstPageInfo = firstPageRes.data?.environment.runs.pageInfo;
   const nextPageInfo = nextPageRes.data?.environment.runs.pageInfo;
   const hasNextPage = nextPageInfo?.hasNextPage || firstPageInfo?.hasNextPage;
-  const isLoading = firstPageRes.isLoading || nextPageRes.isLoading;
+  const isLoading = firstPageRes.fetching || nextPageRes.fetching;
 
   let totalCount = undefined;
-  if (!countRes.isLoading) {
+  if (!countRes.fetching) {
     // Only set the total count if the count query has finished loading since we
     // don't want to render stale data
     totalCount = countRes.data?.environment.runs.totalCount;
   }
 
-  if (functionSlug && !firstPageRunsData && !firstPageRes.isLoading && !firstPageRes.isSkipped) {
+  if (functionSlug && !firstPageRunsData && !firstPageRes.fetching) {
     throw new Error('missing run');
   }
 
@@ -253,17 +192,29 @@ export function FnRuns({ functionSlug }: Props) {
     setIsScrollRequest(false);
   }, []);
 
+  const onRefresh = useCallback(() => {
+    onScrollToTop();
+    setCursor('');
+    setRuns([]);
+    fetchFirstPage();
+  }, [fetchFirstPage, onScrollToTop]);
+
   return (
     <RunsPage
+      apps={appsRes.data?.env?.apps.map((app) => ({
+        id: app.id,
+        name: app.externalID,
+      }))}
       cancelRun={cancelRun}
       data={runs}
       features={{
         history: features.data?.history ?? 7,
       }}
       hasMore={hasNextPage ?? false}
-      isLoadingInitial={firstPageRes.isLoading}
-      isLoadingMore={nextPageRes.isLoading}
+      isLoadingInitial={firstPageRes.fetching}
+      isLoadingMore={nextPageRes.fetching}
       getRun={getRun}
+      onRefresh={onRefresh}
       onScroll={fetchMoreOnScroll}
       onScrollToTop={onScrollToTop}
       getTraceResult={getTraceResult}
@@ -271,7 +222,7 @@ export function FnRuns({ functionSlug }: Props) {
       pathCreator={internalPathCreator}
       rerun={rerun}
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
-      scope="fn"
+      scope={scope}
       totalCount={totalCount}
     />
   );
