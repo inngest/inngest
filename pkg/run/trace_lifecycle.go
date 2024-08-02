@@ -544,7 +544,7 @@ func (l traceLifecycle) OnSleep(
 	startedAt := until.Add(-1 * dur)
 	runID := md.ID.RunID
 
-	ctx, span := telemetry.NewSpan(ctx,
+	_, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeStep),
 		telemetry.WithName(consts.OtelSpanSleep),
 		telemetry.WithTimestamp(startedAt),
