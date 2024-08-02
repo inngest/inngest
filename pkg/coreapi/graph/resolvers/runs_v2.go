@@ -39,10 +39,11 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 	total := len(runs)
 	for i, r := range runs {
 		var (
-			started  *time.Time
-			ended    *time.Time
-			sourceID *string
-			output   *string
+			started   *time.Time
+			ended     *time.Time
+			sourceID  *string
+			output    *string
+			batchTime *time.Time
 		)
 
 		c := r.Cursor
@@ -73,19 +74,25 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 			continue
 		}
 
+		if r.BatchID != nil {
+			ts := ulid.Time(r.BatchID.Time())
+			batchTime = &ts
+		}
+
 		node := &models.FunctionRunV2{
-			ID:           runID,
-			AppID:        r.AppID,
-			FunctionID:   r.FunctionID,
-			TraceID:      r.TraceID,
-			QueuedAt:     r.QueuedAt,
-			StartedAt:    started,
-			EndedAt:      ended,
-			SourceID:     sourceID,
-			Status:       status,
-			Output:       output,
-			IsBatch:      r.IsBatch,
-			CronSchedule: r.CronSchedule,
+			ID:             runID,
+			AppID:          r.AppID,
+			FunctionID:     r.FunctionID,
+			TraceID:        r.TraceID,
+			QueuedAt:       r.QueuedAt,
+			StartedAt:      started,
+			EndedAt:        ended,
+			SourceID:       sourceID,
+			Status:         status,
+			Output:         output,
+			IsBatch:        r.IsBatch,
+			BatchCreatedAt: batchTime,
+			CronSchedule:   r.CronSchedule,
 		}
 
 		triggerIDS := []ulid.ULID{}
