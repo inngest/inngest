@@ -1560,7 +1560,6 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	}); err != nil {
 		logger.From(ctx).Error().Err(err).Msg("error running finish handler")
 	} else if performedFinalization || r.ForceLifecycleHook {
-		ctx = e.extractTraceCtx(ctx, md, nil)
 		for _, e := range e.lifecycles {
 			go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
 		}

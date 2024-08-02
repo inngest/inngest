@@ -330,6 +330,8 @@ func (l traceLifecycle) OnFunctionFinished(
 }
 
 func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata, req execution.CancelRequest, evts []json.RawMessage) {
+	ctx = l.extractTraceCtx(ctx, md, nil, true)
+
 	start := time.Now()
 	if !md.Config.StartedAt.IsZero() {
 		start = md.Config.StartedAt
