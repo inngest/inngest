@@ -525,6 +525,46 @@ func (l traceLifecycle) OnStepFinished(
 	}
 }
 
+func (l traceLifecycle) OnSleep(
+	ctx context.Context,
+	md statev2.Metadata,
+	item queue.Item,
+	gen statev1.GeneratorOpcode,
+	until time.Time,
+) {
+	dur, err := gen.SleepDuration()
+	if err != nil {
+		// TODO: log a warning here
+		return
+	}
+
+	startedAt := until.Add(-1 * dur)
+	runID := md.ID.RunID
+
+	ctx, span := telemetry.NewSpan(ctx,
+		telemetry.WithScope(consts.OtelScopeStep),
+		telemetry.WithName(consts.OtelSpanSleep),
+		telemetry.WithTimestamp(startedAt),
+		telemetry.WithSpanAttributes(
+			attribute.Bool(consts.OtelUserTraceFilterKey, true),
+			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
+			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, md.Config.FunctionSlug()),
+			attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
+			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
+			attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
+			attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
+			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
+			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeSleep.String()),
+			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
+			attribute.Int64(consts.OtelSysStepSleepEndAt, until.UnixMilli()),
+		),
+	)
+	defer span.End(trace.WithTimestamp(until))
+}
+
 func (l traceLifecycle) OnInvokeFunctionResumed(
 	ctx context.Context,
 	md statev2.Metadata,

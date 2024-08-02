@@ -2049,29 +2049,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 	startedAt := time.Now()
 	until := startedAt.Add(dur)
 
-	ctx, span := telemetry.NewSpan(ctx,
-		telemetry.WithScope(consts.OtelScopeStep),
-		telemetry.WithName(consts.OtelSpanSleep),
-		telemetry.WithTimestamp(startedAt),
-		telemetry.WithSpanAttributes(
-			attribute.Bool(consts.OtelUserTraceFilterKey, true),
-			attribute.String(consts.OtelSysAccountID, i.item.Identifier.AccountID.String()),
-			attribute.String(consts.OtelSysWorkspaceID, i.item.Identifier.WorkspaceID.String()),
-			attribute.String(consts.OtelSysAppID, i.item.Identifier.AppID.String()),
-			attribute.String(consts.OtelSysFunctionID, i.item.Identifier.WorkflowID.String()),
-			// attribute.String(consts.OtelSysFunctionSlug, s.Function().GetSlug()),
-			attribute.Int(consts.OtelSysFunctionVersion, i.item.Identifier.WorkflowVersion),
-			attribute.String(consts.OtelAttrSDKRunID, i.item.Identifier.RunID.String()),
-			attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
-			attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
-			attribute.String(consts.OtelSysStepGroupID, i.item.GroupID),
-			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeSleep.String()),
-			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
-			attribute.Int64(consts.OtelSysStepSleepEndAt, until.UnixMilli()),
-		),
-	)
-	defer span.End(trace.WithTimestamp(until))
-
 	// Create another group for the next item which will run.  We're enqueueing
 	// the function to run again after sleep, so need a new group.
 	groupID := uuid.New().String()
@@ -2095,11 +2072,8 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}, until)
 	if err == redis_state.ErrQueueItemExists {
-		// Safely ignore this error.
-		span.Cancel(ctx)
 		return nil
 	}
-	span.Send()
 
 	for _, e := range e.lifecycles {
 		go e.OnSleep(context.WithoutCancel(ctx), i.md, i.item, gen, until)
