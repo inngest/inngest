@@ -2,7 +2,7 @@ import { Link } from '@inngest/components/Link/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiQuestionLine } from '@remixicon/react';
 
-export const ManageInfo = () => (
+export const WebhookInfo = () => (
   <Tooltip>
     <TooltipTrigger>
       <RiQuestionLine className="text-muted h-[18px] w-[18px]" />
