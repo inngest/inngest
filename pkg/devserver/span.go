@@ -55,8 +55,30 @@ func (sh *spanIngestionHandler) Add(ctx context.Context, span *cqrs.Span) {
 	_, _ = h.Write([]byte(id))
 	key := base64.StdEncoding.EncodeToString(h.Sum(nil))
 
-	if s, ok := sh.dedup[key]; !ok || (ok && span.Duration >= s.Duration) {
-		sh.dedup[key] = span
+	{
+		s, ok := sh.dedup[key]
+		switch ok {
+		case false:
+			sh.dedup[key] = span
+		case true:
+			currentCode, _ := strconv.Atoi(spanAttr(s.SpanAttributes, consts.OtelSysFunctionStatusCode))
+			newCode, _ := strconv.Atoi(spanAttr(span.SpanAttributes, consts.OtelSysFunctionStatusCode))
+
+			// HACK:
+			// if a function has no steps and the function finishes quickly,
+			// there's a possibility of a race where the function start hook finishes
+			// after the function end hook.
+			// so check if the code is larger, use the larger one.
+			// this should not be an issue on prod
+			if newCode > currentCode {
+				sh.dedup[key] = span
+				break
+			}
+
+			if span.Duration > s.Duration {
+				sh.dedup[key] = span
+			}
+		}
 	}
 
 	// TODO: find if there's already an entry in the DB and retrieve that instead
