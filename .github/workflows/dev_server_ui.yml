@@ -20,10 +20,12 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: "18"
-      - run: pnpm install
+      - name: Install
+        run: pnpm install
         working-directory: ui/apps/dev-server-ui
-      - name: type-check
+      - name: Type check
         run: pnpm type-check
         working-directory: ui/apps/dev-server-ui
-      - run: pnpm test
+      - name: Test
+        run: pnpm test
         working-directory: ui/apps/dev-server-ui
