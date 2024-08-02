@@ -18,7 +18,6 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
@@ -27,14 +26,13 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func NewTraceLifecycleListener(l *slog.Logger, run sv2.RunService) execution.LifecycleListener {
+func NewTraceLifecycleListener(l *slog.Logger) execution.LifecycleListener {
 	if l == nil {
 		l = slog.Default()
 	}
 
 	return traceLifecycle{
 		log: l,
-		run: run,
 	}
 }
 
@@ -42,7 +40,6 @@ type traceLifecycle struct {
 	execution.NoopLifecyceListener
 
 	log *slog.Logger
-	run sv2.RunService
 }
 
 func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Metadata, item queue.Item, evts []event.TrackedEvent) {
@@ -119,8 +116,8 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 
 						cIDs := strings.Split(meta.InvokeCorrelationId, ".")
 						if len(cIDs) != 2 {
-							log.From(ctx).Error().Interface("metadata", meta).Msg("invalid invoke correlation ID")
 							// format is invalid
+							l.log.Error("invalid invoke correlation ID", "metadata", meta)
 							return
 						}
 
@@ -170,7 +167,7 @@ func (l traceLifecycle) OnFunctionStarted(
 	evts []json.RawMessage,
 ) {
 	// reassign here to make sure we have the right traceID and such
-	ctx = l.extractTraceCtx(ctx, md, &item, true)
+	ctx = l.extractTraceCtx(ctx, md, true)
 
 	start := time.Now()
 	if !md.Config.StartedAt.IsZero() {
@@ -248,7 +245,7 @@ func (l traceLifecycle) OnFunctionFinished(
 	resp statev1.DriverResponse,
 ) {
 	// reassign here to make sure we have the right traceID and such
-	ctx = l.extractTraceCtx(ctx, md, &item, true)
+	ctx = l.extractTraceCtx(ctx, md, true)
 
 	start := time.Now()
 	if !md.Config.StartedAt.IsZero() {
@@ -329,7 +326,7 @@ func (l traceLifecycle) OnFunctionFinished(
 }
 
 func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata, req execution.CancelRequest, evts []json.RawMessage) {
-	ctx = l.extractTraceCtx(ctx, md, nil, true)
+	ctx = l.extractTraceCtx(ctx, md, true)
 
 	start := time.Now()
 	if !md.Config.StartedAt.IsZero() {
@@ -408,7 +405,7 @@ func (l traceLifecycle) OnStepStarted(
 	runID := md.ID.RunID
 
 	// reassign here to make sure we have the right traceID and such
-	ctx = l.extractTraceCtx(ctx, md, &item, false)
+	ctx = l.extractTraceCtx(ctx, md, false)
 	_, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeExecution),
 		telemetry.WithName(consts.OtelExecPlaceholder),
@@ -475,7 +472,7 @@ func (l traceLifecycle) OnStepFinished(
 	runID := md.ID.RunID
 
 	// reassign here to make sure we have the right traceID and such
-	ctx = l.extractTraceCtx(ctx, md, &item, false)
+	ctx = l.extractTraceCtx(ctx, md, false)
 	_, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeExecution),
 		telemetry.WithName(consts.OtelExecPlaceholder),
@@ -591,7 +588,7 @@ func (l traceLifecycle) OnSleep(
 	until time.Time,
 ) {
 	// reassign here to make sure we have the right traceID and such
-	ctx = l.extractTraceCtx(ctx, md, &item, false)
+	ctx = l.extractTraceCtx(ctx, md, false)
 
 	dur, err := gen.SleepDuration()
 	if err != nil {
@@ -681,7 +678,7 @@ func (l traceLifecycle) OnInvokeFunctionResumed(
 	r execution.ResumeRequest,
 ) {
 	// reassign here to make sure we have the right traceID and such
-	ctx = l.extractTraceCtx(ctx, md, nil, false)
+	ctx = l.extractTraceCtx(ctx, md, false)
 
 	if pause.Metadata == nil {
 		return
@@ -827,7 +824,7 @@ func (l traceLifecycle) OnWaitForEventResumed(
 	r execution.ResumeRequest,
 ) {
 	// reassign here to make sure we have the right traceID and such
-	ctx = l.extractTraceCtx(ctx, md, nil, false)
+	ctx = l.extractTraceCtx(ctx, md, false)
 
 	if pause.Metadata == nil {
 		return
@@ -894,7 +891,7 @@ func (l traceLifecycle) OnWaitForEventResumed(
 // extractTraceCtx extracts the trace context from the given item, if it exists.
 // If it doesn't it falls back to extracting the trace for the run overall.
 // If neither exist or they are invalid, it returns the original context.
-func (l *traceLifecycle) extractTraceCtx(ctx context.Context, md sv2.Metadata, item *queue.Item, isFnSpan bool) context.Context {
+func (l *traceLifecycle) extractTraceCtx(ctx context.Context, md sv2.Metadata, isFnSpan bool) context.Context {
 	fntrace := md.Config.FunctionTrace()
 	if fntrace != nil {
 		// NOTE:
@@ -910,35 +907,14 @@ func (l *traceLifecycle) extractTraceCtx(ctx context.Context, md sv2.Metadata, i
 		return trace.ContextWithSpanContext(ctx, sctx)
 	}
 
-	if item != nil {
-		metadata := make(map[string]any)
-		for k, v := range item.Metadata {
-			metadata[k] = v
-		}
-		if newCtx, ok := extractTraceCtxFromMap(ctx, metadata); ok {
-			return newCtx
-		}
-	}
-
 	if md.Config.Context != nil {
-		if newCtx, ok := extractTraceCtxFromMap(ctx, md.Config.Context); ok {
-			return newCtx
+		if trace, ok := md.Config.Context[consts.OtelPropagationKey]; ok {
+			carrier := telemetry.NewTraceCarrier()
+			if err := carrier.Unmarshal(trace); err == nil {
+				return telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+			}
 		}
 	}
 
 	return ctx
-}
-
-// extractTraceCtxFromMap extracts the trace context from a map, if it exists.
-// If it doesn't or it is invalid, it nil.
-func extractTraceCtxFromMap(ctx context.Context, target map[string]any) (context.Context, bool) {
-	if trace, ok := target[consts.OtelPropagationKey]; ok {
-		carrier := telemetry.NewTraceCarrier()
-		if err := carrier.Unmarshal(trace); err == nil {
-			targetCtx := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
-			return targetCtx, true
-		}
-	}
-
-	return ctx, false
 }
