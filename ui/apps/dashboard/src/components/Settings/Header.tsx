@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 
-import { Header } from '@/components/Header/Header';
+import { Header, type BreadCrumbType } from '@/components/Header/Header';
 
 //
 // In the new IA, all the settings pages
@@ -19,7 +19,7 @@ export const SettingsHeader = () => {
   const pathname = usePathname();
   const defined = <T,>(value: T | undefined) => value !== undefined;
 
-  const breadcrumb = paths
+  const breadcrumb: BreadCrumbType[] = paths
     .map(([path, text]) =>
       pathname?.endsWith(path) ? { text, href: `/settings${path}` } : undefined
     )
