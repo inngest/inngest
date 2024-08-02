@@ -644,61 +644,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
 
-	for _, e := range req.Events {
-		go func(ctx context.Context, evt event.Event) {
-			if v, ok := evt.Data[consts.InngestEventDataPrefix]; ok {
-				meta := event.InngestMetadata{}
-				if err := meta.Decode(v); err == nil {
-					if meta.InvokeTraceCarrier != nil && meta.InvokeTraceCarrier.CanResumePause() {
-						ictx := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(meta.InvokeTraceCarrier.Context))
-
-						sid := meta.InvokeTraceCarrier.SpanID()
-
-						cIDs := strings.Split(meta.InvokeCorrelationId, ".")
-						if len(cIDs) != 2 {
-							log.From(ctx).Error().Interface("metadata", meta).Msg("invalid invoke correlation ID")
-							// format is invalid
-							return
-						}
-
-						var mrunID ulid.ULID
-						if meta.RunID() != nil {
-							mrunID = *meta.RunID()
-						}
-
-						_, ispan := telemetry.NewSpan(ictx,
-							telemetry.WithScope(consts.OtelScopeStep),
-							telemetry.WithName(consts.OtelSpanInvoke),
-							telemetry.WithTimestamp(meta.InvokeTraceCarrier.Timestamp),
-							telemetry.WithSpanID(sid),
-							telemetry.WithSpanAttributes(
-								attribute.Bool(consts.OtelUserTraceFilterKey, true),
-								attribute.String(consts.OtelSysAccountID, req.AccountID.String()),
-								attribute.String(consts.OtelSysWorkspaceID, req.WorkspaceID.String()),
-								attribute.String(consts.OtelSysAppID, meta.SourceAppID),
-								attribute.String(consts.OtelSysFunctionID, meta.SourceFnID),
-								attribute.Int(consts.OtelSysFunctionVersion, meta.SourceFnVersion),
-								attribute.String(consts.OtelAttrSDKRunID, mrunID.String()),
-								attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
-								attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
-								attribute.String(consts.OtelSysStepGroupID, meta.InvokeGroupID),
-								attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
-								attribute.String(consts.OtelSysStepDisplayName, meta.InvokeDisplayName),
-
-								attribute.String(consts.OtelSysStepInvokeTargetFnID, req.Function.ID.String()),
-								attribute.Int64(consts.OtelSysStepInvokeExpires, meta.InvokeExpiresAt),
-								attribute.String(consts.OtelSysStepInvokeTriggeringEventID, evt.ID),
-								attribute.String(consts.OtelSysStepInvokeRunID, runID.String()),
-								attribute.Bool(consts.OtelSysStepInvokeExpired, false),
-							),
-						)
-						defer ispan.End()
-					}
-				}
-			}
-		}(ctx, e.GetEvent())
-	}
-
 	for _, e := range e.lifecycles {
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
@@ -2438,6 +2383,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		evtIDs[i] = e.GetInternalID().String()
 	}
 
+	// root span for scheduling a batch
 	ctx, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeBatch),
 		telemetry.WithName(consts.OtelSpanBatch),

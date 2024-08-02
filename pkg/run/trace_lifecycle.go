@@ -18,6 +18,7 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
@@ -103,6 +104,62 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 				attribute.Bool(consts.OtelSysEventData, true),
 			))
 		}
+	}
+
+	// annotate the invoke span with target function run ID for reference purposes
+	for _, e := range evts {
+		go func(ctx context.Context, evt event.Event) {
+			if v, ok := evt.Data[consts.InngestEventDataPrefix]; ok {
+				meta := event.InngestMetadata{}
+				if err := meta.Decode(v); err == nil {
+					if meta.InvokeTraceCarrier != nil && meta.InvokeTraceCarrier.CanResumePause() {
+						ictx := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(meta.InvokeTraceCarrier.Context))
+
+						sid := meta.InvokeTraceCarrier.SpanID()
+
+						cIDs := strings.Split(meta.InvokeCorrelationId, ".")
+						if len(cIDs) != 2 {
+							log.From(ctx).Error().Interface("metadata", meta).Msg("invalid invoke correlation ID")
+							// format is invalid
+							return
+						}
+
+						var mrunID ulid.ULID
+						if meta.RunID() != nil {
+							mrunID = *meta.RunID()
+						}
+
+						_, ispan := telemetry.NewSpan(ictx,
+							telemetry.WithScope(consts.OtelScopeStep),
+							telemetry.WithName(consts.OtelSpanInvoke),
+							telemetry.WithTimestamp(meta.InvokeTraceCarrier.Timestamp),
+							telemetry.WithSpanID(sid),
+							telemetry.WithSpanAttributes(
+								attribute.Bool(consts.OtelUserTraceFilterKey, true),
+								attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
+								attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
+								attribute.String(consts.OtelSysAppID, meta.SourceAppID),
+								attribute.String(consts.OtelSysFunctionID, meta.SourceFnID),
+								attribute.Int(consts.OtelSysFunctionVersion, meta.SourceFnVersion),
+								attribute.String(consts.OtelAttrSDKRunID, mrunID.String()),
+								attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
+								attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
+								attribute.String(consts.OtelSysStepGroupID, meta.InvokeGroupID),
+								attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
+								attribute.String(consts.OtelSysStepDisplayName, meta.InvokeDisplayName),
+
+								attribute.String(consts.OtelSysStepInvokeTargetFnID, md.ID.FunctionID.String()),
+								attribute.Int64(consts.OtelSysStepInvokeExpires, meta.InvokeExpiresAt),
+								attribute.String(consts.OtelSysStepInvokeTriggeringEventID, evt.ID),
+								attribute.String(consts.OtelSysStepInvokeRunID, runID.String()),
+								attribute.Bool(consts.OtelSysStepInvokeExpired, false),
+							),
+						)
+						defer ispan.End()
+					}
+				}
+			}
+		}(ctx, e.GetEvent())
 	}
 }
 
