@@ -4,10 +4,10 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - "ui/apps/dashboard/**"
+      - "ui/**"
   pull_request:
     paths-ignore:
-      - "ui/apps/dashboard/**"
+      - "ui/**"
 
 jobs:
   ts:

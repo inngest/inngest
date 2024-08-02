@@ -50,6 +50,7 @@ type Props = {
   hasMore: boolean;
   isLoadingInitial: boolean;
   isLoadingMore: boolean;
+  onRefresh?: () => void;
   onScroll: UIEventHandler<HTMLDivElement>;
   onScrollToTop: () => void;
   pathCreator: React.ComponentProps<typeof RunDetails>['pathCreator'];
@@ -74,6 +75,7 @@ export function RunsPage({
   hasMore,
   isLoadingInitial,
   isLoadingMore,
+  onRefresh,
   onScroll,
   onScrollToTop,
   pathCreator,
@@ -202,7 +204,7 @@ export function RunsPage({
         });
       }
     },
-    [scrollToTop]
+    [batchUpdate, scrollToTop]
   );
 
   const renderSubComponent = useCallback(
@@ -303,14 +305,15 @@ export function RunsPage({
             setColumnVisibility={setColumnVisibility}
             options={options}
           />
-          {/* TODO: wire button */}
-          <Button
-            label="Refresh"
-            appearance="text"
-            btnAction={() => {}}
-            icon={<RiLoopLeftLine />}
-            disabled
-          />
+
+          {onRefresh && (
+            <Button
+              label="Refresh"
+              appearance="text"
+              btnAction={onRefresh}
+              icon={<RiLoopLeftLine />}
+            />
+          )}
         </div>
       </div>
       <RunsTable
