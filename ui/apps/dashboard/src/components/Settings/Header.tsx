@@ -15,15 +15,18 @@ const paths: [string, string][] = [
   ['/user', 'Your profile'],
 ];
 
-export const SettingsHeader = () => {
-  const pathname = usePathname();
-  const defined = <T,>(value: T | undefined) => value !== undefined;
+const defined = <T,>(value: T | undefined) => value !== undefined;
 
-  const breadcrumb: BreadCrumbType[] = paths
+const getBreadCrumbs = (pathname: string): BreadCrumbType[] =>
+  paths
     .map(([path, text]) =>
       pathname?.endsWith(path) ? { text, href: `/settings${path}` } : undefined
     )
     .filter(defined);
+
+export const SettingsHeader = () => {
+  const pathname = usePathname();
+  const breadcrumb: BreadCrumbType[] = getBreadCrumbs(pathname);
 
   return <Header backNav={true} breadcrumb={breadcrumb} />;
 };
