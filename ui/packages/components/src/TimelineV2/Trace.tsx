@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Route } from 'next';
 
-import type { Result } from '../types/functionRun';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
 import { InlineSpans } from './InlineSpans';
@@ -12,13 +11,14 @@ import { createSpanWidths } from './utils';
 
 type Props = {
   depth: number;
-  getResult: (outputID: string) => Promise<Result>;
+  getResult: (outputID: string) => Promise<string | null>;
   isExpandable?: boolean;
   minTime?: Date;
   maxTime?: Date;
   pathCreator: {
     runPopout: (params: { runID: string }) => Route;
   };
+  runID: string;
   trace: Trace;
 };
 
@@ -29,18 +29,19 @@ export function Trace({
   maxTime,
   minTime,
   pathCreator,
+  runID,
   trace,
 }: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [result, setResult] = useState<Result>();
+  const [result, setResult] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isExpanded && !result && trace.outputID) {
-      getResult(trace.outputID).then((data) => {
+    if (isExpanded && !result) {
+      getResult(runID).then((data) => {
         setResult(data);
       });
     }
-  }, [isExpanded, result]);
+  }, [isExpanded, result, runID]);
 
   if (!minTime) {
     minTime = new Date(trace.queuedAt);
@@ -118,6 +119,7 @@ export function Trace({
                     minTime={minTime}
                     pathCreator={pathCreator}
                     trace={child}
+                    runID={runID}
                   />
                 </div>
               </div>
