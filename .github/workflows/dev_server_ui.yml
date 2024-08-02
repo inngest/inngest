@@ -1,4 +1,13 @@
-name: Test Dev Server UI
+name: Dev Server UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ui/**"
+  pull_request:
+    paths:
+      - "ui/**"
 
 jobs:
   build:
