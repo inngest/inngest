@@ -907,14 +907,5 @@ func (l *traceLifecycle) extractTraceCtx(ctx context.Context, md sv2.Metadata, i
 		return trace.ContextWithSpanContext(ctx, sctx)
 	}
 
-	if md.Config.Context != nil {
-		if trace, ok := md.Config.Context[consts.OtelPropagationKey]; ok {
-			carrier := telemetry.NewTraceCarrier()
-			if err := carrier.Unmarshal(trace); err == nil {
-				return telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
-			}
-		}
-	}
-
 	return ctx
 }

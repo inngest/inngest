@@ -424,8 +424,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	carrier := telemetry.NewTraceCarrier(telemetry.WithTraceCarrierSpanID(&spanID))
 	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 	config.SetFunctionTrace(carrier)
-	// NOTE 2024-08-01:  backward compatibility, should be removed in the future
-	config.Context[consts.OtelPropagationKey] = carrier
 
 	metadata := sv2.Metadata{
 		ID: sv2.ID{
@@ -751,7 +749,18 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	// Store the metadata in context for future use and propagate trace
 	// context. This can be used to reduce reads in the future.
-	ctx = e.extractTraceCtx(ctx, md)
+	fntrace := md.Config.FunctionTrace()
+	if fntrace != nil {
+		tmp := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
+		spanID, err := md.Config.GetSpanID()
+		if err != nil {
+			// NOTE: error here should not block execution, but also means the trace will be messed up
+			// because it can't be traced correctly
+			e.log.Err(err).Interface("config", md.Config).Msg("error retrieving spanID")
+		}
+		sc := trace.SpanContextFromContext(tmp).WithSpanID(*spanID)
+		ctx = trace.ContextWithSpanContext(ctx, sc)
+	}
 
 	evtIDs := make([]string, len(id.EventIDs))
 	for i, eid := range id.EventIDs {
@@ -2271,32 +2280,6 @@ func (e *executor) newExpressionEvaluator(ctx context.Context, expr string) (exp
 		return e.evalFactory(ctx, expr)
 	}
 	return expressions.NewExpressionEvaluator(ctx, expr)
-}
-
-// extractTraceCtx extracts the trace context from the given item, if it exists.
-// If it doesn't it falls back to extracting the trace for the run overall.
-// If neither exist or they are invalid, it returns the original context.
-func (e *executor) extractTraceCtx(ctx context.Context, md sv2.Metadata) context.Context {
-	fntrace := md.Config.FunctionTrace()
-	if fntrace != nil {
-		// NOTE:
-		// this gymastics happens because the carrier stores the spanID separately.
-		// it probably can be simplified
-		tmp := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
-		sctx := trace.SpanContextFromContext(tmp).WithSpanID(fntrace.SpanID())
-		return trace.ContextWithSpanContext(ctx, sctx)
-	}
-
-	if md.Config.Context != nil {
-		if trace, ok := md.Config.Context[consts.OtelPropagationKey]; ok {
-			carrier := telemetry.NewTraceCarrier()
-			if err := carrier.Unmarshal(trace); err == nil {
-				return telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
-			}
-		}
-	}
-
-	return ctx
 }
 
 // AppendAndScheduleBatch appends a new batch item. If a new batch is created, it will be scheduled to run

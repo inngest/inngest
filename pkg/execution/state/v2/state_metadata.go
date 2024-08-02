@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
@@ -16,7 +17,6 @@ const (
 	fnslugKey       = "__fnslug"
 	traceLinkKey    = "__tracelink"
 	debounceKey     = "__debounce"
-	fnTrace         = "__fn_trace"
 )
 
 type ID struct {
@@ -126,8 +126,9 @@ func (c *Config) EventID() ulid.ULID {
 func (c *Config) GetSpanID() (*trace.SpanID, error) {
 	fnTrace := c.FunctionTrace()
 	if fnTrace != nil {
-		sid := fnTrace.SpanID()
-		return &sid, nil
+		if sid := fnTrace.SpanID(); sid.IsValid() {
+			return &sid, nil
+		}
 	}
 
 	// keep this around for backward compatibility purposes
@@ -228,7 +229,7 @@ func (c *Config) SetFunctionTrace(carrier *telemetry.TraceCarrier) {
 	if c.Context == nil {
 		c.Context = map[string]any{}
 	}
-	c.Context[fnTrace] = carrier
+	c.Context[consts.OtelPropagationKey] = *carrier
 }
 
 func (c *Config) FunctionTrace() *telemetry.TraceCarrier {
@@ -236,7 +237,7 @@ func (c *Config) FunctionTrace() *telemetry.TraceCarrier {
 		return nil
 	}
 
-	if v, ok := c.Context[fnTrace]; ok {
+	if v, ok := c.Context[consts.OtelPropagationKey]; ok {
 		carrier := telemetry.NewTraceCarrier()
 		if err := carrier.Unmarshal(v); err == nil {
 			return carrier
