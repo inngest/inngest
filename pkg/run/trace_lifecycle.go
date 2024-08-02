@@ -112,7 +112,7 @@ func (l traceLifecycle) OnFunctionStarted(
 	evts []json.RawMessage,
 ) {
 	// reassign here to make sure we have the right traceID and such
-	ctx = l.extractTraceCtx(ctx, md, &item)
+	ctx = l.extractTraceCtx(ctx, md, &item, true)
 
 	start := time.Now()
 	if !md.Config.StartedAt.IsZero() {
@@ -165,6 +165,7 @@ func (l traceLifecycle) OnFunctionStarted(
 	}
 	batchID := md.Config.BatchID
 	if batchID != nil {
+		// fmt.Println("Start RunID:", runID.String(), ", BatchID:", batchID.String())
 		span.SetAttributes(
 			attribute.String(consts.OtelSysBatchID, batchID.String()),
 			attribute.Int64(consts.OtelSysBatchTS, int64(batchID.Time())),
@@ -189,7 +190,7 @@ func (l traceLifecycle) OnFunctionFinished(
 	resp statev1.DriverResponse,
 ) {
 	// reassign here to make sure we have the right traceID and such
-	ctx = l.extractTraceCtx(ctx, md, &item)
+	ctx = l.extractTraceCtx(ctx, md, &item, true)
 
 	start := time.Now()
 	if !md.Config.StartedAt.IsZero() {
@@ -241,6 +242,7 @@ func (l traceLifecycle) OnFunctionFinished(
 	}
 	batchID := md.Config.BatchID
 	if batchID != nil {
+		// fmt.Println("End RunID: ", runID.String(), ", BatchID:", batchID.String())
 		span.SetAttributes(
 			attribute.String(consts.OtelSysBatchID, batchID.String()),
 			attribute.Int64(consts.OtelSysBatchTS, int64(batchID.Time())),
@@ -265,6 +267,7 @@ func (l traceLifecycle) OnFunctionFinished(
 		span.SetAttributes(attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusFailed.ToCode()))
 	}
 
+	// fmt.Printf("Output: %s\n", resp.Output)
 	span.SetFnOutput(resp.Output)
 }
 
@@ -346,7 +349,7 @@ func (l traceLifecycle) OnStepStarted(
 	runID := md.ID.RunID
 
 	// reassign here to make sure we have the right traceID and such
-	ctx = l.extractTraceCtx(ctx, md, &item)
+	ctx = l.extractTraceCtx(ctx, md, &item, false)
 	_, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeExecution),
 		telemetry.WithName(consts.OtelExecPlaceholder),
@@ -413,7 +416,7 @@ func (l traceLifecycle) OnStepFinished(
 	runID := md.ID.RunID
 
 	// reassign here to make sure we have the right traceID and such
-	ctx = l.extractTraceCtx(ctx, md, &item)
+	ctx = l.extractTraceCtx(ctx, md, &item, false)
 	_, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeExecution),
 		telemetry.WithName(consts.OtelExecPlaceholder),
@@ -527,13 +530,18 @@ func (l traceLifecycle) OnStepFinished(
 // extractTraceCtx extracts the trace context from the given item, if it exists.
 // If it doesn't it falls back to extracting the trace for the run overall.
 // If neither exist or they are invalid, it returns the original context.
-func (l *traceLifecycle) extractTraceCtx(ctx context.Context, md sv2.Metadata, item *queue.Item) context.Context {
+func (l *traceLifecycle) extractTraceCtx(ctx context.Context, md sv2.Metadata, item *queue.Item, isFnSpan bool) context.Context {
 	fntrace := md.Config.FunctionTrace()
 	if fntrace != nil {
 		// NOTE:
 		// this gymastics happens because the carrier stores the spanID separately.
 		// it probably can be simplified
 		tmp := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
+		// NOTE: this is getting complex
+		// need the original with the parent span
+		if isFnSpan {
+			return tmp
+		}
 		sctx := trace.SpanContextFromContext(tmp).WithSpanID(fntrace.SpanID())
 		return trace.ContextWithSpanContext(ctx, sctx)
 	}
