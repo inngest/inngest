@@ -397,6 +397,36 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// function run spanID
 	spanID := telemetry.NewSpanID(ctx)
 
+	config := sv2.Config{
+		FunctionVersion: req.Function.FunctionVersion,
+		SpanID:          spanID.String(),
+		EventIDs:        eventIDs,
+		Idempotency:     key,
+		ReplayID:        req.ReplayID,
+		OriginalRunID:   req.OriginalRunID,
+		PriorityFactor:  &factor,
+		BatchID:         req.BatchID,
+		Context:         req.Context,
+	}
+
+	// Grab the cron schedule for function config.  This is necessary for fast
+	// lookups, trace info, etc.
+	if len(req.Events) == 1 && req.Events[0].GetEvent().Name == event.FnCronName {
+		if cron, ok := req.Events[0].GetEvent().Data["cron"].(string); ok {
+			config.SetCronSchedule(cron)
+		}
+	}
+
+	// FunctionSlug is not stored in V1 format, so needs to be stored in Context
+	config.SetFunctionSlug(req.Function.GetSlug())
+	config.SetDebounceFlag(req.PreventDebounce)
+
+	carrier := telemetry.NewTraceCarrier(telemetry.WithTraceCarrierSpanID(&spanID))
+	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	config.SetFunctionTrace(carrier)
+	// NOTE 2024-08-01:  backward compatibility, should be removed in the future
+	config.Context[consts.OtelPropagationKey] = carrier
+
 	metadata := sv2.Metadata{
 		ID: sv2.ID{
 			RunID:      runID,
@@ -407,36 +437,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				AccountID: req.AccountID,
 			},
 		},
-		Config: sv2.Config{
-			FunctionVersion: req.Function.FunctionVersion,
-			SpanID:          spanID.String(),
-			EventIDs:        eventIDs,
-			Idempotency:     key,
-			ReplayID:        req.ReplayID,
-			OriginalRunID:   req.OriginalRunID,
-			PriorityFactor:  &factor,
-			BatchID:         req.BatchID,
-			Context:         req.Context,
-		},
+		Config: config,
 	}
-
-	// Grab the cron schedule for function config.  This is necessary for fast
-	// lookups, trace info, etc.
-	if len(req.Events) == 1 && req.Events[0].GetEvent().Name == event.FnCronName {
-		if cron, ok := req.Events[0].GetEvent().Data["cron"].(string); ok {
-			metadata.Config.SetCronSchedule(cron)
-		}
-	}
-
-	// FunctionSlug is not stored in V1 format, so needs to be stored in Context
-	metadata.Config.SetFunctionSlug(req.Function.GetSlug())
-	metadata.Config.SetDebounceFlag(req.PreventDebounce)
-
-	carrier := telemetry.NewTraceCarrier(telemetry.WithTraceCarrierSpanID(&spanID))
-	telemetry.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
-	metadata.Config.SetFunctionTrace(carrier)
-	// NOTE 2024-08-01:  backward compatibility, should be removed in the future
-	metadata.Config.Context[consts.OtelPropagationKey] = carrier
 
 	// If this is paused, immediately end just before creating state.
 	isPaused := req.FunctionPausedAt != nil && req.FunctionPausedAt.Before(time.Now())

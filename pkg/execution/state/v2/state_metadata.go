@@ -225,7 +225,7 @@ func (c *Config) DebounceFlag() bool {
 }
 
 func (c *Config) SetFunctionTrace(carrier *telemetry.TraceCarrier) {
-	if c.Context != nil {
+	if c.Context == nil {
 		c.Context = map[string]any{}
 	}
 	c.Context[fnTrace] = carrier
