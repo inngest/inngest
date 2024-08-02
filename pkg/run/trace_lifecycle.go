@@ -333,7 +333,11 @@ func (l traceLifecycle) OnStepStarted(
 	edge inngest.Edge,
 	url string,
 ) {
-	spanID := telemetry.NewSpanIDWithHash(ctx, *item.JobID)
+	spanID, err := item.SpanID()
+	if err != nil {
+		// TODO: log this
+		return
+	}
 	start, ok := redis_state.GetItemStart(ctx)
 	if !ok {
 		// TODO: raise a warning here
@@ -347,7 +351,7 @@ func (l traceLifecycle) OnStepStarted(
 		telemetry.WithScope(consts.OtelScopeExecution),
 		telemetry.WithName(consts.OtelExecPlaceholder),
 		telemetry.WithTimestamp(start),
-		telemetry.WithSpanID(spanID),
+		telemetry.WithSpanID(*spanID),
 		telemetry.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
@@ -395,7 +399,12 @@ func (l traceLifecycle) OnStepFinished(
 	resp *statev1.DriverResponse,
 	runErr error,
 ) {
-	spanID := telemetry.NewSpanIDWithHash(ctx, *item.JobID)
+	spanID, err := item.SpanID()
+	if err != nil {
+		// TODO: log error
+		return
+	}
+	// fmt.Printf("Ended: %s, Attempt: %d\n", spanID, item.Attempt)
 	start, ok := redis_state.GetItemStart(ctx)
 	if !ok {
 		// TODO: raise a warning here
@@ -409,7 +418,7 @@ func (l traceLifecycle) OnStepFinished(
 		telemetry.WithScope(consts.OtelScopeExecution),
 		telemetry.WithName(consts.OtelExecPlaceholder),
 		telemetry.WithTimestamp(start),
-		telemetry.WithSpanID(spanID),
+		telemetry.WithSpanID(*spanID),
 		telemetry.WithSpanAttributes(
 			attribute.Bool(consts.OtelUserTraceFilterKey, true),
 			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),

@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cespare/xxhash/v2"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"go.opentelemetry.io/otel/attribute"
@@ -592,11 +591,4 @@ func (sc *spanIDGenerator) NewIDs(ctx context.Context) (trace.TraceID, trace.Spa
 
 func NewSpanID(ctx context.Context) trace.SpanID {
 	return gen.NewSpanID(ctx, trace.TraceID{})
-}
-
-func NewSpanIDWithHash(ctx context.Context, h string) trace.SpanID {
-	hash := xxhash.New()
-	_, _ = hash.WriteString(h)
-	byt := hash.Sum(nil)
-	return trace.SpanID(byt[:8])
 }
