@@ -20,7 +20,7 @@ const defined = <T,>(value: T | undefined): value is T => value !== undefined;
 const getBreadCrumbs = (pathname: string): BreadCrumbType[] =>
   paths
     .map(([path, text]) =>
-      pathname?.endsWith(path) ? { text, href: `/settings${path}` } : undefined
+      pathname.endsWith(path) ? { text, href: `/settings${path}` } : undefined
     )
     .filter(defined);
 
