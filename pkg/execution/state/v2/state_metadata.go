@@ -229,7 +229,7 @@ func (c *Config) SetFunctionTrace(carrier *telemetry.TraceCarrier) {
 	if c.Context == nil {
 		c.Context = map[string]any{}
 	}
-	c.Context[consts.OtelPropagationKey] = *carrier
+	c.Context[consts.OtelPropagationKey] = carrier
 }
 
 func (c *Config) FunctionTrace() *telemetry.TraceCarrier {

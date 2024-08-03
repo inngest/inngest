@@ -392,6 +392,9 @@ func (l traceLifecycle) OnStepStarted(
 	edge inngest.Edge,
 	url string,
 ) {
+	// reassign here to make sure we have the right traceID and such
+	ctx = l.extractTraceCtx(ctx, md, false)
+
 	spanID, err := item.SpanID()
 	if err != nil {
 		l.log.Error("error retrieving spanID", "error", err, "meta", md, "lifecycle", "OnStepStarted")
@@ -404,8 +407,6 @@ func (l traceLifecycle) OnStepStarted(
 	}
 	runID := md.ID.RunID
 
-	// reassign here to make sure we have the right traceID and such
-	ctx = l.extractTraceCtx(ctx, md, false)
 	_, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeExecution),
 		telemetry.WithName(consts.OtelExecPlaceholder),
@@ -458,6 +459,9 @@ func (l traceLifecycle) OnStepFinished(
 	resp *statev1.DriverResponse,
 	runErr error,
 ) {
+	// reassign here to make sure we have the right traceID and such
+	ctx = l.extractTraceCtx(ctx, md, false)
+
 	spanID, err := item.SpanID()
 	if err != nil {
 		l.log.Error("error retrieving spanID", "meta", md, "error", err, "lifecycle", "OnStepFinished")
@@ -470,8 +474,6 @@ func (l traceLifecycle) OnStepFinished(
 	}
 	runID := md.ID.RunID
 
-	// reassign here to make sure we have the right traceID and such
-	ctx = l.extractTraceCtx(ctx, md, false)
 	_, span := telemetry.NewSpan(ctx,
 		telemetry.WithScope(consts.OtelScopeExecution),
 		telemetry.WithName(consts.OtelExecPlaceholder),
@@ -629,6 +631,8 @@ func (l traceLifecycle) OnInvokeFunction(
 	gen statev1.GeneratorOpcode,
 	invocationEvt event.Event,
 ) {
+	ctx = l.extractTraceCtx(ctx, md, false)
+
 	meta := invocationEvt.InngestMetadata()
 	if meta == nil {
 		l.log.Error("invocation event metadata not available", "meta", md, "lifecycle", "OnInvokeFunction")
@@ -766,6 +770,8 @@ func (l traceLifecycle) OnWaitForEvent(
 	gen statev1.GeneratorOpcode,
 	pause state.Pause,
 ) {
+	ctx = l.extractTraceCtx(ctx, md, false)
+
 	runID := md.ID.RunID
 	opts, err := gen.WaitForEventOpts()
 	if err != nil {
