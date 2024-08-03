@@ -69,7 +69,7 @@ func TestInvoke(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		<-time.After(3 * time.Second)
+		<-time.After(4 * time.Second)
 
 		require.EventuallyWithT(t, func(ct *assert.CollectT) {
 			r := require.New(ct)

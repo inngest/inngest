@@ -752,7 +752,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		evtIDs[i] = eid.String()
 	}
 
-	// set function trace context
+	// TODO: find a way to remove this
+	// set function trace context so downstream execution have the function trace context set
 	ctx = extractTraceCtx(ctx, md)
 
 	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
