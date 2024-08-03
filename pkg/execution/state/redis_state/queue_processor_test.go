@@ -626,16 +626,16 @@ func TestQueueAllowList(t *testing.T) {
 	require.Equal(t, "", val)
 
 	// No more items in system partition
-	peekedItems, err := q.Peek(context.Background(), QueuePartition{PartitionType: int(enums.PartitionTypeSystem), ID: allowedQueueName}.zsetKey(q.u.kg), time.Now(), 1)
+	peekedItems, err := q.Peek(context.Background(), &QueuePartition{PartitionType: int(enums.PartitionTypeSystem), ID: allowedQueueName}, time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(peekedItems))
 
 	// Still items in other and random partition
-	peekedItems, err = q.Peek(context.Background(), QueuePartition{PartitionType: int(enums.PartitionTypeSystem), ID: otherQueueName}.zsetKey(q.u.kg), time.Now(), 1)
+	peekedItems, err = q.Peek(context.Background(), &QueuePartition{PartitionType: int(enums.PartitionTypeSystem), ID: otherQueueName}, time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(peekedItems))
 
-	peekedItems, err = q.Peek(context.Background(), QueuePartition{PartitionType: int(enums.PartitionTypeDefault), FunctionID: &uuid.Nil}.zsetKey(q.u.kg), time.Now(), 1)
+	peekedItems, err = q.Peek(context.Background(), &QueuePartition{PartitionType: int(enums.PartitionTypeDefault), FunctionID: &uuid.Nil}, time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(peekedItems), r.Dump())
 
@@ -738,16 +738,16 @@ func TestQueueDenyList(t *testing.T) {
 	require.Equal(t, *qi.QueueName, "denied")
 
 	// No more items in system partition
-	peekedItems, err := q.Peek(context.Background(), QueuePartition{PartitionType: int(enums.PartitionTypeSystem), ID: deniedQueueName}.zsetKey(q.u.kg), time.Now(), 1)
+	peekedItems, err := q.Peek(context.Background(), &QueuePartition{PartitionType: int(enums.PartitionTypeSystem), ID: deniedQueueName}, time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(peekedItems))
 
 	// Still items in other and random partition
-	peekedItems, err = q.Peek(context.Background(), QueuePartition{PartitionType: int(enums.PartitionTypeSystem), ID: otherQueueName}.zsetKey(q.u.kg), time.Now(), 1)
+	peekedItems, err = q.Peek(context.Background(), &QueuePartition{PartitionType: int(enums.PartitionTypeSystem), ID: otherQueueName}, time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(peekedItems))
 
-	peekedItems, err = q.Peek(context.Background(), QueuePartition{PartitionType: int(enums.PartitionTypeDefault), FunctionID: &uuid.Nil}.zsetKey(q.u.kg), time.Now(), 1)
+	peekedItems, err = q.Peek(context.Background(), &QueuePartition{PartitionType: int(enums.PartitionTypeDefault), FunctionID: &uuid.Nil}, time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(peekedItems), r.Dump())
 

@@ -1275,8 +1275,12 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 //
 // If limit is -1, this will return the first unleased item - representing the next available item in the
 // queue.
-func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, limit int64) ([]*QueueItem, error) {
+func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Peek"), redis_telemetry.ScopeQueue)
+
+	if partition == nil {
+		return nil, fmt.Errorf("expected partition to be set")
+	}
 
 	// Check whether limit is -1, peeking next available time
 	isPeekNext := limit == -1
@@ -1301,22 +1305,11 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 		return nil, err
 	}
 
-	// If the queue name is a UUID, assume that we need to adjust this as we've been
-	// given a standard function queue (enums.PartitionTypeDefault).
-	//
-	// Otherwise, this must be the queue's zset already.
-	//
-	// All new code provides the zset key, so case merely exists
-	// for backwards compatibility
-	if isPartitionUUID(queueName) {
-		queueName = q.u.kg.PartitionQueueSet(enums.PartitionTypeDefault, queueName, "")
-	}
-
 	res, err := scripts["queue/peek"].Exec(
 		redis_telemetry.WithScriptName(ctx, "peek"),
 		q.u.unshardedRc,
 		[]string{
-			queueName,
+			partition.zsetKey(q.u.kg),
 			q.u.kg.QueueItem(),
 		},
 		args,

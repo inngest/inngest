@@ -702,7 +702,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		// NOTE: would love to instrument this value to see it over time per function but
 		// it's likely too high of a cardinality
 		go telemetry.HistogramQueuePeekEWMA(ctx, peek, telemetry.HistogramOpt{PkgName: pkgName})
-		return q.Peek(peekCtx, p.zsetKey(q.u.kg), fetch, peek)
+		return q.Peek(peekCtx, p, fetch, peek)
 	})
 	if err != nil {
 		return err
