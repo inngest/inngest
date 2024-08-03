@@ -909,6 +909,11 @@ func (l *traceLifecycle) extractTraceCtx(ctx context.Context, md sv2.Metadata, i
 
 		spanID, err := md.Config.GetSpanID()
 		if err != nil {
+			l.log.Error("error retreiving spanID for trace",
+				"error", err,
+				"meta", md,
+				"isFnSpan", isFnSpan,
+			)
 			return ctx
 		}
 		sctx := trace.SpanContextFromContext(tmp).WithSpanID(*spanID)
