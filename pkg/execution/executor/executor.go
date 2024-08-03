@@ -752,6 +752,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		evtIDs[i] = eid.String()
 	}
 
+	// set function trace context
+	ctx = extractTraceCtx(ctx, md)
+
 	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
 	// that child;  we don't need to handle the trigger individually.
 	//
@@ -2189,9 +2192,9 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	}
 
 	opcode := gen.Op.String()
-	sid := telemetry.NewSpanID(ctx)
 	now := time.Now()
 
+	sid := telemetry.NewSpanID(ctx)
 	// NOTE: the context here still contains the execSpan's traceID & spanID,
 	// which is what we want because that's the parent that needs to be referenced later on
 	carrier := telemetry.NewTraceCarrier(
@@ -2449,4 +2452,21 @@ func generateCancelExpression(eventID ulid.ULID, expr *string) string {
 		res = *expr + " && " + res
 	}
 	return res
+}
+
+// extractTraceCtx extracts the trace context from the given item, if it exists.
+// If it doesn't it falls back to extracting the trace for the run overall.
+// If neither exist or they are invalid, it returns the original context.
+func extractTraceCtx(ctx context.Context, md sv2.Metadata) context.Context {
+	fntrace := md.Config.FunctionTrace()
+	if fntrace != nil {
+		// NOTE:
+		// this gymastics happens because the carrier stores the spanID separately.
+		// it probably can be simplified
+		tmp := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
+		sctx := trace.SpanContextFromContext(tmp).WithSpanID(fntrace.SpanID())
+		return trace.ContextWithSpanContext(ctx, sctx)
+	}
+
+	return ctx
 }

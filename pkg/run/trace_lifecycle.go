@@ -680,9 +680,6 @@ func (l traceLifecycle) OnInvokeFunctionResumed(
 	pause state.Pause,
 	r execution.ResumeRequest,
 ) {
-	// reassign here to make sure we have the right traceID and such
-	ctx = l.extractTraceCtx(ctx, md, false)
-
 	if pause.Metadata == nil {
 		l.log.Error("no pause metadata", "meta", md, "lifecycle", "OnInvokeFunctionResumed")
 		return
@@ -830,9 +827,6 @@ func (l traceLifecycle) OnWaitForEventResumed(
 	pause state.Pause,
 	r execution.ResumeRequest,
 ) {
-	// reassign here to make sure we have the right traceID and such
-	ctx = l.extractTraceCtx(ctx, md, false)
-
 	if pause.Metadata == nil {
 		l.log.Error("no pause metadata", "meta", md, "lifecycle", "OnWaitForEventResumed")
 		return
