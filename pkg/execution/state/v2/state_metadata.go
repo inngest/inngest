@@ -237,11 +237,20 @@ func (c *Config) FunctionTrace() *telemetry.TraceCarrier {
 		return nil
 	}
 
-	if v, ok := c.Context[consts.OtelPropagationKey]; ok {
-		carrier := telemetry.NewTraceCarrier()
-		if err := carrier.Unmarshal(v); err == nil {
-			return carrier
+	if data, ok := c.Context[consts.OtelPropagationKey]; ok {
+		switch v := data.(type) {
+		case *telemetry.TraceCarrier:
+			return v
+		default:
+			carrier := telemetry.NewTraceCarrier()
+			if err := carrier.Unmarshal(data); err == nil {
+				// reassign it so it doesn't need to do the decoding again
+				c.Context[consts.OtelPropagationKey] = carrier
+				return carrier
+			}
+
 		}
+
 	}
 	return nil
 }
