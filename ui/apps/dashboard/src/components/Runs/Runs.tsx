@@ -10,7 +10,6 @@ import {
 } from '@inngest/components/hooks/useSearchParam';
 import { useQuery } from 'urql';
 
-import type { RefreshRunsRef } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/runs/page';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useGetRun } from '@/components/RunDetails/useGetRun';
 import { useGetTraceResult } from '@/components/RunDetails/useGetTraceResult';
