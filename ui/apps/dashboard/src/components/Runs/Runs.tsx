@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import type { Run } from '@inngest/components/RunsPage/types';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
@@ -10,6 +10,7 @@ import {
 } from '@inngest/components/hooks/useSearchParam';
 import { useQuery } from 'urql';
 
+import type { RefreshRunsRef } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/runs/page';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useGetRun } from '@/components/RunDetails/useGetRun';
 import { useGetTraceResult } from '@/components/RunDetails/useGetTraceResult';
@@ -21,6 +22,10 @@ import { pathCreator } from '@/utils/urls';
 import { usePlanFeatures } from '@/utils/usePlanFeatures';
 import { AppFilterDocument, CountRunsDocument, GetRunsDocument } from './queries';
 import { parseRunsData, toRunStatuses, toTimeField } from './utils';
+
+export type RefreshRunsRef = {
+  refresh: () => void;
+};
 
 type FnProps = {
   functionSlug: string;
@@ -34,7 +39,10 @@ type EnvProps = {
 
 type Props = FnProps | EnvProps;
 
-export function Runs({ functionSlug, scope }: Props) {
+export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
+  { functionSlug, scope }: Props,
+  ref
+) {
   const env = useEnvironment();
 
   const [{ data: pauseData }] = useQuery({
@@ -199,6 +207,12 @@ export function Runs({ functionSlug, scope }: Props) {
     fetchFirstPage();
   }, [fetchFirstPage, onScrollToTop]);
 
+  useImperativeHandle(ref, () => ({
+    refresh: () => {
+      onRefresh();
+    },
+  }));
+
   return (
     <RunsPage
       apps={appsRes.data?.env?.apps.map((app) => ({
@@ -226,4 +240,4 @@ export function Runs({ functionSlug, scope }: Props) {
       totalCount={totalCount}
     />
   );
-}
+});
