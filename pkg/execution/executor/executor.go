@@ -2464,7 +2464,12 @@ func extractTraceCtx(ctx context.Context, md sv2.Metadata) context.Context {
 		// this gymastics happens because the carrier stores the spanID separately.
 		// it probably can be simplified
 		tmp := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
-		sctx := trace.SpanContextFromContext(tmp).WithSpanID(fntrace.SpanID())
+		spanID, err := md.Config.GetSpanID()
+		if err != nil {
+			return ctx
+		}
+
+		sctx := trace.SpanContextFromContext(tmp).WithSpanID(*spanID)
 		return trace.ContextWithSpanContext(ctx, sctx)
 	}
 

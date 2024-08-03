@@ -906,7 +906,12 @@ func (l *traceLifecycle) extractTraceCtx(ctx context.Context, md sv2.Metadata, i
 		if isFnSpan {
 			return tmp
 		}
-		sctx := trace.SpanContextFromContext(tmp).WithSpanID(fntrace.SpanID())
+
+		spanID, err := md.Config.GetSpanID()
+		if err != nil {
+			return ctx
+		}
+		sctx := trace.SpanContextFromContext(tmp).WithSpanID(*spanID)
 		return trace.ContextWithSpanContext(ctx, sctx)
 	}
 
