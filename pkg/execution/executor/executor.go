@@ -747,21 +747,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, err
 	}
 
-	// Store the metadata in context for future use and propagate trace
-	// context. This can be used to reduce reads in the future.
-	fntrace := md.Config.FunctionTrace()
-	if fntrace != nil {
-		tmp := telemetry.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
-		spanID, err := md.Config.GetSpanID()
-		if err != nil {
-			// NOTE: error here should not block execution, but also means the trace will be messed up
-			// because it can't be traced correctly
-			e.log.Err(err).Interface("config", md.Config).Msg("error retrieving spanID")
-		}
-		sc := trace.SpanContextFromContext(tmp).WithSpanID(*spanID)
-		ctx = trace.ContextWithSpanContext(ctx, sc)
-	}
-
 	evtIDs := make([]string, len(id.EventIDs))
 	for i, eid := range id.EventIDs {
 		evtIDs[i] = eid.String()

@@ -394,12 +394,12 @@ func (l traceLifecycle) OnStepStarted(
 ) {
 	spanID, err := item.SpanID()
 	if err != nil {
-		// TODO: log this
+		l.log.Error("error retrieving spanID", "error", err, "meta", md, "lifecycle", "OnStepStarted")
 		return
 	}
 	start, ok := redis_state.GetItemStart(ctx)
 	if !ok {
-		// TODO: raise a warning here
+		l.log.Warn("start time not available for item", "lifecycle", "OnStepStarted")
 		start = time.Now()
 	}
 	runID := md.ID.RunID
@@ -460,13 +460,12 @@ func (l traceLifecycle) OnStepFinished(
 ) {
 	spanID, err := item.SpanID()
 	if err != nil {
-		// TODO: log error
+		l.log.Error("error retrieving spanID", "meta", md, "error", err, "lifecycle", "OnStepFinished")
 		return
 	}
-	// fmt.Printf("Ended: %s, Attempt: %d\n", spanID, item.Attempt)
 	start, ok := redis_state.GetItemStart(ctx)
 	if !ok {
-		// TODO: raise a warning here
+		l.log.Warn("start time not available for item", "lifecycle", "OnStepFinished")
 		start = time.Now()
 	}
 	runID := md.ID.RunID
@@ -592,7 +591,7 @@ func (l traceLifecycle) OnSleep(
 
 	dur, err := gen.SleepDuration()
 	if err != nil {
-		// TODO: log a warning here
+		l.log.Error("error retrieving sleep duration", "error", err, "meta", md, "lifecycle", "OnSleep")
 		return
 	}
 
@@ -632,14 +631,14 @@ func (l traceLifecycle) OnInvokeFunction(
 ) {
 	meta := invocationEvt.InngestMetadata()
 	if meta == nil {
-		// TODO: log warning here
+		l.log.Error("invocation event metadata not available", "meta", md, "lifecycle", "OnInvokeFunction")
 		return
 	}
 
 	runID := md.ID.RunID
 	carrier := meta.InvokeTraceCarrier
 	if carrier == nil {
-		// TODO: log warning here
+		l.log.Error("no trace carrier available", "meta", md, "lifecycle", "OnInvokeFunction")
 		return
 	}
 	spanID := carrier.SpanID()
@@ -681,11 +680,13 @@ func (l traceLifecycle) OnInvokeFunctionResumed(
 	ctx = l.extractTraceCtx(ctx, md, false)
 
 	if pause.Metadata == nil {
+		l.log.Error("no pause metadata", "meta", md, "lifecycle", "OnInvokeFunctionResumed")
 		return
 	}
 
 	meta, ok := pause.Metadata[consts.OtelPropagationKey]
 	if !ok {
+		l.log.Error("no trace propagation in pause", "meta", md, "lifecycle", "OnInvokeFunctionResumed")
 		return
 	}
 
@@ -768,23 +769,23 @@ func (l traceLifecycle) OnWaitForEvent(
 	runID := md.ID.RunID
 	opts, err := gen.WaitForEventOpts()
 	if err != nil {
-		// TODO: log warning here
+		l.log.Error("error retrieving wait opts", "error", err, "meta", md, "lifecycle", "OnWaitForEvent")
 		return
 	}
 	expires, err := opts.Expires()
 	if err != nil {
-		// TODO: log warning here
+		l.log.Error("error retrieving expiration for wait", "error", err, "meta", md, "lifecycle", "OnWaitForEvent")
 		return
 	}
 
 	v, ok := pause.Metadata[consts.OtelPropagationKey]
 	if !ok {
-		// TODO: log warning here
+		l.log.Error("no trace propagation", "meta", md, "lifecycle", "OnWaitForEvent")
 		return
 	}
 	carrier, ok := v.(*telemetry.TraceCarrier)
 	if !ok {
-		// TODO: log warning here
+		l.log.Error("no trace carrier", "meta", md, "lifecycle", "OnWaitForEvent")
 		return
 	}
 
@@ -827,11 +828,13 @@ func (l traceLifecycle) OnWaitForEventResumed(
 	ctx = l.extractTraceCtx(ctx, md, false)
 
 	if pause.Metadata == nil {
+		l.log.Error("no pause metadata", "meta", md, "lifecycle", "OnWaitForEventResumed")
 		return
 	}
 
 	meta, ok := pause.Metadata[consts.OtelPropagationKey]
 	if !ok {
+		l.log.Error("no trace", "meta", md, "lifecycle", "OnWaitForEventResumed")
 		return
 	}
 
