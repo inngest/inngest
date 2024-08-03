@@ -1305,6 +1305,9 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 	// given a standard function queue (enums.PartitionTypeDefault).
 	//
 	// Otherwise, this must be the queue's zset already.
+	//
+	// All new code provides the zset key, so case merely exists
+	// for backwards compatibility
 	if isPartitionUUID(queueName) {
 		queueName = q.u.kg.PartitionQueueSet(enums.PartitionTypeDefault, queueName, "")
 	}

@@ -614,20 +614,27 @@ func TestQueueSystemPartitions(t *testing.T) {
 			func(ctx context.Context, p QueuePartition) int {
 				return customTestLimit
 			}),
+		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) (fn, acct, custom int) {
+			return 1234, 2345, 3456
+		}),
 	)
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
 
-	t.Run("It enqueues an item", func(t *testing.T) {
-		id := uuid.New()
-		item, err := q.EnqueueItem(ctx, QueueItem{
-			FunctionID: id,
-			Data: osqueue.Item{
-				QueueName: &customQueueName,
-			},
+	id := uuid.New()
+
+	qi := QueueItem{
+		FunctionID: id,
+		Data: osqueue.Item{
+			Payload:   json.RawMessage("{\"test\":\"payload\"}"),
 			QueueName: &customQueueName,
-		}, start)
+		},
+		QueueName: &customQueueName,
+	}
+
+	t.Run("It enqueues an item", func(t *testing.T) {
+		item, err := q.EnqueueItem(ctx, qi, start)
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.ULID{})
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
@@ -645,7 +652,36 @@ func TestQueueSystemPartitions(t *testing.T) {
 		}, qp)
 	})
 
-	// TODO Add more cases
+	t.Run("peeks correct partition", func(t *testing.T) {
+		qp := getSystemPartition(t, r, customQueueName)
+
+		partitions, err := q.PartitionPeek(ctx, true, start, 100)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(partitions))
+		require.Equal(t, qp, *partitions[0])
+
+		items, err := q.Peek(ctx, qp.zsetKey(q.u.kg), start, 100)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(items))
+	})
+
+	t.Run("leases correct partition", func(t *testing.T) {
+		qp := getSystemPartition(t, r, customQueueName)
+
+		leaseId, availableCapacity, err := q.PartitionLease(ctx, &qp, time.Second)
+		require.NoError(t, err)
+		require.NotNil(t, leaseId)
+		require.Equal(t, 1234, availableCapacity)
+	})
+
+	t.Run("leases correct partition", func(t *testing.T) {
+		qp := getSystemPartition(t, r, customQueueName)
+
+		items, err := q.Peek(ctx, qp.zsetKey(q.u.kg), start, 100)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(items))
+		require.Equal(t, qi.Data.Payload, items[0].Data.Payload)
+	})
 }
 
 func TestQueuePeek(t *testing.T) {
