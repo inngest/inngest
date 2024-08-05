@@ -1,10 +1,10 @@
+import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { WebhooksIcon } from '@inngest/components/icons/sections/Webhooks';
 
 import type { Environment as EnvType } from '@/utils/environments';
-import { MenuItem } from './MenuItem';
 import { getNavRoute } from './Navigation';
 
 export default function Manage({

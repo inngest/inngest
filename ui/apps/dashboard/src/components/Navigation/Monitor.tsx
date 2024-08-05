@@ -1,9 +1,9 @@
+import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
 
 import type { Environment as EnvType } from '@/utils/environments';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
-import { MenuItem } from './MenuItem';
 import { getNavRoute } from './Navigation';
 
 export default function Monitor({

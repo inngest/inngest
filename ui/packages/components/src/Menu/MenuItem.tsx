@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { OptionalLink } from '@inngest/components/Link/OptionalLink';
 
-import { OptionalTooltip } from './OptionalTooltip';
+import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 
 export const MenuItem = ({
   text,
@@ -29,7 +29,7 @@ export const MenuItem = ({
       <OptionalTooltip tooltip={comingSoon ? 'Coming soon...' : collapsed ? text : ''}>
         <div
           className={`m-1 flex h-8 flex-row items-center rounded px-1.5 ${
-            collapsed ? 'justify-center ' : 'justify-start'
+            collapsed ? 'justify-center' : 'justify-start'
           }  ${
             active
               ? 'bg-secondary-4xSubtle text-info hover:bg-secondary-3xSubtle'

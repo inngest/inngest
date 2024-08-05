@@ -1,19 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Badge } from '@inngest/components/Badge';
 import { TooltipProvider } from '@inngest/components/Tooltip';
-import { IconApp } from '@inngest/components/icons/App';
-import { IconFunction } from '@inngest/components/icons/Function';
-import { cn } from '@inngest/components/utils/classNames';
 import { Toaster } from 'sonner';
 import colors from 'tailwindcss/colors';
 
-import BG from '@/components/BG';
-import Header from '@/components/Header';
-import Navbar from '@/components/Navbar/Navbar';
-import NavbarLink from '@/components/Navbar/NavbarLink';
-import { IconFeed } from '@/icons';
+import Layout from '@/components/Layout/Layout';
 import { useGetAppsQuery } from '@/store/generated';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -24,40 +16,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     pollingInterval: 1500,
   });
 
+  const collapsed = localStorage.getItem('collapsed');
+
   return (
-    <div
-      className={cn(
-        'relative grid h-screen w-screen overflow-hidden text-sm text-slate-400',
-        'grid-cols-1 grid-rows-[50px_1fr]'
-      )}
-    >
-      <BG />
-      <Header>
-        <Navbar>
-          <NavbarLink icon={<IconFeed />} href="/stream" tabName="Stream" />
-          <NavbarLink
-            icon={<IconFunction />}
-            href="/runs"
-            tabName="Runs"
-            badge={
-              <Badge kind="solid" className=" h-3.5 bg-indigo-500 px-[0.235rem] text-white">
-                Beta
-              </Badge>
-            }
-          />
-          <NavbarLink icon={<IconApp />} href="/apps" hasError={hasSyncingError} tabName="Apps" />
-          <NavbarLink icon={<IconFunction />} href="/functions" tabName="Functions" />
-        </Navbar>
-      </Header>
-      <TooltipProvider delayDuration={0}>
+    <TooltipProvider delayDuration={0}>
+      <Layout>
         <React.Suspense>{children}</React.Suspense>
-      </TooltipProvider>
-      <Toaster
-        theme="dark"
-        toastOptions={{
-          style: { background: colors.slate['700'] },
-        }}
-      />
-    </div>
+
+        <Toaster
+          theme="dark"
+          toastOptions={{
+            style: { background: colors.slate['700'] },
+          }}
+        />
+      </Layout>
+    </TooltipProvider>
   );
 }

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSelectedLayoutSegments } from 'next/navigation';
 import { Listbox } from '@headlessui/react';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { RiCloudFill, RiCloudLine, RiExpandUpDownLine, RiLoopLeftLine } from '@remixicon/react';
 
 import { useEnvironments } from '@/queries';
@@ -19,7 +20,6 @@ import {
   type Environment,
 } from '@/utils/environments';
 import isNonEmptyArray from '@/utils/isNonEmptyArray';
-import { OptionalTooltip } from './OptionalTooltip';
 
 // Some URLs cannot just swap between environments,
 // we need to redirect to a less specific resource URL that is shared across environments
