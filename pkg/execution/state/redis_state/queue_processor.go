@@ -650,23 +650,32 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		if p.FunctionID != nil {
 			q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
 		}
-		telemetry.IncrQueuePartitionConcurrencyLimitCounter(
-			ctx,
+		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx,
 			telemetry.CounterOpt{
 				PkgName: pkgName,
-				Tags:    map[string]any{},
+				Tags:    map[string]any{"kind": "function"},
 			},
 		)
 		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 	if errors.Is(err, ErrAccountConcurrencyLimit) {
 		q.lifecycles.OnAccountConcurrencyLimitReached(context.WithoutCancel(ctx), p.AccountID)
-		// TODO(cdzombak): telemetry?
+		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx,
+			telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"kind": "account"},
+			},
+		)
 		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 	if errors.Is(err, ErrConcurrencyLimitCustomKey) {
 		q.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), p.ConcurrencyKey)
-		// TODO(cdzombak): telemetry?
+		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx,
+			telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"kind": "custom"},
+			},
+		)
 		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 	if errors.Is(err, ErrPartitionAlreadyLeased) {
