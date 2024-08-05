@@ -79,7 +79,7 @@ func up(db *sql.DB, opts SqliteCQRSOptions) error {
 
 	dbName := "file:inngest?mode=memory&cache=shared"
 	if !opts.InMemory {
-		fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerDbFile))
+		dbName = fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerDbFile))
 	}
 
 	m, err := migrate.NewWithInstance("iofs", source, dbName, driver)
