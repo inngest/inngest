@@ -58,7 +58,7 @@ func doLite(cmd *cobra.Command, args []string) {
 		ServiceName:   "lite",
 		Type:          telemetry.TracerTypeOTLPHTTP,
 		TraceEndpoint: "localhost:8288",
-		TraceURLPath:  "/lite/traces",
+		TraceURLPath:  "/dev/traces",
 	}); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
