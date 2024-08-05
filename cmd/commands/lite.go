@@ -16,7 +16,7 @@ import (
 func NewCmdLite() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "lite",
-		Short:   "Run the Inngest lite server",
+		Short:   "[Experimental] Run the Inngest lite server",
 		Example: "inngest lite",
 		Run:     doLite,
 	}
