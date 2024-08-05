@@ -653,6 +653,16 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
+	if errors.Is(err, ErrAccountConcurrencyLimit) {
+		q.lifecycles.OnAccountConcurrencyLimitReached(context.WithoutCancel(ctx), p.AccountID)
+		// TODO(cdzombak): telemetry?
+		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+	}
+	if errors.Is(err, ErrConcurrencyLimitCustomKey) {
+		q.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), p.ConcurrencyKey)
+		// TODO(cdzombak): telemetry?
+		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+	}
 	if errors.Is(err, ErrPartitionAlreadyLeased) {
 		telemetry.IncrQueuePartitionLeaseContentionCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 		return nil
@@ -663,16 +673,6 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		// contention metric and continue.  This is unsolvable.
 		telemetry.IncrPartitionGoneCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 		return nil
-	}
-	if errors.Is(err, ErrAccountConcurrencyLimit) {
-		q.lifecycles.OnAccountConcurrencyLimitReached(context.WithoutCancel(ctx), p.AccountID)
-		// TODO(cdzombak): telemetry?
-		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
-	}
-	if errors.Is(err, ErrConcurrencyLimitCustomKey) {
-		q.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), p.ConcurrencyKey)
-		// TODO(cdzombak): telemetry?
-		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 	if err != nil {
 		return fmt.Errorf("error leasing partition: %w", err)
