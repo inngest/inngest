@@ -301,11 +301,18 @@ func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 }
 
 func (e *executor) CloseLifecycleListeners(ctx context.Context) {
+	var eg errgroup.Group
+
 	for _, l := range e.lifecycles {
-		// todo parallel
-		l.Close(ctx)
+		ll := l
+		eg.Go(func() error {
+			return ll.Close(ctx)
+		})
 	}
 
+	if err := eg.Wait(); err != nil {
+		log.From(ctx).Error().Err(err).Msg("error closing lifecycle listeners")
+	}
 }
 
 func idempotencyKey(req execution.ScheduleRequest, runID ulid.ULID) string {

@@ -146,7 +146,9 @@ func (d *devserver) Run(ctx context.Context) error {
 }
 
 func (d *devserver) Stop(ctx context.Context) error {
-	d.exportRedisSnapshot(ctx)
+	if d.persistenceInterval != nil {
+		return d.exportRedisSnapshot(ctx)
+	}
 
 	return nil
 }
@@ -156,8 +158,17 @@ func (d *devserver) startPersistenceRoutine(ctx context.Context) {
 		return
 	}
 
-	for range time.Tick(*d.persistenceInterval) {
-		_ = d.exportRedisSnapshot(ctx)
+	ticker := time.NewTicker(*d.persistenceInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			if err := d.exportRedisSnapshot(ctx); err != nil {
+				logger.From(ctx).Error().Err(err).Msg("error exporting Redis snapshot")
+			}
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 

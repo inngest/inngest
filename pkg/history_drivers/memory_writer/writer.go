@@ -71,7 +71,7 @@ func (w *writer) Close(ctx context.Context) error {
 		return err
 	}
 
-	err = os.WriteFile(fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerHistoryFile), b, 0644)
+	err = os.WriteFile(fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerHistoryFile), b, 0600)
 	if err != nil {
 		l.Error().Err(err).Msg("error writing history data to file")
 		return err

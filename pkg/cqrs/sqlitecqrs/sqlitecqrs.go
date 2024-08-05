@@ -34,7 +34,7 @@ func New(opts SqliteCQRSOptions) (*sql.DB, error) {
 		o.Do(func() {
 			// make the dir if it doesn't exist
 			if _, err := os.Stat(consts.DevServerTempDir); os.IsNotExist(err) {
-				err = os.Mkdir(consts.DevServerTempDir, 0755)
+				err = os.Mkdir(consts.DevServerTempDir, 0750)
 				if err != nil {
 					return
 				}
