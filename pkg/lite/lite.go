@@ -51,6 +51,8 @@ import (
 
 const defaultTick = time.Millisecond * 150
 
+var redisSingleton *miniredis.Miniredis
+
 // StartOpts configures the dev server
 type StartOpts struct {
 	Config  config.Config `json:"-"`
@@ -94,12 +96,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
 
-	shardedRc, err := createInmemoryRedis(ctx, tick)
+	shardedRc, err := createInmemoryRedisConnection(ctx)
 	if err != nil {
 		return err
 	}
 
-	unshardedRc, err := createInmemoryRedis(ctx, tick)
+	unshardedRc, err := createInmemoryRedisConnection(ctx)
 	if err != nil {
 		return err
 	}
@@ -351,31 +353,34 @@ func start(ctx context.Context, opts StartOpts) error {
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
 }
 
-func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, error) {
-	r := miniredis.NewMiniRedis()
-	_ = r.Start()
+// createInMemoryRedisConnection creates a new connection to the in-memory Redis
+// server. If the server is not yet running, it will start one.
+func createInmemoryRedisConnection(ctx context.Context) (rueidis.Client, error) {
+	if redisSingleton == nil {
+		redisSingleton = miniredis.NewMiniRedis()
+		err := redisSingleton.Start()
+		if err != nil {
+			return nil, fmt.Errorf("error starting in-memory redis: %w", err)
+		}
+
+		poll := time.Second
+		go func() {
+			for range time.Tick(poll) {
+				redisSingleton.FastForward(poll)
+			}
+		}()
+	}
+
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:       []string{r.Addr()},
+		InitAddress:       []string{redisSingleton.Addr()},
 		DisableCache:      true,
 		BlockingPoolSize:  1,
 		ForceSingleClient: true,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating in-memory redis client: %w", err)
 	}
 
-	// If tick is lower than 250ms, tick every 100ms.  This lets us save
-	// CPU for standard dev-server testing.
-	poll := time.Second
-	if tick < defaultTick {
-		poll = time.Millisecond * 50
-	}
-
-	go func() {
-		for range time.Tick(poll) {
-			r.FastForward(poll)
-		}
-	}()
 	return rc, nil
 }
 
