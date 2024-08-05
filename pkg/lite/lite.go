@@ -79,7 +79,7 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
-	db, err := sqlitecqrs.New()
+	db, err := sqlitecqrs.New(sqlitecqrs.SqliteCQRSOptions{InMemory: false})
 	if err != nil {
 		return err
 	}
@@ -211,7 +211,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create publisher: %w", err)
 	}
 
-	hmw := memory_writer.NewWriter(ctx)
+	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: true})
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),

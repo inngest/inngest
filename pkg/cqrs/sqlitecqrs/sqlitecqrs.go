@@ -19,26 +19,37 @@ var (
 	db *sql.DB
 )
 
-func New() (*sql.DB, error) {
-	var err error
-	o.Do(func() {
-		// make the dir if it doesn't exist
-		if _, err := os.Stat(consts.DevServerTempDir); os.IsNotExist(err) {
-			err = os.Mkdir(consts.DevServerTempDir, 0755)
-			if err != nil {
-				return
-			}
-		}
+type SqliteCQRSOptions struct {
+	InMemory bool
+}
 
-		db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerDbFile)))
-	})
+func New(opts SqliteCQRSOptions) (*sql.DB, error) {
+	var err error
+
+	if opts.InMemory {
+		o.Do(func() {
+			db, err = sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
+		})
+	} else {
+		o.Do(func() {
+			// make the dir if it doesn't exist
+			if _, err := os.Stat(consts.DevServerTempDir); os.IsNotExist(err) {
+				err = os.Mkdir(consts.DevServerTempDir, 0755)
+				if err != nil {
+					return
+				}
+			}
+
+			db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerDbFile)))
+		})
+	}
 
 	if err := db.Ping(); err != nil {
 		return nil, err
 	}
 
 	// Run migrations.
-	if err := up(db); err != nil {
+	if err := up(db, opts); err != nil {
 		return nil, err
 	}
 
@@ -51,7 +62,7 @@ func New() (*sql.DB, error) {
 //go:embed **/*.sql
 var FS embed.FS
 
-func up(db *sql.DB) error {
+func up(db *sql.DB, opts SqliteCQRSOptions) error {
 	source, err := iofs.New(FS, "migrations")
 	if err != nil {
 		return err
@@ -66,7 +77,12 @@ func up(db *sql.DB) error {
 		return err
 	}
 
-	m, err := migrate.NewWithInstance("iofs", source, fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerDbFile)), driver)
+	dbName := "file:inngest?mode=memory&cache=shared"
+	if !opts.InMemory {
+		fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerDbFile))
+	}
+
+	m, err := migrate.NewWithInstance("iofs", source, dbName, driver)
 	if err != nil {
 		return err
 	}

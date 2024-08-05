@@ -14,39 +14,52 @@ import (
 	"github.com/inngest/inngest/pkg/inngest/log"
 )
 
-func NewWriter(ctx context.Context) history.Driver {
-	if len(memory_store.Singleton.Data) == 0 {
-		l := log.From(ctx).With().Str("caller", "memory_writer").Logger()
+type WriterOptions struct {
+	DumpToFile bool
+}
 
-		// read data from file and populate memory_store.Singleton
-		file, err := os.ReadFile(fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerHistoryFile))
-		if err != nil {
-			if os.IsNotExist(err) {
-				goto end
-			}
-			l.Error().Err(err).Msg("failed to read history file")
-		}
-
-		err = json.Unmarshal(file, &memory_store.Singleton.Data)
-		if err != nil {
-			l.Error().Err(err).Msg("failed to unmarshal history file")
-		}
-
-		humanSize := fmt.Sprintf("%.2fKB", float64(len(file))/1024)
-		l.Info().Str("size", humanSize).Msg("imported history snapshot")
+func NewWriter(ctx context.Context, opts WriterOptions) history.Driver {
+	w := &writer{
+		store:   memory_store.Singleton,
+		options: opts,
 	}
 
-end:
-	return &writer{
-		store: memory_store.Singleton,
+	if !opts.DumpToFile || len(memory_store.Singleton.Data) > 0 {
+		return w
 	}
+
+	l := log.From(ctx).With().Str("caller", "memory_writer").Logger()
+
+	// read data from file and populate memory_store.Singleton
+	file, err := os.ReadFile(fmt.Sprintf("%s/%s", consts.DevServerTempDir, consts.DevServerHistoryFile))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return w
+		}
+		l.Error().Err(err).Msg("failed to read history file")
+	}
+
+	err = json.Unmarshal(file, &memory_store.Singleton.Data)
+	if err != nil {
+		l.Error().Err(err).Msg("failed to unmarshal history file")
+	}
+
+	humanSize := fmt.Sprintf("%.2fKB", float64(len(file))/1024)
+	l.Info().Str("size", humanSize).Msg("imported history snapshot")
+
+	return w
 }
 
 type writer struct {
-	store *memory_store.RunStore
+	store   *memory_store.RunStore
+	options WriterOptions
 }
 
 func (w *writer) Close(ctx context.Context) error {
+	if !w.options.DumpToFile {
+		return nil
+	}
+
 	w.store.Mu.Lock()
 	// never unlock
 
