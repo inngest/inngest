@@ -650,7 +650,13 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		if p.FunctionID != nil {
 			q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
 		}
-		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
+		telemetry.IncrQueuePartitionConcurrencyLimitCounter(
+			ctx,
+			telemetry.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{},
+			},
+		)
 		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 	if errors.Is(err, ErrAccountConcurrencyLimit) {
@@ -668,7 +674,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		return nil
 	}
 	if errors.Is(err, ErrPartitionNotFound) {
-		// Another worker must have pocessed this partition between
+		// Another worker must have processed this partition between
 		// this worker's peek and process.  Increase partition
 		// contention metric and continue.  This is unsolvable.
 		telemetry.IncrPartitionGoneCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
