@@ -37,9 +37,9 @@ import (
 
 func NewService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher, stepLimitOverrides map[string]int, stateSizeLimitOverrides map[string]int, rc rueidis.Client, hw history.Driver) *devserver {
 	return &devserver{
-		data:                    data,
-		runner:                  runner,
-		opts:                    opts,
+		Data:                    data,
+		Runner:                  runner,
+		Opts:                    opts,
 		handlerLock:             &sync.Mutex{},
 		snapshotLock:            &sync.Mutex{},
 		publisher:               pb,
@@ -57,23 +57,23 @@ func NewService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubs
 // in a single router on a single port.  This simplifies the CLI args (--port) and
 // SDKs, as they can test and use a single URL.
 type devserver struct {
-	opts StartOpts
+	Opts StartOpts
 
-	data cqrs.Manager
+	Data cqrs.Manager
 
 	stepLimitOverrides      map[string]int
 	stateSizeLimitOverrides map[string]int
 
-	// runner stores the runner
-	runner      runner.Runner
-	tracker     *runner.Tracker
-	state       state.Manager
-	queue       queue.Queue
-	executor    execution.Executor
+	// Runner stores the Runner
+	Runner      runner.Runner
+	Tracker     *runner.Tracker
+	State       state.Manager
+	Queue       queue.Queue
+	Executor    execution.Executor
 	publisher   pubsub.Publisher
 	redisClient rueidis.Client
 
-	apiservice service.Service
+	Apiservice service.Service
 
 	historyWriter history.Driver
 
@@ -94,7 +94,7 @@ func (d *devserver) Pre(ctx context.Context) error {
 	d.importRedisSnapshot(ctx)
 
 	// Autodiscover the URLs that are hosting Inngest SDKs on the local machine.
-	if d.opts.Autodiscover {
+	if d.Opts.Autodiscover {
 		go d.runDiscovery(ctx)
 	}
 
@@ -109,7 +109,7 @@ func (d *devserver) Run(ctx context.Context) error {
 	if isatty.IsTerminal(os.Stdout.Fd()) {
 		go func() {
 			<-time.After(25 * time.Millisecond)
-			addr := fmt.Sprintf("%s:%d", d.opts.Config.EventAPI.Addr, d.opts.Config.EventAPI.Port)
+			addr := fmt.Sprintf("%s:%d", d.Opts.Config.EventAPI.Addr, d.Opts.Config.EventAPI.Port)
 			fmt.Println("")
 			fmt.Println("")
 			fmt.Print(cli.BoldStyle.Render("\tInngest dev server online "))
@@ -119,14 +119,14 @@ func (d *devserver) Run(ctx context.Context) error {
 				if n > 0 {
 					style = cli.TextStyle
 				}
-				fmt.Print(style.Render(fmt.Sprintf("\t - http://%s:%d", ip.IP.String(), d.opts.Config.EventAPI.Port)))
+				fmt.Print(style.Render(fmt.Sprintf("\t - http://%s:%d", ip.IP.String(), d.Opts.Config.EventAPI.Port)))
 				if ip.IP.IsLoopback() {
-					fmt.Print(cli.TextStyle.Render(fmt.Sprintf(" (http://localhost:%d)", d.opts.Config.EventAPI.Port)))
+					fmt.Print(cli.TextStyle.Render(fmt.Sprintf(" (http://localhost:%d)", d.Opts.Config.EventAPI.Port)))
 				}
 				fmt.Println("")
 			}
 			fmt.Println("")
-			if d.opts.Autodiscover {
+			if d.Opts.Autodiscover {
 				fmt.Printf("\tScanning for available serve handlers.\n")
 				fmt.Printf("\tTo disable scanning run `inngest dev` with flags: --no-discovery -u <your-serve-url>")
 				fmt.Println("")
@@ -153,7 +153,7 @@ func (d *devserver) Stop(ctx context.Context) error {
 // any point.
 func (d *devserver) runDiscovery(ctx context.Context) {
 	logger.From(ctx).Info().Msg("autodiscovering locally hosted SDKs")
-	pollInterval := time.Duration(d.opts.PollInterval) * time.Second
+	pollInterval := time.Duration(d.Opts.PollInterval) * time.Second
 	for {
 		if ctx.Err() != nil {
 			return
@@ -167,10 +167,10 @@ func (d *devserver) runDiscovery(ctx context.Context) {
 // pollSDKs hits each SDK's register endpoint, asking them to communicate with
 // the dev server to re-register their functions.
 func (d *devserver) pollSDKs(ctx context.Context) {
-	pollInterval := time.Duration(d.opts.PollInterval) * time.Second
+	pollInterval := time.Duration(d.Opts.PollInterval) * time.Second
 
 	// Initially, add every app started with the `-u` flag
-	for _, url := range d.opts.URLs {
+	for _, url := range d.Opts.URLs {
 		// URLs must contain a protocol. If not, add http since very few apps
 		// use https during development
 		if !strings.Contains(url, "://") {
@@ -186,7 +186,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 				String: deploy.DeployErrUnreachable.Error(),
 			},
 		}
-		if _, err := d.data.InsertApp(ctx, params); err != nil {
+		if _, err := d.Data.InsertApp(ctx, params); err != nil {
 			log.From(ctx).Error().Err(err).Msg("error inserting app from scan")
 		}
 	}
@@ -199,12 +199,12 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		}
 
 		urls := map[string]struct{}{}
-		if apps, err := d.data.GetApps(ctx); err == nil {
+		if apps, err := d.Data.GetApps(ctx); err == nil {
 			for _, app := range apps {
 				// We've seen this URL.
 				urls[app.Url] = struct{}{}
 
-				if !d.opts.Poll && len(app.Error.String) == 0 {
+				if !d.Opts.Poll && len(app.Error.String) == 0 {
 					continue
 				}
 
@@ -212,7 +212,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 				// SDK should push functions to the dev server.
 				res := deploy.Ping(ctx, app.Url)
 				if res.Err != nil {
-					_, _ = d.data.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
+					_, _ = d.Data.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
 						ID: app.ID,
 						Error: sql.NullString{
 							String: res.Err.Error(),
@@ -225,7 +225,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 
 		// Attempt to add new apps for each discovered URL that's _not_ already
 		// an app.
-		if d.opts.Autodiscover {
+		if d.Opts.Autodiscover {
 			for u := range discovery.URLs() {
 				if _, ok := urls[u]; ok {
 					continue
@@ -237,7 +237,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 				// exists. Otherwise, users will have a harder time figuring out
 				// why the Dev Server can't find their app.
 				if res.Err != nil && res.IsSDK {
-					upsertErroredApp(ctx, d.data, u, res.Err)
+					upsertErroredApp(ctx, d.Data, u, res.Err)
 				}
 			}
 		}
@@ -245,7 +245,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 	}
 }
 
-func (d *devserver) handleEvent(ctx context.Context, e *event.Event) (string, error) {
+func (d *devserver) HandleEvent(ctx context.Context, e *event.Event) (string, error) {
 	// ctx is the request context, so we need to re-add
 	// the caller here.
 	l := logger.From(ctx).With().Str("caller", "devserver").Logger()
@@ -273,7 +273,7 @@ func (d *devserver) handleEvent(ctx context.Context, e *event.Event) (string, er
 
 	err = d.publisher.Publish(
 		ctx,
-		d.opts.Config.EventStream.Service.TopicName(),
+		d.Opts.Config.EventStream.Service.TopicName(),
 		pubsub.Message{
 			Name:      event.EventReceivedName,
 			Data:      string(byt),

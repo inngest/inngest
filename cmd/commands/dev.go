@@ -61,7 +61,7 @@ func doDev(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	if err = localconfig.InitConfig(ctx, cmd); err != nil {
+	if err = localconfig.InitDevConfig(ctx, cmd); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
