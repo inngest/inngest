@@ -646,18 +646,18 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, shard *
 		_, capacity, err := q.PartitionLease(ctx, p, PartitionLeaseDuration)
 		return capacity, err
 	})
-	if err == ErrPartitionConcurrencyLimit {
+	if errors.Is(err, ErrPartitionConcurrencyLimit) {
 		if p.FunctionID != nil {
 			q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
 		}
 		telemetry.IncrQueuePartitionConcurrencyLimitCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 		return q.PartitionRequeue(ctx, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
-	if err == ErrPartitionAlreadyLeased {
+	if errors.Is(err, ErrPartitionAlreadyLeased) {
 		telemetry.IncrQueuePartitionLeaseContentionCounter(ctx, telemetry.CounterOpt{PkgName: pkgName})
 		return nil
 	}
-	if err == ErrPartitionNotFound {
+	if errors.Is(err, ErrPartitionNotFound) {
 		// Another worker must have pocessed this partition between
 		// this worker's peek and process.  Increase partition
 		// contention metric and continue.  This is unsolvable.
