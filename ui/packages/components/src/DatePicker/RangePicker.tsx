@@ -34,6 +34,7 @@ type RangePickerProps = Omit<DateButtonProps, 'defaultValue' | 'onChange'> & {
   defaultValue?: RangeChangeProps;
   upgradeCutoff?: Date;
   triggerComponent?: React.ComponentType<DateButtonProps>;
+  allowFuture?: boolean;
 };
 
 const RELATIVES = {
@@ -82,6 +83,7 @@ export const RangePicker = ({
   defaultValue,
   upgradeCutoff,
   triggerComponent: TriggerComponent = DateInputButton,
+  allowFuture = false,
   ...props
 }: RangePickerProps) => {
   const getInitialDisplayValue = (defaultValue: RangeChangeProps | undefined): ReactNode => {
@@ -141,6 +143,11 @@ export const RangePicker = ({
       setStartError('Please upgrade for increased history limits');
       setStartValid(false);
     }
+
+    if (!allowFuture && absoluteRange?.end && isBefore(new Date(), absoluteRange.end)) {
+      setEndError('End date is in the future');
+      setEndValid(false);
+    }
   };
 
   useEffect(() => {
@@ -149,6 +156,10 @@ export const RangePicker = ({
       setDurationError('');
     };
   }, []);
+
+  useEffect(() => {
+    validateRange();
+  }, [absoluteRange]);
 
   const processDuration = (e: any) => {
     if (e.key !== 'Enter') {
@@ -275,7 +286,6 @@ export const RangePicker = ({
                           ...absoluteRange,
                           start,
                         });
-                        validateRange();
                       }
                     }}
                     valid={startValid}
@@ -305,10 +315,8 @@ export const RangePicker = ({
                       if (end) {
                         setAbsoluteRange({
                           ...absoluteRange,
-
                           end,
                         });
-                        validateRange();
                       }
                     }}
                     valid={endValid}

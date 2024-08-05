@@ -63,7 +63,7 @@ export function SlideOver({ children, onClose, size = 'large' }: SlideOverProps)
                   onOpenAutoFocus={(event: Event) => event.preventDefault()}
                   className={classNames(
                     size === 'small' ? 'w-2/5' : 'w-4/5',
-                    'bg-slate-910 flex h-full flex-col shadow-xl'
+                    'bg-canvasBase flex h-full flex-col shadow-xl'
                   )}
                 >
                   {children}

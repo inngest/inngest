@@ -9,7 +9,7 @@ import { useMutation } from 'urql';
 import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-import Header, { type HeaderLink } from '@/components/Header/Header';
+import Header, { type HeaderLink } from '@/components/Header/old/Header';
 import { graphql } from '@/gql';
 import { useFunction } from '@/queries';
 import { pathCreator } from '@/utils/urls';

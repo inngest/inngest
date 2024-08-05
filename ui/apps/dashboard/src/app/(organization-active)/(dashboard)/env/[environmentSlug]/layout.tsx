@@ -1,3 +1,6 @@
+import type { ReactNode } from 'react';
+import { Alert } from '@inngest/components/Alert/Alert';
+
 import { ArchivedEnvBanner } from '@/components/ArchivedEnvBanner';
 import { getEnv } from '@/components/Environments/data';
 import { EnvironmentProvider } from '@/components/Environments/environment-context';
@@ -5,13 +8,30 @@ import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import Layout from '@/components/Layout/Layout';
 import AppNavigation from '@/components/Navigation/old/AppNavigation';
 import Toaster from '@/components/Toaster';
+import type { Environment } from '@/utils/environments';
 
 type RootLayoutProps = {
   params: {
     environmentSlug: string;
   };
-  children: React.ReactNode;
+  children: ReactNode;
 };
+
+const NotFound = () => (
+  <div className="mt-16 flex place-content-center">
+    <Alert severity="warning">Environment not found.</Alert>
+  </div>
+);
+
+const Env = ({ env, children }: { env?: Environment; children: ReactNode }) =>
+  env ? (
+    <>
+      <ArchivedEnvBanner env={env} />
+      <EnvironmentProvider env={env}>{children}</EnvironmentProvider>
+    </>
+  ) : (
+    <NotFound />
+  );
 
 export default async function RootLayout({
   params: { environmentSlug },
@@ -22,16 +42,13 @@ export default async function RootLayout({
 
   return newIANav ? (
     <Layout activeEnv={env}>
-      <ArchivedEnvBanner env={env} />
-      <EnvironmentProvider env={env}>{children}</EnvironmentProvider>
+      <Env env={env}>{children}</Env>
     </Layout>
   ) : (
     <>
       <div className="isolate flex h-full flex-col">
         <AppNavigation activeEnv={env} envSlug={environmentSlug} />
-
-        <ArchivedEnvBanner env={env} />
-        <EnvironmentProvider env={env}>{children}</EnvironmentProvider>
+        <Env env={env}>{children}</Env>
       </div>
       <Toaster
         toastOptions={{

@@ -13,23 +13,27 @@ export default function SideBar({
   collapsed: serverCollapsed,
   activeEnv,
   profile,
+  isRunsEnabled,
 }: {
   collapsed: boolean;
   activeEnv?: Environment;
   profile: ProfileType;
+
+  // Feature flag
+  isRunsEnabled: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(serverCollapsed);
 
   return (
     <nav
-      className={`bg-canvasBase  border-subtle group
+      className={`bg-canvasBase border-subtle group
          top-0 flex h-screen flex-col justify-start ${
            collapsed ? 'w-[64px]' : 'w-[224px]'
-         }  sticky z-[500] shrink-0 overflow-visible border-r`}
+         }  sticky z-[49] shrink-0 overflow-visible border-r`}
     >
       <Logo collapsed={collapsed} setCollapsed={setCollapsed} />
       <div className="flex grow flex-col justify-between">
-        <Navigation collapsed={collapsed} activeEnv={activeEnv} />
+        <Navigation collapsed={collapsed} activeEnv={activeEnv} isRunsEnabled={isRunsEnabled} />
 
         <div>
           <Integrations collapsed={collapsed} />
