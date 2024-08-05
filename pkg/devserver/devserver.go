@@ -364,10 +364,8 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 	r := miniredis.NewMiniRedis()
 	_ = r.Start()
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:       []string{r.Addr()},
-		DisableCache:      true,
-		BlockingPoolSize:  1,
-		ForceSingleClient: true,
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	if err != nil {
 		return nil, err
