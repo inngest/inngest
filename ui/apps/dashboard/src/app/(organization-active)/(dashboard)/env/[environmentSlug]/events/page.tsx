@@ -1,27 +1,23 @@
 import { IconEvent } from '@inngest/components/icons/Event';
 
-import { EventInfo } from '@/components/Events/EventInfo';
 import { EventList } from '@/components/Events/EventList';
+import { EventsHeader } from '@/components/Events/EventsHeader';
 import SendEventButton from '@/components/Events/SendEventButton';
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
-import { Header } from '@/components/Header/Header';
 import OldHeader from '@/components/Header/old/Header';
 
 export default async function EventsPage({
-  params: { environmentSlug },
+  params: { environmentSlug: envSlug },
 }: {
   params: { environmentSlug: string };
 }) {
   const newIANav = await getBooleanFlag('new-ia-nav');
+  const eventSearch = await getBooleanFlag('event-search');
 
   return (
     <>
       {newIANav ? (
-        <Header
-          breadcrumb={[{ text: 'Events', href: `/env/${environmentSlug}/events` }]}
-          infoIcon={<EventInfo />}
-          action={<SendEventButton newIANav={true} />}
-        />
+        <EventsHeader envSlug={envSlug} eventSearch={eventSearch} sendEvents={true} />
       ) : (
         <OldHeader
           title="Events"

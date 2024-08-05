@@ -1,6 +1,7 @@
 'use client';
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import type { Run } from '@inngest/components/RunsPage/types';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
@@ -43,6 +44,10 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   ref
 ) {
   const env = useEnvironment();
+  const pathName = usePathname();
+  //
+  // Don't do page level refresh on new runs section, it's a top nav action
+  const monitorRuns = pathName.includes(`/env/${env.slug}/runs`);
 
   const [{ data: pauseData }] = useQuery({
     pause: scope !== 'fn',
@@ -227,7 +232,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       isLoadingInitial={firstPageRes.fetching}
       isLoadingMore={nextPageRes.fetching}
       getRun={getRun}
-      onRefresh={onRefresh}
+      onRefresh={monitorRuns ? undefined : onRefresh}
       onScroll={fetchMoreOnScroll}
       onScrollToTop={onScrollToTop}
       getTraceResult={getTraceResult}

@@ -13,14 +13,10 @@ export default function SideBar({
   collapsed: serverCollapsed,
   activeEnv,
   profile,
-  isRunsEnabled,
 }: {
   collapsed: boolean;
   activeEnv?: Environment;
   profile: ProfileType;
-
-  // Feature flag
-  isRunsEnabled: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(serverCollapsed);
 
@@ -33,7 +29,7 @@ export default function SideBar({
     >
       <Logo collapsed={collapsed} setCollapsed={setCollapsed} />
       <div className="flex grow flex-col justify-between">
-        <Navigation collapsed={collapsed} activeEnv={activeEnv} isRunsEnabled={isRunsEnabled} />
+        <Navigation collapsed={collapsed} activeEnv={activeEnv} />
 
         <div>
           <Integrations collapsed={collapsed} />

@@ -305,6 +305,15 @@ export function RunsPage({
             setColumnVisibility={setColumnVisibility}
             options={options}
           />
+
+          {onRefresh && (
+            <Button
+              label="Refresh"
+              appearance="text"
+              btnAction={onRefresh}
+              icon={<RiLoopLeftLine />}
+            />
+          )}
         </div>
       </div>
       <RunsTable
