@@ -35,7 +35,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 )
 
-func NewService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher, stepLimitOverrides map[string]int, stateSizeLimitOverrides map[string]int, rc rueidis.Client, hw history.Driver) *devserver {
+func NewService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher, stepLimitOverrides map[string]int, stateSizeLimitOverrides map[string]int, rc rueidis.Client, hw history.Driver, persistenceInterval *time.Duration) *devserver {
 	return &devserver{
 		Data:                    data,
 		Runner:                  runner,
@@ -47,6 +47,7 @@ func NewService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubs
 		stateSizeLimitOverrides: stateSizeLimitOverrides,
 		redisClient:             rc,
 		historyWriter:           hw,
+		persistenceInterval:     persistenceInterval,
 	}
 }
 
@@ -82,7 +83,8 @@ type devserver struct {
 	handlerLock *sync.Mutex
 
 	// Used to lock the snapshotting process.
-	snapshotLock *sync.Mutex
+	snapshotLock        *sync.Mutex
+	persistenceInterval *time.Duration
 }
 
 func (devserver) Name() string {
@@ -102,6 +104,9 @@ func (d *devserver) Pre(ctx context.Context) error {
 }
 
 func (d *devserver) Run(ctx context.Context) error {
+	// Start persisting Redis data if we have an interval present.
+	go d.startPersistenceRoutine(ctx)
+
 	// Start polling the SDKs as the APIs are going live.
 	go d.pollSDKs(ctx)
 
@@ -144,6 +149,16 @@ func (d *devserver) Stop(ctx context.Context) error {
 	d.exportRedisSnapshot(ctx)
 
 	return nil
+}
+
+func (d *devserver) startPersistenceRoutine(ctx context.Context) {
+	if d.persistenceInterval == nil {
+		return
+	}
+
+	for range time.Tick(*d.persistenceInterval) {
+		_ = d.exportRedisSnapshot(ctx)
+	}
 }
 
 // runDiscovery attempts to run autodiscovery while the dev server is running.
