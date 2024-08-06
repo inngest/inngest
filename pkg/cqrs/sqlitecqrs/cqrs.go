@@ -1073,7 +1073,9 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			"source_id",
 			"trigger_ids",
 			"output",
+			"batch_id",
 			"is_debounce",
+			"cron_schedule",
 		).
 		Where(filter...).
 		Limit(opt.Items).
@@ -1103,7 +1105,9 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			&data.SourceID,
 			&data.TriggerIds,
 			&data.Output,
+			&data.BatchID,
 			&data.IsDebounce,
+			&data.CronSchedule,
 		)
 		if err != nil {
 			return nil, err
@@ -1136,31 +1140,34 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		if err != nil {
 			log.From(ctx).Error().Err(err).Interface("page_cursor", pc).Msg("error encoding cursor")
 		}
-
-		var (
-			isBatch bool
-		)
-
-		if data.BatchID != nilULID {
-			isBatch = true
+		var cron *string
+		if data.CronSchedule.Valid {
+			cron = &data.CronSchedule.String
+		}
+		var batchID *ulid.ULID
+		isBatch := data.BatchID != nilULID
+		if isBatch {
+			batchID = &data.BatchID
 		}
 
 		res = append(res, &cqrs.TraceRun{
-			AppID:      data.AppID,
-			FunctionID: data.FunctionID,
-			TraceID:    string(data.TraceID),
-			RunID:      data.RunID.String(),
-			QueuedAt:   time.UnixMilli(data.QueuedAt),
-			StartedAt:  time.UnixMilli(data.StartedAt),
-			EndedAt:    time.UnixMilli(data.EndedAt),
-			SourceID:   data.SourceID,
-			TriggerIDs: data.EventIDs(),
-			Triggers:   [][]byte{},
-			Output:     data.Output,
-			Status:     enums.RunCodeToStatus(data.Status),
-			IsBatch:    isBatch,
-			IsDebounce: data.IsDebounce,
-			Cursor:     cursor,
+			AppID:        data.AppID,
+			FunctionID:   data.FunctionID,
+			TraceID:      string(data.TraceID),
+			RunID:        data.RunID.String(),
+			QueuedAt:     time.UnixMilli(data.QueuedAt),
+			StartedAt:    time.UnixMilli(data.StartedAt),
+			EndedAt:      time.UnixMilli(data.EndedAt),
+			SourceID:     data.SourceID,
+			TriggerIDs:   data.EventIDs(),
+			Triggers:     [][]byte{},
+			Output:       data.Output,
+			Status:       enums.RunCodeToStatus(data.Status),
+			IsBatch:      isBatch,
+			BatchID:      batchID,
+			IsDebounce:   data.IsDebounce,
+			CronSchedule: cron,
+			Cursor:       cursor,
 		})
 	}
 

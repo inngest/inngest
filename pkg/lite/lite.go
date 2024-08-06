@@ -1,4 +1,4 @@
-package devserver
+package lite
 
 import (
 	"context"
@@ -15,13 +15,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/apiv1"
-	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs"
 	"github.com/inngest/inngest/pkg/deploy"
+	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
@@ -52,16 +52,12 @@ import (
 
 const defaultTick = time.Millisecond * 150
 
+var redisSingleton *miniredis.Miniredis
+
 // StartOpts configures the dev server
 type StartOpts struct {
-	Config        config.Config `json:"-"`
-	RootDir       string        `json:"dir"`
-	URLs          []string      `json:"urls"`
-	Autodiscover  bool          `json:"autodiscover"`
-	Poll          bool          `json:"poll"`
-	PollInterval  int           `json:"poll_interval"`
-	Tick          time.Duration `json:"tick"`
-	RetryInterval int           `json:"retry_interval"`
+	Config  config.Config `json:"-"`
+	RootDir string        `json:"dir"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -86,14 +82,12 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
-	db, err := sqlitecqrs.New(sqlitecqrs.SqliteCQRSOptions{InMemory: true})
+	db, err := sqlitecqrs.New(sqlitecqrs.SqliteCQRSOptions{InMemory: false})
 	if err != nil {
 		return err
 	}
 
-	if opts.Tick == 0 {
-		opts.Tick = defaultTick
-	}
+	tick := defaultTick
 
 	// Initialize the devserver
 	dbcqrs := sqlitecqrs.NewCQRS(db)
@@ -103,12 +97,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
 
-	shardedRc, err := createInmemoryRedis(ctx, opts.Tick)
+	shardedRc, err := createInmemoryRedisConnection(ctx)
 	if err != nil {
 		return err
 	}
 
-	unshardedRc, err := createInmemoryRedis(ctx, opts.Tick)
+	unshardedRc, err := createInmemoryRedisConnection(ctx)
 	if err != nil {
 		return err
 	}
@@ -138,7 +132,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	queueOpts := []redis_state.QueueOpt{
 		redis_state.WithIdempotencyTTL(time.Hour),
 		redis_state.WithNumWorkers(100),
-		redis_state.WithPollTick(opts.Tick),
+		redis_state.WithPollTick(tick),
 		redis_state.WithCustomConcurrencyKeyGenerator(func(ctx context.Context, i redis_state.QueueItem) []state.CustomConcurrency {
 			keys := i.Data.GetConcurrencyKeys()
 
@@ -196,11 +190,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			return p.Queue(), consts.DefaultConcurrencyLimit
 		}),
 	}
-	if opts.RetryInterval > 0 {
-		queueOpts = append(queueOpts, redis_state.WithBackoffFunc(
-			backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval)*time.Second),
-		))
-	}
+
 	rq := redis_state.NewQueue(unshardedClient.Queue(), queueOpts...)
 
 	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
@@ -224,7 +214,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create publisher: %w", err)
 	}
 
-	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
+	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: true})
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
@@ -242,7 +232,7 @@ func start(ctx context.Context, opts StartOpts) error {
 				hd,
 				hmw,
 			),
-			Lifecycle{
+			devserver.Lifecycle{
 				Cqrs:       dbcqrs,
 				Pb:         pb,
 				EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
@@ -300,7 +290,11 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	// The devserver embeds the event API.
-	ds := NewService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hmw, nil)
+	persistenceInterval := time.Second * 60
+	ds := devserver.NewService(devserver.StartOpts{
+		Config:  opts.Config,
+		RootDir: opts.RootDir,
+	}, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hmw, &persistenceInterval)
 	// embed the tracker
 	ds.Tracker = t
 	ds.State = sm
@@ -309,7 +303,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// start the API
 	// Create a new API endpoint which hosts SDK-related functionality for
 	// registering functions.
-	devAPI := NewDevAPI(ds)
+	devAPI := devserver.NewDevAPI(ds)
 
 	devAPI.Route("/v1", func(r chi.Router) {
 		// Add the V1 API to our dev server API.
@@ -358,29 +352,34 @@ func start(ctx context.Context, opts StartOpts) error {
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
 }
 
-func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, error) {
-	r := miniredis.NewMiniRedis()
-	_ = r.Start()
+// createInMemoryRedisConnection creates a new connection to the in-memory Redis
+// server. If the server is not yet running, it will start one.
+func createInmemoryRedisConnection(ctx context.Context) (rueidis.Client, error) {
+	if redisSingleton == nil {
+		redisSingleton = miniredis.NewMiniRedis()
+		err := redisSingleton.Start()
+		if err != nil {
+			return nil, fmt.Errorf("error starting in-memory redis: %w", err)
+		}
+
+		poll := time.Second
+		go func() {
+			for range time.Tick(poll) {
+				redisSingleton.FastForward(poll)
+			}
+		}()
+	}
+
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
+		InitAddress:       []string{redisSingleton.Addr()},
+		DisableCache:      true,
+		BlockingPoolSize:  1,
+		ForceSingleClient: true,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating in-memory redis client: %w", err)
 	}
 
-	// If tick is lower than 250ms, tick every 100ms.  This lets us save
-	// CPU for standard dev-server testing.
-	poll := time.Second
-	if tick < defaultTick {
-		poll = time.Millisecond * 50
-	}
-
-	go func() {
-		for range time.Tick(poll) {
-			r.FastForward(poll)
-		}
-	}()
 	return rc, nil
 }
 

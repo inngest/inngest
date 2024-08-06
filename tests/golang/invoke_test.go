@@ -69,49 +69,51 @@ func TestInvoke(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		<-time.After(3 * time.Second)
+		<-time.After(4 * time.Second)
 
-		require.Eventually(t, func() bool {
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			r := require.New(ct)
+
 			run := c.RunTraces(ctx, runID)
-			require.NotNil(t, run)
-			require.Equal(t, models.FunctionStatusCompleted.String(), run.Status)
-			require.NotNil(t, run.Trace)
-			require.Equal(t, 1, len(run.Trace.ChildSpans))
-			require.True(t, run.Trace.IsRoot)
-			require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
+			r.NotNil(run)
+			r.Equal(models.FunctionStatusCompleted.String(), run.Status)
+			r.NotNil(run.Trace)
+			r.Equal(1, len(run.Trace.ChildSpans))
+			r.True(run.Trace.IsRoot)
+			r.Equal(models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
 
 			// output test
-			require.NotNil(t, run.Trace.OutputID)
+			r.NotNil(run.Trace.OutputID)
 			output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
-			c.ExpectSpanOutput(t, "success", output)
+			c.ExpectSpanOutput(ct, "success", output)
 
 			rootSpanID := run.Trace.SpanID
 
 			t.Run("invoke", func(t *testing.T) {
+				as := assert.New(ct)
+
 				invoke := run.Trace.ChildSpans[0]
-				assert.Equal(t, "invoke", invoke.Name)
-				assert.Equal(t, 0, invoke.Attempts)
-				assert.Equal(t, 0, len(invoke.ChildSpans))
-				assert.False(t, invoke.IsRoot)
-				assert.Equal(t, rootSpanID, invoke.ParentSpanID)
-				assert.Equal(t, models.StepOpInvoke.String(), invoke.StepOp)
+				as.Equal("invoke", invoke.Name)
+				as.Equal(0, invoke.Attempts)
+				as.Equal(0, len(invoke.ChildSpans))
+				as.False(invoke.IsRoot)
+				as.Equal(rootSpanID, invoke.ParentSpanID)
+				as.Equal(models.StepOpInvoke.String(), invoke.StepOp)
 
 				// output test
-				assert.NotNil(t, invoke.OutputID)
+				as.NotNil(invoke.OutputID)
 				invokeOutput := c.RunSpanOutput(ctx, *invoke.OutputID)
-				c.ExpectSpanOutput(t, "invoked!", invokeOutput)
+				c.ExpectSpanOutput(ct, "invoked!", invokeOutput)
 
 				var stepInfo models.InvokeStepInfo
 				byt, err := json.Marshal(invoke.StepInfo)
-				assert.NoError(t, err)
-				assert.NoError(t, json.Unmarshal(byt, &stepInfo))
+				as.NoError(err)
+				as.NoError(json.Unmarshal(byt, &stepInfo))
 
-				assert.False(t, *stepInfo.TimedOut)
-				assert.NotNil(t, stepInfo.ReturnEventID)
-				assert.NotNil(t, stepInfo.RunID)
+				as.False(*stepInfo.TimedOut)
+				as.NotNil(stepInfo.ReturnEventID)
+				as.NotNil(stepInfo.RunID)
 			})
-
-			return true
 		}, 10*time.Second, 2*time.Second)
 	})
 }
@@ -176,88 +178,91 @@ func TestInvokeGroup(t *testing.T) {
 	t.Run("in progress", func(t *testing.T) {
 		<-time.After(3 * time.Second)
 
-		require.Eventually(t, func() bool {
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			r := require.New(ct)
+
 			run := c.RunTraces(ctx, runID)
-			require.Nil(t, run.EndedAt)
-			require.Nil(t, run.Trace.EndedAt)
-			require.NotNil(t, models.FunctionStatusRunning.String(), run.Status)
-			require.NotNil(t, run.Trace)
-			require.Equal(t, 1, len(run.Trace.ChildSpans))
-			require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
-			require.Nil(t, run.Trace.OutputID)
+			r.Nil(run.EndedAt)
+			r.Nil(run.Trace.EndedAt)
+			r.NotNil(models.FunctionStatusRunning.String(), run.Status)
+			r.NotNil(run.Trace)
+			r.Equal(1, len(run.Trace.ChildSpans))
+			r.Equal(models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
+			r.Nil(run.Trace.OutputID)
 
 			rootSpanID := run.Trace.SpanID
 
+			as := assert.New(ct)
+
 			span := run.Trace.ChildSpans[0]
-			assert.Equal(t, consts.OtelExecPlaceholder, span.Name)
-			assert.Equal(t, 0, span.Attempts)
-			assert.Equal(t, rootSpanID, span.ParentSpanID)
-			assert.False(t, span.IsRoot)
-			assert.Equal(t, 2, len(span.ChildSpans)) // include queued retry span
-			assert.Equal(t, models.RunTraceSpanStatusRunning.String(), span.Status)
-			assert.Equal(t, "", span.StepOp)
-			assert.Nil(t, span.OutputID)
+			as.Equal(consts.OtelExecPlaceholder, span.Name)
+			as.Equal(0, span.Attempts)
+			as.Equal(rootSpanID, span.ParentSpanID)
+			as.False(span.IsRoot)
+			as.Equal(2, len(span.ChildSpans)) // include queued retry span
+			as.Equal(models.RunTraceSpanStatusRunning.String(), span.Status)
+			as.Equal("", span.StepOp)
+			as.Nil(span.OutputID)
 
 			t.Run("failed", func(t *testing.T) {
 				exec := span.ChildSpans[0]
-				assert.Equal(t, "Attempt 0", exec.Name)
-				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), exec.Status)
-				assert.NotNil(t, exec.OutputID)
+				as.Equal("Attempt 0", exec.Name)
+				as.Equal(models.RunTraceSpanStatusFailed.String(), exec.Status)
+				as.NotNil(exec.OutputID)
 
 				execOutput := c.RunSpanOutput(ctx, *exec.OutputID)
-				assert.NotNil(t, execOutput)
-				c.ExpectSpanErrorOutput(t, "", "initial error", execOutput)
+				as.NotNil(t, execOutput)
+				c.ExpectSpanErrorOutput(ct, "", "initial error", execOutput)
 			})
-
-			return true
 		}, 10*time.Second, 2*time.Second)
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
 		<-time.After(3 * time.Second)
 
-		require.Eventually(t, func() bool {
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			r := require.New(ct)
+			as := assert.New(ct)
+
 			run := c.RunTraces(ctx, runID)
-			require.NotNil(t, run)
-			require.Equal(t, models.FunctionStatusCompleted.String(), run.Status)
-			require.NotNil(t, run.Trace)
-			require.Equal(t, 1, len(run.Trace.ChildSpans))
-			require.True(t, run.Trace.IsRoot)
-			require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
+			r.NotNil(run)
+			r.Equal(models.FunctionStatusCompleted.String(), run.Status)
+			r.NotNil(run.Trace)
+			r.Equal(1, len(run.Trace.ChildSpans))
+			r.True(run.Trace.IsRoot)
+			r.Equal(models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
 
 			// output test
-			require.NotNil(t, run.Trace.OutputID)
+			r.NotNil(run.Trace.OutputID)
 			output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
-			c.ExpectSpanOutput(t, "success", output)
+			c.ExpectSpanOutput(ct, "success", output)
 
 			rootSpanID := run.Trace.SpanID
 
 			t.Run("invoke", func(t *testing.T) {
 				invoke := run.Trace.ChildSpans[0]
-				assert.Equal(t, "invoke", invoke.Name)
-				assert.Equal(t, 0, invoke.Attempts)
-				assert.False(t, invoke.IsRoot)
-				assert.Equal(t, rootSpanID, invoke.ParentSpanID)
-				assert.Equal(t, 2, len(invoke.ChildSpans))
-				assert.Equal(t, models.StepOpInvoke.String(), invoke.StepOp)
-				assert.NotNil(t, invoke.EndedAt)
+				as.Equal("invoke", invoke.Name)
+				as.Equal(0, invoke.Attempts)
+				as.False(invoke.IsRoot)
+				as.Equal(rootSpanID, invoke.ParentSpanID)
+				as.Equal(2, len(invoke.ChildSpans))
+				as.Equal(models.StepOpInvoke.String(), invoke.StepOp)
+				as.NotNil(invoke.EndedAt)
 
 				// output test
-				assert.NotNil(t, invoke.OutputID)
+				as.NotNil(invoke.OutputID)
 				invokeOutput := c.RunSpanOutput(ctx, *invoke.OutputID)
-				c.ExpectSpanOutput(t, "invoked!", invokeOutput)
+				c.ExpectSpanOutput(ct, "invoked!", invokeOutput)
 
 				var stepInfo models.InvokeStepInfo
 				byt, err := json.Marshal(invoke.StepInfo)
-				assert.NoError(t, err)
-				assert.NoError(t, json.Unmarshal(byt, &stepInfo))
+				as.NoError(err)
+				as.NoError(json.Unmarshal(byt, &stepInfo))
 
-				assert.False(t, *stepInfo.TimedOut)
-				assert.NotNil(t, stepInfo.ReturnEventID)
-				assert.NotNil(t, stepInfo.RunID)
+				as.False(*stepInfo.TimedOut)
+				as.NotNil(stepInfo.ReturnEventID)
+				as.NotNil(stepInfo.RunID)
 			})
-
-			return true
 		}, 10*time.Second, 2*time.Second)
 	})
 }
