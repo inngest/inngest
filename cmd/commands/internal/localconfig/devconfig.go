@@ -1,4 +1,4 @@
-package devconfig
+package localconfig
 
 import (
 	"context"
@@ -13,8 +13,18 @@ import (
 	"github.com/spf13/viper"
 )
 
-func InitConfig(ctx context.Context, cmd *cobra.Command) error {
-	if err := mapFlags(cmd); err != nil {
+func InitDevConfig(ctx context.Context, cmd *cobra.Command) error {
+	if err := mapDevFlags(cmd); err != nil {
+		return err
+	}
+
+	loadConfigFile(ctx, cmd)
+
+	return nil
+}
+
+func InitLiteConfig(ctx context.Context, cmd *cobra.Command) error {
+	if err := mapLiteFlags(cmd); err != nil {
 		return err
 	}
 
@@ -70,8 +80,8 @@ func loadConfigFile(ctx context.Context, cmd *cobra.Command) {
 	}
 }
 
-// mapFlags binds the command line flags to the viper configuration
-func mapFlags(cmd *cobra.Command) error {
+// mapDevFlags binds the command line flags to the viper configuration
+func mapDevFlags(cmd *cobra.Command) error {
 	var err error
 	err = errors.Join(err, viper.BindPFlag("host", cmd.Flags().Lookup("host")))
 	err = errors.Join(err, viper.BindPFlag("no-discovery", cmd.Flags().Lookup("no-discovery")))
@@ -81,6 +91,15 @@ func mapFlags(cmd *cobra.Command) error {
 	err = errors.Join(err, viper.BindPFlag("retry-interval", cmd.Flags().Lookup("retry-interval")))
 	err = errors.Join(err, viper.BindPFlag("tick", cmd.Flags().Lookup("tick")))
 	err = errors.Join(err, viper.BindPFlag("urls", cmd.Flags().Lookup("sdk-url")))
+
+	return err
+}
+
+// mapLiteFlags binds the command line flags to the viper configuration
+func mapLiteFlags(cmd *cobra.Command) error {
+	var err error
+	err = errors.Join(err, viper.BindPFlag("host", cmd.Flags().Lookup("host")))
+	err = errors.Join(err, viper.BindPFlag("port", cmd.Flags().Lookup("port")))
 
 	return err
 }

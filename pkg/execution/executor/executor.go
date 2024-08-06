@@ -300,6 +300,21 @@ func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 	e.lifecycles = append(e.lifecycles, l)
 }
 
+func (e *executor) CloseLifecycleListeners(ctx context.Context) {
+	var eg errgroup.Group
+
+	for _, l := range e.lifecycles {
+		ll := l
+		eg.Go(func() error {
+			return ll.Close(ctx)
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		log.From(ctx).Error().Err(err).Msg("error closing lifecycle listeners")
+	}
+}
+
 func idempotencyKey(req execution.ScheduleRequest, runID ulid.ULID) string {
 	var key string
 	if req.IdempotencyKey != nil {

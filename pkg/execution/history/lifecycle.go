@@ -36,10 +36,10 @@ type lifecycle struct {
 	drivers []Driver
 }
 
-func (l lifecycle) Close() error {
+func (l lifecycle) Close(ctx context.Context) error {
 	var err error
 	for _, d := range l.drivers {
-		err = errors.Join(err, d.Close())
+		err = errors.Join(err, d.Close(ctx))
 	}
 	return err
 }
