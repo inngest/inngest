@@ -113,7 +113,7 @@ type Throttle struct {
 // SpanID generates a spanID based on the combination the jobID and attempt
 func (i Item) SpanID() (*trace.SpanID, error) {
 	if i.JobID == nil {
-		return nil, fmt.Errorf("not job ID for item")
+		return nil, fmt.Errorf("no job ID for item")
 	}
 
 	data := map[string]any{
