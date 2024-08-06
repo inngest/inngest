@@ -43,7 +43,7 @@ export default function Logo({ collapsed, setCollapsed }: LogoProps) {
   return (
     <div
       className={`mt-4 flex h-[28px] w-full flex-row items-center ${
-        collapsed ? 'justify-center' : 'ml-5 justify-start'
+        collapsed ? 'justify-center' : 'ml-4 justify-start'
       }`}
     >
       <div className={`flex flex-row items-center justify-start ${collapsed ? '' : 'mr-2'} `}>

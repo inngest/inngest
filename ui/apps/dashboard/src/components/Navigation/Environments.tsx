@@ -60,7 +60,7 @@ const useSwitchablePathname = (): string => {
 const selectedName = (name: string, collapsed: boolean) => {
   switch (name) {
     case 'Production':
-      return collapsed ? 'PR' : name;
+      return collapsed ? 'PR' : 'name';
     case 'Branch Environments':
       return collapsed ? 'BE' : name;
     default:
@@ -75,9 +75,9 @@ const SelectedDisplay = ({
   selected: Environment | null;
   collapsed: boolean;
 }) => (
-  <span className="flex min-w-0 flex-row items-center truncate">
+  <span className={`flex  flex-row items-center ${collapsed ? '' : 'min-w-0 truncate'}`}>
     {selected ? (
-      <span className="block truncate">
+      <span className="block">
         {selected.type === EnvironmentType.BranchParent
           ? selectedName('Branch Environments', collapsed)
           : selectedName(selected.name, collapsed)}
@@ -85,7 +85,7 @@ const SelectedDisplay = ({
     ) : (
       <>
         {!collapsed && <RiCloudLine className="mr-2 h-4 w-4" />}
-        <span className="block truncate">{selectedName('All Environments', collapsed)}</span>
+        <span className="block">{selectedName('All Environments', collapsed)}</span>
       </>
     )}
   </span>

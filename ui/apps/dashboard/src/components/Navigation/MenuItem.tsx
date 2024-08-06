@@ -22,10 +22,10 @@ export const MenuItem = ({
   comingSoon?: boolean;
 }) => {
   const pathname = usePathname();
-  const active = href && pathname.startsWith(href);
+  const active = href && pathname?.startsWith(href);
 
   return (
-    <OptionalLink href={comingSoon ? '' : href} prefetch={prefetch}>
+    <OptionalLink href={comingSoon ? '' : href} prefetch={false}>
       <OptionalTooltip tooltip={comingSoon ? 'Coming soon...' : collapsed ? text : ''}>
         <div
           className={`m-1 flex h-8 flex-row items-center rounded px-1.5 ${
