@@ -60,7 +60,7 @@ const useSwitchablePathname = (): string => {
 const selectedName = (name: string, collapsed: boolean) => {
   switch (name) {
     case 'Production':
-      return collapsed ? 'PR' : 'name';
+      return collapsed ? 'PR' : name;
     case 'Branch Environments':
       return collapsed ? 'BE' : name;
     default:
