@@ -22,7 +22,7 @@ export const MenuItem = ({
   comingSoon?: boolean;
 }) => {
   const pathname = usePathname();
-  const active = href && pathname?.startsWith(href);
+  const active = href && pathname.startsWith(href);
 
   return (
     <OptionalLink href={comingSoon ? '' : href} prefetch={prefetch}>
