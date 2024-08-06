@@ -37,7 +37,7 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
 export default function Logo({ collapsed, setCollapsed }: LogoProps) {
   return (
     <div
-      className={`mt-5 flex h-10 w-full flex-row items-center ${
+      className={`mt-4 flex w-full flex-row items-center ${
         collapsed ? 'justify-center' : 'ml-5 justify-start'
       }`}
     >

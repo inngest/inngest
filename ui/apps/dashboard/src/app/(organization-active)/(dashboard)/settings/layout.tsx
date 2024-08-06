@@ -4,6 +4,7 @@ import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import Header from '@/components/Header/old/Header';
 import Layout from '@/components/Layout/Layout';
 import AppNavigation from '@/components/Navigation/old/AppNavigation';
+import { SettingsHeader } from '@/components/Settings/Header';
 import Toaster from '@/components/Toaster';
 
 type SettingsLayoutProps = {
@@ -33,11 +34,7 @@ export default async function SettingsLayout({ children }: SettingsLayoutProps) 
 
   return newIANav ? (
     <Layout>
-      <Header
-        title="Settings"
-        links={navLinks}
-        icon={<RiSettings3Line className="w-4 text-white" />}
-      />
+      <SettingsHeader />
       <div className="px-6">{children}</div>
       <Toaster />
     </Layout>

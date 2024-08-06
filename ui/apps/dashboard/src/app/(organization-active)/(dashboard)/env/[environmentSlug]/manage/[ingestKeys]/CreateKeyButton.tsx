@@ -3,14 +3,16 @@
 import { useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
+import { Button, NewButton } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
 import { RiAddLine } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import Input from '@/components/Forms/Input';
+import { OptionalTooltip } from '@/components/Navigation/OptionalTooltip';
 import { graphql } from '@/gql';
 import { defaultTransform } from './[keyID]/TransformEvent';
 import useManagePageTerminology from './useManagePageTerminology';
@@ -30,6 +32,7 @@ export default function CreateKeyButton() {
   const environment = useEnvironment();
   const [{ fetching }, createSourceKey] = useMutation(CreateSourceKey);
   const router = useRouter();
+  const { value: newIANav } = useBooleanFlag('new-ia-nav');
 
   if (!currentContent) {
     return null;
@@ -75,13 +78,28 @@ export default function CreateKeyButton() {
 
   return (
     <>
-      <Button
-        icon={<RiAddLine />}
-        btnAction={() => setModalOpen(true)}
-        disabled={!currentContent}
-        kind="primary"
-        label={`Create ${currentContent.name}`}
-      />
+      <OptionalTooltip
+        tooltip={environment.isArchived && 'Cannot create key. Environment is archived'}
+      >
+        {newIANav ? (
+          <NewButton
+            icon={<RiAddLine />}
+            onClick={() => setModalOpen(true)}
+            disabled={environment.isArchived}
+            kind="primary"
+            label={`Create ${currentContent.name}`}
+          />
+        ) : (
+          <Button
+            icon={<RiAddLine />}
+            btnAction={() => setModalOpen(true)}
+            disabled={environment.isArchived}
+            kind="primary"
+            label={`Create ${currentContent.name}`}
+          />
+        )}
+      </OptionalTooltip>
+
       <Modal
         isOpen={isModalOpen}
         className={'w-1/4'}
