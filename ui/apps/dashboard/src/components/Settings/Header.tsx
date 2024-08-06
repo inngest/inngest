@@ -10,7 +10,7 @@ import { Header, type BreadCrumbType } from '@/components/Header/Header';
 const paths: [string, string][] = [
   ['/integrations', 'Integrations'],
   ['/billing', 'Billing'],
-  ['/organization-settings', 'Oragnization'],
+  ['/organization-settings', 'Organization'],
   ['/organization', 'Members'],
   ['/user', 'Your profile'],
 ];
@@ -18,11 +18,7 @@ const paths: [string, string][] = [
 const defined = <T,>(value: T | undefined): value is T => value !== undefined;
 
 const getBreadCrumbs = (pathname: string): BreadCrumbType[] =>
-  paths
-    .map(([path, text]) =>
-      pathname.endsWith(path) ? { text, href: `/settings${path}` } : undefined
-    )
-    .filter(defined);
+  paths.map(([path, text]) => (pathname.endsWith(path) ? { text } : undefined)).filter(defined);
 
 export const SettingsHeader = () => {
   const pathname = usePathname();
