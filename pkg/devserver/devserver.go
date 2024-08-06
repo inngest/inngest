@@ -41,6 +41,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
+	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
@@ -246,10 +247,7 @@ func start(ctx context.Context, opts StartOpts) error {
 				Pb:         pb,
 				EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
 			},
-			executor.NewTraceRunLifecycleListener(
-				nil,
-				smv2,
-			),
+			run.NewTraceLifecycleListener(nil),
 		),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {

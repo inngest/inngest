@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
@@ -23,6 +24,7 @@ func (l Lifecycle) OnFunctionScheduled(
 	ctx context.Context,
 	md state.Metadata,
 	item queue.Item,
+	_ []event.TrackedEvent,
 ) {
 	_ = l.Cqrs.InsertFunctionRun(ctx, cqrs.FunctionRun{
 		RunID:         md.ID.RunID,

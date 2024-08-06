@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -53,6 +54,7 @@ func (l lifecycle) OnFunctionScheduled(
 	ctx context.Context,
 	md sv2.Metadata,
 	item queue.Item,
+	_ []event.TrackedEvent,
 ) {
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
@@ -95,6 +97,7 @@ func (l lifecycle) OnFunctionStarted(
 	ctx context.Context,
 	md sv2.Metadata,
 	item queue.Item,
+	_ []json.RawMessage,
 ) {
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
@@ -168,6 +171,7 @@ func (l lifecycle) OnFunctionFinished(
 	ctx context.Context,
 	md sv2.Metadata,
 	item queue.Item,
+	_ []json.RawMessage,
 	resp state.DriverResponse,
 ) {
 	groupID, err := toUUID(item.GroupID)
@@ -355,9 +359,14 @@ func (l lifecycle) OnStepFinished(
 	md sv2.Metadata,
 	item queue.Item,
 	edge inngest.Edge,
-	step inngest.Step,
-	resp state.DriverResponse,
+	resp *state.DriverResponse,
+	runErr error,
 ) {
+	// TODO: should this be handled differently?
+	if runErr != nil {
+		return
+	}
+
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
 		l.log.Error(
@@ -383,11 +392,11 @@ func (l lifecycle) OnStepFinished(
 		EventID:         md.Config.EventID(),
 		StepName:        &resp.Step.Name,
 		StepID:          &edge.Incoming,
-		URL:             &step.URI,
+		URL:             &resp.Step.URI,
 		BatchID:         md.Config.BatchID,
 	}
 
-	err = applyResponse(&h, &resp)
+	err = applyResponse(&h, resp)
 	if err != nil {
 		// Swallow error and log, since we don't want a response parsing error
 		// to fail history writing.
@@ -443,6 +452,7 @@ func (l lifecycle) OnWaitForEvent(
 	md sv2.Metadata,
 	item queue.Item,
 	op state.GeneratorOpcode,
+	_ state.Pause,
 ) {
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
@@ -492,10 +502,11 @@ func (l lifecycle) OnWaitForEvent(
 func (l lifecycle) OnWaitForEventResumed(
 	ctx context.Context,
 	md sv2.Metadata,
+	pause state.Pause,
 	req execution.ResumeRequest,
-	groupID string,
 ) {
 	var groupIDUUID *uuid.UUID
+	groupID := pause.GroupID
 	if groupID != "" {
 		val, err := toUUID(groupID)
 		if err != nil {
@@ -546,9 +557,16 @@ func (l lifecycle) OnInvokeFunction(
 	md sv2.Metadata,
 	item queue.Item,
 	op state.GeneratorOpcode,
-	eventID ulid.ULID,
-	corrID string,
+	invocationEvt event.Event,
 ) {
+	eventID := ulid.MustParse(invocationEvt.ID)
+	meta := invocationEvt.InngestMetadata()
+	if meta == nil {
+		// TODO: log warning here?
+		return
+	}
+	corrID := meta.InvokeCorrelationId
+
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
 		l.log.Error(
@@ -624,10 +642,11 @@ func (l lifecycle) OnInvokeFunction(
 func (l lifecycle) OnInvokeFunctionResumed(
 	ctx context.Context,
 	md sv2.Metadata,
+	pause state.Pause,
 	req execution.ResumeRequest,
-	groupID string,
 ) {
 	var groupIDUUID *uuid.UUID
+	groupID := pause.GroupID
 	if groupID != "" {
 		val, err := toUUID(groupID)
 		if err != nil {

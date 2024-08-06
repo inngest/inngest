@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -14,6 +16,7 @@ const (
 	cronScheduleKey = "__cron"
 	fnslugKey       = "__fnslug"
 	traceLinkKey    = "__tracelink"
+	debounceKey     = "__debounce"
 )
 
 type ID struct {
@@ -121,6 +124,14 @@ func (c *Config) EventID() ulid.ULID {
 }
 
 func (c *Config) GetSpanID() (*trace.SpanID, error) {
+	fnTrace := c.FunctionTrace()
+	if fnTrace != nil {
+		if sid := fnTrace.SpanID(); sid.IsValid() {
+			return &sid, nil
+		}
+	}
+
+	// keep this around for backward compatibility purposes
 	if c.SpanID != "" {
 		sid, err := trace.SpanIDFromHex(c.SpanID)
 		return &sid, err
@@ -190,6 +201,57 @@ func (c *Config) TraceLink() *string {
 		}
 	}
 
+	return nil
+}
+
+func (c *Config) SetDebounceFlag(flag bool) {
+	if c.Context == nil {
+		c.Context = map[string]any{}
+	}
+	c.Context[debounceKey] = flag
+}
+
+func (c *Config) DebounceFlag() bool {
+	if c.Context == nil {
+		return false
+	}
+
+	if v, ok := c.Context[debounceKey]; ok {
+		if flag, ok := v.(bool); ok {
+			return flag
+		}
+	}
+
+	return false
+}
+
+func (c *Config) SetFunctionTrace(carrier *telemetry.TraceCarrier) {
+	if c.Context == nil {
+		c.Context = map[string]any{}
+	}
+	c.Context[consts.OtelPropagationKey] = carrier
+}
+
+func (c *Config) FunctionTrace() *telemetry.TraceCarrier {
+	if c.Context == nil {
+		return nil
+	}
+
+	if data, ok := c.Context[consts.OtelPropagationKey]; ok {
+		switch v := data.(type) {
+		case *telemetry.TraceCarrier:
+			return v
+		default:
+			carrier := telemetry.NewTraceCarrier()
+			if err := carrier.Unmarshal(data); err == nil {
+				// reassign it so it doesn't need to do the decoding again
+				c.Context[consts.OtelPropagationKey] = carrier
+				return carrier
+			}
+
+		}
+
+	}
 	return nil
 }
 
