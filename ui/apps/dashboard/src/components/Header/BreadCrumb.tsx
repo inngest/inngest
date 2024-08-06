@@ -11,8 +11,8 @@ export const BreadCrumb = ({ path }: { path: BreadCrumbType[] }) => {
         <OptionalLink href={part.href}>
           <span
             className={`${
-              last ? 'text-basis' : 'text-subtle'
-            } hover:bg-canvasSubtle mr-2 rounded p-1 text-sm`}
+              last ? 'text-basis' : 'text-subtle hover:bg-canvasSubtle'
+            } mr-2 rounded p-1 text-sm`}
           >
             {part.text}
           </span>

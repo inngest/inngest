@@ -48,7 +48,7 @@ export default async function AppsPage({
   return (
     <>
       <Header
-        breadcrumb={[{ text: 'Apps', href: `/env/${envSlug}/apps}` }]}
+        breadcrumb={[{ text: 'Apps' }]}
         infoIcon={<AppInfo />}
         action={
           !isArchived && (
