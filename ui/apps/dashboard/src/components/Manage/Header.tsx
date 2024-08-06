@@ -8,7 +8,7 @@ import { EventKeyInfo } from './EventKeyInfo';
 import { SigningKeyInfo } from './SigningKeyInfo';
 import { WebhookInfo } from './WebhookInfo';
 
-export const ManageHeader = ({ envSlug }: { envSlug: string }) => {
+export const ManageHeader = () => {
   const pathname = usePathname();
 
   return (

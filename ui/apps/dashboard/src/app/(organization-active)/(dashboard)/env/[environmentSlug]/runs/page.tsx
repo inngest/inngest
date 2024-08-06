@@ -8,13 +8,7 @@ import { Header } from '@/components/Header/Header';
 import { Runs } from '@/components/Runs';
 import type { RefreshRunsRef } from '@/components/Runs/Runs';
 
-type RunsProps = {
-  params: {
-    environmentSlug: string;
-  };
-};
-
-export default function Page({ params: { environmentSlug: envSlug } }: RunsProps) {
+export default function Page() {
   const ref = useRef<RefreshRunsRef>(null);
   return (
     <>
