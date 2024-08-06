@@ -18,7 +18,9 @@ const paths: [string, string][] = [
 const defined = <T,>(value: T | undefined): value is T => value !== undefined;
 
 const getBreadCrumbs = (pathname: string): BreadCrumbType[] =>
-  paths.map(([path, text]) => (pathname.endsWith(path) ? { text } : undefined)).filter(defined);
+  pathname.includes('integrations/vercel')
+    ? [{ text: 'Integrations', href: `/settings/integrations` }, { text: 'Vercel' }]
+    : paths.map(([path, text]) => (pathname.endsWith(path) ? { text } : undefined)).filter(defined);
 
 export const SettingsHeader = () => {
   const pathname = usePathname();

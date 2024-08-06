@@ -75,7 +75,7 @@ const SelectedDisplay = ({
   selected: Environment | null;
   collapsed: boolean;
 }) => (
-  <span className="flex flex-row items-center ">
+  <span className="flex min-w-0 flex-row items-center truncate">
     {selected ? (
       <span className="block truncate">
         {selected.type === EnvironmentType.BranchParent
