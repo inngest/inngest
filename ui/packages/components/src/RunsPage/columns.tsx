@@ -66,10 +66,10 @@ const columns = [
         return <TextCell>Batch</TextCell>;
       }
       if (data.cronSchedule) {
-        return <IDCell>data.cronSchedule</IDCell>;
+        return <IDCell>{data.cronSchedule}</IDCell>;
       }
       if (data.eventName) {
-        return <TextCell>data.eventName</TextCell>;
+        return <TextCell>{data.eventName}</TextCell>;
       }
 
       // Unreachable
