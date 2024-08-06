@@ -72,10 +72,11 @@ export default function NewLayout({ children, params: { externalID } }: Props) {
       <Header
         breadcrumb={[
           { text: 'Apps', href: `/env/${env.slug}/apps` },
-          { text: res.data?.name || '', href: `/env/${env.slug}/apps/${externalID}` },
-          ...(pathname.endsWith('/syncs')
-            ? [{ text: 'All syncs', href: `/env/${env.slug}/apps/${externalID}/syncs` }]
-            : []),
+          {
+            text: res.data?.name || '',
+            href: pathname.endsWith('/syncs') ? `/env/${env.slug}/apps/${externalID}` : '',
+          },
+          ...(pathname.endsWith('/syncs') ? [{ text: 'All syncs' }] : []),
         ]}
         action={
           <div className="flex flex-row items-center justify-end gap-x-1">

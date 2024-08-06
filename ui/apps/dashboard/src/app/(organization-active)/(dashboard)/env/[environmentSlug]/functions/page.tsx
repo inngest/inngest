@@ -23,10 +23,7 @@ export default async function FunctionPage({
   return (
     <>
       {newIANav ? (
-        <Header
-          breadcrumb={[{ text: 'Functions', href: `/env/${environmentSlug}/functions` }]}
-          infoIcon={<FunctionInfo />}
-        />
+        <Header breadcrumb={[{ text: 'Functions' }]} infoIcon={<FunctionInfo />} />
       ) : (
         <FunctionsHeader />
       )}

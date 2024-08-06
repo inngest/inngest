@@ -19,7 +19,7 @@ export default function Page({ params: { environmentSlug: envSlug } }: RunsProps
   return (
     <>
       <Header
-        breadcrumb={[{ text: 'Runs', href: `/env/${envSlug}/runs` }]}
+        breadcrumb={[{ text: 'Runs' }]}
         action={
           <NewButton
             kind="primary"

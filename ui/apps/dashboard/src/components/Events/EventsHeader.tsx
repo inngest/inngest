@@ -14,7 +14,7 @@ export const EventsHeader = ({
   sendEvents?: boolean;
 }) => (
   <Header
-    breadcrumb={[{ text: 'Events', href: `/env/${envSlug}/events` }]}
+    breadcrumb={[{ text: 'Events' }]}
     infoIcon={<EventInfo />}
     action={sendEvents && <SendEventButton newIANav={true} />}
     tabs={[
